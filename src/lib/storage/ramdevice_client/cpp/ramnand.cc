@@ -45,7 +45,7 @@ zx_status_t WaitForFile(const fbl::unique_fd& dir, const char* file, fbl::unique
   if (status != ZX_ERR_STOP) {
     return status;
   }
-  out->reset(openat(dir.get(), file, O_RDWR));
+  out->reset(openat(dir.get(), file, O_RDONLY));
   if (!out->is_valid()) {
     return ZX_ERR_IO;
   }
