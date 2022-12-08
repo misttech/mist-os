@@ -11,12 +11,12 @@
     ],
     offer: [
         {
-            directory: "dev",
+            directory: "dev-class",
             from: "parent",
             as: "dev-class-bluetooth",
             to: "#bt-fct-hci",
             rights: [ "rw*" ],
-            subdir: "class/bt-hci",
+            subdir: "bt-hci",
         },
     ],
 }

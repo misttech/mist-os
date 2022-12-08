@@ -460,15 +460,15 @@ require directory access.
 Test Runner Framework only allows the following device directories to be used by
 non-hermetic tests:
 
-Capability                   | Description
----------------------------- | -----------------------------
-`dev-input`                  | Input
-`dev-input-report`           | Input method events
-`dev-display-controller`     | Graphical display controller
-`dev-goldfish-address-space` | Goldfish address space device
-`dev-goldfish-control`       | Goldfish control device
-`dev-goldfish-pipe`          | Goldfish pipe device
-`dev-gpu`                    | GPU device
+Capability                     | Description
+------------------------------ | -----------------------------
+`dev-input`                    | Input
+`dev-input-report`             | Input method events
+`dev-display-controller`       | Graphical display controller
+`dev-goldfish-address-space`   | Goldfish address space device
+`dev-goldfish-control`         | Goldfish control device
+`dev-goldfish-pipe`            | Goldfish pipe device
+`dev-gpu`                      | GPU device
 `dev-gpu-performance-counters` | GPU performance counters device
 
 Following the example in [Test uses injected services][migrate-tests-inject],
