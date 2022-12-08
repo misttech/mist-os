@@ -1150,9 +1150,9 @@ From [//third_party/crashpad/build/crashpad_buildconfig.gni:22](https://fuchsia.
 
 ### crashpad_http_transport_impl
 
-**Current value (from the default):** `"libcurl"`
+**Current value (from the default):** `"socket"`
 
-From [//third_party/crashpad/util/net/tls.gni:21](https://fuchsia.googlesource.com/third_party/crashpad/+/5d8e9274ea8927a7624cf3ed89177aa9bd9153e7/util/net/tls.gni#21)
+From [//third_party/crashpad/util/net/tls.gni:19](https://fuchsia.googlesource.com/third_party/crashpad/+/5d8e9274ea8927a7624cf3ed89177aa9bd9153e7/util/net/tls.gni#19)
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
@@ -2476,7 +2476,7 @@ From [//third_party/perfetto/gn/perfetto.gni:193](https://fuchsia.googlesource.c
 
 ### enable_perfetto_ipc
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From [//third_party/perfetto/gn/perfetto.gni:150](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/0394aac114025be620cf8f3dd9e725a388b6f5f4/gn/perfetto.gni#150)
 
@@ -2510,7 +2510,7 @@ From [//third_party/perfetto/gn/perfetto.gni:235](https://fuchsia.googlesource.c
 
 ### enable_perfetto_system_consumer
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From [//third_party/perfetto/gn/perfetto.gni:251](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/0394aac114025be620cf8f3dd9e725a388b6f5f4/gn/perfetto.gni#251)
 
@@ -2834,6 +2834,12 @@ From //src/storage/fshost/generated_fshost_config.gni:31
 **Current value (from the default):** `""`
 
 From //build/images/args.gni:118
+
+### ffmpeg_profile
+
+**Current value (from the default):** `"max"`
+
+From //src/media/lib/ffmpeg/BUILD.gn:55
 
 ### fidl_trace_level
 0 = Disable FIDL userspace tracing (default).
@@ -3396,7 +3402,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -7191,7 +7197,7 @@ From //build/security.gni:228
 ### thinlto_cache_dir
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"dartlang/thinlto-cache"`
+**Current value (from the default):** `"thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -7492,7 +7498,7 @@ VkInstances or VkDevice will fail.
 This argument will affect all vulkan_{executable/test} build targets.
 
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/lib/vulkan/build/config.gni:40
 
@@ -7523,19 +7529,22 @@ requires:
 ```
 jiri import -name third_party/ffmpeg -revision HEAD third_party/ffmpeg http://fuchsia.googlesource.com/integration
 ```
+TODO(fxbug.dev/116951): This isn't currently working. Use the method below.
 
 Or, if already importing a different manifest from there, resulting in
 errors from jiri update, it can work to just git clone (but jiri update
 won't manage third_party/ffmpeg in this case):
 
 ```
-mkdir third_party/ffmpeg
-git clone "https://fuchsia.googlesource.com/third_party/ffmpeg" third_party/ffmpeg
+mkdir build/secondary/third_party/ffmpeg
+git clone https://fuchsia.googlesource.com/third_party/ffmpeg build/secondary/third_party/ffmpeg
+mkdir third_party/ffmpeg/src
+git clone https://chromium.googlesource.com/chromium/third_party/ffmpeg third_party/ffmpeg/src
 ```
 
 **Current value (from the default):** `true`
 
-From //src/media/lib/ffmpeg/BUILD.gn:28
+From //src/media/lib/ffmpeg/BUILD.gn:31
 
 ### use_scene_manager_as_scene_owner
 If true, use scene_manager as the scene owner component (via ui.cml).
