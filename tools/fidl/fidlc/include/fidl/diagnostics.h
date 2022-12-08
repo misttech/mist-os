@@ -396,7 +396,7 @@ constexpr ErrorDef<168, flat::Name> ErrProtocolConstraintRequired(
 // optionality of boxes may be confusing
 constexpr ErrorDef<169> ErrBoxCannotBeOptional(
     "cannot specify optionality for box, boxes are optional by default");
-constexpr UndocumentedErrorDef<170> ErrBoxedTypeCannotBeOptional(
+constexpr ErrorDef<170> ErrBoxedTypeCannotBeOptional(
     "no double optionality, boxes are already optional");
 constexpr UndocumentedErrorDef<171, flat::Name> ErrCannotBeBoxed(
     "type {} cannot be boxed, try using optional instead");
