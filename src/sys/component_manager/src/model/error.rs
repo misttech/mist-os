@@ -13,7 +13,7 @@ use {
     anyhow::Error,
     clonable_error::ClonableError,
     cm_runner::RunnerError,
-    fuchsia_inspect, fuchsia_zircon as zx,
+    fuchsia_zircon as zx,
     moniker::{AbsoluteMoniker, ChildMoniker, MonikerError},
     std::{ffi::OsString, path::PathBuf},
     thiserror::Error,
@@ -57,14 +57,14 @@ pub enum ModelError {
     },
     #[error("{} is not supported", feature)]
     Unsupported { feature: String },
-    #[error("package URL missing")]
-    PackageUrlMissing,
     #[error("package directory handle missing")]
     PackageDirectoryMissing,
+    // TODO(https://fxbug.dev/117080): Remove this error by using the `camino` library
     #[error("path is not utf-8: {:?}", path)]
     PathIsNotUtf8 { path: PathBuf },
     #[error("path is not valid: {:?}", path)]
     PathInvalid { path: String },
+    // TODO(https://fxbug.dev/117080): Remove this error by using the `camino` library
     #[error("filename is not utf-8: {:?}", name)]
     NameIsNotUtf8 { name: OsString },
     #[error("Moniker error: {}", err)]
@@ -79,11 +79,6 @@ pub enum ModelError {
         url: String,
         #[source]
         err: cm_rust::Error,
-    },
-    #[error("invalid state transition: {}", err)]
-    InvalidComponentStateTransition {
-        #[source]
-        err: ClonableError,
     },
     #[error("The model is not available")]
     ModelNotAvailable,
@@ -128,26 +123,17 @@ pub enum ModelError {
         #[from]
         err: ComponentInstanceError,
     },
-    #[error(
-        "Component {} is trying to use a storage capability which is restricted to the component ID index.",
-        moniker
-    )]
-    ComponentNotInIdIndex { moniker: AbsoluteMoniker },
     #[error("failed to add entry {} to {}", entry_name, moniker)]
     AddEntryError { moniker: AbsoluteMoniker, entry_name: String },
     #[error("failed to remove entry {}", entry_name)]
     RemoveEntryError { entry_name: String },
     #[error("failed to open directory '{}' for component '{}'", relative_path, moniker)]
     OpenDirectoryError { moniker: AbsoluteMoniker, relative_path: String },
-    #[error("failed to clone node '{}' for '{}'", relative_path, moniker)]
-    CloneNodeError { moniker: AbsoluteMoniker, relative_path: String },
     #[error("failed to create stream from channel")]
     StreamCreationError {
         #[source]
         err: ClonableError,
     },
-    #[error("insufficient resources to complete operation")]
-    InsufficientResources,
     #[error("failed to send {} to runner for component {}", operation, moniker)]
     RunnerCommunicationError {
         moniker: AbsoluteMoniker,
@@ -165,11 +151,6 @@ pub enum ModelError {
         #[from]
         err: PolicyError,
     },
-    #[error("inspect error: {}", err)]
-    Inspect {
-        #[from]
-        err: fuchsia_inspect::Error,
-    },
     #[error("component id index error: {}", err)]
     ComponentIdIndexError {
         #[from]
@@ -179,14 +160,10 @@ pub enum ModelError {
     ConfigValuesMissing,
     #[error("failed to resolve component's config: {_0}")]
     ConfigResolutionFailed(#[source] config_encoder::ResolutionError),
-    #[error("failed to encode config wrapper into persistent FIDL: {_0}")]
-    ConfigWrapperEncodingFailed(#[source] fidl::Error),
     #[error("couldn't create vmo: {_0}")]
     VmoCreateFailed(#[source] zx::Status),
     #[error("couldn't write to vmo: {_0}")]
     VmoWriteFailed(#[source] zx::Status),
-    #[error("couldn't create eventpair: {_0}")]
-    EventPairCreateFailed(#[source] zx::Status),
 }
 
 impl ModelError {
@@ -257,10 +234,6 @@ impl ModelError {
         ModelError::RebootFailed { err: err.into().into() }
     }
 
-    pub fn invalid_component_state_transition(err: impl Into<Error>) -> ModelError {
-        ModelError::InvalidComponentStateTransition { err: err.into().into() }
-    }
-
     pub fn component_decl_invalid(url: impl Into<String>, err: cm_rust::Error) -> ModelError {
         ModelError::ComponentDeclInvalid { url: url.into(), err }
     }
@@ -282,13 +255,6 @@ impl ModelError {
         relative_path: impl Into<String>,
     ) -> ModelError {
         ModelError::OpenDirectoryError { moniker, relative_path: relative_path.into() }
-    }
-
-    pub fn clone_node_error(
-        moniker: AbsoluteMoniker,
-        relative_path: impl Into<String>,
-    ) -> ModelError {
-        ModelError::CloneNodeError { moniker, relative_path: relative_path.into() }
     }
 
     pub fn stream_creation_error(err: impl Into<Error>) -> ModelError {

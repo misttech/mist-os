@@ -279,8 +279,7 @@ impl CapabilityProvider for FilteredServiceProvider {
 
         // create a remote directory referring to the unfiltered source service directory.
         let (source_service_proxy, source_service_server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                .map_err(|e| ModelError::stream_creation_error(e))?;
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         self.source_service_provider
             .open(
                 task_scope,

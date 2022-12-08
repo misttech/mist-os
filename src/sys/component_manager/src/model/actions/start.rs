@@ -282,8 +282,7 @@ async fn make_execution_runtime(
         start_reason,
     )?;
     let numbered_handles = component.numbered_handles.lock().await.take();
-    let (break_on_start_left, break_on_start_right) =
-        zx::EventPair::create().map_err(ModelError::EventPairCreateFailed)?;
+    let (break_on_start_left, break_on_start_right) = zx::EventPair::create().unwrap();
     let start_info = fcrunner::ComponentStartInfo {
         resolved_url: Some(url),
         program: decl.program.as_ref().map(|p| p.info.clone()),

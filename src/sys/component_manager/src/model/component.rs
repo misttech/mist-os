@@ -653,8 +653,7 @@ impl ComponentInstance {
             if let Some(runner) = decl.get_runner() {
                 // Open up a channel to the runner.
                 let (client_channel, server_channel) =
-                    endpoints::create_endpoints::<fcrunner::ComponentRunnerMarker>()
-                        .map_err(|_| ModelError::InsufficientResources)?;
+                    endpoints::create_endpoints::<fcrunner::ComponentRunnerMarker>().unwrap();
                 let mut server_channel = server_channel.into_channel();
                 let options = OpenRunnerOptions {
                     flags: fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
