@@ -4,11 +4,13 @@
 
 #include <fcntl.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <getopt.h>
 #include <inttypes.h>
 #include <lib/fdio/cpp/caller.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <zircon/status.h>
 
 #include <utility>
@@ -64,7 +66,16 @@ bool GetOptions(int argc, char** argv, fbl::unique_fd& fd, std::optional<fvm::Ch
     }
     fdio_cpp::UnownedFdioCaller caller(fd);
 
-    checker.emplace(caller.borrow_as<fuchsia_hardware_block::Block>(), block_size, silent);
+    struct stat st;
+    if (fstat(fd.get(), &st)) {
+      fprintf(stderr, "stat failed: %s\n", strerror(errno));
+      return false;
+    }
+    if ((st.st_mode & S_IFMT) == S_IFBLK) {
+      checker.emplace(caller.borrow_as<fuchsia_hardware_block::Block>(), block_size, silent);
+    } else {
+      checker.emplace(caller.borrow_as<fuchsia_io::File>(), block_size, silent);
+    }
     return true;
   }
   return false;
