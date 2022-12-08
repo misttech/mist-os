@@ -28,7 +28,8 @@ constexpr size_t kTestBlockSize = 4096;
 constexpr size_t kTestBlockCount = 25600;
 constexpr size_t kTestBlockDeviceSize = kTestBlockSize * kTestBlockCount;
 
-const std::string linux_path_prefix = "//";
+constexpr std::string_view kLinuxPathPrefix = "//";
+constexpr std::string_view kTestDeviceId = "f2fs_test_device";
 
 class F2fsDebianGuest;
 class LinuxOperator;
@@ -181,8 +182,6 @@ class FuchsiaOperator : public CompatibilityTestOperator {
   fbl::RefPtr<VnodeF2fs> root_;
 };
 
-const std::string test_device_id = "f2fs_test_device";
-
 class F2fsDebianGuest : public DebianEnclosedGuest {
  public:
   explicit F2fsDebianGuest(async::Loop& loop) : DebianEnclosedGuest(loop) {}
@@ -224,7 +223,7 @@ class F2fsDebianGuest : public DebianEnclosedGuest {
       return status;
     }
     block_specs.emplace_back(fuchsia::virtualization::BlockSpec{
-        .id = test_device_id,
+        .id = std::string(kTestDeviceId),
         .mode = fuchsia::virtualization::BlockMode::READ_WRITE,
         .format = fuchsia::virtualization::BlockFormat::WithFile(
             fidl::InterfaceHandle<fuchsia::io::File>(std::move(channel))),
@@ -247,7 +246,7 @@ class F2fsDebianGuest : public DebianEnclosedGuest {
  private:
   std::string guest_path_;
   // Could be a different path on aarch64
-  const std::string linux_device_path_ = "/dev/disk/by-id/virtio-" + test_device_id;
+  const std::string linux_device_path_ = "/dev/disk/by-id/virtio-" + std::string(kTestDeviceId);
 
   std::unique_ptr<LinuxOperator> linux_operator_;
   std::unique_ptr<FuchsiaOperator> fuchsia_operator_;

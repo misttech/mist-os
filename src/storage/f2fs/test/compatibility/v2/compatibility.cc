@@ -86,9 +86,9 @@ void LinuxOperator::ExecuteWithAssert(const std::vector<std::string>& argv, std:
 }
 
 std::string LinuxOperator::ConvertPath(std::string_view path) {
-  // Convert only if |path| starts with |linux_path_prefix|
-  if (path.substr(0, linux_path_prefix.length()) == linux_path_prefix) {
-    return std::string(mount_path_).append("/").append(path.substr(linux_path_prefix.length()));
+  // Convert only if |path| starts with |kLinuxPathPrefix|
+  if (path.substr(0, kLinuxPathPrefix.length()) == kLinuxPathPrefix) {
+    return std::string(mount_path_).append("/").append(path.substr(kLinuxPathPrefix.length()));
   }
 
   return std::string(path);

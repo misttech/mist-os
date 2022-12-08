@@ -31,8 +31,8 @@ TEST_F(FileCompatibilityTest, WriteVerifyLinuxToFuchsia) {
 
       auto umount = fit::defer([&] { GetEnclosedGuest().GetLinuxOperator().Umount(); });
 
-      auto test_file = GetEnclosedGuest().GetLinuxOperator().Open(linux_path_prefix + filename,
-                                                                  O_RDWR | O_CREAT, 0644);
+      auto test_file = GetEnclosedGuest().GetLinuxOperator().Open(
+          std::string(kLinuxPathPrefix) + filename, O_RDWR | O_CREAT, 0644);
       ASSERT_TRUE(test_file->IsValid());
 
       char buffer[kBlockSize];
@@ -98,7 +98,7 @@ TEST_F(FileCompatibilityTest, WriteVerifyFuchsiaToLinux) {
     auto umount = fit::defer([&] { GetEnclosedGuest().GetLinuxOperator().Umount(); });
 
     auto converted_filename =
-        GetEnclosedGuest().GetLinuxOperator().ConvertPath(linux_path_prefix + filename);
+        GetEnclosedGuest().GetLinuxOperator().ConvertPath(std::string(kLinuxPathPrefix) + filename);
 
     for (uint32_t i = 0; i < num_blocks; ++i) {
       std::string result;

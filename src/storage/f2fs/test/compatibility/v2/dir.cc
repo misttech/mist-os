@@ -20,7 +20,7 @@ TEST_F(DirCompatibilityTest, DirWidthTestLinuxToFuchsia) {
     auto umount = fit::defer([&] { GetEnclosedGuest().GetLinuxOperator().Umount(); });
 
     for (int width = 0; width <= kDirWidth; ++width) {
-      std::string dir_name = linux_path_prefix + std::to_string(width);
+      std::string dir_name = std::string(kLinuxPathPrefix) + std::to_string(width);
       GetEnclosedGuest().GetLinuxOperator().Mkdir(dir_name, 0644);
     }
   }
@@ -65,7 +65,7 @@ TEST_F(DirCompatibilityTest, DirWidthTestFuchsiaToLinux) {
     auto umount = fit::defer([&] { GetEnclosedGuest().GetLinuxOperator().Umount(); });
 
     for (int width = 0; width <= kDirWidth; ++width) {
-      std::string dir_name = linux_path_prefix + std::to_string(width);
+      std::string dir_name = std::string(kLinuxPathPrefix) + std::to_string(width);
       auto dir = GetEnclosedGuest().GetLinuxOperator().Open(dir_name, O_RDONLY | O_DIRECTORY, 0644);
       ASSERT_TRUE(dir->IsValid());
     }
@@ -82,7 +82,7 @@ TEST_F(DirCompatibilityTest, DirDepthTestLinuxToFuchsia) {
 
     auto umount = fit::defer([&] { GetEnclosedGuest().GetLinuxOperator().Umount(); });
 
-    std::string dir_name = linux_path_prefix;
+    std::string dir_name(kLinuxPathPrefix);
     for (int depth = 0; depth < kDirDepth; ++depth) {
       dir_name.append("/").append(std::to_string(depth));
       GetEnclosedGuest().GetLinuxOperator().Mkdir(dir_name, 0644);
@@ -129,7 +129,7 @@ TEST_F(DirCompatibilityTest, DirDepthTestFuchsiaToLinux) {
     GetEnclosedGuest().GetLinuxOperator().Mount();
 
     auto umount = fit::defer([&] { GetEnclosedGuest().GetLinuxOperator().Umount(); });
-    std::string dir_name = linux_path_prefix;
+    std::string dir_name(kLinuxPathPrefix);
     for (int depth = 0; depth < kDirDepth; ++depth) {
       dir_name.append("/").append(std::to_string(depth));
       auto dir = GetEnclosedGuest().GetLinuxOperator().Open(dir_name, O_RDONLY | O_DIRECTORY, 0644);
@@ -150,15 +150,17 @@ TEST_F(DirCompatibilityTest, DirRemoveTestLinuxToFuchsia) {
     auto umount = fit::defer([&] { GetEnclosedGuest().GetLinuxOperator().Umount(); });
 
     for (auto dir_name : dir_paths) {
-      GetEnclosedGuest().GetLinuxOperator().Mkdir(linux_path_prefix + dir_name, 0644);
+      GetEnclosedGuest().GetLinuxOperator().Mkdir(std::string(kLinuxPathPrefix) + dir_name, 0644);
     }
 
     for (auto dir_name : remove_fail) {
-      ASSERT_NE(GetEnclosedGuest().GetLinuxOperator().Rmdir(linux_path_prefix + dir_name), 0);
+      ASSERT_NE(
+          GetEnclosedGuest().GetLinuxOperator().Rmdir(std::string(kLinuxPathPrefix) + dir_name), 0);
     }
 
     for (auto dir_name : remove_success) {
-      ASSERT_EQ(GetEnclosedGuest().GetLinuxOperator().Rmdir(linux_path_prefix + dir_name), 0);
+      ASSERT_EQ(
+          GetEnclosedGuest().GetLinuxOperator().Rmdir(std::string(kLinuxPathPrefix) + dir_name), 0);
     }
   }
 
@@ -216,15 +218,15 @@ TEST_F(DirCompatibilityTest, DirRemoveTestFuchsiaToLinux) {
 
     // Check deleted
     for (auto dir_name : remove_success) {
-      auto file = GetEnclosedGuest().GetLinuxOperator().Open(linux_path_prefix + dir_name,
-                                                             O_RDONLY | O_DIRECTORY, 0644);
+      auto file = GetEnclosedGuest().GetLinuxOperator().Open(
+          std::string(kLinuxPathPrefix) + dir_name, O_RDONLY | O_DIRECTORY, 0644);
       ASSERT_FALSE(file->IsValid());
     }
 
     // Check remained
     for (auto dir_name : remove_fail) {
-      auto file = GetEnclosedGuest().GetLinuxOperator().Open(linux_path_prefix + dir_name,
-                                                             O_RDONLY | O_DIRECTORY, 0644);
+      auto file = GetEnclosedGuest().GetLinuxOperator().Open(
+          std::string(kLinuxPathPrefix) + dir_name, O_RDONLY | O_DIRECTORY, 0644);
       ASSERT_TRUE(file->IsValid());
     }
   }
@@ -241,18 +243,19 @@ TEST_F(DirCompatibilityTest, DirRenameTestLinuxToFuchsia) {
     auto umount = fit::defer([&] { GetEnclosedGuest().GetLinuxOperator().Umount(); });
 
     for (auto dir_name : dir_paths) {
-      GetEnclosedGuest().GetLinuxOperator().Mkdir(linux_path_prefix + dir_name, 0644);
+      GetEnclosedGuest().GetLinuxOperator().Mkdir(std::string(kLinuxPathPrefix) + dir_name, 0644);
     }
 
     // Create
     for (auto [dir_name_from, dir_name_to] : rename_from_to) {
-      GetEnclosedGuest().GetLinuxOperator().Mkdir(linux_path_prefix + dir_name_from, 0644);
+      GetEnclosedGuest().GetLinuxOperator().Mkdir(std::string(kLinuxPathPrefix) + dir_name_from,
+                                                  0644);
     }
 
     // Rename
     for (auto [dir_name_from, dir_name_to] : rename_from_to) {
-      GetEnclosedGuest().GetLinuxOperator().Rename(linux_path_prefix + dir_name_from,
-                                                   linux_path_prefix + dir_name_to);
+      GetEnclosedGuest().GetLinuxOperator().Rename(std::string(kLinuxPathPrefix) + dir_name_from,
+                                                   std::string(kLinuxPathPrefix) + dir_name_to);
     }
   }
 
@@ -309,11 +312,11 @@ TEST_F(DirCompatibilityTest, DirRenameTestFuchsiaToLinux) {
     auto umount = fit::defer([&] { GetEnclosedGuest().GetLinuxOperator().Umount(); });
 
     for (auto [dir_name_from, dir_name_to] : rename_from_to) {
-      auto file = GetEnclosedGuest().GetLinuxOperator().Open(linux_path_prefix + dir_name_from,
-                                                             O_RDONLY | O_DIRECTORY, 0644);
+      auto file = GetEnclosedGuest().GetLinuxOperator().Open(
+          std::string(kLinuxPathPrefix) + dir_name_from, O_RDONLY | O_DIRECTORY, 0644);
       ASSERT_FALSE(file->IsValid());
 
-      file = GetEnclosedGuest().GetLinuxOperator().Open(linux_path_prefix + dir_name_to,
+      file = GetEnclosedGuest().GetLinuxOperator().Open(std::string(kLinuxPathPrefix) + dir_name_to,
                                                         O_RDONLY | O_DIRECTORY, 0644);
       ASSERT_TRUE(file->IsValid());
     }
