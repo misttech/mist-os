@@ -30,6 +30,15 @@ typedef int8_t FuchsiaLogSeverity;
 #define FUCHSIA_LOG_SEVERITY_STEP_SIZE ((uint8_t)0x10)
 #define FUCHSIA_LOG_VERBOSITY_STEP_SIZE ((uint8_t)0x1)
 
+// Assert that log levels are in ascending order.
+// Numeric comparison is generally used to determine whether to log.
+static_assert(FUCHSIA_LOG_TRACE < FUCHSIA_LOG_DEBUG);
+static_assert(FUCHSIA_LOG_DEBUG < FUCHSIA_LOG_INFO);
+static_assert(FUCHSIA_LOG_INFO < FUCHSIA_LOG_WARNING);
+static_assert(FUCHSIA_LOG_WARNING < FUCHSIA_LOG_ERROR);
+static_assert(FUCHSIA_LOG_ERROR < FUCHSIA_LOG_FATAL);
+static_assert(FUCHSIA_LOG_FATAL < FUCHSIA_LOG_NONE);
+
 // Max size of log buffer
 #define FUCHSIA_SYSLOG_BUFFER_SIZE ((1 << 15) / 8)
 
