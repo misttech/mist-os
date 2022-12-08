@@ -429,8 +429,9 @@ template("_zither_kernel_sources") {
                          ])
   generated_files = [
     "$output_dir/${output_subdir}/category.inc",
-    "$output_dir/${output_subdir}/syscalls.inc",
     "$output_dir/${output_subdir}/kernel.inc",
+    "$output_dir/${output_subdir}/kernel-wrappers.inc",
+    "$output_dir/${output_subdir}/syscalls.inc",
     "$output_dir/${output_subdir}/zx-syscall-numbers.h",
   ]
 
@@ -499,7 +500,8 @@ template("_zither_kernel_sources") {
 #     A C++ library target for the kernel with the following headers:
 #       - <lib/syscalls/category.inc>: a categorization of syscalls with macro
 #         helpers.
-#       - <lib/syscalls/kernel-wrappers.inc>: TODO(fxbug.dev/110295).
+#       - <lib/syscalls/kernel-wrappers.inc>: kernel-side boilerplate for
+#         syscall definitions.
 #       - <lib/syscalls/kernel.inc>: macro-templated enumeration of syscalls
 #         from the kernel's point of view.
 #       - <lib/syscalls/syscalls.inc>: macro-templated enumeration of syscalls

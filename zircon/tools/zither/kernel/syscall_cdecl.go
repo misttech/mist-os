@@ -55,7 +55,7 @@ func SyscallCDecl(syscall zither.Syscall, ptrView PointerView) string {
 		"Name":       zither.LowerCaseWithUnderscores,
 		"ReturnType": cDeclReturnType,
 		"ParameterType": func(param zither.SyscallParameter) string {
-			return cDeclParameterType(param, ptrView)
+			return cDeclParameterType(param, ptrView, true)
 		},
 	})
 	template.Must(tmpl.Parse(syscallCDeclTemplate))
@@ -97,7 +97,7 @@ func passedAsPointer(param zither.SyscallParameter) bool {
 	return kind.IsPointerLike() || kind == zither.TypeKindStruct // Structs are always passed as pointers.
 }
 
-func cDeclParameterType(param zither.SyscallParameter, ptrView PointerView) string {
+func cDeclParameterType(param zither.SyscallParameter, ptrView PointerView, annotated bool) string {
 	kind := param.Type.Kind
 
 	typ := c.DescribeType(param.Type).Type
@@ -138,28 +138,30 @@ func cDeclParameterType(param zither.SyscallParameter, ptrView PointerView) stri
 		}
 	}
 
-	annotation := ""
-	switch kind {
-	// Handle and handle pointers have a related set of annotations informing
-	// static analysis.
-	case zither.TypeKindHandle, zither.TypeKindPointer:
-		if kind == zither.TypeKindPointer && param.Type.ElementType.Kind != zither.TypeKindHandle {
-			break
+	if annotated {
+		annotation := ""
+		switch kind {
+		// Handle and handle pointers have a related set of annotations informing
+		// static analysis.
+		case zither.TypeKindHandle, zither.TypeKindPointer:
+			if kind == zither.TypeKindPointer && param.Type.ElementType.Kind != zither.TypeKindHandle {
+				break
+			}
+			action := "use"
+			if param.HasTag(zither.ParameterTagReleasedHandle) {
+				action = "release"
+			} else if param.IsStrictOutput() {
+				action = "acquire"
+			}
+			label := "Fuchsia"
+			if param.HasTag(zither.ParameterTagUncheckedHandle) {
+				label = "FuchsiaUnchecked"
+			}
+			annotation = fmt.Sprintf("_ZX_SYSCALL_ANNO(%s_handle(%q))", action, label)
 		}
-		action := "use"
-		if param.HasTag(zither.ParameterTagReleasedHandle) {
-			action = "release"
-		} else if param.IsStrictOutput() {
-			action = "acquire"
+		if annotation != "" {
+			typ = annotation + " " + typ
 		}
-		label := "Fuchsia"
-		if param.HasTag(zither.ParameterTagUncheckedHandle) {
-			label = "FuchsiaUnchecked"
-		}
-		annotation = fmt.Sprintf("_ZX_SYSCALL_ANNO(%s_handle(%q))", action, label)
-	}
-	if annotation != "" {
-		typ = annotation + " " + typ
 	}
 
 	return typ

@@ -83,7 +83,7 @@ func main() {
 	case zirconIFSBackend:
 		gen = zircon_ifs.NewGenerator(f)
 	case kernelBackend:
-		gen = kernel.NewInternalGenerator(f)
+		gen = kernel.NewGenerator(f)
 	default:
 		logger.Errorf(ctx, "unrecognized `-backend` value: %q", flags.backend)
 		os.Exit(1)

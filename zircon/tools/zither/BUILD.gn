@@ -509,6 +509,7 @@ zither_golden_test("zx.test") {
       files = [
         "category.inc",
         "kernel.inc",
+        "kernel-wrappers.inc",
         "syscalls.inc",
         "zx-syscall-numbers.h",
       ]
