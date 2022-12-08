@@ -235,11 +235,8 @@ class TreeVisitor {
   virtual void OnTypeDeclaration(std::unique_ptr<TypeDeclaration> const& element) {
     element->Accept(this);
   }
-  // --- end new syntax ---
 
   virtual void OnFile(std::unique_ptr<File> const& element) { element->Accept(this); }
-  virtual void OnPrimitiveSubtype(types::PrimitiveSubtype subtype) {}
-  virtual void OnNullability(types::Nullability nullability) {}
 };
 
 #undef DISPATCH_TO

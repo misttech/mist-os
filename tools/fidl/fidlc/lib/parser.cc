@@ -1605,6 +1605,7 @@ std::unique_ptr<raw::TypeDeclaration> Parser::ParseTypeDeclaration(
 std::unique_ptr<raw::File> Parser::ParseFile() {
   ASTScope scope(this);
 
+  ConsumeToken(OfKind(Token::Kind::kStartOfFile));
   auto library_decl = ParseLibraryDeclaration();
   if (!Ok())
     return Fail();

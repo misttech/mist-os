@@ -38,7 +38,7 @@ void Compare(const std::unique_ptr<fidl::raw::File>& ast, fidl::raw::TokenPointe
   for (size_t i = 0; i < actual.size(); i++) {
     const auto act = actual[i];
     const auto exp = expected[i];
-    if (act->kind() != Kind::kEndOfFile) {
+    if (act->kind() != Kind::kStartOfFile && act->kind() != Kind::kEndOfFile) {
       ASSERT_STREQ(act->span().data(), std::get<std::string>(exp));
     }
 
@@ -61,6 +61,7 @@ TEST(TokenListTests, MinimalSideTokens) {
 
   Compare(ast, fidl::raw::TokenPointerListBuilder(ast).Build(),
           {
+              {"", Kind::kStartOfFile, Storage::kAST},
               {"library", Kind::kIdentifier, Storage::kAST},
               {"example", Kind::kIdentifier, Storage::kAST},
               {";", Kind::kSemicolon, Storage::kSide},
@@ -76,6 +77,7 @@ TEST(TokenListTests, MoreSideTokens) {
 
   Compare(ast, fidl::raw::TokenPointerListBuilder(ast).Build(),
           {
+              {"", Kind::kStartOfFile, Storage::kAST},
               {"library", Kind::kIdentifier, Storage::kAST},
               {"example", Kind::kIdentifier, Storage::kAST},
               {".", Kind::kDot, Storage::kSide},
@@ -95,6 +97,7 @@ library example;
 
   Compare(ast, fidl::raw::TokenPointerListBuilder(ast).Build(),
           {
+              {"", Kind::kStartOfFile, Storage::kAST},
               {"@", Kind::kAt, Storage::kAST},
               {"attr", Kind::kIdentifier, Storage::kSide},
               {"(", Kind::kLeftParen, Storage::kSide},
@@ -123,6 +126,7 @@ library example;
 
   Compare(ast, fidl::raw::TokenPointerListBuilder(ast).Build(),
           {
+              {"", Kind::kStartOfFile, Storage::kAST},
               {"// A", Kind::kComment, Storage::kSide},
               {"// B", Kind::kComment, Storage::kSide},
               {"library", Kind::kIdentifier, Storage::kAST},
@@ -142,6 +146,7 @@ alias Foo = vector<uint8>;
 
   Compare(ast, fidl::raw::TokenPointerListBuilder(ast).Build(),
           {
+              {"", Kind::kStartOfFile, Storage::kAST},
               {"library", Kind::kIdentifier, Storage::kAST},
               {"example", Kind::kIdentifier, Storage::kAST},
               {";", Kind::kSemicolon, Storage::kSide},

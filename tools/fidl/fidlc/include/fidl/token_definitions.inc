@@ -16,6 +16,7 @@
 // Control and whitespace
 TOKEN(NotAToken)
 TOKEN(EndOfFile)
+TOKEN(StartOfFile)
 TOKEN(Comment)
 TOKEN(DocComment)
 

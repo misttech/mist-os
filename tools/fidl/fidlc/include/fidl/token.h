@@ -91,9 +91,7 @@ class Token {
     return span_.source_file().filename() == rhs.span().source_file().filename();
   }
 
-  constexpr bool operator==(const Token& rhs) const {
-    return this->same_file_as(rhs) && ordinal_ == rhs.ordinal_;
-  }
+  constexpr bool operator==(const Token& rhs) const { return this->span() == rhs.span(); }
   constexpr bool operator!=(const Token& rhs) const { return !(*this == rhs); }
 
   // Files are sorted alphabetically for the purpose of ordering. Generally speaking, however,

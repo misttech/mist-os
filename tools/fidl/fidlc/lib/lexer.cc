@@ -349,6 +349,10 @@ Token Lexer::Lex() {
   ZX_ASSERT_MSG(token_start_ <= end_of_file_, "already reached EOF");
   ZX_ASSERT_MSG(current_ <= end_of_file_ + 1, "current_ is past null terminator");
 
+  if (next_ordinal == 0) {
+    return Finish(Token::Kind::kStartOfFile);
+  }
+
   do {
     SkipWhitespace();
 

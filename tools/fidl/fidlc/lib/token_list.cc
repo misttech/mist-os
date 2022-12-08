@@ -11,17 +11,11 @@
 namespace fidl::raw {
 
 TokenPointerList TokenPointerListBuilder::Build() {
-  ZX_DEBUG_ASSERT(last_added_ordinal_ == 0);
   // When we start, |last_added_ordinal_| is 0, implying that the first token has already been
   // added. Ensure that this is true.
-  if (ast_->start().ordinal() == 0) {
-    building_.push_back(&ast_->start());
-  } else {
-    // The AST always has the libary token as its |start()|, however it may have a comment before
-    // the library declaration. If library isn't the first thing in the file, we need to start from
-    // the actual first token.
-    building_.push_back(&ast_->tokens[last_added_ordinal_]);
-  }
+  ZX_DEBUG_ASSERT(last_added_ordinal_ == 0);
+  ZX_DEBUG_ASSERT(last_added_ordinal_ == ast_->start().ordinal());
+  building_.push_back(&ast_->start());
 
   // Because we inherit from |DeclarationOrderTreeVisitor|, we will visit every |Token| held by the
   // raw AST (ie, demarcating the start or end of a |SourceElement|, rather than just in the

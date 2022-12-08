@@ -105,12 +105,10 @@ void ClearBlankLinesAfterAttributeList(const std::unique_ptr<raw::AttributeList>
 
 // Count the newlines between two adjacent tokens.  The `start` argument is optional because it is
 // possible that the `end` argument is the first token in the file.
-size_t CountNewlinesBetweenAdjacentTokens(const std::string_view source, const Token* start,
+size_t CountNewlinesBetweenAdjacentTokens(const std::string_view source, const Token& start,
                                           const Token& end) {
   const char* source_start_char = source.data();
-  const char* from_char = start == nullptr
-                              ? source_start_char
-                              : start->span().data().data() + start->span().data().size();
+  const char* from_char = start.span().data().data() + start.span().data().size();
   const char* until_char = end.span().data().data();
   ZX_ASSERT(until_char >= from_char);
   const std::string_view whitespace =
@@ -130,14 +128,14 @@ size_t CountNewlinesBetweenAdjacentTokens(const std::string_view source, const T
 // comment.  This function ingests up to the end of that line.  The text passed to this function
 // must include and start with the `//` character pair that triggered this function call (ie,
 // comment lines are ingested with their leading double slashes).
-void IngestCommentToken(Token comment_token, const Token* prev_token, size_t leading_newlines,
-                        AtomicSpanSequence* out) {
+void IngestCommentToken(const Token& comment_token, const Token& prev_token,
+                        size_t leading_newlines, AtomicSpanSequence* out) {
   // Figure out where this comment_token line fits into the bigger picture: its either an inline
   // comment, the first line of a standalone comment, or a continuing line of a standalone
   // comment.
   auto line = comment_token.span().data();
-  if (leading_newlines == 0 && prev_token != nullptr && prev_token->kind() != Token::kComment &&
-      prev_token->kind() != Token::kDocComment) {
+  if (leading_newlines == 0 && prev_token.kind() != Token::kComment &&
+      prev_token.kind() != Token::kDocComment) {
     // The first part of this line was source code, so the last SpanSequence must be an
     // AtomicSpanSequence.  Add the inline comment to that node.
     std::unique_ptr<InlineCommentSpanSequence> inline_comment =
@@ -164,7 +162,7 @@ void IngestCommentToken(Token comment_token, const Token* prev_token, size_t lea
   out->AddChild(std::move(standalone_comment));
 }
 
-void IngestToken(const Token token, const Token* prev_token, size_t leading_newlines,
+void IngestToken(const Token token, const Token prev_token, size_t leading_newlines,
                  AtomicSpanSequence* out) {
   const Token::Kind kind = token.kind();
   if (kind == Token::kComment || kind == Token::kDocComment) {
@@ -209,14 +207,15 @@ std::optional<std::unique_ptr<SpanSequence>> SpanSequenceTreeVisitor::IngestUpTo
     const std::optional<Token> until, SpanSequence::Position position) {
   auto atomic = std::make_unique<AtomicSpanSequence>(position);
   while (next_token_index_ < tokens_.size()) {
-    const Token* token = tokens_[next_token_index_];
-    if (until.has_value() && (*token == until.value() || until.value() < *token)) {
+    const Token& token = *(tokens_[next_token_index_]);
+    if (until.has_value() && (token == until.value() || until.value() < token)) {
       break;
     }
 
-    const Token* prev_token = next_token_index_ > 0 ? tokens_[next_token_index_ - 1] : nullptr;
-    const size_t leading_newlines = CountNewlinesBetweenAdjacentTokens(file_, prev_token, *token);
-    IngestToken(*token, prev_token, leading_newlines, atomic.get());
+    ZX_ASSERT(next_token_index_ > 0);
+    const Token& prev_token = *(tokens_[next_token_index_ - 1]);
+    const size_t leading_newlines = CountNewlinesBetweenAdjacentTokens(file_, prev_token, token);
+    IngestToken(token, prev_token, leading_newlines, atomic.get());
     next_token_index_ += 1;
   }
 
@@ -230,17 +229,18 @@ std::optional<std::unique_ptr<SpanSequence>> SpanSequenceTreeVisitor::IngestUpTo
     const std::optional<Token> until, SpanSequence::Position position) {
   auto atomic = std::make_unique<AtomicSpanSequence>(position);
   while (next_token_index_ < tokens_.size()) {
-    const Token* token = tokens_[next_token_index_];
-    if (until.has_value() && until.value() < *token) {
+    const Token& token = *(tokens_[next_token_index_]);
+    if (until.has_value() && until.value() < token) {
       break;
     }
 
-    const Token* prev_token = next_token_index_ > 0 ? tokens_[next_token_index_ - 1] : nullptr;
-    const size_t leading_newlines = CountNewlinesBetweenAdjacentTokens(file_, prev_token, *token);
-    IngestToken(*token, prev_token, leading_newlines, atomic.get());
+    ZX_ASSERT(next_token_index_ > 0);
+    const Token& prev_token = *(tokens_[next_token_index_ - 1]);
+    const size_t leading_newlines = CountNewlinesBetweenAdjacentTokens(file_, prev_token, token);
+    IngestToken(token, prev_token, leading_newlines, atomic.get());
     next_token_index_ += 1;
 
-    if (until.has_value() && *token == until.value()) {
+    if (until.has_value() && token == until.value()) {
       break;
     }
   }
@@ -257,20 +257,21 @@ SpanSequenceTreeVisitor::IngestUpToAndIncludingTokenKind(
   auto atomic = std::make_unique<AtomicSpanSequence>(position);
   bool found = false;
   while (next_token_index_ < tokens_.size()) {
-    const Token* token = tokens_[next_token_index_];
-    const Token* prev_token = next_token_index_ > 0 ? tokens_[next_token_index_ - 1] : nullptr;
-    const size_t leading_newlines = CountNewlinesBetweenAdjacentTokens(file_, prev_token, *token);
+    const Token& token = *(tokens_[next_token_index_]);
+    ZX_ASSERT(next_token_index_ > 0);
+    const Token& prev_token = *(tokens_[next_token_index_ - 1]);
+    const size_t leading_newlines = CountNewlinesBetweenAdjacentTokens(file_, prev_token, token);
 
     // If we have found the token kind we're looking for, make sure to capture any trailing inline
     // comments!
     if (found && (leading_newlines > 0 ||
-                  (token->kind() != Token::kComment || token->kind() != Token::kComment))) {
+                  (token.kind() != Token::kComment || token.kind() != Token::kComment))) {
       break;
     }
-    IngestToken(*token, prev_token, leading_newlines, atomic.get());
+    IngestToken(token, prev_token, leading_newlines, atomic.get());
 
     next_token_index_ += 1;
-    if (token->kind() == until_kind) {
+    if (token.kind() == until_kind) {
       found = true;
     }
   }
@@ -321,8 +322,7 @@ SpanSequenceTreeVisitor::TokenBuilder::TokenBuilder(SpanSequenceTreeVisitor* ftv
                                                     const Token& token, bool has_trailing_space)
     : Builder<TokenSpanSequence>(ftv, token, token, false) {
   const size_t token_index = this->GetFormattingTreeVisitor()->next_token_index_;
-  const Token* prev_token =
-      token_index > 0 ? this->GetFormattingTreeVisitor()->tokens_[token_index - 1] : nullptr;
+  const Token& prev_token = *(this->GetFormattingTreeVisitor()->tokens_[token_index - 1]);
   const size_t leading_newlines = CountNewlinesBetweenAdjacentTokens(
       this->GetFormattingTreeVisitor()->file_, prev_token, token);
   const size_t leading_blank_lines = leading_newlines == 0 ? 0 : leading_newlines - 1;
@@ -587,6 +587,10 @@ void SpanSequenceTreeVisitor::OnConstDeclaration(
 void SpanSequenceTreeVisitor::OnFile(const std::unique_ptr<raw::File>& element) {
   const auto visiting = Visiting(this, VisitorKind::kFile);
   building_.emplace();
+
+  // Handle the first token, which is always |kStartOfFile|. This also has the nice benefit of not
+  // having to special-case dealing with the first token later in the visitor.
+  next_token_index_++;
 
   DeclarationOrderTreeVisitor::OnFile(element);
 

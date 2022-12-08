@@ -33,7 +33,9 @@ class NoopTreeVisitor : public fidl::raw::DeclarationOrderTreeVisitor {
       std::string gap(ws_location, size);
       std::string content(current_token.data().data(), current_token.data().size());
       output_ += gap + content;
-      last_location_ = ws_location;
+      if (current_token.kind() != fidl::Token::kStartOfFile) {
+        last_location_ = ws_location;
+      }
     }
   }
   std::string& output() { return output_; }
