@@ -79,8 +79,7 @@ func parseMoblyTest(lines [][]byte) []runtests.TestCaseResult {
 		case "SKIP":
 			status = runtests.TestSkipped
 		case "ERROR":
-			// TODO(fxb/116847): Use "CRASH" status instead.
-			status = runtests.TestFailure
+			status = runtests.TestCrashed
 		}
 
 		res = append(res, runtests.TestCaseResult{

@@ -1308,7 +1308,7 @@ Type: Summary
 			DisplayName: "GreetingsTest.test_error",
 			SuiteName:   "GreetingsTest",
 			CaseName:    "test_error",
-			Status:      runtests.TestFailure,
+			Status:      runtests.TestCrashed,
 			Duration:    6 * time.Millisecond,
 			Format:      "Mobly",
 		},
