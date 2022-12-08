@@ -205,12 +205,15 @@ A change in a particular functional area should typically be approved by the
 council member responsible for that area, but any council member can approve the
 change if the responsible council member is unavailable.
 
-Before being merged, every change that modifies the Fuchsia API Surface must receive
-an API-Review+1 from a member of [api-council@fuchsia.dev][api-council-group] in
-addition to the usual Code-Review+2. The same person can provide both
-API-Review+1 and Code-Review+2 for a given change, but someone cannot give their
-own CLs API-Review+1. See [Review Labels][review-labels] for documentation about
-this Gerrit feature.
+Before being merged, every change that modifies the Fuchsia API Surface must
+receive an API-Review+1 from a member of
+[api-council@fuchsia.dev][api-council-group] in addition to the usual
+Code-Review+2. The same person can provide both API-Review+1 and Code-Review+2
+for a given change. See [Review Labels][review-labels] for documentation about
+this Gerrit feature. Members of the API council cannot give their own CLs
+API-Review+1, unless those changes are minor and uncontroversial (e.g.,
+documentation changes). Even so, independent review from a second council member
+is encouraged.
 
 For small API changes, especially incremental refinements to existing APIs, a
 code review is usually sufficient for an API reviewer to give the change
