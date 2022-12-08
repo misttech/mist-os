@@ -99,7 +99,7 @@ deps = [
 
 ### Log events
 
-Call the macros provided by the `tracing` crate to record logs at the declared
+Call the macros provided by the [`tracing`][trc] crate to record logs at the declared
 severity level:
 
 ```rust
@@ -127,3 +127,4 @@ language-agnostic logging documentation.
 [ref-fuchsia]: https://fuchsia-docs.firebaseapp.com/rust/fuchsia/
 [rust-dev]: /docs/development/languages/rust/README.md
 [std-streams]: /docs/development/diagnostics/logs/recording.md#stdout-stderr
+[trc]: https://fuchsia-docs.firebaseapp.com/rust/tracing/index.html
