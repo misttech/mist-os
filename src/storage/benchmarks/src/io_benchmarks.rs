@@ -425,67 +425,17 @@ fn write_random<F: AsRawFd, R: Rng>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{filesystem::MountedFilesystemInstance, Filesystem},
-        futures::lock::Mutex,
-        std::{path::Path, sync::Arc},
-    };
+    use {super::*, crate::testing::TestFilesystem};
 
     const OP_SIZE: usize = 8;
     const OP_COUNT: usize = 2;
-    const BENCHMARK_DIR: &str = "/tmp/benchmarks";
-
-    /// Filesystem implementation that records `clear_cache` calls for validating warm and cold
-    /// benchmarks.
-    #[derive(Clone)]
-    struct TestFilesystem {
-        inner: Arc<Mutex<TestFilesystemInner>>,
-    }
-
-    struct TestFilesystemInner {
-        fs: Option<Box<MountedFilesystemInstance>>,
-        clear_cache_count: u64,
-    }
-
-    impl TestFilesystem {
-        async fn new() -> Self {
-            std::fs::create_dir(BENCHMARK_DIR).unwrap();
-            Self {
-                inner: Arc::new(Mutex::new(TestFilesystemInner {
-                    fs: Some(Box::new(MountedFilesystemInstance::new(BENCHMARK_DIR))),
-                    clear_cache_count: 0,
-                })),
-            }
-        }
-    }
-
-    #[async_trait]
-    impl Filesystem for TestFilesystem {
-        async fn clear_cache(&mut self) {
-            let mut inner = self.inner.lock().await;
-            inner.clear_cache_count += 1;
-        }
-
-        async fn shutdown(self: Box<Self>) {
-            let mut inner = self.inner.lock().await;
-            inner.fs.take().unwrap().shutdown().await;
-        }
-
-        fn benchmark_dir(&self) -> &Path {
-            &Path::new(BENCHMARK_DIR)
-        }
-    }
 
     async fn check_benchmark(benchmark: impl Benchmark, op_count: usize, clear_cache_count: u64) {
-        let mut test_fs = Box::new(TestFilesystem::new().await);
+        let mut test_fs = Box::new(TestFilesystem::new());
         let results = benchmark.run(test_fs.as_mut()).await;
 
         assert_eq!(results.len(), op_count);
-        {
-            let stats = test_fs.inner.lock().await;
-            assert_eq!(stats.clear_cache_count, clear_cache_count);
-        }
+        assert_eq!(test_fs.clear_cache_count().await, clear_cache_count);
         test_fs.shutdown().await;
     }
 

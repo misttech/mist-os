@@ -14,6 +14,14 @@ fuchsia.storage: ReadSequentialWarm/8192/f2fs
 fuchsia.storage: ReadSequentialWarm/8192/fxfs
 fuchsia.storage: ReadSequentialWarm/8192/memfs
 fuchsia.storage: ReadSequentialWarm/8192/minfs
+fuchsia.storage: WalkDirectoryTreeCold/Files3/Dirs2/Depth5/f2fs
+fuchsia.storage: WalkDirectoryTreeCold/Files3/Dirs2/Depth5/fxfs
+fuchsia.storage: WalkDirectoryTreeCold/Files3/Dirs2/Depth5/memfs
+fuchsia.storage: WalkDirectoryTreeCold/Files3/Dirs2/Depth5/minfs
+fuchsia.storage: WalkDirectoryTreeWarm/Files3/Dirs2/Depth5/f2fs
+fuchsia.storage: WalkDirectoryTreeWarm/Files3/Dirs2/Depth5/fxfs
+fuchsia.storage: WalkDirectoryTreeWarm/Files3/Dirs2/Depth5/memfs
+fuchsia.storage: WalkDirectoryTreeWarm/Files3/Dirs2/Depth5/minfs
 fuchsia.storage: WriteRandomCold/8192/f2fs
 fuchsia.storage: WriteRandomCold/8192/fxfs
 fuchsia.storage: WriteRandomCold/8192/memfs

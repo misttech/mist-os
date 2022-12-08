@@ -7,6 +7,7 @@ use {
     std::{path::PathBuf, sync::Arc, vec::Vec},
     storage_benchmarks::{
         block_device::PanickingBlockDeviceFactory,
+        directory_benchmarks::{DirectoryTreeStructure, WalkDirectoryTreeWarm},
         filesystem::MountedFilesystem,
         io_benchmarks::{
             ReadRandomWarm, ReadSequentialWarm, WriteRandomCold, WriteRandomWarm,
@@ -48,6 +49,14 @@ fn build_benchmark_set(dir: PathBuf) -> BenchmarkSet {
     benchmark_set.add_benchmark(WriteRandomWarm::new(OP_SIZE, OP_COUNT), &filesystems);
     benchmark_set.add_benchmark(WriteSequentialCold::new(OP_SIZE, OP_COUNT), &filesystems);
     benchmark_set.add_benchmark(WriteRandomCold::new(OP_SIZE, OP_COUNT), &filesystems);
+
+    // Creates a total of 62 directories and 189 files.
+    let dts = DirectoryTreeStructure {
+        files_per_directory: 3,
+        directories_per_directory: 2,
+        max_depth: 5,
+    };
+    benchmark_set.add_benchmark(WalkDirectoryTreeWarm::new(dts, 20), &filesystems);
 
     benchmark_set
 }

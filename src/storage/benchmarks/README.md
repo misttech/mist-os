@@ -2,10 +2,11 @@
 
 ## Benchmarks
 
-There are 8 benchmarks that get run for every filesystem. The currently supported filesystems are
+There are 10 benchmarks that get run for every filesystem. The currently supported filesystems are
 Fxfs, F2fs, Memfs, and Minfs.
 
-The benchmarks are all of the combinations of read/write, sequential/random, and warm/cold. Every
+### IO Benchmarks
+The IO benchmarks are all of the combinations of read/write, sequential/random, and warm/cold. Every
 read/write call uses an 8KiB buffer and each operation is performed 1024 times spread across an 8MiB
 file. The benchmarks measure how long each read/write operation takes.
 * **Read**: makes `pread` calls to the file.
@@ -19,6 +20,12 @@ file. The benchmarks measure how long each read/write operation takes.
 * **Cold**: the reads/writes are performed on a file that was not cached when the benchmark started.
   If the filesystem supports read-ahead then some of the operations may still hit cached data.
 
+### WalkDirectoryTree Benchmarks
+The `WalkDirectoryTree` benchmarks measure how long it takes to walk a directory tree with POSIX
+`readdir` calls. The directory tree consists of 62 directories and 189 files and is traversed 20
+times by the benchmarks. The "cold" variant of the benchmarks remounts the filesystem between each
+traversal and the "warm" variant does not.
+
 ## "Cold" Benchmarks
 At the beginning of most benchmarks is a setup phase that creates files within the filesystem.
 Simply closing all handles to those files doesn't guarantee that the filesystem will immediately
@@ -27,6 +34,12 @@ ever hit cached (warm) data. To support benchmarking uncached (cold) operations,
 Filesystem Benchmarks support remounting the filesystem. Remounting the filesystem between the setup
 and recording phases guarantees that all data related the file that isn't normally cached gets
 dropped.
+
+### Memfs and "Cold" Benchmarks
+Memfs is an in-memory filesystem that doesn't support remounting. The "warm" and "cold" results
+should be the same for most benchmarks except for cold writes. When cold writing to memfs, the
+kernel needs to allocate pages for the VMO backing the file as the pages are used. This causes cold
+writes to be slower than warm writes which have the pages already allocated.
 
 ## Framework
 The Fuchsia Filesystem Benchmarks use a custom framework for timing filesystem operations.
