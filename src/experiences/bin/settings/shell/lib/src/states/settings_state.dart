@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import 'package:flutter/material.dart' hide Action;
+import 'package:shell_settings/src/services/battery_watcher_service.dart';
 import 'package:shell_settings/src/services/brightness_service.dart';
 import 'package:shell_settings/src/services/channel_service.dart';
 import 'package:shell_settings/src/services/datetime_service.dart';
@@ -34,6 +35,14 @@ enum ChannelState {
   installationError
 }
 
+/// Defines states for battery charge.
+enum BatteryCharge {
+  missing,
+  charging,
+  discharging,
+  error,
+}
+
 /// Defines the state of the main settings overlay.
 abstract class SettingsState implements TaskService {
   bool get allSettingsPageVisible;
@@ -63,6 +72,10 @@ abstract class SettingsState implements TaskService {
   bool get keyboardPageVisible;
   String get currentKeymap;
   List<String> get supportedKeymaps;
+  // Battery
+  BatteryCharge get batteryCharge;
+  IconData get powerIcon;
+  double? get powerLevel;
 
   factory SettingsState.fromEnv() {
     // ignore: unnecessary_cast
@@ -73,6 +86,7 @@ abstract class SettingsState implements TaskService {
       channelService: ChannelService(),
       volumeService: VolumeService(),
       keyboardService: KeyboardService(),
+      batteryWatcherService: BatteryWatcherService(),
     ) as SettingsState;
   }
 

@@ -13,6 +13,7 @@ import 'package:flutter/services.dart';
 import 'package:internationalization/strings.dart';
 import 'package:intl/intl.dart';
 import 'package:mobx/mobx.dart';
+import 'package:shell_settings/src/services/battery_watcher_service.dart';
 import 'package:shell_settings/src/services/brightness_service.dart';
 import 'package:shell_settings/src/services/channel_service.dart';
 import 'package:shell_settings/src/services/datetime_service.dart';
@@ -142,6 +143,21 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
   @override
   final List<String> supportedKeymaps = ObservableList<String>();
 
+  // Battery
+  @override
+  BatteryCharge get batteryCharge => _batteryCharge.value;
+  final _batteryCharge = Observable<BatteryCharge>(BatteryCharge.charging);
+
+  @override
+  IconData get powerIcon => _powerIcon.value;
+  set powerIcon(IconData value) => _powerIcon.value = value;
+  final Observable<IconData> _powerIcon = Icons.battery_unknown.asObservable();
+
+  @override
+  double? get powerLevel => _powerLevel.value;
+  set powerLevel(double? value) => _powerLevel.value = value;
+  final Observable<double?> _powerLevel = Observable<double?>(null);
+
   // Services
   final BrightnessService brightnessService;
   final DateTimeService dateTimeService;
@@ -149,6 +165,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
   final ChannelService channelService;
   final VolumeService volumeService;
   final KeyboardService keyboardService;
+  final BatteryWatcherService batteryWatcherService;
 
   // Constructor
   SettingsStateImpl({
@@ -158,6 +175,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
     required this.channelService,
     required this.volumeService,
     required this.keyboardService,
+    required this.batteryWatcherService,
   })  : _timezones = _loadTimezones(),
         _selectedTimezone = timezoneService.timezone.asObservable() {
     dateTimeService.onChanged = updateDateTime;
@@ -218,6 +236,19 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
           ..addAll(keyboardService.supportedKeymaps);
       });
     };
+    batteryWatcherService.onChanged = () {
+      runInAction(() {
+        powerIcon = batteryWatcherService.icon;
+        powerLevel = batteryWatcherService.levelPercent;
+        if (powerLevel != null) {
+          final level = powerLevel!.toInt();
+
+          if (level == 2 && batteryWatcherService.isLevelDropping) {
+            // TODO(fxb/113485): show alert if battery level low
+          }
+        }
+      });
+    };
 
     // We cannot load MaterialIcons font file from pubspec.yaml. So load it
     // explicitly.
@@ -241,6 +272,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
       channelService.start(),
       volumeService.start(),
       keyboardService.start(),
+      batteryWatcherService.start(),
     ]);
   }
 
@@ -253,6 +285,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
     await channelService.stop();
     await volumeService.stop();
     await keyboardService.stop();
+    await batteryWatcherService.stop();
     _dateTimeNow = null;
   }
 
@@ -265,6 +298,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
     channelService.dispose();
     volumeService.dispose();
     keyboardService.dispose();
+    batteryWatcherService.dispose();
   }
 
   // All

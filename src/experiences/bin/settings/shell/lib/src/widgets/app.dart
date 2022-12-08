@@ -136,6 +136,26 @@ class _ListSettings extends StatelessWidget {
           Expanded(
             child: ListView(
               children: [
+                // Battery
+                Observer(builder: (_) {
+                  return ListTile(
+                    contentPadding: EdgeInsets.symmetric(horizontal: 24),
+                    leading: Icon(settingsState.powerIcon),
+                    title: Text(Strings.power),
+                    trailing: Wrap(
+                      alignment: WrapAlignment.end,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      children: [
+                        if (settingsState.powerLevel != null) ...[
+                          Text('${settingsState.powerLevel!.toInt()}%'),
+                          SizedBox(width: 4),
+                        ],
+                      ],
+                    ),
+                    onTap: settingsState.showKeyboardSettings,
+                  );
+                }),
                 // Channel
                 ListTile(
                   enabled: true,
