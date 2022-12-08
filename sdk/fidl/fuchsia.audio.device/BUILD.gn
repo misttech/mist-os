@@ -6,7 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.audio.device") {
   sources = [
-    "controller.fidl",
+    "control.fidl",
     "device.fidl",
     "provider.fidl",
     "registry.fidl",

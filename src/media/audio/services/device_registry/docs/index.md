@@ -27,8 +27,8 @@ configure the devices, this policy authority would instruct
 
 This suggests that generally there will be only one *direct* client for the
 Audio Device Registry interfaces that change device state (see below:
-`Controller`, `Control`, `RingBuffer`). These interfaces are designed with this
-in mind.
+`ControlCreator`, `Control`, `RingBuffer`). These interfaces are designed with
+this in mind.
 
 This also suggests certain limitations in how *other* clients can use the
 "listener" Audio Device Registry interfaces (see below: `Registry`, `Observer`).
@@ -40,7 +40,7 @@ configures audio devices can indicate when this is complete.
 
 ## Classes and Relationships
 
-Shared pointers are used throughout the service. When an object id described as
+Shared pointers are used throughout the service. When an object is described as
 "held" by another, this indicates the primary way it is accessed, rather than
 strict ownership.
 
@@ -51,7 +51,7 @@ created in `main()` and exists for the lifetime of the process, holding shared
 references to all other objects either directly or indirectly.
 `AudioDeviceRegistry` kicks off device detection and serves incoming requests
 for the three discoverable `fuchsia.audio.device` protocols: `Registry`,
-`Controller`, and `Provider`.
+`ControlCreator`, and `Provider`.
 
 These three FIDL protocols, and the additional three protocols that are created
 from them, are implemented by classes with the same name, with 'Server'
@@ -79,9 +79,9 @@ connections to the audio driver (`fuchsia.hardware.audio.StreamConfig`,
 holds all the connections used to observe or control the device
 (`ObserverServer` or `ControlServer`, described below).
 
-### RegistryServer and ControllerServer
+### RegistryServer and ControlCreatorServer
 
-`RegistryServer` objects and `ControllerServer` objects are held by the
+`RegistryServer` objects and `ControlCreatorServer` objects are held by the
 `AudioDeviceRegistry`. Both classes interact with the list of published `Device`
 instances through the parent `AudioDeviceRegistry`.
 
@@ -95,8 +95,8 @@ that is called when the `DeviceDetector` detects an audio device.
 
 `ObserverServer` objects and `ControlServer` objects are referenced by the
 `Device` that they are observing/controlling. They are created by
-`Registry/CreateObserver` or `Controller/Create` calls, but the `Registry` or
-`Controller` that created them holds no reference to them.
+`Registry/CreateObserver` or `ControlCreator/Create` calls, but the `Registry`
+or `ControlCreator` that created them holds no reference to them.
 
 ### RingBufferServer
 
@@ -112,8 +112,8 @@ Below we describe the logic and actions taken at various service entry points.
 ### Upon service startup
 
 The service will start upon the first incoming FIDL request on any of its
-discoverable protocols (`Registry`, `Control`, `Provider`). The decision to
-demand-start (rather than auto-start earlier in bootup) is discussed below,
+discoverable protocols (`Registry`, `ControlCreator`, `Provider`). The decision
+to demand-start (rather than auto-start earlier in bootup) is discussed below,
 after first describing what occurs during service startup.
 
 When the service is started, it performs the following tasks:
@@ -171,7 +171,7 @@ are notified of the new device.
 
 ### Upon creation of a client FIDL connection
 
-The creation of `RegistryServer` / `ObserverServer` / `ControllerServer` /
+The creation of `RegistryServer` / `ObserverServer` / `ControlCreatorServer` /
 `ControlServer` / `RingBufferServer` / `ProviderServer` instances refer to the
 relevant `Device`(s), and every call to these interfaces is satisfied either
 from `Device` metadata or calls to the underlying driver interfaces
@@ -180,8 +180,8 @@ from `Device` metadata or calls to the underlying driver interfaces
 Creating a `Control` is a request to take exclusive control of the specified
 audio device. If this is available and permitted, the request succeeds, marking
 the `Device` as ***controlled***. If the device is *already* ***controlled***,
-`Controller/Create` will fail. Closing a `Control` returns the `Device` to the
-***uncontrolled*** available state.
+`ControlCreator/Create` will fail. Closing a `Control` returns the `Device` to
+the ***uncontrolled*** available state.
 
 `Control/CreateRingBuffer` creates the underlying
 `fuchsia.hardware.audio.RingBuffer` along with the associated
@@ -191,8 +191,8 @@ the `Device` as ***controlled***. If the device is *already* ***controlled***,
 
 Closing a `Control` or `RingBuffer` causes the underlying
 `fuchsia.hardware.audio.RingBuffer` to be stopped and closed. Closing the others
-(`Registry`, `Observer`, `Controller`, `Provider`) has no effect on device state
-or any other FIDL connections (including children, e.g. `Control`).
+(`Registry`, `Observer`, `ControlCreator`, `Provider`) has no effect on device
+state or any other FIDL connections (including children, e.g. `Control`).
 
 ### Upon closure of underlying driver FIDL connection
 
@@ -202,7 +202,7 @@ reverts to the ***uncontrolled*** state.
 
 If the underlying `fuchsia.hardware.audio.StreamConfig` is closed, the `Device`
 and all associated FIDL objects are destroyed. `RegistryServer`,
-`ControllerServer` and `ProviderServer` objects are unaffected, other than
+`ControlCreatorServer` and `ProviderServer` objects are unaffected, other than
 `Registry/WatchDeviceRemoved` callers being notified. `AudioDeviceRegistry` only
 closes the `StreamConfig` in unrecoverable cases; although the device will still
 exist in `devfs`, we do not attempt to redetect and re-add it.

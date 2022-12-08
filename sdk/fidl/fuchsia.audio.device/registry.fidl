@@ -31,7 +31,7 @@ const MAX_COUNT_RATES uint32 = fuchsia.hardware.audio.MAX_COUNT_SUPPORTED_RATES;
 const MAX_COUNT_CHANNELS uint32 = fuchsia.hardware.audio.MAX_COUNT_CHANNELS_IN_RING_BUFFER;
 
 /// The length of the device's unique ID, in bytes.
-const UNIQUE_ID_SIZE uint32 = fuchsia.hardware.audio.UNIQUE_ID_SIZE;
+const UNIQUE_INSTANCE_ID_SIZE uint32 = fuchsia.hardware.audio.UNIQUE_ID_SIZE;
 
 /// Maximum length of the strings for device, manufacturer and product names.
 const MAX_STRING_SIZE uint32 = fuchsia.hardware.audio.MAX_UI_STRING_SIZE;
@@ -56,7 +56,7 @@ type Info = table {
     /// may change across reboots.
     ///
     /// Required.
-    1: id TokenId;
+    1: token_id TokenId;
 
     /// Whether the device is an input (a source of audio) or an output
     /// (a destination for audio).
@@ -64,27 +64,28 @@ type Info = table {
     /// Required.
     2: device_type DeviceType;
 
-    /// The device's high-level name (if present), as received from devfs or
-    /// provided by the `Provider/AddDevice` caller.
+    /// The device's high-level name, as received from devfs or the
+    /// `Provider/AddDevice` caller.
     ///
-    /// Optional.
+    /// Required.
     3: device_name string:MAX_STRING_SIZE;
-
-    /// A 16-character ID that (if present) differentiates instances of the same
-    /// device. This value should not change across system reboots.
-    ///
-    /// Optional.
-    4: unique_id array<uint8, UNIQUE_ID_SIZE>;
 
     /// The name of the device's manufacturer.
     ///
     /// Optional.
-    5: manufacturer string:MAX_STRING_SIZE;
+    4: manufacturer string:MAX_STRING_SIZE;
 
     /// The device's high-level product name.
     ///
     /// Optional.
-    6: product string:MAX_STRING_SIZE;
+    5: product string:MAX_STRING_SIZE;
+
+    /// A 16-character ID provided by the driver that (if present) can be used
+    /// to differentiate instances of the same device. This value should not
+    /// change across system reboots.
+    ///
+    /// Optional.
+    6: unique_instance_id array<uint8, UNIQUE_INSTANCE_ID_SIZE>;
 
     /// The union of all formats the device can support, across all combinations
     /// of device configuration settings. Must contain at least one entry.
@@ -263,15 +264,15 @@ protocol Registry {
     /// should immediately be re-called, in case other removals have occurred.
     WatchDeviceRemoved() -> (table {
         /// The token of the device least-recently removed.
-        1: id TokenId;
+        1: token_id TokenId;
     }) error RegistrWatchDeviceRemovedyError;
 
     /// Request an `Observer` for the specified device.
     CreateObserver(resource table {
-        /// The token `id` for the device to be observed.
+        /// The token of the device to be observed.
         ///
         /// Required.
-        1: id TokenId;
+        1: token_id TokenId;
 
         /// The server end of the `Observer` that will be created.
         ///
@@ -294,18 +295,18 @@ type RegistrWatchDeviceRemovedyError = flexible enum {};
 
 /// Errors returned by `Registry/CreateObserver`.
 type RegistryCreateObserverError = flexible enum {
-    /// The required `id` is missing.
-    INVALID_TOKEN = 1;
-
-    /// No device with token `id` was found. Either this token has never been
-    /// used, or the device with this token `id` has been removed.
-    DEVICE_NOT_FOUND = 2;
+    /// The required `token_id` is missing.
+    INVALID_TOKEN_ID = 1;
 
     /// The required `observer_server` is missing.
-    INVALID_OBSERVER = 3;
+    INVALID_OBSERVER = 2;
 
-    /// The device with token `id` has become unhealthy and cannot be observed.
-    DEVICE_UNHEALTHY = 4;
+    /// No device with `token_id` was found. Either this token has never been
+    /// used, or the device with `token_id` has been removed.
+    DEVICE_NOT_FOUND = 3;
+
+    /// The device with `token_id` has encountered an error and can no longer be observed.
+    DEVICE_ERROR = 4;
 };
 
 /// `Observer` instances are used to learn the capabilities and state of an
@@ -358,8 +359,8 @@ protocol Observer {
 // TODO(fxbug.dev/102626): Remove this enum after implementation, if no error
 // conditions have been identified and no error codes have been added.
 type ObserverWatchGainStateError = flexible enum {
-    /// This device has become unhealthy and can no longer be observed.
-    DEVICE_UNHEALTHY = 1;
+    /// This device has encountered an error and can no longer be observed.
+    DEVICE_ERROR = 1;
 };
 
 /// Errors returned by `Observer/WatchPlugState`.
@@ -367,8 +368,8 @@ type ObserverWatchGainStateError = flexible enum {
 // TODO(fxbug.dev/102626): Remove this enum after implementation, if no error
 // conditions have been identified and no error codes have been added.
 type ObserverWatchPlugStateError = flexible enum {
-    /// This device has become unhealthy and can no longer be observed.
-    DEVICE_UNHEALTHY = 1;
+    /// This device has encountered an error and can no longer be observed.
+    DEVICE_ERROR = 1;
 };
 
 /// Errors returned by `Observer/GetReferenceClock`.
@@ -376,9 +377,9 @@ type ObserverWatchPlugStateError = flexible enum {
 // TODO(fxbug.dev/102626): Remove this enum after implementation, if no error
 // conditions have been identified and no error codes have been added.
 type ObserverGetReferenceClockError = flexible enum {
-    /// The device's reference clock could not be returned.
-    DEVICE_CLOCK_UNAVAILABLE = 1;
+    /// This device has encountered an error and can no longer be observed.
+    DEVICE_ERROR = 1;
 
-    /// This device has become unhealthy and can no longer be observed.
-    DEVICE_UNHEALTHY = 2;
+    /// The device's reference clock could not be returned.
+    DEVICE_CLOCK_UNAVAILABLE = 2;
 };

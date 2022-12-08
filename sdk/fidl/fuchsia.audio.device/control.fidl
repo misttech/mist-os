@@ -32,7 +32,7 @@ type RingBufferProperties = table {
     /// The number of bits (starting with the most significant) that are valid,
     /// within each individual sample. This may be be smaller than the actual
     /// sample size, in the case of an input ring buffer fed by an 18-bit ADC
-    /// for example. Any additional bits of precision should be ignored. 
+    /// for example. Any additional bits of precision should be ignored.
     ///
     /// Required.
     //
@@ -41,72 +41,65 @@ type RingBufferProperties = table {
     //   Optional (Required for PCM encodings, including 'packed' formats).
     1: valid_bits_per_sample uint8;
 
+    /// The maximum delay until disabled channels become fully operational,
+    /// after calling `SetActiveChannels`. This is the worst-case duration when
+    /// reenabling all channels. The value must be non-negative.
+    ///
+    /// Required.
+    2: turn_on_delay zx.duration;
+};
+
+type DelayInfo = table {
+    /// The driver's best estimate of the delay internal to the hardware it abstracts for
+    /// the chosen format. This duration must be non-negative.
+    ///
+    /// Required.
+    1: internal_delay zx.duration;
+
     /// The amount of pipeline delay beyond the interconnect (subsequent to the
     /// DMA "read" position for output devices, or prior to the DMA "write"
     /// position for input devices). This duration must be non-negative.
     ///
     /// Required.
     2: external_delay zx.duration;
-
-    /// The amount of temporary buffering needed for the ring-buffer DMA
-    /// process. This duration usually corresponds to the size of a hardware
-    /// FIFO block, since that FIFO determines the specifics of data transfers
-    /// into and out of ring-buffer memory.
-    ///
-    /// For output devices this represents the amount of read-ahead buffering
-    /// needed (important when calculating minimum lead-time); for input devices
-    /// this is the amount of hold-back data (important when calculating maximum
-    /// capture delay). Compared to the interconnect (where we measure audio
-    /// position), FIFO delay lies on the _near_ side (unlike external delay,
-    /// which is on the _far_ side). This duration must be non-negative.
-    ///
-    /// Required.
-    3: fifo_delay zx.duration;
-
-    /// The maximum delay until disabled channels become fully operational,
-    /// after calling `SetActiveChannels`. This is the worst-case duration when
-    /// reenabling all channels. The value must be non-negative.
-    ///
-    /// Required.
-    4: turn_on_delay zx.duration;
 };
 
-/// A `Controller` interface creates `Control` instances. Each `Control` binds
+/// A `ControlCreator` interface creates `Control` instances. Each `Control` binds
 /// to a single device. A device can only be bound to one `Control` at any time.
 @discoverable
-protocol Controller {
+protocol ControlCreator {
     // Create a `Control` for the specified device.
     Create(resource table {
-        /// The token `id` for the device to be controlled.
+        /// The token id for the device to be controlled.
         ///
         /// Required.
-        1: id TokenId;
+        1: token_id TokenId;
 
         /// The server_end of the `Control` to be created.
         ///
         /// Required.
         2: control_server server_end:Control;
-    }) -> (table {}) error ControllerCreateError;
+    }) -> (table {}) error ControlCreatorError;
 };
 
-/// Errors returned by `Controller/Create`.
-type ControllerCreateError = flexible enum {
-    /// The required `id` is missing.
-    INVALID_TOKEN = 1;
-
-    /// No device with token `id` was found. Either this token has never been
-    /// used, or the device with this token `id` has been removed.
-    DEVICE_NOT_FOUND = 2;
-
-    /// The device with token `id` has become unhealthy and cannot be observed.
-    DEVICE_UNHEALTHY = 3;
-
-    /// A `Control` associated with `id` already exists. This device is already
-    /// being actively controlled.
-    DEVICE_ALREADY_ALLOCATED = 4;
+/// Errors returned by `ControlCreator/Create`.
+type ControlCreatorError = flexible enum {
+    /// The required `token_id` is missing.
+    INVALID_TOKEN_ID = 1;
 
     /// The required `control_server` is missing.
-    INVALID_CONTROL = 5;
+    INVALID_CONTROL = 2;
+
+    /// No device with `token_id` was found. Either this token has never been
+    /// used, or the device with `token_id` has been removed.
+    DEVICE_NOT_FOUND = 3;
+
+    /// The device with `token_id` encountered an error and cannot be observed.
+    DEVICE_ERROR = 4;
+
+    /// A `Control` associated with `token_id` already exists. This device is
+    /// already being actively controlled.
+    DEVICE_ALREADY_ALLOCATED = 5;
 };
 
 /// A `Control` instance is used to change the settings or state of an audio
@@ -164,35 +157,56 @@ type ControlSetGainError = flexible enum {
     /// The required `target_state` is missing.
     INVALID_GAIN_STATE = 1;
 
+    /// This device has encountered an error and can no longer be controlled.
+    DEVICE_ERROR = 2;
+
+    /// The required `target_state.gain_db` is missing.
+    INVALID_GAIN_DB = 3;
+
     /// The specified gain is outside the device's allowed range.
-    GAIN_OUT_OF_RANGE = 2;
+    GAIN_OUT_OF_RANGE = 4;
 
     /// MUTE is requested, but the device has no MUTE control.
-    MUTE_UNAVAILABLE = 3;
+    MUTE_UNAVAILABLE = 5;
 
     /// Enabling AGC is requested, but the device has no AGC.
-    AGC_UNAVAILABLE = 4;
+    AGC_UNAVAILABLE = 6;
 };
 
 /// Errors returned by `Control/GetCurrentlyPermittedFormats`.
 //
 // TODO(fxbug.dev/102626): Remove this enum after implementation, if no error
 // conditions have been identified and no error codes have been added.
-type ControlGetCurrentlyPermittedFormatsError = flexible enum {};
+type ControlGetCurrentlyPermittedFormatsError = flexible enum {
+    /// This device has encountered an error and can no longer be queried.
+    DEVICE_ERROR = 1;
+};
 
 /// Errors returned by `Control/CreateRingBuffer`.
 type ControlCreateRingBufferError = flexible enum {
-    /// The driver or device is unresponsive.
-    DEVICE_FAILURE = 1;
-
     /// The required `options` is missing.
-    INVALID_OPTIONS = 2;
+    INVALID_OPTIONS = 1;
+
+    /// The required `options.format` is missing.
+    INVALID_FORMAT = 2;
+
+    /// The required `options.ring_buffer_min_bytes` is missing.
+    INVALID_MIN_BYTES = 3;
+
+    /// The required `ring_buffer_server` is missing.
+    INVALID_RING_BUFFER = 4;
+
+    /// This device has encountered an error and can no longer be controlled.
+    DEVICE_ERROR = 5;
+
+    /// The device does not support the specified format.
+    FORMAT_MISMATCH = 6;
 
     /// The device cannot create a ring buffer with the specified options.
-    BAD_RING_BUFFER_OPTION = 3;
+    BAD_RING_BUFFER_OPTION = 7;
 
-    /// The required `ring_buffer_server` is invalid or missing.
-    INVALID_RING_BUFFER = 4;
+    /// An active `RingBuffer` instance already exists for this `Control`.
+    RING_BUFFER_ALREADY_ALLOCATED = 8;
 };
 
 /// A `RingBuffer` instance controls data flow for the associated audio stream.
@@ -222,41 +236,72 @@ protocol RingBuffer {
     }) -> (table {
         /// The CLOCK_MONOTONIC time when the hardware was configured. Note:
         /// this does not include the effects of `turn_on_delay` on streams.
+        ///
+        /// Required.
         1: set_time zx.time;
     }) error RingBufferSetActiveChannelsError;
 
     /// Start the ring buffer, beginning at the first frame of the ring buffer.
     Start(table {}) -> (table {
         /// The CLOCK_MONOTONIC time when the stream was started.
+        ///
+        /// Required.
         1: start_time zx.time;
     }) error RingBufferStartError;
 
     /// Stop the ring buffer.
     Stop(table {}) -> (table {}) error RingBufferStopError;
+
+    /// Request delay information via a hanging get. The RingBuffer will respond
+    /// immediately to the first `WatchDelayInfo` call. Subsequent calls will
+    /// only be completed when the delay info has changed from previously
+    /// communicated values.
+    WatchDelayInfo() -> (table {
+        /// Required.
+        1: delay_info DelayInfo;
+    }) error RingBufferWatchDelayInfoError;
 };
 
 /// Errors returned by `RingBuffer/SetActiveChannels`.
 type RingBufferSetActiveChannelsError = flexible enum {
+    /// The required `channel_bitmask` is missing.
+    INVALID_CHANNEL_BITMASK = 1;
+
+    /// This device has encountered an error and can no longer be controlled.
+    DEVICE_ERROR = 2;
+
     /// The device does not support `SetActiveChannels`. Individual channels
     /// cannot be deactivated (all channels are always active).
-    METHOD_NOT_SUPPORTED = 1;
-
-    /// The required `channel_bitmask` is missing.
-    INVALID_CHANNEL_BITMASK = 2;
+    METHOD_NOT_SUPPORTED = 3;
 
     /// The passed `channel_bitmask` specifies channels that are beyond the
     /// range of channels currently configured for this ring buffer.
-    CHANNEL_OUT_OF_RANGE = 3;
+    CHANNEL_OUT_OF_RANGE = 4;
 };
 
 /// Errors returned by `RingBuffer/Start`.
 type RingBufferStartError = flexible enum {
+    /// This device has encountered an error and can no longer be controlled.
+    DEVICE_ERROR = 1;
+
     /// `Start` was called on a ring buffer that is already started.
-    ALREADY_STARTED = 1;
+    ALREADY_STARTED = 2;
 };
 
 /// Errors returned by `RingBuffer/Stop`.
 type RingBufferStopError = flexible enum {
+    /// This device has encountered an error and can no longer be controlled.
+    DEVICE_ERROR = 1;
+
     /// `Stop` was called on a ring buffer that is already stopped.
-    ALREADY_STOPPED = 1;
+    ALREADY_STOPPED = 2;
+};
+
+/// Errors returned by `RingBuffer/WatchDelayInfo`.
+type RingBufferWatchDelayInfoError = flexible enum {
+    /// The previous `WatchDelayInfo` call has not yet completed.
+    WATCH_ALREADY_PENDING = 1;
+
+    /// This device has encountered an error and can no longer be observed.
+    DEVICE_ERROR = 2;
 };
