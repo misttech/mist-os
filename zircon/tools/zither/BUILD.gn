@@ -53,6 +53,7 @@ if (is_host) {
       "c",
       "golang",
       "kernel",
+      "legacy_syscall_cdecl",
       "zircon_ifs",
       "//tools/fidl/lib/fidlgen",
       "//tools/lib/color",
@@ -312,12 +313,13 @@ template("zither_golden_test") {
                    "case_output_dir",
                    "output_subdir",
                  ])
-    } else if (case.backend == "kernel") {
-      # The kernel backend generates sources that rely on a number of other
-      # kernel and vDSO-specific definitions. Given that and the fact the
-      # singular use-case for these sources will be exercised in any default
-      # build invocation, it is neither worthwhile nor all that practical to do
-      # a compilation check here.
+    } else if (case.backend == "kernel" ||
+               case.backend == "legacy_syscall_cdecl") {
+      # The kernel and legacy_syscall_cdecl backends generate sources that rely
+      # on a number of other kernel and vDSO-specific definitions. Given that
+      # and the fact the singular use-case for these sources will be exercised
+      # in any default build invocation, it is neither worthwhile nor all that
+      # practical to do a compilation check here.
       group(compilation_check_target) {
         visibility = [ ":*" ]
         testonly = true
@@ -512,6 +514,14 @@ zither_golden_test("zx.test") {
         "kernel-wrappers.inc",
         "syscalls.inc",
         "zx-syscall-numbers.h",
+      ]
+    },
+    {
+      backend = "legacy_syscall_cdecl"
+      files = [
+        "cdecls.inc",
+        "testonly-cdecls.inc",
+        "cdecls-next.inc",
       ]
     },
   ]

@@ -38,7 +38,7 @@ func NewGenerator(formatter fidlgen.Formatter) *Generator {
 		"Increment":                func(n int) int { return n + 1 },
 		"IsUserOutHandle":          isUserOutHandle,
 		"KernelIncDecl": func(syscall zither.Syscall) string {
-			return SyscallCDecl(syscall, PointerViewKernel)
+			return SyscallCDecl(syscall, PointerViewKernel, cDeclMacro)
 		},
 		"LastParameterIndex": func(syscall zither.Syscall) int {
 			return len(syscall.Parameters) - 1
@@ -48,7 +48,7 @@ func NewGenerator(formatter fidlgen.Formatter) *Generator {
 		},
 		"PassedAsPointer": passedAsPointer,
 		"SyscallIncDecl": func(syscall zither.Syscall) string {
-			return SyscallCDecl(syscall, PointerViewUserspace)
+			return SyscallCDecl(syscall, PointerViewUserspace, cDeclMacro)
 		},
 		"UserOutHandles": userOutHandles,
 	})

@@ -45,13 +45,13 @@ const (
 // SyscallCDecl generates a macro-friendly representation of the syscall,
 // minor variations of which are used across generated syscall-related
 // sources.
-func SyscallCDecl(syscall zither.Syscall, ptrView PointerView) string {
+func SyscallCDecl(syscall zither.Syscall, ptrView PointerView, macroName func(zither.Syscall) string) string {
 	tmpl := template.New("SyscallCDeclTemplate").Funcs(template.FuncMap{
 		"Attributes": cDeclAttributes,
 		"LastParameterIndex": func(syscall zither.Syscall) int {
 			return len(syscall.Parameters) - 1
 		},
-		"Macro":      cDeclMacro,
+		"Macro":      macroName,
 		"Name":       zither.LowerCaseWithUnderscores,
 		"ReturnType": cDeclReturnType,
 		"ParameterType": func(param zither.SyscallParameter) string {
@@ -94,7 +94,8 @@ func passedAsPointer(param zither.SyscallParameter) bool {
 		return true
 	}
 	kind := param.Type.Kind
-	return kind.IsPointerLike() || kind == zither.TypeKindStruct // Structs are always passed as pointers.
+	// Structs are always passed as pointers.
+	return kind.IsPointerLike() || kind == zither.TypeKindStruct
 }
 
 func cDeclParameterType(param zither.SyscallParameter, ptrView PointerView, annotated bool) string {

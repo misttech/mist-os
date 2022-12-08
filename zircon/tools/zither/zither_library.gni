@@ -12,6 +12,7 @@ supported_zither_backends = [
   "asm",  # Assembly data layout bindings.
   "c",  # C data layout bindings.
   "go",  # Go data layout bindings.
+  "legacy_syscall_cdecl",  # Legacy C syscall declarations.
   "zircon_ifs",  # Syscall text ABI bindings.
   "kernel",  # Internal kernel bindings.
 ]
@@ -128,6 +129,18 @@ supported_zither_backend_info = {
     }
 
     _library_template = "_zither_kernel_sources"
+  }
+
+  legacy_syscall_cdecl = {
+    formatter = _clang_format
+    output_subdir = {
+      prefix_parts = [
+        "zircon",
+        "syscalls",
+        "internal",
+      ]
+    }
+    _library_template = "_zither_legacy_syscall_cdecl_sources"
   }
 }
 
@@ -465,6 +478,55 @@ template("_zither_kernel_sources") {
   }
 }
 
+template("_zither_legacy_syscall_cdecl_sources") {
+  assert(invoker.backend == "legacy_syscall_cdecl")
+
+  main_target = target_name
+  zither_target = "$target_name.gen"
+
+  not_needed(invoker, [ "source_names" ])
+
+  forward_variables_from(invoker,
+                         [
+                           "output_dir",
+                           "output_subdir",
+                         ])
+  generated_files = [
+    "$output_dir/${output_subdir}/cdecls.inc",
+    "$output_dir/${output_subdir}/cdecls-next.inc",
+    "$output_dir/${output_subdir}/testonly-cdecls.inc",
+  ]
+
+  _zither(zither_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                             "deps",
+                             "backend",
+                             "fidl_ir_json",
+                             "fidl_ir_target",
+                             "generated_files",
+                             "formatter",
+                           ])
+  }
+
+  library_headers(main_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                             "generated_files",
+                           ])
+    include_dir = output_dir
+    headers = rebase_path(generated_files, include_dir)
+    deps = [
+      ":${zither_target}($default_toolchain)",
+      ":${zither_target}.check($default_toolchain)",
+    ]
+  }
+}
+
 # Define a full set of per-backend targets for a Zither library.
 #
 # `zither_library()` is meant to be instantiated within `fidl()`. It consumes
@@ -507,6 +569,15 @@ template("_zither_kernel_sources") {
 #       - <lib/syscalls/syscalls.inc>: macro-templated enumeration of syscalls
 #         from userspace's point of view.
 #       - <lib/syscalls/zx-syscall-numbers.h>: `#define`s of syscall numbers.
+#
+#   * Legacy syscall C declaration backend: ${target_name}.legacy_syscall_cdecl
+#     A C++ library target for the kernel with the following headers:
+#       - internal/cdecls.inc: macro-templated enumeration of syscalls meant
+#         for the public headers
+#       - internal/testonly-cdecls.inc: similar to cdecls.inc, but consisting
+#         of the test-only syscalls.
+#       - internal/cdecls-next.inc: similar to cdecls.inc, but consisting
+#         of the "next" syscalls.
 #
 # Parameters:
 #
