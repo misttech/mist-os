@@ -29,11 +29,20 @@ if (is_host) {
       "src/system.rs",
     ]
 
-    deps = [ "//src/sys/pkg/lib/fuchsia-merkle" ]
+    deps = [
+      "//src/sys/pkg/lib/fuchsia-hash",
+      "//src/sys/pkg/lib/fuchsia-merkle",
+      "//third_party/rust_crates:anyhow",
+      "//third_party/rust_crates:thiserror",
+
+      # TODO(fxbug.dev/112505): This dependency was introduced for accessing blobfs archives via
+      # bespoke code that is not owned by the storage team. `scrutiny_x` should contain its own
+      # implementation of blobfs access via a storage team-owned API.
+      "//src/security/lib/scrutiny/utils",
+    ]
     test_deps = [
       "//src/lib/fuchsia",
       "//third_party/rust_crates:maplit",
-      "//third_party/rust_crates:thiserror",
     ]
   }
 }

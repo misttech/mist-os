@@ -29,7 +29,7 @@ impl fmt::Display for Hash {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::Hash;
     use fuchsia_merkle::MerkleTree;
 

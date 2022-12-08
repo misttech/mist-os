@@ -2,7 +2,52 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(fxbug.dev/111251): Implement for production System API.
+use crate::api::DataSource as DataSourceApi;
+use crate::api::DataSourceKind;
+use crate::api::DataSourceVersion;
+use std::iter;
+use std::path::PathBuf;
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct BlobFsArchive {
+    path: PathBuf,
+}
+
+impl BlobFsArchive {
+    /// Constructs a [`BlobFsArchive`] that is backed by the file located at `path`.
+    pub fn new(path: PathBuf) -> Self {
+        Self { path }
+    }
+}
+
+impl DataSourceApi for BlobFsArchive {
+    type SourcePath = PathBuf;
+
+    fn kind(&self) -> DataSourceKind {
+        DataSourceKind::BlobfsArchive
+    }
+
+    fn parent(&self) -> Option<Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>> {
+        None
+    }
+
+    fn children(
+        &self,
+    ) -> Box<dyn Iterator<Item = Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>>> {
+        Box::new(iter::empty())
+    }
+
+    fn path(&self) -> Option<Self::SourcePath> {
+        Some(self.path.clone())
+    }
+
+    fn version(&self) -> DataSourceVersion {
+        // TODO: Add support for exposing the blobfs format version.
+        DataSourceVersion::Unknown
+    }
+}
+
+// TODO(fxbug.dev/111251): Add additional data source types for production System API.
 
 #[cfg(test)]
 pub mod fake {

@@ -319,6 +319,10 @@ pub trait Blob {
     fn hash(&self) -> Self::Hash;
 
     /// Gets a readable and seekable file content access API.
+    ///
+    /// # Panics
+    ///
+    /// Some blob sources may not support concurrent invocations of `Blob::reader_seeker`.
     fn reader_seeker(&self) -> Result<Self::ReaderSeeker, Self::Error>;
 
     /// Iterate over the data sources that provide this blob.
