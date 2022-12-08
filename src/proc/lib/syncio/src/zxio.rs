@@ -726,6 +726,10 @@ extern "C" {
 }
 pub const ZXIO_SHUTDOWN_OPTIONS_READ: zxio_shutdown_options_t = 2;
 pub const ZXIO_SHUTDOWN_OPTIONS_WRITE: zxio_shutdown_options_t = 1;
+pub const ZXIO_NODE_PROTOCOL_NONE: zxio_node_protocols_t = 0;
+pub const ZXIO_NODE_PROTOCOL_CONNECTOR: zxio_node_protocols_t = 1;
+pub const ZXIO_NODE_PROTOCOL_DIRECTORY: zxio_node_protocols_t = 2;
+pub const ZXIO_NODE_PROTOCOL_FILE: zxio_node_protocols_t = 4;
 pub type __builtin_va_list = [__va_list_tag; 1usize];
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
