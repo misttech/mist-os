@@ -192,10 +192,10 @@ struct ProfRawHeader {
 #include <profile/InstrProfData.inc>
 };
 
-constexpr size_t kAlignAfterBuildId = sizeof(uintptr_t);
+constexpr size_t kAlignAfterBuildId = sizeof(uint64_t);
 
 constexpr size_t PaddingSize(size_t chunk_size_bytes) {
-  return kAlignAfterBuildId - (chunk_size_bytes % kAlignAfterBuildId);
+  return (kAlignAfterBuildId - (chunk_size_bytes % kAlignAfterBuildId)) % kAlignAfterBuildId;
 }
 
 constexpr size_t PaddingSize(cpp20::span<const std::byte> chunk) {
