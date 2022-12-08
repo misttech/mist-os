@@ -364,7 +364,12 @@ func (u *Union) cloneAndRenameIfAnonymous(c *compiler, protocol fidlgen.EncodedC
 
 	r := *u
 	r.setName(c, protocol, ext)
+	r.setTagName(c, protocol, ext)
 	return &r
+}
+
+func (u *Union) setTagName(c *compiler, protocol fidlgen.EncodedCompoundIdentifier, ext string) {
+	u.TagName = "I_" + c.compileCompoundIdentifier(protocol, false, ext+TagSuffix)
 }
 
 type UnionMember struct {

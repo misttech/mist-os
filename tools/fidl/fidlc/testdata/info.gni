@@ -352,6 +352,15 @@ fidl_testdata_info = [
     ]
   },
   {
+    name = "protocol_layouts_same_library"
+    target = "//tools/fidl/fidlc/testdata/protocol_layouts_same_library:test.protocollayoutssamelibrary"
+
+    denylist = [
+      # TODO(fxbug.dev/96310): Possibly add backend support for syzkaller.
+      "fidlgen_syzkaller",
+    ]
+  },
+  {
     name = "protocol_payloads"
     target =
         "//tools/fidl/fidlc/testdata/protocol_payloads:test.protocolpayloads"

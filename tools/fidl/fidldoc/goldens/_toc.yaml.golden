@@ -101,6 +101,9 @@ toc:
   - title: test.protocollayouts
     path: /test.protocollayouts
     version_added: ""
+  - title: test.protocollayoutssamelibrary
+    path: /test.protocollayoutssamelibrary
+    version_added: ""
   - title: test.protocolpayloads
     path: /test.protocolpayloads
     version_added: ""

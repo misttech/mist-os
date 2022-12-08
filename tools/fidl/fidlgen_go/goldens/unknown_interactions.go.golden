@@ -5944,7 +5944,7 @@ func (_m *UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse) GetUnknownDa
 	return _m.I_unknownData.(_bindings.UnknownData)
 }
 
-type I_unknownInteractionsAjarProtocolStrictEventUnionRequestTag uint64
+type I_unknownInteractionsAjarProtocolStrictEventUnionResponseTag uint64
 
 const (
 	UnknownInteractionsAjarProtocolStrictEventUnionResponse_unknownData = 0 // 0x00000000
@@ -5952,9 +5952,9 @@ const (
 )
 
 type UnknownInteractionsAjarProtocolStrictEventUnionResponse struct {
-	I_unknownInteractionsAjarProtocolStrictEventUnionRequestTag `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	I_unknownData                                               interface{}
-	SomeField                                                   int32 `fidl_ordinal:"1"`
+	I_unknownInteractionsAjarProtocolStrictEventUnionResponseTag `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	I_unknownData                                                interface{}
+	SomeField                                                    int32 `fidl_ordinal:"1"`
 }
 
 var _mUnknownInteractionsAjarProtocolStrictEventUnionResponse = _bindings.CreateLazyMarshaler(UnknownInteractionsAjarProtocolStrictEventUnionResponse{})
@@ -5964,7 +5964,7 @@ func (msg *UnknownInteractionsAjarProtocolStrictEventUnionResponse) Marshaler() 
 }
 
 func (_m *UnknownInteractionsAjarProtocolStrictEventUnionResponse) reset() {
-	switch _m.I_unknownInteractionsAjarProtocolStrictEventUnionRequestTag {
+	switch _m.I_unknownInteractionsAjarProtocolStrictEventUnionResponseTag {
 	case 1:
 		var _zeroed int32
 		_m.SomeField = _zeroed
@@ -5974,8 +5974,8 @@ func (_m *UnknownInteractionsAjarProtocolStrictEventUnionResponse) reset() {
 	}
 }
 
-func (_m *UnknownInteractionsAjarProtocolStrictEventUnionResponse) Which() I_unknownInteractionsAjarProtocolStrictEventUnionRequestTag {
-	switch _m.I_unknownInteractionsAjarProtocolStrictEventUnionRequestTag {
+func (_m *UnknownInteractionsAjarProtocolStrictEventUnionResponse) Which() I_unknownInteractionsAjarProtocolStrictEventUnionResponseTag {
+	switch _m.I_unknownInteractionsAjarProtocolStrictEventUnionResponseTag {
 	case 1:
 		return UnknownInteractionsAjarProtocolStrictEventUnionResponseSomeField
 	default:
@@ -5984,12 +5984,12 @@ func (_m *UnknownInteractionsAjarProtocolStrictEventUnionResponse) Which() I_unk
 }
 
 func (_m *UnknownInteractionsAjarProtocolStrictEventUnionResponse) Ordinal() uint64 {
-	return uint64(_m.I_unknownInteractionsAjarProtocolStrictEventUnionRequestTag)
+	return uint64(_m.I_unknownInteractionsAjarProtocolStrictEventUnionResponseTag)
 }
 
 func (_m *UnknownInteractionsAjarProtocolStrictEventUnionResponse) SetSomeField(someField int32) {
 	_m.reset()
-	_m.I_unknownInteractionsAjarProtocolStrictEventUnionRequestTag = UnknownInteractionsAjarProtocolStrictEventUnionResponseSomeField
+	_m.I_unknownInteractionsAjarProtocolStrictEventUnionResponseTag = UnknownInteractionsAjarProtocolStrictEventUnionResponseSomeField
 	_m.SomeField = someField
 }
 
@@ -6002,7 +6002,7 @@ func (_m *UnknownInteractionsAjarProtocolStrictEventUnionResponse) GetUnknownDat
 	return _m.I_unknownData.(_bindings.UnknownData)
 }
 
-type I_unknownInteractionsAjarProtocolFlexibleEventUnionRequestTag uint64
+type I_unknownInteractionsAjarProtocolFlexibleEventUnionResponseTag uint64
 
 const (
 	UnknownInteractionsAjarProtocolFlexibleEventUnionResponse_unknownData = 0 // 0x00000000
@@ -6010,9 +6010,9 @@ const (
 )
 
 type UnknownInteractionsAjarProtocolFlexibleEventUnionResponse struct {
-	I_unknownInteractionsAjarProtocolFlexibleEventUnionRequestTag `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	I_unknownData                                                 interface{}
-	SomeField                                                     int32 `fidl_ordinal:"1"`
+	I_unknownInteractionsAjarProtocolFlexibleEventUnionResponseTag `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	I_unknownData                                                  interface{}
+	SomeField                                                      int32 `fidl_ordinal:"1"`
 }
 
 var _mUnknownInteractionsAjarProtocolFlexibleEventUnionResponse = _bindings.CreateLazyMarshaler(UnknownInteractionsAjarProtocolFlexibleEventUnionResponse{})
@@ -6022,7 +6022,7 @@ func (msg *UnknownInteractionsAjarProtocolFlexibleEventUnionResponse) Marshaler(
 }
 
 func (_m *UnknownInteractionsAjarProtocolFlexibleEventUnionResponse) reset() {
-	switch _m.I_unknownInteractionsAjarProtocolFlexibleEventUnionRequestTag {
+	switch _m.I_unknownInteractionsAjarProtocolFlexibleEventUnionResponseTag {
 	case 1:
 		var _zeroed int32
 		_m.SomeField = _zeroed
@@ -6032,8 +6032,8 @@ func (_m *UnknownInteractionsAjarProtocolFlexibleEventUnionResponse) reset() {
 	}
 }
 
-func (_m *UnknownInteractionsAjarProtocolFlexibleEventUnionResponse) Which() I_unknownInteractionsAjarProtocolFlexibleEventUnionRequestTag {
-	switch _m.I_unknownInteractionsAjarProtocolFlexibleEventUnionRequestTag {
+func (_m *UnknownInteractionsAjarProtocolFlexibleEventUnionResponse) Which() I_unknownInteractionsAjarProtocolFlexibleEventUnionResponseTag {
+	switch _m.I_unknownInteractionsAjarProtocolFlexibleEventUnionResponseTag {
 	case 1:
 		return UnknownInteractionsAjarProtocolFlexibleEventUnionResponseSomeField
 	default:
@@ -6042,12 +6042,12 @@ func (_m *UnknownInteractionsAjarProtocolFlexibleEventUnionResponse) Which() I_u
 }
 
 func (_m *UnknownInteractionsAjarProtocolFlexibleEventUnionResponse) Ordinal() uint64 {
-	return uint64(_m.I_unknownInteractionsAjarProtocolFlexibleEventUnionRequestTag)
+	return uint64(_m.I_unknownInteractionsAjarProtocolFlexibleEventUnionResponseTag)
 }
 
 func (_m *UnknownInteractionsAjarProtocolFlexibleEventUnionResponse) SetSomeField(someField int32) {
 	_m.reset()
-	_m.I_unknownInteractionsAjarProtocolFlexibleEventUnionRequestTag = UnknownInteractionsAjarProtocolFlexibleEventUnionResponseSomeField
+	_m.I_unknownInteractionsAjarProtocolFlexibleEventUnionResponseTag = UnknownInteractionsAjarProtocolFlexibleEventUnionResponseSomeField
 	_m.SomeField = someField
 }
 
@@ -6176,7 +6176,7 @@ func (_m *UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse) GetUnknown
 	return _m.I_unknownData.(_bindings.UnknownData)
 }
 
-type I_unknownInteractionsClosedProtocolStrictEventUnionRequestTag uint64
+type I_unknownInteractionsClosedProtocolStrictEventUnionResponseTag uint64
 
 const (
 	UnknownInteractionsClosedProtocolStrictEventUnionResponse_unknownData = 0 // 0x00000000
@@ -6184,9 +6184,9 @@ const (
 )
 
 type UnknownInteractionsClosedProtocolStrictEventUnionResponse struct {
-	I_unknownInteractionsClosedProtocolStrictEventUnionRequestTag `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	I_unknownData                                                 interface{}
-	SomeField                                                     int32 `fidl_ordinal:"1"`
+	I_unknownInteractionsClosedProtocolStrictEventUnionResponseTag `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	I_unknownData                                                  interface{}
+	SomeField                                                      int32 `fidl_ordinal:"1"`
 }
 
 var _mUnknownInteractionsClosedProtocolStrictEventUnionResponse = _bindings.CreateLazyMarshaler(UnknownInteractionsClosedProtocolStrictEventUnionResponse{})
@@ -6196,7 +6196,7 @@ func (msg *UnknownInteractionsClosedProtocolStrictEventUnionResponse) Marshaler(
 }
 
 func (_m *UnknownInteractionsClosedProtocolStrictEventUnionResponse) reset() {
-	switch _m.I_unknownInteractionsClosedProtocolStrictEventUnionRequestTag {
+	switch _m.I_unknownInteractionsClosedProtocolStrictEventUnionResponseTag {
 	case 1:
 		var _zeroed int32
 		_m.SomeField = _zeroed
@@ -6206,8 +6206,8 @@ func (_m *UnknownInteractionsClosedProtocolStrictEventUnionResponse) reset() {
 	}
 }
 
-func (_m *UnknownInteractionsClosedProtocolStrictEventUnionResponse) Which() I_unknownInteractionsClosedProtocolStrictEventUnionRequestTag {
-	switch _m.I_unknownInteractionsClosedProtocolStrictEventUnionRequestTag {
+func (_m *UnknownInteractionsClosedProtocolStrictEventUnionResponse) Which() I_unknownInteractionsClosedProtocolStrictEventUnionResponseTag {
+	switch _m.I_unknownInteractionsClosedProtocolStrictEventUnionResponseTag {
 	case 1:
 		return UnknownInteractionsClosedProtocolStrictEventUnionResponseSomeField
 	default:
@@ -6216,12 +6216,12 @@ func (_m *UnknownInteractionsClosedProtocolStrictEventUnionResponse) Which() I_u
 }
 
 func (_m *UnknownInteractionsClosedProtocolStrictEventUnionResponse) Ordinal() uint64 {
-	return uint64(_m.I_unknownInteractionsClosedProtocolStrictEventUnionRequestTag)
+	return uint64(_m.I_unknownInteractionsClosedProtocolStrictEventUnionResponseTag)
 }
 
 func (_m *UnknownInteractionsClosedProtocolStrictEventUnionResponse) SetSomeField(someField int32) {
 	_m.reset()
-	_m.I_unknownInteractionsClosedProtocolStrictEventUnionRequestTag = UnknownInteractionsClosedProtocolStrictEventUnionResponseSomeField
+	_m.I_unknownInteractionsClosedProtocolStrictEventUnionResponseTag = UnknownInteractionsClosedProtocolStrictEventUnionResponseSomeField
 	_m.SomeField = someField
 }
 
@@ -6350,7 +6350,7 @@ func (_m *UnknownInteractionsProtocolStrictTwoWayUnionResponse) GetUnknownData()
 	return _m.I_unknownData.(_bindings.UnknownData)
 }
 
-type I_unknownInteractionsProtocolStrictEventUnionRequestTag uint64
+type I_unknownInteractionsProtocolStrictEventUnionResponseTag uint64
 
 const (
 	UnknownInteractionsProtocolStrictEventUnionResponse_unknownData = 0 // 0x00000000
@@ -6358,9 +6358,9 @@ const (
 )
 
 type UnknownInteractionsProtocolStrictEventUnionResponse struct {
-	I_unknownInteractionsProtocolStrictEventUnionRequestTag `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	I_unknownData                                           interface{}
-	SomeField                                               int32 `fidl_ordinal:"1"`
+	I_unknownInteractionsProtocolStrictEventUnionResponseTag `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	I_unknownData                                            interface{}
+	SomeField                                                int32 `fidl_ordinal:"1"`
 }
 
 var _mUnknownInteractionsProtocolStrictEventUnionResponse = _bindings.CreateLazyMarshaler(UnknownInteractionsProtocolStrictEventUnionResponse{})
@@ -6370,7 +6370,7 @@ func (msg *UnknownInteractionsProtocolStrictEventUnionResponse) Marshaler() _bin
 }
 
 func (_m *UnknownInteractionsProtocolStrictEventUnionResponse) reset() {
-	switch _m.I_unknownInteractionsProtocolStrictEventUnionRequestTag {
+	switch _m.I_unknownInteractionsProtocolStrictEventUnionResponseTag {
 	case 1:
 		var _zeroed int32
 		_m.SomeField = _zeroed
@@ -6380,8 +6380,8 @@ func (_m *UnknownInteractionsProtocolStrictEventUnionResponse) reset() {
 	}
 }
 
-func (_m *UnknownInteractionsProtocolStrictEventUnionResponse) Which() I_unknownInteractionsProtocolStrictEventUnionRequestTag {
-	switch _m.I_unknownInteractionsProtocolStrictEventUnionRequestTag {
+func (_m *UnknownInteractionsProtocolStrictEventUnionResponse) Which() I_unknownInteractionsProtocolStrictEventUnionResponseTag {
+	switch _m.I_unknownInteractionsProtocolStrictEventUnionResponseTag {
 	case 1:
 		return UnknownInteractionsProtocolStrictEventUnionResponseSomeField
 	default:
@@ -6390,12 +6390,12 @@ func (_m *UnknownInteractionsProtocolStrictEventUnionResponse) Which() I_unknown
 }
 
 func (_m *UnknownInteractionsProtocolStrictEventUnionResponse) Ordinal() uint64 {
-	return uint64(_m.I_unknownInteractionsProtocolStrictEventUnionRequestTag)
+	return uint64(_m.I_unknownInteractionsProtocolStrictEventUnionResponseTag)
 }
 
 func (_m *UnknownInteractionsProtocolStrictEventUnionResponse) SetSomeField(someField int32) {
 	_m.reset()
-	_m.I_unknownInteractionsProtocolStrictEventUnionRequestTag = UnknownInteractionsProtocolStrictEventUnionResponseSomeField
+	_m.I_unknownInteractionsProtocolStrictEventUnionResponseTag = UnknownInteractionsProtocolStrictEventUnionResponseSomeField
 	_m.SomeField = someField
 }
 
@@ -6408,7 +6408,7 @@ func (_m *UnknownInteractionsProtocolStrictEventUnionResponse) GetUnknownData() 
 	return _m.I_unknownData.(_bindings.UnknownData)
 }
 
-type I_unknownInteractionsProtocolFlexibleEventUnionRequestTag uint64
+type I_unknownInteractionsProtocolFlexibleEventUnionResponseTag uint64
 
 const (
 	UnknownInteractionsProtocolFlexibleEventUnionResponse_unknownData = 0 // 0x00000000
@@ -6416,9 +6416,9 @@ const (
 )
 
 type UnknownInteractionsProtocolFlexibleEventUnionResponse struct {
-	I_unknownInteractionsProtocolFlexibleEventUnionRequestTag `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	I_unknownData                                             interface{}
-	SomeField                                                 int32 `fidl_ordinal:"1"`
+	I_unknownInteractionsProtocolFlexibleEventUnionResponseTag `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	I_unknownData                                              interface{}
+	SomeField                                                  int32 `fidl_ordinal:"1"`
 }
 
 var _mUnknownInteractionsProtocolFlexibleEventUnionResponse = _bindings.CreateLazyMarshaler(UnknownInteractionsProtocolFlexibleEventUnionResponse{})
@@ -6428,7 +6428,7 @@ func (msg *UnknownInteractionsProtocolFlexibleEventUnionResponse) Marshaler() _b
 }
 
 func (_m *UnknownInteractionsProtocolFlexibleEventUnionResponse) reset() {
-	switch _m.I_unknownInteractionsProtocolFlexibleEventUnionRequestTag {
+	switch _m.I_unknownInteractionsProtocolFlexibleEventUnionResponseTag {
 	case 1:
 		var _zeroed int32
 		_m.SomeField = _zeroed
@@ -6438,8 +6438,8 @@ func (_m *UnknownInteractionsProtocolFlexibleEventUnionResponse) reset() {
 	}
 }
 
-func (_m *UnknownInteractionsProtocolFlexibleEventUnionResponse) Which() I_unknownInteractionsProtocolFlexibleEventUnionRequestTag {
-	switch _m.I_unknownInteractionsProtocolFlexibleEventUnionRequestTag {
+func (_m *UnknownInteractionsProtocolFlexibleEventUnionResponse) Which() I_unknownInteractionsProtocolFlexibleEventUnionResponseTag {
+	switch _m.I_unknownInteractionsProtocolFlexibleEventUnionResponseTag {
 	case 1:
 		return UnknownInteractionsProtocolFlexibleEventUnionResponseSomeField
 	default:
@@ -6448,12 +6448,12 @@ func (_m *UnknownInteractionsProtocolFlexibleEventUnionResponse) Which() I_unkno
 }
 
 func (_m *UnknownInteractionsProtocolFlexibleEventUnionResponse) Ordinal() uint64 {
-	return uint64(_m.I_unknownInteractionsProtocolFlexibleEventUnionRequestTag)
+	return uint64(_m.I_unknownInteractionsProtocolFlexibleEventUnionResponseTag)
 }
 
 func (_m *UnknownInteractionsProtocolFlexibleEventUnionResponse) SetSomeField(someField int32) {
 	_m.reset()
-	_m.I_unknownInteractionsProtocolFlexibleEventUnionRequestTag = UnknownInteractionsProtocolFlexibleEventUnionResponseSomeField
+	_m.I_unknownInteractionsProtocolFlexibleEventUnionResponseTag = UnknownInteractionsProtocolFlexibleEventUnionResponseSomeField
 	_m.SomeField = someField
 }
 
