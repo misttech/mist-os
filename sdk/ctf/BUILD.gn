@@ -38,6 +38,7 @@ generated_file("test_manifest") {
   outputs = [ "$root_out_dir/cts/test_manifest.json" ]
   output_conversion = "json"
   data_keys = [ "test_manifest" ]
+  walk_keys = [ "ctf_barrier" ]
   deps = [ "tests" ]
 
   metadata = {
