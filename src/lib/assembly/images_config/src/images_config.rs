@@ -215,6 +215,7 @@ pub struct BlobFS {
     pub name: String,
 
     /// Optionally compress the volume file.
+    /// TODO(fxbug.dev/117111): This is now inferred by the package mode.
     #[serde(default = "default_blobfs_compress")]
     pub compress: bool,
 

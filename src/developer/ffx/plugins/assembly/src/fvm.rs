@@ -27,6 +27,7 @@ use tracing::info;
 ///
 /// If the |fvm_config| includes information for a NAND, then an NAND-supported
 /// sparse FVM will also be generated for fastboot flashing.
+#[allow(clippy::too_many_arguments)]
 pub fn construct_fvm(
     outdir: impl AsRef<Utf8Path>,
     gendir: impl AsRef<Utf8Path>,
@@ -34,6 +35,7 @@ pub fn construct_fvm(
     assembly_manifest: &mut AssemblyManifest,
     assembly_config: &ImageAssemblyConfig,
     fvm_config: Fvm,
+    compress_blobfs: bool,
     base_package: &BasePackage,
 ) -> Result<()> {
     let mut builder = MultiFvmBuilder::new(
@@ -41,6 +43,7 @@ pub fn construct_fvm(
         gendir,
         assembly_config,
         assembly_manifest,
+        compress_blobfs,
         fvm_config.slice_size,
         base_package,
     );
@@ -69,6 +72,8 @@ pub struct MultiFvmBuilder<'a> {
     assembly_config: &'a ImageAssemblyConfig,
     /// The manifest of images to add new FVMs to.
     assembly_manifest: &'a mut AssemblyManifest,
+    /// Whether blobfs should be compressed.
+    compress_blobfs: bool,
     /// The size of a slice for the FVM.
     slice_size: u64,
     /// The base package to add to blobfs.
@@ -91,6 +96,7 @@ impl<'a> MultiFvmBuilder<'a> {
         gendir: impl AsRef<Utf8Path>,
         assembly_config: &'a ImageAssemblyConfig,
         assembly_manifest: &'a mut AssemblyManifest,
+        compress_blobfs: bool,
         slice_size: u64,
         base_package: &'a BasePackage,
     ) -> Self {
@@ -101,6 +107,7 @@ impl<'a> MultiFvmBuilder<'a> {
             gendir: gendir.as_ref().to_path_buf(),
             assembly_config,
             assembly_manifest,
+            compress_blobfs,
             slice_size,
             base_package,
         }
@@ -288,6 +295,7 @@ impl<'a> MultiFvmBuilder<'a> {
                     &self.gendir,
                     self.assembly_config,
                     config,
+                    self.compress_blobfs,
                     self.base_package,
                 )
                 .context("Constructing blobfs")?;
@@ -380,12 +388,14 @@ mod tests {
             path: "path/to/base_package".into(),
             manifest_path: Utf8PathBuf::default(),
         };
+        let compress_blobfs = true;
         let slice_size = 0;
         let mut builder = MultiFvmBuilder::new(
             dir,
             dir,
             &assembly_config,
             &mut assembly_manifest,
+            compress_blobfs,
             slice_size,
             &base_package,
         );
@@ -425,12 +435,14 @@ mod tests {
             path: "path/to/base_package".into(),
             manifest_path: Utf8PathBuf::default(),
         };
+        let compress_blobfs = true;
         let slice_size = 0;
         let mut builder = MultiFvmBuilder::new(
             dir,
             dir,
             &assembly_config,
             &mut assembly_manifest,
+            compress_blobfs,
             slice_size,
             &base_package,
         );
@@ -488,12 +500,14 @@ mod tests {
             path: "path/to/base_package".into(),
             manifest_path: Utf8PathBuf::default(),
         };
+        let compress_blobfs = true;
         let slice_size = 0;
         let mut builder = MultiFvmBuilder::new(
             dir,
             dir,
             &assembly_config,
             &mut assembly_manifest,
+            compress_blobfs,
             slice_size,
             &base_package,
         );
@@ -625,12 +639,14 @@ mod tests {
             manifest_path: base_package_manifest_path,
         };
 
+        let compress_blobfs = false;
         let slice_size = 0;
         let mut builder = MultiFvmBuilder::new(
             dir,
             dir,
             &assembly_config,
             &mut assembly_manifest,
+            compress_blobfs,
             slice_size,
             &base_package,
         );
@@ -760,12 +776,14 @@ mod tests {
             manifest_path: base_package_manifest_path,
         };
 
+        let compress_blobfs = false;
         let slice_size = 0;
         let mut builder = MultiFvmBuilder::new(
             dir,
             dir,
             &assembly_config,
             &mut assembly_manifest,
+            compress_blobfs,
             slice_size,
             &base_package,
         );

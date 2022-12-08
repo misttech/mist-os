@@ -200,7 +200,6 @@ if (is_fuchsia) {
 
     # blobfs arguments
     assembly_blob_layout_format = blob_layout_format
-    assembly_compress_blobs = compress_blobs
     if (blobfs_product_minimum_inodes != false) {
       blobfs_minimum_inodes = blobfs_product_minimum_inodes
     } else if (blobfs_board_minimum_inodes != false) {

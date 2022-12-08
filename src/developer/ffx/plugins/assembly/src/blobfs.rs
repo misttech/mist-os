@@ -19,11 +19,12 @@ pub fn construct_blobfs(
     gendir: impl AsRef<Utf8Path>,
     image_config: &ImageAssemblyConfig,
     blobfs_config: &BlobFS,
+    compress: bool,
     base_package: &BasePackage,
 ) -> Result<(Utf8PathBuf, BlobfsContents)> {
     let mut contents = BlobfsContents::default();
     let mut blobfs_builder = BlobFSBuilder::new(blobfs_tool, blobfs_config.layout.to_string());
-    blobfs_builder.set_compressed(blobfs_config.compress);
+    blobfs_builder.set_compressed(compress);
     contents.maximum_contents_size = blobfs_config.maximum_contents_size;
 
     // Add the base and cache packages.
@@ -64,9 +65,10 @@ mod tests {
     use assembly_config_schema::ImageAssemblyConfig;
     use assembly_images_config::{BlobFS, BlobFSLayout};
     use assembly_tool::testing::FakeToolProvider;
-    use assembly_tool::ToolProvider;
+    use assembly_tool::{ToolCommandLog, ToolProvider};
     use camino::Utf8Path;
     use fuchsia_hash::Hash;
+    use serde_json::json;
     use std::collections::BTreeMap;
     use std::fs::File;
     use std::io::Write;
@@ -81,8 +83,8 @@ mod tests {
         let image_config = ImageAssemblyConfig::new_for_testing("kernel", 0);
         let blobfs_config = BlobFS {
             name: "blob".into(),
-            layout: BlobFSLayout::Compact,
             compress: true,
+            layout: BlobFSLayout::Compact,
             maximum_bytes: None,
             minimum_data_bytes: None,
             minimum_inodes: None,
@@ -119,6 +121,118 @@ mod tests {
         let blobfs_tool = tools.get_tool("blobfs").unwrap();
 
         // Construct blobfs, and ensure no error is returned.
-        construct_blobfs(blobfs_tool, dir, dir, &image_config, &blobfs_config, &base).unwrap();
+        construct_blobfs(
+            blobfs_tool,
+            dir,
+            dir,
+            &image_config,
+            &blobfs_config,
+            /*compress=*/ true,
+            &base,
+        )
+        .unwrap();
+
+        // Ensure the command was run correctly.
+        let output_path = dir.join("blob.blk");
+        let blobs_json_path = dir.join("blobs.json");
+        let blob_manifest_path = dir.join("blob.manifest");
+        let expected_commands: ToolCommandLog = serde_json::from_value(json!({
+            "commands": [
+                {
+                    "tool": "./host_x64/blobfs",
+                    "args": [
+                        "--json-output",
+                        blobs_json_path,
+                        "--compress",
+                        output_path,
+                        "create",
+                        "--manifest",
+                        blob_manifest_path,
+                    ]
+                }
+            ]
+        }))
+        .unwrap();
+        assert_eq!(&expected_commands, tools.log());
+    }
+
+    #[test]
+    fn construct_uncompressed() {
+        let tmp = tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        let image_config = ImageAssemblyConfig::new_for_testing("kernel", 0);
+        let blobfs_config = BlobFS {
+            name: "blob".into(),
+            compress: true,
+            layout: BlobFSLayout::Compact,
+            maximum_bytes: None,
+            minimum_data_bytes: None,
+            minimum_inodes: None,
+            maximum_contents_size: None,
+        };
+
+        // Create a fake base package.
+        let base_path = dir.join("base.far");
+        std::fs::write(&base_path, "fake base").unwrap();
+        let base_package_manifest_path = dir.join("package_manifest.json");
+        let mut base_package_manifest_file = File::create(&base_package_manifest_path).unwrap();
+        let contents = r#"{
+            "version": "1",
+            "package": {
+                "name": "system_image",
+                "version": "0"
+            },
+            "blobs": []
+        }
+        "#;
+        write!(base_package_manifest_file, "{}", contents).unwrap();
+        let base = BasePackage {
+            merkle: Hash::from_str(
+                "0000000000000000000000000000000000000000000000000000000000000000",
+            )
+            .unwrap(),
+            contents: BTreeMap::default(),
+            path: base_path,
+            manifest_path: base_package_manifest_path,
+        };
+
+        // Create a fake blobfs tool.
+        let tools = FakeToolProvider::default();
+        let blobfs_tool = tools.get_tool("blobfs").unwrap();
+
+        // Construct blobfs, and ensure no error is returned.
+        construct_blobfs(
+            blobfs_tool,
+            dir,
+            dir,
+            &image_config,
+            &blobfs_config,
+            /*compress=*/ false,
+            &base,
+        )
+        .unwrap();
+
+        // Ensure the command was run correctly.
+        let output_path = dir.join("blob.blk");
+        let blobs_json_path = dir.join("blobs.json");
+        let blob_manifest_path = dir.join("blob.manifest");
+        let expected_commands: ToolCommandLog = serde_json::from_value(json!({
+            "commands": [
+                {
+                    "tool": "./host_x64/blobfs",
+                    "args": [
+                        "--json-output",
+                        blobs_json_path,
+                        output_path,
+                        "create",
+                        "--manifest",
+                        blob_manifest_path,
+                    ]
+                }
+            ]
+        }))
+        .unwrap();
+        assert_eq!(&expected_commands, tools.log());
     }
 }

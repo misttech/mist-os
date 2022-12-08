@@ -162,9 +162,6 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #
 # Board parameters:
 #
-#   assembly_compress_blobs (default: true)
-#     [boolean] Whether the blobs added to the blobfs image should be compressed.
-#
 #   assembly_blob_layout_format (default: "compact")
 #     [string] The format blobfs should store blobs in. The valid values are "deprecated_padded" and
 #     "compact". The deprecated padded format is supported only for Astro devices and will be
@@ -220,6 +217,9 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 template("assembled_system") {
   assert(defined(invoker.base_packages), "Need to define base_packages")
   assert(defined(invoker.bootfs_labels), "Need to define bootfs_labels")
+
+  # TODO(fxbug.dev/117111): Remove all usages of assembly_compress_blobs.
+  not_needed(invoker, [ "assembly_compress_blobs" ])
 
   if (defined(invoker.product_assembly_config_dep)) {
     assert(
@@ -676,11 +676,6 @@ template("assembled_system") {
       blob_layout_format = invoker.assembly_blob_layout_format
     }
 
-    compress_blobs = true
-    if (defined(invoker.assembly_compress_blobs)) {
-      compress_blobs = invoker.assembly_compress_blobs
-    }
-
     if (defined(invoker.assembly_include_account_in_fvm)) {
       empty_account_partition = invoker.assembly_include_account_in_fvm
     }
@@ -715,13 +710,9 @@ template("assembled_system") {
     }
     if (generate_fvm) {
       _slice_size = 1048576
-      _compress_blobs = true
       _blob_layout_format = "compact"
       if (defined(invoker.assembly_fvm_slice_size)) {
         _slice_size = invoker.assembly_fvm_slice_size
-      }
-      if (defined(invoker.assembly_compress_blobs)) {
-        _compress_blobs = invoker.assembly_compress_blobs
       }
       if (defined(invoker.assembly_blob_layout_format)) {
         _blob_layout_format = invoker.assembly_blob_layout_format
@@ -750,7 +741,6 @@ template("assembled_system") {
           }
         }
         blobfs = {
-          compress = _compress_blobs
           layout = _blob_layout_format
           if (defined(invoker.blobfs_minimum_inodes)) {
             minimum_inodes = invoker.blobfs_minimum_inodes

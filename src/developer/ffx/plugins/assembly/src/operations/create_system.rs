@@ -62,6 +62,11 @@ pub fn create_system(args: CreateSystemArgs) -> Result<()> {
         _ => None,
     });
 
+    // Determine whether blobfs should be compressed.
+    // We refrain from compressing blobfs if the FVM is destined for the ZBI,
+    // because the ZBI compression will be more optimized.
+    let compress_blobfs = !matches!(&mode, PackageMode::FvmInZbi);
+
     // Create all the filesystems and FVMs.
     if let Some(fvm_config) = fvm_config {
         // TODO: warn if bootfs_only mode
@@ -73,6 +78,7 @@ pub fn create_system(args: CreateSystemArgs) -> Result<()> {
                 &mut assembly_manifest,
                 &image_assembly_config,
                 fvm_config.clone(),
+                compress_blobfs,
                 base_package,
             )?;
         }
