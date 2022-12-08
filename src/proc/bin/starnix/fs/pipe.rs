@@ -284,17 +284,24 @@ impl FileOps for PipeFileObject {
 
     fn read(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         data: &[UserBuffer],
     ) -> Result<usize, Errno> {
-        let mut user_buffers = UserBufferIterator::new(data);
-        let mut pipe = self.pipe.lock();
-        let actual = pipe.read(current_task, &mut user_buffers)?;
-        if actual > 0 {
-            pipe.waiters.notify_events(FdEvents::POLLOUT);
-        }
-        Ok(actual)
+        file.blocking_op(
+            current_task,
+            || {
+                let mut user_buffers = UserBufferIterator::new(data);
+                let mut pipe = self.pipe.lock();
+                let actual = pipe.read(current_task, &mut user_buffers)?;
+                if actual > 0 {
+                    pipe.waiters.notify_events(FdEvents::POLLOUT);
+                }
+                Ok(BlockableOpsResult::Done(actual))
+            },
+            FdEvents::POLLIN | FdEvents::POLLHUP,
+            None,
+        )
     }
 
     fn write(

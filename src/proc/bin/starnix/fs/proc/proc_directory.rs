@@ -5,8 +5,10 @@
 use super::pid_directory::*;
 use crate::auth::FsCred;
 use crate::fs::*;
+use crate::logging::not_implemented;
 use crate::task::*;
 use crate::types::*;
+use fuchsia_zircon as zx;
 
 use maplit::btreemap;
 use std::collections::BTreeMap;
@@ -168,10 +170,12 @@ impl FileOps for ProcKmsgFile {
     fn read_at(
         &self,
         _file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         _offset: usize,
         _data: &[UserBuffer],
     ) -> Result<usize, Errno> {
+        not_implemented!(current_task, "ProcKmsgFile.read() is stubbed.");
+        Waiter::new().wait_until(current_task, zx::Time::INFINITE)?;
         error!(EAGAIN)
     }
 

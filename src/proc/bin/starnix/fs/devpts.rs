@@ -248,20 +248,30 @@ impl FileOps for DevPtmxFile {
 
     fn read(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         data: &[UserBuffer],
     ) -> Result<usize, Errno> {
-        self.terminal.main_read(current_task, data)
+        file.blocking_op(
+            current_task,
+            || self.terminal.main_read(current_task, data).map(BlockableOpsResult::Done),
+            FdEvents::POLLIN | FdEvents::POLLHUP,
+            None,
+        )
     }
 
     fn write(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         data: &[UserBuffer],
     ) -> Result<usize, Errno> {
-        self.terminal.main_write(current_task, data)
+        file.blocking_op(
+            current_task,
+            || self.terminal.main_write(current_task, data).map(BlockableOpsResult::Done),
+            FdEvents::POLLOUT | FdEvents::POLLHUP,
+            None,
+        )
     }
 
     fn wait_async(
@@ -346,20 +356,30 @@ impl FileOps for DevPtsFile {
 
     fn read(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         data: &[UserBuffer],
     ) -> Result<usize, Errno> {
-        self.terminal.replica_read(current_task, data)
+        file.blocking_op(
+            current_task,
+            || self.terminal.replica_read(current_task, data).map(BlockableOpsResult::Done),
+            FdEvents::POLLIN | FdEvents::POLLHUP,
+            None,
+        )
     }
 
     fn write(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         data: &[UserBuffer],
     ) -> Result<usize, Errno> {
-        self.terminal.replica_write(current_task, data)
+        file.blocking_op(
+            current_task,
+            || self.terminal.replica_write(current_task, data).map(BlockableOpsResult::Done),
+            FdEvents::POLLOUT | FdEvents::POLLHUP,
+            None,
+        )
     }
 
     fn wait_async(

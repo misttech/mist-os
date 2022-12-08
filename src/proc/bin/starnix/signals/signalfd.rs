@@ -30,57 +30,70 @@ impl FileOps for SignalFd {
 
     fn read(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         data: &[UserBuffer],
     ) -> Result<usize, Errno> {
-        let data_len = UserBuffer::get_total_length(data)?;
-        let mut buf = Vec::new();
-        while buf.len() + std::mem::size_of::<signalfd_siginfo>() <= data_len {
-            let signal = current_task
-                .write()
-                .signals
-                .take_next_where(|sig| sig.signal.is_in_set(self.mask))
-                .ok_or_else(|| errno!(EAGAIN))?;
-            let mut siginfo = signalfd_siginfo {
-                ssi_signo: signal.signal.number(),
-                ssi_errno: signal.errno,
-                ssi_code: signal.code,
-                ..Default::default()
-            };
-            // Any future variants of SignalDetail need a match arm here that copies the relevant
-            // fields into the signalfd_siginfo.
-            match signal.detail {
-                SignalDetail::None => {}
-                SignalDetail::SigChld { pid, uid, status } => {
-                    siginfo.ssi_pid = pid as u32;
-                    siginfo.ssi_uid = uid;
-                    siginfo.ssi_status = status;
+        file.blocking_op(
+            current_task,
+            || {
+                let data_len = UserBuffer::get_total_length(data)?;
+                let mut buf = Vec::new();
+                while buf.len() + std::mem::size_of::<signalfd_siginfo>() <= data_len {
+                    let signal = current_task
+                        .write()
+                        .signals
+                        .take_next_where(|sig| sig.signal.is_in_set(self.mask))
+                        .ok_or_else(|| errno!(EAGAIN))?;
+                    let mut siginfo = signalfd_siginfo {
+                        ssi_signo: signal.signal.number(),
+                        ssi_errno: signal.errno,
+                        ssi_code: signal.code,
+                        ..Default::default()
+                    };
+                    // Any future variants of SignalDetail need a match arm here that copies the relevant
+                    // fields into the signalfd_siginfo.
+                    match signal.detail {
+                        SignalDetail::None => {}
+                        SignalDetail::SigChld { pid, uid, status } => {
+                            siginfo.ssi_pid = pid as u32;
+                            siginfo.ssi_uid = uid;
+                            siginfo.ssi_status = status;
+                        }
+                        SignalDetail::Raw { data } => {
+                            // these offsets are taken from the gVisor offsets in the SignalInfo struct
+                            // in //pkg/abi/linux/signal.go and the definition of __sifields in
+                            // /usr/include/asm-generic/siginfo.h
+                            siginfo.ssi_uid = u32::from_ne_bytes(data[4..8].try_into().unwrap());
+                            siginfo.ssi_pid = u32::from_ne_bytes(data[0..4].try_into().unwrap());
+                            siginfo.ssi_fd = i32::from_ne_bytes(data[8..12].try_into().unwrap());
+                            siginfo.ssi_tid = u32::from_ne_bytes(data[0..4].try_into().unwrap());
+                            siginfo.ssi_band = u32::from_ne_bytes(data[0..4].try_into().unwrap());
+                            siginfo.ssi_overrun =
+                                u32::from_ne_bytes(data[4..8].try_into().unwrap());
+                            siginfo.ssi_status =
+                                i32::from_ne_bytes(data[8..12].try_into().unwrap());
+                            siginfo.ssi_int = i32::from_ne_bytes(data[8..12].try_into().unwrap());
+                            siginfo.ssi_ptr = u64::from_ne_bytes(data[8..16].try_into().unwrap());
+                            siginfo.ssi_addr = u64::from_ne_bytes(data[0..8].try_into().unwrap());
+                            siginfo.ssi_syscall =
+                                i32::from_ne_bytes(data[8..12].try_into().unwrap());
+                            siginfo.ssi_call_addr =
+                                u64::from_ne_bytes(data[0..8].try_into().unwrap());
+                            siginfo.ssi_arch = u32::from_ne_bytes(data[12..16].try_into().unwrap());
+                            siginfo.ssi_utime =
+                                u64::from_ne_bytes(data[12..20].try_into().unwrap());
+                            siginfo.ssi_stime =
+                                u64::from_ne_bytes(data[20..28].try_into().unwrap());
+                        }
+                    }
+                    buf.extend_from_slice(siginfo.as_bytes());
                 }
-                SignalDetail::Raw { data } => {
-                    // these offsets are taken from the gVisor offsets in the SignalInfo struct
-                    // in //pkg/abi/linux/signal.go and the definition of __sifields in
-                    // /usr/include/asm-generic/siginfo.h
-                    siginfo.ssi_uid = u32::from_ne_bytes(data[4..8].try_into().unwrap());
-                    siginfo.ssi_pid = u32::from_ne_bytes(data[0..4].try_into().unwrap());
-                    siginfo.ssi_fd = i32::from_ne_bytes(data[8..12].try_into().unwrap());
-                    siginfo.ssi_tid = u32::from_ne_bytes(data[0..4].try_into().unwrap());
-                    siginfo.ssi_band = u32::from_ne_bytes(data[0..4].try_into().unwrap());
-                    siginfo.ssi_overrun = u32::from_ne_bytes(data[4..8].try_into().unwrap());
-                    siginfo.ssi_status = i32::from_ne_bytes(data[8..12].try_into().unwrap());
-                    siginfo.ssi_int = i32::from_ne_bytes(data[8..12].try_into().unwrap());
-                    siginfo.ssi_ptr = u64::from_ne_bytes(data[8..16].try_into().unwrap());
-                    siginfo.ssi_addr = u64::from_ne_bytes(data[0..8].try_into().unwrap());
-                    siginfo.ssi_syscall = i32::from_ne_bytes(data[8..12].try_into().unwrap());
-                    siginfo.ssi_call_addr = u64::from_ne_bytes(data[0..8].try_into().unwrap());
-                    siginfo.ssi_arch = u32::from_ne_bytes(data[12..16].try_into().unwrap());
-                    siginfo.ssi_utime = u64::from_ne_bytes(data[12..20].try_into().unwrap());
-                    siginfo.ssi_stime = u64::from_ne_bytes(data[20..28].try_into().unwrap());
-                }
-            }
-            buf.extend_from_slice(siginfo.as_bytes());
-        }
-        current_task.mm.write_all(data, &buf)
+                current_task.mm.write_all(data, &buf).map(BlockableOpsResult::Done)
+            },
+            FdEvents::POLLIN | FdEvents::POLLHUP,
+            None,
+        )
     }
 
     fn wait_async(

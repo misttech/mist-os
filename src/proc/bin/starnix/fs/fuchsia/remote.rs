@@ -561,20 +561,30 @@ impl FileOps for RemotePipeObject {
 
     fn read(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         data: &[UserBuffer],
     ) -> Result<usize, Errno> {
-        zxio_read(&self.zxio, current_task, data)
+        file.blocking_op(
+            current_task,
+            || zxio_read(&self.zxio, current_task, data).map(BlockableOpsResult::Done),
+            FdEvents::POLLIN | FdEvents::POLLHUP,
+            None,
+        )
     }
 
     fn write(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         data: &[UserBuffer],
     ) -> Result<usize, Errno> {
-        zxio_write(&self.zxio, current_task, data)
+        file.blocking_op(
+            current_task,
+            || zxio_write(&self.zxio, current_task, data).map(BlockableOpsResult::Done),
+            FdEvents::POLLOUT | FdEvents::POLLHUP,
+            None,
+        )
     }
 
     fn wait_async(

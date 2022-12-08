@@ -136,51 +136,58 @@ impl FileOps for TimerFile {
 
     fn read(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         data: &[UserBuffer],
     ) -> Result<usize, Errno> {
-        let mut deadline_interval = self.deadline_interval.lock();
-        let (deadline, interval) = *deadline_interval;
+        file.blocking_op(
+            current_task,
+            || {
+                let mut deadline_interval = self.deadline_interval.lock();
+                let (deadline, interval) = *deadline_interval;
 
-        if deadline == zx::Time::default() {
-            // The timer has not been set.
-            return error!(EAGAIN);
-        }
+                if deadline == zx::Time::default() {
+                    // The timer has not been set.
+                    return error!(EAGAIN);
+                }
 
-        let now = zx::Time::get_monotonic();
-        if deadline > now {
-            // The next deadline has not yet passed.
-            return error!(EAGAIN);
-        }
+                let now = zx::Time::get_monotonic();
+                if deadline > now {
+                    // The next deadline has not yet passed.
+                    return error!(EAGAIN);
+                }
 
-        let count: i64 = if interval > zx::Duration::default() {
-            let elapsed_nanos = (now - deadline).into_nanos();
-            // The number of times the timer has triggered is written to `data`.
-            let num_intervals = elapsed_nanos / interval.into_nanos() + 1;
-            let new_deadline = deadline + interval * num_intervals;
+                let count: i64 = if interval > zx::Duration::default() {
+                    let elapsed_nanos = (now - deadline).into_nanos();
+                    // The number of times the timer has triggered is written to `data`.
+                    let num_intervals = elapsed_nanos / interval.into_nanos() + 1;
+                    let new_deadline = deadline + interval * num_intervals;
 
-            // The timer is set to clear the `ZX_TIMER_SIGNALED` signal until the next deadline is
-            // reached.
-            self.timer
-                .set(new_deadline, zx::Duration::default())
-                .map_err(|status| from_status_like_fdio!(status))?;
+                    // The timer is set to clear the `ZX_TIMER_SIGNALED` signal until the next deadline is
+                    // reached.
+                    self.timer
+                        .set(new_deadline, zx::Duration::default())
+                        .map_err(|status| from_status_like_fdio!(status))?;
 
-            // Update the stored deadline.
-            *deadline_interval = (new_deadline, interval);
+                    // Update the stored deadline.
+                    *deadline_interval = (new_deadline, interval);
 
-            num_intervals
-        } else {
-            // The timer is non-repeating, so cancel the timer to clear the `ZX_TIMER_SIGNALED`
-            // signal.
-            *deadline_interval = (zx::Time::default(), interval);
-            self.timer.cancel().map_err(|status| from_status_like_fdio!(status))?;
-            1
-        };
+                    num_intervals
+                } else {
+                    // The timer is non-repeating, so cancel the timer to clear the `ZX_TIMER_SIGNALED`
+                    // signal.
+                    *deadline_interval = (zx::Time::default(), interval);
+                    self.timer.cancel().map_err(|status| from_status_like_fdio!(status))?;
+                    1
+                };
 
-        let bytes = count.as_bytes();
-        current_task.mm.write_all(data, bytes)?;
-        Ok(bytes.len())
+                let bytes = count.as_bytes();
+                current_task.mm.write_all(data, bytes)?;
+                Ok(BlockableOpsResult::Done(bytes.len()))
+            },
+            FdEvents::POLLIN | FdEvents::POLLHUP,
+            None,
+        )
     }
 
     fn wait_async(

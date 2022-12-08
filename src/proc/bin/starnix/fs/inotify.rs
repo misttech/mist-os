@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use crate::fs::*;
+use crate::logging::not_implemented;
 use crate::task::{CurrentTask, EventHandler, WaitKey, Waiter};
 use crate::types::*;
+use fuchsia_zircon as zx;
 
 pub struct InotifyFileObject {}
 
@@ -32,9 +34,11 @@ impl FileOps for InotifyFileObject {
     fn read(
         &self,
         _file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         _data: &[UserBuffer],
     ) -> Result<usize, Errno> {
+        not_implemented!(current_task, "InotifyFileObject.read() is stubbed.");
+        Waiter::new().wait_until(current_task, zx::Time::INFINITE)?;
         error!(EAGAIN)
     }
 

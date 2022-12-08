@@ -5,6 +5,6 @@
     include: [ "//src/proc/tests/android/gvisor/meta/gvisor.shard.cml" ],
     program: {
         binary: "data/tests/socket_filesystem_test",
-        args: [ "--gunit_filter=-*.SetSocketRecvBufForceAboveMax/*:*.RecvTimeoutReadSucceeds/*:*.SetGetRecvTimeoutLargerArg/*:*.RecvTimeoutNegSecRead/*:*.SetGetSendTimeoutLargerArg/*:*.GetSocketOutOfBandInlineOption/*:*.GetSetSocketRcvlowatOption/*:*.NetdeviceIoctlsSucceed/*:*.SendNullCredsBeforeSoPassCredRecvEndAfterSendEnd/*:*.WriteBeforeSoPassCredRecvEndAfterSendEnd/*" ],
+        args: [ "--gunit_filter=-*.SetSocketRecvBufForceAboveMax/*:*.SetGetRecvTimeoutLargerArg/*:*.SetGetSendTimeoutLargerArg/*:*.GetSocketOutOfBandInlineOption/*:*.GetSetSocketRcvlowatOption/*:*.NetdeviceIoctlsSucceed/*:*.SendNullCredsBeforeSoPassCredRecvEndAfterSendEnd/*:*.WriteBeforeSoPassCredRecvEndAfterSendEnd/*" ],
     },
 }

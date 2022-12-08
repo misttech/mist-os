@@ -723,12 +723,8 @@ impl FileObject {
         if !self.can_read() {
             return error!(EBADF);
         }
-        self.blocking_op(
-            current_task,
-            || self.ops().read(self, current_task, data).map(BlockableOpsResult::Done),
-            FdEvents::POLLIN | FdEvents::POLLHUP,
-            None,
-        )
+
+        self.ops().read(self, current_task, data)
     }
 
     pub fn read_at(
@@ -740,33 +736,20 @@ impl FileObject {
         if !self.can_read() {
             return error!(EBADF);
         }
-        self.blocking_op(
-            current_task,
-            || self.ops().read_at(self, current_task, offset, data).map(BlockableOpsResult::Done),
-            FdEvents::POLLIN | FdEvents::POLLHUP,
-            None,
-        )
+        self.ops().read_at(self, current_task, offset, data)
     }
 
     pub fn write(&self, current_task: &CurrentTask, data: &[UserBuffer]) -> Result<usize, Errno> {
         if !self.can_write() {
             return error!(EBADF);
         }
-        self.blocking_op(
-            current_task,
-            || {
-                if self.flags().contains(OpenFlags::APPEND) {
-                    let _guard = self.node().append_lock.write();
-                    self.ops().write(self, current_task, data)
-                } else {
-                    let _guard = self.node().append_lock.read();
-                    self.ops().write(self, current_task, data)
-                }
-                .map(BlockableOpsResult::Done)
-            },
-            FdEvents::POLLOUT | FdEvents::POLLHUP,
-            None,
-        )
+        if self.flags().contains(OpenFlags::APPEND) {
+            let _guard = self.node().append_lock.write();
+            self.ops().write(self, current_task, data)
+        } else {
+            let _guard = self.node().append_lock.read();
+            self.ops().write(self, current_task, data)
+        }
     }
 
     pub fn write_at(
@@ -778,15 +761,8 @@ impl FileObject {
         if !self.can_write() {
             return error!(EBADF);
         }
-        self.blocking_op(
-            current_task,
-            || {
-                let _guard = self.node().append_lock.read();
-                self.ops().write_at(self, current_task, offset, data).map(BlockableOpsResult::Done)
-            },
-            FdEvents::POLLOUT | FdEvents::POLLHUP,
-            None,
-        )
+        let _guard = self.node().append_lock.read();
+        self.ops().write_at(self, current_task, offset, data)
     }
 
     pub fn seek(

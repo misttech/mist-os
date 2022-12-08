@@ -68,62 +68,76 @@ impl FileOps for EventFdFileObject {
 
     fn write(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         data: &[UserBuffer],
     ) -> Result<usize, Errno> {
-        let mut written_data = [0; DATA_SIZE];
-        if current_task.mm.read_all(data, &mut written_data)? < DATA_SIZE {
-            return error!(EINVAL);
-        }
-        let add_value = u64::from_ne_bytes(written_data);
-        if add_value == u64::MAX {
-            return error!(EINVAL);
-        }
+        file.blocking_op(
+            current_task,
+            || {
+                let mut written_data = [0; DATA_SIZE];
+                if current_task.mm.read_all(data, &mut written_data)? < DATA_SIZE {
+                    return error!(EINVAL);
+                }
+                let add_value = u64::from_ne_bytes(written_data);
+                if add_value == u64::MAX {
+                    return error!(EINVAL);
+                }
 
-        // The maximum value of the counter is u64::MAX - 1
-        let mut inner = self.inner.lock();
-        let headroom = u64::MAX - inner.value;
-        if headroom < add_value {
-            return error!(EAGAIN);
-        }
-        inner.value += add_value;
-        if inner.value > 0 {
-            inner.wait_queue.notify_mask(FdEvents::POLLIN.mask());
-        }
-        Ok(DATA_SIZE)
+                // The maximum value of the counter is u64::MAX - 1
+                let mut inner = self.inner.lock();
+                let headroom = u64::MAX - inner.value;
+                if headroom < add_value {
+                    return error!(EAGAIN);
+                }
+                inner.value += add_value;
+                if inner.value > 0 {
+                    inner.wait_queue.notify_mask(FdEvents::POLLIN.mask());
+                }
+                Ok(BlockableOpsResult::Done(DATA_SIZE))
+            },
+            FdEvents::POLLOUT | FdEvents::POLLHUP,
+            None,
+        )
     }
 
     fn read(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         data: &[UserBuffer],
     ) -> Result<usize, Errno> {
-        if UserBuffer::get_total_length(data)? < DATA_SIZE {
-            return error!(EINVAL);
-        }
+        file.blocking_op(
+            current_task,
+            || {
+                if UserBuffer::get_total_length(data)? < DATA_SIZE {
+                    return error!(EINVAL);
+                }
 
-        let mut inner = self.inner.lock();
-        if inner.value == 0 {
-            return error!(EAGAIN);
-        }
+                let mut inner = self.inner.lock();
+                if inner.value == 0 {
+                    return error!(EAGAIN);
+                }
 
-        let return_value = match self.eventfd_type {
-            EventFdType::Counter => {
-                let start_value = inner.value;
-                inner.value = 0;
-                start_value
-            }
-            EventFdType::Semaphore => {
-                inner.value -= 1;
-                1
-            }
-        };
-        current_task.mm.write_all(data, &return_value.to_ne_bytes())?;
-        inner.wait_queue.notify_mask(FdEvents::POLLOUT.mask());
+                let return_value = match self.eventfd_type {
+                    EventFdType::Counter => {
+                        let start_value = inner.value;
+                        inner.value = 0;
+                        start_value
+                    }
+                    EventFdType::Semaphore => {
+                        inner.value -= 1;
+                        1
+                    }
+                };
+                current_task.mm.write_all(data, &return_value.to_ne_bytes())?;
+                inner.wait_queue.notify_mask(FdEvents::POLLOUT.mask());
 
-        Ok(DATA_SIZE)
+                Ok(BlockableOpsResult::Done(DATA_SIZE))
+            },
+            FdEvents::POLLIN | FdEvents::POLLHUP,
+            None,
+        )
     }
 
     fn wait_async(
