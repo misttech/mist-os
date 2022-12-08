@@ -455,6 +455,9 @@ extern "C" {
     ) -> zx_status_t;
 }
 extern "C" {
+    pub fn zxio_on_mapped(io: *mut zxio_t, ptr: *mut ::std::os::raw::c_void) -> zx_status_t;
+}
+extern "C" {
     pub fn zxio_vmo_get_copy(io: *mut zxio_t, out_vmo: *mut zx_handle_t) -> zx_status_t;
 }
 extern "C" {
