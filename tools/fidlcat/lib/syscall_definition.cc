@@ -2709,17 +2709,6 @@ void SyscallDecoderDispatcher::Populate() {
 
   { Add("zx_system_get_num_cpus", SyscallReturnType::kUint32); }
 
-  {
-    Syscall* zx_system_get_version = Add("zx_system_get_version", SyscallReturnType::kStatus);
-    // Arguments
-    auto version = zx_system_get_version->PointerArgument<char>(SyscallType::kChar);
-    auto version_size = zx_system_get_version->Argument<size_t>(SyscallType::kSize);
-    // Outputs
-    zx_system_get_version->OutputString<char>(
-        ZX_OK, "version", std::make_unique<ArgumentAccess<char>>(version),
-        std::make_unique<ArgumentAccess<size_t>>(version_size));
-  }
-
   { Add("zx_system_get_physmem", SyscallReturnType::kUint64); }
 
   {

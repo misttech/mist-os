@@ -22,8 +22,8 @@ struct StackTestInfo {
   bool is_pthread;
   char** environ;
   const void* safe_stack;
-  const char* unsafe_stack;
-  const char* tls_buf;
+  const zx_info_handle_basic_t* unsafe_stack;
+  const zx_info_handle_basic_t* tls_buf;
   const void* tp;
   const void* unsafe_start;
   const void* unsafe_ptr;
@@ -38,12 +38,14 @@ void* DoStackTest(void* arg) {
 
   // The compiler sees this pointer escape, so it should know
   // that this belongs on the unsafe stack.
-  char unsafe_stack[64];
-  zx_system_get_version(unsafe_stack, sizeof(unsafe_stack));
+  zx_info_handle_basic_t unsafe_stack;
+  zx_object_get_info(zx_handle_t{}, ZX_INFO_HANDLE_BASIC, &unsafe_stack, sizeof(unsafe_stack),
+                     nullptr, nullptr);
 
   // Likewise, the tls_buf is used.
-  static thread_local char tls_buf[64];
-  zx_system_get_version(tls_buf, sizeof(tls_buf));
+  static thread_local zx_info_handle_basic_t tls_buf;
+  zx_object_get_info(zx_handle_t{}, ZX_INFO_HANDLE_BASIC, &tls_buf, sizeof(tls_buf), nullptr,
+                     nullptr);
 
 #ifdef __x86_64__
   __asm__("movq %%fs:0, %0" : "=r"(info->tp));
@@ -52,8 +54,8 @@ void* DoStackTest(void* arg) {
 #endif
 
   info->environ = environ;
-  info->unsafe_stack = unsafe_stack;
-  info->tls_buf = tls_buf;
+  info->unsafe_stack = &unsafe_stack;
+  info->tls_buf = &tls_buf;
 
 #if __has_feature(safe_stack)
   info->unsafe_start = __builtin___get_unsafe_stack_start();

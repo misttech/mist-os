@@ -66,40 +66,6 @@ SYSTEM_GET_NUM_CPUS_DISPLAY_TEST(
     "\x1B[32m0.000000\x1B[0m "
     "  -> \x1B[34m8\x1B[0m\n")
 
-// zx_system_get_version tests.
-
-std::unique_ptr<SystemCallTest> ZxSystemGetVersion(int64_t result, std::string_view result_name,
-                                                   const char* version, size_t version_size) {
-  auto value = std::make_unique<SystemCallTest>("zx_system_get_version", result, result_name);
-  value->AddInput(reinterpret_cast<uint64_t>(version));
-  value->AddInput(version_size);
-  return value;
-}
-
-#define SYSTEM_GET_VERSION_DISPLAY_TEST_CONTENT(result, expected)                              \
-  std::string version("git-8a07d52603404521038d8866b297f99de36f9162");                         \
-  PerformDisplayTest("$plt(zx_system_get_version)",                                            \
-                     ZxSystemGetVersion(result, #result, version.c_str(), version.size() + 1), \
-                     expected)
-
-#define SYSTEM_GET_VERSION_DISPLAY_TEST(name, result, expected) \
-  TEST_F(InterceptionWorkflowTestX64, name) {                   \
-    SYSTEM_GET_VERSION_DISPLAY_TEST_CONTENT(result, expected);  \
-  }                                                             \
-  TEST_F(InterceptionWorkflowTestArm, name) {                   \
-    SYSTEM_GET_VERSION_DISPLAY_TEST_CONTENT(result, expected);  \
-  }
-
-SYSTEM_GET_VERSION_DISPLAY_TEST(
-    ZxSystemGetVersion, ZX_OK,
-    "\n"
-    "\x1B[32m0.000000\x1B[0m "
-    "test_3141 \x1B[31m3141\x1B[0m:\x1B[31m8764\x1B[0m zx_system_get_version()\n"
-    "\x1B[32m0.000000\x1B[0m "
-    "  -> \x1B[32mZX_OK\x1B[0m ("
-    "version: \x1B[32mstring\x1B[0m = "
-    "\x1B[31m\"git-8a07d52603404521038d8866b297f99de36f9162\"\x1B[0m)\n")
-
 // zx_system_get_physmem tests.
 
 std::unique_ptr<SystemCallTest> ZxSystemGetPhysmem(int64_t result, std::string_view result_name) {
@@ -138,12 +104,11 @@ std::unique_ptr<SystemCallTest> ZxSystemGetEvent(int64_t result, std::string_vie
   return value;
 }
 
-#define SYSTEM_GET_EVENT_DISPLAY_TEST_CONTENT(result, expected)                          \
-  zx_handle_t event = kHandleOut;                                                        \
-  PerformDisplayTest(                                                                    \
-      "$plt(zx_system_get_event)",                                                       \
-      ZxSystemGetEvent(result, #result, kHandle, ZX_SYSTEM_EVENT_OUT_OF_MEMORY, &event), \
-      expected)
+#define SYSTEM_GET_EVENT_DISPLAY_TEST_CONTENT(result, expected) \
+  zx_handle_t event = kHandleOut;                               \
+  PerformDisplayTest(                                           \
+      "$plt(zx_system_get_event)",                              \
+      ZxSystemGetEvent(result, #result, kHandle, ZX_SYSTEM_EVENT_OUT_OF_MEMORY, &event), expected)
 
 #define SYSTEM_GET_EVENT_DISPLAY_TEST(name, result, expected) \
   TEST_F(InterceptionWorkflowTestX64, name) {                 \
