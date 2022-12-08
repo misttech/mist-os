@@ -10,7 +10,7 @@
 #include <arch/arm64.h>
 #include <arch/arm64/asm.h>
 #include <arch/asm_macros.h>
-#include <lib/syscalls/arm64.h>
+#include <lib/userabi/vdso-arm64.h>
 #include <lib/syscalls/zx-syscall-numbers.h>
 #include <zircon/compiler.h>
 

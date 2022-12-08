@@ -27,9 +27,8 @@ if (is_fuchsia && toolchain_base_environment != "kernel") {
 group("headers") {
   public_deps = [
     ":zircon-headers",
-    "//zircon/vdso:public($default_toolchain)",
+    "//zircon/vdso:public",
   ]
-  public_configs = [ "//zircon/vdso:public.config($default_toolchain)" ]
   if (!is_fuchsia && !is_kernel) {
     public_deps += [ "//zircon/system/public" ]
   }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/syscalls/arm64.h>
+#include <lib/userabi/vdso-arm64.h>
 
 .macro zircon_syscall num, name, caller
     mov x16, #\num

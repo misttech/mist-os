@@ -52,6 +52,7 @@ config("suppress-warning.config") {
     "//zircon/system/ulib/*",
     "//zircon/third_party/lib/*",
     "//zircon/third_party/ulib/*",
+    "//zircon/vdso/*",
   ]
   if (!is_gcc) {
     # Silence warning in Clang about GNU extension used in string_ref.h.

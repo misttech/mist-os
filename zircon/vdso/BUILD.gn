@@ -186,6 +186,7 @@ barrier_metadata = {
 group("public") {
   visibility = [
     "//src/zircon/lib/zircon/*",
+    "//zircon/kernel/lib/userabi/vdso/*",
     "//zircon/public/sysroot/*",
   ]
   public_configs = [ ":public.config" ]
@@ -193,16 +194,13 @@ group("public") {
   metadata = barrier_metadata
 }
 
-syscall_public_gen_dir = "$root_gen_dir/include/zircon/syscalls"
+default_root_gen_dir =
+    get_label_info(":anything($default_toolchain)", "root_gen_dir")
+
+syscall_public_gen_dir = "$default_root_gen_dir/include/zircon/syscalls"
 config("public.config") {
-  # TODO(joshuaseaton): Migrate dependents over to using :public directly.
-  visibility = [
-    ":public",
-    "//src/zircon/lib/zircon/*",
-    "//zircon/kernel/lib/syscalls/*",
-    "//zircon/kernel/lib/userabi/vdso/*",
-  ]
-  include_dirs = [ "$root_gen_dir/include" ]
+  visibility = [ ":public" ]
+  include_dirs = [ "$default_root_gen_dir/include" ]
 }
 
 # This provides the private headers used by the kernel and vDSO
@@ -223,11 +221,7 @@ default_target_gen_dir =
 
 syscall_private_gen_dir = "$default_target_gen_dir/include/lib/syscalls"
 config("private.config") {
-  # TODO(joshuaseaton): Migrate dependents over to using :private directly.
-  visibility = [
-    ":private",
-    "//zircon/kernel/lib/syscalls/*",
-  ]
+  visibility = [ ":private" ]
   include_dirs = [ "$default_target_gen_dir/include" ]
 }
 
