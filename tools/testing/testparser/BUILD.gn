@@ -11,6 +11,7 @@ go_library("testparser") {
     "dartsystemtest.go",
     "googletest.go",
     "gotest.go",
+    "moblytest.go",
     "networkconformancetest.go",
     "rusttest.go",
     "testparser.go",
@@ -22,6 +23,7 @@ go_library("testparser") {
 
   deps = [
     "//src/connectivity/network/testing/conformance/parseoutput",
+    "//third_party/golibs:gopkg.in/yaml.v2",
     "//tools/testing/runtests",
   ]
 }

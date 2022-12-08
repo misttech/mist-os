@@ -19,6 +19,7 @@ import (
 func Parse(stdout []byte) []runtests.TestCaseResult {
 	lines := bytes.Split(stdout, []byte{'\n'})
 	res := []*regexp.Regexp{
+		moblyTestPreamblePattern,
 		ctsTestPreamblePattern,
 		dartSystemTestPreamblePattern,
 		trfTestPreamblePattern,
@@ -32,6 +33,8 @@ func Parse(stdout []byte) []runtests.TestCaseResult {
 
 	var cases []runtests.TestCaseResult
 	switch match {
+	case moblyTestPreamblePattern:
+		cases = parseMoblyTest(remainingLines)
 	case ctsTestPreamblePattern:
 		cases = parseVulkanCtsTest(remainingLines)
 	case dartSystemTestPreamblePattern:

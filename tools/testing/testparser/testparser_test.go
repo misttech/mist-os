@@ -1201,3 +1201,118 @@ func TestParseNetworkConformanceTest(t *testing.T) {
 
 	testCaseCmp(t, stdout, want)
 }
+
+func TestParseMoblyTest(t *testing.T) {
+	stdout := `
+[=====MOBLY RESULTS=====]
+---
+Requested Tests:
+- test_goodbye
+- test_hello
+Type: TestNameList
+---
+Begin Time: 1668122321142
+Details: null
+End Time: 1668122321143
+Extra Errors: {}
+Extras: null
+Result: PASS
+Retry Parent: null
+Signature: test_goodbye-1668122321142
+Stacktrace: null
+Termination Signal Type: null
+Test Class: GreetingsTest
+Test Name: test_goodbye
+Type: Record
+UID: null
+---
+Begin Time: 1668122321143
+Details: null
+End Time: 1668122321149
+Extra Errors: {}
+Extras: null
+Result: FAIL
+Retry Parent: null
+Signature: test_hello-1668122321143
+Stacktrace: null
+Termination Signal Type: null
+Test Class: GreetingsTest
+Test Name: test_hello
+Type: Record
+UID: null
+---
+Details: null
+Extra Errors: {}
+Extras: null
+Result: SKIP
+Retry Parent: null
+Signature: test_skipped-1668122321143
+Stacktrace: null
+Termination Signal Type: null
+Test Class: GreetingsTest
+Test Name: test_skipped
+Type: Record
+UID: null
+---
+Begin Time: 1668122321143
+Details: null
+End Time: 1668122321149
+Extra Errors: {}
+Extras: null
+Result: ERROR
+Retry Parent: null
+Signature: test_error-1668122321143
+Stacktrace: null
+Termination Signal Type: null
+Test Class: GreetingsTest
+Test Name: test_error
+Type: Record
+UID: null
+---
+Error: 0
+Executed: 2
+Failed: 0
+Passed: 2
+Requested: 2
+Skipped: 0
+Type: Summary
+
+`
+
+	want := []runtests.TestCaseResult{
+		{
+			DisplayName: "GreetingsTest.test_goodbye",
+			SuiteName:   "GreetingsTest",
+			CaseName:    "test_goodbye",
+			Status:      runtests.TestSuccess,
+			Duration:    1 * time.Millisecond,
+			Format:      "Mobly",
+		},
+		{
+			DisplayName: "GreetingsTest.test_hello",
+			SuiteName:   "GreetingsTest",
+			CaseName:    "test_hello",
+			Status:      runtests.TestFailure,
+			Duration:    6 * time.Millisecond,
+			Format:      "Mobly",
+		},
+		{
+			DisplayName: "GreetingsTest.test_skipped",
+			SuiteName:   "GreetingsTest",
+			CaseName:    "test_skipped",
+			Status:      runtests.TestSkipped,
+			Duration:    0,
+			Format:      "Mobly",
+		},
+		{
+			DisplayName: "GreetingsTest.test_error",
+			SuiteName:   "GreetingsTest",
+			CaseName:    "test_error",
+			Status:      runtests.TestFailure,
+			Duration:    6 * time.Millisecond,
+			Format:      "Mobly",
+		},
+	}
+
+	testCaseCmp(t, stdout, want)
+}
