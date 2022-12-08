@@ -139,19 +139,28 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
     // Register a port for web communication.
     fuchsia::web::MessagePortPtr message_port;
     bool is_port_registered = false;
+    bool is_window_resized = false;
     SendMessageToWebPage(message_port.NewRequest(), "REGISTER_PORT");
-    message_port->ReceiveMessage([&is_port_registered](auto web_message) {
+    message_port->ReceiveMessage([&is_port_registered, &is_window_resized](auto web_message) {
       auto message = StringFromBuffer(web_message.data());
-      FX_CHECK(message == "PORT_REGISTERED") << "Expected PORT_REGISTERED but got " << message;
-      is_port_registered = true;
+      if (message == "PORT_REGISTERED") {
+        is_port_registered = true;
+      } else if (message == "PORT_REGISTERED_WINDOW_RESIZED") {
+        is_window_resized = true;
+        is_port_registered = true;
+      } else {
+        FX_LOGS(FATAL) << "Unexpected message from web page: " << message;
+      }
     });
 
     // Wait until various lifecycle stages in the web engine are reached before proceeding.
     FX_LOGS(INFO) << "Wait for is_port_registered";
     RunLoopUntil([&] { return is_port_registered; });
     FX_LOGS(INFO) << "Wait for window_resized";
-    RunLoopUntil(
-        [&navigation_event_listener] { return navigation_event_listener.window_resized_; });
+    if (!is_window_resized) {
+      RunLoopUntil(
+          [&navigation_event_listener] { return navigation_event_listener.window_resized_; });
+    }
     FX_LOGS(INFO) << "Wait for text_input_focused";
     RunLoopUntil(
         [&navigation_event_listener] { return navigation_event_listener.text_input_focused_; });
@@ -201,7 +210,13 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
       if (event.data == "REGISTER_PORT") {
         console.log("received REGISTER_PORT");
         port = event.ports[0];
-        port.postMessage('PORT_REGISTERED');
+        if (window.innerWidth != 0) {
+          // If the window was resized before JS loaded, notify the test
+          // fixture so that it skips waiting for the resize to happen.
+          port.postMessage('PORT_REGISTERED_WINDOW_RESIZED');
+        } else {
+          port.postMessage('PORT_REGISTERED');
+        }
       } else {
         console.error('received unexpected message: ' + event.data);
       }
