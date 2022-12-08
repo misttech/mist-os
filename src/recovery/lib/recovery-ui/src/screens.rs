@@ -33,12 +33,12 @@ impl Screens {
     }
 
     pub fn initial_screen(&self) -> ViewAssistantPtr {
-        self.factory_reset()
+        self.home()
     }
 
     fn state(&mut self, state: &State) {
         let new_view = match state {
-            State::Home => self.factory_reset(),
+            State::Home => self.home(),
             State::Failed(operation, error) => self.failed(operation, error),
             State::Reinstall => self.reinstall(),
             State::GetWiFiNetworks => self.select_wifi(&Vec::new()),
@@ -64,7 +64,7 @@ impl Screens {
         );
     }
 
-    fn factory_reset(&self) -> ViewAssistantPtr {
+    fn home(&self) -> ViewAssistantPtr {
         let view_assistant_ptr = Box::new(
             GenericSplitViewAssistant::new(
                 self.app_sender.clone(),
@@ -140,7 +140,7 @@ impl Screens {
                         Event::Reinstall,
                     ),
                 ]),
-                Some(vec![ButtonInfo::new("Power off", None, true, true, Event::Cancel)]),
+                Some(vec![ButtonInfo::new("Reboot", None, true, true, Event::Cancel)]),
                 None,
                 None,
                 None,
@@ -234,7 +234,7 @@ impl Screens {
                 Some(
                     "• This will clear your data from the\n  \
                        device and can't be undone\n\
-                     • It may take 4 minutes\n\
+                     • It may take several minutes\n\
                      • Upon completion, the device will\n  \
                        automatically restart"
                         .to_string(),

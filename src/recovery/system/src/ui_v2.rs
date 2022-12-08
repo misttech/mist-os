@@ -195,7 +195,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_create_view_assistant_sets_up_state_handlers_and_starts() {
+        let (sender, _) = mpsc::channel::<Event>(10);
         let mut controller = MockController::new();
+        controller.expect_get_event_sender().return_const(EventSender::new(sender));
         controller.expect_add_state_handler().times(2).return_const(());
         controller.expect_start().once().return_const(());
 

@@ -112,7 +112,7 @@ impl StateMachine {
         Self { current_state: state }
     }
 
-    pub fn event(&mut self, event: Event) -> Option<State> {
+    fn event(&mut self, event: Event) -> Option<State> {
         #[cfg(feature = "debug_logging")]
         println!("====== SM: state {:?}, event: {:?}", self.current_state, event);
         let new_state = match (&self.current_state, event) {

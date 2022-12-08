@@ -35,7 +35,7 @@ impl SetSharingConsentAction {
             let mut privacy_settings = PrivacySettings::EMPTY;
             privacy_settings.user_data_sharing_consent = Some(desired == Allow);
             #[cfg(feature = "debug_logging")]
-            println!("Setting privacy to {}", data_sharing_consent);
+            println!("Setting privacy to {:?}", privacy_settings);
             let res = proxy.set(privacy_settings).await;
             #[cfg(feature = "debug_logging")]
             println!("Privacy response is {:?}", res);

@@ -30,8 +30,6 @@ impl Action {
 impl StateHandler for Action {
     fn handle_state(&mut self, state: State) {
         let event_sender = Box::new(self.event_sender.clone());
-        // There are six states that will need background actions
-        // They will be added in future CLs
         match state {
             State::GetWiFiNetworks => GetWifiNetworksAction::run(event_sender),
             State::Connecting(network, password) => {
@@ -51,7 +49,7 @@ impl StateHandler for Action {
                 .detach();
             }
             State::FactoryReset => FactoryResetAction::run(event_sender),
-            // We ignore all other sates
+            // We ignore all other states
             _ => {}
         };
     }
