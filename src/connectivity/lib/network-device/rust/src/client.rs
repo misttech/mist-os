@@ -117,10 +117,10 @@ impl Client {
     pub async fn primary_session(
         &self,
         name: &str,
-        buffer_length: usize,
+        default_buffer_length: usize,
     ) -> Result<(Session, Task)> {
         let device_info = self.device_info().await?;
-        let primary_config = device_info.primary_config(buffer_length)?;
+        let primary_config = device_info.primary_config(default_buffer_length)?;
         Session::new(&self.device, name, primary_config).await
     }
 }

@@ -23,6 +23,7 @@ rustc_library("rust") {
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
+    "//src/connectivity/network/lib/explicit",
     "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fidl_table_validation",

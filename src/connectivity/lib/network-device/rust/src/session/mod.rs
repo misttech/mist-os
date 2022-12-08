@@ -7,11 +7,12 @@
 mod buffer;
 
 use std::fmt::Debug;
-use std::num::{NonZeroU16, NonZeroU32, NonZeroU64};
+use std::num::{NonZeroU16, NonZeroU32, NonZeroU64, TryFromIntError};
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use std::{convert::TryFrom, mem::MaybeUninit, ops::Range, task::Waker};
 
+use explicit::ResultExt as _;
 use fidl_fuchsia_hardware_network as netdev;
 use fidl_table_validation::ValidFidlTable;
 use fuchsia_async as fasync;
@@ -332,7 +333,7 @@ impl DeviceInfo {
     /// from descriptors are safe to convert to [`usize`].
     pub fn make_config(
         &self,
-        buffer_length: usize,
+        default_buffer_length: usize,
         options: netdev::SessionFlags,
     ) -> Result<Config> {
         let DeviceInfo {
@@ -369,22 +370,18 @@ impl DeviceInfo {
 
         let max_buffer_length = max_buffer_length
             .and_then(|max| {
-                match usize::try_from(max.get()) {
-                    Ok(max) => Some(max),
-                    // The error case is the case where max_buffer_length can't fix in a
-                    // usize, but we use it to compare it to usizes, so that's
-                    // equivalent to no limit.
-                    Err(std::num::TryFromIntError { .. }) => None,
-                }
+                // The error case is the case where max_buffer_length can't fix in a
+                // usize, but we use it to compare it to usizes, so that's
+                // equivalent to no limit.
+                usize::try_from(max.get()).ok_checked::<TryFromIntError>()
             })
             .unwrap_or(usize::MAX);
+        let min_buffer_length = usize::try_from(*min_rx_buffer_length)
+            .ok_checked::<TryFromIntError>()
+            .unwrap_or(usize::MAX);
 
-        if buffer_length > max_buffer_length {
-            return Err(Error::Config(format!(
-                "buffer length too big: {} > {}",
-                buffer_length, max_buffer_length
-            )));
-        }
+        let buffer_length =
+            usize::min(max_buffer_length, usize::max(min_buffer_length, default_buffer_length));
 
         let buffer_alignment = usize::try_from(*buffer_alignment).map_err(
             |std::num::TryFromIntError { .. }| {
@@ -461,13 +458,6 @@ impl DeviceInfo {
             }
         };
 
-        if buffer_length < usize::try_from(*min_rx_buffer_length).unwrap_or(usize::MAX) {
-            return Err(Error::Config(format!(
-                "buffer_length smaller than minimum RX requirement: {} < {}",
-                buffer_length, *min_rx_buffer_length
-            )));
-        }
-
         Ok(Config {
             buffer_stride,
             num_rx_buffers,
@@ -483,8 +473,8 @@ impl DeviceInfo {
     }
 
     /// Create a config for a primary session.
-    pub fn primary_config(&self, buffer_length: usize) -> Result<Config> {
-        self.make_config(buffer_length, netdev::SessionFlags::PRIMARY)
+    pub fn primary_config(&self, default_buffer_length: usize) -> Result<Config> {
+        self.make_config(default_buffer_length, netdev::SessionFlags::PRIMARY)
     }
 }
 
@@ -624,13 +614,15 @@ impl<T> ReadyBuffer<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::{num::NonZeroU32, ops::Deref};
+
+    use assert_matches::assert_matches;
+    use test_case::test_case;
+
     use super::{
         buffer::NETWORK_DEVICE_DESCRIPTOR_LENGTH, buffer::NETWORK_DEVICE_DESCRIPTOR_VERSION,
-        DeviceInfo, Error,
+        BufferLayout, Config, DeviceInfo, Error,
     };
-    use assert_matches::assert_matches;
-    use std::{num::NonZeroU32, ops::Deref};
-    use test_case::test_case;
 
     const BASE_DEVICE_INFO: DeviceInfo = DeviceInfo {
         min_descriptor_length: 0,
@@ -671,20 +663,10 @@ mod tests {
         ..BASE_DEVICE_INFO
     }, format!("too many buffers requested: {} + {} > u16::MAX", u16::MAX, u16::MAX))]
     #[test_case(DEFAULT_BUFFER_LENGTH, DeviceInfo {
-        max_buffer_length: Some(unsafe { NonZeroU32::new_unchecked(1) }),
-        ..BASE_DEVICE_INFO
-    }, format!("buffer length too big: {} > {}", DEFAULT_BUFFER_LENGTH, 1))]
-    #[test_case(DEFAULT_BUFFER_LENGTH, DeviceInfo {
         min_tx_buffer_length: DEFAULT_BUFFER_LENGTH as u32 + 1,
         ..BASE_DEVICE_INFO
     }, format!(
         "buffer_length smaller than minimum TX requirement: {} < {}",
-        DEFAULT_BUFFER_LENGTH, DEFAULT_BUFFER_LENGTH + 1))]
-    #[test_case(DEFAULT_BUFFER_LENGTH, DeviceInfo {
-        min_rx_buffer_length: DEFAULT_BUFFER_LENGTH as u32 + 1,
-        ..BASE_DEVICE_INFO
-    }, format!(
-        "buffer_length smaller than minimum RX requirement: {} < {}",
         DEFAULT_BUFFER_LENGTH, DEFAULT_BUFFER_LENGTH + 1))]
     #[test_case(DEFAULT_BUFFER_LENGTH, DeviceInfo {
         min_tx_buffer_head: DEFAULT_BUFFER_LENGTH as u16 + 1,
@@ -718,5 +700,30 @@ mod tests {
             info.primary_config(buffer_length),
             Err(Error::Config(got)) if got.as_str() == expected.deref()
         );
+    }
+
+    #[test_case(DeviceInfo {
+        min_rx_buffer_length: DEFAULT_BUFFER_LENGTH as u32 + 1,
+        ..BASE_DEVICE_INFO
+    }, DEFAULT_BUFFER_LENGTH + 1; "default below min")]
+    #[test_case(DeviceInfo {
+        max_buffer_length: NonZeroU32::new(DEFAULT_BUFFER_LENGTH as u32 - 1),
+        ..BASE_DEVICE_INFO
+    }, DEFAULT_BUFFER_LENGTH - 1; "default above max")]
+    #[test_case(DeviceInfo {
+        min_rx_buffer_length: DEFAULT_BUFFER_LENGTH as u32 - 1,
+        max_buffer_length: NonZeroU32::new(DEFAULT_BUFFER_LENGTH as u32 + 1),
+        ..BASE_DEVICE_INFO
+    }, DEFAULT_BUFFER_LENGTH; "default in bounds")]
+    fn configs_from_device_buffer_length(info: DeviceInfo, expected_length: usize) {
+        let config = info.primary_config(DEFAULT_BUFFER_LENGTH).expect("is valid");
+        let Config {
+            buffer_layout: BufferLayout { length, min_tx_data: _, min_tx_head: _, min_tx_tail: _ },
+            buffer_stride: _,
+            num_rx_buffers: _,
+            num_tx_buffers: _,
+            options: _,
+        } = config;
+        assert_eq!(length, expected_length);
     }
 }
