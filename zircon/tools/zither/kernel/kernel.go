@@ -23,10 +23,10 @@ var templates embed.FS
 var includePaths = []string{
 	filepath.Join("lib", "syscalls", "zx-syscall-numbers.h"),
 	filepath.Join("lib", "syscalls", "category.inc"),
+	filepath.Join("lib", "syscalls", "kernel.inc"),
+	filepath.Join("lib", "syscalls", "syscalls.inc"),
 	// TODO(fxbug.dev/110295):
 	// filepath.Join("lib", "syscalls", "kernel-wrappers.inc"),
-	// filepath.Join("lib", "syscalls", "kernel.inc"),
-	// filepath.Join("lib", "syscalls", "syscalls.inc"),
 }
 
 type Generator struct {
@@ -37,6 +37,12 @@ func NewInternalGenerator(formatter fidlgen.Formatter) *Generator {
 	gen := fidlgen.NewGenerator("ZirconKernelTemplates", templates, formatter, template.FuncMap{
 		"LowerCaseWithUnderscores": zither.LowerCaseWithUnderscores,
 		"Increment":                Increment,
+		"KernelIncDecl": func(syscall zither.Syscall) string {
+			return SyscallCDecl(syscall, PointerViewKernel)
+		},
+		"SyscallIncDecl": func(syscall zither.Syscall) string {
+			return SyscallCDecl(syscall, PointerViewUserspace)
+		},
 	})
 	return &Generator{*gen}
 }

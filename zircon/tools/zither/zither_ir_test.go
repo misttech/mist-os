@@ -1285,6 +1285,19 @@ protocol SyscallWithParameters {
 					ReturnType: &TypeDescriptor{
 						Type: "example/StructReturnType",
 						Kind: TypeKindStruct,
+						Decl: &Struct{
+							decl: decl{Name: fidlgen.MustReadName("example/StructReturnType")},
+							Members: []StructMember{
+								{
+									member: member{Name: "value"},
+									Type: TypeDescriptor{
+										Type: "uint64",
+										Kind: TypeKindInteger,
+									},
+								},
+							},
+							Size: 8,
+						},
 					},
 				},
 				{
@@ -1361,6 +1374,10 @@ protocol Foo {
 					ReturnType: &TypeDescriptor{
 						Type: "zx/status",
 						Kind: TypeKindAlias,
+						Decl: &Alias{
+							decl:  decl{Name: fidlgen.MustReadName("zx/status")},
+							Value: TypeDescriptor{Type: "int32", Kind: TypeKindInteger},
+						},
 					},
 				},
 			},

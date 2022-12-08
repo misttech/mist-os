@@ -8,11 +8,15 @@ go_library("kernel") {
   visibility = [ "../*" ]
   sources = [
     "kernel.go",
+    "syscall_cdecl.go",
     "templates/category.inc.tmpl",
+    "templates/kernel.inc.tmpl",
+    "templates/syscalls.inc.tmpl",
     "templates/zx-syscall-numbers.h.tmpl",
   ]
   deps = [
     "..:common",
+    "../c",
     "//tools/fidl/lib/fidlgen",
   ]
 }

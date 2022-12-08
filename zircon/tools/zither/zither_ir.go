@@ -442,6 +442,10 @@ const (
 	TypeKindHandle       TypeKind = "handle"
 )
 
+func (kind TypeKind) IsPointerLike() bool {
+	return kind == TypeKindPointer || kind == TypeKindVoidPointer
+}
+
 func (kind TypeKind) IsVectorLike() bool {
 	return kind == TypeKindVector || kind == TypeKindVector32 || kind == TypeKindVoidVector || kind == TypeKindVoidVector32
 }
@@ -848,14 +852,16 @@ type StructMember struct {
 	// Offset is the offset of the field.
 	Offset int
 
-	// TODO(fxbug.dev/110021): The following two attributes may annotate
-	// "syscall" request and response structs. While we have to synthesize
-	// syscall information manually, we record these values here during
-	// member processing for later syscall processing.
+	// TODO(fxbug.dev/110021): The following attributes may annotate "syscall"
+	// request and response structs. While we have to synthesize syscall
+	// information manually, we record these values here during member
+	// processing for later syscall processing.
 	//
-	// See the definitions of @inout and @out in //zircon/vdso/README.md.
-	inout bool
-	out   bool
+	// See the definitions of @inout, @out, and @release in
+	// //zircon/vdso/README.md.
+	inout   bool
+	out     bool
+	release bool
 }
 
 func newStruct(strct fidlgen.Struct, decls declMap, typeKinds map[TypeKind]struct{}) (*Struct, error) {
@@ -889,8 +895,9 @@ func newStruct(strct fidlgen.Struct, decls declMap, typeKinds map[TypeKind]struc
 			// TODO(fxbug.dev/110021): Eventually the IR will effectively
 			// surface this information directly in the syscall-related
 			// elements: at that point this can be removed.
-			inout: attrs.HasAttribute("inout"),
-			out:   attrs.HasAttribute("out"),
+			inout:   attrs.HasAttribute("inout"),
+			out:     attrs.HasAttribute("out"),
+			release: attrs.HasAttribute("release"),
 		})
 	}
 
@@ -1120,6 +1127,15 @@ const (
 	// from one given originally as a `vector`. This should only be the case
 	// when the associated parameter gives a 'pointer' or a 'length'.
 	ParameterTagDecayedFromVector ParameterTag = iota
+
+	// ParameterTagUncheckedHandle indicates that associated handle parameter
+	// may be left in a state (e.g., consumed) dependent on the success of the
+	// syscall.
+	ParameterTagUncheckedHandle
+
+	// ParameterTagReleasedHandle indicates that the associated handle
+	// parameter is consumed by its syscall.
+	ParameterTagReleasedHandle
 )
 
 // SyscallParameter represents a C syscall parameter.
@@ -1155,6 +1171,14 @@ func (param *SyscallParameter) SetTag(tag ParameterTag) {
 		param.Tags = make(map[ParameterTag]struct{})
 	}
 	param.Tags[tag] = struct{}{}
+}
+
+func (param SyscallParameter) IsStrictInput() bool {
+	return param.Orientation == ParameterOrientationIn
+}
+
+func (param SyscallParameter) IsStrictOutput() bool {
+	return param.Orientation == ParameterOrientationOut
 }
 
 func newSyscallFamily(protocol fidlgen.Protocol, decls declMap) (*SyscallFamily, error) {
@@ -1233,6 +1257,7 @@ func newSyscallFamily(protocol fidlgen.Protocol, decls declMap) (*SyscallFamily,
 						syscall.ReturnType = &TypeDescriptor{
 							Type: "zx/status",
 							Kind: TypeKindAlias,
+							Decl: status,
 						}
 					}
 				}
@@ -1282,6 +1307,7 @@ func newSyscallFamily(protocol fidlgen.Protocol, decls declMap) (*SyscallFamily,
 				syscall.ReturnType = &TypeDescriptor{
 					Type: string(typ.Identifier),
 					Kind: TypeKindStruct,
+					Decl: ident,
 				}
 				return
 			}
@@ -1296,6 +1322,18 @@ func newSyscallFamily(protocol fidlgen.Protocol, decls declMap) (*SyscallFamily,
 					param.Orientation = ParameterOrientationOut
 				} else if m.inout {
 					param.Orientation = ParameterOrientationInOut
+				}
+
+				switch param.Type.Kind {
+				case TypeKindHandle, TypeKindPointer, TypeKindVector, TypeKindVector32:
+					if param.Type.Kind != TypeKindHandle && param.Type.ElementType.Kind != TypeKindHandle {
+						break
+					}
+					if method.GetAttributes().HasAttribute("handle_unchecked") {
+						param.SetTag(ParameterTagUncheckedHandle)
+					} else if m.release {
+						param.SetTag(ParameterTagReleasedHandle)
+					}
 				}
 
 				// Vector parameters decay into separate pointer and length

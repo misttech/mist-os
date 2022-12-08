@@ -208,8 +208,7 @@ template("zither_golden_test") {
     case_output_dir = "$target_gen_dir/${target_name}-${case.backend}"
 
     # Now verify that the bindings give valid code.
-    if (case.backend == "c" || case.backend == "asm" ||
-        case.backend == "kernel") {
+    if (case.backend == "c" || case.backend == "asm") {
       create_source_target = "${compilation_check_target}.create_source"
 
       if (case.backend == "c") {
@@ -245,16 +244,6 @@ template("zither_golden_test") {
           ":$create_source_target",
           backend_label,
         ]
-
-        if (case.backend == "kernel") {
-          # The kernel backend creates .inc files that expect the following
-          # macros defined.
-          defines = [
-            "SYSCALL_CATEGORY_BEGIN(category)=enum class category##Syscalls {",
-            "SYSCALL_IN_CATEGORY(syscall)=syscall,",
-            "SYSCALL_CATEGORY_END(category)=};",
-          ]
-        }
       }
     } else if (case.backend == "go") {
       # We create a simple main file that imports the generated package, which
@@ -317,7 +306,22 @@ template("zither_golden_test") {
           testonly = true
           deps = [ ":$compilation_check_target($default_toolchain)" ]
         }
-        not_needed([ "backend_label" ])
+      }
+      not_needed([
+                   "backend_label",
+                   "case_output_dir",
+                   "output_subdir",
+                 ])
+    } else if (case.backend == "kernel") {
+      # The kernel backend generates sources that rely on a number of other
+      # kernel and vDSO-specific definitions. Given that and the fact the
+      # singular use-case for these sources will be exercised in any default
+      # build invocation, it is neither worthwhile nor all that practical to do
+      # a compilation check here.
+      group(compilation_check_target) {
+        visibility = [ ":*" ]
+        testonly = true
+        deps = [ backend_label ]
       }
       not_needed([
                    "case_output_dir",
@@ -492,6 +496,7 @@ zither_golden_test("aliases") {
 # FIDL: testdata/zx/
 # Goldens: testdata/zx/goldens/${backend}/
 zither_golden_test("zx.test") {
+  experimental_flags = [ "zx_c_types" ]
   sources = [ "zx.test.fidl" ]
 
   cases = [
@@ -503,6 +508,8 @@ zither_golden_test("zx.test") {
       backend = "kernel"
       files = [
         "category.inc",
+        "kernel.inc",
+        "syscalls.inc",
         "zx-syscall-numbers.h",
       ]
     },

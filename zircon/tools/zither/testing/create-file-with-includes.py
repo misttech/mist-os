@@ -24,8 +24,15 @@ def main():
     args = parser.parse_args()
 
     contents = ["// %s" % args.comment]
+
+    # Include headers before .inc files, as the latter will likely refer to
+    # things defined in the former.
     for include in args.includes:
-        contents.append("#include <%s>" % include)
+        if include.endswith(".h"):
+            contents.append("#include <%s>" % include)
+    for include in args.includes:
+        if not include.endswith(".h"):
+            contents.append("#include <%s>" % include)
     contents.append("")
 
     with open(args.output, "w") as output_file:
