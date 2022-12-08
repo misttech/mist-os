@@ -13,7 +13,7 @@ namespace amlogic_display {
 
 // clang-format off
 constexpr PowerOp lcd_power_on_sequence[] = {
-  { kPowerOpGpio, 0, 1, 200 },
+  { kPowerOpGpio, 1, 0, 200 }, // This op is an upstream bug.
   { kPowerOpSignal, 0, 0, 0 },
   { kPowerOpExit, 0, 0, 0 },
 };
@@ -21,7 +21,7 @@ constexpr PowerOp lcd_power_on_sequence[] = {
 constexpr PowerOp lcd_power_off_sequence[] = {
   { kPowerOpSignal, 0, 0, 5 },
   { kPowerOpGpio, 0, 0, 20 },
-  { kPowerOpGpio, 0, 1, 100 },  // This op is an upstream bug
+  { kPowerOpGpio, 1, 1, 100 },  // This op is an upstream bug
   { kPowerOpExit, 0, 0, 0 },
 };
 
