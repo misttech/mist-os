@@ -74,18 +74,87 @@ install_host_tools("host") {
   outputs = [ "fidlgen_go" ]
 }
 
-if (current_toolchain == go_toolchain) {
-  group("goldens") {
+# Test that the generated Go library compiles.
+#
+# Go libraries can only be compiled inside the context of some binary.
+# The following is modeled from a similar template in
+# /zircon/tools/zither/BUILD.gn.
+# We create a simple main file that imports the generated package, which
+# will feed into our compilation check.
+template("fidlgen_go_golden_compilation_test") {
+  info = invoker.info
+  compilation_check_target = target_name
+  output_dir = "${target_gen_dir}/${target_name}"
+  create_main_target = "${compilation_check_target}.create_main"
+  main_file = "$output_dir/main.go"
+
+  # Something like "fidl/test/foobar"
+  go_package_under_test = "fidl/" + string_replace(info.library, ".", "/")
+  generated_file(create_main_target) {
+    visibility = [ ":*" ]
     testonly = true
 
-    deps = []
-    foreach(info, fidl_testdata_info) {
-      if (info.build_denylist + [ "fidlgen_go" ] - [ "fidlgen_go" ] ==
-          info.build_denylist) {
-        deps += [ info.target + "_go" ]
+    contents = [
+      "package main",
+      "",
+      "import (",
+
+      # It is necessary to import the generated bindings library.
+      # Otherwise, the tree-shaking build optimization from Go will
+      # avoid actually compiling the library.
+      # `_` to avoid usage complaints.
+      "  _ \"${go_package_under_test}\"",
+
+      # Without this import, there are undefined symbol errors at link time.
+      "  _ \"syscall/zx\"",
+      ")",
+      "",
+      "func main() {}",
+      "",
+    ]
+    outputs = [ main_file ]
+  }
+
+  # The generated main file now needs to be declared in a package/library.
+  main_library_target = "${compilation_check_target}.main_library"
+  main_pkg_name = rebase_path(output_dir, root_build_dir)
+  go_library(main_library_target) {
+    visibility = [ ":*" ]
+    testonly = true
+
+    name = main_pkg_name
+    source_dir = output_dir
+    sources = [ rebase_path(main_file, source_dir) ]
+    deps = [ info.target + "_go($go_toolchain)" ]
+    non_go_deps = [ ":$create_main_target" ]
+  }
+
+  go_binary(compilation_check_target) {
+    library = ":$main_library_target"
+    visibility = [ ":*" ]
+    testonly = true
+    sdk_category = "excluded"
+  }
+}
+
+golden_compilation_test_deps = []
+
+if (is_fuchsia) {
+  foreach(testdata_info, fidl_testdata_info) {
+    if (testdata_info.build_denylist + [ "fidlgen_go" ] - [ "fidlgen_go" ] ==
+        testdata_info.build_denylist) {
+      compilation_check_target = "${testdata_info.name}_go_compilation_test"
+      fidlgen_go_golden_compilation_test(compilation_check_target) {
+        info = testdata_info
       }
+      golden_compilation_test_deps += [ ":${compilation_check_target}" ]
     }
   }
+}
+
+group("goldens") {
+  testonly = true
+  deps = golden_compilation_test_deps
 }
 
 group("tests") {
@@ -93,6 +162,6 @@ group("tests") {
   deps = [
     ":fidlgen_go_golden_tests($host_toolchain)",
     ":fidlgen_go_lib_tests($host_toolchain)",
-    ":goldens($go_toolchain)",
+    ":goldens",
   ]
 }

@@ -94,6 +94,7 @@ fidl_testdata_info = [
       "fidlgen_hlcpp",
       "fidlgen_libfuzzer",
       "fidlgen_cpp",
+      "fidlgen_go",
 
       # TODO(fxbug.dev/62763): Fix undefined_identifier errors.
       "fidlgen_dart",
@@ -108,6 +109,7 @@ fidl_testdata_info = [
       "fidlgen_hlcpp",
       "fidlgen_libfuzzer",
       "fidlgen_cpp",
+      "fidlgen_go",
     ]
   },
   {
@@ -130,6 +132,10 @@ fidl_testdata_info = [
   {
     name = "driver_handle"
     target = "//tools/fidl/fidlc/testdata:test.driverhandle"
+    build_denylist = [
+      # TODO(fxbug.dev/116986): Unused import error.
+      "fidlgen_go",
+    ]
   },
   {
     name = "driver_one_way"
@@ -222,6 +228,10 @@ fidl_testdata_info = [
   {
     name = "foreign_type_in_response_used_through_compose"
     target = "//tools/fidl/fidlc/testdata/foreign_type_in_response_used_through_compose:test.foreigntypeinresponseusedthroughcompose"
+    build_denylist = [
+      # TODO(fxbug.dev/116985): Unused import.
+      "fidlgen_go",
+    ]
     host_build_denylist = [
       # TODO(fxbug.dev/62573): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
@@ -333,8 +343,13 @@ fidl_testdata_info = [
     name = "protocol_layouts"
     target = "//tools/fidl/fidlc/testdata/protocol_layouts:test.protocollayouts"
 
-    # TODO(fxbug.dev/96310): Possibly add backend support for syzkaller.
-    denylist = [ "fidlgen_syzkaller" ]
+    denylist = [
+      # TODO(fxbug.dev/96310): Possibly add backend support for syzkaller.
+      "fidlgen_syzkaller",
+
+      # TODO(fxbug.dev/116983): Re-enable when fixed.
+      "fidlgen_go",
+    ]
   },
   {
     name = "protocol_payloads"
