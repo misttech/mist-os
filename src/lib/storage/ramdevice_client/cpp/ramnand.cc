@@ -6,12 +6,7 @@
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.nand/cpp/wire.h>
 #include <lib/component/incoming/cpp/service_client.h>
-#include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/directory.h>
-#include <lib/fdio/fd.h>
-#include <lib/fdio/fdio.h>
-#include <lib/fdio/unsafe.h>
-#include <lib/fdio/watcher.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,36 +18,6 @@
 #include <fbl/string_buffer.h>
 #include <fbl/unique_fd.h>
 #include <ramdevice-client/ramnand.h>
-
-namespace {
-
-// Waits for |file| to appear in |dir|, and opens it when it does.  Times out if
-// the deadline passes.
-zx_status_t WaitForFile(const fbl::unique_fd& dir, const char* file, fbl::unique_fd* out) {
-  auto watch_func = [](int dirfd, int event, const char* fn, void* cookie) -> zx_status_t {
-    auto file = reinterpret_cast<const char*>(cookie);
-    if (event != WATCH_EVENT_ADD_FILE) {
-      return ZX_OK;
-    }
-    if (!strcmp(fn, file)) {
-      return ZX_ERR_STOP;
-    }
-    return ZX_OK;
-  };
-
-  zx_status_t status =
-      fdio_watch_directory(dir.get(), watch_func, ZX_TIME_INFINITE, const_cast<char*>(file));
-  if (status != ZX_ERR_STOP) {
-    return status;
-  }
-  out->reset(openat(dir.get(), file, O_RDONLY));
-  if (!out->is_valid()) {
-    return ZX_ERR_IO;
-  }
-  return ZX_OK;
-}
-
-}  // namespace
 
 namespace ramdevice_client {
 
@@ -75,28 +40,22 @@ zx_status_t RamNand::Create(fuchsia_hardware_nand::wire::RamNandInfo config,
     fprintf(stderr, "could not create ram_nand device: %s\n", zx_status_get_string(status));
     return status;
   }
-
-  std::string_view name = response.name.get();
+  const std::string name(response.name.get());
 
   fbl::unique_fd ram_nand_ctl(open(kBasePath, O_RDONLY | O_DIRECTORY));
   if (!ram_nand_ctl) {
-    fprintf(stderr, "Could not open ram_nand_ctl");
+    fprintf(stderr, "Could not open ram_nand_ctl: %s\n", strerror(errno));
     return ZX_ERR_INTERNAL;
   }
 
-  fbl::unique_fd fd;
-  if (zx_status_t status = WaitForFile(ram_nand_ctl, fbl::String(name).c_str(), &fd);
-      status != ZX_OK) {
-    fprintf(stderr, "could not open ram_nand: %s\n", zx_status_get_string(status));
-    return status;
-  }
-  fdio_cpp::FdioCaller caller(std::move(fd));
-  zx::result ram_nand = caller.take_as<fuchsia_device::Controller>();
-  if (ram_nand.is_error()) {
-    return ram_nand.status_value();
+  zx::result channel = device_watcher::RecursiveWaitForFile(ram_nand_ctl.get(), name.c_str());
+  if (channel.is_error()) {
+    fprintf(stderr, "could not open ram_nand at '%s': %s\n", name.c_str(), channel.status_string());
+    return channel.error_value();
   }
 
-  *out = RamNand(std::move(ram_nand.value()), fbl::String::Concat({kBasePath, "/", name}), name);
+  *out = RamNand(fidl::ClientEnd<fuchsia_device::Controller>(std::move(channel.value())),
+                 fbl::String::Concat({kBasePath, "/", name}), name);
 
   return ZX_OK;
 }
