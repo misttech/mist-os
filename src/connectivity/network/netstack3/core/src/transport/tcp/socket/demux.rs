@@ -201,7 +201,7 @@ where
                             return false;
                         };
 
-                        let (maybe_listener, (), _): &(_, _, ListenerAddr<_, _, _>) = socketmap
+                        let (maybe_listener, (), listener_addr) = socketmap
                             .listeners()
                             .get_by_id(&listener_id)
                             .expect("invalid listener_id");
@@ -222,9 +222,10 @@ where
                             return false;
                         }
 
+                        let ListenerAddr {ip: _, device: bound_device} = listener_addr;
                         let ip_sock = match ip_transport_ctx.new_ip_socket(
                             ctx,
-                            None,
+                            bound_device.as_ref(),
                             Some(local_ip),
                             remote_ip,
                             IpProto::Tcp.into(),
@@ -256,6 +257,7 @@ where
                         if matches!(state, State::SynRcvd(_)) {
                             let poll_send_at =
                                 state.poll_send_at().expect("no retrans timer");
+                            let bound_device = bound_device.clone();
                             let conn_id = sockets.socketmap
                                 .conns_mut()
                                 .try_insert(
@@ -264,7 +266,7 @@ where
                                             local: (local_ip, local_port),
                                             remote: (remote_ip, remote_port),
                                         },
-                                        device: None,
+                                        device: bound_device,
                                     },
                                     Connection {
                                         acceptor: Some(Acceptor::Pending(ListenerId(

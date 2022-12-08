@@ -26,7 +26,7 @@ use netstack3_core::{
     error::{LocalAddressError, NetstackError, RemoteAddressError, SocketError, ZonedAddressError},
     ip::socket::{IpSockCreationError, IpSockRouteError, IpSockSendError, IpSockUnroutableError},
     socket::datagram::{ConnectListenerError, SetMulticastMembershipError, SockCreationError},
-    transport::udp::UdpSendToError,
+    transport::{tcp::socket::SetDeviceError, udp::UdpSendToError},
     Ctx,
 };
 
@@ -525,6 +525,15 @@ impl IntoErrno for ZonedAddressError {
         match self {
             Self::RequiredZoneNotProvided => Errno::Einval,
             Self::DeviceZoneMismatch => Errno::Einval,
+        }
+    }
+}
+
+impl IntoErrno for SetDeviceError {
+    fn into_errno(self) -> Errno {
+        match self {
+            Self::Conflict => Errno::Eaddrinuse,
+            Self::Unroutable => Errno::Ehostunreach,
         }
     }
 }

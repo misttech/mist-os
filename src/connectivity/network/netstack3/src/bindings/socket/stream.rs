@@ -31,13 +31,15 @@ use net_types::{
 };
 
 use crate::bindings::{
+    devices::Devices,
     socket::{IntoErrno, IpSockAddrExt, SockAddr, ZXSIO_SIGNAL_CONNECTED, ZXSIO_SIGNAL_INCOMING},
     util::{IntoFidl, NeedsDataNotifier, NeedsDataWatcher, TryIntoFidl},
-    LockableContext,
+    LockableContext, StackTime,
 };
 
 use net_types::ip::Ip;
 use netstack3_core::{
+    device::DeviceId,
     ip::IpExt,
     transport::tcp::{
         buffer::{Buffer, IntoBuffers, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload},
@@ -45,7 +47,8 @@ use netstack3_core::{
         socket::{
             accept, bind, close_conn, connect_bound, connect_unbound, create_socket,
             get_bound_info, get_connection_info, get_listener_info, listen, remove_bound,
-            remove_unbound, shutdown_conn, shutdown_listener, AcceptError, BindError, BoundId,
+            remove_unbound, set_bound_device, set_connection_device, set_listener_device,
+            set_unbound_device, shutdown_conn, shutdown_listener, AcceptError, BindError, BoundId,
             BoundInfo, ConnectError, ConnectionId, ConnectionInfo, ListenerId, NoConnection,
             SocketAddr, TcpNonSyncContext, UnboundId,
         },
@@ -388,7 +391,7 @@ pub(super) async fn spawn_worker<C>(
 where
     C: LockableContext,
     C: Clone + Send + Sync + 'static,
-    C::NonSyncCtx: SocketWorkerDispatcher,
+    C::NonSyncCtx: SocketWorkerDispatcher + AsRef<Devices<DeviceId<StackTime>>>,
 {
     let (local, peer) = zx::Socket::create(zx::SocketOpts::STREAM)
         .map_err(|_: zx::Status| fposix::Errno::Enobufs)?;
@@ -490,7 +493,7 @@ impl<I: IpSockAddrExt + IpExt, C> SocketWorker<I, C>
 where
     C: LockableContext,
     C: Clone + Send + Sync + 'static,
-    C::NonSyncCtx: SocketWorkerDispatcher,
+    C::NonSyncCtx: SocketWorkerDispatcher + AsRef<Devices<DeviceId<StackTime>>>,
 {
     fn spawn(mut self, request_stream: fposix_socket::StreamSocketRequestStream) {
         fasync::Task::spawn(async move {
@@ -757,6 +760,31 @@ where
         }
     }
 
+    async fn set_bind_to_device(&mut self, device: Option<&str>) -> Result<(), fposix::Errno> {
+        let mut ctx = self.ctx.lock().await;
+        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let device = device
+            .map(|name| {
+                non_sync_ctx
+                    .as_ref()
+                    .get_device_by_name(name)
+                    .map(|d| d.core_id().clone())
+                    .ok_or(fposix::Errno::Enodev)
+            })
+            .transpose()?;
+
+        match self.id {
+            SocketId::Unbound(id, _) => {
+                set_unbound_device(sync_ctx, non_sync_ctx, id, device);
+                Ok(())
+            }
+            SocketId::Bound(id, _) => set_bound_device(sync_ctx, non_sync_ctx, id, device),
+            SocketId::Listener(id) => set_listener_device(sync_ctx, non_sync_ctx, id, device),
+            SocketId::Connection(id) => set_connection_device(sync_ctx, non_sync_ctx, id, device),
+        }
+        .map_err(IntoErrno::into_errno)
+    }
+
     /// Returns a [`ControlFlow`] to indicate whether the parent stream should
     /// continue being polled or dropped.
     ///
@@ -843,6 +871,10 @@ where
                     .expect("failed to create async channel");
                 let events = fposix_socket::StreamSocketRequestStream::from_channel(channel);
                 return ControlFlow::Continue(Some(events));
+            }
+            fposix_socket::StreamSocketRequest::SetBindToDevice { value, responder } => {
+                let identifier = (!value.is_empty()).then_some(value.as_str());
+                responder_send!(responder, &mut self.set_bind_to_device(identifier).await);
             }
             fposix_socket::StreamSocketRequest::GetAttr { responder } => {
                 responder_send!(
@@ -942,9 +974,6 @@ where
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetAcceptConn { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
-            }
-            fposix_socket::StreamSocketRequest::SetBindToDevice { value: _, responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetBindToDevice { responder } => {
