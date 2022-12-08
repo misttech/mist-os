@@ -59,11 +59,11 @@ AllowImplPair Exclude(std::initializer_list<const char*> substrings);
 std::string ExtractShortName(const std::string& pkg_url);
 
 // Run a test for all possible proxy + server combinations.
-void ForAllImpls(Impls impls, TestBody body);
+void ForAllImpls(const Impls& impls, const TestBody& body);
 
 // Only test some proxy + server combinations, using an |AllowImplPair| predicate function to
 // determine whether or not the particular proxy + server combination should be executed.
-void ForSomeImpls(Impls impls, AllowImplPair allow, TestBody body);
+void ForSomeImpls(const Impls& impls, const AllowImplPair& allow, const TestBody& body);
 
 // Parse the input args to build a list of binding implementations being tested. Returns false if no
 // viable implementation names are found in the passed in command line arguments.
@@ -84,15 +84,11 @@ std::string RandomUTF8(size_t count, std::default_random_engine& rand_engine);
 // A generic class for generating random data for a FIDL type.
 class DataGenerator {
  public:
-  DataGenerator(int seed) : rand_engine_(seed) {}
+  explicit DataGenerator(int seed) : rand_engine_(seed) {}
 
   template <typename T>
   T choose(T a, T b) {
-    if (next<bool>()) {
-      return a;
-    } else {
-      return b;
-    }
+    return next<bool>() ? a : b;
   }
 
   // Note: uniform_int_distribution is undefined behavior for integral types
@@ -171,9 +167,8 @@ class DataGenerator {
       // Can't use gtest ASSERT_EQ because we're in a non-void function.
       ZX_ASSERT_MSG(status == ZX_OK, "status = %d", status);
       return zx::handle(raw_event);
-    } else {
-      return zx::handle(0);
     }
+    return {};
   }
 
   template <typename T>
@@ -230,9 +225,8 @@ class DataGenerator {
   T nullable(T null_value, std::function<T(void)> generate_value) {
     if (next<bool>()) {
       return generate_value();
-    } else {
-      return null_value;
     }
+    return null_value;
   }
 };
 

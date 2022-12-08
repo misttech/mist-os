@@ -275,9 +275,12 @@ class EchoClientApp {
   ::fidl::ClientEnd<Echo> ConnectTo() {
     auto context = sys::ComponentContext::Create();
     auto echo_ends = ::fidl::CreateEndpoints<fidl_test_compatibility::Echo>();
-    ZX_ASSERT(echo_ends.is_ok());
-    ZX_ASSERT(context->svc()->Connect(kEchoInterfaceName, echo_ends->server.TakeChannel()) ==
-              ZX_OK);
+    ZX_ASSERT_MSG(echo_ends.is_ok(), "%s", echo_ends.status_string());
+    {
+      zx_status_t status =
+          context->svc()->Connect(kEchoInterfaceName, echo_ends->server.TakeChannel());
+      ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
+    }
 
     return std::move(echo_ends->client);
   }
@@ -319,12 +322,11 @@ class EchoConnection final : public fidl::Server<Echo> {
           "", request.result_variant(),
           [completer = completer.ToAsync(),
            extend_lifetime = app](fidl::Result<Echo::EchoMinimalWithError>& result) mutable {
-            ZX_ASSERT_MSG(result.is_ok() || result.error_value().is_domain_error(),
-                          "Forwarding failed: %s",
-                          result.error_value().FormatDescription().c_str());
             if (result.is_ok()) {
               completer.Reply(fit::ok());
             } else {
+              ZX_ASSERT_MSG(result.error_value().is_domain_error(), "Forwarding failed: %s",
+                            result.error_value().FormatDescription().c_str());
               completer.Reply(fit::error(result.error_value().domain_error()));
             }
           });

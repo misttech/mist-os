@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <utility>
+
 #include <src/tests/fidl/compatibility/helpers.h>
 
 using namespace component_testing;
@@ -13,15 +15,15 @@ constexpr char kUsage[] = ("Usage:\n  fidl_compatibility_test foo_impl bar_impl\
 
 AllowImplPair Exclude(std::initializer_list<const char*> substrings) {
   return [substrings](const std::string& proxy_url, const std::string& server_url) {
-    for (auto substring : substrings) {
+    return std::all_of(std::begin(substrings), std::end(substrings), [&](const char* substring) {
       if (proxy_url.find(substring) != std::string::npos) {
         return false;
       }
       if (server_url.find(substring) != std::string::npos) {
         return false;
       }
-    }
-    return true;
+      return true;
+    });
   };
 }
 
@@ -32,12 +34,12 @@ std::string ExtractShortName(const std::string& pkg_url) {
   return short_name;
 }
 
-void ForAllImpls(Impls impls, TestBody body) {
+void ForAllImpls(const Impls& impls, const TestBody& body) {
   ForSomeImpls(
       impls, [](const std::string& p, const std::string& s) { return true; }, body);
 }
 
-void ForSomeImpls(Impls impls, AllowImplPair allow, TestBody body) {
+void ForSomeImpls(const Impls& impls, const AllowImplPair& allow, const TestBody& body) {
   for (auto const& proxy_url : impls) {
     for (auto const& server_url : impls) {
       if (!allow(proxy_url, server_url)) {
@@ -71,7 +73,8 @@ void ForSomeImpls(Impls impls, AllowImplPair allow, TestBody body) {
       echo.set_error_handler([&proxy_url, &loop, &test_completed](zx_status_t status) {
         if (!test_completed) {
           loop.Quit();
-          FAIL() << "Connection to " << proxy_url << " failed unexpectedly: " << status;
+          FAIL() << "Connection to " << proxy_url
+                 << " failed unexpectedly: " << zx_status_get_string(status);
         }
       });
 
@@ -104,7 +107,7 @@ bool GetImplsUnderTest(int argc, char** argv, Impls* out_impls) {
 zx::handle Handle() {
   zx_handle_t raw_event;
   const zx_status_t status = zx_event_create(0u, &raw_event);
-  ZX_ASSERT_MSG(status == ZX_OK, "status = %d", status);
+  ZX_ASSERT_MSG(status == ZX_OK, "status = %s", zx_status_get_string(status));
   return zx::handle(raw_event);
 }
 
@@ -117,15 +120,17 @@ zx::handle Handle() {
     return ::testing::AssertionSuccess() << "Both handles invalid";
   }
   zx_info_handle_basic_t a_info, b_info;
-  zx_status_t status =
-      zx_object_get_info(a.get(), ZX_INFO_HANDLE_BASIC, &a_info, sizeof(a_info), nullptr, nullptr);
-  if (ZX_OK != status) {
-    return ::testing::AssertionFailure() << "zx_object_get_info(a) returned " << status;
+  if (zx_status_t status = zx_object_get_info(a.get(), ZX_INFO_HANDLE_BASIC, &a_info,
+                                              sizeof(a_info), nullptr, nullptr);
+      ZX_OK != status) {
+    return ::testing::AssertionFailure()
+           << "zx_object_get_info(a) returned " << zx_status_get_string(status);
   }
-  status =
-      zx_object_get_info(b.get(), ZX_INFO_HANDLE_BASIC, &b_info, sizeof(b_info), nullptr, nullptr);
-  if (ZX_OK != status) {
-    return ::testing::AssertionFailure() << "zx_object_get_info(b) returned " << status;
+  if (zx_status_t status = zx_object_get_info(b.get(), ZX_INFO_HANDLE_BASIC, &b_info,
+                                              sizeof(b_info), nullptr, nullptr);
+      ZX_OK != status) {
+    return ::testing::AssertionFailure()
+           << "zx_object_get_info(b) returned " << zx_status_get_string(status);
   }
   if (a_info.koid != b_info.koid) {
     return ::testing::AssertionFailure() << std::endl
