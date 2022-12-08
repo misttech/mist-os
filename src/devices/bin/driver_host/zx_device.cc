@@ -39,7 +39,7 @@ zx_device::~zx_device() = default;
 zx_status_t zx_device::Create(DriverHostContext* ctx, std::string name, fbl::RefPtr<Driver> driver,
                               fbl::RefPtr<zx_device>* out_dev) {
   *out_dev = fbl::AdoptRef(new zx_device(ctx, name, driver));
-  (*out_dev)->vnode.emplace(*out_dev, ctx->loop().dispatcher());
+  (*out_dev)->vnode.emplace(**out_dev, ctx->loop().dispatcher());
   return ZX_OK;
 }
 
@@ -316,8 +316,6 @@ fbl::RefPtr<zx_device> zx_device::GetDeviceFromLocalId(uint64_t local_id) {
   return fbl::RefPtr(&*itr);
 }
 
-bool zx_device::Unbound() { return flags_ & DEV_FLAG_UNBINDING; }
-
 bool zx_device::has_composite() const { return !!composite_; }
 
 fbl::RefPtr<CompositeDevice> zx_device::take_composite() { return std::move(composite_); }
@@ -362,6 +360,35 @@ void zx_device::add_child(zx_device* child) {
 void zx_device::remove_child(zx_device& child) {
   children_.erase(child);
   inspect_->decrement_child_count();
+}
+
+zx::result<std::string> zx_device::GetTopologicalPath() {
+  char buf[fuchsia_device::wire::kMaxDevicePathLen + 1];
+  size_t actual;
+  if (zx_status_t status =
+          driver_host_context()->GetTopoPath(fbl::RefPtr(this), buf, sizeof(buf), &actual);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(std::string(buf));
+}
+
+bool zx_device::IsUnbound() { return flags_ & DEV_FLAG_UNBINDING; }
+
+zx_status_t zx_device::MessageOp(fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
+  libsync::Completion completion;
+  zx_status_t status;
+
+  async::PostTask(driver->dispatcher()->async_dispatcher(), [&]() {
+    TraceLabelBuffer trace_label;
+    TRACE_DURATION("driver_host:driver-hooks", get_trace_label("message", &trace_label));
+    inspect_->MessageOpStats().Update();
+    status = Dispatch(ops_->message, ZX_ERR_NOT_SUPPORTED, msg, txn);
+    completion.Signal();
+  });
+
+  completion.Wait();
+  return status;
 }
 
 void zx_device::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
@@ -426,20 +453,12 @@ void zx_device::ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) {
 }
 
 void zx_device::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
-  char buf[fuchsia_device::wire::kMaxDevicePathLen + 1];
-  size_t actual;
-  zx_status_t status =
-      driver_host_context()->GetTopoPath(fbl::RefPtr(this), buf, sizeof(buf), &actual);
-  if (status != ZX_OK) {
-    completer.ReplyError(status);
+  zx::result topo_path = GetTopologicalPath();
+  if (topo_path.is_error()) {
+    completer.ReplyError(topo_path.error_value());
     return;
   }
-  if (actual > 0) {
-    // Remove the accounting for the null byte
-    actual--;
-  }
-  auto path = fidl::StringView(buf, actual);
-  completer.ReplySuccess(path);
+  completer.ReplySuccess(fidl::StringView::FromExternal(topo_path.value()));
 }
 
 void zx_device::GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& completer) {

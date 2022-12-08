@@ -103,7 +103,7 @@ struct ZxDeviceLocalIdMapTag {};
 
 // This needs to be a struct, not a class, to match the public definition
 struct zx_device
-    : public fidl::WireServer<fuchsia_device::Controller>,
+    : public DeviceInterface,
       public fbl::RefCountedUpgradeable<zx_device>,
       public fbl::Recyclable<zx_device>,
       public fbl::ContainableBaseClasses<
@@ -247,22 +247,6 @@ struct zx_device
     });
 
     completion.Wait();
-  }
-
-  zx_status_t MessageOp(fidl_incoming_msg_t* msg, fidl_txn_t* txn) {
-    libsync::Completion completion;
-    zx_status_t status;
-
-    async::PostTask(driver->dispatcher()->async_dispatcher(), [&]() {
-      TraceLabelBuffer trace_label;
-      TRACE_DURATION("driver_host:driver-hooks", get_trace_label("message", &trace_label));
-      inspect_->MessageOpStats().Update();
-      status = Dispatch(ops_->message, ZX_ERR_NOT_SUPPORTED, msg, txn);
-      completion.Signal();
-    });
-
-    completion.Wait();
-    return status;
   }
 
   void ChildPreReleaseOp(void* child_ctx) {
@@ -475,8 +459,6 @@ struct zx_device
     return AsyncTrace(category, name.data());
   }
 
-  bool Unbound();
-
   fidl::ClientEnd<fuchsia_io::Directory>& runtime_outgoing_dir() { return runtime_outgoing_dir_; }
 
   void set_runtime_outgoing_dir(fidl::ClientEnd<fuchsia_io::Directory> outgoing_dir) {
@@ -491,6 +473,10 @@ struct zx_device
   void FreeInspect() { inspect_.reset(); }
 
  private:
+  // Methods from the DeviceInterface class.
+  zx::result<std::string> GetTopologicalPath() override;
+  bool IsUnbound() override;
+  zx_status_t MessageOp(fidl_incoming_msg_t* msg, fidl_txn_t* txn) override;
   void ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
                            ConnectToDeviceFidlCompleter::Sync& completer) override;
   void Bind(BindRequestView request, BindCompleter::Sync& completer) override;

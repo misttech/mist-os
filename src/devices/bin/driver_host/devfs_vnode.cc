@@ -4,20 +4,18 @@
 
 #include "src/devices/bin/driver_host/devfs_vnode.h"
 
-#include <lib/ddk/device.h>
+#include <lib/async/cpp/task.h>
 
 #include <string_view>
 
-#include "src/devices/bin/driver_host/driver_host_context.h"
-#include "src/devices/bin/driver_host/zx_device.h"
 #include "src/devices/lib/fidl/transaction.h"
 #include "src/devices/lib/log/log.h"
 
-DeviceServer::DeviceServer(fbl::RefPtr<zx_device> dev, async_dispatcher_t* dispatcher)
-    : dev_(std::move(dev)), dispatcher_(dispatcher) {}
+DeviceServer::DeviceServer(DeviceInterface& device, async_dispatcher_t* dispatcher)
+    : dev_(device), dispatcher_(dispatcher) {}
 
 void DeviceServer::ConnectToController(fidl::ServerEnd<fuchsia_device::Controller> server_end) {
-  Serve(server_end.TakeChannel(), dev_.get());
+  Serve(server_end.TakeChannel(), &dev_);
 }
 
 void DeviceServer::ConnectToDeviceFidl(zx::channel channel) { Serve(std::move(channel), &device_); }
@@ -70,13 +68,9 @@ void DeviceServer::Serve(zx::channel channel, fidl::internal::IncomingMessageDis
 DeviceServer::Node::Node(DeviceServer& parent) : parent_(parent) {}
 
 void DeviceServer::Node::NotImplemented_(const std::string& name, fidl::CompleterBase& completer) {
-  char buf[fuchsia_device::wire::kMaxDevicePathLen + 1];
-  size_t actual;
-  zx_status_t status =
-      parent_.dev_->driver_host_context()->GetTopoPath(parent_.dev_, buf, sizeof(buf), &actual);
+  zx::result topo_path = parent_.dev_.GetTopologicalPath();
   LOGF(ERROR, "%s: unsupported call to %s", name.c_str(),
-       status == ZX_OK ? buf : zx_status_get_string(status));
-
+       topo_path.is_ok() ? topo_path.value().c_str() : topo_path.status_string());
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -93,14 +87,10 @@ void DeviceServer::Node::Query(QueryCompleter::Sync& completer) {
 
 void DeviceServer::Node::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
   if (request->flags != fuchsia_io::wire::OpenFlags::kCloneSameRights) {
-    char buf[fuchsia_device::wire::kMaxDevicePathLen + 1];
-    size_t actual;
-    zx_status_t status =
-        parent_.dev_->driver_host_context()->GetTopoPath(parent_.dev_, buf, sizeof(buf), &actual);
+    zx::result topo_path = parent_.dev_.GetTopologicalPath();
     LOGF(ERROR, "%s: unsupported clone flags=0x%x",
-         status == ZX_OK ? buf : zx_status_get_string(status),
+         topo_path.is_ok() ? topo_path.value().c_str() : topo_path.status_string(),
          static_cast<uint32_t>(request->flags));
-
     request->object.Close(ZX_ERR_NOT_SUPPORTED);
     return;
   }
@@ -114,7 +104,7 @@ void DeviceServer::MessageDispatcher::dispatch_message(
     fidl::IncomingHeaderAndMessage&& msg, fidl::Transaction* txn,
     fidl::internal::MessageStorageViewBase* storage_view) {
   // If the device is unbound it shouldn't receive messages so close the channel.
-  if (parent_.dev_->Unbound()) {
+  if (parent_.dev_.IsUnbound()) {
     txn->Close(ZX_ERR_IO_NOT_PRESENT);
     return;
   }
@@ -123,14 +113,14 @@ void DeviceServer::MessageDispatcher::dispatch_message(
     if (fidl::WireTryDispatch(&parent_.node_, msg, txn) == fidl::DispatchResult::kFound) {
       return;
     }
-    if (fidl::WireTryDispatch(parent_.dev_.get(), msg, txn) == fidl::DispatchResult::kFound) {
+    if (fidl::WireTryDispatch(&parent_.dev_, msg, txn) == fidl::DispatchResult::kFound) {
       return;
     }
   }
 
   fidl_incoming_msg_t c_msg = std::move(msg).ReleaseToEncodedCMessage();
   auto ddk_txn = MakeDdkInternalTransaction(txn);
-  zx_status_t status = parent_.dev_->MessageOp(&c_msg, ddk_txn.Txn());
+  zx_status_t status = parent_.dev_.MessageOp(&c_msg, ddk_txn.Txn());
   if (status != ZX_OK && status != ZX_ERR_ASYNC) {
     // Close the connection on any error
     txn->Close(status);
