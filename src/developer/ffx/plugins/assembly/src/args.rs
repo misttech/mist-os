@@ -6,6 +6,8 @@ use anyhow::{anyhow, Result};
 use argh::FromArgs;
 use camino::Utf8PathBuf;
 use ffx_core::ffx_command;
+use std::path::Path;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use assembly_images_config::BlobFSLayout;
@@ -219,6 +221,9 @@ pub struct PackageSizeCheckArgs {
 #[derive(Debug, FromArgs, PartialEq)]
 #[argh(subcommand, name = "product")]
 pub struct ProductSizeCheckArgs {
+    /// use specific auth mode for oauth2 (see examples; default: pkce).
+    #[argh(option, default = "AuthMode::Default")]
+    pub auth: AuthMode,
     /// path to assembly_manifest.json.
     #[argh(option)]
     pub assembly_manifest: Utf8PathBuf,
@@ -242,6 +247,43 @@ pub struct ProductSizeCheckArgs {
     /// This value is propagated to the gerrit size report.
     #[argh(option)]
     pub blobfs_creep_budget: Option<u64>,
+}
+
+/// Select an Oauth2 authorization mode.
+#[derive(PartialEq, Debug, Clone, Default)]
+pub enum AuthMode {
+    #[default]
+    /// defaults to Pkce
+    Default,
+    /// expects a path to a tool which will print an access token to stdout and exit 0.
+    Exec(PathBuf),
+    /// uses Out-of-Band auth (cmd-line friendly).
+    Oob,
+    /// uses PKCE auth flow to obtain an access token (requires GUI browser)
+    Pkce,
+}
+
+impl FromStr for AuthMode {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_ref() {
+            "default" => Ok(AuthMode::Default),
+            "oob" => Ok(AuthMode::Oob),
+            "pkce" => Ok(AuthMode::Pkce),
+            exec => {
+                let path = Path::new(exec);
+                if path.is_file() {
+                    Ok(AuthMode::Exec(path.to_path_buf()))
+                } else {
+                    Err("Unknown auth flow choice. Use one of oob, \
+                        pkce, default, or a path to an executable \
+                        which prints an access token to stdout."
+                        .to_string())
+                }
+            }
+        }
+    }
 }
 
 fn default_blobfs_layout() -> BlobFSLayout {

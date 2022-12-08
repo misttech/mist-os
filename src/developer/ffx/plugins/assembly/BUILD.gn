@@ -79,6 +79,8 @@ ffx_plugin("ffx_assembly") {
     "//src/lib/assembly/vbmeta",
     "//src/lib/assembly/zbi",
     "//src/lib/fuchsia-url",
+    "//src/lib/gcs",
+    "//src/lib/structured_ui",
     "//src/sys/pkg/lib/epoch",
     "//src/sys/pkg/lib/fuchsia-hash",
     "//src/sys/pkg/lib/fuchsia-merkle",
@@ -96,6 +98,7 @@ ffx_plugin("ffx_assembly") {
   test_deps = [
     "//src/lib/assembly/test_keys",
     "//src/lib/assembly/test_util",
+    "//src/lib/fuchsia",
     "//src/storage/blobfs/tools:blobfs",
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",
     "//third_party/rust_crates:assert_matches",

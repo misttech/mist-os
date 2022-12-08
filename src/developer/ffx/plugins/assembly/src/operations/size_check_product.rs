@@ -7,15 +7,22 @@ use crate::operations::size_check::PackageSizeInfos;
 use crate::util::read_config;
 use anyhow::{format_err, Context, Result};
 use assembly_manifest::{AssemblyManifest, BlobfsContents, Image};
-use ffx_assembly_args::ProductSizeCheckArgs;
+use ffx_assembly_args::{AuthMode, ProductSizeCheckArgs};
 use fuchsia_hash::Hash;
 use serde::Serialize;
 use serde_json::json;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
+use std::path::Path;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use super::size_check::PackageBlobSizeInfo;
+use gcs::{
+    client::{Client, ClientFactory},
+    gs_url::split_gs_url,
+    token_store::{RefreshAccessType, TokenStore},
+};
 
 const TOTAL_BLOBFS_GERRIT_COMPONENT_NAME: &str = "Total BlobFS contents";
 
@@ -56,7 +63,7 @@ struct VisualizationBlobNode {
 }
 
 /// Verifies that the product budget is not exceeded.
-pub fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> {
+pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> {
     let assembly_manifest: AssemblyManifest = read_config(&args.assembly_manifest)?;
     let blobfs_contents = match extract_blobfs_contents(&assembly_manifest) {
         Some(contents) => contents,
@@ -86,7 +93,16 @@ pub fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> {
     }
 
     if let Some(base_assembly_manifest) = args.base_assembly_manifest {
-        let other_assembly_manifest = read_config(&base_assembly_manifest)?;
+        let other_assembly_manifest = if base_assembly_manifest.starts_with("gs://") {
+            let (bucket, object) = split_gs_url(base_assembly_manifest.as_str())?;
+            let output_path = gcs_download(bucket, object, args.auth)
+                .await
+                .context("download base assembly manifest")?;
+            read_config(output_path)?
+        } else {
+            read_config(&base_assembly_manifest)?
+        };
+
         let other_blobfs_contents =
             extract_blobfs_contents(&other_assembly_manifest).ok_or_else(|| {
                 format_err!(
@@ -170,6 +186,36 @@ pub fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> {
     }
 
     Ok(contents_fit)
+}
+
+async fn get_gcs_client_with_auth(auth_mode: AuthMode) -> Result<Client> {
+    let refresh_token = match auth_mode {
+        AuthMode::Default | AuthMode::Pkce => {
+            let mut input = std::io::stdin();
+            let mut output = std::io::stdout();
+            let mut err_out = std::io::stderr();
+            let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+
+            RefreshAccessType::RefreshToken(
+                gcs::auth::pkce::new_refresh_token(&ui).await.context("pkce: get refresh token")?,
+            )
+        }
+        AuthMode::Oob => RefreshAccessType::RefreshToken(
+            gcs::auth::oob::new_refresh_token().await.context("oob: get refresh token")?,
+        ),
+        AuthMode::Exec(exec_path) => RefreshAccessType::Exec(exec_path),
+    };
+    let token_store =
+        TokenStore::new_with_auth(refresh_token, /*access_token=*/ None).expect("token_store");
+    let factory = ClientFactory::new(token_store);
+    Ok(factory.create_client())
+}
+
+async fn gcs_download(bucket: &str, object: &str, auth_mode: AuthMode) -> Result<PathBuf> {
+    let client = get_gcs_client_with_auth(auth_mode).await?;
+    let output_path = Path::new("/tmp/fuchsia.json");
+    client.fetch_without_progress(bucket, object, &output_path).await.context("Downloading")?;
+    Ok(output_path.to_path_buf())
 }
 
 #[allow(clippy::ptr_arg)]
@@ -652,6 +698,7 @@ mod tests {
         PackagesMetadata,
     };
     use camino::{Utf8Path, Utf8PathBuf};
+    use ffx_assembly_args::AuthMode;
     use ffx_assembly_args::ProductSizeCheckArgs;
     use fuchsia_hash::Hash;
     use serde_json::json;
@@ -884,8 +931,8 @@ test_base_package                                                            65 
         Ok(())
     }
 
-    #[test]
-    fn verify_product_budgets_with_overflow_test() -> Result<()> {
+    #[fuchsia::test]
+    async fn verify_product_budgets_with_overflow_test() -> Result<()> {
         // Create assembly manifest file
         let test_fs = TestFs::new();
         test_fs.write(
@@ -974,6 +1021,7 @@ test_base_package                                                            65 
 
         // Create ProductSizeCheckArgs
         let product_size_check_args = ProductSizeCheckArgs {
+            auth: AuthMode::Default,
             assembly_manifest: test_fs.path("assembly_manifest.json"),
             base_assembly_manifest: None,
             verbose: false,
@@ -983,12 +1031,12 @@ test_base_package                                                            65 
             blobfs_creep_budget: None,
         };
 
-        assert!(!verify_product_budgets(product_size_check_args)?);
+        assert!(!verify_product_budgets(product_size_check_args).await?);
         Ok(())
     }
 
-    #[test]
-    fn verify_product_budgets_without_overflow_test() -> Result<()> {
+    #[fuchsia::test]
+    async fn verify_product_budgets_without_overflow_test() -> Result<()> {
         // Create assembly manifest file
         let test_fs = TestFs::new();
         test_fs.write(
@@ -1077,6 +1125,7 @@ test_base_package                                                            65 
 
         // Create ProductSizeCheckArgs
         let product_size_check_args = ProductSizeCheckArgs {
+            auth: AuthMode::Default,
             assembly_manifest: test_fs.path("assembly_manifest.json"),
             base_assembly_manifest: None,
             verbose: false,
@@ -1087,7 +1136,7 @@ test_base_package                                                            65 
         };
 
         let res = verify_product_budgets(product_size_check_args);
-        assert!(res?);
+        assert!(res.await?);
         Ok(())
     }
 

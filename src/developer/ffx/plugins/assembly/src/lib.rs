@@ -63,6 +63,7 @@ impl FfxMain for AssemblyTool {
                     // exceeded or not. We don't intend to fail the build when budgets are exceeded so the
                     // returned value is dropped.
                     operations::size_check_product::verify_product_budgets(args)
+                        .await
                         .context("Product size checker")
                         .map(|_| ())
                 }
