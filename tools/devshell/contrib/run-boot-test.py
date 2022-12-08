@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import argparse
+import difflib
 import json
 import os
 import platform
@@ -35,6 +36,10 @@ class BootTest(object):
             if "qemu_kernel" in images else None)
         self.efi = images_by_label[images["efi"]] if "efi" in images else None
 
+    # Enables sorting by name.
+    def __lt__(self, other):
+        return self.name < other.name
+
     @staticmethod
     def is_boot_test(test_json):
         envs = test_json.get("environments", [])
@@ -50,6 +55,12 @@ class BootTest(object):
             kinds.append("EFI")
         print("* %s (%s)" % (self.name, ", ".join(kinds)))
         print("    label: %s" % self.label)
+        if self.qemu_kernel:
+            print("    qemu kernel: %s" % self.qemu_kernel["path"])
+        if self.zbi:
+            print("    zbi: %s" % self.zbi["path"])
+        if self.efi:
+            print("    efi: %s" % self.efi["path"])
         if command:
             print("    command: %s" % " ".join(map(shlex.quote, command)))
 
@@ -58,6 +69,12 @@ def error(str):
     RED = "\033[91m"
     END = "\033[0m"
     print(RED + "ERROR: " + str + END)
+
+
+def warning(str):
+    YELLOW = "\033[93m"
+    END = "\033[0m"
+    print(YELLOW + "WARNING: " + str + END)
 
 
 def find_bootserver(build_dir):
@@ -76,9 +93,16 @@ def find_bootserver(build_dir):
     sys.exit(1)
 
 
+EPILOG = """
+In order to use this tool, please ensure that your boot test (usually defined
+by one of zbi_test(), qemu_kernel_test(), or efi_test()) is in your GN graph. A
+way to do this is to add //bundles:boot_tests to your `fx set` invocation.
+"""
+
+
 def main():
     parser = argparse.ArgumentParser(
-        prog="fx run-boot-test", description="Run a boot test.")
+        prog="fx run-boot-test", description="Run a boot test.", epilog=EPILOG)
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument(
         "--boot", "-b", action="store_true", help="Run via bootserver")
@@ -100,8 +124,7 @@ def main():
     )
     parser.add_argument(
         "name",
-        help=
-        "Name of the zbi_test()/qemu_kernel_test()/efi_test() target to run",
+        help="Name of the boot test (target) to run",
         nargs="?",
     )
     args = parser.parse_args()
@@ -132,20 +155,30 @@ def main():
                 boot_test = BootTest(images, test)
                 boot_tests[boot_test.name] = boot_test
 
+    if not boot_tests:
+        warning(
+            "no boot tests found. Is //bundles:boot_tests in your GN graph?")
+        return 0
+
     if not args.name:
-        for test in boot_tests.values():
+        for test in sorted(boot_tests.values()):
             test.print()
         return 0
 
-    matches = []
-    for test in boot_tests.values():
-        if args.name in test.name:
-            matches.append(test)
+    names = [test.name for test in boot_tests.values()]
+    # A cut-off of 0.8 was determined to be good enough in experimenting
+    # with input names against "core-tests".
+    matching_names = difflib.get_close_matches(args.name, names, cutoff=0.8)
+    matches = [boot_tests[name] for name in matching_names]
     if len(matches) == 0:
-        error("no boot test with '%s' in name found" % args.name)
+        error("no boot tests closely matching a name of '%s' found" % args.name)
         return 1
-    elif len(matches) > 1:
-        error("more than one boot test with '%s' in the name" % args.name)
+    # The returned matches will be ordered by similarlity; if we have an exact
+    # match, always go with that.
+    elif len(matches) > 1 and matches[0].name != args.name:
+        error(
+            "no boot tests closely matching a name of '%s' found. Closest matches:"
+            % args.name)
         for test in matches:
             test.print()
         return 1
@@ -153,7 +186,7 @@ def main():
     test = matches[0]
     if args.boot:
         if test.qemu_kernel:
-            error("cannot use --boot with QEMU-only test %s" % test.name)
+            print(error("cannot use --boot with QEMU-only test %s" % test.name))
             return 1
         assert test.zbi
         bootserver = find_bootserver(build_dir)

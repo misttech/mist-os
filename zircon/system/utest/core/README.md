@@ -16,7 +16,7 @@ any userspace device manager, device drivers, io plumbing, etc.
 ### Example usage
 
 ```
-fx set core.x64   # any of {bringup,core}.{x64,arm64} are fine too.
+fx set bringup.x64 --with //bundles:boot_tests  # or any product or board.
 fx build
 fx core-tests [--gtest_filter=FILTER] [--gtest_repeat=REPEAT]
 ```
