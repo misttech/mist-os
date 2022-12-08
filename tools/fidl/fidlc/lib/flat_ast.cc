@@ -197,7 +197,7 @@ std::unique_ptr<Library> Library::CreateRootLibrary() {
   // to simulate what AvailabilityStep would do (set the platform, inherit the
   // availabilities). Perhaps we could make the root library less special and
   // compile it as well. That would require addressing circularity issues.
-  auto library = std::make_unique<Library>();
+  auto library = std::make_unique<Library>(std::nullopt);
   library->name = {"fidl"};
   library->platform = Platform::Parse("fidl").value();
   library->availability.Init({.added = Version::Head()});
@@ -361,15 +361,17 @@ Builtin* Library::Declarations::LookupBuiltin(Builtin::Identity id) const {
 }
 
 std::unique_ptr<TypeConstructor> TypeConstructor::Clone() const {
-  return std::make_unique<TypeConstructor>(layout, parameters->Clone(), constraints->Clone());
+  return std::make_unique<TypeConstructor>(maybe_source_signature(), layout, parameters->Clone(),
+                                           constraints->Clone());
 }
 
 std::unique_ptr<LayoutParameterList> LayoutParameterList::Clone() const {
-  return std::make_unique<LayoutParameterList>(utils::MapClone(items), span);
+  return std::make_unique<LayoutParameterList>(maybe_source_signature(), utils::MapClone(items),
+                                               span);
 }
 
 std::unique_ptr<TypeConstraints> TypeConstraints::Clone() const {
-  return std::make_unique<TypeConstraints>(utils::MapClone(items), span);
+  return std::make_unique<TypeConstraints>(maybe_source_signature(), utils::MapClone(items), span);
 }
 
 TypeConstructor* LiteralLayoutParameter::AsTypeCtor() const { return nullptr; }
@@ -381,16 +383,17 @@ Constant* TypeLayoutParameter::AsConstant() const { return nullptr; }
 Constant* IdentifierLayoutParameter::AsConstant() const { return as_constant.get(); }
 
 std::unique_ptr<LayoutParameter> LiteralLayoutParameter::Clone() const {
-  return std::make_unique<LiteralLayoutParameter>(literal->CloneLiteralConstant(), span);
+  return std::make_unique<LiteralLayoutParameter>(source_signature(),
+                                                  literal->CloneLiteralConstant(), span);
 }
 
 std::unique_ptr<LayoutParameter> TypeLayoutParameter::Clone() const {
-  return std::make_unique<TypeLayoutParameter>(type_ctor->Clone(), span);
+  return std::make_unique<TypeLayoutParameter>(source_signature(), type_ctor->Clone(), span);
 }
 
 std::unique_ptr<LayoutParameter> IdentifierLayoutParameter::Clone() const {
   ZX_ASSERT_MSG(!(as_constant || as_type_ctor), "Clone() is not allowed after Disambiguate()");
-  return std::make_unique<IdentifierLayoutParameter>(reference, span);
+  return std::make_unique<IdentifierLayoutParameter>(source_signature(), reference, span);
 }
 
 void IdentifierLayoutParameter::Disambiguate() {
@@ -398,12 +401,13 @@ void IdentifierLayoutParameter::Disambiguate() {
     case Element::Kind::kConst:
     case Element::Kind::kBitsMember:
     case Element::Kind::kEnumMember: {
-      as_constant = std::make_unique<IdentifierConstant>(reference, span);
+      as_constant = std::make_unique<IdentifierConstant>(source_signature(), reference, span);
       break;
     }
     default: {
-      as_type_ctor = std::make_unique<TypeConstructor>(
-          reference, std::make_unique<LayoutParameterList>(), std::make_unique<TypeConstraints>());
+      as_type_ctor = std::make_unique<TypeConstructor>(source_signature(), reference,
+                                                       std::make_unique<LayoutParameterList>(),
+                                                       std::make_unique<TypeConstraints>());
       break;
     }
   }
@@ -464,7 +468,8 @@ static std::vector<T> FilterOrdinaledMembers(const std::vector<T>& all, VersionR
     }
     auto [it, inserted] = ordinals.insert(member.ordinal->value);
     if (inserted) {
-      result.push_back(T::Reserved(member.ordinal, member.span.value_or(member.maybe_used->name),
+      result.push_back(T::Reserved(member.source_signature(), member.ordinal,
+                                   member.span.value_or(member.maybe_used->name),
                                    std::make_unique<AttributeList>()));
     }
   }
@@ -478,97 +483,101 @@ std::unique_ptr<Decl> Builtin::SplitImpl(VersionRange range) const {
 }
 
 std::unique_ptr<Decl> Const::SplitImpl(VersionRange range) const {
-  return std::make_unique<Const>(attributes->Clone(), name, type_ctor->Clone(), value->Clone());
+  return std::make_unique<Const>(source_signature(), attributes->Clone(), name, type_ctor->Clone(),
+                                 value->Clone());
 }
 
 std::unique_ptr<Decl> Enum::SplitImpl(VersionRange range) const {
-  return std::make_unique<Enum>(attributes->Clone(), name, subtype_ctor->Clone(),
-                                FilterMembers(members, range), strictness);
+  return std::make_unique<Enum>(source_signature(), attributes->Clone(), name,
+                                subtype_ctor->Clone(), FilterMembers(members, range), strictness);
 }
 
 std::unique_ptr<Decl> Bits::SplitImpl(VersionRange range) const {
-  return std::make_unique<Bits>(attributes->Clone(), name, subtype_ctor->Clone(),
-                                FilterMembers(members, range), strictness);
+  return std::make_unique<Bits>(source_signature(), attributes->Clone(), name,
+                                subtype_ctor->Clone(), FilterMembers(members, range), strictness);
 }
 
 std::unique_ptr<Decl> Service::SplitImpl(VersionRange range) const {
-  return std::make_unique<Service>(attributes->Clone(), name, FilterMembers(members, range));
+  return std::make_unique<Service>(source_signature(), attributes->Clone(), name,
+                                   FilterMembers(members, range));
 }
 
 std::unique_ptr<Decl> Struct::SplitImpl(VersionRange range) const {
-  return std::make_unique<Struct>(attributes->Clone(), name, FilterMembers(members, range),
-                                  resourceness);
+  return std::make_unique<Struct>(source_signature(), attributes->Clone(), name,
+                                  FilterMembers(members, range), resourceness);
 }
 
 std::unique_ptr<Decl> Table::SplitImpl(VersionRange range) const {
-  return std::make_unique<Table>(attributes->Clone(), name, FilterOrdinaledMembers(members, range),
-                                 strictness, resourceness);
+  return std::make_unique<Table>(source_signature(), attributes->Clone(), name,
+                                 FilterOrdinaledMembers(members, range), strictness, resourceness);
 }
 
 std::unique_ptr<Decl> Union::SplitImpl(VersionRange range) const {
-  return std::make_unique<Union>(attributes->Clone(), name, FilterOrdinaledMembers(members, range),
-                                 strictness, resourceness);
+  return std::make_unique<Union>(source_signature(), attributes->Clone(), name,
+                                 FilterOrdinaledMembers(members, range), strictness, resourceness);
 }
 
 std::unique_ptr<Decl> Protocol::SplitImpl(VersionRange range) const {
-  return std::make_unique<Protocol>(attributes->Clone(), openness, name,
+  return std::make_unique<Protocol>(source_signature(), attributes->Clone(), openness, name,
                                     FilterMembers(composed_protocols, range),
                                     FilterMembers(methods, range));
 }
 
 std::unique_ptr<Decl> Resource::SplitImpl(VersionRange range) const {
-  return std::make_unique<Resource>(attributes->Clone(), name, subtype_ctor->Clone(),
-                                    FilterMembers(properties, range));
+  return std::make_unique<Resource>(source_signature(), attributes->Clone(), name,
+                                    subtype_ctor->Clone(), FilterMembers(properties, range));
 }
 
 std::unique_ptr<Decl> Alias::SplitImpl(VersionRange range) const {
-  return std::make_unique<Alias>(attributes->Clone(), name, partial_type_ctor->Clone());
+  return std::make_unique<Alias>(source_signature(), attributes->Clone(), name,
+                                 partial_type_ctor->Clone());
 }
 
 std::unique_ptr<Decl> NewType::SplitImpl(VersionRange range) const {
-  return std::make_unique<NewType>(attributes->Clone(), name, type_ctor->Clone());
+  return std::make_unique<NewType>(source_signature(), attributes->Clone(), name,
+                                   type_ctor->Clone());
 }
 
 Enum::Member Enum::Member::Copy() const {
-  return Member(name, value->Clone(), attributes->Clone());
+  return Member(source_signature(), name, value->Clone(), attributes->Clone());
 }
 
 Bits::Member Bits::Member::Copy() const {
-  return Member(name, value->Clone(), attributes->Clone());
+  return Member(source_signature(), name, value->Clone(), attributes->Clone());
 }
 
 Service::Member Service::Member::Copy() const {
-  return Member(type_ctor->Clone(), name, attributes->Clone());
+  return Member(source_signature(), type_ctor->Clone(), name, attributes->Clone());
 }
 
 Struct::Member Struct::Member::Copy() const {
-  return StructMember(type_ctor->Clone(), name,
+  return StructMember(source_signature(), type_ctor->Clone(), name,
                       maybe_default_value ? maybe_default_value->Clone() : nullptr,
                       attributes->Clone());
 }
 
 Table::Member Table::Member::Copy() const {
-  return TableMember(ordinal, span, maybe_used ? maybe_used->Clone() : nullptr,
+  return TableMember(source_signature(), ordinal, span, maybe_used ? maybe_used->Clone() : nullptr,
                      attributes->Clone());
 }
 
 Union::Member Union::Member::Copy() const {
-  return UnionMember(ordinal, span, maybe_used ? maybe_used->Clone() : nullptr,
+  return UnionMember(source_signature(), ordinal, span, maybe_used ? maybe_used->Clone() : nullptr,
                      attributes->Clone());
 }
 
 Protocol::Method Protocol::Method::Copy() const {
-  return Method(attributes->Clone(), strictness, identifier, name, has_request,
+  return Method(source_signature(), attributes->Clone(), strictness, identifier, name, has_request,
                 maybe_request ? maybe_request->Clone() : nullptr, has_response,
                 maybe_response ? maybe_response->Clone() : nullptr, has_error);
 }
 
 Protocol::ComposedProtocol Protocol::ComposedProtocol::Copy() const {
-  return ComposedProtocol(attributes->Clone(), reference);
+  return ComposedProtocol(source_signature(), attributes->Clone(), reference);
 }
 
 Resource::Property Resource::Property::Copy() const {
-  return Property(type_ctor->Clone(), name, attributes->Clone());
+  return Property(source_signature(), type_ctor->Clone(), name, attributes->Clone());
 }
 
 std::any Bits::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }

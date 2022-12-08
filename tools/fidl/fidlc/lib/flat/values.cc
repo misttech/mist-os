@@ -193,7 +193,4 @@ std::unique_ptr<Constant> Constant::Clone() const {
   return cloned;
 }
 
-LiteralConstant::LiteralConstant(const raw::Literal* literal)
-    : Constant(Kind::kLiteral, literal->span()), literal(literal) {}
-
 }  // namespace fidl::flat

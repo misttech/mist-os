@@ -9,6 +9,7 @@
 
 #include <memory>
 #include <optional>
+#include <string>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -122,9 +123,9 @@ class SourceElement : public TokenChain {
     kLibraryDeclaration,
     kLiteralConstant,
     kLiteralLayoutParameter,
+    kModifiers,
     kNamedLayoutReference,
     kNumericLiteral,
-    kModifiers,
     kOrdinal64,
     kOrdinaledLayout,
     kOrdinaledLayoutMember,
@@ -156,6 +157,67 @@ class SourceElement : public TokenChain {
   NodeKind node_kind() const { return node_kind_; }
 
   NodeKind node_kind_;
+
+  // Represents source span in a FIDL source file, without revealing the contents of that range.
+  // This is meant to serve as a lightweight unique identifier of some |SourceSpan| of interest. The
+  // class is intended to be attached to a flat AST node, so that we may later compare that node
+  // against raw AST ranges to ascertain where it was sourced from.
+  //
+  // The lifetime of this |Signature| is only as long as that of the |SourceFile| it is a view into.
+  // Importantly, comparing identical segments of two different |SourceFile|s will produce diverging
+  // |Signature|s. This means that the |Signature| is only useful when comparing multiple segments
+  // referencing into the same |SourceFile| instance in memory.
+  class Signature {
+   public:
+    constexpr Signature(NodeKind node_kind, std::string_view data)
+        : node_kind_(node_kind), data_(data) {}
+
+    constexpr Signature(const Signature&) = default;
+    constexpr Signature(Signature&&) = default;
+    constexpr Signature& operator=(const Signature&) = default;
+    constexpr Signature& operator=(Signature&&) = default;
+
+    constexpr bool operator==(const Signature& rhs) const {
+      return node_kind_ == rhs.node_kind_ && data_.data() == rhs.data_.data() &&
+             data_.size() == data_.size();
+    }
+    constexpr bool operator<(const Signature& rhs) const {
+      // Assumes both |Signature|s are views into the same buffer.
+      if (this->data_.data() != rhs.data_.data()) {
+        return this->data_.data() < rhs.data_.data();
+      }
+
+      // If two |Signature|s have identical start points, compare the end points instead.
+      if (this->data_.size() != rhs.data_.size()) {
+        return this->data_.size() < rhs.data_.size();
+      }
+
+      // Only sort by |NodeKind| if the underlying string segment is identical. This sorting is a
+      // bit arbitrary, but is currently only used by test code.
+      return node_kind_ < rhs.node_kind_;
+    }
+
+   private:
+    friend struct std::hash<Signature>;
+
+    // Use |NodeKind| to discriminate between raw AST nodes that may share the same underlying
+    // source string, like the marked |raw::TypeLayoutParameter|, |raw::TypeConstructor|, and
+    // |raw::Layout| in the example below:
+    //
+    //   type Foo = vector<struct{}>;
+    //                     ^^^^^^^^
+    //
+    NodeKind node_kind_;
+
+    // It is important that this remain private. While simply forwarding the |string_view| provides
+    // an easy way to uniquely identify a source segment, it can also be tempting to "hack" access
+    // to the source from the flat AST through this field. Resist this temptation! Any raw AST data
+    // used by the compiler should be parsed into the raw AST, consumed in the consumer step, etc,
+    // rather than pulled from this string later in compilation.
+    std::string_view data_;
+  };
+
+  Signature source_signature() const { return Signature(node_kind_, span().data()); }
 };
 
 class SourceElementMark {
@@ -1014,5 +1076,22 @@ class File final : public SourceElement {
 };
 
 }  // namespace fidl::raw
+
+namespace std {
+
+// The entire purpose of |SourceElement::Signature| is to be used as a map key. This is a simple
+// hashing function over that object.
+template <>
+struct std::hash<fidl::raw::SourceElement::Signature> {
+  std::size_t operator()(const fidl::raw::SourceElement::Signature& signature) const noexcept {
+    using NodeKindType = typename std::underlying_type<fidl::raw::SourceElement::NodeKind>::type;
+    std::size_t a = std::hash<NodeKindType>{}(static_cast<NodeKindType>(signature.node_kind_));
+    std::size_t b = std::hash<const void*>{}(signature.data_.data());
+    std::size_t c = std::hash<size_t>{}(signature.data_.size());
+    return a ^ (b << 1) ^ (c << 2);
+  }
+};
+
+}  // namespace std
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_RAW_AST_H_

@@ -43,8 +43,8 @@ TEST(TokenTests, SameFileDifferentToken) {
   auto start = fidl::SourceSpan(file.data().substr(0, 0), file);
   auto first = fidl::SourceSpan(file.data().substr(0, 1), file);
   auto left = fidl::Token(start, first, Kind::kIdentifier, Subkind::kNone, 0);
-  auto space = fidl::SourceSpan(file.data().substr(1, 2), file);
-  auto second = fidl::SourceSpan(file.data().substr(2, 3), file);
+  auto space = fidl::SourceSpan(file.data().substr(1, 1), file);
+  auto second = fidl::SourceSpan(file.data().substr(2, 1), file);
   auto right = fidl::Token(space, second, Kind::kIdentifier, Subkind::kNone, 1);
 
   EXPECT_TRUE(left.same_file_as(right));

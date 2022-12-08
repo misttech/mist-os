@@ -10,11 +10,15 @@
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
+#include "tools/fidl/fidlc/include/fidl/source_file.h"
+#include "tools/fidl/fidlc/include/fidl/source_span.h"
 #include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {
 
+using fidl::SourceFile;
+using fidl::SourceSpan;
 using fidl::Token;
 using fidl::flat::HandleRights;
 using fidl::flat::HandleType;
@@ -34,13 +38,20 @@ TEST(FlatAstTests, GoodImplicitAssumptions) {
 
 TEST(FlatAstTests, GoodCompareHandles) {
   auto name_not_important = Name::CreateIntrinsic(nullptr, "ignore");
+  auto fake_source_file = SourceFile("fake.fidl", "123");
+  auto fake_source_file_start = SourceSpan(fake_source_file.data().substr(0, 0), fake_source_file);
+  auto fake_source_span = SourceSpan(fake_source_file.data(), fake_source_file);
+  auto fake_token = Token(fake_source_file_start, fake_source_span, Token::Kind::kNumericLiteral,
+                          Token::Subkind::kNone, 0);
   auto fake_source_element =
-      SourceElement(SourceElement::NodeKind::kNumericLiteral, Token(), Token());
+      SourceElement(SourceElement::NodeKind::kNumericLiteral, fake_token, fake_token);
   auto fake_literal = Literal(fake_source_element, Literal::Kind::kNumeric);
-  auto rights1Constant = std::make_unique<LiteralConstant>(&fake_literal);
+  auto rights1Constant =
+      std::make_unique<LiteralConstant>(fake_literal.source_signature(), &fake_literal);
   rights1Constant->ResolveTo(std::make_unique<HandleRights>(1), nullptr);
   auto rights1Value = static_cast<const HandleRights*>(&rights1Constant->Value());
-  auto rights2Constant = std::make_unique<LiteralConstant>(&fake_literal);
+  auto rights2Constant =
+      std::make_unique<LiteralConstant>(fake_literal.source_signature(), &fake_literal);
   rights2Constant->ResolveTo(std::make_unique<HandleRights>(2), nullptr);
   auto rights2Value = static_cast<const HandleRights*>(&rights2Constant->Value());
   fidl::flat::Resource* resource_decl_not_needed = nullptr;

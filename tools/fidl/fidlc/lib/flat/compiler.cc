@@ -21,7 +21,7 @@ namespace fidl::flat {
 Compiler::Compiler(Libraries* all_libraries, const VersionSelection* version_selection,
                    ordinals::MethodHasher method_hasher, ExperimentalFlags experimental_flags)
     : ReporterMixin(all_libraries->reporter()),
-      library_(std::make_unique<Library>()),
+      library_(std::make_unique<Library>(std::nullopt)),
       all_libraries_(all_libraries),
       version_selection(version_selection),
       method_hasher_(std::move(method_hasher)),

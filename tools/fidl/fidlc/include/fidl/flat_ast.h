@@ -106,7 +106,7 @@ struct Element {
   Availability availability;
 };
 
-struct Decl : public Element {
+struct Decl : public MaybeSourced, public Element {
   enum struct Kind {
     kAlias,
     kBits,
@@ -151,8 +151,12 @@ struct Decl : public Element {
     }
   }
 
-  Decl(Kind kind, std::unique_ptr<AttributeList> attributes, Name name)
-      : Element(ElementKind(kind), std::move(attributes)), kind(kind), name(std::move(name)) {}
+  Decl(std::optional<raw::SourceElement::Signature> signature, Kind kind,
+       std::unique_ptr<AttributeList> attributes, Name name)
+      : MaybeSourced(signature),
+        Element(ElementKind(kind), std::move(attributes)),
+        kind(kind),
+        name(std::move(name)) {}
 
   const Kind kind;
   const Name name;
@@ -214,7 +218,9 @@ struct Builtin : public Decl {
   };
 
   explicit Builtin(Identity id, Name name)
-      : Decl(Decl::Kind::kBuiltin, std::make_unique<AttributeList>(), std::move(name)), id(id) {}
+      : Decl(std::nullopt, Decl::Kind::kBuiltin, std::make_unique<AttributeList>(),
+             std::move(name)),
+        id(id) {}
 
   const Identity id;
 
@@ -225,9 +231,10 @@ struct Builtin : public Decl {
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
 };
 
-struct TypeDecl : public Decl, public Object {
-  TypeDecl(Kind kind, std::unique_ptr<AttributeList> attributes, Name name)
-      : Decl(kind, std::move(attributes), std::move(name)) {}
+struct TypeDecl : public Sourced, public Decl, public Object {
+  TypeDecl(raw::SourceElement::Signature signature, Kind kind,
+           std::unique_ptr<AttributeList> attributes, Name name)
+      : Sourced(signature), Decl(signature, kind, std::move(attributes), std::move(name)) {}
 
   bool recursive = false;
 };
@@ -298,10 +305,12 @@ struct TypeConstraints;
 // This allows all type compilation to share the code paths through the consume
 // step (i.e. RegisterDecl) and the compilation step (i.e. Typespace::Create),
 // while ensuring that users cannot refer to anonymous layouts by name.
-struct TypeConstructor final : public HasClone<TypeConstructor> {
-  explicit TypeConstructor(Reference layout, std::unique_ptr<LayoutParameterList> parameters,
+struct TypeConstructor final : public MaybeSourced, public HasClone<TypeConstructor> {
+  explicit TypeConstructor(std::optional<raw::SourceElement::Signature> signature, Reference layout,
+                           std::unique_ptr<LayoutParameterList> parameters,
                            std::unique_ptr<TypeConstraints> constraints)
-      : layout(std::move(layout)),
+      : MaybeSourced(signature),
+        layout(std::move(layout)),
         parameters(std::move(parameters)),
         constraints(std::move(constraints)) {}
 
@@ -317,7 +326,7 @@ struct TypeConstructor final : public HasClone<TypeConstructor> {
   LayoutInvocation resolved_params;
 };
 
-struct LayoutParameter : public HasClone<LayoutParameter> {
+struct LayoutParameter : public Sourced, public HasClone<LayoutParameter> {
  public:
   virtual ~LayoutParameter() = default;
   enum Kind {
@@ -326,7 +335,8 @@ struct LayoutParameter : public HasClone<LayoutParameter> {
     kType,
   };
 
-  explicit LayoutParameter(Kind kind, SourceSpan span) : kind(kind), span(span) {}
+  explicit LayoutParameter(raw::SourceElement::Signature signature, Kind kind, SourceSpan span)
+      : Sourced(signature), kind(kind), span(span) {}
 
   // A layout parameter is either a type constructor or a constant. One of these
   // two methods must return non-null, and the other one must return null.
@@ -338,8 +348,9 @@ struct LayoutParameter : public HasClone<LayoutParameter> {
 };
 
 struct LiteralLayoutParameter final : public LayoutParameter {
-  explicit LiteralLayoutParameter(std::unique_ptr<LiteralConstant> literal, SourceSpan span)
-      : LayoutParameter(Kind::kLiteral, span), literal(std::move(literal)) {}
+  explicit LiteralLayoutParameter(raw::SourceElement::Signature signature,
+                                  std::unique_ptr<LiteralConstant> literal, SourceSpan span)
+      : LayoutParameter(signature, Kind::kLiteral, span), literal(std::move(literal)) {}
 
   TypeConstructor* AsTypeCtor() const override;
   Constant* AsConstant() const override;
@@ -349,8 +360,9 @@ struct LiteralLayoutParameter final : public LayoutParameter {
 };
 
 struct TypeLayoutParameter final : public LayoutParameter {
-  explicit TypeLayoutParameter(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan span)
-      : LayoutParameter(Kind::kType, span), type_ctor(std::move(type_ctor)) {}
+  explicit TypeLayoutParameter(raw::SourceElement::Signature signature,
+                               std::unique_ptr<TypeConstructor> type_ctor, SourceSpan span)
+      : LayoutParameter(signature, Kind::kType, span), type_ctor(std::move(type_ctor)) {}
 
   TypeConstructor* AsTypeCtor() const override;
   Constant* AsConstant() const override;
@@ -360,8 +372,9 @@ struct TypeLayoutParameter final : public LayoutParameter {
 };
 
 struct IdentifierLayoutParameter final : public LayoutParameter {
-  explicit IdentifierLayoutParameter(Reference reference, SourceSpan span)
-      : LayoutParameter(Kind::kIdentifier, span), reference(std::move(reference)) {}
+  explicit IdentifierLayoutParameter(raw::SourceElement::Signature signature, Reference reference,
+                                     SourceSpan span)
+      : LayoutParameter(signature, Kind::kIdentifier, span), reference(std::move(reference)) {}
 
   // Disambiguates between type constructor and constant. Must call after
   // resolving the reference, but before calling AsTypeCtor or AsConstant.
@@ -377,11 +390,12 @@ struct IdentifierLayoutParameter final : public LayoutParameter {
   std::unique_ptr<Constant> as_constant;
 };
 
-struct LayoutParameterList final : public HasClone<LayoutParameterList> {
-  LayoutParameterList() = default;
-  explicit LayoutParameterList(std::vector<std::unique_ptr<LayoutParameter>> items,
+struct LayoutParameterList final : public MaybeSourced, public HasClone<LayoutParameterList> {
+  LayoutParameterList() : MaybeSourced(std::nullopt) {}
+  explicit LayoutParameterList(std::optional<raw::SourceElement::Signature> signature,
+                               std::vector<std::unique_ptr<LayoutParameter>> items,
                                std::optional<SourceSpan> span)
-      : items(std::move(items)), span(span) {}
+      : MaybeSourced(signature), items(std::move(items)), span(span) {}
 
   std::unique_ptr<LayoutParameterList> Clone() const override;
 
@@ -389,11 +403,12 @@ struct LayoutParameterList final : public HasClone<LayoutParameterList> {
   const std::optional<SourceSpan> span;
 };
 
-struct TypeConstraints final : public HasClone<TypeConstraints> {
-  TypeConstraints() = default;
-  explicit TypeConstraints(std::vector<std::unique_ptr<Constant>> items,
+struct TypeConstraints final : public MaybeSourced, public HasClone<TypeConstraints> {
+  TypeConstraints() : MaybeSourced(std::nullopt) {}
+  explicit TypeConstraints(std::optional<raw::SourceElement::Signature> signature,
+                           std::vector<std::unique_ptr<Constant>> items,
                            std::optional<SourceSpan> span)
-      : items(std::move(items)), span(span) {}
+      : MaybeSourced(signature), items(std::move(items)), span(span) {}
 
   std::unique_ptr<TypeConstraints> Clone() const override;
 
@@ -404,10 +419,11 @@ struct TypeConstraints final : public HasClone<TypeConstraints> {
 // Const represents the _declaration_ of a constant. (For the _use_, see
 // Constant. For the _value_, see ConstantValue.) A Const consists of a
 // left-hand-side Name (found in Decl) and a right-hand-side Constant.
-struct Const final : public Decl {
-  Const(std::unique_ptr<AttributeList> attributes, Name name,
-        std::unique_ptr<TypeConstructor> type_ctor, std::unique_ptr<Constant> value)
-      : Decl(Kind::kConst, std::move(attributes), std::move(name)),
+struct Const final : public Sourced, public Decl {
+  Const(raw::SourceElement::Signature signature, std::unique_ptr<AttributeList> attributes,
+        Name name, std::unique_ptr<TypeConstructor> type_ctor, std::unique_ptr<Constant> value)
+      : Sourced(signature),
+        Decl(signature, Kind::kConst, std::move(attributes), std::move(name)),
         type_ctor(std::move(type_ctor)),
         value(std::move(value)) {}
 
@@ -419,10 +435,11 @@ struct Const final : public Decl {
 };
 
 struct Enum final : public TypeDecl {
-  struct Member : public Element, public HasCopy<Member> {
-    Member(SourceSpan name, std::unique_ptr<Constant> value,
-           std::unique_ptr<AttributeList> attributes)
-        : Element(Element::Kind::kEnumMember, std::move(attributes)),
+  struct Member : public Sourced, public Element, public HasCopy<Member> {
+    Member(raw::SourceElement::Signature signature, SourceSpan name,
+           std::unique_ptr<Constant> value, std::unique_ptr<AttributeList> attributes)
+        : Sourced(signature),
+          Element(Element::Kind::kEnumMember, std::move(attributes)),
           name(name),
           value(std::move(value)) {}
     Member Copy() const override;
@@ -431,10 +448,10 @@ struct Enum final : public TypeDecl {
     std::unique_ptr<Constant> value;
   };
 
-  Enum(std::unique_ptr<AttributeList> attributes, Name name,
-       std::unique_ptr<TypeConstructor> subtype_ctor, std::vector<Member> members,
+  Enum(raw::SourceElement::Signature signature, std::unique_ptr<AttributeList> attributes,
+       Name name, std::unique_ptr<TypeConstructor> subtype_ctor, std::vector<Member> members,
        types::Strictness strictness)
-      : TypeDecl(Kind::kEnum, std::move(attributes), std::move(name)),
+      : TypeDecl(signature, Kind::kEnum, std::move(attributes), std::move(name)),
         subtype_ctor(std::move(subtype_ctor)),
         members(std::move(members)),
         strictness(strictness) {}
@@ -458,10 +475,11 @@ struct Enum final : public TypeDecl {
 };
 
 struct Bits final : public TypeDecl {
-  struct Member : public Element, public HasCopy<Member> {
-    Member(SourceSpan name, std::unique_ptr<Constant> value,
-           std::unique_ptr<AttributeList> attributes)
-        : Element(Element::Kind::kBitsMember, std::move(attributes)),
+  struct Member : public Sourced, public Element, public HasCopy<Member> {
+    Member(raw::SourceElement::Signature signature, SourceSpan name,
+           std::unique_ptr<Constant> value, std::unique_ptr<AttributeList> attributes)
+        : Sourced(signature),
+          Element(Element::Kind::kBitsMember, std::move(attributes)),
           name(name),
           value(std::move(value)) {}
     Member Copy() const override;
@@ -470,10 +488,10 @@ struct Bits final : public TypeDecl {
     std::unique_ptr<Constant> value;
   };
 
-  Bits(std::unique_ptr<AttributeList> attributes, Name name,
-       std::unique_ptr<TypeConstructor> subtype_ctor, std::vector<Member> members,
+  Bits(raw::SourceElement::Signature signature, std::unique_ptr<AttributeList> attributes,
+       Name name, std::unique_ptr<TypeConstructor> subtype_ctor, std::vector<Member> members,
        types::Strictness strictness)
-      : TypeDecl(Kind::kBits, std::move(attributes), std::move(name)),
+      : TypeDecl(signature, Kind::kBits, std::move(attributes), std::move(name)),
         subtype_ctor(std::move(subtype_ctor)),
         members(std::move(members)),
         strictness(strictness) {}
@@ -493,10 +511,11 @@ struct Bits final : public TypeDecl {
 };
 
 struct Service final : public TypeDecl {
-  struct Member : public Element, public HasCopy<Member> {
-    Member(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name,
-           std::unique_ptr<AttributeList> attributes)
-        : Element(Element::Kind::kServiceMember, std::move(attributes)),
+  struct Member : public Sourced, public Element, public HasCopy<Member> {
+    Member(raw::SourceElement::Signature signature, std::unique_ptr<TypeConstructor> type_ctor,
+           SourceSpan name, std::unique_ptr<AttributeList> attributes)
+        : Sourced(signature),
+          Element(Element::Kind::kServiceMember, std::move(attributes)),
           type_ctor(std::move(type_ctor)),
           name(name) {}
     Member Copy() const override;
@@ -505,8 +524,9 @@ struct Service final : public TypeDecl {
     SourceSpan name;
   };
 
-  Service(std::unique_ptr<AttributeList> attributes, Name name, std::vector<Member> members)
-      : TypeDecl(Kind::kService, std::move(attributes), std::move(name)),
+  Service(raw::SourceElement::Signature signature, std::unique_ptr<AttributeList> attributes,
+          Name name, std::vector<Member> members)
+      : TypeDecl(signature, Kind::kService, std::move(attributes), std::move(name)),
         members(std::move(members)) {}
 
   std::any AcceptAny(VisitorAny* visitor) const override;
@@ -523,11 +543,12 @@ struct Struct;
 // was made a top-level class since it's not possible to forward-declare nested classes in C++. For
 // backward-compatibility, Struct::Member is now an alias for this top-level StructMember.
 // TODO(fxbug.dev/37535): Move this to a nested class inside Struct.
-struct StructMember : public Element, public Object, public HasCopy<StructMember> {
-  StructMember(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name,
-               std::unique_ptr<Constant> maybe_default_value,
+struct StructMember : public Sourced, public Element, public Object, public HasCopy<StructMember> {
+  StructMember(raw::SourceElement::Signature signature, std::unique_ptr<TypeConstructor> type_ctor,
+               SourceSpan name, std::unique_ptr<Constant> maybe_default_value,
                std::unique_ptr<AttributeList> attributes)
-      : Element(Element::Kind::kStructMember, std::move(attributes)),
+      : Sourced(signature),
+        Element(Element::Kind::kStructMember, std::move(attributes)),
         type_ctor(std::move(type_ctor)),
         name(name),
         maybe_default_value(std::move(maybe_default_value)) {}
@@ -544,9 +565,10 @@ struct StructMember : public Element, public Object, public HasCopy<StructMember
 struct Struct final : public TypeDecl {
   using Member = StructMember;
 
-  Struct(std::unique_ptr<AttributeList> attributes, Name name,
-         std::vector<Member> unparented_members, std::optional<types::Resourceness> resourceness)
-      : TypeDecl(Kind::kStruct, std::move(attributes), std::move(name)),
+  Struct(raw::SourceElement::Signature signature, std::unique_ptr<AttributeList> attributes,
+         Name name, std::vector<Member> unparented_members,
+         std::optional<types::Resourceness> resourceness)
+      : TypeDecl(signature, Kind::kStruct, std::move(attributes), std::move(name)),
         members(std::move(unparented_members)),
         resourceness(resourceness) {
     for (auto& member : members) {
@@ -587,18 +609,21 @@ struct TableMemberUsed : public Object, public HasClone<TableMemberUsed> {
 
 // See the comment on the StructMember class for why this is a top-level class.
 // TODO(fxbug.dev/37535): Move this to a nested class inside Table.
-struct TableMember : public Element, public Object, public HasCopy<TableMember> {
+struct TableMember : public Sourced, public Element, public Object, public HasCopy<TableMember> {
   using Used = TableMemberUsed;
 
-  TableMember(const raw::Ordinal64* ordinal, std::unique_ptr<TypeConstructor> type, SourceSpan name,
+  TableMember(raw::SourceElement::Signature signature, const raw::Ordinal64* ordinal,
+              std::unique_ptr<TypeConstructor> type, SourceSpan name,
               std::unique_ptr<AttributeList> attributes)
-      : Element(Element::Kind::kTableMember, std::move(attributes)),
+      : Sourced(signature),
+        Element(Element::Kind::kTableMember, std::move(attributes)),
         ordinal(ordinal),
         maybe_used(std::make_unique<Used>(std::move(type), name)) {}
 
-  static TableMember Reserved(const raw::Ordinal64* ordinal, SourceSpan span,
+  static TableMember Reserved(raw::SourceElement::Signature signature,
+                              const raw::Ordinal64* ordinal, SourceSpan span,
                               std::unique_ptr<AttributeList> attributes) {
-    return TableMember(ordinal, span, nullptr, std::move(attributes));
+    return TableMember(signature, ordinal, span, nullptr, std::move(attributes));
   }
 
   TableMember Copy() const override;
@@ -611,9 +636,11 @@ struct TableMember : public Element, public Object, public HasCopy<TableMember> 
   std::unique_ptr<Used> maybe_used;
 
  private:
-  TableMember(const raw::Ordinal64* ordinal, std::optional<SourceSpan> span,
-              std::unique_ptr<Used> maybe_used, std::unique_ptr<AttributeList> attributes)
-      : Element(Element::Kind::kTableMember, std::move(attributes)),
+  TableMember(raw::SourceElement::Signature signature, const raw::Ordinal64* ordinal,
+              std::optional<SourceSpan> span, std::unique_ptr<Used> maybe_used,
+              std::unique_ptr<AttributeList> attributes)
+      : Sourced(signature),
+        Element(Element::Kind::kTableMember, std::move(attributes)),
         ordinal(ordinal),
         span(span),
         maybe_used(std::move(maybe_used)) {}
@@ -622,9 +649,10 @@ struct TableMember : public Element, public Object, public HasCopy<TableMember> 
 struct Table final : public TypeDecl {
   using Member = TableMember;
 
-  Table(std::unique_ptr<AttributeList> attributes, Name name, std::vector<Member> members,
-        types::Strictness strictness, types::Resourceness resourceness)
-      : TypeDecl(Kind::kTable, std::move(attributes), std::move(name)),
+  Table(raw::SourceElement::Signature signature, std::unique_ptr<AttributeList> attributes,
+        Name name, std::vector<Member> members, types::Strictness strictness,
+        types::Resourceness resourceness)
+      : TypeDecl(signature, Kind::kTable, std::move(attributes), std::move(name)),
         members(std::move(members)),
         strictness(strictness),
         resourceness(resourceness) {}
@@ -662,18 +690,21 @@ struct UnionMemberUsed : public Object, public HasClone<UnionMemberUsed> {
 
 // See the comment on the StructMember class for why this is a top-level class.
 // TODO(fxbug.dev/37535): Move this to a nested class inside Union.
-struct UnionMember : public Element, public Object, public HasCopy<UnionMember> {
+struct UnionMember : public Sourced, public Element, public Object, public HasCopy<UnionMember> {
   using Used = UnionMemberUsed;
 
-  UnionMember(const raw::Ordinal64* ordinal, std::unique_ptr<TypeConstructor> type_ctor,
-              SourceSpan name, std::unique_ptr<AttributeList> attributes)
-      : Element(Element::Kind::kUnionMember, std::move(attributes)),
+  UnionMember(raw::SourceElement::Signature signature, const raw::Ordinal64* ordinal,
+              std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name,
+              std::unique_ptr<AttributeList> attributes)
+      : Sourced(signature),
+        Element(Element::Kind::kUnionMember, std::move(attributes)),
         ordinal(ordinal),
         maybe_used(std::make_unique<Used>(std::move(type_ctor), name)) {}
 
-  static UnionMember Reserved(const raw::Ordinal64* ordinal, SourceSpan span,
+  static UnionMember Reserved(raw::SourceElement::Signature signature,
+                              const raw::Ordinal64* ordinal, SourceSpan span,
                               std::unique_ptr<AttributeList> attributes) {
-    return UnionMember(ordinal, span, nullptr, std::move(attributes));
+    return UnionMember(signature, ordinal, span, nullptr, std::move(attributes));
   }
 
   UnionMember Copy() const override;
@@ -686,9 +717,11 @@ struct UnionMember : public Element, public Object, public HasCopy<UnionMember> 
   std::unique_ptr<Used> maybe_used;
 
  private:
-  UnionMember(const raw::Ordinal64* ordinal, std::optional<SourceSpan> span,
-              std::unique_ptr<Used> maybe_used, std::unique_ptr<AttributeList> attributes)
-      : Element(Element::Kind::kUnionMember, std::move(attributes)),
+  UnionMember(raw::SourceElement::Signature signature, const raw::Ordinal64* ordinal,
+              std::optional<SourceSpan> span, std::unique_ptr<Used> maybe_used,
+              std::unique_ptr<AttributeList> attributes)
+      : Sourced(signature),
+        Element(Element::Kind::kUnionMember, std::move(attributes)),
         ordinal(ordinal),
         span(span),
         maybe_used(std::move(maybe_used)) {}
@@ -697,10 +730,10 @@ struct UnionMember : public Element, public Object, public HasCopy<UnionMember> 
 struct Union final : public TypeDecl {
   using Member = UnionMember;
 
-  Union(std::unique_ptr<AttributeList> attributes, Name name,
-        std::vector<Member> unparented_members, types::Strictness strictness,
+  Union(raw::SourceElement::Signature signature, std::unique_ptr<AttributeList> attributes,
+        Name name, std::vector<Member> unparented_members, types::Strictness strictness,
         std::optional<types::Resourceness> resourceness)
-      : TypeDecl(Kind::kUnion, std::move(attributes), std::move(name)),
+      : TypeDecl(signature, Kind::kUnion, std::move(attributes), std::move(name)),
         members(std::move(unparented_members)),
         strictness(strictness),
         resourceness(resourceness) {
@@ -728,12 +761,13 @@ struct Union final : public TypeDecl {
 };
 
 struct Protocol final : public TypeDecl {
-  struct Method : public Element, public HasCopy<Method> {
-    Method(std::unique_ptr<AttributeList> attributes, types::Strictness strictness,
-           const raw::Identifier* identifier, SourceSpan name, bool has_request,
-           std::unique_ptr<TypeConstructor> maybe_request, bool has_response,
+  struct Method : public Sourced, public Element, public HasCopy<Method> {
+    Method(raw::SourceElement::Signature signature, std::unique_ptr<AttributeList> attributes,
+           types::Strictness strictness, const raw::Identifier* identifier, SourceSpan name,
+           bool has_request, std::unique_ptr<TypeConstructor> maybe_request, bool has_response,
            std::unique_ptr<TypeConstructor> maybe_response, bool has_error)
-        : Element(Element::Kind::kProtocolMethod, std::move(attributes)),
+        : Sourced(signature),
+          Element(Element::Kind::kProtocolMethod, std::move(attributes)),
           strictness(strictness),
           identifier(identifier),
           name(name),
@@ -782,18 +816,21 @@ struct Protocol final : public TypeDecl {
     const bool is_composed;
   };
 
-  struct ComposedProtocol : public Element {
-    ComposedProtocol(std::unique_ptr<AttributeList> attributes, Reference reference)
-        : Element(Element::Kind::kProtocolCompose, std::move(attributes)),
+  struct ComposedProtocol : public Sourced, public Element {
+    ComposedProtocol(raw::SourceElement::Signature signature,
+                     std::unique_ptr<AttributeList> attributes, Reference reference)
+        : Sourced(signature),
+          Element(Element::Kind::kProtocolCompose, std::move(attributes)),
           reference(std::move(reference)) {}
     ComposedProtocol Copy() const;
 
     Reference reference;
   };
 
-  Protocol(std::unique_ptr<AttributeList> attributes, types::Openness openness, Name name,
-           std::vector<ComposedProtocol> composed_protocols, std::vector<Method> methods)
-      : TypeDecl(Kind::kProtocol, std::move(attributes), std::move(name)),
+  Protocol(raw::SourceElement::Signature signature, std::unique_ptr<AttributeList> attributes,
+           types::Openness openness, Name name, std::vector<ComposedProtocol> composed_protocols,
+           std::vector<Method> methods)
+      : TypeDecl(signature, Kind::kProtocol, std::move(attributes), std::move(name)),
         openness(openness),
         composed_protocols(std::move(composed_protocols)),
         methods(std::move(methods)) {
@@ -815,11 +852,12 @@ struct Protocol final : public TypeDecl {
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
 };
 
-struct Resource final : public Decl {
-  struct Property : public Element {
-    Property(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name,
-             std::unique_ptr<AttributeList> attributes)
-        : Element(Element::Kind::kResourceProperty, std::move(attributes)),
+struct Resource final : public Sourced, public Decl {
+  struct Property : public Sourced, public Element {
+    Property(raw::SourceElement::Signature signature, std::unique_ptr<TypeConstructor> type_ctor,
+             SourceSpan name, std::unique_ptr<AttributeList> attributes)
+        : Sourced(signature),
+          Element(Element::Kind::kResourceProperty, std::move(attributes)),
           type_ctor(std::move(type_ctor)),
           name(name) {}
     Property Copy() const;
@@ -828,9 +866,11 @@ struct Resource final : public Decl {
     SourceSpan name;
   };
 
-  Resource(std::unique_ptr<AttributeList> attributes, Name name,
-           std::unique_ptr<TypeConstructor> subtype_ctor, std::vector<Property> properties)
-      : Decl(Kind::kResource, std::move(attributes), std::move(name)),
+  Resource(raw::SourceElement::Signature signature, std::unique_ptr<AttributeList> attributes,
+           Name name, std::unique_ptr<TypeConstructor> subtype_ctor,
+           std::vector<Property> properties)
+      : Sourced(signature),
+        Decl(signature, Kind::kResource, std::move(attributes), std::move(name)),
         subtype_ctor(std::move(subtype_ctor)),
         properties(std::move(properties)) {}
 
@@ -844,10 +884,11 @@ struct Resource final : public Decl {
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
 };
 
-struct Alias final : public Decl {
-  Alias(std::unique_ptr<AttributeList> attributes, Name name,
-        std::unique_ptr<TypeConstructor> partial_type_ctor)
-      : Decl(Kind::kAlias, std::move(attributes), std::move(name)),
+struct Alias final : public Sourced, public Decl {
+  Alias(raw::SourceElement::Signature signature, std::unique_ptr<AttributeList> attributes,
+        Name name, std::unique_ptr<TypeConstructor> partial_type_ctor)
+      : Sourced(signature),
+        Decl(signature, Kind::kAlias, std::move(attributes), std::move(name)),
         partial_type_ctor(std::move(partial_type_ctor)) {}
 
   // The shape of this type constructor is more constrained than just being a
@@ -867,9 +908,9 @@ struct Alias final : public Decl {
 };
 
 struct NewType final : public TypeDecl {
-  NewType(std::unique_ptr<AttributeList> attributes, Name name,
-          std::unique_ptr<TypeConstructor> type_ctor)
-      : TypeDecl(Kind::kNewType, std::move(attributes), std::move(name)),
+  NewType(raw::SourceElement::Signature signature, std::unique_ptr<AttributeList> attributes,
+          Name name, std::unique_ptr<TypeConstructor> type_ctor)
+      : TypeDecl(signature, Kind::kNewType, std::move(attributes), std::move(name)),
         type_ctor(std::move(type_ctor)) {}
 
   // Note that unlike in Alias, we are not calling this partial type constructor. Whether or
@@ -951,8 +992,10 @@ class Dependencies {
 
 struct LibraryComparator;
 
-struct Library final : public Element {
-  Library() : Element(Element::Kind::kLibrary, std::make_unique<AttributeList>()) {}
+struct Library final : public MaybeSourced, public Element {
+  explicit Library(std::optional<raw::SourceElement::Signature> signature)
+      : MaybeSourced(signature),
+        Element(Element::Kind::kLibrary, std::make_unique<AttributeList>()) {}
 
   // Creates the root library which holds all Builtin decls.
   static std::unique_ptr<Library> CreateRootLibrary();

@@ -14,74 +14,79 @@
 #include "tools/fidl/fidlc/include/fidl/tree_visitor.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
+using NodeKind = fidl::raw::SourceElement::NodeKind;
+
 // This test provides a way to write comprehensive unit tests on the fidlc
 // parser. Each test case provides a SourceElement type and a list of source
 // strings, with expected source spans of that type marked with special
 // characters (see kMarkerLeft and kMarkerRight). The markers can be nested and
-// are expected to specify all occurences of that type of SourceElement.
+// are expected to specify all occurrences of that type of SourceElement.
 
 // Test cases are defined near the bottom of the file as a
 // std::vector<TestCase>.
 
 // For each test case:
-// - extract_expected_spans creates a multiset of source spans from a marked
+// - extract_expected_span_views creates a multiset of source spans and source signatures from a
+// marked
 //   source string.
-// - SourceSpanChecker inherits from TreeVisitor, and it collects all the actual
-//   spans of a given ElementType by walking the AST in each test case.
-// - then the expected spans are compared against the actual spans via set
+// - |SourceSpanChecker| inherits from |TreeVisitor|, and it collects all the actual
+//   spans and signatured of a given |SourceElement::NodeKind| by walking the AST in each test case.
+// - then the expected values are compared against the actual values via set
 //   arithmetic.
 
 namespace {
 
 #define FOR_ENUM_VARIANTS(DO)   \
-  DO(Identifier)                \
-  DO(CompoundIdentifier)        \
-  DO(StringLiteral)             \
-  DO(NumericLiteral)            \
-  DO(BoolLiteral)               \
-  DO(Ordinal64)                 \
-  DO(IdentifierConstant)        \
-  DO(LiteralConstant)           \
-  DO(BinaryOperatorConstant)    \
+  DO(AliasDeclaration)          \
   DO(Attribute)                 \
   DO(AttributeArg)              \
   DO(AttributeList)             \
-  DO(TypeConstructor)           \
-  DO(Library)                   \
-  DO(Using)                     \
+  DO(BinaryOperatorConstant)    \
+  DO(BoolLiteral)               \
+  DO(CompoundIdentifier)        \
   DO(ConstDeclaration)          \
-  DO(Parameter)                 \
+  DO(DocCommentLiteral)         \
+  DO(File)                      \
+  DO(Identifier)                \
+  DO(IdentifierConstant)        \
+  DO(IdentifierLayoutParameter) \
+  DO(InlineLayoutReference)     \
+  DO(LayoutParameterList)       \
+  DO(LibraryDeclaration)        \
+  DO(LiteralConstant)           \
+  DO(LiteralLayoutParameter)    \
+  DO(Modifiers)                 \
+  DO(NamedLayoutReference)      \
+  DO(NumericLiteral)            \
+  DO(Ordinal64)                 \
+  DO(OrdinaledLayout)           \
+  DO(OrdinaledLayoutMember)     \
   DO(ParameterList)             \
   DO(ProtocolCompose)           \
-  DO(ProtocolMethod)            \
   DO(ProtocolDeclaration)       \
+  DO(ProtocolMethod)            \
   DO(ResourceDeclaration)       \
   DO(ResourceProperty)          \
   DO(ServiceMember)             \
   DO(ServiceDeclaration)        \
-  DO(Modifiers)                 \
-  DO(IdentifierLayoutParameter) \
-  DO(LiteralLayoutParameter)    \
-  DO(TypeLayoutParameter)       \
-  DO(LayoutParameterList)       \
-  DO(OrdinaledLayoutMember)     \
+  DO(StringLiteral)             \
+  DO(StructLayout)              \
   DO(StructLayoutMember)        \
-  DO(ValueLayoutMember)         \
-  DO(Layout)                    \
-  DO(InlineLayoutReference)     \
-  DO(NamedLayoutReference)      \
-  DO(ParameterListNew)          \
   DO(TypeConstraints)           \
-  DO(TypeConstructorNew)        \
-  DO(TypeDeclaration)
-
-#define MAKE_ENUM_VARIANT(VAR) VAR,
-enum ElementType { FOR_ENUM_VARIANTS(MAKE_ENUM_VARIANT) };
+  DO(TypeDeclaration)           \
+  DO(TypeConstructor)           \
+  DO(TypeLayoutParameter)       \
+  DO(Using)                     \
+  DO(ValueLayout)               \
+  DO(ValueLayoutMember)
 
 #define MAKE_ENUM_NAME(VAR) #VAR,
-const std::string kElementTypeNames[] = {FOR_ENUM_VARIANTS(MAKE_ENUM_NAME)};
+const std::string kNodeKindNames[] = {FOR_ENUM_VARIANTS(MAKE_ENUM_NAME)};
 
-std::string element_type_str(ElementType type) { return kElementTypeNames[type]; }
+std::string element_node_kind_str(NodeKind type) {
+  auto x = static_cast<std::underlying_type_t<NodeKind>>(type);
+  return kNodeKindNames[x];
+}
 
 // Used to delineate spans in source code. E.g.,
 // const uint32 «three» = 3;
@@ -90,186 +95,215 @@ constexpr std::string_view kMarkerRight = "»";
 
 class SourceSpanVisitor : public fidl::raw::TreeVisitor {
  public:
-  explicit SourceSpanVisitor(ElementType test_case_type) : test_case_type_(test_case_type) {}
+  explicit SourceSpanVisitor(NodeKind test_case_node_kind)
+      : test_case_node_kind_(test_case_node_kind) {}
 
   const std::multiset<std::string>& spans() { return spans_; }
+  const std::set<fidl::raw::SourceElement::Signature>& source_signatures() {
+    return source_signatures_;
+  }
 
-  void OnIdentifier(std::unique_ptr<fidl::raw::Identifier> const& element) override {
-    CheckSpanOfType(ElementType::Identifier, *element);
+  void OnAliasDeclaration(const std::unique_ptr<fidl::raw::AliasDeclaration>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kAliasDeclaration, *element);
+    TreeVisitor::OnAliasDeclaration(element);
   }
-  void OnCompoundIdentifier(
-      std::unique_ptr<fidl::raw::CompoundIdentifier> const& element) override {
-    CheckSpanOfType(ElementType::CompoundIdentifier, *element);
-    TreeVisitor::OnCompoundIdentifier(element);
+  void OnAttribute(const std::unique_ptr<fidl::raw::Attribute>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kAttribute, *element);
+    TreeVisitor::OnAttribute(element);
   }
-  void OnStringLiteral(fidl::raw::StringLiteral& element) override {
-    CheckSpanOfType(ElementType::StringLiteral, element);
-    TreeVisitor::OnStringLiteral(element);
+  void OnAttributeArg(const std::unique_ptr<fidl::raw::AttributeArg>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kAttributeArg, *element);
+    TreeVisitor::OnAttributeArg(element);
   }
-  void OnNumericLiteral(fidl::raw::NumericLiteral& element) override {
-    CheckSpanOfType(ElementType::NumericLiteral, element);
-    TreeVisitor::OnNumericLiteral(element);
-  }
-  void OnBoolLiteral(fidl::raw::BoolLiteral& element) override {
-    CheckSpanOfType(ElementType::BoolLiteral, element);
-    TreeVisitor::OnBoolLiteral(element);
-  }
-  void OnOrdinal64(fidl::raw::Ordinal64& element) override {
-    CheckSpanOfType(ElementType::Ordinal64, element);
-    TreeVisitor::OnOrdinal64(element);
-  }
-  void OnIdentifierConstant(
-      std::unique_ptr<fidl::raw::IdentifierConstant> const& element) override {
-    CheckSpanOfType(ElementType::IdentifierConstant, *element);
-    TreeVisitor::OnIdentifierConstant(element);
-  }
-  void OnLiteralConstant(std::unique_ptr<fidl::raw::LiteralConstant> const& element) override {
-    CheckSpanOfType(ElementType::LiteralConstant, *element);
-    TreeVisitor::OnLiteralConstant(element);
+  void OnAttributeList(const std::unique_ptr<fidl::raw::AttributeList>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kAttributeList, *element);
+    TreeVisitor::OnAttributeList(element);
   }
   void OnBinaryOperatorConstant(
-      std::unique_ptr<fidl::raw::BinaryOperatorConstant> const& element) override {
-    CheckSpanOfType(ElementType::BinaryOperatorConstant, *element);
+      const std::unique_ptr<fidl::raw::BinaryOperatorConstant>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kBinaryOperatorConstant, *element);
     TreeVisitor::OnBinaryOperatorConstant(element);
   }
-  void OnLibraryDeclaration(
-      std::unique_ptr<fidl::raw::LibraryDeclaration> const& element) override {
-    CheckSpanOfType(ElementType::Library, *element);
-    TreeVisitor::OnLibraryDeclaration(element);
+  void OnBoolLiteral(fidl::raw::BoolLiteral& element) override {
+    CheckSpanOfNodeKind(NodeKind::kBoolLiteral, element);
+    TreeVisitor::OnBoolLiteral(element);
   }
-  void OnUsing(std::unique_ptr<fidl::raw::Using> const& element) override {
-    CheckSpanOfType(ElementType::Using, *element);
-    TreeVisitor::OnUsing(element);
+  void OnCompoundIdentifier(
+      const std::unique_ptr<fidl::raw::CompoundIdentifier>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kCompoundIdentifier, *element);
+    TreeVisitor::OnCompoundIdentifier(element);
   }
-  void OnConstDeclaration(std::unique_ptr<fidl::raw::ConstDeclaration> const& element) override {
-    CheckSpanOfType(ElementType::ConstDeclaration, *element);
+  void OnConstDeclaration(const std::unique_ptr<fidl::raw::ConstDeclaration>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kConstDeclaration, *element);
     TreeVisitor::OnConstDeclaration(element);
   }
-  void OnParameterList(std::unique_ptr<fidl::raw::ParameterList> const& element) override {
-    CheckSpanOfType(ElementType::ParameterListNew, *element);
+  void OnDocCommentLiteral(fidl::raw::DocCommentLiteral& element) override {
+    CheckSpanOfNodeKind(NodeKind::kDocCommentLiteral, element);
+    TreeVisitor::OnDocCommentLiteral(element);
+  }
+  void OnFile(const std::unique_ptr<fidl::raw::File>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kFile, *element);
+    TreeVisitor::OnFile(element);
+  }
+  void OnIdentifier(const std::unique_ptr<fidl::raw::Identifier>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kIdentifier, *element);
+  }
+  void OnIdentifierConstant(
+      const std::unique_ptr<fidl::raw::IdentifierConstant>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kIdentifierConstant, *element);
+    TreeVisitor::OnIdentifierConstant(element);
+  }
+  void OnIdentifierLayoutParameter(
+      const std::unique_ptr<fidl::raw::IdentifierLayoutParameter>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kIdentifierLayoutParameter, *element);
+    TreeVisitor::OnIdentifierLayoutParameter(element);
+  }
+  void OnInlineLayoutReference(
+      const std::unique_ptr<fidl::raw::InlineLayoutReference>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kInlineLayoutReference, *element);
+    TreeVisitor::OnInlineLayoutReference(element);
+  }
+  void OnLayout(const std::unique_ptr<fidl::raw::Layout>& element) override {
+    switch (element->kind) {
+      case fidl::raw::Layout::kBits:
+      case fidl::raw::Layout::kEnum:
+        CheckSpanOfNodeKind(NodeKind::kValueLayout, *element);
+        break;
+      case fidl::raw::Layout::kStruct:
+        CheckSpanOfNodeKind(NodeKind::kStructLayout, *element);
+        break;
+      case fidl::raw::Layout::kTable:
+      case fidl::raw::Layout::kUnion:
+        CheckSpanOfNodeKind(NodeKind::kOrdinaledLayout, *element);
+        break;
+    }
+    TreeVisitor::OnLayout(element);
+  }
+  void OnLayoutParameterList(
+      const std::unique_ptr<fidl::raw::LayoutParameterList>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kLayoutParameterList, *element);
+    TreeVisitor::OnLayoutParameterList(element);
+  }
+  void OnLibraryDeclaration(
+      const std::unique_ptr<fidl::raw::LibraryDeclaration>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kLibraryDeclaration, *element);
+    TreeVisitor::OnLibraryDeclaration(element);
+  }
+  void OnLiteralConstant(const std::unique_ptr<fidl::raw::LiteralConstant>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kLiteralConstant, *element);
+    TreeVisitor::OnLiteralConstant(element);
+  }
+  void OnLiteralLayoutParameter(
+      const std::unique_ptr<fidl::raw::LiteralLayoutParameter>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kLiteralLayoutParameter, *element);
+    TreeVisitor::OnLiteralLayoutParameter(element);
+  }
+  void OnModifiers(const std::unique_ptr<fidl::raw::Modifiers>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kModifiers, *element);
+    TreeVisitor::OnModifiers(element);
+  }
+  void OnNamedLayoutReference(
+      const std::unique_ptr<fidl::raw::NamedLayoutReference>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kNamedLayoutReference, *element);
+    TreeVisitor::OnNamedLayoutReference(element);
+  }
+  void OnNumericLiteral(fidl::raw::NumericLiteral& element) override {
+    CheckSpanOfNodeKind(NodeKind::kNumericLiteral, element);
+    TreeVisitor::OnNumericLiteral(element);
+  }
+  void OnOrdinal64(fidl::raw::Ordinal64& element) override {
+    CheckSpanOfNodeKind(NodeKind::kOrdinal64, element);
+    TreeVisitor::OnOrdinal64(element);
+  }
+  void OnOrdinaledLayoutMember(
+      const std::unique_ptr<fidl::raw::OrdinaledLayoutMember>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kOrdinaledLayoutMember, *element);
+    TreeVisitor::OnOrdinaledLayoutMember(element);
+  }
+  void OnParameterList(const std::unique_ptr<fidl::raw::ParameterList>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kParameterList, *element);
     TreeVisitor::OnParameterList(element);
   }
-  void OnProtocolCompose(std::unique_ptr<fidl::raw::ProtocolCompose> const& element) override {
-    CheckSpanOfType(ElementType::ProtocolCompose, *element);
+  void OnProtocolCompose(const std::unique_ptr<fidl::raw::ProtocolCompose>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kProtocolCompose, *element);
     TreeVisitor::OnProtocolCompose(element);
   }
   void OnProtocolDeclaration(
-      std::unique_ptr<fidl::raw::ProtocolDeclaration> const& element) override {
-    CheckSpanOfType(ElementType::ProtocolDeclaration, *element);
+      const std::unique_ptr<fidl::raw::ProtocolDeclaration>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kProtocolDeclaration, *element);
     TreeVisitor::OnProtocolDeclaration(element);
   }
-  void OnProtocolMethod(std::unique_ptr<fidl::raw::ProtocolMethod> const& element) override {
-    CheckSpanOfType(ElementType::ProtocolMethod, *element);
+  void OnProtocolMethod(const std::unique_ptr<fidl::raw::ProtocolMethod>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kProtocolMethod, *element);
     TreeVisitor::OnProtocolMethod(element);
   }
-  void OnResourceProperty(std::unique_ptr<fidl::raw::ResourceProperty> const& element) override {
-    CheckSpanOfType(ElementType::ResourceProperty, *element);
-    TreeVisitor::OnResourceProperty(element);
-  }
   void OnResourceDeclaration(
-      std::unique_ptr<fidl::raw::ResourceDeclaration> const& element) override {
-    CheckSpanOfType(ElementType::ResourceDeclaration, *element);
+      const std::unique_ptr<fidl::raw::ResourceDeclaration>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kResourceDeclaration, *element);
     TreeVisitor::OnResourceDeclaration(element);
   }
-  void OnServiceMember(std::unique_ptr<fidl::raw::ServiceMember> const& element) override {
-    CheckSpanOfType(ElementType::ServiceMember, *element);
-    TreeVisitor::OnServiceMember(element);
+  void OnResourceProperty(const std::unique_ptr<fidl::raw::ResourceProperty>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kResourceProperty, *element);
+    TreeVisitor::OnResourceProperty(element);
   }
   void OnServiceDeclaration(
-      std::unique_ptr<fidl::raw::ServiceDeclaration> const& element) override {
-    CheckSpanOfType(ElementType::ServiceDeclaration, *element);
+      const std::unique_ptr<fidl::raw::ServiceDeclaration>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kServiceDeclaration, *element);
     TreeVisitor::OnServiceDeclaration(element);
   }
-  void OnAttributeArg(std::unique_ptr<fidl::raw::AttributeArg> const& element) override {
-    CheckSpanOfType(ElementType::AttributeArg, *element);
-    TreeVisitor::OnAttributeArg(element);
+  void OnServiceMember(const std::unique_ptr<fidl::raw::ServiceMember>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kServiceMember, *element);
+    TreeVisitor::OnServiceMember(element);
   }
-  void OnAttribute(std::unique_ptr<fidl::raw::Attribute> const& element) override {
-    CheckSpanOfType(ElementType::Attribute, *element);
-    TreeVisitor::OnAttribute(element);
-  }
-  void OnAttributeList(std::unique_ptr<fidl::raw::AttributeList> const& element) override {
-    CheckSpanOfType(ElementType::AttributeList, *element);
-    TreeVisitor::OnAttributeList(element);
-  }
-  void OnModifiers(std::unique_ptr<fidl::raw::Modifiers> const& element) override {
-    CheckSpanOfType(ElementType::Modifiers, *element);
-    TreeVisitor::OnModifiers(element);
-  }
-  void OnIdentifierLayoutParameter(
-      std::unique_ptr<fidl::raw::IdentifierLayoutParameter> const& element) override {
-    CheckSpanOfType(ElementType::IdentifierLayoutParameter, *element);
-    TreeVisitor::OnIdentifierLayoutParameter(element);
-  }
-  void OnLiteralLayoutParameter(
-      std::unique_ptr<fidl::raw::LiteralLayoutParameter> const& element) override {
-    CheckSpanOfType(ElementType::LiteralLayoutParameter, *element);
-    TreeVisitor::OnLiteralLayoutParameter(element);
-  }
-  void OnTypeLayoutParameter(
-      std::unique_ptr<fidl::raw::TypeLayoutParameter> const& element) override {
-    CheckSpanOfType(ElementType::TypeLayoutParameter, *element);
-    TreeVisitor::OnTypeLayoutParameter(element);
-  }
-  void OnLayoutParameterList(
-      std::unique_ptr<fidl::raw::LayoutParameterList> const& element) override {
-    CheckSpanOfType(ElementType::LayoutParameterList, *element);
-    TreeVisitor::OnLayoutParameterList(element);
-  }
-  void OnOrdinaledLayoutMember(
-      std::unique_ptr<fidl::raw::OrdinaledLayoutMember> const& element) override {
-    CheckSpanOfType(ElementType::OrdinaledLayoutMember, *element);
-    TreeVisitor::OnOrdinaledLayoutMember(element);
+  void OnStringLiteral(fidl::raw::StringLiteral& element) override {
+    CheckSpanOfNodeKind(NodeKind::kStringLiteral, element);
+    TreeVisitor::OnStringLiteral(element);
   }
   void OnStructLayoutMember(
-      std::unique_ptr<fidl::raw::StructLayoutMember> const& element) override {
-    CheckSpanOfType(ElementType::StructLayoutMember, *element);
+      const std::unique_ptr<fidl::raw::StructLayoutMember>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kStructLayoutMember, *element);
     TreeVisitor::OnStructLayoutMember(element);
   }
-  void OnValueLayoutMember(std::unique_ptr<fidl::raw::ValueLayoutMember> const& element) override {
-    CheckSpanOfType(ElementType::ValueLayoutMember, *element);
-    TreeVisitor::OnValueLayoutMember(element);
-  }
-  void OnLayout(std::unique_ptr<fidl::raw::Layout> const& element) override {
-    CheckSpanOfType(ElementType::Layout, *element);
-    TreeVisitor::OnLayout(element);
-  }
-  void OnInlineLayoutReference(
-      std::unique_ptr<fidl::raw::InlineLayoutReference> const& element) override {
-    CheckSpanOfType(ElementType::InlineLayoutReference, *element);
-    TreeVisitor::OnInlineLayoutReference(element);
-  }
-  void OnNamedLayoutReference(
-      std::unique_ptr<fidl::raw::NamedLayoutReference> const& element) override {
-    CheckSpanOfType(ElementType::NamedLayoutReference, *element);
-    TreeVisitor::OnNamedLayoutReference(element);
-  }
-  void OnTypeConstraints(std::unique_ptr<fidl::raw::TypeConstraints> const& element) override {
-    CheckSpanOfType(ElementType::TypeConstraints, *element);
+  void OnTypeConstraints(const std::unique_ptr<fidl::raw::TypeConstraints>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kTypeConstraints, *element);
     TreeVisitor::OnTypeConstraints(element);
   }
-  void OnTypeConstructor(std::unique_ptr<fidl::raw::TypeConstructor> const& element) override {
-    CheckSpanOfType(ElementType::TypeConstructorNew, *element);
+  void OnTypeConstructor(const std::unique_ptr<fidl::raw::TypeConstructor>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kTypeConstructor, *element);
     TreeVisitor::OnTypeConstructor(element);
   }
-  void OnTypeDeclaration(std::unique_ptr<fidl::raw::TypeDeclaration> const& element) override {
-    CheckSpanOfType(ElementType::TypeDeclaration, *element);
+  void OnTypeDeclaration(const std::unique_ptr<fidl::raw::TypeDeclaration>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kTypeDeclaration, *element);
     TreeVisitor::OnTypeDeclaration(element);
+  }
+  void OnTypeLayoutParameter(
+      const std::unique_ptr<fidl::raw::TypeLayoutParameter>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kTypeLayoutParameter, *element);
+    TreeVisitor::OnTypeLayoutParameter(element);
+  }
+  void OnUsing(const std::unique_ptr<fidl::raw::Using>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kUsing, *element);
+    TreeVisitor::OnUsing(element);
+  }
+  void OnValueLayoutMember(const std::unique_ptr<fidl::raw::ValueLayoutMember>& element) override {
+    CheckSpanOfNodeKind(NodeKind::kValueLayoutMember, *element);
+    TreeVisitor::OnValueLayoutMember(element);
   }
 
  private:
-  // Called on every node of the AST that we visit. We collect spans of the
-  // ElementType we are looking for as we traverse the tree, and store them in a
-  // multiset.
-  void CheckSpanOfType(const ElementType type, const fidl::raw::SourceElement& element) {
-    if (type != test_case_type_) {
+  // Called on every node of the AST that we visit. We collect spans of the |NodeKind| we are
+  // looking for as we traverse the tree, and store them in a multiset.
+  void CheckSpanOfNodeKind(const NodeKind node_kind, const fidl::raw::SourceElement& element) {
+    if (node_kind != test_case_node_kind_) {
       return;
     }
     spans_.insert(std::string(element.span().data()));
+    source_signatures_.insert(element.source_signature());
   }
 
-  ElementType test_case_type_;
+  NodeKind test_case_node_kind_;
   std::multiset<std::string> spans_;
+  std::set<fidl::raw::SourceElement::Signature> source_signatures_;
 };
 
 std::string replace_markers(std::string_view source, std::string_view left_replace,
@@ -291,22 +325,30 @@ std::string replace_markers(std::string_view source, std::string_view left_repla
 
 std::string remove_markers(std::string_view source) { return replace_markers(source, "", ""); }
 
-// Extracts marked source spans from a given source string.
-// If source spans are incorrectly marked (missing or extra markers), returns
+// Extracts marked source spans from a given source string as |string_view|s into the
+// |cleaned_source|. If source spans are incorrectly marked (missing or extra markers), returns
 // empty set; otherwise, returns a multiset of expected spans.
-std::multiset<std::string> extract_expected_spans(std::string_view source,
-                                                  std::vector<std::string>* errors) {
+std::multiset<std::string_view> extract_expected_span_views(std::string_view marked_source,
+                                                            std::string_view clean_source,
+                                                            std::vector<std::string>* errors) {
   std::stack<size_t> stack;
-  std::multiset<std::string> spans;
+  std::multiset<std::string_view> spans;
+  size_t left_marker_size = kMarkerLeft.length();
+  size_t right_marker_size = kMarkerRight.length();
+  size_t combined_marker_size = left_marker_size + right_marker_size;
 
   const auto match = [&](size_t i, std::string_view marker) {
-    return marker.compare(source.substr(i, marker.length())) == 0;
+    return marker.compare(marked_source.substr(i, marker.length())) == 0;
   };
 
-  for (size_t i = 0; i < source.length();) {
+  auto offset = [&](size_t i) {
+    return i - (stack.size() * left_marker_size) - (spans.size() * combined_marker_size);
+  };
+
+  for (size_t i = 0; i < marked_source.length();) {
     if (match(i, kMarkerLeft)) {
-      i += kMarkerLeft.length();
-      stack.push(i);
+      stack.push(offset(i));
+      i += left_marker_size;
     } else if (match(i, kMarkerRight)) {
       if (stack.empty()) {
         std::stringstream error_msg;
@@ -318,12 +360,15 @@ std::multiset<std::string> extract_expected_spans(std::string_view source,
         break;
       }
 
-      const std::string span = remove_markers(source.substr(stack.top(),  // index of left marker
-                                                            i - stack.top())  // length of span
-      );
+      // const std::string span = remove_markers(source.substr(stack.top(),  // index of left marker
+      //                                                       i - stack.top())  // length of span
+      // );
+      size_t pos_in_clean_source = stack.top();
+      size_t count_in_clean_source = offset(i) - pos_in_clean_source;
       stack.pop();
-      spans.insert(span);
-      i += kMarkerRight.length();
+      auto x = clean_source.substr(pos_in_clean_source, count_in_clean_source);
+      spans.insert(x);
+      i += right_marker_size;
     } else {
       i += 1;
     }
@@ -341,22 +386,17 @@ std::multiset<std::string> extract_expected_spans(std::string_view source,
 }
 
 struct TestCase {
-  ElementType type;
+  NodeKind node_kind;
   std::vector<std::string> marked_sources;
 };
 
 const std::vector<TestCase> test_cases = {
-    {ElementType::AttributeArg,
+    {NodeKind::kAliasDeclaration,
      {
-         R"FIDL(library x; @attr(«"foo"») const MY_BOOL bool = false;)FIDL",
-         R"FIDL(library x; @attr(«a="foo"»,«b="bar"») const MY_BOOL bool = false;)FIDL",
-         R"FIDL(library x;
-          const MY_BOOL bool = false;
-          @attr(«a=true»,«b=MY_BOOL»,«c="foo"»)
-          const MY_OTHER_BOOL bool = false;
-         )FIDL",
+         R"FIDL(library x; «alias Foo = uint8»;)FIDL",
+         R"FIDL(library x; «alias Foo = vector<uint8>»;)FIDL",
      }},
-    {ElementType::Attribute,
+    {NodeKind::kAttribute,
      {
          R"FIDL(library x; «@foo("foo")» «@bar» const MY_BOOL bool = false;)FIDL",
          R"FIDL(library x;
@@ -370,120 +410,96 @@ const std::vector<TestCase> test_cases = {
           };
          )FIDL",
      }},
-    {ElementType::Modifiers,
+    {NodeKind::kAttributeArg,
      {
-         R"FIDL(library x; type MyBits = «flexible» bits { MY_VALUE = 1; };)FIDL",
-         R"FIDL(library x; type MyBits = «strict» bits : uint32 { MY_VALUE = 1; };)FIDL",
-         R"FIDL(library x; type MyEnum = «flexible» enum : uint32 { MY_VALUE = 1; };)FIDL",
-         R"FIDL(library x; type MyEnum = «strict» enum { MY_VALUE = 1; };)FIDL",
-         R"FIDL(library x; type MyStruct = «resource» struct {};)FIDL",
-         R"FIDL(library x; type MyTable = «resource» table { 1: my_member bool; };)FIDL",
-         R"FIDL(library x; type MyUnion = «resource» union { 1: my_member bool; };)FIDL",
-         R"FIDL(library x; type MyUnion = «flexible» union { 1: my_member bool; };)FIDL",
-         R"FIDL(library x; type MyUnion = «strict» union { 1: my_member bool; };)FIDL",
-         R"FIDL(library x; type MyUnion = «resource strict» union { 1: my_member bool; };)FIDL",
-         // Note that the following 3 tests have union members named like modifiers.
-         R"FIDL(library x; type MyUnion = «resource flexible» union { 1: my_member resource; };)FIDL",
-         R"FIDL(library x; type MyUnion = «strict resource» union { 1: my_member flexible; };)FIDL",
-         R"FIDL(library x; type MyUnion = «flexible resource» union { 1: my_member strict; };)FIDL",
-     }},
-    {ElementType::NamedLayoutReference,
-     {
+         R"FIDL(library x; @attr(«"foo"») const MY_BOOL bool = false;)FIDL",
+         R"FIDL(library x; @attr(«a="foo"»,«b="bar"») const MY_BOOL bool = false;)FIDL",
          R"FIDL(library x;
-          type S = struct {
-            intval «int64»;
-            boolval «bool» = false;
-            stringval «string»:MAX_STRING_SIZE;
-            inner struct {
-              floatval «float64»;
-              uintval «uint8» = 7;
-              vecval «vector»<«vector»<Foo>>;
-              arrval «array»<uint8,4>;
-            };
+          const MY_BOOL bool = false;
+          @attr(«a=true»,«b=MY_BOOL»,«c="foo"»)
+          const MY_OTHER_BOOL bool = false;
+         )FIDL",
+     }},
+    {NodeKind::kAttributeList,
+     {
+         R"FIDL(library x; «@foo("foo") @bar» const MY_BOOL bool = false;)FIDL",
+         R"FIDL(library x;
+          «@foo("foo")
+          @bar»
+          const MY_BOOL bool = false;
+         )FIDL",
+         R"FIDL(library x;
+          protocol Foo {
+            Bar(«@foo» struct {});
           };
          )FIDL",
      }},
-    {ElementType::IdentifierLayoutParameter,
+    {NodeKind::kBinaryOperatorConstant,
+     {
+         R"FIDL(library x;
+          const one uint8 = 0x0001;
+          const two_fifty_six uint16 = 0x0100;
+          const two_fifty_seven uint16 = «one | two_fifty_six»;
+         )FIDL",
+         R"FIDL(library x; const two_fifty_seven uint16 = «0x0001 | 0x0100»;)FIDL",
+     }},
+    {NodeKind::kBoolLiteral,
+     {
+         R"FIDL(library x; const x bool = «true»;)FIDL",
+         R"FIDL(library x; @attr(«true») const x bool = «true»;)FIDL",
+         R"FIDL(library x; const x bool = «false»;)FIDL",
+         R"FIDL(library x; @attr(«false») const x bool = «false»;)FIDL",
+     }},
+    {NodeKind::kCompoundIdentifier,
+     {
+         R"FIDL(library «foo.bar.baz»;)FIDL",
+     }},
+    {NodeKind::kConstDeclaration,
+     {
+         R"FIDL(library example;
+          «const C_SIMPLE uint32   = 11259375»;
+          «const C_HEX_S uint32    = 0xABCDEF»;
+          «const C_HEX_L uint32    = 0XABCDEF»;
+          «const C_BINARY_S uint32 = 0b101010111100110111101111»;
+          «const C_BINARY_L uint32 = 0B101010111100110111101111»;
+      )FIDL"}},
+    {NodeKind::kDocCommentLiteral,
+     {
+         R"FIDL(library x;
+          «/// Foo»
+          const MY_BOOL bool = false;)FIDL",
+     }},
+    {NodeKind::kIdentifier,
+     {
+         R"FIDL(library «x»;
+          type «MyEnum» = strict enum {
+            «A» = 1;
+          };
+         )FIDL",
+         R"FIDL(library «x»;
+          type «MyStruct» = resource struct {
+            «boolval» «bool»;
+            «boolval» «resource»;
+            «boolval» «flexible»;
+            «boolval» «struct»;
+          };
+         )FIDL",
+         R"FIDL(library «x»;
+          type «MyUnion» = flexible union {
+            1: «intval» «int64»;
+            2: reserved;
+          };
+         )FIDL",
+     }},
+    {NodeKind::kIdentifierConstant,
+     {
+         R"FIDL(library x; const x bool = true; const y bool = «x»;)FIDL",
+     }},
+    {NodeKind::kIdentifierLayoutParameter,
      {
          R"FIDL(library x; type a = bool; const b uint8 = 4; type y = array<«a»,«b»>;)FIDL",
      }},
-    {ElementType::LiteralLayoutParameter,
-     {
-         R"FIDL(library x; type y = array<uint8,«4»>;)FIDL",
-         R"FIDL(library x; type y = vector<array<uint8,«4»>>;)FIDL",
-     }},
-    {ElementType::TypeLayoutParameter,
-     {
-         R"FIDL(library x; type y = array<uint8,4>;)FIDL",
-         R"FIDL(library x; type y = vector<«array<uint8,4>»>;)FIDL",
-     }},
-    {ElementType::LayoutParameterList,
-     {
-         R"FIDL(library x; type y = array«<uint8,4>»;)FIDL",
-         R"FIDL(library x; type y = vector«<array«<uint8,4>»>»;)FIDL",
-     }},
-    {ElementType::OrdinaledLayoutMember,
-     {
-         R"FIDL(library x;
-          type T = table {
-            «1: intval int64»;
-            «2: reserved»;
-            «@attr 3: floatval float64»;
-            «4: stringval string:100»;
-            «5: inner union {
-              «1: boolval bool»;
-              «2: reserved»;
-            }:optional»;
-          };
-         )FIDL",
-     }},
-    {ElementType::StructLayoutMember,
-     {
-         R"FIDL(library x;
-          type S = struct {
-            «intval int64»;
-            «boolval bool = false»;
-            «@attr stringval string:100»;
-            «inner struct {
-              «floatval float64»;
-              «uintval uint8 = 7»;
-            }»;
-          };
-         )FIDL",
-     }},
-    {ElementType::ValueLayoutMember,
-     {
-         R"FIDL(library x;
-          type E = enum {
-            «A = 1»;
-            «@attr B = 2»;
-          };
-         )FIDL",
-         R"FIDL(library x;
-          type B = bits {
-            «A = 0x1»;
-            «@attr B = 0x2»;
-          };
-         )FIDL",
-     }},
-    {ElementType::Layout,
-     {
-         R"FIDL(library x;
-          type B = «bits {
-            A = 1;
-          }»;
-          type E = «strict enum {
-            A = 1;
-          }»;
-          type S = «resource struct {
-            intval int64;
-          }»;
-          type U = «flexible resource union {
-            1: intval int64;
-          }»:optional;
-         )FIDL",
-     }},
-    {ElementType::InlineLayoutReference,
+    {NodeKind::kInlineLayoutReference,
      {
          R"FIDL(library x;
           type S = «struct {
@@ -513,7 +529,45 @@ const std::vector<TestCase> test_cases = {
           };
          )FIDL",
      }},
-    {ElementType::NamedLayoutReference,
+    {NodeKind::kLayoutParameterList,
+     {
+         R"FIDL(library x; type y = array«<uint8,4>»;)FIDL",
+         R"FIDL(library x; type y = vector«<array«<uint8,4>»>»;)FIDL",
+     }},
+    {NodeKind::kLibraryDeclaration,
+     {
+         R"FIDL(«library x»; using y;)FIDL",
+         R"FIDL(«library x.y.z»; using y;)FIDL",
+     }},
+    {NodeKind::kLiteralConstant,
+     {
+         R"FIDL(library x; const x bool = «true»;)FIDL",
+         R"FIDL(library x; const x uint8 = «42»;)FIDL",
+         R"FIDL(library x; const x string = «"hi"»;)FIDL",
+     }},
+    {NodeKind::kLiteralLayoutParameter,
+     {
+         R"FIDL(library x; type y = array<uint8,«4»>;)FIDL",
+         R"FIDL(library x; type y = vector<array<uint8,«4»>>;)FIDL",
+     }},
+    {NodeKind::kModifiers,
+     {
+         R"FIDL(library x; type MyBits = «flexible» bits { MY_VALUE = 1; };)FIDL",
+         R"FIDL(library x; type MyBits = «strict» bits : uint32 { MY_VALUE = 1; };)FIDL",
+         R"FIDL(library x; type MyEnum = «flexible» enum : uint32 { MY_VALUE = 1; };)FIDL",
+         R"FIDL(library x; type MyEnum = «strict» enum { MY_VALUE = 1; };)FIDL",
+         R"FIDL(library x; type MyStruct = «resource» struct {};)FIDL",
+         R"FIDL(library x; type MyTable = «resource» table { 1: my_member bool; };)FIDL",
+         R"FIDL(library x; type MyUnion = «resource» union { 1: my_member bool; };)FIDL",
+         R"FIDL(library x; type MyUnion = «flexible» union { 1: my_member bool; };)FIDL",
+         R"FIDL(library x; type MyUnion = «strict» union { 1: my_member bool; };)FIDL",
+         R"FIDL(library x; type MyUnion = «resource strict» union { 1: my_member bool; };)FIDL",
+         // Note that the following 3 tests have union members named like modifiers.
+         R"FIDL(library x; type MyUnion = «resource flexible» union { 1: my_member resource; };)FIDL",
+         R"FIDL(library x; type MyUnion = «strict resource» union { 1: my_member flexible; };)FIDL",
+         R"FIDL(library x; type MyUnion = «flexible resource» union { 1: my_member strict; };)FIDL",
+     }},
+    {NodeKind::kNamedLayoutReference,
      {
          R"FIDL(library x;
           type S = struct {
@@ -529,16 +583,138 @@ const std::vector<TestCase> test_cases = {
           };
          )FIDL",
      }},
-    {ElementType::ParameterListNew,
+    {NodeKind::kNumericLiteral,
+     {
+         R"FIDL(library x; const x uint8 = «42»;)FIDL",
+         R"FIDL(library x; @attr(«42») const x uint8 = «42»;)FIDL",
+     }},
+    {NodeKind::kOrdinal64,
+     {
+         R"FIDL(library x; type U = union { «1:» one uint8; };)FIDL",
+     }},
+    {NodeKind::kOrdinaledLayout,
+     {
+         R"FIDL(library x;
+          type T = «resource table {
+            1: intval int64;
+          }»;
+          type U = «flexible resource union {
+            1: intval int64;
+          }»:optional;
+         )FIDL",
+     }},
+    {NodeKind::kOrdinaledLayoutMember,
+     {
+         R"FIDL(library x;
+          type T = table {
+            «1: intval int64»;
+            «2: reserved»;
+            «@attr 3: floatval float64»;
+            «4: stringval string:100»;
+            «5: inner union {
+              «1: boolval bool»;
+              «2: reserved»;
+            }:optional»;
+          };
+         )FIDL",
+     }},
+    {NodeKind::kParameterList,
      {
          R"FIDL(library x; protocol X { Method«()» -> «()»; };)FIDL",
          R"FIDL(library x; protocol X { Method«(struct {})» -> «(struct {})»; };)FIDL",
-         R"FIDL(library x; protocol X { Method«(struct { a int32; b bool; })» -> «(struct { c uint8; d bool; })»; };)FIDL",
+         R"FIDL(library x; protocol X { Method«(struct { a int32; b bool; })» -> «(struct { c
+         uint8; d bool; })»; };)FIDL",
          R"FIDL(library x; protocol X { -> Event«()»; };)FIDL",
          R"FIDL(library x; protocol X { -> Event«(struct {})»; };)FIDL",
          R"FIDL(library x; protocol X { -> Event«(struct { a int32; b bool; })»; };)FIDL",
      }},
-    {ElementType::TypeConstraints,
+    {NodeKind::kProtocolCompose,
+     {
+         R"FIDL(library x; protocol X { «compose OtherProtocol»; };)FIDL",
+         R"FIDL(library x; protocol X { «@attr compose OtherProtocol»; };)FIDL",
+         R"FIDL(library x; protocol X {
+            «/// Foo
+            compose OtherProtocol»;
+          };)FIDL",
+     }},
+    {NodeKind::kProtocolDeclaration,
+     {
+         R"FIDL(library x; «protocol X {}»;)FIDL",
+         R"FIDL(library x; «@attr protocol X { compose OtherProtocol; }»;)FIDL",
+     }},
+    {NodeKind::kProtocolMethod,
+     {
+         // One-way
+         R"FIDL(library x; protocol X { «Method()»; };)FIDL",
+         R"FIDL(library x; protocol X { «@attr Method(struct { a int32; b bool; })»; };)FIDL",
+         // Two-way
+         R"FIDL(library x; protocol X { «Method(struct { a int32; }) -> ()»; };)FIDL",
+         R"FIDL(library x; protocol X { «@attr Method(struct { a int32; }) -> ()»; };)FIDL",
+         R"FIDL(library x; protocol X { «Method(struct { a int32; }) -> (struct { res bool; })»;
+         };)FIDL",
+         R"FIDL(library x; protocol X { «Method(struct { a int32; }) -> (struct { res
+         bool; res2 int32; })»; };)FIDL",
+         // Two-way + error
+         R"FIDL(library x; protocol X { «Method(struct { a int32; }) -> () error uint32»;
+         };)FIDL",
+         R"FIDL(library x; protocol X { «@attr Method(struct { a int32; }) -> () error
+         uint32»; };)FIDL",
+         R"FIDL(library x; protocol X { «Method(struct { a int32; }) ->
+         (struct { res bool; }) error uint32»; };)FIDL",
+         R"FIDL(library x; protocol X {
+         «Method(struct { a int32; }) -> (struct { res bool; res2 int32; }) error uint32»;
+         };)FIDL",
+         // Event
+         R"FIDL(library x; protocol X { «-> Event()»; };)FIDL",
+         R"FIDL(library x; protocol X { «-> Event(struct { res bool; })»; };)FIDL",
+         R"FIDL(library x; protocol X { «@attr -> Event(struct { res bool; res2 int32; })»;
+         };)FIDL",
+     }},
+    {NodeKind::kResourceDeclaration, {R"FIDL(
+     library example; «resource_definition Res : uint32 { properties { subtype Enum; };
+     }»;)FIDL"}},
+    {NodeKind::kResourceProperty, {R"FIDL(
+     library example; resource_definition Res : uint32 { properties { «subtype Enum»; };
+     };)FIDL"}},
+    {NodeKind::kServiceDeclaration,
+     {
+         R"FIDL(library x; «service X {}»;)FIDL",
+         R"FIDL(library x; protocol P {}; «service X { Z client_end:P; }»;)FIDL",
+     }},
+    {NodeKind::kServiceMember,
+     {
+         R"FIDL(library x; protocol P {}; service X { «Z client_end:P»; };)FIDL",
+         R"FIDL(library x; protocol P {}; service X { «@attr Z client_end:P»; };)FIDL",
+     }},
+    {NodeKind::kStringLiteral,
+     {
+         R"FIDL(library x; const x string = «"hello"»;)FIDL",
+         R"FIDL(library x; @attr(«"foo"») const x string = «"goodbye"»;)FIDL",
+         R"FIDL(library x; @attr(a=«"foo"»,b=«"bar"») const MY_BOOL bool = false;)FIDL",
+     }},
+    {NodeKind::kStructLayout,
+     {
+         R"FIDL(library x;
+          type S = «resource struct {
+            intval int64;
+          }»;
+         )FIDL",
+     }},
+    {NodeKind::kStructLayoutMember,
+     {
+         R"FIDL(library x;
+          type S = struct {
+            «intval int64»;
+            «boolval bool = false»;
+            «@attr stringval string:100»;
+            «inner struct {
+              «floatval float64»;
+              «uintval uint8 = 7»;
+            }»;
+          };
+         )FIDL",
+     }},
+    {NodeKind::kTypeConstraints,
      {
          R"FIDL(library x; type y = array<uint8,4>;)FIDL",
          R"FIDL(library x; type y = vector<vector<uint8>:«16»>:«<16,optional>»;)FIDL",
@@ -546,7 +722,7 @@ const std::vector<TestCase> test_cases = {
          R"FIDL(library x; using zx; type y = zx.handle:«optional»;)FIDL",
          R"FIDL(library x; using zx; type y = zx.handle:«<VMO,zx.READ,optional>»;)FIDL",
      }},
-    {ElementType::TypeConstructorNew,
+    {NodeKind::kTypeConstructor,
      {
          R"FIDL(library x; const x «int32» = 1;)FIDL",
          R"FIDL(library x; const x «zx.handle:<VMO, zx.rights.READ, optional>» = 1;)FIDL",
@@ -574,7 +750,8 @@ const std::vector<TestCase> test_cases = {
             }»;
           }»;
          )FIDL",
-         R"FIDL(library x; protocol X { Method(«struct { a «int32»; b «bool»; }») -> («struct {}») error «uint32»; };)FIDL",
+         R"FIDL(library x; protocol X { Method(«struct { a «int32»; b «bool»; }») -> («struct
+         {}») error «uint32»; };)FIDL",
          R"FIDL(library x;
           resource_definition foo : «uint8» {
               properties {
@@ -588,7 +765,7 @@ const std::vector<TestCase> test_cases = {
           };
          )FIDL",
      }},
-    {ElementType::TypeDeclaration,
+    {NodeKind::kTypeDeclaration,
      {
          R"FIDL(library x;
           «type E = enum : int8 {
@@ -602,167 +779,68 @@ const std::vector<TestCase> test_cases = {
           }:optional»;
          )FIDL",
      }},
-
-    // The following tests "duplicate" some of the auto-converted old syntax test cases above for
-    // situations specific only to the new syntax.
-    {ElementType::StringLiteral,
+    {NodeKind::kTypeLayoutParameter,
      {
-         R"FIDL(library x; @attr(a=«"foo"»,b=«"bar"») const MY_BOOL bool = false;)FIDL",
+         R"FIDL(library x; type y = array<uint8,4>;)FIDL",
+         R"FIDL(library x; type y = vector<«array<uint8,4>»>;)FIDL",
      }},
-    {ElementType::Identifier,
-     {
-         R"FIDL(library «x»;
-          type «MyEnum» = strict enum {
-            «A» = 1;
-          };
-         )FIDL",
-         R"FIDL(library «x»;
-          type «MyStruct» = resource struct {
-            «boolval» «bool»;
-            «boolval» «resource»;
-            «boolval» «flexible»;
-            «boolval» «struct»;
-          };
-         )FIDL",
-         R"FIDL(library «x»;
-          type «MyUnion» = flexible union {
-            1: «intval» «int64»;
-            2: reserved;
-          };
-         )FIDL",
-     }},
-    {ElementType::ServiceDeclaration,
-     {
-         R"FIDL(library x; «service X {}»;)FIDL",
-         R"FIDL(library x; protocol P {}; «service X { Z client_end:P; }»;)FIDL",
-     }},
-    {ElementType::ServiceMember,
-     {
-         R"FIDL(library x; protocol P {}; service X { «Z client_end:P»; };)FIDL",
-         R"FIDL(library x; protocol P {}; service X { «@attr Z client_end:P»; };)FIDL",
-     }},
-    {ElementType::ProtocolCompose,
-     {
-         R"FIDL(library x; protocol X { «compose OtherProtocol»; };)FIDL",
-         R"FIDL(library x; protocol X { «@attr compose OtherProtocol»; };)FIDL",
-         R"FIDL(library x; protocol X {
-            «/// Foo
-            compose OtherProtocol»;
-          };)FIDL",
-     }},
-    {ElementType::Library,
-     {
-         R"FIDL(«library x»; using y;)FIDL",
-         R"FIDL(«library x.y.z»; using y;)FIDL",
-     }},
-    {ElementType::Using,
+    {NodeKind::kUsing,
      {
          R"FIDL(library x; «using y»;)FIDL",
          R"FIDL(library x; «using y as z»;)FIDL",
      }},
-    {ElementType::ResourceDeclaration, {R"FIDL(
-     library example; «resource_definition Res : uint32 { properties { subtype Enum; }; }»;)FIDL"}},
-    {ElementType::ResourceProperty, {R"FIDL(
-     library example; resource_definition Res : uint32 { properties { «subtype Enum»; }; };)FIDL"}},
-    {ElementType::ProtocolDeclaration,
-     {
-         R"FIDL(library x; «protocol X {}»;)FIDL",
-         R"FIDL(library x; «@attr protocol X { compose OtherProtocol; }»;)FIDL",
-     }},
-    {ElementType::ProtocolMethod,  // Method
-     {
-         R"FIDL(library x; protocol X { «Method(struct { a int32; }) -> (struct { res bool; })»; };)FIDL",
-         R"FIDL(library x; protocol X { «-> Event(struct { res bool; })»; };)FIDL",
-     }},
-    {ElementType::ProtocolMethod,
-     {
-         R"FIDL(library x; protocol X { «Method()»; };)FIDL",
-         R"FIDL(library x; protocol X { «@attr Method(struct { a int32; b bool; })»; };)FIDL",
-         R"FIDL(library x; protocol X { «Method(struct { a int32; }) -> ()»; };)FIDL",
-         R"FIDL(library x; protocol X { «Method(struct { a int32; }) -> (struct { res bool; res2 int32; })»; };)FIDL",
-     }},
-    {ElementType::ProtocolMethod,  // Event
-     {
-         R"FIDL(library x; protocol X { «-> Event()»; };)FIDL",
-         R"FIDL(library x; protocol X { «@attr -> Event(struct { res bool; res2 int32; })»; };)FIDL",
-     }},
-    {ElementType::CompoundIdentifier,
-     {
-         R"FIDL(library «foo.bar.baz»;)FIDL",
-     }},
-    {ElementType::StringLiteral,
-     {
-         R"FIDL(library x; const x string = «"hello"»;)FIDL",
-         R"FIDL(library x; @attr(«"foo"») const x string = «"goodbye"»;)FIDL",
-     }},
-    {ElementType::NumericLiteral,
-     {
-         R"FIDL(library x; const x uint8 = «42»;)FIDL",
-         R"FIDL(library x; @attr(«42») const x uint8 = «42»;)FIDL",
-     }},
-    {ElementType::BoolLiteral,
-     {
-         R"FIDL(library x; const x bool = «true»;)FIDL",
-         R"FIDL(library x; @attr(«true») const x bool = «true»;)FIDL",
-         R"FIDL(library x; const x bool = «false»;)FIDL",
-         R"FIDL(library x; @attr(«false») const x bool = «false»;)FIDL",
-     }},
-    {ElementType::Ordinal64,
-     {
-         R"FIDL(library x; type U = union { «1:» one uint8; };)FIDL",
-     }},
-    {ElementType::IdentifierConstant,
-     {
-         R"FIDL(library x; const x bool = true; const y bool = «x»;)FIDL",
-     }},
-    {ElementType::LiteralConstant,
-     {
-         R"FIDL(library x; const x bool = «true»;)FIDL",
-         R"FIDL(library x; const x uint8 = «42»;)FIDL",
-         R"FIDL(library x; const x string = «"hi"»;)FIDL",
-     }},
-    {ElementType::BinaryOperatorConstant,
+    {NodeKind::kValueLayout,
      {
          R"FIDL(library x;
-const one uint8 = 0x0001;
-const two_fifty_six uint16 = 0x0100;
-const two_fifty_seven uint16 = «one | two_fifty_six»;
+          type B = «bits {
+            A = 1;
+          }»;
+          type E = «strict enum {
+            A = 1;
+          }»;
          )FIDL",
-         R"FIDL(library x; const two_fifty_seven uint16 = «0x0001 | 0x0100»;)FIDL",
      }},
-    {ElementType::ConstDeclaration,
+    {NodeKind::kValueLayoutMember,
      {
-         R"FIDL(library example;
-«const C_SIMPLE uint32   = 11259375»;
-«const C_HEX_S uint32    = 0xABCDEF»;
-«const C_HEX_L uint32    = 0XABCDEF»;
-«const C_BINARY_S uint32 = 0b101010111100110111101111»;
-«const C_BINARY_L uint32 = 0B101010111100110111101111»;
-      )FIDL"}},
+         R"FIDL(library x;
+          type E = enum {
+            «A = 1»;
+            «@attr B = 2»;
+          };
+         )FIDL",
+         R"FIDL(library x;
+          type B = bits {
+            «A = 0x1»;
+            «@attr B = 0x2»;
+          };
+         )FIDL",
+     }},
 };
-// --- end new syntax ---
 
 constexpr std::string_view kPassedMsg = "\x1B[32mPassed\033[0m";
 constexpr std::string_view kFailedMsg = "\x1B[31mFailed\033[0m";
 constexpr std::string_view kErrorMsg = "\x1B[31mERROR:\033[0m";
 
 void RunParseTests(const std::vector<TestCase>& cases, const std::string& insert_left_padding,
-                   const std::string& insert_right_padding) {
+                   const std::string& insert_right_padding, std::set<NodeKind> exclude) {
   std::cerr << '\n'
             << std::left << '\t' << "\x1B[34mWhere left padding = \"" << insert_left_padding
             << "\" and right padding = \"" << insert_right_padding << "\":\033[0m\n";
 
   bool all_passed = true;
   for (const auto& test_case : cases) {
-    std::cerr << std::left << '\t' << std::setw(48) << element_type_str(test_case.type);
+    if (exclude.find(test_case.node_kind) != exclude.end()) {
+      continue;
+    }
+    std::cerr << std::left << '\t' << std::setw(48) << element_node_kind_str(test_case.node_kind);
     std::vector<std::string> errors;
 
     for (const auto& unpadded_source : test_case.marked_sources) {
       // Insert the specified left/right padding.
-      auto marked_source =
+      std::string marked_source =
           replace_markers(unpadded_source, insert_left_padding + kMarkerLeft.data(),
                           kMarkerRight.data() + insert_right_padding);
-      auto clean_source = remove_markers(marked_source);
+      std::string clean_source = remove_markers(marked_source);
 
       // Parse the source with markers removed
       TestLibrary library(clean_source);
@@ -773,40 +851,87 @@ void RunParseTests(const std::vector<TestCase>& cases, const std::string& insert
       }
 
       // Get the expected spans from the marked source
-      std::multiset<std::string> expected_spans = extract_expected_spans(marked_source, &errors);
+      std::multiset<std::string_view> span_views =
+          extract_expected_span_views(marked_source, library.source_file().data(), &errors);
       // Returns an empty set when there are errors
-      if (expected_spans.empty()) {
+      if (span_views.empty()) {
         break;
       }
 
-      // Get the actual spans by walking the AST
-      SourceSpanVisitor visitor(test_case.type);
+      std::multiset<std::string> expected_spans;
+      for (const auto& span_view : span_views) {
+        expected_spans.insert(std::string(span_view));
+      }
+
+      // Convert each expected span into a |SourceElement::Signature| by using the |NodeKind|
+      // supplied for the |test_case|.
+      std::set<fidl::raw::SourceElement::Signature> expected_source_signatures;
+      for (auto& span_view : span_views) {
+        expected_source_signatures.insert(
+            fidl::raw::SourceElement::Signature(test_case.node_kind, span_view));
+      }
+
+      // Get the actual spans and source signatures by walking the AST, then compare them against
+      // our expectation.
+      SourceSpanVisitor visitor(test_case.node_kind);
       visitor.OnFile(ast);
       std::multiset<std::string> actual_spans = visitor.spans();
+      std::set<fidl::raw::SourceElement::Signature> actual_source_signatures =
+          visitor.source_signatures();
 
-      // Report errors where the checker found unexpected spans
-      // (spans in actual but not expected)
-      std::multiset<std::string> actual_minus_expected;
-      std::set_difference(actual_spans.begin(), actual_spans.end(), expected_spans.begin(),
-                          expected_spans.end(),
-                          std::inserter(actual_minus_expected, actual_minus_expected.begin()));
-      for (const auto& span : actual_minus_expected) {
+      // Report errors where the checker found unexpected spans (spans in actual but not
+      // expected).
+      std::multiset<std::string> actual_spans_minus_expected;
+      std::set_difference(
+          actual_spans.begin(), actual_spans.end(), expected_spans.begin(), expected_spans.end(),
+          std::inserter(actual_spans_minus_expected, actual_spans_minus_expected.begin()));
+      for (const auto& span : actual_spans_minus_expected) {
         std::stringstream error_msg;
-        error_msg << "unexpected occurrence of type " << element_type_str(test_case.type) << ": "
-                  << kMarkerLeft << span << kMarkerRight;
+        error_msg << "unexpected occurrence of spans of type "
+                  << element_node_kind_str(test_case.node_kind) << ": " << kMarkerLeft << span
+                  << kMarkerRight;
         errors.push_back(error_msg.str());
       }
 
-      // Report errors if the checker failed to find expected spans
-      // (spans in expected but not actual)
-      std::multiset<std::string> expected_minus_actual;
-      std::set_difference(expected_spans.begin(), expected_spans.end(), actual_spans.begin(),
-                          actual_spans.end(),
-                          std::inserter(expected_minus_actual, expected_minus_actual.begin()));
-      for (const auto& span : expected_minus_actual) {
+      // Report errors where the checker failed to find expected spans (spans in expected but not
+      // actual).
+      std::multiset<std::string> expected_spans_minus_actual;
+      std::set_difference(
+          expected_spans.begin(), expected_spans.end(), actual_spans.begin(), actual_spans.end(),
+          std::inserter(expected_spans_minus_actual, expected_spans_minus_actual.begin()));
+      for (const auto& span : expected_spans_minus_actual) {
         std::stringstream error_msg;
-        error_msg << "expected (but didn't find) span of type " << element_type_str(test_case.type)
-                  << ": " << kMarkerLeft << span << kMarkerRight;
+        error_msg << "expected (but didn't find) spans of type "
+                  << element_node_kind_str(test_case.node_kind) << ": " << kMarkerLeft << span
+                  << kMarkerRight;
+        errors.push_back(error_msg.str());
+      }
+
+      // Report errors where the checker found unexpected source signatures (source signatures in
+      // actual but not expected).
+      std::set<fidl::raw::SourceElement::Signature> actual_source_signatures_minus_expected;
+      std::set_difference(actual_source_signatures.begin(), actual_source_signatures.end(),
+                          expected_source_signatures.begin(), expected_source_signatures.end(),
+                          std::inserter(actual_source_signatures_minus_expected,
+                                        actual_source_signatures_minus_expected.begin()));
+      for (size_t i = 0; i < actual_source_signatures_minus_expected.size(); i++) {
+        std::stringstream error_msg;
+        error_msg << "unexpected occurrence of source signatures of type "
+                  << element_node_kind_str(test_case.node_kind);
+        errors.push_back(error_msg.str());
+      }
+
+      // Report errors where the checker failed to find expected source signatures (source
+      // signatures in expected but not actual).
+      std::set<fidl::raw::SourceElement::Signature> expected_source_signatures_minus_actual;
+      std::set_difference(expected_source_signatures.begin(), expected_source_signatures.end(),
+                          actual_source_signatures.begin(), actual_source_signatures.end(),
+                          std::inserter(expected_source_signatures_minus_actual,
+                                        expected_source_signatures_minus_actual.begin()));
+      for (size_t i = 0; i < expected_source_signatures_minus_actual.size(); i++) {
+        std::stringstream error_msg;
+        error_msg << "expected (but didn't find) source signatures of type "
+                  << element_node_kind_str(test_case.node_kind);
         errors.push_back(error_msg.str());
       }
     }
@@ -828,10 +953,10 @@ void RunParseTests(const std::vector<TestCase>& cases, const std::string& insert
 }
 
 TEST(SpanTests, GoodParseTest) {
-  RunParseTests(test_cases, "", "");
-  RunParseTests(test_cases, " ", "");
-  RunParseTests(test_cases, "", " ");
-  RunParseTests(test_cases, " ", " ");
+  RunParseTests(test_cases, "", "", {});
+  RunParseTests(test_cases, " ", "", {});
+  RunParseTests(test_cases, "", " ", {NodeKind::kDocCommentLiteral});
+  RunParseTests(test_cases, " ", " ", {NodeKind::kDocCommentLiteral});
 }
 
 }  // namespace
