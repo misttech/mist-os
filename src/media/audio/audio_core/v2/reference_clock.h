@@ -19,6 +19,9 @@ struct ReferenceClock {
   zx::clock handle;
   uint32_t domain;
 
+  // Construct as a clone of the monotonic clock.
+  static ReferenceClock FromMonotonic();
+
   // Construct from a FIDL RingBuffer.
   static ReferenceClock FromFidlRingBuffer(fuchsia_audio::wire::RingBuffer ring_buffer);
 

@@ -23,6 +23,8 @@ source_set("audio_core_lib") {
     "stream_sink_server.cc",
     "stream_sink_server.h",
     "task_barrier.h",
+    "usage_volume.cc",
+    "usage_volume.h",
   ]
 
   public_deps = [
@@ -68,6 +70,7 @@ executable("unittest_bin") {
     "output_device_pipeline_unittest.cc",
     "route_graph_unittest.cc",
     "stream_sink_server_unittest.cc",
+    "usage_volume_unittest.cc",
   ]
 
   deps = [

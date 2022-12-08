@@ -22,6 +22,22 @@ zx::clock DupZxClockHandle(const zx::clock& in) {
 }  // namespace
 
 // static
+ReferenceClock ReferenceClock::FromMonotonic() {
+  zx::clock mono;
+  auto status = zx::clock::create(
+      ZX_CLOCK_OPT_AUTO_START | ZX_CLOCK_OPT_MONOTONIC | ZX_CLOCK_OPT_CONTINUOUS, nullptr, &mono);
+  if (status != ZX_OK) {
+    FX_PLOGS(FATAL, status) << "zx::clock::create failed for system monotonic clock";
+  }
+
+  return {
+      .name = "Monotonic",
+      .handle = std::move(mono),
+      .domain = fuchsia_hardware_audio::kClockDomainMonotonic,
+  };
+}
+
+// static
 ReferenceClock ReferenceClock::FromFidlRingBuffer(fuchsia_audio::wire::RingBuffer ring_buffer) {
   return {
       .handle = DupZxClockHandle(ring_buffer.reference_clock()),

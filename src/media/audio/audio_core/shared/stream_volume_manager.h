@@ -36,6 +36,7 @@ struct VolumeCommand {
 // An interface for persisting and realizing stream volumes.
 class StreamVolume {
  public:
+  virtual ~StreamVolume() = default;
   virtual fuchsia::media::Usage GetStreamUsage() const = 0;
 
   // Returns true if this stream should receive volume commands that factor in
