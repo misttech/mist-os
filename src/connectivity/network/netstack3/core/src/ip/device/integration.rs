@@ -4,11 +4,11 @@
 
 //! The integrations for protocols built on top of an IP device.
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::boxed::Box;
 use core::{marker::PhantomData, num::NonZeroU8, time::Duration};
 
 use net_types::{
-    ip::{AddrSubnet, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+    ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
     LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{BufferMut, EmptyBuf, Serializer};
@@ -438,6 +438,43 @@ impl<
     }
 }
 
+/// Iterator over a device and its status for an address.
+///
+/// This is functionally identical to using `Iterator::filter_map` on the
+/// provided devices and yielding devices with the address assigned (and the
+/// status), but is named so that it can be used as an associated type.
+pub(crate) struct FilterPresentWithDevices<I: Ip, Devices, SC, C> {
+    devices: Devices,
+    addr: SpecifiedAddr<I::Addr>,
+    status_source: SC,
+    _marker: PhantomData<C>,
+}
+
+impl<I: Ip, Devices, SC, C> FilterPresentWithDevices<I, Devices, SC, C> {
+    fn new(devices: Devices, addr: SpecifiedAddr<I::Addr>, status_source: SC) -> Self {
+        Self { devices, status_source, addr, _marker: PhantomData }
+    }
+}
+
+impl<
+        I: Ip + IpLayerIpExt,
+        Devices: Iterator<Item = SC::DeviceId>,
+        C,
+        SC: ip::IpDeviceContext<I, C>,
+    > Iterator for FilterPresentWithDevices<I, Devices, &'_ SC, C>
+{
+    type Item = (SC::DeviceId, I::AddressStatus);
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { devices, addr, status_source, _marker } = self;
+        devices
+            .filter_map(|d| match status_source.address_status_for_device(*addr, &d) {
+                AddressStatus::Present(status) => Some((d, status)),
+                AddressStatus::Unassigned => None,
+            })
+            .next()
+    }
+}
+
 impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<Ipv4, C>>
     ip::IpDeviceContext<Ipv4, C> for SC
 {
@@ -455,19 +492,16 @@ impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<
         })
     }
 
-    type AddressStatusesIter<'s> = alloc::vec::IntoIter<(SC::DeviceId, Ipv4PresentAddressStatus)>
-        where SC: 's;
+    type DeviceAndAddressStatusIter<'a, 's> =
+        FilterPresentWithDevices<Ipv4, SC::DevicesIter<'a>, &'s Self, C> where
+                Self: 's;
 
-    fn address_statuses(&self, dst_ip: SpecifiedAddr<Ipv4Addr>) -> Self::AddressStatusesIter<'_> {
-        self.with_devices(|devices| {
-            devices
-                .filter_map(|device_id| match self.address_status_for_device(dst_ip, &device_id) {
-                    AddressStatus::Present(a) => Some((device_id, a)),
-                    AddressStatus::Unassigned => None,
-                })
-                .collect::<Vec<_>>()
-        })
-        .into_iter()
+    fn with_address_statuses<'a, F: FnOnce(Self::DeviceAndAddressStatusIter<'_, 'a>) -> R, R>(
+        &'a self,
+        addr: SpecifiedAddr<Ipv4Addr>,
+        cb: F,
+    ) -> R {
+        self.with_devices(|devices| cb(FilterPresentWithDevices::new(devices, addr, self)))
     }
 
     fn address_status_for_device(
@@ -540,19 +574,16 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::IpDeviceContext<
         })
     }
 
-    type AddressStatusesIter<'s> = alloc::vec::IntoIter<(SC::DeviceId, Ipv6PresentAddressStatus)>
-        where SC: 's;
+    type DeviceAndAddressStatusIter<'a, 's> =
+        FilterPresentWithDevices<Ipv6, SC::DevicesIter<'a>, &'s Self, C> where
+                Self: 's;
 
-    fn address_statuses(&self, dst_ip: SpecifiedAddr<Ipv6Addr>) -> Self::AddressStatusesIter<'_> {
-        self.with_devices(|devices| {
-            devices
-                .filter_map(|device_id| match self.address_status_for_device(dst_ip, &device_id) {
-                    AddressStatus::Present(a) => Some((device_id, a)),
-                    AddressStatus::Unassigned => None,
-                })
-                .collect::<Vec<_>>()
-        })
-        .into_iter()
+    fn with_address_statuses<'a, F: FnOnce(Self::DeviceAndAddressStatusIter<'_, 'a>) -> R, R>(
+        &'a self,
+        addr: SpecifiedAddr<Ipv6Addr>,
+        cb: F,
+    ) -> R {
+        self.with_devices(|devices| cb(FilterPresentWithDevices::new(devices, addr, self)))
     }
 
     fn address_status_for_device(
