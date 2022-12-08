@@ -385,6 +385,21 @@ static bool IsStruct(const Type* type) {
   return static_cast<const IdentifierType*>(type)->type_decl->kind == Decl::Kind::kStruct;
 }
 
+static bool CannotBeBoxedNorOptional(const Type* type) {
+  if (type->kind == Type::Kind::kArray || type->kind == Type::Kind::kBox ||
+      type->kind == Type::Kind::kPrimitive || type->kind == Type::Kind::kUntypedNumeric) {
+    return true;
+  }
+  if (type->kind == Type::Kind::kIdentifier) {
+    Decl::Kind decl_kind = static_cast<const IdentifierType*>(type)->type_decl->kind;
+    if (decl_kind == Decl::Kind::kEnum || decl_kind == Decl::Kind::kBits ||
+        decl_kind == Decl::Kind::kTable || decl_kind == Decl::Kind::kBuiltin) {
+      return true;
+    }
+  }
+  return false;
+}
+
 const Type* Typespace::Creator::CreateBoxType() {
   if (!EnsureNumberOfLayoutParams(1))
     return nullptr;
@@ -393,7 +408,13 @@ const Type* Typespace::Creator::CreateBoxType() {
   if (!resolver_->ResolveParamAsType(layout_, parameters_.items[0], &boxed_type))
     return nullptr;
   if (!IsStruct(boxed_type)) {
-    Fail(ErrCannotBeBoxed, parameters_.items[0]->span, boxed_type->name);
+    if (boxed_type) {
+      if (CannotBeBoxedNorOptional(boxed_type)) {
+        Fail(ErrCannotBeBoxedNorOptional, parameters_.items[0]->span, boxed_type->name);
+      } else {
+        Fail(ErrCannotBeBoxedShouldBeOptional, parameters_.items[0]->span, boxed_type->name);
+      }
+    }
     return nullptr;
   }
   const auto* inner = static_cast<const IdentifierType*>(boxed_type);

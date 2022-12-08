@@ -398,7 +398,7 @@ constexpr ErrorDef<169> ErrBoxCannotBeOptional(
     "cannot specify optionality for box, boxes are optional by default");
 constexpr ErrorDef<170> ErrBoxedTypeCannotBeOptional(
     "no double optionality, boxes are already optional");
-constexpr UndocumentedErrorDef<171, flat::Name> ErrCannotBeBoxed(
+constexpr ErrorDef<171, flat::Name> ErrCannotBeBoxedShouldBeOptional(
     "type {} cannot be boxed, try using optional instead");
 constexpr ErrorDef<172, flat::Name> ErrResourceMustBeUint32Derived("resource {} must be uint32");
 constexpr ErrorDef<173, flat::Name> ErrResourceMissingSubtypeProperty(
@@ -446,6 +446,7 @@ constexpr ErrorDef<191, std::string_view> ErrMethodMustDefineStrictness(
 constexpr ErrorDef<192, std::string_view> ErrProtocolMustDefineOpenness(
     "Protocol {} must explicitly specify open, ajar, or closed. (The default is changing "
     "from closed to open, and explicit modifiers are mandatory during the migration.)");
+constexpr ErrorDef<193, flat::Name> ErrCannotBeBoxedNorOptional("type {} cannot be boxed");
 }  // namespace fidl
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_DIAGNOSTICS_H_

@@ -334,23 +334,59 @@ TEST(StructsTests, BadWithFlagStructCannotBeOptional) {
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "box<Date>");
 }
 
-TEST(StructsTests, BadTypeCannotBeBoxed) {
+TEST(StructsTests, BadHandleCannotBeBoxedShouldBeOptional) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0171.test.fidl");
+  library.UseLibraryZx();
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotBeBoxedShouldBeOptional);
+}
+
+TEST(StructsTests, BadTypeCannotBeBoxedShouldBeOptional) {
   for (const std::string& definition : {
-           "type Foo = struct { box_member box<box<struct {}>>; };",
            "type Foo = struct { union_member box<union { 1: data uint8; }>; };",
-           "type Foo = struct { table_member box<table { 1: data uint8; }>; };",
-           "type Foo = struct { enum_member box<enum { DATA = 1; }>; };",
-           "type Foo = struct { bits_member box<bits { DATA = 1; }>; };",
-           "type Foo = struct { array_member box<array<uint8, 1>>; };",
            "type Foo = struct { vector_member box<vector<uint8>>; };",
            "type Foo = struct { string_member box<string>; };",
-           "type Foo = struct { prim_member box<int32>; };",
-           "type Foo = struct { resource_member box<zx.handle>; };",
+           "type Foo = resource struct { handle_member box<zx.handle>; };",
+           "protocol Bar {}; type Foo = resource struct { client_member box<client_end:Bar>; };",
+           "protocol Bar {}; type Foo = resource struct { server_member box<server_end:Bar>; };",
        }) {
     std::string fidl_library = "library example;\nusing zx;\n\n" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotBeBoxed);
+    ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotBeBoxedShouldBeOptional);
+  }
+}
+
+TEST(StructsTests, BadCannotBoxPrimitive) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0193.test.fidl");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotBeBoxedNorOptional);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "bool");
+}
+
+TEST(StructsTests, BadTypeCannotBeBoxedNorOptional) {
+  for (const std::string& definition : {
+           "type Foo = struct { table_member box<table { 1: data uint8; }>; };",
+           "type Foo = struct { box_member box<box<struct {}>>; };",
+           "type Foo = struct { enum_member box<enum { DATA = 1; }>; };",
+           "type Foo = struct { bits_member box<bits { DATA = 1; }>; };",
+           "type Foo = struct { array_member box<array<uint8, 1>>; };",
+           "type Foo = struct { bool_member box<bool>; };",
+           "type Foo = struct { int8_member box<int8>; };",
+           "type Foo = struct { int16_member box<int16>; };",
+           "type Foo = struct { int32_member box<int32>; };",
+           "type Foo = struct { int64_member box<int64>; };",
+           "type Foo = struct { uint8_member box<uint8>; };",
+           "type Foo = struct { uint16_member box<uint16>; };",
+           "type Foo = struct { uint32_member box<uint32>; };",
+           "type Foo = struct { uint64_member box<uint64>; };",
+           "type Foo = struct { float32_member box<float32>; };",
+           "type Foo = struct { float64_member box<float64>; };",
+       }) {
+    std::string fidl_library = "library example;\nusing zx;\n\n" + definition + "\n";
+    TestLibrary library(fidl_library);
+    library.UseLibraryZx();
+    ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotBeBoxedNorOptional);
   }
 }
 

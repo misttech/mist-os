@@ -346,6 +346,8 @@ This document lists all errors emitted by the [FIDL compiler][docs-fidlc],
 
 <<error-catalog/_fi-0170.md>>
 
+<<error-catalog/_fi-0171.md>>
+
 <<error-catalog/_fi-0172.md>>
 
 <<error-catalog/_fi-0173.md>>
@@ -383,6 +385,8 @@ This document lists all errors emitted by the [FIDL compiler][docs-fidlc],
 <<error-catalog/_fi-0189.md>>
 
 <<error-catalog/_fi-0190.md>>
+
+<<error-catalog/_fi-0193.md>>
 
 <!--
 
