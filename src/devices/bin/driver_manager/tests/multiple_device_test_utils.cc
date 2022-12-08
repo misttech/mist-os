@@ -9,6 +9,7 @@
 #include <zircon/fidl.h>
 #include <zircon/types.h>
 
+#include "src/devices/bin/driver_manager/constants.h"
 #include "src/devices/bin/driver_manager/tests/multiple_device_test.h"
 
 namespace {
@@ -227,7 +228,7 @@ void MultipleDeviceTestCase::SetUp() {
 
   ASSERT_NO_FATAL_FAILURE(InitializeCoordinator(&coordinator()));
 
-  coordinator().driver_loader().LoadDriverUrl(coordinator().GetFragmentDriverUrl());
+  coordinator().driver_loader().LoadDriverUrl(std::string{fdf::kFragmentDriverUrl});
   {
     auto client_end = fidl::CreateEndpoints(&driver_host_server_);
     ASSERT_OK(client_end.status_value());

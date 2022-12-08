@@ -64,6 +64,7 @@ source_set("lib") {
     "component_lifecycle.cc",
     "component_lifecycle.h",
     "composite_device.cc",
+    "constants.h",
     "coordinator.cc",
     "coordinator.h",
     "device.cc",

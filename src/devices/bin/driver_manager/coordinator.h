@@ -39,6 +39,7 @@
 
 #include "lib/async/dispatcher.h"
 #include "src/devices/bin/driver_manager/bind_driver_manager.h"
+#include "src/devices/bin/driver_manager/constants.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/bin/driver_manager/device.h"
 #include "src/devices/bin/driver_manager/driver.h"
@@ -167,15 +168,11 @@ class Coordinator : public CompositeManagerBridge,
   // Function to attempt binding a driver to the device.
   zx_status_t AttemptBind(const MatchedDriverInfo matched_driver, const fbl::RefPtr<Device>& dev);
 
-  // Returns URL to driver that should be bound to fragments of composite devices.
-  std::string GetFragmentDriverUrl() const;
-  std::string GetFragmentProxyDriverUrl() const;
-
   const Driver* LoadFragmentDriver() {
-    return driver_loader_.LoadDriverUrl(GetFragmentDriverUrl());
+    return driver_loader_.LoadDriverUrl(std::string{fdf::kFragmentDriverUrl});
   }
   const Driver* LoadFragmentProxyDriver() {
-    return driver_loader_.LoadDriverUrl(GetFragmentProxyDriverUrl());
+    return driver_loader_.LoadDriverUrl(std::string{fdf::kFragmentProxyDriverUrl});
   }
 
   zx_status_t NewDriverHost(const char* name, fbl::RefPtr<DriverHost>* out);

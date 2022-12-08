@@ -27,6 +27,7 @@
 #include <fbl/vector.h>
 
 #include "src/devices/bin/driver_manager/composite_device.h"
+#include "src/devices/bin/driver_manager/constants.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/bin/driver_manager/device_v2.h"
 #include "src/devices/bin/driver_manager/inspect.h"
@@ -233,6 +234,11 @@ class Device final
   }
   bool is_composite() const { return composite_.has_value(); }
   void disassociate_from_composite() { composite_.reset(); }
+
+  bool is_fragment_device() const { return std::string_view{libname_} == fdf::kFragmentDriverUrl; }
+  bool is_fragment_proxy_device() const {
+    return std::string_view{libname_} == fdf::kFragmentProxyDriverUrl;
+  }
 
   void set_host(fbl::RefPtr<DriverHost> host);
   const fbl::RefPtr<DriverHost>& host() const { return host_; }

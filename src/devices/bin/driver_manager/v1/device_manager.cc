@@ -111,7 +111,7 @@ zx_status_t DeviceManager::AddDevice(
 
   // If we're creating a device that's using the fragment driver, inform the
   // fragment.
-  if (dev->libname() == coordinator_->GetFragmentDriverUrl()) {
+  if (dev->is_fragment_device()) {
     for (auto& cur_fragment : dev->parent()->fragments()) {
       // Pick the first fragment that does not have a device added by the fragment
       // driver.
@@ -129,7 +129,7 @@ zx_status_t DeviceManager::AddDevice(
 
   // If we're creating a device that's using the fragment driver, inform the
   // fragment.
-  if (dev->libname() == coordinator_->GetFragmentProxyDriverUrl()) {
+  if (dev->is_fragment_proxy_device()) {
     bool found = false;
     for (auto& fragment : dev->parent()->parent()->fragments()) {
       // We are looking for the fragment that is our parent.
@@ -299,7 +299,7 @@ zx_status_t DeviceManager::RemoveDevice(const fbl::RefPtr<Device>& dev, bool for
   }
 
   // Check if this device is a composite fragment device
-  if (dev->libname() == coordinator_->GetFragmentDriverUrl()) {
+  if (dev->is_fragment_device()) {
     // If it is, then its parent will know about which one (since the parent
     // is the actual device matched by the fragment description).
     const auto& parent = dev->parent();

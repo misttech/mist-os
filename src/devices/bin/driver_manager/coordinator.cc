@@ -934,7 +934,7 @@ void Coordinator::GetDeviceInfo(GetDeviceInfoRequestView request,
                                 GetDeviceInfoCompleter::Sync& completer) {
   std::vector<fbl::RefPtr<const Device>> device_list;
   for (auto& device : device_manager_->devices()) {
-    if (device.libname() == GetFragmentProxyDriverUrl()) {
+    if (device.is_fragment_proxy_device()) {
       continue;
     }
 
@@ -1041,9 +1041,6 @@ void Coordinator::InitOutgoingServices(component::OutgoingDirectory& outgoing) {
   result = outgoing.AddProtocol<fdm::SystemStateTransition>(&system_state_manager_);
   ZX_ASSERT(result.is_ok());
 }
-
-std::string Coordinator::GetFragmentDriverUrl() const { return "#driver/fragment.so"; }
-std::string Coordinator::GetFragmentProxyDriverUrl() const { return "#driver/fragment.proxy.so"; }
 
 // TODO(fxb/107737): Ideally, we try to match and bind all devices, regardless if they
 // match with a node group or not. However, this causes issues because the driver manager

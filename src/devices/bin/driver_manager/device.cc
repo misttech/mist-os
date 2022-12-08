@@ -150,7 +150,7 @@ zx_status_t Device::Create(
   }
 
   // If the device was created by the proxy driver then it's a proxy.
-  if (dev->libname() == dev->coordinator->GetFragmentProxyDriverUrl()) {
+  if (dev->is_fragment_proxy_device()) {
     dev->flags |= DEV_CTX_PROXY;
     if (real_parent->proxy()) {
       return ZX_ERR_ALREADY_EXISTS;
@@ -391,7 +391,7 @@ std::list<DeviceType*> Device::GetChildren(DeviceType* device) {
 
   // If we are a fragment device, we can find more children by looking
   // at our parent's fragment list.
-  if (device->libname() == device->coordinator->GetFragmentDriverUrl()) {
+  if (device->is_fragment_device()) {
     if (!device->parent_) {
       return children;
     }
