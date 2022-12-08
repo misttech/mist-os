@@ -22,11 +22,11 @@
             to: [ "#bt-hfp-audio-gateway" ],
         },
         {
-            directory: "dev-class",
+            directory: "dev",
             from: "parent",
             as: "dev-dai",
             to: [ "#bt-hfp-audio-gateway" ],
-            subdir: "dai",
+            subdir: "class/dai",
         },
         {
             protocol: [ "fuchsia.media.AudioDeviceEnumerator" ],

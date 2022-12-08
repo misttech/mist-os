@@ -23,11 +23,11 @@
             to: [ "#bt-snoop" ],
         },
         {
-            directory: "dev-class",
+            directory: "dev",
             from: "parent",
             as: "dev-bt-hci",
             to: [ "#bt-snoop" ],
-            subdir: "bt-hci",
+            subdir: "class/bt-hci",
         },
         {
             protocol: [ "fuchsia.tracing.provider.Registry" ],

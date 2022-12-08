@@ -97,11 +97,11 @@
             to: "#wlandevicemonitor",
         },
         {
-            directory: "dev-class",
+            directory: "dev",
             from: "#driver_test_realm",
             as: "dev-wlanphy",
             to: "#wlandevicemonitor",
-            subdir: "wlanphy",
+            subdir: "class/wlanphy",
         },
         {
             storage: "data",
