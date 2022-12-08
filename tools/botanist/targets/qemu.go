@@ -223,9 +223,6 @@ func (t *QEMUTarget) SSHClient() (*sshutil.Client, error) {
 
 // Start starts the QEMU target.
 func (t *QEMUTarget) Start(ctx context.Context, images []bootserver.Image, args []string) (err error) {
-	// TODO(fxbug.dev/91352): Remove experimental condition once stable.
-	useFFX := t.UseFFXExperimental(1)
-
 	if t.process != nil {
 		return fmt.Errorf("a process has already been started with PID %d", t.process.Pid)
 	}
@@ -302,7 +299,7 @@ func (t *QEMUTarget) Start(ctx context.Context, images []bootserver.Image, args 
 		if err := os.WriteFile(tmpFile, authorizedKeys, os.ModePerm); err != nil {
 			return fmt.Errorf("could not write authorized keys to file: %w", err)
 		}
-		if useFFX {
+		if t.UseFFX() {
 			t.ffx.ConfigSet(ctx, "ssh.pub", tmpFile)
 		}
 		if err := embedZBIWithKey(ctx, zbi, t.config.ZBITool, tmpFile); err != nil {
@@ -437,7 +434,7 @@ func (t *QEMUTarget) Start(ctx context.Context, images []bootserver.Image, args 
 	qemuCmd.SetFlag("-monitor", "none")
 
 	var cmd *exec.Cmd
-	if useFFX {
+	if t.UseFFX() {
 		config, err := qemuCmd.BuildConfig()
 		if err != nil {
 			return err
@@ -535,8 +532,7 @@ func rewriteSDKManifest(manifestPath, targetCPU string, isQEMU bool) error {
 
 // Stop stops the QEMU target.
 func (t *QEMUTarget) Stop() error {
-	// TODO(fxbug.dev/91352): Remove experimental condition once stable.
-	if t.UseFFXExperimental(1) {
+	if t.UseFFX() {
 		return t.ffx.EmuStop(context.Background())
 	}
 	if t.process == nil {

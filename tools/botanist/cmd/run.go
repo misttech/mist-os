@@ -84,7 +84,8 @@ type RunCommand struct {
 	// The level of experimental ffx features to enable.
 	//
 	// The following levels enable the following ffx features:
-	// 1 or greater: ffx emu, ffx target flash, ffx bootloader boot
+	// 0 or greater: ffx emu
+	// 1 or greater: ffx target flash, ffx bootloader boot
 	// 2 or greater: ffx test, ffx target snapshot, keeps ffx output dir for debugging
 	// 3: enables parallel test execution
 	ffxExperimentLevel int
