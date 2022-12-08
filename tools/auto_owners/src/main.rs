@@ -27,9 +27,9 @@ struct Options {
     #[argh(option)]
     rust_metadata: Option<PathBuf>,
 
-    /// path to the 3P JIRI manifest
+    /// path to the 3P integration manifest
     #[argh(option)]
-    jiri_manifest: Option<PathBuf>,
+    integration_manifest: Option<PathBuf>,
 
     /// path to the ownership overrides config file
     #[argh(option)]
@@ -55,7 +55,7 @@ struct Options {
 fn main() -> Result<()> {
     let Options {
         rust_metadata,
-        jiri_manifest,
+        integration_manifest,
         overrides,
         out_dir,
         gn_bin,
@@ -71,7 +71,7 @@ fn main() -> Result<()> {
         rayon::ThreadPoolBuilder::new().num_threads(num_threads).build_global().unwrap();
     }
 
-    OwnersDb::new(rust_metadata, jiri_manifest, overrides, gn_bin, out_dir, update_strategy)?
+    OwnersDb::new(rust_metadata, integration_manifest, overrides, gn_bin, out_dir, update_strategy)?
         .update_all_files()
 }
 
@@ -117,7 +117,7 @@ struct OwnersDb {
 impl OwnersDb {
     fn new(
         rust_metadata: Option<PathBuf>,
-        jiri_manifest: Option<PathBuf>,
+        integration_manifest: Option<PathBuf>,
         overrides: Utf8PathBuf,
         gn_bin: PathBuf,
         out_dir: PathBuf,
@@ -161,10 +161,10 @@ impl OwnersDb {
                 ),
             })
             .collect();
-        let integration_projects = jiri_manifest
+        let integration_projects = integration_manifest
             .map(|manifest| {
                 Ok::<_, anyhow::Error>(
-                    parse_jiri_manifest(&manifest)
+                    parse_integration_manifest(&manifest)
                         .with_context(|| format!("parsing {}", manifest.display()))?,
                 )
             })
@@ -420,7 +420,7 @@ fn should_include(owners_file: &Utf8Path) -> bool {
     owners_file != "OWNERS"
 }
 
-fn parse_jiri_manifest(manifest_path: &PathBuf) -> Result<Vec<ProjectMetadata>> {
+fn parse_integration_manifest(manifest_path: &PathBuf) -> Result<Vec<ProjectMetadata>> {
     let parser = EventReader::new(BufReader::new(File::open(&manifest_path)?));
 
     parser
@@ -499,9 +499,9 @@ mod tests {
     }
 
     #[test]
-    fn parse_jiri_manifest_projects() {
+    fn parse_integration_manifest_projects() {
         let projects =
-            parse_jiri_manifest(&PATHS.test_base_dir.join("integration/manifest")).unwrap();
+            parse_integration_manifest(&PATHS.test_base_dir.join("integration/manifest")).unwrap();
         assert_eq!(
             projects
                 .into_iter()

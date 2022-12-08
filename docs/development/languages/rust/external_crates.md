@@ -286,9 +286,10 @@ needs the metadata from the completion of a maximal "kitchen sink" build:
 
 1. Run `fx set core.x64 --with //bundles/buildbot/core --with //bundles/kitchen_sink`
 2. Run `fx build`
-3. Run `fx update-3p-owners --rust-only --num-threads <NUM_THREADS>`. It's
-   usually a good idea to limit the number of threads to 50% of available CPUs
-   (see [#75382] for details).
+3. Run `fx update-3p-owners --rust-metadata
+   <FUCHSIA_BUILD_DIR>/rustlang/3p-crates-metadata.json --num-threads
+   <NUM_THREADS>`. It's usually a good idea to limit the number of threads to
+   50% of available CPUs (see [#75382] for details).
 
 This tool can take a significant amount of time to run - upwards of 45 minutes
 in some cases.

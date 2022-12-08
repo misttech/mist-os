@@ -7,7 +7,8 @@
 ### updates OWNERS files for third_party dependencies
 
 ## usage: fx update-3p-owners  [--num-threads N]
-##                             [--rust-only | --integration-only]
+##                             [--rust-metadata FILE]
+##                             [--integration-manifest FILE]
 ##                             [--skip-rustc-3p-update]
 ##                             [--skip-existing]
 ##
@@ -15,26 +16,23 @@
 ## given project, the tool adds as owners the owners of the projects that depend
 ## on that project.
 ##
-## By default, the tool updates OWNERS for:
-##   - third_party/rust_crates/vendor/*, for Rust crates specified in
-##     third_party/rust_crates/Cargo.toml
-##   - integration third party projects specified in
-##     integration/third_party/flower.
 ##
 ## Arguments:
-## --num-threads N:           run on N threads.
+## --num-threads N:               run on N threads.
 ##
-## --rust-only:               update OWNERS files only for Rust crates,
-##                            specified in third_party/rust_crates/Cargo.toml.
+## --rust-metadata FILE:          update OWNERS for the projects specified in
+##                                the rust metadata JSON FILE.
 ##
-## --integration-only:        update OWNERS files only for projects specified
-##                            in integration/third_party/flower.
+## --integration-manifest FILE:   update OWNERS for the projects specified in
+##                                the integration manifest XML FILE.
 ##
-## --skip-existing:           only generate OWNERS files for projects missing
-##                            owners; does not update existing OWNERS files.
+## --skip-existing:               only generate OWNERS files for projects
+##                                missing owners; does not update existing
+##                                OWNERS files.
 ##
-## --skip-rustc-3p-update:    skip updating rustc_library and rustc_binary
-##                            third_party dependencies.
+## --skip-rustc-3p-update:        skip updating rustc_library and rustc_binary
+##                                third_party dependencies.
+##
 ##
 ## See https://fuchsia.dev/fuchsia-src/development/languages/rust/third_party.md
 ## for more details.
@@ -46,8 +44,6 @@ fx-config-read
 
 OWNERS_TOOL_TARGET="host-tools/auto_owners"
 OWNERS_TOOL_BIN="${FUCHSIA_BUILD_DIR}/${OWNERS_TOOL_TARGET}"
-RUST_METADATA="--rust-metadata $FUCHSIA_BUILD_DIR/rustlang/3p-crates-metadata.json"
-JIRI_MANIFEST="--jiri-manifest $FUCHSIA_DIR/integration/third_party/flower"
 
 # Parse arguments
 while [[ $# -ge 1 ]]; do
@@ -61,15 +57,15 @@ while [[ $# -ge 1 ]]; do
       [[ ! $1 ]] && die "--num-threads requires an argument after it"
       NUM_THREADS="--num-threads $1"
       ;;
-    --rust-only)
-      RUST_ONLY="--rust-only"
-      JIRI_MANIFEST=""
+    --rust-metadata)
+      shift
+      [[ ! $1 ]] && die "--rust-metadata requires an argument after it"
+      RUST_METADATA="--rust-metadata $1"
       ;;
-    --integration-only)
-      INTEGRATION_ONLY="--integration-only"
-      RUST_METADATA=""
-      # skip rustc update if not updating rust owners.
-      SKIP_RUSTC_3P_UPDATE="true"
+    --integration-manifest)
+      shift
+      [[ ! $1 ]] && die "--integration-manifest requires an argument after it"
+      INTEGRATION_MANIFEST="--integration-manifest $1"
       ;;
     --skip-rustc-3p-update)
       SKIP_RUSTC_3P_UPDATE="true"
@@ -91,9 +87,9 @@ if [[ ! -n "$NUM_THREADS" ]]; then
   exit 1
 fi
 
-if [[ -n "$RUST_ONLY" && -n "$INTEGRATION_ONLY" ]]; then
-  fx-error "Argument --rust-only not allowed with --integration-only."
-  exit 1
+if [[ -z "$RUST_METADATA" ]] && [[ -z "$INTEGRATION_MANIFEST" ]]; then
+  fx-warn "No project OWNERS will be updated."
+  fx-warn "Use [ --rust-metadata | --integration-manifest ] to specify projects."
 fi
 
 fx-command-run build ${OWNERS_TOOL_TARGET} || ( \
@@ -111,7 +107,7 @@ fi
 (cd $FUCHSIA_DIR; $OWNERS_TOOL_BIN \
   $NUM_THREADS \
   $RUST_METADATA \
-  $JIRI_MANIFEST \
+  $INTEGRATION_MANIFEST \
   --overrides $FUCHSIA_DIR/third_party/rust_crates/owners.toml \
   --out-dir $FUCHSIA_BUILD_DIR \
   --gn-bin $PREBUILT_GN \
