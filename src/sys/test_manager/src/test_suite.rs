@@ -168,11 +168,16 @@ impl TestRunBuilder {
         );
         let inspect_node_ref = &inspect_node;
 
-        let max_parallel_suites = match scheduling_options {
-            Some(options) => options.max_parallel_suites,
+        let max_parallel_suites = match scheduling_options.as_ref() {
+            Some(options) => options.max_parallel_suites.clone(),
             None => None,
         };
         let max_parallel_suites_ref = &max_parallel_suites;
+        let accumulate_debug_data =
+            match scheduling_options.as_ref().map(|options| &options.accumulate_debug_data) {
+                Some(Some(accumulate)) => *accumulate,
+                _ => false,
+            };
 
         // Generate a random number in an attempt to prevent realm name collisions between runs.
         let run_id: u32 = rand::random();
@@ -232,7 +237,10 @@ impl TestRunBuilder {
 
             // Collect run artifacts
             let mut kernel_debug_tasks = vec![];
-            kernel_debug_tasks.push(debug_data_server::send_kernel_debug_data(event_sender));
+            kernel_debug_tasks.push(debug_data_server::send_kernel_debug_data(
+                event_sender,
+                accumulate_debug_data,
+            ));
             join_all(kernel_debug_tasks).await;
             inspect_node_ref.set_execution_state(self_diagnostics::RunExecutionState::Complete);
         };
