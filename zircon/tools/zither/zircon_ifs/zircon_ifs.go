@@ -30,7 +30,15 @@ func NewGenerator(formatter fidlgen.Formatter) *Generator {
 func (gen Generator) DeclOrder() zither.DeclOrder { return zither.SourceDeclOrder }
 
 func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string) ([]string, error) {
-	var symbols []symbol
+	symbols := []symbol{
+		// TODO(fxbug.dev/49971): These are not syscalls, but are a part of the
+		// vDSO interface today (they probably shouldn't be). For now, we
+		// hardcode these symbols here.
+		{Name: "_zx_exception_get_string", Weak: false},
+		{Name: "zx_exception_get_string", Weak: true},
+		{Name: "_zx_status_get_string", Weak: false},
+		{Name: "zx_status_get_string", Weak: true},
+	}
 	for _, summary := range summaries {
 		for _, decl := range summary.Decls {
 			if !decl.IsSyscallFamily() {

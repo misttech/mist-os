@@ -13,6 +13,7 @@ if (is_fuchsia && toolchain_base_environment != "kernel") {
   ifs_shared_library("zircon") {
     abi = "zircon.ifs"
     public_deps = [ ":headers" ]
+    deps = [ "//zircon/vdso:ifs" ]
   }
 } else {
   # References from other environments only get the headers.  This
