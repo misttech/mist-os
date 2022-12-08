@@ -40,6 +40,7 @@ use {
     fuchsia_inspect::ArrayProperty,
     futures::FutureExt,
     merge::{filter_marked_for_deletion, filter_tombstones, merge},
+    once_cell::sync::OnceCell,
     serde::{Deserialize, Serialize},
     std::{
         borrow::Borrow,
@@ -429,7 +430,7 @@ pub struct SimpleAllocator {
     allocation_mutex: futures::lock::Mutex<()>,
     // While the allocator is being tracked, the node is retained here.  See
     // `Self::track_statistics`.
-    tracking: Mutex<Option<fuchsia_inspect::LazyNode>>,
+    tracking: OnceCell<fuchsia_inspect::LazyNode>,
     counters: Mutex<SimpleAllocatorCounters>,
 }
 
@@ -605,7 +606,7 @@ impl SimpleAllocator {
                 committed_marked_for_deletion: BTreeMap::new(),
             }),
             allocation_mutex: futures::lock::Mutex::new(()),
-            tracking: Mutex::new(None),
+            tracking: OnceCell::new(),
             counters: Mutex::new(SimpleAllocatorCounters::default()),
         }
     }
@@ -801,7 +802,7 @@ impl SimpleAllocator {
     /// allocator when queried.
     pub fn track_statistics(self: &Arc<Self>, parent: &fuchsia_inspect::Node, name: &str) {
         let this = Arc::downgrade(self);
-        *self.tracking.lock().unwrap() = Some(parent.create_lazy_child(name, move || {
+        let _ = self.tracking.set(parent.create_lazy_child(name, move || {
             let this_clone = this.clone();
             async move {
                 let inspector = fuchsia_inspect::Inspector::new();

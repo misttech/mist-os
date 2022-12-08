@@ -317,6 +317,7 @@ impl Component {
         )?;
 
         fs.allocator().track_statistics(&*DETAIL_NODE.lock().unwrap(), "allocator");
+        fs.object_manager().track_statistics(&*DETAIL_NODE.lock().unwrap(), "object_manager");
         fs.root_store().track_statistics(&*OBJECT_STORES_NODE.lock().unwrap(), "__root");
 
         *state = State::Running(RunningState { fs, volumes, _inspect_tree: inspect_tree });

@@ -23,6 +23,7 @@ use {
         serialized_types::{Version, LATEST_VERSION},
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
+    futures::FutureExt as _,
     once_cell::sync::OnceCell,
     std::{
         collections::{hash_map::Entry, HashMap},
@@ -49,6 +50,9 @@ pub struct ObjectManager {
     metadata_reservation: OnceCell<Reservation>,
     volume_directory: OnceCell<Directory<ObjectStore>>,
     on_new_store: Option<Box<dyn Fn(&ObjectStore) + Send + Sync>>,
+    // While the ObjectManager is being tracked, the node is retained here.  See
+    // `Self::track_statistics`.
+    tracking: OnceCell<fuchsia_inspect::LazyNode>,
 }
 
 // Whilst we are flushing we need to keep track of the old checkpoint that we are hoping to flush,
@@ -138,6 +142,7 @@ impl ObjectManager {
             metadata_reservation: OnceCell::new(),
             volume_directory: OnceCell::new(),
             on_new_store,
+            tracking: OnceCell::new(),
         }
     }
 
@@ -672,6 +677,30 @@ impl ObjectManager {
             }
         }
         stores
+    }
+
+    /// Creates a lazy inspect node named `str` under `parent` which will yield statistics for the
+    /// allocator when queried.
+    pub fn track_statistics(self: &Arc<Self>, parent: &fuchsia_inspect::Node, name: &str) {
+        let this = Arc::downgrade(self);
+        let _ = self.tracking.set(parent.create_lazy_child(name, move || {
+            let this_clone = this.clone();
+            async move {
+                let inspector = fuchsia_inspect::Inspector::new();
+                if let Some(this) = this_clone.upgrade() {
+                    let (required, borrowed) = {
+                        let inner = this.inner.read().unwrap();
+                        (inner.required_reservation(), inner.borrowed_metadata_space)
+                    };
+                    let root = inspector.root();
+                    root.record_uint("metadata_reservation", this.metadata_reservation().amount());
+                    root.record_uint("required_reservation", required);
+                    root.record_uint("borrowed_reservation", borrowed);
+                }
+                Ok(inspector)
+            }
+            .boxed()
+        }));
     }
 }
 

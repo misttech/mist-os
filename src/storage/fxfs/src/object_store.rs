@@ -456,7 +456,7 @@ pub struct ObjectStore {
 
     // While the object store is being tracked, the node is retained here.  See
     // `Self::track_statistics`.
-    tracking: Mutex<Option<LazyNode>>,
+    tracking: OnceCell<LazyNode>,
 
     // Contains the last object ID and, optionally, a cipher to be used when generating new object
     // IDs.
@@ -500,7 +500,7 @@ impl ObjectStore {
             lock_state: Mutex::new(lock_state),
             trace: AtomicBool::new(false),
             counters: Mutex::new(ObjectStoreCounters::default()),
-            tracking: Mutex::new(None),
+            tracking: OnceCell::new(),
             last_object_id: Mutex::new(last_object_id),
         })
     }
@@ -537,7 +537,7 @@ impl ObjectStore {
             lock_state: Mutex::new(LockState::Unencrypted),
             trace: AtomicBool::new(false),
             counters: Mutex::new(ObjectStoreCounters::default()),
-            tracking: Mutex::new(None),
+            tracking: OnceCell::new(),
             last_object_id: Mutex::new(LastObjectId::default()),
         }
     }
@@ -664,7 +664,7 @@ impl ObjectStore {
     /// object store when queried.
     pub fn track_statistics(self: &Arc<Self>, parent: &fuchsia_inspect::Node, name: &str) {
         let this = Arc::downgrade(self);
-        *self.tracking.lock().unwrap() = Some(parent.create_lazy_child(name, move || {
+        let _ = self.tracking.set(parent.create_lazy_child(name, move || {
             let this_clone = this.clone();
             async move {
                 let inspector = fuchsia_inspect::Inspector::new();
