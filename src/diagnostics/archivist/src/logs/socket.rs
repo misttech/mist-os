@@ -6,8 +6,7 @@ use crate::logs::error::StreamError;
 use crate::logs::stored_message::StoredMessage;
 use diagnostics_message::MAX_DATAGRAM_LEN;
 use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
-use futures::io::{self, AsyncReadExt};
+use futures::io::AsyncReadExt;
 use std::{marker::PhantomData, sync::Arc};
 
 /// An `Encoding` is able to parse a `Message` from raw bytes.
@@ -50,31 +49,18 @@ pub struct LogMessageSocket<E> {
 
 impl LogMessageSocket<LegacyEncoding> {
     /// Creates a new `LogMessageSocket` from the given `socket` that reads the legacy format.
-    pub fn new(socket: zx::Socket, stats: Arc<LogStreamStats>) -> Result<Self, io::Error> {
+    pub fn new(socket: fasync::Socket, stats: Arc<LogStreamStats>) -> Self {
         stats.open_socket();
-        Ok(Self {
-            socket: fasync::Socket::from_socket(socket)?,
-            buffer: [0; MAX_DATAGRAM_LEN],
-            stats,
-            _encoder: PhantomData,
-        })
+        Self { socket, buffer: [0; MAX_DATAGRAM_LEN], stats, _encoder: PhantomData }
     }
 }
 
 impl LogMessageSocket<StructuredEncoding> {
     /// Creates a new `LogMessageSocket` from the given `socket` that reads the structured log
     /// format.
-    pub fn new_structured(
-        socket: zx::Socket,
-        stats: Arc<LogStreamStats>,
-    ) -> Result<Self, io::Error> {
+    pub fn new_structured(socket: fasync::Socket, stats: Arc<LogStreamStats>) -> Self {
         stats.open_socket();
-        Ok(Self {
-            socket: fasync::Socket::from_socket(socket)?,
-            buffer: [0; MAX_DATAGRAM_LEN],
-            stats,
-            _encoder: PhantomData,
-        })
+        Self { socket, buffer: [0; MAX_DATAGRAM_LEN], stats, _encoder: PhantomData }
     }
 }
 
@@ -109,6 +95,7 @@ mod tests {
         encode::Encoder, Argument, Record, Severity as StreamSeverity, Value,
     };
     use diagnostics_message::{fx_log_packet_t, METADATA_SIZE};
+    use fuchsia_zircon as zx;
     use std::io::Cursor;
 
     #[fasync::run_until_stalled(test)]
@@ -121,7 +108,8 @@ mod tests {
         packet.fill_data(1..6, b'A' as _);
         packet.fill_data(7..12, b'B' as _);
 
-        let mut ls = LogMessageSocket::new(sout, Default::default()).unwrap();
+        let socket = fasync::Socket::from_socket(sout).unwrap();
+        let mut ls = LogMessageSocket::new(socket, Default::default());
         sin.write(packet.as_bytes()).unwrap();
         let expected_p = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             timestamp_nanos: zx::Time::from_nanos(packet.metadata.time).into(),
@@ -177,7 +165,8 @@ mod tests {
         ))
         .build();
 
-        let mut stream = LogMessageSocket::new_structured(sout, Default::default()).unwrap();
+        let socket = fasync::Socket::from_socket(sout).unwrap();
+        let mut stream = LogMessageSocket::new_structured(socket, Default::default());
 
         sin.write(encoded).unwrap();
         let bytes = stream.next().await.unwrap();

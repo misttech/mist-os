@@ -23,6 +23,7 @@ use fidl_fuchsia_logger::{
     InterestChangeError, LogSinkRequest, LogSinkRequestStream,
     LogSinkWaitForInterestChangeResponder,
 };
+use fuchsia_async as fasync;
 use fuchsia_async::Task;
 use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::WithInspect;
@@ -235,15 +236,16 @@ impl LogsArtifactsContainer {
 
         macro_rules! handle_socket {
             ($ctor:ident($socket:ident, $control_handle:ident)) => {{
-                match LogMessageSocket::$ctor($socket, self.stats.clone()) {
-                    Ok(log_stream) => {
+                match fasync::Socket::from_socket($socket) {
+                    Ok(socket) => {
+                        let log_stream = LogMessageSocket::$ctor(socket, self.stats.clone());
                         self.state.lock().await.num_active_sockets += 1;
                         let task = Task::spawn(self.clone().drain_messages(log_stream));
                         sender.unbounded_send(task).expect("channel alive for whole program");
-                    }
-                    Err(e) => {
+                    },
+                    Err(err) => {
                         $control_handle.shutdown();
-                        warn!(?self.identity, %e, "error creating socket")
+                        warn!(?self.identity, %err, "error creating socket")
                     }
                 };
             }}
