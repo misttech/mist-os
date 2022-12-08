@@ -12,7 +12,7 @@
 #include <sstream>
 #include <string_view>
 
-#include "tools/fidl/fidlc/include/fidl/fixes.h"
+#include "tools/fidl/fidlc/include/fidl/fixables.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/program_invocation.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
@@ -136,14 +136,14 @@ enum class DiagnosticDocumented {
 
 struct DiagnosticDef {
   constexpr explicit DiagnosticDef(ErrorId id, DiagnosticKind kind, DiagnosticDocumented documented,
-                                   std::optional<Fix::Kind> fixable, std::string_view msg)
+                                   std::optional<Fixable::Kind> fixable, std::string_view msg)
       : id(id), kind(kind), documented(documented), fixable(fixable), msg(msg) {}
   DiagnosticDef(const DiagnosticDef&) = delete;
 
   ErrorId id;
   DiagnosticKind kind;
   DiagnosticDocumented documented;
-  std::optional<Fix::Kind> fixable = std::nullopt;
+  std::optional<Fixable::Kind> fixable = std::nullopt;
   std::string_view msg;
 };
 
@@ -193,14 +193,14 @@ struct RetiredDef final : DiagnosticDef {
 
 // The definition of a fixable diagnostic. See |FixableErrorDef| and |FixableWarningDef| for more
 // information on how these should be used.
-template <ErrorId Id, Fix::Kind FixKind>
+template <ErrorId Id, Fixable::Kind FixableKind>
 struct FixableDiagnosticDef : DiagnosticDef {
   constexpr explicit FixableDiagnosticDef(DiagnosticKind kind, std::string_view msg)
-      : DiagnosticDef(Id, kind, DiagnosticDocumented::kDocumented, FixKind, msg),
-        fix_kind_(FixKind) {}
+      : DiagnosticDef(Id, kind, DiagnosticDocumented::kDocumented, FixableKind, msg),
+        fix_kind_(FixableKind) {}
 
  private:
-  const Fix::Kind fix_kind_;
+  const Fixable::Kind fix_kind_;
 };
 
 // The definition of a fixable error. This diagnostic will only be surfaced to the user in the
@@ -212,10 +212,10 @@ struct FixableDiagnosticDef : DiagnosticDef {
 // This ensures that users only see fixable error notifications for inputs that would otherwise
 // compile if the fix were performed, and that the fixable error notifications can be turned off
 // when fidlc is used to apply the fix itself.
-template <ErrorId Id, Fix::Kind FixKind, typename... Args>
-struct FixableErrorDef final : FixableDiagnosticDef<Id, FixKind> {
+template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
+struct FixableErrorDef final : FixableDiagnosticDef<Id, FixableKind> {
   constexpr explicit FixableErrorDef(std::string_view msg)
-      : FixableDiagnosticDef<Id, FixKind>(DiagnosticKind::kError, msg) {
+      : FixableDiagnosticDef<Id, FixableKind>(DiagnosticKind::kError, msg) {
     internal::CheckFormatArgs<Args...>(msg);
   }
 };
@@ -229,10 +229,10 @@ struct FixableErrorDef final : FixableDiagnosticDef<Id, FixKind> {
 // This ensures that users only see fixable warning notifications for inputs that would otherwise
 // compile if the fix were performed, and that the fixable warning notifications can be turned off
 // when fidlc is used to apply the fix itself.
-template <ErrorId Id, Fix::Kind FixKind, typename... Args>
+template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
 struct FixableWarningDef final : DiagnosticDef {
   constexpr explicit FixableWarningDef(std::string_view msg)
-      : DiagnosticDef(Id, DiagnosticKind::kWarning, DiagnosticDocumented::kDocumented, FixKind,
+      : DiagnosticDef(Id, DiagnosticKind::kWarning, DiagnosticDocumented::kDocumented, FixableKind,
                       msg) {
     internal::CheckFormatArgs<Args...>(msg);
   }
@@ -258,8 +258,8 @@ struct Diagnostic {
     return std::make_unique<Diagnostic>(def, span, args...);
   }
 
-  template <ErrorId Id, Fix::Kind FixKind, typename... Args>
-  static std::unique_ptr<Diagnostic> MakeError(const FixableErrorDef<Id, FixKind, Args...>& def,
+  template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
+  static std::unique_ptr<Diagnostic> MakeError(const FixableErrorDef<Id, FixableKind, Args...>& def,
 
                                                SourceSpan span, const identity_t<Args>&... args) {
     return std::make_unique<Diagnostic>(def, span, args...);
@@ -280,10 +280,11 @@ struct Diagnostic {
     return std::make_unique<Diagnostic>(def, span, args...);
   }
 
-  template <ErrorId Id, Fix::Kind FixKind, typename... Args>
-  static std::unique_ptr<Diagnostic> MakeWarning(const FixableWarningDef<Id, FixKind, Args...>& def,
+  template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
+  static std::unique_ptr<Diagnostic> MakeWarning(
+      const FixableWarningDef<Id, FixableKind, Args...>& def,
 
-                                                 SourceSpan span, const identity_t<Args>&... args) {
+      SourceSpan span, const identity_t<Args>&... args) {
     return std::make_unique<Diagnostic>(def, span, args...);
   }
 

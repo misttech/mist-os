@@ -6,7 +6,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/diagnostic_types.h"
 #include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
-#include "tools/fidl/fidlc/include/fidl/fixes.h"
+#include "tools/fidl/fidlc/include/fidl/fixables.h"
 #include "tools/fidl/fidlc/include/fidl/reporter.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 #include "tools/fidl/fidlc/include/fidl/virtual_source_file.h"
@@ -49,10 +49,10 @@ constexpr ErrorDef<kTestErrorId, std::string_view, std::string_view> ErrTest(
 constexpr WarningDef<kTestWarningId, std::string_view, std::string_view> WarnTest(
     "This test warning has one string param '{}' and another '{}'.");
 
-constexpr FixableErrorDef<kTestFixableErrorId, fidl::Fix::Kind::kNoop, std::string_view,
+constexpr FixableErrorDef<kTestFixableErrorId, fidl::Fixable::Kind::kNoop, std::string_view,
                           std::string_view>
     FixableErrTest("This test error has one string param '{}' and another '{}'.");
-constexpr FixableWarningDef<kTestFixableWarningId, fidl::Fix::Kind::kNoop, std::string_view,
+constexpr FixableWarningDef<kTestFixableWarningId, fidl::Fixable::Kind::kNoop, std::string_view,
                             std::string_view>
     FixableWarnTest("This test warning has one string param '{}' and another '{}'.");
 
@@ -209,7 +209,7 @@ TEST(ReporterTests, ReportFixableErrorFormatParams) {
   EXPECT_SUBSTR(errors[0]->Print(reporter.program_invocation()).c_str(), kFixMeTagOpen);
   EXPECT_SUBSTR(errors[0]->Print(reporter.program_invocation()).c_str(),
                 ">>> " + kFakeBinaryLocation + "/fidl-fix --fix=" +
-                    std::string(fidl::Fix::FixKindName(fidl::Fix::Kind::kNoop)) +
+                    std::string(fidl::Fixable::Get(fidl::Fixable::Kind::kNoop).name) +
                     " --experiment=noop --dep=dep_0_file_0.fidl,dep_0_file_1.fidl" +
                     " lib_file_0.fidl lib_file_1.fidl");
   EXPECT_SUBSTR(errors[0]->Print(reporter.program_invocation()).c_str(), kFixMeTagClose);
@@ -238,7 +238,7 @@ TEST(ReporterTests, MakeFixableErrorThenReportIt) {
   EXPECT_SUBSTR(errors[0]->Print(reporter.program_invocation()).c_str(), kFixMeTagOpen);
   EXPECT_SUBSTR(errors[0]->Print(reporter.program_invocation()).c_str(),
                 ">>> " + kFakeBinaryLocation + "/fidl-fix --fix=" +
-                    std::string(fidl::Fix::FixKindName(fidl::Fix::Kind::kNoop)) +
+                    std::string(fidl::Fixable::Get(fidl::Fixable::Kind::kNoop).name) +
                     " --experiment=noop lib_file_0.fidl lib_file_1.fidl lib_file_2.fidl");
   EXPECT_SUBSTR(errors[0]->Print(reporter.program_invocation()).c_str(), kFixMeTagClose);
 }
@@ -265,7 +265,7 @@ TEST(ReporterTests, ReportFixableWarningFormatParams) {
   EXPECT_SUBSTR(warnings[0]->Print(reporter.program_invocation()).c_str(), kFixMeTagOpen);
   EXPECT_SUBSTR(warnings[0]->Print(reporter.program_invocation()).c_str(),
                 ">>> " + kFakeBinaryLocation + "/fidl-fix --fix=" +
-                    std::string(fidl::Fix::FixKindName(fidl::Fix::Kind::kNoop)) +
+                    std::string(fidl::Fixable::Get(fidl::Fixable::Kind::kNoop).name) +
                     " --experiment=noop --dep=dep_0_file_0.fidl,dep_0_file_1.fidl" +
                     " lib_file_0.fidl lib_file_1.fidl");
   EXPECT_SUBSTR(warnings[0]->Print(reporter.program_invocation()).c_str(), kFixMeTagClose);
@@ -295,7 +295,7 @@ TEST(ReporterTests, MakeFixableWarningThenReportIt) {
   EXPECT_SUBSTR(warnings[0]->Print(reporter.program_invocation()).c_str(), kFixMeTagOpen);
   EXPECT_SUBSTR(warnings[0]->Print(reporter.program_invocation()).c_str(),
                 ">>> " + kFakeBinaryLocation + "/fidl-fix --fix=" +
-                    std::string(fidl::Fix::FixKindName(fidl::Fix::Kind::kNoop)) +
+                    std::string(fidl::Fixable::Get(fidl::Fixable::Kind::kNoop).name) +
                     " --experiment=noop lib_file_0.fidl lib_file_1.fidl lib_file_2.fidl");
   EXPECT_SUBSTR(warnings[0]->Print(reporter.program_invocation()).c_str(), kFixMeTagClose);
 }

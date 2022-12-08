@@ -320,7 +320,7 @@ std::string Diagnostic::Print(const ProgramInvocation& program_invocation) const
           << "  Please run the following command to update your FIDL files and fix the issue:\n\n"
           << "    [[[ FIXME ]]]\n\n"
           << "    >>> " << program_invocation.binary_path().c_str()
-          << "/fidl-fix --fix=" << Fix::FixKindName(def.fixable.value())
+          << "/fidl-fix --fix=" << Fixable::Get(def.fixable.value()).name
           << program_invocation.ExperimentsAsString(" --experiment=", " ").c_str()
           << program_invocation.DependenciesAsString(" --dep=", ",").c_str() << " "
           << program_invocation.LibraryFilesAsString(" ").value().c_str() << "\n\n"

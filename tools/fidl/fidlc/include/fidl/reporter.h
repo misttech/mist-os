@@ -16,7 +16,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/diagnostic_types.h"
 #include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
-#include "tools/fidl/fidlc/include/fidl/fixes.h"
+#include "tools/fidl/fidlc/include/fidl/fixables.h"
 #include "tools/fidl/fidlc/include/fidl/program_invocation.h"
 #include "tools/fidl/fidlc/include/fidl/source_manager.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
@@ -72,16 +72,16 @@ class Reporter {
 
   // Reports a fixable error. This differs slightly from |Fail| in that it should never stop
   // compilation, but rather may optionally be reported when it completes.
-  template <ErrorId Id, Fix::Kind FixKind, typename... Args>
-  void FixableFail(const FixableErrorDef<Id, FixKind, Args...>& def, SourceSpan span,
+  template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
+  void FixableFail(const FixableErrorDef<Id, FixableKind, Args...>& def, SourceSpan span,
                    const identity_t<Args>&... args) {
     Report(Diagnostic::MakeError(def, span, args...));
   }
 
   // Reports a fixable warning. This differs slightly from |Fail| in that it should never stop
   // compilation, but rather may optionally be reported when it completes.
-  template <ErrorId Id, Fix::Kind FixKind, typename... Args>
-  void FixableWarn(const FixableWarningDef<Id, FixKind, Args...>& def, SourceSpan span,
+  template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
+  void FixableWarn(const FixableWarningDef<Id, FixableKind, Args...>& def, SourceSpan span,
                    const identity_t<Args>&... args) {
     Report(Diagnostic::MakeWarning(def, span, args...));
   }
