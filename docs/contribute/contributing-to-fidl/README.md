@@ -220,6 +220,22 @@ To symbolize backtraces, you'll need a symbolizer in scope:
 export ASAN_SYMBOLIZER_PATH="$(find `pwd` -name llvm-symbolizer | grep clang | head -1)"
 ```
 
+### Fast test builds
+
+FIDL is a very deep-seated part of the system, so modifying it often results in
+"rebuilding the world", with small changes potentially triggering tens of
+thousands of compilation actions and minutes long builds. This can be slow and
+cumbersome when you're just trying to build and run some FIDL tests, rather than
+the system as a whole.
+
+The `fx` tool supports on-demand, narrow-scope build and package publishing to
+help with this exact situation. To enable it, set the following environment
+variable in your `~/.bashrc` (or equivalent):
+
+```sh
+export FUCHSIA_DISABLED_incremental=0
+```
+
 ## Compiling and running tests
 
 We provide mostly one-liners to run tests for the various parts.
