@@ -363,3 +363,109 @@ void zx_device::remove_child(zx_device& child) {
   children_.erase(child);
   inspect_->decrement_child_count();
 }
+
+void zx_device::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
+                                    ConnectToDeviceFidlCompleter::Sync& completer) {
+  if (vnode.has_value()) {
+    vnode.value().ConnectToDeviceFidl(std::move(request->server));
+  }
+}
+
+void zx_device::Bind(BindRequestView request, BindCompleter::Sync& completer) {
+  zx_status_t status = device_bind(fbl::RefPtr(this), std::string(request->driver.get()).c_str());
+  if (status != ZX_OK) {
+    completer.ReplyError(status);
+    return;
+  }
+  set_bind_conn([completer = completer.ToAsync()](zx_status_t status) mutable {
+    completer.Reply(zx::make_result(status));
+  });
+}
+
+void zx_device::GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) {
+  completer.Reply(current_performance_state());
+}
+
+void zx_device::Rebind(RebindRequestView request, RebindCompleter::Sync& completer) {
+  set_rebind_drv_name(std::string(request->driver.get()).c_str());
+  zx_status_t status = device_rebind(this);
+  if (status != ZX_OK) {
+    completer.ReplyError(status);
+    return;
+  }
+  // These will be set, until device is unbound and then bound again.
+  set_rebind_conn([completer = completer.ToAsync()](zx_status_t status) mutable {
+    completer.Reply(zx::make_result(status));
+  });
+}
+
+void zx_device::UnbindChildren(UnbindChildrenCompleter::Sync& completer) {
+  zx::result<bool> scheduled_unbind = device_schedule_unbind_children(fbl::RefPtr(this));
+  if (scheduled_unbind.is_error()) {
+    completer.ReplyError(scheduled_unbind.status_value());
+    return;
+  }
+
+  // Handle case where we have no children to unbind (otherwise the callback below will never
+  // fire).
+  if (!scheduled_unbind.value()) {
+    completer.ReplySuccess();
+    return;
+  }
+
+  // Asynchronously respond to the unbind request once all children have been unbound.
+  // The unbind children conn will be set until all the children of this device are unbound.
+  set_unbind_children_conn([completer = completer.ToAsync()](zx_status_t status) mutable {
+    completer.Reply(zx::make_result(status));
+  });
+}
+
+void zx_device::ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) {
+  zx_status_t status = device_schedule_remove(fbl::RefPtr(this), true /* unbind_self */);
+  completer.Reply(zx::make_result(status));
+}
+
+void zx_device::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
+  char buf[fuchsia_device::wire::kMaxDevicePathLen + 1];
+  size_t actual;
+  zx_status_t status =
+      driver_host_context()->GetTopoPath(fbl::RefPtr(this), buf, sizeof(buf), &actual);
+  if (status != ZX_OK) {
+    completer.ReplyError(status);
+    return;
+  }
+  if (actual > 0) {
+    // Remove the accounting for the null byte
+    actual--;
+  }
+  auto path = fidl::StringView(buf, actual);
+  completer.ReplySuccess(path);
+}
+
+void zx_device::GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& completer) {
+  if (!driver) {
+    completer.Reply(ZX_ERR_UNAVAILABLE, fuchsia_logger::wire::LogLevelFilter::kNone);
+    return;
+  }
+  fx_log_severity_t severity = fx_logger_get_min_severity(zx_driver()->logger());
+  completer.Reply(ZX_OK, static_cast<fuchsia_logger::wire::LogLevelFilter>(severity));
+}
+
+void zx_device::SetMinDriverLogSeverity(SetMinDriverLogSeverityRequestView request,
+                                        SetMinDriverLogSeverityCompleter::Sync& completer) {
+  if (!driver) {
+    completer.Reply(ZX_ERR_UNAVAILABLE);
+    return;
+  }
+  auto status =
+      zx_driver()->set_driver_min_log_severity(static_cast<fx_log_severity_t>(request->severity));
+  completer.Reply(status);
+}
+
+void zx_device::SetPerformanceState(SetPerformanceStateRequestView request,
+                                    SetPerformanceStateCompleter::Sync& completer) {
+  uint32_t out_state;
+  zx_status_t status = driver_host_context()->DeviceSetPerformanceState(
+      fbl::RefPtr(this), request->requested_state, &out_state);
+  completer.Reply(status, out_state);
+}

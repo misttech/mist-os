@@ -17,7 +17,7 @@ DeviceServer::DeviceServer(fbl::RefPtr<zx_device> dev, async_dispatcher_t* dispa
     : dev_(std::move(dev)), dispatcher_(dispatcher) {}
 
 void DeviceServer::ConnectToController(fidl::ServerEnd<fuchsia_device::Controller> server_end) {
-  Serve(server_end.TakeChannel(), &controller_);
+  Serve(server_end.TakeChannel(), dev_.get());
 }
 
 void DeviceServer::ConnectToDeviceFidl(zx::channel channel) { Serve(std::move(channel), &device_); }
@@ -107,115 +107,6 @@ void DeviceServer::Node::Clone(CloneRequestView request, CloneCompleter::Sync& c
   parent_.ServeMultiplexed(request->object.TakeChannel());
 }
 
-DeviceServer::Controller::Controller(DeviceServer& parent) : parent_(parent) {}
-
-void DeviceServer::Controller::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
-                                                   ConnectToDeviceFidlCompleter::Sync& completer) {
-  parent_.ConnectToDeviceFidl(std::move(request->server));
-}
-
-void DeviceServer::Controller::Bind(BindRequestView request, BindCompleter::Sync& completer) {
-  zx_status_t status = device_bind(parent_.dev_, std::string(request->driver.get()).c_str());
-  if (status != ZX_OK) {
-    completer.ReplyError(status);
-    return;
-  }
-  parent_.dev_->set_bind_conn([completer = completer.ToAsync()](zx_status_t status) mutable {
-    completer.Reply(zx::make_result(status));
-  });
-}
-
-void DeviceServer::Controller::GetCurrentPerformanceState(
-    GetCurrentPerformanceStateCompleter::Sync& completer) {
-  completer.Reply(parent_.dev_->current_performance_state());
-}
-
-void DeviceServer::Controller::Rebind(RebindRequestView request, RebindCompleter::Sync& completer) {
-  parent_.dev_->set_rebind_drv_name(std::string(request->driver.get()).c_str());
-  zx_status_t status = device_rebind(parent_.dev_.get());
-  if (status != ZX_OK) {
-    completer.ReplyError(status);
-    return;
-  }
-  // These will be set, until device is unbound and then bound again.
-  parent_.dev_->set_rebind_conn([completer = completer.ToAsync()](zx_status_t status) mutable {
-    completer.Reply(zx::make_result(status));
-  });
-}
-
-void DeviceServer::Controller::UnbindChildren(UnbindChildrenCompleter::Sync& completer) {
-  zx::result<bool> scheduled_unbind = device_schedule_unbind_children(parent_.dev_);
-  if (scheduled_unbind.is_error()) {
-    completer.ReplyError(scheduled_unbind.status_value());
-    return;
-  }
-
-  // Handle case where we have no children to unbind (otherwise the callback below will never
-  // fire).
-  if (!scheduled_unbind.value()) {
-    completer.ReplySuccess();
-    return;
-  }
-
-  // Asynchronously respond to the unbind request once all children have been unbound.
-  // The unbind children conn will be set until all the children of this device are unbound.
-  parent_.dev_->set_unbind_children_conn(
-      [completer = completer.ToAsync()](zx_status_t status) mutable {
-        completer.Reply(zx::make_result(status));
-      });
-}
-
-void DeviceServer::Controller::ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) {
-  zx_status_t status = device_schedule_remove(parent_.dev_, true /* unbind_self */);
-  completer.Reply(zx::make_result(status));
-}
-
-void DeviceServer::Controller::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
-  char buf[fuchsia_device::wire::kMaxDevicePathLen + 1];
-  size_t actual;
-  zx_status_t status =
-      parent_.dev_->driver_host_context()->GetTopoPath(parent_.dev_, buf, sizeof(buf), &actual);
-  if (status != ZX_OK) {
-    completer.ReplyError(status);
-    return;
-  }
-  if (actual > 0) {
-    // Remove the accounting for the null byte
-    actual--;
-  }
-  auto path = fidl::StringView(buf, actual);
-  completer.ReplySuccess(path);
-}
-
-void DeviceServer::Controller::GetMinDriverLogSeverity(
-    GetMinDriverLogSeverityCompleter::Sync& completer) {
-  if (!parent_.dev_->driver) {
-    completer.Reply(ZX_ERR_UNAVAILABLE, fuchsia_logger::wire::LogLevelFilter::kNone);
-    return;
-  }
-  fx_log_severity_t severity = fx_logger_get_min_severity(parent_.dev_->zx_driver()->logger());
-  completer.Reply(ZX_OK, static_cast<fuchsia_logger::wire::LogLevelFilter>(severity));
-}
-
-void DeviceServer::Controller::SetMinDriverLogSeverity(
-    SetMinDriverLogSeverityRequestView request, SetMinDriverLogSeverityCompleter::Sync& completer) {
-  if (!parent_.dev_->driver) {
-    completer.Reply(ZX_ERR_UNAVAILABLE);
-    return;
-  }
-  auto status = parent_.dev_->zx_driver()->set_driver_min_log_severity(
-      static_cast<fx_log_severity_t>(request->severity));
-  completer.Reply(status);
-}
-
-void DeviceServer::Controller::SetPerformanceState(SetPerformanceStateRequestView request,
-                                                   SetPerformanceStateCompleter::Sync& completer) {
-  uint32_t out_state;
-  zx_status_t status = parent_.dev_->driver_host_context()->DeviceSetPerformanceState(
-      parent_.dev_, request->requested_state, &out_state);
-  completer.Reply(status, out_state);
-}
-
 DeviceServer::MessageDispatcher::MessageDispatcher(DeviceServer& parent, bool multiplexing)
     : parent_(parent), multiplexing_(multiplexing) {}
 
@@ -232,7 +123,7 @@ void DeviceServer::MessageDispatcher::dispatch_message(
     if (fidl::WireTryDispatch(&parent_.node_, msg, txn) == fidl::DispatchResult::kFound) {
       return;
     }
-    if (fidl::WireTryDispatch(&parent_.controller_, msg, txn) == fidl::DispatchResult::kFound) {
+    if (fidl::WireTryDispatch(parent_.dev_.get(), msg, txn) == fidl::DispatchResult::kFound) {
       return;
     }
   }

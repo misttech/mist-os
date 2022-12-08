@@ -103,7 +103,8 @@ struct ZxDeviceLocalIdMapTag {};
 
 // This needs to be a struct, not a class, to match the public definition
 struct zx_device
-    : public fbl::RefCountedUpgradeable<zx_device>,
+    : public fidl::WireServer<fuchsia_device::Controller>,
+      public fbl::RefCountedUpgradeable<zx_device>,
       public fbl::Recyclable<zx_device>,
       public fbl::ContainableBaseClasses<
           fbl::TaggedDoublyLinkedListable<zx_device*, internal::ZxDeviceChildrenListTag>,
@@ -490,6 +491,20 @@ struct zx_device
   void FreeInspect() { inspect_.reset(); }
 
  private:
+  void ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
+                           ConnectToDeviceFidlCompleter::Sync& completer) override;
+  void Bind(BindRequestView request, BindCompleter::Sync& completer) override;
+  void Rebind(RebindRequestView request, RebindCompleter::Sync& completer) override;
+  void UnbindChildren(UnbindChildrenCompleter::Sync& completer) override;
+  void ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) override;
+  void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override;
+  void GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& completer) override;
+  void GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) override;
+  void SetMinDriverLogSeverity(SetMinDriverLogSeverityRequestView request,
+                               SetMinDriverLogSeverityCompleter::Sync& completer) override;
+  void SetPerformanceState(SetPerformanceStateRequestView request,
+                           SetPerformanceStateCompleter::Sync& completer) override;
+
   explicit zx_device(DriverHostContext* ctx, std::string name, fbl::RefPtr<Driver> driver);
 
   char name_[ZX_DEVICE_NAME_MAX + 1] = {};

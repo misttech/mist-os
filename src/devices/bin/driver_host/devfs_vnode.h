@@ -42,28 +42,6 @@ class DeviceServer {
     DeviceServer& parent_;
   };
 
-  class Controller : public fidl::WireServer<fuchsia_device::Controller> {
-   public:
-    explicit Controller(DeviceServer& parent);
-
-   private:
-    void ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
-                             ConnectToDeviceFidlCompleter::Sync& completer) override;
-    void Bind(BindRequestView request, BindCompleter::Sync& completer) override;
-    void Rebind(RebindRequestView request, RebindCompleter::Sync& completer) override;
-    void UnbindChildren(UnbindChildrenCompleter::Sync& completer) override;
-    void ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) override;
-    void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override;
-    void GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& completer) override;
-    void GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) override;
-    void SetMinDriverLogSeverity(SetMinDriverLogSeverityRequestView request,
-                                 SetMinDriverLogSeverityCompleter::Sync& completer) override;
-    void SetPerformanceState(SetPerformanceStateRequestView request,
-                             SetPerformanceStateCompleter::Sync& completer) override;
-
-    DeviceServer& parent_;
-  };
-
   class MessageDispatcher : public fidl::internal::IncomingMessageDispatcher {
    public:
     MessageDispatcher(DeviceServer& parent, bool multiplexing);
@@ -80,7 +58,6 @@ class DeviceServer {
   async_dispatcher_t* const dispatcher_;
 
   Node node_{*this};
-  Controller controller_{*this};
   MessageDispatcher device_{*this, false};
   MessageDispatcher multiplexed_{*this, true};
 
