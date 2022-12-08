@@ -157,7 +157,7 @@ impl<T> UserRef<T> {
 
     /// Returns None if the buffer is too small for the type.
     pub fn from_buf(buf: UserBuffer) -> Option<Self> {
-        if mem::size_of::<T>() < buf.length {
+        if buf.length < mem::size_of::<T>() {
             return None;
         }
         Some(Self::new(buf.address))
