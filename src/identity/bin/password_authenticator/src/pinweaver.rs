@@ -21,6 +21,12 @@ use {
     tracing::{error, info},
 };
 
+#[cfg(test)]
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
+
 // This file implements a key source which combines the computational hardness of scrypt with
 // firmware-enforced rate-limiting of guesses.  The overall dataflow is:
 //
@@ -374,177 +380,198 @@ where
 }
 
 #[cfg(test)]
-pub mod test {
+#[derive(Clone, Debug)]
+enum EnrollBehavior {
+    AsExpected,
+    ExpectLeSecret(Key),
+    ForceFailWithEnrollmentError,
+}
+
+#[cfg(test)]
+#[derive(Clone, Debug)]
+enum RetrieveBehavior {
+    AsExpected,
+    ForceFailWithRetrievalError,
+}
+
+#[cfg(test)]
+pub struct MockCredManagerProvider {
+    mcm: MockCredManager,
+}
+
+#[cfg(test)]
+impl MockCredManagerProvider {
+    pub fn new() -> MockCredManagerProvider {
+        MockCredManagerProvider { mcm: MockCredManager::new() }
+    }
+}
+
+#[cfg(test)]
+impl CredManagerProvider for MockCredManagerProvider {
+    type CM = MockCredManager;
+    fn new_cred_manager(&self) -> Result<Self::CM, anyhow::Error> {
+        Ok(self.mcm.clone())
+    }
+}
+
+/// An in-memory mock of a CredentialManager implementation which stores all secrets in a
+/// HashMap in memory.
+#[cfg(test)]
+#[derive(Clone, Debug)]
+pub struct MockCredManager {
+    creds: Arc<Mutex<HashMap<Label, (Key, Key)>>>,
+    enroll_behavior: EnrollBehavior,
+    retrieve_behavior: RetrieveBehavior,
+}
+
+#[cfg(test)]
+impl MockCredManager {
+    pub fn new_with_creds(creds: Arc<Mutex<HashMap<Label, (Key, Key)>>>) -> MockCredManager {
+        MockCredManager {
+            creds,
+            enroll_behavior: EnrollBehavior::AsExpected,
+            retrieve_behavior: RetrieveBehavior::AsExpected,
+        }
+    }
+
+    pub fn new() -> MockCredManager {
+        MockCredManager::new_with_creds(Arc::new(Mutex::new(HashMap::new())))
+    }
+
+    fn new_expect_le_secret(le_secret: &Key) -> MockCredManager {
+        MockCredManager {
+            creds: Arc::new(Mutex::new(HashMap::new())),
+            enroll_behavior: EnrollBehavior::ExpectLeSecret(*le_secret),
+            retrieve_behavior: RetrieveBehavior::AsExpected,
+        }
+    }
+
+    fn new_fail_enrollment() -> MockCredManager {
+        MockCredManager {
+            creds: Arc::new(Mutex::new(HashMap::new())),
+            enroll_behavior: EnrollBehavior::ForceFailWithEnrollmentError,
+            retrieve_behavior: RetrieveBehavior::AsExpected,
+        }
+    }
+
+    fn new_fail_retrieval() -> MockCredManager {
+        MockCredManager {
+            creds: Arc::new(Mutex::new(HashMap::new())),
+            enroll_behavior: EnrollBehavior::AsExpected,
+            retrieve_behavior: RetrieveBehavior::ForceFailWithRetrievalError,
+        }
+    }
+
+    pub fn insert_with_next_free_label(
+        &mut self,
+        le_secret: Key,
+        he_secret: Key,
+    ) -> (Label, Option<(Key, Key)>) {
+        let mut creds = self.creds.lock().unwrap();
+        // Select the next label not in use.
+        let mut label = 1;
+        while creds.contains_key(&label) {
+            label += 1;
+        }
+        let prev_value = creds.insert(label, (le_secret, he_secret));
+        (label, prev_value)
+    }
+}
+
+#[cfg(test)]
+#[async_trait]
+impl CredManager for MockCredManager {
+    async fn add(&mut self, le_secret: &Key, he_secret: &Key) -> Result<Label, KeyEnrollmentError> {
+        match &self.enroll_behavior {
+            EnrollBehavior::AsExpected => {
+                let (label, _) = self.insert_with_next_free_label(*le_secret, *he_secret);
+                Ok(label)
+            }
+            EnrollBehavior::ExpectLeSecret(key) => {
+                assert_eq!(key, le_secret);
+                let (label, _) = self.insert_with_next_free_label(*le_secret, *he_secret);
+                Ok(label)
+            }
+            EnrollBehavior::ForceFailWithEnrollmentError => {
+                Err(KeyEnrollmentError::CredentialManagerError(fcred::CredentialError::NoFreeLabel))
+            }
+        }
+    }
+
+    async fn retrieve(&self, le_secret: &Key, cred_label: Label) -> Result<Key, KeyRetrievalError> {
+        match self.retrieve_behavior {
+            RetrieveBehavior::AsExpected => {
+                let creds = self.creds.lock().unwrap();
+                match creds.get(&cred_label) {
+                    Some((low_entropy_secret, high_entropy_secret)) => {
+                        if le_secret == low_entropy_secret {
+                            Ok(*high_entropy_secret)
+                        } else {
+                            Err(KeyRetrievalError::CredentialManagerError(
+                                fcred::CredentialError::InvalidSecret,
+                            ))
+                        }
+                    }
+                    None => Err(KeyRetrievalError::CredentialManagerError(
+                        fcred::CredentialError::InvalidLabel,
+                    )),
+                }
+            }
+            RetrieveBehavior::ForceFailWithRetrievalError => Err(
+                KeyRetrievalError::CredentialManagerError(fcred::CredentialError::InvalidSecret),
+            ),
+        }
+    }
+
+    async fn remove(&mut self, cred_label: Label) -> Result<(), KeyEnrollmentError> {
+        let mut creds = self.creds.lock().unwrap();
+        let prev = creds.remove(&cred_label);
+        match prev {
+            Some(_) => Ok(()),
+            None => Err(KeyEnrollmentError::CredentialManagerError(
+                fcred::CredentialError::InvalidLabel,
+            )),
+        }
+    }
+}
+
+#[cfg(test)]
+pub const TEST_PINWEAVER_CREDENTIAL_LABEL: Label = 1u64;
+
+/// The fixed low-entropy secret derived from TEST_SCRYPT_PASSWORD
+#[cfg(test)]
+pub const TEST_PINWEAVER_LE_SECRET: [u8; KEY_LEN] = [
+    230, 21, 65, 10, 158, 243, 134, 222, 213, 187, 110, 176, 44, 67, 246, 104, 137, 26, 30, 76, 90,
+    12, 229, 169, 241, 31, 123, 127, 178, 76, 210, 210,
+];
+/// A fixed key generated and recorded in source for test usage to enable deterministic testing
+/// of key-derivation computations.  In practice, high-entropy secrets will be randomly
+/// generated at runtime.
+#[cfg(test)]
+pub const TEST_PINWEAVER_HE_SECRET: [u8; KEY_LEN] = [
+    165, 169, 79, 36, 201, 215, 227, 13, 74, 62, 115, 217, 71, 229, 180, 70, 233, 76, 139, 10, 55,
+    49, 182, 163, 113, 209, 83, 18, 248, 250, 189, 153,
+];
+/// Derived from TEST_PINWEAVER_HE_SECRET and TEST_SCRYPT_PASSWORD
+#[cfg(test)]
+pub const TEST_PINWEAVER_MIX_SECRET: [u8; KEY_LEN] = [
+    94, 201, 56, 224, 222, 39, 239, 116, 198, 113, 209, 14, 37, 140, 225, 6, 144, 168, 246, 212,
+    239, 145, 233, 119, 229, 0, 91, 138, 142, 22, 10, 195,
+];
+/// Derived from TEST_PINWEAVER_MIX_SECRET and TEST_SCRYPT_PARAMS
+#[cfg(test)]
+pub const TEST_PINWEAVER_ACCOUNT_KEY: [u8; KEY_LEN] = [
+    228, 50, 47, 112, 78, 137, 56, 116, 50, 180, 30, 230, 55, 132, 33, 117, 119, 187, 221, 250, 73,
+    193, 216, 194, 37, 177, 70, 45, 209, 216, 49, 110,
+];
+
+#[cfg(test)]
+mod test {
     use {
         super::*,
-        crate::scrypt::test::{TEST_SCRYPT_PARAMS, TEST_SCRYPT_PASSWORD},
+        crate::scrypt::{TEST_SCRYPT_PARAMS, TEST_SCRYPT_PASSWORD},
         assert_matches::assert_matches,
-        std::{
-            collections::HashMap,
-            sync::{Arc, Mutex},
-        },
     };
-
-    #[derive(Clone, Debug)]
-    enum EnrollBehavior {
-        AsExpected,
-        ExpectLeSecret(Key),
-        ForceFailWithEnrollmentError,
-    }
-
-    #[derive(Clone, Debug)]
-    enum RetrieveBehavior {
-        AsExpected,
-        ForceFailWithRetrievalError,
-    }
-
-    pub struct MockCredManagerProvider {
-        mcm: MockCredManager,
-    }
-
-    impl MockCredManagerProvider {
-        pub fn new() -> MockCredManagerProvider {
-            MockCredManagerProvider { mcm: MockCredManager::new() }
-        }
-    }
-
-    impl CredManagerProvider for MockCredManagerProvider {
-        type CM = MockCredManager;
-        fn new_cred_manager(&self) -> Result<Self::CM, anyhow::Error> {
-            Ok(self.mcm.clone())
-        }
-    }
-
-    /// An in-memory mock of a CredentialManager implementation which stores all secrets in a
-    /// HashMap in memory.
-    // TODO(fxb/116814): move this out of ::test.
-    #[derive(Clone, Debug)]
-    pub struct MockCredManager {
-        creds: Arc<Mutex<HashMap<Label, (Key, Key)>>>,
-        enroll_behavior: EnrollBehavior,
-        retrieve_behavior: RetrieveBehavior,
-    }
-
-    impl MockCredManager {
-        pub fn new_with_creds(creds: Arc<Mutex<HashMap<Label, (Key, Key)>>>) -> MockCredManager {
-            MockCredManager {
-                creds,
-                enroll_behavior: EnrollBehavior::AsExpected,
-                retrieve_behavior: RetrieveBehavior::AsExpected,
-            }
-        }
-
-        pub fn new() -> MockCredManager {
-            MockCredManager::new_with_creds(Arc::new(Mutex::new(HashMap::new())))
-        }
-
-        fn new_expect_le_secret(le_secret: &Key) -> MockCredManager {
-            MockCredManager {
-                creds: Arc::new(Mutex::new(HashMap::new())),
-                enroll_behavior: EnrollBehavior::ExpectLeSecret(*le_secret),
-                retrieve_behavior: RetrieveBehavior::AsExpected,
-            }
-        }
-
-        fn new_fail_enrollment() -> MockCredManager {
-            MockCredManager {
-                creds: Arc::new(Mutex::new(HashMap::new())),
-                enroll_behavior: EnrollBehavior::ForceFailWithEnrollmentError,
-                retrieve_behavior: RetrieveBehavior::AsExpected,
-            }
-        }
-
-        fn new_fail_retrieval() -> MockCredManager {
-            MockCredManager {
-                creds: Arc::new(Mutex::new(HashMap::new())),
-                enroll_behavior: EnrollBehavior::AsExpected,
-                retrieve_behavior: RetrieveBehavior::ForceFailWithRetrievalError,
-            }
-        }
-
-        pub fn insert_with_next_free_label(
-            &mut self,
-            le_secret: Key,
-            he_secret: Key,
-        ) -> (Label, Option<(Key, Key)>) {
-            let mut creds = self.creds.lock().unwrap();
-            // Select the next label not in use.
-            let mut label = 1;
-            while creds.contains_key(&label) {
-                label += 1;
-            }
-            let prev_value = creds.insert(label, (le_secret, he_secret));
-            (label, prev_value)
-        }
-    }
-
-    #[async_trait]
-    impl CredManager for MockCredManager {
-        async fn add(
-            &mut self,
-            le_secret: &Key,
-            he_secret: &Key,
-        ) -> Result<Label, KeyEnrollmentError> {
-            match &self.enroll_behavior {
-                EnrollBehavior::AsExpected => {
-                    let (label, _) = self.insert_with_next_free_label(*le_secret, *he_secret);
-                    Ok(label)
-                }
-                EnrollBehavior::ExpectLeSecret(key) => {
-                    assert_eq!(key, le_secret);
-                    let (label, _) = self.insert_with_next_free_label(*le_secret, *he_secret);
-                    Ok(label)
-                }
-                EnrollBehavior::ForceFailWithEnrollmentError => Err(
-                    KeyEnrollmentError::CredentialManagerError(fcred::CredentialError::NoFreeLabel),
-                ),
-            }
-        }
-
-        async fn retrieve(
-            &self,
-            le_secret: &Key,
-            cred_label: Label,
-        ) -> Result<Key, KeyRetrievalError> {
-            match self.retrieve_behavior {
-                RetrieveBehavior::AsExpected => {
-                    let creds = self.creds.lock().unwrap();
-                    match creds.get(&cred_label) {
-                        Some((low_entropy_secret, high_entropy_secret)) => {
-                            if le_secret == low_entropy_secret {
-                                Ok(*high_entropy_secret)
-                            } else {
-                                Err(KeyRetrievalError::CredentialManagerError(
-                                    fcred::CredentialError::InvalidSecret,
-                                ))
-                            }
-                        }
-                        None => Err(KeyRetrievalError::CredentialManagerError(
-                            fcred::CredentialError::InvalidLabel,
-                        )),
-                    }
-                }
-                RetrieveBehavior::ForceFailWithRetrievalError => {
-                    Err(KeyRetrievalError::CredentialManagerError(
-                        fcred::CredentialError::InvalidSecret,
-                    ))
-                }
-            }
-        }
-
-        async fn remove(&mut self, cred_label: Label) -> Result<(), KeyEnrollmentError> {
-            let mut creds = self.creds.lock().unwrap();
-            let prev = creds.remove(&cred_label);
-            match prev {
-                Some(_) => Ok(()),
-                None => Err(KeyEnrollmentError::CredentialManagerError(
-                    fcred::CredentialError::InvalidLabel,
-                )),
-            }
-        }
-    }
-
-    pub const TEST_PINWEAVER_CREDENTIAL_LABEL: Label = 1u64;
 
     #[fuchsia::test]
     async fn test_enroll_key() {
@@ -570,29 +597,6 @@ pub mod test {
             KeyEnrollmentError::CredentialManagerError(fcred::CredentialError::NoFreeLabel)
         );
     }
-
-    /// The fixed low-entropy secret derived from TEST_SCRYPT_PASSWORD
-    pub const TEST_PINWEAVER_LE_SECRET: [u8; KEY_LEN] = [
-        230, 21, 65, 10, 158, 243, 134, 222, 213, 187, 110, 176, 44, 67, 246, 104, 137, 26, 30, 76,
-        90, 12, 229, 169, 241, 31, 123, 127, 178, 76, 210, 210,
-    ];
-    /// A fixed key generated and recorded in source for test usage to enable deterministic testing
-    /// of key-derivation computations.  In practice, high-entropy secrets will be randomly
-    /// generated at runtime.
-    pub const TEST_PINWEAVER_HE_SECRET: [u8; KEY_LEN] = [
-        165, 169, 79, 36, 201, 215, 227, 13, 74, 62, 115, 217, 71, 229, 180, 70, 233, 76, 139, 10,
-        55, 49, 182, 163, 113, 209, 83, 18, 248, 250, 189, 153,
-    ];
-    /// Derived from TEST_PINWEAVER_HE_SECRET and TEST_SCRYPT_PASSWORD
-    pub const TEST_PINWEAVER_MIX_SECRET: [u8; KEY_LEN] = [
-        94, 201, 56, 224, 222, 39, 239, 116, 198, 113, 209, 14, 37, 140, 225, 6, 144, 168, 246,
-        212, 239, 145, 233, 119, 229, 0, 91, 138, 142, 22, 10, 195,
-    ];
-    /// Derived from TEST_PINWEAVER_MIX_SECRET and TEST_SCRYPT_PARAMS
-    pub const TEST_PINWEAVER_ACCOUNT_KEY: [u8; KEY_LEN] = [
-        228, 50, 47, 112, 78, 137, 56, 116, 50, 180, 30, 230, 55, 132, 33, 117, 119, 187, 221, 250,
-        73, 193, 216, 194, 37, 177, 70, 45, 209, 216, 49, 110,
-    ];
 
     #[fuchsia::test]
     async fn test_pinweaver_goldens() {

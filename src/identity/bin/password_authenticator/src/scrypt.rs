@@ -135,26 +135,37 @@ impl Validator<(AuthenticatorMetadata, PrekeyMaterial)> for EnrollScryptValidato
     }
 }
 
+// A well-known set of (weak) params & salt, password, and corresponding key for tests, to avoid
+// spending excessive CPU time doing expensive key derivations.
 #[cfg(test)]
-pub mod test {
+const TEST_SCRYPT_SALT: [u8; 16] =
+    [202, 26, 165, 102, 212, 113, 114, 60, 106, 121, 183, 133, 36, 166, 127, 146];
+#[cfg(test)]
+pub const TEST_SCRYPT_PARAMS: ScryptParams =
+    ScryptParams { salt: TEST_SCRYPT_SALT, log_n: 8, r: 8, p: 1 };
 
+#[cfg(test)]
+pub const TEST_SCRYPT_PASSWORD: &str = "test password";
+
+// We have precomputed the key produced by the above fixed salt and params so that each test
+// that wants to use one doesn't need to perform an additional key derivation every single time.
+// A test below ensures that we verify our constant is correct.
+#[cfg(test)]
+pub const TEST_SCRYPT_KEY: [u8; KEY_LEN] = [
+    88, 91, 129, 123, 173, 34, 21, 1, 23, 147, 87, 189, 56, 149, 89, 132, 210, 235, 150, 102, 129,
+    93, 202, 53, 115, 170, 162, 217, 254, 115, 216, 181,
+];
+
+#[cfg(test)]
+const FULL_STRENGTH_SCRYPT_SALT: [u8; 16] =
+    [198, 228, 57, 32, 90, 251, 238, 12, 194, 62, 68, 106, 218, 187, 24, 246];
+#[cfg(test)]
+pub const FULL_STRENGTH_SCRYPT_PARAMS: ScryptParams =
+    ScryptParams { salt: FULL_STRENGTH_SCRYPT_SALT, log_n: 15, r: 8, p: 1 };
+
+#[cfg(test)]
+mod test {
     use {super::*, anyhow::Result, assert_matches::assert_matches};
-
-    // A well-known set of (weak) params & salt, password, and corresponding key for tests, to avoid
-    // spending excessive CPU time doing expensive key derivations.
-    pub const TEST_SCRYPT_SALT: [u8; 16] =
-        [202, 26, 165, 102, 212, 113, 114, 60, 106, 121, 183, 133, 36, 166, 127, 146];
-    pub const TEST_SCRYPT_PARAMS: ScryptParams =
-        ScryptParams { salt: TEST_SCRYPT_SALT, log_n: 8, r: 8, p: 1 };
-    pub const TEST_SCRYPT_PASSWORD: &str = "test password";
-
-    // We have precomputed the key produced by the above fixed salt and params so that each test
-    // that wants to use one doesn't need to perform an additional key derivation every single time.
-    // A test below ensures that we verify our constant is correct.
-    pub const TEST_SCRYPT_KEY: [u8; KEY_LEN] = [
-        88, 91, 129, 123, 173, 34, 21, 1, 23, 147, 87, 189, 56, 149, 89, 132, 210, 235, 150, 102,
-        129, 93, 202, 53, 115, 170, 162, 217, 254, 115, 216, 181,
-    ];
 
     #[fuchsia::test]
     async fn test_enroll_key() {
@@ -179,10 +190,6 @@ pub mod test {
         assert_eq!(key, TEST_SCRYPT_KEY);
     }
 
-    const FULL_STRENGTH_SCRYPT_SALT: [u8; 16] =
-        [198, 228, 57, 32, 90, 251, 238, 12, 194, 62, 68, 106, 218, 187, 24, 246];
-    pub const FULL_STRENGTH_SCRYPT_PARAMS: ScryptParams =
-        ScryptParams { salt: FULL_STRENGTH_SCRYPT_SALT, log_n: 15, r: 8, p: 1 };
     const GOLDEN_SCRYPT_PASSWORD: &str = "test password";
     const GOLDEN_SCRYPT_KEY: [u8; KEY_LEN] = [
         27, 250, 228, 96, 145, 67, 194, 114, 144, 240, 92, 150, 43, 136, 128, 51, 223, 120, 56,

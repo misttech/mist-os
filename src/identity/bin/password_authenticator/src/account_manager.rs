@@ -778,14 +778,11 @@ mod test {
                 AccountMetadata, AccountMetadataStoreError,
             },
             pinweaver::{
-                test::{
-                    MockCredManagerProvider, TEST_PINWEAVER_ACCOUNT_KEY,
-                    TEST_PINWEAVER_CREDENTIAL_LABEL, TEST_PINWEAVER_HE_SECRET,
-                    TEST_PINWEAVER_LE_SECRET,
-                },
-                CredManager,
+                CredManager, MockCredManagerProvider, TEST_PINWEAVER_ACCOUNT_KEY,
+                TEST_PINWEAVER_CREDENTIAL_LABEL, TEST_PINWEAVER_HE_SECRET,
+                TEST_PINWEAVER_LE_SECRET,
             },
-            scrypt::test::{TEST_SCRYPT_KEY, TEST_SCRYPT_PASSWORD},
+            scrypt::{TEST_SCRYPT_KEY, TEST_SCRYPT_PASSWORD},
         },
         anyhow::anyhow,
         async_trait::async_trait,

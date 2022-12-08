@@ -295,8 +295,8 @@ pub mod test {
     use {
         super::*,
         crate::{
-            pinweaver::test::TEST_PINWEAVER_CREDENTIAL_LABEL,
-            scrypt::test::{FULL_STRENGTH_SCRYPT_PARAMS, TEST_SCRYPT_PARAMS},
+            pinweaver::TEST_PINWEAVER_CREDENTIAL_LABEL,
+            scrypt::{FULL_STRENGTH_SCRYPT_PARAMS, TEST_SCRYPT_PARAMS},
         },
         assert_matches::assert_matches,
         lazy_static::lazy_static,
