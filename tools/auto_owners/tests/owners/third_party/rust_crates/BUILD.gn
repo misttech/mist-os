@@ -1,0 +1,15 @@
+group("bar") {
+  deps = [ "//third_party/rust_crates/vendor/bar" ]
+}
+
+group("bar-v0_0_1") {
+  deps = [ ":bar" ]
+}
+
+group("foo-v1_0_0") {
+  deps = [ ":foo" ]
+}
+
+group("foo") {
+  deps = [ "//third_party/rust_crates/vendor/foo" ]
+}
