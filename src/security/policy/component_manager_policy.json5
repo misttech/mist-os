@@ -721,7 +721,6 @@
                     "/core/account/password_authenticator",
                     "/core/appmgr",
                     "/core/audio_recording",
-                    "/core/bluetooth-core/bt-gap",
                     "/core/brightness_manager",
                     "/core/bt-snoop",
                     "/core/cobalt_system_metrics",

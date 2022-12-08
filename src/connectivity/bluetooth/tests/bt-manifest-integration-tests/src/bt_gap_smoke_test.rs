@@ -256,7 +256,11 @@ async fn bt_gap_component_topology() {
     builder
         .add_route(
             Route::new()
-                .capability(Capability::directory("dev").path("/dev").rights(fio::RW_STAR_DIR))
+                .capability(
+                    Capability::directory("dev-bt-host")
+                        .path("/dev/class/bt-host")
+                        .rights(fio::RW_STAR_DIR),
+                )
                 .from(&mock_dev_child)
                 .to(&bt_gap),
         )

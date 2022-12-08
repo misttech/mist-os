@@ -688,9 +688,11 @@
             subdir: "class/goldfish-sync",
         },
         {
-            directory: "dev",
+            directory: "dev-class",
             from: "parent",
+            as: "dev-bt-host",
             to: "#bluetooth-core",
+            subdir: "bt-host",
         },
         {
             directory: "dev",

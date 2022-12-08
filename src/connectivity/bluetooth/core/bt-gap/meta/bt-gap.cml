@@ -28,11 +28,9 @@
     ],
     use: [
         {
-            // TODO(fxbug.dev/78757): RealmBuilder does not support subdirectory routing, so we
-            // depend directly on /dev so this works in testing environments.
-            directory: "dev",
+            directory: "dev-bt-host",
             rights: [ "rw*" ],
-            path: "/dev",
+            path: "/dev/class/bt-host",
         },
         {
             protocol: [

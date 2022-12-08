@@ -142,11 +142,12 @@ impl CoreRealm {
             )
             .await?;
 
-        // TODO(fxbug.dev/78757): Route /dev/class/bt-host to bt-init upon RealmBuilder support.
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::directory("dev"))
+                    .capability(
+                        Capability::directory("dev-class").subdir("bt-host").as_("dev-bt-host"),
+                    )
                     .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
                     .to(&bt_init),
             )
