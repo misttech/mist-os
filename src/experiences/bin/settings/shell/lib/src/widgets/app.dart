@@ -7,7 +7,6 @@
 
 import 'dart:math';
 
-import 'package:ermine_utils/ermine_utils.dart' show Strings;
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:internationalization/strings.dart';
@@ -136,6 +135,43 @@ class _ListSettings extends StatelessWidget {
           Expanded(
             child: ListView(
               children: [
+                // IP Address
+                Observer(builder: (_) {
+                  return ListTile(
+                    contentPadding: EdgeInsets.symmetric(horizontal: 24),
+                    leading: Icon(Icons.network_ping),
+                    title: Text(Strings.network),
+                    trailing: Wrap(
+                      alignment: WrapAlignment.end,
+                      crossAxisAlignment: WrapCrossAlignment.end,
+                      spacing: 8,
+                      children: [
+                        settingsState.networkAddresses.isEmpty
+                            ? Text('--')
+                            : settingsState.networkAddresses.length == 1
+                                ? Text(
+                                    settingsState.networkAddresses.first,
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  )
+                                : Tooltip(
+                                    message: settingsState.networkAddresses
+                                        .join('\n'),
+                                    child: Text(
+                                      settingsState.networkAddresses.join('\n'),
+                                      maxLines: 1,
+                                      style: TextStyle(
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      textAlign: TextAlign.right,
+                                    ),
+                                  ),
+                      ],
+                    ),
+                  );
+                }),
                 // Battery
                 Observer(builder: (_) {
                   return ListTile(
@@ -153,7 +189,6 @@ class _ListSettings extends StatelessWidget {
                         ],
                       ],
                     ),
-                    onTap: settingsState.showKeyboardSettings,
                   );
                 }),
                 // Channel

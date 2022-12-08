@@ -10,7 +10,6 @@ import 'dart:io';
 import 'package:ermine_utils/ermine_utils.dart';
 import 'package:flutter/material.dart' hide Action;
 import 'package:flutter/services.dart';
-import 'package:internationalization/strings.dart';
 import 'package:intl/intl.dart';
 import 'package:mobx/mobx.dart';
 import 'package:shell_settings/src/services/battery_watcher_service.dart';
@@ -18,6 +17,7 @@ import 'package:shell_settings/src/services/brightness_service.dart';
 import 'package:shell_settings/src/services/channel_service.dart';
 import 'package:shell_settings/src/services/datetime_service.dart';
 import 'package:shell_settings/src/services/keyboard_service.dart';
+import 'package:shell_settings/src/services/network_address_service.dart';
 import 'package:shell_settings/src/services/task_service.dart';
 import 'package:shell_settings/src/services/timezone_service.dart';
 import 'package:shell_settings/src/services/volume_service.dart';
@@ -158,6 +158,10 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
   set powerLevel(double? value) => _powerLevel.value = value;
   final Observable<double?> _powerLevel = Observable<double?>(null);
 
+  // Network
+  @override
+  final networkAddresses = ObservableList<String>();
+
   // Services
   final BrightnessService brightnessService;
   final DateTimeService dateTimeService;
@@ -166,6 +170,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
   final VolumeService volumeService;
   final KeyboardService keyboardService;
   final BatteryWatcherService batteryWatcherService;
+  final NetworkAddressService networkService;
 
   // Constructor
   SettingsStateImpl({
@@ -176,6 +181,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
     required this.volumeService,
     required this.keyboardService,
     required this.batteryWatcherService,
+    required this.networkService,
   })  : _timezones = _loadTimezones(),
         _selectedTimezone = timezoneService.timezone.asObservable() {
     dateTimeService.onChanged = updateDateTime;
@@ -249,6 +255,19 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
         }
       });
     };
+    networkService.onChanged = () => NetworkInterface.list().then((interfaces) {
+          // Gather all addresses from all interfaces and sort them such that
+          // IPv4 addresses come before IPv6.
+          final addresses = interfaces
+              .expand((interface) => interface.addresses)
+              .toList(growable: false)
+            ..sort((addr1, addr2) =>
+                addr1.type == InternetAddressType.IPv4 ? -1 : 0);
+
+          runInAction(() => networkAddresses
+            ..clear()
+            ..addAll(addresses.map((address) => address.address)));
+        });
 
     // We cannot load MaterialIcons font file from pubspec.yaml. So load it
     // explicitly.
@@ -273,6 +292,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
       volumeService.start(),
       keyboardService.start(),
       batteryWatcherService.start(),
+      networkService.start(),
     ]);
   }
 
@@ -286,6 +306,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
     await volumeService.stop();
     await keyboardService.stop();
     await batteryWatcherService.stop();
+    await networkService.stop();
     _dateTimeNow = null;
   }
 
@@ -299,6 +320,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
     volumeService.dispose();
     keyboardService.dispose();
     batteryWatcherService.dispose();
+    networkService.dispose();
   }
 
   // All

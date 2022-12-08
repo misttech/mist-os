@@ -8,11 +8,11 @@ import 'package:shell_settings/src/services/brightness_service.dart';
 import 'package:shell_settings/src/services/channel_service.dart';
 import 'package:shell_settings/src/services/datetime_service.dart';
 import 'package:shell_settings/src/services/keyboard_service.dart';
+import 'package:shell_settings/src/services/network_address_service.dart';
 import 'package:shell_settings/src/services/task_service.dart';
 import 'package:shell_settings/src/services/timezone_service.dart';
 import 'package:shell_settings/src/services/volume_service.dart';
 import 'package:shell_settings/src/states/settings_state_impl.dart';
-import 'package:shell_settings/src/widgets/app.dart';
 import 'package:shell_settings/src/widgets/setting_details.dart';
 
 /// Defines the pages that have a [SettingDetails] widget.
@@ -76,6 +76,8 @@ abstract class SettingsState implements TaskService {
   BatteryCharge get batteryCharge;
   IconData get powerIcon;
   double? get powerLevel;
+  // Network
+  List<String> get networkAddresses;
 
   factory SettingsState.fromEnv() {
     // ignore: unnecessary_cast
@@ -87,6 +89,7 @@ abstract class SettingsState implements TaskService {
       volumeService: VolumeService(),
       keyboardService: KeyboardService(),
       batteryWatcherService: BatteryWatcherService(),
+      networkService: NetworkAddressService(),
     ) as SettingsState;
   }
 

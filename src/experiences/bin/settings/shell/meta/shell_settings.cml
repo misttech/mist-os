@@ -19,6 +19,7 @@
                 "fuchsia.intl.PropertyProvider",
                 "fuchsia.media.Audio",
                 "fuchsia.media.AudioCore",
+                "fuchsia.net.interfaces.State",
                 "fuchsia.power.battery.BatteryManager",
                 "fuchsia.settings.Intl",
                 "fuchsia.settings.Keyboard",
