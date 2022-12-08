@@ -353,6 +353,7 @@ func (q *QEMUCommandBuilder) BuildConfig() (Config, error) {
 	if q.initrd != "" {
 		config.Args = append(config.Args, "-initrd", q.initrd)
 	}
+	config.KernelArgs = []string{}
 	if q.uefi != nil {
 		config.Args = append(
 			config.Args,

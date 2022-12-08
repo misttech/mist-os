@@ -55,15 +55,11 @@
             "dimensions": {
                 "device_type": "AEMU"
             },
-            "is_emu": true
+            "image_overrides": {}
         },
         "deps": [
             "images.json",
-            "obj/build/images/flash/virtual_device_specification_recommended_flags.json.template",
-            "product_bundle.json",
-            "sdk/manifest/core",
-            "virtual_device_min.json",
-            "virtual_device_recommended.json"
+            "sdk/manifest/core"
         ],
         "timeout_secs": 0,
         "summary": {

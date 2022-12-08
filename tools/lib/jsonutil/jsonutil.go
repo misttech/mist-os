@@ -11,7 +11,7 @@ import (
 
 // WriteToFile writes data as JSON into a file.
 func WriteToFile(path string, v interface{}) error {
-	raw, err := json.Marshal(v)
+	raw, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return err
 	}

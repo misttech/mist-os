@@ -23,7 +23,7 @@
             "dimensions": {
                 "device_type": "AEMU"
             },
-            "is_emu": true
+            "image_overrides": {}
         },
         "timeout_secs": 0,
         "summary": {
@@ -53,7 +53,8 @@
             "dimensions": {
                 "os": "Linux",
                 "cpu": "x64"
-            }
+            },
+            "image_overrides": {}
         },
         "deps": [
             "host_x64/bar",

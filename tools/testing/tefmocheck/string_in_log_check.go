@@ -310,8 +310,8 @@ func fuchsiaLogChecks() []FailureModeCheck {
 				{startString: "RUN   TestDisabledJitterEntropyAndRequiredForReseedDoesntReachUserspace", endString: "PASS: TestDisabledJitterEntropyAndRequiredForReseedDoesntReachUserspace"},
 			}},
 			&stringInLogCheck{String: "double fault, halting", Type: lt},
-			// This string can show up in some zbi tests.
-			&stringInLogCheck{String: "entering panic shell loop", Type: lt, ExceptString: "ZBI-test-successful!"},
+			// This string can show up in some boot tests.
+			&stringInLogCheck{String: "entering panic shell loop", Type: lt, ExceptString: "Boot-test-successful!"},
 		}...)
 	}
 

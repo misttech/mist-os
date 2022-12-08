@@ -17,9 +17,6 @@ import (
 const (
 	// The path to the SDK manifest relative to the sdk.root.
 	SDKManifestPath = "sdk/manifest/core"
-	// The path to the default virtual_device config that `ffx emu`
-	// uses relative to the sdk.root.
-	VirtualDevicePath = "virtual_device_recommended.json"
 )
 
 // EmuTools represent tools used by `ffx emu`. If using tools not included in the SDK,
@@ -101,15 +98,6 @@ func (f *FFXInstance) EmuStop(ctx context.Context) error {
 func GetEmuDeps(sdkRoot string, targetCPU string, tools []string) ([]string, error) {
 	deps := []string{
 		SDKManifestPath,
-		VirtualDevicePath,
-		"product_bundle.json",
-		"virtual_device_min.json",
-		"obj/build/images/flash/virtual_device_specification_recommended_flags.json.template",
-	}
-	if targetCPU == "x64" {
-		if _, err := os.Stat(filepath.Join(sdkRoot, "physical_device.json")); err == nil {
-			deps = append(deps, "physical_device.json")
-		}
 	}
 
 	manifestPath := filepath.Join(sdkRoot, SDKManifestPath)
@@ -153,49 +141,4 @@ func GetFFXEmuManifest(manifestPath, targetCPU string, tools []string) (SDKManif
 	}
 	manifest.Atoms = requiredAtoms
 	return manifest, nil
-}
-
-// VirtualDevice represents the schema of the virtual_device specification config
-// used by `ffx emu`. It should be kept in sync with build/sdk/virtual_device.gni.
-type VirtualDevice struct {
-	Data     VirtualDeviceData `json:"data"`
-	SchemaID string            `json:"schema_id"`
-}
-
-type VirtualDeviceData struct {
-	Description         string                `json:"description"`
-	Hardware            VirtualDeviceHardware `json:"hardware"`
-	Name                string                `json:"name"`
-	Ports               map[string]int        `json:"ports"`
-	StartUpArgsTemplate string                `json:"start_up_args_template"`
-	Type                string                `json:"type"`
-}
-
-type VirtualDeviceHardware struct {
-	Audio      map[string]string `json:"audio"`
-	CPU        map[string]string `json:"cpu"`
-	Inputs     map[string]string `json:"inputs"`
-	Memory     quantity          `json:"memory"`
-	Storage    quantity          `json:"storage"`
-	WindowSize dimension         `json:"window_size"`
-}
-
-type quantity struct {
-	Quantity int    `json:"quantity"`
-	Units    string `json:"units"`
-}
-
-type dimension struct {
-	Height int    `json:"height"`
-	Units  string `json:"units"`
-	Width  int    `json:"width"`
-}
-
-// GetVirtualDevice returns the contents of the virtual_device config.
-func GetVirtualDevice(path string) (VirtualDevice, error) {
-	var device VirtualDevice
-	if err := jsonutil.ReadFromFile(path, &device); err != nil {
-		return device, fmt.Errorf("failed to read %s: %w", path, err)
-	}
-	return device, nil
 }

@@ -19,10 +19,6 @@ import (
 func TestAddFFXDeps(t *testing.T) {
 	baseDeps := []string{
 		"sdk/manifest/core",
-		"product_bundle.json",
-		"virtual_device_min.json",
-		"virtual_device_recommended.json",
-		"obj/build/images/flash/virtual_device_specification_recommended_flags.json.template",
 	}
 	testCases := []struct {
 		name       string

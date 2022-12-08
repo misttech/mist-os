@@ -248,14 +248,14 @@ func (t *QEMUTarget) Start(ctx context.Context, images []bootserver.Image, args 
 	qemuCmd.SetBinary(absQEMUSystemPath)
 
 	var qemuKernel *bootserver.Image
-	if t.imageOverrides.QEMUKernel == "" {
+	if t.imageOverrides.QEMUKernel == "" && t.imageOverrides.EFI == "" {
 		qemuKernel = getImageByName(images, "kernel_qemu-kernel")
 	} else {
 		qemuKernel = getImage(images, t.imageOverrides.QEMUKernel, build.ImageTypeQEMUKernel)
 	}
 
 	var zbi *bootserver.Image
-	if t.imageOverrides.ZBI == "" {
+	if t.imageOverrides.ZBI == "" && t.imageOverrides.EFI == "" {
 		zbi = getImageByName(images, "zbi_zircon-a")
 	} else {
 		zbi = getImage(images, t.imageOverrides.ZBI, build.ImageTypeZBI)
@@ -457,9 +457,6 @@ func (t *QEMUTarget) Start(ctx context.Context, images []bootserver.Image, args 
 		if err := rewriteSDKManifest(sdkManifestPath, t.config.Target, t.isQEMU); err != nil {
 			return err
 		}
-		if err := rewriteVirtualDevice(filepath.Join(cwd, ffxutil.VirtualDevicePath), t.config, int(storageFullMinSize/1000000000)); err != nil {
-			return err
-		}
 		tools := ffxutil.EmuTools{
 			Emulator: absQEMUSystemPath,
 			FVM:      t.config.FVMTool,
@@ -532,25 +529,6 @@ func rewriteSDKManifest(manifestPath, targetCPU string, isQEMU bool) error {
 
 	if err := jsonutil.WriteToFile(manifestPath, manifest); err != nil {
 		return fmt.Errorf("failed to modify sdk manifest: %w", err)
-	}
-	return nil
-}
-
-// rewriteVirtualDevice rewrites the virtual_device config used by `ffx emu` with the
-// provided memory and storage values. This is necessary because there is no
-// other way to modify these values currently.
-func rewriteVirtualDevice(path string, config QEMUConfig, storage int) error {
-	device, err := ffxutil.GetVirtualDevice(path)
-	if err != nil {
-		return err
-	}
-	device.Data.Hardware.Memory.Quantity = config.Memory
-	device.Data.Hardware.Memory.Units = "megabytes"
-	device.Data.Hardware.Storage.Quantity = storage
-	device.Data.Hardware.Storage.Units = "gigabytes"
-
-	if err := jsonutil.WriteToFile(path, device); err != nil {
-		return fmt.Errorf("failed to modify virtual_device: %w", err)
 	}
 	return nil
 }

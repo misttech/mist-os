@@ -28,7 +28,7 @@
             "dimensions": {
                 "device_type": "AEMU"
             },
-            "is_emu": true
+            "image_overrides": {}
         },
         "timeout_secs": 0,
         "summary": {
@@ -84,7 +84,7 @@
             "dimensions": {
                 "device_type": "AEMU"
             },
-            "is_emu": true
+            "image_overrides": {}
         },
         "timeout_secs": 0,
         "summary": {
@@ -119,7 +119,7 @@
             "dimensions": {
                 "device_type": "AEMU"
             },
-            "is_emu": true
+            "image_overrides": {}
         },
         "timeout_secs": 0,
         "summary": {

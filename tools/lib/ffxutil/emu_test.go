@@ -47,10 +47,6 @@ func makeSDKManifest(t *testing.T, tools, cpus []string, manifestPath string) SD
 func TestAddFFXDeps(t *testing.T) {
 	baseDeps := []string{
 		"sdk/manifest/core",
-		"product_bundle.json",
-		"virtual_device_min.json",
-		"virtual_device_recommended.json",
-		"obj/build/images/flash/virtual_device_specification_recommended_flags.json.template",
 	}
 	testCases := []struct {
 		name      string
@@ -63,14 +59,14 @@ func TestAddFFXDeps(t *testing.T) {
 			name:      "QEMU x64 deps with tools",
 			targetCPU: "x64",
 			tools:     []string{"zbi", "fvm", "qemu_internal"},
-			want:      append(baseDeps, "physical_device.json", "x64/zbi", "x64/fvm", "x64/qemu_internal"),
+			want:      append(baseDeps, "x64/zbi", "x64/fvm", "x64/qemu_internal"),
 			wantTools: []string{"zbi", "fvm", "qemu_internal"},
 		},
 		{
 			name:      "AEMU x64 deps with tools",
 			targetCPU: "x64",
 			tools:     []string{"zbi", "fvm", "aemu_internal"},
-			want:      append(baseDeps, "physical_device.json", "x64/zbi", "x64/fvm", "x64/aemu_internal"),
+			want:      append(baseDeps, "x64/zbi", "x64/fvm", "x64/aemu_internal"),
 			wantTools: []string{"zbi", "fvm", "aemu_internal"},
 		},
 		{
