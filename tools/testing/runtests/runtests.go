@@ -41,6 +41,10 @@ const (
 
 	// TestSkipped represents a skipped test.
 	TestSkipped TestResult = "SKIP"
+
+	// TestCrashed means the test exited unexpectedly in a way that may not be
+	// the test's fault, e.g. an infrastructure failure.
+	TestCrashed TestResult = "CRASH"
 )
 
 // IsFailure returns whether a test result corresponds to any failure condition

@@ -28,7 +28,7 @@ const (
 	MAX_FAIL_REASON_SIZE_BYTES = 1024
 )
 
-// ParseSummary unmarshalls the summary.json file content into runtests.TestSummary struct.
+// ParseSummary unmarshals the summary.json file content into runtests.TestSummary struct.
 func ParseSummary(filePath string) (*runtests.TestSummary, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
@@ -236,6 +236,8 @@ func resultDBStatus(result runtests.TestResult) (resultpb.TestStatus, error) {
 		return resultpb.TestStatus_SKIP, nil
 	case runtests.TestAborted:
 		return resultpb.TestStatus_ABORT, nil
+	case runtests.TestCrashed:
+		return resultpb.TestStatus_CRASH, nil
 	}
 	return resultpb.TestStatus_STATUS_UNSPECIFIED, fmt.Errorf("cannot map Result: %s to result_sink test_result status", result)
 }
