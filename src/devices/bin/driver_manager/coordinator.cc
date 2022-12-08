@@ -933,13 +933,15 @@ void Coordinator::GetNodeGroups(GetNodeGroupsRequestView request,
 void Coordinator::GetDeviceInfo(GetDeviceInfoRequestView request,
                                 GetDeviceInfoCompleter::Sync& completer) {
   std::vector<fbl::RefPtr<const Device>> device_list;
-  if (request->device_filter.empty()) {
-    for (auto& device : device_manager_->devices()) {
-      device_list.emplace_back(&device);
+  for (auto& device : device_manager_->devices()) {
+    if (device.libname() == GetFragmentProxyDriverUrl()) {
+      continue;
     }
-  } else {
-    for (const fidl::StringView& device_filter : request->device_filter) {
-      for (auto& device : device_manager_->devices()) {
+
+    if (request->device_filter.empty()) {
+      device_list.emplace_back(&device);
+    } else {
+      for (const fidl::StringView& device_filter : request->device_filter) {
         zx::result path = device.GetTopologicalPath();
         if (path.is_error()) {
           request->iterator.Close(path.status_value());
