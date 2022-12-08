@@ -137,8 +137,8 @@ More objects.
 This should display fields as a list.
 
 - `val`: (_`string`_) It's a string, but it can take the following values:
-  - "0": zero things
-  - "1": one thing!
+    - "0": zero things
+    - "1": one thing!
 - `val2`: (_optional `string`_) An enum.
 
 

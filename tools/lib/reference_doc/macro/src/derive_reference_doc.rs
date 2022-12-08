@@ -9,7 +9,7 @@ use {
     syn,
 };
 
-const LIST_INDENT_SPACES: usize = 2;
+const LIST_INDENT_SPACES: usize = 4;
 
 pub fn impl_derive_reference_doc(ast: syn::DeriveInput) -> Result<TokenStream2, syn::Error> {
     let mut parsed = ReferenceDocAttributes::from_derive_input(&ast).unwrap();

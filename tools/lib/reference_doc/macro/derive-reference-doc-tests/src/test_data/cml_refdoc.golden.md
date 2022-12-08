@@ -150,23 +150,23 @@ The `children` section declares child component instances as described in
 [doc-children]: /docs/concepts/components/v2/realms.md#child-component-instances
 
 - `name`: (_`string`_) The name of the child component instance, which is a string of one
-  or more of the following characters: `a-z`, `0-9`, `_`, `.`, `-`. The name
-  identifies this component when used in a [reference](#references).
+    or more of the following characters: `a-z`, `0-9`, `_`, `.`, `-`. The name
+    identifies this component when used in a [reference](#references).
 - `url`: (_`string`_) The [component URL][component-url] for the child component instance.
 - `startup`: (_`string`_) The component instance's startup mode. One of:
-  - `lazy` _(default)_: Start the component instance only if another
-      component instance binds to it.
-  - [`eager`][doc-eager]: Start the component instance as soon as its parent
-      starts.
+    - `lazy` _(default)_: Start the component instance only if another
+        component instance binds to it.
+    - [`eager`][doc-eager]: Start the component instance as soon as its parent
+        starts.
 - `on_terminate`: (_optional `string`_) Determines the fault recovery policy to apply if this component terminates.
-  - `none` _(default)_: Do nothing.
-  - `reboot`: Gracefully reboot the system if the component terminates for
-      any reason. This is a special feature for use only by a narrow set of
-      components; see [Termination policies][doc-reboot-on-terminate] for more
-      information.
+    - `none` _(default)_: Do nothing.
+    - `reboot`: Gracefully reboot the system if the component terminates for
+        any reason. This is a special feature for use only by a narrow set of
+        components; see [Termination policies][doc-reboot-on-terminate] for more
+        information.
 - `environment`: (_optional `string`_) If present, the name of the environment to be assigned to the child component instance, one
-  of [`environments`](#environments). If omitted, the child will inherit the same environment
-  assigned to this component.
+    of [`environments`](#environments). If omitted, the child will inherit the same environment
+    assigned to this component.
 
 Example:
 
@@ -202,28 +202,28 @@ The `collections` section declares collections as described in
 [Component collections][doc-collections].
 
 - `name`: (_`string`_) The name of the component collection, which is a string of one or
-  more of the following characters: `a-z`, `0-9`, `_`, `.`, `-`. The name
-  identifies this collection when used in a [reference](#references).
+    more of the following characters: `a-z`, `0-9`, `_`, `.`, `-`. The name
+    identifies this collection when used in a [reference](#references).
 - `durability`: (_`string`_) The duration of child component instances in the collection.
-  - `transient`: The instance exists until its parent is stopped or it is
-      explicitly destroyed.
-  - `single_run`: The instance is started when it is created, and destroyed
-      when it is stopped.
+    - `transient`: The instance exists until its parent is stopped or it is
+        explicitly destroyed.
+    - `single_run`: The instance is started when it is created, and destroyed
+        when it is stopped.
 - `environment`: (_optional `string`_) If present, the environment that will be
-  assigned to instances in this collection, one of
-  [`environments`](#environments). If omitted, instances in this collection
-  will inherit the same environment assigned to this component.
+    assigned to instances in this collection, one of
+    [`environments`](#environments). If omitted, instances in this collection
+    will inherit the same environment assigned to this component.
 - `allowed_offers`: (_optional `string`_) Constraints on the dynamic offers that target the components in this collection.
-  Dynamic offers are specified when calling `fuchsia.component.Realm/CreateChild`.
-  - `static_only`: Only those specified in this `.cml` file. No dynamic offers.
-      This is the default.
-  - `static_and_dynamic`: Both static offers and those specified at runtime
-      with `CreateChild` are allowed.
+    Dynamic offers are specified when calling `fuchsia.component.Realm/CreateChild`.
+    - `static_only`: Only those specified in this `.cml` file. No dynamic offers.
+        This is the default.
+    - `static_and_dynamic`: Both static offers and those specified at runtime
+        with `CreateChild` are allowed.
 - `allow_long_names`: (_optional `bool`_) Allow child names up to 1024 characters long instead of the usual 100 character limit.
-  Default is false.
+    Default is false.
 - `persistent_storage`: (_optional `bool`_) If set to `true`, the data in isolated storage used by dynamic child instances and
-  their descendants will persist after the instances are destroyed. A new child instance
-  created with the same name will share the same storage path as the previous instance.
+    their descendants will persist after the instances are destroyed. A new child instance
+    created with the same name will share the same storage path as the previous instance.
 
 Example:
 
@@ -248,47 +248,47 @@ The `environments` section declares environments as described in
 [doc-environments]: /docs/concepts/components/v2/environments.md
 
 - `name`: (_`string`_) The name of the environment, which is a string of one or more of the
-  following characters: `a-z`, `0-9`, `_`, `.`, `-`. The name identifies this
-  environment when used in a [reference](#references).
+    following characters: `a-z`, `0-9`, `_`, `.`, `-`. The name identifies this
+    environment when used in a [reference](#references).
 - `extends`: (_optional `string`_) How the environment should extend this realm's environment.
-  - `realm`: Inherit all properties from this compenent's environment.
-  - `none`: Start with an empty environment, do not inherit anything.
+    - `realm`: Inherit all properties from this compenent's environment.
+    - `none`: Start with an empty environment, do not inherit anything.
 - `runners`: (_optional array of `object`_) The runners registered in the environment. An array of objects
-  with the following properties:
-  - `runner`: (_`string`_) The [name](#name) of a runner capability, whose source is specified in `from`.
-  - `from`: (_`string`_) The source of the runner capability, one of:
-    - `parent`: The component's parent.
-    - `self`: This component.
-    - `#<child-name>`: A [reference](#references) to a child component
-        instance.
-  - `as`: (_optional `string`_) An explicit name for the runner as it will be known in
-    this environment. If omitted, defaults to `runner`.
+    with the following properties:
+    - `runner`: (_`string`_) The [name](#name) of a runner capability, whose source is specified in `from`.
+    - `from`: (_`string`_) The source of the runner capability, one of:
+        - `parent`: The component's parent.
+        - `self`: This component.
+        - `#<child-name>`: A [reference](#references) to a child component
+            instance.
+    - `as`: (_optional `string`_) An explicit name for the runner as it will be known in
+        this environment. If omitted, defaults to `runner`.
 
 - `resolvers`: (_optional array of `object`_) The resolvers registered in the environment. An array of
-  objects with the following properties:
-  - `resolver`: (_`string`_) The [name](#name) of a resolver capability,
-    whose source is specified in `from`.
-  - `from`: (_`string`_) The source of the resolver capability, one of:
-    - `parent`: The component's parent.
-    - `self`: This component.
-    - `#<child-name>`: A [reference](#references) to a child component
-        instance.
-  - `scheme`: (_`string`_) The URL scheme for which the resolver should handle
-    resolution.
+    objects with the following properties:
+    - `resolver`: (_`string`_) The [name](#name) of a resolver capability,
+        whose source is specified in `from`.
+    - `from`: (_`string`_) The source of the resolver capability, one of:
+        - `parent`: The component's parent.
+        - `self`: This component.
+        - `#<child-name>`: A [reference](#references) to a child component
+            instance.
+    - `scheme`: (_`string`_) The URL scheme for which the resolver should handle
+        resolution.
 
 - `debug`: (_optional array of `object`_) Debug protocols available to any component in this environment acquired
-  through `use from debug`.
-  - `protocol`: (_optional `string or array of strings`_) The name(s) of the protocol(s) to make available.
-  - `from`: (_`string`_) The source of the capability(s), one of:
-    - `parent`: The component's parent.
-    - `self`: This component.
-    - `#<child-name>`: A [reference](#references) to a child component
-        instance.
-  - `as`: (_optional `string`_) If specified, the name that the capability in `protocol` should be made
-    available as to clients. Disallowed if `protocol` is an array.
+    through `use from debug`.
+    - `protocol`: (_optional `string or array of strings`_) The name(s) of the protocol(s) to make available.
+    - `from`: (_`string`_) The source of the capability(s), one of:
+        - `parent`: The component's parent.
+        - `self`: This component.
+        - `#<child-name>`: A [reference](#references) to a child component
+            instance.
+    - `as`: (_optional `string`_) If specified, the name that the capability in `protocol` should be made
+        available as to clients. Disallowed if `protocol` is an array.
 
 - `stop_timeout_ms`: (_optional `number`_) The number of milliseconds to wait, after notifying a component in this environment that it
-  should terminate, before forcibly killing it.
+    should terminate, before forcibly killing it.
 
 Example:
 
@@ -329,9 +329,9 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
 [glossary.outgoing directory]: /docs/glossary/README.md#outgoing-directory
 
 - `service`: (_optional `string or array of strings`_) The [name](#name) for this service capability. Specifying `path` is valid
-  only when this value is a string.
+    only when this value is a string.
 - `protocol`: (_optional `string or array of strings`_) The [name](#name) for this protocol capability. Specifying `path` is valid
-  only when this value is a string.
+    only when this value is a string.
 - `directory`: (_optional `string`_) The [name](#name) for this directory capability.
 - `storage`: (_optional `string`_) The [name](#name) for this storage capability.
 - `runner`: (_optional `string`_) The [name](#name) for this runner capability.
@@ -339,40 +339,40 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
 - `event`: (_optional `string`_) The [name](#name) for this event capability.
 - `event_stream`: (_optional `string or array of strings`_) The [name](#name) for this event_stream capability.
 - `path`: (_optional `string`_) The path within the [outgoing directory][glossary.outgoing directory] of the component's
-  program to source the capability.
+    program to source the capability.
 
-  For `protocol` and `service`, defaults to `/svc/${protocol}`, otherwise required.
+    For `protocol` and `service`, defaults to `/svc/${protocol}`, otherwise required.
 
-  For `protocol`, the target of the path MUST be a channel, which tends to speak
-  the protocol matching the name of this capability.
+    For `protocol`, the target of the path MUST be a channel, which tends to speak
+    the protocol matching the name of this capability.
 
-  For `service`, `directory`, the target of the path MUST be a directory.
+    For `service`, `directory`, the target of the path MUST be a directory.
 
-  For `runner`, the target of the path MUST be a channel and MUST speak
-  the protocol `fuchsia.component.runner.ComponentRunner`.
+    For `runner`, the target of the path MUST be a channel and MUST speak
+    the protocol `fuchsia.component.runner.ComponentRunner`.
 
-  For `resolver`, the target of the path MUST be a channel and MUST speak
-  the protocol `fuchsia.component.resolution.Resolver`.
+    For `resolver`, the target of the path MUST be a channel and MUST speak
+    the protocol `fuchsia.component.resolution.Resolver`.
 - `rights`: (_optional `array of string`_) (`directory` only) The maximum [directory rights][doc-directory-rights] that may be set
-  when using this directory.
+    when using this directory.
 - `from`: (_optional `string`_) (`storage` only) The source component of an existing directory capability backing this
-  storage capability, one of:
-  - `parent`: The component's parent.
-  - `self`: This component.
-  - `#<child-name>`: A [reference](#references) to a child component
-      instance.
+    storage capability, one of:
+    - `parent`: The component's parent.
+    - `self`: This component.
+    - `#<child-name>`: A [reference](#references) to a child component
+        instance.
 - `backing_dir`: (_optional `string`_) (`storage` only) The [name](#name) of the directory capability backing the storage. The
-  capability must be available from the component referenced in `from`.
+    capability must be available from the component referenced in `from`.
 - `subdir`: (_optional `string`_) (`storage` only) A subdirectory within `backing_dir` where per-component isolated storage
-  directories are created
+    directories are created
 - `storage_id`: (_optional `string`_) (`storage only`) The identifier used to isolated storage for a component, one of:
-  - `static_instance_id`: The instance ID in the component ID index is used
-      as the key for a component's storage. Components which are not listed in
-      the component ID index will not be able to use this storage capability.
-  - `static_instance_id_or_moniker`: If the component is listed in the
-      component ID index, the instance ID is used as the key for a component's
-      storage. Otherwise, the component's relative moniker from the storage
-      capability is used.
+    - `static_instance_id`: The instance ID in the component ID index is used
+        as the key for a component's storage. Components which are not listed in
+        the component ID index will not be able to use this storage capability.
+    - `static_instance_id_or_moniker`: If the component is listed in the
+        component ID index, the instance ID is used as the key for a component's
+        storage. Otherwise, the component's relative moniker from the storage
+        capability is used.
 
 
 ### `use` {#use}
@@ -396,44 +396,44 @@ this component and the capability's source.
 - `event_stream_deprecated`: (_optional `string`_) Deprecated.
 - `event_stream`: (_optional `string or array of strings`_) When using an event stream capability, the [name](#name) of an [event stream capability][doc-event].
 - `from`: (_optional `string`_) The source of the capability. Defaults to `parent`.  One of:
-  - `parent`: The component's parent.
-  - `debug`: One of [`debug_capabilities`][fidl-environment-decl] in the
-      environment assigned to this component.
-  - `framework`: The Component Framework runtime.
-  - `self`: This component.
-  - `#<capability-name>`: The name of another capability from which the
-      requested capability is derived.
-  - `#<child-name>`: A [reference](#references) to a child component
-      instance.
+    - `parent`: The component's parent.
+    - `debug`: One of [`debug_capabilities`][fidl-environment-decl] in the
+        environment assigned to this component.
+    - `framework`: The Component Framework runtime.
+    - `self`: This component.
+    - `#<capability-name>`: The name of another capability from which the
+        requested capability is derived.
+    - `#<child-name>`: A [reference](#references) to a child component
+        instance.
 - `path`: (_optional `string`_) The path at which to install the capability in the component's namespace. For protocols,
-  defaults to `/svc/${protocol}`.  Required for `directory` and `storage`. This property is
-  disallowed for declarations with arrays of capability names.
+    defaults to `/svc/${protocol}`.  Required for `directory` and `storage`. This property is
+    disallowed for declarations with arrays of capability names.
 - `rights`: (_optional `string`_) (`directory` only) the maximum [directory rights][doc-directory-rights] to apply to
-  the directory in the component's namespace.
+    the directory in the component's namespace.
 - `subdir`: (_optional `string`_) (`directory` only) A subdirectory within the directory capability to provide in the
-  component's namespace.
+    component's namespace.
 - `as`: (_optional `string`_) TODO(fxb/96705): Document events features.
 - `scope`: (_optional `string or array of strings`_) TODO(fxb/96705): Document events features.
 - `filter`: (_optional `object`_) TODO(fxb/96705): Document events features.
 - `subscriptions`: (_optional `string`_) TODO(fxb/96705): Document events features.
 - `dependency`: (_optional `string`_) `dependency` _(optional)_: The type of dependency between the source and
-  this component, one of:
-  - `strong`: a strong dependency, which is used to determine shutdown
-      ordering. Component manager is guaranteed to stop the target before the
-      source. This is the default.
-  - `weak_for_migration`: a weak dependency, which is ignored during
-      shutdown. When component manager stops the parent realm, the source may
-      stop before the clients. Clients of weak dependencies must be able to
-      handle these dependencies becoming unavailable. This type exists to keep
-      track of weak dependencies that resulted from migrations into v2
-      components.
+    this component, one of:
+    - `strong`: a strong dependency, which is used to determine shutdown
+        ordering. Component manager is guaranteed to stop the target before the
+        source. This is the default.
+    - `weak_for_migration`: a weak dependency, which is ignored during
+        shutdown. When component manager stops the parent realm, the source may
+        stop before the clients. Clients of weak dependencies must be able to
+        handle these dependencies becoming unavailable. This type exists to keep
+        track of weak dependencies that resulted from migrations into v2
+        components.
 - `availability`: (_optional `string`_) `availability` _(optional)_: The expectations around this capability's availability. One
-  of:
-  - `required` (default): a required dependency, the component is unable to perform its
-      work without this capability.
-  - `optional`: an optional dependency, the component will be able to function without this
-      capability (although if the capability is unavailable some functionality may be
-      disabled).
+    of:
+    - `required` (default): a required dependency, the component is unable to perform its
+        work without this capability.
+    - `optional`: an optional dependency, the component will be able to function without this
+        capability (although if the capability is unavailable some functionality may be
+        disabled).
 
 Example:
 
@@ -481,19 +481,19 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
 - `runner`: (_optional `string or array of strings`_) When routing a runner, the [name](#name) of a [runner capability][doc-runners].
 - `resolver`: (_optional `string or array of strings`_) When routing a resolver, the [name](#name) of a [resolver capability][doc-resolvers].
 - `from`: (_`string or array of strings`_) `from`: The source of the capability, one of:
-  - `self`: This component. Requires a corresponding
-      [`capability`](#capabilities) declaration.
-  - `framework`: The Component Framework runtime.
-  - `#<child-name>`: A [reference](#references) to a child component
-      instance.
+    - `self`: This component. Requires a corresponding
+        [`capability`](#capabilities) declaration.
+    - `framework`: The Component Framework runtime.
+    - `#<child-name>`: A [reference](#references) to a child component
+        instance.
 - `as`: (_optional `string`_) The [name](#name) for the capability as it will be known by the target. If omitted,
-  defaults to the original name. `as` cannot be used when an array of multiple capability
-  names is provided.
+    defaults to the original name. `as` cannot be used when an array of multiple capability
+    names is provided.
 - `to`: (_optional `string`_) The capability target. Either `parent` or `framework`. Defaults to `parent`.
 - `rights`: (_optional `string`_) (`directory` only) the maximum [directory rights][doc-directory-rights] to apply to
-  the exposed directory capability.
+    the exposed directory capability.
 - `subdir`: (_optional `string`_) (`directory` only) the relative path of a subdirectory within the source directory
-  capability to route.
+    capability to route.
 - `event_stream`: (_optional `string or array of strings`_) TODO(fxb/96705): Complete.
 - `scope`: (_optional `string or array of strings`_) TODO(fxb/96705): Complete.
 
@@ -546,52 +546,52 @@ instance or a [child collection][doc-collections].
 - `storage`: (_optional `string or array of strings`_) When routing a storage capability, the [name](#name) of a [storage capability][doc-storage].
 - `event`: (_optional `string or array of strings`_) When routing an event, the [name](#name) of the [event][doc-event].
 - `from`: (_`string or array of strings`_) `from`: The source of the capability, one of:
-  - `parent`: The component's parent. This source can be used for all
-      capability types.
-  - `self`: This component. Requires a corresponding
-      [`capability`](#capabilities) declaration.
-  - `framework`: The Component Framework runtime.
-  - `#<child-name>`: A [reference](#references) to a child component
-      instance. This source can only be used when offering protocol,
-      directory, or runner capabilities.
-  - `void`: The source is intentionally omitted. Only valid when `availability` is not
-      `required`.
+    - `parent`: The component's parent. This source can be used for all
+        capability types.
+    - `self`: This component. Requires a corresponding
+        [`capability`](#capabilities) declaration.
+    - `framework`: The Component Framework runtime.
+    - `#<child-name>`: A [reference](#references) to a child component
+        instance. This source can only be used when offering protocol,
+        directory, or runner capabilities.
+    - `void`: The source is intentionally omitted. Only valid when `availability` is not
+        `required`.
 - `to`: (_`string or array of strings`_) A capability target or array of targets, each of which is a [reference](#references) to the
-  child or collection to which the capability is being offered, of the form `#<target-name>`.
+    child or collection to which the capability is being offered, of the form `#<target-name>`.
 - `as`: (_optional `string`_) An explicit [name](#name) for the capability as it will be known by the target. If omitted,
-  defaults to the original name. `as` cannot be used when an array of multiple names is
-  provided.
+    defaults to the original name. `as` cannot be used when an array of multiple names is
+    provided.
 - `dependency`: (_optional `string`_) The type of dependency between the source and
-  targets, one of:
-  - `strong`: a strong dependency, which is used to determine shutdown
-      ordering. Component manager is guaranteed to stop the target before the
-      source. This is the default.
-  - `weak_for_migration`: a weak dependency, which is ignored during
-      shutdown. When component manager stops the parent realm, the source may
-      stop before the clients. Clients of weak dependencies must be able to
-      handle these dependencies becoming unavailable. This type exists to keep
-      track of weak dependencies that resulted from migrations into v2
-      components.
+    targets, one of:
+    - `strong`: a strong dependency, which is used to determine shutdown
+        ordering. Component manager is guaranteed to stop the target before the
+        source. This is the default.
+    - `weak_for_migration`: a weak dependency, which is ignored during
+        shutdown. When component manager stops the parent realm, the source may
+        stop before the clients. Clients of weak dependencies must be able to
+        handle these dependencies becoming unavailable. This type exists to keep
+        track of weak dependencies that resulted from migrations into v2
+        components.
 - `rights`: (_optional `string`_) (`directory` only) the maximum [directory rights][doc-directory-rights] to apply to
-  the offered directory capability.
+    the offered directory capability.
 - `subdir`: (_optional `string`_) (`directory` only) the relative path of a subdirectory within the source directory
-  capability to route.
+    capability to route.
 - `filter`: (_optional `object`_) TODO(fxb/96705): Complete.
 - `event_stream`: (_optional `string or array of strings`_) TODO(fxb/96705): Complete.
 - `scope`: (_optional `string or array of strings`_) TODO(fxb/96705): Complete.
 - `availability`: (_optional `string`_) `availability` _(optional)_: The expectations around this capability's availability. One
-  of:
-  - `required` (default): a required dependency, the target of this offer must receive this
-      capability.
-  - `optional`: an optional dependency, the target of this offer may or may not receive
-      this capability, and the target must consume this capability as `optional`.
-  - `same_as_target`: the availability expectations of this capability will match whatever
-      the target's. If the target requires the capability, then this field is set to
-      `required`. If the target has an optional dependency on the capability, then the field
-      is set to `optional`.
+    of:
+    - `required` (default): a required dependency, the target of this offer must receive this
+        capability.
+    - `optional`: an optional dependency, the target of this offer may or may not receive
+        this capability, and the target must consume this capability as `optional`.
+    - `same_as_target`: the availability expectations of this capability will match whatever
+        the target's. If the target requires the capability, then this field is set to
+        `required`. If the target has an optional dependency on the capability, then the field
+        is set to `optional`.
 - `source_availability`: (_optional `string`_) Whether or not the source of this offer must exist. If set to `unknown`, the source of this
-  offer will be rewritten to `void` if the source does not exist (i.e. is not defined in this
-  manifest). Defaults to `required`.
+    offer will be rewritten to `void` if the source does not exist (i.e. is not defined in this
+    manifest). Defaults to `required`.
 
 Example:
 
