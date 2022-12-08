@@ -44,6 +44,7 @@ rustc_binary("element_manager_bin") {
     "//src/session/testing",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:maplit",
   ]
 
   sources = [
@@ -66,7 +67,8 @@ fuchsia_structured_config_rust_lib("element_config") {
 fuchsia_structured_config_values("sc_values") {
   cm_label = ":manifest"
   values = {
-    elements_collection_name = "elements"
+    url_to_collection = []
+    default_collection = "elements"
   }
 }
 
@@ -79,6 +81,25 @@ fuchsia_package("element_manager") {
   deps = [
     ":element_manager_comp",
     ":sc_values",
+  ]
+}
+
+# TODO(fxbug.dev/117065): Remove this once parents can configure their children.
+fuchsia_structured_config_values("sc_values_gazelle") {
+  cm_label = ":manifest"
+  values = {
+    url_to_collection = [
+      "fuchsia-pkg://fuchsia.com/shell_settings#meta/shell_settings.cm|shell_settings",
+      "fuchsia-pkg://fuchsia.com/terminal#meta/terminal.cm|terminal",
+    ]
+    default_collection = "elements"
+  }
+}
+
+fuchsia_package("element_manager_gazelle") {
+  deps = [
+    ":element_manager_comp",
+    ":sc_values_gazelle",
   ]
 }
 

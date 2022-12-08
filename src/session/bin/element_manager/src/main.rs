@@ -17,7 +17,7 @@ mod element;
 mod element_manager;
 
 use {
-    crate::element_manager::ElementManager,
+    crate::element_manager::{CollectionConfig, ElementManager},
     anyhow::Error,
     element_config::Config,
     fidl_connector::ServiceReconnector,
@@ -45,8 +45,6 @@ async fn main() -> Result<(), Error> {
     let inspector = fuchsia_inspect::component::inspector();
     inspector.root().record_child("config", |config_node| config.record_inspect(config_node));
 
-    info!("Element collection name set to \"#{}\"", config.elements_collection_name);
-
     let realm = connect_to_protocol::<fcomponent::RealmMarker>()
         .expect("Failed to connect to Realm service");
 
@@ -62,11 +60,26 @@ async fn main() -> Result<(), Error> {
         .await
         .expect("Failed to get flatland info.");
 
+    let collection_config = CollectionConfig {
+        url_to_collection: config
+            .url_to_collection
+            .into_iter()
+            .map(|rule: String| -> (String, String) {
+                let split: Vec<&str> = rule.split("|").collect();
+                assert_eq!(split.len(), 2, "malformed url_to_collection entry: {:?}", rule);
+                (split[0].to_owned(), split[1].to_owned())
+            })
+            .collect(),
+        default_collection: config.default_collection.to_string(),
+    };
+
+    info!("Element collection policy: #{:?}", collection_config);
+
     let element_manager = Rc::new(ElementManager::new(
         realm,
         Some(graphical_presenter),
         sys_launcher,
-        config.elements_collection_name.as_str(),
+        collection_config,
         scenic_uses_flatland,
     ));
 
@@ -93,7 +106,7 @@ async fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use {
-        crate::element_manager::ElementManager,
+        crate::element_manager::{CollectionConfig, ElementManager},
         fidl::endpoints::{create_proxy_and_stream, spawn_stream_handler},
         fidl::endpoints::{ProtocolMarker, Proxy},
         fidl_connector::Connect,
@@ -101,10 +114,9 @@ mod tests {
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
         lazy_static::lazy_static,
         session_testing::spawn_directory_server,
+        std::collections::HashMap,
         test_util::Counter,
     };
-
-    const ELEMENT_COLLECTION_NAME: &str = "elements";
 
     /// Spawns a local `Manager` server.
     ///
@@ -155,6 +167,11 @@ mod tests {
         }
 
         let component_url = "fuchsia-pkg://fuchsia.com/simple_element#meta/simple_element.cm";
+
+        let collection_config = CollectionConfig {
+            url_to_collection: HashMap::new(),
+            default_collection: "elements".to_string(),
+        };
 
         let directory_request_handler = move |directory_request| match directory_request {
             fio::DirectoryRequest::Open { path, .. } => {
@@ -213,7 +230,7 @@ mod tests {
             realm,
             Some(graphical_presenter_connector),
             launcher,
-            ELEMENT_COLLECTION_NAME,
+            collection_config,
             false,
         ));
         let manager_proxy = spawn_manager_server(element_manager);

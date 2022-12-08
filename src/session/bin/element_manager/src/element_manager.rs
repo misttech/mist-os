@@ -30,7 +30,7 @@ use {
         thread_rng,
     },
     realm_management,
-    std::sync::Arc,
+    std::{collections::HashMap, sync::Arc},
     tracing::{debug, error, info},
 };
 
@@ -191,6 +191,22 @@ struct AdditionalServices {
 pub type GraphicalPresenterConnector =
     Box<dyn Connect<Proxy = felement::GraphicalPresenterProxy> + Send + Sync>;
 
+/// A mapping from component URL to the name of the collection in which
+/// components with that URL should be run.
+#[derive(Debug, Clone)]
+pub struct CollectionConfig {
+    pub url_to_collection: HashMap<String, String>,
+    pub default_collection: String,
+}
+
+impl CollectionConfig {
+    /// For a given component URL, returns the collection in which to run
+    /// components with that URL.
+    fn for_url(&self, url: &str) -> &str {
+        self.url_to_collection.get(url).unwrap_or(&self.default_collection)
+    }
+}
+
 /// Manages the elements associated with a session.
 pub struct ElementManager {
     /// The realm which this element manager uses to create components.
@@ -204,14 +220,14 @@ pub struct ElementManager {
     /// A proxy to the `fuchsia::sys::Launcher` protocol used to create CFv1 components.
     sys_launcher: fsys::LauncherProxy,
 
-    /// The collection in which elements will be launched.
+    /// Policy that determines the collection in which elements will be launched.
     ///
     /// This is only used for elements that have a CFv2 (*.cm) component URL, and has no meaning
     /// for CFv1 elementes.
     ///
-    /// The component that is running the `ElementManager` must have a collection
-    /// with the same name in its CML file.
-    collection: String,
+    /// The component that is running the `ElementManager` must have a collection in its CML file
+    /// for each collection listed in `collections_config`.
+    collection_config: CollectionConfig,
 
     /// Returns whether the client should use Flatland to interact with Scenic.
     /// TODO(fxbug.dev/64206): Remove after Flatland migration is completed.
@@ -223,14 +239,14 @@ impl ElementManager {
         realm: fcomponent::RealmProxy,
         graphical_presenter_connector: Option<GraphicalPresenterConnector>,
         sys_launcher: fsys::LauncherProxy,
-        collection: &str,
+        collection_config: CollectionConfig,
         scenic_uses_flatland: bool,
     ) -> ElementManager {
         ElementManager {
             realm,
             graphical_presenter_connector,
             sys_launcher,
-            collection: collection.to_string(),
+            collection_config,
             scenic_uses_flatland,
         }
     }
@@ -260,6 +276,8 @@ impl ElementManager {
         arguments: Option<Vec<String>>,
         child_name: &str,
     ) -> Result<Element, ElementManagerError> {
+        let collection = self.collection_config.for_url(&url);
+
         let additional_services =
             additional_services.map_or(Ok(None), |services| match services {
                 fsys::ServiceList {
@@ -267,24 +285,20 @@ impl ElementManager {
                     host_directory: Some(service_host_directory),
                     provider: None,
                 } => Ok(Some(AdditionalServices { names, host_directory: service_host_directory })),
-                _ => Err(ElementManagerError::invalid_service_list(child_name, &self.collection)),
+                _ => Err(ElementManagerError::invalid_service_list(child_name, collection)),
             })?;
 
         let element = if is_v2_component(&url) {
             // `additional_services` is only supported for CFv1 components.
             if additional_services.is_some() {
                 return Err(ElementManagerError::additional_services_not_supported(
-                    child_name,
-                    &self.collection,
+                    child_name, collection,
                 ));
             }
 
             // `arguments` is only supported for CFv1 components.
             if arguments.is_some() {
-                return Err(ElementManagerError::arguments_not_supported(
-                    child_name,
-                    &self.collection,
-                ));
+                return Err(ElementManagerError::arguments_not_supported(child_name, collection));
             }
 
             self.launch_v2_element(&child_name, &url).await?
@@ -372,29 +386,24 @@ impl ElementManager {
         child_name: &str,
         child_url: &str,
     ) -> Result<Element, ElementManagerError> {
+        let collection = self.collection_config.for_url(child_url);
+
         info!(
             child_name,
             child_url,
-            collection = %self.collection,
+            collection = %collection,
             "launch_v2_element"
         );
 
-        let collection_name = self.collection.as_ref();
-
-        realm_management::create_child_component(
-            &child_name,
-            &child_url,
-            collection_name,
-            &self.realm,
-        )
-        .await
-        .map_err(|err: fcomponent::Error| {
-            ElementManagerError::not_created(child_name, &self.collection, child_url, err)
-        })?;
+        realm_management::create_child_component(&child_name, &child_url, collection, &self.realm)
+            .await
+            .map_err(|err: fcomponent::Error| {
+                ElementManagerError::not_created(child_name, collection, child_url, err)
+            })?;
 
         let exposed_directory = match realm_management::open_child_component_exposed_dir(
             child_name,
-            &self.collection,
+            collection,
             &self.realm,
         )
         .await
@@ -403,7 +412,7 @@ impl ElementManager {
             Err(err) => {
                 return Err(ElementManagerError::exposed_dir_not_opened(
                     child_name,
-                    self.collection.clone(),
+                    collection.to_owned(),
                     child_url,
                     err,
                 ))
@@ -417,7 +426,7 @@ impl ElementManager {
         .map_err(|err| {
             ElementManagerError::not_bound(
                 child_name,
-                self.collection.clone(),
+                collection.to_owned(),
                 child_url,
                 err.to_string(),
             )
@@ -427,7 +436,7 @@ impl ElementManager {
             exposed_directory.into_channel().unwrap().into_zx_channel(),
             child_name,
             child_url,
-            &self.collection,
+            collection,
         ))
     }
 
@@ -731,15 +740,25 @@ async fn handle_element_controller_stream(
 #[cfg(test)]
 mod tests {
     use {
-        super::{ElementManager, ElementManagerError},
+        super::{CollectionConfig, ElementManager, ElementManagerError},
         fidl::{endpoints::spawn_stream_handler, prelude::*},
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_sys as fsys,
         fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::{channel::mpsc::channel, prelude::*},
         lazy_static::lazy_static,
+        maplit::hashmap,
         session_testing::{spawn_directory_server, spawn_noop_directory_server},
         test_util::Counter,
     };
+
+    fn example_collection_config() -> CollectionConfig {
+        CollectionConfig {
+            url_to_collection: hashmap! {
+                "https://special_component.cm".to_string() => "special_collection".to_string(),
+            },
+            default_collection: "elements".to_string(),
+        }
+    }
 
     /// Tests that launching a component with a cmx file successfully returns an Element
     /// with outgoing directory routing appropriate for v1 components.
@@ -753,7 +772,6 @@ mod tests {
 
         let component_url = "test_url.cmx";
         let child_name = "child";
-        let child_collection = "elements";
 
         let realm = spawn_stream_handler(move |_realm_request| async move {
             panic!("Realm should not receive any requests as it's only used for v2 components")
@@ -798,7 +816,8 @@ mod tests {
         })
         .unwrap();
 
-        let element_manager = ElementManager::new(realm, None, launcher, child_collection, false);
+        let element_manager =
+            ElementManager::new(realm, None, launcher, example_collection_config(), false);
         let result =
             element_manager.launch_element(component_url.to_string(), None, None, child_name).await;
         let element = result.unwrap();
@@ -836,8 +855,6 @@ mod tests {
         let b_component_url = "https://google.com";
         let b_child_name = "b_child";
 
-        let child_collection = "elements";
-
         let realm = spawn_stream_handler(move |_realm_request| async move {
             panic!("Realm should not receive any requests as it's only used for v2 components")
         })
@@ -861,7 +878,8 @@ mod tests {
         })
         .unwrap();
 
-        let element_manager = ElementManager::new(realm, None, launcher, child_collection, false);
+        let element_manager =
+            ElementManager::new(realm, None, launcher, example_collection_config(), false);
         assert!(element_manager
             .launch_element(a_component_url.to_string(), None, None, a_child_name)
             .await
@@ -886,7 +904,6 @@ mod tests {
 
         let component_url = "test_url.cmx";
         let child_name = "child";
-        let child_collection = "elements";
 
         const ELEMENT_COUNT: usize = 1;
 
@@ -958,7 +975,8 @@ mod tests {
         })
         .unwrap();
 
-        let element_manager = ElementManager::new(realm, None, launcher, child_collection, false);
+        let element_manager =
+            ElementManager::new(realm, None, launcher, example_collection_config(), false);
         let result = element_manager
             .launch_element(component_url.to_string(), Some(additional_services), None, child_name)
             .await;
@@ -986,7 +1004,6 @@ mod tests {
 
         let component_url = "test_url.cmx";
         let child_name = "child";
-        let child_collection = "elements";
 
         const ELEMENT_COUNT: usize = 1;
 
@@ -1020,7 +1037,8 @@ mod tests {
         })
         .unwrap();
 
-        let element_manager = ElementManager::new(realm, None, launcher, child_collection, false);
+        let element_manager =
+            ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
         let result = element_manager
             .launch_element(component_url.to_string(), None, Some(TEST_ARGS.clone()), child_name)
@@ -1039,7 +1057,6 @@ mod tests {
     async fn launch_v2_element_success() {
         let component_url = "fuchsia-pkg://fuchsia.com/simple_element#meta/simple_element.cm";
         let child_name = "child";
-        let child_collection = "elements";
 
         let (directory_open_sender, directory_open_receiver) = channel::<String>(1);
         let directory_request_handler = move |directory_request| match directory_request {
@@ -1065,12 +1082,12 @@ mod tests {
                     } => {
                         assert_eq!(decl.url.unwrap(), component_url);
                         assert_eq!(decl.name.unwrap(), child_name);
-                        assert_eq!(&collection.name, child_collection);
+                        assert_eq!(&collection.name, "elements");
 
                         let _ = responder.send(&mut Ok(()));
                     }
                     fcomponent::RealmRequest::OpenExposedDir { child, exposed_dir, responder } => {
-                        assert_eq!(child.collection, Some(child_collection.to_string()));
+                        assert_eq!(child.collection, Some("elements".to_string()));
                         spawn_directory_server(exposed_dir, directory_request_handler);
                         let _ = responder.send(&mut Ok(()));
                     }
@@ -1085,7 +1102,72 @@ mod tests {
         })
         .unwrap();
 
-        let element_manager = ElementManager::new(realm, None, launcher, child_collection, false);
+        let element_manager =
+            ElementManager::new(realm, None, launcher, example_collection_config(), false);
+
+        let result =
+            element_manager.launch_element(component_url.to_string(), None, None, child_name).await;
+        let element = result.unwrap();
+
+        // Now use the element api to open a service in the element's outgoing dir. Verify
+        // that the directory channel received the request with the correct path.
+        let (_client_channel, server_channel) = zx::Channel::create().unwrap();
+        let _ = element.connect_to_named_protocol_with_channel("myProtocol", server_channel);
+        let open_paths = directory_open_receiver.take(2).collect::<Vec<_>>().await;
+        assert_eq!(vec![fcomponent::BinderMarker::DEBUG_NAME, "myProtocol"], open_paths);
+    }
+
+    #[fuchsia::test]
+    async fn launch_v2_element_in_special_collection_success() {
+        let component_url = "https://special_component.cm";
+        let child_name = "child";
+
+        let (directory_open_sender, directory_open_receiver) = channel::<String>(1);
+        let directory_request_handler = move |directory_request| match directory_request {
+            fio::DirectoryRequest::Open { path: capability_path, .. } => {
+                let mut result_sender = directory_open_sender.clone();
+                fasync::Task::spawn(async move {
+                    let _ = result_sender.send(capability_path).await;
+                })
+                .detach()
+            }
+            _ => panic!("Directory handler received an unexpected request"),
+        };
+
+        let realm = spawn_stream_handler(move |realm_request| {
+            let directory_request_handler = directory_request_handler.clone();
+            async move {
+                match realm_request {
+                    fcomponent::RealmRequest::CreateChild {
+                        collection,
+                        decl,
+                        args: _,
+                        responder,
+                    } => {
+                        assert_eq!(decl.url.unwrap(), component_url);
+                        assert_eq!(decl.name.unwrap(), child_name);
+                        assert_eq!(&collection.name, "special_collection");
+
+                        let _ = responder.send(&mut Ok(()));
+                    }
+                    fcomponent::RealmRequest::OpenExposedDir { child, exposed_dir, responder } => {
+                        assert_eq!(child.collection, Some("special_collection".to_string()));
+                        spawn_directory_server(exposed_dir, directory_request_handler);
+                        let _ = responder.send(&mut Ok(()));
+                    }
+                    _ => panic!("Realm handler received an unexpected request"),
+                }
+            }
+        })
+        .unwrap();
+
+        let launcher = spawn_stream_handler(move |_launcher_request| async move {
+            panic!("Launcher should not receive any requests as it's only used for v1 components")
+        })
+        .unwrap();
+
+        let element_manager =
+            ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
         let result =
             element_manager.launch_element(component_url.to_string(), None, None, child_name).await;
@@ -1104,19 +1186,18 @@ mod tests {
     async fn launch_element_success_not_use_launcher() {
         let component_url = "fuchsia-pkg://fuchsia.com/simple_element#meta/simple_element.cm";
         let child_name = "child";
-        let child_collection = "elements";
 
         let realm = spawn_stream_handler(move |realm_request| async move {
             match realm_request {
                 fcomponent::RealmRequest::CreateChild { collection, decl, args: _, responder } => {
                     assert_eq!(decl.url.unwrap(), component_url);
                     assert_eq!(decl.name.unwrap(), child_name);
-                    assert_eq!(&collection.name, child_collection);
+                    assert_eq!(&collection.name, "elements");
 
                     let _ = responder.send(&mut Ok(()));
                 }
                 fcomponent::RealmRequest::OpenExposedDir { child, exposed_dir, responder } => {
-                    assert_eq!(child.collection, Some(child_collection.to_string()));
+                    assert_eq!(child.collection, Some("elements".to_string()));
                     spawn_noop_directory_server(exposed_dir);
                     let _ = responder.send(&mut Ok(()));
                 }
@@ -1130,7 +1211,8 @@ mod tests {
         })
         .unwrap();
 
-        let element_manager = ElementManager::new(realm, None, launcher, child_collection, false);
+        let element_manager =
+            ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
         assert!(element_manager
             .launch_element(component_url.to_string(), None, None, child_name)
@@ -1164,13 +1246,17 @@ mod tests {
         })
         .unwrap();
 
-        let element_manager = ElementManager::new(realm, None, launcher, "", false);
+        let element_manager =
+            ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
         let result = element_manager
             .launch_element(component_url.to_string(), Some(additional_services), None, "")
             .await;
         assert!(result.is_err());
-        assert_eq!(result.err().unwrap(), ElementManagerError::invalid_service_list("", ""));
+        assert_eq!(
+            result.err().unwrap(),
+            ElementManagerError::invalid_service_list("", "elements")
+        );
     }
 
     /// Tests that launching a *.cm element with a spec that contains `additional_services`
@@ -1196,7 +1282,8 @@ mod tests {
             panic!("Realm should not receive any requests since the child won't be created")
         })
         .unwrap();
-        let element_manager = ElementManager::new(realm, None, launcher, "", false);
+        let element_manager =
+            ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
         let result = element_manager
             .launch_element(component_url.to_string(), Some(additional_services), None, "")
@@ -1204,7 +1291,7 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             result.err().unwrap(),
-            ElementManagerError::additional_services_not_supported("", "")
+            ElementManagerError::additional_services_not_supported("", "elements")
         );
     }
 
@@ -1226,13 +1313,17 @@ mod tests {
             panic!("Realm should not receive any requests since the child won't be created")
         })
         .unwrap();
-        let element_manager = ElementManager::new(realm, None, launcher, "", false);
+        let element_manager =
+            ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
         let result = element_manager
             .launch_element(component_url.to_string(), None, Some(arguments), "")
             .await;
         assert!(result.is_err());
-        assert_eq!(result.err().unwrap(), ElementManagerError::arguments_not_supported("", ""));
+        assert_eq!(
+            result.err().unwrap(),
+            ElementManagerError::arguments_not_supported("", "elements")
+        );
     }
 
     /// Tests that launching an element which is not successfully created in the realm returns an
@@ -1262,14 +1353,20 @@ mod tests {
             }
         })
         .unwrap();
-        let element_manager = ElementManager::new(realm, None, launcher, "", false);
+        let element_manager =
+            ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
         let result =
             element_manager.launch_element(component_url.to_string(), None, None, "").await;
         assert!(result.is_err());
         assert_eq!(
             result.err().unwrap(),
-            ElementManagerError::not_created("", "", component_url, fcomponent::Error::Internal)
+            ElementManagerError::not_created(
+                "",
+                "elements",
+                component_url,
+                fcomponent::Error::Internal
+            )
         );
     }
 
@@ -1300,7 +1397,8 @@ mod tests {
             }
         })
         .unwrap();
-        let element_manager = ElementManager::new(realm, None, launcher, "", false);
+        let element_manager =
+            ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
         let result =
             element_manager.launch_element(component_url.to_string(), None, None, "").await;
@@ -1309,7 +1407,7 @@ mod tests {
             result.err().unwrap(),
             ElementManagerError::not_created(
                 "",
-                "",
+                "elements",
                 component_url,
                 fcomponent::Error::ResourceUnavailable
             )
@@ -1349,7 +1447,8 @@ mod tests {
         })
         .unwrap();
 
-        let element_manager = ElementManager::new(realm, None, launcher, "", false);
+        let element_manager =
+            ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
         let result =
             element_manager.launch_element(component_url.to_string(), None, None, "").await;
@@ -1358,7 +1457,7 @@ mod tests {
             result.err().unwrap(),
             ElementManagerError::exposed_dir_not_opened(
                 "",
-                "",
+                "elements",
                 component_url,
                 fcomponent::Error::InstanceCannotResolve,
             )
@@ -1400,7 +1499,8 @@ mod tests {
             }
         })
         .unwrap();
-        let element_manager = ElementManager::new(realm, None, launcher, "", false);
+        let element_manager =
+            ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
         let result =
             element_manager.launch_element(component_url.to_string(), None, None, "").await;
@@ -1409,7 +1509,7 @@ mod tests {
             result.err().unwrap(),
             ElementManagerError::not_bound(
                 "",
-                "",
+                "elements",
                 component_url,
                 "Failed to open protocol in directory"
             )

@@ -4,7 +4,7 @@
 {
     include: [
         "inspect/client.shard.cml",
-        "syslog/client.shard.cml",
+        "syslog/offer.shard.cml",
     ],
     children: [
         {
@@ -14,7 +14,7 @@
         },
         {
             name: "element_manager",
-            url: "fuchsia-pkg://fuchsia.com/element_manager#meta/element_manager.cm",
+            url: "fuchsia-pkg://fuchsia.com/element_manager_gazelle#meta/element_manager.cm",
         },
         {
             name: "element_router",
@@ -31,19 +31,16 @@
             name: "elements",
             durability: "transient",
         },
+        {
+            name: "shell_settings",
+            durability: "transient",
+        },
+        {
+            name: "terminal",
+            durability: "transient",
+        },
     ],
     offer: [
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#chrome",
-                "#element_manager",
-                "#element_router",
-                "#elements",
-                "#wm",
-            ],
-        },
         {
             protocol: [
                 "fuchsia.sysmem.Allocator",
@@ -132,21 +129,15 @@
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
-            to: "#elements",
+            to: [
+                "#elements",
+                "#shell_settings",
+                "#terminal",
+            ],
         },
 
         // Capabilities for terminal.
         {
-            // TODO(fxbug.dev/105828): These additional `protocol` offers to
-            // `#elements` are only required by the `terminal` component.
-            // `terminal` is launched as a member of the `elements` collection,
-            // and if/when there is a way to route capabilities to specific
-            // collection members, these protocols should be routed only to
-            // terminal.
-            //
-            // Other (current and future) members of `#elements` should not
-            // `use` these protocols without first getting a security policy
-            // review.
             protocol: [
                 "fuchsia.bluetooth.sys.Access",
                 "fuchsia.bluetooth.sys.HostWatcher",
@@ -175,26 +166,16 @@
                 "fuchsia.wlan.policy.ClientProvider",
             ],
             from: "parent",
-            to: "#elements",
+            to: "#terminal",
         },
         {
-            // TODO(fxbug.dev/105828): These additional `directory` offers to
-            // `#elements` are only required by the `terminal` component.
-            // `terminal` is launched as a member of the `elements` collection,
-            // and if/when there is a way to route capabilities to specific
-            // collection members, these directories should be routed only to
-            // terminal.
-            //
-            // Other (current and future) members of `#elements` should not
-            // `use` these directories without first getting a security policy
-            // review.
             directory: [
                 "bin",
                 "boot-bin",
                 "pkgfs-packages",
             ],
             from: "parent",
-            to: "#elements",
+            to: "#terminal",
         },
 
         // Capabilities for chrome.
@@ -254,6 +235,17 @@
             from: "parent",
             as: "data",
             to: "#chrome",
+        },
+
+        // Capabilities for the settings app.
+        {
+            protocol: [
+                "fuchsia.feedback.CrashReporter",
+                "fuchsia.update.channelcontrol.ChannelControl",
+                "fuchsia.update.Manager",
+            ],
+            from: "parent",
+            to: [ "#shell_settings" ],
         },
     ],
     expose: [
