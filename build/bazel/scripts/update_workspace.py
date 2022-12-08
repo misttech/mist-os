@@ -87,19 +87,24 @@ def force_symlink(target_path: str, dst_path: str):
 def make_removeable(path: str):
     '''Ensure the file at |path| is removeable.'''
 
+    islink = os.path.islink(path)
+
     # Skip if the input path is a symlink, and chmod with
     # `follow_symlinks=False` is not supported. Linux is the most notable
     # platform that meets this requirement, and adding S_IWUSR is not necessary
     # for removing symlinks.
-    if os.path.islink(path) and (os.chmod not in os.supports_follow_symlinks):
+    if islink and (os.chmod not in os.supports_follow_symlinks):
         return
 
     info = os.stat(path, follow_symlinks=False)
     if info.st_mode & stat.S_IWUSR == 0:
         try:
-            os.chmod(path, info.st_mode | stat.S_IWUSR, follow_symlinks=False)
+            if islink:
+                os.chmod(
+                    path, info.st_mode | stat.S_IWUSR, follow_symlinks=False)
+            else:
+                os.chmod(path, info.st_mode | stat.S_IWUSR)
         except Exception as e:
-            islink = os.path.islink(path)
             raise RuntimeError(
                 f'Failed to chmod +w to {path}, islink: {islink}, info: {info}, error: {e}'
             )
