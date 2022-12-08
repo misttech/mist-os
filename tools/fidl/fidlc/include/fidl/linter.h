@@ -65,10 +65,10 @@ class Linter {
   //   excluded check IDs remain in this set.
   //
   // Returns true if no new findings were generated.
-  bool Lint(std::unique_ptr<raw::File> const& parsed_source, Findings* findings,
+  bool Lint(const std::unique_ptr<raw::File>& parsed_source, Findings* findings,
             std::set<std::string>* excluded_checks_not_found);
 
-  bool Lint(std::unique_ptr<raw::File> const& parsed_source, Findings* findings) {
+  bool Lint(const std::unique_ptr<raw::File>& parsed_source, Findings* findings) {
     return Lint(parsed_source, findings, nullptr);
   }
 

@@ -23,43 +23,43 @@ class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
  public:
   explicit SpanSequenceTreeVisitor(std::string_view file, raw::TokenPointerList tokens)
       : file_(file), tokens_(std::move(tokens)) {}
-  void OnAliasDeclaration(std::unique_ptr<raw::AliasDeclaration> const& element) override;
-  void OnAttributeArg(std::unique_ptr<raw::AttributeArg> const& element) override;
-  void OnAttribute(std::unique_ptr<raw::Attribute> const& element) override;
-  void OnAttributeList(std::unique_ptr<raw::AttributeList> const& element) override;
+  void OnAliasDeclaration(const std::unique_ptr<raw::AliasDeclaration>& element) override;
+  void OnAttributeArg(const std::unique_ptr<raw::AttributeArg>& element) override;
+  void OnAttribute(const std::unique_ptr<raw::Attribute>& element) override;
+  void OnAttributeList(const std::unique_ptr<raw::AttributeList>& element) override;
   void OnBinaryOperatorConstant(
-      std::unique_ptr<raw::BinaryOperatorConstant> const& element) override;
-  void OnCompoundIdentifier(std::unique_ptr<raw::CompoundIdentifier> const& element) override;
-  void OnConstant(std::unique_ptr<raw::Constant> const& element) override;
-  void OnConstDeclaration(std::unique_ptr<raw::ConstDeclaration> const& element) override;
-  void OnFile(std::unique_ptr<raw::File> const& element) override;
-  void OnIdentifier(std::unique_ptr<raw::Identifier> const& element, bool ignore);
-  void OnIdentifier(std::unique_ptr<raw::Identifier> const& element) override {
+      const std::unique_ptr<raw::BinaryOperatorConstant>& element) override;
+  void OnCompoundIdentifier(const std::unique_ptr<raw::CompoundIdentifier>& element) override;
+  void OnConstant(const std::unique_ptr<raw::Constant>& element) override;
+  void OnConstDeclaration(const std::unique_ptr<raw::ConstDeclaration>& element) override;
+  void OnFile(const std::unique_ptr<raw::File>& element) override;
+  void OnIdentifier(const std::unique_ptr<raw::Identifier>& element, bool ignore);
+  void OnIdentifier(const std::unique_ptr<raw::Identifier>& element) override {
     OnIdentifier(element, false);
   }
-  void OnIdentifierConstant(std::unique_ptr<raw::IdentifierConstant> const& element) override;
-  void OnLayout(std::unique_ptr<raw::Layout> const& element) override;
-  void OnInlineLayoutReference(std::unique_ptr<raw::InlineLayoutReference> const& element) override;
-  void OnLayoutMember(std::unique_ptr<raw::LayoutMember> const& element) override;
-  void OnLibraryDeclaration(std::unique_ptr<raw::LibraryDeclaration> const& element) override;
-  void OnLiteral(std::unique_ptr<raw::Literal> const& element) override;
-  void OnLiteralConstant(std::unique_ptr<raw::LiteralConstant> const& element) override;
-  void OnNamedLayoutReference(std::unique_ptr<raw::NamedLayoutReference> const& element) override;
+  void OnIdentifierConstant(const std::unique_ptr<raw::IdentifierConstant>& element) override;
+  void OnLayout(const std::unique_ptr<raw::Layout>& element) override;
+  void OnInlineLayoutReference(const std::unique_ptr<raw::InlineLayoutReference>& element) override;
+  void OnLayoutMember(const std::unique_ptr<raw::LayoutMember>& element) override;
+  void OnLibraryDeclaration(const std::unique_ptr<raw::LibraryDeclaration>& element) override;
+  void OnLiteral(const std::unique_ptr<raw::Literal>& element) override;
+  void OnLiteralConstant(const std::unique_ptr<raw::LiteralConstant>& element) override;
+  void OnNamedLayoutReference(const std::unique_ptr<raw::NamedLayoutReference>& element) override;
   void OnOrdinal64(raw::Ordinal64& element) override;
-  void OnOrdinaledLayoutMember(std::unique_ptr<raw::OrdinaledLayoutMember> const& element) override;
-  void OnParameterList(std::unique_ptr<raw::ParameterList> const& element) override;
-  void OnProtocolCompose(std::unique_ptr<raw::ProtocolCompose> const& element) override;
-  void OnProtocolDeclaration(std::unique_ptr<raw::ProtocolDeclaration> const& element) override;
-  void OnProtocolMethod(std::unique_ptr<raw::ProtocolMethod> const& element) override;
-  void OnResourceDeclaration(std::unique_ptr<raw::ResourceDeclaration> const& element) override;
-  void OnResourceProperty(std::unique_ptr<raw::ResourceProperty> const& element) override;
-  void OnServiceDeclaration(std::unique_ptr<raw::ServiceDeclaration> const& element) override;
-  void OnServiceMember(std::unique_ptr<raw::ServiceMember> const& element) override;
-  void OnStructLayoutMember(std::unique_ptr<raw::StructLayoutMember> const& element) override;
-  void OnTypeConstructor(std::unique_ptr<raw::TypeConstructor> const& element) override;
-  void OnTypeDeclaration(std::unique_ptr<raw::TypeDeclaration> const& element) override;
-  void OnUsing(std::unique_ptr<raw::Using> const& element) override;
-  void OnValueLayoutMember(std::unique_ptr<raw::ValueLayoutMember> const& element) override;
+  void OnOrdinaledLayoutMember(const std::unique_ptr<raw::OrdinaledLayoutMember>& element) override;
+  void OnParameterList(const std::unique_ptr<raw::ParameterList>& element) override;
+  void OnProtocolCompose(const std::unique_ptr<raw::ProtocolCompose>& element) override;
+  void OnProtocolDeclaration(const std::unique_ptr<raw::ProtocolDeclaration>& element) override;
+  void OnProtocolMethod(const std::unique_ptr<raw::ProtocolMethod>& element) override;
+  void OnResourceDeclaration(const std::unique_ptr<raw::ResourceDeclaration>& element) override;
+  void OnResourceProperty(const std::unique_ptr<raw::ResourceProperty>& element) override;
+  void OnServiceDeclaration(const std::unique_ptr<raw::ServiceDeclaration>& element) override;
+  void OnServiceMember(const std::unique_ptr<raw::ServiceMember>& element) override;
+  void OnStructLayoutMember(const std::unique_ptr<raw::StructLayoutMember>& element) override;
+  void OnTypeConstructor(const std::unique_ptr<raw::TypeConstructor>& element) override;
+  void OnTypeDeclaration(const std::unique_ptr<raw::TypeDeclaration>& element) override;
+  void OnUsing(const std::unique_ptr<raw::Using>& element) override;
+  void OnValueLayoutMember(const std::unique_ptr<raw::ValueLayoutMember>& element) override;
 
   // Must be called after OnFile() has been called.  Returns the result of the file fragmentation
   // work done by this class.

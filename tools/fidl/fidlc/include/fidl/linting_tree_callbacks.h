@@ -28,7 +28,7 @@ class LintingTreeCallbacks {
 
   // Process a file (initiates the callbacks as each element is visited for
   // the given parsed source file).
-  void Visit(std::unique_ptr<raw::File> const& element);
+  void Visit(const std::unique_ptr<raw::File>& element);
 
   // Register a callback for a "File" event. All of the remaining "On"
   // functions similarly match their corresponding TreeVisitor methods.

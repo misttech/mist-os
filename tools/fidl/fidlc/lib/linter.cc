@@ -208,7 +208,7 @@ CheckDef Linter::DefineCheck(std::string_view check_id, std::string message_temp
 }
 
 // Returns true if no new findings were generated
-bool Linter::Lint(std::unique_ptr<raw::File> const& parsed_source, Findings* findings,
+bool Linter::Lint(const std::unique_ptr<raw::File>& parsed_source, Findings* findings,
                   std::set<std::string>* excluded_checks_not_found) {
   auto initial_findings_size = findings->size();
   callbacks_.Visit(parsed_source);

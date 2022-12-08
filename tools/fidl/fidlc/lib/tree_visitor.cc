@@ -10,7 +10,7 @@
 
 namespace fidl::raw {
 
-void DeclarationOrderTreeVisitor::OnFile(std::unique_ptr<File> const& element) {
+void DeclarationOrderTreeVisitor::OnFile(const std::unique_ptr<File>& element) {
   OnSourceElementStart(*element);
   OnLibraryDeclaration(element->library_decl);
 
@@ -107,7 +107,7 @@ void DeclarationOrderTreeVisitor::OnFile(std::unique_ptr<File> const& element) {
 }
 
 void DeclarationOrderTreeVisitor::OnProtocolDeclaration(
-    std::unique_ptr<ProtocolDeclaration> const& element) {
+    const std::unique_ptr<ProtocolDeclaration>& element) {
   SourceElementMark sem(this, *element);
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);

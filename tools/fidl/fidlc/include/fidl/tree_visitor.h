@@ -18,12 +18,12 @@ class TreeVisitor {
 
   virtual void OnSourceElementStart(const SourceElement& element) {}
   virtual void OnSourceElementEnd(const SourceElement& element) {}
-  virtual void OnIdentifier(std::unique_ptr<Identifier> const& element) { element->Accept(this); }
-  virtual void OnCompoundIdentifier(std::unique_ptr<CompoundIdentifier> const& element) {
+  virtual void OnIdentifier(const std::unique_ptr<Identifier>& element) { element->Accept(this); }
+  virtual void OnCompoundIdentifier(const std::unique_ptr<CompoundIdentifier>& element) {
     element->Accept(this);
   }
 
-  virtual void OnLiteral(std::unique_ptr<fidl::raw::Literal> const& element) {
+  virtual void OnLiteral(const std::unique_ptr<fidl::raw::Literal>& element) {
     switch (element->kind) {
       case Literal::Kind::kDocComment:
         OnDocCommentLiteral(*static_cast<DocCommentLiteral*>(element.get()));
@@ -62,7 +62,7 @@ class TreeVisitor {
     static_cast<void>(uptr.release());                     \
   } while (0)
 
-  virtual void OnConstant(std::unique_ptr<Constant> const& element) {
+  virtual void OnConstant(const std::unique_ptr<Constant>& element) {
     Constant::Kind kind = element->kind;
     switch (kind) {
       case Constant::Kind::kIdentifier: {
@@ -80,13 +80,13 @@ class TreeVisitor {
     }
   }
 
-  virtual void OnIdentifierConstant(std::unique_ptr<IdentifierConstant> const& element) {
+  virtual void OnIdentifierConstant(const std::unique_ptr<IdentifierConstant>& element) {
     element->Accept(this);
   }
-  virtual void OnLiteralConstant(std::unique_ptr<LiteralConstant> const& element) {
+  virtual void OnLiteralConstant(const std::unique_ptr<LiteralConstant>& element) {
     element->Accept(this);
   }
-  virtual void OnBinaryOperatorConstant(std::unique_ptr<BinaryOperatorConstant> const& element) {
+  virtual void OnBinaryOperatorConstant(const std::unique_ptr<BinaryOperatorConstant>& element) {
     element->Accept(this);
   }
 
@@ -96,51 +96,51 @@ class TreeVisitor {
 
   virtual void OnAttribute(const std::unique_ptr<Attribute>& element) { element->Accept(this); }
 
-  virtual void OnAttributeList(std::unique_ptr<AttributeList> const& element) {
+  virtual void OnAttributeList(const std::unique_ptr<AttributeList>& element) {
     element->Accept(this);
   }
 
-  virtual void OnAliasDeclaration(std::unique_ptr<AliasDeclaration> const& element) {
+  virtual void OnAliasDeclaration(const std::unique_ptr<AliasDeclaration>& element) {
     element->Accept(this);
   }
 
-  virtual void OnLibraryDeclaration(std::unique_ptr<LibraryDeclaration> const& element) {
+  virtual void OnLibraryDeclaration(const std::unique_ptr<LibraryDeclaration>& element) {
     element->Accept(this);
   }
 
-  virtual void OnUsing(std::unique_ptr<Using> const& element) { element->Accept(this); }
+  virtual void OnUsing(const std::unique_ptr<Using>& element) { element->Accept(this); }
 
-  virtual void OnConstDeclaration(std::unique_ptr<ConstDeclaration> const& element) {
+  virtual void OnConstDeclaration(const std::unique_ptr<ConstDeclaration>& element) {
     element->Accept(this);
   }
 
-  virtual void OnParameterList(std::unique_ptr<ParameterList> const& element) {
+  virtual void OnParameterList(const std::unique_ptr<ParameterList>& element) {
     element->Accept(this);
   }
-  virtual void OnProtocolMethod(std::unique_ptr<ProtocolMethod> const& element) {
+  virtual void OnProtocolMethod(const std::unique_ptr<ProtocolMethod>& element) {
     element->Accept(this);
   }
-  virtual void OnProtocolCompose(std::unique_ptr<ProtocolCompose> const& element) {
+  virtual void OnProtocolCompose(const std::unique_ptr<ProtocolCompose>& element) {
     element->Accept(this);
   }
-  virtual void OnProtocolDeclaration(std::unique_ptr<ProtocolDeclaration> const& element) {
+  virtual void OnProtocolDeclaration(const std::unique_ptr<ProtocolDeclaration>& element) {
     element->Accept(this);
   }
-  virtual void OnResourceProperty(std::unique_ptr<ResourceProperty> const& element) {
+  virtual void OnResourceProperty(const std::unique_ptr<ResourceProperty>& element) {
     element->Accept(this);
   }
-  virtual void OnResourceDeclaration(std::unique_ptr<ResourceDeclaration> const& element) {
+  virtual void OnResourceDeclaration(const std::unique_ptr<ResourceDeclaration>& element) {
     element->Accept(this);
   }
-  virtual void OnServiceMember(std::unique_ptr<ServiceMember> const& element) {
+  virtual void OnServiceMember(const std::unique_ptr<ServiceMember>& element) {
     element->Accept(this);
   }
-  virtual void OnServiceDeclaration(std::unique_ptr<ServiceDeclaration> const& element) {
+  virtual void OnServiceDeclaration(const std::unique_ptr<ServiceDeclaration>& element) {
     element->Accept(this);
   }
-  virtual void OnModifiers(std::unique_ptr<Modifiers> const& element) { element->Accept(this); }
+  virtual void OnModifiers(const std::unique_ptr<Modifiers>& element) { element->Accept(this); }
 
-  virtual void OnLayoutParameter(std::unique_ptr<LayoutParameter> const& element) {
+  virtual void OnLayoutParameter(const std::unique_ptr<LayoutParameter>& element) {
     LayoutParameter::Kind kind = element->kind;
     switch (kind) {
       case LayoutParameter::Kind::kIdentifier: {
@@ -158,22 +158,22 @@ class TreeVisitor {
     }
   }
 
-  virtual void OnLayoutParameterList(std::unique_ptr<LayoutParameterList> const& element) {
+  virtual void OnLayoutParameterList(const std::unique_ptr<LayoutParameterList>& element) {
     element->Accept(this);
   }
 
   virtual void OnIdentifierLayoutParameter(
-      std::unique_ptr<IdentifierLayoutParameter> const& element) {
+      const std::unique_ptr<IdentifierLayoutParameter>& element) {
     element->Accept(this);
   }
-  virtual void OnLiteralLayoutParameter(std::unique_ptr<LiteralLayoutParameter> const& element) {
+  virtual void OnLiteralLayoutParameter(const std::unique_ptr<LiteralLayoutParameter>& element) {
     element->Accept(this);
   }
-  virtual void OnTypeLayoutParameter(std::unique_ptr<TypeLayoutParameter> const& element) {
+  virtual void OnTypeLayoutParameter(const std::unique_ptr<TypeLayoutParameter>& element) {
     element->Accept(this);
   }
 
-  virtual void OnLayoutMember(std::unique_ptr<LayoutMember> const& element) {
+  virtual void OnLayoutMember(const std::unique_ptr<LayoutMember>& element) {
     LayoutMember::Kind kind = element->kind;
     switch (kind) {
       case LayoutMember::Kind::kOrdinaled: {
@@ -191,19 +191,19 @@ class TreeVisitor {
     }
   }
 
-  virtual void OnOrdinaledLayoutMember(std::unique_ptr<OrdinaledLayoutMember> const& element) {
+  virtual void OnOrdinaledLayoutMember(const std::unique_ptr<OrdinaledLayoutMember>& element) {
     element->Accept(this);
   }
-  virtual void OnStructLayoutMember(std::unique_ptr<StructLayoutMember> const& element) {
+  virtual void OnStructLayoutMember(const std::unique_ptr<StructLayoutMember>& element) {
     element->Accept(this);
   }
-  virtual void OnValueLayoutMember(std::unique_ptr<ValueLayoutMember> const& element) {
+  virtual void OnValueLayoutMember(const std::unique_ptr<ValueLayoutMember>& element) {
     element->Accept(this);
   }
 
-  virtual void OnLayout(std::unique_ptr<Layout> const& element) { element->Accept(this); }
+  virtual void OnLayout(const std::unique_ptr<Layout>& element) { element->Accept(this); }
 
-  virtual void OnLayoutReference(std::unique_ptr<LayoutReference> const& element) {
+  virtual void OnLayoutReference(const std::unique_ptr<LayoutReference>& element) {
     LayoutReference::Kind kind = element->kind;
     switch (kind) {
       case LayoutReference::Kind::kInline: {
@@ -217,26 +217,26 @@ class TreeVisitor {
     }
   }
 
-  virtual void OnInlineLayoutReference(std::unique_ptr<InlineLayoutReference> const& element) {
+  virtual void OnInlineLayoutReference(const std::unique_ptr<InlineLayoutReference>& element) {
     element->Accept(this);
   }
-  virtual void OnNamedLayoutReference(std::unique_ptr<NamedLayoutReference> const& element) {
-    element->Accept(this);
-  }
-
-  virtual void OnTypeConstraints(std::unique_ptr<TypeConstraints> const& element) {
+  virtual void OnNamedLayoutReference(const std::unique_ptr<NamedLayoutReference>& element) {
     element->Accept(this);
   }
 
-  virtual void OnTypeConstructor(std::unique_ptr<TypeConstructor> const& element) {
+  virtual void OnTypeConstraints(const std::unique_ptr<TypeConstraints>& element) {
     element->Accept(this);
   }
 
-  virtual void OnTypeDeclaration(std::unique_ptr<TypeDeclaration> const& element) {
+  virtual void OnTypeConstructor(const std::unique_ptr<TypeConstructor>& element) {
     element->Accept(this);
   }
 
-  virtual void OnFile(std::unique_ptr<File> const& element) { element->Accept(this); }
+  virtual void OnTypeDeclaration(const std::unique_ptr<TypeDeclaration>& element) {
+    element->Accept(this);
+  }
+
+  virtual void OnFile(const std::unique_ptr<File>& element) { element->Accept(this); }
 };
 
 #undef DISPATCH_TO
@@ -245,8 +245,8 @@ class TreeVisitor {
 // have a special visitor for code that needs to visit in declaration order.
 class DeclarationOrderTreeVisitor : public TreeVisitor {
  public:
-  void OnFile(std::unique_ptr<File> const& element) override;
-  void OnProtocolDeclaration(std::unique_ptr<ProtocolDeclaration> const& element) override;
+  void OnFile(const std::unique_ptr<File>& element) override;
+  void OnProtocolDeclaration(const std::unique_ptr<ProtocolDeclaration>& element) override;
 };
 
 }  // namespace fidl::raw

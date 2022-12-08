@@ -28,7 +28,7 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
     explicit CallbackTreeVisitor(const LintingTreeCallbacks& callbacks)
         : callbacks_(callbacks), kGapTextRegex_(GapTextRegex()) {}
 
-    void OnFile(std::unique_ptr<raw::File> const& element) override {
+    void OnFile(const std::unique_ptr<raw::File>& element) override {
       for (auto& callback : callbacks_.file_callbacks_) {
         callback(*element);
       }
@@ -46,7 +46,7 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
     void OnSourceElementEnd(const raw::SourceElement& element) override {
       ProcessGapText(element.end());
     }
-    void OnAliasDeclaration(std::unique_ptr<raw::AliasDeclaration> const& element) override {
+    void OnAliasDeclaration(const std::unique_ptr<raw::AliasDeclaration>& element) override {
       ProcessGapText(element->start());
       for (auto& callback : callbacks_.alias_callbacks_) {
         callback(*element);
@@ -54,7 +54,7 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
       DeclarationOrderTreeVisitor::OnAliasDeclaration(element);
       ProcessGapText(element->end());
     }
-    void OnUsing(std::unique_ptr<raw::Using> const& element) override {
+    void OnUsing(const std::unique_ptr<raw::Using>& element) override {
       ProcessGapText(element->start());
       for (auto& callback : callbacks_.using_callbacks_) {
         callback(*element);
@@ -62,7 +62,7 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
       DeclarationOrderTreeVisitor::OnUsing(element);
       ProcessGapText(element->end());
     }
-    void OnConstDeclaration(std::unique_ptr<raw::ConstDeclaration> const& element) override {
+    void OnConstDeclaration(const std::unique_ptr<raw::ConstDeclaration>& element) override {
       ProcessGapText(element->start());
       for (auto& callback : callbacks_.const_declaration_callbacks_) {
         callback(*element);
@@ -73,7 +73,7 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
       }
       ProcessGapText(element->end());
     }
-    void OnProtocolDeclaration(std::unique_ptr<raw::ProtocolDeclaration> const& element) override {
+    void OnProtocolDeclaration(const std::unique_ptr<raw::ProtocolDeclaration>& element) override {
       ProcessGapText(element->start());
       for (auto& callback : callbacks_.protocol_declaration_callbacks_) {
         callback(*element);
@@ -84,7 +84,7 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
       }
       ProcessGapText(element->end());
     }
-    void OnProtocolMethod(std::unique_ptr<raw::ProtocolMethod> const& element) override {
+    void OnProtocolMethod(const std::unique_ptr<raw::ProtocolMethod>& element) override {
       ProcessGapText(element->start());
       if (element->maybe_request != nullptr) {
         for (auto& callback : callbacks_.method_callbacks_) {
@@ -104,7 +104,7 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
       }
     }
     void OnOrdinaledLayoutMember(
-        std::unique_ptr<raw::OrdinaledLayoutMember> const& element) override {
+        const std::unique_ptr<raw::OrdinaledLayoutMember>& element) override {
       ProcessGapText(element->start());
       for (auto& callback : callbacks_.ordinaled_layout_member_callbacks_) {
         callback(*element);
@@ -112,7 +112,7 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
       DeclarationOrderTreeVisitor::OnOrdinaledLayoutMember(element);
       ProcessGapText(element->end());
     }
-    void OnStructLayoutMember(std::unique_ptr<raw::StructLayoutMember> const& element) override {
+    void OnStructLayoutMember(const std::unique_ptr<raw::StructLayoutMember>& element) override {
       ProcessGapText(element->start());
       for (auto& callback : callbacks_.struct_layout_member_callbacks_) {
         callback(*element);
@@ -120,7 +120,7 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
       DeclarationOrderTreeVisitor::OnStructLayoutMember(element);
       ProcessGapText(element->end());
     }
-    void OnValueLayoutMember(std::unique_ptr<raw::ValueLayoutMember> const& element) override {
+    void OnValueLayoutMember(const std::unique_ptr<raw::ValueLayoutMember>& element) override {
       ProcessGapText(element->start());
       for (auto& callback : callbacks_.value_layout_member_callbacks_) {
         callback(*element);
@@ -128,7 +128,7 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
       DeclarationOrderTreeVisitor::OnValueLayoutMember(element);
       ProcessGapText(element->end());
     }
-    void OnLayout(std::unique_ptr<raw::Layout> const& element) override {
+    void OnLayout(const std::unique_ptr<raw::Layout>& element) override {
       ProcessGapText(element->start());
       for (auto& callback : callbacks_.layout_callbacks_) {
         callback(*element);
@@ -139,7 +139,7 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
       }
       ProcessGapText(element->end());
     }
-    void OnTypeDeclaration(std::unique_ptr<raw::TypeDeclaration> const& element) override {
+    void OnTypeDeclaration(const std::unique_ptr<raw::TypeDeclaration>& element) override {
       ProcessGapText(element->start());
       for (auto& callback : callbacks_.type_decl_callbacks_) {
         callback(*element);
@@ -151,7 +151,7 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
       ProcessGapText(element->end());
     }
     void OnIdentifierLayoutParameter(
-        std::unique_ptr<raw::IdentifierLayoutParameter> const& element) override {
+        const std::unique_ptr<raw::IdentifierLayoutParameter>& element) override {
       // For the time being, the the first type parameter in a layout must either be a
       // TypeConstructor (like `vector<uint8>`), or else a reference to on (like `vector<Foo>`).
       // Because of this, we can treat an IdentifierLayoutParameter as a TypeConstructor for the
@@ -161,7 +161,7 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
       }
       DeclarationOrderTreeVisitor::OnIdentifierLayoutParameter(element);
     }
-    void OnTypeConstructor(std::unique_ptr<raw::TypeConstructor> const& element) override {
+    void OnTypeConstructor(const std::unique_ptr<raw::TypeConstructor>& element) override {
       for (auto& callback : callbacks_.type_constructor_callbacks_) {
         callback(*element);
       }
@@ -314,7 +314,7 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
   tree_visitor_ = std::make_unique<CallbackTreeVisitor>(*this);
 }  // namespace linter
 
-void LintingTreeCallbacks::Visit(std::unique_ptr<raw::File> const& element) {
+void LintingTreeCallbacks::Visit(const std::unique_ptr<raw::File>& element) {
   tree_visitor_->OnFile(element);
 }
 
