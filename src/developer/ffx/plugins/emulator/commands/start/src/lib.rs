@@ -78,7 +78,7 @@ pub async fn start(cmd: StartCommand, proxy: TargetCollectionProxy) -> Result<()
     }
 
     // We do an initial build here, because we need an initial configuration before staging.
-    let emulator_cmd = engine.build_emulator_cmd();
+    let mut emulator_cmd = engine.build_emulator_cmd();
 
     if cmd.verbose || cmd.dry_run {
         println!("\n[emulator] Command line after Configuration: {:?}\n", emulator_cmd);
@@ -97,7 +97,7 @@ pub async fn start(cmd: StartCommand, proxy: TargetCollectionProxy) -> Result<()
         }
 
         // We rebuild the command, since staging likely changed the file paths.
-        let emulator_cmd = engine.build_emulator_cmd();
+        emulator_cmd = engine.build_emulator_cmd();
 
         if cmd.verbose || cmd.stage {
             println!("\n[emulator] Command line after Staging: {:?}\n", emulator_cmd);
@@ -106,6 +106,11 @@ pub async fn start(cmd: StartCommand, proxy: TargetCollectionProxy) -> Result<()
                 return Ok(());
             }
         }
+    }
+
+    if cmd.verbose {
+        println!("\n[emulator] Final Command line: {:?}\n", emulator_cmd);
+        println!("[emulator] With ENV: {:?}\n", emulator_cmd.get_envs());
     }
 
     match engine.start(emulator_cmd, &proxy).await {
