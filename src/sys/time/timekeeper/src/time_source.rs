@@ -19,7 +19,6 @@ use {
 };
 
 const TIMESOURCE_COLLECTION_NAME: &str = "timesource";
-const PRIMARY_TIMESOURCE_NAME: &str = "primary";
 
 /// A time sample received from a source of time.
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -112,6 +111,7 @@ pub trait PullSource: Send + Sync + Debug {
 #[derive(Debug)]
 pub struct TimeSourceLauncher {
     component_url: String,
+    name: String,
 }
 
 enum DestroyChildError {
@@ -130,9 +130,13 @@ impl From<DestroyChildError> for anyhow::Error {
 
 impl TimeSourceLauncher {
     /// Creates new launcher.
-    /// TODO(fxb/111889): Pass in the Role enum and use it to derive the time source name.
-    pub fn new(component_url: String) -> Self {
-        TimeSourceLauncher { component_url }
+    pub fn new<S>(component_url: S, name: S) -> Self
+    where
+        S: Into<String>,
+    {
+        let component_url = component_url.into();
+        let name = name.into();
+        TimeSourceLauncher { component_url, name }
     }
 
     /// Launches the timesource.
@@ -146,7 +150,7 @@ impl TimeSourceLauncher {
             DestroyChildError::Internal(e) => Err(e),
         })?;
         let child_decl = Child {
-            name: Some(String::from(PRIMARY_TIMESOURCE_NAME)),
+            name: Some(self.name.clone()),
             url: Some(self.component_url.clone()),
             startup: Some(StartupMode::Lazy),
             ..Child::EMPTY
@@ -160,7 +164,7 @@ impl TimeSourceLauncher {
             .map_err(|e| anyhow!("failed to create child: {:?}", e))?;
 
         Ok(client::open_childs_exposed_directory(
-            String::from(PRIMARY_TIMESOURCE_NAME),
+            &self.name,
             Some(String::from(TIMESOURCE_COLLECTION_NAME)),
         )
         .await
@@ -182,7 +186,7 @@ impl TimeSourceLauncher {
         info!("Destroying TimeSource at {}", self.component_url);
         // Destroy the previously launched timesource.
         let mut child_ref = ChildRef {
-            name: String::from(PRIMARY_TIMESOURCE_NAME),
+            name: self.name.clone(),
             collection: Some(String::from(TIMESOURCE_COLLECTION_NAME)),
         };
         realm
@@ -522,10 +526,12 @@ mod test {
     }
 
     #[fuchsia::test]
-    fn new_push_time_source() {
+    fn new_primary_time_source() {
         const COMPONENT_NAME: &str = "alfred";
-        let time_source = TimeSourceLauncher::new(COMPONENT_NAME.to_string());
-        assert_eq!(time_source.component_url, COMPONENT_NAME);
+        const COMPONENT_URL: &str = "pennyworth";
+        let time_source = TimeSourceLauncher::new(COMPONENT_URL, COMPONENT_NAME);
+        assert_eq!(time_source.component_url, COMPONENT_URL);
+        assert_eq!(time_source.name, COMPONENT_NAME);
     }
 
     #[fuchsia::test]

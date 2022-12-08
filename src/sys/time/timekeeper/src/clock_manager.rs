@@ -540,9 +540,7 @@ mod tests {
     };
 
     const NANOS_PER_SECOND: i64 = 1_000_000_000;
-
     const TEST_ROLE: Role = Role::Primary;
-
     const SAMPLE_SPACING: zx::Duration = zx::Duration::from_millis(100);
     const OFFSET: zx::Duration = zx::Duration::from_seconds(1111_000);
     const OFFSET_2: zx::Duration = zx::Duration::from_seconds(2222_000);

@@ -228,23 +228,23 @@ impl<D: Diagnostics> TimeSourceManager<D, KernelMonotonicProvider> {
             TimeSource::Push(time_source) => TimeManager::Push(PushSourceManager {
                 backstop,
                 delays_enabled: true,
+                diagnostics,
+                event_stream: None,
+                last_accepted_sample_arrival: None,
+                last_status: None,
+                monotonic: KernelMonotonicProvider(),
                 role,
                 time_source,
-                diagnostics,
-                monotonic: KernelMonotonicProvider(),
-                event_stream: None,
-                last_status: None,
-                last_accepted_sample_arrival: None,
             }),
             TimeSource::Pull(time_source) => TimeManager::Pull(PullSourceManager {
                 backstop,
                 delays_enabled: true,
+                diagnostics,
+                last_sample_request_time: None,
+                monotonic: KernelMonotonicProvider(),
+                received_sample: false,
                 role,
                 time_source,
-                diagnostics,
-                monotonic: KernelMonotonicProvider(),
-                last_sample_request_time: None,
-                received_sample: false,
             }),
         };
         TimeSourceManager { manager }
@@ -430,10 +430,10 @@ mod test {
         diagnostics: Arc<FakeDiagnostics>,
     ) -> TimeSourceManager<FakeDiagnostics, FakeMonotonicProvider> {
         let manager = TimeManager::Push(PushSourceManager {
+            role: TEST_ROLE,
             backstop: zx::Time::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
             delays_enabled: true,
             monotonic: FakeMonotonicProvider::new(MIN_UPDATE_DELAY),
-            role: TEST_ROLE,
             time_source: Box::new(time_source),
             diagnostics,
             event_stream: None,
@@ -451,10 +451,10 @@ mod test {
         diagnostics: Arc<FakeDiagnostics>,
     ) -> TimeSourceManager<FakeDiagnostics, FakeMonotonicProvider> {
         let manager = TimeManager::Pull(PullSourceManager {
+            role: TEST_ROLE,
             backstop: zx::Time::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
             delays_enabled: true,
             monotonic: FakeMonotonicProvider::new(MIN_UPDATE_DELAY),
-            role: TEST_ROLE,
             time_source: Box::new(time_source),
             diagnostics,
             last_sample_request_time: None,
@@ -472,9 +472,9 @@ mod test {
     ) -> TimeSourceManager<FakeDiagnostics, FakeMonotonicProvider> {
         let manager = TimeManager::Push(PushSourceManager {
             backstop: zx::Time::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
+            role: TEST_ROLE,
             delays_enabled: false,
             monotonic: FakeMonotonicProvider::new(MIN_UPDATE_DELAY),
-            role: TEST_ROLE,
             time_source: Box::new(time_source),
             diagnostics,
             event_stream: None,
@@ -647,12 +647,12 @@ mod test {
 
     #[fuchsia::test]
     async fn restart_on_launch_failure() {
-        let time_source = FakePushTimeSource::failing().into();
+        let time_source = FakePushTimeSource::failing();
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let mut manager = TimeSourceManager::new(
             zx::Time::ZERO,
             TEST_ROLE,
-            time_source,
+            time_source.into(),
             Arc::clone(&diagnostics),
         );
 

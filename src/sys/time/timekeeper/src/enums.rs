@@ -92,6 +92,15 @@ impl Into<TimeMetricDimensionRole> for Role {
     }
 }
 
+impl std::fmt::Display for Role {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Primary => write!(f, "primary"),
+            Self::Monitor => write!(f, "monitor"),
+        }
+    }
+}
+
 /// Which of the independent estimates of time is applicable. Timekeeper maintains a Primary track
 /// that is externally visible and optionally a internal Monitor track that is used to validate
 /// proposed changes to the time synchronization source or algorithms.

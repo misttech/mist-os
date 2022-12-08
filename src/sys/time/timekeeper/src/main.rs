@@ -85,10 +85,16 @@ impl Config {
     }
 }
 
-/// A definition which time sources to install, along with the URL for each.
+/// A definition which time sources to install, along with the URL and child names for each.
 struct TimeSourceUrls {
-    primary: String,
-    monitor: Option<&'static str>,
+    primary: TimeSourceDetails,
+    monitor: Option<TimeSourceDetails>,
+}
+
+/// Describes the timesource to be installed.
+struct TimeSourceDetails {
+    url: String,
+    name: String,
 }
 
 /// The experiment to record on Cobalt events.
@@ -121,18 +127,24 @@ async fn main() -> Result<(), Error> {
             .context("failed to get UTC clock from maintainer")?,
     );
 
-    let time_source_urls =
-        TimeSourceUrls { primary: config.get_primary_time_source_url().clone(), monitor: None };
+    let time_source_urls = TimeSourceUrls {
+        primary: TimeSourceDetails {
+            url: config.get_primary_time_source_url().clone(),
+            name: Role::Primary.to_string(),
+        },
+        monitor: None,
+    };
 
     info!("constructing time sources");
     let primary_track = PrimaryTrack {
         time_source: TimeSource::Push(
-            TimeSourceLauncher::new(time_source_urls.primary.to_string()).into(),
+            TimeSourceLauncher::new(&time_source_urls.primary.url, &time_source_urls.primary.name)
+                .into(),
         ),
         clock: Arc::new(utc_clock),
     };
-    let monitor_track = time_source_urls.monitor.map(|url| MonitorTrack {
-        time_source: TimeSource::Push(TimeSourceLauncher::new(url.to_string()).into()),
+    let monitor_track = time_source_urls.monitor.map(|info| MonitorTrack {
+        time_source: TimeSource::Push(TimeSourceLauncher::new(&info.url, &info.name).into()),
         clock: Arc::new(create_monitor_clock(&primary_track.clock)),
     });
 
