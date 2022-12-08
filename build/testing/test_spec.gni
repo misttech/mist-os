@@ -333,7 +333,8 @@ template("test_spec") {
     dims = env.dimensions
 
     if (defined(dims.device_type) &&
-        dims.device_type == "Intel NUC Kit NUC7i5DNHE") {
+        dims.device_type == "Intel NUC Kit NUC7i5DNHE" &&
+        target_name != "core-tests-hpet") {
       new_nuc11_env = {
       }
       new_nuc11_env = {
