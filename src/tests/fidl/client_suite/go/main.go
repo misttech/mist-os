@@ -47,6 +47,10 @@ var _ clientsuite.RunnerWithCtx = (*runnerImpl)(nil)
 func (*runnerImpl) IsTestEnabled(_ fidl.Context, test clientsuite.Test) (bool, error) {
 	isEnabled := func(test clientsuite.Test) bool {
 		switch test {
+		case clientsuite.TestReceiveEventNoPayload, clientsuite.TestReceiveEventStructPayload,
+			clientsuite.TestReceiveEventTablePayload, clientsuite.TestReceiveEventUnionPayload:
+			// Go cannot receive events of arbitrary type.
+			return false
 		case clientsuite.TestOneWayStrictSend:
 			return false
 		case clientsuite.TestOneWayFlexibleSend:

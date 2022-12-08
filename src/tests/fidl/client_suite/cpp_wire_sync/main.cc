@@ -369,6 +369,28 @@ class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {
                            ReceiveClosedEventsCompleter::Sync& completer) override {
     class EventHandler : public fidl::WireSyncEventHandler<fidl_clientsuite::ClosedTarget> {
      public:
+      void OnEventNoPayload() override {
+        received_event = fidl_clientsuite::ClosedTargetEventReport::WithOnEventNoPayload({});
+      }
+      void OnEventStructPayload(
+          ::fidl::WireEvent<::fidl_clientsuite::ClosedTarget::OnEventStructPayload>* event)
+          override {
+        received_event = fidl_clientsuite::ClosedTargetEventReport::WithOnEventStructPayload(
+            fidl::ToNatural(*event));
+      }
+      void OnEventTablePayload(
+          ::fidl::WireEvent<::fidl_clientsuite::ClosedTarget::OnEventTablePayload>* event)
+          override {
+        received_event = fidl_clientsuite::ClosedTargetEventReport::WithOnEventTablePayload(
+            fidl::ToNatural(*event));
+      }
+      void OnEventUnionPayload(
+          ::fidl::WireEvent<::fidl_clientsuite::ClosedTarget::OnEventUnionPayload>* event)
+          override {
+        received_event = fidl_clientsuite::ClosedTargetEventReport::WithOnEventUnionPayload(
+            fidl::ToNatural(*event));
+      }
+
       // Using the natural types for the reporter makes the ajar and open
       // targets simpler to test, because |fidl_clientsuite::UnknownEvent| is >8
       // bytes, so is out-of-line and requires an ObjectView in wire types. The

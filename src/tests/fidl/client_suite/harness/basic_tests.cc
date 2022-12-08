@@ -374,6 +374,83 @@ CLIENT_TEST(OneWayUnionRequest) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+CLIENT_TEST(ReceiveEventNoPayload) {
+  auto reporter = ReceiveClosedEvents();
+  ASSERT_NE(nullptr, reporter);
+
+  Bytes bytes_in = {
+      header(kOneWayTxid, kOrdinalOnEventNoPayload, fidl::MessageDynamicFlags::kStrictMethod),
+  };
+  ASSERT_OK(server_end().write(bytes_in));
+
+  WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
+
+  ASSERT_EQ(1u, reporter->NumReceivedEvents());
+  auto event = reporter->TakeNextEvent();
+  ASSERT_TRUE(event.on_event_no_payload().has_value());
+}
+
+CLIENT_TEST(ReceiveEventStructPayload) {
+  static const fidl_clientsuite::NonEmptyPayload kRequest{{.some_field = 9098607}};
+
+  auto reporter = ReceiveClosedEvents();
+  ASSERT_NE(nullptr, reporter);
+
+  Bytes bytes_in = {
+      header(kOneWayTxid, kOrdinalOnEventStructPayload, fidl::MessageDynamicFlags::kStrictMethod),
+      encode(kRequest),
+  };
+  ASSERT_OK(server_end().write(bytes_in));
+
+  WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
+
+  ASSERT_EQ(1u, reporter->NumReceivedEvents());
+  auto event = reporter->TakeNextEvent();
+  ASSERT_TRUE(event.on_event_struct_payload().has_value());
+  EXPECT_EQ(kRequest, event.on_event_struct_payload().value());
+}
+
+CLIENT_TEST(ReceiveEventTablePayload) {
+  static const fidl_clientsuite::TablePayload kRequest{{.some_field = 9098607}};
+
+  auto reporter = ReceiveClosedEvents();
+  ASSERT_NE(nullptr, reporter);
+
+  Bytes bytes_in = {
+      header(kOneWayTxid, kOrdinalOnEventTablePayload, fidl::MessageDynamicFlags::kStrictMethod),
+      encode(kRequest),
+  };
+  ASSERT_OK(server_end().write(bytes_in));
+
+  WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
+
+  ASSERT_EQ(1u, reporter->NumReceivedEvents());
+  auto event = reporter->TakeNextEvent();
+  ASSERT_TRUE(event.on_event_table_payload().has_value());
+  EXPECT_EQ(kRequest, event.on_event_table_payload().value());
+}
+
+CLIENT_TEST(ReceiveEventUnionPayload) {
+  static const fidl_clientsuite::UnionPayload kRequest =
+      fidl_clientsuite::UnionPayload::WithSomeVariant(87662);
+
+  auto reporter = ReceiveClosedEvents();
+  ASSERT_NE(nullptr, reporter);
+
+  Bytes bytes_in = {
+      header(kOneWayTxid, kOrdinalOnEventUnionPayload, fidl::MessageDynamicFlags::kStrictMethod),
+      encode(kRequest),
+  };
+  ASSERT_OK(server_end().write(bytes_in));
+
+  WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
+
+  ASSERT_EQ(1u, reporter->NumReceivedEvents());
+  auto event = reporter->TakeNextEvent();
+  ASSERT_TRUE(event.on_event_union_payload().has_value());
+  EXPECT_EQ(kRequest, event.on_event_union_payload().value());
+}
+
 CLIENT_TEST(GracefulFailureDuringCallAfterPeerClose) {
   server_end().get().reset();
 

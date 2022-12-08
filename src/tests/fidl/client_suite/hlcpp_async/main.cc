@@ -478,6 +478,33 @@ class RunnerServer : public fidl::clientsuite::Runner {
         }
       }
     });
+    client_reporter.client().events().OnEventNoPayload = [client_reporter]() {
+      if (client_reporter) {
+        client_reporter.reporter()->ReportEvent(
+            fidl::clientsuite::ClosedTargetEventReport::WithOnEventNoPayload({}));
+      }
+    };
+    client_reporter.client().events().OnEventStructPayload = [client_reporter](int some_field) {
+      if (client_reporter) {
+        client_reporter.reporter()->ReportEvent(
+            fidl::clientsuite::ClosedTargetEventReport::WithOnEventStructPayload(
+                fidl::clientsuite::NonEmptyPayload(some_field)));
+      }
+    };
+    client_reporter.client().events().OnEventTablePayload = [client_reporter](auto payload) {
+      if (client_reporter) {
+        client_reporter.reporter()->ReportEvent(
+            fidl::clientsuite::ClosedTargetEventReport::WithOnEventTablePayload(
+                std::move(payload)));
+      }
+    };
+    client_reporter.client().events().OnEventUnionPayload = [client_reporter](auto payload) {
+      if (client_reporter) {
+        client_reporter.reporter()->ReportEvent(
+            fidl::clientsuite::ClosedTargetEventReport::WithOnEventUnionPayload(
+                std::move(payload)));
+      }
+    };
     callback();
   }
 

@@ -376,6 +376,34 @@ class RunnerImpl extends Runner {
     var reporter = ClosedTargetEventReporterProxy();
     reporter.ctrl.bind(reporterHandle);
 
+    target.onEventNoPayload.forEach((_) {
+      if (reporter.ctrl.isBound) {
+        reporter.reportEvent(
+            const ClosedTargetEventReport.withOnEventNoPayload(Empty()));
+      }
+    });
+
+    target.onEventStructPayload.forEach((someField) {
+      if (reporter.ctrl.isBound) {
+        reporter.reportEvent(ClosedTargetEventReport.withOnEventStructPayload(
+            NonEmptyPayload(someField: someField)));
+      }
+    });
+
+    target.onEventTablePayload.forEach((payload) {
+      if (reporter.ctrl.isBound) {
+        reporter.reportEvent(
+            ClosedTargetEventReport.withOnEventTablePayload(payload));
+      }
+    });
+
+    target.onEventUnionPayload.forEach((payload) {
+      if (reporter.ctrl.isBound) {
+        reporter.reportEvent(
+            ClosedTargetEventReport.withOnEventUnionPayload(payload));
+      }
+    });
+
     target.ctrl.whenClosed.then((_) {
       if (reporter.ctrl.isBound) {
         reporter.reportEvent(const ClosedTargetEventReport.withFidlError(

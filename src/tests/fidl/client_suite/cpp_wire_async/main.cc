@@ -14,6 +14,7 @@
 #include <iostream>
 
 #include "fidl/fidl.clientsuite/cpp/wire_types.h"
+#include "lib/fidl/cpp/wire_natural_conversions.h"
 #include "src/tests/fidl/client_suite/cpp_util/error_util.h"
 
 class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {
@@ -419,17 +420,46 @@ class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {
                             fidl::ClientEnd<fidl_clientsuite::ClosedTargetEventReporter> reporter)
           : dispatcher_(dispatcher), reporter_(std::move(reporter)) {}
 
-      void on_fidl_error(fidl::UnbindInfo error) override {
-        auto report_result =
-            reporter_->ReportEvent(fidl_clientsuite::ClosedTargetEventReport::WithFidlError(
-                clienttest_util::ClassifyError(error.ToError())));
+      // Report an event to the harness. If the reporter is closed, return
+      // false. If reporting succeeded, returns true.
+      bool ReportEvent(const fidl_clientsuite::ClosedTargetEventReport& event) {
+        auto report_result = reporter_->ReportEvent(event);
         if (report_result.is_error()) {
           if (report_result.error_value().is_peer_closed()) {
             client_.AsyncTeardown();
+            return false;
           }
           ZX_PANIC("Could not report received event: %s",
                    report_result.error_value().lossy_description());
-        } else {
+        }
+        return true;
+      }
+
+      void OnEventNoPayload() override {
+        ReportEvent(fidl_clientsuite::ClosedTargetEventReport::WithOnEventNoPayload({}));
+      }
+      void OnEventStructPayload(
+          ::fidl::WireEvent<::fidl_clientsuite::ClosedTarget::OnEventStructPayload>* event)
+          override {
+        ReportEvent(fidl_clientsuite::ClosedTargetEventReport::WithOnEventStructPayload(
+            fidl::ToNatural(*event)));
+      }
+      void OnEventTablePayload(
+          ::fidl::WireEvent<::fidl_clientsuite::ClosedTarget::OnEventTablePayload>* event)
+          override {
+        ReportEvent(fidl_clientsuite::ClosedTargetEventReport::WithOnEventTablePayload(
+            fidl::ToNatural(*event)));
+      }
+      void OnEventUnionPayload(
+          ::fidl::WireEvent<::fidl_clientsuite::ClosedTarget::OnEventUnionPayload>* event)
+          override {
+        ReportEvent(fidl_clientsuite::ClosedTargetEventReport::WithOnEventUnionPayload(
+            fidl::ToNatural(*event)));
+      }
+
+      void on_fidl_error(fidl::UnbindInfo error) override {
+        if (ReportEvent(fidl_clientsuite::ClosedTargetEventReport::WithFidlError(
+                clienttest_util::ClassifyError(error.ToError())))) {
           auto waiter = std::make_unique<async::WaitOnce>(reporter_.client_end().channel().get(),
                                                           ZX_CHANNEL_PEER_CLOSED);
           auto waiter_ptr = waiter.get();
@@ -469,8 +499,8 @@ class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {
 
       // Report an event to the harness. If the reporter is closed, return
       // false. If reporting succeeded, returns true.
-      bool ReportEvent(fidl_clientsuite::AjarTargetEventReport event) {
-        auto report_result = reporter_->ReportEvent(std::move(event));
+      bool ReportEvent(const fidl_clientsuite::AjarTargetEventReport& event) {
+        auto report_result = reporter_->ReportEvent(event);
         if (report_result.is_error()) {
           if (report_result.error_value().is_peer_closed()) {
             client_.AsyncTeardown();
@@ -530,8 +560,8 @@ class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {
 
       // Report an event to the harness. If the reporter is closed, return
       // false. If reporting succeeded, returns true.
-      bool ReportEvent(fidl_clientsuite::OpenTargetEventReport event) {
-        auto report_result = reporter_->ReportEvent(std::move(event));
+      bool ReportEvent(const fidl_clientsuite::OpenTargetEventReport& event) {
+        auto report_result = reporter_->ReportEvent(event);
         if (report_result.is_error()) {
           if (report_result.error_value().is_peer_closed()) {
             client_.AsyncTeardown();

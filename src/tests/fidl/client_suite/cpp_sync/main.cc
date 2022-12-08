@@ -329,6 +329,22 @@ class RunnerServer : public fidl::Server<fidl_clientsuite::Runner> {
                            ReceiveClosedEventsCompleter::Sync& completer) override {
     class EventHandler : public fidl::SyncEventHandler<fidl_clientsuite::ClosedTarget> {
      public:
+      void OnEventNoPayload() override {
+        received_event = fidl_clientsuite::ClosedTargetEventReport::WithOnEventNoPayload({});
+      }
+      void OnEventStructPayload(
+          fidl::Event<fidl_clientsuite::ClosedTarget::OnEventStructPayload>& event) override {
+        received_event = fidl_clientsuite::ClosedTargetEventReport::WithOnEventStructPayload(event);
+      }
+      void OnEventTablePayload(
+          fidl::Event<fidl_clientsuite::ClosedTarget::OnEventTablePayload>& event) override {
+        received_event = fidl_clientsuite::ClosedTargetEventReport::WithOnEventTablePayload(event);
+      }
+      void OnEventUnionPayload(
+          fidl::Event<fidl_clientsuite::ClosedTarget::OnEventUnionPayload>& event) override {
+        received_event = fidl_clientsuite::ClosedTargetEventReport::WithOnEventUnionPayload(event);
+      }
+
       std::optional<fidl_clientsuite::ClosedTargetEventReport> received_event;
     };
 

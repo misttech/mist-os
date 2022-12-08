@@ -6,7 +6,7 @@ use {
     anyhow::{Context as _, Error},
     fidl_fidl_clientsuite::{
         AjarTargetEvent, AjarTargetEventReport, AjarTargetEventReporterSynchronousProxy,
-        AjarTargetSynchronousProxy, ClosedTargetEventReport,
+        AjarTargetSynchronousProxy, ClosedTargetEvent, ClosedTargetEventReport,
         ClosedTargetEventReporterSynchronousProxy, ClosedTargetSynchronousProxy, Empty,
         EmptyResultClassification, EmptyResultWithErrorClassification, NonEmptyPayload,
         NonEmptyResultClassification, NonEmptyResultWithErrorClassification, OpenTargetEvent,
@@ -342,7 +342,25 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     std::thread::spawn(move || {
                         loop {
                             let report_result = match client.wait_for_event(zx::Time::INFINITE) {
-                                Ok(_) => panic!("unreachable: closed target defines no events"),
+                                Ok(ClosedTargetEvent::OnEventNoPayload {}) => reporter
+                                    .report_event(&mut ClosedTargetEventReport::OnEventNoPayload(
+                                        Empty {},
+                                    )),
+                                Ok(ClosedTargetEvent::OnEventStructPayload { some_field }) => {
+                                    reporter.report_event(
+                                        &mut ClosedTargetEventReport::OnEventStructPayload(
+                                            NonEmptyPayload { some_field },
+                                        ),
+                                    )
+                                }
+                                Ok(ClosedTargetEvent::OnEventTablePayload { payload }) => reporter
+                                    .report_event(
+                                        &mut ClosedTargetEventReport::OnEventTablePayload(payload),
+                                    ),
+                                Ok(ClosedTargetEvent::OnEventUnionPayload { payload }) => reporter
+                                    .report_event(
+                                        &mut ClosedTargetEventReport::OnEventUnionPayload(payload),
+                                    ),
                                 Err(fidl_err @ fidl::Error::ClientEvent(_))
                                 | Err(fidl_err @ fidl::Error::ClientChannelClosed { .. }) => {
                                     // Error receiving event or peer closed.

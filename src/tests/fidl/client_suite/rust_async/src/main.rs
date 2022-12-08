@@ -6,7 +6,7 @@ use {
     anyhow::{Context as _, Error},
     fidl::endpoints::Proxy,
     fidl_fidl_clientsuite::{
-        AjarTargetEvent, AjarTargetEventReport, ClosedTargetEventReport, Empty,
+        AjarTargetEvent, AjarTargetEventReport, ClosedTargetEvent, ClosedTargetEventReport, Empty,
         EmptyResultClassification, EmptyResultWithErrorClassification, NonEmptyPayload,
         NonEmptyResultClassification, NonEmptyResultWithErrorClassification, OpenTargetEvent,
         OpenTargetEventReport, RunnerRequest, RunnerRequestStream, TableResultClassification, Test,
@@ -341,7 +341,25 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                             reporter.into_proxy().expect("creating reporter proxy failed");
                         while let Some(event) = client.take_event_stream().next().await {
                             let report_result = match event {
-                                Ok(_) => panic!("unreachable: closed target defines no events"),
+                                Ok(ClosedTargetEvent::OnEventNoPayload {}) => reporter
+                                    .report_event(&mut ClosedTargetEventReport::OnEventNoPayload(
+                                        Empty {},
+                                    )),
+                                Ok(ClosedTargetEvent::OnEventStructPayload { some_field }) => {
+                                    reporter.report_event(
+                                        &mut ClosedTargetEventReport::OnEventStructPayload(
+                                            NonEmptyPayload { some_field },
+                                        ),
+                                    )
+                                }
+                                Ok(ClosedTargetEvent::OnEventTablePayload { payload }) => reporter
+                                    .report_event(
+                                        &mut ClosedTargetEventReport::OnEventTablePayload(payload),
+                                    ),
+                                Ok(ClosedTargetEvent::OnEventUnionPayload { payload }) => reporter
+                                    .report_event(
+                                        &mut ClosedTargetEventReport::OnEventUnionPayload(payload),
+                                    ),
                                 Err(fidl_err) => {
                                     reporter.report_event(&mut ClosedTargetEventReport::FidlError(
                                         classify_error(fidl_err),

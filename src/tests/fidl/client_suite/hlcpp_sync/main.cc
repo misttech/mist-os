@@ -23,6 +23,10 @@ class RunnerServer : public fidl::clientsuite::Runner {
   void IsTestEnabled(fidl::clientsuite::Test test, IsTestEnabledCallback callback) override {
     switch (test) {
       // HLCPP Sync Client Bindings do not support events.
+      case fidl::clientsuite::Test::RECEIVE_EVENT_NO_PAYLOAD:
+      case fidl::clientsuite::Test::RECEIVE_EVENT_STRUCT_PAYLOAD:
+      case fidl::clientsuite::Test::RECEIVE_EVENT_TABLE_PAYLOAD:
+      case fidl::clientsuite::Test::RECEIVE_EVENT_UNION_PAYLOAD:
       case fidl::clientsuite::Test::RECEIVE_STRICT_EVENT:
       case fidl::clientsuite::Test::RECEIVE_STRICT_EVENT_MISMATCHED_STRICTNESS:
       case fidl::clientsuite::Test::RECEIVE_FLEXIBLE_EVENT:

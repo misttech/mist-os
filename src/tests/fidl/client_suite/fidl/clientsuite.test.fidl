@@ -357,13 +357,22 @@ closed protocol ClosedTarget {
     strict OneWayStructRequest(NonEmptyPayload);
     strict OneWayTableRequest(TablePayload);
     strict OneWayUnionRequest(UnionPayload);
+
+    strict -> OnEventNoPayload();
+    strict -> OnEventStructPayload(NonEmptyPayload);
+    strict -> OnEventTablePayload(TablePayload);
+    strict -> OnEventUnionPayload(UnionPayload);
 };
 
 // An event received in the [`ClosedTarget`]. Used to report the received event
 // to the test harness.
-type ClosedTargetEventReport = union {
+type ClosedTargetEventReport = flexible union {
     // Set if an error was received by the event handler.
     1: fidl_error FidlErrorKind;
+    2: on_event_no_payload Empty;
+    3: on_event_struct_payload NonEmptyPayload;
+    4: on_event_table_payload TablePayload;
+    5: on_event_union_payload UnionPayload;
 };
 
 // When the test [`Runner`] is directed to receive events on the
@@ -453,6 +462,11 @@ type Test = flexible enum : uint32 {
     ONE_WAY_TABLE_REQUEST = 50;
     ONE_WAY_UNION_REQUEST = 51;
 
+    RECEIVE_EVENT_NO_PAYLOAD = 55;
+    RECEIVE_EVENT_STRUCT_PAYLOAD = 56;
+    RECEIVE_EVENT_TABLE_PAYLOAD = 57;
+    RECEIVE_EVENT_UNION_PAYLOAD = 58;
+
     GRACEFUL_FAILURE_DURING_CALL_AFTER_PEER_CLOSE = 3;
 
     // ////////////////////////////////////////////////////////////////////////
@@ -508,5 +522,5 @@ type Test = flexible enum : uint32 {
     V1_TWO_WAY_NO_PAYLOAD = 40;
     V1_TWO_WAY_STRUCT_PAYLOAD = 41;
 
-    // next available: 55
+    // next available: 59
 };

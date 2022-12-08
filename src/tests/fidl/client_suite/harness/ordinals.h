@@ -43,6 +43,11 @@ static const uint64_t kOrdinalOneWayStructRequest = 2745184144532233426lu;
 static const uint64_t kOrdinalOneWayTableRequest = 1894745725882679327lu;
 static const uint64_t kOrdinalOneWayUnionRequest = 1453322211393998309lu;
 
+static const uint64_t kOrdinalOnEventNoPayload = 5685716274827179686lu;
+static const uint64_t kOrdinalOnEventStructPayload = 5253669518495638118lu;
+static const uint64_t kOrdinalOnEventTablePayload = 8251567748156745542lu;
+static const uint64_t kOrdinalOnEventUnionPayload = 7621842152112557728lu;
+
 // Open Target Ordinals
 static const uint64_t kOrdinalStrictOneWay = 7904024199254697828lu;
 static const uint64_t kOrdinalFlexibleOneWay = 1119507890521778684lu;
