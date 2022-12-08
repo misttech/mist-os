@@ -11,6 +11,7 @@
 ##                             [--integration-manifest FILE]
 ##                             [--skip-rustc-3p-update]
 ##                             [--skip-existing]
+##                             [--dry-run]
 ##
 ## Updates OWNERS files for projects, based on gn target references. For any
 ## given project, the tool adds as owners the owners of the projects that depend
@@ -33,6 +34,8 @@
 ## --skip-rustc-3p-update:        skip updating rustc_library and rustc_binary
 ##                                third_party dependencies.
 ##
+## --dry-run:                     print the generated content without creating
+##                                OWNERS files.
 ##
 ## See https://fuchsia.dev/fuchsia-src/development/languages/rust/third_party.md
 ## for more details.
@@ -73,6 +76,9 @@ while [[ $# -ge 1 ]]; do
     --skip-existing)
       SKIP_EXISTING="--skip-existing"
       ;;
+    --dry-run)
+      DRY_RUN="--dry-run"
+      ;;
     -*)
       echo "Cannot understand option $1"
       exit 1
@@ -111,4 +117,5 @@ fi
   --overrides $FUCHSIA_DIR/third_party/rust_crates/owners.toml \
   --out-dir $FUCHSIA_BUILD_DIR \
   --gn-bin $PREBUILT_GN \
-  $SKIP_EXISTING)
+  $SKIP_EXISTING \
+  $DRY_RUN)

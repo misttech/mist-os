@@ -10,7 +10,7 @@ use rayon::prelude::*;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs::File,
-    io::BufReader,
+    io::{BufReader, Write},
     path::{Path, PathBuf},
     process::Command,
 };
@@ -50,6 +50,10 @@ struct Options {
     /// don't updated existing OWNERS files
     #[argh(switch)]
     skip_existing: bool,
+
+    /// print the generated content without updating OWNERS files
+    #[argh(switch)]
+    dry_run: bool,
 }
 
 fn main() -> Result<()> {
@@ -61,6 +65,7 @@ fn main() -> Result<()> {
         gn_bin,
         num_threads,
         skip_existing,
+        dry_run,
     } = argh::from_env();
     let update_strategy = match skip_existing {
         true => UpdateStrategy::OnlyMissing,
@@ -71,8 +76,16 @@ fn main() -> Result<()> {
         rayon::ThreadPoolBuilder::new().num_threads(num_threads).build_global().unwrap();
     }
 
-    OwnersDb::new(rust_metadata, integration_manifest, overrides, gn_bin, out_dir, update_strategy)?
-        .update_all_files()
+    OwnersDb::new(
+        rust_metadata,
+        integration_manifest,
+        overrides,
+        gn_bin,
+        out_dir,
+        update_strategy,
+        dry_run,
+    )?
+    .update_all_files()
 }
 
 struct ProjectMetadata {
@@ -109,6 +122,9 @@ struct OwnersDb {
     /// explicit lists of OWNERS files to include instead of inferring, indexed by project name
     overrides: BTreeMap<String, Vec<Utf8PathBuf>>,
 
+    /// if set, print update results instead of updating OWNERS file
+    dry_run: bool,
+
     update_strategy: UpdateStrategy,
     gn_bin: PathBuf,
     out_dir: PathBuf,
@@ -122,6 +138,7 @@ impl OwnersDb {
         gn_bin: PathBuf,
         out_dir: PathBuf,
         update_strategy: UpdateStrategy,
+        dry_run: bool,
     ) -> Result<Self> {
         let rust_crates: Vec<CrateOutputMetadata> = rust_metadata
             .as_ref()
@@ -184,6 +201,7 @@ impl OwnersDb {
             rust_metadata,
             overrides,
             update_strategy,
+            dry_run,
             gn_bin,
             out_dir,
         })
@@ -195,7 +213,7 @@ impl OwnersDb {
         self.projects
             .par_iter()
             .filter(|metadata| !metadata.path.starts_with("third_party/rust_crates/mirrors"))
-            .map(|metadata| self.update_owners_file(metadata))
+            .map(|metadata| self.update_owners_file(metadata, &mut std::io::stdout()))
             .panic_fuse()
             .collect::<Result<()>>()?;
         eprintln!("\nDone!");
@@ -204,7 +222,11 @@ impl OwnersDb {
     }
 
     /// Update the OWNERS file for a single 3p project.
-    fn update_owners_file(&self, metadata: &ProjectMetadata) -> Result<()> {
+    fn update_owners_file<W: Write>(
+        &self,
+        metadata: &ProjectMetadata,
+        output_buffer: &mut W,
+    ) -> Result<()> {
         if self.update_strategy == UpdateStrategy::OnlyMissing
             && metadata.path.join("OWNERS").exists()
         {
@@ -213,10 +235,14 @@ impl OwnersDb {
         }
         let file = self.compute_owners_file(metadata)?;
         let owners_path = metadata.path.join("OWNERS");
-        // We need to every OWNERS file, even if it would be empty, because
-        // the other OWNERS files may include the empty ones.
-        std::fs::write(&owners_path, file.to_string().as_bytes())
-            .with_context(|| format!("writing {}", owners_path))?;
+        if self.dry_run {
+            eprintln!("Dry-run: generated {} with content:\n", owners_path);
+            output_buffer.write_all(file.to_string().as_bytes())?;
+        } else {
+            // We need to write every OWNERS file, even if it would be empty,
+            // because the other OWNERS files may include the empty ones.
+            std::fs::write(owners_path, file.to_string().as_bytes())?;
+        }
         eprint!(".");
 
         Ok(())
@@ -523,6 +549,7 @@ mod tests {
             PATHS.gn_binary_path.clone(),
             out_dir,
             UpdateStrategy::AllFiles,
+            false,
         )
         .expect("valid OwnersDb")
         .update_all_files()
@@ -567,6 +594,7 @@ include /third_party/foo/OWNERS
             PATHS.gn_binary_path.clone(),
             out_dir,
             UpdateStrategy::AllFiles,
+            false,
         )
         .expect("valid OwnersDb")
         .update_all_files()
@@ -614,6 +642,7 @@ include /dep/OWNERS
             PATHS.gn_binary_path.clone(),
             out_dir,
             UpdateStrategy::OnlyMissing,
+            false,
         )
         .expect("valid OwnersDb")
         .update_all_files()
@@ -638,6 +667,53 @@ include /dep/OWNERS
                 test_dir_path.join("third_party/rust_crates/vendor/bar/OWNERS"),
             )
             .expect("read succeeds")
+        );
+    }
+
+    #[test]
+    #[serial] // these tests mutate the current process' working directory
+    fn dry_run() {
+        let test_dir = setup_test_dir("owners");
+        let test_dir_path = test_dir.path().to_path_buf();
+        let out_dir = test_dir_path.join("out");
+        let overrides = Utf8PathBuf::from_path_buf(PATHS.test_base_dir.join("owners/owners.toml"))
+            .expect("path is valid");
+        let manifest = Some(PATHS.test_base_dir.join("owners/manifest"));
+
+        // check that the project doesn't have an OWNERS file
+        assert!(!test_dir_path.join("third_party/bar/OWNERS").exists());
+
+        let owners_db = OwnersDb::new(
+            None,
+            manifest,
+            overrides,
+            PATHS.gn_binary_path.clone(),
+            out_dir,
+            UpdateStrategy::AllFiles,
+            true,
+        )
+        .expect("OwnersDb is valid");
+        let unowned_metadata = owners_db
+            .projects
+            .iter()
+            .find(|m| m.name.contains("bar"))
+            .expect("should contain project metadata");
+        let mut output_buffer = vec![];
+        assert!(owners_db.update_owners_file(&unowned_metadata, &mut output_buffer).is_ok());
+
+        // check that an OWNERS file was not created for the project
+        assert!(!test_dir_path.join("third_party/bar/OWNERS").exists());
+
+        // check that the dry-run output is correct
+        let output = String::from_utf8(output_buffer).unwrap();
+        assert_eq!(
+            output,
+            format!(
+                "{}\n{}
+include /dep/OWNERS
+",
+                AUTOGENERATED_HEADER, HEADER
+            )
         );
     }
 
