@@ -12,6 +12,7 @@ group("developer") {
     "ffx",
     "forensics",
     "fuchsia-criterion",
+    "lib",
     "remote-control",
   ]
 }
@@ -27,6 +28,7 @@ group("tests") {
     "forensics:tests",
     "fuchsia-criterion:tests",
     "hw_info:tests",
+    "lib:tests",
     "memory:tests",
     "remote-control:tests",
     "shell:tests",
