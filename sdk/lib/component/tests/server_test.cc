@@ -8,11 +8,11 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/outgoing/cpp/handlers.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/fit/defer.h>
-#include <lib/sys/component/cpp/handlers.h>
-#include <lib/sys/component/cpp/outgoing_directory.h>
 #include <lib/zx/channel.h>
 
 #include <iostream>

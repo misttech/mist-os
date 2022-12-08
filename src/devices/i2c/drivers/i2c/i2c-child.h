@@ -8,9 +8,9 @@
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fdf/cpp/dispatcher.h>
-#include <lib/sys/component/cpp/outgoing_directory.h>
 
 #include <optional>
 

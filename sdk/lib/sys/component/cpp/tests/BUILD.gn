@@ -9,11 +9,7 @@ import("//src/lib/fostr/build/fostr_fidl.gni")
 group("tests") {
   testonly = true
 
-  deps = [
-    ":component_cpp_outgoing_directory_tests",
-    ":component_cpp_service_server_tests",
-    ":component_cpp_testing_realm_builder_tests",
-  ]
+  deps = [ ":component_cpp_testing_realm_builder_tests" ]
 }
 
 source_set("test_utils") {
@@ -60,21 +56,6 @@ executable("echo_server_sc_bin") {
     "//src/lib/fxl",
     "//src/testing/fidl:placeholders_hlcpp",
     "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-  ]
-}
-
-executable("echo_service_server_bin") {
-  testonly = true
-
-  sources = [ "echo_service_server.cc" ]
-
-  deps = [
-    "//examples/fidl/fuchsia.examples:fuchsia.examples_cpp_wire",
-    "//sdk/lib/fidl",
-    "//sdk/lib/sys/component/cpp",
-    "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
@@ -205,12 +186,6 @@ fuchsia_structured_config_values("echo_server_default_config") {
   }
 }
 
-fuchsia_component("echo_service_server") {
-  testonly = true
-  deps = [ ":echo_service_server_bin" ]
-  manifest = "meta/echo_service_server.cml"
-}
-
 fuchsia_component("realm_builder_test") {
   testonly = true
   deps = [ ":realm_builder_test_bin" ]
@@ -235,89 +210,7 @@ fuchsia_test_package("component_cpp_testing_realm_builder_tests") {
     ":echo_server",
     ":echo_server_default_config",
     ":echo_server_sc",
-    ":echo_service_server",
     ":pre_populated_realm",
+    "//sdk/lib/component/tests:echo_service_server",
   ]
-}
-
-executable("cpp_outgoing_directory_test_bin") {
-  testonly = true
-
-  sources = [ "outgoing_directory_test.cc" ]
-
-  deps = [
-    "//examples/fidl/fuchsia.examples:fuchsia.examples_cpp",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
-    "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/sys/component/cpp",
-    "//src/lib/fidl/cpp",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/storage/vfs/cpp",
-    "//src/lib/testing/loop_fixture",
-    "//third_party/googletest:gmock",
-    "//zircon/system/ulib/sync:sync-cpp",
-  ]
-}
-
-executable("cpp_outgoing_directory_integration_test_bin") {
-  testonly = true
-
-  sources = [ "outgoing_directory_integration_test.cc" ]
-
-  deps = [
-    "//examples/fidl/fuchsia.examples:fuchsia.examples_hlcpp",
-    "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
-    "//sdk/lib/fidl/cpp",
-    "//sdk/lib/sys/component/cpp/testing:cpp",
-    "//sdk/lib/sys/cpp",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/storage/vfs/cpp",
-    "//src/lib/testing/loop_fixture",
-  ]
-}
-
-fuchsia_component("cpp_echo_service_server") {
-  testonly = true
-  deps = [ ":echo_service_server_bin" ]
-  manifest = "meta/cpp_echo_service_server.cml"
-}
-
-fuchsia_component("outgoing_directory_test") {
-  testonly = true
-  deps = [ ":cpp_outgoing_directory_test_bin" ]
-  manifest = "meta/outgoing_directory_test.cml"
-}
-
-fuchsia_component("outgoing_directory_integration_test") {
-  testonly = true
-  deps = [ ":cpp_outgoing_directory_integration_test_bin" ]
-  manifest = "meta/outgoing_directory_integration_test.cml"
-}
-
-fuchsia_test_package("component_cpp_outgoing_directory_tests") {
-  test_components = [
-    ":outgoing_directory_test",
-    ":outgoing_directory_integration_test",
-  ]
-  deps = [ ":cpp_echo_service_server" ]
-}
-
-test("service_server_test") {
-  sources = [ "server_test.cc" ]
-  deps = [
-    "//sdk/lib/component/tests:fidl.service.test_cpp_wire",
-    "//sdk/lib/fdio",
-    "//sdk/lib/sys/component/cpp",
-    "//src/lib/storage/vfs/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fidl-async",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
-    "//zircon/system/ulib/zxtest",
-  ]
-}
-
-fuchsia_unittest_package("component_cpp_service_server_tests") {
-  deps = [ ":service_server_test" ]
 }

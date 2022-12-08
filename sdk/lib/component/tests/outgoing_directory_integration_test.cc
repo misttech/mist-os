@@ -26,7 +26,7 @@ namespace {
 using namespace component_testing;
 
 constexpr char kEchoServiceServer[] = "echo_service_server";
-constexpr char kEchoServiceServerUrl[] = "#meta/cpp_echo_service_server.cm";
+constexpr char kEchoServiceServerUrl[] = "#meta/echo_service_server.cm";
 
 class OutgoingDirectoryTest : public gtest::RealLoopFixture {};
 
