@@ -6,10 +6,10 @@
 #include <fuchsia/device/fs/cpp/fidl_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver/component/cpp/tests/test_base.h>
 #include <lib/driver/devfs/cpp/exporter.h>
 #include <lib/fidl/cpp/binding.h>
-#include <lib/sys/component/cpp/outgoing_directory.h>
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 

@@ -6,10 +6,10 @@
 #define LIB_INSPECT_COMPONENT_CPP_COMPONENT_H_
 
 #include <lib/async/cpp/executor.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/inspect/component/cpp/tree_handler_settings.h>
 #include <lib/inspect/cpp/health.h>
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/sys/component/cpp/outgoing_directory.h>
 
 namespace inspect {
 // ComponentInspector is a component-wide instance of an Inspector that
@@ -21,7 +21,7 @@ namespace inspect {
 // #include <lib/async-loop/cpp/loop.h>
 // #include <lib/async-loop/default.h>
 // #include <lib/inspect/component/cpp/component.h>
-// #include "lib/sys/component/cpp/outgoing_directory.h"
+// #include "lib/component/outgoing/cpp/outgoing_directory.h"
 //
 // int main() {
 //   using inspect::ComponentInspector;

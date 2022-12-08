@@ -22,7 +22,7 @@ sdk_source_set("inspect_component_cpp") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_cpp_wire",
-    "//sdk/lib/sys/component/cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//src/lib/fidl/cpp",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/inspect",

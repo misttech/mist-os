@@ -5,15 +5,15 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_OUTGOING_DIRECTORY_H_
 #define LIB_DRIVER_COMPONENT_CPP_OUTGOING_DIRECTORY_H_
 
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver/component/cpp/handlers.h>
 #include <lib/fdf/cpp/channel.h>
 #include <lib/fdf/cpp/protocol.h>
 #include <lib/fdf/dispatcher.h>
 #include <lib/fidl_driver/cpp/transport.h>
-#include <lib/sys/component/cpp/outgoing_directory.h>
 
+#include "lib/component/outgoing/cpp/handlers.h"
 #include "lib/fidl/cpp/wire/service_handler.h"
-#include "lib/sys/component/cpp/handlers.h"
 
 namespace driver {
 

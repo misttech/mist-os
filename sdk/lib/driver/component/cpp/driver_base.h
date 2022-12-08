@@ -6,6 +6,7 @@
 #define LIB_DRIVER_COMPONENT_CPP_DRIVER_BASE_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <lib/component/outgoing/cpp/structured_config.h>
 #include <lib/driver/component/cpp/driver_context.h>
 #include <lib/driver/component/cpp/logger.h>
 #include <lib/driver/component/cpp/namespace.h>
@@ -13,7 +14,6 @@
 #include <lib/driver/component/cpp/start_args.h>
 #include <lib/driver/record/record.h>
 #include <lib/fdf/cpp/dispatcher.h>
-#include <lib/sys/component/cpp/structured_config.h>
 
 namespace driver {
 
