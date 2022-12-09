@@ -8,6 +8,7 @@ import("//build/test.gni")
 test("scenic_cpp_unittests") {
   sources = [
     "commands_sizing_test.cc",
+    "fake_flatland_unittests.cc",
     "session_test.cc",
     "view_identity_test.cc",
     "view_ref_pair_test.cc",
@@ -17,6 +18,7 @@ test("scenic_cpp_unittests") {
   deps = [
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/ui/scenic/cpp",
+    "//sdk/lib/ui/scenic/cpp/testing",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
   ]

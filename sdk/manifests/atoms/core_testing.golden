@@ -8,12 +8,20 @@
 //sdk/fidl/fuchsia.data:fuchsia.data_sdk
 //sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_sdk
 //sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types_sdk
+//sdk/fidl/fuchsia.input.report:fuchsia.input.report_sdk
+//sdk/fidl/fuchsia.input:fuchsia.input_sdk
 //sdk/fidl/fuchsia.io:fuchsia.io_sdk
 //sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_sdk
+//sdk/fidl/fuchsia.math:fuchsia.math_sdk
 //sdk/fidl/fuchsia.mem:fuchsia.mem_sdk
 //sdk/fidl/fuchsia.process:fuchsia.process_sdk
+//sdk/fidl/fuchsia.scenic.scheduling:fuchsia.scenic.scheduling_sdk
 //sdk/fidl/fuchsia.sys:fuchsia.sys_sdk
+//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_sdk
 //sdk/fidl/fuchsia.test:fuchsia.test_sdk
+//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_sdk
+//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_sdk
+//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_sdk
 //sdk/fidl/fuchsia.unknown:fuchsia.unknown_sdk
 //sdk/fidl/fuchsia.url:fuchsia.url_sdk
 //sdk/lib/fdio:fdio_sdk_manifest
@@ -29,6 +37,7 @@
 //sdk/lib/sys/cpp/testing:cpp_sdk
 //sdk/lib/sys/cpp:cpp_sdk
 //sdk/lib/sys/service/cpp:cpp_sdk
+//sdk/lib/ui/scenic/cpp/testing:testing_sdk
 //sdk/lib/utf-utils:utf-utils_sdk
 //sdk/lib/vfs/cpp:cpp_sdk
 //tools/docsgen:ref_docs_sdk
@@ -40,5 +49,7 @@
 //zircon/system/ulib/async-testing:async-testing_sdk
 //zircon/system/ulib/async:async-cpp_sdk
 //zircon/system/ulib/async:async_sdk
+//zircon/system/ulib/syslog:syslog_sdk_manifest
+//zircon/system/ulib/trace-engine:trace-engine_sdk_manifest
 //zircon/system/ulib/zx:zx_sdk
 //zircon/vdso/zx:zx_sdk
