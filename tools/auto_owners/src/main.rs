@@ -62,6 +62,7 @@ struct Options {
 }
 
 fn main() -> Result<()> {
+    tracing_subscriber::fmt().compact().with_max_level(tracing::Level::INFO).init();
     let Options {
         rust_metadata,
         integration_manifest,
@@ -226,14 +227,14 @@ impl OwnersDb {
 
     /// Update all OWNERS files for all projects.
     fn update_all_files(&self) -> Result<()> {
-        eprintln!("Updating OWNERS files...");
+        tracing::info!("Updating OWNERS files...");
         self.projects
             .par_iter()
             .filter(|metadata| !metadata.path.starts_with("third_party/rust_crates/mirrors"))
             .map(|metadata| self.update_owners_file(metadata, &mut std::io::stdout()))
             .panic_fuse()
             .collect::<Result<()>>()?;
-        eprintln!("\nDone!");
+        tracing::info!("\nDone!");
 
         Ok(())
     }
@@ -247,13 +248,13 @@ impl OwnersDb {
         if self.update_strategy == UpdateStrategy::OnlyMissing
             && metadata.path.join("OWNERS").exists()
         {
-            eprintln!("\n{} has OWNERS file, skipping", metadata.path);
+            tracing::info!("\n{} has OWNERS file, skipping", metadata.path);
             return Ok(());
         }
         let file = self.compute_owners_file(metadata)?;
         let owners_path = metadata.path.join("OWNERS");
         if self.dry_run {
-            eprintln!("Dry-run: generated {} with content:\n", owners_path);
+            tracing::info!("Dry-run: generated {} with content:\n", owners_path);
             output_buffer.write_all(file.to_string().as_bytes())?;
         } else {
             // We need to write every OWNERS file, even if it would be empty,
@@ -851,7 +852,7 @@ include /dep/OWNERS
                 .expect("making parent of file to copy");
             std::fs::copy(to_copy, destination).expect("copying file");
         }
-        println!("done copying files");
+        tracing::info!("done copying files");
     }
 
     /// All the paths to runfiles and tools which are used in this test.

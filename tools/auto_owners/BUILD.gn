@@ -15,6 +15,8 @@ if (is_host) {
     "//third_party/rust_crates:rayon",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:toml",
+    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:tracing-subscriber",
     "//third_party/rust_crates:xml-rs",
     "//tools/cargo-gnaw:cargo-gnaw-lib",
   ]
