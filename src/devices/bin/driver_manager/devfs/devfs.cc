@@ -484,6 +484,7 @@ Devfs::Devfs(std::optional<Devnode>& root,
       // TODO(https://fxbug.dev/113842): Remove.
       "backlight",
 
+      // TODO(https://fxbug.dev/117160): Remove.
       "block",
 
       // TODO(https://fxbug.dev/113719): Remove.

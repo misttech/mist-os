@@ -664,6 +664,7 @@ class BlockWatcherTest : public testing::FshostIntegrationTest {
     return storage::RamDisk::CreateWithVmo(std::move(ramdisk_vmo), kBlockSize).value();
   }
 
+  // TODO(https://fxbug.dev/117160): Avoid relying on predictable "device numbers".
   static fbl::unique_fd WaitForBlockDevice(int number) {
     auto path = fbl::StringPrintf("/dev/class/block/%03d", number);
     EXPECT_EQ(wait_for_device(path.data(), ZX_TIME_INFINITE), ZX_OK);
