@@ -281,7 +281,7 @@ zx_status_t VolumeManager::OpenInnerBlockDevice(const zx::duration& timeout, fbl
   fbl::String path_block_exposed = fbl::String::Concat({path_base, "/zxcrypt/unsealed/block"});
 
   // Early return if path_block_exposed is already present in the device tree
-  fbl::unique_fd fd(openat(devfs_root_fd_.get(), path_block_exposed.c_str(), O_RDWR));
+  fbl::unique_fd fd(openat(devfs_root_fd_.get(), path_block_exposed.c_str(), O_RDONLY));
   if (fd) {
     out->reset(fd.release());
     return ZX_OK;
@@ -294,7 +294,7 @@ zx_status_t VolumeManager::OpenInnerBlockDevice(const zx::duration& timeout, fbl
             zx_status_get_string(rc));
     return rc;
   }
-  fd.reset(openat(devfs_root_fd_.get(), path_block_exposed.c_str(), O_RDWR));
+  fd.reset(openat(devfs_root_fd_.get(), path_block_exposed.c_str(), O_RDONLY));
   if (!fd) {
     xprintf("failed to open zxcrypt volume\n");
     return ZX_ERR_NOT_FOUND;
@@ -324,7 +324,7 @@ zx_status_t VolumeManager::OpenClientWithCaller(fdio_cpp::UnownedFdioCaller& cal
   }
   fbl::String path_manager = fbl::String::Concat({path_base, "/zxcrypt"});
 
-  fbl::unique_fd fd(openat(devfs_root_fd_.get(), path_manager.c_str(), O_RDWR));
+  fbl::unique_fd fd(openat(devfs_root_fd_.get(), path_manager.c_str(), O_RDONLY));
   if (!fd) {
     // No manager device in the /dev tree yet.  Try binding the zxcrypt
     // driver and waiting for it to appear.
@@ -348,7 +348,7 @@ zx_status_t VolumeManager::OpenClientWithCaller(fdio_cpp::UnownedFdioCaller& cal
       return rc;
     }
 
-    fd.reset(openat(devfs_root_fd_.get(), path_manager.c_str(), O_RDWR));
+    fd.reset(openat(devfs_root_fd_.get(), path_manager.c_str(), O_RDONLY));
     if (!fd) {
       xprintf("failed to open zxcrypt manager\n");
       return ZX_ERR_NOT_FOUND;
