@@ -15,13 +15,13 @@ import (
 // 'a'
 const CharConst byte = 97
 
-const SizeConst uint64 = 100
+const SizeConst uint = 100
 
 const UintptrConst uintptr = 0x1234abcd5678ffff
 
 type StructWithPrimitives struct {
 	CharField    byte
-	SizeField    uint64
+	SizeField    uint
 	UintptrField uintptr
 }
 
@@ -30,7 +30,7 @@ type Uint8Alias = uint8
 type StructWithPointers struct {
 	U64ptr   *uint64
 	Charptr  *byte
-	Usizeptr *uint64
+	Usizeptr *uint
 	Byteptr  *uint8
 	Voidptr  unsafe.Pointer
 	Aliasptr *Uint8Alias

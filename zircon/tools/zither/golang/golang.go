@@ -72,7 +72,7 @@ func primitiveTypeName(typ fidlgen.PrimitiveSubtype) string {
 	case fidlgen.ZxExperimentalUchar:
 		return "byte"
 	case fidlgen.ZxExperimentalUsize:
-		return "uint64"
+		return "uint"
 	default:
 		return string(typ)
 	}
