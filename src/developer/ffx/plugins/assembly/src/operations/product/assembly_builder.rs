@@ -14,7 +14,7 @@ use assembly_config_schema::{
 };
 use assembly_driver_manifest::DriverManifestBuilder;
 use assembly_package_utils::{PackageInternalPathBuf, PackageManifestPathBuf};
-use assembly_platform_configuration::{ComponentConfigs, PackageConfig, PackageConfigs};
+use assembly_platform_configuration::{ComponentConfigs, PackageConfigs, PackageConfiguration};
 use assembly_shell_commands::ShellCommandsBuilder;
 use assembly_structured_config::Repackager;
 use assembly_tool::ToolProvider;
@@ -405,7 +405,7 @@ impl ImageAssemblyConfigBuilder {
     pub fn set_package_config(
         &mut self,
         package: impl AsRef<str>,
-        config: PackageConfig,
+        config: PackageConfiguration,
     ) -> Result<()> {
         if self.package_configs.insert(package.as_ref().to_owned(), config).is_none() {
             Ok(())
