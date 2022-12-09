@@ -2540,6 +2540,7 @@ go_library("gvisor.dev/gvisor") {
     "pkg/tcpip/sock_err_list.go",
     "pkg/tcpip/socketops.go",
     "pkg/tcpip/stack/address_state_mutex.go",
+    "pkg/tcpip/stack/address_state_refs.go",
     "pkg/tcpip/stack/addressable_endpoint_state.go",
     "pkg/tcpip/stack/addressable_endpoint_state_mutex.go",
     "pkg/tcpip/stack/bucket_mutex.go",

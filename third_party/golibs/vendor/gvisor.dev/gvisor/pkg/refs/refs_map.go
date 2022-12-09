@@ -141,14 +141,35 @@ func DoRepeatedLeakCheck() {
 	}
 }
 
+type leakCheckDisabled interface {
+	LeakCheckDisabled() bool
+}
+
+// CleanupSync is used to wait for async cleanup actions.
+var CleanupSync sync.WaitGroup
+
 func doLeakCheck() {
+	CleanupSync.Wait()
 	liveObjectsMu.Lock()
 	defer liveObjectsMu.Unlock()
 	leaked := len(liveObjects)
 	if leaked > 0 {
+		n := 0
 		msg := fmt.Sprintf("Leak checking detected %d leaked objects:\n", leaked)
 		for obj := range liveObjects {
+			skip := false
+			if o, ok := obj.(leakCheckDisabled); ok {
+				skip = o.LeakCheckDisabled()
+			}
+			if skip {
+				log.Debugf(obj.LeakMessage())
+				continue
+			}
 			msg += obj.LeakMessage() + "\n"
+			n++
+		}
+		if n == 0 {
+			return
 		}
 		if leakCheckPanicEnabled() {
 			panic(msg)

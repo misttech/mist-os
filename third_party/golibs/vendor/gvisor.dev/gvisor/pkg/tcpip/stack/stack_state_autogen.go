@@ -6,6 +6,30 @@ import (
 	"gvisor.dev/gvisor/pkg/state"
 )
 
+func (r *addressStateRefs) StateTypeName() string {
+	return "pkg/tcpip/stack.addressStateRefs"
+}
+
+func (r *addressStateRefs) StateFields() []string {
+	return []string{
+		"refCount",
+	}
+}
+
+func (r *addressStateRefs) beforeSave() {}
+
+// +checklocksignore
+func (r *addressStateRefs) StateSave(stateSinkObject state.Sink) {
+	r.beforeSave()
+	stateSinkObject.Save(0, &r.refCount)
+}
+
+// +checklocksignore
+func (r *addressStateRefs) StateLoad(stateSourceObject state.Source) {
+	stateSourceObject.Load(0, &r.refCount)
+	stateSourceObject.AfterLoad(r.afterLoad)
+}
+
 func (t *tuple) StateTypeName() string {
 	return "pkg/tcpip/stack.tuple"
 }
@@ -1543,6 +1567,7 @@ func (e *tupleEntry) StateLoad(stateSourceObject state.Source) {
 }
 
 func init() {
+	state.Register((*addressStateRefs)(nil))
 	state.Register((*tuple)(nil))
 	state.Register((*tupleID)(nil))
 	state.Register((*conn)(nil))
