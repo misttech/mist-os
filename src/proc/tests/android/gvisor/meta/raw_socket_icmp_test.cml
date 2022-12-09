@@ -1,0 +1,11 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "//src/proc/tests/android/gvisor/meta/gvisor.shard.cml" ],
+    program: {
+        binary: "data/tests/raw_socket_icmp_test",
+        args: [ "--gunit_filter=-*.IPv6ChecksumNotSupported:*.ICMPv6FilterNotSupported:*.SendAndReceiveBadChecksum:*.SendAndReceive:*.MultipleSocketReceive:*.RawAndPingSockets:*.SendAndReceiveViaConnect:*.BindSendAndReceive:*.BindConnectSendAndReceive" ],
+        user: "fuchsia:x:0:0",
+    },
+}
