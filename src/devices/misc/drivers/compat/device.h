@@ -26,6 +26,7 @@
 
 #include <fbl/intrusive_double_list.h>
 
+#include "src/devices/lib/fidl/device_server.h"
 #include "src/devices/misc/drivers/compat/devfs_vnode.h"
 #include "src/lib/storage/vfs/cpp/vmo_file.h"
 
@@ -40,6 +41,7 @@ class Driver;
 
 // Device is an implementation of a DFv1 device.
 class Device : public std::enable_shared_from_this<Device>,
+               public devfs_fidl::DeviceInterface,
                public fidl::WireServer<fuchsia_driver_framework::RuntimeConnector> {
  public:
   Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
@@ -80,7 +82,6 @@ class Device : public std::enable_shared_from_this<Device>,
   zx_status_t AddMetadata(uint32_t type, const void* data, size_t size);
   zx_status_t GetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual);
   zx_status_t GetMetadataSize(uint32_t type, size_t* out_size);
-  zx_status_t MessageOp(fidl_incoming_msg_t* msg, fidl_txn_t* txn);
   zx::result<uint32_t> SetPerformanceStateOp(uint32_t state);
 
   void InitReply(zx_status_t status);
@@ -138,6 +139,24 @@ class Device : public std::enable_shared_from_this<Device>,
   Device(Device&&) = delete;
   Device& operator=(Device&&) = delete;
 
+  // device_fidl::DeviceInterface APIs.
+  zx::result<std::string> GetTopologicalPath() override;
+  bool IsUnbound() override;
+  zx_status_t MessageOp(fidl_incoming_msg_t* msg, fidl_txn_t* txn) override;
+  void ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
+                           ConnectToDeviceFidlCompleter::Sync& completer) override;
+  void Bind(BindRequestView request, BindCompleter::Sync& completer) override;
+  void Rebind(RebindRequestView request, RebindCompleter::Sync& completer) override;
+  void UnbindChildren(UnbindChildrenCompleter::Sync& completer) override;
+  void ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) override;
+  void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override;
+  void GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& completer) override;
+  void GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) override;
+  void SetMinDriverLogSeverity(SetMinDriverLogSeverityRequestView request,
+                               SetMinDriverLogSeverityCompleter::Sync& completer) override;
+  void SetPerformanceState(SetPerformanceStateRequestView request,
+                           SetPerformanceStateCompleter::Sync& completer) override;
+
   void RemoveChild(std::shared_ptr<Device>& child);
   void InsertOrUpdateProperty(fuchsia_driver_framework::wire::NodePropertyKey key,
                               fuchsia_driver_framework::wire::NodePropertyValue value);
@@ -155,6 +174,8 @@ class Device : public std::enable_shared_from_this<Device>,
 
   DeviceServer device_server_;
 
+  // This is the device's topological path without the leading '/dev/'.
+  // TODO(fxbug.dev/117180): Simplify this and the GetTopologicalPath API.
   std::string topological_path_;
   const std::string name_;
   // A unique id for the device.

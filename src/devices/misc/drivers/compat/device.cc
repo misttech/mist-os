@@ -280,7 +280,7 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
     device->device_id_ = driver()->GetNextDeviceId();
   }
 
-  device->dev_vnode_ = fbl::MakeRefCounted<DevfsVnode>(device->ZxDevice());
+  device->dev_vnode_ = fbl::MakeRefCounted<DevfsVnode>(device->ZxDevice(), dispatcher_);
 
   auto outgoing_name = device->OutgoingName();
 
@@ -1008,6 +1008,98 @@ void Device::Connect(ConnectRequestView request, ConnectCompleter::Sync& complet
   } else {
     completer.ReplySuccess();
   }
+}
+
+zx::result<std::string> Device::GetTopologicalPath() {
+  std::string path("/dev/");
+  path.append(topological_path());
+  return zx::ok(path);
+}
+
+bool Device::IsUnbound() { return pending_removal_; }
+
+void Device::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
+                                 ConnectToDeviceFidlCompleter::Sync& completer) {
+  if (dev_vnode_) {
+    dev_vnode_->ConnectToDeviceFidl(std::move(request->server));
+  }
+}
+
+void Device::Bind(BindRequestView request, BindCompleter::Sync& completer) {
+  if (HasChildren()) {
+    // A DFv1 driver will add a child device once it's bound. If the device has any children, refuse
+    // the Bind() call.
+    completer.ReplyError(ZX_ERR_ALREADY_BOUND);
+    return;
+  }
+  auto promise = RebindToLibname(request->driver.get())
+                     .then([completer = completer.ToAsync()](
+                               fpromise::result<void, zx_status_t>& result) mutable {
+                       if (result.is_ok()) {
+                         completer.ReplySuccess();
+                       } else {
+                         completer.ReplyError(result.take_error());
+                       }
+                     });
+
+  executor().schedule_task(std::move(promise));
+}
+
+void Device::GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) {
+  completer.Reply(0);
+}
+
+void Device::Rebind(RebindRequestView request, RebindCompleter::Sync& completer) {
+  auto promise = RebindToLibname(request->driver.get())
+                     .then([completer = completer.ToAsync()](
+                               fpromise::result<void, zx_status_t>& result) mutable {
+                       if (result.is_ok()) {
+                         completer.ReplySuccess();
+                       } else {
+                         completer.ReplyError(result.take_error());
+                       }
+                     });
+
+  executor().schedule_task(std::move(promise));
+}
+
+void Device::UnbindChildren(UnbindChildrenCompleter::Sync& completer) {
+  executor().schedule_task(
+      RemoveChildren().then([completer = completer.ToAsync()](fpromise::result<>& result) mutable {
+        completer.ReplySuccess();
+      }));
+}
+
+void Device::ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) {
+  Remove();
+  completer.ReplySuccess();
+}
+
+void Device::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
+  zx::result path = GetTopologicalPath();
+  if (path.is_error()) {
+    completer.ReplyError(path.error_value());
+    return;
+  }
+  completer.ReplySuccess(fidl::StringView::FromExternal(path.value()));
+}
+
+void Device::GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& completer) {
+  uint8_t severity = logger().GetSeverity();
+  completer.Reply(ZX_OK, fuchsia_logger::wire::LogLevelFilter(severity));
+}
+
+void Device::SetMinDriverLogSeverity(SetMinDriverLogSeverityRequestView request,
+                                     SetMinDriverLogSeverityCompleter::Sync& completer) {
+  FuchsiaLogSeverity severity = static_cast<FuchsiaLogSeverity>(request->severity);
+  logger().SetSeverity(severity);
+  completer.Reply(ZX_OK);
+}
+
+void Device::SetPerformanceState(SetPerformanceStateRequestView request,
+                                 SetPerformanceStateCompleter::Sync& completer) {
+  zx::result result = SetPerformanceStateOp(request->requested_state);
+  completer.Reply(result.status_value(), result.is_ok() ? result.value() : 0);
 }
 
 }  // namespace compat

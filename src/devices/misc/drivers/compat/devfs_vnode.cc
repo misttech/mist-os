@@ -10,7 +10,6 @@
 
 #include <fbl/string_buffer.h>
 
-#include "device.h"
 #include "fbl/ref_ptr.h"
 #include "src/devices/bin/driver_host/simple_binding.h"
 #include "src/devices/lib/fidl/transaction.h"
@@ -64,6 +63,10 @@ void FidlDispatcher::dispatch_message(fidl::IncomingHeaderAndMessage&& msg,
 
 }  // namespace
 
+void DevfsVnode::ConnectToDeviceFidl(zx::channel server) {
+  FidlDispatcher::CreateAndBind(fbl::RefPtr(this), dispatcher_, std::move(server));
+}
+
 zx_status_t DevfsVnode::GetAttributes(fs::VnodeAttributes* a) {
   a->mode = V_TYPE_CDEV | V_IRUSR | V_IWUSR;
   a->content_size = 0;
@@ -85,7 +88,7 @@ zx_status_t DevfsVnode::GetNodeInfoForProtocol(fs::VnodeProtocol protocol, fs::R
 void DevfsVnode::HandleFsSpecificMessage(fidl::IncomingHeaderAndMessage& msg,
                                          fidl::Transaction* txn) {
   ::fidl::DispatchResult dispatch_result =
-      fidl::WireTryDispatch<fuchsia_device::Controller>(this, msg, txn);
+      fidl::WireTryDispatch<fuchsia_device::Controller>(dev_, msg, txn);
   if (dispatch_result == ::fidl::DispatchResult::kFound) {
     return;
   }
@@ -97,90 +100,4 @@ void DevfsVnode::HandleFsSpecificMessage(fidl::IncomingHeaderAndMessage& msg,
     // Close the connection on any error
     txn->Close(status);
   }
-}
-
-void DevfsVnode::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
-                                     ConnectToDeviceFidlCompleter::Sync& completer) {
-  FidlDispatcher::CreateAndBind(fbl::RefPtr(this), dev_->dispatcher(), std::move(request->server));
-}
-
-void DevfsVnode::Bind(BindRequestView request, BindCompleter::Sync& completer) {
-  if (dev_->HasChildren()) {
-    // A DFv1 driver will add a child device once it's bound. If the device has any children, refuse
-    // the Bind() call.
-    completer.ReplyError(ZX_ERR_ALREADY_BOUND);
-    return;
-  }
-  auto async = completer.ToAsync();
-  auto promise =
-      dev_->RebindToLibname(std::string_view{request->driver.data(), request->driver.size()})
-          .then(
-              [completer = std::move(async)](fpromise::result<void, zx_status_t>& result) mutable {
-                if (result.is_ok()) {
-                  completer.ReplySuccess();
-                } else {
-                  completer.ReplyError(result.take_error());
-                }
-              });
-
-  dev_->executor().schedule_task(std::move(promise));
-}
-
-void DevfsVnode::GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) {
-  completer.Reply(0);
-}
-
-void DevfsVnode::Rebind(RebindRequestView request, RebindCompleter::Sync& completer) {
-  auto async = completer.ToAsync();
-  auto promise =
-      dev_->RebindToLibname(std::string_view{request->driver.data(), request->driver.size()})
-          .then(
-              [completer = std::move(async)](fpromise::result<void, zx_status_t>& result) mutable {
-                if (result.is_ok()) {
-                  completer.ReplySuccess();
-                } else {
-                  completer.ReplyError(result.take_error());
-                }
-              });
-
-  dev_->executor().schedule_task(std::move(promise));
-}
-
-void DevfsVnode::UnbindChildren(UnbindChildrenCompleter::Sync& completer) {
-  auto async = completer.ToAsync();
-  dev_->executor().schedule_task(dev_->RemoveChildren().then(
-      [completer = std::move(async)](fpromise::result<>& result) mutable {
-        completer.ReplySuccess();
-      }));
-}
-
-void DevfsVnode::ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) {
-  dev_->Remove();
-  completer.ReplySuccess();
-}
-
-void DevfsVnode::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
-  std::string path("/dev/");
-  path.append(dev_->topological_path());
-  completer.ReplySuccess(fidl::StringView::FromExternal(path));
-}
-
-void DevfsVnode::GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& completer) {
-  uint8_t severity = dev_->logger().GetSeverity();
-  completer.Reply(ZX_OK, fuchsia_logger::wire::LogLevelFilter(severity));
-}
-
-void DevfsVnode::SetMinDriverLogSeverity(SetMinDriverLogSeverityRequestView request,
-                                         SetMinDriverLogSeverityCompleter::Sync& completer) {
-  FuchsiaLogSeverity severity = static_cast<FuchsiaLogSeverity>(request->severity);
-  dev_->logger().SetSeverity(severity);
-  completer.Reply(ZX_OK);
-}
-
-void DevfsVnode::SetPerformanceState(SetPerformanceStateRequestView request,
-                                     SetPerformanceStateCompleter::Sync& completer) {
-  auto result = dev_->SetPerformanceStateOp(request->requested_state);
-  zx_status_t status = result.is_ok() ? ZX_OK : result.error_value();
-  uint32_t out_state = result.is_ok() ? result.value() : 0;
-  completer.Reply(status, out_state);
 }

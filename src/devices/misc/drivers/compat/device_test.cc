@@ -16,7 +16,6 @@
 #include <gtest/gtest.h>
 
 #include "lib/ddk/binding_priv.h"
-#include "lib/ddk/debug.h"
 #include "lib/ddk/device.h"
 #include "lib/ddk/driver.h"
 #include "src/devices/misc/drivers/compat/devfs_vnode.h"
@@ -156,11 +155,11 @@ class DeviceTest : public gtest::TestLoopFixture {
 
   std::pair<std::unique_ptr<DevfsVnode>, fidl::WireClient<fuchsia_device::Controller>> CreateVnode(
       zx_device_t* device) {
-    auto vnode = std::make_unique<DevfsVnode>(device);
+    auto vnode = std::make_unique<DevfsVnode>(device, test_loop().dispatcher());
     auto dev_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
     EXPECT_EQ(ZX_OK, dev_endpoints.status_value());
 
-    fidl::BindServer(test_loop().dispatcher(), std::move(dev_endpoints->server), vnode.get());
+    fidl::BindServer(test_loop().dispatcher(), std::move(dev_endpoints->server), vnode->dev());
     fidl::WireClient<fuchsia_device::Controller> client;
     client.Bind(std::move(dev_endpoints->client), test_loop().dispatcher());
 
@@ -605,11 +604,11 @@ TEST_F(DeviceTest, DevfsVnodeGetTopologicalPath) {
   };
   device.Add(&args, &second_device);
 
-  DevfsVnode vnode(second_device);
+  DevfsVnode vnode(second_device, test_loop().dispatcher());
   auto dev_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
   ASSERT_EQ(ZX_OK, endpoints.status_value());
 
-  fidl::BindServer(test_loop().dispatcher(), std::move(dev_endpoints->server), &vnode);
+  fidl::BindServer(test_loop().dispatcher(), std::move(dev_endpoints->server), vnode.dev());
 
   fidl::WireClient<fuchsia_device::Controller> client;
   client.Bind(std::move(dev_endpoints->client), test_loop().dispatcher());
@@ -645,11 +644,11 @@ TEST_F(DeviceTest, DevfsVnodeSetPerformanceState) {
                         dispatcher());
   device.Bind({std::move(endpoints->client), dispatcher()});
 
-  DevfsVnode vnode(device.ZxDevice());
+  DevfsVnode vnode(device.ZxDevice(), test_loop().dispatcher());
   auto dev_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
   ASSERT_EQ(ZX_OK, endpoints.status_value());
 
-  fidl::BindServer(test_loop().dispatcher(), std::move(dev_endpoints->server), &vnode);
+  fidl::BindServer(test_loop().dispatcher(), std::move(dev_endpoints->server), vnode.dev());
 
   fidl::WireClient<fuchsia_device::Controller> client;
   client.Bind(std::move(dev_endpoints->client), test_loop().dispatcher());
@@ -681,11 +680,11 @@ TEST_F(DeviceTest, DevfsVnodeSetAndGetMinDriverLogSeverity) {
                         dispatcher());
   device.Bind({std::move(endpoints->client), dispatcher()});
 
-  DevfsVnode vnode(device.ZxDevice());
+  DevfsVnode vnode(device.ZxDevice(), test_loop().dispatcher());
   auto dev_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
   ASSERT_EQ(ZX_OK, endpoints.status_value());
 
-  fidl::BindServer(test_loop().dispatcher(), std::move(dev_endpoints->server), &vnode);
+  fidl::BindServer(test_loop().dispatcher(), std::move(dev_endpoints->server), vnode.dev());
 
   fidl::WireClient<fuchsia_device::Controller> client;
   client.Bind(std::move(dev_endpoints->client), test_loop().dispatcher());
