@@ -902,13 +902,9 @@ main(int argc, char * const argv[])
   //
   // default vendor/device is the first physical device
   //
-  if (vendor_id == 0)
+  if ((vendor_id == 0) && (device_id == 0))
     {
       vendor_id = pdp.vendorID;
-    }
-
-  if (device_id == 0)
-    {
       device_id = pdp.deviceID;
     }
 

@@ -677,6 +677,7 @@
 #define SPN_TTCK_HI_BITS_Y                       9
 #define SPN_TTCK_HI_BITS_XY                      (SPN_TTCK_HI_BITS_X + SPN_TTCK_HI_BITS_Y)
 #define SPN_TTCK_HI_BITS_LXY                     (SPN_TTCK_LO_HI_BITS_LAYER + SPN_TTCK_HI_BITS_X + SPN_TTCK_HI_BITS_Y)
+#define SPN_TTCK_BITS_LXY                        (SPN_TTCK_LO_BITS_LAYER + SPN_TTCK_HI_BITS_LXY)
 
 #define SPN_TTCK_LO_OFFSET_PREFIX                SPN_TTCK_LO_BITS_TTXB_ID
 #define SPN_TTCK_LO_OFFSET_LAYER                 (SPN_TTCK_LO_OFFSET_PREFIX + SPN_TTCK_LO_BITS_PREFIX)
