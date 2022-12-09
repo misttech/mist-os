@@ -28,21 +28,15 @@
 //! }
 //!
 
-use {
-    fidl::{client::QueryResponseFut, endpoints::create_request_stream},
-    fidl_fuchsia_bluetooth_bredr as bredr,
-    fuchsia_bluetooth::types::{Channel, PeerId},
-    futures::{
-        stream::{FusedStream, Stream, StreamExt},
-        task::{Context, Poll, Waker},
-        FutureExt,
-    },
-    std::{
-        convert::{TryFrom, TryInto},
-        pin::Pin,
-    },
-    tracing::trace,
-};
+use fidl::{client::QueryResponseFut, endpoints::create_request_stream};
+use fidl_fuchsia_bluetooth_bredr as bredr;
+use fuchsia_bluetooth::types::{Channel, PeerId};
+use futures::stream::{FusedStream, Stream, StreamExt};
+use futures::task::{Context, Poll, Waker};
+use futures::FutureExt;
+use std::convert::{TryFrom, TryInto};
+use std::pin::Pin;
+use tracing::trace;
 
 /// Error type used by this library.
 mod error;
@@ -79,12 +73,7 @@ impl TryFrom<bredr::SearchResultsRequest> for ProfileEvent {
             value;
         let id: PeerId = peer_id.into();
         responder.send()?;
-        trace!(
-            "Profile Search Result: {:?} - protocol {:?}, attributes {:?}",
-            id,
-            protocol,
-            attributes
-        );
+        trace!(%id, ?protocol, ?attributes, "Profile Search Result");
         Ok(ProfileEvent::SearchResult { id, protocol, attributes })
     }
 }
@@ -95,7 +84,7 @@ impl TryFrom<bredr::ConnectionReceiverRequest> for ProfileEvent {
         let bredr::ConnectionReceiverRequest::Connected { peer_id, channel, protocol, .. } = value;
         let id = peer_id.into();
         let channel = channel.try_into().map_err(Error::connection_receiver)?;
-        trace!("Connection from {:?} - protocol {:?}", id, protocol);
+        trace!(%id, ?protocol, "Incoming connection");
         Ok(ProfileEvent::PeerConnected { id, channel, protocol })
     }
 }
