@@ -689,7 +689,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kComposedProtocol_OneWayAnonComposed_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();
@@ -705,7 +705,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposed_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedRequest>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedRequest>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();
@@ -721,7 +721,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposedWithError_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();
@@ -737,7 +737,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kComposedProtocol_OneWayNamedComposed_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::TablePayload>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::TablePayload>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();
@@ -753,7 +753,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposed_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::UnionPayload>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::UnionPayload>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();
@@ -769,7 +769,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposedWithError_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::TablePayload>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::TablePayload>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();
@@ -2705,7 +2705,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kMainProtocol_OneWayAnonComposed_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();
@@ -2721,7 +2721,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposed_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedRequest>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedRequest>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();
@@ -2737,7 +2737,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposedWithError_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();
@@ -2753,7 +2753,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kMainProtocol_OneWayNamedComposed_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::TablePayload>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::TablePayload>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();
@@ -2769,7 +2769,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposed_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::UnionPayload>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::UnionPayload>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();
@@ -2785,7 +2785,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposedWithError_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::TablePayload>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::TablePayload>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();
@@ -2801,7 +2801,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kMainProtocol_OneWayLocal_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::TablePayload>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::TablePayload>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();
@@ -2817,7 +2817,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocal_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::UnionPayload>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::UnionPayload>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();
@@ -2833,7 +2833,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocalWithError_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::TablePayload>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::TablePayload>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();
@@ -2849,7 +2849,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kMainProtocol_OneWayAnon_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();
@@ -2865,7 +2865,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnon_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonRequest>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonRequest>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();
@@ -2881,7 +2881,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
     { ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonWithError_Ordinal,
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-        ::fit::result decoded = ::fidl::InplaceDecode<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorRequest>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorRequest>(
             std::move(msg), metadata);
         if (unlikely(!decoded.is_ok())) {
           return decoded.error_value();

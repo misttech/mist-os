@@ -165,7 +165,7 @@ OwnedSplitMetadataAndMessage(cpp20::span<const uint8_t> persisted);
 // Example:
 //
 //     fuchsia_my_lib::SomeType some_value = {...};
-//     fidl::OwnedEncodeResult encoded = fidl::Encode(std::move(some_value));
+//     fidl::OwnedEncodeResult encoded = fidl::StandaloneEncode(std::move(some_value));
 //
 //     if (!encoded.message().ok()) {
 //       // Handle errors...
@@ -182,18 +182,18 @@ OwnedSplitMetadataAndMessage(cpp20::span<const uint8_t> persisted);
 //     fidl::OutgoingMessage::CopiedBytes bytes = encoded.message().CopyBytes();
 //
 template <typename FidlType, internal::EnableIfNaturalType<FidlType> = nullptr>
-OwnedEncodeResult Encode(FidlType value) {
+OwnedEncodeResult StandaloneEncode(FidlType value) {
   return internal::EncodeWithTransport<fidl::internal::ChannelTransport>(std::move(value));
 }
 
-// |Decode| decodes a non-transactional incoming message to a natural domain
+// |StandaloneDecode| decodes an encoded message to a natural domain
 // object |FidlType|. Supported types are structs, tables, and unions. Example:
 //
 //     // Create a message referencing an encoded payload.
 //     fidl::EncodedMessage message = fidl::EncodedMessage::Create(byte_span);
 //
 //     // Decode the message.
-//     fit::result decoded = fidl::Decode<fuchsia_my_lib::SomeType>(
+//     fit::result decoded = fidl::StandaloneDecode<fuchsia_my_lib::SomeType>(
 //         std::move(message), wire_format_metadata);
 //
 //     // Use the decoded value.
@@ -205,8 +205,8 @@ OwnedEncodeResult Encode(FidlType value) {
 // |message| is always consumed. |metadata| informs the wire format of the
 // encoded message.
 template <typename FidlType>
-::fit::result<::fidl::Error, FidlType> Decode(::fidl::EncodedMessage message,
-                                              ::fidl::WireFormatMetadata metadata) {
+::fit::result<::fidl::Error, FidlType> StandaloneDecode(::fidl::EncodedMessage message,
+                                                        ::fidl::WireFormatMetadata metadata) {
   static_assert(::fidl::IsFidlType<FidlType>::value, "Only FIDL types are supported");
   FidlType value{internal::DefaultConstructPossiblyInvalidObjectTag{}};
 
@@ -253,7 +253,7 @@ fit::result<fidl::Error, std::vector<uint8_t>> Persist(const FidlType& value) {
       "|FidlType| cannot be a resource type. Resources cannot be persisted. "
       "If you need to send resource types to another process, consider using a FIDL protocol.");
 
-  fidl::OwnedEncodeResult encoded = fidl::Encode(value);
+  fidl::OwnedEncodeResult encoded = fidl::StandaloneEncode(value);
   if (!encoded.message().ok()) {
     return fit::error(encoded.message().error());
   }
@@ -293,7 +293,7 @@ fit::result<fidl::Error, FidlType> Unpersist(cpp20::span<const uint8_t> data) {
     return split.take_error();
   }
   auto [metadata, bytes] = split.value();
-  return fidl::Decode<FidlType>(fidl::EncodedMessage::Create(bytes), metadata);
+  return fidl::StandaloneDecode<FidlType>(fidl::EncodedMessage::Create(bytes), metadata);
 }
 
 }  // namespace fidl

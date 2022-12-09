@@ -106,7 +106,7 @@ TEST(StandaloneResourceTypeCoding, Decode) {
 
   // Perform decoding.
   fit::result decoded =
-      fidl::Decode<test_driver_coding::MixedResources>(std::move(message), metadata);
+      fidl::StandaloneDecode<test_driver_coding::MixedResources>(std::move(message), metadata);
   ASSERT_TRUE(decoded.is_ok());
 
   test_driver_coding::MixedResources& value = decoded.value();

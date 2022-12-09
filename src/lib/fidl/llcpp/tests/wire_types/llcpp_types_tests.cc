@@ -211,7 +211,7 @@ TEST(LlcppTypesTests, OwnedEncodedMessageOwns) {
 
   fidl::OutgoingToEncodedMessage converted(encoded->GetOutgoingMessage());
   ASSERT_TRUE(converted.ok());
-  fit::result decoded = fidl::InplaceDecode<VectorStruct>(
+  fit::result decoded = fidl::StandaloneInplaceDecode<VectorStruct>(
       std::move(converted.message()),
       fidl::internal::WireFormatMetadataForVersion(fidl::internal::WireFormatVersion::kV2));
   ASSERT_TRUE(decoded.is_ok());

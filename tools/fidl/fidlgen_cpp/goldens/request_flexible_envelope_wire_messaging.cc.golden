@@ -205,7 +205,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
         ::test_requestflexibleenvelope::kProtocol_RequestStrictResponseFlexible_Ordinal,
         [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
            internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-          ::fit::result decoded = ::fidl::InplaceDecode<::test_requestflexibleenvelope::wire::ProtocolRequestStrictResponseFlexibleRequest>(
+          ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_requestflexibleenvelope::wire::ProtocolRequestStrictResponseFlexibleRequest>(
               std::move(msg), metadata);
           if (unlikely(!decoded.is_ok())) {
             return decoded.error_value();
@@ -221,7 +221,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
         ::test_requestflexibleenvelope::kProtocol_RequestFlexibleResponseStrict_Ordinal,
         [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
            internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-          ::fit::result decoded = ::fidl::InplaceDecode<::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleResponseStrictRequest>(
+          ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleResponseStrictRequest>(
               std::move(msg), metadata);
           if (unlikely(!decoded.is_ok())) {
             return decoded.error_value();

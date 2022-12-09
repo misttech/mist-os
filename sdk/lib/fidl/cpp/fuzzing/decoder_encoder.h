@@ -142,7 +142,7 @@ DecoderEncoderStatus DecoderEncoderImpl(uint8_t* bytes, uint32_t num_bytes, zx_h
     fidl::EncodedMessage encoded = fidl::EncodedMessage::Create(
         cpp20::span<uint8_t>(bytes, num_bytes), handles, handle_metadata, num_handles);
     decoded_initialize_later.emplace(
-        fidl::InplaceDecode<Body>(std::move(encoded), wire_format_metadata));
+        fidl::StandaloneInplaceDecode<Body>(std::move(encoded), wire_format_metadata));
   }
 
   fit::result<fidl::Error, fidl::DecodedValue<Body>>& decoded = decoded_initialize_later.value();
@@ -183,7 +183,7 @@ DecoderEncoderStatus DecoderEncoderImpl(uint8_t* bytes, uint32_t num_bytes, zx_h
 
   std::optional<fit::result<fidl::Error, fidl::DecodedValue<Body>>> decoded2_initialize_later;
   decoded2_initialize_later.emplace(
-      fidl::InplaceDecode<Body>(std::move(conversion.message()), wire_format_metadata));
+      fidl::StandaloneInplaceDecode<Body>(std::move(conversion.message()), wire_format_metadata));
   fit::result<fidl::Error, fidl::DecodedValue<Body>>& decoded2 = decoded2_initialize_later.value();
 
   if (!decoded2.is_ok()) {

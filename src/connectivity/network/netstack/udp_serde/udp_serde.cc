@@ -168,7 +168,7 @@ DeserializeSendMsgMetaResult deserialize_send_msg_meta(Buffer buf) {
     res.err = DeserializeSendMsgMetaErrorInputBufferTooSmall;
     return res;
   }
-  fit::result decoded = fidl::InplaceDecode<fsocket::wire::SendMsgMeta>(
+  fit::result decoded = fidl::StandaloneInplaceDecode<fsocket::wire::SendMsgMeta>(
       fidl::EncodedMessage::Create(span.subspan(0, meta_size)),
       fidl::internal::WireFormatMetadataForVersion(fidl::internal::WireFormatVersion::kV2));
 
@@ -218,7 +218,7 @@ DeserializeSendMsgMetaResult deserialize_send_msg_meta(Buffer buf) {
 
 SerializeSendMsgMetaError serialize_send_msg_meta(fsocket::wire::SendMsgMeta& meta,
                                                   cpp20::span<uint8_t> out_buf) {
-  fidl::OwnedEncodeResult encoded = fidl::Encode(meta);
+  fidl::OwnedEncodeResult encoded = fidl::StandaloneEncode(meta);
   if (!encoded.message().ok()) {
     return SerializeSendMsgMetaErrorFailedToEncode;
   }
@@ -391,7 +391,7 @@ fit::result<fidl::Error, fidl::DecodedValue<fsocket::wire::RecvMsgMeta>> deseria
     return fit::error(fidl::Error::DecodeError(ZX_ERR_BUFFER_TOO_SMALL));
   }
 
-  return fidl::InplaceDecode<fsocket::wire::RecvMsgMeta>(
+  return fidl::StandaloneInplaceDecode<fsocket::wire::RecvMsgMeta>(
       fidl::EncodedMessage::Create(buf.subspan(0, meta_size)),
       fidl::internal::WireFormatMetadataForVersion(fidl::internal::WireFormatVersion::kV2));
 }
@@ -496,7 +496,7 @@ SerializeRecvMsgMetaError serialize_recv_msg_meta(const RecvMsgMeta* meta_, Cons
 
   fsocket::wire::RecvMsgMeta fsocket_meta = meta_builder.Build();
 
-  fidl::OwnedEncodeResult encoded = fidl::Encode(fsocket_meta);
+  fidl::OwnedEncodeResult encoded = fidl::StandaloneEncode(fsocket_meta);
   if (!encoded.message().ok()) {
     return SerializeRecvMsgMetaErrorFailedToEncode;
   }

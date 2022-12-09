@@ -47,7 +47,7 @@ constexpr ::fidl::internal::MethodEntry {{ .WireServerDispatcher.NoLeading }}::e
         fdf::Arena arena(::fidl::internal::TakeDriverArenaFromStorage(storage_view));
         {{- end }}
         {{- if .HasRequestPayload }}
-        ::fit::result decoded = ::fidl::InplaceDecode<{{ .RequestPayload }}>(
+        ::fit::result decoded = ::fidl::StandaloneInplaceDecode<{{ .RequestPayload }}>(
             std::move(msg), metadata);
         {{- else }}
         ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessageWithoutBody(
@@ -156,7 +156,7 @@ constexpr ::fidl::internal::MethodEntry {{ .NaturalServerDispatcher.NoLeading }}
       [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
          internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
         {{- if .HasRequestPayload }}
-        ::fit::result decoded = ::fidl::Decode<{{ .RequestPayload }}>(
+        ::fit::result decoded = ::fidl::StandaloneDecode<{{ .RequestPayload }}>(
             std::move(msg), metadata);
         {{- else }}
         ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessageWithoutBody(

@@ -181,7 +181,7 @@ zx::result<> Driver::Start(fuchsia_driver_framework::DriverStartArgs start_args,
     initial_dispatcher_ = std::move(dispatcher);
   }
 
-  fidl::OwnedEncodeResult encoded = fidl::Encode(std::move(start_args));
+  fidl::OwnedEncodeResult encoded = fidl::StandaloneEncode(std::move(start_args));
   if (!encoded.message().ok()) {
     LOGF(ERROR, "Failed to start driver, could not encode start args: %s",
          encoded.message().FormatDescription().data());

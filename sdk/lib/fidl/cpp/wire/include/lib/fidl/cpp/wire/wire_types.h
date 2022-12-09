@@ -262,7 +262,7 @@ class OwnedEncodeResult {
   //
   // Before using the message, one should first check it for encoding errors:
   //
-  //     fidl::OwnedEncodeResult result = fidl::Encode(...);
+  //     fidl::OwnedEncodeResult result = fidl::StandaloneEncode(...);
   //     if (!result.message().ok()) {
   //       // Handle errors...
   //       fidl::Error error = result.message().error();
@@ -299,7 +299,7 @@ class OwnedEncodeResult {
 // Example:
 //
 //     fuchsia_my_lib::wire::SomeType some_value = {...};
-//     fidl::OwnedEncodeResult encoded = fidl::Encode(std::move(some_value));
+//     fidl::OwnedEncodeResult encoded = fidl::StandaloneEncode(std::move(some_value));
 //
 //     if (!encoded.message().ok()) {
 //       // Handle errors...
@@ -316,7 +316,7 @@ class OwnedEncodeResult {
 //     fidl::OutgoingMessage::CopiedBytes bytes = encoded.message().CopyBytes();
 //
 template <typename FidlType, internal::EnableIfWireType<FidlType> = nullptr>
-OwnedEncodeResult Encode(FidlType& value) {
+OwnedEncodeResult StandaloneEncode(FidlType& value) {
   static_assert(IsFidlType<FidlType>::value, "Only FIDL types are supported");
 
   class Encoded final : public internal::EncodeResult {
@@ -339,7 +339,7 @@ OwnedEncodeResult Encode(FidlType& value) {
   return OwnedEncodeResult(cpp17::in_place_type_t<Encoded>{}, &value);
 }
 
-// |InplaceDecode| decodes the |message| to a wire domain
+// |StandaloneInplaceDecode| decodes the |message| to a wire domain
 // object |FidlType|. Supported types are structs, tables, and unions.
 // Bytes are mutated in-place. The bytes must remain alive if one needs to
 // access the decoded result.
@@ -350,7 +350,7 @@ OwnedEncodeResult Encode(FidlType& value) {
 //     fidl::EncodedMessage message = fidl::EncodedMessage::Create(byte_span);
 //
 //     // Decode the message.
-//     fit::result decoded = fidl::InplaceDecode<fuchsia_my_lib::wire::SomeType>(
+//     fit::result decoded = fidl::StandaloneInplaceDecode<fuchsia_my_lib::wire::SomeType>(
 //         std::move(message), wire_format_metadata);
 //
 //     // Use the decoded value.
@@ -362,7 +362,7 @@ OwnedEncodeResult Encode(FidlType& value) {
 // |message| is always consumed. |metadata| informs the wire format of the
 // encoded message.
 template <typename FidlType>
-::fit::result<::fidl::Error, ::fidl::DecodedValue<FidlType>> InplaceDecode(
+::fit::result<::fidl::Error, ::fidl::DecodedValue<FidlType>> StandaloneInplaceDecode(
     EncodedMessage message, WireFormatMetadata metadata) {
   static_assert(IsFidlType<FidlType>::value, "Only FIDL types are supported");
 
@@ -408,7 +408,7 @@ fit::result<fidl::Error, std::vector<uint8_t>> Persist(const FidlType& value) {
 
   // Const safety: because there are no handles in non-resource types,
   // encoding will not mutate the input tree of values.
-  fidl::OwnedEncodeResult encoded = fidl::Encode(const_cast<FidlType&>(value));
+  fidl::OwnedEncodeResult encoded = fidl::StandaloneEncode(const_cast<FidlType&>(value));
   if (!encoded.message().ok()) {
     return fit::error(encoded.message().error());
   }
@@ -454,7 +454,7 @@ fit::result<fidl::Error, fidl::ObjectView<FidlType>> InplaceUnpersist(cpp20::spa
   }
   auto [metadata, bytes] = split.value();
   fit::result decoded =
-      fidl::InplaceDecode<FidlType>(fidl::EncodedMessage::Create(bytes), metadata);
+      fidl::StandaloneInplaceDecode<FidlType>(fidl::EncodedMessage::Create(bytes), metadata);
   if (decoded.is_error()) {
     return decoded.take_error();
   }

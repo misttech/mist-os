@@ -175,10 +175,11 @@ bool DecodeSuccess(fidl::internal::WireFormatVersion wire_format_version,
         .rights = handle_info.rights,
     });
   }
-  fit::result<fidl::Error, fidl::DecodedValue<FidlType>> result = fidl::InplaceDecode<FidlType>(
-      fidl::EncodedMessage::Create(bytes, handles.data(), handle_metadata.data(),
-                                   static_cast<uint32_t>(handle_infos.size())),
-      fidl::internal::WireFormatMetadataForVersion(wire_format_version));
+  fit::result<fidl::Error, fidl::DecodedValue<FidlType>> result =
+      fidl::StandaloneInplaceDecode<FidlType>(
+          fidl::EncodedMessage::Create(bytes, handles.data(), handle_metadata.data(),
+                                       static_cast<uint32_t>(handle_infos.size())),
+          fidl::internal::WireFormatMetadataForVersion(wire_format_version));
   if (!result.is_ok()) {
     std::cout << "Decoding failed: " << result.error_value() << std::endl;
     return false;
@@ -202,10 +203,11 @@ bool DecodeFailure(fidl::internal::WireFormatVersion wire_format_version,
         .rights = handle_info.rights,
     });
   }
-  fit::result<fidl::Error, fidl::DecodedValue<FidlType>> result = fidl::InplaceDecode<FidlType>(
-      fidl::EncodedMessage::Create(bytes, handles.data(), handle_metadata.data(),
-                                   static_cast<uint32_t>(handle_infos.size())),
-      fidl::internal::WireFormatMetadataForVersion(wire_format_version));
+  fit::result<fidl::Error, fidl::DecodedValue<FidlType>> result =
+      fidl::StandaloneInplaceDecode<FidlType>(
+          fidl::EncodedMessage::Create(bytes, handles.data(), handle_metadata.data(),
+                                       static_cast<uint32_t>(handle_infos.size())),
+          fidl::internal::WireFormatMetadataForVersion(wire_format_version));
   if (result.is_ok()) {
     std::cout << "Decoding unexpectedly succeeded" << std::endl;
     return false;

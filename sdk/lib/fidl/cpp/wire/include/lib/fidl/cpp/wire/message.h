@@ -171,7 +171,7 @@ class DecodedMessage<FidlType, Transport,
 
   DecodedMessage(internal::WireFormatVersion wire_format_version, ::fidl::EncodedMessage&& msg)
       : Status(::fidl::Status::Ok()) {
-    ::fit::result result = ::fidl::InplaceDecode<FidlType>(
+    ::fit::result result = ::fidl::StandaloneInplaceDecode<FidlType>(
         std::move(msg), ::fidl::internal::WireFormatMetadataForVersion(wire_format_version));
     if (result.is_error()) {
       Status::operator=(result.error_value());

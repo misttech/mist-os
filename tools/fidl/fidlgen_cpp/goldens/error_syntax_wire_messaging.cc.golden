@@ -205,7 +205,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
         ::test_errorsyntax::kExampleUseOfErrorSyntax_ComposedCallWhichMayFail_Ordinal,
         [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
            internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-          ::fit::result decoded = ::fidl::InplaceDecode<::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest>(
+          ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest>(
               std::move(msg), metadata);
           if (unlikely(!decoded.is_ok())) {
             return decoded.error_value();
@@ -221,7 +221,7 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::t
         ::test_errorsyntax::kExampleUseOfErrorSyntax_CallWhichMayFail_Ordinal,
         [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
            internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
-          ::fit::result decoded = ::fidl::InplaceDecode<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest>(
+          ::fit::result decoded = ::fidl::StandaloneInplaceDecode<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest>(
               std::move(msg), metadata);
           if (unlikely(!decoded.is_ok())) {
             return decoded.error_value();

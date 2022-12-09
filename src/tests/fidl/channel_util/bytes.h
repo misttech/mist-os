@@ -112,7 +112,7 @@ inline Bytes header(zx_txid_t txid, uint64_t ordinal, fidl::MessageDynamicFlags 
 
 template <typename FidlType>
 inline Bytes encode(FidlType message) {
-  auto result = fidl::Encode(message);
+  auto result = fidl::StandaloneEncode(message);
   ZX_ASSERT_MSG(result.message().ok(), "encode failed");
   ZX_ASSERT_MSG(result.message().handle_actual() == 0u, "message contained handles");
   auto copied_bytes = result.message().CopyBytes();

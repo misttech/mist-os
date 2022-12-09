@@ -173,7 +173,7 @@ class LinearSnap {
       natural = std::move(to_move_in);
     }
 
-    fidl::OwnedEncodeResult encoded = fidl::Encode(std::move(natural));
+    fidl::OwnedEncodeResult encoded = fidl::StandaloneEncode(std::move(natural));
     ZX_ASSERT(encoded.message().ok());
     fidl::OutgoingMessage& outgoing_message = encoded.message();
     fidl::OutgoingMessage::CopiedBytes outgoing_message_bytes = outgoing_message.CopyBytes();
@@ -187,7 +187,7 @@ class LinearSnap {
 
     fidl::OutgoingToEncodedMessage outgoing_to_encoded_result_{outgoing_message};
     ZX_ASSERT(outgoing_to_encoded_result_.ok());
-    fit::result decoded = fidl::Decode<NaturalType>(
+    fit::result decoded = fidl::StandaloneDecode<NaturalType>(
         std::move(outgoing_to_encoded_result_.message()), encoded.wire_format_metadata());
     ZX_ASSERT(decoded.is_ok());
 

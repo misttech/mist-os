@@ -31,7 +31,7 @@ bool EncodeBenchmark(perftest::RepeatState* state, BuilderFunc builder) {
 
     state->NextStep();  // End: Setup. Begin: Encode.
 
-    fidl::OwnedEncodeResult result = fidl::Encode(std::move(value));
+    fidl::OwnedEncodeResult result = fidl::StandaloneEncode(std::move(value));
 
     state->NextStep();  // End: Encode. Begin: Teardown.
 

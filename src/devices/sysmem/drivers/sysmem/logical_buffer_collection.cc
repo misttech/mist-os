@@ -1613,13 +1613,13 @@ zx::result<bool> LogicalBufferCollection::CompareBufferCollectionInfo(
   }
 
   // Encode both.
-  auto encoded_lhs = fidl::Encode(std::move(clone_lhs.value()));
+  auto encoded_lhs = fidl::StandaloneEncode(std::move(clone_lhs.value()));
   if (!encoded_lhs.message().ok()) {
     LogError(FROM_HERE, "lhs encode error: %s", encoded_lhs.message().FormatDescription().c_str());
     return zx::error(encoded_lhs.message().error().status());
   }
   ZX_DEBUG_ASSERT(encoded_lhs.message().handle_actual() == 0);
-  auto encoded_rhs = fidl::Encode(std::move(clone_rhs.value()));
+  auto encoded_rhs = fidl::StandaloneEncode(std::move(clone_rhs.value()));
   if (!encoded_rhs.message().ok()) {
     LogError(FROM_HERE, "rhs encode error: %s", encoded_rhs.message().FormatDescription().c_str());
     return zx::error(encoded_rhs.message().error().status());

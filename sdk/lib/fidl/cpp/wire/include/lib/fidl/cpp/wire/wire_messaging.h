@@ -137,7 +137,7 @@ auto InplaceDecodeTransactionalMessage(::fidl::IncomingHeaderAndMessage&& messag
     auto metadata = ::fidl::WireFormatMetadata::FromTransactionalHeader(header);
     fidl::EncodedMessage body_message = std::move(message).SkipTransactionHeader();
     // Delegate into the decode logic of the body.
-    return ::fidl::InplaceDecode<Body>(std::move(body_message), metadata);
+    return ::fidl::StandaloneInplaceDecode<Body>(std::move(body_message), metadata);
   } else {
     return DecodeTransactionalMessageWithoutBody(std::move(message));
   }

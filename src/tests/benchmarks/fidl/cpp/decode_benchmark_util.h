@@ -31,7 +31,7 @@ bool DecodeBenchmark(perftest::RepeatState* state, BuilderFunc builder) {
 
   while (state->KeepRunning()) {
     auto value = builder();
-    fidl::OwnedEncodeResult encode_result = fidl::Encode(std::move(value));
+    fidl::OwnedEncodeResult encode_result = fidl::StandaloneEncode(std::move(value));
     ZX_ASSERT(encode_result.message().ok());
 
     // Convert the outgoing message to incoming which is suitable for decoding.
@@ -43,8 +43,8 @@ bool DecodeBenchmark(perftest::RepeatState* state, BuilderFunc builder) {
     state->NextStep();  // End: Setup. Begin: Decode.
 
     {
-      auto result = fidl::Decode<FidlType>(std::move(converted.message()),
-                                           encode_result.wire_format_metadata());
+      auto result = fidl::StandaloneDecode<FidlType>(std::move(converted.message()),
+                                                     encode_result.wire_format_metadata());
       ZX_DEBUG_ASSERT(result.is_ok());
       // Include time taken to close handles in |FidlType|.
     }

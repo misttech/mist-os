@@ -60,7 +60,8 @@ TEST(NaturalResponsePayload, Decode) {
       fidl::internal::WireFormatMetadataForVersion(fidl::internal::WireFormatVersion::kV2);
 
   // Perform decoding.
-  fit::result result = fidl::Decode<test_types::BazFooResponse>(std::move(message), metadata);
+  fit::result result =
+      fidl::StandaloneDecode<test_types::BazFooResponse>(std::move(message), metadata);
   ASSERT_TRUE(result.is_ok(), "Error decoding: %s",
               result.error_value().FormatDescription().c_str());
   test_types::BazFooResponse& response = result.value();
@@ -75,7 +76,7 @@ TEST(NaturalResponsePayload, Encode) {
   response.res() = test_types::FooResponse{{.bar = 42}};
 
   // Perform encoding.
-  fidl::OwnedEncodeResult result = fidl::Encode(response);
+  fidl::OwnedEncodeResult result = fidl::StandaloneEncode(response);
   ASSERT_TRUE(result.message().ok(), "Error encoding: %s",
               result.message().error().FormatDescription().c_str());
 
@@ -121,7 +122,7 @@ TEST(NaturalResponseWithHandle, Encode) {
   }};
 
   // Perform encoding.
-  fidl::OwnedEncodeResult result = fidl::Encode(std::move(response));
+  fidl::OwnedEncodeResult result = fidl::StandaloneEncode(std::move(response));
   ASSERT_TRUE(result.message().ok(), "Error encoding: %s",
               result.message().error().FormatDescription().c_str());
   // Handles are moved.

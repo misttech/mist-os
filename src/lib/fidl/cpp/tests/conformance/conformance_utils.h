@@ -51,7 +51,7 @@ void EncodeSuccess(fidl::internal::WireFormatVersion wire_format_version, FidlTy
                    const std::vector<uint8_t>& expected_bytes,
                    const std::vector<zx_handle_disposition_t> expected_handles,
                    bool check_handle_rights) {
-  fidl::OwnedEncodeResult result = fidl::Encode(std::move(obj));
+  fidl::OwnedEncodeResult result = fidl::StandaloneEncode(std::move(obj));
   ASSERT_TRUE(result.message().ok(), "Error encoding: %s",
               result.message().error().FormatDescription().c_str());
 
@@ -86,8 +86,8 @@ void DecodeSuccess(fidl::internal::WireFormatVersion wire_format_version,
   auto message = fidl::EncodedMessage::Create<fidl::internal::ChannelTransport>(
       cpp20::span(bytes), handles.get(), handle_metadata.get(),
       static_cast<uint32_t>(handle_infos.size()));
-  auto result =
-      fidl::Decode<FidlType>(std::move(message), CreateWireFormatMetadata(wire_format_version));
+  auto result = fidl::StandaloneDecode<FidlType>(std::move(message),
+                                                 CreateWireFormatMetadata(wire_format_version));
   ASSERT_TRUE(result.is_ok(), "Error decoding: %s",
               result.error_value().FormatDescription().c_str());
 
@@ -96,7 +96,7 @@ void DecodeSuccess(fidl::internal::WireFormatVersion wire_format_version,
 
 template <typename FidlType>
 void EncodeFailure(fidl::internal::WireFormatVersion wire_format_version, FidlType& obj) {
-  fidl::OwnedEncodeResult result = fidl::Encode(std::move(obj));
+  fidl::OwnedEncodeResult result = fidl::StandaloneEncode(std::move(obj));
   ASSERT_FALSE(result.message().ok());
 }
 
@@ -115,8 +115,8 @@ void DecodeFailure(fidl::internal::WireFormatVersion wire_format_version,
   auto message = fidl::EncodedMessage::Create<fidl::internal::ChannelTransport>(
       cpp20::span(bytes), handles.get(), handle_metadata.get(),
       static_cast<uint32_t>(handle_infos.size()));
-  auto result =
-      fidl::Decode<FidlType>(std::move(message), CreateWireFormatMetadata(wire_format_version));
+  auto result = fidl::StandaloneDecode<FidlType>(std::move(message),
+                                                 CreateWireFormatMetadata(wire_format_version));
   ASSERT_TRUE(result.is_error());
 }
 
