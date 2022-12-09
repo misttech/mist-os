@@ -96,4 +96,7 @@ if (is_host && target_cpu == "x64" && !is_asan) {
     ]
     environments = [ emu_env ]
   }
+} else {
+  group("flatland_view_provider_with_host_script") {
+  }
 }

@@ -93,20 +93,18 @@ template("run_target_test_and_host_script") {
     }
   }
 
-  if (defined(invoker.host_script)) {
-    _script_bin_name =
-        get_path_info(get_label_info(invoker.host_script, "target_out_dir"),
-                      "file")
-    host_test_data("host_script_for_${target_name}") {
-      sources = [ "${root_out_dir}/${_script_bin_name}" ]
-      deps = [ invoker.host_script ]
-    }
-    _data_deps += [ ":host_script_for_${target_name}" ]
-    _args += [
-      "--host-script-bin",
-      rebase_path("${root_out_dir}/${_script_bin_name}", root_build_dir),
-    ]
+  _script_bin_name =
+      get_path_info(get_label_info(invoker.host_script, "target_out_dir"),
+                    "file")
+  host_test_data("host_script_for_${target_name}") {
+    sources = [ "${root_out_dir}/${_script_bin_name}" ]
+    deps = [ invoker.host_script ]
   }
+  _data_deps += [ ":host_script_for_${target_name}" ]
+  _args += [
+    "--host-script-bin",
+    rebase_path("${root_out_dir}/${_script_bin_name}", root_build_dir),
+  ]
 
   if (defined(invoker.host_script_args)) {
     foreach(_host_script_arg, invoker.host_script_args) {

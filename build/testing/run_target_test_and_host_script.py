@@ -42,7 +42,7 @@ def run_target_test(
         outdir
     ]
     args += ffx_test_args
-    return subprocess.run(args, stderr=sys.stdout)
+    return subprocess.run(args, text=True, stderr=subprocess.PIPE)
 
 
 def get_test_suite_artifact_dir(
@@ -78,7 +78,8 @@ def run_host_script(
     substituted_args = []
     for arg in script_args:
         substituted_args.append(do_variable_substitution(arg))
-    return subprocess.run([script_bin] + substituted_args, stderr=sys.stdout)
+    return subprocess.run(
+        [script_bin] + substituted_args, text=True, stderr=subprocess.PIPE)
 
 
 class RunTargetTestWithHostScript(unittest.TestCase):
@@ -97,7 +98,7 @@ class RunTargetTestWithHostScript(unittest.TestCase):
             self.args.ffx_test_args)
         self.assertEqual(
             self.test_status.returncode, 0,
-            "test returned non-zero status, error: %s" %
+            "test returned non-zero status, stderr: %s" %
             self.test_status.stderr)
 
     def tearDown(self):
@@ -111,7 +112,7 @@ class RunTargetTestWithHostScript(unittest.TestCase):
                 self.args.host_script_bin, self.args.host_script_args)
             self.assertEqual(
                 script_status.returncode, 0,
-                "host script returned non-zero status, error: %s" %
+                "host script returned non-zero status, stderr: %s" %
                 script_status.stderr)
 
 
