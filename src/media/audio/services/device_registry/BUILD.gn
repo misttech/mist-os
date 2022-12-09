@@ -13,34 +13,70 @@ group("device_registry") {
 
 group("tests") {
   testonly = true
-  deps = [ ":audio_services_device_registry_unittests" ]
+  deps = [
+    ":audio_services_device_registry_unittests",
+    ":audio_services_device_registry_warning_unittests",
+  ]
 }
 
 ## Packages
 fuchsia_unittest_package("audio_services_device_registry_unittests") {
   deps = [ ":device_registry_unittests_bin" ]
+
+  test_specs = {
+    log_settings = {
+      max_severity = "INFO"
+    }
+  }
+}
+
+fuchsia_unittest_package("audio_services_device_registry_warning_unittests") {
+  deps = [ ":device_registry_warning_unittests_bin" ]
+
+  test_specs = {
+    log_settings = {
+      max_severity = "WARN"
+    }
+  }
 }
 
 ## Executables
 executable("device_registry_unittests_bin") {
   testonly = true
 
-  sources = [ "device_detector_unittest.cc" ]
+  sources = [
+    "device_detector_unittest.cc",
+    "device_unittest.cc",
+  ]
 
   deps = [
-    ":device_registry_lib",
-    "//src/lib/fxl/test:gtest_main",
+    ":unittest_base",
     "//src/lib/storage/vfs/cpp",
-    "//src/lib/testing/loop_fixture",
+    "//zircon/system/ulib/sync:sync-cpp",
   ]
+}
+
+executable("device_registry_warning_unittests_bin") {
+  testonly = true
+
+  sources = [ "device_warning_unittest.cc" ]
+
+  deps = [ ":unittest_base" ]
 }
 
 ## Source sets
 source_set("device_registry_lib") {
   sources = [
+    "basic_types.h",
+    "device.cc",
+    "device.h",
     "device_detector.cc",
     "device_detector.h",
+    "device_presence_watcher.h",
+    "logging.cc",
     "logging.h",
+    "validate.cc",
+    "validate.h",
   ]
 
   public_deps = [
@@ -52,6 +88,24 @@ source_set("device_registry_lib") {
   deps = [
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
+    "//src/media/audio/lib/clock",
+    "//zircon/system/public",
     "//zircon/system/ulib/zx",
+  ]
+}
+
+source_set("unittest_base") {
+  testonly = true
+
+  sources = [ "device_unittest.h" ]
+
+  public_deps = [
+    ":device_registry_lib",
+    "testing",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
+    "//src/media/audio/lib/clock",
+    "//src/media/audio/services/common/testing",
+    "//zircon/system/public",
   ]
 }

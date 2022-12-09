@@ -1,0 +1,31 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/test.gni")
+source_set("testing") {
+  testonly = true
+
+  sources = [
+    "fake_audio_driver.cc",
+    "fake_audio_driver.h",
+    "fake_device_presence_watcher.h",
+  ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_hlcpp",
+    "//sdk/lib/fit-promise",
+    "//zircon/system/ulib/fzl",
+  ]
+
+  deps = [
+    "//sdk/lib/fit",
+    "//sdk/lib/syslog/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/media/audio/drivers/lib/audio-proto-utils",
+    "//src/media/audio/lib/format",
+    "//src/media/audio/services/device_registry:device_registry_lib",
+    "//zircon/system/public",
+    "//zircon/system/ulib/async-testing",
+  ]
+}

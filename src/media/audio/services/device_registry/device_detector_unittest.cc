@@ -110,7 +110,7 @@ class DeviceTracker {
 
 class DeviceDetectorTest : public gtest::TestLoopFixture {
  protected:
-  static inline constexpr zx::duration kCommandTimeout = zx::sec(30);
+  static inline constexpr zx::duration kCommandTimeout = zx::sec(10);
 
   void SetUp() override {
     ASSERT_TRUE(input_dir_ != nullptr);
