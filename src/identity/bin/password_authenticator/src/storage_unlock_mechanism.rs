@@ -4,7 +4,11 @@
 
 use {
     crate::{
-        password_interaction::PasswordInteractionHandler, scrypt::EnrollScryptValidator, Config,
+        account_metadata::AuthenticatorMetadata,
+        password_interaction::{PasswordInteractionHandler, Validator},
+        pinweaver::{CredManagerProvider, EnrollPinweaverValidator},
+        scrypt::EnrollScryptValidator,
+        Config,
     },
     anyhow::anyhow,
     fidl_fuchsia_identity_authentication::{
@@ -17,13 +21,21 @@ use {
 };
 
 /// A struct to handle authentication and enrollment requests.
-pub struct StorageUnlockMechanism {
+pub struct StorageUnlockMechanism<CMP>
+where
+    CMP: CredManagerProvider + 'static,
+{
     config: Config,
+    cred_manager_provider: CMP,
 }
 
-impl StorageUnlockMechanism {
-    pub fn new(config: Config) -> Self {
-        Self { config }
+impl<CMP> StorageUnlockMechanism<CMP>
+where
+    CMP: CredManagerProvider + 'static,
+{
+    /// Instantiate a new StorageUnlockMechanism.
+    pub fn new(config: Config, cred_manager_provider: CMP) -> Self {
+        Self { config, cred_manager_provider }
     }
 
     /// Serially process a stream of incoming StorageUnlockMechanism FIDL requests.
@@ -71,11 +83,15 @@ impl StorageUnlockMechanism {
         &self,
         interaction: InteractionProtocolServerEnd,
     ) -> Result<(EnrollmentData, PrekeyMaterial), ApiError> {
-        let validator = if self.config.allow_pinweaver {
-            //TODO(fxb/114755): Remove error when implemented.
-            return Err(ApiError::UnsupportedOperation);
+        let validator: Box<dyn Validator<(AuthenticatorMetadata, PrekeyMaterial)>> = if self
+            .config
+            .allow_pinweaver
+        {
+            let cred_manager =
+                self.cred_manager_provider.new_cred_manager().map_err(|_| ApiError::Resource)?;
+            Box::new(EnrollPinweaverValidator::new(cred_manager))
         } else {
-            EnrollScryptValidator {}
+            Box::new(EnrollScryptValidator {})
         };
 
         let server_end = if let InteractionProtocolServerEnd::Password(server_end) = interaction {
@@ -100,7 +116,18 @@ impl StorageUnlockMechanism {
 mod test {
     use {
         super::*,
+        crate::{
+            keys::KEY_LEN,
+            pinweaver::{
+                MockCredManager, MockCredManagerProvider, PinweaverParams,
+                TEST_PINWEAVER_CREDENTIAL_LABEL, TEST_PINWEAVER_LE_SECRET,
+            },
+            scrypt::TEST_SCRYPT_PASSWORD,
+        },
+        anyhow::Result,
+        assert_matches::assert_matches,
         fidl_fuchsia_identity_authentication::{PasswordInteractionMarker, TestInteractionMarker},
+        futures::StreamExt,
     };
 
     // By default, allow any implemented form of password and encryption.
@@ -109,10 +136,49 @@ mod test {
     const SCRYPT_ONLY_CONFIG: Config = Config { allow_scrypt: true, allow_pinweaver: false };
     const PINWEAVER_ONLY_CONFIG: Config = Config { allow_scrypt: false, allow_pinweaver: true };
 
+    async fn pinweaver_success_case(config: Config) -> Result<()> {
+        let mcm = MockCredManager::new_expect_le_secret(&TEST_PINWEAVER_LE_SECRET);
+        let initial_creds = mcm.get_number_of_creds();
+        let cred_manager_provider = MockCredManagerProvider::new_with_cred_manager(mcm.clone());
+        let storage_unlock_mechanism = StorageUnlockMechanism::new(config, cred_manager_provider);
+        let (client, interaction_server) =
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+
+        let _ = client.into_proxy().unwrap().set_password(TEST_SCRYPT_PASSWORD).unwrap();
+
+        let result = storage_unlock_mechanism
+            .enroll(InteractionProtocolServerEnd::Password(interaction_server))
+            .await;
+        assert!(result.is_ok());
+        let (enrollment_data, prekey) = result.unwrap();
+        assert_eq!(prekey.0.len(), KEY_LEN);
+
+        let str_enrollment = std::str::from_utf8(&enrollment_data.0).unwrap();
+        let authenticator_data: AuthenticatorMetadata =
+            serde_json::from_str(str_enrollment).unwrap();
+
+        let pinweaver_params = if let AuthenticatorMetadata::Pinweaver(p) = authenticator_data {
+            p.pinweaver_params
+        } else {
+            return Err(anyhow!("wrong authenticator metadata type"));
+        };
+
+        assert_matches!(
+            pinweaver_params,
+            PinweaverParams { scrypt_params: _, credential_label: TEST_PINWEAVER_CREDENTIAL_LABEL }
+        );
+
+        let final_creds = mcm.get_number_of_creds();
+        assert!(final_creds > initial_creds);
+        Ok(())
+    }
+
     #[fuchsia::test]
     #[should_panic(expected = "not implemented")]
     async fn test_authenticate_not_implemented() {
-        let storage_unlock_mechanism = StorageUnlockMechanism::new(DEFAULT_CONFIG);
+        let cred_manager_provider = MockCredManagerProvider::new();
+        let storage_unlock_mechanism =
+            StorageUnlockMechanism::new(DEFAULT_CONFIG, cred_manager_provider);
         let (_, interaction_server) =
             fidl::endpoints::create_endpoints::<TestInteractionMarker>().unwrap();
 
@@ -122,7 +188,9 @@ mod test {
 
     #[fuchsia::test]
     async fn test_enroll_scrypt() {
-        let storage_unlock_mechanism = StorageUnlockMechanism::new(SCRYPT_ONLY_CONFIG);
+        let cred_manager_provider = MockCredManagerProvider::new();
+        let storage_unlock_mechanism =
+            StorageUnlockMechanism::new(SCRYPT_ONLY_CONFIG, cred_manager_provider);
         let (client, interaction_server) =
             fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
 
@@ -135,38 +203,42 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_enroll_pinweaver() {
-        let storage_unlock_mechanism = StorageUnlockMechanism::new(PINWEAVER_ONLY_CONFIG);
-        let (client, interaction_server) =
-            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
-
-        let _ = client.into_proxy().unwrap().set_password("password").unwrap();
-
-        let result = storage_unlock_mechanism
-            .enroll(InteractionProtocolServerEnd::Password(interaction_server))
-            .await;
-        assert_eq!(result, Err(ApiError::UnsupportedOperation));
+    async fn test_enroll_pinweaver_success() -> Result<()> {
+        pinweaver_success_case(PINWEAVER_ONLY_CONFIG).await
     }
 
     #[fuchsia::test]
-    async fn test_enroll_pinweaver_and_scrypt() {
-        let storage_unlock_mechanism = StorageUnlockMechanism::new(DEFAULT_CONFIG);
+    async fn test_enroll_pinweaver_failure() {
+        let mcm = MockCredManager::new_fail_enrollment();
+        let cred_manager_provider = MockCredManagerProvider::new_with_cred_manager(mcm);
+        let storage_unlock_mechanism =
+            StorageUnlockMechanism::new(PINWEAVER_ONLY_CONFIG, cred_manager_provider);
         let (client, interaction_server) =
             fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
 
-        let _ = client.into_proxy().unwrap().set_password("password").unwrap();
+        let password_proxy = client.into_proxy().unwrap();
+        let _ = password_proxy.set_password(TEST_SCRYPT_PASSWORD).unwrap();
 
         let result = storage_unlock_mechanism
             .enroll(InteractionProtocolServerEnd::Password(interaction_server))
             .await;
-        // Choose the pinweaver implementation if both are available in config.
-        // TODO(fxb/114755): Implement Pinweaver validation trait.
-        assert_eq!(result, Err(ApiError::UnsupportedOperation));
+        assert_matches!(result, Err(ApiError::Resource));
+        assert_matches!(
+            password_proxy.take_event_stream().next().await.unwrap(),
+            Err(fidl::Error::ClientChannelClosed { status: fidl::Status::BAD_STATE, .. })
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_enroll_pinweaver_and_scrypt() -> Result<()> {
+        pinweaver_success_case(DEFAULT_CONFIG).await
     }
 
     #[fuchsia::test]
     async fn test_enroll_incorrect_ipse() {
-        let storage_unlock_mechanism = StorageUnlockMechanism::new(SCRYPT_ONLY_CONFIG);
+        let cred_manager_provider = MockCredManagerProvider::new();
+        let storage_unlock_mechanism =
+            StorageUnlockMechanism::new(SCRYPT_ONLY_CONFIG, cred_manager_provider);
         let (client, interaction_server) =
             fidl::endpoints::create_endpoints::<TestInteractionMarker>().unwrap();
 

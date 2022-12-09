@@ -330,7 +330,7 @@ where
                         );
                         KeyEnrollmentError::CredentialManagerConnectionError(err)
                     })?;
-                let mut key_source = PinweaverKeyEnroller::new(cred_manager);
+                let mut key_source = PinweaverKeyEnroller::new(Arc::new(Mutex::new(cred_manager)));
                 key_source.remove_key((*p_meta).into()).await
             }
         }
@@ -580,7 +580,7 @@ where
                         );
                         KeyEnrollmentError::CredentialManagerConnectionError(err)
                     })?;
-                let mut key_source = PinweaverKeyEnroller::new(cred_manager);
+                let mut key_source = PinweaverKeyEnroller::new(Arc::new(Mutex::new(cred_manager)));
                 key_source
                     .enroll_key(password)
                     .await

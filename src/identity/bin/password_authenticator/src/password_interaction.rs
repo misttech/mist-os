@@ -31,6 +31,8 @@ pub trait Validator<T: Sized> {
 pub enum ValidationError {
     // An error occurred inside the password authentication itself.
     InternalError(anyhow::Error),
+    // An error occurred with a password authentication dependency.
+    DependencyError(anyhow::Error),
     // A problem occurred with the supplied password.
     PasswordError(PasswordError),
 }
@@ -49,25 +51,19 @@ const CHANNEL_SIZE: usize = 2;
 
 /// A struct to handle interactive password interaction over a request stream, using the supplied
 /// validator to validate passwords.
-pub struct PasswordInteractionHandler<V, T>
-where
-    V: Validator<T>,
-{
+pub struct PasswordInteractionHandler<T> {
     hanging_get: RefCell<PasswordInteractionStateHangingGet>,
     state_machine: Rc<StateMachine>,
-    validator: V,
+    validator: Box<dyn Validator<T>>,
     publish_task: Task<()>,
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl<V, T> PasswordInteractionHandler<V, T>
-where
-    V: Validator<T>,
-{
-    pub async fn new(validator: V) -> Self {
+impl<T> PasswordInteractionHandler<T> {
+    pub async fn new(validator: Box<dyn Validator<T>>) -> Self {
         let (sender, mut receiver) = mpsc::channel(CHANNEL_SIZE);
         let state_machine = Rc::new(StateMachine::new(sender));
-        let hanging_get = PasswordInteractionHandler::<V, T>::hanging_get(&state_machine).await;
+        let hanging_get = PasswordInteractionHandler::<T>::hanging_get(&state_machine).await;
 
         // Create an async task that publishes to the hanging get each time the state machine
         // notifies us of an update to the state.
@@ -138,10 +134,15 @@ where
                                     warn!("Password was not valid: {:?}", e);
                                     self.state_machine.set_error(e).await;
                                 }
-                                Err(ValidationError::InternalError(err)) => {
-                                    warn!("Responded with internal error: {:?}", err);
+                                Err(ValidationError::InternalError(e)) => {
+                                    warn!("Responded with internal error: {:?}", e);
                                     control_handle.shutdown_with_epitaph(zx::Status::INTERNAL);
                                     return Err(ApiError::Internal);
+                                }
+                                Err(ValidationError::DependencyError(e)) => {
+                                    warn!("Responded with a dependency error: {:?}", e);
+                                    control_handle.shutdown_with_epitaph(zx::Status::BAD_STATE);
+                                    return Err(ApiError::Resource);
                                 }
                             }
                         }
@@ -223,7 +224,7 @@ mod tests {
     ) -> PasswordInteractionProxy {
         let (proxy, stream) = create_proxy_and_stream::<PasswordInteractionMarker>()
             .expect("Failed to create password interaction proxy");
-        let password_interaction_handler_fut = PasswordInteractionHandler::new(validator);
+        let password_interaction_handler_fut = PasswordInteractionHandler::new(Box::new(validator));
 
         Task::local(async move {
             if password_interaction_handler_fut

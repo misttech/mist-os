@@ -4,28 +4,31 @@
 
 use {
     crate::{
+        account_metadata::AuthenticatorMetadata,
         keys::{
             EnrolledKey, Key, KeyEnrollment, KeyEnrollmentError, KeyRetrieval, KeyRetrievalError,
             KEY_LEN,
         },
+        password_interaction::{ValidationError, Validator},
         scrypt::{ScryptError, ScryptParams},
     },
+    anyhow::anyhow,
     async_trait::async_trait,
     fidl_fuchsia_identity_credential::{self as fcred, ManagerMarker, ManagerProxy},
     fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon as zx,
+    futures::lock::Mutex,
     hmac::{Hmac, Mac, NewMac},
+    identity_common::PrekeyMaterial,
     lazy_static::lazy_static,
     serde::{Deserialize, Serialize},
     sha2::Sha256,
+    std::sync::Arc,
     tracing::{error, info},
 };
 
 #[cfg(test)]
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, sync::Mutex as SyncMutex};
 
 // This file implements a key source which combines the computational hardness of scrypt with
 // firmware-enforced rate-limiting of guesses.  The overall dataflow is:
@@ -98,7 +101,7 @@ fn compute_account_key(mix_secret: &Key, params: &ScryptParams) -> Result<Key, S
 /// A trait to support injecting credential manager implementations to enable
 /// unit testing.
 pub trait CredManagerProvider {
-    type CM: CredManager + std::marker::Send + std::marker::Sync;
+    type CM: CredManager;
     fn new_cred_manager(&self) -> Result<Self::CM, anyhow::Error>;
 }
 
@@ -120,7 +123,7 @@ impl CredManagerProvider for EnvCredManagerProvider {
 
 /// A trait which abstracts over the Credential Manager interface.
 #[async_trait]
-pub trait CredManager {
+pub trait CredManager: Sync + Send {
     /// Enroll a (low-entropy, high-entropy) key pair with the credential manager, returning a
     /// credential label on success or a KeyEnrollmentError on failure.
     async fn add(&mut self, le_secret: &Key, he_secret: &Key) -> Result<Label, KeyEnrollmentError>;
@@ -276,14 +279,14 @@ where
     CM: CredManager,
 {
     scrypt_params: ScryptParams,
-    credential_manager: CM,
+    credential_manager: Arc<Mutex<CM>>,
 }
 
 impl<CM> PinweaverKeyEnroller<CM>
 where
     CM: CredManager,
 {
-    pub fn new(credential_manager: CM) -> PinweaverKeyEnroller<CM> {
+    pub fn new(credential_manager: Arc<Mutex<CM>>) -> PinweaverKeyEnroller<CM> {
         PinweaverKeyEnroller { scrypt_params: ScryptParams::new(), credential_manager }
     }
 }
@@ -291,7 +294,7 @@ where
 #[async_trait]
 impl<CM> KeyEnrollment<PinweaverParams> for PinweaverKeyEnroller<CM>
 where
-    CM: CredManager + std::marker::Send + std::marker::Sync,
+    CM: CredManager,
 {
     async fn enroll_key(
         &mut self,
@@ -305,8 +308,12 @@ where
         zx::cprng_draw(&mut high_entropy_secret);
 
         // Enroll the secret with the credential manager
-        let cm = &mut self.credential_manager;
-        let label = cm.add(&low_entropy_secret, &high_entropy_secret).await?;
+        let label = self
+            .credential_manager
+            .lock()
+            .await
+            .add(&low_entropy_secret, &high_entropy_secret)
+            .await?;
 
         // compute mix_secret = HMAC-SHA256(password, he_secret)
         let mix_secret = compute_mix_secret(password, &high_entropy_secret);
@@ -316,6 +323,7 @@ where
             .map_err(|_| KeyEnrollmentError::ParamsError)?;
 
         // return account_key
+        // TODO(fxb/116904): change account_key variable name.
         Ok(EnrolledKey::<PinweaverParams> {
             key: account_key,
             enrollment_data: PinweaverParams {
@@ -330,7 +338,7 @@ where
         enrollment_data: PinweaverParams,
     ) -> Result<(), KeyEnrollmentError> {
         // Tell the credential manager to remove the credential identified by the credential label
-        let cm = &mut self.credential_manager;
+        let mut cm = self.credential_manager.lock().await;
         cm.remove(enrollment_data.credential_label).await
     }
 }
@@ -358,7 +366,7 @@ where
 #[async_trait]
 impl<CM> KeyRetrieval for PinweaverKeyRetriever<CM>
 where
-    CM: CredManager + std::marker::Send + std::marker::Sync,
+    CM: CredManager,
 {
     async fn retrieve_key(&self, password: &str) -> Result<Key, KeyRetrievalError> {
         let low_entropy_secret = compute_low_entropy_secret(password);
@@ -376,6 +384,52 @@ where
                 .map_err(|_| KeyRetrievalError::ParamsError)?;
 
         Ok(account_key)
+    }
+}
+
+/// Implements the pinweaver key derivation function for enrolling and
+/// validating a password.
+pub struct EnrollPinweaverValidator<CM>
+where
+    CM: CredManager,
+{
+    // Wrap CM in an Arc<Mutex<>> because it needs to be owned by
+    // PinweaverKeyEnroller.
+    cred_manager: Arc<Mutex<CM>>,
+}
+
+impl<CM> EnrollPinweaverValidator<CM>
+where
+    CM: CredManager,
+{
+    /// Instantiate an EnrollPinweaverValidator with a given CM.
+    pub fn new(cred_manager: CM) -> Self {
+        Self { cred_manager: Arc::new(Mutex::new(cred_manager)) }
+    }
+}
+
+#[async_trait]
+impl<CM> Validator<(AuthenticatorMetadata, PrekeyMaterial)> for EnrollPinweaverValidator<CM>
+where
+    CM: CredManager + std::marker::Sync + std::marker::Send,
+{
+    async fn validate(
+        &self,
+        password: &str,
+    ) -> Result<(AuthenticatorMetadata, PrekeyMaterial), ValidationError> {
+        let mut key_source = PinweaverKeyEnroller::new(Arc::clone(&self.cred_manager));
+        key_source
+            .enroll_key(password)
+            .await
+            .map(|enrolled_key| {
+                (enrolled_key.enrollment_data.into(), PrekeyMaterial(enrolled_key.key.into()))
+            })
+            .map_err(|err| {
+                ValidationError::DependencyError(anyhow!(
+                    "pinweaver key enrollment failed: {:?}",
+                    err
+                ))
+            })
     }
 }
 
@@ -404,6 +458,10 @@ impl MockCredManagerProvider {
     pub fn new() -> MockCredManagerProvider {
         MockCredManagerProvider { mcm: MockCredManager::new() }
     }
+
+    pub fn new_with_cred_manager(mcm: MockCredManager) -> MockCredManagerProvider {
+        MockCredManagerProvider { mcm }
+    }
 }
 
 #[cfg(test)]
@@ -419,14 +477,14 @@ impl CredManagerProvider for MockCredManagerProvider {
 #[cfg(test)]
 #[derive(Clone, Debug)]
 pub struct MockCredManager {
-    creds: Arc<Mutex<HashMap<Label, (Key, Key)>>>,
+    creds: Arc<SyncMutex<HashMap<Label, (Key, Key)>>>,
     enroll_behavior: EnrollBehavior,
     retrieve_behavior: RetrieveBehavior,
 }
 
 #[cfg(test)]
 impl MockCredManager {
-    pub fn new_with_creds(creds: Arc<Mutex<HashMap<Label, (Key, Key)>>>) -> MockCredManager {
+    pub fn new_with_creds(creds: Arc<SyncMutex<HashMap<Label, (Key, Key)>>>) -> MockCredManager {
         MockCredManager {
             creds,
             enroll_behavior: EnrollBehavior::AsExpected,
@@ -435,20 +493,20 @@ impl MockCredManager {
     }
 
     pub fn new() -> MockCredManager {
-        MockCredManager::new_with_creds(Arc::new(Mutex::new(HashMap::new())))
+        MockCredManager::new_with_creds(Arc::new(SyncMutex::new(HashMap::new())))
     }
 
-    fn new_expect_le_secret(le_secret: &Key) -> MockCredManager {
+    pub fn new_expect_le_secret(le_secret: &Key) -> MockCredManager {
         MockCredManager {
-            creds: Arc::new(Mutex::new(HashMap::new())),
+            creds: Arc::new(SyncMutex::new(HashMap::new())),
             enroll_behavior: EnrollBehavior::ExpectLeSecret(*le_secret),
             retrieve_behavior: RetrieveBehavior::AsExpected,
         }
     }
 
-    fn new_fail_enrollment() -> MockCredManager {
+    pub fn new_fail_enrollment() -> MockCredManager {
         MockCredManager {
-            creds: Arc::new(Mutex::new(HashMap::new())),
+            creds: Arc::new(SyncMutex::new(HashMap::new())),
             enroll_behavior: EnrollBehavior::ForceFailWithEnrollmentError,
             retrieve_behavior: RetrieveBehavior::AsExpected,
         }
@@ -456,7 +514,7 @@ impl MockCredManager {
 
     fn new_fail_retrieval() -> MockCredManager {
         MockCredManager {
-            creds: Arc::new(Mutex::new(HashMap::new())),
+            creds: Arc::new(SyncMutex::new(HashMap::new())),
             enroll_behavior: EnrollBehavior::AsExpected,
             retrieve_behavior: RetrieveBehavior::ForceFailWithRetrievalError,
         }
@@ -475,6 +533,10 @@ impl MockCredManager {
         }
         let prev_value = creds.insert(label, (le_secret, he_secret));
         (label, prev_value)
+    }
+
+    pub fn get_number_of_creds(&self) -> usize {
+        self.creds.lock().expect("cannot unlock").len()
     }
 }
 
@@ -570,6 +632,7 @@ mod test {
     use {
         super::*,
         crate::scrypt::{TEST_SCRYPT_PARAMS, TEST_SCRYPT_PASSWORD},
+        anyhow::Result,
         assert_matches::assert_matches,
     };
 
@@ -577,7 +640,7 @@ mod test {
     async fn test_enroll_key() {
         let expected_le_secret = compute_low_entropy_secret(TEST_SCRYPT_PASSWORD);
         let mcm = MockCredManager::new_expect_le_secret(&expected_le_secret);
-        let mut pw_enroller = PinweaverKeyEnroller::new(mcm);
+        let mut pw_enroller = PinweaverKeyEnroller::new(Arc::new(Mutex::new(mcm)));
         let enrolled_key =
             pw_enroller.enroll_key(TEST_SCRYPT_PASSWORD).await.expect("enrollment should succeed");
         assert_matches!(
@@ -589,7 +652,7 @@ mod test {
     #[fuchsia::test]
     async fn test_enroll_key_fail() {
         let mcm = MockCredManager::new_fail_enrollment();
-        let mut pw_enroller = PinweaverKeyEnroller::new(mcm);
+        let mut pw_enroller = PinweaverKeyEnroller::new(Arc::new(Mutex::new(mcm)));
         let err =
             pw_enroller.enroll_key(TEST_SCRYPT_PASSWORD).await.expect_err("enrollment should fail");
         assert_matches!(
@@ -648,9 +711,9 @@ mod test {
 
     #[fuchsia::test]
     async fn test_remove_key() {
-        let creds = Arc::new(Mutex::new(HashMap::new()));
+        let creds = Arc::new(SyncMutex::new(HashMap::new()));
         let mcm = MockCredManager::new_with_creds(creds.clone());
-        let mut pw_enroller = PinweaverKeyEnroller::new(mcm);
+        let mut pw_enroller = PinweaverKeyEnroller::new(Arc::new(Mutex::new(mcm)));
         let enrolled_key = pw_enroller.enroll_key(TEST_SCRYPT_PASSWORD).await.expect("enroll");
         let remove_res = pw_enroller.remove_key(enrolled_key.enrollment_data).await;
         assert_matches!(remove_res, Ok(()));
@@ -659,9 +722,9 @@ mod test {
     #[fuchsia::test]
     async fn test_roundtrip() {
         // Enroll a key and get the enrollment data.
-        let creds = Arc::new(Mutex::new(HashMap::new()));
+        let creds = Arc::new(SyncMutex::new(HashMap::new()));
         let mcm = MockCredManager::new_with_creds(creds.clone());
-        let mut pw_enroller = PinweaverKeyEnroller::new(mcm);
+        let mut pw_enroller = PinweaverKeyEnroller::new(Arc::new(Mutex::new(mcm)));
         let enrolled_key = pw_enroller.enroll_key(TEST_SCRYPT_PASSWORD).await.expect("enroll");
         let account_key = enrolled_key.key;
         let enrollment_data = enrolled_key.enrollment_data;
@@ -690,5 +753,43 @@ mod test {
             remove_res2,
             Err(KeyEnrollmentError::CredentialManagerError(fcred::CredentialError::InvalidLabel))
         );
+    }
+
+    #[fuchsia::test]
+    async fn test_enrollment_validator_success() -> Result<()> {
+        let expected_le_secret = compute_low_entropy_secret(TEST_SCRYPT_PASSWORD);
+        let mcm = MockCredManager::new_expect_le_secret(&expected_le_secret);
+
+        let validator = EnrollPinweaverValidator::new(mcm);
+        let result = validator.validate(TEST_SCRYPT_PASSWORD).await;
+
+        assert!(result.is_ok());
+
+        let (meta_data, prekey) = result.unwrap();
+
+        let pinweaver_data = if let AuthenticatorMetadata::Pinweaver(p) = meta_data {
+            p.pinweaver_params
+        } else {
+            return Err(anyhow!("wrong authenticator metadata type"));
+        };
+
+        assert_matches!(
+            pinweaver_data,
+            PinweaverParams { scrypt_params: _, credential_label: TEST_PINWEAVER_CREDENTIAL_LABEL }
+        );
+
+        assert_eq!(prekey.0.len(), KEY_LEN);
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_enrollment_validator_failure() {
+        let mcm = MockCredManager::new_fail_enrollment();
+
+        let validator = EnrollPinweaverValidator::new(mcm);
+        let result = validator.validate(TEST_SCRYPT_PASSWORD).await;
+
+        assert_matches!(result, Err(ValidationError::DependencyError(_)));
     }
 }

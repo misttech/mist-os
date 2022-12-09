@@ -101,7 +101,11 @@ async fn main() -> Result<(), Error> {
         },
     ));
 
-    let storage_unlock_mechanism = Arc::new(StorageUnlockMechanism::new(config));
+    // EnvCredManagerProvider is stateless and not shared.
+    let cred_manager_provider = EnvCredManagerProvider {};
+
+    let storage_unlock_mechanism =
+        Arc::new(StorageUnlockMechanism::new(config, cred_manager_provider));
 
     let mut fs = ServiceFs::new();
     fs.dir("svc").add_fidl_service(Services::AccountManager);
