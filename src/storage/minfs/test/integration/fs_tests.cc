@@ -122,7 +122,7 @@ class MinfsFvmTest : public BaseFilesystemTest {
 
     // Want something like "/dev/sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm"
     std::string fvm_path = ram_disk->path() + "/fvm";
-    fbl::unique_fd fd(open(fvm_path.c_str(), O_RDWR));
+    fbl::unique_fd fd(open(fvm_path.c_str(), O_RDONLY));
     EXPECT_TRUE(fd);
     return fd;
   }
