@@ -35,6 +35,12 @@
             to: "#realm_builder",
         },
         {
+            protocol: [ "fuchsia.tracing.provider.Registry" ],
+            from: "parent",
+            to: "#realm_builder",
+            availability: "optional",
+        },
+        {
             directory: "config-data",
             from: "parent",
             to: [ "#realm_builder" ],

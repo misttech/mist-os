@@ -35,7 +35,6 @@
             protocol: [
                 "fuchsia.sys.internal.ComponentEventProvider",
                 "fuchsia.sys.internal.LogConnector",
-                "fuchsia.tracing.provider.Registry",
             ],
             availability: "optional",
         },
