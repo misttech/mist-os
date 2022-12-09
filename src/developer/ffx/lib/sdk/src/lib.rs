@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, bail, Context, Result};
+use sdk_metadata::{FfxTool, FidlLibrary, HostTool, Manifest};
 use serde::Deserialize;
 use serde_json::Value;
 use std::{
     collections::HashMap,
-    convert::Into,
     fs,
-    io::{self, BufReader},
+    io::{self, BufReader, Read},
     path::{Path, PathBuf},
 };
 use tracing::warn;
@@ -24,9 +24,38 @@ pub enum SdkVersion {
 #[derive(Debug)]
 pub struct Sdk {
     path_prefix: PathBuf,
-    metas: Vec<Value>,
+    metas: Vec<Meta>,
     real_paths: Option<HashMap<String, String>>,
     version: SdkVersion,
+}
+
+#[derive(Debug)]
+pub enum Meta {
+    HostTool(HostTool),
+    CompanionHostTool(HostTool),
+    FfxTool(FfxTool),
+    FidlLibrary(FidlLibrary),
+    Unknown(Value),
+}
+
+// we manually implement deserializing because the semantics of serde's
+// tagging functionality don't allow for having a tag and including it
+// in the structure, so we make a stop at json to check the type field
+// ourselves.
+impl Meta {
+    fn from_reader(buf: impl Read) -> Result<Self, serde_json::Error> {
+        let obj: serde_json::Map<_, _> = serde_json::from_reader(buf)?;
+        let meta = match obj.get("type").and_then(Value::as_str) {
+            Some("host_tool") => Meta::HostTool(serde_json::from_value(Value::Object(obj))?),
+            Some("companion_host_tool") => {
+                Meta::CompanionHostTool(serde_json::from_value(Value::Object(obj))?)
+            }
+            Some("ffx_tool") => Meta::FfxTool(serde_json::from_value(Value::Object(obj))?),
+            Some("fidl_library") => Meta::FidlLibrary(serde_json::from_value(Value::Object(obj))?),
+            Some(_) | None => Meta::Unknown(Value::Object(obj)),
+        };
+        Ok(meta)
+    }
 }
 
 #[derive(Deserialize)]
@@ -58,24 +87,6 @@ struct Atom {
 struct File {
     destination: String,
     source: String,
-}
-
-#[derive(Deserialize)]
-struct Manifest {
-    #[allow(unused)]
-    arch: Value,
-    id: Option<String>,
-    parts: Vec<Part>,
-    #[allow(unused)]
-    schema_version: String,
-}
-
-#[derive(Deserialize)]
-struct Part {
-    meta: String,
-    #[serde(rename = "type")]
-    #[allow(unused)]
-    ty: String,
 }
 
 pub enum SdkRoot {
@@ -161,25 +172,22 @@ impl Sdk {
         manifest: BufReader<T>,
         version: &mut SdkVersion,
         get_meta: M,
-    ) -> Result<Vec<Value>>
+    ) -> Result<Vec<Meta>>
     where
         M: Fn(&str) -> Option<BufReader<T>>,
         T: io::Read,
     {
-        let manifest: Manifest = serde_json::from_reader(manifest)?;
+        let manifest: Manifest =
+            serde_json::from_reader(manifest).context("Reading manifest file")?;
         // TODO: Check the schema version and log a warning if it's not what we expect.
 
-        if let Some(id) = manifest.id {
-            *version = SdkVersion::Version(id.clone());
-        }
+        *version = SdkVersion::Version(manifest.id.clone());
 
         let metas = manifest
             .parts
             .into_iter()
-            .map(|x| match get_meta(&x.meta) {
-                Some(reader) => serde_json::from_reader(reader).map_err(|x| x.into()),
-                None => serde_json::from_str("{}").map_err(|x| x.into()),
-            })
+            .filter_map(|x| get_meta(&x.meta))
+            .map(|reader| Meta::from_reader(reader).context("Parsing metadata file"))
             .collect::<Result<Vec<_>>>()?;
         Ok(metas)
     }
@@ -227,52 +235,32 @@ impl Sdk {
         }
     }
 
+    fn get_host_tools(&self) -> impl Iterator<Item = &HostTool> {
+        self.metas.iter().filter_map(|meta| match meta {
+            Meta::HostTool(tool) | Meta::CompanionHostTool(tool) => Some(tool),
+            _ => None,
+        })
+    }
+
     fn get_host_tool_relative_path(&self, name: &str) -> Result<PathBuf> {
-        self.get_real_path(
-            self.metas
-                .iter()
-                .filter(|x| {
-                    x.get("name")
-                        .filter(|n| *n == name)
-                        .and(
-                            x.get("type")
-                                .filter(|t| *t == "host_tool" || *t == "companion_host_tool"),
-                        )
-                        .is_some()
-                })
-                .map(|x| -> Result<_> {
-                    let arr = x
-                        .get("files")
-                        .ok_or(anyhow!(
-                            "No executable provided for tool '{}' (no file list present)",
-                            name
-                        ))?
-                        .as_array()
-                        .ok_or(anyhow!(
-                            "Malformed manifest for tool '{}': file list wasn't an array",
-                            name
-                        ))?;
-
-                    if arr.len() > 1 {
-                        warn!("Tool '{}' provides multiple files in manifest", name);
-                    }
-
-                    arr.get(0)
-                        .ok_or(anyhow!(
-                            "No executable provided for tool '{}' (file list was empty)",
-                            name
-                        ))?
-                        .as_str()
-                        .ok_or(anyhow!(
-                            "Malformed manifest for tool '{}': file name wasn't a string",
-                            name
-                        ))
-                })
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .min_by_key(|x| x.len()) // Shortest path is the one with no arch specifier, i.e. the default arch, i.e. the current arch (we hope.)
-                .ok_or(anyhow!("Tool '{}' not found in SDK dir", name))?,
-        )
+        let found_tool = self
+            .get_host_tools()
+            .filter(|tool| tool.name == name)
+            .map(|tool| match &tool.files.as_deref() {
+                Some([tool_path]) => Ok(tool_path.as_str()),
+                Some([tool_path, ..]) => {
+                    warn!("Tool '{}' provides multiple files in manifest", name);
+                    Ok(tool_path.as_str())
+                }
+                Some([]) | None => {
+                    Err(anyhow!("No executable provided for tool '{}' (file list was empty)", name))
+                }
+            })
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .min_by_key(|x| x.len()) // Shortest path is the one with no arch specifier, i.e. the default arch, i.e. the current arch (we hope.)
+            .ok_or(anyhow!("Tool '{}' not found in SDK dir", name))?;
+        self.get_real_path(found_tool)
     }
 
     fn get_real_path(&self, path: impl AsRef<str>) -> Result<PathBuf> {
@@ -334,16 +322,14 @@ impl Sdk {
                 .get(&atom.meta)
                 .ok_or(anyhow!("Atom did not specify source for its metadata."))?;
             let full_meta_path = path_prefix.join(meta_file_name);
-
             let reader = get_meta(&full_meta_path);
-            let json_metas = serde_json::from_reader(reader?);
+            let json_metas = Meta::from_reader(reader?);
 
-            match json_metas {
-                Ok(result) => metas.push(result),
-                Err(e) => {
-                    return Err(anyhow!("Can't read json file {:?}: {:?}", full_meta_path, e))
-                }
-            }
+            metas.push(
+                json_metas.with_context(|| {
+                    format!("Can't read json file {}", full_meta_path.display())
+                })?,
+            );
         }
 
         Ok(Sdk { path_prefix, metas, real_paths: Some(real_paths), version })
@@ -355,24 +341,12 @@ impl Sdk {
 
 #[cfg(test)]
 mod test {
+    use sdk_metadata::ElementType;
+
     use super::*;
 
-    const CORE_MANIFEST: &str = r#"{
+    const CORE_MANIFEST: &[u8] = br#"{
       "atoms": [
-        {
-          "category": "partner",
-          "deps": [],
-          "files": [
-            {
-              "destination": "device/generic-arm64.json",
-              "source": "gen/sdk/devices/generic-arm64.meta.json"
-            }
-          ],
-          "gn-label": "//sdk/devices:generic-arm64(//build/toolchain/fuchsia:x64)",
-          "id": "sdk://device/generic-arm64",
-          "meta": "device/generic-arm64.json",
-          "type": "device_profile"
-        },
         {
           "category": "partner",
           "deps": [],
@@ -426,81 +400,88 @@ mod test {
           "id": "sdk://tools/x64/symbol-index",
           "meta": "tools/x64/symbol-index-meta.json",
           "type": "host_tool"
-        }
+        },
+        {
+            "category": "partner",
+            "deps": [],
+            "files": [
+              {
+                "destination": "ffx_tools/x64/ffx-assembly",
+                "source": "host_x64/ffx-assembly"
+              },
+              {
+                "destination": "ffx_tools/x64/ffx-assembly.json",
+                "source": "host_x64/ffx-assembly.json"
+              },
+              {
+                "destination": "ffx_tools/x64/ffx-assembly-meta.json",
+                "source": "host_x64/gen/src/developer/ffx/plugins/assembly/sdk.meta.json"
+              }
+            ],
+            "gn-label": "//src/developer/ffx/plugins/assembly:sdk(//build/toolchain:host_x64)",
+            "id": "sdk://ffx_tools/x64/ffx-assembly",
+            "meta": "ffx_tools/x64/ffx-assembly-meta.json",
+            "plasa": [],
+            "type": "ffx_tool"
+          }
       ],
       "ids": []
     }"#;
 
     fn get_core_manifest_meta(file_path: &Path) -> Result<BufReader<&'static [u8]>> {
-        let name = file_path.to_str().unwrap();
-        if name == "/fuchsia/out/default/gen/sdk/devices/generic-arm64.meta.json" {
-            const META: &str = r#"{
-              "description": "A generic arm64 device",
-              "images_url": "gs://fuchsia/development//images/generic-arm64.tgz",
-              "name": "generic-arm64",
-              "packages_url": "gs://fuchsia/development//packages/generic-arm64.tar.gz",
-              "type": "device_profile"
-            }"#;
-
-            Ok(BufReader::new(META.as_bytes()))
-        } else if name
-            == "/fuchsia/out/default/host_x64/gen/src/developer/debug/zxdb/zxdb_sdk.meta.json"
-        {
-            const META: &str = r#"{
-              "files": [
-                "tools/x64/zxdb"
-              ],
-              "name": "zxdb",
-              "root": "tools",
-              "type": "host_tool"
-            }"#;
-
-            Ok(BufReader::new(META.as_bytes()))
-        } else if name
-            == "/fuchsia/out/default/host_x64/gen/tools/symbol-index/symbol_index_sdk.meta.json"
-        {
-            const META: &str = r#"{
-              "files": [
-                "tools/x64/symbol-index"
-              ],
-              "name": "symbol-index",
-              "root": "tools",
-              "type": "host_tool"
-            }"#;
-
-            Ok(BufReader::new(META.as_bytes()))
-        } else if name
-            == "/fuchsia/out/default/host_x64/gen/tools/symbol-index/symbol_index_sdk_legacy.meta.json"
-        {
-            const META: &str = r#"{
-              "files": [
-                "tools/x64/symbol-index"
-              ],
-              "name": "symbol-index",
-              "root": "tools",
-              "type": "host_tool"
-            }"#;
-
-            Ok(BufReader::new(META.as_bytes()))
-        } else if name
-            == "/fuchsia/out/default/host_arm64/gen/tools/symbol-index/symbol_index_sdk.meta.json"
-        {
-            const META: &str = r#"{
-              "files": [
-                "tools/arm64/symbol-index"
-              ],
-              "name": "symbol-index",
-              "root": "tools",
-              "type": "host_tool"
-            }"#;
-
-            Ok(BufReader::new(META.as_bytes()))
-        } else {
-            Err(anyhow!("No such manifest: {}", name))
+        match file_path.to_str() {
+            Some("/fuchsia/out/default/host_x64/gen/src/developer/debug/zxdb/zxdb_sdk.meta.json") => Ok(
+                BufReader::new(br#"{
+                    "files": [
+                        "tools/x64/zxdb"
+                    ],
+                    "name": "zxdb",
+                    "root": "tools",
+                    "type": "host_tool"
+                }"#)),
+            Some("/fuchsia/out/default/host_x64/gen/tools/symbol-index/symbol_index_sdk.meta.json") => Ok(
+                BufReader::new(br#"{
+                    "files": [
+                        "tools/x64/symbol-index"
+                    ],
+                    "name": "symbol-index",
+                    "root": "tools",
+                    "type": "host_tool"
+                }"#)),
+            Some("/fuchsia/out/default/host_x64/gen/tools/symbol-index/symbol_index_sdk_legacy.meta.json") => Ok(
+                BufReader::new(br#"{
+                    "files": [
+                        "tools/x64/symbol-index"
+                    ],
+                    "name": "symbol-index",
+                    "root": "tools",
+                    "type": "host_tool"
+                }"#)),
+            Some("/fuchsia/out/default/host_arm64/gen/tools/symbol-index/symbol_index_sdk.meta.json") => Ok(
+                BufReader::new(br#"{
+                    "files": [
+                        "tools/arm64/symbol-index"
+                    ],
+                    "name": "symbol-index",
+                    "root": "tools",
+                    "type": "host_tool"
+                }"#)),
+            Some("/fuchsia/out/default/host_x64/gen/src/developer/ffx/plugins/assembly/sdk.meta.json") => Ok(BufReader::new(br#"{
+                "executable": "ffx_tools/x64/ffx-assembly",
+                "executable_metadata": "ffx_tools/x64/ffx-assembly.json",
+                "files": [
+                  "ffx_tools/x64/ffx-assembly",
+                  "ffx_tools/x64/ffx-assembly.json"
+                ],
+                "name": "ffx-assembly",
+                "root": "ffx_tools/x64",
+                "type": "ffx_tool"
+              }"#)),
+            _ => Err(anyhow!("No such manifest: {}", file_path.display()))
         }
     }
 
-    const SDK_MANIFEST: &str = r#"{
+    const SDK_MANIFEST: &[u8] = br#"{
         "arch": {
             "host": "x86_64-linux-gnu",
             "target": [
@@ -519,36 +500,35 @@ mod test {
               "type": "host_tool"
             }
         ],
+        "root": "..",
         "schema_version": "1"
     }"#;
 
     fn get_sdk_manifest_meta(name: &str) -> Option<BufReader<&'static [u8]>> {
-        if name == "fidl/fuchsia.data/meta.json" {
-            const META: &str = r#"{
-              "deps": [],
-              "name": "fuchsia.data",
-              "root": "fidl/fuchsia.data",
-              "sources": [
-                "fidl/fuchsia.data/data.fidl"
-              ],
-              "type": "fidl_library"
-            }"#;
-
-            Some(BufReader::new(META.as_bytes()))
-        } else if name == "tools/zxdb-meta.json" {
-            const META: &str = r#"{
-              "files": [
-                "tools/zxdb"
-              ],
-              "name": "zxdb",
-              "root": "tools",
-              "target_files": {},
-              "type": "host_tool"
-            }"#;
-
-            Some(BufReader::new(META.as_bytes()))
-        } else {
-            None
+        match name {
+            "fidl/fuchsia.data/meta.json" => Some(BufReader::new(
+                br#"{
+                "deps": [],
+                "name": "fuchsia.data",
+                "root": "fidl/fuchsia.data",
+                "sources": [
+                    "fidl/fuchsia.data/data.fidl"
+                ],
+                "type": "fidl_library"
+                }"#,
+            )),
+            "tools/zxdb-meta.json" => Some(BufReader::new(
+                br#"{
+                "files": [
+                    "tools/zxdb"
+                ],
+                "name": "zxdb",
+                "root": "tools",
+                "target_files": {},
+                "type": "host_tool"
+                }"#,
+            )),
+            _ => None,
         }
     }
 
@@ -556,8 +536,7 @@ mod test {
     async fn test_core_manifest() {
         let manifest_path: PathBuf = PathBuf::from("/fuchsia/out/default");
         let atoms =
-            Sdk::atoms_from_core_manifest(&manifest_path, BufReader::new(CORE_MANIFEST.as_bytes()))
-                .unwrap();
+            Sdk::atoms_from_core_manifest(&manifest_path, BufReader::new(CORE_MANIFEST)).unwrap();
 
         assert!(atoms.ids.is_empty());
 
@@ -565,24 +544,34 @@ mod test {
         assert_eq!(4, atoms.len());
         assert_eq!("partner", atoms[0].category);
         assert!(atoms[0].deps.is_empty());
-        assert_eq!("//sdk/devices:generic-arm64(//build/toolchain/fuchsia:x64)", atoms[0].gn_label);
-        assert_eq!("sdk://device/generic-arm64", atoms[0].id);
-        assert_eq!("device_profile", atoms[0].ty);
-        assert_eq!(1, atoms[0].files.len());
-        assert_eq!("device/generic-arm64.json", atoms[0].files[0].destination);
-        assert_eq!("gen/sdk/devices/generic-arm64.meta.json", atoms[0].files[0].source);
+        assert_eq!(
+            "//src/developer/debug/zxdb:zxdb_sdk(//build/toolchain:host_x64)",
+            atoms[0].gn_label
+        );
+        assert_eq!("sdk://tools/x64/zxdb", atoms[0].id);
+        assert_eq!("host_tool", atoms[0].ty);
+        assert_eq!(2, atoms[0].files.len());
+        assert_eq!("host_x64/zxdb", atoms[0].files[0].source);
+        assert_eq!("tools/x64/zxdb", atoms[0].files[0].destination);
 
-        assert_eq!(2, atoms[1].files.len());
-        assert_eq!("tools/x64/zxdb", atoms[1].files[0].destination);
-        assert_eq!("host_x64/zxdb", atoms[1].files[0].source);
+        assert_eq!("partner", atoms[3].category);
+        assert!(atoms[3].deps.is_empty());
+        assert_eq!(
+            "//src/developer/ffx/plugins/assembly:sdk(//build/toolchain:host_x64)",
+            atoms[3].gn_label
+        );
+        assert_eq!("sdk://ffx_tools/x64/ffx-assembly", atoms[3].id);
+        assert_eq!("ffx_tool", atoms[3].ty);
+        assert_eq!(3, atoms[3].files.len());
+        assert_eq!("host_x64/ffx-assembly", atoms[3].files[0].source);
+        assert_eq!("ffx_tools/x64/ffx-assembly", atoms[3].files[0].destination);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_core_manifest_to_sdk() {
         let manifest_path: PathBuf = PathBuf::from("/fuchsia/out/default");
         let atoms =
-            Sdk::atoms_from_core_manifest(&manifest_path, BufReader::new(CORE_MANIFEST.as_bytes()))
-                .unwrap();
+            Sdk::atoms_from_core_manifest(&manifest_path, BufReader::new(CORE_MANIFEST)).unwrap();
 
         let sdk = Sdk::from_sdk_atoms(
             manifest_path.to_owned(),
@@ -593,19 +582,27 @@ mod test {
         .unwrap();
 
         assert_eq!(4, sdk.metas.len());
-        assert_eq!(
-            "A generic arm64 device",
-            sdk.metas[0].get("description").unwrap().as_str().unwrap()
-        );
-        assert_eq!("host_tool", sdk.metas[1].get("type").unwrap().as_str().unwrap());
+        println!("{:#?}", sdk.metas);
+        assert!(matches!(
+            sdk.metas[0],
+            Meta::HostTool(HostTool { kind: ElementType::HostTool, .. })
+        ));
+        assert!(matches!(
+            sdk.metas[1],
+            Meta::HostTool(HostTool { kind: ElementType::HostTool, .. })
+        ));
+        assert!(matches!(
+            sdk.metas[2],
+            Meta::HostTool(HostTool { kind: ElementType::HostTool, .. })
+        ));
+        assert!(matches!(sdk.metas[3], Meta::FfxTool(FfxTool { kind: ElementType::FfxTool, .. })));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_core_manifest_host_tool() {
         let manifest_path: PathBuf = PathBuf::from("/fuchsia/out/default");
         let atoms =
-            Sdk::atoms_from_core_manifest(&manifest_path, BufReader::new(CORE_MANIFEST.as_bytes()))
-                .unwrap();
+            Sdk::atoms_from_core_manifest(&manifest_path, BufReader::new(CORE_MANIFEST)).unwrap();
 
         let sdk = Sdk::from_sdk_atoms(
             manifest_path.to_owned(),
@@ -623,8 +620,7 @@ mod test {
     async fn test_core_manifest_host_tool_multi_arch() {
         let manifest_path: PathBuf = PathBuf::from("/fuchsia/out/default");
         let atoms =
-            Sdk::atoms_from_core_manifest(&manifest_path, BufReader::new(CORE_MANIFEST.as_bytes()))
-                .unwrap();
+            Sdk::atoms_from_core_manifest(&manifest_path, BufReader::new(CORE_MANIFEST)).unwrap();
 
         let sdk = Sdk::from_sdk_atoms(
             manifest_path.to_owned(),
@@ -642,7 +638,7 @@ mod test {
     async fn test_sdk_manifest() {
         let mut version = SdkVersion::Unknown;
         let metas = Sdk::metas_from_sdk_manifest(
-            BufReader::new(SDK_MANIFEST.as_bytes()),
+            BufReader::new(SDK_MANIFEST),
             &mut version,
             get_sdk_manifest_meta,
         )
@@ -651,14 +647,17 @@ mod test {
         assert_eq!(SdkVersion::Version("0.20201005.4.1".to_owned()), version);
 
         assert_eq!(2, metas.len());
-        assert_eq!("fidl_library", metas[0].get("type").unwrap().as_str().unwrap());
-        assert_eq!("host_tool", metas[1].get("type").unwrap().as_str().unwrap());
+        assert!(matches!(
+            metas[0],
+            Meta::FidlLibrary(FidlLibrary { kind: ElementType::FidlLibrary, .. })
+        ));
+        assert!(matches!(metas[1], Meta::HostTool(HostTool { kind: ElementType::HostTool, .. })));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_sdk_manifest_host_tool() {
         let metas = Sdk::metas_from_sdk_manifest(
-            BufReader::new(SDK_MANIFEST.as_bytes()),
+            BufReader::new(SDK_MANIFEST),
             &mut SdkVersion::Unknown,
             get_sdk_manifest_meta,
         )

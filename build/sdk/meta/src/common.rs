@@ -170,6 +170,7 @@ pub enum ElementType {
     BanjoLibrary,
     CcPrebuiltLibrary,
     CcSourceLibrary,
+    CompanionHostTool,
     Config,
     DartLibrary,
     Documentation,
