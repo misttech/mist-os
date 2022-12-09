@@ -88,20 +88,10 @@ executable("bin") {
   ]
 }
 
-resource("virtio_magma_resources") {
-  sources = [ "${root_build_dir}/linux_x64-shared/libvulkan_intel.so" ]
-  outputs = [ "drivers/libvulkan_intel.so" ]
-}
-
 fuchsia_component("virtio_magma_component") {
   component_name = "virtio_magma"
   manifest = "meta/virtio_magma.cml"
-  deps = [
-    # TODO(fxbug.dev/13128): don't hard-code the driver
-    ":bin",
-    ":virtio_magma_resources",
-    "//third_party/mesa/src/intel/vulkan:vulkan_intel(//build/toolchain:linux_x64-shared)",
-  ]
+  deps = [ ":bin" ]
 }
 
 executable("unittests_bin") {
