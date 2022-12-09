@@ -127,7 +127,7 @@ zx_status_t DeviceManager::AddDevice(
     }
   }
 
-  // If we're creating a device that's using the fragment driver, inform the
+  // If we're creating a device that's using the fragment proxy driver, inform the
   // fragment.
   if (dev->is_fragment_proxy_device()) {
     bool found = false;

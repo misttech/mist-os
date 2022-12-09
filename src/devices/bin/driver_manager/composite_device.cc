@@ -149,23 +149,29 @@ bool CompositeDevice::IsFragmentMatch(const fbl::RefPtr<Device>& dev, size_t* in
 
   // Check bound fragments for ambiguous binds.
   for (auto& fragment : fragments_) {
-    if (!fragment.IsBound() || !fragment.TryMatch(dev)) {
+    if (!fragment.IsBound()) {
       continue;
     }
-    LOGF(ERROR, "Ambiguous bind for composite device %p '%s': device 1 '%s', device 2 '%s'", this,
-         name_.data(), fragment.bound_device()->name().data(), dev->name().data());
-    return false;
+
+    if (fragment.TryMatch(dev)) {
+      LOGF(ERROR, "Ambiguous bind for composite device %p '%s': device 1 '%s', device 2 '%s'", this,
+           name_.data(), fragment.bound_device()->name().data(), dev->name().data());
+      return false;
+    }
   }
 
   // Check unbound fragments for matches.
   for (auto& fragment : fragments_) {
-    if (fragment.IsBound() || !fragment.TryMatch(dev)) {
+    if (fragment.IsBound()) {
       continue;
     }
-    VLOGF(1, "Found a match for composite device %p '%s': device '%s'", this, name_.data(),
-          dev->name().data());
-    *index_out = fragment.index();
-    return true;
+
+    if (fragment.TryMatch(dev)) {
+      VLOGF(1, "Found a match for composite device %p '%s': device '%s'", this, name_.data(),
+            dev->name().data());
+      *index_out = fragment.index();
+      return true;
+    }
   }
 
   VLOGF(1, "No match for composite device %p '%s': device '%s'", this, name_.data(),
@@ -180,8 +186,9 @@ zx_status_t CompositeDevice::TryMatchBindFragments(const fbl::RefPtr<Device>& de
   }
 
   if (dev->name() == "sysmem-fidl" || dev->name() == "sysmem-banjo") {
-    VLOGF(1, "Device '%s' matched fragment %zu of composite '%s'", dev->name().data(), index,
-          name().data());
+    // Log sysmem matches at DEBUG as these logs are very frequent and noisy.
+    LOGF(DEBUG, "Device '%s' matched fragment %zu of composite '%s'", dev->name().data(), index,
+         name().data());
   } else {
     LOGF(INFO, "Device '%s' matched fragment %zu of composite '%s'", dev->name().data(), index,
          name().data());
@@ -213,6 +220,11 @@ zx_status_t CompositeDevice::BindFragment(size_t index, const fbl::RefPtr<Device
   if (status != ZX_OK) {
     return status;
   }
+
+  // If the device does not have an outgoing directory, then `CompositeDeviceFragment::Bind` will
+  // bind the fragment driver to the device, and `DeviceManager` will call `TryAssemble` once the
+  // fragment device is added. If the device does have an outgoing directory, then this will not
+  // happen, so we have to call `TryAssemble` explicitly here.
   if (dev->has_outgoing_directory()) {
     status = TryAssemble();
     if (status != ZX_OK && status != ZX_ERR_SHOULD_WAIT) {

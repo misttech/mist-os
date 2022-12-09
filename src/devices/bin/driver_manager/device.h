@@ -442,10 +442,17 @@ class Device final
   // Metadata entries associated to this device.
   fbl::DoublyLinkedList<std::unique_ptr<Metadata>> metadata_;
 
-  // list of all fragments that this device bound to.
+  // If a composite device is bound to this device, this list will contain a reference to the
+  // fragment that matched it. If the device has the MULTI_COMPOSITE flag set and multiple
+  // composites are bound to it, then this list will contain a reference to each fragment.
+  //
+  // Note that this is NOT the list of fragments that comprise a composite device; that can be found
+  // instead at composite_->fragments().
   fbl::TaggedDoublyLinkedList<CompositeDeviceFragment*, CompositeDeviceFragment::DeviceListTag>
       fragments_;
 
+  // If the device is a composite, this field holds a reference to its composite-specific
+  // information.
   std::optional<std::reference_wrapper<CompositeDevice>> composite_;
 
   fbl::RefPtr<DriverHost> host_;
