@@ -10,6 +10,9 @@
 
 namespace a11y {
 
+// Used for floating point comparisons.
+constexpr float kEpsilon = 1.e-10f;
+
 ViewCoordinateConverter::ViewCoordinateConverter(
     fuchsia::ui::observation::scope::RegistryPtr registry, zx_koid_t context_view_ref_koid)
     : context_view_ref_koid_(context_view_ref_koid) {
@@ -77,24 +80,29 @@ std::optional<fuchsia::math::PointF> ViewCoordinateConverter::Convert(
   const float y_offset = view_data.y_scale * (coordinate.y - view_data.origin.y);
 
   fuchsia::math::PointF context_point;
-  if (view_data.angle == 0.0) {
+
+  // Map `view_data.angle` to the range [0., 360.)
+  const float angle = fmod(360.f + fmod(view_data.angle, 360.f), 360.f);
+  if (abs(angle - 0.0) < kEpsilon) {
     context_point.x = view_data.origin_in_context.x + x_offset;
     context_point.y = view_data.origin_in_context.y + y_offset;
     return context_point;
-  } else if (view_data.angle == 90.0) {
+  } else if (abs(angle - 90.0) < kEpsilon) {
     context_point.x = view_data.origin_in_context.x + y_offset;
     context_point.y = view_data.origin_in_context.y - x_offset;
     return context_point;
-  } else if (view_data.angle == 180.0) {
+  } else if (abs(angle - 180.0) < kEpsilon) {
     context_point.x = view_data.origin_in_context.x - x_offset;
     context_point.y = view_data.origin_in_context.y - y_offset;
     return context_point;
-  } else if (view_data.angle == 270.0) {
+  } else if (abs(angle - 270.0) < kEpsilon) {
     context_point.x = view_data.origin_in_context.x - y_offset;
     context_point.y = view_data.origin_in_context.y + x_offset;
     return context_point;
   }
 
+  FX_LOGS(WARNING)
+      << "ViewCoordinateConverter can't handle rotations that aren't a multiple of 90 degrees, returning nullopt";
   return std::nullopt;
 }
 
