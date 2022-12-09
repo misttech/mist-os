@@ -1139,8 +1139,12 @@ where
             fposix_socket::StreamSocketRequest::GetInfo { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
-            fposix_socket::StreamSocketRequest::SetTcpNoDelay { value: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+            fposix_socket::StreamSocketRequest::SetTcpNoDelay { value, responder } => {
+                // TODO(https://fxbug.dev/117115): Implement Nagle's algorithm
+                // and disable TCP_NODELAY by default.
+                responder_send!(responder, &mut {
+                    value.then_some(()).ok_or(fposix::Errno::Eopnotsupp)
+                });
             }
             fposix_socket::StreamSocketRequest::GetTcpNoDelay { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
