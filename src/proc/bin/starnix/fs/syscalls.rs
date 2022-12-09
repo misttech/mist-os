@@ -1556,19 +1556,19 @@ pub fn sys_epoll_wait(
     sys_epoll_pwait(current_task, epfd, events, max_events, timeout, UserRef::<sigset_t>::default())
 }
 
-pub fn sys_epoll_pwait(
+// Backend for sys_epoll_pwait and sys_epoll_pwait2 that takes an already-decoded duration.
+fn do_epoll_pwait(
     current_task: &mut CurrentTask,
     epfd: FdNumber,
     events: UserRef<EpollEvent>,
     max_events: i32,
-    timeout: i32,
+    timeout: zx::Duration,
     user_sigmask: UserRef<sigset_t>,
 ) -> Result<usize, Errno> {
     if max_events < 1 {
         return error!(EINVAL);
     }
 
-    let timeout = duration_from_poll_timeout(timeout)?;
     let file = current_task.files.get(epfd)?;
     let epoll_file = file.downcast_file::<EpollFileObject>().ok_or_else(|| errno!(EINVAL))?;
 
@@ -1588,6 +1588,35 @@ pub fn sys_epoll_pwait(
     }
 
     Ok(active_events.len())
+}
+
+pub fn sys_epoll_pwait(
+    current_task: &mut CurrentTask,
+    epfd: FdNumber,
+    events: UserRef<EpollEvent>,
+    max_events: i32,
+    timeout: i32,
+    user_sigmask: UserRef<sigset_t>,
+) -> Result<usize, Errno> {
+    let timeout = duration_from_poll_timeout(timeout)?;
+    do_epoll_pwait(current_task, epfd, events, max_events, timeout, user_sigmask)
+}
+
+pub fn sys_epoll_pwait2(
+    current_task: &mut CurrentTask,
+    epfd: FdNumber,
+    events: UserRef<EpollEvent>,
+    max_events: i32,
+    user_timespec: UserRef<timespec>,
+    user_sigmask: UserRef<sigset_t>,
+) -> Result<usize, Errno> {
+    let timeout = if user_timespec.is_null() {
+        zx::Duration::INFINITE
+    } else {
+        let ts = current_task.mm.read_object(user_timespec)?;
+        duration_from_timespec(ts)?
+    };
+    do_epoll_pwait(current_task, epfd, events, max_events, timeout, user_sigmask)
 }
 
 struct ReadyPollItem {

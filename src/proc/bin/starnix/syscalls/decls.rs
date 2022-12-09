@@ -368,6 +368,7 @@ macro_rules! for_each_syscall {
             pidfd_getfd,
             faccessat2,
             process_madvise,
+            epoll_pwait2,
         }
     }
 }
