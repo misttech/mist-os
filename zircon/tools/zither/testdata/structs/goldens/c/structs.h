@@ -47,6 +47,21 @@ typedef struct {
   int8_t nested_arrays2[1][2][3];
 } zither_structs_array_members_t;
 
+typedef int32_t zither_structs_enum_t;
+
+#define ZITHER_STRUCTS_ENUM_ZERO ((zither_structs_enum_t)(0u))
+#define ZITHER_STRUCTS_ENUM_ONE ((zither_structs_enum_t)(1u))
+
+typedef uint16_t zither_structs_bits_t;
+
+#define ZITHER_STRUCTS_BITS_ONE ((zither_structs_bits_t)(1u << 0))
+#define ZITHER_STRUCTS_BITS_TWO ((zither_structs_bits_t)(1u << 1))
+
+typedef struct {
+  zither_structs_enum_t e;
+  zither_structs_bits_t b;
+} zither_structs_enum_and_bits_members_t;
+
 // Struct with a one-line comment.
 typedef struct {
   // Struct member with one-line comment.

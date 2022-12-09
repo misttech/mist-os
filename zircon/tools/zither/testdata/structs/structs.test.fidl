@@ -34,6 +34,21 @@ type ArrayMembers = struct {
     nested_arrays2 array<array<array<int8, 1>, 2>, 3>;
 };
 
+type Enum = enum : int32 {
+    ZERO = 0;
+    ONE = 1;
+};
+
+type Bits = bits : uint16 {
+    ONE = 1;
+    TWO = 2;
+};
+
+type EnumAndBitsMembers = struct {
+    e Enum;
+    b Bits;
+};
+
 /// Struct with a one-line comment.
 type StructWithOneLineComment = struct {
     /// Struct member with one-line comment.

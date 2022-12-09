@@ -39,6 +39,25 @@ type ArrayMembers struct {
 	NestedArrays2 [3][2][1]int8
 }
 
+type Enum int32
+
+const (
+	EnumZero Enum = 0
+	EnumOne  Enum = 1
+)
+
+type Bits uint16
+
+const (
+	BitsOne Bits = 1 << 0
+	BitsTwo Bits = 1 << 1
+)
+
+type EnumAndBitsMembers struct {
+	E Enum
+	B Bits
+}
+
 // Struct with a one-line comment.
 type StructWithOneLineComment struct {
 

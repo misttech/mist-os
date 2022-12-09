@@ -7,6 +7,8 @@
 
 #![allow(unused_imports)]
 
+use bitflags::bitflags;
+
 #[repr(C)]
 pub struct Empty {}
 
@@ -40,6 +42,26 @@ pub struct ArrayMembers {
     pub singletons: [Singleton; 6],
     pub nested_arrays1: [[u8; 10]; 20],
     pub nested_arrays2: [[[i8; 1]; 2]; 3],
+}
+
+#[repr(i32)]
+pub enum Enum {
+    Zero = 0,
+    One = 1,
+}
+
+bitflags! {
+
+    pub struct Bits : u16 {
+    const ONE = 1 << 0;
+    const TWO = 1 << 1;
+  }
+}
+
+#[repr(C)]
+pub struct EnumAndBitsMembers {
+    pub e: Enum,
+    pub b: Bits,
 }
 
 /// Struct with a one-line comment.
