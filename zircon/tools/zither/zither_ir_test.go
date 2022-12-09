@@ -1553,8 +1553,9 @@ protocol Syscall {
 							Type: TypeDescriptor{
 								Kind: TypeKindPointer,
 								ElementType: &TypeDescriptor{
-									Kind: TypeKindInteger,
-									Type: "int8",
+									Kind:    TypeKindInteger,
+									Type:    "int8",
+									Mutable: true,
 								},
 							},
 							Orientation: ParameterOrientationInOut,
@@ -1578,8 +1579,9 @@ protocol Syscall {
 							Type: TypeDescriptor{
 								Kind: TypeKindPointer,
 								ElementType: &TypeDescriptor{
-									Kind: TypeKindInteger,
-									Type: "int8",
+									Kind:    TypeKindInteger,
+									Type:    "int8",
+									Mutable: true,
 								},
 							},
 							Orientation: ParameterOrientationInOut,
@@ -1603,8 +1605,9 @@ protocol Syscall {
 							Type: TypeDescriptor{
 								Kind: TypeKindPointer,
 								ElementType: &TypeDescriptor{
-									Kind: TypeKindBool,
-									Type: "bool",
+									Kind:    TypeKindBool,
+									Type:    "bool",
+									Mutable: true,
 								},
 							},
 							Orientation: ParameterOrientationOut,

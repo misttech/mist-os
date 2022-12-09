@@ -36,7 +36,9 @@ func NewGenerator(formatter fidlgen.Formatter) *Generator {
 		"ConstValue":               ConstValue,
 		"EnumAttributes":           EnumAttributes,
 		"StructAttributes":         StructAttributes,
-		"DescribeType":             DescribeType,
+		"DescribeType": func(desc zither.TypeDescriptor) string {
+			return DescribeType(desc, CaseStyleRust)
+		},
 	})
 	return &Generator{*gen}
 }
@@ -182,24 +184,56 @@ func StructAttributes() []string {
 	return []string{"#[repr(C)]"}
 }
 
-func DescribeType(desc zither.TypeDescriptor) string {
+// CaseStyle represents a style of casing Rust type names.
+type CaseStyle int
+
+const (
+	// CaseStyleRust represents official rust style.
+	CaseStyleRust CaseStyle = iota
+
+	// CaseStyleSyscall gives a C-style spelling for certain types, for
+	// suggestive use in the Rust FFI syscall wrapper definitions.
+	CaseStyleSyscall
+)
+
+func DescribeType(desc zither.TypeDescriptor, style CaseStyle) string {
+	var casify func(string) string
+	switch style {
+	case CaseStyleRust:
+		casify = fidlgen.ToUpperCamelCase
+	case CaseStyleSyscall:
+		casify = func(name string) string {
+			typ := fidlgen.ToSnakeCase(name)
+			switch desc.Kind {
+			case zither.TypeKindAlias, zither.TypeKindStruct, zither.TypeKindEnum,
+				zither.TypeKindBits, zither.TypeKindHandle:
+				return "zx_" + typ + "_t"
+			default:
+				return typ
+			}
+		}
+	}
+
 	switch desc.Kind {
 	case zither.TypeKindBool, zither.TypeKindInteger, zither.TypeKindSize:
 		return ScalarTypeName(fidlgen.PrimitiveSubtype(desc.Type))
 	case zither.TypeKindEnum, zither.TypeKindBits, zither.TypeKindStruct:
 		layout, _ := fidlgen.MustReadName(desc.Type).SplitMember()
-		return fidlgen.ToUpperCamelCase(layout.DeclarationName())
+		return casify(layout.DeclarationName())
 	case zither.TypeKindAlias, zither.TypeKindHandle:
 		// TODO(fxbug.dev/105758): This assumes that the alias/handle was defined
 		// within the same package. That's true now, but this would need to be
 		// re-evaluated if/when zither supports library dependencies and the IR
 		// preserves imported alias names.
-		return fidlgen.ToUpperCamelCase(fidlgen.MustReadName(desc.Type).DeclarationName())
+		return casify(fidlgen.MustReadName(desc.Type).DeclarationName())
 	case zither.TypeKindArray:
-		return fmt.Sprintf("[%s; %d]", DescribeType(*desc.ElementType), *desc.ElementCount)
+		return fmt.Sprintf("[%s; %d]", DescribeType(*desc.ElementType, style), *desc.ElementCount)
 	case zither.TypeKindPointer, zither.TypeKindVoidPointer:
-		// TODO(fxbug.dev/110294): Handle mutability.
-		return "*const " + DescribeType(*desc.ElementType)
+		mutability := "const"
+		if desc.ElementType.Mutable {
+			mutability = "mut"
+		}
+		return fmt.Sprintf("*%s %s", mutability, DescribeType(*desc.ElementType, style))
 	default:
 		panic(fmt.Sprintf("unsupported type kind: %v", desc.Kind))
 	}

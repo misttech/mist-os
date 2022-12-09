@@ -18,6 +18,7 @@ supported_zither_backends = [
   "legacy_syscall_cdecl",  # Legacy C syscall declarations.
   "zircon_ifs",  # Syscall text ABI bindings.
   "kernel",  # Internal kernel bindings.
+  "rust_syscall",  # Thin Rust FFI syscall wrappers.
 ]
 
 _clang_format = {
@@ -156,6 +157,8 @@ supported_zither_backend_info = {
     }
     _library_template = "_zither_legacy_syscall_cdecl_sources"
   }
+
+  rust_syscall = rust
 }
 
 # Internal Zither invocation helper template used by `zither_library()`.
@@ -400,7 +403,7 @@ template("_zither_go_library") {
 }
 
 template("_zither_rust_library") {
-  assert(invoker.backend == "rust")
+  assert(invoker.backend == "rust" || invoker.backend == "rust_syscall")
 
   main_target = target_name
   zither_target = "$target_name.gen"
@@ -412,11 +415,19 @@ template("_zither_rust_library") {
                            "output_subdir",
                          ])
 
-  crate_root = "${output_dir}/${output_subdir}/src/lib.rs"
-  generated_files = [ crate_root ]
-  foreach(name, source_names) {
-    generated_files += [ "${output_dir}/${output_subdir}/src/${name}.rs" ]
+  generated_files = []
+  if (invoker.backend == "rust_syscall") {
+    crate_root = "${output_dir}/${output_subdir}/src/definitions.rs"
+    crate_deps = [ "//src/lib/zircon/rust:fuchsia-zircon-types" ]
+    not_needed([ "source_names" ])
+  } else {
+    foreach(name, source_names) {
+      generated_files += [ "${output_dir}/${output_subdir}/src/${name}.rs" ]
+    }
+    crate_root = "${output_dir}/${output_subdir}/src/lib.rs"
+    crate_deps = [ "//third_party/rust_crates:bitflags" ]
   }
+  generated_files += [ crate_root ]
 
   _zither(zither_target) {
     forward_variables_from(invoker,
@@ -427,9 +438,9 @@ template("_zither_rust_library") {
                              "fidl_ir_json",
                              "fidl_ir_target",
                              "generated_files",
+                             "backend",
                              "formatter",
                            ])
-    backend = "rust"
   }
 
   rustc_library(main_target) {
@@ -446,7 +457,7 @@ template("_zither_rust_library") {
       ":${zither_target}($default_toolchain)",
       ":${zither_target}.check($default_toolchain)",
     ]
-    deps = [ "//third_party/rust_crates:bitflags" ]
+    deps = crate_deps
     configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   }
 }
@@ -644,6 +655,9 @@ template("_zither_legacy_syscall_cdecl_sources") {
 #         of the test-only syscalls.
 #       - internal/cdecls-next.inc: similar to cdecls.inc, but consisting
 #         of the "next" syscalls.
+#
+#   * Rust syscall backend: ${target_name}.rust_syscall
+#     Generates a crate consisting of thin FFI syscall wrappers.
 #
 # Parameters:
 #

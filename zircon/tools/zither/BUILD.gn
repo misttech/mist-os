@@ -56,6 +56,7 @@ if (is_host) {
       "kernel",
       "legacy_syscall_cdecl",
       "rust",
+      "rust_syscall",
       "zircon_ifs",
       "//tools/fidl/lib/fidlgen",
       "//tools/lib/color",
@@ -316,13 +317,14 @@ template("zither_golden_test") {
                    "output_subdir",
                  ])
     } else if (case.backend == "rust" || case.backend == "kernel" ||
-               case.backend == "legacy_syscall_cdecl") {
-      # The generated rust library target should already enforce compilation.
+               case.backend == "legacy_syscall_cdecl" ||
+               case.backend == "rust_syscall") {
+      # The generated rust library targets should already enforce compilation.
       #
-      # The kernel and legacy_syscall_cdecl backends generate sources that rely
-      # on a number of other kernel and vDSO-specific definitions. Given that
-      # and the fact the singular use-case for these sources will be exercised
-      # in any default build invocation, it is neither worthwhile nor all that
+      # The kernel and syscall-related backends generate sources that rely on a
+      # number of other kernel and vDSO-specific definitions. Given that and
+      # the fact the singular use-case for these sources will be exercised in
+      # any default build invocation, it is neither worthwhile nor all that
       # practical to do a compilation check here.
       group(compilation_check_target) {
         visibility = [ ":*" ]
@@ -571,6 +573,10 @@ zither_golden_test("zx.test") {
         "testonly-cdecls.inc",
         "cdecls-next.inc",
       ]
+    },
+    {
+      backend = "rust_syscall"
+      files = [ "definitions.rs" ]
     },
   ]
 }

@@ -673,6 +673,9 @@ type TypeDescriptor struct {
 
 	// ElementCount gives the size of the associated array.
 	ElementCount *int
+
+	// Mutable gives whether this type is mutable.
+	Mutable bool
 }
 
 // Represents an recursively-defined type, effectively abstracting
@@ -1323,10 +1326,14 @@ func newSyscallFamily(protocol fidlgen.Protocol, decls declMap) (*SyscallFamily,
 				} else if m.inout {
 					param.Orientation = ParameterOrientationInOut
 				}
+				kind := param.Type.Kind
+				if !param.IsStrictInput() && (kind.IsVectorLike() || kind.IsPointerLike()) {
+					param.Type.ElementType.Mutable = true
+				}
 
-				switch param.Type.Kind {
+				switch kind {
 				case TypeKindHandle, TypeKindPointer, TypeKindVector, TypeKindVector32:
-					if param.Type.Kind != TypeKindHandle && param.Type.ElementType.Kind != TypeKindHandle {
+					if kind != TypeKindHandle && param.Type.ElementType.Kind != TypeKindHandle {
 						break
 					}
 					if method.GetAttributes().HasAttribute("handle_unchecked") {
@@ -1338,10 +1345,10 @@ func newSyscallFamily(protocol fidlgen.Protocol, decls declMap) (*SyscallFamily,
 
 				// Vector parameters decay into separate pointer and length
 				// parameters.
-				if param.Type.Kind.IsVectorLike() {
+				if kind.IsVectorLike() {
 					pointer := param
 					pointer.SetTag(ParameterTagDecayedFromVector)
-					if param.Type.Kind.IsVoidVectorLike() {
+					if kind.IsVoidVectorLike() {
 						pointer.Type.Kind = TypeKindVoidPointer
 					} else {
 						pointer.Type.Kind = TypeKindPointer
@@ -1364,7 +1371,7 @@ func newSyscallFamily(protocol fidlgen.Protocol, decls declMap) (*SyscallFamily,
 						length.Name += "_size"
 					}
 
-					if param.Type.Kind.IsVector32Like() {
+					if kind.IsVector32Like() {
 						length.Type = TypeDescriptor{
 							Kind: TypeKindInteger,
 							Type: string(fidlgen.Uint32),
