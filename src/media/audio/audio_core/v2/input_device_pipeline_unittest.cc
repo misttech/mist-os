@@ -129,6 +129,7 @@ TEST(InputDevicePipelineTest, CreateForDevice) {
   std::shared_ptr<InputDevicePipeline> pipeline;
   InputDevicePipeline::CreateForDevice({
       .graph_client = h.client,
+      .dispatcher = h.loop.dispatcher(),
       .producer =
           {
               .ring_buffer = fuchsia_audio::wire::RingBuffer::Builder(arena)
@@ -166,8 +167,15 @@ TEST(InputDevicePipelineTest, CreateForDevice) {
   EXPECT_FALSE(pipeline->SupportsUsage(CaptureUsage::SYSTEM_AGENT));
   EXPECT_FALSE(pipeline->SupportsUsage(CaptureUsage::COMMUNICATION));
 
-  // Should have created 2 nodes with one edge connecting them.
-  EXPECT_EQ(h.server->calls().size(), 3u);
+  EXPECT_FALSE(pipeline->UsageVolumeForUsage(CaptureUsage::LOOPBACK));
+  EXPECT_TRUE(pipeline->UsageVolumeForUsage(CaptureUsage::BACKGROUND));
+  EXPECT_TRUE(pipeline->UsageVolumeForUsage(CaptureUsage::FOREGROUND));
+  EXPECT_FALSE(pipeline->UsageVolumeForUsage(CaptureUsage::SYSTEM_AGENT));
+  EXPECT_FALSE(pipeline->UsageVolumeForUsage(CaptureUsage::COMMUNICATION));
+
+  // Should have created 2 nodes with one edge connecting them, plus 2 gain controls for each of 2
+  // supported usages.
+  EXPECT_EQ(h.server->calls().size(), 7u);
 
   static constexpr NodeId kProducerId = 1;
   static constexpr NodeId kRootSplitterId = 2;
@@ -191,7 +199,7 @@ TEST(InputDevicePipelineTest, CreateForDevice) {
       done = true;
     });
     EXPECT_TRUE(done);
-    EXPECT_EQ(h.server->calls().size(), 3u);
+    EXPECT_EQ(h.server->calls().size(), 7u);
   }
 
   {
@@ -202,7 +210,7 @@ TEST(InputDevicePipelineTest, CreateForDevice) {
       done = true;
     });
     EXPECT_TRUE(done);
-    EXPECT_EQ(h.server->calls().size(), 3u);
+    EXPECT_EQ(h.server->calls().size(), 7u);
   }
 
   // With a new format, we should create a new source node.
@@ -216,7 +224,7 @@ TEST(InputDevicePipelineTest, CreateForDevice) {
     h.loop.RunUntilIdle();
     EXPECT_TRUE(done);
     // creates 2 nodes and 2 edges
-    EXPECT_EQ(h.server->calls().size(), 7u);
+    EXPECT_EQ(h.server->calls().size(), 11u);
   }
 
   // With that a compatible format, this should return immediately.
@@ -228,7 +236,7 @@ TEST(InputDevicePipelineTest, CreateForDevice) {
       done = true;
     });
     EXPECT_TRUE(done);
-    EXPECT_EQ(h.server->calls().size(), 7u);
+    EXPECT_EQ(h.server->calls().size(), 11u);
   }
 
   // Adds 4 DeleteNode calls.
@@ -241,7 +249,7 @@ TEST(InputDevicePipelineTest, CreateForDevice) {
 
   // Check the graph calls.
   const auto& calls = h.server->calls();
-  ASSERT_EQ(calls.size(), 11u);
+  ASSERT_EQ(calls.size(), 15u);
 
   auto call0 = std::get_if<GraphCreateProducerRequest>(&calls[0]);
   auto call1 = std::get_if<GraphCreateSplitterRequest>(&calls[1]);
@@ -267,9 +275,10 @@ TEST(InputDevicePipelineTest, CreateForDevice) {
   ValidateCreateSourceNodeForFormatCalls(kFormatIntStereo,
                                          /*root_splitter_id=*/kRootSplitterId,
                                          /*mixer_id=*/kStereoMixerId,
-                                         /*splitter_id=*/kStereoSplitterId, kThreadId, calls, 3);
+                                         /*splitter_id=*/kStereoSplitterId, kThreadId, calls, 7);
 
-  ValidateDeletedNodes(calls, 7, {kProducerId, kRootSplitterId, kStereoMixerId, kStereoSplitterId});
+  ValidateDeletedNodes(calls, 11,
+                       {kProducerId, kRootSplitterId, kStereoMixerId, kStereoSplitterId});
 }
 
 TEST(InputDevicePipelineTest, CreateForLoopback) {
@@ -279,13 +288,17 @@ TEST(InputDevicePipelineTest, CreateForLoopback) {
   static constexpr auto kStereoSplitterId = 2;
 
   TestHarness h;
-  auto pipeline = InputDevicePipeline::CreateForLoopback({
+  std::shared_ptr<InputDevicePipeline> pipeline;
+  InputDevicePipeline::CreateForLoopback({
       .graph_client = h.client,
+      .dispatcher = h.loop.dispatcher(),
       .splitter_node = kLoopbackSplitterId,
       .format = kFormatIntMono,
       .reference_clock = h.reference_clock.Dup(),
       .thread = kThreadId,
+      .callback = [&pipeline](auto p) { pipeline = std::move(p); },
   });
+  h.loop.RunUntilIdle();
   ASSERT_TRUE(pipeline);
 
   EXPECT_TRUE(pipeline->SupportsUsage(CaptureUsage::LOOPBACK));
@@ -294,8 +307,14 @@ TEST(InputDevicePipelineTest, CreateForLoopback) {
   EXPECT_FALSE(pipeline->SupportsUsage(CaptureUsage::SYSTEM_AGENT));
   EXPECT_FALSE(pipeline->SupportsUsage(CaptureUsage::COMMUNICATION));
 
-  // Should not have created any nodes.
-  EXPECT_EQ(h.server->calls().size(), 0u);
+  EXPECT_TRUE(pipeline->UsageVolumeForUsage(CaptureUsage::LOOPBACK));
+  EXPECT_FALSE(pipeline->UsageVolumeForUsage(CaptureUsage::BACKGROUND));
+  EXPECT_FALSE(pipeline->UsageVolumeForUsage(CaptureUsage::FOREGROUND));
+  EXPECT_FALSE(pipeline->UsageVolumeForUsage(CaptureUsage::SYSTEM_AGENT));
+  EXPECT_FALSE(pipeline->UsageVolumeForUsage(CaptureUsage::COMMUNICATION));
+
+  // Should have created 2 gain controls for the LOOPBACK usage.
+  EXPECT_EQ(h.server->calls().size(), 2u);
 
   // Formats match the device.
   EXPECT_EQ(pipeline->SourceNodeForFormat(kFormatIntMono), kLoopbackSplitterId);
@@ -314,7 +333,7 @@ TEST(InputDevicePipelineTest, CreateForLoopback) {
       done = true;
     });
     EXPECT_TRUE(done);
-    EXPECT_EQ(h.server->calls().size(), 0u);
+    EXPECT_EQ(h.server->calls().size(), 2u);
   }
 
   {
@@ -325,7 +344,7 @@ TEST(InputDevicePipelineTest, CreateForLoopback) {
       done = true;
     });
     EXPECT_TRUE(done);
-    EXPECT_EQ(h.server->calls().size(), 0u);
+    EXPECT_EQ(h.server->calls().size(), 2u);
   }
 
   // With a new format, we should create a new source node.
@@ -339,7 +358,7 @@ TEST(InputDevicePipelineTest, CreateForLoopback) {
     h.loop.RunUntilIdle();
     EXPECT_TRUE(done);
     // creates 2 nodes and 2 edges
-    EXPECT_EQ(h.server->calls().size(), 4u);
+    EXPECT_EQ(h.server->calls().size(), 6u);
   }
 
   // With that a compatible format, this should return immediately.
@@ -351,7 +370,7 @@ TEST(InputDevicePipelineTest, CreateForLoopback) {
       done = true;
     });
     EXPECT_TRUE(done);
-    EXPECT_EQ(h.server->calls().size(), 4u);
+    EXPECT_EQ(h.server->calls().size(), 6u);
   }
 
   // Adds 2 DeleteNode calls.
@@ -364,14 +383,14 @@ TEST(InputDevicePipelineTest, CreateForLoopback) {
 
   // Check the graph calls.
   const auto& calls = h.server->calls();
-  ASSERT_EQ(calls.size(), 6u);
+  ASSERT_EQ(calls.size(), 8u);
 
   ValidateCreateSourceNodeForFormatCalls(kFormatIntStereo,
                                          /*root_splitter_id=*/kLoopbackSplitterId,
                                          /*mixer_id=*/1,
-                                         /*splitter_id=*/2, kThreadId, calls, 0);
+                                         /*splitter_id=*/2, kThreadId, calls, 2);
 
-  ValidateDeletedNodes(calls, 4, {kStereoMixerId, kStereoSplitterId});
+  ValidateDeletedNodes(calls, 6, {kStereoMixerId, kStereoSplitterId});
 }
 
 TEST(InputDevicePipelineTest, ConcurrentCreateSourceNode) {
@@ -380,13 +399,17 @@ TEST(InputDevicePipelineTest, ConcurrentCreateSourceNode) {
   static constexpr auto kStereoSplitterId = 2;
 
   TestHarness h;
-  auto pipeline = InputDevicePipeline::CreateForLoopback({
+  std::shared_ptr<InputDevicePipeline> pipeline;
+  InputDevicePipeline::CreateForLoopback({
       .graph_client = h.client,
+      .dispatcher = h.loop.dispatcher(),
       .splitter_node = kLoopbackSplitterId,
       .format = kFormatIntMono,
       .reference_clock = h.reference_clock.Dup(),
       .thread = kThreadId,
+      .callback = [&pipeline](auto p) { pipeline = std::move(p); },
   });
+  h.loop.RunUntilIdle();
   ASSERT_TRUE(pipeline);
 
   EXPECT_TRUE(pipeline->SupportsUsage(CaptureUsage::LOOPBACK));

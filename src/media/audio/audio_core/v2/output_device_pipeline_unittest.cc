@@ -33,6 +33,7 @@ using OutputDeviceProfile = ::media::audio::DeviceConfig::OutputDeviceProfile;
 using ::fuchsia_audio_mixer::GraphCreateConsumerRequest;
 using ::fuchsia_audio_mixer::GraphCreateCustomRequest;
 using ::fuchsia_audio_mixer::GraphCreateEdgeRequest;
+using ::fuchsia_audio_mixer::GraphCreateGainControlRequest;
 using ::fuchsia_audio_mixer::GraphCreateMixerRequest;
 using ::fuchsia_audio_mixer::GraphCreateSplitterRequest;
 using ::fuchsia_audio_mixer::GraphDeleteNodeRequest;
@@ -122,6 +123,7 @@ std::shared_ptr<OutputDevicePipeline> CreatePipeline(TestHarness& h, const Forma
 
   OutputDevicePipeline::Create({
       .graph_client = h.client,
+      .dispatcher = h.loop.dispatcher(),
       .consumer =
           {
               .thread = kThreadId,
@@ -168,7 +170,24 @@ std::shared_ptr<OutputDevicePipeline> CreatePipeline(TestHarness& h, const Forma
   EXPECT_TRUE(pipeline->SupportsUsage(RenderUsage::COMMUNICATION));
   EXPECT_FALSE(pipeline->SupportsUsage(RenderUsage::ULTRASOUND));
 
+  EXPECT_TRUE(pipeline->UsageVolumeForUsage(RenderUsage::BACKGROUND));
+  EXPECT_TRUE(pipeline->UsageVolumeForUsage(RenderUsage::MEDIA));
+  EXPECT_TRUE(pipeline->UsageVolumeForUsage(RenderUsage::SYSTEM_AGENT));
+  EXPECT_TRUE(pipeline->UsageVolumeForUsage(RenderUsage::INTERRUPTION));
+  EXPECT_TRUE(pipeline->UsageVolumeForUsage(RenderUsage::COMMUNICATION));
+  EXPECT_FALSE(pipeline->UsageVolumeForUsage(RenderUsage::ULTRASOUND));
+
   return pipeline;
+}
+
+void DeleteCreateGainControlCalls(std::vector<FakeGraphServer::CallType>& calls) {
+  for (size_t k = 0; k < calls.size();) {
+    if (std::holds_alternative<GraphCreateGainControlRequest>(calls[k])) {
+      calls.erase(calls.begin() + k);
+    } else {
+      k++;
+    }
+  }
 }
 
 void ValidateEffect(const std::optional<fuchsia_audio_effects::ProcessorConfiguration>& config,
@@ -229,7 +248,12 @@ TEST(OutputDevicePipelineTest, EmptyNoLoopback) {
   static constexpr NodeId kConsumerId = 2;
   static constexpr NodeId kMixerId = 1;
 
-  // 1 nodes and 1 edge.
+  // 2 nodes and 1 edge, plus 2 gain controls for each of 5 supported usages.
+  EXPECT_EQ(h.server->calls().size(), 13u);
+
+  // The CreateGainControl calls are interleaved with node creation. To simplify the rest of this
+  // test, delete all of those calls.
+  DeleteCreateGainControlCalls(h.server->calls());
   EXPECT_EQ(h.server->calls().size(), 3u);
 
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::BACKGROUND), kMixerId);
@@ -323,7 +347,12 @@ TEST(OutputDevicePipelineTest, MultilevelWithEffectsAndLoopback) {
   static constexpr NodeId kMixCustomId = 2;
   static constexpr NodeId kMixSplitterId = 3;
 
-  // 6 nodes and 5 edges.
+  // 6 nodes and 5 edges, plus 2 gain controls for each of 6 supported usages (including loopback).
+  EXPECT_EQ(h.server->calls().size(), 23u);
+
+  // The CreateGainControl calls are interleaved with node creation. To simplify the rest of this
+  // test, delete all of those calls.
+  DeleteCreateGainControlCalls(h.server->calls());
   EXPECT_EQ(h.server->calls().size(), 11u);
 
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::BACKGROUND), kLinearizeMixerId);
@@ -353,7 +382,7 @@ TEST(OutputDevicePipelineTest, MultilevelWithEffectsAndLoopback) {
 
   // Check the graph calls.
   const auto& calls = h.server->calls();
-  EXPECT_EQ(calls.size(), 17u);
+  ASSERT_EQ(calls.size(), 17u);
 
   {
     SCOPED_TRACE("Consumer");
@@ -468,7 +497,12 @@ TEST(OutputDevicePipelineTest, UpsampleAfterLoopback) {
   static constexpr NodeId kMixMixerId = 1;
   static constexpr NodeId kMixSplitterId = 2;
 
-  // 4 nodes and 3 edges.
+  // 4 nodes and 3 edges, plus 2 gain controls for each of 6 supported usages (including loopback).
+  EXPECT_EQ(h.server->calls().size(), 19u);
+
+  // The CreateGainControl calls are interleaved with node creation. To simplify the rest of this
+  // test, delete all of those calls.
+  DeleteCreateGainControlCalls(h.server->calls());
   EXPECT_EQ(h.server->calls().size(), 7u);
 
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::BACKGROUND), kLinearizeMixerId);
@@ -498,7 +532,7 @@ TEST(OutputDevicePipelineTest, UpsampleAfterLoopback) {
 
   // Check the graph calls.
   const auto& calls = h.server->calls();
-  EXPECT_EQ(calls.size(), 11u);
+  ASSERT_EQ(calls.size(), 11u);
 
   {
     SCOPED_TRACE("Consumer");
@@ -582,7 +616,12 @@ TEST(OutputDevicePipelineTest, RechannelEffects) {
   static constexpr NodeId kCustomId = 2;
   static constexpr NodeId kSplitterId = 3;
 
-  // 4 nodes and 3 edges.
+  // 4 nodes and 3 edges, plus 2 gain controls for each of 6 supported usages (including loopback).
+  EXPECT_EQ(h.server->calls().size(), 19u);
+
+  // The CreateGainControl calls are interleaved with node creation. To simplify the rest of this
+  // test, delete all of those calls.
+  DeleteCreateGainControlCalls(h.server->calls());
   EXPECT_EQ(h.server->calls().size(), 7u);
 
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::BACKGROUND), kMixerId);

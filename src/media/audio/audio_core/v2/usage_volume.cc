@@ -84,11 +84,14 @@ void UsageVolume::Create(Args args) {
 UsageVolume::UsageVolume(Args args, ConstructorState& state)
     : graph_client_(std::move(args.graph_client)),
       volume_curve_(std::move(args.volume_curve)),
-      usage_(args.usage),
-      controls_({
-          Control{std::move(*state.clients[0]), *state.ids[0]},
-          Control{std::move(*state.clients[1]), *state.ids[1]},
-      }) {}
+      usage_(args.usage) {
+  // std::vector's constructor cannot accept an initializer list of move-only objects, so this
+  // initialization must be done with push_back.
+  for (int k = 0; k < 2; k++) {
+    clients_.push_back(std::move(*state.clients[k]));
+    gain_controls_.push_back(*state.ids[k]);
+  }
+}
 
 UsageVolume::~UsageVolume() {
   // Delete graph objects.
@@ -96,7 +99,7 @@ UsageVolume::~UsageVolume() {
     fidl::Arena<> arena;
     (*graph_client_)
         ->DeleteGainControl(fuchsia_audio_mixer::wire::GraphDeleteGainControlRequest::Builder(arena)
-                                .id(controls_[k].id)
+                                .id(gain_controls_[k])
                                 .Build())
         .Then([k](auto& result) {
           if (result.ok() && !result->is_ok()) {
@@ -121,7 +124,7 @@ fuchsia::media::Usage UsageVolume::GetStreamUsage() const {
 
 void UsageVolume::RealizeVolume(VolumeCommand command) {
   const float target_dbs[2] = {
-      /*primary*/ volume_curve_.VolumeToDb(command.volume),
+      /*primary*/ volume_curve_->VolumeToDb(command.volume),
       /*adjustment*/ command.gain_db_adjustment,
   };
 
@@ -129,8 +132,7 @@ void UsageVolume::RealizeVolume(VolumeCommand command) {
     fidl::Arena<> arena;
     if (command.ramp) {
       FX_CHECK(command.ramp->ramp_type == fuchsia::media::audio::RampType::SCALE_LINEAR);
-      controls_[k]
-          .client
+      clients_[k]
           ->SetGain(GainControlSetGainRequest::Builder(arena)
                         .how(GainUpdateMethod::WithRamped(
                             arena, RampedGain::Builder(arena)
@@ -148,8 +150,7 @@ void UsageVolume::RealizeVolume(VolumeCommand command) {
             }
           });
     } else {
-      controls_[k]
-          .client
+      clients_[k]
           ->SetGain(GainControlSetGainRequest::Builder(arena)
                         .how(GainUpdateMethod::WithGainDb(target_dbs[k]))
                         .when(fuchsia_media2::wire::RealTime::WithAsap({}))

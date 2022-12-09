@@ -9,6 +9,7 @@
 
 #include <gmock/gmock.h>
 
+#include "src/media/audio/audio_core/v2/usage_volume.h"
 #include "src/media/audio/lib/format2/format.h"
 
 namespace media_audio {
@@ -108,6 +109,34 @@ MATCHER_P2(DeleteEdgeEq, want_source, want_dest, "") {
   if (*call->source_id() != want_source || *call->dest_id() != want_dest) {
     *result_listener << "got edge " << *call->source_id() << "->" << *call->dest_id()
                      << " want edge " << want_source << "->" << want_dest;
+    return false;
+  }
+  return true;
+}
+
+MATCHER_P(UsageVolumeRenderUsageEq, want_usage, "") {
+  if (!arg->GetStreamUsage().is_render_usage()) {
+    *result_listener << "got capture usage, expected render usage";
+    return false;
+  }
+  if (arg->GetStreamUsage().render_usage() != FidlRenderUsageFromRenderUsage(want_usage)) {
+    *result_listener << "got render usage "
+                     << static_cast<int>(arg->GetStreamUsage().render_usage()) << ", expected "
+                     << static_cast<int>(want_usage);
+    return false;
+  }
+  return true;
+}
+
+MATCHER_P(UsageVolumeCaptureUsageEq, want_usage, "") {
+  if (!arg->GetStreamUsage().is_capture_usage()) {
+    *result_listener << "got render usage, expected capture usage";
+    return false;
+  }
+  if (arg->GetStreamUsage().capture_usage() != FidlCaptureUsageFromCaptureUsage(want_usage)) {
+    *result_listener << "got capture usage "
+                     << static_cast<int>(arg->GetStreamUsage().capture_usage()) << ", expected "
+                     << static_cast<int>(want_usage);
     return false;
   }
   return true;

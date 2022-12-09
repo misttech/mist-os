@@ -19,6 +19,7 @@
 #include "src/media/audio/audio_core/shared/stream_usage.h"
 #include "src/media/audio/audio_core/v2/graph_types.h"
 #include "src/media/audio/audio_core/v2/input_device_pipeline.h"
+#include "src/media/audio/audio_core/v2/usage_volume.h"
 #include "src/media/audio/lib/effects_loader/effects_loader_v2.h"
 
 namespace media_audio {
@@ -38,6 +39,9 @@ class OutputDevicePipeline : public std::enable_shared_from_this<OutputDevicePip
     // Connection to the mixer service.
     std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> graph_client;
 
+    // Dispatcher for managing other FIDL connections.
+    async_dispatcher_t* dispatcher;
+
     // Args used to create the ConsumerNode which represents this device.
     ConsumerArgs consumer;
 
@@ -47,7 +51,7 @@ class OutputDevicePipeline : public std::enable_shared_from_this<OutputDevicePip
     // For loading effects configs.
     std::unique_ptr<media::audio::EffectsLoaderV2> effects_loader;
 
-    // Callback invoked after the output pipeline is constructed.
+    // Callback invoked after the pipeline is constructed.
     fit::callback<void(std::shared_ptr<OutputDevicePipeline>)> callback;
   };
 
@@ -76,28 +80,34 @@ class OutputDevicePipeline : public std::enable_shared_from_this<OutputDevicePip
   // REQUIRED: `SupportsUsage(usage)`.
   NodeId DestNodeForUsage(media::audio::RenderUsage usage) const;
 
+  // Returns a volume control for the given usage, or nullptr if `!SupportedUsage(usage)`.
+  std::shared_ptr<UsageVolume> UsageVolumeForUsage(media::audio::RenderUsage usage) const;
+
   // Returns the loopback interface, or `nullptr` if this output pipeline does not support loopback.
   std::shared_ptr<InputDevicePipeline> loopback() const { return loopback_; }
 
   // Returns this pipeline's volume curve.
-  const media::audio::VolumeCurve& volume_curve() const { return volume_curve_; }
+  std::shared_ptr<media::audio::VolumeCurve> volume_curve() const { return volume_curve_; }
 
  private:
-  OutputDevicePipeline(std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> client,
-                       std::shared_ptr<InputDevicePipeline> loopback,
-                       media::audio::VolumeCurve volume_curve, NodeId consumer_node,
-                       std::unordered_map<media::audio::RenderUsage, NodeId> usage_to_dest_node,
-                       std::unordered_set<NodeId> created_nodes)
+  OutputDevicePipeline(
+      std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> client,
+      std::shared_ptr<InputDevicePipeline> loopback,
+      std::shared_ptr<media::audio::VolumeCurve> volume_curve, NodeId consumer_node,
+      std::unordered_map<media::audio::RenderUsage, NodeId> usage_to_dest_node,
+      std::unordered_map<media::audio::RenderUsage, std::shared_ptr<UsageVolume>> usage_to_volume,
+      std::unordered_set<NodeId> created_nodes)
       : client_(std::move(client)),
         loopback_(std::move(loopback)),
         volume_curve_(std::move(volume_curve)),
         consumer_node_(consumer_node),
         usage_to_dest_node_(std::move(usage_to_dest_node)),
+        usage_to_volume_(std::move(usage_to_volume)),
         created_nodes_(std::move(created_nodes)) {}
 
-  std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> client_;
-  std::shared_ptr<InputDevicePipeline> loopback_;
-  media::audio::VolumeCurve volume_curve_;
+  const std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> client_;
+  const std::shared_ptr<InputDevicePipeline> loopback_;
+  const std::shared_ptr<media::audio::VolumeCurve> volume_curve_;
 
   // An output pipeline is an inverted tree of arbitrary depth, where the root of the tree is a
   // ConsumerNode (representing the device) and the leaves are MixerNodes which can be connected by
@@ -116,13 +126,15 @@ class OutputDevicePipeline : public std::enable_shared_from_this<OutputDevicePip
   // ```
   //
   // This is the ConsumerNode in the above diagram.
-  NodeId consumer_node_;
+  const NodeId consumer_node_;
 
-  // Maps each usage to a MixerNode.
-  std::unordered_map<media::audio::RenderUsage, NodeId> usage_to_dest_node_;
+  // Maps each usage to a MixerNode and UsageValume.
+  const std::unordered_map<media::audio::RenderUsage, NodeId> usage_to_dest_node_;
+  const std::unordered_map<media::audio::RenderUsage, std::shared_ptr<UsageVolume>>
+      usage_to_volume_;
 
   // All nodes created by this pipeline.
-  std::unordered_set<NodeId> created_nodes_;
+  const std::unordered_set<NodeId> created_nodes_;
 
   bool started_ = false;
   bool pending_start_ = false;

@@ -33,7 +33,7 @@ class UsageVolume : public media::audio::StreamVolume {
     async_dispatcher_t* dispatcher;
 
     // For translating volume commands to gains;
-    media::audio::VolumeCurve volume_curve;
+    std::shared_ptr<media::audio::VolumeCurve> volume_curve;
 
     // Which usage this control is bound to.
     media::audio::StreamUsage usage;
@@ -52,6 +52,9 @@ class UsageVolume : public media::audio::StreamVolume {
   fuchsia::media::Usage GetStreamUsage() const final;
   void RealizeVolume(media::audio::VolumeCommand volume_command) final;
 
+  // Returns the underlying GainControls managed by this object.
+  const std::vector<GainControlId>& gain_controls() const { return gain_controls_; }
+
  private:
   static constexpr auto kPrimary = 0;
   static constexpr auto kAdjustment = 1;
@@ -63,14 +66,11 @@ class UsageVolume : public media::audio::StreamVolume {
   UsageVolume(Args args, ConstructorState& state);
 
   const std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> graph_client_;
-  const media::audio::VolumeCurve volume_curve_;
+  const std::shared_ptr<media::audio::VolumeCurve> volume_curve_;
   const media::audio::StreamUsage usage_;
 
-  struct Control {
-    fidl::WireSharedClient<fuchsia_audio::GainControl> client;
-    GainControlId id;
-  };
-  const std::array<Control, 2> controls_;
+  std::vector<fidl::WireSharedClient<fuchsia_audio::GainControl>> clients_;
+  std::vector<GainControlId> gain_controls_;
 };
 
 }  // namespace media_audio

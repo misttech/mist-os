@@ -144,6 +144,7 @@ struct InputDevicePipeline::PendingCreate {
 
 // static
 void InputDevicePipeline::CreateForDevice(DeviceArgs args) {
+  FX_CHECK(args.dispatcher);
   FX_CHECK(args.producer.ring_buffer.has_reference_clock());
   FX_CHECK(args.producer.ring_buffer.has_format());
   FX_CHECK(args.producer.ring_buffer.format().has_frames_per_second());
@@ -152,16 +153,19 @@ void InputDevicePipeline::CreateForDevice(DeviceArgs args) {
   // State held during this asynchronous operation.
   struct State {
     std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> client;
+    async_dispatcher_t* dispatcher;
     media::audio::DeviceConfig::InputDeviceProfile config;
     Format format;
     ThreadId thread;
     ReferenceClock reference_clock;
     fit::callback<void(std::shared_ptr<InputDevicePipeline>)> callback;
     std::shared_ptr<Connector<2>> connector;
+    std::unordered_map<media::audio::CaptureUsage, std::shared_ptr<UsageVolume>> usage_to_volume;
   };
 
   auto state = std::make_shared<State>(State{
       .client = std::move(args.graph_client),
+      .dispatcher = args.dispatcher,
       .config = std::move(args.config),
       .format = Format::CreateOrDie(args.producer.ring_buffer.format()),
       .thread = args.thread,
@@ -176,17 +180,39 @@ void InputDevicePipeline::CreateForDevice(DeviceArgs args) {
       return;
     }
 
-    auto pipeline = std::shared_ptr<InputDevicePipeline>(new InputDevicePipeline(
-        std::move(state->client), state->config.volume_curve(), state->config.supported_usages(),
-        state->thread, std::move(state->reference_clock)));
+    auto volume_curve = std::shared_ptr<VolumeCurve>(new VolumeCurve(state->config.volume_curve()));
 
-    pipeline->root_splitter_ = state->connector->node(1);
-    pipeline->producer_node_ = state->connector->node(0);
-    pipeline->splitters_by_format_[FormatToKey(state->format)] = pipeline->root_splitter_;
-    pipeline->created_nodes_.insert(state->connector->node(0));
-    pipeline->created_nodes_.insert(state->connector->node(1));
+    // Create volume controls for each supported usage.
+    for (auto usage : state->config.supported_usages()) {
+      UsageVolume::Create({
+          .graph_client = state->client,
+          .dispatcher = state->dispatcher,
+          .volume_curve = volume_curve,
+          .usage = usage,
+          .device_name = "InputDevice",
+          .callback =
+              [state, volume_curve, usage](auto uv) {
+                state->usage_to_volume[usage.capture_usage()] = std::move(uv);
+                if (state->usage_to_volume.size() < state->config.supported_usages().size()) {
+                  return;
+                }
 
-    state->callback(std::move(pipeline));
+                auto pipeline = std::shared_ptr<InputDevicePipeline>(new InputDevicePipeline(
+                    std::move(state->client), std::move(volume_curve),
+                    state->config.supported_usages(), std::move(state->usage_to_volume),
+                    state->thread, std::move(state->reference_clock)));
+
+                pipeline->root_splitter_ = state->connector->node(1);
+                pipeline->producer_node_ = state->connector->node(0);
+                pipeline->splitters_by_format_[FormatToKey(state->format)] =
+                    pipeline->root_splitter_;
+                pipeline->created_nodes_.insert(state->connector->node(0));
+                pipeline->created_nodes_.insert(state->connector->node(1));
+
+                state->callback(std::move(pipeline));
+              },
+      });
+    }
   });
 
   fidl::Arena arena;
@@ -238,17 +264,29 @@ void InputDevicePipeline::CreateForDevice(DeviceArgs args) {
 }
 
 // static
-std::shared_ptr<InputDevicePipeline> InputDevicePipeline::CreateForLoopback(LoopbackArgs args) {
-  auto pipeline = std::shared_ptr<InputDevicePipeline>(
-      new InputDevicePipeline(std::move(args.graph_client),
-                              VolumeCurve::DefaultForMinGain(VolumeCurve::kDefaultGainForMinVolume),
-                              {StreamUsage::WithCaptureUsage(CaptureUsage::LOOPBACK)}, args.thread,
-                              std::move(args.reference_clock)));
+void InputDevicePipeline::CreateForLoopback(LoopbackArgs args) {
+  FX_CHECK(args.dispatcher);
 
-  pipeline->root_splitter_ = args.splitter_node;
-  pipeline->splitters_by_format_[FormatToKey(args.format)] = args.splitter_node;
+  auto volume_curve = std::shared_ptr<VolumeCurve>(
+      new VolumeCurve(VolumeCurve::DefaultForMinGain(VolumeCurve::kDefaultGainForMinVolume)));
+  UsageVolume::Create({
+      .graph_client = args.graph_client,
+      .dispatcher = args.dispatcher,
+      .volume_curve = volume_curve,
+      .usage = StreamUsage::WithCaptureUsage(CaptureUsage::LOOPBACK),
+      .device_name = "LoopbackDevice",
+      .callback =
+          [args = std::move(args), volume_curve](auto uv) mutable {
+            auto pipeline = std::shared_ptr<InputDevicePipeline>(new InputDevicePipeline(
+                std::move(args.graph_client), volume_curve,
+                {StreamUsage::WithCaptureUsage(CaptureUsage::LOOPBACK)},
+                {{CaptureUsage::LOOPBACK, uv}}, args.thread, std::move(args.reference_clock)));
 
-  return pipeline;
+            pipeline->root_splitter_ = args.splitter_node;
+            pipeline->splitters_by_format_[FormatToKey(args.format)] = args.splitter_node;
+            args.callback(pipeline);
+          },
+  });
 }
 
 void InputDevicePipeline::Start(fidl::AnyArena& arena, fuchsia_media2::wire::RealTime when,
@@ -407,6 +445,15 @@ void InputDevicePipeline::CreateSourceNodeForFormat(
         connector->SetNode(2, id);
         created_nodes_.insert(id);
       });
+}
+
+std::shared_ptr<UsageVolume> InputDevicePipeline::UsageVolumeForUsage(
+    media::audio::CaptureUsage usage) const {
+  auto it = usage_to_volume_.find(usage);
+  if (it == usage_to_volume_.end()) {
+    return nullptr;
+  }
+  return it->second;
 }
 
 }  // namespace media_audio

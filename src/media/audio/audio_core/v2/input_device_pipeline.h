@@ -21,6 +21,7 @@
 #include "src/media/audio/audio_core/shared/stream_usage.h"
 #include "src/media/audio/audio_core/v2/graph_types.h"
 #include "src/media/audio/audio_core/v2/reference_clock.h"
+#include "src/media/audio/audio_core/v2/usage_volume.h"
 #include "src/media/audio/lib/format2/format.h"
 
 namespace media_audio {
@@ -39,6 +40,9 @@ class InputDevicePipeline : public std::enable_shared_from_this<InputDevicePipel
     // Connection to the mixer service.
     std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> graph_client;
 
+    // Dispatcher for managing other FIDL connections.
+    async_dispatcher_t* dispatcher;
+
     // Args used to create the ProducerNode which represents this device.
     ProducerArgs producer;
 
@@ -48,13 +52,16 @@ class InputDevicePipeline : public std::enable_shared_from_this<InputDevicePipel
     // Thread which runs this pipeline.
     ThreadId thread;
 
-    // Callback invoked after the output pipeline is constructed.
+    // Callback invoked after the pipeline is constructed.
     fit::callback<void(std::shared_ptr<InputDevicePipeline>)> callback;
   };
 
   struct LoopbackArgs {
     // Connection to the mixer service.
     std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> graph_client;
+
+    // Dispatcher for managing other FIDL connections.
+    async_dispatcher_t* dispatcher;
 
     // The SplitterNode which represents this loopback interface.
     NodeId splitter_node;
@@ -67,6 +74,9 @@ class InputDevicePipeline : public std::enable_shared_from_this<InputDevicePipel
 
     // Thread which runs this pipeline.
     ThreadId thread;
+
+    // Callback invoked after the pipeline is constructed.
+    fit::callback<void(std::shared_ptr<InputDevicePipeline>)> callback;
   };
 
   // Creates a new pipeline for the given device. This creates a ProducerNode for `args.producer`.
@@ -75,7 +85,7 @@ class InputDevicePipeline : public std::enable_shared_from_this<InputDevicePipel
   static void CreateForDevice(DeviceArgs args);
 
   // Creates a new pipeline for a loopback device.
-  static std::shared_ptr<InputDevicePipeline> CreateForLoopback(LoopbackArgs args);
+  static void CreateForLoopback(LoopbackArgs args);
 
   // Starts the underlying ProducerNode.
   // REQUIRED: created with `CreateForDevice`
@@ -103,26 +113,34 @@ class InputDevicePipeline : public std::enable_shared_from_this<InputDevicePipel
   void CreateSourceNodeForFormat(const Format& format,
                                  fit::callback<void(std::optional<NodeId>)> callback);
 
+  // Returns a volume control for the given usage, or nullptr if `!SupportedUsage(usage)`.
+  std::shared_ptr<UsageVolume> UsageVolumeForUsage(media::audio::CaptureUsage usage) const;
+
   // Returns this pipeline's volume curve.
-  const media::audio::VolumeCurve& volume_curve() const { return volume_curve_; }
+  std::shared_ptr<media::audio::VolumeCurve> volume_curve() const { return volume_curve_; }
 
  private:
-  InputDevicePipeline(std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> client,
-                      media::audio::VolumeCurve volume_curve,
-                      media::audio::StreamUsageSet supported_usages, ThreadId thread,
-                      ReferenceClock reference_clock)
+  InputDevicePipeline(
+      std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> client,
+      std::shared_ptr<media::audio::VolumeCurve> volume_curve,
+      media::audio::StreamUsageSet supported_usages,
+      std::unordered_map<media::audio::CaptureUsage, std::shared_ptr<UsageVolume>> usage_to_volume,
+      ThreadId thread, ReferenceClock reference_clock)
       : client_(std::move(client)),
         volume_curve_(std::move(volume_curve)),
         supported_usages_(std::move(supported_usages)),
+        usage_to_volume_(std::move(usage_to_volume)),
         thread_(thread),
         reference_clock_(std::move(reference_clock)) {}
 
-  std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> client_;
-  media::audio::VolumeCurve volume_curve_;
-  media::audio::StreamUsageSet supported_usages_;
+  const std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> client_;
+  const std::shared_ptr<media::audio::VolumeCurve> volume_curve_;
+  const media::audio::StreamUsageSet supported_usages_;
+  const std::unordered_map<media::audio::CaptureUsage, std::shared_ptr<UsageVolume>>
+      usage_to_volume_;
 
-  ThreadId thread_;
-  ReferenceClock reference_clock_;
+  const ThreadId thread_;
+  const ReferenceClock reference_clock_;
 
   // If an input pipeline is rooted at an input device, it looks like:
   //

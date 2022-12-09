@@ -26,13 +26,13 @@ struct ReferenceClock {
   static ReferenceClock FromFidlRingBuffer(fuchsia_audio::wire::RingBuffer ring_buffer);
 
   // Duplicates this object.
-  ReferenceClock Dup();
+  ReferenceClock Dup() const;
 
   // Duplicates `handle`.
-  zx::clock DupHandle();
+  zx::clock DupHandle() const;
 
   // Converts to a FIDL ReferenceClock. Duplicates (does not consume) `handle`.
-  fuchsia_audio_mixer::wire::ReferenceClock ToFidl(fidl::AnyArena& arena);
+  fuchsia_audio_mixer::wire::ReferenceClock ToFidl(fidl::AnyArena& arena) const;
 };
 
 }  // namespace media_audio

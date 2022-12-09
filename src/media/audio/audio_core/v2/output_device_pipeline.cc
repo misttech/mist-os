@@ -13,6 +13,7 @@
 using ::media::audio::DeviceConfig;
 using ::media::audio::PipelineConfig;
 using ::media::audio::RenderUsage;
+using ::media::audio::StreamUsage;
 using ::media::audio::VolumeCurve;
 
 namespace media_audio {
@@ -38,12 +39,14 @@ struct StateForCreate {
   // Will become private fields of OutputDevicePipeline.
   std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> client;
   std::shared_ptr<InputDevicePipeline> loopback;
-  VolumeCurve volume_curve;
+  std::shared_ptr<VolumeCurve> volume_curve;
   std::optional<NodeId> consumer_node;
   std::unordered_map<RenderUsage, NodeId> usage_to_dest_node;
+  std::unordered_map<RenderUsage, std::shared_ptr<UsageVolume>> usage_to_volume;
   std::unordered_set<NodeId> created_nodes;
 
   // Temporary state.
+  async_dispatcher_t* dispatcher;
   ThreadId thread;
   ReferenceClock reference_clock;
   std::unique_ptr<media::audio::EffectsLoaderV2> effects_loader;
@@ -92,7 +95,7 @@ class MixGroupCreator : public std::enable_shared_from_this<MixGroupCreator> {
 
   enum class Status {
     kWaitingForNodes,  // sending FIDL calls to create all nodes and waiting for the responses
-    kHaveNodes,        // all nodes were created successfully
+    kHaveNodes,        // all nodes (and other objects) were created successfully
     kFailed,           // failed to create one or more nodes
   };
   Status status_ = Status::kWaitingForNodes;
@@ -218,15 +221,36 @@ void MixGroupCreator::Create(const PipelineConfig::MixGroup& spec) {
           }
           splitter_node_ = result->value()->id();
           state_->created_nodes.insert(*splitter_node_);
-          state_->loopback = InputDevicePipeline::CreateForLoopback({
+          InputDevicePipeline::CreateForLoopback({
               .graph_client = state_->client,
+              .dispatcher = state_->dispatcher,
               .splitter_node = *splitter_node_,
               .format = splitter_format,
               .reference_clock = state_->reference_clock.Dup(),
               .thread = state_->thread,
+              .callback =
+                  [this, self](auto loopback) {
+                    state_->loopback = std::move(loopback);
+                    CreateEdgesIfReady();
+                  },
           });
-          CreateEdgesIfReady();
         });
+  }
+
+  // Create a volume control for each usage.
+  for (const auto usage : source_usages_) {
+    UsageVolume::Create({
+        .graph_client = state_->client,
+        .dispatcher = state_->dispatcher,
+        .volume_curve = state_->volume_curve,
+        .usage = StreamUsage::WithRenderUsage(usage),
+        .device_name = "OutputDevice",
+        .callback =
+            [this, self = shared_from_this(), usage](auto uv) {
+              state_->usage_to_volume[usage] = std::move(uv);
+              CreateEdgesIfReady();
+            },
+    });
   }
 }
 
@@ -254,11 +278,19 @@ void MixGroupCreator::CreateEdgesIfReady() {
     return;
   }
 
-  const bool have_nodes = dest_node_ && mixer_node_ && (!needs_custom_node_ || custom_node_) &&
-                          (!needs_splitter_node_ || splitter_node_);
-  if (!have_nodes) {
+  const bool have_local_nodes = dest_node_ && mixer_node_ &&
+                                (!needs_custom_node_ || custom_node_) &&
+                                (!needs_splitter_node_ || splitter_node_);
+  if (!have_local_nodes) {
     return;
   }
+  if (state_->usage_to_volume.size() < source_usages_.size()) {
+    return;
+  }
+  if (needs_splitter_node_ && !state_->loopback) {
+    return;
+  }
+
   status_ = Status::kHaveNodes;
 
   if (needs_custom_node_ && needs_splitter_node_) {
@@ -303,11 +335,13 @@ void MixGroupCreator::Failed() {
 
 // static
 void OutputDevicePipeline::Create(Args args) {
+  FX_CHECK(args.dispatcher);
   FX_CHECK(args.consumer.ring_buffer.has_reference_clock());
 
   auto state = std::make_shared<StateForCreate>(StateForCreate{
       .client = std::move(args.graph_client),
-      .volume_curve = args.config.volume_curve(),
+      .volume_curve = std::shared_ptr<VolumeCurve>(new VolumeCurve(args.config.volume_curve())),
+      .dispatcher = args.dispatcher,
       .thread = args.consumer.thread,
       .reference_clock = ReferenceClock::FromFidlRingBuffer(args.consumer.ring_buffer),
       .effects_loader = std::move(args.effects_loader),
@@ -336,7 +370,7 @@ void OutputDevicePipeline::Create(Args args) {
     callback(std::shared_ptr<OutputDevicePipeline>(new OutputDevicePipeline(
         std::move(state->client), std::move(state->loopback), std::move(state->volume_curve),
         *state->consumer_node, std::move(state->usage_to_dest_node),
-        std::move(state->created_nodes))));
+        std::move(state->usage_to_volume), std::move(state->created_nodes))));
   });
 
   // Add the CreateConsumer task.
@@ -439,6 +473,15 @@ bool OutputDevicePipeline::SupportsUsage(RenderUsage usage) const {
 NodeId OutputDevicePipeline::DestNodeForUsage(RenderUsage usage) const {
   auto it = usage_to_dest_node_.find(usage);
   FX_CHECK(it != usage_to_dest_node_.end());
+  return it->second;
+}
+
+std::shared_ptr<UsageVolume> OutputDevicePipeline::UsageVolumeForUsage(
+    media::audio::RenderUsage usage) const {
+  auto it = usage_to_volume_.find(usage);
+  if (it == usage_to_volume_.end()) {
+    return nullptr;
+  }
   return it->second;
 }
 

@@ -8,12 +8,15 @@
 
 #include <algorithm>
 
-using ::media::audio::CaptureUsage;
-using ::media::audio::RenderUsage;
-
 namespace media_audio {
 
 namespace {
+
+using ::media::audio::CaptureUsage;
+using ::media::audio::CaptureUsageFromFidlCaptureUsage;
+using ::media::audio::RenderUsage;
+using ::media::audio::RenderUsageFromFidlRenderUsage;
+using ::media::audio::VolumeCurve;
 
 template <class InfoT, class PipelineT>
 typename std::vector<InfoT>::iterator FindDevice(std::vector<InfoT>& devices,
@@ -69,14 +72,14 @@ fidl::VectorView<GainControlId> GainControlsVector(fidl::AnyArena& arena,
 
 }  // namespace
 
-RouteGraph::RouteGraph(Args args)
-    : graph_client_(std::move(args.graph_client)),
-      gain_controls_per_render_usage_(std::move(args.gain_controls_per_render_usage)),
-      gain_controls_per_capture_usage_(std::move(args.gain_controls_per_capture_usage)) {}
+RouteGraph::RouteGraph(
+    std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> graph_client)
+    : graph_client_(std::move(graph_client)) {}
 
 void RouteGraph::AddOutputDevice(std::shared_ptr<OutputDevicePipeline> pipeline,
                                  zx::time plug_time) {
   AddDevice(output_devices_, pipeline, plug_time);
+  RecomputeGainControlsForRenderers();
   RerouteAllRenderers();
 
   if (pipeline->loopback()) {
@@ -86,11 +89,13 @@ void RouteGraph::AddOutputDevice(std::shared_ptr<OutputDevicePipeline> pipeline,
 
 void RouteGraph::AddInputDevice(std::shared_ptr<InputDevicePipeline> pipeline, zx::time plug_time) {
   AddDevice(input_devices_, pipeline, plug_time);
+  RecomputeGainControlsForCapturers();
   RerouteAllCapturers();
 }
 
 void RouteGraph::RemoveOutputDevice(std::shared_ptr<OutputDevicePipeline> pipeline) {
   RemoveDevice(output_devices_, pipeline);
+  RecomputeGainControlsForRenderers();
   RerouteAllRenderers();
 
   if (pipeline->loopback()) {
@@ -100,6 +105,7 @@ void RouteGraph::RemoveOutputDevice(std::shared_ptr<OutputDevicePipeline> pipeli
 
 void RouteGraph::RemoveInputDevice(std::shared_ptr<InputDevicePipeline> pipeline) {
   RemoveDevice(input_devices_, pipeline);
+  RecomputeGainControlsForCapturers();
   RerouteAllCapturers();
 }
 
@@ -123,6 +129,48 @@ void RouteGraph::RemoveCapturer(std::shared_ptr<AudioCapturerServer> capturer) {
   auto it = capturers_.find(capturer);
   FX_CHECK(it != capturers_.end());
   DisconnectCapturer(it);
+}
+
+std::shared_ptr<VolumeCurve> RouteGraph::VolumeCurveForUsage(RenderUsage usage) {
+  for (const auto& device : output_devices_) {
+    if (device.pipeline->SupportsUsage(usage)) {
+      return device.pipeline->volume_curve();
+    }
+  }
+  return nullptr;
+}
+
+std::shared_ptr<VolumeCurve> RouteGraph::VolumeCurveForUsage(CaptureUsage usage) {
+  for (const auto& device : input_devices_) {
+    if (device.pipeline->SupportsUsage(usage)) {
+      return device.pipeline->volume_curve();
+    }
+  }
+  return nullptr;
+}
+
+void RouteGraph::RecomputeGainControlsForRenderers() {
+  gain_controls_per_render_usage_.clear();
+
+  for (const auto& device : output_devices_) {
+    for (auto usage : media::audio::kRenderUsages) {
+      if (auto uv = device.pipeline->UsageVolumeForUsage(usage); uv) {
+        gain_controls_per_render_usage_[usage] = uv->gain_controls();
+      }
+    }
+  }
+}
+
+void RouteGraph::RecomputeGainControlsForCapturers() {
+  gain_controls_per_capture_usage_.clear();
+
+  for (const auto& device : input_devices_) {
+    for (auto usage : media::audio::kCaptureUsages) {
+      if (auto uv = device.pipeline->UsageVolumeForUsage(usage); uv) {
+        gain_controls_per_capture_usage_[usage] = uv->gain_controls();
+      }
+    }
+  }
 }
 
 void RouteGraph::RerouteAllRenderers() {

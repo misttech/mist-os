@@ -120,6 +120,7 @@ std::shared_ptr<OutputDevicePipeline> CreateOutputPipeline(TestHarness& h, const
 
   OutputDevicePipeline::Create({
       .graph_client = h.graph_client,
+      .dispatcher = h.loop.dispatcher(),
       .consumer =
           {
               .thread = kThreadId,
@@ -157,6 +158,7 @@ std::shared_ptr<InputDevicePipeline> CreateInputPipeline(TestHarness& h, const F
   std::shared_ptr<InputDevicePipeline> pipeline;
   InputDevicePipeline::CreateForDevice({
       .graph_client = h.graph_client,
+      .dispatcher = h.loop.dispatcher(),
       .producer =
           {
               .ring_buffer = fuchsia_audio::wire::RingBuffer::Builder(arena)
@@ -276,11 +278,7 @@ TEST(RouteGraphTest, TestOutputDevices) {
   const auto& calls = h.graph_server->calls();
   const auto call0 = calls.size();
 
-  auto r = std::make_shared<RouteGraph>(RouteGraph::Args{
-      .graph_client = h.graph_client,
-      .gain_controls_per_render_usage = {{kUsage1, {100, 101}}, {kUsage2, {200, 201}}},
-      .gain_controls_per_capture_usage = {{CaptureUsage::LOOPBACK, {300, 301}}},
-  });
+  auto r = std::make_shared<RouteGraph>(h.graph_client);
 
   // Add device1 and the renderers, each of which should route to device1.
   r->AddOutputDevice(device1, zx::time(1));
@@ -295,16 +293,21 @@ TEST(RouteGraphTest, TestOutputDevices) {
   EXPECT_THAT(calls[call0 + 2], CreateEdgeEq(producer3, device1->DestNodeForUsage(kUsage2)));
 
   // Check that the correct gain controls were attached to those edges.
-  EXPECT_THAT(calls[call0 + 0],  //
-              CreateEdgeWithGainControlsEq(
-                  std::vector<GainControlId>{100, 101, renderer1.server->stream_gain_control(),
-                                             *renderer1.server->play_pause_ramp_gain_control()}));
-  EXPECT_THAT(calls[call0 + 1],  //
-              CreateEdgeWithGainControlsEq(
-                  std::vector<GainControlId>{200, 201, renderer2.server->stream_gain_control()}));
-  EXPECT_THAT(calls[call0 + 2],  //
-              CreateEdgeWithGainControlsEq(
-                  std::vector<GainControlId>{200, 201, renderer3.server->stream_gain_control()}));
+  EXPECT_THAT(calls[call0 + 0], CreateEdgeWithGainControlsEq(std::vector<GainControlId>{
+                                    device1->UsageVolumeForUsage(kUsage1)->gain_controls()[0],
+                                    device1->UsageVolumeForUsage(kUsage1)->gain_controls()[1],
+                                    renderer1.server->stream_gain_control(),
+                                    *renderer1.server->play_pause_ramp_gain_control()}));
+
+  EXPECT_THAT(calls[call0 + 1], CreateEdgeWithGainControlsEq(std::vector<GainControlId>{
+                                    device1->UsageVolumeForUsage(kUsage2)->gain_controls()[0],
+                                    device1->UsageVolumeForUsage(kUsage2)->gain_controls()[1],
+                                    renderer2.server->stream_gain_control()}));
+
+  EXPECT_THAT(calls[call0 + 2], CreateEdgeWithGainControlsEq(std::vector<GainControlId>{
+                                    device1->UsageVolumeForUsage(kUsage2)->gain_controls()[0],
+                                    device1->UsageVolumeForUsage(kUsage2)->gain_controls()[1],
+                                    renderer3.server->stream_gain_control()}));
 
   // Add capturers. capturer1 routes to device1's loopback. capture2 does not have a route.
   r->AddCapturer(capturer1.server);
@@ -315,6 +318,13 @@ TEST(RouteGraphTest, TestOutputDevices) {
   ASSERT_TRUE(device1->loopback()->SourceNodeForFormat(kFormat));
   EXPECT_THAT(calls[call0 + 3],
               CreateEdgeEq(*device1->loopback()->SourceNodeForFormat(kFormat), consumer1));
+
+  EXPECT_THAT(
+      calls[call0 + 3],
+      CreateEdgeWithGainControlsEq(std::vector<GainControlId>{
+          device1->loopback()->UsageVolumeForUsage(CaptureUsage::LOOPBACK)->gain_controls()[0],
+          device1->loopback()->UsageVolumeForUsage(CaptureUsage::LOOPBACK)->gain_controls()[1],
+          capturer1.server->stream_gain_control()}));
 
   // After adding device1, renderer2 and renderer3 are rerouted to device2.
   // Whether renderer2 or renderer3 is rerouted first depends on how the shared_ptrs are sorted.
@@ -394,10 +404,7 @@ TEST(RouteGraphTest, TestInputDevices) {
   const auto& calls = h.graph_server->calls();
   const auto call0 = calls.size();
 
-  auto r = std::make_shared<RouteGraph>(RouteGraph::Args{
-      .graph_client = h.graph_client,
-      .gain_controls_per_capture_usage = {{kUsage1, {100, 101}}, {kUsage2, {200, 201}}},
-  });
+  auto r = std::make_shared<RouteGraph>(h.graph_client);
 
   // Add device1 and the capturers, each of which should route to device1.
   r->AddInputDevice(device1, zx::time(1));
@@ -423,15 +430,20 @@ TEST(RouteGraphTest, TestInputDevices) {
   EXPECT_THAT(calls[call0 + 6], CreateEdgeEq(device1_format2_source, consumer3));
 
   // Check that the correct gain controls were attached to those edges.
-  EXPECT_THAT(calls[call0 + 0],  //
-              CreateEdgeWithGainControlsEq(
-                  std::vector<GainControlId>{100, 101, capturer1.server->stream_gain_control()}));
-  EXPECT_THAT(calls[call0 + 1],  //
-              CreateEdgeWithGainControlsEq(
-                  std::vector<GainControlId>{200, 201, capturer2.server->stream_gain_control()}));
-  EXPECT_THAT(calls[call0 + 6],  //
-              CreateEdgeWithGainControlsEq(
-                  std::vector<GainControlId>{200, 201, capturer3.server->stream_gain_control()}));
+  EXPECT_THAT(calls[call0 + 0], CreateEdgeWithGainControlsEq(std::vector<GainControlId>{
+                                    device1->UsageVolumeForUsage(kUsage1)->gain_controls()[0],
+                                    device1->UsageVolumeForUsage(kUsage1)->gain_controls()[1],
+                                    capturer1.server->stream_gain_control()}));
+
+  EXPECT_THAT(calls[call0 + 1], CreateEdgeWithGainControlsEq(std::vector<GainControlId>{
+                                    device1->UsageVolumeForUsage(kUsage2)->gain_controls()[0],
+                                    device1->UsageVolumeForUsage(kUsage2)->gain_controls()[1],
+                                    capturer2.server->stream_gain_control()}));
+
+  EXPECT_THAT(calls[call0 + 6], CreateEdgeWithGainControlsEq(std::vector<GainControlId>{
+                                    device1->UsageVolumeForUsage(kUsage2)->gain_controls()[0],
+                                    device1->UsageVolumeForUsage(kUsage2)->gain_controls()[1],
+                                    capturer3.server->stream_gain_control()}));
 
   // After adding device2, capturer2 and capturer3 are rerouted to device2.
   // Whether capturer2 or capturer3 is rerouted first depends on how the shared_ptrs are sorted.

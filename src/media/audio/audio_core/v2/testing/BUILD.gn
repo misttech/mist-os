@@ -15,6 +15,7 @@ source_set("testing") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.audio.mixer:fuchsia.audio.mixer_cpp",
+    "//src/media/audio/audio_core/v2:audio_core_lib",
     "//src/media/audio/lib/format2",
     "//src/media/audio/services/common",
     "//third_party/googletest:gmock",

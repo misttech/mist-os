@@ -47,7 +47,7 @@ ReferenceClock ReferenceClock::FromFidlRingBuffer(fuchsia_audio::wire::RingBuffe
   };
 }
 
-ReferenceClock ReferenceClock::Dup() {
+ReferenceClock ReferenceClock::Dup() const {
   return {
       .name = name,
       .handle = DupZxClockHandle(handle),
@@ -55,9 +55,9 @@ ReferenceClock ReferenceClock::Dup() {
   };
 }
 
-zx::clock ReferenceClock::DupHandle() { return DupZxClockHandle(handle); }
+zx::clock ReferenceClock::DupHandle() const { return DupZxClockHandle(handle); }
 
-fuchsia_audio_mixer::wire::ReferenceClock ReferenceClock::ToFidl(fidl::AnyArena& arena) {
+fuchsia_audio_mixer::wire::ReferenceClock ReferenceClock::ToFidl(fidl::AnyArena& arena) const {
   auto builder = fuchsia_audio_mixer::wire::ReferenceClock::Builder(arena);
   if (!name.empty()) {
     builder.name(fidl::StringView(arena, name));

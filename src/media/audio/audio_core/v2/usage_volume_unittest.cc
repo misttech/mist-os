@@ -67,11 +67,12 @@ TEST(UsageVolumeTest, RealizeVolume) {
   UsageVolume::Create({
       .graph_client = h.graph_client,
       .dispatcher = h.loop.dispatcher(),
-      .volume_curve = VolumeCurve::FromMappings({
-                                                    VolumeMapping(0.0, -160.0f),
-                                                    VolumeMapping(1.0, 0.0f),
-                                                })
-                          .value(),
+      .volume_curve = std::shared_ptr<VolumeCurve>(
+          new VolumeCurve(VolumeCurve::FromMappings({
+                                                        VolumeMapping(0.0, -160.0f),
+                                                        VolumeMapping(1.0, 0.0f),
+                                                    })
+                              .value())),
       .usage = StreamUsage::WithRenderUsage(RenderUsage::MEDIA),
       .callback = [&usage_volume](auto uv) { usage_volume = uv; },
   });

@@ -23,22 +23,8 @@ namespace media_audio {
 // Manages renderer-to-output-device and input-device-to-capturer connections.
 class RouteGraph : public std::enable_shared_from_this<RouteGraph> {
  public:
-  struct Args {
-    // Connection to the mixer service.
-    std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> graph_client;
-
-    // GainControls for each usage. These are used during edge creation: when we create an edge from
-    // a Renderer to an OutputDevice, `gain_controls_per_render_usage[Renderer.usage]` are attached
-    // to the edge, and similarly for capturers.
-    //
-    // TODO(fxbug.dev/98652): These are vectors because each usage will have the main gain setting
-    // (from a volume control) plus an adjustment (for ducking/muting).
-    std::map<media::audio::RenderUsage, std::vector<GainControlId>> gain_controls_per_render_usage;
-    std::map<media::audio::CaptureUsage, std::vector<GainControlId>>
-        gain_controls_per_capture_usage;
-  };
-
-  explicit RouteGraph(Args args);
+  explicit RouteGraph(
+      std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> graph_client);
 
   // Adds a routable device. This should be called when the device has been added and plugged in.
   // Caller is expected to `Start` the device. If the output device has a loopback interface, then
@@ -59,8 +45,10 @@ class RouteGraph : public std::enable_shared_from_this<RouteGraph> {
   void RemoveRenderer(std::shared_ptr<AudioRendererServer> renderer);
   void RemoveCapturer(std::shared_ptr<AudioCapturerServer> capturer);
 
-  // TODO(fxbug.dev/98652): see v1/AudioCoreImpl::GetDbFromVolume
-  // std::shared_ptr<VolumeCurve> VolumeCurveForUsage(StreamUsage);
+  // Returns the VolumeCurve currently used by the given usage, or nullptr if the current usage
+  // cannot be routed to any devices.
+  std::shared_ptr<media::audio::VolumeCurve> VolumeCurveForUsage(media::audio::RenderUsage usage);
+  std::shared_ptr<media::audio::VolumeCurve> VolumeCurveForUsage(media::audio::CaptureUsage usage);
 
  private:
   struct OutputDevicePipelineInfo {
@@ -82,6 +70,8 @@ class RouteGraph : public std::enable_shared_from_this<RouteGraph> {
   using RendererMap = std::map<std::shared_ptr<AudioRendererServer>, RendererInfo>;
   using CapturerMap = std::map<std::shared_ptr<AudioCapturerServer>, CapturerInfo>;
 
+  void RecomputeGainControlsForRenderers();
+  void RecomputeGainControlsForCapturers();
   void RerouteAllRenderers();
   void RerouteAllCapturers();
   void RerouteRenderer(const std::shared_ptr<AudioRendererServer>& renderer);
@@ -90,6 +80,8 @@ class RouteGraph : public std::enable_shared_from_this<RouteGraph> {
   void DisconnectCapturer(CapturerMap::iterator it);
 
   const std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> graph_client_;
+
+  // These are computed based on the set of currently-available devices.
   std::map<media::audio::RenderUsage, std::vector<GainControlId>> gain_controls_per_render_usage_;
   std::map<media::audio::CaptureUsage, std::vector<GainControlId>> gain_controls_per_capture_usage_;
 
