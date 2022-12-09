@@ -439,31 +439,59 @@ server.
 
 See the class documentation on these types for more details.
 
-### Request and response structs {#request-response-structs}
+### Request and response types {#request-response-structs}
 
-FIDL generates a type for each request, response, and event in the protocol by
-treating the parameters as struct fields. For example, the `MakeMoveRequest` is
-generated as if it were a struct with two fields: `uint8 row`, and `uint8 col`,
-providing the same generated code API as [regular structs](#structs):
-
-```c++
-struct MakeMoveRequest final {
-    uint8_t row;
-    uint8_t col;
-}
-```
-
-For this example, the following types are generated:
+The request type for a FIDL method or event can be accessed through a pair of
+aliases, `fidl::WireRequest` and `fidl::WireEvent`:
 
 * `fidl::WireRequest<TicTacToe::StartGame>`
 * `fidl::WireRequest<TicTacToe::MakeMove>`
-* `fidl::WireResponse<TicTacToe::MakeMove>`
 * `fidl::WireEvent<TicTacToe::OnOpponentMove>`
 
-The naming scheme for requests is `[Method]Request`. The naming scheme for
-responses is `[Method]Response`. The naming scheme for events is `[Method]Event`.
+If the type used for the request or event is a named type, the alias will point
+to that type. If the request type was an anonymous type, the alias will point to
+the type name generated for that anonymous type. For both method requests and
+events, the generated request type is named `[Method]Request`.
 
-Any empty request, response, or event is represented by a `nullptr`.
+Unlike requests, responses to two-way methods are generated as a new type,
+`fidl::WireResult`:
+
+* `fidl::WireResult<TicTacToe::MakeMove>`
+
+The `fidl::WireResult` type inherits from `fidl::Status`, and its status tells
+whether the call succeeded at the FIDL layer. If the method has a non-empty
+response or uses FIDL error syntax, the generated `WireResult` type will also
+have a set of accessors for accessing the return value or application-layer
+error. The available accessors for the contained result are:
+
+* `WireResultUnwrapType<FidlMethod>* Unwrap()`
+* `const WireResultUnwrapType<FidlMethod>* Unwrap() const`
+* `WireResultUnwrapType<FidlMethod>& value()`
+* `const WireResultUnwrapType<FidlMethod>& value() const`
+* `WireResultUnwrapType<FidlMethod>* operator->()`
+* `const WireResultUnwrapType<FidlMethod>* operator->() const`
+* `WireResultUnwrapType<FidlMethod>& operator*()`
+* `const WireResultUnwrapType<FidlMethod>& operator*() const`
+
+The `WireResultUnwrapType` is another type alias, which depends on whether the
+method uses error syntax. Given this example library,
+
+```fidl
+library response.examples;
+
+protocol Test {
+  Foo() -> (struct { x int32; });
+  Bar() -> () error int32;
+  Baz() -> (struct { x int32; }) error int32;
+};
+```
+
+here is what the `fidl::WireResultUnwrapType` is for each method in the `Test`
+protocol:
+
+* `fidl::WireResultUnwrapType<response_examples::Test::Foo> = response_examples::wire::TestFooResponse`
+* `fidl::WireResultUnwrapType<response_examples::Test::Bar> = fit::result<int32_t>`
+* `fidl::WireResultUnwrapType<response_examples::Test::Baz> = fit::result<int32_t, ::response_examples::wire::TestBazResponse*>`
 
 ### Client {#client}
 
