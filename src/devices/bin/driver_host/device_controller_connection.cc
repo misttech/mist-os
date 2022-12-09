@@ -53,21 +53,21 @@ void BindReply(const fbl::RefPtr<zx_device_t>& dev,
 
 void DeviceControllerConnection::ConnectMultiplexed(ConnectMultiplexedRequestView request,
                                                     ConnectMultiplexedCompleter::Sync& completer) {
-  if (std::optional<DeviceServer>& vnode = dev()->vnode; vnode.has_value()) {
+  if (std::optional<devfs_fidl::DeviceServer>& vnode = dev()->vnode; vnode.has_value()) {
     vnode.value().ServeMultiplexed(std::move(request->server));
   }
 }
 
 void DeviceControllerConnection::ConnectToDeviceProtocol(
     ConnectToDeviceProtocolRequestView request, ConnectToDeviceProtocolCompleter::Sync& completer) {
-  if (std::optional<DeviceServer>& vnode = dev()->vnode; vnode.has_value()) {
+  if (std::optional<devfs_fidl::DeviceServer>& vnode = dev()->vnode; vnode.has_value()) {
     vnode.value().ConnectToDeviceFidl(std::move(request->server));
   }
 }
 
 void DeviceControllerConnection::ConnectToController(
     ConnectToControllerRequestView request, ConnectToControllerCompleter::Sync& completer) {
-  if (std::optional<DeviceServer>& vnode = dev()->vnode; vnode.has_value()) {
+  if (std::optional<devfs_fidl::DeviceServer>& vnode = dev()->vnode; vnode.has_value()) {
     vnode.value().ConnectToController(std::move(request->controller));
   }
 }

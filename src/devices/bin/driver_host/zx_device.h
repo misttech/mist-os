@@ -103,7 +103,7 @@ struct ZxDeviceLocalIdMapTag {};
 
 // This needs to be a struct, not a class, to match the public definition
 struct zx_device
-    : public DeviceInterface,
+    : public devfs_fidl::DeviceInterface,
       public fbl::RefCountedUpgradeable<zx_device>,
       public fbl::Recyclable<zx_device>,
       public fbl::ContainableBaseClasses<
@@ -379,7 +379,7 @@ struct zx_device
   fbl::Mutex controller_lock;
   std::optional<fidl::ServerBindingRef<fuchsia_device_manager::DeviceController>> controller_binding
       TA_GUARDED(controller_lock);
-  std::optional<DeviceServer> vnode;
+  std::optional<devfs_fidl::DeviceServer> vnode;
 
   fbl::Mutex proxy_ios_lock;
   ProxyIostate* proxy_ios TA_GUARDED(proxy_ios_lock) = nullptr;
@@ -473,7 +473,7 @@ struct zx_device
   void FreeInspect() { inspect_.reset(); }
 
  private:
-  // Methods from the DeviceInterface class.
+  // Methods from the devfs_fidl::DeviceInterface class.
   zx::result<std::string> GetTopologicalPath() override;
   bool IsUnbound() override;
   zx_status_t MessageOp(fidl_incoming_msg_t* msg, fidl_txn_t* txn) override;

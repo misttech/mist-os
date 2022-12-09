@@ -9,6 +9,8 @@
 #include <fidl/fuchsia.io/cpp/wire_test_base.h>
 #include <lib/fidl/cpp/wire/internal/server_details.h>
 
+namespace devfs_fidl {
+
 class DeviceInterface : public fidl::WireServer<fuchsia_device::Controller> {
  public:
   // Redeclare this fuchsia_device::Controller function to avoid implicit shadowing.
@@ -78,5 +80,7 @@ class DeviceServer {
   // Set via `CloseAllConnections` and called when all bindings have completed their teardown.
   std::optional<fit::callback<void()>> callback_;
 };
+
+}  // namespace devfs_fidl
 
 #endif  // SRC_DEVICES_LIB_FIDL_DEVICE_SERVER_H_

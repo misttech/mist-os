@@ -433,7 +433,7 @@ zx_status_t DriverHostContext::DriverManagerRemove(fbl::RefPtr<zx_device_t> dev)
 
   // Close all connections to the device vnode and drop it, since no one should be able to open
   // connections anymore. This will break the reference cycle between the device and its vnode.
-  if (std::optional<DeviceServer>& vnode = dev->vnode; vnode.has_value()) {
+  if (std::optional<devfs_fidl::DeviceServer>& vnode = dev->vnode; vnode.has_value()) {
     vnode.value().CloseAllConnections([dev]() { dev->vnode.reset(); });
   }
 

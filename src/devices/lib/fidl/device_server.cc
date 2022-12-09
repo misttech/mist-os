@@ -11,6 +11,8 @@
 
 #include "src/devices/lib/fidl/transaction.h"
 
+namespace devfs_fidl {
+
 namespace {
 constexpr char kLogTag[] = "devfs";
 }  // namespace
@@ -130,3 +132,5 @@ void DeviceServer::MessageDispatcher::dispatch_message(
     txn->Close(status);
   }
 }
+
+}  // namespace devfs_fidl

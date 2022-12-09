@@ -548,7 +548,7 @@ void DriverHostContext::DeviceUnbindReply(const fbl::RefPtr<zx_device_t>& dev) {
     LOGD(FATAL, *dev, "Device %p cannot reply to unbind, no callback set (flags %#x)", dev.get(),
          dev->flags());
   }
-  if (std::optional<DeviceServer>& vnode = dev->vnode; vnode.has_value()) {
+  if (std::optional<devfs_fidl::DeviceServer>& vnode = dev->vnode; vnode.has_value()) {
     vnode.value().CloseAllConnections(/*callback=*/nullptr);
   }
   dev->unbind_cb(ZX_OK);

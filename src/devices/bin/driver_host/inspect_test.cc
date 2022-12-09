@@ -190,7 +190,7 @@ TEST_F(DeviceInspectTestCase, CallStats) {
   fidl_incoming_msg_t dummy_msg = {};
   fidl_message_header_t dummy_hdr = {};
   dummy_msg.bytes = static_cast<void*>(&dummy_hdr);
-  static_cast<DeviceInterface*>(device.get())->MessageOp(&dummy_msg, nullptr);
+  static_cast<devfs_fidl::DeviceInterface*>(device.get())->MessageOp(&dummy_msg, nullptr);
 
   {
     // Test InspectCallStats::Update() method

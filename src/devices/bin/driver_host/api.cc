@@ -229,7 +229,7 @@ __EXPORT zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* paren
                     [dev, client_remote = std::move(client_remote)]() mutable {
                       // This needs to be called async because it would otherwise re-entrantly call
                       // back into the driver.
-                      if (std::optional<DeviceServer>& vnode = dev->vnode;
+                      if (std::optional<devfs_fidl::DeviceServer>& vnode = dev->vnode;
                           vnode.has_value() && client_remote.is_valid()) {
                         vnode.value().ServeMultiplexed(std::move(client_remote));
                       }
