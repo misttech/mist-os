@@ -76,7 +76,7 @@ zx::result<std::string> CreateFvmPartition(const std::string& device_path, size_
   }
 
   // Open "fvm" driver
-  auto fvm_fd = fbl::unique_fd(open(fvm_disk_path_or->c_str(), O_RDWR));
+  auto fvm_fd = fbl::unique_fd(open(fvm_disk_path_or->c_str(), O_RDONLY));
   if (!fvm_fd) {
     FX_LOGS(ERROR) << "Could not open FVM driver: errno=" << errno;
     return zx::error(ZX_ERR_BAD_STATE);

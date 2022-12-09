@@ -15,7 +15,7 @@
 namespace storage {
 
 zx::result<std::string> CreateZxcryptVolume(const std::string& device_path) {
-  fbl::unique_fd fd(open(device_path.c_str(), O_RDWR));
+  fbl::unique_fd fd(open(device_path.c_str(), O_RDONLY));
   if (!fd) {
     FX_LOGS(ERROR) << "Could not open test block device";
     return zx::error(ZX_ERR_BAD_STATE);

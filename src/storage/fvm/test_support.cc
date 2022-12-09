@@ -380,7 +380,7 @@ zx_status_t FvmAdapter::Rebind(fbl::Vector<VPartitionAdapter*> vpartitions) {
 }
 
 zx_status_t FvmAdapter::Query(VolumeManagerInfo* out_info) const {
-  fbl::unique_fd fd(openat(devfs_root_.get(), path(), O_RDWR));
+  fbl::unique_fd fd(openat(devfs_root_.get(), path(), O_RDONLY));
   zx::result info = fs_management::FvmQuery(fd.get());
   if (info.is_error()) {
     return info.error_value();
