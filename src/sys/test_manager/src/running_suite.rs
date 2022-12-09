@@ -42,8 +42,6 @@ use {
         prelude::*,
         FutureExt,
     },
-    lazy_static::lazy_static,
-    maplit::hashset,
     moniker::RelativeMonikerBase,
     resolver::AllowedPackages,
     std::{
@@ -538,30 +536,10 @@ impl CaseMatcher {
     }
 }
 
-lazy_static! {
-
-    // Allows prebuilt tests to resolve any package. These tests have been fixed at source but will
-    // take months to roll into fuchsia.
-    static ref PREBUILT_TESTS: HashSet<&'static str> = hashset! {
-        "fuchsia-pkg://fuchsia.com/base_unittests#meta/base_unittests.cm",
-        "fuchsia-pkg://fuchsia.com/blink_common_unittests#meta/blink_common_unittests.cm",
-        "fuchsia-pkg://fuchsia.com/cast_runner_integration_tests#meta/cast_runner_integration_tests.cm",
-        "fuchsia-pkg://fuchsia.com/ipc_tests#meta/ipc_tests.cm",
-        "fuchsia-pkg://fuchsia.com/media_unittests#meta/media_unittests.cm",
-        "fuchsia-pkg://fuchsia.com/mojo_unittests#meta/mojo_unittests.cm",
-        "fuchsia-pkg://fuchsia.com/skia_unittests#meta/skia_unittests.cm",
-        "fuchsia-pkg://fuchsia.com/web_engine_integration_tests#meta/web_engine_integration_tests.cm",
-        "fuchsia-pkg://fuchsia.com/web_engine_integration_tests_cfv1#meta/web_engine_integration_tests_cfv1.cm",
-        "fuchsia-pkg://fuchsia.com/web_runner_integration_tests#meta/web_runner_integration_tests.cm"
-    };
-}
-
 fn get_allowed_package_value(test_url: &str, suite_facet: &facet::SuiteFacets) -> AllowedPackages {
     let facet::SuiteFacets { collection, deprecated_allowed_packages } = suite_facet;
     if let Some(deprecated_allowed_packages) = deprecated_allowed_packages {
         AllowedPackages::from_iter(deprecated_allowed_packages.iter().cloned())
-    } else if PREBUILT_TESTS.contains(test_url) {
-        AllowedPackages::all(test_url.to_string())
     } else {
         match *collection {
             HERMETIC_TESTS_COLLECTION => AllowedPackages::zero_allowed_pkgs(),
@@ -1212,25 +1190,5 @@ mod tests {
             false => AllowedPackages::all(url.to_string()),
         };
         assert_eq!(expected, get_allowed_package_value(&url, &suite_facet));
-
-        for url in PREBUILT_TESTS.iter() {
-            let mut suite_facet = facet::SuiteFacets {
-                collection: HERMETIC_TESTS_COLLECTION,
-                deprecated_allowed_packages: None,
-            };
-
-            // default is all packages.
-            assert_eq!(
-                AllowedPackages::all(url.to_string()),
-                get_allowed_package_value(url, &suite_facet)
-            );
-
-            // deprecated_allowed_packages overrides the list
-            suite_facet.deprecated_allowed_packages = Some(vec!["pkg-one".to_owned()]);
-            assert_eq!(
-                AllowedPackages::from_iter(["pkg-one".to_owned()]),
-                get_allowed_package_value(url, &suite_facet)
-            );
-        }
     }
 }
