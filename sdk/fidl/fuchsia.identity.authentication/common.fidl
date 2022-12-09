@@ -46,7 +46,8 @@ type Error = flexible enum {
     /// failure. Retry, after a delay, is recommended.
     RESOURCE = 7;
 
-    /// An interactive authentication operation was cancelled by the user.
+    /// The client cancelled an authentication operation, usually by closing
+    /// a channel.
     ABORTED = 8;
 };
 

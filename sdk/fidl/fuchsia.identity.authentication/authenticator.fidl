@@ -26,6 +26,8 @@ protocol StorageUnlockMechanism {
     ///                    `updated_enrollment_data` indicates that the
     ///                    enrollment with said id must also be updated if the
     ///                    attempt is successful.
+    ///
+    /// Fails with `ABORTED` if the client closes the `interaction` channel.
     Authenticate(resource struct {
         interaction InteractionProtocolServerEnd;
         enrollments vector<Enrollment>:MAX_ENROLLMENTS;
@@ -45,6 +47,8 @@ protocol StorageUnlockMechanism {
     ///          `prekey_material` The pre-key material that will be produced
     ///                            by successfully authenticating against this
     ///                            enrollment.
+    ///
+    /// Fails with `ABORTED` if the client closes the `interaction` channel.
     Enroll(resource struct {
         interaction InteractionProtocolServerEnd;
     }) -> (struct {

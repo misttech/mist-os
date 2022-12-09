@@ -38,6 +38,8 @@ protocol AccountManager {
     /// `interaction` An `Interaction` channel enabling the user to complete
     ///               authentication challenges if these are necessary.
     /// `account` [required] The server end of an `Account` channel
+    ///
+    /// Fails with `ABORTED` if the client closes the `interaction` channel.
     GetAccount(resource table {
         1: id AccountId;
         2: interaction server_end:fuchsia.identity.authentication.Interaction;
@@ -114,6 +116,8 @@ protocol AccountManager {
     ///                     unlock.
     ///
     /// Returns: `account_id` The identifier of the newly added account
+    ///
+    /// Fails with `ABORTED` if the client closes the `interaction` channel.
     ProvisionNewAccount(resource table {
         1: lifetime Lifetime;
         2: metadata AccountMetadata;

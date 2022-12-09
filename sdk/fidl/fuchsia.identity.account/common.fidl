@@ -84,6 +84,9 @@ type Error = flexible enum {
     /// The request cannot be processed due to a rejected authentication
     /// attempt. User consent or input is required before any retry.
     FAILED_AUTHENTICATION = 10;
+
+    /// The client cancelled an account operation, usually by closing a channel.
+    ABORTED = 11;
 };
 
 /// Basic data about a system account. These data are available even while an
