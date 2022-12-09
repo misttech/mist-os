@@ -77,6 +77,7 @@ fn new_run_params() -> run_test_suite_lib::RunParams {
     run_test_suite_lib::RunParams {
         timeout_behavior: run_test_suite_lib::TimeoutBehavior::TerminateRemaining,
         timeout_grace_seconds: 0,
+        suite_start_timeout_seconds: None,
         stop_after_failures: None,
         experimental_parallel_execution: None,
         accumulate_debug_data: false,
@@ -1205,6 +1206,7 @@ async fn test_continue_on_timeout(test_chunk_size: usize) {
         run_test_suite_lib::RunParams {
             timeout_behavior: run_test_suite_lib::TimeoutBehavior::Continue,
             timeout_grace_seconds: 0,
+            suite_start_timeout_seconds: None,
             stop_after_failures: None,
             experimental_parallel_execution: None,
             accumulate_debug_data: false,
@@ -1277,6 +1279,7 @@ async fn test_stop_after_n_failures(test_chunk_size: usize) {
                 run_test_suite_lib::RunParams {
                     timeout_behavior: run_test_suite_lib::TimeoutBehavior::Continue,
                     timeout_grace_seconds: 0,
+                    suite_start_timeout_seconds: None,
                     stop_after_failures: Some(5u32.try_into().unwrap()),
                     experimental_parallel_execution: None,
                     accumulate_debug_data: false,

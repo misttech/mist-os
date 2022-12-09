@@ -16,7 +16,7 @@ use {
     },
     fidl_fuchsia_test_manager::{self as ftest_manager, RunBuilderProxy},
     fuchsia_async as fasync,
-    futures::{prelude::*, stream::FuturesUnordered, StreamExt},
+    futures::{future::Either, prelude::*, stream::FuturesUnordered, StreamExt},
     std::collections::HashMap,
     std::io::Write,
     std::path::PathBuf,
@@ -59,8 +59,8 @@ impl<'a> RunState<'a> {
         }
     }
 
-    fn cancel(&mut self) {
-        self.final_outcome = Some(Outcome::Cancelled);
+    fn cancel_run(&mut self, final_outcome: Outcome) {
+        self.final_outcome = Some(final_outcome);
         self.cancel_occurred = true;
     }
 
@@ -156,22 +156,35 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
     let cancel_fut = cancel_fut.shared();
     let cancel_fut_clone = cancel_fut.clone();
 
+    let suite_start_timeout_duration = run_params
+        .suite_start_timeout_seconds
+        .map(|secs| std::time::Duration::from_secs(secs.get() as u64));
+
     let handle_suite_fut = async move {
         let mut stopped_prematurely = false;
         // for now, we assume that suites are run serially.
         loop {
+            let suite_start_timeout = match suite_start_timeout_duration {
+                Some(duration) => fasync::Timer::new(duration).boxed(),
+                None => futures::future::pending::<()>().boxed(),
+            };
+            let suite_stop_fut = futures::future::select(cancel_fut.clone(), suite_start_timeout)
+                .map(|result| match result {
+                    Either::Left(_) => Outcome::Cancelled,
+                    Either::Right(_) => Outcome::Timedout,
+                });
             let (running_suite, suite_id) = match suite_start_futs
                 .next()
                 .named("suite_start")
-                .or_cancelled(cancel_fut.clone())
+                .or_cancelled(suite_stop_fut)
                 .await
             {
                 Ok(Some((running_suite, suite_id))) => (running_suite, suite_id),
                 // normal completion.
                 Ok(None) => break,
-                Err(Cancelled(_)) => {
+                Err(Cancelled(final_outcome)) => {
                     stopped_prematurely = true;
-                    run_state.cancel();
+                    run_state.cancel_run(final_outcome);
                     break;
                 }
             };
@@ -209,7 +222,7 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
                 reporter.finished().await?;
             }
         }
-        Ok(())
+        Result::<_, RunTestSuiteError>::Ok(run_state)
     };
 
     let handle_run_events_fut = async move {
@@ -255,7 +268,7 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
                 Ok(None) => (),
             }
         }
-        Ok(())
+        Result::<_, RunTestSuiteError>::Ok(())
     };
 
     // Make sure we stop polling run events on cancel. Since cancellation is expected
@@ -268,12 +281,47 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
             Err(Cancelled(_)) => Ok(()),
         });
 
-    // Use join instead of try_join as we want to poll the futures to completion
-    // even if one fails.
-    match futures::future::join(handle_suite_fut, cancellable_run_events_fut).await {
-        (Ok(()), Ok(())) => Ok(()),
-        (Err(e), _) | (_, Err(e)) => Err(e),
-    }
+    // How we poll these futures to completion depends on timeout behavior.
+    let drain_timeout = match suite_start_timeout_duration {
+        Some(duration) => fasync::Timer::new(duration).boxed(),
+        None => futures::future::pending::<()>().boxed(),
+    };
+    let result =
+        match futures::future::select(handle_suite_fut.boxed_local(), cancellable_run_events_fut)
+            .await
+        {
+            Either::Left((Ok(run_state), run_events_fut)) => match run_state.should_stop_run() {
+                // in case of early termination, don't complete polling events.
+                true => Ok(()),
+                // otherwise, complete with a timeout.
+                false => {
+                    run_events_fut
+                        .or_cancelled(drain_timeout)
+                        .unwrap_or_else(|Cancelled(_)| {
+                            warn!("Cancelled draining run events due to timeout");
+                            Ok(())
+                        })
+                        .await?;
+                    Ok(())
+                }
+            },
+            Either::Left((Err(e), run_events_fut)) => {
+                run_events_fut
+                    .or_cancelled(drain_timeout)
+                    .unwrap_or_else(|Cancelled(_)| {
+                        warn!("Cancelled draining run events due to timeout");
+                        Ok(())
+                    })
+                    .await?;
+                Err(e.into())
+            }
+            Either::Right((result, suite_fut)) => {
+                suite_fut.await?;
+                result?;
+                Ok(())
+            }
+        };
+    result
 }
 
 async fn run_tests<'a, F: 'a + Future<Output = ()> + Unpin>(
@@ -426,6 +474,7 @@ mod test {
         fidl::endpoints::ServerEnd,
         fidl_fuchsia_io as fio, fuchsia_zircon as zx,
         futures::future::join3,
+        std::task::Poll,
         vfs::{
             directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
             file::vmo::read_only_static, pseudo_directory,
@@ -548,6 +597,7 @@ mod test {
             RunParams {
                 timeout_behavior: TimeoutBehavior::Continue,
                 timeout_grace_seconds: 0,
+                suite_start_timeout_seconds: None,
                 stop_after_failures: None,
                 experimental_parallel_execution: None,
                 accumulate_debug_data: false,
@@ -578,6 +628,46 @@ mod test {
         let reports = reporter.get_reports();
         assert_eq!(1usize, reports.len());
         assert_eq!(reports[0].id, EntityId::TestRun);
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    #[fuchsia::test]
+    fn suite_start_timeout() {
+        let mut executor = fasync::TestExecutor::new_with_fake_time().expect("create executor");
+
+        // Create a RunBuilder stream that doesn't process requests to simulate a timeout.
+        let (builder_proxy, _run_builder_stream) =
+            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>()
+                .expect("create builder proxy");
+
+        let reporter = InMemoryReporter::new();
+        let run_reporter = RunReporter::new(reporter.clone());
+        let mut run_fut = run_tests_and_get_outcome(
+            SingleRunConnector::new(builder_proxy),
+            vec![TestParams {
+                test_url: "fuchsia-pkg://fuchsia.com/nothing#meta/nothing.cm".to_string(),
+                ..TestParams::default()
+            }],
+            RunParams {
+                timeout_behavior: TimeoutBehavior::Continue,
+                timeout_grace_seconds: 0,
+                suite_start_timeout_seconds: Some(std::num::NonZeroU32::new(1).unwrap()),
+                stop_after_failures: None,
+                experimental_parallel_execution: None,
+                accumulate_debug_data: false,
+                log_protocol: None,
+                min_severity_logs: None,
+                show_full_moniker: false,
+            },
+            run_reporter,
+            futures::future::pending(),
+        )
+        .boxed_local();
+
+        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
+        executor.set_fake_time(executor.now() + fuchsia_zircon::Duration::from_seconds(1));
+        assert!(executor.wake_expired_timers());
+        assert_eq!(executor.run_until_stalled(&mut run_fut), Poll::Ready(Outcome::Timedout));
     }
 
     #[fuchsia::test]
@@ -873,6 +963,7 @@ mod test {
         let run_params = RunParams {
             timeout_behavior: TimeoutBehavior::Continue,
             timeout_grace_seconds: 0,
+            suite_start_timeout_seconds: None,
             stop_after_failures: None,
             experimental_parallel_execution: Some(max_parallel_suites),
             accumulate_debug_data: false,
@@ -903,6 +994,7 @@ mod test {
         let run_params = RunParams {
             timeout_behavior: TimeoutBehavior::Continue,
             timeout_grace_seconds: 0,
+            suite_start_timeout_seconds: None,
             stop_after_failures: None,
             experimental_parallel_execution: None,
             accumulate_debug_data: false,
