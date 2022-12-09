@@ -299,8 +299,7 @@ class McastFilterTestWithoutIface : public Mac80211Test, public MockTrans {
 
     auto test = GET_TEST(McastFilterTestWithoutIface, trans);
     return test->mock_send_cmd_.Call(hcmd->id, mcast_cmd->port_id, mcast_cmd->count,
-                                     mcast_cmd->pass_all,
-                                     mcast_cmd->bssid[0]);
+                                     mcast_cmd->pass_all, mcast_cmd->bssid[0]);
   }
 
  protected:
@@ -367,7 +366,7 @@ TEST_F(RegulatoryTest, RegulatoryTestNormal) {
   ClientInterfaceHelper helper = ClientInterfaceHelper(&sim_trans_);
 
   bool changed;
-  wlanphy_country_t country;
+  wlan_phy_country_t country;
   mtx_lock(&mvm_->mutex);
   EXPECT_EQ(ZX_OK, iwl_mvm_get_regdomain(mvm_, "TW", MCC_SOURCE_WIFI, &changed, &country));
   mtx_unlock(&mvm_->mutex);
@@ -461,7 +460,7 @@ TEST_F(RegulatoryTest, TestGetCurrentRegDomain) {
   ClientInterfaceHelper helper = ClientInterfaceHelper(&sim_trans_);
 
   bool changed;
-  wlanphy_country_t country = {};
+  wlan_phy_country_t country = {};
   mtx_lock(&mvm_->mutex);
   EXPECT_EQ(ZX_OK, iwl_mvm_get_current_regdomain(mvm_, &changed, &country));
   mtx_unlock(&mvm_->mutex);

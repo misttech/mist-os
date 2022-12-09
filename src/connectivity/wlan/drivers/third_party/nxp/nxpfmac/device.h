@@ -42,7 +42,7 @@ using DeviceType =
     ::ddk::Device<Device, ddk::Initializable, ddk::Suspendable, ddk::ServiceConnectable>;
 
 class Device : public DeviceType,
-               public fdf::WireServer<fuchsia_wlan_wlanphyimpl::WlanphyImpl>,
+               public fdf::WireServer<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>,
                public DataPlaneIfc {
  public:
   // State accessors.
@@ -54,7 +54,7 @@ class Device : public DeviceType,
   void DdkSuspend(ddk::SuspendTxn txn);
   zx_status_t DdkServiceConnect(const char* service_name, fdf::Channel channel);
 
-  // WlanphyImpl interface implementation.
+  // WlanPhyImpl interface implementation.
   void GetSupportedMacRoles(fdf::Arena& arena,
                             GetSupportedMacRolesCompleter::Sync& completer) override;
   void CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
@@ -65,9 +65,9 @@ class Device : public DeviceType,
                   SetCountryCompleter::Sync& completer) override;
   void GetCountry(fdf::Arena& arena, GetCountryCompleter::Sync& completer) override;
   void ClearCountry(fdf::Arena& arena, ClearCountryCompleter::Sync& completer) override;
-  void SetPsMode(SetPsModeRequestView request, fdf::Arena& arena,
-                 SetPsModeCompleter::Sync& completer) override;
-  void GetPsMode(fdf::Arena& arena, GetPsModeCompleter::Sync& completer) override;
+  void SetPowerSaveMode(SetPowerSaveModeRequestView request, fdf::Arena& arena,
+                        SetPowerSaveModeCompleter::Sync& completer) override;
+  void GetPowerSaveMode(fdf::Arena& arena, GetPowerSaveModeCompleter::Sync& completer) override;
 
   // DataPlaneIfc implementation
   void OnEapolTransmitted(wlan::drivers::components::Frame&& frame, zx_status_t status) override;

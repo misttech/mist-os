@@ -113,7 +113,7 @@ struct DeviceTest : public zxtest::Test {
     device->WaitUntilInitReplyCalled();
     ASSERT_OK(device->InitReplyCallStatus());
 
-    auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_wlanphyimpl::WlanphyImpl>();
+    auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>();
     ASSERT_OK(endpoints.status_value());
     auto dispatcher = fdf::Dispatcher::Create(0, "TestDispatcher", [&](fdf_dispatcher_t*) {
       sync_completion_signal(&dispatcher_completion_);
@@ -122,11 +122,11 @@ struct DeviceTest : public zxtest::Test {
     ASSERT_OK(dispatcher.status_value());
     fidl_dispatcher_ = *std::move(dispatcher);
 
-    wlanphy_client_ = fdf::WireSharedClient<fuchsia_wlan_wlanphyimpl::WlanphyImpl>(
+    wlanphy_client_ = fdf::WireSharedClient<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>(
         std::move(endpoints->client), fidl_dispatcher_.get());
 
     ASSERT_OK(device_->DdkServiceConnect(
-        fidl::DiscoverableProtocolName<fuchsia_wlan_wlanphyimpl::WlanphyImpl>,
+        fidl::DiscoverableProtocolName<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>,
         endpoints->server.TakeHandle()));
   }
 
@@ -157,7 +157,7 @@ struct DeviceTest : public zxtest::Test {
   sync_completion_t dispatcher_completion_;
   fdf::Dispatcher fidl_dispatcher_;
   wlan::nxpfmac::MlanMockAdapter mlan_mocks_;
-  fdf::WireSharedClient<fuchsia_wlan_wlanphyimpl::WlanphyImpl> wlanphy_client_;
+  fdf::WireSharedClient<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> wlanphy_client_;
 };
 
 // Since we use a zero byte vmo for the files, none of the power file related ioctls will be
@@ -165,7 +165,7 @@ struct DeviceTest : public zxtest::Test {
 TEST_F(DeviceTest, SetCountry) {
   fdf::Arena arena(kArenaTag);
 
-  auto request = ::fuchsia_wlan_wlanphyimpl::wire::WlanphyCountry::WithAlpha2({'U', 'S'});
+  auto request = ::fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry::WithAlpha2({'U', 'S'});
 
   bool ioctl_called = false;
   mlan_mocks_.SetOnMlanIoctl([&](t_void*, pmlan_ioctl_req req) -> mlan_status {
@@ -188,7 +188,7 @@ TEST_F(DeviceTest, SetCountry) {
 TEST_F(DeviceTest, SetCountryCodeFails) {
   fdf::Arena arena(kArenaTag);
 
-  auto request = ::fuchsia_wlan_wlanphyimpl::wire::WlanphyCountry::WithAlpha2({'U', 'S'});
+  auto request = ::fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry::WithAlpha2({'U', 'S'});
 
   bool ioctl_called = false;
   mlan_mocks_.SetOnMlanIoctl([&](t_void*, pmlan_ioctl_req req) -> mlan_status {
@@ -210,7 +210,7 @@ TEST_F(DeviceTest, SetCountryCodeFails) {
 TEST_F(DeviceTest, GetCountry) {
   std::array<uint8_t, 3> country_code_set_by_ioctl;
 
-  auto set_request = ::fuchsia_wlan_wlanphyimpl::wire::WlanphyCountry::WithAlpha2({'U', 'S'});
+  auto set_request = ::fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry::WithAlpha2({'U', 'S'});
 
   mlan_mocks_.SetOnMlanIoctl([&](t_void*, pmlan_ioctl_req req) -> mlan_status {
     EXPECT_EQ(MLAN_IOCTL_MISC_CFG, req->req_id);
@@ -252,7 +252,7 @@ TEST_F(DeviceTest, GetCountry) {
 TEST_F(DeviceTest, ClearCountry) {
   std::array<uint8_t, 3> country_code_set_by_ioctl;
 
-  auto set_request = ::fuchsia_wlan_wlanphyimpl::wire::WlanphyCountry::WithAlpha2({'U', 'S'});
+  auto set_request = ::fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry::WithAlpha2({'U', 'S'});
 
   mlan_mocks_.SetOnMlanIoctl([&](t_void*, pmlan_ioctl_req req) -> mlan_status {
     EXPECT_EQ(MLAN_IOCTL_MISC_CFG, req->req_id);

@@ -8,7 +8,7 @@ using fuchsia.wlan.ieee80211 as ieee80211;
 using zx;
 
 /// Parameters to create an interface.
-type WlanphyImplCreateIfaceReq = resource struct {
+type WlanPhyImplCreateIfaceReq = resource struct {
     /// The station role for this interface. A device may support multiple roles,
     /// but an interface is instantiated with a single role.
     role fuchsia.wlan.common.WlanMacRole;
@@ -25,7 +25,7 @@ type WlanphyImplCreateIfaceReq = resource struct {
 
 const WLANPHY_ALPHA2_LEN uint8 = 2;
 
-type WlanphyCountry = struct {
+type WlanPhyCountry = struct {
     /// ISO Alpha-2 takes two octet alphabet characters.
     /// This needs to be expanded if at least one WLAN device driver or firmware
     /// requires more than two octets.
@@ -33,13 +33,13 @@ type WlanphyCountry = struct {
 };
 
 
-type WlanphyPsMode = struct {
+type WlanPhyPsMode = struct {
     ps_mode fuchsia.wlan.common.PowerSaveType;
 };
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol WlanphyImpl {
+protocol WlanPhyImpl {
     /// MAC roles supported for ifaces on the physical device.
     GetSupportedMacRoles() -> (struct {
         s zx.status;
@@ -53,7 +53,7 @@ protocol WlanphyImpl {
     /// ZX_ERR_NO_RESOURCES: maximum number of interfaces have already been created
     /// ZX_ERR_NOT_SUPPORTED: device does not support the specified role
     CreateIface(resource struct {
-        req WlanphyImplCreateIfaceReq;
+        req WlanPhyImplCreateIfaceReq;
     }) -> (struct {
         s zx.status;
         iface_id uint16;
@@ -66,9 +66,9 @@ protocol WlanphyImpl {
         s zx.status;
     });
 
-    /// Set country with a WlanphyCountry
+    /// Set country with a WlanPhyCountry
     SetCountry(struct {
-        country WlanphyCountry;
+        country WlanPhyCountry;
     }) -> (struct {
         s zx.status;
     });
@@ -82,21 +82,21 @@ protocol WlanphyImpl {
     /// country directly from the firmware, where possible.
     GetCountry() -> (struct {
         s zx.status;
-        country WlanphyCountry;
+        country WlanPhyCountry;
     });
 
     /// Set Power Save mode On/Off on device. In most implementations this
     /// likely to be set in Firmware.
-    SetPsMode(struct {
-        ps_mode WlanphyPsMode;
+    SetPowerSaveMode(struct {
+        ps_mode WlanPhyPsMode;
     }) -> (struct {
         s zx.status;
     });
 
     /// Get current Power Save Mode from device. In most implementation this
     /// likely to be retrieved from Firmware.
-    GetPsMode() -> (struct {
+    GetPowerSaveMode() -> (struct {
         s zx.status;
-        ps_mode WlanphyPsMode;
+        ps_mode WlanPhyPsMode;
     });
 };

@@ -27,7 +27,7 @@ TEST_F(SimTest, ScanResultAfterIfaceStop) {
   EXPECT_EQ(DeleteInterface(&client_ifc), ZX_OK);
 }
 
-// Verify that calling WlanphyImplDestroyIface() twice will not cause a crash when the first call
+// Verify that calling WlanPhyImplDestroyIface() twice will not cause a crash when the first call
 // failed.
 TEST_F(SimTest, DeleteIfaceTwice) {
   ASSERT_EQ(Init(), ZX_OK);

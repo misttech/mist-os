@@ -16,7 +16,7 @@
 
 // This data structure is used to save the MCC info returned from the firmware in MCC_UPDATE_CMD.
 struct mcc_info {
-  wlanphy_country_t country;
+  wlan_phy_country_t country;
 
   size_t num_ch;                       // total number of the channel.
   uint8_t channels[MAX_MCC_INFO_CH];   // channel number. ex: 1-14, 36-152.

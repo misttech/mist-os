@@ -296,7 +296,7 @@ TEST_F(DynamicIfTest, EventHandlingOnSoftAPDel) {
   wlan_mac_role_t ap_role = WLAN_MAC_ROLE_AP;
   EXPECT_EQ(ZX_OK, softap_ifc_.Init(env_, ap_role));
 
-  wlanphy_impl_create_iface_req_t req = {
+  wlan_phy_impl_create_iface_req_t req = {
       .role = ap_role,
       .mlme_channel = softap_ifc_.ch_mlme_,
       .has_init_sta_addr = false,
@@ -472,7 +472,7 @@ TEST_F(DynamicIfTest, CreateClientWithRandomMac) {
 
   EXPECT_EQ(ZX_OK, client_ifc_.Init(env_, WLAN_MAC_ROLE_CLIENT));
   wireless_dev* wdev = nullptr;
-  wlanphy_impl_create_iface_req_t req = {
+  wlan_phy_impl_create_iface_req_t req = {
       .role = WLAN_MAC_ROLE_CLIENT,
       .mlme_channel = client_ifc_.ch_mlme_,
       .has_init_sta_addr = false,
@@ -493,7 +493,7 @@ TEST_F(DynamicIfTest, CreateIfaceMustProvideWdevOut) {
 
   wlan_mac_role_t client_role = WLAN_MAC_ROLE_CLIENT;
   EXPECT_EQ(ZX_OK, client_ifc_.Init(env_, client_role));
-  wlanphy_impl_create_iface_req_t req = {
+  wlan_phy_impl_create_iface_req_t req = {
       .role = client_role,
       .mlme_channel = client_ifc_.ch_mlme_,
       .has_init_sta_addr = false,
@@ -510,7 +510,7 @@ void DynamicIfTest::CheckAddIfaceWritesWdev(wlan_mac_role_t role, const char ifa
   wireless_dev* wdev = nullptr;
 
   EXPECT_EQ(ZX_OK, ifc.Init(env_, role));
-  wlanphy_impl_create_iface_req_t req = {
+  wlan_phy_impl_create_iface_req_t req = {
       .role = role,
       .mlme_channel = ifc.ch_mlme_,
       .has_init_sta_addr = false,
@@ -550,7 +550,7 @@ TEST_F(DynamicIfTest, CreateClientWithCustomName) {
   wlan_mac_role_t client_role = WLAN_MAC_ROLE_CLIENT;
   EXPECT_EQ(ZX_OK, client_ifc_.Init(env_, client_role));
 
-  wlanphy_impl_create_iface_req_t req = {
+  wlan_phy_impl_create_iface_req_t req = {
       .role = client_role,
       .mlme_channel = client_ifc_.ch_mlme_,
       .has_init_sta_addr = false,
@@ -574,7 +574,7 @@ TEST_F(DynamicIfTest, CreateApWithCustomName) {
   wlan_mac_role_t ap_role = WLAN_MAC_ROLE_AP;
   EXPECT_EQ(ZX_OK, softap_ifc_.Init(env_, ap_role));
 
-  wlanphy_impl_create_iface_req_t req = {
+  wlan_phy_impl_create_iface_req_t req = {
       .role = ap_role,
       .mlme_channel = softap_ifc_.ch_mlme_,
       .has_init_sta_addr = false,
@@ -609,7 +609,7 @@ TEST_F(DynamicIfTest, CreateClientWithLongName) {
   ASSERT_LT(strlen(truncated_name),
             strlen(really_long_name));  // sanity check that truncated_name is actually shorter
 
-  wlanphy_impl_create_iface_req_t req = {
+  wlan_phy_impl_create_iface_req_t req = {
       .role = client_role,
       .mlme_channel = client_ifc_.ch_mlme_,
       .has_init_sta_addr = false,

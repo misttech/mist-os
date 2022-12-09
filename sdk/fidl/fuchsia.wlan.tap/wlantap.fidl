@@ -96,7 +96,7 @@ type SetCountryArgs = struct {
 /// used for testing purpose.
 /// Implements a subset of `wlan_softmac_ifc_t` and `wlan_softmac_protocol_ops_t` defined in
 /// fuchsia.wlan.softmac/softmac.fidl
-/// Implements a subset of `WlanphyImpl` protocol defined in
+/// Implements a subset of `WlanPhyImpl` protocol defined in
 /// fuchsia.hardware.wlanphyimpl/wlanphy-impl.fidl
 protocol WlantapPhy {
     /// Shutdown the phy device so that it does not respond to any further calls.

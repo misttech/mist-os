@@ -22,13 +22,13 @@ struct iwl_trans;
 
 namespace wlan::iwlwifi {
 
-class WlanphyImplDevice : public ::ddk::Device<WlanphyImplDevice, ::ddk::Initializable,
+class WlanPhyImplDevice : public ::ddk::Device<WlanPhyImplDevice, ::ddk::Initializable,
                                                ::ddk::Unbindable, ddk::ServiceConnectable>,
-                          public fdf::WireServer<fuchsia_wlan_wlanphyimpl::WlanphyImpl> {
+                          public fdf::WireServer<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> {
  public:
-  WlanphyImplDevice(const WlanphyImplDevice& device) = delete;
-  WlanphyImplDevice& operator=(const WlanphyImplDevice& other) = delete;
-  virtual ~WlanphyImplDevice();
+  WlanPhyImplDevice(const WlanPhyImplDevice& device) = delete;
+  WlanPhyImplDevice& operator=(const WlanPhyImplDevice& other) = delete;
+  virtual ~WlanPhyImplDevice();
 
   // ::ddk::Device functions implemented by this class.
   void DdkRelease();
@@ -52,13 +52,13 @@ class WlanphyImplDevice : public ::ddk::Device<WlanphyImplDevice, ::ddk::Initial
                   SetCountryCompleter::Sync& completer) override;
   void ClearCountry(fdf::Arena& arena, ClearCountryCompleter::Sync& completer) override;
   void GetCountry(fdf::Arena& arena, GetCountryCompleter::Sync& completer) override;
-  void SetPsMode(SetPsModeRequestView request, fdf::Arena& arena,
-                 SetPsModeCompleter::Sync& completer) override;
-  void GetPsMode(fdf::Arena& arena, GetPsModeCompleter::Sync& completer) override;
+  void SetPowerSaveMode(SetPowerSaveModeRequestView request, fdf::Arena& arena,
+                        SetPowerSaveModeCompleter::Sync& completer) override;
+  void GetPowerSaveMode(fdf::Arena& arena, GetPowerSaveModeCompleter::Sync& completer) override;
 
  protected:
   // Only derived classes are allowed to create this object.
-  explicit WlanphyImplDevice(zx_device_t* parent);
+  explicit WlanPhyImplDevice(zx_device_t* parent);
 };
 
 }  // namespace wlan::iwlwifi

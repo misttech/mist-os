@@ -232,7 +232,7 @@ zx_status_t brcmf_get_meta_data(brcmf_if* ifp, wifi_config_t* config) {
 }
 
 /* Search through the given country code table and issue the iovar */
-zx_status_t brcmf_set_country(brcmf_pub* drvr, const wlanphy_country_t* country) {
+zx_status_t brcmf_set_country(brcmf_pub* drvr, const wlan_phy_country_t* country) {
   if (country == nullptr) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -290,7 +290,7 @@ zx_status_t brcmf_set_country(brcmf_pub* drvr, const wlanphy_country_t* country)
 }
 
 /* Retrieve the current country code from the firmware */
-zx_status_t brcmf_get_country(brcmf_pub* drvr, wlanphy_country_t* out_country) {
+zx_status_t brcmf_get_country(brcmf_pub* drvr, wlan_phy_country_t* out_country) {
   struct brcmf_if* ifp = brcmf_get_ifp(drvr, 0);
   struct brcmf_fil_country_le ccreq;
   zx_status_t err;
@@ -314,7 +314,7 @@ zx_status_t brcmf_get_country(brcmf_pub* drvr, wlanphy_country_t* out_country) {
 
 /* Set firmware country code to a world-safe one, which is "WW" in brcmfmac*/
 zx_status_t brcmf_clear_country(brcmf_pub* drvr) {
-  wlanphy_country_t country = {};
+  wlan_phy_country_t country = {};
   zx_status_t err;
 
   BRCMF_DBG(TRACE, "Enter");
@@ -331,7 +331,7 @@ zx_status_t brcmf_clear_country(brcmf_pub* drvr) {
 }
 
 /* Set Power Save Mode On/Off */
-zx_status_t brcmf_set_ps_mode(brcmf_pub* drvr, const wlanphy_ps_mode_t* ps_mode) {
+zx_status_t brcmf_set_power_save_mode(brcmf_pub* drvr, const wlan_phy_ps_mode_t* ps_mode) {
   struct brcmf_if* ifp = brcmf_get_ifp(drvr, 0);
   zx_status_t err;
   bcme_status_t fw_err = BCME_OK;
@@ -362,7 +362,7 @@ zx_status_t brcmf_set_ps_mode(brcmf_pub* drvr, const wlanphy_ps_mode_t* ps_mode)
 }
 
 /* Get Power Save Mode from FW */
-zx_status_t brcmf_get_ps_mode(brcmf_pub* drvr, wlanphy_ps_mode_t* out_ps_mode) {
+zx_status_t brcmf_get_power_save_mode(brcmf_pub* drvr, wlan_phy_ps_mode_t* out_ps_mode) {
   struct brcmf_if* ifp = brcmf_get_ifp(drvr, 0);
   zx_status_t err;
   bcme_status_t fw_err = BCME_OK;
@@ -458,7 +458,7 @@ zx_status_t brcmf_c_preinit_dcmds(struct brcmf_if* ifp) {
   char* ptr;
   zx_status_t err;
   bcme_status_t fw_err;
-  const wlanphy_country_t country = {{'W', 'W'}};
+  const wlan_phy_country_t country = {{'W', 'W'}};
 
   err = brcmf_set_macaddr(ifp);
   if (err != ZX_OK) {
@@ -520,7 +520,7 @@ zx_status_t brcmf_c_preinit_dcmds(struct brcmf_if* ifp) {
 
   if (drvr->drvr_resetting.load()) {
     // If it's driver recovery process, reset the country code to the one before crash.
-    const wlanphy_country_t reset_country = {
+    const wlan_phy_country_t reset_country = {
         {drvr->last_country_code[0], drvr->last_country_code[1]}};
     BRCMF_INFO("Recovering country code %c%c.", reset_country.alpha2[0], reset_country.alpha2[1]);
     brcmf_set_country(drvr, &reset_country);

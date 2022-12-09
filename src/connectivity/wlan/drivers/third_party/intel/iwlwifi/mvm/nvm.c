@@ -527,7 +527,7 @@ zx_status_t iwl_mvm_init_mcc(struct iwl_mvm* mvm) {
   bool tlv_lar;
   bool nvm_lar;
   zx_status_t retval;
-  wlanphy_country_t country;
+  wlan_phy_country_t country;
   char mcc[3];
 
   if (mvm->cfg->nvm_type == IWL_NVM_EXT) {
@@ -625,7 +625,7 @@ void iwl_mvm_rx_chub_update_mcc(struct iwl_mvm* mvm, struct iwl_rx_cmd_buffer* r
 
   // Ask the firmware to change the regulatory domain and take effective.
   bool changed;
-  wlanphy_country_t country;
+  wlan_phy_country_t country;
   zx_status_t ret = iwl_mvm_get_regdomain(mvm, mcc, src, &changed, &country);
   if (ret != ZX_OK) {
     IWL_ERR(mvm, "Cannot update the firmware with new country code (%s): %s\n", mcc,

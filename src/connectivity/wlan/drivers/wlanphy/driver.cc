@@ -29,15 +29,15 @@ zx_status_t wlanphy_bind(void* ctx, zx_device_t* device) {
   ltrace_fn();
   zx_status_t status;
 
-  wlanphy_impl_protocol_t wlanphy_impl_proto;
+  wlan_phy_impl_protocol_t wlan_phy_impl_proto;
   status = device_get_protocol(device, ZX_PROTOCOL_WLANPHY_IMPL,
-                               static_cast<void*>(&wlanphy_impl_proto));
+                               static_cast<void*>(&wlan_phy_impl_proto));
   if (status != ZX_OK) {
     lerror("no wlanphy_impl protocol (%s)", zx_status_get_string(status));
     return ZX_ERR_INTERNAL;
   }
 
-  auto wlanphy_dev = std::make_unique<wlanphy::Device>(device, wlanphy_impl_proto);
+  auto wlanphy_dev = std::make_unique<wlanphy::Device>(device, wlan_phy_impl_proto);
   status = wlanphy_dev->Bind();
 
   if (status != ZX_OK) {

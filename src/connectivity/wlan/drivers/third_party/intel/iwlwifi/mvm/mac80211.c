@@ -215,7 +215,7 @@ static void iwl_mvm_reset_phy_ctxts(struct iwl_mvm* mvm) {
 
 zx_status_t iwl_mvm_get_regdomain(struct iwl_mvm* mvm, const char* alpha2,
                                   enum iwl_mcc_source src_id, bool* changed,
-                                  wlanphy_country_t* out_country) {
+                                  wlan_phy_country_t* out_country) {
   struct iwl_mcc_update_resp* resp;
 
   ZX_ASSERT(out_country);
@@ -276,7 +276,7 @@ void iwl_mvm_update_changed_regdom(struct iwl_mvm* mvm) {
 #endif  // NEEDS_PORTING
 
 zx_status_t iwl_mvm_get_current_regdomain(struct iwl_mvm* mvm, bool* changed,
-                                          wlanphy_country_t* out_country) {
+                                          wlan_phy_country_t* out_country) {
   return iwl_mvm_get_regdomain(
       mvm, "ZZ", iwl_mvm_is_wifi_mcc_supported(mvm) ? MCC_SOURCE_GET_CURRENT : MCC_SOURCE_OLD_FW,
       changed, out_country);

@@ -28,13 +28,13 @@ class Device
       public ::ddk::Device<Device, ::ddk::Messageable<fuchsia_wlan_device::Connector>::Mixin,
                            ::ddk::Unbindable> {
  public:
-  Device(zx_device_t* device, fdf::ClientEnd<fuchsia_wlan_wlanphyimpl::WlanphyImpl> client);
+  Device(zx_device_t* device, fdf::ClientEnd<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> client);
   ~Device();
 
   // Creates and binds wlanphy device instance. On success hands device off to device lifecycle
   // management.
   static zx_status_t Create(zx_device_t* parent_device,
-                            fdf::ClientEnd<fuchsia_wlan_wlanphyimpl::WlanphyImpl> client);
+                            fdf::ClientEnd<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> client);
 
   // Overriding DDK functions.
   void DdkRelease();
@@ -48,14 +48,15 @@ class Device
   void SetCountry(SetCountryRequestView request, SetCountryCompleter::Sync& completer) override;
   void GetCountry(GetCountryCompleter::Sync& completer) override;
   void ClearCountry(ClearCountryCompleter::Sync& completer) override;
-  void SetPsMode(SetPsModeRequestView request, SetPsModeCompleter::Sync& completer) override;
-  void GetPsMode(GetPsModeCompleter::Sync& completer) override;
+  void SetPowerSaveMode(SetPowerSaveModeRequestView request,
+                        SetPowerSaveModeCompleter::Sync& completer) override;
+  void GetPowerSaveMode(GetPowerSaveModeCompleter::Sync& completer) override;
 
   // Function implementations in protocol fuchsia_wlan_device::Connector.
   void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override;
   void Connect(fidl::ServerEnd<fuchsia_wlan_device::Phy> server_end);
 
-  zx_status_t ConnectToWlanphyImpl(fdf::Channel server_channel);
+  zx_status_t ConnectToWlanPhyImpl(fdf::Channel server_channel);
 
   // Add the device to the devhost.
   zx_status_t DeviceAdd();
@@ -65,9 +66,9 @@ class Device
   async_dispatcher_t* server_dispatcher_;
 
   // The FIDL client to communicate with iwlwifi
-  fdf::WireSharedClient<fuchsia_wlan_wlanphyimpl::WlanphyImpl> client_;
+  fdf::WireSharedClient<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> client_;
 
-  // Dispatcher for being a FIDL client firing requests to WlanphyImpl device.
+  // Dispatcher for being a FIDL client firing requests to WlanPhyImpl device.
   fdf::Dispatcher client_dispatcher_;
 
   // Store unbind txn for async reply.

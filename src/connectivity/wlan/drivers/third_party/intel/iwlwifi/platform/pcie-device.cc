@@ -30,7 +30,7 @@ extern "C" {
 namespace wlan {
 namespace iwlwifi {
 
-PcieDevice::PcieDevice(zx_device_t* parent) : WlanphyImplDevice(parent) { pci_dev_ = {}; }
+PcieDevice::PcieDevice(zx_device_t* parent) : WlanPhyImplDevice(parent) { pci_dev_ = {}; }
 
 PcieDevice::~PcieDevice() { ZX_DEBUG_ASSERT(pci_dev_.drvdata == nullptr); }
 

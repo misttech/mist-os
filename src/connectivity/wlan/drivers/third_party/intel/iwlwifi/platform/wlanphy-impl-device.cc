@@ -19,27 +19,27 @@ namespace wlan::iwlwifi {
 
 namespace wlanphyimpl_fidl = fuchsia_wlan_wlanphyimpl::wire;
 
-WlanphyImplDevice::WlanphyImplDevice(zx_device_t* parent)
-    : ::ddk::Device<WlanphyImplDevice, ::ddk::Initializable, ::ddk::Unbindable,
+WlanPhyImplDevice::WlanPhyImplDevice(zx_device_t* parent)
+    : ::ddk::Device<WlanPhyImplDevice, ::ddk::Initializable, ::ddk::Unbindable,
                     ddk::ServiceConnectable>(parent) {}
 
-WlanphyImplDevice::~WlanphyImplDevice() = default;
+WlanPhyImplDevice::~WlanPhyImplDevice() = default;
 
-void WlanphyImplDevice::DdkRelease() { delete this; }
+void WlanPhyImplDevice::DdkRelease() { delete this; }
 
-zx_status_t WlanphyImplDevice::DdkServiceConnect(const char* service_name, fdf::Channel channel) {
+zx_status_t WlanPhyImplDevice::DdkServiceConnect(const char* service_name, fdf::Channel channel) {
   // Ensure they are requesting the correct protocol.
   if (std::string_view(service_name) !=
-      fidl::DiscoverableProtocolName<fuchsia_wlan_wlanphyimpl::WlanphyImpl>) {
+      fidl::DiscoverableProtocolName<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>) {
     IWL_ERR(this, "Service name doesn't match. Connection request from a wrong device.\n");
     return ZX_ERR_NOT_SUPPORTED;
   }
-  fdf::ServerEnd<fuchsia_wlan_wlanphyimpl::WlanphyImpl> server_end(std::move(channel));
+  fdf::ServerEnd<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> server_end(std::move(channel));
   fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(server_end), this);
   return ZX_OK;
 }
 
-void WlanphyImplDevice::GetSupportedMacRoles(fdf::Arena& arena,
+void WlanPhyImplDevice::GetSupportedMacRoles(fdf::Arena& arena,
                                              GetSupportedMacRolesCompleter::Sync& completer) {
   // The fidl array which will be returned to Wlanphy driver.
   fuchsia_wlan_common::WlanMacRole
@@ -69,7 +69,7 @@ void WlanphyImplDevice::GetSupportedMacRoles(fdf::Arena& arena,
   completer.buffer(arena).ReplySuccess(reply_vector);
 }
 
-void WlanphyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
+void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
                                     CreateIfaceCompleter::Sync& completer) {
   zx_status_t status = ZX_OK;
 
@@ -81,7 +81,7 @@ void WlanphyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& 
   }
 
   uint16_t out_iface_id;
-  wlanphy_impl_create_iface_req_t create_iface_req;
+  wlan_phy_impl_create_iface_req_t create_iface_req;
 
   switch (request->role()) {
     case fuchsia_wlan_common::WlanMacRole::kClient:
@@ -126,12 +126,12 @@ void WlanphyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& 
   IWL_INFO("%s() created iface %u\n", __func__, out_iface_id);
 
   fidl::Arena fidl_arena;
-  auto builder = wlanphyimpl_fidl::WlanphyImplCreateIfaceResponse::Builder(fidl_arena);
+  auto builder = wlanphyimpl_fidl::WlanPhyImplCreateIfaceResponse::Builder(fidl_arena);
   builder.iface_id(out_iface_id);
   completer.buffer(arena).ReplySuccess(builder.Build());
 }
 
-void WlanphyImplDevice::DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
+void WlanPhyImplDevice::DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
                                      DestroyIfaceCompleter::Sync& completer) {
   if (!request->has_iface_id()) {
     IWL_ERR(this, "%s() invoked without valid iface id\n", __func__);
@@ -150,9 +150,9 @@ void WlanphyImplDevice::DestroyIface(DestroyIfaceRequestView request, fdf::Arena
   completer.buffer(arena).ReplySuccess();
 }
 
-void WlanphyImplDevice::SetCountry(SetCountryRequestView request, fdf::Arena& arena,
+void WlanPhyImplDevice::SetCountry(SetCountryRequestView request, fdf::Arena& arena,
                                    SetCountryCompleter::Sync& completer) {
-  wlanphy_country_t country;
+  wlan_phy_country_t country;
 
   if (!request->country.is_alpha2()) {
     IWL_ERR(this, "%s() only alpha2 format is supported\n", __func__);
@@ -171,16 +171,16 @@ void WlanphyImplDevice::SetCountry(SetCountryRequestView request, fdf::Arena& ar
   completer.buffer(arena).ReplySuccess();
 }
 
-void WlanphyImplDevice::ClearCountry(fdf::Arena& arena, ClearCountryCompleter::Sync& completer) {
+void WlanPhyImplDevice::ClearCountry(fdf::Arena& arena, ClearCountryCompleter::Sync& completer) {
   IWL_ERR(this, "%s() not implemented ...\n", __func__);
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-void WlanphyImplDevice::GetCountry(fdf::Arena& arena, GetCountryCompleter::Sync& completer) {
+void WlanPhyImplDevice::GetCountry(fdf::Arena& arena, GetCountryCompleter::Sync& completer) {
   fidl::Array<uint8_t, WLANPHY_ALPHA2_LEN> alpha2;
 
-  // TODO(fxbug.dev/95504): Remove the usage of wlanphy_country_t inside the iwlwifi driver.
-  wlanphy_country_t country;
+  // TODO(fxbug.dev/95504): Remove the usage of wlan_phy_country_t inside the iwlwifi driver.
+  wlan_phy_country_t country;
   zx_status_t status = phy_get_country(drvdata(), &country);
   if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
@@ -190,17 +190,18 @@ void WlanphyImplDevice::GetCountry(fdf::Arena& arena, GetCountryCompleter::Sync&
 
   memcpy(alpha2.begin(), country.alpha2, WLANPHY_ALPHA2_LEN);
 
-  auto out_country = fuchsia_wlan_wlanphyimpl::wire::WlanphyCountry::WithAlpha2(alpha2);
+  auto out_country = fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry::WithAlpha2(alpha2);
   completer.buffer(arena).ReplySuccess(out_country);
 }
 
-void WlanphyImplDevice::SetPsMode(SetPsModeRequestView request, fdf::Arena& arena,
-                                  SetPsModeCompleter::Sync& completer) {
+void WlanPhyImplDevice::SetPowerSaveMode(SetPowerSaveModeRequestView request, fdf::Arena& arena,
+                                         SetPowerSaveModeCompleter::Sync& completer) {
   IWL_ERR(this, "%s() not implemented ...\n", __func__);
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-void WlanphyImplDevice::GetPsMode(fdf::Arena& arena, GetPsModeCompleter::Sync& completer) {
+void WlanPhyImplDevice::GetPowerSaveMode(fdf::Arena& arena,
+                                         GetPowerSaveModeCompleter::Sync& completer) {
   IWL_ERR(this, "%s() not implemented ...\n", __func__);
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }

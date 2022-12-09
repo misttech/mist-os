@@ -81,13 +81,13 @@ protocol Phy {
         status int32;
     });
 
-    SetPsMode(struct {
+    SetPowerSaveMode(struct {
         req fuchsia.wlan.common.PowerSaveType;
     }) -> (struct {
         status int32;
     });
 
-    GetPsMode() -> (struct {
+    GetPowerSaveMode() -> (struct {
         resp fuchsia.wlan.common.PowerSaveType;
     }) error int32;
 };

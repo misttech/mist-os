@@ -90,11 +90,11 @@ void Device::DdkSuspend(ddk::SuspendTxn txn) {
 
 zx_status_t Device::DdkServiceConnect(const char* service_name, fdf::Channel channel) {
   if (std::string_view(service_name) !=
-      fidl::DiscoverableProtocolName<fuchsia_wlan_wlanphyimpl::WlanphyImpl>) {
+      fidl::DiscoverableProtocolName<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>) {
     BRCMF_ERR("Service name doesn't match. Connection request from a wrong device.\n");
     return ZX_ERR_NOT_SUPPORTED;
   }
-  fdf::ServerEnd<fuchsia_wlan_wlanphyimpl::WlanphyImpl> server_end(std::move(channel));
+  fdf::ServerEnd<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> server_end(std::move(channel));
   fdf::BindServer(dispatcher_.get(), std::move(server_end), this);
   return ZX_OK;
 }
@@ -174,7 +174,7 @@ void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
   zx_status_t status = ZX_OK;
   wireless_dev* wdev = nullptr;
   uint16_t iface_id = 0;
-  wlanphy_impl_create_iface_req_t create_iface_req;
+  wlan_phy_impl_create_iface_req_t create_iface_req;
 
   create_iface_req.mlme_channel = request->mlme_channel().release();
 
@@ -283,7 +283,7 @@ void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
 
   fidl::Arena fidl_arena;
   auto builder =
-      fuchsia_wlan_wlanphyimpl::wire::WlanphyImplCreateIfaceResponse::Builder(fidl_arena);
+      fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplCreateIfaceResponse::Builder(fidl_arena);
   builder.iface_id(iface_id);
   completer.buffer(arena).ReplySuccess(builder.Build());
   return;
@@ -341,7 +341,7 @@ void Device::DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
 void Device::SetCountry(SetCountryRequestView request, fdf::Arena& arena,
                         SetCountryCompleter::Sync& completer) {
   BRCMF_DBG(WLANPHY, "Setting country code dfv2");
-  wlanphy_country_t country;
+  wlan_phy_country_t country;
   if (!request->country.is_alpha2()) {
     completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
     BRCMF_ERR("Device::SetCountry() Invalid input format of country code.");
@@ -373,7 +373,7 @@ void Device::ClearCountry(fdf::Arena& arena, ClearCountryCompleter::Sync& comple
 void Device::GetCountry(fdf::Arena& arena, GetCountryCompleter::Sync& completer) {
   BRCMF_DBG(WLANPHY, "Received request for country from SME dfv2");
   fidl::Array<uint8_t, WLANPHY_ALPHA2_LEN> alpha2;
-  wlanphy_country_t country;
+  wlan_phy_country_t country;
   zx_status_t status = WlanInterface::GetCountry(brcmf_pub_.get(), &country);
   if (status != ZX_OK) {
     BRCMF_ERR("Device::GetCountry() Failed Get country : %s", zx_status_get_string(status));
@@ -382,20 +382,20 @@ void Device::GetCountry(fdf::Arena& arena, GetCountryCompleter::Sync& completer)
   }
 
   memcpy(alpha2.begin(), country.alpha2, WLANPHY_ALPHA2_LEN);
-  auto out_country = fuchsia_wlan_wlanphyimpl::wire::WlanphyCountry::WithAlpha2(alpha2);
+  auto out_country = fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry::WithAlpha2(alpha2);
   completer.buffer(arena).ReplySuccess(out_country);
 }
 
-void Device::SetPsMode(SetPsModeRequestView request, fdf::Arena& arena,
-                       SetPsModeCompleter::Sync& completer) {
+void Device::SetPowerSaveMode(SetPowerSaveModeRequestView request, fdf::Arena& arena,
+                              SetPowerSaveModeCompleter::Sync& completer) {
   BRCMF_DBG(WLANPHY, "Setting power save mode dfv2");
   if (!request->has_ps_mode()) {
-    BRCMF_ERR("Device::SetPsMode() invoked without ps_mode");
+    BRCMF_ERR("Device::SetPowerSaveMode() invoked without ps_mode");
     completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
 
-  wlanphy_ps_mode_t ps_mode;
+  wlan_phy_ps_mode_t ps_mode;
 
   switch (request->ps_mode()) {
     case fuchsia_wlan_common::wire::PowerSaveType::kPsModeUltraLowPower:
@@ -411,14 +411,15 @@ void Device::SetPsMode(SetPsModeRequestView request, fdf::Arena& arena,
       ps_mode.ps_mode = POWER_SAVE_TYPE_PS_MODE_PERFORMANCE;
       break;
     default:
-      BRCMF_ERR("Device::SetPsMode() Invalid Power Save mode in request");
+      BRCMF_ERR("Device::SetPowerSaveMode() Invalid Power Save mode in request");
       completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
       return;
   }
 
-  zx_status_t status = brcmf_set_ps_mode(brcmf_pub_.get(), &ps_mode);
+  zx_status_t status = brcmf_set_power_save_mode(brcmf_pub_.get(), &ps_mode);
   if (status != ZX_OK) {
-    BRCMF_ERR("Device::SetPsMode() failed setting ps mode : %s", zx_status_get_string(status));
+    BRCMF_ERR("Device::SetPowerSaveMode() failed setting ps mode : %s",
+              zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }
@@ -426,12 +427,12 @@ void Device::SetPsMode(SetPsModeRequestView request, fdf::Arena& arena,
   completer.buffer(arena).ReplySuccess();
 }
 
-void Device::GetPsMode(fdf::Arena& arena, GetPsModeCompleter::Sync& completer) {
+void Device::GetPowerSaveMode(fdf::Arena& arena, GetPowerSaveModeCompleter::Sync& completer) {
   BRCMF_DBG(WLANPHY, "Received request for PS mode from SME dfv2");
-  wlanphy_ps_mode_t out_ps_mode;
-  zx_status_t status = brcmf_get_ps_mode(brcmf_pub_.get(), &out_ps_mode);
+  wlan_phy_ps_mode_t out_ps_mode;
+  zx_status_t status = brcmf_get_power_save_mode(brcmf_pub_.get(), &out_ps_mode);
   if (status != ZX_OK) {
-    BRCMF_ERR("Device::GetPsMode() Get Power Save Mode failed");
+    BRCMF_ERR("Device::GetPowerSaveMode() Get Power Save Mode failed");
     completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
     return;
   }
@@ -450,12 +451,13 @@ void Device::GetPsMode(fdf::Arena& arena, GetPsModeCompleter::Sync& completer) {
       ps_mode = fuchsia_wlan_common::wire::PowerSaveType::kPsModePerformance;
       break;
     default:
-      BRCMF_ERR("Device::GetPsMode() Incorrect Power Save Mode received");
+      BRCMF_ERR("Device::GetPowerSaveMode() Incorrect Power Save Mode received");
       completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
       return;
   }
   fidl::Arena fidl_arena;
-  auto builder = fuchsia_wlan_wlanphyimpl::wire::WlanphyImplGetPsModeResponse::Builder(fidl_arena);
+  auto builder =
+      fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplGetPowerSaveModeResponse::Builder(fidl_arena);
   builder.ps_mode(ps_mode);
   completer.buffer(arena).ReplySuccess(builder.Build());
 }

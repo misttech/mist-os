@@ -24,7 +24,7 @@ class RcuManager;
 
 // This class contains the Fuchsia-specific PCIE bus initialization logic, using the DDKTL classes
 // to manage the lifetime of a iwlwifi driver instance.
-class PcieDevice : public WlanphyImplDevice {
+class PcieDevice : public WlanPhyImplDevice {
  public:
   PcieDevice(const PcieDevice& device) = delete;
   PcieDevice& operator=(const PcieDevice& other) = delete;

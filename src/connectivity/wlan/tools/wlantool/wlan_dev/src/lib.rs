@@ -246,16 +246,18 @@ async fn do_phy(cmd: opts::PhyCmd, monitor_proxy: DeviceMonitor) -> Result<(), E
                 monitor_proxy.clear_country(&mut req).await.context("error clearing country")?;
             println!("response: {:?}", zx_status::Status::from_raw(response));
         }
-        opts::PhyCmd::SetPsMode { phy_id, mode } => {
+        opts::PhyCmd::SetPowerSaveMode { phy_id, mode } => {
             println!("SetPSMode: phy_id {:?} ps_mode {:?}", phy_id, mode);
-            let mut req = wlan_service::SetPsModeRequest { phy_id, ps_mode: mode.into() };
-            let response =
-                monitor_proxy.set_ps_mode(&mut req).await.context("error setting ps mode")?;
+            let mut req = wlan_service::SetPowerSaveModeRequest { phy_id, ps_mode: mode.into() };
+            let response = monitor_proxy
+                .set_power_save_mode(&mut req)
+                .await
+                .context("error setting ps mode")?;
             println!("response: {:?}", zx_status::Status::from_raw(response));
         }
-        opts::PhyCmd::GetPsMode { phy_id } => {
+        opts::PhyCmd::GetPowerSaveMode { phy_id } => {
             let result =
-                monitor_proxy.get_ps_mode(phy_id).await.context("error getting ps mode")?;
+                monitor_proxy.get_power_save_mode(phy_id).await.context("error getting ps mode")?;
             match result {
                 Ok(resp) => match resp.ps_mode {
                     PowerSaveType::PsModePerformance => {
@@ -1006,24 +1008,24 @@ mod tests {
     }
 
     #[test]
-    fn test_get_ps_mode() {
+    fn test_get_power_save_mode() {
         let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
         let (monitor_svc_local, monitor_svc_remote) =
             create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
         let mut monitor_svc_stream =
             monitor_svc_remote.into_stream().expect("failed to create stream");
-        let fut = do_phy(PhyCmd::GetPsMode { phy_id: 45 }, monitor_svc_local);
+        let fut = do_phy(PhyCmd::GetPowerSaveMode { phy_id: 45 }, monitor_svc_local);
         pin_mut!(fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut monitor_svc_stream.next()),
-            Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::GetPsMode {
+            Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::GetPowerSaveMode {
                 phy_id, responder,
             }))) => {
                 assert_eq!(phy_id, 45);
                 responder.send(
-                    &mut Ok(fidl_fuchsia_wlan_device_service::GetPsModeResponse {
+                    &mut Ok(fidl_fuchsia_wlan_device_service::GetPowerSaveModeResponse {
                         ps_mode: PowerSaveType::PsModePerformance,
                     })).expect("failed to send response");
             }
@@ -1033,14 +1035,14 @@ mod tests {
     }
 
     #[test]
-    fn test_set_ps_mode() {
+    fn test_set_power_save_mode() {
         let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
         let (monitor_svc_local, monitor_svc_remote) =
             create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
         let mut monitor_svc_stream =
             monitor_svc_remote.into_stream().expect("failed to create stream");
         let fut = do_phy(
-            PhyCmd::SetPsMode { phy_id: 45, mode: PsModeArg::PsModeBalanced },
+            PhyCmd::SetPowerSaveMode { phy_id: 45, mode: PsModeArg::PsModeBalanced },
             monitor_svc_local,
         );
         pin_mut!(fut);
@@ -1048,7 +1050,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut monitor_svc_stream.next()),
-            Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::SetPsMode {
+            Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::SetPowerSaveMode {
                 req, responder,
             }))) => {
                 assert_eq!(req.phy_id, 45);

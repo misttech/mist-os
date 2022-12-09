@@ -28,7 +28,7 @@ namespace wlan {
 namespace iwlwifi {
 
 class RcuManager;
-class WlanphyImplDevice;
+class WlanPhyImplDevice;
 
 }  // namespace iwlwifi
 
@@ -58,8 +58,8 @@ class SimTransport : public SimMvm {
   // Member accessors.
   struct iwl_trans* iwl_trans();
   const struct iwl_trans* iwl_trans() const;
-  ::wlan::iwlwifi::WlanphyImplDevice* sim_device();
-  const ::wlan::iwlwifi::WlanphyImplDevice* sim_device() const;
+  ::wlan::iwlwifi::WlanPhyImplDevice* sim_device();
+  const ::wlan::iwlwifi::WlanPhyImplDevice* sim_device() const;
   zx_device_t* fake_parent();
 
  private:
@@ -68,7 +68,7 @@ class SimTransport : public SimMvm {
   std::unique_ptr<::wlan::iwlwifi::RcuManager> rcu_manager_;
   struct device device_;
   struct iwl_trans* iwl_trans_;
-  wlan::iwlwifi::WlanphyImplDevice* sim_device_;
+  wlan::iwlwifi::WlanPhyImplDevice* sim_device_;
 };
 
 }  // namespace testing

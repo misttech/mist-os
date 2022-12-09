@@ -23,7 +23,7 @@ class DeviceConnector;
 
 class Device : public fidl::WireServer<fuchsia_wlan_device::Phy> {
  public:
-  Device(zx_device_t* device, wlanphy_impl_protocol_t wlanphy_impl_proto);
+  Device(zx_device_t* device, wlan_phy_impl_protocol_t wlan_phy_impl_proto);
   ~Device() override;
 
   zx_status_t Bind();
@@ -39,8 +39,9 @@ class Device : public fidl::WireServer<fuchsia_wlan_device::Phy> {
   void SetCountry(SetCountryRequestView request, SetCountryCompleter::Sync& completer) override;
   void GetCountry(GetCountryCompleter::Sync& completer) override;
   void ClearCountry(ClearCountryCompleter::Sync& completer) override;
-  void SetPsMode(SetPsModeRequestView request, SetPsModeCompleter::Sync& completer) override;
-  void GetPsMode(GetPsModeCompleter::Sync& completer) override;
+  void SetPowerSaveMode(SetPowerSaveModeRequestView request,
+                        SetPowerSaveModeCompleter::Sync& completer) override;
+  void GetPowerSaveMode(GetPowerSaveModeCompleter::Sync& completer) override;
 
   zx_status_t Connect(fidl::ServerEnd<fuchsia_wlan_device::Phy> server_end);
 
@@ -48,7 +49,7 @@ class Device : public fidl::WireServer<fuchsia_wlan_device::Phy> {
   zx_device_t* parent_;
   zx_device_t* zxdev_;
 
-  wlanphy_impl_protocol_t wlanphy_impl_;
+  wlan_phy_impl_protocol_t wlan_phy_impl_;
 
   friend class DeviceConnector;
   friend class WlanphyConvertTest;

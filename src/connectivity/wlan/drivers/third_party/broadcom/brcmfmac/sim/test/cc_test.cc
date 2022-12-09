@@ -22,9 +22,9 @@ class CountryCodeTest : public SimTest {
   void Init();
   void CreateInterface();
   void DeleteInterface();
-  zx_status_t SetCountryCode(const fuchsia_wlan_wlanphyimpl::wire::WlanphyCountry* country);
+  zx_status_t SetCountryCode(const fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry* country);
   void GetCountryCodeFromFirmware(brcmf_fil_country_le* ccode);
-  zx_status_t SetCountryCodeInFirmware(const wlanphy_country_t* country);
+  zx_status_t SetCountryCodeInFirmware(const wlan_phy_country_t* country);
   zx_status_t ClearCountryCode();
   uint32_t DeviceCountByProtocolId(uint32_t proto_id);
 
@@ -50,7 +50,7 @@ uint32_t CountryCodeTest::DeviceCountByProtocolId(uint32_t proto_id) {
 }
 
 zx_status_t CountryCodeTest::SetCountryCode(
-    const fuchsia_wlan_wlanphyimpl::wire::WlanphyCountry* country) {
+    const fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry* country) {
   auto result = client_.sync().buffer(test_arena_)->SetCountry(*country);
   EXPECT_TRUE(result.ok());
   if (result->is_error()) {
@@ -78,7 +78,7 @@ void CountryCodeTest::GetCountryCodeFromFirmware(brcmf_fil_country_le* ccode) {
   EXPECT_EQ(status, ZX_OK);
 }
 
-zx_status_t CountryCodeTest::SetCountryCodeInFirmware(const wlanphy_country_t* country) {
+zx_status_t CountryCodeTest::SetCountryCodeInFirmware(const wlan_phy_country_t* country) {
   EXPECT_NE(country, nullptr);
   brcmf_simdev* sim = device_->GetSim();
   return brcmf_set_country(sim->drvr, country);
@@ -92,9 +92,9 @@ TEST_F(CountryCodeTest, SetDefault) {
 }
 
 TEST_F(CountryCodeTest, SetCCode) {
-  const auto valid_country = fuchsia_wlan_wlanphyimpl::wire::WlanphyCountry::WithAlpha2({'U', 'S'});
+  const auto valid_country = fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry::WithAlpha2({'U', 'S'});
   const auto invalid_country =
-      fuchsia_wlan_wlanphyimpl::wire::WlanphyCountry::WithAlpha2({'X', 'X'});
+      fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry::WithAlpha2({'X', 'X'});
   struct brcmf_fil_country_le country_code;
   zx_status_t status;
   uint8_t code;
@@ -129,7 +129,7 @@ TEST_F(CountryCodeTest, GetCCode) {
   CreateInterface();
 
   {
-    const wlanphy_country_t country = {{'W', 'W'}};
+    const wlan_phy_country_t country = {{'W', 'W'}};
     ASSERT_EQ(ZX_OK, SetCountryCodeInFirmware(&country));
     auto result = client_.sync().buffer(test_arena_)->GetCountry();
     EXPECT_TRUE(result.ok());
@@ -141,7 +141,7 @@ TEST_F(CountryCodeTest, GetCCode) {
 
   // Try again, just in case the first one was a default value.
   {
-    const wlanphy_country_t country = {{'U', 'S'}};
+    const wlan_phy_country_t country = {{'U', 'S'}};
     ASSERT_EQ(ZX_OK, SetCountryCodeInFirmware(&country));
     auto result = client_.sync().buffer(test_arena_)->GetCountry();
     EXPECT_TRUE(result.ok());
@@ -153,7 +153,7 @@ TEST_F(CountryCodeTest, GetCCode) {
 }
 
 TEST_F(CountryCodeTest, ClearCCode) {
-  const wlanphy_country_t world_safe_country = {{'W', 'W'}};
+  const wlan_phy_country_t world_safe_country = {{'W', 'W'}};
   struct brcmf_fil_country_le country_code;
   zx_status_t status;
   uint8_t code;

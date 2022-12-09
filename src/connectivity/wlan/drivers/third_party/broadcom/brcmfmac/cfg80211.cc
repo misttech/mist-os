@@ -566,7 +566,7 @@ static bool brcmf_is_existing_macaddr(brcmf_pub* drvr, const uint8_t mac_addr[ET
 }
 
 zx_status_t brcmf_cfg80211_add_iface(brcmf_pub* drvr, const char* name, struct vif_params* params,
-                                     const wlanphy_impl_create_iface_req_t* req,
+                                     const wlan_phy_impl_create_iface_req_t* req,
                                      struct wireless_dev** wdev_out) {
   zx_status_t err;
   net_device* ndev;

@@ -316,8 +316,8 @@ executable("wlan_softmac_device_test") {
   ]
 }
 
-executable("wlanphy_impl_device_test") {
-  output_name = "wlanphy_impl_device_test"
+executable("wlan_phy_impl_device_test") {
+  output_name = "wlan_phy_impl_device_test"
   testonly = true
   sources = [ "wlanphy-impl-device-test.cc" ]
   deps = [
@@ -351,7 +351,7 @@ _tests = [
   "task_test",
   "utils_test",
   "wlan_softmac_device_test",
-  "wlanphy_impl_device_test",
+  "wlan_phy_impl_device_test",
 ]
 
 foreach(test_name, _tests) {

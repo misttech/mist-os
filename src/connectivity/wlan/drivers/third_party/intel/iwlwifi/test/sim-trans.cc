@@ -8,7 +8,7 @@
 // The simulated behaviors are implemented in the 'trans_ops_sim_trans',
 // which is a 'struct iwl_trans_ops'.
 //
-// This file also calls device_add() to register 'wlanphy_impl_protocol_ops_t'
+// This file also calls device_add() to register 'wlan_phy_impl_protocol_ops_t'
 // so that we can simulate the MLME (the user of this softmac driver) to test
 // the iface functions.
 //
@@ -47,10 +47,10 @@ using wlan::testing::SimMvm;
 namespace {
 
 // SimTransDevice to appropriately handle unbind and release.
-class SimTransDevice : public ::wlan::iwlwifi::WlanphyImplDevice {
+class SimTransDevice : public ::wlan::iwlwifi::WlanPhyImplDevice {
  public:
   explicit SimTransDevice(zx_device_t* parent, iwl_trans* drvdata)
-      : WlanphyImplDevice(parent), drvdata_(drvdata) {}
+      : WlanPhyImplDevice(parent), drvdata_(drvdata) {}
   void DdkInit(::ddk::InitTxn txn) override { txn.Reply(ZX_OK); }
   void DdkUnbind(::ddk::UnbindTxn txn) override {
     struct iwl_trans* trans = drvdata_;
@@ -264,7 +264,7 @@ static struct iwl_trans* iwl_sim_trans_transport_alloc(struct device* dev,
 // 'out_trans' is used to return the new allocated 'struct iwl_trans'.
 static zx_status_t sim_transport_bind(SimMvm* fw, struct device* dev,
                                       struct iwl_trans** out_iwl_trans,
-                                      wlan::iwlwifi::WlanphyImplDevice** out_device) {
+                                      wlan::iwlwifi::WlanPhyImplDevice** out_device) {
   zx_status_t status = ZX_OK;
   const struct iwl_cfg* cfg = &iwl7265_2ac_cfg;
 
@@ -342,9 +342,9 @@ struct iwl_trans* SimTransport::iwl_trans() { return iwl_trans_; }
 
 const struct iwl_trans* SimTransport::iwl_trans() const { return iwl_trans_; }
 
-::wlan::iwlwifi::WlanphyImplDevice* SimTransport::sim_device() { return sim_device_; }
+::wlan::iwlwifi::WlanPhyImplDevice* SimTransport::sim_device() { return sim_device_; }
 
-const ::wlan::iwlwifi::WlanphyImplDevice* SimTransport::sim_device() const { return sim_device_; }
+const ::wlan::iwlwifi::WlanPhyImplDevice* SimTransport::sim_device() const { return sim_device_; }
 
 zx_device_t* SimTransport::fake_parent() { return device_.zxdev; }
 

@@ -11,8 +11,8 @@ components.
 ### `PcieDevice`
 
 The [`PcieDevice`](pcie_device.h) class is the interface between the brcmfmac driver and the DDK
-concepts and entry points.  As a `ddk::WlanphyImplProtocol<>` subclass, it presents the DDK view of a
-WLAN device as a `WlanphyImpl` device providing multiple `WlanifImpl` interfaces.  As a
+concepts and entry points.  As a `ddk::WlanPhyImplProtocol<>` subclass, it presents the DDK view of a
+WLAN device as a `WlanPhyImpl` device providing multiple `WlanifImpl` interfaces.  As a
 [`Device`](../device.h) subclass, it provides the brcmfmac driver with access to the relevant DDK
 entry points.
 

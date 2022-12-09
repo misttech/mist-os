@@ -335,7 +335,7 @@ TEST_F(WlanSoftmacDeviceTest, MacStartOnlyOneMlmeChannelAllowed) {
   // The normal case. A channel will be transferred to MLME.
   constexpr zx_handle_t kMlmeChannel = static_cast<zx_handle_t>(0xF001);
 
-  // Manually set mlme channel here, in reality, this is set when WlanphyImplDevice::CreateIface()
+  // Manually set mlme channel here, in reality, this is set when WlanPhyImplDevice::CreateIface()
   // is called.
   mvmvif_->mlme_channel = kMlmeChannel;
 
@@ -427,7 +427,7 @@ TEST_F(WlanSoftmacDeviceTest, Release) {
 class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
  public:
   MacInterfaceTest() {
-    zx_handle_t wlanphy_impl_channel = mvmvif_->mlme_channel;
+    zx_handle_t wlan_phy_impl_channel = mvmvif_->mlme_channel;
 
     auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmacIfc>();
     ASSERT_FALSE(endpoints.is_error());
@@ -442,7 +442,7 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
 
     ASSERT_TRUE(result.ok());
     EXPECT_FALSE(result->is_error());
-    ASSERT_EQ(wlanphy_impl_channel, result->value()->sme_channel);
+    ASSERT_EQ(wlan_phy_impl_channel, result->value()->sme_channel);
 
     // Add the interface to MVM instance.
     mvmvif_->mvm->mvmvif[0] = mvmvif_;

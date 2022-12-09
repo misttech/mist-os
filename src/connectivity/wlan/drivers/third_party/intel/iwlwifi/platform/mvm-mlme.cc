@@ -711,7 +711,7 @@ zx_status_t phy_get_supported_mac_roles(
 }
 
 // This function is working with a PHY context ('ctx') to create a MAC interface.
-zx_status_t phy_create_iface(void* ctx, const wlanphy_impl_create_iface_req_t* req,
+zx_status_t phy_create_iface(void* ctx, const wlan_phy_impl_create_iface_req_t* req,
                              uint16_t* out_iface_id) {
   const auto iwl_trans = reinterpret_cast<struct iwl_trans*>(ctx);
   struct iwl_mvm* mvm = iwl_trans_get_mvm(iwl_trans);
@@ -893,12 +893,12 @@ zx_status_t phy_destroy_iface(void* ctx, uint16_t id) {
   return ZX_OK;
 }
 
-zx_status_t phy_set_country(void* ctx, const wlanphy_country_t* country) {
+zx_status_t phy_set_country(void* ctx, const wlan_phy_country_t* country) {
   IWL_ERR(ctx, "%s() needs porting ...\n", __func__);
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t phy_get_country(void* ctx, wlanphy_country_t* out_country) {
+zx_status_t phy_get_country(void* ctx, wlan_phy_country_t* out_country) {
   const auto iwl_trans = reinterpret_cast<struct iwl_trans*>(ctx);
   struct iwl_mvm* mvm = iwl_trans_get_mvm(iwl_trans);
 

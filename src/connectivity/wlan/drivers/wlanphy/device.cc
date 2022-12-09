@@ -37,14 +37,14 @@ class DeviceConnector : public fidl::WireServer<fuchsia_wlan_device::Connector> 
   Device* device_;
 };
 
-Device::Device(zx_device_t* device, wlanphy_impl_protocol_t wlanphy_impl_proto)
-    : parent_(device), wlanphy_impl_(wlanphy_impl_proto) {
+Device::Device(zx_device_t* device, wlan_phy_impl_protocol_t wlan_phy_impl_proto)
+    : parent_(device), wlan_phy_impl_(wlan_phy_impl_proto) {
   ltrace_fn();
   // Assert minimum required functionality from the wlanphy_impl driver
-  ZX_ASSERT(wlanphy_impl_.ops != nullptr && wlanphy_impl_.ops->get_supported_mac_roles != nullptr &&
-            wlanphy_impl_.ops->create_iface != nullptr &&
-            wlanphy_impl_.ops->destroy_iface != nullptr &&
-            wlanphy_impl_.ops->set_country != nullptr && wlanphy_impl_.ops->get_country != nullptr);
+  ZX_ASSERT(
+      wlan_phy_impl_.ops != nullptr && wlan_phy_impl_.ops->get_supported_mac_roles != nullptr &&
+      wlan_phy_impl_.ops->create_iface != nullptr && wlan_phy_impl_.ops->destroy_iface != nullptr &&
+      wlan_phy_impl_.ops->set_country != nullptr && wlan_phy_impl_.ops->get_country != nullptr);
 }
 
 Device::~Device() { ltrace_fn(); }
@@ -109,8 +109,8 @@ void Device::GetSupportedMacRoles(GetSupportedMacRolesCompleter::Sync& completer
   wlan_mac_role_t supported_mac_roles_list[fuchsia_wlan_common::wire::kMaxSupportedMacRoles];
   uint8_t supported_mac_roles_count;
 
-  zx_status_t status = wlanphy_impl_.ops->get_supported_mac_roles(
-      wlanphy_impl_.ctx, supported_mac_roles_list, &supported_mac_roles_count);
+  zx_status_t status = wlan_phy_impl_.ops->get_supported_mac_roles(
+      wlan_phy_impl_.ctx, supported_mac_roles_list, &supported_mac_roles_count);
   if (status != ZX_OK) {
     completer.ReplyError(status);
     return;
@@ -166,8 +166,8 @@ void Device::CreateIface(CreateIfaceRequestView request, CreateIfaceCompleter::S
   }
 
   uint16_t iface_id;
-  wlanphy_impl_create_iface_req_t create_req{.role = role,
-                                             .mlme_channel = request->req.mlme_channel.release()};
+  wlan_phy_impl_create_iface_req_t create_req{.role = role,
+                                              .mlme_channel = request->req.mlme_channel.release()};
   if (memcmp(request->req.init_sta_addr.data(), NULL_MAC_ADDR.data(), NULL_MAC_ADDR.size()) != 0) {
     create_req.has_init_sta_addr = true;
     std::copy(request->req.init_sta_addr.begin(), request->req.init_sta_addr.end(),
@@ -176,7 +176,7 @@ void Device::CreateIface(CreateIfaceRequestView request, CreateIfaceCompleter::S
     create_req.has_init_sta_addr = false;
   }
 
-  status = wlanphy_impl_.ops->create_iface(wlanphy_impl_.ctx, &create_req, &iface_id);
+  status = wlan_phy_impl_.ops->create_iface(wlan_phy_impl_.ctx, &create_req, &iface_id);
   if (status != ZX_OK) {
     completer.ReplyError(status);
     return;
@@ -188,7 +188,7 @@ void Device::DestroyIface(DestroyIfaceRequestView request, DestroyIfaceCompleter
   ltrace_fn();
 
   zx_status_t status;
-  status = wlanphy_impl_.ops->destroy_iface(wlanphy_impl_.ctx, request->req.id);
+  status = wlan_phy_impl_.ops->destroy_iface(wlan_phy_impl_.ctx, request->req.id);
   if (status != ZX_OK) {
     completer.ReplyError(status);
   }
@@ -199,9 +199,9 @@ void Device::SetCountry(SetCountryRequestView request, SetCountryCompleter::Sync
   ltrace_fn();
   ldebug_device("SetCountry to %s\n", wlan::common::Alpha2ToStr(request->req.alpha2).c_str());
 
-  wlanphy_country_t country;
+  wlan_phy_country_t country;
   memcpy(country.alpha2, request->req.alpha2.data(), WLANPHY_ALPHA2_LEN);
-  auto status = wlanphy_impl_.ops->set_country(wlanphy_impl_.ctx, &country);
+  auto status = wlan_phy_impl_.ops->set_country(wlan_phy_impl_.ctx, &country);
 
   if (status != ZX_OK) {
     ldebug_device("SetCountry to %s failed with error %s\n",
@@ -215,8 +215,8 @@ void Device::SetCountry(SetCountryRequestView request, SetCountryCompleter::Sync
 void Device::GetCountry(GetCountryCompleter::Sync& completer) {
   ltrace_fn();
 
-  wlanphy_country_t country;
-  if (zx_status_t status = wlanphy_impl_.ops->get_country(wlanphy_impl_.ctx, &country);
+  wlan_phy_country_t country;
+  if (zx_status_t status = wlan_phy_impl_.ops->get_country(wlan_phy_impl_.ctx, &country);
       status != ZX_OK) {
     ldebug_device("GetCountry failed with error %s\n", zx_status_get_string(status));
     completer.ReplyError(status);
@@ -233,42 +233,43 @@ void Device::GetCountry(GetCountryCompleter::Sync& completer) {
 void Device::ClearCountry(ClearCountryCompleter::Sync& completer) {
   ltrace_fn();
 
-  auto status = wlanphy_impl_.ops->clear_country(wlanphy_impl_.ctx);
+  auto status = wlan_phy_impl_.ops->clear_country(wlan_phy_impl_.ctx);
   if (status != ZX_OK) {
     ldebug_device("ClearCountry failed with error %s\n", zx_status_get_string(status));
   }
   completer.Reply(status);
 }
 
-void Device::SetPsMode(SetPsModeRequestView request, SetPsModeCompleter::Sync& completer) {
+void Device::SetPowerSaveMode(SetPowerSaveModeRequestView request,
+                              SetPowerSaveModeCompleter::Sync& completer) {
   ltrace_fn();
-  ldebug_device("SetPsMode to %d\n", request->req);
+  ldebug_device("SetPowerSaveMode to %d\n", request->req);
 
-  wlanphy_ps_mode_t ps_mode_req{
+  wlan_phy_ps_mode_t ps_mode_req{
       .ps_mode = static_cast<power_save_type_t>(request->req),
   };
-  zx_status_t status = wlanphy_impl_.ops->set_ps_mode(wlanphy_impl_.ctx, &ps_mode_req);
+  zx_status_t status = wlan_phy_impl_.ops->set_power_save_mode(wlan_phy_impl_.ctx, &ps_mode_req);
   if (status != ZX_OK) {
-    ldebug_device("SetPsMode to %d failed with error %s\n", request->req,
+    ldebug_device("SetPowerSaveMode to %d failed with error %s\n", request->req,
                   zx_status_get_string(status));
   }
   completer.Reply(status);
 }
 
-void Device::GetPsMode(GetPsModeCompleter::Sync& completer) {
+void Device::GetPowerSaveMode(GetPowerSaveModeCompleter::Sync& completer) {
   ltrace_fn();
 
-  wlanphy_ps_mode_t ps_mode;
-  if (zx_status_t status = wlanphy_impl_.ops->get_ps_mode(wlanphy_impl_.ctx, &ps_mode);
+  wlan_phy_ps_mode_t ps_mode;
+  if (zx_status_t status = wlan_phy_impl_.ops->get_power_save_mode(wlan_phy_impl_.ctx, &ps_mode);
       status != ZX_OK) {
-    ldebug_device("GetPsMode failed with error %s\n", zx_status_get_string(status));
+    ldebug_device("GetPowerSaveMode failed with error %s\n", zx_status_get_string(status));
     completer.ReplyError(status);
     return;
   }
 
   fuchsia_wlan_common::PowerSaveType response =
       static_cast<fuchsia_wlan_common::PowerSaveType>(ps_mode.ps_mode);
-  ldebug_device("GetPsMode returning %d\n", response);
+  ldebug_device("GetPowerSaveMode returning %d\n", response);
   completer.ReplySuccess(response);
 }
 }  // namespace wlanphy

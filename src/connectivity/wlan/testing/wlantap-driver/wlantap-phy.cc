@@ -184,7 +184,7 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
     }
   }
 
-  zx_status_t CreateIface(const wlanphy_impl_create_iface_req_t* req) {
+  zx_status_t CreateIface(const wlan_phy_impl_create_iface_req_t* req) {
     zxlogf(INFO, "%s: received a 'CreateIface' DDK request", name_.c_str());
     {
       std::lock_guard<std::mutex> guard(wlantap_mac_lock_);
@@ -240,7 +240,7 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
     return ZX_OK;
   }
 
-  zx_status_t SetCountry(const wlanphy_country_t* country) {
+  zx_status_t SetCountry(const wlan_phy_country_t* country) {
     if (country == nullptr) {
       zxlogf(ERROR, "%s: SetCountry() received nullptr", name_.c_str());
       return ZX_ERR_INVALID_ARGS;
@@ -262,7 +262,7 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
     return ZX_OK;
   }
 
-  zx_status_t GetCountry(wlanphy_country_t* out_country) {
+  zx_status_t GetCountry(wlan_phy_country_t* out_country) {
     if (out_country == nullptr) {
       zxlogf(ERROR, "%s: GetCountry() received nullptr", name_.c_str());
       return ZX_ERR_INVALID_ARGS;
@@ -271,8 +271,8 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  zx_status_t SetPsMode(const wlanphy_ps_mode_t* ps_mode) {
-    zxlogf(ERROR, "SetPsMode not implemented");
+  zx_status_t SetPowerSaveMode(const wlan_phy_ps_mode_t* ps_mode) {
+    zxlogf(ERROR, "SetPowerSaveMode not implemented");
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -486,7 +486,7 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
 }  // namespace
 
 #define DEV(c) static_cast<WlantapPhy*>(c)
-static wlanphy_impl_protocol_ops_t wlanphy_impl_ops = {
+static wlan_phy_impl_protocol_ops_t wlan_phy_impl_ops = {
     .get_supported_mac_roles =
         [](void* ctx,
            wlan_mac_role_t
@@ -495,7 +495,7 @@ static wlanphy_impl_protocol_ops_t wlanphy_impl_ops = {
       return DEV(ctx)->GetSupportedMacRoles(out_supported_mac_roles_list,
                                             out_supported_mac_roles_count);
     },
-    .create_iface = [](void* ctx, const wlanphy_impl_create_iface_req_t* req,
+    .create_iface = [](void* ctx, const wlan_phy_impl_create_iface_req_t* req,
                        uint16_t* out_iface_id) -> zx_status_t {
       *out_iface_id = 0;
       return DEV(ctx)->CreateIface(req);
@@ -504,14 +504,14 @@ static wlanphy_impl_protocol_ops_t wlanphy_impl_ops = {
       ZX_ASSERT(id == 0);
       return DEV(ctx)->DestroyIface();
     },
-    .set_country = [](void* ctx, const wlanphy_country_t* country) -> zx_status_t {
+    .set_country = [](void* ctx, const wlan_phy_country_t* country) -> zx_status_t {
       return DEV(ctx)->SetCountry(country);
     },
-    .get_country = [](void* ctx, wlanphy_country_t* out_country) -> zx_status_t {
+    .get_country = [](void* ctx, wlan_phy_country_t* out_country) -> zx_status_t {
       return DEV(ctx)->GetCountry(out_country);
     },
-    .set_ps_mode = [](void* ctx, const wlanphy_ps_mode_t* ps_mode) -> zx_status_t {
-      return DEV(ctx)->SetPsMode(ps_mode);
+    .set_power_save_mode = [](void* ctx, const wlan_phy_ps_mode_t* ps_mode) -> zx_status_t {
+      return DEV(ctx)->SetPowerSaveMode(ps_mode);
     },
 };
 #undef DEV
@@ -528,7 +528,7 @@ zx_status_t CreatePhy(zx_device_t* wlantapctl, zx::channel user_channel,
                             .ctx = phy.get(),
                             .ops = &device_ops,
                             .proto_id = ZX_PROTOCOL_WLANPHY_IMPL,
-                            .proto_ops = &wlanphy_impl_ops};
+                            .proto_ops = &wlan_phy_impl_ops};
   zx_status_t status = device_add(wlantapctl, &args, &phy->device_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: could not add device: %d", __func__, status);

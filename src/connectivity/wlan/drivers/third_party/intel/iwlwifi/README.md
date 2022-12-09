@@ -48,7 +48,7 @@ Below is the brief illustration of how we map the iwlwifi driver onto Fuchsia:
 ```
                  MLME
                   |
-           --------------- wlanphy_impl_protocol_ops_t / wlan_softmac_protocol_ops_t
+           --------------- wlan_phy_impl_protocol_ops_t / wlan_softmac_protocol_ops_t
                   |
      ^            |
      |     +-------------+         +--------------+
@@ -102,8 +102,8 @@ The highlevel initialization procedure is:
 - `iwl_op_mode_mvm_start()` then takes over to download the ucode to hardware, start the firmware,
   and initialize all variables.
 
-- After the PCIe and mvm are ready, `::ddk::WlanphyImpl*()` in device.cc also implement the callback
-  functions for WLAN core.  For example, the WLAN core can call `Device::WlanphyImplCreateIface()`
+- After the PCIe and mvm are ready, `::ddk::WlanPhyImpl*()` in device.cc also implement the callback
+  functions for WLAN core.  For example, the WLAN core can call `Device::WlanPhyImplCreateIface()`
   to create a MAC interface for scan and association.
 
 - Now, the driver is ready to accept requests.

@@ -55,9 +55,9 @@ class WlanInterface : public wlan::drivers::components::NetworkPort,
       fuchsia_wlan_common::wire::WlanMacRole
           out_supported_mac_roles_list[fuchsia_wlan_common::wire::kMaxSupportedMacRoles],
       uint8_t* out_supported_mac_roles_count);
-  static zx_status_t SetCountry(brcmf_pub* drvr, const wlanphy_country_t* country);
+  static zx_status_t SetCountry(brcmf_pub* drvr, const wlan_phy_country_t* country);
   // Reads the currently configured `country` from the firmware.
-  static zx_status_t GetCountry(brcmf_pub* drvr, wlanphy_country_t* out_country);
+  static zx_status_t GetCountry(brcmf_pub* drvr, wlan_phy_country_t* out_country);
   static zx_status_t ClearCountry(brcmf_pub* drvr);
 
   // ZX_PROTOCOL_WLAN_FULLMAC_IMPL operations.

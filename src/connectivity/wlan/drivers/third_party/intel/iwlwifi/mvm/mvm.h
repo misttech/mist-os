@@ -741,10 +741,10 @@ struct iwl_mvm_reorder_buffer {
  * @has_packet: True if the entry has a packet stored, false otherwise.
  */
 struct _iwl_mvm_reorder_buf_entry {
-	wlan_rx_packet_t rx_packet;
-	struct ieee80211_rx_status rx_status;
-	zx_time_t reorder_time;
-	bool has_packet;
+  wlan_rx_packet_t rx_packet;
+  struct ieee80211_rx_status rx_status;
+  zx_time_t reorder_time;
+  bool has_packet;
 };
 
 /* make this indirection to get the aligned thing */
@@ -1727,18 +1727,16 @@ void iwl_mvm_rx_shared_mem_cfg_notif(struct iwl_mvm* mvm, struct iwl_rx_cmd_buff
  * This is exposed in this header for unit tests, but isn't used outside rxmq.c.
  */
 bool iwl_mvm_reorder(struct iwl_mvm* mvm, struct ieee80211_sta* sta,
-		     const wlan_rx_packet_t* rx_packet,
-		     struct ieee80211_rx_status* rx_status,
-		     int queue, struct iwl_rx_mpdu_desc* desc);
-
+                     const wlan_rx_packet_t* rx_packet, struct ieee80211_rx_status* rx_status,
+                     int queue, struct iwl_rx_mpdu_desc* desc);
 
 /*
  * Initializes the reorder buffer owned by baid_data.
  * This is exposed in this header for unit tests, but isn't used outside of
  * sta.c
  */
-void iwl_mvm_init_reorder_buffer(struct iwl_mvm* mvm, struct iwl_mvm_baid_data* data,
-                                        uint16_t ssn, uint16_t buf_size);
+void iwl_mvm_init_reorder_buffer(struct iwl_mvm* mvm, struct iwl_mvm_baid_data* data, uint16_t ssn,
+                                 uint16_t buf_size);
 
 /*
  * Frees the reorder buffer owned by baid_data.
@@ -1746,7 +1744,6 @@ void iwl_mvm_init_reorder_buffer(struct iwl_mvm* mvm, struct iwl_mvm_baid_data* 
  * sta.c
  */
 void iwl_mvm_free_reorder(struct iwl_mvm* mvm, struct iwl_mvm_baid_data* baid_data);
-
 
 /* MVM PHY */
 zx_status_t iwl_mvm_phy_ctxt_add(struct iwl_mvm* mvm, struct iwl_mvm_phy_ctxt* ctxt,
@@ -2085,10 +2082,10 @@ void iwl_mvm_rx_chub_update_mcc(struct iwl_mvm* mvm, struct iwl_rx_cmd_buffer* r
 
 zx_status_t iwl_mvm_get_regdomain(struct iwl_mvm* mvm, const char* alpha2,
                                   enum iwl_mcc_source src_id, bool* changed,
-                                  wlanphy_country_t* out_country);
+                                  wlan_phy_country_t* out_country);
 
 zx_status_t iwl_mvm_get_current_regdomain(struct iwl_mvm* mvm, bool* changed,
-                                          wlanphy_country_t* out_country);
+                                          wlan_phy_country_t* out_country);
 
 int iwl_mvm_init_fw_regd(struct iwl_mvm* mvm);
 void iwl_mvm_update_changed_regdom(struct iwl_mvm* mvm);

@@ -50,14 +50,14 @@ type ClearCountryRequest = struct {
     phy_id uint16;
 };
 
-type SetPsModeRequest = struct {
+type SetPowerSaveModeRequest = struct {
     /// Interface's PHY ID
     phy_id uint16;
     /// Power Save Mode bit mask
     ps_mode fuchsia.wlan.common.PowerSaveType;
 };
 
-type GetPsModeResponse = struct {
+type GetPowerSaveModeResponse = struct {
     /// Power Save Mode bit mask
     ps_mode fuchsia.wlan.common.PowerSaveType;
 };
@@ -149,15 +149,15 @@ protocol DeviceMonitor {
     }) -> (struct {
         status int32;
     });
-    SetPsMode(struct {
-        req SetPsModeRequest;
+    SetPowerSaveMode(struct {
+        req SetPowerSaveModeRequest;
     }) -> (struct {
         status int32;
     });
-    GetPsMode(struct {
+    GetPowerSaveMode(struct {
         phy_id uint16;
     }) -> (struct {
-        resp GetPsModeResponse;
+        resp GetPowerSaveModeResponse;
     }) error int32;
 
     // Iface methods

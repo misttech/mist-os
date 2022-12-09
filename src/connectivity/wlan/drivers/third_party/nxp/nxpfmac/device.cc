@@ -162,12 +162,12 @@ void Device::DdkSuspend(ddk::SuspendTxn txn) {
 
 zx_status_t Device::DdkServiceConnect(const char *service_name, fdf::Channel channel) {
   if (std::string_view(service_name) !=
-      fidl::DiscoverableProtocolName<fuchsia_wlan_wlanphyimpl::WlanphyImpl>) {
+      fidl::DiscoverableProtocolName<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>) {
     NXPF_ERR("Service name doesn't match, expected '%s' but got '%s'",
-             fidl::DiscoverableProtocolName<fuchsia_wlan_wlanphyimpl::WlanphyImpl>, service_name);
+             fidl::DiscoverableProtocolName<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>, service_name);
     return ZX_ERR_NOT_SUPPORTED;
   }
-  fdf::ServerEnd<fuchsia_wlan_wlanphyimpl::WlanphyImpl> server_end(std::move(channel));
+  fdf::ServerEnd<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> server_end(std::move(channel));
   fdf::BindServer(fidl_dispatcher_.get(), std::move(server_end), this);
   return ZX_OK;
 }
@@ -288,7 +288,7 @@ void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena &arena,
 
   fidl::Arena fidl_arena;
   auto builder =
-      fuchsia_wlan_wlanphyimpl::wire::WlanphyImplCreateIfaceResponse::Builder(fidl_arena);
+      fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplCreateIfaceResponse::Builder(fidl_arena);
   builder.iface_id(iface_id);
   completer.buffer(arena).ReplySuccess(builder.Build());
 }
@@ -439,7 +439,7 @@ void Device::GetCountry(fdf::Arena &arena, GetCountryCompleter::Sync &completer)
          decltype(alpha2)::size());
 
   completer.buffer(arena).ReplySuccess(
-      ::fuchsia_wlan_wlanphyimpl::wire::WlanphyCountry::WithAlpha2(alpha2));
+      ::fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry::WithAlpha2(alpha2));
 }
 
 void Device::ClearCountry(fdf::Arena &arena, ClearCountryCompleter::Sync &completer) {
@@ -454,13 +454,13 @@ void Device::ClearCountry(fdf::Arena &arena, ClearCountryCompleter::Sync &comple
   completer.buffer(arena).ReplySuccess();
 }
 
-void Device::SetPsMode(SetPsModeRequestView request, fdf::Arena &arena,
-                       SetPsModeCompleter::Sync &completer) {
+void Device::SetPowerSaveMode(SetPowerSaveModeRequestView request, fdf::Arena &arena,
+                              SetPowerSaveModeCompleter::Sync &completer) {
   NXPF_ERR("Not supported");
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-void Device::GetPsMode(fdf::Arena &arena, GetPsModeCompleter::Sync &completer) {
+void Device::GetPowerSaveMode(fdf::Arena &arena, GetPowerSaveModeCompleter::Sync &completer) {
   NXPF_ERR("Not supported");
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }

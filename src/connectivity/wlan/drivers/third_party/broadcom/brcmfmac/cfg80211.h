@@ -536,7 +536,7 @@ const char* brcmf_cfg80211_get_iface_str(struct net_device* ndev);
 
 zx_status_t brcmf_cfg80211_add_iface(struct brcmf_pub* drvr, const char* name,
                                      struct vif_params* params,
-                                     const wlanphy_impl_create_iface_req_t* req,
+                                     const wlan_phy_impl_create_iface_req_t* req,
                                      struct wireless_dev** wdev_out);
 zx_status_t brcmf_cfg80211_del_iface(struct brcmf_cfg80211_info* cfg, struct wireless_dev* wdev);
 

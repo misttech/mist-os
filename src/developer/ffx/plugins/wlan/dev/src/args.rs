@@ -52,8 +52,8 @@ pub enum PhySubCommand {
     GetCountry(GetCountry),
     SetCountry(SetCountry),
     ClearCountry(ClearCountry),
-    SetPsMode(SetPsMode),
-    GetPsMode(GetPsMode),
+    SetPowerSaveMode(SetPowerSaveMode),
+    GetPowerSaveMode(GetPowerSaveMode),
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -116,8 +116,8 @@ impl From<PhySubCommand> for wlan_dev::opts::Opt {
             PhySubCommand::GetCountry(arg) => wlan_dev::opts::PhyCmd::from(arg),
             PhySubCommand::SetCountry(arg) => wlan_dev::opts::PhyCmd::from(arg),
             PhySubCommand::ClearCountry(arg) => wlan_dev::opts::PhyCmd::from(arg),
-            PhySubCommand::SetPsMode(arg) => wlan_dev::opts::PhyCmd::from(arg),
-            PhySubCommand::GetPsMode(arg) => wlan_dev::opts::PhyCmd::from(arg),
+            PhySubCommand::SetPowerSaveMode(arg) => wlan_dev::opts::PhyCmd::from(arg),
+            PhySubCommand::GetPowerSaveMode(arg) => wlan_dev::opts::PhyCmd::from(arg),
         })
     }
 }
@@ -225,16 +225,16 @@ impl From<PsModeArg> for wlan_dev::opts::PsModeArg {
     name = "set-ps-mode",
     description = "Sets the power save state of the target PHY."
 )]
-pub struct SetPsMode {
+pub struct SetPowerSaveMode {
     #[argh(positional, description = "PHY ID on which power save mode should be set.")]
     phy_id: u16,
     #[argh(positional, description = "desired power save mode.")]
     mode: PsModeArg,
 }
 
-impl From<SetPsMode> for wlan_dev::opts::PhyCmd {
-    fn from(cmd: SetPsMode) -> Self {
-        wlan_dev::opts::PhyCmd::SetPsMode {
+impl From<SetPowerSaveMode> for wlan_dev::opts::PhyCmd {
+    fn from(cmd: SetPowerSaveMode) -> Self {
+        wlan_dev::opts::PhyCmd::SetPowerSaveMode {
             phy_id: cmd.phy_id,
             mode: wlan_dev::opts::PsModeArg::from(cmd.mode),
         }
@@ -243,14 +243,14 @@ impl From<SetPsMode> for wlan_dev::opts::PhyCmd {
 
 #[derive(FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "get-ps-mode", description = "Query power save mode of target PHY.")]
-pub struct GetPsMode {
+pub struct GetPowerSaveMode {
     #[argh(positional, description = "PHY ID on which power save mode should be set.")]
     phy_id: u16,
 }
 
-impl From<GetPsMode> for wlan_dev::opts::PhyCmd {
-    fn from(cmd: GetPsMode) -> Self {
-        wlan_dev::opts::PhyCmd::GetPsMode { phy_id: cmd.phy_id }
+impl From<GetPowerSaveMode> for wlan_dev::opts::PhyCmd {
+    fn from(cmd: GetPowerSaveMode) -> Self {
+        wlan_dev::opts::PhyCmd::GetPowerSaveMode { phy_id: cmd.phy_id }
     }
 }
 
@@ -804,13 +804,13 @@ mod tests {
     }
 
     #[test]
-    fn test_set_ps_mode_conversion() {
+    fn test_set_power_save_mode_conversion() {
         assert_eq!(
-            wlan_dev::opts::PhyCmd::from(SetPsMode {
+            wlan_dev::opts::PhyCmd::from(SetPowerSaveMode {
                 phy_id: 123,
                 mode: PsModeArg::PsModePerformance
             }),
-            wlan_dev::opts::PhyCmd::SetPsMode {
+            wlan_dev::opts::PhyCmd::SetPowerSaveMode {
                 phy_id: 123,
                 mode: wlan_dev::opts::PsModeArg::PsModePerformance
             }
@@ -818,10 +818,10 @@ mod tests {
     }
 
     #[test]
-    fn test_get_ps_mode_conversion() {
+    fn test_get_power_save_mode_conversion() {
         assert_eq!(
-            wlan_dev::opts::PhyCmd::from(GetPsMode { phy_id: 123 }),
-            wlan_dev::opts::PhyCmd::GetPsMode { phy_id: 123 }
+            wlan_dev::opts::PhyCmd::from(GetPowerSaveMode { phy_id: 123 }),
+            wlan_dev::opts::PhyCmd::GetPowerSaveMode { phy_id: 123 }
         );
     }
 

@@ -16,11 +16,11 @@
 
 #include "common.h"
 
-typedef struct wlanphy_impl_create_iface_req wlanphy_impl_create_iface_req_t;
-typedef struct wlanphy_country wlanphy_country_t;
+typedef struct wlan_phy_impl_create_iface_req wlan_phy_impl_create_iface_req_t;
+typedef struct wlan_phy_country wlan_phy_country_t;
 #define WLANPHY_ALPHA2_LEN UINT8_C(2)
 // Parameters to create an interface.
-struct wlanphy_impl_create_iface_req {
+struct wlan_phy_impl_create_iface_req {
   // The station role for this interface. A device may support multiple roles,
   // but an interface is instantiated with a single role.
   wlan_mac_role_t role;
@@ -32,7 +32,7 @@ struct wlanphy_impl_create_iface_req {
   uint8_t init_sta_addr[6];
 };
 
-struct wlanphy_country {
+struct wlan_phy_country {
   // ISO Alpha-2 takes two octet alphabet characters.
   // This needs to be expanded if at least one WLAN device driver or firmware
   // requires more than two octets.

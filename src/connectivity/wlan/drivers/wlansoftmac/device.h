@@ -165,10 +165,10 @@ class Device : public DeviceInterface,
   // The FIDL client to communicate with iwlwifi
   fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
 
-  // Dispatcher for being a FIDL client firing requests to WlanphyImply device.
+  // Dispatcher for being a FIDL client firing requests to WlanPhyImply device.
   fdf::Dispatcher client_dispatcher_;
 
-  // Dispatcher for being a FIDL client firing requests to WlanphyImply device.
+  // Dispatcher for being a FIDL client firing requests to WlanPhyImply device.
   fdf::Dispatcher server_dispatcher_;
 
   // Store unbind txn for async reply.

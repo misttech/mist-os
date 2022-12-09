@@ -297,7 +297,7 @@ impl PhyManagerApi for PhyManager {
         }
 
         if self.power_state != fidl_common::PowerSaveType::PsModePerformance {
-            let ps_result = set_ps_mode(&self.device_monitor, phy_id, self.power_state)
+            let ps_result = set_power_save_mode(&self.device_monitor, phy_id, self.power_state)
                 .await
                 .map_err(|_| PhyManagerError::PhySetLowPowerFailure)?;
             fuchsia_zircon::ok(ps_result).map_err(|_| PhyManagerError::PhySetLowPowerFailure)?
@@ -678,7 +678,7 @@ impl PhyManagerApi for PhyManager {
         let mut final_status = fuchsia_zircon::Status::OK;
 
         for phy_id in self.phys.keys() {
-            let result = set_ps_mode(&self.device_monitor, *phy_id, power_state).await?;
+            let result = set_power_save_mode(&self.device_monitor, *phy_id, power_state).await?;
             if let Err(status) = fuchsia_zircon::ok(result) {
                 final_status = status;
             }
@@ -835,13 +835,13 @@ async fn clear_phy_country_code(
     })
 }
 
-async fn set_ps_mode(
+async fn set_power_save_mode(
     proxy: &fidl_service::DeviceMonitorProxy,
     phy_id: u16,
     state: fidl_common::PowerSaveType,
 ) -> Result<i32, anyhow::Error> {
-    let mut req = fidl_service::SetPsModeRequest { phy_id, ps_mode: state };
-    proxy.set_ps_mode(&mut req).await.map_err(|e| e.into())
+    let mut req = fidl_service::SetPowerSaveModeRequest { phy_id, ps_mode: state };
+    proxy.set_power_save_mode(&mut req).await.map_err(|e| e.into())
 }
 
 #[cfg(test)]
@@ -3309,8 +3309,8 @@ mod tests {
                 assert_variant!(
                     exec.run_until_stalled(&mut test_values.monitor_stream.next()),
                     Poll::Ready(Some(Ok(
-                        fidl_service::DeviceMonitorRequest::SetPsMode {
-                            req: fidl_service::SetPsModeRequest { phy_id, ps_mode },
+                        fidl_service::DeviceMonitorRequest::SetPowerSaveMode {
+                            req: fidl_service::SetPowerSaveModeRequest { phy_id, ps_mode },
                             responder,
                         }
                     ))) => {
@@ -3364,8 +3364,8 @@ mod tests {
                 assert_variant!(
                     exec.run_until_stalled(&mut test_values.monitor_stream.next()),
                     Poll::Ready(Some(Ok(
-                        fidl_service::DeviceMonitorRequest::SetPsMode {
-                            req: fidl_service::SetPsModeRequest { phy_id, ps_mode },
+                        fidl_service::DeviceMonitorRequest::SetPowerSaveMode {
+                            req: fidl_service::SetPowerSaveModeRequest { phy_id, ps_mode },
                             responder,
                         }
                     ))) => {
@@ -3468,8 +3468,8 @@ mod tests {
             assert_variant!(
                 exec.run_until_stalled(&mut test_values.monitor_stream.next()),
                 Poll::Ready(Some(Ok(
-                    fidl_service::DeviceMonitorRequest::SetPsMode {
-                        req: fidl_service::SetPsModeRequest { phy_id, ps_mode },
+                    fidl_service::DeviceMonitorRequest::SetPowerSaveMode {
+                        req: fidl_service::SetPowerSaveModeRequest { phy_id, ps_mode },
                         responder,
                     }
                 ))) => {

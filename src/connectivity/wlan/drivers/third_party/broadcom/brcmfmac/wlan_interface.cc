@@ -276,7 +276,7 @@ zx_status_t WlanInterface::GetSupportedMacRoles(
 }
 
 // static
-zx_status_t WlanInterface::SetCountry(brcmf_pub* drvr, const wlanphy_country_t* country) {
+zx_status_t WlanInterface::SetCountry(brcmf_pub* drvr, const wlan_phy_country_t* country) {
   if (country == nullptr) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -284,7 +284,7 @@ zx_status_t WlanInterface::SetCountry(brcmf_pub* drvr, const wlanphy_country_t* 
 }
 
 // static
-zx_status_t WlanInterface::GetCountry(brcmf_pub* drvr, wlanphy_country_t* out_country) {
+zx_status_t WlanInterface::GetCountry(brcmf_pub* drvr, wlan_phy_country_t* out_country) {
   return brcmf_get_country(drvr, out_country);
 }
 

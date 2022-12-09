@@ -39,12 +39,12 @@ zx_status_t phy_get_supported_mac_roles(
     wlan_common_wire::WlanMacRole
         out_supported_mac_roles_list[wlan_common_wire::kMaxSupportedMacRoles],
     uint8_t* out_supported_mac_roles_count);
-zx_status_t phy_create_iface(void* ctx, const wlanphy_impl_create_iface_req_t* req,
+zx_status_t phy_create_iface(void* ctx, const wlan_phy_impl_create_iface_req_t* req,
                              uint16_t* out_iface_id);
 zx_status_t phy_start_iface(void* ctx, zx_device_t* zxdev, uint16_t idx);
 zx_status_t phy_destroy_iface(void* ctx, uint16_t id);
-zx_status_t phy_set_country(void* ctx, const wlanphy_country_t* country);
-zx_status_t phy_get_country(void* ctx, wlanphy_country_t* out_country);
+zx_status_t phy_set_country(void* ctx, const wlan_phy_country_t* country);
+zx_status_t phy_get_country(void* ctx, wlan_phy_country_t* out_country);
 
 void phy_create_iface_undo(struct iwl_trans* iwl_trans, uint16_t idx);
 
