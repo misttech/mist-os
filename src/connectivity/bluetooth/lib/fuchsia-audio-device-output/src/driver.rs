@@ -491,10 +491,11 @@ impl SoftPcmOutput {
                     responder.drop_without_shutdown();
                     return Ok(());
                 }
-                let delay_info = DelayInfo::EMPTY;
+                // internal_delay is required. For now we just set 0.
                 // TODO(fxbug.dev/51726): Set actual external_delay and internal_delay values
                 // received from outside the crate, and support the hanging-get pattern in order to
                 // dynamically update these values as we learn more about the remote device.
+                let delay_info = DelayInfo { internal_delay: Some(0), ..DelayInfo::EMPTY };
                 responder.send(delay_info)?;
                 self.delay_info_replied = true;
             }
