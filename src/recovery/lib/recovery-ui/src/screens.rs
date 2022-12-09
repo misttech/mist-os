@@ -55,6 +55,10 @@ impl Screens {
             State::ReinstallConfirm { desired: user_data_sharing_consent, reported } => {
                 self.reinstall_confirm(user_data_sharing_consent.clone(), reported.clone())
             }
+            State::FinalizeReinstall(_) => {
+                // TODO(b/260796654): Add UI for finalize screen
+                self.home()
+            }
             // Temporary catch-all until all the other states are added
             _ => self.failed(&Operation::Reinstall, &Some("State not yet implemented".to_string())),
         };

@@ -61,6 +61,7 @@ rustc_library("recovery-util") {
     "src/lib.rs",
     "src/ota/action.rs",
     "src/ota/actions/factory_reset.rs",
+    "src/ota/actions/finalize_reinstall.rs",
     "src/ota/actions/get_wifi_networks.rs",
     "src/ota/actions/mod.rs",
     "src/ota/actions/ota_reinstall.rs",

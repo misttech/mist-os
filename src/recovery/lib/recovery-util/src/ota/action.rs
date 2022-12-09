@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::ota::actions::factory_reset::FactoryResetAction;
+use crate::ota::actions::finalize_reinstall::FinalizeReinstallAction;
 use crate::ota::actions::get_wifi_networks::GetWifiNetworksAction;
 use crate::ota::actions::ota_reinstall::OtaReinstallAction;
 use crate::ota::actions::set_sharing_consent::SetSharingConsentAction;
@@ -48,6 +49,7 @@ impl StateHandler for Action {
                 })
                 .detach();
             }
+            State::FinalizeReinstall(status) => FinalizeReinstallAction::run(event_sender, status),
             State::FactoryReset => FactoryResetAction::run(event_sender),
             // We ignore all other states
             _ => {}

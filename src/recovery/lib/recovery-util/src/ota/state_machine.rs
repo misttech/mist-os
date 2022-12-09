@@ -47,11 +47,11 @@ impl DataSharingConsent {
 pub enum State {
     Connecting(Network, Password),
     ConnectionFailed(Network, Password),
-    Done(Operation),
     EnterPassword(Network),
     EnterWiFi,
     ExecuteReinstall(Option<OtaStatus>),
     FactoryReset,
+    FinalizeReinstall(OtaStatus),
     Failed(Operation, Option<ErrorMessage>),
     Home,
     Reinstall,
@@ -186,10 +186,7 @@ impl StateMachine {
                 Some(State::ExecuteReinstall(None))
             }
             (State::ExecuteReinstall(_), Event::OtaStatusReceived(status)) => {
-                Some(State::ExecuteReinstall(Some(status)))
-            }
-            (State::ExecuteReinstall(_), Event::Progress(100)) => {
-                Some(State::Done(Operation::Reinstall))
+                Some(State::FinalizeReinstall(status))
             }
             (State::ExecuteReinstall(_), Event::Error(error)) => {
                 Some(State::Failed(Operation::Reinstall, Some(error)))
@@ -231,12 +228,12 @@ mod test {
         static ref STATES: Vec<State> = vec![
             State::Connecting("Network".to_string(), "Password".to_string()),
             State::ConnectionFailed("Network".to_string(), "Password".to_string()),
-            State::Done(Operation::Reinstall),
             State::EnterPassword("Network".to_string()),
             State::EnterWiFi,
             State::ExecuteReinstall(None),
             State::FactoryReset,
             State::Failed(Operation::Reinstall, Some("Error message".to_string())),
+            State::FinalizeReinstall(OtaStatus::Succeeded),
             State::GetWiFiNetworks,
             State::Home,
             State::Reinstall,
@@ -301,7 +298,7 @@ mod test {
         assert_eq!(state, State::ReinstallConfirm { desired: DontAllow, reported: Unknown });
         state = sm.event(Event::Reinstall).unwrap();
         assert_eq!(state, State::ExecuteReinstall(None));
-        state = sm.event(Event::Progress(100)).unwrap();
-        assert_eq!(state, State::Done(Operation::Reinstall));
+        state = sm.event(Event::OtaStatusReceived(OtaStatus::Succeeded)).unwrap();
+        assert_eq!(state, State::FinalizeReinstall(OtaStatus::Succeeded));
     }
 }
