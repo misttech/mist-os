@@ -47,11 +47,11 @@
             to: "#system_recovery",
         },
         {
-            directory: "dev",
+            directory: "dev-class",
             from: "parent",
             as: "dev-class-block",
             to: "#system_recovery",
-            subdir: "class/block",
+            subdir: "block",
         },
         {
             directory: "dev",

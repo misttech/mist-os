@@ -20,6 +20,7 @@
 
                 // Tests can produce trace.
                 "fuchsia.tracing.provider.Registry",
+                "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
             to: [ "#devices-tests" ],
@@ -34,34 +35,23 @@
             scope: "#devices-tests",
         },
         {
-            storage: "data",
+            storage: [
+                "cache",
+                "custom_artifacts",
+                "data",
+                "tmp",
+            ],
             from: "self",
             to: [ "#devices-tests" ],
-        },
-        {
-            storage: "tmp",
-            from: "self",
-            to: [ "#devices-tests" ],
-        },
-        {
-            storage: "cache",
-            from: "self",
-            to: [ "#devices-tests" ],
-        },
-        {
-            storage: "custom_artifacts",
-            from: "self",
-            to: "#devices-tests",
         },
 
         // These system capabilities are offered for use by the devices tests.
         {
-            directory: "dev",
-            from: "parent",
-            to: "#devices-tests",
-        },
-        {
-            protocol: "fuchsia.vulkan.loader.Loader",
+            directory: [
+                "dev",
+                "dev-class",
+                "dev-topological",
+            ],
             from: "parent",
             to: "#devices-tests",
         },

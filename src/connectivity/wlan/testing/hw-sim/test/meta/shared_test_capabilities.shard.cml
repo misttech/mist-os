@@ -89,11 +89,11 @@
             dependency: "weak",
         },
         {
-            directory: "dev",
+            directory: "dev-class",
             from: "#driver_test_realm",
             as: "dev-wlanphy",
             to: "#wlandevicemonitor",
-            subdir: "class/wlanphy",
+            subdir: "wlanphy",
         },
         {
             storage: "data",
