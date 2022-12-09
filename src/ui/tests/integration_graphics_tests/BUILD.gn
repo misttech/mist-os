@@ -9,5 +9,6 @@ group("integration_graphics_tests") {
     "display-pixel-ratio:tests",
     "display-rotation:tests",
     "presentation:tests",
+    "web-pixel-tests:tests",
   ]
 }

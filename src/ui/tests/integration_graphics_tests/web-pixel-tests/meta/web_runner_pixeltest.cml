@@ -1,0 +1,48 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/chromium/web_engine/meta/shards/web_engine_base.shard.cml",
+        "//src/chromium/web_engine/meta/shards/web_engine_feature_network.shard.cml",
+        "//src/chromium/web_engine/meta/shards/web_engine_feature_vulkan.shard.cml",
+        "//src/chromium/web_engine/meta/shards/web_engine_view.shard.cml",
+        "inspect/client.shard.cml",
+        "sys/component/realm_builder.shard.cml",
+        "sys/testing/elf_test_runner.shard.cml",
+
+        // system-test is needed to access fuchsia.sysmem.Allocator
+        // and fuchsia.vulkan.loader.Loader.
+        "sys/testing/system-test.shard.cml",
+    ],
+    program: {
+        binary: "bin/web_runner_pixel_test_bin",
+    },
+    offer: [
+        {
+            protocol: [
+                "fuchsia.kernel.RootJobForInspect",
+                "fuchsia.kernel.Stats",
+                "fuchsia.logger.LogSink",
+                "fuchsia.media.ProfileProvider",
+                "fuchsia.posix.socket.Provider",
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.sys.Environment",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.tracing.provider.Registry",
+                "fuchsia.vulkan.loader.Loader",
+            ],
+            from: "parent",
+            to: "#realm_builder",
+        },
+    ],
+    facets: {
+        "fuchsia.test": {
+            "deprecated-allowed-packages": [
+                "cursor",
+                "intl_property_manager",
+                "web_engine",
+            ],
+        },
+    },
+}
