@@ -88,12 +88,14 @@ StreamImpl::StreamImpl(async_dispatcher_t* dispatcher,
                        fidl::InterfaceRequest<fuchsia::camera3::Stream> request,
                        StreamRequestedCallback on_stream_requested,
                        AllocatorBindSharedCollectionCallback allocator_bind_shared_collection,
+                       RegisterDeallocationEvent register_deallocation_event,
                        NoClientsCallback on_no_clients, std::optional<std::string> description)
     : ActorBase(dispatcher, scope_),
       dispatcher_(dispatcher),
       properties_(properties),
       on_stream_requested_(std::move(on_stream_requested)),
       allocator_bind_shared_collection_(std::move(allocator_bind_shared_collection)),
+      register_deallocation_event_(std::move(register_deallocation_event)),
       on_no_clients_(std::move(on_no_clients)),
       description_(description.value_or("<unknown>")) {
   current_resolution_ = ConvertToSize(properties.image_format());
@@ -134,7 +136,7 @@ promise<void> StreamImpl::RemoveClient(uint64_t id) {
     TRACE_DURATION("camera", "StreamImpl::RemoveClient");
     clients_.erase(id);
     if (clients_.empty()) {
-      return on_no_clients_();
+      return Cleanup(ZX_OK, "Last client disconnected.");
     }
     return make_ok_promise();
   });
@@ -258,6 +260,8 @@ promise<std::optional<BufferCollectionTokenPtr>> StreamImpl::SetClientParticipat
     if (!token_handle)
       return make_ok_promise<std::optional<BufferCollectionTokenPtr>>(std::nullopt);
 
+    frame_waiters_.clear();
+
     BufferCollectionTokenPtr token;
     token.Bind(std::move(token_handle));
 
@@ -276,7 +280,10 @@ promise<BufferCollectionInfo, zx_status_t> StreamImpl::InitBufferCollections(
       .and_then([this]() { return SetClientBufferCollectionConstraints(); })
       .then([this](result<void>& /*result*/) { return WaitForClientBufferCollectionAllocated(); })
       .and_then([this](BufferCollectionInfo_2& result) {
-        return InitializeClientBuffers(std::move(result))
+        return RegisterClientBufferCollectionDeallocationEvent()
+            .and_then([this, result = std::move(result)]() mutable {
+              return InitializeClientBuffers(std::move(result));
+            })
             .and_then([]() {
               VideoFormat video_format;
               UvcHackGetServerBufferVideoFormat(&video_format);
@@ -292,10 +299,36 @@ promise<BufferCollectionInfo, zx_status_t> StreamImpl::InitBufferCollections(
 }
 
 void StreamImpl::OnError(zx_status_t status, const std::string& message) {
-  Schedule([this, status, message]() {
-    FX_PLOGS(ERROR, status) << description_ << message;
-    // Close all clients and cause this stream to be destroyed.
+  Schedule(Cleanup(status, message));
+}
+
+promise<void> StreamImpl::Cleanup(zx_status_t status, const std::string& message) {
+  return make_promise([this, status, message]() {
+    if (status == ZX_OK) {
+      FX_PLOGS(INFO, status) << description_ << message;
+    } else {
+      FX_PLOGS(ERROR, status) << description_ << message;
+    }
+
+    // Close all clients.
     clients_.clear();
+
+    // Unmap VMOs and close the VMO handles.
+    auto vmo_size = client_buffer_collection_info_.settings.buffer_settings.size_bytes;
+    for (uint32_t buffer_id = 0; buffer_id < client_buffer_collection_info_.buffer_count;
+         buffer_id++) {
+      uintptr_t vmo_virt_addr = client_buffer_id_to_virt_addr_[buffer_id];
+      auto status = zx::vmar::root_self()->unmap(vmo_virt_addr, vmo_size);
+      ZX_ASSERT(status == ZX_OK);
+      zx::vmo& vmo = client_buffer_collection_info_.buffers[buffer_id].vmo;
+      vmo.reset();
+    }
+    client_buffer_id_to_virt_addr_.clear();
+    if (client_buffer_collection_) {
+      client_buffer_collection_->Close();
+    }
+
+    // Cause this stream to be destroyed.
     return on_no_clients_();
   });
 }
@@ -329,6 +362,15 @@ promise<void> StreamImpl::SetClientBufferCollectionConstraints() {
     BufferCollectionConstraints buffer_collection_constraints;
     UvcHackGetClientBufferCollectionConstraints(&buffer_collection_constraints);
     client_buffer_collection_->SetConstraints(true, std::move(buffer_collection_constraints));
+  });
+}
+
+promise<void> StreamImpl::RegisterClientBufferCollectionDeallocationEvent() {
+  return make_promise([this]() {
+    zx::eventpair deallocation_event_client, deallocation_event_server;
+    zx::eventpair::create(/*options=*/0, &deallocation_event_client, &deallocation_event_server);
+    client_buffer_collection_->AttachLifetimeTracking(std::move(deallocation_event_server), 0);
+    register_deallocation_event_(std::move(deallocation_event_client));
   });
 }
 

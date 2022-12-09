@@ -113,6 +113,7 @@ promise<void> DeviceImpl::SetConfiguration(uint32_t index) {
       WaitOnce(event.release(), ZX_EVENTPAIR_PEER_CLOSED,
                [completer = std::move(bridge.completer)](zx_status_t status,
                                                          const zx_packet_signal_t* signal) mutable {
+                 FX_LOGS(INFO) << "Client buffer collection deallocated successfully.";
                  if (status != ZX_OK) {
                    completer.complete_error(status);
                    return;
@@ -199,10 +200,22 @@ promise<void> DeviceImpl::ConnectToStream(
           return bridge.consumer.promise();
         };
 
+    StreamImpl::RegisterDeallocationEvent register_deallocation_event =
+        [this](zx::eventpair deallocation_event) {
+          bridge<void> bridge;
+          Schedule([this, deallocation_event = std::move(deallocation_event),
+                    completer = std::move(bridge.completer)]() mutable {
+            deallocation_events_.push_back(std::move(deallocation_event));
+            completer.complete_ok();
+          });
+          return bridge.consumer.promise();
+        };
+
     streams_[index] = std::make_unique<StreamImpl>(
         stream_dispatcher_, configurations_[current_configuration_index_].streams()[index],
         std::move(request), std::move(on_stream_requested),
-        std::move(allocator_bind_shared_collection), std::move(on_no_clients), description);
+        std::move(allocator_bind_shared_collection), std::move(register_deallocation_event),
+        std::move(on_no_clients), description);
   });
 }
 
@@ -248,10 +261,13 @@ promise<void> DeviceImpl::OnStreamRequested(uint32_t index,
     auto promises = std::move(deallocation_promises_);
     deallocation_promises_.clear();
 
+    FX_LOGS(INFO) << "Waiting on the deallocation of " << promises.size()
+                  << " previous client BufferCollection(s).";
     return join_promise_vector(std::move(promises))
         .then([this, index, connect = std::move(connect)](
                   const result<std::vector<result<void, zx_status_t>>>& results) mutable
               -> promise<void> {
+          FX_LOGS(INFO) << "Finished waiting for client BufferCollection deallocations.";
           // TODO(ernesthua): Get the proper camera index.
           std::string description = "c0s" + std::to_string(index);
           if (!IsDeallocationComplete(results, description)) {

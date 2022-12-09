@@ -42,6 +42,8 @@ class StreamImpl : public actor::ActorBase {
   using AllocatorBindSharedCollectionCallback =
       fit::function<promise<void>(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
                                   fidl::InterfaceRequest<fuchsia::sysmem::BufferCollection>)>;
+  // Called by the stream to register a BufferCollection deallocation devent.
+  using RegisterDeallocationEvent = fit::function<promise<void>(zx::eventpair deallocation_event)>;
   // Called by the stream when it has no more clients.
   using NoClientsCallback = fit::function<promise<void>()>;
 
@@ -49,7 +51,7 @@ class StreamImpl : public actor::ActorBase {
              fidl::InterfaceRequest<fuchsia::camera3::Stream> request,
              StreamRequestedCallback on_stream_requested,
              AllocatorBindSharedCollectionCallback allocator_bind_shared_collection,
-             NoClientsCallback on_no_clients,
+             RegisterDeallocationEvent register_deallocation_event, NoClientsCallback on_no_clients,
              std::optional<std::string> description = std::nullopt);
   ~StreamImpl() = default;
 
@@ -60,8 +62,12 @@ class StreamImpl : public actor::ActorBase {
   promise<void> CloseAllClients(zx_status_t status);
 
  private:
-  // Error handler, disconnects all clients and calls the on_no_clients_ callback.
+  // Schedules a cleanup.
   void OnError(zx_status_t status, const std::string& message);
+
+  // Cleanup promise. Unmaps and closes VMOs and closes client BufferCollection. Disconnects all
+  // clients and calls the on_no_clients_ callback. If status != ZX_OK, logs at error level.
+  promise<void> Cleanup(zx_status_t status, const std::string& message);
 
   // Called when a client calls Rebind.
   void OnNewRequest(fidl::InterfaceRequest<fuchsia::camera3::Stream> request);
@@ -100,9 +106,11 @@ class StreamImpl : public actor::ActorBase {
   // 1. InitializeSharedCollection - Bind shared collection and set attributes
   // 2. SetClientBufferCollectionConstraints - Set constraints
   // 3. WaitForClientBufferCollectionAllocated - Wait for the allocation to finish
-  // 4. InitializeClientBuffers - Initialize individual buffers
+  // 4. RegisterDeallocationEvent - so it is known when the client BufferCollection is deallocated
+  // 5. InitializeClientBuffers - Initialize individual buffers
   promise<void> InitializeClientSharedCollection(fuchsia::sysmem::BufferCollectionTokenPtr token);
   promise<void> SetClientBufferCollectionConstraints();
+  promise<void> RegisterClientBufferCollectionDeallocationEvent();
   promise<void> InitializeClientBuffers(
       fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info);
 
@@ -217,6 +225,7 @@ class StreamImpl : public actor::ActorBase {
   uint64_t client_id_next_ = 1;
   StreamRequestedCallback on_stream_requested_;
   AllocatorBindSharedCollectionCallback allocator_bind_shared_collection_;
+  RegisterDeallocationEvent register_deallocation_event_;
   NoClientsCallback on_no_clients_;
   uint32_t max_camping_buffers_ = kUvcHackClientMaxBufferCountForCamping;
 
