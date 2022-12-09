@@ -557,20 +557,22 @@ async fn test_ota_component_successfully_updates_with_empty_blobfs() -> Result<(
     let result = env.run().await.expect("failed to run TestEnv");
     result.check_packages();
 
+    assert!(result.progress_renderer_requests.len() >= 2);
     assert_eq!(
-        result.progress_renderer_requests,
-        vec![
-            frui::ProgressRendererRender2Request {
-                status: Some(frui::Status::Active),
-                percent_complete: Some(0.0),
-                ..frui::ProgressRendererRender2Request::EMPTY
-            },
-            frui::ProgressRendererRender2Request {
-                status: Some(frui::Status::Complete),
-                percent_complete: Some(100.0),
-                ..frui::ProgressRendererRender2Request::EMPTY
-            },
-        ]
+        *result.progress_renderer_requests.first().unwrap(),
+        frui::ProgressRendererRender2Request {
+            status: Some(frui::Status::Active),
+            percent_complete: Some(0.0),
+            ..frui::ProgressRendererRender2Request::EMPTY
+        }
+    );
+    assert_eq!(
+        *result.progress_renderer_requests.last().unwrap(),
+        frui::ProgressRendererRender2Request {
+            status: Some(frui::Status::Complete),
+            percent_complete: Some(100.0),
+            ..frui::ProgressRendererRender2Request::EMPTY
+        }
     );
 
     assert_eq!(
@@ -643,19 +645,21 @@ async fn test_ota_component_reports_error_when_omaha_broken() -> Result<(), Erro
 
     let result = env.run().await.expect("failed to run TestEnv");
 
+    assert!(result.progress_renderer_requests.len() >= 2);
     assert_eq!(
-        result.progress_renderer_requests,
-        vec![
-            frui::ProgressRendererRender2Request {
-                status: Some(frui::Status::Active),
-                percent_complete: Some(0.0),
-                ..frui::ProgressRendererRender2Request::EMPTY
-            },
-            frui::ProgressRendererRender2Request {
-                status: Some(frui::Status::Error),
-                ..frui::ProgressRendererRender2Request::EMPTY
-            },
-        ]
+        *result.progress_renderer_requests.first().unwrap(),
+        frui::ProgressRendererRender2Request {
+            status: Some(frui::Status::Active),
+            percent_complete: Some(0.0),
+            ..frui::ProgressRendererRender2Request::EMPTY
+        }
+    );
+    assert_eq!(
+        *result.progress_renderer_requests.last().unwrap(),
+        frui::ProgressRendererRender2Request {
+            status: Some(frui::Status::Error),
+            ..frui::ProgressRendererRender2Request::EMPTY
+        },
     );
 
     assert_eq!(result.paver.take_events(), vec![]);

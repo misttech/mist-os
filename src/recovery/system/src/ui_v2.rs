@@ -58,15 +58,21 @@ impl RecoveryAppAssistant {
         }
     }
 
-    fn send_ota_status(mut event_sender: Box<dyn SendEvent>, status: frui::Status) {
+    // TODO(b/253084947) Swap out interface when we switch to the official progress fidl from SWD
+    fn send_ota_status(mut event_sender: Box<dyn SendEvent>, percent: f32, status: frui::Status) {
         match status {
             frui::Status::Active => {
-                println!("OTA update is now in progress...")
+                println!("OTA update is now in progress... ({}%)", percent);
+                event_sender.send(Event::Progress(percent as u8));
             }
             frui::Status::Complete => {
-                event_sender.send(Event::OtaStatusReceived(OtaStatus::Succeeded))
+                event_sender.send(Event::ProgressComplete(OtaStatus::Succeeded))
             }
-            _ => event_sender.send(Event::OtaStatusReceived(OtaStatus::Failed)),
+            frui::Status::Cancelled | frui::Status::Error => {
+                // Cancelled and Error are both considered failed, since you can't cancel recovery installation
+                event_sender.send(Event::ProgressComplete(OtaStatus::Failed))
+            }
+            frui::Status::Paused => (), //ignore
         }
     }
 }
@@ -129,15 +135,26 @@ impl AppAssistant for RecoveryAppAssistant {
                         match request {
                             frui::ProgressRendererRequest::Render {
                                 status,
-                                percent_complete: _,
+                                percent_complete,
                                 responder,
                             } => {
-                                Self::send_ota_status(Box::new(event_sender.clone()), status);
+                                println!("Ota status event {:?}", &status);
+                                Self::send_ota_status(
+                                    Box::new(event_sender.clone()),
+                                    percent_complete,
+                                    status,
+                                );
                                 responder.send().expect("Error replying to progress update");
                             }
                             frui::ProgressRendererRequest::Render2 { payload, responder } => {
+                                println!("Ota progress event: {:?}", &payload);
                                 if let Some(status) = payload.status {
-                                    Self::send_ota_status(Box::new(event_sender.clone()), status);
+                                    let progress = payload.percent_complete.unwrap_or(0f32);
+                                    Self::send_ota_status(
+                                        Box::new(event_sender.clone()),
+                                        progress,
+                                        status,
+                                    );
                                 }
                                 responder.send().expect("Error replying to progress update");
                             }
@@ -253,8 +270,9 @@ mod tests {
             .await
             .unwrap();
 
+        assert_eq!(Event::Progress(0), on_handle_event.try_next().unwrap().unwrap());
         assert_eq!(
-            Event::OtaStatusReceived(OtaStatus::Succeeded),
+            Event::ProgressComplete(OtaStatus::Succeeded),
             on_handle_event.try_next().unwrap().unwrap()
         );
     }
@@ -302,8 +320,9 @@ mod tests {
             .await
             .unwrap();
 
+        assert_eq!(Event::Progress(0), on_handle_event.try_next().unwrap().unwrap());
         assert_eq!(
-            Event::OtaStatusReceived(OtaStatus::Failed),
+            Event::ProgressComplete(OtaStatus::Failed),
             on_handle_event.try_next().unwrap().unwrap()
         );
     }

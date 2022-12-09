@@ -11,9 +11,12 @@ use fidl_fuchsia_recovery_ui::{
 use fuchsia_async as fasync;
 use fuchsia_component::client;
 use fuchsia_runtime::{take_startup_handle, HandleType};
-use futures::future::Future;
+use futures::future::{join, Future};
 use ota_lib::{ota::run_wellknown_ota, storage::wipe_storage};
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use vfs::directory::{entry::DirectoryEntry, mutable::simple::Simple};
 
 fn to_render2_error(err: fidl::Error) -> Error {
@@ -58,7 +61,39 @@ where
         .await
         .map_err(to_render2_error)?;
 
-    match do_ota_fn(blobfs_proxy, outgoing_dir_vfs).await {
+    let ota_done: &AtomicBool = &AtomicBool::new(false);
+    let progress_future = async move {
+        // TODO(b/245415603) Send false progress updates until actual progress is reported
+        use fuchsia_async::Duration;
+        use futures::StreamExt;
+        let duration = 7 * 60 * 1000; // 7 minutes (ms)
+        let num_updates = 100;
+        let mut interval_timer =
+            fasync::Interval::new(Duration::from_millis(duration / num_updates));
+
+        let mut progress = 0;
+        while let Some(_) = interval_timer.next().await {
+            if ota_done.load(Ordering::Relaxed) || progress == 100 {
+                return;
+            }
+            let _ = ota_progress_proxy
+                .render2(ProgressRendererRender2Request {
+                    status: Some(Status::Active),
+                    percent_complete: Some(progress as f32),
+                    ..ProgressRendererRender2Request::EMPTY
+                })
+                .await;
+            progress += 1;
+        }
+    };
+    let ota_future = async move {
+        let result = do_ota_fn(blobfs_proxy, outgoing_dir_vfs).await;
+        ota_done.store(true, Ordering::Relaxed);
+        result
+    };
+
+    let (ota_result, _) = join(ota_future, progress_future).await;
+    match ota_result {
         Ok(_) => {
             println!("OTA Success!");
             ota_progress_proxy
