@@ -12,15 +12,15 @@ Write data to a stream at the current seek offset.
 
 zx_status_t zx_stream_writev(zx_handle_t handle,
                              uint32_t options,
-                             const zx_iovec_t* vector,
-                             size_t num_vector,
+                             const zx_iovec_t* vectors,
+                             size_t num_vectors,
                              size_t* actual);
 ```
 
 ## Description
 
 `zx_stream_writev()` attempts to write bytes to the stream, starting at the
-current seek offset, from the buffers specified by *vector* and *num_vector*.
+current seek offset, from the buffers specified by *vectors* and *num_vectors*.
 If successful, the number of bytes actually written are return via *actual*.
 
 If *options* contains **ZX_STREAM_APPEND** or the stream is in append mode, the
@@ -42,8 +42,8 @@ Advances the seek offset of the stream by the actual number of bytes written.
 If the write fails, the seek offset could either remain the same or have
 been changed to an unspecified value.
 
-If the contents of *vector* change during this operation, if any of the buffers
-overlap, or if any of the buffers overlap *vector*, the behavior is unspecified.
+If the contents of *vectors* change during this operation, if any of the buffers
+overlap, or if any of the buffers overlap *vectors*, the behavior is unspecified.
 
 ## Rights
 
@@ -62,11 +62,11 @@ overlap, or if any of the buffers overlap *vector*, the behavior is unspecified.
 
 **ZX_ERR_ACCESS_DENIED**  *handle* does not have the **ZX_RIGHT_WRITE** right.
 
-**ZX_ERR_INVALID_ARGS**   *vector* is an invalid `zx_iovec_t` or *options* has an
+**ZX_ERR_INVALID_ARGS**   *vectors* is an invalid `zx_iovec_t` or *options* has an
 unsupported bit set to 1.
 
-**ZX_ERR_NOT_FOUND**  the *vector* address, or an address specified within
-*vector* does not map to address in address space.
+**ZX_ERR_NOT_FOUND**  the *vectors* address, or an address specified within
+*vectors* does not map to address in address space.
 
 **ZX_ERR_BAD_STATE**  the underlying data source cannot be written.
 

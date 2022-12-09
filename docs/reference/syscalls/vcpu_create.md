@@ -51,7 +51,7 @@ The following rights will be set on the handle *out* by default:
 
 ## Rights
 
-*guest* must be of type **ZX_OBJ_TYPE_GUEST** and have **ZX_RIGHT_MANAGE_PROCESS**.
+*guest* must be of type **ZX_OBJ_TYPE_GUEST** and have **ZX_RIGHT_MANAGE_THREAD**.
 
 ## Return value
 
@@ -60,7 +60,7 @@ returned.
 
 ## Errors
 
-**ZX_ERR_ACCESS_DENIED** *guest* does not have the **ZX_RIGHT_MANAGE_PROCESS**
+**ZX_ERR_ACCESS_DENIED** *guest* does not have the **ZX_RIGHT_MANAGE_THREAD**
 right.
 
 **ZX_ERR_BAD_HANDLE** *guest* is an invalid handle.

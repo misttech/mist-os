@@ -12,15 +12,15 @@ Read data from a stream at the current seek offset.
 
 zx_status_t zx_stream_readv(zx_handle_t handle,
                             uint32_t options,
-                            zx_iovec_t* vector,
-                            size_t num_vector,
+                            zx_iovec_t* vectors,
+                            size_t num_vectors,
                             size_t* actual);
 ```
 
 ## Description
 
 `zx_stream_readv()` attempts to read bytes from the stream, starting at the
-current seek offset, into the buffers specified by *vector* and *num_vector*.
+current seek offset, into the buffers specified by *vectors* and *num_vectors*.
 If successful, the number of bytes actually read are return via *actual*.
 
 If the current seek offset is beyond the end of the stream, `zx_stream_readv()`
@@ -32,8 +32,8 @@ Advances the seek offset of the stream by the actual number of bytes read.
 If the read fails, the seek offset could either remain the same or have
 been changed to an unspecified value.
 
-If the contents of *vector* change during this operation, if any of the buffers
-overlap, or if any of the buffers overlap *vector*, the behavior is unspecified.
+If the contents of *vectors* change during this operation, if any of the buffers
+overlap, or if any of the buffers overlap *vectors*, the behavior is unspecified.
 
 *options* is reserved for future use and must be 0.
 
@@ -54,11 +54,11 @@ overlap, or if any of the buffers overlap *vector*, the behavior is unspecified.
 
 **ZX_ERR_ACCESS_DENIED**  *handle* does not have the **ZX_RIGHT_READ** right.
 
-**ZX_ERR_INVALID_ARGS**  *vector* is an invalid `zx_iovec_t` or *options* is
+**ZX_ERR_INVALID_ARGS**  *vectors* is an invalid `zx_iovec_t` or *options* is
 nonzero.
 
-**ZX_ERR_NOT_FOUND**  the *vector* address, or an address specified within
-*vector* does not map to address in address space.
+**ZX_ERR_NOT_FOUND**  the *vectors* address, or an address specified within
+*vectors* does not map to address in address space.
 
 **ZX_ERR_BAD_STATE**  the underlying data source cannot be read.
 

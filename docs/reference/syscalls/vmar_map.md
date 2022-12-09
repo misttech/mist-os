@@ -108,7 +108,6 @@ and non-zero.  In the event of failure, a negative error value is returned.
 **ZX_ERR_BAD_STATE**  *handle* refers to a destroyed VMAR.
 
 **ZX_ERR_INVALID_ARGS** for any of the following:
-
  - *mapped_addr* or *options* is not valid.
  - *vmar_offset* is non-zero when none of **ZX_VM_SPECIFIC**, **ZX_VM_SPECIFIC_OVERWRITE** or
    **ZX_VM_OFFSET_IS_UPPER_LIMIT** is specified.
