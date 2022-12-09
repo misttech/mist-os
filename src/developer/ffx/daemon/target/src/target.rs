@@ -10,7 +10,7 @@ use {
     crate::overnet::host_pipe::{HostAddr, HostPipeConnection, LogBuffer},
     crate::{FASTBOOT_MAX_AGE, MDNS_MAX_AGE, ZEDBOOT_MAX_AGE},
     addr::TargetAddr,
-    anyhow::{anyhow, bail, Error, Result},
+    anyhow::{anyhow, bail, Context, Error, Result},
     async_trait::async_trait,
     chrono::{DateTime, Utc},
     ffx::{TargetAddrInfo, TargetIpPort},
@@ -654,10 +654,14 @@ impl Target {
         }
     }
 
-    pub fn usb(&self) -> (String, Option<Interface>) {
+    pub fn usb(&self) -> Result<(String, Interface)> {
         match self.serial.borrow().as_ref() {
-            Some(s) => (s.to_string(), open_interface_with_serial(s).ok()),
-            None => ("".to_string(), None),
+            Some(s) => Ok((
+                s.to_string(),
+                open_interface_with_serial(s)
+                    .context("Failed to open target usb interface by serial")?,
+            )),
+            None => Err(anyhow!("No usb serial available to connect to")),
         }
     }
 
@@ -1159,7 +1163,6 @@ impl PartialEq for Target {
 mod test {
     use {
         super::*,
-        anyhow::Context as _,
         assert_matches::assert_matches,
         chrono::TimeZone,
         ffx::TargetIp,

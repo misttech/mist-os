@@ -102,17 +102,13 @@ struct UsbFactory {
 #[async_trait(?Send)]
 impl InterfaceFactory<Interface> for UsbFactory {
     async fn open(&mut self, target: &Target) -> Result<Interface> {
-        let (s, usb) = target.usb();
-        match usb {
-            Some(iface) => {
-                let mut in_use = SERIALS_IN_USE.lock().await;
-                let _ = in_use.insert(s.clone());
-                self.serial.replace(s.clone());
-                tracing::debug!("serial now in use: {}", s);
-                Ok(iface)
-            }
-            None => bail!("Could not open usb interface for target: {:?}", target),
-        }
+        let (s, iface) =
+            target.usb().context("TargetFactory cannot open target's usb interface")?;
+        let mut in_use = SERIALS_IN_USE.lock().await;
+        let _ = in_use.insert(s.clone());
+        self.serial.replace(s.clone());
+        tracing::debug!("serial now in use: {}", s);
+        Ok(iface)
     }
 
     async fn close(&self) {
