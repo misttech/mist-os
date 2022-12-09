@@ -6,7 +6,7 @@ use crate::ota::controller::SendEvent;
 use crate::ota::state_machine::Event;
 use fuchsia_async as fasync;
 use fuchsia_async::Task;
-use ota_lib::OtaManager;
+use ota_lib::{OtaManager, OtaStatus};
 use recovery_metrics_registry::cobalt_registry as metrics;
 use std::sync::Arc;
 
@@ -29,20 +29,22 @@ impl OtaReinstallAction {
 }
 
 async fn run_ota(mut event_sender: Box<dyn SendEvent>, ota_manager: Arc<dyn OtaManager>) {
+    event_sender.send(Event::Reinstall); // Might need to document this or fix naming to be explicit
     event_sender.send_recovery_stage_event(metrics::RecoveryEventMetricDimensionResult::OtaStarted);
     let start_time = fasync::Time::now();
     let res = ota_manager.start_and_wait_for_result().await;
     let end_time = fasync::Time::now();
     let elapsed_time = (end_time - start_time).into_seconds();
 
-    // Progress can be sent by sending Event::Progress(pcent) as seen below.
     let event = match res {
         Ok(_) => {
-            println!("OTA Success!");
+            println!("OtaReinstallAction: OTA Success!");
             event_sender
                 .send_recovery_stage_event(metrics::RecoveryEventMetricDimensionResult::OtaSuccess);
             event_sender.send_ota_duration(elapsed_time);
-            Event::Progress(100)
+            // TODO(b/253084947) start_and_wait_for_result should return actual OTA result
+            // Currently returns OK(()) or Err(..)
+            Event::OtaStatusReceived(OtaStatus::Succeeded)
         }
         Err(e) => {
             println!("OTA Error..... {:?}", e);
@@ -62,7 +64,8 @@ mod tests {
     use crate::ota::state_machine::{Event, OtaStatus};
     use anyhow::{format_err, Error};
     use async_trait::async_trait;
-    use futures::channel::oneshot;
+    use futures::channel::mpsc;
+    use futures::StreamExt;
     use mockall::predicate::eq;
     use ota_lib::OtaManager;
     use recovery_metrics_registry::cobalt_registry as metrics;
@@ -97,8 +100,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn ota_reinstall_sends_progress_event_on_successful_ota() {
-        let (tx, on_event) = oneshot::channel::<Event>();
+    async fn ota_reinstall_sends_status_event_on_successful_ota() {
+        let (mut tx, mut on_handle_event) = mpsc::channel::<Event>(10);
         let mut event_sender = MockSendEvent::new();
         event_sender
             .expect_send_recovery_stage_event()
@@ -111,19 +114,29 @@ mod tests {
             .times(1)
             .return_const(());
         event_sender.expect_send_ota_duration().times(1).return_const(());
-        event_sender.expect_send().once().return_once(move |event| {
-            tx.send(event).unwrap();
+        event_sender.expect_send().times(2).returning(move |event| {
+            tx.try_send(event).unwrap();
         });
+        // event_sender.expect_send().with(eq(Event::OtaStatusReceived(OtaStatus::Succeeded))).once().return_once(move |event| {
+        //     tx.send(event).unwrap();
+        // });
         let event_sender: Box<dyn SendEvent> = Box::new(event_sender);
 
         let ota_manager = Arc::new(FakeOtaManager::new());
         OtaReinstallAction::run(event_sender, ota_manager);
-        assert_eq!(Event::Progress(100), on_event.await.unwrap());
+        println!("checking for reinstall event");
+        assert_eq!(Event::Reinstall, on_handle_event.next().await.unwrap());
+        println!("checking for status event");
+        assert_eq!(
+            Event::OtaStatusReceived(OtaStatus::Succeeded),
+            on_handle_event.next().await.unwrap()
+        );
+        println!("Done Done Done");
     }
 
     #[fuchsia::test]
     async fn ota_reinstall_sends_error_event_on_failed_ota() {
-        let (tx, on_event) = oneshot::channel::<Event>();
+        let (mut tx, mut on_handle_event) = mpsc::channel::<Event>(10);
         let mut event_sender = MockSendEvent::new();
         event_sender
             .expect_send_recovery_stage_event()
@@ -135,13 +148,15 @@ mod tests {
             .with(eq(metrics::RecoveryEventMetricDimensionResult::OtaFailed))
             .times(1)
             .return_const(());
-        event_sender.expect_send().once().return_once(move |event| {
-            tx.send(event).unwrap();
+        event_sender.expect_send().times(2).returning(move |event| {
+            println!("Sending something {:?}", &event);
+            tx.try_send(event).unwrap();
         });
         let event_sender: Box<dyn SendEvent> = Box::new(event_sender);
 
         let ota_manager = Arc::new(FakeOtaManager::new_failing());
         OtaReinstallAction::run(event_sender, ota_manager);
-        assert_eq!(Event::Error("ota failed".to_string()), on_event.await.unwrap());
+        assert_eq!(Event::Reinstall, on_handle_event.next().await.unwrap());
+        assert_eq!(Event::Error("ota failed".to_string()), on_handle_event.next().await.unwrap());
     }
 }

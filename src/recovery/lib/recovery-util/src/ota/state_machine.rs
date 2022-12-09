@@ -49,13 +49,23 @@ pub enum State {
     ConnectionFailed(Network, Password),
     EnterPassword(Network),
     EnterWiFi,
-    ExecuteReinstall(Option<OtaStatus>),
+    ExecuteReinstall,
     FactoryReset,
     FinalizeReinstall(OtaStatus),
     Failed(Operation, Option<ErrorMessage>),
     Home,
     Reinstall,
-    ReinstallConfirm { desired: DataSharingConsent, reported: DataSharingConsent },
+    ReinstallConfirm {
+        desired: DataSharingConsent,
+        reported: DataSharingConsent,
+    },
+    /// Tells the state machine an OTA is in progress
+    /// OtaStatus = None: the reinstall is running and can receive progress updates
+    /// OtaStatus = Some(?): the reinstall has completed with a status
+    ReinstallRunning {
+        status: Option<OtaStatus>,
+        progress: u8,
+    },
     GetWiFiNetworks,
     SelectWiFi(NetworkInfos),
 }
@@ -75,6 +85,8 @@ pub enum Event {
     Networks(NetworkInfos),
     OtaStatusReceived(OtaStatus),
     Progress(PercentProgress),
+    //TODO(b/253084947): remove this event when switching to correct update status fidl
+    ProgressComplete(OtaStatus),
     Reinstall,
     SystemPrivacySetting(DataSharingConsent),
     SendReports(DataSharingConsent),
@@ -182,13 +194,22 @@ impl StateMachine {
                 desired: desired_setting,
                 reported: reported.clone(),
             }),
-            (State::ReinstallConfirm { .. }, Event::Reinstall) => {
-                Some(State::ExecuteReinstall(None))
+            (State::ReinstallConfirm { .. }, Event::Reinstall) => Some(State::ExecuteReinstall),
+            (State::ExecuteReinstall, Event::Reinstall) => {
+                Some(State::ReinstallRunning { status: None, progress: 0 })
             }
-            (State::ExecuteReinstall(_), Event::OtaStatusReceived(status)) => {
+            (State::ReinstallRunning { status: None, .. }, Event::Progress(progress)) => {
+                Some(State::ReinstallRunning { status: None, progress: progress })
+            }
+            (State::ReinstallRunning { status: None, .. }, Event::ProgressComplete(status)) => {
+                // TODO(b/253084947): Remove this transition since complete will come from OtaReinstallAction after ota_manager finishes
+                Some(State::ReinstallRunning { status: Some(status), progress: 100 })
+            }
+            (State::ReinstallRunning { .. }, Event::OtaStatusReceived(status)) => {
                 Some(State::FinalizeReinstall(status))
             }
-            (State::ExecuteReinstall(_), Event::Error(error)) => {
+            (State::ReinstallRunning { .. }, Event::Error(error))
+            | (State::FinalizeReinstall(_), Event::Error(error)) => {
                 Some(State::Failed(Operation::Reinstall, Some(error)))
             }
             // TODO(b/258323217): Add error message to home screen
@@ -230,13 +251,14 @@ mod test {
             State::ConnectionFailed("Network".to_string(), "Password".to_string()),
             State::EnterPassword("Network".to_string()),
             State::EnterWiFi,
-            State::ExecuteReinstall(None),
+            State::ExecuteReinstall,
             State::FactoryReset,
             State::Failed(Operation::Reinstall, Some("Error message".to_string())),
             State::FinalizeReinstall(OtaStatus::Succeeded),
             State::GetWiFiNetworks,
             State::Home,
             State::Reinstall,
+            State::ReinstallRunning { status: None, progress: 50 },
             State::SelectWiFi(vec![]),
         ];
         static ref EVENTS: Vec<Event> = vec![
@@ -247,6 +269,7 @@ mod test {
             Event::Networks(Vec::new()),
             Event::OtaStatusReceived(OtaStatus::Succeeded),
             Event::Progress(0),
+            Event::ProgressComplete(OtaStatus::Succeeded),
             Event::Reinstall,
             Event::SendReports(DataSharingConsent::Allow),
             Event::StartFactoryReset,
@@ -297,7 +320,16 @@ mod test {
         state = sm.event(Event::WiFiConnected).unwrap();
         assert_eq!(state, State::ReinstallConfirm { desired: DontAllow, reported: Unknown });
         state = sm.event(Event::Reinstall).unwrap();
-        assert_eq!(state, State::ExecuteReinstall(None));
+        assert_eq!(state, State::ExecuteReinstall);
+        state = sm.event(Event::Reinstall).unwrap();
+        assert_eq!(state, State::ReinstallRunning { status: None, progress: 0 });
+        state = sm.event(Event::Progress(55)).unwrap();
+        assert_eq!(state, State::ReinstallRunning { status: None, progress: 55 });
+        state = sm.event(Event::ProgressComplete(OtaStatus::Succeeded)).unwrap();
+        assert_eq!(
+            state,
+            State::ReinstallRunning { status: Some(OtaStatus::Succeeded), progress: 100 }
+        );
         state = sm.event(Event::OtaStatusReceived(OtaStatus::Succeeded)).unwrap();
         assert_eq!(state, State::FinalizeReinstall(OtaStatus::Succeeded));
     }

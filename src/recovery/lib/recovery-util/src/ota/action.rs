@@ -39,10 +39,11 @@ impl StateHandler for Action {
             State::ReinstallConfirm { desired: user_data_sharing_consent, reported } => {
                 SetSharingConsentAction::run(event_sender, user_data_sharing_consent, reported)
             }
-            State::ExecuteReinstall(None) => {
+            State::ExecuteReinstall => {
                 OtaReinstallAction::run(event_sender, self.ota_manager.clone())
             }
-            State::ExecuteReinstall(Some(status)) => {
+            State::ReinstallRunning { status: Some(status), .. } => {
+                // TODO(b/253084947): Remove call to tell ota_manager the OTA is complete
                 let ota_manager = self.ota_manager.clone();
                 fasync::Task::local(async move {
                     ota_manager.complete_ota(status).await;
@@ -100,7 +101,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn execute_reinstall_with_ota_status_completes_ota() {
+    async fn reinstall_progress_with_ota_status_completes_ota() {
         let (sender, _receiver) = mpsc::channel::<Event>(10);
         let event_sender = EventSender::new(sender);
 
@@ -109,7 +110,10 @@ mod test {
             let (ota_manager, on_complete_ota) = FakeOtaManager::new();
             let mut action = Action::new(event_sender.clone(), ota_manager);
 
-            action.handle_state(State::ExecuteReinstall(Some(status.clone())));
+            action.handle_state(State::ReinstallRunning {
+                status: Some(status.clone()),
+                progress: 100,
+            });
             assert_eq!(status, on_complete_ota.await.unwrap());
         }
     }

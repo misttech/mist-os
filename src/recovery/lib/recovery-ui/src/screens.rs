@@ -55,9 +55,18 @@ impl Screens {
             State::ReinstallConfirm { desired: user_data_sharing_consent, reported } => {
                 self.reinstall_confirm(user_data_sharing_consent.clone(), reported.clone())
             }
+            State::ExecuteReinstall => self.progress(Operation::Reinstall, 0),
+            State::ReinstallRunning { progress, .. } => {
+                // TODO(b/245415603): report actual progress values
+                // Clamping progress to between 0-93%. The progress reports currently arrive as fake timed events
+                // A device staying at 93% indicates OTA is still running
+                let mapped_progess: f32 = (*progress as f32) * 0.93;
+                self.progress(Operation::Reinstall, mapped_progess as u8)
+            }
             State::FinalizeReinstall(_) => {
-                // TODO(b/260796654): Add UI for finalize screen
-                self.home()
+                // TODO(b/258285426): Evaluate UI impact of uploading metrics
+                // Marking progress as 95 percent to indicate metrics uploading and reboot is in progress.
+                self.progress(Operation::Reinstall, 95)
             }
             // Temporary catch-all until all the other states are added
             _ => self.failed(&Operation::Reinstall, &Some("State not yet implemented".to_string())),
@@ -66,6 +75,32 @@ impl Screens {
             MessageTarget::View(self.view_key),
             make_message(ProxyMessages::ReplaceViewAssistant(Some(new_view))),
         );
+    }
+
+    fn progress(&self, _operation: Operation, percent: u8) -> ViewAssistantPtr {
+        let view_assistant_ptr = Box::new(
+            GenericSplitViewAssistant::new(
+                self.app_sender.clone(),
+                self.view_key,
+                ScreenSplit::Even,
+                Some(format!("Updating {}%", percent).to_string()),
+                Some(
+                    "• This may take several minutes\n\
+                     • Upon completion, the\n   \
+                       device will automatically\n   \
+                       restart"
+                        .to_string(),
+                ),
+                None,
+                None,
+                None,
+                None,
+                Some(IMAGE_DEVICE_UPDATING),
+                Some(IMAGE_DEVICE_UPDATING_SIZE),
+            )
+            .unwrap(),
+        );
+        view_assistant_ptr
     }
 
     fn home(&self) -> ViewAssistantPtr {
