@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 #### CATEGORY=Code submission and review
-#### EXECUTABLE=${HOST_TOOLS_DIR}/doc-checker-new
+#### EXECUTABLE=${HOST_TOOLS_DIR}/doc-checker
 ### Check the markdown documentation using a variety of checks.
 ## USAGE:
 ##     fx doc-checker [--root <root>] [--project <project>] [--docs-folder <docs-folder>] [--local-links-only]
