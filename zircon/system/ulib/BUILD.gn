@@ -69,6 +69,7 @@ group("tests") {
     "trace-engine:tests",
     "trace-provider:tests",
     "trace-reader:tests",
+    "trace-test-utils:tests",
     "trace-vthread:tests",
     "uart:tests",
     "zircon-internal:tests",

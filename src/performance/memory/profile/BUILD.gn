@@ -56,17 +56,6 @@ source_set("test_record_container") {
   ]
 }
 
-source_set("trace_fixture_test") {
-  testonly = true
-  sources = [ "trace_fixture_test.cc" ]
-
-  deps = [
-    "//third_party/googletest:gtest",
-    "//zircon/system/ulib/trace",
-    "//zircon/system/ulib/trace-test-utils",
-  ]
-}
-
 source_set("fxt_to_pprof_test") {
   testonly = true
   sources = [ "fxt_to_pprof_test.cc" ]
@@ -115,7 +104,6 @@ test("profile_test") {
     ":fxt_to_pprof_test",
     ":memory_trace_test",
     ":stack_compression_test",
-    ":trace_fixture_test",
     "//src/lib/fxl/test:gtest_main",
   ]
 }

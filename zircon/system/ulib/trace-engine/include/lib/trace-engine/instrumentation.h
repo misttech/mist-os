@@ -23,15 +23,13 @@
 // See <trace/event.h> for instrumentation macros.
 //
 
-#ifndef ZIRCON_SYSTEM_ULIB_LIB_TRACE_ENGINE_INSTRUMENTATION_H_
-#define ZIRCON_SYSTEM_ULIB_LIB_TRACE_ENGINE_INSTRUMENTATION_H_
-
-#include <stdbool.h>
-#include <stdint.h>
-
-#include <zircon/compiler.h>
+#ifndef LIB_TRACE_ENGINE_INSTRUMENTATION_H_
+#define LIB_TRACE_ENGINE_INSTRUMENTATION_H_
 
 #include <lib/trace-engine/context.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <zircon/compiler.h>
 
 __BEGIN_CDECLS
 
@@ -60,11 +58,6 @@ typedef enum {
 //
 // This function is thread-safe.
 trace_state_t trace_state(void);
-
-// Returns true if tracing is enabled (started or stopping but not stopped).
-//
-// This function is thread-safe and lock-free.
-static inline bool trace_is_enabled(void) { return trace_state() != TRACE_STOPPED; }
 
 // Returns true if tracing of the specified category has been enabled (which
 // implies that |trace_is_enabled()| is also true).
@@ -126,6 +119,28 @@ trace_context_t* trace_acquire_context(void);
 trace_context_t* trace_acquire_context_for_category(const char* category_literal,
                                                     trace_string_ref_t* out_ref);
 
+// Releases a reference to the trace engine's context.
+// Must balance a prior successful call to |trace_acquire_context()|
+// or |trace_acquire_context_for_category()|.
+//
+// |context| must be a valid trace context reference.
+//
+// This function is thread-safe, never-fail, and lock-free.
+void trace_release_context(trace_context_t* context);
+
+// Returns true if tracing is enabled (started or stopping but not stopped).
+//
+// This function is thread-safe and lock-free.
+static inline bool trace_is_enabled(void) {
+  bool result = false;
+  trace_context_t* context = trace_acquire_context();
+  if (unlikely(context)) {
+    result = trace_state() != TRACE_STOPPED;
+    trace_release_context(context);
+  }
+  return result;
+}
+
 // Opaque type that is used to cache category enabled/disabled state.
 // ["opaque" in the sense that client code must not touch it]
 // The term "site" is used because it's relatively unique and because this type
@@ -176,15 +191,6 @@ trace_context_t* trace_acquire_context_for_category_cached(const char* category_
 //
 // This function is thread-safe.
 zx_status_t trace_engine_flush_category_cache(void);
-
-// Releases a reference to the trace engine's context.
-// Must balance a prior successful call to |trace_acquire_context()|
-// or |trace_acquire_context_for_category()|.
-//
-// |context| must be a valid trace context reference.
-//
-// This function is thread-safe, never-fail, and lock-free.
-void trace_release_context(trace_context_t* context);
 
 // Acquires a reference to the trace engine's context, for prolonged use.
 // This cannot be used to acquire the context for the purposes of writing to
@@ -361,4 +367,4 @@ class TraceProlongedContext final {
 
 #endif  // __cplusplus
 
-#endif  // ZIRCON_SYSTEM_ULIB_LIB_TRACE_ENGINE_INSTRUMENTATION_H_
+#endif  // LIB_TRACE_ENGINE_INSTRUMENTATION_H_

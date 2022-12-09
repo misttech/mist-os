@@ -13,9 +13,7 @@
 
 namespace {
 
-// This test is a reproduction for fxb/114682 issue.
-// To be moved to trace-tes-utils when the issue is resolved.
-TEST(TraceFixtureTest, DISABLED_Background) {
+TEST(TraceFixtureTest, Background) {
   for (int repeat_test = 0; repeat_test < 100; repeat_test++) {
     printf("Iteration %d\n", repeat_test);
 
