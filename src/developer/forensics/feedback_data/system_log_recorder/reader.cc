@@ -183,7 +183,7 @@ bool Concatenate(const std::string& logs_dir, Decoder* decoder, const std::strin
   files::ReadDirContents(logs_dir, &file_paths);
 
   // Remove the current directory from the files.
-  file_paths.erase(std::find(file_paths.begin(), file_paths.end(), "."));
+  file_paths.erase(std::remove(file_paths.begin(), file_paths.end(), "."), file_paths.end());
 
   // Sort the files based on the number the previous writer assigned them. The lower the number,
   // the older the file.

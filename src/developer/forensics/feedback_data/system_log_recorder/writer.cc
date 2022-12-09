@@ -34,7 +34,8 @@ SystemLogWriter::SystemLogWriter(const std::string& logs_dir, size_t max_num_fil
   files::ReadDirContents(logs_dir_, &current_log_files);
 
   // Remove the current directory from the files.
-  current_log_files.erase(std::find(current_log_files.begin(), current_log_files.end(), "."));
+  current_log_files.erase(std::remove(current_log_files.begin(), current_log_files.end(), "."),
+                          current_log_files.end());
 
   // Get the numbers the previous writer assigned to the files – there should only be previous
   // files in case of a component restart.
