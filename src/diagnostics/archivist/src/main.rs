@@ -11,7 +11,7 @@ use anyhow::{format_err, Context, Error};
 use archivist_config::Config;
 use archivist_lib::{archivist::Archivist, constants, events::router::RouterOptions};
 use argh::FromArgs;
-use fuchsia_async::SendExecutor;
+use fuchsia_async as fasync;
 use fuchsia_component::server::MissingStartupHandle;
 use fuchsia_inspect::{component, health::Reporter};
 use fuchsia_zircon as zx;
@@ -95,8 +95,13 @@ fn main() -> Result<(), Error> {
     };
     let num_threads = config.num_threads;
     debug!("Running executor with {} threads.", num_threads);
-    let mut executor = SendExecutor::new(num_threads as usize)?;
-    executor.run(async_main(config)).context("async main")?;
+    if num_threads == 1 {
+        let mut executor = fasync::LocalExecutor::new()?;
+        executor.run_singlethreaded(async_main(config)).context("async main")?;
+    } else {
+        let mut executor = fasync::SendExecutor::new(num_threads as usize - 1)?;
+        executor.run(async_main(config)).context("async main")?;
+    }
     debug!("Exiting.");
     Ok(())
 }
