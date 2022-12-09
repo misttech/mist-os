@@ -9,9 +9,7 @@ using zx;
 @available(added=HEAD)
 type DelayInfo = table {
     /// The driver's best estimate of the delay internal to the hardware it abstracts for
-    /// the chosen format. If not included `internal_delay` is unknown. If unknown, the
-    /// client may treat `internal_delay` as it chooses, e.g. may autodetect it, consider
-    /// it zero, consider it a large number, etc.
+    /// the chosen format.
     ///
     /// `internal_delay` must be taken into account by the client when determining either
     /// the minimum lead time requirement (for playback) or the minimum capture delay (for
@@ -30,6 +28,8 @@ type DelayInfo = table {
     /// buffer before they are committed it to main system memory.
     /// In these cases `internal_delay` can be calculated based on the rate, frame size and the size
     /// of a hardware FIFO block.
+    ///
+    /// Required.
     1: internal_delay zx.duration;
 
     /// The driver's best estimate of the delay external to the hardware it abstracts for
