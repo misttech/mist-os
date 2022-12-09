@@ -13,7 +13,6 @@ driver_bind_rules("as370-bind") {
   deps = [
     "//src/devices/bind/fuchsia.google.platform",
     "//src/devices/bind/fuchsia.hardware.platform.bus",
-    "//src/devices/bind/fuchsia.synaptics.platform",
   ]
 }
 

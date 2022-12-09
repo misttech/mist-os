@@ -131,7 +131,6 @@ template("boot_shim") {
 }
 
 shims = [
-  "as370",
   "imx8mmevk",
   "motmot",
   "pinecrest",

@@ -122,7 +122,7 @@ fbl::String GetTestFilter() {
     return "*Sherlock*";
   } else if (board_name == "msm8x53-som") {
     return "*Msm8x53Som*";
-  } else if (board_name == "as370" || board_name == "visalia") {
+  } else if (board_name == "visalia") {
     return "*Visalia*";
   } else if (board_name == "pinecrest") {
     return "*Pinecrest*";
