@@ -39,6 +39,8 @@ impl Screens {
     fn state(&mut self, state: &State) {
         let new_view = match state {
             State::Home => self.home(),
+            State::FactoryReset => self.progress(Operation::FactoryDataReset, 0),
+            State::FactoryResetConfirm => self.factory_reset_confirm(),
             State::Failed(operation, error) => self.failed(operation, error),
             State::Reinstall => self.reinstall(),
             State::GetWiFiNetworks => self.select_wifi(&Vec::new()),
@@ -68,8 +70,6 @@ impl Screens {
                 // Marking progress as 95 percent to indicate metrics uploading and reboot is in progress.
                 self.progress(Operation::Reinstall, 95)
             }
-            // Temporary catch-all until all the other states are added
-            _ => self.failed(&Operation::Reinstall, &Some("State not yet implemented".to_string())),
         };
         self.app_sender.queue_message(
             MessageTarget::View(self.view_key),
@@ -77,20 +77,64 @@ impl Screens {
         );
     }
 
-    fn progress(&self, _operation: Operation, percent: u8) -> ViewAssistantPtr {
+    fn factory_reset_confirm(&self) -> ViewAssistantPtr {
+        let view_assistant_ptr = Box::new(
+            GenericSplitViewAssistant::new(
+                self.app_sender.clone(),
+                self.view_key,
+                ScreenSplit::None,
+                Some("Confirm factory reset".to_string()),
+                Some(
+                    "• This will clear your data from the device and can't be undone\n\
+                     • Upon completion, the device will automatically restart"
+                        .to_string(),
+                ),
+                None,
+                Some(vec![
+                    ButtonInfo::new("Cancel", None, false, true, Event::Cancel),
+                    ButtonInfo::new(
+                        "Start Factory Reset",
+                        Some(ICON_FACTORY_RESET),
+                        false,
+                        false,
+                        Event::StartFactoryReset,
+                    ),
+                ]),
+                None,
+                None,
+                Some(IMAGE_DEVICE_UPDATING),
+                Some(IMAGE_DEVICE_UPDATING_SIZE),
+            )
+            .unwrap(),
+        );
+        view_assistant_ptr
+    }
+
+    fn progress(&self, operation: Operation, percent: u8) -> ViewAssistantPtr {
+        let title = match operation {
+            // Factory resets are currently fast operations. If they take longer progress can be added here.
+            Operation::FactoryDataReset => "Resetting".to_string(),
+            Operation::Reinstall => format!("Updating {}%", percent).to_string(),
+        };
+        let content = match operation {
+            Operation::FactoryDataReset => "• Resetting user data\n\
+            • Upon completion, the\n   \
+              device will automatically\n   \
+              restart"
+                .to_string(),
+            Operation::Reinstall => "• This may take several minutes\n\
+            • Upon completion, the\n   \
+              device will automatically\n   \
+              restart"
+                .to_string(),
+        };
         let view_assistant_ptr = Box::new(
             GenericSplitViewAssistant::new(
                 self.app_sender.clone(),
                 self.view_key,
                 ScreenSplit::Even,
-                Some(format!("Updating {}%", percent).to_string()),
-                Some(
-                    "• This may take several minutes\n\
-                     • Upon completion, the\n   \
-                       device will automatically\n   \
-                       restart"
-                        .to_string(),
-                ),
+                Some(title),
+                Some(content),
                 None,
                 None,
                 None,

@@ -51,6 +51,7 @@ pub enum State {
     EnterWiFi,
     ExecuteReinstall,
     FactoryReset,
+    FactoryResetConfirm,
     FinalizeReinstall(OtaStatus),
     Failed(Operation, Option<ErrorMessage>),
     Home,
@@ -131,9 +132,10 @@ impl StateMachine {
             // Any cancel or error sends us back to the start.
             (_, Event::Cancel) => Some(State::Home),
 
-            (State::Home, Event::StartFactoryReset) => Some(State::FactoryReset),
+            (State::Home, Event::StartFactoryReset) => Some(State::FactoryResetConfirm),
             (State::Home, Event::TryAnotherWay) => Some(State::Reinstall),
 
+            (State::FactoryResetConfirm, Event::StartFactoryReset) => Some(State::FactoryReset),
             (State::FactoryReset, Event::Error(_reason)) => {
                 Some(State::Failed(Operation::FactoryDataReset, None))
             }
@@ -253,6 +255,7 @@ mod test {
             State::EnterWiFi,
             State::ExecuteReinstall,
             State::FactoryReset,
+            State::FactoryResetConfirm,
             State::Failed(Operation::Reinstall, Some("Error message".to_string())),
             State::FinalizeReinstall(OtaStatus::Succeeded),
             State::GetWiFiNetworks,
@@ -332,5 +335,18 @@ mod test {
         );
         state = sm.event(Event::OtaStatusReceived(OtaStatus::Succeeded)).unwrap();
         assert_eq!(state, State::FinalizeReinstall(OtaStatus::Succeeded));
+    }
+
+    #[test]
+    fn run_through_factory_reset_with_cancel() {
+        let mut sm = StateMachine::new(State::Home);
+        let mut state = sm.event(Event::StartFactoryReset).unwrap();
+        assert_eq!(state, State::FactoryResetConfirm);
+        state = sm.event(Event::Cancel).unwrap();
+        assert_eq!(state, State::Home);
+        state = sm.event(Event::StartFactoryReset).unwrap();
+        assert_eq!(state, State::FactoryResetConfirm);
+        state = sm.event(Event::StartFactoryReset).unwrap();
+        assert_eq!(state, State::FactoryReset);
     }
 }
