@@ -221,7 +221,7 @@ fbl::unique_fd TryBindToFvmDriver(const fbl::unique_fd& devfs_root,
   char fvm_path[PATH_MAX];
   snprintf(fvm_path, sizeof(fvm_path), "%s/fvm", &path[5]);
 
-  fbl::unique_fd fvm(openat(devfs_root.get(), fvm_path, O_RDWR));
+  fbl::unique_fd fvm(openat(devfs_root.get(), fvm_path, O_RDONLY));
   if (fvm) {
     return fvm;
   }
@@ -246,7 +246,7 @@ fbl::unique_fd TryBindToFvmDriver(const fbl::unique_fd& devfs_root,
     return fbl::unique_fd();
   }
 
-  auto fvm_device_fd = openat(devfs_root.get(), fvm_path, O_RDWR);
+  auto fvm_device_fd = openat(devfs_root.get(), fvm_path, O_RDONLY);
   if (fvm_device_fd == -1) {
     ERROR("Failed to open fvm dev file at \"%s\": %s\n", fvm_path, strerror(errno));
     return fbl::unique_fd();
