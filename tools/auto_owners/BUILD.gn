@@ -17,6 +17,7 @@ if (is_host) {
     "//third_party/rust_crates:toml",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:tracing-subscriber",
+    "//third_party/rust_crates:walkdir",
     "//third_party/rust_crates:xml-rs",
     "//tools/cargo-gnaw:cargo-gnaw-lib",
   ]
@@ -39,7 +40,6 @@ if (is_host) {
              "//third_party/rust_crates:pretty_assertions",
              "//third_party/rust_crates:serial_test",
              "//third_party/rust_crates:tempfile",
-             "//third_party/rust_crates:walkdir",
            ]
 
     non_rust_deps = [
@@ -68,6 +68,7 @@ if (is_host) {
       "tests/owners/owners.toml",
       "tests/owners/rust_metadata.json",
       "tests/owners/third_party/bar/BUILD.gn",
+      "tests/owners/third_party/baz/src/source.c",
       "tests/owners/third_party/foo/BUILD.gn",
       "tests/owners/third_party/foo/OWNERS",
       "tests/owners/third_party/rust_crates/BUILD.gn",

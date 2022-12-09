@@ -12,5 +12,7 @@ The directory structure contains:
 * Non-rust projects:
   * third_party/foo: a project with an up-to-date OWNERS file.
   * third_party/bar: a project without an OWNERS file.
+  * third_party/baz: a project without OWNERS that is depended on by file
+    instead of gn target.
 * dep/: project depending on all 3P projects.
 
