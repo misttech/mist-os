@@ -21,7 +21,7 @@ function preserve_owner_files {
   do
     local owner_dir=$(dirname "$owner_file")
     local version=$(sed -n "s/^version = \"\(.*\)\"$/\\1/p" "$owner_dir/Cargo.toml" | head -n 1)
-    if [[ $owner_dir != *-"$version" ]] then
+    if [[ $owner_dir != *-"$version" ]]; then
       owner_dir="$owner_dir-$version"
     fi
     local temp_owner_dir="$owners_tmp/$owner_dir"
