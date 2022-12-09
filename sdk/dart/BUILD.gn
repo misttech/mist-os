@@ -117,7 +117,6 @@ group("tests") {
   public_deps = [
                   # TODO: This target should just aggregate the top-level directories and
                   # most of these dependencies should be in those subdirectories.
-                  "//bundles/packages:base_packages",
                   "//bundles/packages/tests:scenic",
                   "//sdk/dart/fuchsia_component_test:tests",
                   "//sdk/dart/fuchsia_inspect:tests",
