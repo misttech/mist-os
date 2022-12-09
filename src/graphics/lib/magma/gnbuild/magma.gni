@@ -102,8 +102,13 @@ template("magma_vulkan_icd") {
       if (!defined(invoker.ldflags)) {
         ldflags = []
       }
-      ldflags += [ "-Wl,--version-script=" +
-                   rebase_path(version_script, root_build_dir) ]
+      ldflags += [
+        "-Wl,--version-script=" + rebase_path(version_script, root_build_dir),
+
+        # TODO(fxbug.dev/117101): Mitigate linker errors on libvulkan_intel.so
+        # after "--no-undefined-version" was enabled by default.
+        "-Wl,--undefined-version",
+      ]
     }
 
     # Do not build ICDs with instrumented build variants, otherwise
