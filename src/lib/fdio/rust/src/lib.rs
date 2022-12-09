@@ -749,6 +749,7 @@ impl Namespace {
 }
 
 /// Entry in a flat representation of a namespace.
+#[derive(Debug)]
 pub struct NamespaceEntry {
     pub handle: zx::Handle,
     pub info: HandleInfo,
