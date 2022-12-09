@@ -8,6 +8,7 @@
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/layout.h>
 
+#include <filesystem>
 #include <functional>
 #include <iostream>
 #include <sstream>
@@ -111,5 +112,7 @@ constexpr auto ExpectOkDiagnostics() {
   };
   return elfldltl::Diagnostics(fail, elfldltl::DiagnosticsFlags{.extra_checking = true});
 }
+
+std::filesystem::path GetTestDataPath(std::string_view filename);
 
 #endif  // SRC_LIB_ELFLDLTL_TEST_TESTS_H_

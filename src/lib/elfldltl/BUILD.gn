@@ -33,6 +33,7 @@ zx_library("elfldltl") {
     "lib/elfldltl/mapped-fd-file.h",
     "lib/elfldltl/mapped-vmo-file.h",
     "lib/elfldltl/memory.h",
+    "lib/elfldltl/mmap-loader.h",
     "lib/elfldltl/note.h",
     "lib/elfldltl/phdr.h",
     "lib/elfldltl/posix.h",

@@ -120,7 +120,7 @@ class NewArrayFromFile {
 
     constexpr cpp20::span<T> release() { return {ptr_.release(), size_}; }
 
-    constexpr operator bool() const { return ptr_; }
+    constexpr explicit operator bool() const { return ptr_ != nullptr; }
 
     constexpr operator cpp20::span<T>() const { return get(); }
 
@@ -202,6 +202,16 @@ class DirectMemory {
   uintptr_t base() const { return base_; }
   void set_base(uintptr_t base) { base_ = base; }
 
+  // This returns an address in memory for an address in the loaded ELF file.
+  template <typename T>
+  T* GetPointer(uintptr_t ptr) {
+    if (ptr < base_ || ptr - base_ >= image_.size() ||
+        image_.size() - (ptr - base_) < PointerSize<T>()) [[unlikely]] {
+      return nullptr;
+    }
+    return reinterpret_cast<T*>(&image_[ptr - base_]);
+  }
+
   // File API assumes this file's first segment has page-aligned p_offset of 0.
 
   template <typename T>
@@ -256,7 +266,7 @@ class DirectMemory {
   // other ones.  (The caller doesn't need to supply the U template parameter.)
   template <typename T, typename U>
   bool Store(uintptr_t ptr, U value) {
-    if (auto word = StoreLocation<T>(ptr)) [[likely]] {
+    if (auto word = GetPointer<T>(ptr)) [[likely]] {
       *word = value;
       return true;
     }
@@ -269,7 +279,7 @@ class DirectMemory {
   // other ones.  (The caller doesn't need to supply the U template parameter.)
   template <typename T, typename U>
   bool StoreAdd(uintptr_t ptr, U value) {
-    if (auto word = StoreLocation<T>(ptr)) [[likely]] {
+    if (auto word = GetPointer<T>(ptr)) [[likely]] {
       *word = *word + value;  // Don't assume T::operator+= works.
       return true;
     }
@@ -290,12 +300,12 @@ class DirectMemory {
   }
 
   template <typename T>
-  T* StoreLocation(uintptr_t ptr) {
-    if (ptr < base_ || ptr - base_ >= image_.size() || image_.size() - (ptr - base_) < sizeof(T))
-        [[unlikely]] {
-      return nullptr;
+  static constexpr size_t PointerSize() {
+    if constexpr (std::is_function_v<T>) {
+      return 1;
+    } else {
+      return sizeof(T);
     }
-    return reinterpret_cast<T*>(&image_[ptr - base_]);
   }
 
   cpp20::span<std::byte> image_;
