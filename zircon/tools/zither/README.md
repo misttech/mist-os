@@ -70,12 +70,28 @@ primitive type with a name of `UpperCamelCase(${declname})`;
 * A struct declaration yields a struct of name `UpperCamelCase(${declname})`,
 with an obvious mapping of members.
 
+### Rust
+* One crate `zither-${id1}-${id2}-...-{idn}-${idn}` is generated: it contains
+a `${filename}.rs` for each original FIDL source file and a crate root `lib.rs`
+* Type translation from FIDL to Rust is as follows:
+  - `{u,}int{8,16,32,64}` map to `{u,i}{8,16,32,64}`, respectively;
+  - `bool` maps to `bool`;
+  - unbounded `string`s are only permitted in constants and map to static
+  `&str` literals;
+* Type aliases are naturally converted into `pub type $name = $type;`
+statements.
+* A constant yields an exported `const` declaration of the name
+`UpperSnakeCase(${declname})`;
+* An enum declaration is naturally translated to an exported
+`#[repr(${subtype}]` `enum` with `UpperCamelCase(${member_name})` member names;
+* A bits declaration yields a conventional `bitflags!` instantiation on a
+`struct` of name `UpperCamelCase(${member_name})` with
+`const` members of name `UpperSnakeCase(${member_name})`;
+* A struct declaration yields an exported `#[repr(C)]` `struct` declaration of
+name `UpperCamelCase(${declname})` with exported members of name
+`LowerSnakeCase(${member_name})`.
 
-* TODO(fxbug.dev/51002): Document more as we go.
-
-TODO(fxbug.dev/91102): Also C++ and Rust
-
-TODO(fxbug.dev/93393): Also Assembly.
+TODO(fxbug.dev/91102): Also C++
 
 ## Testing
 zither's testing strategy is three-fold.

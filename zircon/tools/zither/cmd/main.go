@@ -21,6 +21,7 @@ import (
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither/golang"
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither/kernel"
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither/legacy_syscall_cdecl"
+	"go.fuchsia.dev/fuchsia/zircon/tools/zither/rust"
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither/zircon_ifs"
 )
 
@@ -28,6 +29,7 @@ const (
 	cBackend                  string = "c"
 	goBackend                 string = "go"
 	asmBackend                string = "asm"
+	rustBackend               string = "rust"
 	zirconIFSBackend          string = "zircon_ifs"
 	kernelBackend             string = "kernel"
 	legacySyscallCDeclBackend string = "legacy_syscall_cdecl"
@@ -37,6 +39,7 @@ var supportedBackends = []string{
 	cBackend,
 	goBackend,
 	asmBackend,
+	rustBackend,
 	zirconIFSBackend,
 	kernelBackend,
 	legacySyscallCDeclBackend,
@@ -83,6 +86,8 @@ func main() {
 		gen = asm.NewGenerator(f)
 	case goBackend:
 		gen = golang.NewGenerator(f)
+	case rustBackend:
+		gen = rust.NewGenerator(f)
 	case zirconIFSBackend:
 		gen = zircon_ifs.NewGenerator(f)
 	case kernelBackend:

@@ -6,12 +6,15 @@ import("//build/compiled_action.gni")
 import("//build/config/clang/clang.gni")
 import("//build/cpp/library_headers.gni")
 import("//build/go/go_library.gni")
+import("//build/rust/config.gni")
+import("//build/rust/rustc_library.gni")
 
-# TODO(fxbug.dev/91102, fxbug.dev/93393): "cpp", and "rust".
+# TODO(fxbug.dev/91102, fxbug.dev/93393): "cpp"
 supported_zither_backends = [
   "asm",  # Assembly data layout bindings.
   "c",  # C data layout bindings.
   "go",  # Go data layout bindings.
+  "rust",  # Rust data layout bindings.
   "legacy_syscall_cdecl",  # Legacy C syscall declarations.
   "zircon_ifs",  # Syscall text ABI bindings.
   "kernel",  # Internal kernel bindings.
@@ -112,6 +115,17 @@ supported_zither_backend_info = {
     }
 
     _library_template = "_zither_go_library"
+  }
+  rust = {
+    output_subdir = {
+      library_name_separator = "-"
+    }
+    formatter = {
+      script = "$rustc_prefix/bin/rustfmt"
+      inputs = [ "//rustfmt.toml" ]
+      args = [ "--config-path=" + rebase_path(inputs[0], root_build_dir) ]
+    }
+    _library_template = "_zither_rust_library"
   }
   zircon_ifs = {
     output_subdir = {
@@ -382,6 +396,58 @@ template("_zither_go_library") {
       ":${zither_target}($default_toolchain)",
       ":${zither_target}.check($default_toolchain)",
     ]
+  }
+}
+
+template("_zither_rust_library") {
+  assert(invoker.backend == "rust")
+
+  main_target = target_name
+  zither_target = "$target_name.gen"
+
+  forward_variables_from(invoker,
+                         [
+                           "source_names",
+                           "output_dir",
+                           "output_subdir",
+                         ])
+
+  crate_root = "${output_dir}/${output_subdir}/src/lib.rs"
+  generated_files = [ crate_root ]
+  foreach(name, source_names) {
+    generated_files += [ "${output_dir}/${output_subdir}/src/${name}.rs" ]
+  }
+
+  _zither(zither_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                             "deps",
+                             "fidl_ir_json",
+                             "fidl_ir_target",
+                             "generated_files",
+                             "formatter",
+                           ])
+    backend = "rust"
+  }
+
+  rustc_library(main_target) {
+    forward_variables_from(invoker,
+                           [
+                             "visibility",
+                             "testonly",
+                           ])
+    name = output_subdir
+    edition = "2021"
+    source_root = crate_root
+    sources = generated_files
+    non_rust_deps = [
+      ":${zither_target}($default_toolchain)",
+      ":${zither_target}.check($default_toolchain)",
+    ]
+    deps = [ "//third_party/rust_crates:bitflags" ]
+    configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   }
 }
 

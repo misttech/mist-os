@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 import("//build/go/go_binary.gni")
 import("//build/go/go_library.gni")
+import("//build/rust/rustc_binary.gni")
 import("//build/toolchain/ifs_shared_library.gni")
 import("//tools/fidl/lib/fidlgentest/fidlgentest_go_test.gni")
 import("zither_golden_files.gni")
@@ -54,6 +55,7 @@ if (is_host) {
       "golang",
       "kernel",
       "legacy_syscall_cdecl",
+      "rust",
       "zircon_ifs",
       "//tools/fidl/lib/fidlgen",
       "//tools/lib/color",
@@ -313,8 +315,10 @@ template("zither_golden_test") {
                    "case_output_dir",
                    "output_subdir",
                  ])
-    } else if (case.backend == "kernel" ||
+    } else if (case.backend == "rust" || case.backend == "kernel" ||
                case.backend == "legacy_syscall_cdecl") {
+      # The generated rust library target should already enforce compilation.
+      #
       # The kernel and legacy_syscall_cdecl backends generate sources that rely
       # on a number of other kernel and vDSO-specific definitions. Given that
       # and the fact the singular use-case for these sources will be exercised
@@ -362,6 +366,13 @@ zither_golden_test("constants") {
         "pkg_name.txt",
       ]
     },
+    {
+      backend = "rust"
+      files = [
+        "constants.rs",
+        "lib.rs",
+      ]
+    },
   ]
 }
 
@@ -384,6 +395,13 @@ zither_golden_test("enums") {
       files = [
         "enums.go",
         "pkg_name.txt",
+      ]
+    },
+    {
+      backend = "rust"
+      files = [
+        "enums.rs",
+        "lib.rs",
       ]
     },
   ]
@@ -410,6 +428,13 @@ zither_golden_test("bits") {
         "pkg_name.txt",
       ]
     },
+    {
+      backend = "rust"
+      files = [
+        "bits.rs",
+        "lib.rs",
+      ]
+    },
   ]
 }
 
@@ -432,6 +457,13 @@ zither_golden_test("structs") {
       files = [
         "pkg_name.txt",
         "structs.go",
+      ]
+    },
+    {
+      backend = "rust"
+      files = [
+        "structs.rs",
+        "lib.rs",
       ]
     },
   ]
@@ -472,6 +504,15 @@ zither_golden_test("multifile") {
         "pkg_name.txt",
       ]
     },
+    {
+      backend = "rust"
+      files = [
+        "a.rs",
+        "b.rs",
+        "c.rs",
+        "lib.rs",
+      ]
+    },
   ]
 }
 
@@ -490,6 +531,13 @@ zither_golden_test("aliases") {
       files = [
         "aliases.go",
         "pkg_name.txt",
+      ]
+    },
+    {
+      backend = "rust"
+      files = [
+        "aliases.rs",
+        "lib.rs",
       ]
     },
   ]
@@ -543,6 +591,13 @@ zither_golden_test("experimental_zx_types") {
       backend = "go"
       files = [ "experimental_zx_types.go" ]
     },
+    {
+      backend = "rust"
+      files = [
+        "experimental_zx_types.rs",
+        "lib.rs",
+      ]
+    },
   ]
 }
 
@@ -558,6 +613,13 @@ zither_golden_test("resources") {
     {
       backend = "go"
       files = [ "resources.go" ]
+    },
+    {
+      backend = "rust"
+      files = [
+        "resources.rs",
+        "lib.rs",
+      ]
     },
   ]
 }

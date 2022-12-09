@@ -1,0 +1,47 @@
+{{/*
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+*/}}
+{{- define "GenerateRustFile" -}}
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+{{/* TODO(fxbug.dev/51002): Give source-relative path to library. */}}
+// DO NOT EDIT.
+// Generated from FIDL library `{{ .Library.String }}` by zither, a Fuchsia platform tool.
+
+#![allow(unused_imports)]
+
+{{ range Imports . }}
+{{- "" -}} use {{ . }};
+{{ end }}
+
+{{ range $name := .Deps }}
+{{- "" -}} use crate::{{ $name }}::*;
+{{ end }}
+
+{{ range .Decls }}
+
+{{ if .IsConst }}
+{{ template "GenerateRustConst" .AsConst }}
+
+{{ else if .IsEnum }}
+{{ template "GenerateRustEnum" .AsEnum }}
+
+{{ else if .IsBits }}
+{{ template "GenerateRustBits" .AsBits }}
+
+{{ else if .IsStruct }}
+{{ template "GenerateRustStruct" .AsStruct }}
+
+{{ else if .IsAlias }}
+{{ template "GenerateRustAlias" .AsAlias }}
+
+{{ else if .IsHandle }}
+{{ template "GenerateRustHandle" .AsHandle }}
+
+{{ end }}
+{{ end }}
+{{ end }}
