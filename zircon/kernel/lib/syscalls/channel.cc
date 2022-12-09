@@ -272,6 +272,7 @@ static __WARN_UNUSED_RESULT zx_status_t msg_put_handles(ProcessDispatcher* up, M
     return status;
 
   {
+    AutoExpiringPreemptDisabler preempt_disable{Mutex::DEFAULT_TIMESLICE_EXTENSION};
     Guard<BrwLockPi, BrwLockPi::Writer> guard{up->handle_table().get_lock()};
 
     for (size_t ix = 0; ix != num_handles; ++ix) {
