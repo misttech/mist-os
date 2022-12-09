@@ -23,8 +23,15 @@ use std::fs::File;
 use tracing::info;
 
 pub fn create_system(args: CreateSystemArgs) -> Result<()> {
-    let CreateSystemArgs { image_assembly_config, images, outdir, gendir, base_package_name, mode } =
-        args;
+    let CreateSystemArgs {
+        image_assembly_config,
+        include_account,
+        images,
+        outdir,
+        gendir,
+        base_package_name,
+        mode,
+    } = args;
     let gendir = gendir.unwrap_or_else(|| outdir.clone());
     let base_package_name = base_package_name.unwrap_or_else(|| "system_image".to_string());
 
@@ -79,6 +86,7 @@ pub fn create_system(args: CreateSystemArgs) -> Result<()> {
                 &image_assembly_config,
                 fvm_config.clone(),
                 compress_blobfs,
+                include_account,
                 base_package,
             )?;
         }

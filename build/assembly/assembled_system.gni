@@ -675,10 +675,6 @@ template("assembled_system") {
     if (defined(invoker.assembly_blob_layout_format)) {
       blob_layout_format = invoker.assembly_blob_layout_format
     }
-
-    if (defined(invoker.assembly_include_account_in_fvm)) {
-      empty_account_partition = invoker.assembly_include_account_in_fvm
-    }
   }
 
   generated_images_config(labels.images_config) {
@@ -726,9 +722,6 @@ template("assembled_system") {
         }
         if (fvm_max_disk_size != false) {
           max_disk_size = fvm_max_disk_size
-        }
-        if (defined(invoker.assembly_include_account_in_fvm)) {
-          empty_account_partition = invoker.assembly_include_account_in_fvm
         }
 
         # Filesystems
@@ -953,6 +946,11 @@ template("assembled_system") {
       "--outdir",
       rebase_path(files.outdir, root_build_dir),
     ]
+
+    if (defined(invoker.assembly_include_account_in_fvm) &&
+        invoker.assembly_include_account_in_fvm) {
+      args += [ "--include-account" ]
+    }
 
     if (embed_fvm_in_zbi) {
       args += [

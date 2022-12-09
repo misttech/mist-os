@@ -41,6 +41,10 @@ pub struct CreateSystemArgs {
     #[argh(option)]
     pub image_assembly_config: Utf8PathBuf,
 
+    /// whether to include an account partition in the FVMs.
+    #[argh(switch)]
+    pub include_account: bool,
+
     /// the configuration file that specifies which images to generate and how.
     #[argh(option)]
     pub images: Utf8PathBuf,

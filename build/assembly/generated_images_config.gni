@@ -193,16 +193,6 @@ template("generated_images_config") {
       empty_minfs,
     ]
 
-    # Optionally, include an empty account partition.
-    if (defined(invoker_fvm.empty_account_partition) &&
-        invoker_fvm.empty_account_partition) {
-      empty_account = {
-        type = "empty-account"
-        name = "account"
-      }
-      fvm_filesystems += [ empty_account ]
-    }
-
     # Optionally, reserve some slices in the FVM.
     if (defined(invoker_fvm.reserved)) {
       invoker_reserved = invoker_fvm.reserved
@@ -221,9 +211,6 @@ template("generated_images_config") {
         "data",
         "blob",
       ]
-      if (defined(empty_account)) {
-        filesystems += [ "account" ]
-      }
       if (defined(reserved)) {
         filesystems += [ "internal" ]
       }
@@ -239,9 +226,6 @@ template("generated_images_config") {
         "data",
         "blob",
       ]
-      if (defined(empty_account)) {
-        filesystems += [ "account" ]
-      }
       if (defined(reserved)) {
         filesystems += [ "internal" ]
       }
@@ -254,9 +238,6 @@ template("generated_images_config") {
       type = "sparse"
       name = "fvm.blob.sparse"
       filesystems = [ "blob" ]
-      if (defined(empty_account)) {
-        filesystems += [ "account" ]
-      }
       if (defined(reserved)) {
         filesystems += [ "internal" ]
       }
@@ -279,9 +260,6 @@ template("generated_images_config") {
           "data",
           "blob",
         ]
-        if (defined(empty_account)) {
-          filesystems += [ "account" ]
-        }
         if (defined(reserved)) {
           filesystems += [ "internal" ]
         }
@@ -312,9 +290,6 @@ template("generated_images_config") {
         page_size = invoker_nand.page_size
         pages_per_block = invoker_nand.pages_per_block
         filesystems = [ "blob" ]
-        if (defined(empty_account)) {
-          filesystems += [ "account" ]
-        }
         if (defined(reserved)) {
           filesystems += [ "internal" ]
         }

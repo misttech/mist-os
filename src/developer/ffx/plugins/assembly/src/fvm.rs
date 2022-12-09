@@ -36,6 +36,7 @@ pub fn construct_fvm(
     assembly_config: &ImageAssemblyConfig,
     fvm_config: Fvm,
     compress_blobfs: bool,
+    include_account: bool,
     base_package: &BasePackage,
 ) -> Result<()> {
     let mut builder = MultiFvmBuilder::new(
@@ -45,6 +46,7 @@ pub fn construct_fvm(
         assembly_manifest,
         compress_blobfs,
         fvm_config.slice_size,
+        include_account,
         base_package,
     );
     for filesystem in fvm_config.filesystems {
@@ -76,6 +78,8 @@ pub struct MultiFvmBuilder<'a> {
     compress_blobfs: bool,
     /// The size of a slice for the FVM.
     slice_size: u64,
+    /// Whether to include an account partition in the FVMs.
+    include_account: bool,
     /// The base package to add to blobfs.
     base_package: &'a BasePackage,
 }
@@ -91,6 +95,7 @@ pub enum FilesystemEntry {
 impl<'a> MultiFvmBuilder<'a> {
     /// Construct a new MultiFvmBuilder.
     /// These parameters are constant across all generated FVMs.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         outdir: impl AsRef<Utf8Path>,
         gendir: impl AsRef<Utf8Path>,
@@ -98,6 +103,7 @@ impl<'a> MultiFvmBuilder<'a> {
         assembly_manifest: &'a mut AssemblyManifest,
         compress_blobfs: bool,
         slice_size: u64,
+        include_account: bool,
         base_package: &'a BasePackage,
     ) -> Self {
         Self {
@@ -109,6 +115,7 @@ impl<'a> MultiFvmBuilder<'a> {
             assembly_manifest,
             compress_blobfs,
             slice_size,
+            include_account,
             base_package,
         }
     }
@@ -119,7 +126,6 @@ impl<'a> MultiFvmBuilder<'a> {
             FvmFilesystem::BlobFS(fs) => &fs.name,
             FvmFilesystem::MinFS(fs) => &fs.name,
             FvmFilesystem::EmptyMinFS(fs) => &fs.name,
-            FvmFilesystem::EmptyAccount(fs) => &fs.name,
             FvmFilesystem::Reserved(fs) => &fs.name,
         };
         self.filesystems.insert(name.clone(), FilesystemEntry::Params(filesystem));
@@ -165,8 +171,14 @@ impl<'a> MultiFvmBuilder<'a> {
                     resize_image_file_to_fit: config.resize_image_file_to_fit,
                     truncate_to_length: config.truncate_to_length,
                 };
-                let mut builder =
-                    FvmBuilder::new(fvm_tool, &path, self.slice_size, config.compress, fvm_type);
+                let mut builder = FvmBuilder::new(
+                    fvm_tool,
+                    &path,
+                    self.slice_size,
+                    self.include_account,
+                    config.compress,
+                    fvm_type,
+                );
                 for filesystem_name in &config.filesystems {
                     let fs = self
                         .get_filesystem(tools, filesystem_name)
@@ -190,8 +202,14 @@ impl<'a> MultiFvmBuilder<'a> {
                 let path = self.outdir.join(format!("{}.blk", &config.name));
                 let fvm_type = FvmType::Sparse { max_disk_size: config.max_disk_size };
                 let compress = true;
-                let mut builder =
-                    FvmBuilder::new(fvm_tool, &path, self.slice_size, compress, fvm_type);
+                let mut builder = FvmBuilder::new(
+                    fvm_tool,
+                    &path,
+                    self.slice_size,
+                    self.include_account,
+                    compress,
+                    fvm_type,
+                );
 
                 let mut has_minfs = false;
                 for filesystem_name in &config.filesystems {
@@ -333,7 +351,6 @@ impl<'a> MultiFvmBuilder<'a> {
                 )
             }
             FvmFilesystem::EmptyMinFS(_config) => (None, Filesystem::EmptyMinFS {}),
-            FvmFilesystem::EmptyAccount(_config) => (None, Filesystem::EmptyAccount {}),
             FvmFilesystem::Reserved(config) => {
                 (None, Filesystem::Reserved { slices: config.slices })
             }
@@ -349,8 +366,8 @@ mod tests {
     use crate::base_package::BasePackage;
     use assembly_config_schema::image_assembly_config::{ImageAssemblyConfig, KernelConfig};
     use assembly_images_config::{
-        BlobFS, BlobFSLayout, EmptyAccount, EmptyMinFS, FvmFilesystem, FvmOutput, MinFS, NandFvm,
-        Reserved, SparseFvm, StandardFvm,
+        BlobFS, BlobFSLayout, EmptyMinFS, FvmFilesystem, FvmOutput, MinFS, NandFvm, Reserved,
+        SparseFvm, StandardFvm,
     };
     use assembly_manifest::AssemblyManifest;
     use assembly_tool::testing::FakeToolProvider;
@@ -388,6 +405,7 @@ mod tests {
             path: "path/to/base_package".into(),
             manifest_path: Utf8PathBuf::default(),
         };
+        let include_account = false;
         let compress_blobfs = true;
         let slice_size = 0;
         let mut builder = MultiFvmBuilder::new(
@@ -397,6 +415,7 @@ mod tests {
             &mut assembly_manifest,
             compress_blobfs,
             slice_size,
+            include_account,
             &base_package,
         );
         let tools = FakeToolProvider::default();
@@ -435,6 +454,7 @@ mod tests {
             path: "path/to/base_package".into(),
             manifest_path: Utf8PathBuf::default(),
         };
+        let include_account = false;
         let compress_blobfs = true;
         let slice_size = 0;
         let mut builder = MultiFvmBuilder::new(
@@ -444,6 +464,7 @@ mod tests {
             &mut assembly_manifest,
             compress_blobfs,
             slice_size,
+            include_account,
             &base_package,
         );
         builder.output(FvmOutput::Standard(StandardFvm {
@@ -500,6 +521,7 @@ mod tests {
             path: "path/to/base_package".into(),
             manifest_path: Utf8PathBuf::default(),
         };
+        let include_account = false;
         let compress_blobfs = true;
         let slice_size = 0;
         let mut builder = MultiFvmBuilder::new(
@@ -509,6 +531,7 @@ mod tests {
             &mut assembly_manifest,
             compress_blobfs,
             slice_size,
+            include_account,
             &base_package,
         );
         builder.output(FvmOutput::Standard(StandardFvm {
@@ -639,6 +662,7 @@ mod tests {
             manifest_path: base_package_manifest_path,
         };
 
+        let include_account = true;
         let compress_blobfs = false;
         let slice_size = 0;
         let mut builder = MultiFvmBuilder::new(
@@ -648,6 +672,7 @@ mod tests {
             &mut assembly_manifest,
             compress_blobfs,
             slice_size,
+            include_account,
             &base_package,
         );
         builder.filesystem(FvmFilesystem::BlobFS(BlobFS {
@@ -666,18 +691,11 @@ mod tests {
             minimum_inodes: None,
         }));
         builder.filesystem(FvmFilesystem::EmptyMinFS(EmptyMinFS { name: "empty-data".into() }));
-        builder.filesystem(FvmFilesystem::EmptyAccount(EmptyAccount { name: "account".into() }));
         builder
             .filesystem(FvmFilesystem::Reserved(Reserved { name: "reserved".into(), slices: 10 }));
         builder.output(FvmOutput::Standard(StandardFvm {
             name: "fvm".into(),
-            filesystems: vec![
-                "blob".into(),
-                "data".into(),
-                "empty-data".into(),
-                "account".into(),
-                "reserved".into(),
-            ],
+            filesystems: vec!["blob".into(), "data".into(), "empty-data".into(), "reserved".into()],
             compress: false,
             resize_image_file_to_fit: false,
             truncate_to_length: None,
@@ -722,9 +740,9 @@ mod tests {
                     "--data",
                     minfs_path,
                     "--with-empty-minfs",
-                    "--with-empty-account-partition",
                     "--reserve-slices",
                     "10",
+                    "--with-empty-account-partition",
                 ]
             }
             ]
@@ -776,6 +794,7 @@ mod tests {
             manifest_path: base_package_manifest_path,
         };
 
+        let include_account = false;
         let compress_blobfs = false;
         let slice_size = 0;
         let mut builder = MultiFvmBuilder::new(
@@ -785,6 +804,7 @@ mod tests {
             &mut assembly_manifest,
             compress_blobfs,
             slice_size,
+            include_account,
             &base_package,
         );
         builder.filesystem(FvmFilesystem::BlobFS(BlobFS {

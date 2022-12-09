@@ -6,11 +6,13 @@
 ///
 /// ```
 /// let slice_size: u64 = 1;
+/// let include_account: bool = true;
 /// let compress = true;
 /// let builder = FvmBuilder::new(
 ///     fvm_tool,
 ///     "path/to/output.blk",
 ///     slice_size,
+///     include_account,
 ///     compress,
 ///     Fvm::Standard {
 ///         resize_image_file_to_fit: false,
@@ -42,6 +44,8 @@ pub struct FvmBuilder {
     output: Utf8PathBuf,
     /// The size of a slice for the FVM.
     slice_size: u64,
+    /// Whether to include an account in the FVM.
+    include_account: bool,
     /// Whether to compress the FVM.
     compress: bool,
     /// The type of FVM to generate.
@@ -86,8 +90,6 @@ pub enum Filesystem {
     },
     /// An empty minfs filesystem that will be formatted when Fuchsia boots.
     EmptyMinFS,
-    /// An empty minfs filesystem reserved for account data.
-    EmptyAccount,
     /// Reserved slices for future use.
     Reserved {
         /// The number of slices to reserve.
@@ -114,6 +116,7 @@ impl FvmBuilder {
         tool: Box<dyn Tool>,
         output: impl AsRef<Utf8Path>,
         slice_size: u64,
+        include_account: bool,
         compress: bool,
         fvm_type: FvmType,
     ) -> Self {
@@ -121,6 +124,7 @@ impl FvmBuilder {
             tool,
             output: output.as_ref().to_path_buf(),
             slice_size,
+            include_account,
             compress,
             fvm_type,
             filesystems: Vec::<Filesystem>::new(),
@@ -205,14 +209,15 @@ impl FvmBuilder {
                 Filesystem::EmptyMinFS => {
                     args.push("--with-empty-minfs".to_string());
                 }
-                Filesystem::EmptyAccount => {
-                    args.push("--with-empty-account-partition".to_string());
-                }
                 Filesystem::Reserved { slices } => {
                     args.push("--reserve-slices".to_string());
                     args.push(slices.to_string());
                 }
             }
+        }
+
+        if self.include_account {
+            args.push("--with-empty-account-partition".to_string())
         }
 
         Ok(args)
@@ -233,7 +238,7 @@ mod tests {
     fn standard_args_no_filesystem() {
         let tools = FakeToolProvider::default();
         let fvm_tool = tools.get_tool("fvm").unwrap();
-        let builder = FvmBuilder::new(fvm_tool, "mypath", 1, false, default_standard());
+        let builder = FvmBuilder::new(fvm_tool, "mypath", 1, false, false, default_standard());
         let args = builder.build_args().unwrap();
         assert_eq!(vec!["mypath", "create", "--slice", "1"], args);
     }
@@ -242,7 +247,7 @@ mod tests {
     fn standard_args_with_filesystem() {
         let tools = FakeToolProvider::default();
         let fvm_tool = tools.get_tool("fvm").unwrap();
-        let mut builder = FvmBuilder::new(fvm_tool, "mypath", 1, false, default_standard());
+        let mut builder = FvmBuilder::new(fvm_tool, "mypath", 1, false, false, default_standard());
         builder.filesystem(Filesystem::BlobFS {
             path: Utf8PathBuf::from("path/to/blob.blk"),
             attributes: FilesystemAttributes {
@@ -277,7 +282,7 @@ mod tests {
     fn standard_args_compressed() {
         let tools = FakeToolProvider::default();
         let fvm_tool = tools.get_tool("fvm").unwrap();
-        let builder = FvmBuilder::new(fvm_tool, "mypath", 1, true, default_standard());
+        let builder = FvmBuilder::new(fvm_tool, "mypath", 1, false, true, default_standard());
         let args = builder.build_args().unwrap();
 
         assert_eq!(vec!["mypath", "create", "--slice", "1", "--compress", "lz4",], args);
@@ -287,8 +292,7 @@ mod tests {
     fn standard_args_with_empty_account() {
         let tools = FakeToolProvider::default();
         let fvm_tool = tools.get_tool("fvm").unwrap();
-        let mut builder = FvmBuilder::new(fvm_tool, "mypath", 1, false, default_standard());
-        builder.filesystem(Filesystem::EmptyAccount);
+        let builder = FvmBuilder::new(fvm_tool, "mypath", 1, true, false, default_standard());
         let args = builder.build_args().unwrap();
 
         assert_eq!(
@@ -301,7 +305,7 @@ mod tests {
     fn standard_args_with_reserved() {
         let tools = FakeToolProvider::default();
         let fvm_tool = tools.get_tool("fvm").unwrap();
-        let mut builder = FvmBuilder::new(fvm_tool, "mypath", 1, false, default_standard());
+        let mut builder = FvmBuilder::new(fvm_tool, "mypath", 1, false, false, default_standard());
         builder.filesystem(Filesystem::Reserved { slices: 500 });
         let args = builder.build_args().unwrap();
 
@@ -316,6 +320,7 @@ mod tests {
             fvm_tool,
             "mypath",
             1,
+            false,
             false,
             FvmType::Standard { resize_image_file_to_fit: true, truncate_to_length: Some(500) },
         );
@@ -339,8 +344,14 @@ mod tests {
     fn sparse_args_no_max_size() {
         let tools = FakeToolProvider::default();
         let fvm_tool = tools.get_tool("fvm").unwrap();
-        let builder =
-            FvmBuilder::new(fvm_tool, "mypath", 1, false, FvmType::Sparse { max_disk_size: None });
+        let builder = FvmBuilder::new(
+            fvm_tool,
+            "mypath",
+            1,
+            false,
+            false,
+            FvmType::Sparse { max_disk_size: None },
+        );
         let args = builder.build_args().unwrap();
         assert_eq!(vec!["mypath", "sparse", "--slice", "1"], args);
     }
@@ -354,6 +365,7 @@ mod tests {
             "mypath",
             1,
             false,
+            false,
             FvmType::Sparse { max_disk_size: Some(500) },
         );
         let args = builder.build_args().unwrap();
@@ -364,8 +376,14 @@ mod tests {
     fn sparse_blob_args() {
         let tools = FakeToolProvider::default();
         let fvm_tool = tools.get_tool("fvm").unwrap();
-        let mut builder =
-            FvmBuilder::new(fvm_tool, "mypath", 1, false, FvmType::Sparse { max_disk_size: None });
+        let mut builder = FvmBuilder::new(
+            fvm_tool,
+            "mypath",
+            1,
+            false,
+            false,
+            FvmType::Sparse { max_disk_size: None },
+        );
         builder.filesystem(Filesystem::EmptyMinFS);
         let args = builder.build_args().unwrap();
         assert_eq!(vec!["mypath", "sparse", "--slice", "1", "--with-empty-minfs",], args);
