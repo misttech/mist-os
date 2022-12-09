@@ -428,15 +428,21 @@ fxl::RefPtr<AsyncOutputBuffer> FormatActiveTasksHashMap(const ErrOrValue& hashma
     return FormatError("Invalid HashMap (4)", bucket_mask_res.err());
   uint64_t bucket_mask = 0;
   Err err = bucket_mask_res.value().PromoteTo64(&bucket_mask);
-  if (err.has_error() || !bucket_mask)
+  if (err.has_error())
     return FormatError("Invalid HashMap (5)", err);
+  if (!bucket_mask) {
+    // Empty hashmap.
+    auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
+    out->Complete();
+    return out;
+  }
   ErrOrValue ctrl_res =
       ResolveNonstaticMember(context, raw_table.value(), {"table", "ctrl", "pointer"});
   if (ctrl_res.has_error())
     return FormatError("Invalid HashMap (6)", ctrl_res.err());
   uint64_t ctrl = 0;
   err = ctrl_res.value().PromoteTo64(&ctrl);
-  if (err.has_error() || !bucket_mask)
+  if (err.has_error() || !ctrl)
     return FormatError("Invalid HashMap (7)", err);
 
   // 3. Read the memory. To save some operations we try to fetch the whole hashmap once.
@@ -450,7 +456,7 @@ fxl::RefPtr<AsyncOutputBuffer> FormatActiveTasksHashMap(const ErrOrValue& hashma
       ctrl - total_buckets_size, total_buckets_size + capacity,
       [=](const Err& err, std::vector<uint8_t> data) {
         if (err.has_error()) {
-          out->Complete(FormatError("Invalid HashMap (7)", err));
+          out->Complete(FormatError("Invalid HashMap (8)", err));
           return;
         }
         for (size_t idx = 0; idx < capacity; idx++) {
