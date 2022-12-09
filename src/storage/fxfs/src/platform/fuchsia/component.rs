@@ -219,7 +219,7 @@ impl Component {
 
         self.outgoing_dir.clone().open(
             self.scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
             0,
             Path::dot(),
             outgoing_dir.into(),
@@ -661,7 +661,7 @@ mod tests {
                     .expect("create_proxy failed");
             client
                 .open(
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                    fio::OpenFlags::RIGHT_READABLE,
                     0,
                     "volumes",
                     ServerEnd::new(server_end.into_channel()),

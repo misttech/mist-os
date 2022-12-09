@@ -50,20 +50,12 @@ extern "C" {
 /// it is suitable only for use in tests.
 /// root.open(..,"dev",..).
 pub fn get_dev_root(realm_instance: &RealmInstance) -> fio::DirectoryProxy {
-    let (dev_dir_client, dev_dir_server) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().expect("create channel pair");
-
-    realm_instance
-        .root
-        .get_exposed_dir()
-        .open(
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
-            "dev",
-            ServerEnd::new(dev_dir_server.into_channel()),
-        )
-        .expect("Get /dev from isolated_devmgr");
-    dev_dir_client
+    fuchsia_fs::directory::open_directory_no_describe(
+        realm_instance.root.get_exposed_dir(),
+        "/dev",
+        fio::OpenFlags::RIGHT_READABLE,
+    )
+    .expect("Get /dev from isolated_devmgr")
 }
 
 /// Given a realm instance, return a File which is /dev, taken as a handle.
@@ -169,19 +161,12 @@ pub fn open_zxcrypt_manager(
     ramdisk: &RamdiskClient,
     name: &str,
 ) -> DeviceManagerProxy {
-    let (manager_client, manager_server) = fidl::endpoints::create_proxy::<DeviceManagerMarker>()
-        .expect("Could not create encryption volume manager channel pair");
-    let mgr_path = ramdisk.get_path().to_string() + "/fvm/" + name + "-p-1/block/zxcrypt";
-    get_dev_root(realm_instance)
-        .open(
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_SERVICE,
-            &mgr_path,
-            ServerEnd::new(manager_server.into_channel()),
-        )
-        .expect("Could not connect to zxcrypt manager");
-
-    manager_client
+    let mgr_path = format!("{}/fvm/{}-p-1/block/zxcrypt", ramdisk.get_path(), name);
+    fuchsia_component::client::connect_to_named_protocol_at_dir_root::<DeviceManagerMarker>(
+        &get_dev_root(realm_instance),
+        &mgr_path,
+    )
+    .expect("Could not connect to zxcrypt manager")
 }
 
 /// Given a realm instance and a ramdisk, formats that disk under
@@ -190,17 +175,11 @@ pub fn open_zxcrypt_manager(
 /// NB: This method calls .expect() and panics rather than returning a result, so
 /// it is suitable only for use in tests.
 pub async fn format_zxcrypt(realm_instance: &RealmInstance, ramdisk: &RamdiskClient, name: &str) {
-    let (controller_client, controller_server) =
-        fidl::endpoints::create_proxy::<ControllerMarker>().expect("create channel pair");
-    let block_path = ramdisk.get_path().to_string() + "/fvm/" + name + "-p-1/block";
-    get_dev_root(realm_instance)
-        .open(
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_SERVICE,
-            &block_path,
-            ServerEnd::new(controller_server.into_channel()),
-        )
-        .expect("Could not connect to fvm block device");
+    let block_path = format!("{}/fvm/{}-p-1/block", ramdisk.get_path(), name);
+    let controller_client = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+        ControllerMarker,
+    >(&get_dev_root(realm_instance), &block_path)
+    .expect("Could not connect to fvm block device");
 
     // Bind the zxcrypt driver to the block device
     controller_client

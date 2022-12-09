@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{Context, Error},
-    fidl::endpoints::Proxy,
-    fidl::endpoints::ServerEnd,
+    anyhow::{Context as _, Error},
+    fidl::endpoints::Proxy as _,
+    fidl_fuchsia_io as fio,
     std::sync::Arc,
 };
 
@@ -13,7 +13,7 @@ use {
 pub struct Cache {
     pkg_cache_proxy: fidl_fuchsia_pkg::PackageCacheProxy,
     _space_manager_proxy: fidl_fuchsia_space::ManagerProxy,
-    svc_dir_proxy: fidl_fuchsia_io::DirectoryProxy,
+    svc_dir_proxy: fio::DirectoryProxy,
 }
 
 impl Cache {
@@ -29,7 +29,7 @@ impl Cache {
     pub fn new_with_proxies(
         pkg_cache_proxy: fidl_fuchsia_pkg::PackageCacheProxy,
         space_manager_proxy: fidl_fuchsia_space::ManagerProxy,
-        directory_proxy_with_access_to_pkg_cache: fidl_fuchsia_io::DirectoryProxy,
+        directory_proxy_with_access_to_pkg_cache: fio::DirectoryProxy,
     ) -> Result<Self, Error> {
         Ok(Self {
             pkg_cache_proxy,
@@ -42,12 +42,8 @@ impl Cache {
     /// calling this function. Should be the default in production usage, as these capabilities
     /// should be statically routed (i.e. from `pkg-recovery.cml`).
     pub fn new() -> Result<Self, Error> {
-        // TODO(https://fxbug.dev/110044): Remove WRITABLE when FIDL through /svc works without it.
-        let svc_dir_proxy = fuchsia_fs::directory::open_in_namespace(
-            "/svc",
-            fidl_fuchsia_io::OpenFlags::RIGHT_READABLE | fidl_fuchsia_io::OpenFlags::RIGHT_WRITABLE,
-        )
-        .context("error opening svc directory")?;
+        let svc_dir_proxy = fuchsia_component::client::clone_namespace_svc()
+            .context("error cloning svc directory")?;
 
         Ok(Self {
             pkg_cache_proxy: fuchsia_component::client::connect_to_protocol::<
@@ -60,19 +56,6 @@ impl Cache {
         })
     }
 
-    /// TODO(fxbug.dev/104919): delete once CFv2 migration is done
-    fn clone_cache_proxy(
-        cache_proxy: &fidl_fuchsia_io::DirectoryProxy,
-    ) -> Result<fidl_fuchsia_io::DirectoryProxy, Error> {
-        let (cache_clone, remote) =
-            fidl::endpoints::create_endpoints::<fidl_fuchsia_io::DirectoryMarker>()?;
-        cache_proxy.clone(
-            fidl_fuchsia_io::OpenFlags::CLONE_SAME_RIGHTS,
-            ServerEnd::from(remote.into_channel()),
-        )?;
-        Ok(cache_clone.into_proxy()?)
-    }
-
     /// Get a proxy to an instance of fuchsia.pkg.PackageCache.
     pub fn package_cache_proxy(&self) -> Result<fidl_fuchsia_pkg::PackageCacheProxy, Error> {
         Ok(self.pkg_cache_proxy.clone())
@@ -83,27 +66,22 @@ impl Cache {
     // TODO(fxbug.dev/104919): delete
     pub fn directory_request(
         &self,
-    ) -> Result<Arc<fidl::endpoints::ClientEnd<fidl_fuchsia_io::DirectoryMarker>>, Error> {
+    ) -> Result<Arc<fidl::endpoints::ClientEnd<fio::DirectoryMarker>>, Error> {
+        let clone = fuchsia_fs::directory::clone_no_describe(&self.svc_dir_proxy, None)?;
         // TODO(https://fxbug.dev/108786): Use Proxy::into_client_end when available.
-        Ok(std::sync::Arc::new(fidl::endpoints::ClientEnd::new(
-            Self::clone_cache_proxy(&self.svc_dir_proxy)?
-                .into_channel()
-                .expect("proxy into channel")
-                .into_zx_channel(),
-        )))
+        Ok(std::sync::Arc::new(
+            clone.into_channel().expect("proxy into channel").into_zx_channel().into(),
+        ))
     }
 }
 
 #[cfg(test)]
 pub(crate) mod for_tests {
-    use fuchsia_component_test::ChildRef;
-
     use {
         super::*,
         blobfs_ramdisk::BlobfsRamdisk,
-        fidl_fuchsia_io as fio,
         fuchsia_component_test::{
-            Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route,
+            Capability, ChildOptions, ChildRef, RealmBuilder, RealmInstance, Ref, Route,
         },
         futures::prelude::*,
         std::sync::Arc,
@@ -230,11 +208,11 @@ pub(crate) mod for_tests {
                 .expect("connect to space manager");
 
             let (cache_clone, remote) =
-                fidl::endpoints::create_endpoints::<fidl_fuchsia_io::DirectoryMarker>()?;
-            realm_instance.root.get_exposed_dir().clone(
-                fidl_fuchsia_io::OpenFlags::CLONE_SAME_RIGHTS,
-                ServerEnd::from(remote.into_channel()),
-            )?;
+                fidl::endpoints::create_endpoints::<fio::DirectoryMarker>()?;
+            realm_instance
+                .root
+                .get_exposed_dir()
+                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, remote.into_channel().into())?;
 
             let cache = Cache::new_with_proxies(
                 pkg_cache_proxy,

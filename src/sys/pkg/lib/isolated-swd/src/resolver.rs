@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{Context, Error},
-    fidl::endpoints::{Proxy, ServerEnd},
+    anyhow::{Context as _, Error},
+    fidl::endpoints::Proxy as _,
     fidl_fuchsia_io as fio,
     std::sync::Arc,
 };
@@ -12,13 +12,13 @@ use {
 /// Represents the sandboxed package resolver.
 pub struct Resolver {
     _pkg_resolver_proxy: fidl_fuchsia_pkg::PackageResolverProxy,
-    svc_dir_proxy: fidl_fuchsia_io::DirectoryProxy,
+    svc_dir_proxy: fio::DirectoryProxy,
 }
 
 impl Resolver {
     pub fn new_with_proxy(
         pkg_resolver_proxy: fidl_fuchsia_pkg::PackageResolverProxy,
-        directory_proxy_with_access_to_pkg_resolver: fidl_fuchsia_io::DirectoryProxy,
+        directory_proxy_with_access_to_pkg_resolver: fio::DirectoryProxy,
     ) -> Result<Self, Error> {
         Ok(Self {
             _pkg_resolver_proxy: pkg_resolver_proxy,
@@ -27,11 +27,8 @@ impl Resolver {
     }
 
     pub fn new() -> Result<Self, Error> {
-        let svc_dir_proxy = fuchsia_fs::directory::open_in_namespace(
-            "/svc",
-            fidl_fuchsia_io::OpenFlags::RIGHT_READABLE | fidl_fuchsia_io::OpenFlags::RIGHT_WRITABLE,
-        )
-        .context("error opening svc directory")?;
+        let svc_dir_proxy = fuchsia_component::client::clone_namespace_svc()
+            .context("error cloning svc directory")?;
 
         Ok(Self {
             _pkg_resolver_proxy: fuchsia_component::client::connect_to_protocol::<
@@ -39,19 +36,6 @@ impl Resolver {
             >()?,
             svc_dir_proxy,
         })
-    }
-
-    /// TODO(fxbug.dev/104919): delete once CFv2 migration is done
-    fn clone_resolver_proxy(
-        resolver_proxy: &fidl_fuchsia_io::DirectoryProxy,
-    ) -> Result<fidl_fuchsia_io::DirectoryProxy, Error> {
-        let (resolver_clone, remote) =
-            fidl::endpoints::create_endpoints::<fidl_fuchsia_io::DirectoryMarker>()?;
-        resolver_proxy.clone(
-            fidl_fuchsia_io::OpenFlags::CLONE_SAME_RIGHTS,
-            ServerEnd::from(remote.into_channel()),
-        )?;
-        Ok(resolver_clone.into_proxy()?)
     }
 
     #[cfg(test)]
@@ -62,13 +46,11 @@ impl Resolver {
     pub fn directory_request(
         &self,
     ) -> Result<Arc<fidl::endpoints::ClientEnd<fio::DirectoryMarker>>, Error> {
+        let clone = fuchsia_fs::directory::clone_no_describe(&self.svc_dir_proxy, None)?;
         // TODO(https://fxbug.dev/108786): Use Proxy::into_client_end when available.
-        Ok(std::sync::Arc::new(fidl::endpoints::ClientEnd::new(
-            Self::clone_resolver_proxy(&self.svc_dir_proxy)?
-                .into_channel()
-                .expect("proxy into channel")
-                .into_zx_channel(),
-        )))
+        Ok(std::sync::Arc::new(
+            clone.into_channel().expect("proxy into channel").into_zx_channel().into(),
+        ))
     }
 }
 
@@ -79,7 +61,6 @@ pub(crate) mod for_tests {
         crate::cache::for_tests::CacheForTest,
         anyhow::anyhow,
         blobfs_ramdisk::BlobfsRamdisk,
-        fidl::endpoints::ServerEnd,
         fidl_fuchsia_boot::{ArgumentsRequest, ArgumentsRequestStream},
         fidl_fuchsia_pkg_ext as pkg,
         fidl_fuchsia_pkg_ext::RepositoryConfigs,
@@ -257,11 +238,11 @@ pub(crate) mod for_tests {
                 .expect("connect to pkg resolver");
 
             let (resolver_clone, remote) =
-                fidl::endpoints::create_endpoints::<fidl_fuchsia_io::DirectoryMarker>()?;
-            realm_instance.root.get_exposed_dir().clone(
-                fidl_fuchsia_io::OpenFlags::CLONE_SAME_RIGHTS,
-                ServerEnd::from(remote.into_channel()),
-            )?;
+                fidl::endpoints::create_endpoints::<fio::DirectoryMarker>()?;
+            realm_instance
+                .root
+                .get_exposed_dir()
+                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, remote.into_channel().into())?;
 
             let resolver =
                 Resolver::new_with_proxy(resolver_proxy, resolver_clone.into_proxy()?).unwrap();
