@@ -79,7 +79,7 @@ class Login extends StatelessWidget {
                                   return Strings.accountPasswordInvalid;
                                 }
                                 if (oobe.authError.isNotEmpty) {
-                                  Focus.of(context).requestFocus(_focusNode);
+                                  _focusNode.requestFocus();
                                 }
                                 return null;
                               },
