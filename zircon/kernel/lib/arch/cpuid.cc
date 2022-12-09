@@ -99,8 +99,12 @@ std::string_view ToString(Microarchitecture microarch) {
       return "Intel Tiger Lake";
     case Microarchitecture::kIntelAlderLake:
       return "Intel Alder Lake";
+    case Microarchitecture::kIntelRaptorLake:
+      return "Intel Raptor Lake";
     case Microarchitecture::kIntelBonnell:
       return "Intel Bonnell";
+    case Microarchitecture::kIntelSaltwell:
+      return "Intel Saltwell";
     case Microarchitecture::kIntelSilvermont:
       return "Intel Silvermont";
     case Microarchitecture::kIntelAirmont:
@@ -142,80 +146,90 @@ uint8_t CpuidVersionInfo::model() const {
 Microarchitecture CpuidVersionInfo::microarchitecture(Vendor vendor) const {
   switch (vendor) {
     case Vendor::kIntel: {
+      // Table largely from https://en.wikichip.org/wiki/intel/cpuid
       switch (family()) {
         case 0x6: {
           switch (model()) {
-            case 0x0f:  // Merom.
-            case 0x16:  // Merom L.
-            case 0x17:  // Penryn, Wolfdale, Yorkfield, Harpertown, QC.
-            case 0x1d:  // Dunnington.
+            // Big cores
+            case 0x0f:  // Merom
+            case 0x16:  // Merom L
+            case 0x17:  // Penryn, Wolfdale, Yorkfield, Harpertown, QC
+            case 0x1d:  // Dunnington
               return Microarchitecture::kIntelCore2;
-            case 0x1a:  // Bloomfield, EP, WS.
-            case 0x1e:  // Lynnfield, Clarksfield.
-            case 0x1f:  // Auburndale, Havendale.
-            case 0x2e:  // EX.
+            case 0x1a:  // Bloomfield, EP, WS
+            case 0x1e:  // Lynnfield, Clarksfield
+            case 0x1f:  // Auburndale, Havendale
+            case 0x2e:  // EX
               return Microarchitecture::kIntelNehalem;
-            case 0x25:  // Arrandale, Clarkdale.
-            case 0x2c:  // Gulftown, EP.
-            case 0x2f:  // EX.
+            case 0x25:  // Arrandale, Clarkdale
+            case 0x2c:  // Gulftown, EP
+            case 0x2f:  // EX
               return Microarchitecture::kIntelWestmere;
-            case 0x2a:  // M, H.
-            case 0x2d:  // E, EN, EP.
+            case 0x2a:  // M, H
+            case 0x2d:  // E, EN, EP
               return Microarchitecture::kIntelSandyBridge;
             case 0x3a:  // M, H, Gladden
-            case 0x3e:  // E, EN, EP, EX.
+            case 0x3e:  // E, EN, EP, EX
               return Microarchitecture::kIntelIvyBridge;
-            case 0x3c:  // S.
-            case 0x3f:  // E, EP, EX.
-            case 0x45:  // ULT.
-            case 0x46:  // GT3E.
+            case 0x3c:  // S
+            case 0x3f:  // E, EP, EX
+            case 0x45:  // ULT
+            case 0x46:  // GT3E
               return Microarchitecture::kIntelHaswell;
-            case 0x3d:  // U, Y, S.
-            case 0x47:  // H, C, W.
-            case 0x56:  // DE, Hewitt Lake.
-            case 0x4f:  // E, EP, EX.
+            case 0x3d:  // U, Y, S
+            case 0x47:  // H, C, W
+            case 0x56:  // DE, Hewitt Lake
+            case 0x4f:  // E, EP, EX
               return Microarchitecture::kIntelBroadwell;
-            case 0x4e:  // Skylake Y, U.
-            case 0x5e:  // Skylake DT, H, S.
-            // Kaby Lake Y, U; Coffee Lake U; Whiskey Lake U; Amber Lake Y;
-            // Comet Lake U.
-            case 0x8e:
-            // Kaby Lake T, H, S, X; Coffee Lake S, H, E; Comet Lake S, H.
-            case 0x9e:
+            case 0x4e:  // Skylake Y, U
+            case 0x5e:  // Skylake DT, H, S
+            case 0x8e:  // Kaby Lake Y, U; Coffee Lake U; Whiskey Lake U; Amber Lake Y;
+                        // Comet Lake U
+            case 0x9e:  // Kaby Lake T, H, S, X; Coffee Lake S, H, E
+            case 0xa5:  // Comet Lake S, H
               return Microarchitecture::kIntelSkylake;
-            // Skylake SP, X, DE, W; Cascade Lake SP, X, W; Cooper Lake.
-            case 0x55:
+            case 0x55:  // Skylake SP, X, DE, W; Cascade Lake SP, X, W; Cooper Lake
               return Microarchitecture::kIntelSkylakeServer;
-            case 0x66:  // U.
+            case 0x66:  // Cannon Lake U
               return Microarchitecture::kIntelCannonLake;
-            case 0x6a:
+            case 0x6a:  // Ice Lake Server SP
+            case 0x6c:  // Ice Lake Server DE
+            case 0x7d:  // Ice Lake Y
+            case 0x7e:  // Ice Lake U
               return Microarchitecture::kIntelIceLake;
-            case 0x8c:  // Tiger Lake UP.
-            case 0x8d:  // Tiger Lake H.
+            case 0x8c:  // Tiger Lake UP
+            case 0x8d:  // Tiger Lake H
               return Microarchitecture::kIntelTigerLake;
             case 0x97:  // Alder Lake S
             case 0x9a:  // Alder Lake H, P, U
               return Microarchitecture::kIntelAlderLake;
-            case 0x1c:  // Silverthorne, Diamondville, Pineview.
-            case 0x26:  // Lincroft.
-            case 0x27:  // Penwell.
-            case 0x35:  // Cloverview.
-            case 0x36:  // Cedarview.
+            case 0xb7:  // Raptor Lake S
+              return Microarchitecture::kIntelRaptorLake;
+
+            // Small cores
+            case 0x1c:  // Silverthorne, Diamondville, Pineview
+            case 0x26:  // Lincroft
               return Microarchitecture::kIntelBonnell;
-            case 0x37:  // Bay Trail.
-            case 0x4a:  // Tangier.
-            case 0x4d:  // Avoton, Rangeley.
-            case 0x5a:  // Anniedale.
-            case 0x5d:  // SoFIA.
+            case 0x27:  // Penwell
+            case 0x35:  // Cloverview
+            case 0x36:  // Cedarview
+              return Microarchitecture::kIntelSaltwell;
+            case 0x37:  // Bay Trail
+            case 0x4a:  // Tangier
+            case 0x4d:  // Avoton, Rangeley
+            case 0x5a:  // Anniedale
+            case 0x5d:  // SoFIA
               return Microarchitecture::kIntelSilvermont;
-            case 0x4c:  // Cherry Trail, Braswell.
+            case 0x4c:  // Cherry Trail, Braswell
               return Microarchitecture::kIntelAirmont;
-            case 0x5c:  // Apollo Lake, Broxton.
-            case 0x5f:  // Denverton.
+            case 0x5c:  // Apollo Lake, Broxton
+            case 0x5f:  // Denverton
               return Microarchitecture::kIntelGoldmont;
-            case 0x7a:  // Gemini Lake.
+            case 0x7a:  // Gemini Lake
               return Microarchitecture::kIntelGoldmontPlus;
-            case 0x86:  // Elkhart Lake.
+            case 0x8a:  // Lakefield
+            case 0x96:  // Elkhart Lake
+            case 0x9c:  // Jasper Lake
               return Microarchitecture::kIntelTremont;
           }
           return Microarchitecture::kUnknown;
@@ -224,6 +238,7 @@ Microarchitecture CpuidVersionInfo::microarchitecture(Vendor vendor) const {
       return Microarchitecture::kUnknown;
     }
     case Vendor::kAmd: {
+      // Table largely from https://en.wikichip.org/wiki/amd/cpuid
       switch (family()) {
         case 0x15:  // Bulldozer/Piledriver/Steamroller/Excavator
           return Microarchitecture::kAmdFamilyBulldozer;

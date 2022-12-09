@@ -150,7 +150,9 @@ inline bool HasX86MdsBugs(CpuidIoProvider&& cpuid, MsrIoProvider&& msr) {
       return true;
     case Microarchitecture::kIntelTigerLake:
     case Microarchitecture::kIntelAlderLake:
+    case Microarchitecture::kIntelRaptorLake:
     case Microarchitecture::kIntelBonnell:
+    case Microarchitecture::kIntelSaltwell:
     case Microarchitecture::kIntelGoldmont:
     case Microarchitecture::kIntelGoldmontPlus:
     case Microarchitecture::kIntelTremont:
@@ -194,7 +196,9 @@ inline bool HasX86TaaBug(CpuidIoProvider&& cpuid, MsrIoProvider&& msr) {
     case Microarchitecture::kIntelIvyBridge:
     case Microarchitecture::kIntelTigerLake:
     case Microarchitecture::kIntelAlderLake:
+    case Microarchitecture::kIntelRaptorLake:
     case Microarchitecture::kIntelBonnell:
+    case Microarchitecture::kIntelSaltwell:
     case Microarchitecture::kIntelSilvermont:
     case Microarchitecture::kIntelAirmont:
     case Microarchitecture::kIntelGoldmont:
@@ -255,7 +259,7 @@ inline bool HasX86SsbBug(CpuidIoProvider&& cpuid, MsrIoProvider&& msr) {
     case Microarchitecture::kIntelIceLake:
     case Microarchitecture::kIntelTigerLake:
     case Microarchitecture::kIntelAlderLake:
-    case Microarchitecture::kIntelBonnell:
+    case Microarchitecture::kIntelRaptorLake:
     case Microarchitecture::kIntelGoldmont:
     case Microarchitecture::kIntelGoldmontPlus:
     case Microarchitecture::kIntelTremont:
@@ -264,6 +268,8 @@ inline bool HasX86SsbBug(CpuidIoProvider&& cpuid, MsrIoProvider&& msr) {
     case Microarchitecture::kAmdFamilyZen:
     case Microarchitecture::kAmdFamilyZen3:
       return true;
+    case Microarchitecture::kIntelBonnell:
+    case Microarchitecture::kIntelSaltwell:
     case Microarchitecture::kIntelSilvermont:
     case Microarchitecture::kIntelAirmont:
       break;
@@ -346,22 +352,38 @@ inline bool HasX86MeltdownBug(CpuidIoProvider&& cpuid, MsrIoProvider&& msr) {
     case Microarchitecture::kIntelBroadwell:
     case Microarchitecture::kIntelSkylake:
     case Microarchitecture::kIntelCannonLake:
-    case Microarchitecture::kIntelBonnell:
-    case Microarchitecture::kIntelSilvermont:
-    case Microarchitecture::kIntelAirmont:
       return true;
-    case Microarchitecture::kIntelSkylakeServer:
     case Microarchitecture::kIntelIceLake:
     case Microarchitecture::kIntelTigerLake:
     case Microarchitecture::kIntelAlderLake:
+    case Microarchitecture::kIntelRaptorLake:
+    case Microarchitecture::kIntelBonnell:
+    case Microarchitecture::kIntelSaltwell:
+    case Microarchitecture::kIntelSilvermont:
+    case Microarchitecture::kIntelAirmont:
     case Microarchitecture::kIntelGoldmont:
-    case Microarchitecture::kIntelGoldmontPlus:
     case Microarchitecture::kIntelTremont:
     case Microarchitecture::kAmdFamilyBulldozer:
     case Microarchitecture::kAmdFamilyJaguar:
     case Microarchitecture::kAmdFamilyZen:
     case Microarchitecture::kAmdFamilyZen3:
       break;
+    // Special cases from the above table.
+    case Microarchitecture::kIntelSkylakeServer: {
+      const auto info = cpuid.template Read<CpuidVersionInfo>();
+      if (info.stepping() >= 0x6) {  // Cascade Lake server+
+        return false;
+      }
+      return true;  // Skylake server
+      break;
+    }
+    case Microarchitecture::kIntelGoldmontPlus: {
+      const auto info = cpuid.template Read<CpuidVersionInfo>();
+      if (info.stepping() == 0x1) {  // First stepping was suceptable to Meltdown.
+        return true;
+      }
+      break;
+    }
   }
   return false;
 }
@@ -390,12 +412,13 @@ inline bool HasX86L1tfBug(CpuidIoProvider&& cpuid, MsrIoProvider&& msr) {
     case Microarchitecture::kIntelBroadwell:
     case Microarchitecture::kIntelSkylake:
     case Microarchitecture::kIntelCannonLake:
-    case Microarchitecture::kIntelIceLake:
-    case Microarchitecture::kIntelBonnell:
       return true;
-    case Microarchitecture::kIntelSkylakeServer:
+    case Microarchitecture::kIntelIceLake:
     case Microarchitecture::kIntelTigerLake:
     case Microarchitecture::kIntelAlderLake:
+    case Microarchitecture::kIntelRaptorLake:
+    case Microarchitecture::kIntelBonnell:
+    case Microarchitecture::kIntelSaltwell:
     case Microarchitecture::kIntelSilvermont:
     case Microarchitecture::kIntelAirmont:
     case Microarchitecture::kIntelGoldmont:
@@ -406,6 +429,15 @@ inline bool HasX86L1tfBug(CpuidIoProvider&& cpuid, MsrIoProvider&& msr) {
     case Microarchitecture::kAmdFamilyZen:
     case Microarchitecture::kAmdFamilyZen3:
       break;
+    // Special cases from the above table.
+    case Microarchitecture::kIntelSkylakeServer: {
+      const auto info = cpuid.template Read<CpuidVersionInfo>();
+      if (info.stepping() >= 0x6) {  // Cascade Lake server+
+        return false;
+      }
+      return true;  // Skylake server
+      break;
+    }
   }
   return false;
 }

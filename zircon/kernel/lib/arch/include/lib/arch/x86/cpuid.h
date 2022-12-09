@@ -115,9 +115,11 @@ enum class Microarchitecture {
   kIntelIceLake,
   kIntelTigerLake,
   kIntelAlderLake,
+  kIntelRaptorLake,
 
   // Intel Atom family.
   kIntelBonnell,
+  kIntelSaltwell,
   kIntelSilvermont,
   kIntelAirmont,
   kIntelGoldmont,
@@ -497,7 +499,8 @@ struct CpuidExtendedFeatureFlagsC
   // Bit 24 is reserved.
   DEF_BIT(23, kl);
   DEF_BIT(22, rdpid);
-  // Bits [21:17] are 'The value of MAWAU used by the BNDLDX and BNDSTX instructions in 64-bit mode.'
+  // Bits [21:17] are 'The value of MAWAU used by the BNDLDX and BNDSTX instructions in 64-bit
+  // mode.'
   DEF_BIT(16, la57);
   // Bit 15 is reserved.
   DEF_BIT(14, avx512_vpopcntdq);

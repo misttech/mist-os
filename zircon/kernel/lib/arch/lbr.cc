@@ -117,6 +117,7 @@ size_t LbrStack::Size(Microarchitecture microarch) {
     case Microarchitecture::kIntelCore2:
       return 4;
     case Microarchitecture::kIntelBonnell:
+    case Microarchitecture::kIntelSaltwell:
     case Microarchitecture::kIntelSilvermont:
     case Microarchitecture::kIntelAirmont:
       return 8;
@@ -133,6 +134,7 @@ size_t LbrStack::Size(Microarchitecture microarch) {
     case Microarchitecture::kIntelIceLake:
     case Microarchitecture::kIntelTigerLake:
     case Microarchitecture::kIntelAlderLake:
+    case Microarchitecture::kIntelRaptorLake:
     case Microarchitecture::kIntelGoldmont:
     case Microarchitecture::kIntelGoldmontPlus:
     case Microarchitecture::kIntelTremont:
@@ -148,6 +150,7 @@ bool LbrStack::SupportsCallstackProfiling(Microarchitecture microarch) {
     case Microarchitecture::kUnknown:
     case Microarchitecture::kIntelCore2:
     case Microarchitecture::kIntelBonnell:
+    case Microarchitecture::kIntelSaltwell:
     case Microarchitecture::kIntelSilvermont:
     case Microarchitecture::kIntelAirmont:
     case Microarchitecture::kIntelNehalem:
@@ -167,6 +170,7 @@ bool LbrStack::SupportsCallstackProfiling(Microarchitecture microarch) {
     case Microarchitecture::kIntelIceLake:
     case Microarchitecture::kIntelTigerLake:
     case Microarchitecture::kIntelAlderLake:
+    case Microarchitecture::kIntelRaptorLake:
     case Microarchitecture::kIntelGoldmont:
     case Microarchitecture::kIntelGoldmontPlus:
     case Microarchitecture::kIntelTremont:

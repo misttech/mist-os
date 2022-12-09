@@ -954,7 +954,9 @@ const x86_microarch_config_t* get_microarch_config(const cpu_id::CpuId* cpuid) {
   auto processor_id = cpuid->ReadProcessorId();
 
   if (vendor.manufacturer() == cpu_id::ManufacturerInfo::INTEL && processor_id.family() == 0x6) {
+    /* Table largely from https://en.wikichip.org/wiki/intel/cpuid */
     switch (processor_id.model()) {
+      /* Big cores */
       case 0x1a: /* Nehalem */
       case 0x1e: /* Nehalem */
       case 0x1f: /* Nehalem */
@@ -982,32 +984,45 @@ const x86_microarch_config_t* get_microarch_config(const cpu_id::CpuId* cpuid) {
         return &broadwell_config;
       case 0x4e: /* Skylake Y/U */
       case 0x5e: /* Skylake H/S */
-      case 0x8e: /* Kaby Lake Y/U, Coffee Lake, Whiskey Lake */
+      case 0x8e: /* Kaby Lake Y/U, Coffee Lake, Whiskey Lake, Amber Lake, Comet Lake U */
       case 0x9e: /* Kaby Lake H/S, Coffee Lake, Whiskey Lake */
+      case 0xa5: /* Comet Lake S/H */
         return &skylake_config;
       case 0x55: /* Skylake X/SP, Cascade Lake */
         return &skylake_x_config;
       case 0x66: /* Cannon Lake U */
         return &cannon_lake_config;
       case 0x6a: /* Ice Lake-SP */
+      case 0x6c: /* Ice Lake-DE */
+      case 0x7d: /* Ice Lake Y */
+      case 0x7e: /* Ice Lake U */
         return &icelake_config;
       case 0x8c: /* Tiger Lake UP */
       case 0x8d: /* Tiger Lake H */
+      case 0xa7: /* Rocket Lake S */
         return &tiger_lake_config;
       case 0x97: /* Alder Lake S */
       case 0x9a: /* Alder Lake H/P/U */
+      case 0xb7: /* Raptor Lake S */
         return &alder_lake_config;
+
+      /* Small cores */
       case 0x37: /* Silvermont */
       case 0x4a: /* Silvermont "Cherry View" */
-      case 0x4d: /* Silvermont "Avoton" */
-      case 0x4c: /* Airmont "Braswell" */
-      case 0x5a: /* Airmont */
+      case 0x4d: /* Silvermont "Avoton", "Rangeley" */
+      case 0x5a: /* Silvermont "Anniedale" */
+      case 0x5d: /* Silvermont "SoFIA" */
+      case 0x4c: /* Airmont "Braswell", "Cherry Trail" */
         return &silvermont_config;
       case 0x5c: /* Goldmont (Apollo Lake) */
       case 0x5f: /* Goldmont (Denverton) */
         return &goldmont_config;
       case 0x7a: /* Goldmont Plus (Gemini Lake) */
+      case 0x8a: /* Tremont (Lakefield) */
+      case 0x96: /* Tremont (Elkhart Lake) */
+      case 0x9c: /* Tremont (Jasper Lake) */
         return &goldmont_plus_config;
+
       default:
         return &intel_default_config;
     }
