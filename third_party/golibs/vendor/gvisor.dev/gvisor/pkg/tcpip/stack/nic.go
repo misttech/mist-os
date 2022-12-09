@@ -19,7 +19,6 @@ import (
 	"reflect"
 
 	"gvisor.dev/gvisor/pkg/atomicbitops"
-	"gvisor.dev/gvisor/pkg/sync"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
 )
@@ -59,7 +58,7 @@ type nic struct {
 	linkResQueue packetsPendingLinkResolution
 
 	// mu protects annotated fields below.
-	mu sync.RWMutex
+	mu nicRWMutex
 
 	// +checklocks:mu
 	spoofing bool
@@ -68,7 +67,7 @@ type nic struct {
 	promiscuous bool
 
 	// packetEPsMu protects annotated fields below.
-	packetEPsMu sync.RWMutex
+	packetEPsMu packetEPsRWMutex
 
 	// eps is protected by the mutex, but the values contained in it are not.
 	//
@@ -76,6 +75,8 @@ type nic struct {
 	packetEPs map[tcpip.NetworkProtocolNumber]*packetEndpointList
 
 	qDisc QueueingDiscipline
+
+	gro groDispatcher
 }
 
 // makeNICStats initializes the NIC statistics and associates them to the global
@@ -88,7 +89,7 @@ func makeNICStats(global tcpip.NICStats) sharedStats {
 }
 
 type packetEndpointList struct {
-	mu sync.RWMutex
+	mu packetEndpointListRWMutex
 
 	// eps is protected by mu, but the contained PacketEndpoint values are not.
 	//
@@ -199,6 +200,7 @@ func newNIC(stack *Stack, id tcpip.NICID, ep LinkEndpoint, opts NICOptions) *nic
 		}
 	}
 
+	nic.gro.init(opts.GROTimeout)
 	nic.NetworkLinkEndpoint.Attach(nic)
 
 	return nic
@@ -304,6 +306,9 @@ func (n *nic) remove() tcpip.Error {
 	for _, ep := range n.networkEndpoints {
 		ep.Close()
 	}
+
+	// Shutdown GRO.
+	n.gro.close()
 
 	// drain and drop any packets pending link resolution.
 	n.linkResQueue.cancel()
@@ -731,9 +736,9 @@ func (n *nic) DeliverNetworkPacket(protocol tcpip.NetworkProtocolNumber, pkt Pac
 		return
 	}
 
-	pkt.RXTransportChecksumValidated = n.NetworkLinkEndpoint.Capabilities()&CapabilityRXChecksumOffload != 0
+	pkt.RXChecksumValidated = n.NetworkLinkEndpoint.Capabilities()&CapabilityRXChecksumOffload != 0
 
-	networkEndpoint.HandlePacket(pkt)
+	n.gro.dispatch(pkt, protocol, networkEndpoint)
 }
 
 func (n *nic) DeliverLinkPacket(protocol tcpip.NetworkProtocolNumber, pkt PacketBufferPtr, incoming bool) {

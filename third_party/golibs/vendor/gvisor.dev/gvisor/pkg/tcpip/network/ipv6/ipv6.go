@@ -1101,7 +1101,7 @@ func (e *endpoint) handleLocalPacket(pkt stack.PacketBufferPtr, canSkipRXChecksu
 
 	pkt = pkt.CloneToInbound()
 	defer pkt.DecRef()
-	pkt.RXTransportChecksumValidated = canSkipRXChecksum
+	pkt.RXChecksumValidated = canSkipRXChecksum
 
 	hView, ok := e.protocol.parseAndValidate(pkt)
 	if !ok {
@@ -2551,12 +2551,10 @@ func (p *protocol) parseAndValidate(pkt stack.PacketBufferPtr) (*bufferv2.View, 
 		return nil, false
 	}
 
-	hView := pkt.NetworkHeader().View()
-	h := header.IPv6(hView.AsSlice())
+	h := header.IPv6(pkt.NetworkHeader().Slice())
 	// Do not include the link header's size when calculating the size of the IP
 	// packet.
 	if !h.IsValid(pkt.Size() - len(pkt.LinkHeader().Slice())) {
-		hView.Release()
 		return nil, false
 	}
 
@@ -2564,7 +2562,7 @@ func (p *protocol) parseAndValidate(pkt stack.PacketBufferPtr) (*bufferv2.View, 
 		p.parseTransport(pkt, transProtoNum)
 	}
 
-	return hView, true
+	return pkt.NetworkHeader().View(), true
 }
 
 func (p *protocol) parseTransport(pkt stack.PacketBufferPtr, transProtoNum tcpip.TransportProtocolNumber) {

@@ -34,7 +34,7 @@ const (
 )
 
 var pkPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return &packetBuffer{}
 	},
 }
@@ -162,9 +162,9 @@ type packetBuffer struct {
 	// NICID is the ID of the last interface the network packet was handled at.
 	NICID tcpip.NICID
 
-	// RXTransportChecksumValidated indicates that transport checksum verification
-	// may be safely skipped.
-	RXTransportChecksumValidated bool
+	// RXChecksumValidated indicates that checksum verification may be
+	// safely skipped.
+	RXChecksumValidated bool
 
 	// NetworkPacketInfo holds an incoming packet's network-layer information.
 	NetworkPacketInfo NetworkPacketInfo
@@ -390,7 +390,7 @@ func (pk PacketBufferPtr) Clone() PacketBufferPtr {
 	newPk.TransportProtocolNumber = pk.TransportProtocolNumber
 	newPk.PktType = pk.PktType
 	newPk.NICID = pk.NICID
-	newPk.RXTransportChecksumValidated = pk.RXTransportChecksumValidated
+	newPk.RXChecksumValidated = pk.RXChecksumValidated
 	newPk.NetworkPacketInfo = pk.NetworkPacketInfo
 	newPk.tuple = pk.tuple
 	newPk.InitRefs()
@@ -676,6 +676,12 @@ func (d PacketData) AsRange() Range {
 // Checksum returns a checksum over the data payload of the packet.
 func (d PacketData) Checksum() uint16 {
 	return d.pk.buf.Checksum(d.pk.dataOffset())
+}
+
+// ChecksumAtOffset returns a checksum over the data payload of the packet
+// starting from offset.
+func (d PacketData) ChecksumAtOffset(offset int) uint16 {
+	return d.pk.buf.Checksum(offset)
 }
 
 // Range represents a contiguous subportion of a PacketBuffer.

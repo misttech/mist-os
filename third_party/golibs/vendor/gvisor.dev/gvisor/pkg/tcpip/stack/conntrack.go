@@ -139,7 +139,7 @@ type conn struct {
 	// Holds a finalizeResult.
 	finalizeResult atomicbitops.Uint32
 
-	mu sync.RWMutex `state:"nosave"`
+	mu connRWMutex `state:"nosave"`
 	// sourceManip indicates the source manipulation type.
 	//
 	// +checklocks:mu
@@ -149,7 +149,7 @@ type conn struct {
 	// +checklocks:mu
 	destinationManip manipType
 
-	stateMu sync.RWMutex `state:"nosave"`
+	stateMu stateConnRWMutex `state:"nosave"`
 	// tcb is TCB control block. It is used to keep track of states
 	// of tcp connection.
 	//
@@ -230,7 +230,7 @@ type ConnTrack struct {
 	clock tcpip.Clock
 	rand  *rand.Rand
 
-	mu sync.RWMutex `state:"nosave"`
+	mu connTrackRWMutex `state:"nosave"`
 	// mu protects the buckets slice, but not buckets' contents. Only take
 	// the write lock if you are modifying the slice or saving for S/R.
 	//
@@ -240,7 +240,7 @@ type ConnTrack struct {
 
 // +stateify savable
 type bucket struct {
-	mu sync.RWMutex `state:"nosave"`
+	mu bucketRWMutex `state:"nosave"`
 	// +checklocks:mu
 	tuples tupleList
 }
@@ -530,7 +530,7 @@ func (ct *ConnTrack) getConnAndUpdate(pkt PacketBufferPtr, skipChecksumValidatio
 				uint16(pkt.Data().Size()),
 				tid.srcAddr,
 				tid.dstAddr,
-				pkt.RXTransportChecksumValidated || skipChecksumValidation)
+				pkt.RXChecksumValidated || skipChecksumValidation)
 			if !csumValid || !ok {
 				return nil
 			}
@@ -542,16 +542,14 @@ func (ct *ConnTrack) getConnAndUpdate(pkt PacketBufferPtr, skipChecksumValidatio
 				pkt.NetworkProtocolNumber,
 				tid.srcAddr,
 				tid.dstAddr,
-				pkt.RXTransportChecksumValidated || skipChecksumValidation)
+				pkt.RXChecksumValidated || skipChecksumValidation)
 			if !lengthValid || !csumValid {
 				return nil
 			}
 		}
 
-		bktID := ct.bucket(tid)
-
 		ct.mu.RLock()
-		bkt := &ct.buckets[bktID]
+		bkt := &ct.buckets[ct.bucket(tid)]
 		ct.mu.RUnlock()
 
 		now := ct.clock.NowMonotonic()
@@ -603,10 +601,8 @@ func (ct *ConnTrack) getConnAndUpdate(pkt PacketBufferPtr, skipChecksumValidatio
 }
 
 func (ct *ConnTrack) connForTID(tid tupleID) *tuple {
-	bktID := ct.bucket(tid)
-
 	ct.mu.RLock()
-	bkt := &ct.buckets[bktID]
+	bkt := &ct.buckets[ct.bucket(tid)]
 	ct.mu.RUnlock()
 
 	return bkt.connForTID(tid, ct.clock.NowMonotonic())
@@ -635,7 +631,7 @@ func (ct *ConnTrack) finalize(cn *conn) finalizeResult {
 
 	{
 		tid := cn.reply.tupleID
-		id := ct.bucket(tid)
+		id := ct.bucketWithTableLength(tid, len(buckets))
 
 		bkt := &buckets[id]
 		bkt.mu.Lock()
@@ -663,7 +659,7 @@ func (ct *ConnTrack) finalize(cn *conn) finalizeResult {
 	// better.
 
 	tid := cn.original.tupleID
-	id := ct.bucket(tid)
+	id := ct.bucketWithTableLength(tid, len(buckets))
 	bkt := &buckets[id]
 	bkt.mu.Lock()
 	defer bkt.mu.Unlock()
@@ -978,7 +974,12 @@ func (cn *conn) handlePacket(pkt PacketBufferPtr, hook Hook, rt *Route) bool {
 }
 
 // bucket gets the conntrack bucket for a tupleID.
+// +checklocksread:ct.mu
 func (ct *ConnTrack) bucket(id tupleID) int {
+	return ct.bucketWithTableLength(id, len(ct.buckets))
+}
+
+func (ct *ConnTrack) bucketWithTableLength(id tupleID, tableLength int) int {
 	h := jenkins.Sum32(ct.seed)
 	h.Write([]byte(id.srcAddr))
 	h.Write([]byte(id.dstAddr))
@@ -991,9 +992,7 @@ func (ct *ConnTrack) bucket(id tupleID) int {
 	h.Write([]byte(shortBuf))
 	binary.LittleEndian.PutUint16(shortBuf, uint16(id.netProto))
 	h.Write([]byte(shortBuf))
-	ct.mu.RLock()
-	defer ct.mu.RUnlock()
-	return int(h.Sum32()) % len(ct.buckets)
+	return int(h.Sum32()) % tableLength
 }
 
 // reapUnused deletes timed out entries from the conntrack map. The rules for

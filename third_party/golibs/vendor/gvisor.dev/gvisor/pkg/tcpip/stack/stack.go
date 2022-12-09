@@ -32,7 +32,6 @@ import (
 	"gvisor.dev/gvisor/pkg/bufferv2"
 	"gvisor.dev/gvisor/pkg/log"
 	cryptorand "gvisor.dev/gvisor/pkg/rand"
-	"gvisor.dev/gvisor/pkg/sync"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
 	"gvisor.dev/gvisor/pkg/tcpip/ports"
@@ -85,18 +84,18 @@ type Stack struct {
 	stats tcpip.Stats
 
 	// routeMu protects annotated fields below.
-	routeMu sync.RWMutex
+	routeMu routeStackRWMutex
 
 	// +checklocks:routeMu
 	routeTable []tcpip.Route
 
-	mu sync.RWMutex
+	mu stackRWMutex
 	// +checklocks:mu
 	nics                     map[tcpip.NICID]*nic
 	defaultForwardingEnabled map[tcpip.NetworkProtocolNumber]struct{}
 
 	// cleanupEndpointsMu protects cleanupEndpoints.
-	cleanupEndpointsMu sync.Mutex
+	cleanupEndpointsMu cleanupEndpointsMutex
 	// +checklocks:cleanupEndpointsMu
 	cleanupEndpoints map[TransportEndpoint]struct{}
 
@@ -710,6 +709,33 @@ func (s *Stack) SetPortRange(start uint16, end uint16) tcpip.Error {
 	return s.PortManager.SetPortRange(start, end)
 }
 
+// GROTimeout returns the GRO timeout.
+func (s *Stack) GROTimeout(NICID int32) (time.Duration, tcpip.Error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	nic, ok := s.nics[tcpip.NICID(NICID)]
+	if !ok {
+		return 0, &tcpip.ErrUnknownNICID{}
+	}
+
+	return nic.gro.getInterval(), nil
+}
+
+// SetGROTimeout sets the GRO timeout.
+func (s *Stack) SetGROTimeout(NICID int32, timeout time.Duration) tcpip.Error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	nic, ok := s.nics[tcpip.NICID(NICID)]
+	if !ok {
+		return &tcpip.ErrUnknownNICID{}
+	}
+
+	nic.gro.setInterval(timeout)
+	return nil
+}
+
 // SetRouteTable assigns the route table to be used by this stack. It
 // specifies which NIC to use for given destination address ranges.
 //
@@ -790,7 +816,7 @@ func (s *Stack) NewPacketEndpoint(cooked bool, netProto tcpip.NetworkProtocolNum
 }
 
 // NICContext is an opaque pointer used to store client-supplied NIC metadata.
-type NICContext interface{}
+type NICContext any
 
 // NICOptions specifies the configuration of a NIC as it is being created.
 // The zero value creates an enabled, unnamed NIC.
@@ -810,6 +836,9 @@ type NICOptions struct {
 
 	// QDisc is the queue discipline to use for this NIC.
 	QDisc QueueingDiscipline
+
+	// GROTimeout specifies the GRO timeout. Zero bypasses GRO.
+	GROTimeout time.Duration
 }
 
 // CreateNICWithOptions creates a NIC with the provided id, LinkEndpoint, and
@@ -927,9 +956,6 @@ func (s *Stack) removeNICLocked(id tcpip.NICID) tcpip.Error {
 	nic, ok := s.nics[id]
 	if !ok {
 		return &tcpip.ErrUnknownNICID{}
-	}
-	if nic.IsLoopback() {
-		return &tcpip.ErrNotSupported{}
 	}
 	delete(s.nics, id)
 

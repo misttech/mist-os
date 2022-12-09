@@ -188,6 +188,62 @@ func (bkt *bucket) StateLoad(stateSourceObject state.Source) {
 	stateSourceObject.Load(0, &bkt.tuples)
 }
 
+func (l *groPacketList) StateTypeName() string {
+	return "pkg/tcpip/stack.groPacketList"
+}
+
+func (l *groPacketList) StateFields() []string {
+	return []string{
+		"head",
+		"tail",
+	}
+}
+
+func (l *groPacketList) beforeSave() {}
+
+// +checklocksignore
+func (l *groPacketList) StateSave(stateSinkObject state.Sink) {
+	l.beforeSave()
+	stateSinkObject.Save(0, &l.head)
+	stateSinkObject.Save(1, &l.tail)
+}
+
+func (l *groPacketList) afterLoad() {}
+
+// +checklocksignore
+func (l *groPacketList) StateLoad(stateSourceObject state.Source) {
+	stateSourceObject.Load(0, &l.head)
+	stateSourceObject.Load(1, &l.tail)
+}
+
+func (e *groPacketEntry) StateTypeName() string {
+	return "pkg/tcpip/stack.groPacketEntry"
+}
+
+func (e *groPacketEntry) StateFields() []string {
+	return []string{
+		"next",
+		"prev",
+	}
+}
+
+func (e *groPacketEntry) beforeSave() {}
+
+// +checklocksignore
+func (e *groPacketEntry) StateSave(stateSinkObject state.Sink) {
+	e.beforeSave()
+	stateSinkObject.Save(0, &e.next)
+	stateSinkObject.Save(1, &e.prev)
+}
+
+func (e *groPacketEntry) afterLoad() {}
+
+// +checklocksignore
+func (e *groPacketEntry) StateLoad(stateSourceObject state.Source) {
+	stateSourceObject.Load(0, &e.next)
+	stateSourceObject.Load(1, &e.prev)
+}
+
 func (it *IPTables) StateTypeName() string {
 	return "pkg/tcpip/stack.IPTables"
 }
@@ -454,7 +510,7 @@ func (pk *packetBuffer) StateFields() []string {
 		"dnatDone",
 		"PktType",
 		"NICID",
-		"RXTransportChecksumValidated",
+		"RXChecksumValidated",
 		"NetworkPacketInfo",
 		"tuple",
 	}
@@ -481,7 +537,7 @@ func (pk *packetBuffer) StateSave(stateSinkObject state.Sink) {
 	stateSinkObject.Save(13, &pk.dnatDone)
 	stateSinkObject.Save(14, &pk.PktType)
 	stateSinkObject.Save(15, &pk.NICID)
-	stateSinkObject.Save(16, &pk.RXTransportChecksumValidated)
+	stateSinkObject.Save(16, &pk.RXChecksumValidated)
 	stateSinkObject.Save(17, &pk.NetworkPacketInfo)
 	stateSinkObject.Save(18, &pk.tuple)
 }
@@ -506,7 +562,7 @@ func (pk *packetBuffer) StateLoad(stateSourceObject state.Source) {
 	stateSourceObject.Load(13, &pk.dnatDone)
 	stateSourceObject.Load(14, &pk.PktType)
 	stateSourceObject.Load(15, &pk.NICID)
-	stateSourceObject.Load(16, &pk.RXTransportChecksumValidated)
+	stateSourceObject.Load(16, &pk.RXChecksumValidated)
 	stateSourceObject.Load(17, &pk.NetworkPacketInfo)
 	stateSourceObject.Load(18, &pk.tuple)
 }
@@ -1492,6 +1548,8 @@ func init() {
 	state.Register((*conn)(nil))
 	state.Register((*ConnTrack)(nil))
 	state.Register((*bucket)(nil))
+	state.Register((*groPacketList)(nil))
+	state.Register((*groPacketEntry)(nil))
 	state.Register((*IPTables)(nil))
 	state.Register((*Table)(nil))
 	state.Register((*Rule)(nil))
