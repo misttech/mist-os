@@ -9,19 +9,20 @@ mod string_list;
 use {
     anyhow::{bail, Context as _, Error},
     fuchsia_inspect as inspect,
+    futures::FutureExt,
     glob::{GlobError, Paths},
-    parking_lot::Mutex,
     serde::{de::DeserializeOwned, Deserialize},
     serde_json5,
     std::fs,
     std::path::{Path, PathBuf},
-    std::sync::Arc,
+    std::sync::{Arc, Mutex},
     string_list::StringList,
 };
 
 pub use selector_list::{ParsedSelector, SelectorList};
 
 const MONIKER_INTERPOLATION: &str = "{MONIKER}";
+const METRICS_INSPECT_SIZE_BYTES: usize = 1024 * 1024; // 1MiB
 
 /// Configuration for a single project to map Inspect data to its Cobalt metrics.
 #[derive(Deserialize, Debug, PartialEq)]
@@ -81,7 +82,7 @@ fn default_source_name() -> String {
 
 /// Configuration for a single metric to map from an Inspect property
 /// to a Cobalt metric.
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Debug, PartialEq)]
 pub struct MetricConfig {
     /// Selector identifying the metric to
     /// sample via the diagnostics platform.
@@ -244,8 +245,12 @@ fn load_many<T: DeserializeOwned + RemembersSource>(paths: Paths) -> Result<Vec<
 ///      - Minimum sample rate.
 #[derive(Debug)]
 pub struct SamplerConfig {
-    pub project_configs: Vec<ProjectConfig>,
+    pub project_configs: Vec<Arc<ProjectConfig>>,
     pub minimum_sample_rate_sec: i64,
+
+    // Used to store a lazy node that publishes data to Inspect if
+    // present.
+    inspect_node: Mutex<Option<inspect::LazyNode>>,
 }
 
 impl MetricConfig {
@@ -336,8 +341,9 @@ impl SamplerConfig {
     pub fn from_directory(
         minimum_sample_rate_sec: i64,
         sampler_dir: impl AsRef<Path>,
-    ) -> Result<Self, Error> {
+    ) -> Result<Arc<Self>, Error> {
         Self::from_directories_internal(minimum_sample_rate_sec, sampler_dir, None::<&Path>)
+            .map(Arc::new)
     }
 
     /// Parse the ProjectConfigurations for every project from config data.
@@ -346,8 +352,9 @@ impl SamplerConfig {
         minimum_sample_rate_sec: i64,
         sampler_dir: impl AsRef<Path>,
         fire_dir: impl AsRef<Path>,
-    ) -> Result<Self, Error> {
+    ) -> Result<Arc<Self>, Error> {
         Self::from_directories_internal(minimum_sample_rate_sec, sampler_dir, Some(fire_dir))
+            .map(Arc::new)
     }
 
     /// Parse the ProjectConfigurations for every project from config data.
@@ -373,22 +380,43 @@ impl SamplerConfig {
             project_configs
                 .append(&mut expand_fire_projects(fire_project_templates, fire_components)?);
         }
-        // The upload_count properties should outlive the selector they're stored in, since
-        // selectors for upload_once Metrics are deleted after upload.
+        let project_configs = project_configs.into_iter().map(Arc::new).collect();
+        Ok(Self { minimum_sample_rate_sec, project_configs, inspect_node: Mutex::new(None) })
+    }
+
+    /// Publish data about this config to Inspect under the given node.
+    ///
+    /// Takes an Arc so that a weak reference can be used to populate an
+    /// Inspector on demand.
+    pub fn publish_inspect(self: &Arc<Self>, parent_node: &inspect::Node) {
+        let weak_self = Arc::downgrade(self);
+
         lazy_static::lazy_static! {
-            static ref UPLOAD_COUNTS: Mutex<Vec<Arc<inspect::UintProperty>>> = Mutex::new(vec![]);
             static ref SELECTOR_STRING : inspect::StringReference<'static> = "selector".into();
             static ref UPLOAD_COUNT_STRING : inspect::StringReference<'static> = "upload_count".into();
         }
-        inspect::component::inspector().root().record_child("metrics_sent", |top_node| {
-            for config in project_configs.iter_mut() {
+
+        let mut locked_node = self.inspect_node.lock().unwrap();
+
+        *locked_node = Some(parent_node.create_lazy_child("metrics_sent", move || {
+            let local_self = weak_self.upgrade();
+            if local_self.is_none() {
+                return async move { Ok(inspect::Inspector::new()) }.boxed();
+            }
+
+            let local_self = local_self.unwrap();
+
+            let inspector = inspect::Inspector::new_with_size(METRICS_INSPECT_SIZE_BYTES);
+            let top_node = inspector.root();
+
+            for config in local_self.project_configs.iter() {
                 let mut next_selector_index = 0;
                 // "<unknown>" should never happen, so it's better not to make it StringReference.
                 let source_name = config.source_name.clone();
                 top_node.record_child(source_name, |file_node| {
-                    for metric in config.metrics.iter_mut() {
-                        for selector in metric.selectors.iter_mut() {
-                            if let Some(ref mut selector) = selector {
+                    for metric in config.metrics.iter() {
+                        for selector in metric.selectors.iter() {
+                            if let Some(ref selector) = selector {
                                 file_node.record_child(
                                     format!("{}", next_selector_index),
                                     |selector_node| {
@@ -397,11 +425,10 @@ impl SamplerConfig {
                                             &*SELECTOR_STRING,
                                             selector.selector_string.clone(),
                                         );
-                                        let upload_count = Arc::new(
-                                            selector_node.create_uint(&*UPLOAD_COUNT_STRING, 0),
+                                        selector_node.record_uint(
+                                            &*UPLOAD_COUNT_STRING,
+                                            selector.get_upload_count(),
                                         );
-                                        selector.upload_count = upload_count.clone();
-                                        UPLOAD_COUNTS.lock().push(upload_count);
                                     },
                                 );
                             }
@@ -409,8 +436,9 @@ impl SamplerConfig {
                     }
                 });
             }
-        });
-        Ok(Self { minimum_sample_rate_sec, project_configs })
+
+            async move { Ok(inspector) }.boxed()
+        }));
     }
 }
 

@@ -256,7 +256,7 @@ pub struct SamplerExecutor {
 impl SamplerExecutor {
     /// Instantiate connection to the cobalt logger and map ProjectConfigurations
     /// to [`ProjectSampler`] plans.
-    pub async fn new(sampler_config: SamplerConfig) -> Result<Self, Error> {
+    pub async fn new(sampler_config: Arc<SamplerConfig>) -> Result<Self, Error> {
         let metric_logger_factory: Arc<MetricEventLoggerFactoryProxy> = Arc::new(
             connect_to_protocol::<MetricEventLoggerFactoryMarker>()
                 .context("Failed to connect to the Metric LoggerFactory")?,
@@ -281,7 +281,7 @@ impl SamplerExecutor {
         // TODO(fxbug.dev/42067): Create only one ArchiveReader for each unique poll rate so we
         // can avoid redundant snapshots.
         let project_sampler_futures =
-            sampler_config.project_configs.into_iter().map(|project_config| {
+            sampler_config.project_configs.iter().cloned().map(|project_config| {
                 let project_sampler_stats =
                     project_to_stats_map.entry(project_config.project_id).or_insert(Arc::new(
                         ProjectSamplerStats::new()
@@ -429,7 +429,7 @@ enum SnapshotOutcome {
 
 impl ProjectSampler {
     pub async fn new(
-        config: ProjectConfig,
+        config: Arc<ProjectConfig>,
         metric_logger_factory: Arc<MetricEventLoggerFactoryProxy>,
         minimum_sample_rate_sec: i64,
         project_sampler_stats: Arc<ProjectSamplerStats>,
@@ -475,7 +475,7 @@ impl ProjectSampler {
         let mut project_sampler = ProjectSampler {
             archive_reader: ArchiveReader::new(),
             moniker_to_selector_map: HashMap::new(),
-            metrics: config.metrics,
+            metrics: config.metrics.clone(),
             metric_cache: HashMap::new(),
             metrics_logger,
             poll_rate_sec,
@@ -680,10 +680,10 @@ impl ProjectSampler {
                             )
                             .await?
                         {
-                            if let Some(ParsedSelector { upload_count, .. }) =
+                            if let Some(parsed_selector) =
                                 &self.metrics[*metric_index].selectors[*selector_index]
                             {
-                                upload_count.add(1);
+                                parsed_selector.increment_upload_count();
                             }
                             events_to_log.push(event);
                         }

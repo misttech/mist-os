@@ -4,9 +4,9 @@
 
 use {
     fidl_fuchsia_diagnostics::StringSelector,
-    fuchsia_inspect as inspect,
     selectors::{self, FastError},
     serde::{de::Unexpected, Deserialize, Deserializer},
+    std::sync::atomic::{AtomicU64, Ordering},
     std::sync::Arc,
 };
 
@@ -49,7 +49,7 @@ impl IntoIterator for SelectorList {
 
 /// ParsedSelector stores the information Sampler needs to use the selector.
 // TODO(fxbug.dev/87709) - this could be more memory-efficient by using slices into the string.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct ParsedSelector {
     /// The original string, needed to initialize the ArchiveAccessor
     pub selector_string: String,
@@ -58,7 +58,27 @@ pub struct ParsedSelector {
     /// The moniker of the selector, to find which hierarchy may contain the data
     pub moniker: String,
     /// How many times this selector has found and uploaded data
-    pub upload_count: Arc<inspect::UintProperty>,
+    upload_count: Arc<AtomicU64>,
+}
+
+impl ParsedSelector {
+    pub fn increment_upload_count(&self) {
+        self.upload_count.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn get_upload_count(&self) -> u64 {
+        self.upload_count.load(Ordering::Relaxed)
+    }
+}
+
+impl PartialEq for ParsedSelector {
+    fn eq(&self, other: &Self) -> bool {
+        self.selector_string == other.selector_string
+            && self.selector == other.selector
+            && self.moniker == other.moniker
+            && self.upload_count.load(Ordering::Relaxed)
+                == other.upload_count.load(Ordering::Relaxed)
+    }
 }
 
 pub(crate) fn parse_selector<E>(selector_str: &str) -> Result<ParsedSelector, E>
@@ -91,7 +111,7 @@ where
         selector,
         selector_string: selector_str.to_string(),
         moniker,
-        upload_count: Arc::new(inspect::UintProperty::default()),
+        upload_count: Arc::new(AtomicU64::new(0)),
     })
 }
 

@@ -70,7 +70,10 @@ pub async fn main() -> Result<(), Error> {
                     .context("Providing the reboot register with callback channel.")?;
             }
 
-            let sampler_executor = executor::SamplerExecutor::new(sampler_config).await?;
+            info!("publishing inspect");
+            sampler_config.publish_inspect(inspector.root());
+
+            let sampler_executor = executor::SamplerExecutor::new(sampler_config.clone()).await?;
 
             // Trigger the project samplers and returns a TaskCancellation struct used to trigger
             // reboot shutdown of sampler.
@@ -78,6 +81,10 @@ pub async fn main() -> Result<(), Error> {
 
             inspect::component::health().set_ok();
             reboot_watcher(reboot_watcher_request_stream, task_canceller).await;
+
+            // Keep the original config around until termination.
+            // Otherwise we cannot inspect its value.
+            let _sampler_config = sampler_config;
             Ok(())
         }
         Err(e) => {
