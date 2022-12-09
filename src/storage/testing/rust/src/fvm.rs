@@ -6,18 +6,14 @@ use {
     crate::Guid,
     anyhow::{Context, Result},
     device_watcher::recursive_wait_and_open_node,
+    fidl::endpoints::Proxy,
     fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
     fidl_fuchsia_hardware_block_partition::Guid as FidlGuid,
     fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeManagerProxy},
     fidl_fuchsia_io as fio,
     fuchsia_component::client::connect_to_protocol_at_path,
-    fuchsia_zircon::{self as zx, zx_status_t},
-    std::os::raw::c_int,
-    std::{
-        fs::OpenOptions,
-        os::unix::io::AsRawFd,
-        path::{Path, PathBuf},
-    },
+    fuchsia_zircon::{self as zx, sys::zx_handle_t, zx_status_t, AsHandleRef},
+    std::path::{Path, PathBuf},
 };
 
 const FVM_DRIVER_PATH: &str = "fvm.so";
@@ -26,18 +22,17 @@ const FVM_DRIVER_PATH: &str = "fvm.so";
 extern "C" {
     // This function initializes FVM on a fuchsia.hardware.block.Block device
     // with a given slice size.
-    fn fvm_init(fd: c_int, slice_size: usize) -> zx_status_t;
+    fn fvm_init(device: zx_handle_t, slice_size: usize) -> zx_status_t;
 }
 
 /// Formats the block device at `block_device` to be an empty FVM instance.
 pub fn format_for_fvm(block_device: &Path, fvm_slice_size: usize) -> Result<()> {
-    let file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(block_device)
-        .context("format_for_fvm open failed")?;
-    let status = unsafe { fvm_init(file.as_raw_fd(), fvm_slice_size) };
-    Ok(zx::ok(status).context("fvm_init failed")?)
+    let device = connect_to_protocol_at_path::<fidl_fuchsia_hardware_block::BlockMarker>(
+        block_device.to_str().unwrap(),
+    )?;
+    let device_raw = device.as_channel().raw_handle();
+    let status = unsafe { fvm_init(device_raw, fvm_slice_size) };
+    zx::ok(status).context("fvm_init failed")
 }
 
 /// Binds the FVM driver to the device at `controller`. Does not wait for the driver to be ready.
@@ -76,8 +71,8 @@ pub async fn set_up_fvm(block_device: &Path, fvm_slice_size: usize) -> Result<Vo
     bind_fvm_driver(&controller).await?;
 
     let fvm_path = wait_for_fvm_driver(block_device).await?;
-    Ok(connect_to_protocol_at_path::<VolumeManagerMarker>(fvm_path.to_str().unwrap())
-        .context("fvm_path volume manager connect failed")?)
+    connect_to_protocol_at_path::<VolumeManagerMarker>(fvm_path.to_str().unwrap())
+        .context("fvm_path volume manager connect failed")
 }
 
 /// Creates an FVM volume in `volume_manager`.
@@ -113,7 +108,7 @@ pub async fn create_fvm_volume(
     let status = volume_manager
         .allocate_partition(slice_count, &mut type_guid, &mut instance_guid, name, flags)
         .await?;
-    Ok(zx::ok(status)?)
+    zx::ok(status).context("error allocating partition")
 }
 
 #[cfg(test)]

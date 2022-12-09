@@ -17,10 +17,13 @@ use {
     fidl_fuchsia_io as fio,
     fuchsia_component_test::RealmInstance,
     fuchsia_driver_test as _,
-    fuchsia_zircon::{sys::zx_status_t, Status},
+    fuchsia_zircon::{
+        sys::{zx_handle_t, zx_status_t},
+        AsHandleRef, Status,
+    },
     ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
     rand::{rngs::SmallRng, Rng, SeedableRng},
-    std::{fs, os::raw::c_int, time::Duration},
+    std::{fs, time::Duration},
     storage_isolated_driver_manager::bind_fvm,
 };
 
@@ -36,9 +39,9 @@ const FVM_SLICE_SIZE: usize = BLOCK_SIZE as usize * 4;
 // we just set a quite large timeout here.
 const DEVICE_WAIT_TIMEOUT: Duration = Duration::from_secs(60);
 
-#[link(name = "fs-management")]
+#[link(name = "fvm")]
 extern "C" {
-    pub fn fvm_init(fd: c_int, slice_size: usize) -> zx_status_t;
+    pub fn fvm_init(device: zx_handle_t, slice_size: usize) -> zx_status_t;
 }
 
 /// Given a realm instance, return a DirectoryProxy which is a client to
@@ -105,11 +108,10 @@ pub async fn setup_ramdisk(
 
     // Open ramdisk device and initialize FVM
     {
-        let ramdisk_handle = ramdisk.open().expect("Could not re-open ramdisk").into_handle();
-        let ramdisk_fd = fdio::create_fd(ramdisk_handle).expect("create fd of dev root");
-        let status = unsafe { fvm_init(ramdisk_fd, FVM_SLICE_SIZE) };
+        let ramdisk_handle = ramdisk.open().expect("Could not re-open ramdisk");
+        let ramdisk_handle_raw = ramdisk_handle.raw_handle();
+        let status = unsafe { fvm_init(ramdisk_handle_raw, FVM_SLICE_SIZE) };
         Status::ok(status).expect("could not initialize FVM structures in ramdisk");
-        // ramdisk_file drops, closing the fd we created
     }
 
     // Open ramdisk device again as fidl_fuchsia_device::ControllerProxy

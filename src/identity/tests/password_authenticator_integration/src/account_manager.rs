@@ -20,10 +20,9 @@ use {
     fuchsia_component_test::LocalComponentHandles,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
-    fuchsia_zircon::{self as zx, sys::zx_status_t},
+    fuchsia_zircon as zx,
     futures::{FutureExt as _, StreamExt as _},
     std::collections::VecDeque,
-    std::os::raw::c_int,
 };
 
 use crate::mock_cr50_agent::{mock, MockResponse};
@@ -43,11 +42,6 @@ const GLOBAL_ACCOUNT_ID: u64 = 1;
 const EMPTY_PASSWORD: &str = "";
 const REAL_PASSWORD: &str = "a real passphrase!";
 const BAD_PASSWORD: &str = "not the real passphrase :(";
-
-#[link(name = "fs-management")]
-extern "C" {
-    pub fn fvm_init(fd: c_int, slice_size: usize) -> zx_status_t;
-}
 
 enum Config {
     PinweaverOrScrypt,

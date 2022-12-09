@@ -9,7 +9,13 @@
 
 extern "C" {
 
-zx_status_t fvm_init(int fd, size_t slice_size);
+// Initialize an fvm partition on the device backed by |handle|. This function does not take
+// ownership of the handle. It should be the equivalent of a
+// fidl::UnownedClientEnd<fidl_fuchsia_hardware_block::Block>.
+//
+// This function is primarily for use with the FFI. When using C++ directly, use the functions in
+// fs_management/cpp/fvm.h instead, which provide clearer ownership semantics.
+zx_status_t fvm_init(zx_handle_t device, size_t slice_size);
 }
 
 #endif  // SRC_LIB_STORAGE_FS_MANAGEMENT_C_FVM_H_

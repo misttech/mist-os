@@ -4,10 +4,7 @@
 
 static_library("fvm") {
   sources = [ "fvm.cc" ]
-  deps = [
-    "//src/lib/storage/fs_management",
-    "//zircon/system/ulib/fdio-caller",
-  ]
+  deps = [ "//src/lib/storage/fs_management" ]
 }
 
 group("c") {
