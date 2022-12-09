@@ -299,11 +299,8 @@ closed protocol ClosedExample1 {
 
 // TODO(fxbug.dev/88366): remove once fully migrated.
 TEST(MethodTests, BadInvalidMethodsAndEventsMandateMode) {
-  TestLibrary library1(R"FIDL(library example;
-open protocol Example {
-    OneWay();
-};
-)FIDL");
+  TestLibrary library1;
+  library1.AddFile("bad/fi-0191.test.fidl");
   library1.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
   library1.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsMandate);
   ASSERT_ERRORED_DURING_COMPILE(library1, fidl::ErrMethodMustDefineStrictness)

@@ -157,9 +157,8 @@ closed protocol ClosedEmpty {};
 
 // TODO(fxbug.dev/88366): remove once fully migrated.
 TEST(ProtocolTests, BadMissingOpennessModifierMandateMode) {
-  TestLibrary library(R"FIDL(library example;
-protocol ImplicitOpenness {};
-)FIDL");
+  TestLibrary library;
+  library.AddFile("bad/fi-0192.test.fidl");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsMandate);
   ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrProtocolMustDefineOpenness);

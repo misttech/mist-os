@@ -1279,6 +1279,21 @@ TEST(ErrcatTests, Good0190) {
   ASSERT_COMPILED(library);
 }
 
+TEST(ErrcatTests, Good0191) {
+  TestLibrary library;
+  library.AddFile("good/fi-0191.test.fidl");
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsMandate);
+  ASSERT_COMPILED(library);
+}
+TEST(ErrcatTests, Good0192) {
+  TestLibrary library;
+  library.AddFile("good/fi-0192.test.fidl");
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsMandate);
+  ASSERT_COMPILED(library);
+}
+
 TEST(ErrcatTests, Good0193) {
   TestLibrary library;
   library.AddFile("good/fi-0193.test.fidl");
