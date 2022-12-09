@@ -256,7 +256,8 @@ pub enum FlexibleUnion {
     Field(i32),
     #[deprecated = "Use `FlexibleUnion::unknown()` to construct and `FlexibleUnionUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __Unknown { ordinal: u64, bytes: Vec<u8> },
+    #[non_exhaustive]
+    __Unknown { ordinal: u64 },
 }
 /// Pattern that matches an unknown `FlexibleUnion` member.
 #[macro_export]
@@ -268,16 +269,16 @@ macro_rules! FlexibleUnionUnknown {
 
 impl FlexibleUnion {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -304,7 +305,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 /// strict union comment #1

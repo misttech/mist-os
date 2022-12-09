@@ -98,9 +98,9 @@ pub enum LocalUnionPayload {
     B(bool),
     #[deprecated = "Use `LocalUnionPayload::unknown()` to construct and `LocalUnionPayloadUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `LocalUnionPayload` member.
@@ -113,16 +113,16 @@ macro_rules! LocalUnionPayloadUnknown {
 
 impl LocalUnionPayload {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -149,7 +149,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -157,9 +157,9 @@ pub enum MainProtocolOnAnonRequest {
     B(bool),
     #[deprecated = "Use `MainProtocolOnAnonRequest::unknown()` to construct and `MainProtocolOnAnonRequestUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `MainProtocolOnAnonRequest` member.
@@ -172,16 +172,16 @@ macro_rules! MainProtocolOnAnonRequestUnknown {
 
 impl MainProtocolOnAnonRequest {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -208,7 +208,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -216,9 +216,9 @@ pub enum MainProtocolTwoWayAnonRequest {
     B(bool),
     #[deprecated = "Use `MainProtocolTwoWayAnonRequest::unknown()` to construct and `MainProtocolTwoWayAnonRequestUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `MainProtocolTwoWayAnonRequest` member.
@@ -231,16 +231,16 @@ macro_rules! MainProtocolTwoWayAnonRequestUnknown {
 
 impl MainProtocolTwoWayAnonRequest {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -267,7 +267,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -275,9 +275,9 @@ pub enum MainProtocolTwoWayAnonWithErrorResponse {
     B(bool),
     #[deprecated = "Use `MainProtocolTwoWayAnonWithErrorResponse::unknown()` to construct and `MainProtocolTwoWayAnonWithErrorResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `MainProtocolTwoWayAnonWithErrorResponse` member.
@@ -290,16 +290,16 @@ macro_rules! MainProtocolTwoWayAnonWithErrorResponseUnknown {
 
 impl MainProtocolTwoWayAnonWithErrorResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -326,7 +326,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]

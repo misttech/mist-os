@@ -161,7 +161,7 @@ mod tests {
 
     #[test]
     fn invalid_identifier() {
-        let invalid = Identifier::unknown(10, vec![]);
+        let invalid = Identifier::unknown_variant_for_testing();
         assert_matches!(peer_id_from_identifier(&invalid), Err(Error::Identifier { .. }));
 
         let unsupported = Identifier::LocalDevice(LocalDevice);

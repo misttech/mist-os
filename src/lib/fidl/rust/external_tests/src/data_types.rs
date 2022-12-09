@@ -140,8 +140,8 @@ fn flexible_value_union() {
         FlexibleValueThing::Name("hello".to_owned()).validate(),
         Ok(FlexibleValueThing::Name("hello".to_owned()))
     );
-    assert_eq!(FlexibleValueThing::unknown(0, vec![]).is_unknown(), true);
-    assert_eq!(FlexibleValueThing::unknown(0, vec![]).validate(), Err((0, vec![])));
+    assert_eq!(FlexibleValueThing::unknown_variant_for_testing().is_unknown(), true);
+    assert_eq!(FlexibleValueThing::unknown_variant_for_testing().validate(), Err(0));
 }
 
 #[test]
@@ -165,16 +165,8 @@ fn flexible_resource_union() {
         FlexibleResourceThing::Name("hello".to_owned()).validate(),
         Ok(FlexibleResourceThing::Name("hello".to_owned()))
     );
-    assert_eq!(
-        FlexibleResourceThing::unknown(0, fidl::UnknownData { bytes: vec![], handles: vec![] })
-            .is_unknown(),
-        true
-    );
-    assert_eq!(
-        FlexibleResourceThing::unknown(0, fidl::UnknownData { bytes: vec![], handles: vec![] })
-            .validate(),
-        Err((0, fidl::UnknownData { bytes: vec![], handles: vec![] }))
-    );
+    assert_eq!(FlexibleResourceThing::unknown_variant_for_testing().is_unknown(), true);
+    assert_eq!(FlexibleResourceThing::unknown_variant_for_testing().validate(), Err(0));
 }
 
 #[test]

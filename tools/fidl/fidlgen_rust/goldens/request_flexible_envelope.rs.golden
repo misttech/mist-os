@@ -38,9 +38,9 @@ pub enum FlexibleFoo {
     I(i32),
     #[deprecated = "Use `FlexibleFoo::unknown()` to construct and `FlexibleFooUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `FlexibleFoo` member.
@@ -53,16 +53,16 @@ macro_rules! FlexibleFooUnknown {
 
 impl FlexibleFoo {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -93,7 +93,7 @@ fidl_union! {
             ordinal: 2,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]

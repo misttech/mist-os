@@ -2763,87 +2763,6 @@ macro_rules! fidl_empty_struct {
     };
 }
 
-/// Encodes the provided unknown bytes and handles behind a FIDL envelope.
-#[doc(hidden)] // only exported for macro use
-pub fn encode_unknown_data(
-    val: &mut UnknownData,
-    encoder: &mut Encoder<'_, '_>,
-    offset: usize,
-    recursion_depth: usize,
-) -> Result<()> {
-    match encoder.context.wire_format_version {
-        WireFormatVersion::V1 => {
-            (val.bytes.len() as u32).encode(encoder, offset, recursion_depth)?;
-            (val.handles.len() as u32).encode(encoder, offset + 4, recursion_depth)?;
-            ALLOC_PRESENT_U64.clone().encode(encoder, offset + 8, recursion_depth)?;
-            Encoder::check_recursion_depth(recursion_depth + 1)?;
-            encoder.append_out_of_line_bytes(&val.bytes);
-            encoder.append_unknown_handles(&mut val.handles);
-        }
-        WireFormatVersion::V2 => {
-            if val.bytes.len() <= 4 {
-                unsafe {
-                    std::ptr::copy_nonoverlapping(
-                        val.bytes.as_ptr(),
-                        encoder.buf.as_mut_ptr().offset(offset as isize),
-                        val.bytes.len(),
-                    );
-                }
-                encoder.padding(offset + val.bytes.len(), 4 - val.bytes.len());
-                (val.handles.len() as u16).encode(encoder, offset + 4, recursion_depth)?;
-                1u16.encode(encoder, offset + 6, recursion_depth)?;
-                encoder.append_unknown_handles(&mut val.handles);
-            } else {
-                (val.bytes.len() as u32).encode(encoder, offset, recursion_depth)?;
-                (val.handles.len() as u32).encode(encoder, offset + 4, recursion_depth)?;
-                Encoder::check_recursion_depth(recursion_depth + 1)?;
-                encoder.append_out_of_line_bytes(&val.bytes);
-                encoder.append_unknown_handles(&mut val.handles);
-            }
-        }
-    }
-    encoder.set_next_handle_subtype(ObjectType::NONE);
-    encoder.set_next_handle_rights(Rights::SAME_RIGHTS);
-    Ok(())
-}
-
-/// Encodes the provided unknown bytes behind a FIDL envelope.
-#[doc(hidden)] // only exported for macro use
-pub fn encode_unknown_bytes(
-    val: &[u8],
-    encoder: &mut Encoder<'_, '_>,
-    offset: usize,
-    recursion_depth: usize,
-) -> Result<()> {
-    match encoder.context.wire_format_version {
-        WireFormatVersion::V1 => {
-            (val.len() as u64).encode(encoder, offset, recursion_depth)?;
-            ALLOC_PRESENT_U64.clone().encode(encoder, offset + 8, recursion_depth)?;
-            Encoder::check_recursion_depth(recursion_depth + 1)?;
-            encoder.append_out_of_line_bytes(val);
-        }
-        WireFormatVersion::V2 => {
-            if val.len() <= 4 {
-                unsafe {
-                    std::ptr::copy_nonoverlapping(
-                        val.as_ptr(),
-                        encoder.buf.as_mut_ptr().offset(offset as isize),
-                        val.len(),
-                    );
-                }
-                encoder.padding(offset + val.len(), 4 - val.len());
-                0u16.encode(encoder, offset + 4, recursion_depth)?;
-                1u16.encode(encoder, offset + 6, recursion_depth)?;
-            } else {
-                (val.len() as u64).encode(encoder, offset, recursion_depth)?;
-                Encoder::check_recursion_depth(recursion_depth + 1)?;
-                encoder.append_out_of_line_bytes(val);
-            }
-        }
-    }
-    Ok(())
-}
-
 /// Encodes the provided value behind a FIDL envelope.
 #[doc(hidden)] // only exported for macro use
 pub fn encode_in_envelope(
@@ -2994,25 +2913,6 @@ pub fn decode_unknown_envelope(decoder: &mut Decoder<'_>, offset: usize) -> Resu
         }
     }
     Ok(())
-}
-
-/// Returns the unknown bytes and handles directly from an envelope's out of line data.
-#[doc(hidden)] // only exported for macro use
-#[inline]
-pub fn decode_unknown_data_contents(
-    decoder: &mut Decoder<'_>,
-    offset: usize,
-    num_bytes: u32,
-    num_handles: u32,
-) -> Result<UnknownData> {
-    let bytes = decoder.buffer()[offset..offset + (num_bytes as usize)].to_vec();
-    let mut handles = Vec::with_capacity(num_handles as usize);
-    decoder.set_next_handle_subtype(ObjectType::NONE);
-    decoder.set_next_handle_rights(Rights::SAME_RIGHTS);
-    for _ in 0..num_handles {
-        handles.push(decoder.take_next_handle()?);
-    }
-    Ok(UnknownData { bytes, handles })
 }
 
 /// Implements the FIDL `Encodable` and `Decodable` traits for a struct
@@ -3674,10 +3574,7 @@ macro_rules! fidl_union {
                 )?
             },
         )*],
-        // Flexible xunions only: provide the name of the unknown variant using
-        // either `resource_unknown_member` or `value_unknown_member`.
-        $( resource_unknown_member: $resource_unknown_name:ident, )?
-        $( value_unknown_member: $value_unknown_name:ident, )?
+        $( unknown_member: $unknown_name:ident, )?
     ) => {
         impl $name {
             #[inline]
@@ -3688,11 +3585,7 @@ macro_rules! fidl_union {
                     )*
                     $(
                         #[allow(deprecated)]
-                        $name::$value_unknown_name { ordinal, .. } => ordinal,
-                    )?
-                    $(
-                        #[allow(deprecated)]
-                        $name::$resource_unknown_name { ordinal, .. } => ordinal,
+                        $name::$unknown_name { ordinal } => ordinal,
                     )?
                 }
             }
@@ -3732,21 +3625,7 @@ macro_rules! fidl_union {
                     )*
                     $(
                         #[allow(deprecated)]
-                        $name::$resource_unknown_name { ordinal: _, data } => {
-                            // Throw the raw data from the unrecognized variant
-                            // back onto the wire. This will allow correct proxies even in
-                            // the event that they don't yet recognize this union variant.
-                            $crate::encoding::encode_unknown_data(data, encoder, offset + 8, recursion_depth)
-                        },
-                    )?
-                    $(
-                        #[allow(deprecated)]
-                        $name::$value_unknown_name { ordinal: _, bytes } => {
-                            // Throw the raw data from the unrecognized variant
-                            // back onto the wire. This will allow correct proxies even in
-                            // the event that they don't yet recognize this union variant.
-                            $crate::encoding::encode_unknown_bytes(&bytes, encoder, offset + 8, recursion_depth)
-                        },
+                        $name::$unknown_name { .. } => Err($crate::Error::UnknownUnionTag),
                     )?
                 }
             }
@@ -3761,14 +3640,7 @@ macro_rules! fidl_union {
                 )*
                 $(
                     #[allow(deprecated)]
-                    $name::$resource_unknown_name {
-                        ordinal: 0,
-                        data: $crate::encoding::UnknownData { bytes: vec![], handles: vec![] }
-                    }
-                )?
-                $(
-                    #[allow(deprecated)]
-                    $name::$value_unknown_name { ordinal: 0, bytes: vec![] }
+                    $name::$unknown_name { ordinal: 0 }
                 )?
             }
 
@@ -3790,29 +3662,11 @@ macro_rules! fidl_union {
                     $(
                         #[allow(deprecated)]
                         _ => {
-                            stringify!($resource_unknown_name); // placeholder use for expansion
-                            // Flexible xunion: unknown payloads are considered
-                            // a wholly-inline string of bytes.
+                            stringify!($unknown_name); // placeholder use for expansion
                             num_bytes as usize
                         }
                     )?
-                    $(
-                        #[allow(deprecated)]
-                        _ => {
-                            // Disallow unknown handles in non-resource types.
-                            if (num_handles > 0) {
-                                for _ in 0..num_handles {
-                                    decoder.drop_next_handle()?;
-                                }
-                                return Err($crate::Error::CannotStoreUnknownHandles);
-                            }
-                            stringify!($value_unknown_name); // placeholder use for expansion
-                            // Flexible xunion: unknown payloads are considered
-                            // a wholly-inline string of bytes.
-                            num_bytes as usize
-                        }
-                    )?
-                    // Strict xunion: reject unknown ordinals.
+                    // Strict union: reject unknown ordinals.
                     #[allow(unreachable_patterns)]
                     _ => {
                         for _ in 0..num_handles {
@@ -3850,16 +3704,11 @@ macro_rules! fidl_union {
                         $(
                             #[allow(deprecated)]
                             ordinal => {
-                                let data = $crate::encoding::decode_unknown_data_contents(decoder, offset, num_bytes, num_handles)?;
-                                *self = $name::$resource_unknown_name { ordinal, data };
-                            }
-                        )?
-                        $(
-                            #[allow(deprecated)]
-                            ordinal => {
-                                let bytes = decoder.buffer()[offset.. offset+(num_bytes as usize)].to_vec();
-                                *self = $name::$value_unknown_name { ordinal, bytes };
-                            }
+                                for _ in 0..num_handles {
+                                    decoder.drop_next_handle()?;
+                                }
+                                *self = $name::$unknown_name { ordinal }
+                            },
                         )?
                         // This should be unreachable, since we already
                         // checked for unknown ordinals above and returned
@@ -3897,15 +3746,6 @@ macro_rules! fidl_union {
             }
         }
     }
-}
-
-/// Container for the raw bytes and handles of an unknown envelope payload.
-#[derive(Debug, Default, Eq, PartialEq)]
-pub struct UnknownData {
-    /// Unknown bytes.
-    pub bytes: Vec<u8>,
-    /// Unknown handles.
-    pub handles: Vec<Handle>,
 }
 
 /// Header for transactional FIDL messages
@@ -5334,49 +5174,6 @@ mod test {
         align_v2: 8,
     }
 
-    // This is a resource union, as a resource member is added in
-    // TestSampleXUnionExpanded
-    #[derive(Debug, PartialEq)]
-    pub enum TestSampleXUnion {
-        U(u32),
-        St(String),
-        __Unknown { ordinal: u64, data: UnknownData },
-    }
-    fidl_union! {
-        name: TestSampleXUnion,
-        members: [
-            U {
-                ty: u32,
-                ordinal: 0x29df47a5,
-            },
-            St {
-                ty: String,
-                ordinal: 0x6f317664,
-            },
-        ],
-        resource_unknown_member: __Unknown,
-    }
-
-    #[derive(Debug, PartialEq)]
-    pub enum TestSampleXUnionExpanded {
-        SomethinElse(Handle),
-        __Unknown { ordinal: u64, data: UnknownData },
-    }
-    fidl_union! {
-        name: TestSampleXUnionExpanded,
-        members: [
-            SomethinElse {
-                ty: Handle,
-                ordinal: 55,
-                handle_metadata: {
-                    handle_subtype: ObjectType::NONE,
-                    handle_rights: Rights::SAME_RIGHTS,
-                },
-            },
-        ],
-        resource_unknown_member: __Unknown,
-    }
-
     #[test]
     fn encode_decode_transaction_msg() {
         for ctx in CONTEXTS {
@@ -5668,53 +5465,6 @@ mod zx_test {
             let mut out = TestSampleTable::new_empty();
             let res = Decoder::decode_with_context(ctx, bytes, handle_buf, &mut out);
             assert_matches!(res, Err(Error::OutOfRange));
-        }
-    }
-
-    #[test]
-    fn flexible_xunion_unknown_variant_transparent_passthrough() {
-        for ctx in CONTEXTS {
-            let handle = Handle::from(zx::Port::create().expect("Port creation failed"));
-            let raw_handle = handle.raw_handle();
-
-            let mut input = TestSampleXUnionExpanded::SomethinElse(handle);
-            // encode expanded and decode as xunion w/ missing variant
-            let buf = &mut Vec::new();
-            let handle_buf = &mut Vec::new();
-            Encoder::encode_with_context(ctx, buf, handle_buf, &mut input)
-                .expect("Encoding TestSampleXUnionExpanded failed");
-
-            let mut intermediate_missing_variant = TestSampleXUnion::new_empty();
-            Decoder::decode_with_context(
-                ctx,
-                buf,
-                &mut to_handle_info(handle_buf),
-                &mut intermediate_missing_variant,
-            )
-            .expect("Decoding TestSampleXUnion failed");
-
-            // Ensure we've recorded the unknown variant. This can't use
-            // assert_matches because it doesn't work with #[allow(deprecated)],
-            // which we need to reference __Unknown.
-            #[allow(deprecated)]
-            if !matches!(intermediate_missing_variant, TestSampleXUnion::__Unknown { .. }) {
-                panic!("unexpected variant")
-            }
-
-            let buf = &mut Vec::new();
-            let handle_buf = &mut Vec::new();
-            Encoder::encode_with_context(ctx, buf, handle_buf, &mut intermediate_missing_variant)
-                .expect("encoding unknown variant failed");
-
-            let mut out = TestSampleXUnionExpanded::new_empty();
-            Decoder::decode_with_context(ctx, buf, &mut to_handle_info(handle_buf), &mut out)
-                .expect("Decoding final output failed");
-
-            if let TestSampleXUnionExpanded::SomethinElse(handle_out) = out {
-                assert_eq!(raw_handle, handle_out.raw_handle());
-            } else {
-                panic!("wrong final variant")
-            }
         }
     }
 

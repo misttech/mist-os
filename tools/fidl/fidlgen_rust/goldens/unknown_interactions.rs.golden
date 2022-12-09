@@ -703,9 +703,9 @@ pub enum UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse` member.
@@ -718,16 +718,16 @@ macro_rules! UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponseUnkno
 
 impl UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -757,7 +757,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -765,9 +765,9 @@ pub enum UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse` member.
@@ -780,16 +780,16 @@ macro_rules! UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponseUn
 
 impl UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -822,7 +822,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -830,9 +830,9 @@ pub enum UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::unknown()` to construct and `UnknownInteractionsAjarProtocolFlexibleEventUnionRequestUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsAjarProtocolFlexibleEventUnionRequest` member.
@@ -845,16 +845,16 @@ macro_rules! UnknownInteractionsAjarProtocolFlexibleEventUnionRequestUnknown {
 
 impl UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -881,7 +881,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -889,9 +889,9 @@ pub enum UnknownInteractionsAjarProtocolStrictEventUnionRequest {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolStrictEventUnionRequest::unknown()` to construct and `UnknownInteractionsAjarProtocolStrictEventUnionRequestUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsAjarProtocolStrictEventUnionRequest` member.
@@ -904,16 +904,16 @@ macro_rules! UnknownInteractionsAjarProtocolStrictEventUnionRequestUnknown {
 
 impl UnknownInteractionsAjarProtocolStrictEventUnionRequest {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -940,7 +940,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -948,9 +948,9 @@ pub enum UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsAjarProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse` member.
@@ -963,16 +963,16 @@ macro_rules! UnknownInteractionsAjarProtocolStrictTwoWayUnionResponseUnknown {
 
 impl UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -999,7 +999,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1007,9 +1007,9 @@ pub enum UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse` member.
@@ -1022,16 +1022,16 @@ macro_rules! UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponseUnknown
 
 impl UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1058,7 +1058,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1066,9 +1066,9 @@ pub enum UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsAjarProtocolStrictEventUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsAjarProtocolStrictEventUnionErrResponse` member.
@@ -1081,16 +1081,16 @@ macro_rules! UnknownInteractionsAjarProtocolStrictEventUnionErrResponseUnknown {
 
 impl UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1117,7 +1117,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1125,9 +1125,9 @@ pub enum UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse` member.
@@ -1140,16 +1140,16 @@ macro_rules! UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponseUnknown 
 
 impl UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1176,7 +1176,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1184,9 +1184,9 @@ pub enum UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse` member.
@@ -1199,16 +1199,16 @@ macro_rules! UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponseUnk
 
 impl UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1238,7 +1238,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1246,9 +1246,9 @@ pub enum UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse` member.
@@ -1261,16 +1261,16 @@ macro_rules! UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse
 
 impl UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1303,7 +1303,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1311,9 +1311,9 @@ pub enum UnknownInteractionsClosedProtocolStrictEventUnionRequest {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsClosedProtocolStrictEventUnionRequest::unknown()` to construct and `UnknownInteractionsClosedProtocolStrictEventUnionRequestUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsClosedProtocolStrictEventUnionRequest` member.
@@ -1326,16 +1326,16 @@ macro_rules! UnknownInteractionsClosedProtocolStrictEventUnionRequestUnknown {
 
 impl UnknownInteractionsClosedProtocolStrictEventUnionRequest {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1362,7 +1362,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1370,9 +1370,9 @@ pub enum UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsClosedProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse` member.
@@ -1385,16 +1385,16 @@ macro_rules! UnknownInteractionsClosedProtocolStrictTwoWayUnionResponseUnknown {
 
 impl UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1421,7 +1421,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1429,9 +1429,9 @@ pub enum UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsClosedProtocolStrictEventUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsClosedProtocolStrictEventUnionErrResponse` member.
@@ -1444,16 +1444,16 @@ macro_rules! UnknownInteractionsClosedProtocolStrictEventUnionErrResponseUnknown
 
 impl UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1480,7 +1480,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1488,9 +1488,9 @@ pub enum UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse` member.
@@ -1503,16 +1503,16 @@ macro_rules! UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponseUnknow
 
 impl UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1539,7 +1539,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1547,9 +1547,9 @@ pub enum UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsDriverProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse` member.
@@ -1562,16 +1562,16 @@ macro_rules! UnknownInteractionsDriverProtocolStrictTwoWayUnionResponseUnknown {
 
 impl UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1598,7 +1598,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1606,9 +1606,9 @@ pub enum UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse` member.
@@ -1621,16 +1621,16 @@ macro_rules! UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponseUnkn
 
 impl UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1660,7 +1660,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1668,9 +1668,9 @@ pub enum UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse` member.
@@ -1683,16 +1683,16 @@ macro_rules! UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponseUnknown
 
 impl UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1719,7 +1719,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1727,9 +1727,9 @@ pub enum UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse` member.
@@ -1742,16 +1742,16 @@ macro_rules! UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponseUnknow
 
 impl UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1778,7 +1778,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1786,9 +1786,9 @@ pub enum UnknownInteractionsProtocolFlexibleEventUnionRequest {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolFlexibleEventUnionRequest::unknown()` to construct and `UnknownInteractionsProtocolFlexibleEventUnionRequestUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsProtocolFlexibleEventUnionRequest` member.
@@ -1801,16 +1801,16 @@ macro_rules! UnknownInteractionsProtocolFlexibleEventUnionRequestUnknown {
 
 impl UnknownInteractionsProtocolFlexibleEventUnionRequest {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1837,7 +1837,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1845,9 +1845,9 @@ pub enum UnknownInteractionsProtocolStrictEventUnionRequest {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolStrictEventUnionRequest::unknown()` to construct and `UnknownInteractionsProtocolStrictEventUnionRequestUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsProtocolStrictEventUnionRequest` member.
@@ -1860,16 +1860,16 @@ macro_rules! UnknownInteractionsProtocolStrictEventUnionRequestUnknown {
 
 impl UnknownInteractionsProtocolStrictEventUnionRequest {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1896,7 +1896,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1904,9 +1904,9 @@ pub enum UnknownInteractionsProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsProtocolStrictTwoWayUnionResponse` member.
@@ -1919,16 +1919,16 @@ macro_rules! UnknownInteractionsProtocolStrictTwoWayUnionResponseUnknown {
 
 impl UnknownInteractionsProtocolStrictTwoWayUnionResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1955,7 +1955,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1963,9 +1963,9 @@ pub enum UnknownInteractionsProtocolFlexibleEventUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolFlexibleEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsProtocolFlexibleEventUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsProtocolFlexibleEventUnionErrResponse` member.
@@ -1978,16 +1978,16 @@ macro_rules! UnknownInteractionsProtocolFlexibleEventUnionErrResponseUnknown {
 
 impl UnknownInteractionsProtocolFlexibleEventUnionErrResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -2014,7 +2014,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -2022,9 +2022,9 @@ pub enum UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse` member.
@@ -2037,16 +2037,16 @@ macro_rules! UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponseUnknown {
 
 impl UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -2073,7 +2073,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -2081,9 +2081,9 @@ pub enum UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsProtocolFlexibleTwoWayUnionResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsProtocolFlexibleTwoWayUnionResponse` member.
@@ -2096,16 +2096,16 @@ macro_rules! UnknownInteractionsProtocolFlexibleTwoWayUnionResponseUnknown {
 
 impl UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -2132,7 +2132,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -2140,9 +2140,9 @@ pub enum UnknownInteractionsProtocolStrictEventUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolStrictEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsProtocolStrictEventUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsProtocolStrictEventUnionErrResponse` member.
@@ -2155,16 +2155,16 @@ macro_rules! UnknownInteractionsProtocolStrictEventUnionErrResponseUnknown {
 
 impl UnknownInteractionsProtocolStrictEventUnionErrResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -2191,7 +2191,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -2199,9 +2199,9 @@ pub enum UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnknownInteractionsProtocolStrictTwoWayUnionErrResponse` member.
@@ -2214,16 +2214,16 @@ macro_rules! UnknownInteractionsProtocolStrictTwoWayUnionErrResponseUnknown {
 
 impl UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -2250,7 +2250,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]

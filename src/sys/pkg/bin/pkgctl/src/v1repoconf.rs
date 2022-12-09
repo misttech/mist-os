@@ -90,7 +90,8 @@ impl From<KeyConfig> for fidl::RepositoryKeyConfig {
     fn from(key: KeyConfig) -> Self {
         match key.r#type.as_str() {
             "ed25519" => fidl::RepositoryKeyConfig::Ed25519Key(key.value),
-            _ => fidl::RepositoryKeyConfig::unknown(0, Default::default()),
+            // TODO(fxbug.dev/116856): Don't use unknown_variant_for_testing() outside tests.
+            _ => fidl::RepositoryKeyConfig::unknown_variant_for_testing(),
         }
     }
 }

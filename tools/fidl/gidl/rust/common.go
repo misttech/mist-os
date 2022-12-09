@@ -58,16 +58,6 @@ func buildHandleValues(handles []gidlir.Handle) string {
 	return builder.String()
 }
 
-func buildUnknownData(data gidlir.UnknownData, isResource bool) string {
-	if !isResource {
-		return fmt.Sprintf("vec!%s", gidllibrust.BuildBytes(data.Bytes))
-	}
-	return fmt.Sprintf(
-		"UnknownData { bytes: vec!%s, handles: %s }",
-		gidllibrust.BuildBytes(data.Bytes),
-		buildHandleValues(data.Handles))
-}
-
 func visit(value gidlir.Value, decl gidlmixer.Declaration) string {
 	switch value := value.(type) {
 	case bool:
@@ -256,12 +246,31 @@ func onUnion(value gidlir.Record, decl *gidlmixer.UnionDecl) string {
 	var valueStr string
 	if field.Key.IsUnknown() {
 		unknownData := field.Value.(gidlir.UnknownData)
-		valueStr = fmt.Sprintf(
-			"%s::unknown(%d, %s)",
-			declName(decl),
-			field.Key.UnknownOrdinal,
-			buildUnknownData(unknownData, decl.IsResourceType()),
-		)
+		if unknownData.HasData() {
+			panic(fmt.Sprintf("union %s: unknown ordinal %d: Rust cannot construct union with unknown bytes/handles",
+				decl.Name(), field.Key.UnknownOrdinal))
+		}
+		if field.Key.UnknownOrdinal == 0 {
+			valueStr = fmt.Sprintf("%s::unknown_variant_for_testing()", declName(decl))
+		} else {
+			// TODO(fxbug.dev/116276): This is a temporary workaround until
+			// we implement the GIDL decode() function.
+			var ordinalBytes strings.Builder
+			for i := 0; i < 64; i += 8 {
+				fmt.Fprintf(&ordinalBytes, "%d, ", (field.Key.UnknownOrdinal>>i)&0xff)
+			}
+			return fmt.Sprintf(`
+				(|| {
+					let mut value = %s::new_empty();
+					let bytes = &[
+						%s// ordinal
+						0, 0, 0, 0, 0, 0, 1, 0, // inlined envelope
+					];
+					Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut [], &mut value).unwrap();
+					value
+				})()
+			`, declName(decl), ordinalBytes.String())
+		}
 	} else {
 		fieldName := fidlgen.ToUpperCamelCase(field.Key.Name)
 		fieldValueStr := visit(field.Value, decl.Field(field.Key.Name))

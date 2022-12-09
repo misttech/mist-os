@@ -253,7 +253,7 @@ mod serde_tests {
 
     #[test]
     fn test_rejects_unknown_fidl_variant() {
-        let as_fidl = fidl::Rule::unknown(0, Default::default());
+        let as_fidl = fidl::Rule::unknown_variant_for_testing();
         assert_eq!(Rule::try_from(as_fidl), Err(RuleDecodeError::UnknownVariant));
     }
 

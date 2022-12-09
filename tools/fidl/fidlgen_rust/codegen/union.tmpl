@@ -19,13 +19,9 @@ pub enum {{ .Name }} {
     {{- if .IsFlexible }}
     #[deprecated = "Use `{{ .Name }}::unknown()` to construct and `{{ .Name }}Unknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        {{- if .IsResourceType }}
-        data: fidl::UnknownData,
-        {{- else }}
-        bytes: Vec<u8>,
-        {{- end }}
     },
     {{- end }}
 }
@@ -39,7 +35,7 @@ macro_rules! {{ .Name }}Unknown {
 {{- end }}
 
 impl {{ .Name }} {
-{{- if and .IsStrict .IsValueType }}
+{{- if .IsStrict }}
     #[deprecated = "Strict unions should not use `validate`"]
     #[inline]
     pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
@@ -53,62 +49,18 @@ impl {{ .Name }} {
     }
 {{- end }}
 
-{{- if and .IsStrict .IsResourceType }}
-    #[deprecated = "Strict unions should not use `validate`"]
+{{- if .IsFlexible }}
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, fidl::UnknownData)> {
-        Ok(self)
-    }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
-{{- end }}
-
-{{- if and .IsFlexible .IsValueType }}
-    #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
-            {{- if .Members }}
-            _ => Ok(self)
-            {{- end }}
-        }
-    }
-
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
-            {{- if .Members }}
-            _ => false,
-            {{- end }}
-        }
-    }
-{{- end }}
-
-{{- if and .IsFlexible .IsResourceType }}
-    #[inline]
-    pub fn unknown(ordinal: u64, data: fidl::UnknownData) -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal, data }
-    }
-
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, fidl::UnknownData)> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal, data } => Err((ordinal, data)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             {{- if .Members }}
             _ => Ok(self)
             {{- end }}
@@ -150,7 +102,7 @@ fidl_union! {
     {{- end }}
     ],
     {{- if .IsFlexible }}
-    {{ if .IsResourceType }}resource{{ else }}value{{ end }}_unknown_member: __Unknown,
+    unknown_member: __Unknown,
     {{- end }}
 }
 {{ end }}

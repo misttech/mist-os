@@ -20,7 +20,6 @@ pub mod server;
 mod error;
 pub use self::error::{Error, Result};
 
-pub use encoding::UnknownData;
 pub use handle::*;
 pub use server::ServeInner;
 

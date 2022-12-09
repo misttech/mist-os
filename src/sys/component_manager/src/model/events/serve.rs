@@ -396,7 +396,8 @@ fn maybe_create_empty_payload(event_type: EventType) -> Option<fsys::EventResult
         EventType::Started => {
             fsys::EventResult::Payload(fsys::EventPayload::Started(fsys::StartedPayload::EMPTY))
         }
-        _ => fsys::EventResult::unknown(999, Default::default()),
+        // TODO(fxbug.dev/116856): Don't use unknown_variant_for_testing() outside tests.
+        _ => fsys::EventResult::unknown_variant_for_testing(),
     };
     Some(result)
 }

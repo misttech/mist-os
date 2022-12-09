@@ -4214,13 +4214,6 @@ mod tests {
         }),
         vec![fcdecl::Ref::Parent(fcdecl::ParentRef {})],
         ftest::RealmBuilderError::CapabilitiesEmpty ; "capabilities_empty")]
-    #[test_case(vec![ftest::Capability::unknown(100, vec![])],
-        fcdecl::Ref::Child(fcdecl::ChildRef {
-            name: "a".to_owned(),
-            collection: None
-        }),
-        vec![fcdecl::Ref::Parent(fcdecl::ParentRef {})],
-        ftest::RealmBuilderError::CapabilityInvalid ; "invalid_capability")]
     #[fuchsia::test]
     async fn add_route_error(
         mut capabilities: Vec<ftest::Capability>,

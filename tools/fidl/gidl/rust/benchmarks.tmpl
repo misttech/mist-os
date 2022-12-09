@@ -9,7 +9,7 @@ use {
     fidl::{
         encoding::{Context, Decodable, Decoder, Encoder, with_tls_encode_buf, WireFormatVersion},
         handle::Handle, handle::HandleDisposition, handle::HandleInfo, handle::HandleOp,
-        ObjectType, Rights, UnknownData,
+        ObjectType, Rights,
     },
     fidl_test_benchmarkfidl{{ .CrateSuffix }} as test_benchmarkfidl{{ .CrateSuffix }},
     fuchsia_async as fasync,

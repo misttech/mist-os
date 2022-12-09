@@ -36,7 +36,8 @@ const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
 pub enum EmptyFlexibleUnion {
     #[deprecated = "Use `EmptyFlexibleUnion::unknown()` to construct and `EmptyFlexibleUnionUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __Unknown { ordinal: u64, bytes: Vec<u8> },
+    #[non_exhaustive]
+    __Unknown { ordinal: u64 },
 }
 /// Pattern that matches an unknown `EmptyFlexibleUnion` member.
 #[macro_export]
@@ -48,16 +49,16 @@ macro_rules! EmptyFlexibleUnionUnknown {
 
 impl EmptyFlexibleUnion {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
         }
     }
 
@@ -78,7 +79,7 @@ fidl_union! {
     name: EmptyFlexibleUnion,
     members: [
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -87,9 +88,9 @@ pub enum ExplicitFoo {
     S(String),
     #[deprecated = "Use `ExplicitFoo::unknown()` to construct and `ExplicitFooUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `ExplicitFoo` member.
@@ -102,16 +103,16 @@ macro_rules! ExplicitFooUnknown {
 
 impl ExplicitFoo {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -142,7 +143,7 @@ fidl_union! {
             ordinal: 2,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -265,9 +266,9 @@ pub enum ExplicitXUnion {
     F(f32),
     #[deprecated = "Use `ExplicitXUnion::unknown()` to construct and `ExplicitXUnionUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `ExplicitXUnion` member.
@@ -280,16 +281,16 @@ macro_rules! ExplicitXUnionUnknown {
 
 impl ExplicitXUnion {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -320,7 +321,7 @@ fidl_union! {
             ordinal: 4,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -362,9 +363,9 @@ pub enum FlexibleFoo {
     I(i32),
     #[deprecated = "Use `FlexibleFoo::unknown()` to construct and `FlexibleFooUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `FlexibleFoo` member.
@@ -377,16 +378,16 @@ macro_rules! FlexibleFooUnknown {
 
 impl FlexibleFoo {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -417,7 +418,7 @@ fidl_union! {
             ordinal: 2,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -426,9 +427,9 @@ pub enum FlexiblePizzaOrPasta {
     Pasta(Pasta),
     #[deprecated = "Use `FlexiblePizzaOrPasta::unknown()` to construct and `FlexiblePizzaOrPastaUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `FlexiblePizzaOrPasta` member.
@@ -441,16 +442,16 @@ macro_rules! FlexiblePizzaOrPastaUnknown {
 
 impl FlexiblePizzaOrPasta {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -481,7 +482,7 @@ fidl_union! {
             ordinal: 2,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -491,9 +492,9 @@ pub enum FlexibleUnion {
     VectorStringAlsoNeedsConstructor(Vec<String>),
     #[deprecated = "Use `FlexibleUnion::unknown()` to construct and `FlexibleUnionUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `FlexibleUnion` member.
@@ -506,16 +507,16 @@ macro_rules! FlexibleUnionUnknown {
 
 impl FlexibleUnion {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -550,7 +551,7 @@ fidl_union! {
             ordinal: 3,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -560,9 +561,9 @@ pub enum NewerSimpleUnion {
     V(Vec<String>),
     #[deprecated = "Use `NewerSimpleUnion::unknown()` to construct and `NewerSimpleUnionUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `NewerSimpleUnion` member.
@@ -575,16 +576,16 @@ macro_rules! NewerSimpleUnionUnknown {
 
 impl NewerSimpleUnion {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -619,7 +620,7 @@ fidl_union! {
             ordinal: 3,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -628,9 +629,9 @@ pub enum OlderSimpleUnion {
     F(f32),
     #[deprecated = "Use `OlderSimpleUnion::unknown()` to construct and `OlderSimpleUnionUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `OlderSimpleUnion` member.
@@ -643,16 +644,16 @@ macro_rules! OlderSimpleUnionUnknown {
 
 impl OlderSimpleUnion {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -683,14 +684,15 @@ fidl_union! {
             ordinal: 2,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum OnlyReservedFlexibleUnion {
     #[deprecated = "Use `OnlyReservedFlexibleUnion::unknown()` to construct and `OnlyReservedFlexibleUnionUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __Unknown { ordinal: u64, bytes: Vec<u8> },
+    #[non_exhaustive]
+    __Unknown { ordinal: u64 },
 }
 /// Pattern that matches an unknown `OnlyReservedFlexibleUnion` member.
 #[macro_export]
@@ -702,16 +704,16 @@ macro_rules! OnlyReservedFlexibleUnionUnknown {
 
 impl OnlyReservedFlexibleUnion {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
         }
     }
 
@@ -732,7 +734,7 @@ fidl_union! {
     name: OnlyReservedFlexibleUnion,
     members: [
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -1054,9 +1056,9 @@ pub enum UnionWithAttributes {
     X(i64),
     #[deprecated = "Use `UnionWithAttributes::unknown()` to construct and `UnionWithAttributesUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `UnionWithAttributes` member.
@@ -1069,16 +1071,16 @@ macro_rules! UnionWithAttributesUnknown {
 
 impl UnionWithAttributes {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1105,7 +1107,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1113,9 +1115,9 @@ pub enum XUnionContainingEmptyStruct {
     Empty(Empty),
     #[deprecated = "Use `XUnionContainingEmptyStruct::unknown()` to construct and `XUnionContainingEmptyStructUnknown!()` to exhaustively match."]
     #[doc(hidden)]
+    #[non_exhaustive]
     __Unknown {
         ordinal: u64,
-        bytes: Vec<u8>,
     },
 }
 /// Pattern that matches an unknown `XUnionContainingEmptyStruct` member.
@@ -1128,16 +1130,16 @@ macro_rules! XUnionContainingEmptyStructUnknown {
 
 impl XUnionContainingEmptyStruct {
     #[inline]
-    pub fn unknown(ordinal: u64, bytes: Vec<u8>) -> Self {
+    pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
-        Self::__Unknown { ordinal, bytes }
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
+    pub fn validate(self) -> std::result::Result<Self, u64> {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown { ordinal, bytes } => Err((ordinal, bytes)),
+            Self::__Unknown { ordinal } => Err(ordinal),
             _ => Ok(self),
         }
     }
@@ -1164,7 +1166,7 @@ fidl_union! {
             ordinal: 1,
         },
     ],
-    value_unknown_member: __Unknown,
+    unknown_member: __Unknown,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]

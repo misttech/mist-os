@@ -2838,7 +2838,7 @@ mod tests {
         test_values_data_unknown_checksum => {
             input = fconfig::ValuesData {
                 values: Some(vec![]),
-                checksum: Some(fdecl::ConfigChecksum::unknown(0, vec![])),
+                checksum: Some(fdecl::ConfigChecksum::unknown_variant_for_testing()),
                 ..fconfig::ValuesData::EMPTY
             },
             result = Err(ErrorList::new(vec![
@@ -2871,7 +2871,7 @@ mod tests {
             input = fconfig::ValuesData {
                 values: Some(vec![
                     fconfig::ValueSpec {
-                        value: Some(fconfig::Value::unknown(0, vec![])),
+                        value: Some(fconfig::Value::unknown_variant_for_testing()),
                         ..fconfig::ValueSpec::EMPTY
                     }
                 ]),
@@ -2886,7 +2886,7 @@ mod tests {
             input = fconfig::ValuesData {
                 values: Some(vec![
                     fconfig::ValueSpec {
-                        value: Some(fconfig::Value::Single(fconfig::SingleValue::unknown(0, vec![]))),
+                        value: Some(fconfig::Value::Single(fconfig::SingleValue::unknown_variant_for_testing())),
                         ..fconfig::ValueSpec::EMPTY
                     }
                 ]),
@@ -2901,7 +2901,7 @@ mod tests {
             input = fconfig::ValuesData {
                 values: Some(vec![
                     fconfig::ValueSpec {
-                        value: Some(fconfig::Value::Vector(fconfig::VectorValue::unknown(0, vec![]))),
+                        value: Some(fconfig::Value::Vector(fconfig::VectorValue::unknown_variant_for_testing())),
                         ..fconfig::ValueSpec::EMPTY
                     }
                 ]),
