@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/cpp/sdk_static_library.gni")
+
 config("config") {
   defines = [ "NO_LIBDEXFILE_SUPPORT" ]
 
@@ -14,24 +16,36 @@ config("config_private") {
   defines = [ "FUCHSIA" ]
 }
 
-static_library("libunwindstack") {
+sdk_static_library("libunwindstack") {
+  category = "internal"
+
   public_configs = [ ":config" ]
   configs += [ ":config_private" ]
 
   sources = [
     "ArmExidx.cpp",
+    "ArmExidx.h",
+    "Check.h",
     "DwarfCfa.cpp",
+    "DwarfCfa.h",
+    "DwarfDebugFrame.h",
+    "DwarfEhFrame.h",
     "DwarfEhFrameWithHdr.cpp",
+    "DwarfEhFrameWithHdr.h",
+    "DwarfEncoding.h",
     "DwarfMemory.cpp",
     "DwarfOp.cpp",
+    "DwarfOp.h",
     "DwarfSection.cpp",
     "Elf.cpp",
     "ElfInterface.cpp",
     "ElfInterfaceArm.cpp",
+    "ElfInterfaceArm.h",
     "Global.cpp",
     "JitDebug.cpp",
     "MapInfo.cpp",
     "Symbols.cpp",
+    "Symbols.h",
     "Unwinder.cpp",
     "fuchsia/LogFuchsia.cpp",
     "fuchsia/MapsFuchsia.cpp",
@@ -39,6 +53,7 @@ static_library("libunwindstack") {
     # These files are Android-specific and aren't compiled for Fuchsia.
     #"DexFile.cpp",
     #"DexFiles.cpp",
+    #"DexFile.h",
     #"LocalUnwinder.cpp",
     #"Log.cpp",
     #"Maps.cpp",
@@ -48,7 +63,12 @@ static_library("libunwindstack") {
     # This project does some locking but doesn't annotate usage.
     configs -= [ "//build/config:thread_safety_annotations" ]
 
-    sources += [ "fuchsia/MemoryFuchsia.cpp" ]
+    sources += [
+      "fuchsia/MemoryFuchsia.cpp",
+      "fuchsia/MemoryFuchsia.h",
+      "fuchsia/RegsFuchsia.h",
+      "fuchsia/fuchsia_basename.h",
+    ]
 
     if (target_cpu == "x64") {
       sources += [ "fuchsia/RegsFuchsiaX86_64.cpp" ]
@@ -61,6 +81,7 @@ static_library("libunwindstack") {
       "Regs.cpp",
       "RegsArm.cpp",
       "RegsArm64.cpp",
+      "RegsInfo.h",
       "RegsMips.cpp",
       "RegsMips64.cpp",
       "RegsX86.cpp",

@@ -278,6 +278,19 @@ template("sdk_static_library") {
 
   # Add binaries.
   lib_name = "lib${output_name}.a"
+
+  # If output_name already starts with `lib`, GN won't prepend lib to it.
+  #
+  # E.g. the following target/ouput name yileds the corresponding lib file:
+  #  ngunwind -> libngunwind.a
+  #  libngunwind -> libngunwind.a
+  #
+  # Prepend ### and use string_replace to mimic behavior of has_prefix, for lack
+  # of such a function in GN.
+  if (string_replace("###${output_name}", "###lib", "") !=
+      "###${output_name}") {
+    lib_name = "${output_name}.a"
+  }
   link_lib = "${prebuilt_base}/lib/${lib_name}"
   sdk_files = sdk_header_files + [
                 {

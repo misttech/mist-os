@@ -10,6 +10,7 @@ zx_library("ngunwind") {
   # statically links it into its shared library.
   visibility = [
     ":*",
+    "//sdk:platform_libs",
     "//src/developer/debug/debug_agent:lib",
     "//zircon/system/ulib/inspector/*",
   ]
@@ -19,6 +20,7 @@ zx_library("ngunwind") {
   # TODO(mcgrathr): Give inspector an API debug_agent can use instead.
   visibility += [ "//zircon/third_party/ulib" ]
   sdk = "static"
+  sdk_publishable = "internal"
   sdk_headers = [
     "ngunwind/private/compiler.h",
     "ngunwind/private/config.h",
