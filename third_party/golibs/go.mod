@@ -25,11 +25,11 @@ require (
 	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90
 	golang.org/x/exp v0.0.0-20221023144134-a1e5550cf13e
 	golang.org/x/net v0.0.0-20220907135653-1e95f45603a7
-	golang.org/x/sync v0.0.0-20220907140024-f12130a52804
-	golang.org/x/sys v0.0.0-20220908164124-27713097b956
+	golang.org/x/sync v0.1.0
+	golang.org/x/sys v0.2.0
 	gonum.org/v1/gonum v0.12.0
 	google.golang.org/api v0.95.0
-	google.golang.org/grpc v1.49.0
+	google.golang.org/grpc v1.51.0-dev
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/yaml.v2 v2.4.0
