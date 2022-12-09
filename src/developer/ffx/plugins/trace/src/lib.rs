@@ -3,16 +3,18 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, Result},
+    anyhow::{anyhow, Context, Result},
     errors::ffx_bail,
     ffx_core::ffx_plugin,
-    ffx_trace_args::{TraceCommand, TraceSubCommand, DEFAULT_CATEGORIES},
+    ffx_trace_args::{TraceCommand, TraceSubCommand},
     ffx_writer::Writer,
     fidl_fuchsia_developer_ffx::{self as ffx, RecordingError, TracingProxy},
     fidl_fuchsia_tracing_controller::{ControllerProxy, KnownCategory, ProviderInfo, TraceConfig},
     futures::future::{BoxFuture, FutureExt},
+    lazy_static::lazy_static,
+    regex::Regex,
     serde::{Deserialize, Serialize},
-    std::collections::HashSet,
+    std::collections::{BTreeSet, HashSet},
     std::future::Future,
     std::io::{stdin, Stdin},
     std::path::{Component, PathBuf},
@@ -28,6 +30,37 @@ enum TraceOutput {
     ListCategories(Vec<TraceKnownCategory>),
     ListProviders(Vec<TraceProviderInfo>),
 }
+
+// This list should be kept in sync with DEFAULT_CATEGORIES in
+// //src/testing/sl4f/src/tracing/facade.rs as well the default
+// group in data/config.json
+// TODO(fxbug.dev/115872): Remove this once category discovery is
+// available.
+const DEFAULT_CATEGORIES: &[&'static str] = &[
+    "app",
+    "audio",
+    "benchmark",
+    "blobfs",
+    "gfx",
+    "input",
+    "kernel:meta",
+    "kernel:sched",
+    "ledger",
+    "magma",
+    "minfs",
+    "modular",
+    "view",
+    "flutter",
+    "dart",
+    "dart:compiler",
+    "dart:dart",
+    "dart:debugger",
+    "dart:embedder",
+    "dart:gc",
+    "dart:isolate",
+    "dart:profiler",
+    "dart:vm",
+];
 
 // These fields are arranged this way because deriving Ord uses field declaration order.
 #[derive(Debug, Deserialize, Serialize, PartialOrd, Ord, PartialEq, Eq)]
@@ -115,6 +148,54 @@ impl<'a> LineWaiter<'a> for Stdin {
     }
 }
 
+fn validate_category_name(category_name: &str) -> Result<()> {
+    lazy_static! {
+        static ref VALID_CATEGORY_REGEX: Regex = Regex::new(r#"^[^\*",\s]*\*?$"#).unwrap();
+    }
+    if !VALID_CATEGORY_REGEX.is_match(category_name) {
+        return Err(anyhow!("Error: category \"{}\" is invalid", category_name));
+    }
+    Ok(())
+}
+
+async fn get_category_group(category_group_name: &str) -> Result<Vec<String>> {
+    let category_group = ffx_config::get::<Vec<String>, _>(&format!(
+        "trace.category_groups.{}",
+        category_group_name
+    ))
+    .await
+    .context(format!(
+        "Error: no category group found for {0}, you can add this category locally by calling \
+              `ffx config set trace.category_groups.{0} '[\"list\", \"of\", \"categories\"]'`\
+              or globally by adding it to data/config.json in the ffx trace plugin.",
+        category_group_name
+    ))?;
+    for category in &category_group {
+        validate_category_name(&category).context(format!(
+            "Error: #{} contains an invalid category \"{}\"",
+            category_group_name, category
+        ))?;
+    }
+    Ok(category_group)
+}
+
+async fn expand_categories(categories: Vec<String>) -> Result<Vec<String>> {
+    let mut expanded_categories = BTreeSet::new();
+    for category in categories {
+        match category.strip_prefix('#') {
+            Some(category_group_name) => {
+                let category_group = get_category_group(category_group_name).await?;
+                expanded_categories.extend(category_group);
+            }
+            None => {
+                validate_category_name(&category)?;
+                expanded_categories.insert(category);
+            }
+        }
+    }
+    Ok(expanded_categories.into_iter().collect())
+}
+
 // OPTIMIZATION: Only grab a tracing controller proxy only when necessary.
 #[ffx_plugin(
     TracingProxy = "daemon::protocol",
@@ -191,9 +272,10 @@ pub async fn trace(
                     opts.buffer_size
                 );
             }
+            let expanded_categories = expand_categories(opts.categories).await?;
             let trace_config = TraceConfig {
                 buffer_size_megabytes_hint: Some(opts.buffer_size),
-                categories: Some(opts.categories),
+                categories: Some(expanded_categories.clone()),
                 buffering_mode: Some(opts.buffering_mode),
                 ..TraceConfig::EMPTY
             };
@@ -212,8 +294,9 @@ pub async fn trace(
                 .await?;
             let target = handle_recording_result(res, &output).await?;
             writer.write(format!(
-                "Tracing started successfully on \"{}\".\nWriting to {}",
+                "Tracing started successfully on \"{}\" for categories: [ {} ].\nWriting to {}",
                 target.nodename.or(target.serial_number).as_deref().unwrap_or("<UNKNOWN>"),
+                expanded_categories.join(","),
                 output
             ))?;
             if let Some(duration) = &opts.duration {
@@ -436,6 +519,7 @@ mod tests {
         fidl_fuchsia_tracing_controller::{self as trace, BufferingMode},
         futures::TryStreamExt,
         regex::Regex,
+        serde_json::json,
         std::matches,
     };
 
@@ -736,7 +820,7 @@ mod tests {
             TraceCommand {
                 sub_cmd: TraceSubCommand::Start(Start {
                     buffer_size: 2,
-                    categories: vec![],
+                    categories: vec!["platypus".to_string(), "beaver".to_string()],
                     duration: None,
                     buffering_mode: BufferingMode::Oneshot,
                     output: "foo.txt".to_string(),
@@ -750,7 +834,7 @@ mod tests {
         let output = writer.test_output().unwrap();
         // This doesn't find `/.../foo.txt` for the tracing status, since the faked
         // proxy has no state.
-        let regex_str = "Tracing started successfully on \"foo\".\nWriting to /([^/]+/)+?foo.txt
+        let regex_str = "Tracing started successfully on \"foo\" for categories: \\[ beaver,platypus \\].\nWriting to /([^/]+/)+?foo.txt
 To manually stop the trace, use `ffx trace stop`
 Current tracing status:
 - foo:
@@ -832,7 +916,7 @@ Current tracing status:
         .await;
         let output = writer.test_output().unwrap();
         let regex_str =
-            "Tracing started successfully on \"foo\".\nWriting to /([^/]+/)+?foober.fxt for 5.2 seconds.";
+            "Tracing started successfully on \"foo\" for categories: \\[  \\].\nWriting to /([^/]+/)+?foober.fxt for 5.2 seconds.";
         let want = Regex::new(regex_str).unwrap();
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
     }
@@ -858,7 +942,7 @@ Current tracing status:
         .await;
         let output = writer.test_output().unwrap();
         let regex_str =
-            "Tracing started successfully on \"foo\".\nWriting to /([^/]+/)+?foober.fxt for 0.8 seconds.\n\
+            "Tracing started successfully on \"foo\" for categories: \\[  \\].\nWriting to /([^/]+/)+?foober.fxt for 0.8 seconds.\n\
             Waiting for 0.8 seconds.\n\
             Shutting down recording and writing to file.\n\
             Tracing stopped successfully on \"foo\".\nResults written to /([^/]+/)+?foober.fxt\n\
@@ -888,7 +972,7 @@ Current tracing status:
         .await;
         let output = writer.test_output().unwrap();
         let regex_str =
-            "Tracing started successfully on \"foo\".\nWriting to /([^/]+/)+?foober.fxt\n\
+            "Tracing started successfully on \"foo\" for categories: \\[  \\].\nWriting to /([^/]+/)+?foober.fxt\n\
             Press <enter> to stop trace.\n\
             Shutting down recording and writing to file.\n\
             Tracing stopped successfully on \"foo\".\nResults written to /([^/]+/)+?foober.fxt\n\
@@ -918,5 +1002,101 @@ Current tracing status:
         assert!(res.ffx_error().is_some());
         assert!(res.to_string().contains("Error: Requested buffer size of"));
         assert!(writer.test_output().unwrap().is_empty());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_get_category_group() {
+        let _env = ffx_config::test_init().await.unwrap();
+        let birds = vec!["chickens", "bald_eagle", "blue-jay", "hawk*", "goose:gosling"];
+        ffx_config::query("trace.category_groups.birds")
+            .level(Some(ffx_config::ConfigLevel::User))
+            .set(json!(birds))
+            .await
+            .unwrap();
+        assert_eq!(birds, get_category_group("birds").await.unwrap());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_get_category_group_not_found() {
+        let _env = ffx_config::test_init().await.unwrap();
+        let err = get_category_group("not_found").await.unwrap_err();
+        assert!(
+            err.to_string().contains("Error: no category group found for not_found"),
+            "the actual value was \"{}\"",
+            err.to_string()
+        );
+    }
+
+    const INVALID_CATEGORIES: &[&str] =
+        &["chic*kens", "*turkeys", "golden eagle", "ha,wk*", "goose:gosl\"ing"];
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_get_category_group_invalid_category() {
+        let _env = ffx_config::test_init().await.unwrap();
+        for invalid_category in INVALID_CATEGORIES {
+            ffx_config::query("trace.category_groups.flawed")
+                .level(Some(ffx_config::ConfigLevel::User))
+                .set(json!(vec![invalid_category]))
+                .await
+                .unwrap();
+            let err = get_category_group("flawed").await.unwrap_err();
+            let expected_message = format!("invalid category \"{}\"", invalid_category);
+            assert!(
+                err.to_string().contains(&expected_message),
+                "the actual value was \"{}\"",
+                err.to_string()
+            );
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_expand_categories() {
+        let _env = ffx_config::test_init().await.unwrap();
+        let birds = vec!["chickens", "bald_eagle", "hawk*", "goose:gosling", "blue-jay"];
+        ffx_config::query("trace.category_groups.birds")
+            .level(Some(ffx_config::ConfigLevel::User))
+            .set(json!(birds))
+            .await
+            .unwrap();
+        // The result should have all groups expanded, merge duplicate categories, and sort them.
+        assert_eq!(
+            vec!["*", "bald_eagle", "blue-jay", "chickens", "dove*", "goose:gosling", "hawk*"],
+            expand_categories(vec![
+                "dove*".to_string(),
+                "bald_eagle".to_string(),
+                "#birds".to_string(),
+                "*".to_string()
+            ])
+            .await
+            .unwrap()
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_expand_categories_invalid() {
+        let _env = ffx_config::test_init().await.unwrap();
+        for invalid_category in INVALID_CATEGORIES {
+            let err = expand_categories(vec![invalid_category.to_string()]).await.unwrap_err();
+            let expected_message = format!("category \"{}\" is invalid", invalid_category);
+            assert!(
+                err.to_string().contains(&expected_message),
+                "the actual value was \"{}\"",
+                err.to_string()
+            );
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_curated_category_groups_valid() {
+        let _env = ffx_config::test_init().await.unwrap();
+
+        // Get all of the category groups found in config.json
+        let category_groups_json: serde_json::Value =
+            ffx_config::get("trace.category_groups").await.unwrap();
+
+        for category_group_name in category_groups_json.as_object().unwrap().keys() {
+            let category_group = get_category_group(category_group_name).await.unwrap();
+            assert_ne!(0, category_group.len());
+        }
     }
 }

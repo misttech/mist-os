@@ -44,34 +44,6 @@ pub struct ListProviders {}
 // is much more concise when dealing with a large set of categories.
 pub type TraceCategories = Vec<String>;
 
-// This list should be kept in sync with DEFAULT_CATEGORIES in
-// //src/testing/sl4f/src/tracing/facade.rs as well as the help text below
-pub const DEFAULT_CATEGORIES: &[&'static str] = &[
-    "app",
-    "audio",
-    "benchmark",
-    "blobfs",
-    "gfx",
-    "input",
-    "kernel:meta",
-    "kernel:sched",
-    "ledger",
-    "magma",
-    "minfs",
-    "modular",
-    "view",
-    "flutter",
-    "dart",
-    "dart:compiler",
-    "dart:dart",
-    "dart:debugger",
-    "dart:embedder",
-    "dart:gc",
-    "dart:isolate",
-    "dart:profiler",
-    "dart:vm",
-];
-
 #[derive(FromArgs, PartialEq, Debug)]
 /// Gets status of all running traces.
 #[argh(subcommand, name = "status")]
@@ -102,17 +74,20 @@ pub struct Start {
     pub buffer_size: u32,
 
     /// comma-separated list of categories to enable.  Defaults
-    /// to "app,audio,benchmark,blobfs,gfx,input,kernel:meta,
-    /// kernel:sched,ledger,magma,minfs,modular,view,flutter,
-    /// dart,dart:compiler,dart:dart,dart:debugger,dart:embedder,
-    /// dart:gc,dart:isolate,dart:profiler,dart:vm". A trailing *
-    /// may be used to indicate a prefix match. For example, kernel*
-    /// would match any category that starts with kernel.
-    #[argh(
-        option,
-        default = "DEFAULT_CATEGORIES.into_iter().cloned().map(String::from).collect()",
-        from_str_fn(parse_categories)
-    )]
+    /// to #default. Run `ffx config get trace.category_groups.default`
+    /// to see what categories are included in #default.
+    ///
+    /// A trailing * may be used to indicate a prefix match. For example,
+    /// kernel* would match any category that starts with kernel.
+    ///
+    /// A name prefixed with # indicates a category group that will be expanded
+    /// from ffx config within the plugin *before* being sent to trace manager.
+    /// A category group can either be added to global config by editing
+    /// data/config.json in the ffx trace plugin, or by using ffx config set to
+    /// add/edit a user configured category group. Available category groups
+    /// can be discovered by running
+    /// `ffx config get -s all trace.category_groups`
+    #[argh(option, default = "vec![String::from(\"#default\")]", from_str_fn(parse_categories))]
     pub categories: TraceCategories,
 
     /// duration of trace capture in seconds.
@@ -182,7 +157,7 @@ fn parse_categories(value: &str) -> Result<TraceCategories, String> {
         return Err("no categories specified".to_string());
     }
 
-    for cat in value.split(",") {
+    for cat in value.split(",").map(|category| category.trim()) {
         if cat.is_empty() {
             return Err("empty category specified".to_string());
         }
@@ -215,10 +190,7 @@ mod tests {
         // This tests the code in a string that is passed as a default to argh. It is compile
         // checked because of the generated code, but this ensures that it is functionally correct.
         let cmd = Start::from_args(START_CMD_NAME, &[]).unwrap();
-        assert_eq!(cmd.categories.len(), DEFAULT_CATEGORIES.len());
-        for category in DEFAULT_CATEGORIES {
-            assert!(cmd.categories.iter().any(|c| c == category));
-        }
+        assert_eq!(vec!["#default"], cmd.categories);
     }
 
     #[test]
