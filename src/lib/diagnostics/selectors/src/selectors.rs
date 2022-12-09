@@ -597,20 +597,6 @@ pub fn selector_to_string(selector: Selector) -> Result<String, anyhow::Error> {
     Ok(segments.join(":"))
 }
 
-/// Matches a string against a single StringSelector.
-/// This will only match against a single "level" and does not support recursive globbing.
-pub fn match_selector_against_single_node(
-    node: &impl AsRef<str>,
-    selector: &StringSelector,
-) -> Result<bool, anyhow::Error> {
-    let regex = Regex::new(&format!(
-        "^{}$",
-        convert_string_selector_to_regex(selector, WILDCARD_REGEX_EQUIVALENT, None)?
-    ))?;
-
-    Ok(regex.is_match(&sanitize_string_for_selectors(node.as_ref())))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
