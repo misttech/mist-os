@@ -6,6 +6,7 @@
 
 #include <fcntl.h>
 #include <fuchsia/io/cpp/fidl.h>
+#include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
@@ -20,8 +21,7 @@
 #include <thread>
 
 #include <fbl/unique_fd.h>
-
-#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
+#include <zxtest/zxtest.h>
 
 namespace svc {
 namespace {
@@ -55,7 +55,8 @@ zx_status_t svc_directory_remove_entry_unsized(svc_dir_t* dir, std::string_view 
   return svc_directory_remove_entry(dir, path.data(), path.size(), name.data(), name.size());
 }
 
-using ServiceTest = ::gtest::RealLoopFixture;
+using ServiceTest = class RealLoopFixture : public ::loop_fixture::RealLoop, public ::zxtest::Test {
+};
 
 TEST_F(ServiceTest, Control) {
   zx::channel dir, dir_request;

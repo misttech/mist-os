@@ -9,6 +9,7 @@ group("tests") {
     "fdio:tests",
     "fidl/cpp:tests",
     "memfs:tests",
+    "svc:tests",
     "vulkan:tests",
   ]
 

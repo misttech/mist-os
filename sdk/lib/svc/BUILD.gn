@@ -6,11 +6,6 @@ import("//build/components.gni")
 import("//build/cpp/sdk_shared_library.gni")
 import("//build/test.gni")
 
-group("tests") {
-  testonly = true
-  deps = [ ":svc_tests" ]
-}
-
 sdk_shared_library("svc") {
   category = "partner"
 
@@ -40,22 +35,4 @@ sdk_shared_library("svc") {
     "//zircon/system/ulib/async-default:async-default_sdk",
     "//zircon/system/ulib/trace-engine:trace-engine_sdk",
   ]
-}
-
-test("svc_unittests") {
-  sources = [ "dir_unittest.cc" ]
-
-  deps = [
-    ":svc",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
-    "//sdk/lib/fdio",
-    "//sdk/lib/vfs/cpp",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/loop_fixture",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-fuchsia_unittest_package("svc_tests") {
-  deps = [ ":svc_unittests" ]
 }

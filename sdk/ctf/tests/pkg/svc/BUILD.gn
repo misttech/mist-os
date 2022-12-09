@@ -1,0 +1,35 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//sdk/ctf/build/ctf.gni")
+
+ctf_executable("svc-unittests") {
+  sources = [ "dir_unittest.cc" ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
+    "//sdk/lib/fdio",
+    "//sdk/lib/svc",
+    "//sdk/lib/vfs/cpp",
+    "//zircon/system/ulib/async-loop/testing:async-loop-testing",
+    "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
+  ]
+
+  testonly = true
+}
+
+ctf_fuchsia_unittest_component("svc-component") {
+  deps = [ ":svc-unittests" ]
+}
+
+ctf_fuchsia_test_package("svc-test-package") {
+  package_name = "ctf-svc-tests"
+  test_components = [ ":svc-component" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":svc-test-package" ]
+}
