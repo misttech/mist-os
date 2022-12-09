@@ -11,10 +11,10 @@
 #include <fbl/mutex.h>
 
 #include "src/devices/bin/driver_host/composite_device.h"
-#include "src/devices/bin/driver_host/devfs_vnode.h"
 #include "src/devices/bin/driver_host/driver_host.h"
 #include "src/devices/bin/driver_host/log.h"
 #include "src/devices/bin/driver_host/proxy_device.h"
+#include "src/devices/lib/fidl/device_server.h"
 #include "src/devices/lib/log/log.h"
 
 zx_device::zx_device(DriverHostContext* ctx, std::string name, fbl::RefPtr<Driver> drv)

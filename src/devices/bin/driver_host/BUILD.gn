@@ -55,7 +55,6 @@ source_set("common") {
     "api.cc",
     "composite_device.cc",
     "core.cc",
-    "devfs_vnode.cc",
     "device_controller_connection.cc",
     "driver.cc",
     "driver_host.cc",
@@ -79,6 +78,7 @@ source_set("common") {
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/fidl",
+    "//src/devices/lib/fidl:devfs_fidl",
   ]
 
   public_deps = [
@@ -123,11 +123,6 @@ source_set("common") {
   # Please migrate to typed channel APIs (fidl::ClientEnd<T>, fidl::ServerEnd<T>).
   # See linked bug for details.
   configs += [ "//build/cpp:fidl-llcpp-deprecated-raw-channels" ]
-
-  # TODO(fxbug.dev/85473): This target uses |fidl::WireTryDispatch| which is deprecated.
-  # Please remove ad-hoc composition of FIDL protocols and migrate to |fidl::WireDispatch|.
-  # See linked bug for details.
-  configs += [ "//build/cpp:fidl-llcpp-deprecated-wire-try-dispatch" ]
 }
 
 shared_library("driver") {

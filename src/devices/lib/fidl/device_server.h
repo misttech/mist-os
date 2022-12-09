@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_HOST_DEVFS_VNODE_H_
-#define SRC_DEVICES_BIN_DRIVER_HOST_DEVFS_VNODE_H_
+#ifndef SRC_DEVICES_LIB_FIDL_DEVICE_SERVER_H_
+#define SRC_DEVICES_LIB_FIDL_DEVICE_SERVER_H_
 
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire_test_base.h>
 #include <lib/fidl/cpp/wire/internal/server_details.h>
-
-#include <fbl/ref_ptr.h>
-
-struct zx_device;
 
 class DeviceInterface : public fidl::WireServer<fuchsia_device::Controller> {
  public:
@@ -83,4 +79,4 @@ class DeviceServer {
   std::optional<fit::callback<void()>> callback_;
 };
 
-#endif  // SRC_DEVICES_BIN_DRIVER_HOST_DEVFS_VNODE_H_
+#endif  // SRC_DEVICES_LIB_FIDL_DEVICE_SERVER_H_

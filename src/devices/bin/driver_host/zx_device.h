@@ -38,7 +38,7 @@
 
 #include "driver.h"
 #include "inspect.h"
-#include "src/devices/bin/driver_host/devfs_vnode.h"
+#include "src/devices/lib/fidl/device_server.h"
 
 class CompositeDevice;
 class ProxyDevice;

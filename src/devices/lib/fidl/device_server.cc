@@ -2,14 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bin/driver_host/devfs_vnode.h"
+#include "src/devices/lib/fidl/device_server.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/syslog/global.h>
 
 #include <string_view>
 
 #include "src/devices/lib/fidl/transaction.h"
-#include "src/devices/lib/log/log.h"
+
+namespace {
+constexpr char kLogTag[] = "devfs";
+}  // namespace
 
 DeviceServer::DeviceServer(DeviceInterface& device, async_dispatcher_t* dispatcher)
     : dev_(device), dispatcher_(dispatcher) {}
@@ -69,8 +73,8 @@ DeviceServer::Node::Node(DeviceServer& parent) : parent_(parent) {}
 
 void DeviceServer::Node::NotImplemented_(const std::string& name, fidl::CompleterBase& completer) {
   zx::result topo_path = parent_.dev_.GetTopologicalPath();
-  LOGF(ERROR, "%s: unsupported call to %s", name.c_str(),
-       topo_path.is_ok() ? topo_path.value().c_str() : topo_path.status_string());
+  FX_LOGF(ERROR, kLogTag, "%s: unsupported call to %s", name.c_str(),
+          topo_path.is_ok() ? topo_path.value().c_str() : topo_path.status_string());
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -88,9 +92,9 @@ void DeviceServer::Node::Query(QueryCompleter::Sync& completer) {
 void DeviceServer::Node::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
   if (request->flags != fuchsia_io::wire::OpenFlags::kCloneSameRights) {
     zx::result topo_path = parent_.dev_.GetTopologicalPath();
-    LOGF(ERROR, "%s: unsupported clone flags=0x%x",
-         topo_path.is_ok() ? topo_path.value().c_str() : topo_path.status_string(),
-         static_cast<uint32_t>(request->flags));
+    FX_LOGF(ERROR, kLogTag, "%s: unsupported clone flags=0x%x",
+            topo_path.is_ok() ? topo_path.value().c_str() : topo_path.status_string(),
+            static_cast<uint32_t>(request->flags));
     request->object.Close(ZX_ERR_NOT_SUPPORTED);
     return;
   }

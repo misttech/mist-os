@@ -12,13 +12,13 @@
 #include <fbl/auto_lock.h>
 #include <fbl/string_printf.h>
 
-#include "devfs_vnode.h"
-#include "driver_host.h"
-#include "env.h"
-#include "log.h"
-#include "proxy_iostate.h"
-#include "zx_device.h"
-#include "zx_driver.h"
+#include "src/devices/bin/driver_host/driver_host.h"
+#include "src/devices/bin/driver_host/env.h"
+#include "src/devices/bin/driver_host/log.h"
+#include "src/devices/bin/driver_host/proxy_iostate.h"
+#include "src/devices/bin/driver_host/zx_device.h"
+#include "src/devices/bin/driver_host/zx_driver.h"
+#include "src/devices/lib/fidl/device_server.h"
 
 namespace {
 

@@ -12,3 +12,21 @@ source_set("fidl") {
     "//src/lib/ddktl",
   ]
 }
+
+source_set("devfs_fidl") {
+  sources = [
+    "device_server.cc",
+    "device_server.h",
+  ]
+  deps = [ ":fidl" ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
+    "//sdk/lib/fidl/cpp/wire",
+  ]
+
+  # TODO(fxbug.dev/85473): This target uses |fidl::WireTryDispatch| which is deprecated.
+  # Please remove ad-hoc composition of FIDL protocols and migrate to |fidl::WireDispatch|.
+  # See linked bug for details.
+  configs += [ "//build/cpp:fidl-llcpp-deprecated-wire-try-dispatch" ]
+}
