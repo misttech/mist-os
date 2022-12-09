@@ -13,6 +13,7 @@
 #include <sstream>
 
 #include "src/media/audio/services/device_registry/basic_types.h"
+#include "src/media/audio/services/device_registry/device.h"
 
 namespace media_audio {
 
@@ -352,6 +353,11 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
   }
 
   FX_LOGS(INFO) << clock_domain_str;
+}
+
+void LogObjectCounts() {
+  ADR_LOG(kLogObjectCounts) << Device::count() << " Devices (" << Device::initialized_count()
+                            << " active/" << Device::unhealthy_count() << " unhealthy)";
 }
 
 }  // namespace media_audio

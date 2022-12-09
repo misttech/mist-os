@@ -191,14 +191,14 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig {
   std::vector<std::optional<std::vector<uint8_t>>> valid_bits_per_sample_;
   std::vector<std::optional<std::vector<uint32_t>>> frame_rates_;
 
-  static inline constexpr UniqueId kDefaultUniqueId{{0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-                                                     0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32,
-                                                     0x10}};
+  static inline constexpr UniqueId kDefaultUniqueId{
+      {0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,  //
+       0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10},
+  };
 
   fuchsia::hardware::audio::PcmSupportedFormats format_set_ = {};
 
   async_dispatcher_t* dispatcher_;
-  // fidl::InterfaceRequest<fuchsia::hardware::audio::StreamConfig> stream_req_;
   std::optional<fidl::Binding<fuchsia::hardware::audio::StreamConfig>> stream_config_binding_;
   zx::channel stream_config_server_end_;
   zx::channel stream_config_client_end_;

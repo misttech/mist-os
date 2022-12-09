@@ -69,7 +69,7 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     return device->state_ == Device::State::Ready;
   }
 
-  static inline constexpr zx::duration kCommandTimeout = zx::sec(10);
+  // static inline constexpr zx::duration kCommandTimeout = zx::sec(10);
 
   std::shared_ptr<Device> device_;
   std::shared_ptr<Clock> device_clock() { return device_->device_clock_; }

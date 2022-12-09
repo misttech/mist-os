@@ -45,6 +45,7 @@ executable("device_registry_unittests_bin") {
   testonly = true
 
   sources = [
+    "audio_device_registry_unittest.cc",
     "device_detector_unittest.cc",
     "device_unittest.cc",
   ]
@@ -59,7 +60,10 @@ executable("device_registry_unittests_bin") {
 executable("device_registry_warning_unittests_bin") {
   testonly = true
 
-  sources = [ "device_warning_unittest.cc" ]
+  sources = [
+    "audio_device_registry_warning_unittest.cc",
+    "device_warning_unittest.cc",
+  ]
 
   deps = [ ":unittest_base" ]
 }
@@ -67,6 +71,8 @@ executable("device_registry_warning_unittests_bin") {
 ## Source sets
 source_set("device_registry_lib") {
   sources = [
+    "audio_device_registry.cc",
+    "audio_device_registry.h",
     "basic_types.h",
     "device.cc",
     "device.h",
@@ -83,6 +89,7 @@ source_set("device_registry_lib") {
     "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_cpp",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
     "//src/lib/fsl",
+    "//src/media/audio/services/common",
   ]
 
   deps = [
@@ -97,7 +104,10 @@ source_set("device_registry_lib") {
 source_set("unittest_base") {
   testonly = true
 
-  sources = [ "device_unittest.h" ]
+  sources = [
+    "adr_server_unittest_base.h",
+    "device_unittest.h",
+  ]
 
   public_deps = [
     ":device_registry_lib",

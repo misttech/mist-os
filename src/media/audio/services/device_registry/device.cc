@@ -427,9 +427,4 @@ zx::result<zx::clock> Device::GetReadOnlyClock() {
   return zx::ok(std::move(*dupe_clock));
 }
 
-void LogObjectCounts() {
-  ADR_LOG(kLogObjectCounts) << Device::count() << " Devices (" << Device::initialized_count()
-                            << " active/" << Device::unhealthy_count() << " unhealthy)";
-}
-
 }  // namespace media_audio
