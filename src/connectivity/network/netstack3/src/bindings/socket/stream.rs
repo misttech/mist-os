@@ -6,13 +6,15 @@
 
 use std::{
     convert::Infallible as Never,
-    num::{NonZeroU16, NonZeroUsize},
+    num::{NonZeroU16, NonZeroU64, NonZeroU8, NonZeroUsize, TryFromIntError},
     ops::{ControlFlow, DerefMut as _},
     sync::Arc,
+    time::Duration,
 };
 
 use assert_matches::assert_matches;
 use async_utils::stream::OneOrMany;
+use explicit::ResultExt as _;
 use fidl::{
     endpoints::{ClientEnd, ControlHandle as _, RequestStream as _},
     HandleBased as _,
@@ -24,11 +26,11 @@ use fidl_fuchsia_posix_socket as fposix_socket;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, Peered as _};
 use futures::StreamExt as _;
-use log::error;
 use net_types::{
     ip::{IpAddress, IpVersion, IpVersionMarker, Ipv4, Ipv6},
     SpecifiedAddr, ZonedAddr,
 };
+use packet_formats::utils::NonZeroDuration;
 
 use crate::bindings::{
     devices::Devices,
@@ -48,15 +50,21 @@ use netstack3_core::{
             accept, bind, close_conn, connect_bound, connect_unbound, create_socket,
             get_bound_info, get_connection_info, get_listener_info, listen, remove_bound,
             remove_unbound, set_bound_device, set_connection_device, set_listener_device,
-            set_unbound_device, shutdown_conn, shutdown_listener, AcceptError, BindError, BoundId,
-            BoundInfo, ConnectError, ConnectionId, ConnectionInfo, ListenerId, NoConnection,
-            SocketAddr, TcpNonSyncContext, UnboundId,
+            set_unbound_device, shutdown_conn, shutdown_listener, with_keep_alive,
+            with_keep_alive_mut, AcceptError, BindError, BoundId, BoundInfo, ConnectError,
+            ConnectionId, ConnectionInfo, ListenerId, NoConnection, SocketAddr, TcpNonSyncContext,
+            UnboundId,
         },
         state::Takeable,
-        BufferSizes,
+        BufferSizes, KeepAlive,
     },
     Ctx,
 };
+
+/// Maximum values allowed on linux: https://github.com/torvalds/linux/blob/0326074ff4652329f2a1a9c8685104576bd8d131/include/net/tcp.h#L159-L161
+const MAX_TCP_KEEPIDLE_SECS: u64 = 32767;
+const MAX_TCP_KEEPINTVL_SECS: u64 = 32767;
+const MAX_TCP_KEEPCNT: u8 = 127;
 
 #[derive(Debug)]
 enum SocketId<I: Ip> {
@@ -938,12 +946,13 @@ where
             fposix_socket::StreamSocketRequest::GetReceiveBuffer { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
-            fposix_socket::StreamSocketRequest::SetKeepAlive { value: _, responder } => {
-                error!("TODO(https://fxbug.dev/110483): implement the SO_KEEPALIVE socket option");
+            fposix_socket::StreamSocketRequest::SetKeepAlive { value: enabled, responder } => {
+                self.with_keep_alive_mut(|k| k.enabled = enabled).await;
                 responder_send!(responder, &mut Ok(()));
             }
             fposix_socket::StreamSocketRequest::GetKeepAlive { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                let enabled = self.with_keep_alive(|k| k.enabled).await;
+                responder_send!(responder, &mut Ok(enabled));
             }
             fposix_socket::StreamSocketRequest::SetOutOfBandInline { value: _, responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
@@ -1161,32 +1170,70 @@ where
             fposix_socket::StreamSocketRequest::GetTcpCork { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
-            fposix_socket::StreamSocketRequest::SetTcpKeepAliveIdle {
-                value_secs: _,
-                responder,
-            } => {
-                error!("TODO(https://fxbug.dev/110483): implement the TCP_KEEPIDLE socket option");
-                responder_send!(responder, &mut Ok(()));
+            fposix_socket::StreamSocketRequest::SetTcpKeepAliveIdle { value_secs, responder } => {
+                match NonZeroU64::new(value_secs.into())
+                    .filter(|value_secs| value_secs.get() <= MAX_TCP_KEEPIDLE_SECS)
+                {
+                    Some(secs) => {
+                        self.with_keep_alive_mut(|k| {
+                            k.idle = NonZeroDuration::from_nonzero_secs(secs)
+                        })
+                        .await;
+                        responder_send!(responder, &mut Ok(()));
+                    }
+                    None => {
+                        responder_send!(responder, &mut Err(fposix::Errno::Einval));
+                    }
+                }
             }
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveIdle { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                let secs = self.with_keep_alive(|k| Duration::from(k.idle).as_secs()).await;
+                responder_send!(responder, &mut Ok(u32::try_from(secs).unwrap()));
             }
             fposix_socket::StreamSocketRequest::SetTcpKeepAliveInterval {
-                value_secs: _,
+                value_secs,
                 responder,
             } => {
-                error!("TODO(https://fxbug.dev/110483): implement the TCP_KEEPINTVL socket option");
-                responder_send!(responder, &mut Ok(()));
+                match NonZeroU64::new(value_secs.into())
+                    .filter(|value_secs| value_secs.get() <= MAX_TCP_KEEPINTVL_SECS)
+                {
+                    Some(secs) => {
+                        self.with_keep_alive_mut(|k| {
+                            k.interval = NonZeroDuration::from_nonzero_secs(secs)
+                        })
+                        .await;
+                        responder_send!(responder, &mut Ok(()));
+                    }
+                    None => {
+                        responder_send!(responder, &mut Err(fposix::Errno::Einval));
+                    }
+                }
             }
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveInterval { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                let secs = self.with_keep_alive(|k| Duration::from(k.interval).as_secs()).await;
+                responder_send!(responder, &mut Ok(u32::try_from(secs).unwrap()));
             }
-            fposix_socket::StreamSocketRequest::SetTcpKeepAliveCount { value: _, responder } => {
-                error!("TODO(https://fxbug.dev/110483): implement the TCP_KEEPCNT socket option");
-                responder_send!(responder, &mut Ok(()));
+            fposix_socket::StreamSocketRequest::SetTcpKeepAliveCount { value, responder } => {
+                match u8::try_from(value)
+                    .ok_checked::<TryFromIntError>()
+                    .and_then(NonZeroU8::new)
+                    .filter(|count| count.get() <= MAX_TCP_KEEPCNT)
+                {
+                    Some(count) => {
+                        self.with_keep_alive_mut(|k| {
+                            k.count = count;
+                        })
+                        .await;
+                        responder_send!(responder, &mut Ok(()));
+                    }
+                    None => {
+                        responder_send!(responder, &mut Err(fposix::Errno::Einval));
+                    }
+                };
             }
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveCount { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                let count = self.with_keep_alive(|k| k.count).await;
+                responder_send!(responder, &mut Ok(u32::from(u8::from(count))));
             }
             fposix_socket::StreamSocketRequest::SetTcpSynCount { value: _, responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
@@ -1238,6 +1285,28 @@ where
             }
         }
         ControlFlow::Continue(None)
+    }
+
+    async fn with_keep_alive_mut<R, F: FnOnce(&mut KeepAlive) -> R>(&mut self, f: F) -> R {
+        let mut guard = self.ctx.lock().await;
+        let Ctx { sync_ctx, non_sync_ctx } = &mut *guard;
+        match self.id {
+            SocketId::Unbound(id, _) => with_keep_alive_mut(sync_ctx, non_sync_ctx, id, f),
+            SocketId::Bound(id, _) => with_keep_alive_mut(sync_ctx, non_sync_ctx, id, f),
+            SocketId::Connection(id) => with_keep_alive_mut(sync_ctx, non_sync_ctx, id, f),
+            SocketId::Listener(id) => with_keep_alive_mut(sync_ctx, non_sync_ctx, id, f),
+        }
+    }
+
+    async fn with_keep_alive<R, F: FnOnce(&KeepAlive) -> R>(&mut self, f: F) -> R {
+        let guard = self.ctx.lock().await;
+        let Ctx { sync_ctx, non_sync_ctx: _ } = &*guard;
+        match self.id {
+            SocketId::Unbound(id, _) => with_keep_alive(sync_ctx, id, f),
+            SocketId::Bound(id, _) => with_keep_alive(sync_ctx, id, f),
+            SocketId::Connection(id) => with_keep_alive(sync_ctx, id, f),
+            SocketId::Listener(id) => with_keep_alive(sync_ctx, id, f),
+        }
     }
 }
 

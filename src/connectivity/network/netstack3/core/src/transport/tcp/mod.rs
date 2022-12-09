@@ -12,6 +12,10 @@ mod seqnum;
 pub mod socket;
 pub mod state;
 
+use core::num::{NonZeroU64, NonZeroU8};
+
+use const_unwrap::const_unwrap_option;
+use packet_formats::utils::NonZeroDuration;
 use rand::RngCore;
 
 /// Per RFC 879 section 1 (https://tools.ietf.org/html/rfc879#section-1):
@@ -89,5 +93,40 @@ impl Default for BufferSizes {
     fn default() -> Self {
         let send = WindowSize::DEFAULT.into();
         Self { send }
+    }
+}
+
+/// Options that are related to TCP keep-alive.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct KeepAlive {
+    /// TCP_KEEPIDLE, the amount of time for an idle connection to wait before
+    /// sending out probes.
+    pub idle: NonZeroDuration,
+    /// TCP_KEEPINTVL, interval between consecutive probes.
+    pub interval: NonZeroDuration,
+    /// TCP_KEEPCNT, maximum number of probes we send before considering the
+    /// connection dead.
+    ///
+    /// `u8` is enough because if a connection doesn't hear back from the peer
+    /// after 256 probes, then chances are that the connection is already dead.
+    pub count: NonZeroU8,
+    /// SO_KEEPALIVE, we only send probes if keep-alive is enabled.
+    pub enabled: bool,
+}
+
+impl Default for KeepAlive {
+    fn default() -> Self {
+        Self {
+            // Default values inspired by Linux's TCP implementation:
+            // https://github.com/torvalds/linux/blob/0326074ff4652329f2a1a9c8685104576bd8d131/include/net/tcp.h#L155-L157
+            idle: NonZeroDuration::from_nonzero_secs(const_unwrap_option(NonZeroU64::new(
+                2 * 60 * 60,
+            ))),
+            interval: NonZeroDuration::from_nonzero_secs(const_unwrap_option(NonZeroU64::new(75))),
+            count: const_unwrap_option(NonZeroU8::new(9)),
+            // Per RFC 9293(https://datatracker.ietf.org/doc/html/rfc9293#section-3.8.4):
+            //   ... they MUST default to off.
+            enabled: false,
+        }
     }
 }

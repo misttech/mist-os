@@ -40,7 +40,7 @@ use crate::{
             TcpNonSyncContext, TcpSyncContext, TimerId,
         },
         state::{BufferProvider, Closed, Initial, State},
-        BufferSizes, Control, UserError,
+        BufferSizes, Control, KeepAlive, UserError,
     },
 };
 
@@ -132,10 +132,10 @@ where
                             .get_by_id_mut(&conn_id)
                             .expect("inconsistent state: invalid connection id");
 
-                        let Connection { acceptor: _, state, ip_sock, defunct } = conn;
+                        let Connection { acceptor: _, state, ip_sock, defunct, keep_alive } = conn;
 
                         // Send the reply to the segment immediately.
-                        let (reply, passive_open) = state.on_segment::<_, C>(incoming, now);
+                        let (reply, passive_open) = state.on_segment::<_, C>(incoming, now, keep_alive);
 
                         // If the incoming segment caused the state machine to
                         // enter Closed state, and the user has already promised
@@ -169,6 +169,7 @@ where
                                 state: _,
                                 ip_sock: _,
                                 defunct: _,
+                                keep_alive: _,
                             } => {
                                 let listener_id = *listener_id;
                                 conn.acceptor = Some(Acceptor::Ready(listener_id));
@@ -206,7 +207,7 @@ where
                             .get_by_id(&listener_id)
                             .expect("invalid listener_id");
 
-                        let Listener {pending, backlog, buffer_sizes, ready: _} = match maybe_listener {
+                        let Listener {pending, backlog, buffer_sizes, ready: _, keep_alive } = match maybe_listener {
                             MaybeListener::Bound(_bound) => {
                                 // If the socket is only bound, but not listening.
                                 return false;
@@ -251,14 +252,26 @@ where
 
                         let mut state = State::Listen(Closed::<Initial>::listen(isn, buffer_sizes.clone()));
                         let reply = assert_matches!(
-                            state.on_segment::<_, C>(incoming, now),
+                            state.on_segment::<_, C>(incoming, now, &KeepAlive::default()),
                             (reply, None) => reply
                         );
+                        if let Some(seg) = reply {
+                            let body = tcp_serialize_segment(seg, conn_addr);
+                            match ip_transport_ctx.send_ip_packet(ctx, &ip_sock, body, None) {
+                                Ok(()) => {}
+                                Err((body, err)) => {
+                                    // TODO(https://fxbug.dev/101993): Increment the counter.
+                                    trace!("tcp: failed to send ip packet {:?}: {:?}", body, err)
+                                }
+                            }
+                        }
+
                         if matches!(state, State::SynRcvd(_)) {
                             let poll_send_at =
                                 state.poll_send_at().expect("no retrans timer");
                             let bound_device = bound_device.clone();
-                            let conn_id = sockets.socketmap
+                            let keep_alive = keep_alive.clone();
+                            let conn_id = socketmap
                                 .conns_mut()
                                 .try_insert(
                                     ConnAddr {
@@ -274,8 +287,9 @@ where
                                             IpVersionMarker::default(),
                                         ))),
                                         state,
-                                        ip_sock: ip_sock.clone(),
+                                        ip_sock,
                                         defunct: false,
+                                        keep_alive,
                                     },
                                     // TODO(https://fxbug.dev/101596): Support sharing for TCP sockets.
                                     (),
@@ -307,17 +321,6 @@ where
                                     // should have called close on it.
                                     let MaybeClosedConnectionId(id, marker) = conn_id;
                                     listener.pending.push(ConnectionId(id, marker));
-                                }
-                            }
-                        }
-
-                        if let Some(seg) = reply {
-                            let body = tcp_serialize_segment(seg, conn_addr);
-                            match ip_transport_ctx.send_ip_packet(ctx, &ip_sock, body, None) {
-                                Ok(()) => {}
-                                Err((body, err)) => {
-                                    // TODO(https://fxbug.dev/101993): Increment the counter.
-                                    trace!("tcp: failed to send ip packet {:?}: {:?}", body, err)
                                 }
                             }
                         }
