@@ -56,7 +56,7 @@ async fn no_fvm_device() {
         .await
         .expect("FIDL call to WipeStorage failed")
         .expect_err("WipeStorage unexpectedly succeeded");
-    assert_eq!(zx::Status::from_raw(result), zx::Status::NOT_FOUND);
+    assert_eq!(zx::Status::from_raw(result), zx::Status::TIMED_OUT);
     fixture.tear_down().await;
 }
 
@@ -69,8 +69,12 @@ async fn write_blob() {
     }
 
     let mut builder = new_builder();
+    // Ensure the ramdisk prefix will **not** match the ramdisks we create in the fixture, thus
+    // treating them as "real" storage devices.
     builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/nada/zip/zilch");
-    builder.with_disk();
+    // We need to use a GPT as WipeStorage relies on the reported partition type GUID, rather than
+    // content sniffing of the FVM magic.
+    builder.with_disk().with_gpt();
     let fixture = builder.build().await;
 
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
@@ -95,7 +99,7 @@ async fn blobfs_formatted() {
 
     let mut builder = new_builder();
     builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/nada/zip/zilch");
-    builder.with_disk();
+    builder.with_disk().with_gpt();
     let fixture = builder.build().await;
     let dev = fixture.dir("dev-topological/class/block");
 
@@ -154,7 +158,7 @@ async fn data_unformatted() {
     const BUFF_LEN: usize = 512;
     let mut builder = new_builder();
     builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/nada/zip/zilch");
-    builder.with_disk().format_data(true, DATA_FILESYSTEM_FORMAT);
+    builder.with_disk().with_gpt().format_data(true, DATA_FILESYSTEM_FORMAT);
     let fixture = builder.build().await;
     let dev = fixture.dir("dev-topological/class/block");
 
@@ -221,6 +225,34 @@ async fn data_unformatted() {
     let mut buff: [u8; BUFF_LEN] = [0; BUFF_LEN];
     block_client.read_at(MutableBufferSlice::Memory(&mut buff), 0).await.unwrap();
     assert_eq!(buff, [0; BUFF_LEN]);
+
+    fixture.tear_down().await;
+}
+
+// Verify that WipeStorage can handle a completely corrupted FVM.
+#[fuchsia::test]
+async fn handles_corrupt_fvm() {
+    // TODO(fxbug.dev/113970): this test doesn't work on f2fs
+    if DATA_FILESYSTEM_FORMAT == "f2fs" {
+        return;
+    }
+
+    let mut builder = new_builder();
+    // Ensure the ramdisk prefix will **not** match the ramdisks we create in the fixture, thus
+    // treating them as "real" storage devices.
+    builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/nada/zip/zilch");
+    // Ensure that, while we allocate an FVM partition inside the GPT, we leave it empty.
+    builder.with_disk().with_gpt().with_unformatted_fvm();
+    let fixture = builder.build().await;
+
+    // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
+    let admin =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    admin.wipe_storage(blobfs_server).await.unwrap().expect("WipeStorage unexpectedly failed");
+
+    // Ensure that we can write a blob into the new Blobfs instance.
+    write_test_blob(&blobfs_root).await;
 
     fixture.tear_down().await;
 }

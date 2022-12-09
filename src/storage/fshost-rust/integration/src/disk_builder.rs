@@ -222,6 +222,7 @@ pub struct DiskBuilder {
     corrupt_contents: bool,
     legacy_crypto_format: bool,
     gpt: bool,
+    format_fvm: bool,
 }
 
 impl DiskBuilder {
@@ -234,6 +235,7 @@ impl DiskBuilder {
             corrupt_contents: false,
             legacy_crypto_format: false,
             gpt: false,
+            format_fvm: true,
         }
     }
 
@@ -256,6 +258,7 @@ impl DiskBuilder {
     }
 
     pub fn format_data(&mut self, with_zxcrypt_if_needed: bool, format: &'static str) -> &mut Self {
+        assert!(self.format_fvm);
         self.format = Some(format);
         self.format_zxcrypt = with_zxcrypt_if_needed;
         self
@@ -273,6 +276,12 @@ impl DiskBuilder {
 
     pub fn with_gpt(&mut self) -> &mut Self {
         self.gpt = true;
+        self
+    }
+
+    pub fn with_unformatted_fvm(&mut self) -> &mut Self {
+        assert!(self.format.is_none());
+        self.format_fvm = false;
         self
     }
 
@@ -294,6 +303,10 @@ impl DiskBuilder {
         // Initialize the VMO with GPT headers and an *empty* FVM partition.
         if self.gpt {
             initialize_gpt(&vmo, RAMDISK_BLOCK_SIZE);
+        }
+
+        if !self.format_fvm {
+            return vmo;
         }
 
         // Create a ramdisk with a duplicate handle of `vmo` so we can keep the data once destroyed.

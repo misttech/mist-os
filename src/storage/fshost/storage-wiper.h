@@ -24,10 +24,6 @@ namespace fshost::storage_wiper {
 zx::result<fs_management::StartedSingleVolumeFilesystem> WipeStorage(
     fbl::unique_fd fvm_block_device, const fshost_config::Config& config);
 
-// Find and return handle to first block device that identifies itself as an FVM partition.
-// Ignores any devices whose topological paths start with |ignore_prefix|.
-zx::result<fbl::unique_fd> GetFvmBlockDevice(std::string_view ignore_prefix);
-
 }  // namespace fshost::storage_wiper
 
 #endif  // SRC_STORAGE_FSHOST_STORAGE_WIPER_H_

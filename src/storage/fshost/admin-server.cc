@@ -44,6 +44,8 @@ namespace fshost {
 namespace {
 
 constexpr zx_duration_t kOpenPartitionDuration = ZX_SEC(10);
+constexpr uuid::Uuid kFvmGuid = GPT_FVM_TYPE_GUID;
+constexpr uuid::Uuid kLegacyFvmGuid = GUID_FVM_VALUE;
 
 }  // namespace
 
@@ -447,13 +449,21 @@ void AdminServer::WipeStorage(WipeStorageRequestView request,
 
   // Find the first non-ramdisk FVM partition to wipe.
   ZX_DEBUG_ASSERT(!config_.ramdisk_prefix().empty());
+
+  FX_LOGS(INFO) << "Searching for block device with FVM.";
+
+  const fs_management::PartitionMatcher fvm_matcher = {
+      .type_guids = {kFvmGuid, kLegacyFvmGuid},
+      .ignore_prefix = config_.ramdisk_prefix(),
+  };
   zx::result<fbl::unique_fd> fvm_device =
-      storage_wiper::GetFvmBlockDevice(config_.ramdisk_prefix());
+      fs_management::OpenPartition(fvm_matcher, kOpenPartitionDuration, nullptr);
   if (fvm_device.is_error()) {
     FX_LOGS(ERROR) << "Failed get FVM block device: " << fvm_device.status_string();
     completer.ReplyError(fvm_device.status_value());
     return;
   }
+  ZX_ASSERT(fvm_device->is_valid());
 
   // Wipe and reprovision the FVM partition with the product/board configured values.
   zx::result<fs_management::StartedSingleVolumeFilesystem> blobfs =

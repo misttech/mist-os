@@ -6,7 +6,7 @@
 
 #include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
-#include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
+#include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/fd.h>
@@ -147,59 +147,19 @@ zx::result<fbl::unique_fd> WaitForFvm(const std::filesystem::path& device_topo_p
 
 namespace fshost::storage_wiper {
 
-zx::result<fbl::unique_fd> GetFvmBlockDevice(std::string_view ignore_prefix) {
-  FX_LOGS(INFO) << "Searching for FVM block device.";
-  if (!ignore_prefix.empty()) {
-    FX_LOGS(INFO) << "Ignoring devices with prefix: " << ignore_prefix;
-  }
-
-  std::optional<fbl::unique_fd> fvm_device;
-
-  for (const auto& block_device : std::filesystem::directory_iterator{kBlockDeviceClassPrefix}) {
-    fbl::unique_fd fd(open(block_device.path().c_str(), O_RDONLY));
-    ZX_DEBUG_ASSERT(fd.is_valid());
-    if (!fd.is_valid()) {
-      FX_LOGS(ERROR) << "Failed to open device=" << block_device.path().c_str();
-      continue;
-    }
-    fdio_cpp::UnownedFdioCaller caller(fd);
-
-    zx::result topo_path = GetTopologicalPath(caller.borrow_as<fuchsia_device::Controller>());
-    if (topo_path.is_error()) {
-      FX_PLOGS(ERROR, topo_path.error_value())
-          << "Failed to get topological path from device=" << block_device.path().c_str();
-      return topo_path.take_error();
-    }
-    if (!ignore_prefix.empty()) {
-      if (topo_path.value().find(ignore_prefix) == 0) {
-        FX_LOGS(INFO) << "Ignoring device=" << topo_path.value();
-        continue;
-      }
-    }
-
-    // TODO(fxbug.dev/100049): Try using the partition protocol first to avoid content sniffing. If
-    // that fails for some reason, then fall back to content sniffing.
-    if (fs_management::DetectDiskFormat(caller.borrow_as<fuchsia_hardware_block::Block>()) ==
-        fs_management::DiskFormat::kDiskFormatFvm) {
-      FX_LOGS(INFO) << "Found FVM block device=" << topo_path.value();
-      fvm_device = std::move(fd);
-      break;
-    }
-  }
-
-  if (!fvm_device.has_value()) {
-    FX_LOGS(ERROR) << "Unable to find FVM block device.";
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }
-
-  return zx::ok(*std::move(fvm_device));
-}
-
 zx::result<fs_management::StartedSingleVolumeFilesystem> WipeStorage(
     fbl::unique_fd fvm_block_device, const fshost_config::Config& config) {
+  if (!fvm_block_device.is_valid()) {
+    FX_LOGS(ERROR) << "Invalid handle passed for fvm_block_device!";
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
   fdio_cpp::UnownedFdioCaller caller(fvm_block_device);
+
   zx::result device_topo_path = GetTopologicalPath(caller.borrow_as<fuchsia_device::Controller>());
   if (device_topo_path.is_error()) {
+    FX_LOGS(ERROR) << "Failed to get topological path of FVM device: "
+                   << device_topo_path.status_string();
     return device_topo_path.take_error();
   }
   FX_LOGS(INFO) << "Wiping storage on device: " << device_topo_path.value();

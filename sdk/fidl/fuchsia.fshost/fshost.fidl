@@ -71,9 +71,8 @@ protocol Admin {
         payload zx.handle:VMO;
     }) -> () error zx.status;
 
-    /// Reprovision the first non-ramdisk FVM volume (based on class path index), and format/mount
-    /// the blob partition. The formatted Blobfs instance can be accessed via the client end of the
-    /// given `blobfs_root`.
+    /// Reprovision the first non-ramdisk FVM volume, and format/mount the blob partition.
+    /// The formatted Blobfs instance can be accessed via the client end of `blobfs_root`.
     ///
     /// This function will pause the fshost block watcher regardless of success or failure.
     /// Requires fshost to be started with the `fvm_ramdisk` config option set to true.
