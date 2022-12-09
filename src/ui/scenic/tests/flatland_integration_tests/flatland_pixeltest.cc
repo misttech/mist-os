@@ -126,6 +126,32 @@ class FlatlandPixelTestBase : public gtest::RealLoopFixture {
     flatland->AddChild(fuchsia::ui::composition::TransformId{kRootTransform}, kTransformId);
   }
 
+  fuchsia::sysmem::BufferCollectionConstraints GetBufferConstraints(
+      fuchsia::sysmem::PixelFormatType pixel_format, fuchsia::sysmem::ColorSpaceType color_space) {
+    fuchsia::sysmem::BufferCollectionConstraints constraints;
+    constraints.has_buffer_memory_constraints = true;
+    constraints.buffer_memory_constraints = {.ram_domain_supported = true,
+                                             .cpu_domain_supported = true};
+
+    constraints.usage = fuchsia::sysmem::BufferUsage{.cpu = fuchsia::sysmem::cpuUsageWriteOften};
+
+    constraints.min_buffer_count = 1;
+
+    constraints.image_format_constraints_count = 1;
+    auto& image_constraints = constraints.image_format_constraints[0];
+    image_constraints.pixel_format.type = pixel_format;
+    image_constraints.pixel_format.has_format_modifier = true;
+    image_constraints.pixel_format.format_modifier.value = fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
+    image_constraints.color_spaces_count = 1;
+    image_constraints.color_space[0].type = color_space;
+    image_constraints.required_min_coded_width = display_width_;
+    image_constraints.required_min_coded_height = display_height_;
+    image_constraints.required_max_coded_width = display_width_;
+    image_constraints.required_max_coded_height = display_height_;
+
+    return constraints;
+  }
+
  protected:
   // Invokes Flatland.Present() and waits for a response from Scenic that the frame has been
   // presented.
@@ -177,34 +203,7 @@ class FlatlandPixelTestBase : public gtest::RealLoopFixture {
 
 class ParameterizedPixelFormatTest
     : public FlatlandPixelTestBase,
-      public ::testing::WithParamInterface<fuchsia::sysmem::PixelFormatType> {
- public:
-  fuchsia::sysmem::BufferCollectionConstraints GetBufferConstraints(
-      fuchsia::sysmem::PixelFormatType pixel_format, fuchsia::sysmem::ColorSpaceType color_space) {
-    fuchsia::sysmem::BufferCollectionConstraints constraints;
-    constraints.has_buffer_memory_constraints = true;
-    constraints.buffer_memory_constraints = {.ram_domain_supported = true,
-                                             .cpu_domain_supported = true};
-
-    constraints.usage = fuchsia::sysmem::BufferUsage{.cpu = fuchsia::sysmem::cpuUsageWriteOften};
-
-    constraints.min_buffer_count = 1;
-
-    constraints.image_format_constraints_count = 1;
-    auto& image_constraints = constraints.image_format_constraints[0];
-    image_constraints.pixel_format.type = pixel_format;
-    image_constraints.pixel_format.has_format_modifier = true;
-    image_constraints.pixel_format.format_modifier.value = fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
-    image_constraints.color_spaces_count = 1;
-    image_constraints.color_space[0].type = color_space;
-    image_constraints.required_min_coded_width = display_width_;
-    image_constraints.required_min_coded_height = display_height_;
-    image_constraints.required_max_coded_width = display_width_;
-    image_constraints.required_max_coded_height = display_height_;
-
-    return constraints;
-  }
-};
+      public ::testing::WithParamInterface<fuchsia::sysmem::PixelFormatType> {};
 
 class ParameterizedYUVPixelTest : public ParameterizedPixelFormatTest {};
 
@@ -372,6 +371,294 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
   auto histogram = screenshot.Histogram();
 
   EXPECT_EQ(histogram[color], num_pixels);
+}
+
+// Test a combination of orientations and image flips to ensure that images are flipped before the
+// parent transform orientation is set and that the output is the expected output. For an ASCII
+// representation of the input image, see |GetImageColorSetter|. For an ASCII representation of the
+// expected output, see the constructor for |ParameterizedFlipAndOrientationTest|.
+using FlipAndOrientationTestParams =
+    std::tuple<fuchsia::sysmem::PixelFormatType, fuc::Orientation, fuc::ImageFlip>;
+
+class ParameterizedFlipAndOrientationTest
+    : public FlatlandPixelTestBase,
+      public ::testing::WithParamInterface<FlipAndOrientationTestParams> {
+ protected:
+  ParameterizedFlipAndOrientationTest() {
+    // Image flip: LEFT_RIGHT; Orientation: CCW_0.
+    //
+    // |Bk|R |     |R |Bk|
+    // |--|--| --> |--|--|
+    // |G |Be|     |Be|G |
+    //
+    expected_colors_map.insert(
+        {std::make_pair(fuc::ImageFlip::LEFT_RIGHT, fuc::Orientation::CCW_0_DEGREES),
+         {.top_left = ui_testing::Screenshot::kRed,
+          .top_right = ui_testing::Screenshot::kBlack,
+          .bottom_left = ui_testing::Screenshot::kBlue,
+          .bottom_right = ui_testing::Screenshot::kGreen}});
+
+    // Image flip: LEFT_RIGHT; Orientation: CCW_90.
+    //
+    // |Bk|R |     |R |Bk|     |Bk|G |
+    // |--|--| --> |--|--| --> |--|--|
+    // |G |Be|     |Be|G |     |R |Be|
+    //
+    expected_colors_map.insert(
+        {std::make_pair(fuc::ImageFlip::LEFT_RIGHT, fuc::Orientation::CCW_90_DEGREES),
+         {.top_left = ui_testing::Screenshot::kBlack,
+          .top_right = ui_testing::Screenshot::kGreen,
+          .bottom_left = ui_testing::Screenshot::kRed,
+          .bottom_right = ui_testing::Screenshot::kBlue}});
+
+    // Image flip: LEFT_RIGHT; Orientation: CCW_180.
+    //
+    // |Bk|R |     |R |Bk|     |G |Be|
+    // |--|--| --> |--|--| --> |--|--|
+    // |G |Be|     |Be|G |     |Bk|R |
+    //
+    expected_colors_map.insert(
+        {std::make_pair(fuc::ImageFlip::LEFT_RIGHT, fuc::Orientation::CCW_180_DEGREES),
+         {.top_left = ui_testing::Screenshot::kGreen,
+          .top_right = ui_testing::Screenshot::kBlue,
+          .bottom_left = ui_testing::Screenshot::kBlack,
+          .bottom_right = ui_testing::Screenshot::kRed}});
+
+    // Image flip: LEFT_RIGHT; Orientation: CCW_270.
+    //
+    // |Bk|R |     |R |Bk|     |Be|R |
+    // |--|--| --> |--|--| --> |--|--|
+    // |G |Be|     |Be|G |     |G |Bk|
+    //
+    expected_colors_map.insert(
+        {std::make_pair(fuc::ImageFlip::LEFT_RIGHT, fuc::Orientation::CCW_270_DEGREES),
+         {.top_left = ui_testing::Screenshot::kBlue,
+          .top_right = ui_testing::Screenshot::kRed,
+          .bottom_left = ui_testing::Screenshot::kGreen,
+          .bottom_right = ui_testing::Screenshot::kBlack}});
+
+    // Image flip: UP_DOWN; Orientation: CCW_0.
+    //
+    // |Bk|R |     |G |Be|
+    // |--|--| --> |--|--|
+    // |G |Be|     |Bk|R |
+    //
+    expected_colors_map.insert(
+        {std::make_pair(fuc::ImageFlip::UP_DOWN, fuc::Orientation::CCW_0_DEGREES),
+         {.top_left = ui_testing::Screenshot::kGreen,
+          .top_right = ui_testing::Screenshot::kBlue,
+          .bottom_left = ui_testing::Screenshot::kBlack,
+          .bottom_right = ui_testing::Screenshot::kRed}});
+
+    // Image flip: UP_DOWN; Orientation: CCW_90.
+    //
+    // |Bk|R |     |G |Be|     |Be|R |
+    // |--|--| --> |--|--| --> |--|--|
+    // |G |Be|     |Bk|R |     |G |Bk|
+    //
+    expected_colors_map.insert(
+        {std::make_pair(fuc::ImageFlip::UP_DOWN, fuc::Orientation::CCW_90_DEGREES),
+         {.top_left = ui_testing::Screenshot::kBlue,
+          .top_right = ui_testing::Screenshot::kRed,
+          .bottom_left = ui_testing::Screenshot::kGreen,
+          .bottom_right = ui_testing::Screenshot::kBlack}});
+
+    // Image flip: UP_DOWN; Orientation: CCW_180.
+    //
+    // |Bk|R |     |G |Be|     |R |Bk|
+    // |--|--| --> |--|--| --> |--|--|
+    // |G |Be|     |Bk|R |     |Be|G |
+    //
+    expected_colors_map.insert(
+        {std::make_pair(fuc::ImageFlip::UP_DOWN, fuc::Orientation::CCW_180_DEGREES),
+         {.top_left = ui_testing::Screenshot::kRed,
+          .top_right = ui_testing::Screenshot::kBlack,
+          .bottom_left = ui_testing::Screenshot::kBlue,
+          .bottom_right = ui_testing::Screenshot::kGreen}});
+
+    // Image flip: UP_DOWN; Orientation: CCW_270.
+    //
+    // |Bk|R |     |G |Be|     |Bk|G |
+    // |--|--| --> |--|--| --> |--|--|
+    // |G |Be|     |Bk|R |     |R |Be|
+    //
+    expected_colors_map.insert(
+        {std::make_pair(fuc::ImageFlip::UP_DOWN, fuc::Orientation::CCW_270_DEGREES),
+         {.top_left = ui_testing::Screenshot::kBlack,
+          .top_right = ui_testing::Screenshot::kGreen,
+          .bottom_left = ui_testing::Screenshot::kRed,
+          .bottom_right = ui_testing::Screenshot::kBlue}});
+  }
+
+  // Returns a color given the pixel index, to produce the following image:
+  //
+  // ___________________________________
+  // |                |                |
+  // |     BLACK      |     RED        |
+  // |                |                |
+  // |________________|________________|
+  // |                |                |
+  // |                |                |
+  // |      GREEN     |     BLUE       |
+  // |________________|________________|
+  //
+  auto GetPixelColor(unsigned int pixel_index, unsigned int bytes_per_row,
+                     unsigned int image_vmo_bytes) {
+    const ui_testing::Pixel color_quadrants[2][2] = {
+        {ui_testing::Screenshot::kBlack, ui_testing::Screenshot::kRed},
+        {ui_testing::Screenshot::kGreen, ui_testing::Screenshot::kBlue},
+    };
+    int vertical_half_index = pixel_index < (image_vmo_bytes / 2) ? 0 : 1;
+    int horizontal_half_index = (pixel_index % bytes_per_row) < (bytes_per_row / 2) ? 0 : 1;
+    return color_quadrants[vertical_half_index][horizontal_half_index];
+  }
+
+  struct FlipAndOrientationHash {
+    std::size_t operator()(std::pair<fuc::ImageFlip, fuc::Orientation> v) const {
+      return static_cast<size_t>(v.first) << 16 | static_cast<size_t>(v.second);
+    }
+  };
+
+  struct ExpectedColors {
+    ui_testing::Pixel top_left;
+    ui_testing::Pixel top_right;
+    ui_testing::Pixel bottom_left;
+    ui_testing::Pixel bottom_right;
+  };
+
+  std::unordered_map<std::pair<fuc::ImageFlip, fuc::Orientation>, ExpectedColors,
+                     FlipAndOrientationHash>
+      expected_colors_map;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    ParameterizedFlipAndOrientationTestWithParams, ParameterizedFlipAndOrientationTest,
+    ::testing::Combine(::testing::Values(fuchsia::sysmem::PixelFormatType::BGRA32,
+                                         fuchsia::sysmem::PixelFormatType::R8G8B8A8),
+                       ::testing::Values(fuc::Orientation::CCW_0_DEGREES,
+                                         fuc::Orientation::CCW_90_DEGREES,
+                                         fuc::Orientation::CCW_180_DEGREES,
+                                         fuc::Orientation::CCW_270_DEGREES),
+                       ::testing::Values(fuc::ImageFlip::LEFT_RIGHT, fuc::ImageFlip::UP_DOWN)));
+
+TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
+  auto [pixel_format, orientation, image_flip] = GetParam();
+
+  const uint32_t num_pixels = display_width_ * display_height_;
+  const uint64_t image_vmo_bytes = num_pixels * kByterPerPixel;
+
+  auto [local_token, scenic_token] = utils::CreateSysmemTokens(sysmem_allocator_.get());
+
+  // Send one token to Flatland Allocator.
+  allocation::BufferCollectionImportExportTokens bc_tokens =
+      allocation::BufferCollectionImportExportTokens::New();
+  fuc::RegisterBufferCollectionArgs rbc_args = {};
+  rbc_args.set_export_token(std::move(bc_tokens.export_token));
+  rbc_args.set_buffer_collection_token(std::move(scenic_token));
+  fuc::Allocator_RegisterBufferCollection_Result result;
+  flatland_allocator_->RegisterBufferCollection(std::move(rbc_args), &result);
+  ASSERT_FALSE(result.is_err());
+
+  // Use the local token to allocate a protected buffer.
+  auto info = SetConstraintsAndAllocateBuffer(
+      std::move(local_token),
+      GetBufferConstraints(pixel_format, fuchsia::sysmem::ColorSpaceType::SRGB));
+
+  // Write the pixel values to the VMO.
+  ASSERT_EQ(image_vmo_bytes, info.settings.buffer_settings.size_bytes);
+
+  zx::vmo& image_vmo = info.buffers[0].vmo;
+
+  unsigned int current_image_content_id = 1;
+  uint8_t* vmo_base;
+  auto status =
+      zx::vmar::root_self()->map(ZX_VM_PERM_WRITE | ZX_VM_PERM_READ, 0, image_vmo, 0,
+                                 image_vmo_bytes, reinterpret_cast<uintptr_t*>(&vmo_base));
+  EXPECT_EQ(ZX_OK, status);
+
+  vmo_base += info.buffers[0].vmo_usable_start;
+
+  unsigned int image_width = display_width_;
+  unsigned int image_height = display_height_;
+  if (orientation == fuc::Orientation::CCW_90_DEGREES ||
+      orientation == fuc::Orientation::CCW_270_DEGREES) {
+    std::swap(image_width, image_height);
+  }
+
+  unsigned int bytes_per_row = image_width * kByterPerPixel;
+  for (uint32_t i = 0; i < image_vmo_bytes; i += kByterPerPixel) {
+    const ui_testing::Pixel color = GetPixelColor(i, bytes_per_row, image_vmo_bytes);
+    // For BGRA32 pixel format, the first and the third byte in the pixel corresponds to the
+    // blue
+    // and the red channel respectively.
+    if (pixel_format == fuchsia::sysmem::PixelFormatType::BGRA32) {
+      vmo_base[i] = color.blue;
+      vmo_base[i + 2] = color.red;
+    }
+    // For R8G8B8A8 pixel format, the first and the third byte in the pixel corresponds to the
+    // red and the blue channel respectively.
+    if (pixel_format == fuchsia::sysmem::PixelFormatType::R8G8B8A8) {
+      vmo_base[i] = color.red;
+      vmo_base[i + 2] = color.blue;
+    }
+    vmo_base[i + 1] = color.green;
+    vmo_base[i + 3] = color.alpha;
+  }
+
+  if (info.settings.buffer_settings.coherency_domain == fuchsia::sysmem::CoherencyDomain::RAM) {
+    EXPECT_EQ(ZX_OK,
+              info.buffers[0].vmo.op_range(ZX_VMO_OP_CACHE_CLEAN, 0, image_vmo_bytes, nullptr, 0));
+  }
+
+  fuc::ImageProperties image_properties = {};
+  image_properties.set_size({image_width, image_height});
+  const fuc::ContentId kImageContentId{.value = current_image_content_id++};
+
+  root_flatland_->CreateImage(kImageContentId, std::move(bc_tokens.import_token), 0,
+                              std::move(image_properties));
+  root_flatland_->SetImageFlip(kImageContentId, image_flip);
+
+  // Present the created Image.
+  root_flatland_->SetContent(kRootTransform, kImageContentId);
+  root_flatland_->SetOrientation(kRootTransform, orientation);
+
+  // Translate back into position after orientating around top-left corner.
+  fuchsia::math::Vec translation;
+  switch (orientation) {
+    case fuc::Orientation::CCW_0_DEGREES:
+      translation = {0, 0};
+      break;
+    case fuc::Orientation::CCW_90_DEGREES:
+      translation = {0, static_cast<int32_t>(image_width)};
+      break;
+    case fuc::Orientation::CCW_180_DEGREES:
+      translation = {static_cast<int32_t>(image_width), static_cast<int32_t>(image_height)};
+      break;
+    case fuc::Orientation::CCW_270_DEGREES:
+      translation = {static_cast<int32_t>(image_height), 0};
+      break;
+  }
+  root_flatland_->SetTranslation(kRootTransform, translation);
+
+  BlockingPresent(root_flatland_);
+
+  auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
+
+  // Verify that the number of pixels is the same (i.e. the image hasn't changed).
+  auto histogram = screenshot.Histogram();
+  EXPECT_EQ(histogram[ui_testing::Screenshot::kBlue], num_pixels / 4);
+  EXPECT_EQ(histogram[ui_testing::Screenshot::kGreen], num_pixels / 4);
+  EXPECT_EQ(histogram[ui_testing::Screenshot::kBlack], num_pixels / 4);
+  EXPECT_EQ(histogram[ui_testing::Screenshot::kRed], num_pixels / 4);
+
+  // Verify that the screenshot corners are the expected color.
+  const auto expected_colors = expected_colors_map.find(std::make_pair(image_flip, orientation));
+  ASSERT_NE(expected_colors, expected_colors_map.end());
+  EXPECT_EQ(screenshot.GetPixelAt(0, 0), expected_colors->second.top_left);
+  EXPECT_EQ(screenshot.GetPixelAt(screenshot.width() - 1, 0), expected_colors->second.top_right);
+  EXPECT_EQ(screenshot.GetPixelAt(0, screenshot.height() - 1), expected_colors->second.bottom_left);
+  EXPECT_EQ(screenshot.GetPixelAt(screenshot.width() - 1, screenshot.height() - 1),
+            expected_colors->second.bottom_right);
 }
 
 // Draws and tests the following coordinate test pattern without views:
