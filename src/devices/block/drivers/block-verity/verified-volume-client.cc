@@ -94,7 +94,7 @@ zx_status_t VerifiedVolumeClient::CreateFromBlockDevice(
   }
 
   // Open the device.
-  fbl::unique_fd verity_fd(openat(devfs_root_fd.get(), verity_path.c_str(), O_RDWR));
+  fbl::unique_fd verity_fd(openat(devfs_root_fd.get(), verity_path.c_str(), O_RDONLY));
   if (!verity_fd) {
     printf("VerifiedVolumeClient: couldn't open verity device at %s\n", verity_path.c_str());
     return ZX_ERR_NOT_FOUND;
@@ -170,7 +170,7 @@ zx_status_t VerifiedVolumeClient::OpenForAuthoring(const zx::duration& timeout,
   }
 
   // Open child device and return
-  mutable_block_fd_out.reset(openat(devfs_root_fd_.get(), mutable_block_path.c_str(), O_RDWR));
+  mutable_block_fd_out.reset(openat(devfs_root_fd_.get(), mutable_block_path.c_str(), O_RDONLY));
   if (!mutable_block_fd_out) {
     printf("VerifiedVolumeClient: failed to open %s\n", mutable_block_path.c_str());
     return ZX_ERR_NOT_FOUND;
@@ -272,7 +272,7 @@ zx_status_t VerifiedVolumeClient::OpenForVerifiedRead(const digest::Digest& expe
     return status;
   }
 
-  verified_block_fd_out.reset(openat(devfs_root_fd_.get(), verified_block_path.c_str(), O_RDWR));
+  verified_block_fd_out.reset(openat(devfs_root_fd_.get(), verified_block_path.c_str(), O_RDONLY));
   if (!verified_block_fd_out) {
     printf("VerifiedVolumeClient: failed to open %s\n", verified_block_path.c_str());
     return ZX_ERR_NOT_FOUND;
