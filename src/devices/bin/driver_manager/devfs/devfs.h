@@ -59,8 +59,6 @@ class Devnode {
   Devnode(Devnode&&) = delete;
   Devnode& operator=(Devnode&&) = delete;
 
-  zx::result<Devnode*> walk(std::string_view path);
-
   // Add a child to this devnode with a given `name`, `protocol`, and `remote.
   // The child will be constructed in `out_child`.
   zx_status_t add_child(std::string_view name, uint32_t protocol, Remote remote,

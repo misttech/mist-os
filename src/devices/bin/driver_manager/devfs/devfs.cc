@@ -88,30 +88,6 @@ void Devnode::advertise_modified() {
   parent_->Notify(name(), fio::wire::WatchEvent::kAdded);
 }
 
-zx::result<Devnode*> Devnode::walk(std::string_view path) {
-  Devnode* dn = this;
-
-  while (!path.empty()) {
-    const size_t i = path.find('/');
-    if (i == 0) {
-      return zx::error(ZX_ERR_BAD_PATH);
-    }
-    std::string_view name = path;
-    if (i != std::string::npos) {
-      name = path.substr(0, i);
-      path = path.substr(i + 1);
-    } else {
-      path = {};
-    }
-    fbl::RefPtr<fs::Vnode> out;
-    if (const zx_status_t status = dn->children().Lookup(name, &out); status != ZX_OK) {
-      return zx::error(status);
-    }
-    dn = &fbl::RefPtr<Devnode::VnodeImpl>::Downcast(out)->holder_;
-  }
-  return zx::ok(dn);
-}
-
 Devnode::VnodeImpl::VnodeImpl(Devnode& holder, Target target)
     : holder_(holder), target_(std::move(target)) {}
 

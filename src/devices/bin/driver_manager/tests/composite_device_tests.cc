@@ -393,6 +393,36 @@ void CompositeAddOrderTestCase::ExecuteTest(AddLocation add) {
                                                  std::size(device_indexes), fragment_device_indexes,
                                                  &composite));
 }
+
+zx::result<Devnode*> resolve_path(Devnode* dn, std::string_view path) {
+  // This function does not work with /dev/class entries due to the downcast to Devnode::VnodeImpl.
+  if (cpp20::starts_with(path, "class/")) {
+    ADD_FAILURE("resolve_path does not work with /dev/class entry: %.*s",
+                static_cast<int>(path.size()), path.data());
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  while (!path.empty()) {
+    const size_t i = path.find('/');
+    if (i == 0) {
+      return zx::error(ZX_ERR_BAD_PATH);
+    }
+    std::string_view name = path;
+    if (i != std::string::npos) {
+      name = path.substr(0, i);
+      path = path.substr(i + 1);
+    } else {
+      path = {};
+    }
+    fbl::RefPtr<fs::Vnode> out;
+    if (const zx_status_t status = dn->children().Lookup(name, &out); status != ZX_OK) {
+      return zx::error(status);
+    }
+    dn = &fbl::RefPtr<Devnode::VnodeImpl>::Downcast(out)->holder_;
+  }
+  return zx::ok(dn);
+}
+
 TEST_F(CompositeAddOrderTestCase, DefineBeforeDevices) {
   ASSERT_NO_FATAL_FAILURE(ExecuteTest(AddLocation::BEFORE));
 }
@@ -933,9 +963,9 @@ TEST_F(CompositeTestCase, Topology) {
     ASSERT_OK(path.status_value());
 
     const std::string_view parent_topological_path{path.value().c_str() + kDev.size()};
-    zx::result parent = root.walk(parent_topological_path);
+    zx::result parent = resolve_path(&root, parent_topological_path);
     ASSERT_OK(parent);
-    zx::result child = parent.value()->walk(kCompositeDevName);
+    zx::result child = resolve_path(parent.value(), kCompositeDevName);
     if (i != 0) {
       // This isn't the primary parent; the composite device isn't a child node.
       ASSERT_STATUS(child.status_value(), ZX_ERR_NOT_FOUND);
