@@ -513,36 +513,14 @@ you exported from your component.
 
 This section assumes you have SSH access to your running Fuchsia system and
 that you started running your component. We will use the name
-`my_component.cmx` as a placeholder for the name of your component.
+`my_component.cm` as a placeholder for the name of your component's manifest.
 
-### Find your Inspect endpoint
-
-The command below prints all available components that expose inspect:
-
-```posix-terminal
-ffx inspect list
-```
-
-The command below prints all `fuchsia.diagnostics.ArchiveAccessor` paths:
-
-```posix-terminal
-ffx inspect list-accessors
-```
-Your component's endpoint is listed as
-`<path>/my_component.cmx/<id>/out/diagnostics/fuchsia.inspect.Tree`.
-However, in some languages (without dynamic value support) and in drivers,
-the data is placed in VMO files instead. In that case, the endpoint is listed
-as `<path>/my_component.cmx/<id>/out/diagnostics/root.inspect`.
-
-An accessor path listed by `ffx inspect list-accessors` can later be used by
-`ffx inspect show` and `ffx inspect selectors` using the `--accessor-path` flag.
-
-The command below prints all available selectors for a component
-(for example, `my_component.cmx`):
-
-```posix-terminal
-ffx inspect selectors my_component.cmx
-```
+Note: Your component's full URL may be
+`fuchsia-pkg://fuchsia.com/my_component#meta/my_component.cm`, but
+you only need the manifest name to find it. This is separate from
+your component's *[moniker]*, which is the location it is running in
+the component hierarchy. You may refer to your component by either
+moniker or manifest name.
 
 ### Read your Inspect data
 
@@ -554,29 +532,53 @@ ffx inspect show
 ```
 
 Using the output from `ffx inspect list`, you can specify a
-single component (for example, `my_component.cmx`) as input to
+single component (for example, `my_component.cm`) as input to
 `ffx inspect show`:
 
 ```posix-terminal
-ffx inspect show my_component.cmx
+ffx inspect show --manifest my_component.cm
 ```
 
-Or specify multiple components (for example, `core/font_provider`
-and `my_component.cmx`):
+Specifying `--manifest` above will return data for all instances
+of your component running on the system. If you know a specific
+moniker of your component (for example, `core/my_component`) you
+may pass that instead:
 
 ```posix-terminal
-ffx inspect show core/font_provider my_component.cmx
+ffx inspect show core/my_component
 ```
 
-You can also specify a node and property value (for example,
-`my_component.cmx:root.inspect)` from `ffx inspect selectors`
+You may specify multiple components (for example, `core/font_provider`
+and `core/my_component`):
+
+```posix-terminal
+ffx inspect show core/font_provider core/my_component
+```
+
+You can also specify a node and property value. To see the
+list of all possible [selectors], use `ffx inspect selectors`:
+
+```posix-terminal
+ffx inspect selectors core/my_component
+```
+
+You may then specify a selector (for example, `core/my_component:root`)
 as input to `ffx inspect show`:
 
 ```posix-terminal
-ffx inspect show my_component.cmx:root
+ffx inspect show core/my_component:root
 ```
 
-This will print out the following if you followed the suggested steps above:
+If you don't know the moniker for your component, you may use
+`--manifest` with a selector that applies to all matched component
+monikers (using `*`):
+
+```posix-terminal
+ffx inspect show --manifest my_component.cm *:root
+```
+
+This will print out the following if you followed the suggested
+steps above:
 
 ```none {:.devsite-disable-click-to-copy}
 root:
@@ -603,3 +605,5 @@ root:
 [ffx-inspect]: https://fuchsia.dev/reference/tools/sdk/ffx.md#inspect
 [health-check]: /docs/development/diagnostics/inspect/health.md
 [overview]: /docs/development/diagnostics/inspect/README.md
+[moniker]: /reference/components/moniker
+[selectors]: /reference/diagnostics/selectors 
