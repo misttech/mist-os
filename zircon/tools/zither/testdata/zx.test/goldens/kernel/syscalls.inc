@@ -16,10 +16,9 @@ KERNEL_SYSCALL(channel_write, zx_status_t, /* no attributes */, 6,
                 _ZX_SYSCALL_ANNO(release_handle("Fuchsia")) const zx_handle_t* handles,
                 uint32_t num_handles))
 
-VDSO_SYSCALL(clock_get_monotonic, void, /* no attributes */, 1, (time), (zx_time_t * time))
+VDSO_SYSCALL(clock_get_monotonic, zx_time_t, /* no attributes */, 0, (), (void))
 
-INTERNAL_SYSCALL(clock_get_monotonic_via_kernel, void, /* no attributes */, 1, (time),
-                 (zx_time_t * time))
+INTERNAL_SYSCALL(clock_get_monotonic_via_kernel, zx_time_t, /* no attributes */, 0, (), (void))
 
 KERNEL_SYSCALL(handle_close_many, zx_status_t, /* no attributes */, 2, (handles, num_handles),
                (_ZX_SYSCALL_ANNO(release_handle("Fuchsia")) const zx_handle_t* handles,

@@ -66,15 +66,12 @@ syscall_result wrapper_channel_write(SafeSyscallArgument<zx_handle_t>::RawType h
       });
 }
 
-syscall_result wrapper_clock_get_monotonic_via_kernel(SafeSyscallArgument<zx_time_t*>::RawType time,
-                                                      uint64_t pc);
-syscall_result wrapper_clock_get_monotonic_via_kernel(SafeSyscallArgument<zx_time_t*>::RawType time,
-                                                      uint64_t pc) {
+syscall_result wrapper_clock_get_monotonic_via_kernel(uint64_t pc);
+syscall_result wrapper_clock_get_monotonic_via_kernel(uint64_t pc) {
   return do_syscall(ZX_SYS_clock_get_monotonic_via_kernel, pc,
                     &VDso::ValidSyscallPC::clock_get_monotonic_via_kernel,
                     [&](ProcessDispatcher* current_process) -> uint64_t {
-                      auto result = sys_clock_get_monotonic_via_kernel(
-                          make_user_out_ptr(SafeSyscallArgument<zx_time_t*>::Sanitize(time)));
+                      auto result = sys_clock_get_monotonic_via_kernel();
                       return result;
                     });
 }

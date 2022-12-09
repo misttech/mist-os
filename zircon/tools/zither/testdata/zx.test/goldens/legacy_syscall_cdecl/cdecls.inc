@@ -16,7 +16,7 @@ _ZX_SYSCALL_DECL(channel_write, zx_status_t, /* no attributes */, 6,
                   _ZX_SYSCALL_ANNO(release_handle("Fuchsia")) const zx_handle_t* handles,
                   uint32_t num_handles))
 
-_ZX_SYSCALL_DECL(clock_get_monotonic, void, /* no attributes */, 1, (time), (zx_time_t * time))
+_ZX_SYSCALL_DECL(clock_get_monotonic, zx_time_t, /* no attributes */, 0, (), (void))
 
 _ZX_SYSCALL_DECL(handle_close_many, zx_status_t, /* no attributes */, 2, (handles, num_handles),
                  (_ZX_SYSCALL_ANNO(release_handle("Fuchsia")) const zx_handle_t* handles,

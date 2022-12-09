@@ -56,12 +56,12 @@ protocol Channel {
 @no_protocol_prefix
 protocol Clockfuncs {
     @vdsocall
-    ClockGetMonotonic() -> (struct {
+    ClockGetMonotonic() -> (@wrapped_return struct {
         time Time;
     });
 
     @internal
-    ClockGetMonotonicViaKernel() -> (struct {
+    ClockGetMonotonicViaKernel() -> (@wrapped_return struct {
         time Time;
     });
 };
