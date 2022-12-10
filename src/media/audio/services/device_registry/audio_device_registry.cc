@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.audio.device/cpp/markers.h>
 #include <fidl/fuchsia.audio.device/cpp/wire.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fidl/cpp/wire/internal/transport.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/errors.h>
@@ -16,11 +17,13 @@
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/device_detector.h"
 #include "src/media/audio/services/device_registry/logging.h"
+#include "src/media/audio/services/device_registry/provider_server.h"
 
 namespace media_audio {
 
 AudioDeviceRegistry::AudioDeviceRegistry(std::shared_ptr<FidlThread> server_thread)
-    : thread_(std::move(server_thread)) {
+    : thread_(std::move(server_thread)),
+      outgoing_(component::OutgoingDirectory(thread_->dispatcher())) {
   ADR_LOG_OBJECT(kLogObjectLifetimes);
 }
 
@@ -65,7 +68,6 @@ void AudioDeviceRegistry::DeviceIsReady(std::shared_ptr<media_audio::Device> rea
     FX_LOGS(ERROR) << __func__ << ": device " << ready_device << " already in initialized list";
     return;
   }
-  // for (auto& registry : registries_) {   registry->DeviceWasAdded(ready_device);  }
 }
 
 void AudioDeviceRegistry::DeviceHasError(std::shared_ptr<media_audio::Device> device_with_error) {
@@ -104,6 +106,39 @@ void AudioDeviceRegistry::DeviceIsRemoved(std::shared_ptr<media_audio::Device> d
     ADR_LOG_OBJECT(kLogObjectLifetimes)
         << "removed " << device_to_remove << " from pending (initializing) device list";
   }
+}
+
+zx_status_t AudioDeviceRegistry::RegisterAndServeOutgoing() {
+  ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods);
+
+  auto status = outgoing_.AddProtocol<fuchsia_audio_device::Provider>(
+      [this](fidl::ServerEnd<fuchsia_audio_device::Provider> server_end) mutable {
+        ADR_LOG_OBJECT(kLogProviderServerMethods)
+            << "Incoming connection for "
+            << fidl::DiscoverableProtocolName<fuchsia_audio_device::Provider>;
+
+        auto provider = CreateProviderServer(std::move(server_end));
+      });
+
+  if (status.is_error()) {
+    FX_LOGS(ERROR) << "Failed to add Provider protocol: " << status.error_value() << " ("
+                   << status.status_string() << ")";
+    return status.status_value();
+  }
+
+  // Set up an outgoing directory with the startup handle (provided by the system to components so
+  // they can serve out FIDL protocols etc).
+  return outgoing_.ServeFromStartupInfo().status_value();
+}
+
+// This does nothing that couldn't be done by calling ProviderServer::Create directly, bit it
+// mirrors similar (upcoming) methods for other FIDL Server classes that WILL do more. If this turns
+// out to not be the case, we will remove this at that time.
+std::shared_ptr<ProviderServer> AudioDeviceRegistry::CreateProviderServer(
+    fidl::ServerEnd<fuchsia_audio_device::Provider> server_end) {
+  ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods || kLogProviderServerMethods);
+
+  return ProviderServer::Create(thread_, std::move(server_end), shared_from_this());
 }
 
 }  // namespace media_audio

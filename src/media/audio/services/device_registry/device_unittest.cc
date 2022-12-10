@@ -30,6 +30,8 @@ TEST_F(DeviceTest, Initialization) {
   EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
   EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
   EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+
+  fake_device_presence_watcher_.reset();
 }
 
 TEST_F(DeviceTest, EmptyHealthResponse) {

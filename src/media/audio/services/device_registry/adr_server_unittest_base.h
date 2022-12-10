@@ -23,6 +23,7 @@
 #include "src/media/audio/services/common/testing/test_server_and_async_client.h"
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
 #include "src/media/audio/services/device_registry/device.h"
+#include "src/media/audio/services/device_registry/provider_server.h"
 #include "src/media/audio/services/device_registry/testing/fake_audio_driver.h"
 
 namespace media_audio {
@@ -41,11 +42,18 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
 
   // Device
   // Create a Device object (backed by a fake driver); insert it to ADR as if it had been detected.
+  // Through the stream_config connection, this will communicate with the fake driver.
   void AddDeviceForDetection(
       std::string_view name, fuchsia_audio_device::DeviceType device_type,
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> stream_config_client_end) {
     adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), name, device_type,
                                            std::move(stream_config_client_end)));
+  }
+
+  // Provider
+  std::unique_ptr<TestServerAndNaturalAsyncClient<ProviderServer>> CreateProviderServer() {
+    return std::make_unique<TestServerAndNaturalAsyncClient<ProviderServer>>(
+        test_loop(), server_thread_, adr_service_);
   }
 
   std::shared_ptr<FidlThread> server_thread_ =

@@ -127,7 +127,7 @@ class Device : public std::enable_shared_from_this<Device>,
   std::weak_ptr<DevicePresenceWatcher> presence_watcher_;
   async_dispatcher_t* dispatcher_;
 
-  // The three values provided upon a successful devfs detection.
+  // The three values provided upon a successful devfs detection or a Provider/AddDevice call.
   const std::string name_;
   const fuchsia_audio_device::DeviceType device_type_;
   fidl::Client<fuchsia_hardware_audio::StreamConfig> stream_config_;

@@ -56,9 +56,8 @@ std::shared_ptr<Device> Device::Create(
                  std::move(stream_config)) {}
   };
 
-  auto device = std::make_shared<MakePublicCtor>(presence_watcher, dispatcher, name, device_type,
-                                                 std::move(stream_config));
-  return device;
+  return std::make_shared<MakePublicCtor>(presence_watcher, dispatcher, name, device_type,
+                                          std::move(stream_config));
 }
 
 // Device notifies presence_watcher when it is available (Ready), unhealthy (Error) or removed.

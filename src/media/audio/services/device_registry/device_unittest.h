@@ -39,6 +39,7 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     fake_driver_ = std::make_unique<FakeAudioDriver>(std::move(server_end), std::move(client_end),
                                                      dispatcher());
   }
+  void TearDown() override { fake_device_presence_watcher_.reset(); }
 
  protected:
   // Used when device_ and fake_driver_ are used (which is the vast majority of cases).
@@ -68,8 +69,6 @@ class DeviceTestBase : public gtest::TestLoopFixture {
   static bool InReadyState(std::shared_ptr<Device> device) {
     return device->state_ == Device::State::Ready;
   }
-
-  // static inline constexpr zx::duration kCommandTimeout = zx::sec(10);
 
   std::shared_ptr<Device> device_;
   std::shared_ptr<Clock> device_clock() { return device_->device_clock_; }

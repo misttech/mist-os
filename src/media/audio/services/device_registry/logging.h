@@ -37,9 +37,12 @@ inline constexpr bool kLogStreamConfigFidlCalls = false;
 inline constexpr bool kLogStreamConfigFidlResponses = false;
 inline constexpr bool kLogStreamConfigFidlResponseValues = false;
 
-inline constexpr bool kLogObjectLifetimes = false;
+inline constexpr bool kLogObjectLifetimes = true;
 inline constexpr bool kLogDeviceState = false;
-inline constexpr bool kLogObjectCounts = false;
+inline constexpr bool kLogObjectCounts = true;
+
+inline constexpr bool kLogProviderServerMethods = false;
+inline constexpr bool kLogProviderServerResponses = false;
 
 std::string UidToString(std::optional<UniqueId> unique_instance_id);
 

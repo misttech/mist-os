@@ -48,6 +48,7 @@ executable("device_registry_unittests_bin") {
     "audio_device_registry_unittest.cc",
     "device_detector_unittest.cc",
     "device_unittest.cc",
+    "provider_server_unittest.cc",
   ]
 
   deps = [
@@ -63,6 +64,7 @@ executable("device_registry_warning_unittests_bin") {
   sources = [
     "audio_device_registry_warning_unittest.cc",
     "device_warning_unittest.cc",
+    "provider_server_warning_unittest.cc",
   ]
 
   deps = [ ":unittest_base" ]
@@ -81,6 +83,8 @@ source_set("device_registry_lib") {
     "device_presence_watcher.h",
     "logging.cc",
     "logging.h",
+    "provider_server.cc",
+    "provider_server.h",
     "validate.cc",
     "validate.h",
   ]
@@ -93,6 +97,7 @@ source_set("device_registry_lib") {
   ]
 
   deps = [
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
     "//src/media/audio/lib/clock",
