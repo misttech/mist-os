@@ -115,7 +115,7 @@ impl Clients {
                 bredr::Channel::try_from(channel).unwrap(),
                 &mut protocol.iter_mut(),
             )
-            .map_err(|e| format_err!("{:?}", e))
+            .map_err(|e| format_err!("{e:?}"))
     }
 }
 
@@ -193,19 +193,19 @@ impl RfcommServer {
         server_channel: ServerChannel,
         responder: bredr::ProfileConnectResponder,
     ) -> Result<(), Error> {
-        trace!("Received request to open RFCOMM channel {:?} with peer {:?}", server_channel, id);
+        trace!(%id, "Received request to open RFCOMM channel ({server_channel:?})");
 
         match self.sessions.get(&id).and_then(|s| s.upgrade()) {
             None => {
                 // Peer either disconnected or doesn't exist.
                 let _ = responder.send(&mut Err(ErrorCode::Failed));
-                Err(format_err!("Invalid peer ID {:?}", id))
+                Err(format_err!("Invalid peer ID {id}"))
             }
             Some(session) => {
                 let channel_opened_callback =
                     Box::new(move |channel: Result<Channel, ErrorCode>| {
                         let mut channel = channel.map(|c| bredr::Channel::try_from(c).unwrap());
-                        responder.send(&mut channel).map_err(|e| format_err!("{:?}", e))
+                        responder.send(&mut channel).map_err(|e| format_err!("{e:?}"))
                     });
                 session.open_rfcomm_channel(server_channel, channel_opened_callback).await;
                 Ok(())
@@ -220,9 +220,9 @@ impl RfcommServer {
     /// Otherwise, creates and stores a new session over the provided `l2cap` channel.
     pub fn new_l2cap_connection(&mut self, id: PeerId, l2cap: Channel) -> Result<(), Error> {
         if self.is_active_session(&id) {
-            return Err(format_err!("RFCOMM Session already exists with peer {:?}", id));
+            return Err(format_err!("RFCOMM Session already exists with peer {id}"));
         }
-        info!("Received new l2cap connection from peer {:?}", id);
+        info!(%id, "Received new l2cap connection");
 
         // Create a new RFCOMM Session with the provided `channel_opened_callback` which will be
         // called anytime an RFCOMM channel is created. Opened RFCOMM channels will be delivered
@@ -237,7 +237,7 @@ impl RfcommServer {
         let _ = session.iattach(&self.inspect, inspect::unique_name("peer_"));
         let closed_fut = session.finished();
         if self.sessions.insert(id, session).is_some() {
-            warn!("Overwriting existing RFCOMM session");
+            warn!(%id, "Overwriting existing RFCOMM session");
         }
 
         // Task eagerly removes the Session from the set of active sessions upon termination.
@@ -268,8 +268,7 @@ impl RfcommServer {
                     Ok(sc) => sc,
                     Err(e) => {
                         warn!(
-                            "RemoteLineStatus FIDL request with invalid ServerChannel number: {:?}",
-                            e
+                            "RemoteLineStatus FIDL request with invalid ServerChannel number: {e:?}"
                         );
                         return;
                     }

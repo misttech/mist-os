@@ -412,7 +412,7 @@ impl SessionChannel {
                             flow_controller.send_data_to_peer(user_data).await;
                         }
                         Some(Err(e)) => {
-                            error!("Error receiving data from client {:?}", e);
+                            error!("Error receiving data from client {e:?}");
                         }
                         None => {
                             trace!("RFCOMM channel closed by profile");
@@ -432,7 +432,7 @@ impl SessionChannel {
                 complete => break,
             }
         }
-        info!("Profile-client processing task for DLCI {:?} finished", dlci);
+        info!("Profile-client processing task for DLCI {dlci:?} finished");
         // Client closed the `channel` - notify listener of termination.
         let _ = termination_sender.send(());
     }
@@ -493,7 +493,7 @@ impl SessionChannel {
         // This unwrap is safe because the task is guaranteed to be set if the channel
         // has been established.
         let queue = &mut self.processing_task.as_mut().unwrap().user_data_queue;
-        queue.send(data).await.map_err(|e| anyhow::format_err!("{:?}", e).into())
+        queue.send(data).await.map_err(|e| anyhow::format_err!("{e:?}").into())
     }
 }
 

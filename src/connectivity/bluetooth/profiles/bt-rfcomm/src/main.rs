@@ -9,7 +9,7 @@ use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect_derive::Inspect;
 use futures::{self, channel::mpsc, future, pin_mut};
-use tracing::warn;
+use tracing::{debug, warn};
 
 mod fidl_service;
 mod profile;
@@ -41,7 +41,7 @@ pub async fn main() -> Result<(), Error> {
         warn!("Failed to attach to inspect: {}", e);
     }
     let profile_registrar_fut = profile_registrar.start(service_receiver);
-
+    debug!("RFCOMM component running");
     match future::select(services, profile_registrar_fut).await {
         future::Either::Left(((), _)) => {
             warn!("Service FS directory handle closed. Exiting.");

@@ -214,16 +214,16 @@ impl SessionInner {
                     self.relay_inbound_channel_to_client(server_channel, channel).await
                 };
                 if let Err(e) = result {
-                    warn!("Couldn't relay channel to client: {:?}", e);
+                    warn!("Couldn't relay channel to client: {e:?}");
                     // Close the local end of the RFCOMM channel.
                     let _ = self.multiplexer().close_session_channel(&dlci);
                     return false;
                 }
-                trace!("Established RFCOMM Channel with DLCI: {:?}", dlci);
+                trace!("Established RFCOMM Channel with DLCI: {dlci:?}");
                 true
             }
             Err(e) => {
-                warn!("Couldn't establish DLCI {:?}: {:?}", dlci, e);
+                warn!("Couldn't establish DLCI {dlci:?}: {e:?}");
                 false
             }
         }
@@ -240,7 +240,7 @@ impl SessionInner {
 
         if let Some(channel_open_fn) = self.pending_channels.remove(&server_channel) {
             if let Err(e) = self.open_remote_channel(server_channel, channel_open_fn).await {
-                warn!("Error opening outbound remote channel {:?}: {:?}", server_channel, e);
+                warn!("Error opening outbound remote channel {server_channel:?}: {e:?}");
             }
         }
         Ok(())
@@ -255,9 +255,9 @@ impl SessionInner {
 
         let outstanding_channels = std::mem::take(&mut self.pending_channels);
         for (server_channel, channel_open_fn) in outstanding_channels {
-            trace!("Processing outstanding open channel request: {:?}", server_channel);
+            trace!("Processing outstanding open channel request: {server_channel:?}");
             if let Err(e) = self.open_remote_channel(server_channel, channel_open_fn).await {
-                warn!("Error opening remote channel {:?}: {:?}", server_channel, e);
+                warn!("Error opening remote channel {server_channel:?}: {e:?}");
             }
         }
         Ok(())
@@ -302,7 +302,7 @@ impl SessionInner {
         // The result is irrelevant because the DLCI was just created and can't be established
         // already. Setting the initial credits should always succeed.
         if let Err(e) = self.multiplexer().set_flow_control(params.dlci, flow_control) {
-            warn!("Setting flow control failed: {:?}", e);
+            warn!("Setting flow control failed: {e:?}");
         }
     }
 
@@ -314,10 +314,9 @@ impl SessionInner {
         channel_result: Result<Channel, ErrorCode>,
     ) -> Result<(), Error> {
         if let Some(callback) = self.pending_channels.remove(&server_channel) {
-            return callback(channel_result)
-                .map_err(|e| Error::Other(format_err!("{:?}", e).into()));
+            return callback(channel_result).map_err(|e| Error::Other(format_err!("{e:?}").into()));
         }
-        Err(Error::Other(format_err!("No outstanding client for: {:?}", server_channel).into()))
+        Err(Error::Other(format_err!("No outstanding client for: {server_channel:?}").into()))
     }
 
     /// Relays the inbound `channel` opened for the provided `server_channel` to the local clients
@@ -329,7 +328,7 @@ impl SessionInner {
     ) -> Result<(), Error> {
         (self.channel_opened_fn)(server_channel, channel)
             .await
-            .map_err(|e| format_err!("{:?}", e).into())
+            .map_err(|e| format_err!("{e:?}").into())
     }
 
     /// Attempts to initiate multiplexer startup by sending an SABM command over the
@@ -476,7 +475,7 @@ impl SessionInner {
     /// 1) Mux Control DLCI - indicates request to start up the session multiplexer.
     /// 2) User DLCI - indicates request to establish up an RFCOMM channel over the provided `dlci`.
     async fn handle_sabm_command(&mut self, dlci: DLCI) {
-        trace!("Handling SABM with DLCI: {:?}", dlci);
+        trace!("Handling SABM with DLCI: {dlci:?}");
         if dlci.is_mux_control() {
             match &self.role() {
                 Role::Unassigned => {
@@ -485,7 +484,7 @@ impl SessionInner {
                     match self.multiplexer().start(Role::Responder) {
                         Ok(_) => self.send_ua_response(dlci).await,
                         Err(e) => {
-                            warn!("Mux startup failed: {:?}", e);
+                            warn!("Mux startup failed: {e:?}");
                             self.send_dm_response(dlci).await;
                         }
                     }
@@ -511,7 +510,7 @@ impl SessionInner {
         // channel for the given DLCI. If this fails, reply with a DM response for the `dlci`.
         match dlci.validate(self.role()) {
             Err(e) => {
-                warn!("Received SABM with invalid DLCI: {:?}", e);
+                warn!("Received SABM with invalid DLCI: {e:?}");
                 self.send_dm_response(dlci).await;
             }
             Ok(_) => {
@@ -649,7 +648,7 @@ impl SessionInner {
         {
             // If there was an error sending the user data for any reason, we reply with
             // a DM to indicate failure.
-            warn!("Couldn't relay user data: {:?}", e);
+            warn!("Couldn't relay user data: {e:?}");
             self.send_dm_response(dlci).await;
         }
     }
@@ -763,7 +762,7 @@ impl SessionInner {
     /// Handles the error case when parsing a frame and sends an optional response frame if
     /// needed.
     async fn handle_frame_parse_error(&mut self, e: FrameParseError) {
-        warn!("Error parsing frame: {:?}", e);
+        warn!("Error parsing frame: {e:?}");
         // Currently, the only frame parsing error that requires a response is the MuxCommand
         // parsing error.
         match e {
@@ -828,7 +827,7 @@ impl SessionInner {
         // bookkeeping step will allow us to easily match received responses to our sent
         // commands.
         if let Err(e) = self.outstanding_frames.register_frame(&frame) {
-            warn!("Couldn't send frame: {:?}", e);
+            warn!("Couldn't send frame: {e:?}");
             return;
         }
 
@@ -850,11 +849,11 @@ impl SessionInner {
             match Frame::parse(w_inner.role().opposite_role(), w_inner.credit_based_flow(), &bytes)
             {
                 Ok(f) => {
-                    trace!("Parsed frame from peer: {:?}", f);
+                    trace!("Parsed frame from peer: {f:?}");
                     match w_inner.handle_frame(f).await {
                         Ok(true) => break,
                         Ok(false) => {}
-                        Err(e) => warn!("Error handling RFCOMM frame: {:?}", e),
+                        Err(e) => warn!("Error handling RFCOMM frame: {e:?}"),
                     }
                 }
                 Err(e) => {
@@ -961,7 +960,7 @@ impl Session {
         let _ = futures::future::join(session_inner_task, peer_processing_task).await;
 
         // Session has finished; notify any subscribed clients.
-        info!("Session with peer {:?} ended", id);
+        info!(%id, "Session with peer ended");
         let _ = termination_sender.send(());
     }
 
@@ -985,7 +984,7 @@ impl Session {
                             }
                         },
                         Some(Err(e)) => {
-                            error!("Error reading bytes from l2cap channel: {:?}", e);
+                            error!("Error reading bytes from l2cap channel: {e:?}");
                         },
                         None => {
                             info!("Peer closed L2CAP connection, exiting");
@@ -1007,7 +1006,7 @@ impl Session {
                     trace!("Sending frame to remote: {:?}", frame);
                     let mut buf = vec![0; frame.encoded_len()];
                     if let Err(e) = frame.encode(&mut buf[..]) {
-                        warn!("Couldn't encode frame: {:?}", e);
+                        warn!("Couldn't encode frame: {e:?}");
                         continue;
                     }
                     // The result of this send is irrelevant, as failure would
@@ -1037,7 +1036,7 @@ impl Session {
     ) {
         let mut w_inner = self.inner.lock().await;
         if let Err(e) = w_inner.open_remote_channel(server_channel, channel_opened_cb).await {
-            warn!("Couldn't open RFCOMM channel: {:?}", e);
+            warn!("Couldn't open RFCOMM channel: {e:?}");
         }
     }
 
@@ -1045,7 +1044,7 @@ impl Session {
     pub async fn close(&self) {
         let mut w_inner = self.inner.lock().await;
         if let Err(e) = w_inner.close().await {
-            warn!("Couldn't close RFCOMM session: {:?}", e);
+            warn!("Couldn't close RFCOMM session: {e:?}");
         }
     }
 
@@ -1057,7 +1056,7 @@ impl Session {
     ) {
         let mut w_inner = self.inner.lock().await;
         if let Err(e) = w_inner.send_remote_line_status(server_channel, status).await {
-            warn!("Couldn't close RFCOMM session: {:?}", e);
+            warn!("Couldn't close RFCOMM session: {e:?}");
         }
     }
 }

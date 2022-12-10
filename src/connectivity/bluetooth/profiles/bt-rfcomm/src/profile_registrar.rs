@@ -149,6 +149,7 @@ impl ProfileRegistrar {
         channel: bredr::Channel,
         protocol: Vec<bredr::ProtocolDescriptor>,
     ) -> Result<(), Error> {
+        trace!(%peer_id, "Received incoming L2CAP connection request {protocol:?}");
         let local = protocol.iter().map(|p| p.into()).collect();
         match psm_from_protocol(&local).ok_or(format_err!("No PSM provided"))? {
             Psm::RFCOMM => self.rfcomm_server.new_l2cap_connection(peer_id, channel.try_into()?),
@@ -184,7 +185,7 @@ impl ProfileRegistrar {
                     return Err(e);
                 }
                 Err(e) => {
-                    warn!("Couldn't establish L2CAP connection with {:?}: {:?}", peer_id, e);
+                    warn!(%peer_id, "Couldn't establish L2CAP connection {e:?}");
                     return Err(ErrorCode::Failed);
                 }
             };
@@ -202,6 +203,7 @@ impl ProfileRegistrar {
         mut connection: bredr::ConnectParameters,
         responder: bredr::ProfileConnectResponder,
     ) -> Result<(), Error> {
+        trace!(%peer_id, "Making outgoing connection request {connection:?}");
         // If the provided `connection` is for a non-RFCOMM PSM, simply forward the outbound
         // connection to the upstream Profile service.
         // Otherwise, route to the RFCOMM server.
@@ -269,7 +271,7 @@ impl ProfileRegistrar {
                 Ok(request) => {
                     let _ = sender.send(ConnectionEvent::Request(request)).await;
                 }
-                Err(e) => info!("Connection request error: {:?}", e),
+                Err(e) => info!("Connection request error: {e:?}"),
             }
         }
         // The upstream server has dropped the ConnectionReceiver. Let the
@@ -386,7 +388,7 @@ impl ProfileRegistrar {
             let _ = adv_fut
                 .await
                 .and_then(|mut r| responder.send(&mut r))
-                .map_err(|e| trace!("Relayed advertisement terminated: {:?}", e));
+                .map_err(|e| trace!("Relayed advertisement terminated: {e:?}"));
         }
     }
 
@@ -413,7 +415,7 @@ impl ProfileRegistrar {
                         .add_managed_advertisement(services_local, parameters, receiver, responder)
                         .await
                     {
-                        Err(e) => warn!("Error handling advertise request: {:?}", e),
+                        Err(e) => warn!("Error handling advertise request: {e:?}"),
                         Ok(evt_stream) => return Some(AdvertiseResult::EventStream(evt_stream)),
                     }
                 } else {
@@ -424,10 +426,9 @@ impl ProfileRegistrar {
                 }
             }
             bredr::ProfileRequest::Connect { peer_id, connection, responder, .. } => {
-                if let Err(e) =
-                    self.handle_outgoing_connection(peer_id.into(), connection, responder).await
-                {
-                    warn!("Error establishing outgoing connection {:?}", e);
+                let id = peer_id.into();
+                if let Err(e) = self.handle_outgoing_connection(id, connection, responder).await {
+                    warn!(%id, "Error establishing outgoing connection {e:?}");
                 }
             }
             bredr::ProfileRequest::Search { service_uuid, attr_ids, results, .. } => {
@@ -502,7 +503,7 @@ impl ProfileRegistrar {
                     let profile_request = match profile_request {
                         Ok(request) => request,
                         Err(e) => {
-                            info!("Error from Profile request: {:?}", e);
+                            info!("Error from Profile request: {e:?}");
                             continue;
                         }
                     };
@@ -514,23 +515,23 @@ impl ProfileRegistrar {
                 connection_request = connection_receiver.select_next_some() => {
                     // Incoming connection request from the upstream Profile server.
                     if let Err(e) = self.handle_connection_request(connection_request).await {
-                        warn!("Error processing incoming l2cap connection request: {:?}", e);
+                        warn!("Error processing incoming l2cap connection request: {e:?}");
                     }
                 }
                 service_event = client_event_streams.next() => {
                     // `Profile` client has terminated their service advertisement.
                     if let Some(StreamItem::Epitaph(service_id)) = service_event {
                         // Unregister the service from the ProfileRegistrar.
-                        info!("Client {:?} unregistered service advertisement", service_id);
+                        info!("Client {service_id:?} unregistered service advertisement");
                         if let Err(e) = self.unregister_service(service_id).await {
-                            warn!("Error unregistering service {:?}: {:?}", service_id, e);
+                            warn!("Error unregistering service {service_id:?}: {e:?}");
                         }
                     }
                 }
                 request = test_requests.select_next_some() => {
                     match request {
                         Ok(req) => self.rfcomm_server.handle_test_request(req).await,
-                        Err(e) => warn!("RfcommTest request is error: {:?}", e),
+                        Err(e) => warn!("RfcommTest request is error: {e:?}"),
                     }
                 }
                 complete => break,
