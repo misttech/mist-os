@@ -539,9 +539,13 @@ impl Provider {
                             self.pairing = Default::default();
                         }
                         Some(id) => {
-                            // Pairing completed for peer.
+                            // Pairing completed for peer - notify the Fast Pair FIDL client &
+                            // `sys.Pairing` FIDL client of completion.
                             info!(%id, "Fast Pair pairing completed");
                             self.upstream.notify_pairing_complete(id);
+                            if let Some(pairing) = self.pairing.inner_mut() {
+                                pairing.notify_pairing_complete(id);
+                            }
                         }
                     }
                 }
@@ -1043,6 +1047,10 @@ mod tests {
 
         // Upstream client should be notified that Fast Pair pairing has successfully completed.
         let pairing_complete_fut = mock_upstream.expect_on_pairing_complete(PEER_ID);
+        pin_mut!(pairing_complete_fut);
+        let () = exec.run_until_stalled(&mut pairing_complete_fut).expect("should resolve");
+        // `sys.Pairing` client should also be notified of completion.
+        let pairing_complete_fut = mock_pairing.expect_on_pairing_complete(PEER_ID);
         pin_mut!(pairing_complete_fut);
         let () = exec.run_until_stalled(&mut pairing_complete_fut).expect("should resolve");
     }

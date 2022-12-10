@@ -300,6 +300,17 @@ impl PairingManager {
         Ok(this)
     }
 
+    /// Notifies the upstream `sys.Pairing` client of Fast Pair completion.
+    pub fn notify_pairing_complete(&self, id: PeerId) {
+        if let Err(e) = self
+            .upstream_client
+            .delegate
+            .on_pairing_complete(&mut id.into(), /* success */ true)
+        {
+            warn!(%id, "Couldn't notify `sys.Pairing` client: {e:}");
+        }
+    }
+
     /// Attempts to set the downstream Pairing Delegate.
     ///
     /// Note: This is an internal method. To avoid unnecessary churn, it should only be used when
@@ -780,6 +791,18 @@ pub(crate) mod tests {
                 .into_set_pairing_delegate()
                 .unwrap();
             self.downstream_delegate_client = delegate.into_proxy().unwrap();
+        }
+
+        pub async fn expect_on_pairing_complete(&mut self, id: PeerId) {
+            let (received_id, success, _) = self
+                .upstream_delegate_server
+                .select_next_some()
+                .await
+                .expect("fidl request")
+                .into_on_pairing_complete()
+                .unwrap();
+            assert_eq!(received_id, id.into());
+            assert!(success);
         }
 
         pub fn make_pairing_request(
