@@ -8,6 +8,15 @@
 
 set -eo pipefail
 
+# Use temp files for intermediates, and delete them upon exit.
+TEMP_FILES=()
+make_temp_file() {
+    local temp="$(mktemp)"
+    TEMP_FILES+=("$temp")
+    printf -v "$1" -- "$temp"
+}
+trap 'rm -f "${TEMP_FILES[@]}"' EXIT HUP INT TERM
+
 SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ZIRCON_DIR="${SCRIPTS_DIR}/.."
 
@@ -135,7 +144,7 @@ fi
 BOOT_SHIM="${ROOT_BUILD_DIR}/${BOARD}-boot-shim.bin"
 
 # zircon ZBI image with prepended boot shim
-SHIMMED_ZIRCON_BOOTIMAGE="${ZIRCON_BOOTIMAGE}.shim"
+make_temp_file SHIMMED_ZIRCON_BOOTIMAGE
 
 # Final packaged Android style boot.img
 if [[ -z "${BOOT_IMG}" ]]; then
@@ -151,8 +160,8 @@ fi
 
 # Append extra command line items
 if [[ -n "${CMDLINE}" ]]; then
-    CMDLINE_FILE="${ZIRCON_BOOTIMAGE}-cmdline.txt"
-    CMDLINE_BOOTIMAGE="${ZIRCON_BOOTIMAGE}.cmdline"
+    make_temp_file CMDLINE_FILE
+    make_temp_file CMDLINE_BOOTIMAGE
 
     echo ${CMDLINE} > "${CMDLINE_FILE}"
     "${ZBI}" -o "${CMDLINE_BOOTIMAGE}" "${ZIRCON_BOOTIMAGE}" -T cmdline "${CMDLINE_FILE}"
@@ -165,10 +174,10 @@ cat "${BOOT_SHIM}" "${CMDLINE_BOOTIMAGE}" > "${SHIMMED_ZIRCON_BOOTIMAGE}"
 
 # Optionally compress the shimmed image
 if [[ ${USE_GZIP} == true ]]; then
-    COMPRESSED_BOOTIMAGE="${ZIRCON_BOOTIMAGE}.gz"
+    make_temp_file COMPRESSED_BOOTIMAGE
     gzip -c "${SHIMMED_ZIRCON_BOOTIMAGE}" > "${COMPRESSED_BOOTIMAGE}"
 elif [[ ${USE_LZ4} == true ]]; then
-    COMPRESSED_BOOTIMAGE="${ZIRCON_BOOTIMAGE}.lz4"
+    make_temp_file COMPRESSED_BOOTIMAGE
     "${LZ4}" -B4 -c "${SHIMMED_ZIRCON_BOOTIMAGE}" > "${COMPRESSED_BOOTIMAGE}"
 else
     COMPRESSED_BOOTIMAGE="${SHIMMED_ZIRCON_BOOTIMAGE}"
@@ -176,7 +185,7 @@ fi
 
 # Handle options for packaging dtb
 if [[ -n "${DTB_PATH}" ]] && [[ "${DTB_DEST}" == "append" ]]; then
-    COMPRESSED_BOOTIMAGE_DTB="${COMPRESSED_BOOTIMAGE}.dtb"
+    make_temp_file COMPRESSED_BOOTIMAGE_DTB
     cat "${COMPRESSED_BOOTIMAGE}" "${DTB_PATH}" > "${COMPRESSED_BOOTIMAGE_DTB}"
 elif [[ -n "${DTB_PATH}" ]] && [[ "${DTB_DEST}" == "mkbootimg" ]]; then
     COMPRESSED_BOOTIMAGE_DTB="${COMPRESSED_BOOTIMAGE}"
@@ -191,7 +200,7 @@ if [[ "${RAMDISK_TYPE}" == "zbi" ]]; then
 elif [[ "${RAMDISK_TYPE}" == "none" ]]; then
     RAMDISK_OPTION=""
 else
-    RAMDISK="${ROOT_BUILD_DIR}/dummy-ramdisk"
+    make_temp_file RAMDISK
     echo "foo" > "${RAMDISK}"
     RAMDISK_OPTION="--ramdisk ${RAMDISK}"
 fi
