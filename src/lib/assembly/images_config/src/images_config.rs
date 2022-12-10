@@ -209,11 +209,6 @@ pub struct BlobFS {
     #[serde(default = "default_blobfs_name")]
     pub name: String,
 
-    /// Optionally compress the volume file.
-    /// TODO(fxbug.dev/117111): This is now inferred by the package mode.
-    #[serde(default = "default_blobfs_compress")]
-    pub compress: bool,
-
     /// Optional deprecated layout.
     #[serde(default = "default_blobfs_layout")]
     pub layout: BlobFSLayout,
@@ -238,10 +233,6 @@ pub struct BlobFS {
 
 fn default_blobfs_name() -> String {
     "blob".into()
-}
-
-fn default_blobfs_compress() -> bool {
-    true
 }
 
 fn default_blobfs_layout() -> BlobFSLayout {
@@ -530,7 +521,6 @@ mod tests {
                             {
                                 type: "blobfs",
                                 name: "blob",
-                                compress: true,
                                 layout: "compact",
                                 maximum_bytes: 0,
                                 minimum_data_bytes: 0,

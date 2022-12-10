@@ -218,9 +218,6 @@ template("assembled_system") {
   assert(defined(invoker.base_packages), "Need to define base_packages")
   assert(defined(invoker.bootfs_labels), "Need to define bootfs_labels")
 
-  # TODO(fxbug.dev/117111): Remove all usages of assembly_compress_blobs.
-  not_needed(invoker, [ "assembly_compress_blobs" ])
-
   if (defined(invoker.product_assembly_config_dep)) {
     assert(
         invoker.product_assembly_config_dep != "",

@@ -677,7 +677,6 @@ mod tests {
         );
         builder.filesystem(FvmFilesystem::BlobFS(BlobFS {
             name: "blob".into(),
-            compress: false,
             layout: BlobFSLayout::Compact,
             maximum_bytes: None,
             minimum_data_bytes: None,
@@ -809,7 +808,6 @@ mod tests {
         );
         builder.filesystem(FvmFilesystem::BlobFS(BlobFS {
             name: "blob".into(),
-            compress: false,
             layout: BlobFSLayout::Compact,
             maximum_bytes: None,
             minimum_data_bytes: None,

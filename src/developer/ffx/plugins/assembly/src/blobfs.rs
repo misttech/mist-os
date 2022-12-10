@@ -83,7 +83,6 @@ mod tests {
         let image_config = ImageAssemblyConfig::new_for_testing("kernel", 0);
         let blobfs_config = BlobFS {
             name: "blob".into(),
-            compress: true,
             layout: BlobFSLayout::Compact,
             maximum_bytes: None,
             minimum_data_bytes: None,
@@ -164,7 +163,6 @@ mod tests {
         let image_config = ImageAssemblyConfig::new_for_testing("kernel", 0);
         let blobfs_config = BlobFS {
             name: "blob".into(),
-            compress: true,
             layout: BlobFSLayout::Compact,
             maximum_bytes: None,
             minimum_data_bytes: None,
