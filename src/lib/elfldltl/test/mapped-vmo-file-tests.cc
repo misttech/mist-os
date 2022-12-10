@@ -6,7 +6,7 @@
 #include <zircon/errors.h>
 #include <zircon/syscalls.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace {
 
@@ -14,8 +14,8 @@ constexpr std::string_view kContents = "file contents";
 
 TEST(ElfldltlMappedVmoFileTests, Basic) {
   zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(kContents.size(), 0, &vmo));
-  ASSERT_OK(vmo.write(kContents.data(), 0, kContents.size()));
+  ASSERT_EQ(zx::vmo::create(kContents.size(), 0, &vmo), ZX_OK);
+  ASSERT_EQ(vmo.write(kContents.data(), 0, kContents.size()), ZX_OK);
 
   elfldltl::MappedVmoFile vmofile;
   ASSERT_TRUE(vmofile.Init(vmo.borrow()).is_ok());

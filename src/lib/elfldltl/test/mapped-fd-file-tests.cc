@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 
 #include <fbl/unique_fd.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace {
 
@@ -17,7 +17,7 @@ constexpr std::string_view kContents = "file contents";
 
 TEST(ElfldltlMappedFdFileTests, Basic) {
   FILE* f = tmpfile();
-  ASSERT_NOT_NULL(f);
+  ASSERT_NE(f, nullptr);
   auto close_f = fit::defer([f]() { EXPECT_EQ(0, fclose(f)); });
 
   ASSERT_EQ(kContents.size(), fwrite(kContents.data(), 1, kContents.size(), f));

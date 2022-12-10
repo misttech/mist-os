@@ -15,7 +15,7 @@
 #include <type_traits>
 #include <utility>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace {
 
@@ -43,7 +43,7 @@ class StringFile {
       : file_(tmpfile())
 #endif
   {
-    ASSERT_NOT_NULL(file_);
+    EXPECT_NE(file_, nullptr);
   }
 
   FILE* file() { return file_; }
@@ -53,12 +53,12 @@ class StringFile {
     EXPECT_EQ(0, fflush(file_));
     return std::string(buffer_, buffer_size_);
 #endif
-    EXPECT_EQ(0, fseek(file_, 0, SEEK_END), "fseek: %s", strerror(errno));
+    EXPECT_EQ(0, fseek(file_, 0, SEEK_END)) << "fseek: " << strerror(errno);
     std::string result(ftell(file_), 'x');
     rewind(file_);
     EXPECT_FALSE(ferror(file_));
-    EXPECT_EQ(1, fread(result.data(), result.size(), 1, file_), "fread of %zu: %s", result.size(),
-              strerror(errno));
+    EXPECT_EQ(1u, fread(result.data(), result.size(), 1, file_))
+        << "fread of " << result.size() << ": " << strerror(errno);
     return result;
   }
 
@@ -99,7 +99,7 @@ TEST(ElfldltlNoteTests, Empty) {
     EXPECT_TRUE(note.name.empty());
     EXPECT_TRUE(note.desc.empty());
     EXPECT_EQ(note.type, uint32_t{0});
-    FAIL("container should be empty");
+    FAIL() << "container should be empty";
   }
 }
 
@@ -144,15 +144,15 @@ TEST(ElfldltlNoteTests, BuildId) {
 
     EXPECT_TRUE(note.IsBuildId());
 
-    EXPECT_EQ(16, note.HexSize());
+    EXPECT_EQ(16u, note.HexSize());
 
     std::string str;
     note.HexDump([&str](char c) { str += c; });
-    EXPECT_STREQ(str, "0102030405060708");
+    EXPECT_EQ(str, "0102030405060708");
 
     StringFile sf;
     note.HexDump(sf.file());
-    EXPECT_STREQ(std::move(sf).contents(), "0102030405060708");
+    EXPECT_EQ(std::move(sf).contents(), "0102030405060708");
   }
   EXPECT_EQ(count, size_t{1});
 }
@@ -166,7 +166,7 @@ TEST(ElfldltlFileNoteTests, ObserveEmpty) {
   elfldltl::DirectMemory file;
   elfldltl::PhdrFileNoteObserver observer(Elf{}, file, elfldltl::NoArrayFromFile<Phdr>(),
                                           [](const elfldltl::ElfNote& note) {
-                                            EXPECT_TRUE(false, "callback shouldn't be called");
+                                            EXPECT_TRUE(false) << "callback shouldn't be called";
                                             return false;
                                           });
   std::vector<std::string> errors;
@@ -175,7 +175,7 @@ TEST(ElfldltlFileNoteTests, ObserveEmpty) {
   Phdr phdr{.filesz = 0};
   ASSERT_TRUE(
       observer.Observe(diag, elfldltl::PhdrTypeMatch<elfldltl::ElfPhdrType::kNote>{}, phdr));
-  EXPECT_EQ(diag.warnings() + diag.errors(), 0);
+  EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
 }
 
 TEST(ElfldltlFileNoteTests, ObserveBadFile) {
@@ -185,7 +185,7 @@ TEST(ElfldltlFileNoteTests, ObserveBadFile) {
   elfldltl::DirectMemory file;
   elfldltl::PhdrFileNoteObserver observer(Elf{}, file, elfldltl::NoArrayFromFile<Phdr>(),
                                           [](const elfldltl::ElfNote& note) {
-                                            EXPECT_TRUE(false, "callback shouldn't be called");
+                                            EXPECT_TRUE(false) << "callback shouldn't be called";
                                             return false;
                                           });
   std::vector<std::string> errors;
@@ -193,8 +193,8 @@ TEST(ElfldltlFileNoteTests, ObserveBadFile) {
 
   Phdr phdr{.filesz = 1};
   observer.Observe(diag, elfldltl::PhdrTypeMatch<elfldltl::ElfPhdrType::kNote>{}, phdr);
-  EXPECT_EQ(diag.warnings(), 0);
-  EXPECT_EQ(diag.errors(), 1);
+  EXPECT_EQ(diag.warnings(), 0u);
+  EXPECT_EQ(diag.errors(), 1u);
   EXPECT_EQ(errors[0], "failed to read note segment from file");
 }
 
@@ -223,16 +223,16 @@ TEST(ElfldltlFileNoteTests, ObserveOneBuildID) {
     std::optional<elfldltl::ElfNote> note;
     EXPECT_FALSE(observeNotes(note_data, diag, ObserveBuildIdNote(note)));
     ASSERT_TRUE(note.has_value());
-    EXPECT_EQ(*note, note_data);
-    EXPECT_EQ(diag.warnings() + diag.errors(), 0);
+    EXPECT_EQ(note_data, *note);
+    EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
   }
 
   {
     std::optional<elfldltl::ElfNote> note;
     EXPECT_TRUE(observeNotes(note_data, diag, ObserveBuildIdNote(note, true)));
     ASSERT_TRUE(note.has_value());
-    EXPECT_EQ(*note, note_data);
-    EXPECT_EQ(diag.warnings() + diag.errors(), 0);
+    EXPECT_EQ(note_data, *note);
+    EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
   }
 }
 
@@ -249,16 +249,16 @@ TEST(ElfldltlFileNoteTests, ObserveBuildIDFirst) {
     std::optional<elfldltl::ElfNote> note;
     EXPECT_FALSE(observeNotes(note_data, diag, ObserveBuildIdNote(note)));
     ASSERT_TRUE(note.has_value());
-    EXPECT_EQ(*note, note_data.build_id);
-    EXPECT_EQ(diag.warnings() + diag.errors(), 0);
+    EXPECT_EQ(note_data.build_id, *note);
+    EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
   }
 
   {
     std::optional<elfldltl::ElfNote> note;
     EXPECT_TRUE(observeNotes(note_data, diag, ObserveBuildIdNote(note, true)));
     ASSERT_TRUE(note.has_value());
-    EXPECT_EQ(*note, note_data.build_id);
-    EXPECT_EQ(diag.warnings() + diag.errors(), 0);
+    EXPECT_EQ(note_data.build_id, *note);
+    EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
   }
 }
 
@@ -275,16 +275,16 @@ TEST(ElfldltlFileNoteTests, ObserveBuildIDLast) {
     std::optional<elfldltl::ElfNote> note;
     EXPECT_FALSE(observeNotes(note_data, diag, ObserveBuildIdNote(note)));
     ASSERT_TRUE(note.has_value());
-    EXPECT_EQ(*note, note_data.build_id);
-    EXPECT_EQ(diag.warnings() + diag.errors(), 0);
+    EXPECT_EQ(note_data.build_id, *note);
+    EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
   }
 
   {
     std::optional<elfldltl::ElfNote> note;
     EXPECT_TRUE(observeNotes(note_data, diag, ObserveBuildIdNote(note, true)));
     ASSERT_TRUE(note.has_value());
-    EXPECT_EQ(*note, note_data.build_id);
-    EXPECT_EQ(diag.warnings() + diag.errors(), 0);
+    EXPECT_EQ(note_data.build_id, *note);
+    EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
   }
 }
 
@@ -302,16 +302,16 @@ TEST(ElfldltlFileNoteTests, Observe2BuildIDs) {
     std::optional<elfldltl::ElfNote> note;
     EXPECT_FALSE(observeNotes(note_data, diag, ObserveBuildIdNote(note)));
     ASSERT_TRUE(note.has_value());
-    EXPECT_EQ(*note, note_data.build_id);
-    EXPECT_EQ(diag.warnings() + diag.errors(), 0);
+    EXPECT_EQ(note_data.build_id, *note);
+    EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
   }
 
   {
     std::optional<elfldltl::ElfNote> note;
     EXPECT_TRUE(observeNotes(note_data, diag, ObserveBuildIdNote(note, true)));
     ASSERT_TRUE(note.has_value());
-    EXPECT_EQ(*note, note_data.build_id);
-    EXPECT_EQ(diag.warnings() + diag.errors(), 0);
+    EXPECT_EQ(note_data.build_id, *note);
+    EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
   }
 }
 
@@ -339,10 +339,10 @@ TEST(ElfldltlFileNoteTests, ObserveMultipleObservers) {
   EXPECT_TRUE(observeNotes(note_data, diag, ObserveBuildIdNote(note, true),
                            ObserveBuildIdNote(note2, true)));
   ASSERT_TRUE(note.has_value());
-  EXPECT_EQ(*note, note_data);
+  EXPECT_EQ(note_data, *note);
   ASSERT_TRUE(note2.has_value());
-  EXPECT_EQ(*note2, note_data);
-  EXPECT_EQ(diag.warnings() + diag.errors(), 0);
+  EXPECT_EQ(note_data, *note2);
+  EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
 }
 
 TEST(ElfldltlFileNoteTests, ObserveMultipleStopsEarly) {
@@ -355,9 +355,9 @@ TEST(ElfldltlFileNoteTests, ObserveMultipleStopsEarly) {
   EXPECT_FALSE(
       observeNotes(note_data, diag, ObserveBuildIdNote(note), ObserveBuildIdNote(note2, true)));
   ASSERT_TRUE(note.has_value());
-  EXPECT_EQ(*note, note_data);
+  EXPECT_EQ(note_data, *note);
   EXPECT_FALSE(note2.has_value());
-  EXPECT_EQ(diag.warnings() + diag.errors(), 0);
+  EXPECT_EQ(diag.warnings() + diag.errors(), 0u);
 }
 
 }  // namespace

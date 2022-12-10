@@ -14,8 +14,8 @@
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
-#include "gtests.h"
 #include "test-data.h"
+#include "tests.h"
 
 namespace {
 

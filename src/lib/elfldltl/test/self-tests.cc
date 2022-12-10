@@ -4,7 +4,7 @@
 
 #include <lib/elfldltl/self.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace {
 
@@ -59,11 +59,11 @@ TEST(ElfldltlSelfTests, Dynamic) {
     switch (dyn.tag) {
       case elfldltl::ElfDynTag::kSymTab:
         symtab = true;
-        EXPECT_NE(dyn.val(), 0);
+        EXPECT_NE(dyn.val(), 0u);
         break;
       case elfldltl::ElfDynTag::kStrTab:
         strtab = true;
-        EXPECT_NE(dyn.val(), 0);
+        EXPECT_NE(dyn.val(), 0u);
         break;
       default:
         break;

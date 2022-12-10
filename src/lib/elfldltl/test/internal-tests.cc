@@ -4,7 +4,7 @@
 
 #include <lib/elfldltl/internal/const-string.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace {
 
@@ -32,10 +32,10 @@ static_assert(kFooSv.data() == kFoo.data());
 static_assert(kFooSv.size() == kFoo.size());
 
 TEST(ElfldltlInternalTests, ConstString) {
-  EXPECT_STREQ(std::string_view(kFoo), "foo");
-  EXPECT_STREQ(std::string_view(kFoobar), "foobar");
-  EXPECT_STREQ(std::string_view(kFoobarbaz), "foobarbaz");
-  EXPECT_STREQ(kFooSv, "foo");
+  EXPECT_EQ(std::string_view(kFoo), "foo");
+  EXPECT_EQ(std::string_view(kFoobar), "foobar");
+  EXPECT_EQ(std::string_view(kFoobarbaz), "foobarbaz");
+  EXPECT_EQ(kFooSv, "foo");
 }
 
 }  // namespace

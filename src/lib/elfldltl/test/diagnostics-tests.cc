@@ -16,15 +16,9 @@
 #include <utility>
 #include <vector>
 
-#include <zxtest/zxtest.h>
-
 #include "tests.h"
 
 namespace {
-
-#ifndef ASSERT_DEATH
-#define ASSERT_DEATH(...)  // Not available on host.
-#endif
 
 TEST(ElfldltlDiagnosticsTests, PrintfDiagnosticsReport) {
   std::array<char, 200> buffer{};
@@ -95,21 +89,21 @@ TEST(ElfldltlDiagnosticsTests, PrintfDiagnosticsReportSystemErrors) {
 TEST(ElfldltlDiagnosticsTests, Trap) {
   auto diag = elfldltl::TrapDiagnostics();
 
-  EXPECT_EQ(1, diag.errors());
-  ASSERT_DEATH([diag]() mutable { diag.FormatError("errors are fatal"); });
+  EXPECT_EQ(1u, diag.errors());
+  ASSERT_DEATH(diag.FormatError("errors are fatal"), "");
 
-  EXPECT_EQ(1, diag.warnings());
-  ASSERT_DEATH([diag]() mutable { diag.FormatWarning("warnings are fatal"); });
+  EXPECT_EQ(1u, diag.warnings());
+  ASSERT_DEATH(diag.FormatWarning("warnings are fatal"), "");
 }
 
 TEST(ElfldltlDiagnosticsTests, Panic) {
   auto diag = elfldltl::PanicDiagnostics();
 
-  EXPECT_EQ(1, diag.errors());
-  ASSERT_DEATH([diag]() mutable { diag.FormatError("errors are fatal"); });
+  EXPECT_EQ(1u, diag.errors());
+  ASSERT_DEATH(diag.FormatError("errors are fatal"), "");
 
-  EXPECT_EQ(1, diag.warnings());
-  ASSERT_DEATH([diag]() mutable { diag.FormatWarning("warnings are fatal"); });
+  EXPECT_EQ(1u, diag.warnings());
+  ASSERT_DEATH(diag.FormatWarning("warnings are fatal"), "");
 }
 
 TEST(ElfldltlDiagnosticsTests, OneString) {
@@ -117,17 +111,17 @@ TEST(ElfldltlDiagnosticsTests, OneString) {
   auto diag = elfldltl::OneStringDiagnostics(error);
 
   EXPECT_FALSE(diag.FormatError("first error"));
-  EXPECT_STREQ(error, "first error");
-  EXPECT_EQ(1, diag.errors());
+  EXPECT_EQ(error, "first error");
+  EXPECT_EQ(1u, diag.errors());
 
   EXPECT_FALSE(diag.FormatError("second error"));
-  EXPECT_STREQ(error, "second error");
-  EXPECT_EQ(2, diag.errors());
+  EXPECT_EQ(error, "second error");
+  EXPECT_EQ(2u, diag.errors());
 
   EXPECT_FALSE(diag.FormatWarning("warning"));
-  EXPECT_STREQ(error, "warning");
-  EXPECT_EQ(1, diag.warnings());
-  EXPECT_EQ(2, diag.errors());
+  EXPECT_EQ(error, "warning");
+  EXPECT_EQ(1u, diag.warnings());
+  EXPECT_EQ(2u, diag.errors());
 }
 
 TEST(ElfldltlDiagnosticsTests, CollectStrings) {
@@ -135,28 +129,28 @@ TEST(ElfldltlDiagnosticsTests, CollectStrings) {
   const elfldltl::DiagnosticsFlags flags = {.multiple_errors = true};
   auto diag = elfldltl::CollectStringsDiagnostics(errors, flags);
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
 
   EXPECT_TRUE(diag.FormatError("first error"));
-  EXPECT_EQ(1, errors.size());
-  EXPECT_EQ(0, diag.warnings());
-  EXPECT_EQ(1, diag.errors());
+  EXPECT_EQ(1u, errors.size());
+  EXPECT_EQ(0u, diag.warnings());
+  EXPECT_EQ(1u, diag.errors());
 
   EXPECT_TRUE(diag.FormatError("second error"));
-  EXPECT_EQ(2, errors.size());
-  EXPECT_EQ(0, diag.warnings());
-  EXPECT_EQ(2, diag.errors());
+  EXPECT_EQ(2u, errors.size());
+  EXPECT_EQ(0u, diag.warnings());
+  EXPECT_EQ(2u, diag.errors());
 
   EXPECT_TRUE(diag.FormatWarning("warning"));
-  EXPECT_EQ(3, errors.size());
-  EXPECT_EQ(1, diag.warnings());
-  EXPECT_EQ(2, diag.errors());
+  EXPECT_EQ(3u, errors.size());
+  EXPECT_EQ(1u, diag.warnings());
+  EXPECT_EQ(2u, diag.errors());
 
-  ASSERT_GE(errors.size(), 3);
-  EXPECT_STREQ(errors[0], "first error");
-  EXPECT_STREQ(errors[1], "second error");
-  EXPECT_STREQ(errors[2], "warning");
+  ASSERT_GE(errors.size(), 3u);
+  EXPECT_EQ(errors[0], "first error");
+  EXPECT_EQ(errors[1], "second error");
+  EXPECT_EQ(errors[2], "warning");
 }
 
 TEST(ElfldltlDiagnosticsTests, Ostream) {
@@ -164,23 +158,23 @@ TEST(ElfldltlDiagnosticsTests, Ostream) {
   const elfldltl::DiagnosticsFlags flags = {.multiple_errors = true};
   auto diag = elfldltl::OstreamDiagnostics(sstr, flags, 'a', 1, ":");
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
 
   EXPECT_TRUE(diag.FormatError("first error"));
-  EXPECT_EQ(1, diag.errors());
+  EXPECT_EQ(1u, diag.errors());
 
   EXPECT_TRUE(diag.FormatError("second error"));
-  EXPECT_EQ(2, diag.errors());
+  EXPECT_EQ(2u, diag.errors());
 
   EXPECT_TRUE(diag.FormatWarning("warning"));
-  EXPECT_EQ(1, diag.warnings());
-  EXPECT_EQ(2, diag.errors());
+  EXPECT_EQ(1u, diag.warnings());
+  EXPECT_EQ(2u, diag.errors());
 
-  EXPECT_STREQ(sstr.str(),
-               "a1:first error\n"
-               "a1:second error\n"
-               "a1:warning\n");
+  EXPECT_EQ(sstr.str(),
+            "a1:first error\n"
+            "a1:second error\n"
+            "a1:warning\n");
 }
 
 template <size_t... Args>

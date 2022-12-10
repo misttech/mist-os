@@ -10,6 +10,8 @@
 #include <tuple>
 #include <type_traits>
 
+#include <gtest/gtest.h>
+
 #include "tests.h"
 
 namespace {
@@ -21,10 +23,10 @@ using Elf64Big = elfldltl::Elf64<elfldltl::ElfData::k2Msb>;
 
 TEST(ElfldltlLayoutTests, Magic) {
   constexpr std::array<uint8_t, 4> kMagic = {0x7f, 'E', 'L', 'F'};
-  EXPECT_BYTES_EQ(kMagic.data(), &Elf32Little::Ehdr::kMagic, 4);
-  EXPECT_BYTES_EQ(kMagic.data(), &Elf64Little::Ehdr::kMagic, 4);
-  EXPECT_BYTES_EQ(kMagic.data(), &Elf32Big::Ehdr::kMagic, 4);
-  EXPECT_BYTES_EQ(kMagic.data(), &Elf64Big::Ehdr::kMagic, 4);
+  EXPECT_EQ(memcmp(kMagic.begin(), &Elf32Little::Ehdr::kMagic, 4), 0);
+  EXPECT_EQ(memcmp(kMagic.begin(), &Elf64Little::Ehdr::kMagic, 4), 0);
+  EXPECT_EQ(memcmp(kMagic.begin(), &Elf32Big::Ehdr::kMagic, 4), 0);
+  EXPECT_EQ(memcmp(kMagic.begin(), &Elf64Big::Ehdr::kMagic, 4), 0);
 }
 
 TEST(ElfldltlLayoutTests, Sizes) {

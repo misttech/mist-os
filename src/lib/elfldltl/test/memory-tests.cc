@@ -7,7 +7,7 @@
 
 #include <string_view>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace {
 
@@ -34,12 +34,12 @@ TEST(ElfldltlDirectMemoryTests, FileApi) {
 
   auto array = file.ReadArrayFromFile<char>(16, elfldltl::NoArrayFromFile<char>(), 4);
   ASSERT_TRUE(array.has_value());
-  EXPECT_EQ(4, array->size());
-  EXPECT_STREQ(std::string_view(array->data(), array->size()), "Data");
+  EXPECT_EQ(4u, array->size());
+  EXPECT_EQ(std::string_view(array->data(), array->size()), "Data");
 
   auto array2 = file.ReadArrayFromFile<uint16_t>(20, elfldltl::NoArrayFromFile<uint16_t>(), 2);
   ASSERT_TRUE(array2.has_value());
-  ASSERT_EQ(2, array2->size());
+  ASSERT_EQ(2u, array2->size());
   EXPECT_EQ(uint16_t{('a' << 8) | 'a'}, (*array2)[0]);
   EXPECT_EQ(uint16_t{('b' << 8) | 'b'}, (*array2)[1]);
 
@@ -58,7 +58,7 @@ TEST(ElfldltlDirectMemoryTests, MemoryApi) {
   // Test default-construction.
   elfldltl::DirectMemory empty;
   EXPECT_TRUE(empty.image().empty());
-  EXPECT_EQ(empty.base(), 0);
+  EXPECT_EQ(empty.base(), 0u);
   empty.set_image(image_bytes);
   empty.set_base(kBaseAddress);
   EXPECT_EQ(empty.image().data(), image_bytes.data());
@@ -67,8 +67,8 @@ TEST(ElfldltlDirectMemoryTests, MemoryApi) {
 
   auto array = file.ReadArray<char>(kBaseAddress + 16, 4);
   ASSERT_TRUE(array.has_value());
-  EXPECT_EQ(4, array->size());
-  EXPECT_STREQ(std::string_view(array->data(), array->size()), "Data");
+  EXPECT_EQ(4u, array->size());
+  EXPECT_EQ(std::string_view(array->data(), array->size()), "Data");
 
   auto bad_address_low = file.ReadArray<uint64_t>(kBaseAddress - 4, 16);
   EXPECT_FALSE(bad_address_low.has_value());
@@ -78,7 +78,7 @@ TEST(ElfldltlDirectMemoryTests, MemoryApi) {
 
   auto unbounded = file.ReadArray<char>(kBaseAddress + 16);
   ASSERT_TRUE(unbounded.has_value());
-  EXPECT_EQ(9, unbounded->size());
+  EXPECT_EQ(9u, unbounded->size());
   EXPECT_EQ(array->data(), unbounded->data());
 
   EXPECT_TRUE(file.Store<uint32_t>(kBaseAddress + 16, 0xaabbccdd));

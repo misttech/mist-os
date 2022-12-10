@@ -12,26 +12,18 @@ import("//build/testing/zbi_test.gni")
 is_elf = current_os != "mac" && current_os != "win"
 
 test("elfldltl-unittests") {
-  deps = [
-    ":hosted-unittests",
-    ":unittests",
-  ]
-}
-
-# These pure unit tests can be included in a standalone ZBI test binary too.
-source_set("unittests") {
-  testonly = true
-
   sources = [
     "abi-tests.cc",
     "container-tests.cc",
     "diagnostics-tests.cc",
     "dynamic-tests.cc",
     "field-tests.cc",
+    "file-tests.cc",
     "initfini-tests.cc",
     "internal-tests.cc",
     "layout-tests.cc",
     "load-tests.cc",
+    "mapped-fd-file-tests.cc",
     "memory-tests.cc",
     "note-tests.cc",
     "phdr-tests.cc",
@@ -40,60 +32,39 @@ source_set("unittests") {
     "symbol-tests.cc",
     "symbol-tests.h",
   ]
-  deps = [
-    ":test-helper",
-    "..",
-    "//sdk/lib/stdcompat",
-    "//src/lib/symbolizer-markup",
-    "//zircon/system/ulib/zxtest",
-  ]
+
   if (is_elf) {
     sources += [ "self-tests.cc" ]
   }
   if (is_fuchsia) {
     sources += [ "mapped-vmo-file-tests.cc" ]
   }
+
+  deps = [
+    ":test-utils",
+    "..",
+    "//sdk/lib/stdcompat",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/symbolizer-markup",
+  ]
+
+  # TODO(fxbug.dev/117207): Enable these tests on Fuchsia too.
+  if (is_elf && !is_fuchsia) {
+    deps += [ ":load-tests" ]
+  }
 }
 
-source_set("test-helper") {
+source_set("test-utils") {
   visibility = [ ":*" ]
   testonly = true
 
   public = [ "tests.h" ]
+
   sources = [ "tests.cc" ]
 
-  deps = [
+  public_deps = [
     "..",
-    "//zircon/system/ulib/zxtest",
-  ]
-}
-
-source_set("test-helper-gtest") {
-  visibility = [ ":*" ]
-  testonly = true
-
-  public = [ "gtests.h" ]
-  sources = [ "tests.cc" ]
-
-  defines = [ "USE_GTEST" ]
-
-  public_deps = [ "//third_party/googletest:gtest" ]
-  deps = [ ".." ]
-}
-
-# These cannot be included in standalone-core-tests since they rely on having a
-# real external filesystem.
-source_set("hosted-unittests") {
-  visibility = [ ":*" ]
-  sources = [
-    "file-tests.cc",
-    "mapped-fd-file-tests.cc",
-    "tests.h",
-  ]
-  deps = [
-    "..",
-    "//sdk/lib/stdcompat",
-    "//zircon/system/ulib/zxtest",
+    "//third_party/googletest:gtest",
   ]
 }
 
@@ -256,21 +227,17 @@ if (is_host && is_elf) {
   }
 }
 
-test("elfldltl-load-tests") {
+source_set("load-tests") {
   visibility = [ ":*" ]
   testonly = true
 
-  sources = [
-    "mmap-loader-tests.cc",
-    "test-data.h",
-  ]
+  sources = [ "mmap-loader-tests.cc" ]
 
   deps = [
-    ":test-helper-gtest",
+    ":test-data",
+    ":test-utils",
     "..",
     "//sdk/lib/stdcompat",
-    "//src/lib/fxl/test:gtest_main",
-    "//third_party/googletest:gtest",
     "//zircon/system/ulib/fbl",
   ]
 
@@ -329,16 +296,6 @@ fuzzer_package("elfldltl-fuzzers") {
   ]
 }
 
-group("elf-host-tests") {
-  testonly = true
-  visibility = [ ":*" ]
-
-  deps = []
-  if (host_os == "linux") {
-    deps = [ ":elfldltl-load-tests($host_toolchain)" ]
-  }
-}
-
 group("tests") {
   testonly = true
 
@@ -350,10 +307,7 @@ group("tests") {
   ]
 
   if (host_os == "linux") {
-    deps += [
-      ":elf-host-tests($host_toolchain)",
-      ":linux-static-pie-test($host_toolchain)",
-    ]
+    deps += [ ":linux-static-pie-test($host_toolchain)" ]
   }
 }
 

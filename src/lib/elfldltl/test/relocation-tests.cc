@@ -8,6 +8,8 @@
 
 #include <limits>
 
+#include <gtest/gtest.h>
+
 #include "tests.h"
 
 namespace {
@@ -20,7 +22,7 @@ constexpr auto VisitRelativeEmpty = [](auto elf) {
     ++count;
     return false;
   }));
-  EXPECT_EQ(0, count);
+  EXPECT_EQ(0u, count);
 };
 
 TEST(ElfldltlRelocationTests, VisitRelativeEmpty) { TestAllFormats(VisitRelativeEmpty); }
@@ -85,15 +87,15 @@ constexpr auto VisitRelativeRel = [](auto elf) {
     auto offset = RelocOffset(info, reloc);
     switch (count++) {
       case 0:
-        EXPECT_EQ(8, offset);
+        EXPECT_EQ(8u, offset);
         break;
       case 1:
-        EXPECT_EQ(24, offset);
+        EXPECT_EQ(24u, offset);
         break;
     }
     return true;
   }));
-  EXPECT_EQ(2, count);
+  EXPECT_EQ(2u, count);
 };
 
 TEST(ElfldltlRelocationTests, VisitRelativeRel) { TestAllFormats(VisitRelativeRel<>); }
@@ -121,17 +123,17 @@ constexpr auto VisitRelativeRela = [](auto elf) {
     auto addend = RelocAddend(info, reloc);
     switch (count++) {
       case 0:
-        EXPECT_EQ(8, offset);
-        EXPECT_EQ(0x11111111, addend);
+        EXPECT_EQ(8u, offset);
+        EXPECT_EQ(0x11111111u, addend);
         break;
       case 1:
-        EXPECT_EQ(24, offset);
-        EXPECT_EQ(0x33333333, addend);
+        EXPECT_EQ(24u, offset);
+        EXPECT_EQ(0x33333333u, addend);
         break;
     }
     return true;
   }));
-  EXPECT_EQ(2, count);
+  EXPECT_EQ(2u, count);
 };
 
 TEST(ElfldltlRelocationTests, VisitRelativeRela) { TestAllFormats(VisitRelativeRela<>); }
@@ -158,12 +160,12 @@ constexpr auto VisitRelativeRelrSingle = [](auto elf) {
     auto offset = RelocOffset(info, reloc);
     switch (count++) {
       case 0:
-        EXPECT_EQ(8, offset);
+        EXPECT_EQ(8u, offset);
         break;
     }
     return true;
   }));
-  EXPECT_EQ(1, count);
+  EXPECT_EQ(1u, count);
 };
 
 TEST(ElfldltlRelocationTests, VisitRelativeRelrSingle) { TestAllFormats(VisitRelativeRelrSingle); }
@@ -188,18 +190,18 @@ constexpr auto VisitRelativeRelrNoBitmaps = [](auto elf) {
     auto offset = RelocOffset(info, reloc);
     switch (count++) {
       case 0:
-        EXPECT_EQ(0x8, offset);
+        EXPECT_EQ(0x8u, offset);
         break;
       case 1:
-        EXPECT_EQ(0x18, offset);
+        EXPECT_EQ(0x18u, offset);
         break;
       case 2:
-        EXPECT_EQ(0x28, offset);
+        EXPECT_EQ(0x28u, offset);
         break;
     }
     return true;
   }));
-  EXPECT_EQ(3, count);
+  EXPECT_EQ(3u, count);
 };
 
 TEST(ElfldltlRelocationTests, VisitRelativeRelrNoBitmaps) {
@@ -227,7 +229,7 @@ constexpr auto VisitRelativeRelrSingleBitmap = [](auto elf) {
     ++count;
     return true;
   }));
-  EXPECT_EQ(3, count);
+  EXPECT_EQ(3u, count);
 };
 
 TEST(ElfldltlRelocationTests, VisitRelativeRelrSingleBitmap) {
@@ -261,12 +263,12 @@ constexpr auto VisitRelativeRelrMultipleBitmaps = [](auto elf) {
   size_t count = 0;
   EXPECT_TRUE(info.VisitRelative([&](auto&& reloc) -> bool {
     auto offset = RelocOffset(info, reloc);
-    EXPECT_EQ(0x8 + (sizeof(Addr) * 2 * count), offset, "%zu * 2 * %zu", sizeof(Addr), count);
+    EXPECT_EQ(0x8 + (sizeof(Addr) * 2 * count), offset) << sizeof(Addr) << " * 2 * " << count;
     ++count;
     return true;
   }));
 
-  EXPECT_EQ(decltype(elf)::kAddressBits, count);
+  EXPECT_EQ(static_cast<size_t>(decltype(elf)::kAddressBits), count);
 };
 
 TEST(ElfldltlRelocationTests, VisitRelativeRelrMultipleBitmaps) {
@@ -281,7 +283,7 @@ constexpr auto VisitSymbolicEmpty = [](auto elf) {
     ++count;
     return false;
   }));
-  EXPECT_EQ(0, count);
+  EXPECT_EQ(0u, count);
 };
 
 TEST(ElfldltlRelocationTests, VisitSymbolicEmpty) { TestAllFormats(VisitSymbolicEmpty); }

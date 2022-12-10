@@ -11,13 +11,11 @@
 #include <array>
 #include <string_view>
 
-#include <zxtest/zxtest.h>
-
 #include "tests.h"
 
-using namespace std::literals;
-
 namespace {
+
+using namespace std::literals;
 
 TEST(ElfldltlContainerTests, Basic) {
   std::vector<std::string> errors;
@@ -32,7 +30,7 @@ TEST(ElfldltlContainerTests, Basic) {
 
   auto expected = {0, 1, 2, 3};
   EXPECT_TRUE(std::equal(list.begin(), list.end(), expected.begin()));
-  EXPECT_EQ(diag.errors() + diag.warnings(), 0);
+  EXPECT_EQ(diag.errors() + diag.warnings(), 0u);
 }
 
 TEST(ElfldltlContainerTests, ForwardArgs) {
@@ -48,7 +46,7 @@ TEST(ElfldltlContainerTests, ForwardArgs) {
 
   std::array<std::pair<int, int>, 4> expected{{{1, 2}, {2, 3}, {3, 4}, {4, 5}}};
   EXPECT_TRUE(std::equal(list.begin(), list.end(), expected.begin()));
-  EXPECT_EQ(diag.errors() + diag.warnings(), 0);
+  EXPECT_EQ(diag.errors() + diag.warnings(), 0u);
 }
 
 template <typename T>
@@ -76,11 +74,11 @@ TEST(ElfldltlContainerTests, TemplateArgs) {
 template <class List>
 void CheckContainerAPI(List& list, size_t max_size = 10) {
   EXPECT_EQ(list.max_size(), max_size);
-  EXPECT_EQ(list.capacity(), 10);
+  EXPECT_EQ(list.capacity(), 10u);
   cpp20::span<const typename List::value_type> span = list.as_span();
-  EXPECT_EQ(span.size(), 0);
+  EXPECT_EQ(span.size(), 0u);
   EXPECT_TRUE(list.data());
-  EXPECT_EQ(list.size(), 0);
+  EXPECT_EQ(list.size(), 0u);
   EXPECT_TRUE(list.empty());
   EXPECT_EQ(list.begin(), list.end());
   EXPECT_EQ(list.cbegin(), list.cend());
@@ -97,7 +95,7 @@ TEST(ElfldltlContainerTests, StaticVectorBasicApi) {
 TEST(ElfldltlContainerTests, StaticVectorCtor) {
   {
     elfldltl::StaticVector<10>::Container<int> list;
-    EXPECT_EQ(list.size(), 0);
+    EXPECT_EQ(list.size(), 0u);
   }
   {
     auto diag = ExpectOkDiagnostics();
@@ -195,7 +193,7 @@ TEST(ElfldltlContainerTests, StaticVectorEmplace) {
     auto to_insert = list.begin() + 5;
     EXPECT_EQ(*to_insert, 8);
     auto it_or_err = list.emplace(diag, "", to_insert, 7);
-    EXPECT_EQ(diag.errors() + diag.warnings(), 0);
+    EXPECT_EQ(diag.errors() + diag.warnings(), 0u);
     ASSERT_TRUE(it_or_err);
     EXPECT_EQ(**it_or_err, 7);
     auto expected = {0, 1, 2, 3, 4, 7, 8, 9};
@@ -209,7 +207,7 @@ TEST(ElfldltlContainerTests, StaticVectorInsert) {
     elfldltl::StaticVector<10>::Container<int> list{diag, "", {0, 1, 2, 3, 4, 9}};
     auto to_insert = list.end() - 1;
     auto it_or_err = list.insert(diag, "", to_insert, 8);
-    EXPECT_EQ(diag.errors() + diag.warnings(), 0);
+    EXPECT_EQ(diag.errors() + diag.warnings(), 0u);
     ASSERT_TRUE(it_or_err);
     EXPECT_EQ(**it_or_err, 8);
     auto expected = {0, 1, 2, 3, 4, 8, 9};
@@ -222,7 +220,7 @@ TEST(ElfldltlContainerTests, StaticVectorInsert) {
     EXPECT_EQ(*to_insert, 7);
     auto insert_range = {5, 6};
     auto it_or_err = list.insert(diag, "", to_insert, insert_range.begin(), insert_range.end());
-    EXPECT_EQ(diag.errors() + diag.warnings(), 0);
+    EXPECT_EQ(diag.errors() + diag.warnings(), 0u);
     ASSERT_TRUE(it_or_err);
     EXPECT_EQ(**it_or_err, 5);
     auto expected = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
@@ -295,8 +293,8 @@ TEST(ElfldltlContainerTests, StaticVectorResize) {
 
 TEST(ElfldltlContainerTests, StaticVectorUnusedNoDtor) {
   struct S {
-    S() { FAIL(); }
-    ~S() { FAIL(); }
+    S() { ADD_FAILURE(); }
+    ~S() { ADD_FAILURE(); }
   };
   elfldltl::StaticVector<10>::Container<S> list;
 }
@@ -345,7 +343,7 @@ TEST(ElfldltlContainerTests, StaticVectorCorrectlyMoves) {
     list.emplace(diag, "", list.begin());
     EXPECT_EQ(count, i + 1);
   }
-  EXPECT_EQ(diag.errors() + diag.warnings(), 0);
+  EXPECT_EQ(diag.errors() + diag.warnings(), 0u);
 
   list.emplace(expected.diag(), "error", list.begin());
 
@@ -394,14 +392,14 @@ TEST(ElfldltlContainerTests, PreallocatedVectorDynamicExtent) {
   elfldltl::PreallocatedVector vec{cpp20::span{arr.data(), 5}};
 
   EXPECT_EQ(vec.max_size(), cpp20::dynamic_extent);
-  EXPECT_EQ(vec.size(), 0);
+  EXPECT_EQ(vec.size(), 0u);
 
   auto insert_range = {1, 5, 7, 1293, 2};
   auto it_or_err = vec.insert(diag, "", vec.begin(), insert_range.begin(), insert_range.end());
   ASSERT_TRUE(it_or_err);
   EXPECT_TRUE(std::equal(vec.begin(), vec.end(), insert_range.begin()));
 
-  EXPECT_EQ(vec.size(), 5);
+  EXPECT_EQ(vec.size(), 5u);
 
   {
     ExpectedSingleError expected("error", ": maximum ", 5, " < requested ", 6);

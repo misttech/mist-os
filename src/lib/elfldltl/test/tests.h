@@ -16,7 +16,7 @@
 #include <tuple>
 #include <type_traits>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 template <class... Elf>
 struct TestAllFormatsHelper {
@@ -50,7 +50,7 @@ class ExpectedSingleError {
   template <typename... Ts>
   bool operator()(Ts&&... args) {
     if constexpr (sizeof...(Args) != sizeof...(Ts)) {
-      ADD_FAILURE("Expected %zu args, got %zu\n", sizeof...(Args), sizeof...(Ts));
+      ADD_FAILURE() << "Expected " << sizeof...(Args) << " args, got " << sizeof...(Ts);
     } else {
       Check(std::make_tuple(args...), std::make_index_sequence<sizeof...(Args)>());
     }
@@ -75,7 +75,12 @@ class ExpectedSingleError {
 
   template <typename Tuple, size_t... I>
   void Check(Tuple&& args, std::index_sequence<I...> seq) {
-    ([&]() { EXPECT_EQ(std::get<I>(args), std::get<I>(expected_), "argument %zu", I); }(), ...);
+    (
+        [&]() {
+          using T = typename ExpectedType<decltype(std::get<I>(args))>::type;
+          EXPECT_EQ(std::get<I>(args), T(std::get<I>(expected_))) << "argument " << I;
+        }(),
+        ...);
   }
 
  public:
@@ -105,8 +110,7 @@ constexpr auto ExpectOkDiagnostics() {
     std::string message = os.str();
     if (message.back() == '\n')
       message.pop_back();
-    ADD_FAILURE("Expected no diagnostics, got \"%.*s\"", static_cast<int>(message.size()),
-                message.data());
+    ADD_FAILURE() << "Expected no diagnostics, got \"" << message << '"';
     return false;
     ;
   };

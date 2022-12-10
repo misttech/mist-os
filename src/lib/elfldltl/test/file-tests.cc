@@ -7,7 +7,7 @@
 #include <lib/elfldltl/memory.h>
 #include <stdio.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tests.h"
 
@@ -24,7 +24,7 @@ struct TestFdFile {
 
   TestFdFile() {
     f_ = tmpfile();
-    ASSERT_NOT_NULL(f_);
+    EXPECT_NE(f_, nullptr);
   }
 
   ~TestFdFile() {
@@ -58,8 +58,8 @@ struct TestVmoFile {
   using FileT = elfldltl::VmoFile<Diagnostics>;
 
   void Write(const void* p, size_t size) {
-    ASSERT_OK(zx::vmo::create(size, 0, &vmo_));
-    ASSERT_OK(vmo_.write(p, 0, size));
+    ASSERT_EQ(zx::vmo::create(size, 0, &vmo_), ZX_OK);
+    ASSERT_EQ(vmo_.write(p, 0, size), ZX_OK);
   }
 
   zx::vmo GetHandle() { return std::move(vmo_); }

@@ -8,6 +8,8 @@
 #include <set>
 #include <vector>
 
+#include <gtest/gtest.h>
+
 namespace {
 
 constexpr std::string_view kEmpty{};
@@ -67,21 +69,21 @@ constexpr auto LookupCompatHash = [](auto&& elf) {
   kTestSymbols<Elf>.SetInfo(si);
   si.set_compat_hash(kTestCompatHash<typename Elf::Word>);
 
-  EXPECT_NULL(kNotFoundSymbol.Lookup(si));
+  EXPECT_EQ(kNotFoundSymbol.Lookup(si), nullptr);
 
-  EXPECT_NULL(kQuuxSymbol.Lookup(si));  // Undefined should be skipped.
+  EXPECT_EQ(kQuuxSymbol.Lookup(si), nullptr);  // Undefined should be skipped.
 
   const auto* foo = kFooSymbol.Lookup(si);
-  ASSERT_NOT_NULL(foo);
-  EXPECT_EQ(foo->value(), 1);
+  ASSERT_NE(foo, nullptr);
+  EXPECT_EQ(foo->value(), 1u);
 
   const auto* bar = kBarSymbol.Lookup(si);
-  ASSERT_NOT_NULL(bar);
-  EXPECT_EQ(bar->value(), 2);
+  ASSERT_NE(bar, nullptr);
+  EXPECT_EQ(bar->value(), 2u);
 
   const auto* foobar = kFoobarSymbol.Lookup(si);
-  ASSERT_NOT_NULL(foobar);
-  EXPECT_EQ(foobar->value(), 3);
+  ASSERT_NE(foobar, nullptr);
+  EXPECT_EQ(foobar->value(), 3u);
 };
 
 TEST(ElfldltlSymbolTests, LookupCompatHash) {
@@ -95,21 +97,21 @@ constexpr auto LookupGnuHash = [](auto&& elf) {
   kTestSymbols<Elf>.SetInfo(si);
   si.set_gnu_hash(kTestGnuHash<typename Elf::Addr>);
 
-  EXPECT_NULL(kNotFoundSymbol.Lookup(si));
+  EXPECT_EQ(kNotFoundSymbol.Lookup(si), nullptr);
 
-  EXPECT_NULL(kQuuxSymbol.Lookup(si));  // Undefined should be skipped.
+  EXPECT_EQ(kQuuxSymbol.Lookup(si), nullptr);  // Undefined should be skipped.
 
   const auto* foo = kFooSymbol.Lookup(si);
-  ASSERT_NOT_NULL(foo);
-  EXPECT_EQ(foo->value(), 1);
+  ASSERT_NE(foo, nullptr);
+  EXPECT_EQ(foo->value(), 1u);
 
   const auto* bar = kBarSymbol.Lookup(si);
-  ASSERT_NOT_NULL(bar);
-  EXPECT_EQ(bar->value(), 2);
+  ASSERT_NE(bar, nullptr);
+  EXPECT_EQ(bar->value(), 2u);
 
   const auto* foobar = kFoobarSymbol.Lookup(si);
-  ASSERT_NOT_NULL(foobar);
-  EXPECT_EQ(foobar->value(), 3);
+  ASSERT_NE(foobar, nullptr);
+  EXPECT_EQ(foobar->value(), 3u);
 };
 
 TEST(ElfldltlSymbolTests, LookupGnuHash) { ASSERT_NO_FATAL_FAILURE(TestAllFormats(LookupGnuHash)); }

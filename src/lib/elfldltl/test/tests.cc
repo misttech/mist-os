@@ -11,11 +11,7 @@
 #include <mach-o/dyld.h>
 #endif
 
-#ifdef USE_GTEST
-#include "gtests.h"  // nogncheck
-#else
-#include "tests.h"  // nogncheck
-#endif
+#include "tests.h"
 
 std::filesystem::path GetTestDataPath(std::string_view filename) {
   std::filesystem::path path;

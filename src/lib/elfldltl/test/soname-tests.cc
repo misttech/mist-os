@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tests.h"
 
@@ -17,11 +17,11 @@ namespace {
 
 TEST(ElfldltlSonameTests, Basic) {
   elfldltl::Soname name{"test"};
-  EXPECT_STREQ(name.str(), "test");
+  EXPECT_EQ(name.str(), "test");
   elfldltl::Soname other{"other"};
-  EXPECT_STREQ(other.str(), "other");
+  EXPECT_EQ(other.str(), "other");
   name = other;
-  EXPECT_STREQ(name.str(), "other");
+  EXPECT_EQ(name.str(), "other");
   EXPECT_EQ(other, name);
   EXPECT_EQ(other.hash(), elfldltl::GnuHashString("other"));
 

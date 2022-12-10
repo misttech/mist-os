@@ -12,7 +12,7 @@
 #include <lib/stdcompat/span.h>
 #include <lib/symbolizer-markup/writer.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tests.h"
 
@@ -61,7 +61,7 @@ constexpr auto CreateConstantSegment = [](auto&& elf) {
   EXPECT_TRUE(loadInfo.AddSegment(diag, kPageSize, phdr));
 
   const auto& segments = loadInfo.segments();
-  ASSERT_EQ(segments.size(), 1);
+  ASSERT_EQ(segments.size(), 1u);
   const auto& variant = segments[0];
   ASSERT_TRUE(std::holds_alternative<ConstantSegment>(variant));
   EXPECT_EQ(std::get<ConstantSegment>(variant).memsz(), phdr.memsz);
@@ -83,7 +83,7 @@ constexpr auto CreateZeroFillSegment = [](auto&& elf) {
   EXPECT_TRUE(loadInfo.AddSegment(diag, kPageSize, phdr));
 
   const auto& segments = loadInfo.segments();
-  ASSERT_EQ(segments.size(), 1);
+  ASSERT_EQ(segments.size(), 1u);
   const auto& variant = segments[0];
   ASSERT_TRUE(std::holds_alternative<ZeroFillSegment>(variant));
   EXPECT_EQ(std::get<ZeroFillSegment>(variant).memsz(), phdr.memsz);
@@ -105,7 +105,7 @@ constexpr auto CreateDataWithZeroFillSegment = [](auto&& elf) {
   EXPECT_TRUE(loadInfo.AddSegment(diag, kPageSize, phdr));
 
   const auto& segments = loadInfo.segments();
-  ASSERT_EQ(segments.size(), 1);
+  ASSERT_EQ(segments.size(), 1u);
   const auto& variant = segments[0];
   ASSERT_TRUE(std::holds_alternative<DataWithZeroFillSegment>(variant));
   EXPECT_EQ(std::get<DataWithZeroFillSegment>(variant).memsz(), phdr.memsz());
@@ -129,7 +129,7 @@ constexpr auto CreateDataSegment = [](auto&& elf) {
   EXPECT_TRUE(loadInfo.AddSegment(diag, kPageSize, phdr));
 
   const auto& segments = loadInfo.segments();
-  ASSERT_EQ(segments.size(), 1);
+  ASSERT_EQ(segments.size(), 1u);
   const auto& variant = segments[0];
   ASSERT_TRUE(std::holds_alternative<DataSegment>(variant));
   EXPECT_EQ(std::get<DataSegment>(variant).memsz(), phdr.memsz());
@@ -145,7 +145,7 @@ constexpr auto CreateMergeTest() {
     using Elf = std::decay_t<decltype(elf)>;
     using Segment1T = Segment1<Elf>;
     using Segment2T = Segment2<Elf>;
-    constexpr int totalSegments = Merged ? 1 : 2;
+    constexpr unsigned totalSegments = Merged ? 1 : 2;
 
     auto diag = ExpectOkDiagnostics();
 
@@ -158,7 +158,7 @@ constexpr auto CreateMergeTest() {
     auto expectedSize = Merged ? phdr1.memsz() + phdr2.memsz() : phdr2.memsz();
 
     loadInfo.AddSegment(diag, kPageSize, phdr1);
-    ASSERT_EQ(segments.size(), 1);
+    ASSERT_EQ(segments.size(), 1u);
     ASSERT_TRUE(std::holds_alternative<Segment1T>(segments.back()));
     EXPECT_EQ(std::get<Segment1T>(segments.back()).memsz(), phdr1.memsz());
     loadInfo.AddSegment(diag, kPageSize, phdr2);
@@ -299,7 +299,7 @@ constexpr auto GetPhdrObserver = [](auto&& elf) {
   EXPECT_TRUE(
       elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), loadInfo.GetPhdrObserver(kPageSize)));
   const auto& segments = loadInfo.segments();
-  EXPECT_EQ(segments.size(), 2);
+  EXPECT_EQ(segments.size(), 2u);
   ASSERT_TRUE(std::holds_alternative<ConstantSegment>(segments[0]));
   EXPECT_EQ(std::get<ConstantSegment>(segments[0]).memsz(), kPhdrs[0].memsz + kPhdrs[1].memsz);
   ASSERT_TRUE(std::holds_alternative<DataWithZeroFillSegment>(segments[1]));
@@ -317,7 +317,7 @@ constexpr auto VisitSegments = [](auto&& elf) {
 
   elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> loadInfo;
 
-  ASSERT_EQ(loadInfo.segments().size(), 0);
+  ASSERT_EQ(loadInfo.segments().size(), 0u);
   EXPECT_TRUE(loadInfo.VisitSegments([](auto&& segment) {
     ADD_FAILURE();
     return true;
@@ -331,7 +331,7 @@ constexpr auto VisitSegments = [](auto&& elf) {
 
   EXPECT_TRUE(
       elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), loadInfo.GetPhdrObserver(kPageSize)));
-  ASSERT_EQ(loadInfo.segments().size(), 2);
+  ASSERT_EQ(loadInfo.segments().size(), 2u);
 
   int currentIndex = 0;
   EXPECT_TRUE(loadInfo.VisitSegments([&](auto&& segment) {
@@ -357,27 +357,27 @@ constexpr auto RelroBounds = [](auto&& elf) {
 
   {
     Region r = loadInfo.RelroBounds({}, kPageSize);
-    EXPECT_EQ(r.start, 0);
-    EXPECT_EQ(r.end, 0);
+    EXPECT_EQ(r.start, 0u);
+    EXPECT_EQ(r.end, 0u);
     EXPECT_TRUE(r.empty());
   }
   {
     Phdr phdr{.memsz = kPageSize - 1};
     Region r = loadInfo.RelroBounds(phdr, kPageSize);
-    EXPECT_EQ(r.start, 0);
-    EXPECT_EQ(r.end, 0);
+    EXPECT_EQ(r.start, 0u);
+    EXPECT_EQ(r.end, 0u);
     EXPECT_TRUE(r.empty());
   }
   {
     Phdr phdr{.memsz = kPageSize};
     Region r = loadInfo.RelroBounds(phdr, kPageSize);
-    EXPECT_EQ(r.start, 0);
+    EXPECT_EQ(r.start, 0u);
     EXPECT_EQ(r.end, kPageSize);
   }
   {
     Phdr phdr{.memsz = kPageSize + 1};
     Region r = loadInfo.RelroBounds(phdr, kPageSize);
-    EXPECT_EQ(r.start, 0);
+    EXPECT_EQ(r.start, 0u);
     EXPECT_EQ(r.end, kPageSize);
   }
 };
@@ -401,7 +401,7 @@ constexpr auto ApplyRelroMissing = [](auto&& elf) {
   ASSERT_FALSE(loadInfo.RelroBounds(phdrs[1], kPageSize).empty());
 
   {
-    ASSERT_EQ(loadInfo.segments().size(), 0);
+    ASSERT_EQ(loadInfo.segments().size(), 0u);
     ExpectedSingleError expected("PT_GNU_RELRO not in any data segment");
     EXPECT_TRUE(loadInfo.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false));
   }
@@ -410,7 +410,7 @@ constexpr auto ApplyRelroMissing = [](auto&& elf) {
                                     loadInfo.GetPhdrObserver(kPageSize)));
 
   {
-    ASSERT_EQ(loadInfo.segments().size(), 1);
+    ASSERT_EQ(loadInfo.segments().size(), 1u);
     ExpectedSingleError expected("PT_GNU_RELRO not in any data segment");
     EXPECT_TRUE(loadInfo.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false));
   }
@@ -462,7 +462,7 @@ constexpr auto ApplyRelroTooManyLoads = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>(phdrs),
                                     loadInfo.GetPhdrObserver(kPageSize)));
 
-  ASSERT_EQ(loadInfo.segments().size(), 1);
+  ASSERT_EQ(loadInfo.segments().size(), 1u);
 
   auto expected = ExpectedSingleError("too many PT_LOAD segments", ": maximum 1 < requested ", 2);
   loadInfo.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false);
@@ -562,13 +562,13 @@ void RelroTest(PhdrsPattern input, PhdrsPattern expected, SplitStrategy strategy
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag,
                                     cpp20::span<const Phdr>(input_phdrs.data(), input_phdrs.size()),
                                     loadInfo.GetPhdrObserver(kPageSize)));
-  ASSERT_TRUE(loadInfo.ApplyRelro(diag, creator.get_relro_phdr(), kPageSize, merge_ro), "line %d\n",
-              loc.line());
+  ASSERT_TRUE(loadInfo.ApplyRelro(diag, creator.get_relro_phdr(), kPageSize, merge_ro))
+      << "line " << loc.line();
   auto& segments = loadInfo.segments();
-  ASSERT_EQ(segments.size(), expected.size(), "line %d\n", loc.line());
+  ASSERT_EQ(segments.size(), expected.size()) << "line " << loc.line();
 
   for (size_t i = 0; i < segments.size(); i++) {
-    EXPECT_EQ(segments[i].index(), std::data(expected)[i], "line %d\n", loc.line());
+    EXPECT_EQ(segments[i].index(), std::data(expected)[i]) << "line " << loc.line();
   }
 }
 
@@ -664,9 +664,9 @@ constexpr auto ApplyRelroCantMerge = [](auto&& elf) {
     EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>(phdrs),
                                       loadInfo.GetPhdrObserver(kPageSize)));
     auto& segments = loadInfo.segments();
-    ASSERT_EQ(segments.size(), 2);
+    ASSERT_EQ(segments.size(), 2u);
     EXPECT_TRUE(loadInfo.ApplyRelro(diag, relro, kPageSize, merge_ro));
-    ASSERT_EQ(segments.size(), 2);
+    ASSERT_EQ(segments.size(), 2u);
     ASSERT_TRUE(std::holds_alternative<ConstantSegment>(segments[0]));
     EXPECT_EQ(std::get<ConstantSegment>(segments[0]).flags(), phdrs[0].flags);
     ASSERT_TRUE(std::holds_alternative<ConstantSegment>(segments[1]));
@@ -717,7 +717,7 @@ foo: {{{mmap:0x12342000:0x1000:load:17:rw:0x2000}}}
   EXPECT_EQ(&writer, &(info.SymbolizerContext(writer, 17, "foo", cpp20::span(kBuildId), 0x12340000,
                                               "foo: ")));
 
-  EXPECT_STREQ(kExpectedContext, markup);
+  EXPECT_EQ(kExpectedContext, markup);
 };
 
 TEST(ElfldltlLoadTests, SymbolizerContext) { TestAllFormats(SymbolizerContext); }

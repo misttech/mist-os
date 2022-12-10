@@ -11,7 +11,7 @@
 #include <type_traits>
 #include <vector>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "symbol-tests.h"
 
@@ -35,8 +35,8 @@ constexpr auto EmptyTest = [](auto&& elf) {
   // No matchers and nothing to match.
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, cpp20::span(dyn)));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
 };
 
 TEST(ElfldltlDynamicTests, Empty) { TestAllFormats(EmptyTest); }
@@ -54,10 +54,10 @@ constexpr auto MissingTerminatorTest = [](auto&& elf) {
 
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, dyn));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_GE(errors.size(), 1);
-  EXPECT_STREQ(errors.front(), "missing DT_NULL terminator in PT_DYNAMIC");
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_GE(errors.size(), 1u);
+  EXPECT_EQ(errors.front(), "missing DT_NULL terminator in PT_DYNAMIC");
 };
 
 TEST(ElfldltlDynamicTests, MissingTerminator) { TestAllFormats(MissingTerminatorTest); }
@@ -78,8 +78,8 @@ constexpr auto RejectTextrelTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, cpp20::span(dyn_notextrel),
                                       elfldltl::DynamicTextrelRejectObserver{}));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
   EXPECT_TRUE(errors.empty());
 
   // PT_DYNAMIC with DT_TEXTREL.
@@ -91,10 +91,10 @@ constexpr auto RejectTextrelTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, cpp20::span(dyn_textrel),
                                       elfldltl::DynamicTextrelRejectObserver{}));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_GE(errors.size(), 1);
-  EXPECT_STREQ(errors.front(), elfldltl::DynamicTextrelRejectObserver::Message());
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_GE(errors.size(), 1u);
+  EXPECT_EQ(errors.front(), elfldltl::DynamicTextrelRejectObserver::Message());
 };
 
 TEST(ElfldltlDynamicTests, RejectTextrel) { TestAllFormats(RejectTextrelTest); }
@@ -137,11 +137,11 @@ constexpr auto RelocationInfoObserverEmptyTest = [](auto&& elf) {
 
   elfldltl::RelocationInfo<Elf> info;
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), empty_memory, cpp20::span(dyn_noreloc),
-                                      elfldltl::DynamicRelocationInfoObserver(info)),
-              "%s", diag.ExplainErrors().c_str());
+                                      elfldltl::DynamicRelocationInfoObserver(info)))
+      << diag.ExplainErrors();
 
-  EXPECT_EQ(0, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
+  EXPECT_EQ(0u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
   EXPECT_TRUE(diag.errors().empty());
 
   EXPECT_TRUE(info.rel_relative().empty());
@@ -300,19 +300,19 @@ constexpr auto RelocationInfoObserverFullValidTest = [](auto&& elf) {
 
   elfldltl::RelocationInfo<Elf> info;
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(), cpp20::span(dyn_goodreloc),
-                                      elfldltl::DynamicRelocationInfoObserver(info)),
-              "%s", diag.ExplainErrors().c_str());
+                                      elfldltl::DynamicRelocationInfoObserver(info)))
+      << diag.ExplainErrors();
 
-  EXPECT_EQ(0, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_TRUE(diag.errors().empty(), "%s", diag.ExplainErrors().c_str());
+  EXPECT_EQ(0u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_TRUE(diag.errors().empty()) << diag.ExplainErrors();
 
-  EXPECT_EQ(2, info.rel_relative().size());
-  EXPECT_EQ(1, info.rel_symbolic().size());
-  EXPECT_EQ(2, info.rela_relative().size());
-  EXPECT_EQ(1, info.rela_symbolic().size());
-  EXPECT_EQ(3, info.relr().size());
-  std::visit([](const auto& table) { EXPECT_EQ(3, table.size()); }, info.jmprel());
+  EXPECT_EQ(2u, info.rel_relative().size());
+  EXPECT_EQ(1u, info.rel_symbolic().size());
+  EXPECT_EQ(2u, info.rela_relative().size());
+  EXPECT_EQ(1u, info.rela_symbolic().size());
+  EXPECT_EQ(3u, info.relr().size());
+  std::visit([](const auto& table) { EXPECT_EQ(3u, table.size()); }, info.jmprel());
 };
 
 TEST(ElfldltlDynamicTests, RelocationInfoObserverFullValid) {
@@ -382,20 +382,20 @@ constexpr auto RelocationInfoObserverBadRelentTest = [](auto&& elf) {
 
   elfldltl::RelocationInfo<Elf> info;
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(), cpp20::span(dyn_bad_relent),
-                                      elfldltl::DynamicRelocationInfoObserver(info)),
-              "%s", diag.ExplainErrors().c_str());
+                                      elfldltl::DynamicRelocationInfoObserver(info)))
+      << diag.ExplainErrors();
 
-  EXPECT_EQ(1, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(1, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+  EXPECT_EQ(1u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
 
   // With keep-going, the data is delivered anyway.
-  EXPECT_EQ(2, info.rel_relative().size());
-  EXPECT_EQ(1, info.rel_symbolic().size());
-  EXPECT_EQ(2, info.rela_relative().size());
-  EXPECT_EQ(1, info.rela_symbolic().size());
-  EXPECT_EQ(3, info.relr().size());
-  std::visit([](const auto& table) { EXPECT_EQ(3, table.size()); }, info.jmprel());
+  EXPECT_EQ(2u, info.rel_relative().size());
+  EXPECT_EQ(1u, info.rel_symbolic().size());
+  EXPECT_EQ(2u, info.rela_relative().size());
+  EXPECT_EQ(1u, info.rela_symbolic().size());
+  EXPECT_EQ(3u, info.relr().size());
+  std::visit([](const auto& table) { EXPECT_EQ(3u, table.size()); }, info.jmprel());
 };
 
 TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelent) {
@@ -461,22 +461,22 @@ constexpr auto RelocationInfoObserverBadRelaentTest = [](auto&& elf) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(
-      elfldltl::DecodeDynamic(diag.diag(), test_image.memory(), cpp20::span(dyn_bad_relaent),
-                              elfldltl::DynamicRelocationInfoObserver(info)),
-      "%s", diag.ExplainErrors().c_str());
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(),
+                                      cpp20::span(dyn_bad_relaent),
+                                      elfldltl::DynamicRelocationInfoObserver(info)))
+      << diag.ExplainErrors();
 
-  EXPECT_EQ(1, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(1, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+  EXPECT_EQ(1u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
 
   // With keep-going, the data is delivered anyway.
-  EXPECT_EQ(2, info.rel_relative().size());
-  EXPECT_EQ(1, info.rel_symbolic().size());
-  EXPECT_EQ(2, info.rela_relative().size());
-  EXPECT_EQ(1, info.rela_symbolic().size());
-  EXPECT_EQ(3, info.relr().size());
-  std::visit([](const auto& table) { EXPECT_EQ(3, table.size()); }, info.jmprel());
+  EXPECT_EQ(2u, info.rel_relative().size());
+  EXPECT_EQ(1u, info.rel_symbolic().size());
+  EXPECT_EQ(2u, info.rela_relative().size());
+  EXPECT_EQ(1u, info.rela_symbolic().size());
+  EXPECT_EQ(3u, info.relr().size());
+  std::visit([](const auto& table) { EXPECT_EQ(3u, table.size()); }, info.jmprel());
 };
 
 TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelaent) {
@@ -542,22 +542,22 @@ constexpr auto RelocationInfoObserverBadRelrentTest = [](auto&& elf) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(
-      elfldltl::DecodeDynamic(diag.diag(), test_image.memory(), cpp20::span(dyn_bad_relrent),
-                              elfldltl::DynamicRelocationInfoObserver(info)),
-      "%s", diag.ExplainErrors().c_str());
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(),
+                                      cpp20::span(dyn_bad_relrent),
+                                      elfldltl::DynamicRelocationInfoObserver(info)))
+      << diag.ExplainErrors();
 
-  EXPECT_EQ(1, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(1, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+  EXPECT_EQ(1u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
 
   // With keep-going, the data is delivered anyway.
-  EXPECT_EQ(2, info.rel_relative().size());
-  EXPECT_EQ(1, info.rel_symbolic().size());
-  EXPECT_EQ(2, info.rela_relative().size());
-  EXPECT_EQ(1, info.rela_symbolic().size());
-  EXPECT_EQ(3, info.relr().size());
-  std::visit([](const auto& table) { EXPECT_EQ(3, table.size()); }, info.jmprel());
+  EXPECT_EQ(2u, info.rel_relative().size());
+  EXPECT_EQ(1u, info.rel_symbolic().size());
+  EXPECT_EQ(2u, info.rela_relative().size());
+  EXPECT_EQ(1u, info.rela_symbolic().size());
+  EXPECT_EQ(3u, info.relr().size());
+  std::visit([](const auto& table) { EXPECT_EQ(3u, table.size()); }, info.jmprel());
 };
 
 TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelrent) {
@@ -624,22 +624,22 @@ constexpr auto RelocationInfoObserverMissingPltrelTest = [](auto&& elf) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(
-      elfldltl::DecodeDynamic(diag.diag(), test_image.memory(), cpp20::span(dyn_missing_pltrel),
-                              elfldltl::DynamicRelocationInfoObserver(info)),
-      "%s", diag.ExplainErrors().c_str());
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(),
+                                      cpp20::span(dyn_missing_pltrel),
+                                      elfldltl::DynamicRelocationInfoObserver(info)))
+      << diag.ExplainErrors();
 
-  EXPECT_EQ(1, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(1, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+  EXPECT_EQ(1u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
 
   // DT_JMPREL was ignored but the rest is normal.
-  EXPECT_EQ(2, info.rel_relative().size());
-  EXPECT_EQ(1, info.rel_symbolic().size());
-  EXPECT_EQ(2, info.rela_relative().size());
-  EXPECT_EQ(1, info.rela_symbolic().size());
-  EXPECT_EQ(3, info.relr().size());
-  std::visit([](const auto& table) { EXPECT_EQ(0, table.size()); }, info.jmprel());
+  EXPECT_EQ(2u, info.rel_relative().size());
+  EXPECT_EQ(1u, info.rel_symbolic().size());
+  EXPECT_EQ(2u, info.rela_relative().size());
+  EXPECT_EQ(1u, info.rela_symbolic().size());
+  EXPECT_EQ(3u, info.relr().size());
+  std::visit([](const auto& table) { EXPECT_EQ(0u, table.size()); }, info.jmprel());
 };
 
 TEST(ElfldltlDynamicTests, RelocationInfoObserverMissingPltrel) {
@@ -704,20 +704,20 @@ constexpr auto RelocationInfoObserverBadPltrelTest = [](auto&& elf) {
 
   elfldltl::RelocationInfo<Elf> info;
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(), cpp20::span(dyn_bad_pltrel),
-                                      elfldltl::DynamicRelocationInfoObserver(info)),
-              "%s", diag.ExplainErrors().c_str());
+                                      elfldltl::DynamicRelocationInfoObserver(info)))
+      << diag.ExplainErrors();
 
-  EXPECT_EQ(1, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(1, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+  EXPECT_EQ(1u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
 
   // DT_JMPREL was ignored but the rest is normal.
-  EXPECT_EQ(2, info.rel_relative().size());
-  EXPECT_EQ(1, info.rel_symbolic().size());
-  EXPECT_EQ(2, info.rela_relative().size());
-  EXPECT_EQ(1, info.rela_symbolic().size());
-  EXPECT_EQ(3, info.relr().size());
-  std::visit([](const auto& table) { EXPECT_EQ(0, table.size()); }, info.jmprel());
+  EXPECT_EQ(2u, info.rel_relative().size());
+  EXPECT_EQ(1u, info.rel_symbolic().size());
+  EXPECT_EQ(2u, info.rela_relative().size());
+  EXPECT_EQ(1u, info.rela_symbolic().size());
+  EXPECT_EQ(3u, info.relr().size());
+  std::visit([](const auto& table) { EXPECT_EQ(0u, table.size()); }, info.jmprel());
 };
 
 TEST(ElfldltlDynamicTests, RelocationInfoObserverBadPltrel) {
@@ -788,22 +788,22 @@ constexpr auto RelocationInfoObserverBadRelAddrTest = [](auto&& elf) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(
-      elfldltl::DecodeDynamic(diag.diag(), test_image.memory(), cpp20::span(dyn_bad_rel_addr),
-                              elfldltl::DynamicRelocationInfoObserver(info)),
-      "%s", diag.ExplainErrors().c_str());
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(),
+                                      cpp20::span(dyn_bad_rel_addr),
+                                      elfldltl::DynamicRelocationInfoObserver(info)))
+      << diag.ExplainErrors();
 
-  EXPECT_EQ(1, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(1, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+  EXPECT_EQ(1u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
 
   // DT_REL was ignored but the rest is normal.
-  EXPECT_EQ(0, info.rel_relative().size());
-  EXPECT_EQ(0, info.rel_symbolic().size());
-  EXPECT_EQ(2, info.rela_relative().size());
-  EXPECT_EQ(1, info.rela_symbolic().size());
-  EXPECT_EQ(3, info.relr().size());
-  std::visit([](const auto& table) { EXPECT_EQ(3, table.size()); }, info.jmprel());
+  EXPECT_EQ(0u, info.rel_relative().size());
+  EXPECT_EQ(0u, info.rel_symbolic().size());
+  EXPECT_EQ(2u, info.rela_relative().size());
+  EXPECT_EQ(1u, info.rela_symbolic().size());
+  EXPECT_EQ(3u, info.relr().size());
+  std::visit([](const auto& table) { EXPECT_EQ(3u, table.size()); }, info.jmprel());
 };
 
 TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelAddr) {
@@ -872,20 +872,20 @@ constexpr auto RelocationInfoObserverBadRelSzTest = [](auto&& elf) {
 
   elfldltl::RelocationInfo<Elf> info;
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(), cpp20::span(dyn_bad_relsz),
-                                      elfldltl::DynamicRelocationInfoObserver(info)),
-              "%s", diag.ExplainErrors().c_str());
+                                      elfldltl::DynamicRelocationInfoObserver(info)))
+      << diag.ExplainErrors();
 
-  EXPECT_EQ(1, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(1, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+  EXPECT_EQ(1u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
 
   // DT_REL was ignored but the rest is normal.
-  EXPECT_EQ(0, info.rel_relative().size());
-  EXPECT_EQ(0, info.rel_symbolic().size());
-  EXPECT_EQ(2, info.rela_relative().size());
-  EXPECT_EQ(1, info.rela_symbolic().size());
-  EXPECT_EQ(3, info.relr().size());
-  std::visit([](const auto& table) { EXPECT_EQ(3, table.size()); }, info.jmprel());
+  EXPECT_EQ(0u, info.rel_relative().size());
+  EXPECT_EQ(0u, info.rel_symbolic().size());
+  EXPECT_EQ(2u, info.rela_relative().size());
+  EXPECT_EQ(1u, info.rela_symbolic().size());
+  EXPECT_EQ(3u, info.relr().size());
+  std::visit([](const auto& table) { EXPECT_EQ(3u, table.size()); }, info.jmprel());
 };
 
 TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelSz) {
@@ -953,22 +953,22 @@ constexpr auto RelocationInfoObserverBadRelSzAlignTest = [](auto&& elf) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(
-      elfldltl::DecodeDynamic(diag.diag(), test_image.memory(), cpp20::span(dyn_bad_relsz_align),
-                              elfldltl::DynamicRelocationInfoObserver(info)),
-      "%s", diag.ExplainErrors().c_str());
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(),
+                                      cpp20::span(dyn_bad_relsz_align),
+                                      elfldltl::DynamicRelocationInfoObserver(info)))
+      << diag.ExplainErrors();
 
-  EXPECT_EQ(1, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(1, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+  EXPECT_EQ(1u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
 
   // DT_REL was ignored but the rest is normal.
-  EXPECT_EQ(0, info.rel_relative().size());
-  EXPECT_EQ(0, info.rel_symbolic().size());
-  EXPECT_EQ(2, info.rela_relative().size());
-  EXPECT_EQ(1, info.rela_symbolic().size());
-  EXPECT_EQ(3, info.relr().size());
-  std::visit([](const auto& table) { EXPECT_EQ(3, table.size()); }, info.jmprel());
+  EXPECT_EQ(0u, info.rel_relative().size());
+  EXPECT_EQ(0u, info.rel_symbolic().size());
+  EXPECT_EQ(2u, info.rela_relative().size());
+  EXPECT_EQ(1u, info.rela_symbolic().size());
+  EXPECT_EQ(3u, info.relr().size());
+  std::visit([](const auto& table) { EXPECT_EQ(3u, table.size()); }, info.jmprel());
 };
 
 TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelSzAlign) {
@@ -1064,11 +1064,11 @@ constexpr auto SymbolInfoObserverEmptyTest = [](auto&& elf) {
 
   elfldltl::SymbolInfo<Elf> info;
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), empty_memory, cpp20::span(dyn_nosyms),
-                                      elfldltl::DynamicSymbolInfoObserver(info)),
-              "%s", diag.ExplainErrors().c_str());
+                                      elfldltl::DynamicSymbolInfoObserver(info)))
+      << diag.ExplainErrors();
 
-  EXPECT_EQ(0, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
+  EXPECT_EQ(0u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
   EXPECT_TRUE(diag.errors().empty());
 
   EXPECT_TRUE(info.strtab().empty());
@@ -1109,17 +1109,17 @@ constexpr auto SymbolInfoObserverFullValidTest = [](auto&& elf) {
 
   elfldltl::SymbolInfo<Elf> info;
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(), cpp20::span(dyn_goodsyms),
-                                      elfldltl::DynamicSymbolInfoObserver(info)),
-              "%s", diag.ExplainErrors().c_str());
+                                      elfldltl::DynamicSymbolInfoObserver(info)))
+      << diag.ExplainErrors();
 
-  EXPECT_EQ(0, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
+  EXPECT_EQ(0u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
   EXPECT_TRUE(diag.errors().empty());
 
   EXPECT_EQ(info.strtab().size(), test_image.test_syms().strtab().size());
   EXPECT_EQ(info.strtab(), test_image.test_syms().strtab());
   EXPECT_EQ(info.safe_symtab().size(), test_image.test_syms().symtab().size());
-  EXPECT_STREQ(info.soname(), "libfoo.so");
+  EXPECT_EQ(info.soname(), "libfoo.so");
   EXPECT_TRUE(info.compat_hash());
   EXPECT_TRUE(info.gnu_hash());
 };
@@ -1161,11 +1161,11 @@ constexpr auto SymbolInfoObserverBadSonameOffsetTest = [](auto&& elf) {
 
   elfldltl::SymbolInfo<Elf> info;
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_bad_soname_offset),
-                                      elfldltl::DynamicSymbolInfoObserver(info)),
-              "%s", diag.ExplainErrors().c_str());
-  EXPECT_EQ(1, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(1, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+                                      elfldltl::DynamicSymbolInfoObserver(info)))
+      << diag.ExplainErrors();
+  EXPECT_EQ(1u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
 };
 
 TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSonameOffset) {
@@ -1200,11 +1200,11 @@ constexpr auto SymbolInfoObserverBadSymentTest = [](auto&& elf) {
 
   elfldltl::SymbolInfo<Elf> info;
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_bad_syment),
-                                      elfldltl::DynamicSymbolInfoObserver(info)),
-              "%s", diag.ExplainErrors().c_str());
-  EXPECT_EQ(1, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(1, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+                                      elfldltl::DynamicSymbolInfoObserver(info)))
+      << diag.ExplainErrors();
+  EXPECT_EQ(1u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
 };
 
 TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSyment) {
@@ -1235,11 +1235,11 @@ constexpr auto SymbolInfoObserverMissingStrszTest = [](auto&& elf) {
 
   elfldltl::SymbolInfo<Elf> info;
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_missing_strsz),
-                                      elfldltl::DynamicSymbolInfoObserver(info)),
-              "%s", diag.ExplainErrors().c_str());
-  EXPECT_EQ(1, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(1, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+                                      elfldltl::DynamicSymbolInfoObserver(info)))
+      << diag.ExplainErrors();
+  EXPECT_EQ(1u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
 };
 
 TEST(ElfldltlDynamicTests, SymbolInfoObserverMissingStrsz) {
@@ -1274,11 +1274,11 @@ constexpr auto SymbolInfoObserverMissingStrtabTest = [](auto&& elf) {
 
   elfldltl::SymbolInfo<Elf> info;
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_missing_strtab),
-                                      elfldltl::DynamicSymbolInfoObserver(info)),
-              "%s", diag.ExplainErrors().c_str());
-  EXPECT_EQ(1, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(1, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+                                      elfldltl::DynamicSymbolInfoObserver(info)))
+      << diag.ExplainErrors();
+  EXPECT_EQ(1u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
 };
 
 TEST(ElfldltlDynamicTests, SymbolInfoObserverMissingStrtab) {
@@ -1317,11 +1317,11 @@ constexpr auto SymbolInfoObserverBadStrtabAddrTest = [](auto&& elf) {
 
   elfldltl::SymbolInfo<Elf> info;
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_bad_strtab_addr),
-                                      elfldltl::DynamicSymbolInfoObserver(info)),
-              "%s", diag.ExplainErrors().c_str());
-  EXPECT_EQ(1, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(1, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+                                      elfldltl::DynamicSymbolInfoObserver(info)))
+      << diag.ExplainErrors();
+  EXPECT_EQ(1u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
 };
 
 TEST(ElfldltlDynamicTests, SymbolInfoObserverBadStrtabAddr) {
@@ -1364,11 +1364,11 @@ constexpr auto SymbolInfoObserverBadSymtabAddrTest = [](auto&& elf) {
 
   elfldltl::SymbolInfo<Elf> info;
   EXPECT_FALSE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_bad_symtab_addr),
-                                       elfldltl::DynamicSymbolInfoObserver(info)),
-               "%s", diag.ExplainErrors().c_str());
-  EXPECT_EQ(0, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(0, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+                                       elfldltl::DynamicSymbolInfoObserver(info)))
+      << diag.ExplainErrors();
+  EXPECT_EQ(0u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(0u, diag.errors().size()) << diag.ExplainErrors();
 };
 
 TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSymtabAddr) {
@@ -1410,11 +1410,11 @@ constexpr auto SymbolInfoObserverBadSymtabAlignTest = [](auto&& elf) {
 
   elfldltl::SymbolInfo<Elf> info;
   EXPECT_FALSE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_bad_symtab_align),
-                                       elfldltl::DynamicSymbolInfoObserver(info)),
-               "%s", diag.ExplainErrors().c_str());
-  EXPECT_EQ(1, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(1, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+                                       elfldltl::DynamicSymbolInfoObserver(info)))
+      << diag.ExplainErrors();
+  EXPECT_EQ(1u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
 };
 
 TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSymtabAlign) {
@@ -1457,11 +1457,11 @@ constexpr auto SymbolInfoObserverBadHashAddrTest = [](auto&& elf) {
 
   elfldltl::SymbolInfo<Elf> info;
   EXPECT_FALSE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_bad_hash_addr),
-                                       elfldltl::DynamicSymbolInfoObserver(info)),
-               "%s", diag.ExplainErrors().c_str());
-  EXPECT_EQ(0, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(0, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+                                       elfldltl::DynamicSymbolInfoObserver(info)))
+      << diag.ExplainErrors();
+  EXPECT_EQ(0u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(0u, diag.errors().size()) << diag.ExplainErrors();
 };
 
 TEST(ElfldltlDynamicTests, SymbolInfoObserverBadHashAddr) {
@@ -1501,11 +1501,11 @@ constexpr auto SymbolInfoObserverBadHashAlignTest = [](auto&& elf) {
 
   elfldltl::SymbolInfo<Elf> info;
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_bad_hash_align),
-                                      elfldltl::DynamicSymbolInfoObserver(info)),
-              "%s", diag.ExplainErrors().c_str());
-  EXPECT_EQ(1, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(1, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+                                      elfldltl::DynamicSymbolInfoObserver(info)))
+      << diag.ExplainErrors();
+  EXPECT_EQ(1u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
 };
 
 TEST(ElfldltlDynamicTests, SymbolInfoObserverBadHashAlign) {
@@ -1544,13 +1544,13 @@ constexpr auto SymbolInfoObserverBadGnuHashAddrTest = [](auto&& elf) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_FALSE(
-      elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_bad_gnu_hash_addr),
-                              elfldltl::DynamicSymbolInfoObserver(info)),
-      "%s", diag.ExplainErrors().c_str());
-  EXPECT_EQ(0, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(0, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+  EXPECT_FALSE(elfldltl::DecodeDynamic(diag.diag(), image_memory,
+                                       cpp20::span(dyn_bad_gnu_hash_addr),
+                                       elfldltl::DynamicSymbolInfoObserver(info)))
+      << diag.ExplainErrors();
+  EXPECT_EQ(0u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(0u, diag.errors().size()) << diag.ExplainErrors();
 };
 
 TEST(ElfldltlDynamicTests, SymbolInfoObserverBadGnuHashAddr) {
@@ -1586,13 +1586,13 @@ constexpr auto SymbolInfoObserverBadGnuHashAlignTest = [](auto&& elf) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(
-      elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_bad_gnu_hash_align),
-                              elfldltl::DynamicSymbolInfoObserver(info)),
-      "%s", diag.ExplainErrors().c_str());
-  EXPECT_EQ(1, diag.diag().errors());
-  EXPECT_EQ(0, diag.diag().warnings());
-  EXPECT_EQ(1, diag.errors().size(), "%s", diag.ExplainErrors().c_str());
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), image_memory,
+                                      cpp20::span(dyn_bad_gnu_hash_align),
+                                      elfldltl::DynamicSymbolInfoObserver(info)))
+      << diag.ExplainErrors();
+  EXPECT_EQ(1u, diag.diag().errors());
+  EXPECT_EQ(0u, diag.diag().warnings());
+  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
 };
 
 TEST(ElfldltlDynamicTests, SymbolInfoObserverBadGnuHashAlign) {
@@ -1654,7 +1654,7 @@ constexpr auto ObserveNeededTest = [](auto&& elf) {
 
   size_type current_index = 0;
   auto expect_next = [&](std::string_view needed) {
-    EXPECT_STREQ(kNeededStrings[current_index++], needed);
+    EXPECT_EQ(kNeededStrings[current_index++], needed);
     return true;
   };
 

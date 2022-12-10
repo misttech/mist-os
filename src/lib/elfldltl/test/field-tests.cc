@@ -5,7 +5,7 @@
 #include <lib/elfldltl/field.h>
 #include <lib/stdcompat/bit.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace {
 
@@ -159,7 +159,7 @@ TEST(ElfldltlFieldTests, EnumField) {
     case E64::k1:
       break;
     default:
-      EXPECT_TRUE(false, "switch on enum");
+      EXPECT_TRUE(false) << "switch on enum";
   }
 
   EXPECT_EQ(s.e32.get(), E32::k1);
@@ -169,7 +169,7 @@ TEST(ElfldltlFieldTests, EnumField) {
     case E32::k1:
       break;
     default:
-      EXPECT_TRUE(false, "switch on enum");
+      EXPECT_TRUE(false) << "switch on enum";
   }
 
   EXPECT_EQ(s.e16.get(), E16::k1);
@@ -179,7 +179,7 @@ TEST(ElfldltlFieldTests, EnumField) {
     case E16::k1:
       break;
     default:
-      EXPECT_TRUE(false, "switch on enum");
+      EXPECT_TRUE(false) << "switch on enum";
   }
 
   EXPECT_EQ(s.e8[0].get(), E8::k1);
@@ -189,7 +189,7 @@ TEST(ElfldltlFieldTests, EnumField) {
     case E8::k1:
       break;
     default:
-      EXPECT_TRUE(false, "switch on enum");
+      EXPECT_TRUE(false) << "switch on enum";
   }
 
   EXPECT_EQ(s.e8[1].get(), E8::k2);
@@ -274,8 +274,8 @@ TEST(ElfldltlFieldTests, ByteSwap) {
   constexpr elfldltl::UnsignedField<uint32_t, kLittle> kBigConst{{1, 2, 3, 4}};
   constexpr uint32_t kConstVal = kConst;
   constexpr uint32_t kBigConstVal = kBigConst;
-  EXPECT_EQ(kConstVal, 0x01020304);
-  EXPECT_EQ(kBigConstVal, 0x01020304);
+  EXPECT_EQ(kConstVal, 0x01020304u);
+  EXPECT_EQ(kBigConstVal, 0x01020304u);
 }
 
 }  // namespace

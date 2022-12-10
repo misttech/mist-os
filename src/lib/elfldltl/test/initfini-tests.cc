@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tests.h"
 
@@ -59,13 +59,13 @@ constexpr auto EmptyTest = [](auto&& elf) {
   EXPECT_TRUE(
       elfldltl::DecodeDynamic(diag, memory, DynSpan(dyn), elfldltl::DynamicInitObserver(info)));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  EXPECT_EQ(0, errors.size());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  EXPECT_EQ(0u, errors.size());
 
-  EXPECT_EQ(0, info.size());
-  info.VisitInit([](auto&&... args) { FAIL("should not be called"); }, 0);
-  info.VisitFini([](auto&&... args) { FAIL("should not be called"); }, 0);
+  EXPECT_EQ(0u, info.size());
+  info.VisitInit([](auto&&... args) { FAIL() << "should not be called"; }, 0);
+  info.VisitFini([](auto&&... args) { FAIL() << "should not be called"; }, 0);
 };
 
 TEST(ElfldltlInitFiniTests, Empty) { TestAllFormats(EmptyTest); }
@@ -94,11 +94,11 @@ constexpr auto ArrayOnlyTest = [](auto&& elf) {
   EXPECT_TRUE(
       elfldltl::DecodeDynamic(diag, memory, DynSpan(dyn), elfldltl::DynamicInitObserver(info)));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  EXPECT_EQ(0, errors.size());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  EXPECT_EQ(0u, errors.size());
 
-  EXPECT_EQ(4, info.size());
+  EXPECT_EQ(4u, info.size());
 };
 
 TEST(ElfldltlInitFiniTests, ArrayOnly) { TestAllFormats(ArrayOnlyTest); }
@@ -126,12 +126,12 @@ constexpr auto LegacyOnlyTest = [](auto&& elf) {
   EXPECT_TRUE(
       elfldltl::DecodeDynamic(diag, memory, DynSpan(dyn), elfldltl::DynamicInitObserver(info)));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  EXPECT_EQ(0, errors.size());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  EXPECT_EQ(0u, errors.size());
 
-  EXPECT_EQ(1, info.size());
-  EXPECT_EQ(0x5678, info.legacy());
+  EXPECT_EQ(1u, info.size());
+  EXPECT_EQ(0x5678u, info.legacy());
 };
 
 TEST(ElfldltlInitFiniTests, LegacyOnly) { TestAllFormats(LegacyOnlyTest); }
@@ -161,11 +161,11 @@ constexpr auto ArrayWithLegacyTest = [](auto&& elf) {
   EXPECT_TRUE(
       elfldltl::DecodeDynamic(diag, memory, DynSpan(dyn), elfldltl::DynamicInitObserver(info)));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  EXPECT_EQ(0, errors.size());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  EXPECT_EQ(0u, errors.size());
 
-  EXPECT_EQ(5, info.size());
+  EXPECT_EQ(5u, info.size());
 };
 
 TEST(ElfldltlInitFiniTests, ArrayWithLegacy) { TestAllFormats(ArrayWithLegacyTest); }
@@ -194,11 +194,11 @@ constexpr auto MissingArrayTest = [](auto&& elf) {
   EXPECT_TRUE(
       elfldltl::DecodeDynamic(diag, memory, DynSpan(dyn), elfldltl::DynamicInitObserver(info)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  EXPECT_EQ(1, errors.size());
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  EXPECT_EQ(1u, errors.size());
 
-  EXPECT_EQ(0, info.size());
+  EXPECT_EQ(0u, info.size());
 };
 
 TEST(ElfldltlInitFiniTests, MissingArray) { TestAllFormats(MissingArrayTest); }
@@ -227,11 +227,11 @@ constexpr auto MissingSizeTest = [](auto&& elf) {
   EXPECT_TRUE(
       elfldltl::DecodeDynamic(diag, memory, DynSpan(dyn), elfldltl::DynamicInitObserver(info)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  EXPECT_EQ(1, errors.size());
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  EXPECT_EQ(1u, errors.size());
 
-  EXPECT_EQ(0, info.size());
+  EXPECT_EQ(0u, info.size());
 };
 
 TEST(ElfldltlInitFiniTests, MissingSize) { TestAllFormats(MissingSizeTest); }
@@ -245,7 +245,7 @@ constexpr auto VisitInitTests = [](auto&& elf) {
   info.set_array(cpp20::span(array));
   info.set_legacy(1);
 
-  ASSERT_EQ(5, info.size());
+  ASSERT_EQ(5u, info.size());
 
   info.VisitInit(
       [i = size_type{1}](size_type addr, bool relocated) mutable {
@@ -275,7 +275,7 @@ constexpr auto VisitFiniTests = [](auto&& elf) {
   info.set_array(cpp20::span(array));
   info.set_legacy(1);
 
-  ASSERT_EQ(5, info.size());
+  ASSERT_EQ(5u, info.size());
 
   info.VisitFini(
       [i = size_type{5}](size_type addr, bool relocated) mutable {

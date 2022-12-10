@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tests.h"
 
@@ -54,8 +54,8 @@ constexpr auto EmptyTest = [](auto&& elf) {
   // No matchers and nothing to match.
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>{}));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
 };
 
 TEST(ElfldltlPhdrTests, Empty) { TestAllFormats(EmptyTest); }
@@ -71,8 +71,8 @@ constexpr auto NullObserverNoNullsTest = [](auto&& elf) {
   auto diag = elfldltl::CollectStringsDiagnostics(warnings, kFlags);
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), elfldltl::PhdrNullObserver<Elf>()));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
 };
 
 TEST(ElfldltlPhdrTests, NullObserverNoNulls) { TestAllFormats(NullObserverNoNullsTest); }
@@ -92,10 +92,10 @@ constexpr auto NullObserverOneNullTest = [](auto&& elf) {
   auto diag = elfldltl::CollectStringsDiagnostics(warnings, kFlags);
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), elfldltl::PhdrNullObserver<Elf>()));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(1, diag.warnings());
-  ASSERT_EQ(1, warnings.size());
-  EXPECT_STREQ(kNullWarning, warnings[0]);
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(1u, diag.warnings());
+  ASSERT_EQ(1u, warnings.size());
+  EXPECT_EQ(kNullWarning, warnings[0]);
 };
 
 TEST(ElfldltlPhdrTests, NullObserverOneNull) { TestAllFormats(NullObserverOneNullTest); }
@@ -114,12 +114,12 @@ constexpr auto NullObserverThreeNullsTest = [](auto&& elf) {
   auto diag = elfldltl::CollectStringsDiagnostics(warnings, kFlags);
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), elfldltl::PhdrNullObserver<Elf>()));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(3, diag.warnings());
-  ASSERT_EQ(3, warnings.size());
-  EXPECT_STREQ(kNullWarning, warnings[0]);
-  EXPECT_STREQ(kNullWarning, warnings[1]);
-  EXPECT_STREQ(kNullWarning, warnings[2]);
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(3u, diag.warnings());
+  ASSERT_EQ(3u, warnings.size());
+  EXPECT_EQ(kNullWarning, warnings[0]);
+  EXPECT_EQ(kNullWarning, warnings[1]);
+  EXPECT_EQ(kNullWarning, warnings[2]);
 };
 
 TEST(ElfldltlPhdrTests, NullObserverThreeNulls) { TestAllFormats(NullObserverThreeNullsTest); }
@@ -145,8 +145,8 @@ constexpr auto SingletonObserverAtMostOneHeaderPerTypeTest = [](auto&& elf) {
       elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kEhFrameHdr>(eh_frame),
       elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kRelro>(relro)));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
 
   EXPECT_FALSE(dynamic);
 
@@ -184,12 +184,12 @@ constexpr auto SingletonObserverMultipleHeadersPerTypeTest = [](auto&& elf) {
       elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kEhFrameHdr>(eh_frame),
       elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kRelro>(relro)));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(2, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(2u, diag.warnings());
 
-  ASSERT_EQ(warnings.size(), 2);
-  EXPECT_STREQ(warnings[0], "too many PT_GNU_RELRO headers; expected at most one");
-  EXPECT_STREQ(warnings[1], "too many PT_INTERP headers; expected at most one");
+  ASSERT_EQ(warnings.size(), 2u);
+  EXPECT_EQ(warnings[0], "too many PT_GNU_RELRO headers; expected at most one");
+  EXPECT_EQ(warnings[1], "too many PT_INTERP headers; expected at most one");
 };
 
 TEST(ElfldltlPhdrTests, SingletonObserverMultipleHeadersPerType) {
@@ -219,18 +219,16 @@ constexpr auto UnknownFlagsTest = [](auto&& elf) {
                             elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kStack>(stack),
                             elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kRelro>(relro)));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(4, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(4u, diag.warnings());
 
-  ASSERT_EQ(warnings.size(), 4);
-  EXPECT_STREQ(warnings[0],
-               "PT_DYNAMIC header has unrecognized flags (other than PF_R, PF_W, PF_X)");
-  EXPECT_STREQ(warnings[1],
-               "PT_INTERP header has unrecognized flags (other than PF_R, PF_W, PF_X)");
-  EXPECT_STREQ(warnings[2],
-               "PT_GNU_STACK header has unrecognized flags (other than PF_R, PF_W, PF_X)");
-  EXPECT_STREQ(warnings[3],
-               "PT_GNU_RELRO header has unrecognized flags (other than PF_R, PF_W, PF_X)");
+  ASSERT_EQ(warnings.size(), 4u);
+  EXPECT_EQ(warnings[0], "PT_DYNAMIC header has unrecognized flags (other than PF_R, PF_W, PF_X)");
+  EXPECT_EQ(warnings[1], "PT_INTERP header has unrecognized flags (other than PF_R, PF_W, PF_X)");
+  EXPECT_EQ(warnings[2],
+            "PT_GNU_STACK header has unrecognized flags (other than PF_R, PF_W, PF_X)");
+  EXPECT_EQ(warnings[3],
+            "PT_GNU_RELRO header has unrecognized flags (other than PF_R, PF_W, PF_X)");
 };
 
 TEST(ElfldltlPhdrTests, UnknownFlags) { TestAllFormats(UnknownFlagsTest); }
@@ -258,13 +256,13 @@ constexpr auto BadAlignmentTest = [](auto&& elf) {
                             elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kNote>(note),
                             elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kRelro>(relro)));
 
-  EXPECT_EQ(3, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(3u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
 
-  ASSERT_EQ(errors.size(), 3);
-  EXPECT_STREQ(errors[0], "PT_INTERP header has `p_align` that is not zero or a power of two");
-  EXPECT_STREQ(errors[1], "PT_NOTE header has `p_align` that is not zero or a power of two");
-  EXPECT_STREQ(errors[2], "PT_GNU_RELRO header has `p_align` that is not zero or a power of two");
+  ASSERT_EQ(errors.size(), 3u);
+  EXPECT_EQ(errors[0], "PT_INTERP header has `p_align` that is not zero or a power of two");
+  EXPECT_EQ(errors[1], "PT_NOTE header has `p_align` that is not zero or a power of two");
+  EXPECT_EQ(errors[2], "PT_GNU_RELRO header has `p_align` that is not zero or a power of two");
 };
 
 TEST(ElfldltlPhdrTests, BadAlignment) { TestAllFormats(BadAlignmentTest); }
@@ -319,14 +317,13 @@ constexpr auto OffsetNotEquivVaddrTest = [](auto&& elf) {
                             elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kNote>(note),
                             elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kRelro>(relro)));
 
-  EXPECT_EQ(2, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(2u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
 
-  ASSERT_EQ(2, errors.size());
-  EXPECT_STREQ(errors[0],
-               "PT_NOTE header has incongruent `p_offset` and `p_vaddr` modulo `p_align`");
-  EXPECT_STREQ(errors[1],
-               "PT_GNU_RELRO header has incongruent `p_offset` and `p_vaddr` modulo `p_align`");
+  ASSERT_EQ(2u, errors.size());
+  EXPECT_EQ(errors[0], "PT_NOTE header has incongruent `p_offset` and `p_vaddr` modulo `p_align`");
+  EXPECT_EQ(errors[1],
+            "PT_GNU_RELRO header has incongruent `p_offset` and `p_vaddr` modulo `p_align`");
 };
 
 TEST(ElfldltlPhdrTests, OffsetNotEquivVaddrVaddr) { TestAllFormats(OffsetNotEquivVaddrTest); }
@@ -349,7 +346,7 @@ constexpr auto StackObserverExecOkPhdrNonzeroSizeTest = [](auto&& elf) {
       elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/true>(size, executable)));
 
   ASSERT_TRUE(size);
-  EXPECT_EQ(0x1000, *size);
+  EXPECT_EQ(0x1000u, *size);
 };
 
 TEST(ElfldltlPhdrTests, StackObserverExecOkPhdrNonzeroSize) {
@@ -420,10 +417,10 @@ constexpr auto StackObserverExecOkPhdrWithXTest = [](auto&& elf) {
       elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/true>(size, executable)));
 
   ASSERT_TRUE(size);
-  EXPECT_EQ(0x1000, *size);
+  EXPECT_EQ(0x1000u, *size);
   EXPECT_TRUE(executable);
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
 };
 
 TEST(ElfldltlPhdrTests, StackObserverExecOkPhdrWithX) {
@@ -448,8 +445,8 @@ constexpr auto StackObserverExecOkPhdrWithoutXTest = [](auto&& elf) {
       elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/true>(size, executable)));
 
   EXPECT_FALSE(executable);
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
 };
 
 TEST(ElfldltlPhdrTests, StackObserverExecOkPhdrWithoutX) {
@@ -472,8 +469,8 @@ constexpr auto StackObserverExecOkNoPhdrTest = [](auto&& elf) {
       elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/true>(size, executable)));
 
   EXPECT_TRUE(executable);
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
 };
 
 TEST(ElfldltlPhdrTests, StackObserverExecOkNoPhdr) {
@@ -497,7 +494,7 @@ constexpr auto StackObserverExecNotOkPhdrNonzeroSizeTest = [](auto&& elf) {
                             elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/false>(size)));
 
   ASSERT_TRUE(size);
-  EXPECT_EQ(0x1000, *size);
+  EXPECT_EQ(0x1000u, *size);
 };
 
 TEST(ElfldltlPhdrTests, StackObserverExecNotOkPhdrNonzeroSize) {
@@ -564,10 +561,10 @@ constexpr auto StackObserverExecNotOkPhdrWithXTest = [](auto&& elf) {
       elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                             elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/false>(size)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(errors.size(), 1);
-  EXPECT_STREQ(errors.front(), "executable stack not supported: PF_X is set");
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(errors.size(), 1u);
+  EXPECT_EQ(errors.front(), "executable stack not supported: PF_X is set");
 };
 
 TEST(ElfldltlPhdrTests, StackObserverExecNotOkPhdrWithX) {
@@ -590,8 +587,8 @@ constexpr auto StackObserverExecNotOkPhdrWithoutXTest = [](auto&& elf) {
       elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                             elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/false>(size)));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
 };
 
 TEST(ElfldltlPhdrTests, StackObserverExecNotOkPhdrWithoutX) {
@@ -612,10 +609,10 @@ constexpr auto StackObserverExecNotOkNoPhdrTest = [](auto&& elf) {
       elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>{},
                             elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/false>(size)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(errors.size(), 1);
-  EXPECT_STREQ(errors.front(), "executable stack not supported: PT_GNU_STACK header required");
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(errors.size(), 1u);
+  EXPECT_EQ(errors.front(), "executable stack not supported: PT_GNU_STACK header required");
 };
 
 TEST(ElfldltlPhdrTests, StackObserverExecNotOkNoPhdr) {
@@ -637,10 +634,10 @@ constexpr auto StackObserverNonReadableTest = [](auto&& elf) {
   EXPECT_TRUE(
       elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), elfldltl::PhdrStackObserver<Elf>(size)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(errors.size(), 1);
-  EXPECT_STREQ(errors.front(), "stack is not readable: PF_R is not set");
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(errors.size(), 1u);
+  EXPECT_EQ(errors.front(), "stack is not readable: PF_R is not set");
 };
 
 TEST(ElfldltlPhdrTests, StackObserverNonReadable) { TestAllFormats(StackObserverNonReadableTest); }
@@ -660,10 +657,10 @@ constexpr auto StackObserverNonWritableTest = [](auto&& elf) {
   EXPECT_TRUE(
       elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), elfldltl::PhdrStackObserver<Elf>(size)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(errors.size(), 1);
-  EXPECT_STREQ(errors.front(), "stack is not writable: PF_W is not set");
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(errors.size(), 1u);
+  EXPECT_EQ(errors.front(), "stack is not writable: PF_W is not set");
 };
 
 TEST(ElfldltlPhdrTests, StackObserverNonWritable) { TestAllFormats(StackObserverNonWritableTest); }
@@ -681,8 +678,8 @@ constexpr auto MetadataObserverNoPhdrTest = [](auto&& elf) {
                             elfldltl::PhdrMetadataObserver<Elf, ElfPhdrType::kInterp>(phdr)));
 
   EXPECT_FALSE(phdr);
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
 };
 
 TEST(ElfldltlPhdrTests, MetadataObserverNoPhdr) { TestAllFormats(MetadataObserverNoPhdrTest); }
@@ -706,11 +703,11 @@ constexpr auto MetadataObserverUnalignedVaddrTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodePhdrs(
       diag, cpp20::span(kPhdrs), elfldltl::PhdrMetadataObserver<Elf, ElfPhdrType::kInterp>(phdr)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
 
-  ASSERT_EQ(errors.size(), 1);
-  EXPECT_STREQ(errors[0], "PT_INTERP header has `p_vaddr % p_align != 0`");
+  ASSERT_EQ(errors.size(), 1u);
+  EXPECT_EQ(errors[0], "PT_INTERP header has `p_vaddr % p_align != 0`");
 };
 
 TEST(ElfldltlPhdrTests, MetadataObserverUnalignedVaddr) {
@@ -738,10 +735,10 @@ constexpr auto MetadataObserverFileszNotEqMemszTest = [](auto&& elf) {
       diag, cpp20::span(kPhdrs), elfldltl::PhdrMetadataObserver<Elf, ElfPhdrType::kInterp>(phdr)));
 
   EXPECT_TRUE(phdr);
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(1, errors.size());
-  EXPECT_STREQ("PT_INTERP header has `p_filesz != p_memsz`", errors.front());
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(1u, errors.size());
+  EXPECT_EQ("PT_INTERP header has `p_filesz != p_memsz`", errors.front());
 };
 
 TEST(ElfldltlPhdrTests, MetadataObserverFileszNotEqMemsz) {
@@ -771,10 +768,10 @@ constexpr auto MetadataObserverIncompatibleEntrySizeTest = [](auto&& elf) {
                             elfldltl::PhdrMetadataObserver<Elf, ElfPhdrType::kDynamic, Dyn>(phdr)));
 
   EXPECT_TRUE(phdr);
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(1, errors.size());
-  EXPECT_STREQ("PT_DYNAMIC segment size is not a multiple of entry size", errors.front());
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(1u, errors.size());
+  EXPECT_EQ("PT_DYNAMIC segment size is not a multiple of entry size", errors.front());
 };
 
 TEST(ElfldltlPhdrTests, MetadataObserverIncompatibleEntrySize) {
@@ -802,10 +799,10 @@ constexpr auto MetadataObserverIncompatibleEntryAlignmentTest = [](auto&& elf) {
                             elfldltl::PhdrMetadataObserver<Elf, ElfPhdrType::kDynamic, Dyn>(phdr)));
 
   EXPECT_TRUE(phdr);
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(1, errors.size());
-  EXPECT_STREQ("PT_DYNAMIC segment alignment is not a multiple of entry alignment", errors.front());
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(1u, errors.size());
+  EXPECT_EQ("PT_DYNAMIC segment alignment is not a multiple of entry alignment", errors.front());
 };
 
 TEST(ElfldltlPhdrTests, MetadataObserverIncompatibleAlignmentSize) {
@@ -826,10 +823,10 @@ constexpr auto LoadObserverNoPhdrTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>{},
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
-  EXPECT_EQ(0, vaddr_start);
-  EXPECT_EQ(0, vaddr_size);
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, vaddr_start);
+  EXPECT_EQ(0u, vaddr_size);
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
 };
 
 TEST(ElfldltlPhdrTests, LoadObserverNoPhdr) { TestAllFormats(LoadObserverNoPhdrTest); }
@@ -852,10 +849,10 @@ constexpr auto BasicLoadObserverSmallAlignTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(1, errors.size());
-  EXPECT_STREQ("PT_LOAD's `p_align` is not page-aligned", errors.front());
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(1u, errors.size());
+  EXPECT_EQ("PT_LOAD's `p_align` is not page-aligned", errors.front());
 };
 
 TEST(ElfldltlPhdrTests, BasicLoadObserverSmallAlign) {
@@ -880,10 +877,10 @@ constexpr auto BasicLoadObserverZeroMemszTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(1, diag.warnings());
-  ASSERT_EQ(1, warnings.size());
-  EXPECT_STREQ("PT_LOAD has `p_memsz == 0`", warnings.front());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(1u, diag.warnings());
+  ASSERT_EQ(1u, warnings.size());
+  EXPECT_EQ("PT_LOAD has `p_memsz == 0`", warnings.front());
 };
 
 TEST(ElfldltlPhdrTests, BasicLoadObserverZeroMemsz) {
@@ -908,10 +905,10 @@ constexpr auto BasicLoadObserverMemszTooSmallTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(1, errors.size());
-  EXPECT_STREQ("PT_LOAD has `p_memsz < p_filesz`", errors.front());
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(1u, errors.size());
+  EXPECT_EQ("PT_LOAD has `p_memsz < p_filesz`", errors.front());
 };
 
 TEST(ElfldltlPhdrTests, BasicLoadObserverMemszTooSmall) {
@@ -938,10 +935,10 @@ constexpr auto BasicLoadObserverMemEndOverflowTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(1, errors.size());
-  EXPECT_STREQ("PT_LOAD has overflowing `p_vaddr + p_memsz`", errors.front());
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(1u, errors.size());
+  EXPECT_EQ("PT_LOAD has overflowing `p_vaddr + p_memsz`", errors.front());
 };
 
 TEST(ElfldltlPhdrTests, BasicLoadObserverMemEndOverflow) {
@@ -968,10 +965,10 @@ constexpr auto BasicLoadObserverAlignedMemEndOverflowTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(1, errors.size());
-  EXPECT_STREQ("PT_LOAD has overflowing `p_align`-aligned `p_vaddr + p_memsz`", errors.front());
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(1u, errors.size());
+  EXPECT_EQ("PT_LOAD has overflowing `p_align`-aligned `p_vaddr + p_memsz`", errors.front());
 };
 
 TEST(ElfldltlPhdrTests, BasicLoadObserverAlignedMemEndOverflows) {
@@ -1004,10 +1001,10 @@ constexpr auto BasicLoadObserverFileEndOverflowTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(1, errors.size());
-  EXPECT_STREQ("PT_LOAD has overflowing `p_offset + p_filesz`", errors.front());
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(1u, errors.size());
+  EXPECT_EQ("PT_LOAD has overflowing `p_offset + p_filesz`", errors.front());
 };
 
 TEST(ElfldltlPhdrTests, BasicLoadObserverFileEndOverflow) {
@@ -1040,10 +1037,10 @@ constexpr auto BasicLoadObserverAlignedFileEndOverflowTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(1, errors.size());
-  EXPECT_STREQ("PT_LOAD has overflowing `p_align`-aligned `p_offset + p_filesz`", errors.front());
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(1u, errors.size());
+  EXPECT_EQ("PT_LOAD has overflowing `p_align`-aligned `p_offset + p_filesz`", errors.front());
 };
 
 TEST(ElfldltlPhdrTests, BasicLoadObserverAlignedFileEndOverflows) {
@@ -1070,10 +1067,10 @@ constexpr auto BasicLoadObserverUnorderedTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(1, errors.size());
-  EXPECT_STREQ(
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(1u, errors.size());
+  EXPECT_EQ(
       "PT_LOAD has `p_align`-aligned memory ranges that overlap or do not increase "
       "monotonically",
       errors.front());
@@ -1102,10 +1099,10 @@ constexpr auto BasicLoadObserverOverlappingMemoryRangeTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(1, errors.size());
-  EXPECT_STREQ(
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(1u, errors.size());
+  EXPECT_EQ(
       "PT_LOAD has `p_align`-aligned memory ranges that overlap or do not increase "
       "monotonically",
       errors.front());
@@ -1156,8 +1153,8 @@ constexpr auto BasicLoadObserverCompliantTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                                     LoadObserver(kAlign / 2, vaddr_start, vaddr_size)));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
 
   EXPECT_EQ(kAlign, vaddr_start);
   EXPECT_EQ(99 * kAlign, vaddr_size);
@@ -1206,10 +1203,10 @@ constexpr auto FileRangeMonotonicLoadObserverUnorderedTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(1, errors.size());
-  EXPECT_STREQ(
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(1u, errors.size());
+  EXPECT_EQ(
       "PT_LOAD has `p_align`-aligned file offset ranges that overlap or do not "
       "increase monotonically",
       errors.front());
@@ -1253,10 +1250,10 @@ constexpr auto FileRangeMonotonicLoadObserverOverlappingAlignedFileRangeTest = [
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                                     LoadObserver(kAlign, vaddr_start, vaddr_size)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(1, errors.size());
-  EXPECT_STREQ(
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(1u, errors.size());
+  EXPECT_EQ(
       "PT_LOAD has `p_align`-aligned file offset ranges that overlap or do not "
       "increase monotonically",
       errors.front());
@@ -1314,9 +1311,9 @@ constexpr auto FileRangeMonotonicLoadObserverCompliantTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                                     LoadObserver(kAlign, vaddr_start, vaddr_size)));
 
-  // EXPECT_STREQ("", errors.front());
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  // EXPECT_EQ("", errors.front());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
   EXPECT_EQ(kAlign, vaddr_start);
   EXPECT_EQ(99 * kAlign, vaddr_size);
 };
@@ -1358,11 +1355,11 @@ constexpr auto ContiguousLoadObserverHighFirstOffsetTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                                     LoadObserver(kAlign, vaddr_start, vaddr_size)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(1, errors.size());
-  EXPECT_STREQ("PT_LOAD has `p_align`-aligned file offset ranges that are not contiguous",
-               errors.front());
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(1u, errors.size());
+  EXPECT_EQ("PT_LOAD has `p_align`-aligned file offset ranges that are not contiguous",
+            errors.front());
 };
 
 TEST(ElfldltlPhdrTests, ContiguousLoadObserverHighFirstOffset) {
@@ -1393,10 +1390,10 @@ constexpr auto ContiguousLoadObserverNonContiguousFileRangesTest = [](auto&& elf
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
-  EXPECT_EQ(1, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  ASSERT_EQ(1, errors.size());
-  EXPECT_STREQ("first PT_LOAD's `p_offset` does not lie within the first page", errors.front());
+  EXPECT_EQ(1u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  ASSERT_EQ(1u, errors.size());
+  EXPECT_EQ("first PT_LOAD's `p_offset` does not lie within the first page", errors.front());
 };
 
 TEST(ElfldltlPhdrTests, ContiguousLoadObserverNonContiguousFileRanges) {
@@ -1450,8 +1447,8 @@ constexpr auto ContiguousLoadObserverCompliantTest = [](auto&& elf) {
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
                                     LoadObserver(kAlign, vaddr_start, vaddr_size)));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
   EXPECT_EQ(kAlign, vaddr_start);
   EXPECT_EQ(6 * kAlign, vaddr_size);
 };
@@ -1526,9 +1523,9 @@ constexpr auto LoadObserverCallbackTest = [](auto&& elf) {
       return false;
     }
 
-    EXPECT_EQ(phdr.offset(), kExpected[count].offset, "#%zu", count);
-    EXPECT_EQ(phdr.filesz(), kExpected[count].filesz, "#%zu", count);
-    EXPECT_EQ(phdr.memsz(), kExpected[count].memsz, "#%zu", count);
+    EXPECT_EQ(phdr.offset(), kExpected[count].offset) << count;
+    EXPECT_EQ(phdr.filesz(), kExpected[count].filesz) << count;
+    EXPECT_EQ(phdr.memsz(), kExpected[count].memsz) << count;
 
     ++count;
     return true;
@@ -1538,12 +1535,12 @@ constexpr auto LoadObserverCallbackTest = [](auto&& elf) {
       diag, cpp20::span(kPhdrs),
       elfldltl::MakePhdrLoadObserver<Elf>(kPageSize, vaddr_start, vaddr_size, check_phdrs)));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  EXPECT_EQ(0, vaddr_start);
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  EXPECT_EQ(0u, vaddr_start);
   EXPECT_EQ(kAlign * 2, vaddr_size);
 
-  ASSERT_EQ(count, 2);
+  ASSERT_EQ(count, 2u);
 };
 
 TEST(ElfldltlPhdrTests, LoadObserverCallback) { TestAllFormats(LoadObserverCallbackTest); }
@@ -1585,16 +1582,16 @@ constexpr auto LoadObserverCallbackBailoutTest = [](auto&& elf) {
   size_type vaddr_size = 0;
 
   auto bail_early = [](auto& diag, const Phdr& phdr) {
-    EXPECT_EQ(phdr.memsz(), 1234);
+    EXPECT_EQ(phdr.memsz(), 1234u);
     return false;
   };
   EXPECT_FALSE(elfldltl::DecodePhdrs(
       diag, cpp20::span(kPhdrs),
       elfldltl::MakePhdrLoadObserver<Elf>(kPageSize, vaddr_start, vaddr_size, bail_early)));
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
-  EXPECT_EQ(0, vaddr_start);
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
+  EXPECT_EQ(0u, vaddr_start);
 
   // It should have bailed out on seeing the first PT_LOAD, but only after the
   // generic code updated the vaddr_size.  It's still before the second PT_LOAD
@@ -1618,10 +1615,10 @@ constexpr auto ReadPhdrsFromFileBadSizeTest = [](auto&& elf) {
   elfldltl::DirectMemory file;
   auto result = ReadPhdrsFromFile(diag, file, elfldltl::NoArrayFromFile<Phdr>(), ehdr);
 
-  EXPECT_EQ(1, diag.errors());
-  ASSERT_EQ(1, errors.size());
+  EXPECT_EQ(1u, diag.errors());
+  ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("e_phentsize has unexpected value", errors[0]);
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.warnings());
   EXPECT_FALSE(result);
 };
 
@@ -1639,10 +1636,10 @@ constexpr auto ReadPhdrsFromFileBadOffsetTest = [](auto&& elf) {
   elfldltl::DirectMemory file;
   auto result = ReadPhdrsFromFile(diag, file, elfldltl::NoArrayFromFile<Phdr>(), ehdr);
 
-  EXPECT_EQ(1, diag.errors());
-  ASSERT_EQ(1, errors.size());
+  EXPECT_EQ(1u, diag.errors());
+  ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("e_phoff overlaps with ELF file header", errors[0]);
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.warnings());
   EXPECT_FALSE(result);
 };
 
@@ -1662,10 +1659,10 @@ constexpr auto ReadPhdrsFromFileBadAlignTest = [](auto&& elf) {
   elfldltl::DirectMemory file;
   auto result = ReadPhdrsFromFile(diag, file, elfldltl::NoArrayFromFile<Phdr>(), ehdr);
 
-  EXPECT_EQ(1, diag.errors());
-  ASSERT_EQ(1, errors.size());
+  EXPECT_EQ(1u, diag.errors());
+  ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("e_phoff has insufficient alignment", errors[0]);
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.warnings());
   EXPECT_FALSE(result);
 };
 
@@ -1690,10 +1687,10 @@ constexpr auto ReadPhdrsFromFilePhXNumBadShSizeTest = [](auto&& elf) {
   elfldltl::DirectMemory file;
   auto result = ReadPhdrsFromFile(diag, file, elfldltl::NoArrayFromFile<Phdr>(), ehdr);
 
-  EXPECT_EQ(1, diag.errors());
-  ASSERT_EQ(1, errors.size());
+  EXPECT_EQ(1u, diag.errors());
+  ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("e_shentsize has unexpected value", errors[0]);
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.warnings());
   EXPECT_FALSE(result);
 };
 
@@ -1719,10 +1716,10 @@ constexpr auto ReadPhdrsFromFilePhXNumBadShOffTest = [](auto&& elf) {
   elfldltl::DirectMemory file;
   auto result = ReadPhdrsFromFile(diag, file, elfldltl::NoArrayFromFile<Phdr>(), ehdr);
 
-  EXPECT_EQ(1, diag.errors());
-  ASSERT_EQ(1, errors.size());
+  EXPECT_EQ(1u, diag.errors());
+  ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("e_shoff overlaps with ELF file header", errors[0]);
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.warnings());
   EXPECT_FALSE(result);
 };
 
@@ -1748,10 +1745,10 @@ constexpr auto ReadPhdrsFromFilePhXNumNoShdrsTest = [](auto&& elf) {
   elfldltl::DirectMemory file;
   auto result = ReadPhdrsFromFile(diag, file, elfldltl::NoArrayFromFile<Phdr>(), ehdr);
 
-  EXPECT_EQ(1, diag.errors());
-  ASSERT_EQ(1, errors.size());
+  EXPECT_EQ(1u, diag.errors());
+  ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("PN_XNUM with no section headers", errors[0]);
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.warnings());
   EXPECT_FALSE(result);
 };
 
@@ -1777,10 +1774,10 @@ constexpr auto ReadPhdrsFromFilePhXNumCantReadShdrTest = [](auto&& elf) {
   elfldltl::DirectMemory file;
   auto result = ReadPhdrsFromFile(diag, file, elfldltl::NoArrayFromFile<Phdr>(), ehdr);
 
-  EXPECT_EQ(1, diag.errors());
-  ASSERT_EQ(1, errors.size());
+  EXPECT_EQ(1u, diag.errors());
+  ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("cannot read section header 0 from ELF file", errors[0]);
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.warnings());
   EXPECT_FALSE(result);
 };
 
@@ -1800,10 +1797,10 @@ constexpr auto ReadPhdrsFromFileCantReadPhdrTest = [](auto&& elf) {
   elfldltl::DirectMemory file;
   auto result = ReadPhdrsFromFile(diag, file, elfldltl::NoArrayFromFile<Phdr>(), ehdr);
 
-  EXPECT_EQ(1, diag.errors());
-  ASSERT_EQ(1, errors.size());
+  EXPECT_EQ(1u, diag.errors());
+  ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("cannot read program headers from ELF file", errors[0]);
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.warnings());
   EXPECT_FALSE(result);
 };
 
@@ -1823,10 +1820,10 @@ constexpr auto ReadPhdrsFromFileNoPhdrsTest = [](auto&& elf) {
   elfldltl::DirectMemory file;
   auto result = ReadPhdrsFromFile(diag, file, elfldltl::NoArrayFromFile<Phdr>(), ehdr);
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
   ASSERT_TRUE(result);
-  EXPECT_EQ(0, result->size());
+  EXPECT_EQ(0u, result->size());
 };
 
 TEST(ElfldltlPhdrTests, ReadPhdrsFromFileNoPhdrs) { TestAllFormats(ReadPhdrsFromFileNoPhdrsTest); }
@@ -1847,11 +1844,11 @@ constexpr auto ReadPhdrsFromFileTest = [](auto&& elf) {
       cpp20::span<std::byte>{reinterpret_cast<std::byte*>(&elfbytes), sizeof(elfbytes)}};
   auto result = ReadPhdrsFromFile(diag, file, elfldltl::NoArrayFromFile<Phdr>(), elfbytes.ehdr);
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
   ASSERT_TRUE(result);
   auto& phdrs = *result;
-  EXPECT_EQ(1, phdrs.size());
+  EXPECT_EQ(1u, phdrs.size());
   EXPECT_FALSE((memcmp(elfbytes.phdrs, std::addressof(phdrs[0]), sizeof(Phdr))));
 };
 
@@ -1880,11 +1877,11 @@ constexpr auto ReadPhdrsFromFilePhXNumTest = [](auto&& elf) {
       cpp20::span<std::byte>{reinterpret_cast<std::byte*>(&elfbytes), sizeof(elfbytes)}};
   auto result = ReadPhdrsFromFile(diag, file, elfldltl::NoArrayFromFile<Phdr>(), elfbytes.ehdr);
 
-  EXPECT_EQ(0, diag.errors());
-  EXPECT_EQ(0, diag.warnings());
+  EXPECT_EQ(0u, diag.errors());
+  EXPECT_EQ(0u, diag.warnings());
   ASSERT_TRUE(result);
   auto& phdrs = *result;
-  EXPECT_EQ(1, phdrs.size());
+  EXPECT_EQ(1u, phdrs.size());
   EXPECT_FALSE((memcmp(elfbytes.phdrs, std::addressof(phdrs[0]), sizeof(Phdr))));
 };
 
