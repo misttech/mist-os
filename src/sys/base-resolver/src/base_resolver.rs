@@ -16,12 +16,16 @@ use {
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
     fuchsia_pkg::{
         transitional::{context_bytes_from_subpackages_map, subpackages_map_from_context_bytes},
-        PackageDirectory,
+        PackageDirectory, PackageName,
     },
     fuchsia_url::{ComponentUrl, PackageUrl},
     futures::prelude::*,
     tracing::*,
 };
+
+fn context_to_string(context: &fresolution::Context) -> String {
+    String::from_utf8(context.bytes.clone()).unwrap_or_else(|_| hex::encode(&context.bytes))
+}
 
 pub(crate) async fn main() -> anyhow::Result<()> {
     info!("started");
@@ -71,16 +75,9 @@ async fn serve(mut stream: ResolverRequestStream, config: &Config) -> anyhow::Re
     {
         match request {
             ResolverRequest::Resolve { component_url, responder } => {
-                let mut result =
-                    resolve_component(&component_url, &packages_dir).await.map_err(|err| {
-                        let fidl_err = (&err).into();
-                        error!(
-                            "failed to resolve component URL {}: {:#}",
-                            &component_url,
-                            anyhow::anyhow!(err)
-                        );
-                        fidl_err
-                    });
+                let mut result = resolve_component(&component_url, &packages_dir)
+                    .await
+                    .map_err(|err| (&err).into());
                 responder.send(&mut result).context("failed sending response")?;
             }
             ResolverRequest::ResolveWithContext { component_url, context, responder } => {
@@ -92,22 +89,13 @@ async fn serve(mut stream: ResolverRequestStream, config: &Config) -> anyhow::Re
                         &base_package_index,
                     )
                     .await
-                    .map_err(|err| {
-                        let fidl_err = (&err).into();
-                        error!(
-                            "failed to resolve component URL {} with context {:?}: {:#}",
-                            &component_url,
-                            &context,
-                            anyhow::anyhow!(err)
-                        );
-                        fidl_err
-                    });
+                    .map_err(|err| (&err).into());
                     responder.send(&mut result).context("failed sending response")?;
                 } else {
                     error!(
-                        "base-resolver ResolveWithContext is disabled. Config value `enable_subpackages` is false. Cannot resolve component URL {:?} with context {:?}",
+                        "base-resolver ResolveWithContext is disabled. Config value `enable_subpackages` is false. Cannot resolve component URL {:?} with context {}",
                         component_url,
-                        context
+                        context_to_string(&context)
                     );
                     responder
                         .send(&mut Err(fresolution::ResolverError::Internal))
@@ -123,7 +111,11 @@ async fn resolve_component(
     component_url: &str,
     packages_dir: &fio::DirectoryProxy,
 ) -> Result<fresolution::Component, crate::ResolverError> {
-    resolve_component_async(component_url, None, packages_dir, None).await
+    let res = resolve_component_async(component_url, None, packages_dir, None).await;
+    if let Err(err) = &res {
+        error!("failed to resolve component URL {}: {:?}", &component_url, err);
+    }
+    res
 }
 
 async fn resolve_component_with_context(
@@ -132,8 +124,23 @@ async fn resolve_component_with_context(
     packages_dir: &fio::DirectoryProxy,
     base_package_index: &BasePackageIndex,
 ) -> Result<fresolution::Component, crate::ResolverError> {
-    resolve_component_async(component_url, Some(context), packages_dir, Some(base_package_index))
-        .await
+    let res = resolve_component_async(
+        component_url,
+        Some(context),
+        packages_dir,
+        Some(base_package_index),
+    )
+    .await;
+    if let Err(err) = &res {
+        error!(
+            "failed to resolve component URL {} with context {}: {:?}",
+            &component_url,
+            String::from_utf8(context.bytes.clone())
+                .unwrap_or_else(|_| hex::encode(&context.bytes)),
+            err
+        );
+    }
+    res
 }
 
 async fn resolve_component_async(
@@ -240,13 +247,20 @@ async fn resolve_package_async(
             if absolute.hash().is_some() {
                 return Err(crate::ResolverError::PackageHashNotSupported);
             }
+            if absolute.name().as_ref().starts_with(PackageName::PREFIX_FOR_INDEXED_SUBPACKAGES) {
+                return Err(crate::ResolverError::AbsoluteUrlWithReservedName);
+            }
             (absolute.name(), absolute.variant())
         }
     };
     // Package contents are available at `packages/$PACKAGE_NAME/0`.
     let dir = fuchsia_fs::directory::open_directory(
         packages_dir,
-        &format!("{}/{}", package_name.as_ref(), some_variant.map(|v| v.as_ref()).unwrap_or("0")),
+        &format!(
+            "{}/{}",
+            package_name.as_ref(),
+            some_variant.as_ref().map(|v| v.as_ref()).unwrap_or("0")
+        ),
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
     )
     .await
@@ -288,7 +302,7 @@ mod tests {
     const SUBPACKAGE_NAME: &'static str = "my_subpackage";
     const SUBPACKAGE_HASH: &'static str =
         "facefacefacefacefacefacefacefacefacefacefacefacefacefacefaceface";
-    const OTHER_PACKAGE_HASH: &'static str =
+    const OTHER_SUBPACKAGE_HASH: &'static str =
         "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
 
     /// A DirectoryEntry implementation that checks whether an expected set of flags
@@ -367,6 +381,18 @@ mod tests {
             resolve_component("fuchsia-pkg://fuchsia.ca/foo#meta/bar.cm", &packages_dir).await,
             Err(crate::ResolverError::UnsupportedRepo)
         );
+        assert_matches!(
+            resolve_component(
+                &format!(
+                    "fuchsia-pkg://fuchsia.com/{}{}#meta/bar.cm",
+                    PackageName::PREFIX_FOR_INDEXED_SUBPACKAGES,
+                    SUBPACKAGE_HASH
+                ),
+                &packages_dir
+            )
+            .await,
+            Err(crate::ResolverError::AbsoluteUrlWithReservedName)
+        );
 
         let url_with_hash = concat!(
             "fuchsia-pkg://fuchsia.com/test-package",
@@ -443,20 +469,17 @@ mod tests {
         let subpackaged_component_url = SUBPACKAGE_NAME.to_string() + "#meta/subfoo.cm";
 
         // Set up the base package index with the subpackage's hash that will
-        // be requested
+        // be requested. The subpackage's top-level package name does not need
+        // to match `SUBPACKAGE_NAME`.
         let subpackage_as_base_package_url: UnpinnedAbsolutePackageUrl =
             "fuchsia-pkg://fuchsia.com/toplevel-subpackage".parse().unwrap();
         let subpackage_blob_id = BlobId::parse(SUBPACKAGE_HASH).unwrap();
-        let other_package_as_base_package_url: UnpinnedAbsolutePackageUrl =
-            "fuchsia-pkg://fuchsia.com/some-other-package".parse().unwrap();
-        let other_package_blob_id = BlobId::parse(OTHER_PACKAGE_HASH).unwrap();
         let index = hashmap! {
             subpackage_as_base_package_url => subpackage_blob_id,
-            other_package_as_base_package_url => other_package_blob_id,
         };
         let base_package_index = BasePackageIndex::create_mock(index);
 
-        let packages_dir = serve_executable_dir(build_fake_packages_dir());
+        let packages_dir = serve_executable_dir(build_fake_packages_dir_with_named_subpackage());
         let parent_component = resolve_component(parent_component_url, &packages_dir)
             .await
             .expect("failed to resolve parent_component");
@@ -473,7 +496,63 @@ mod tests {
             Ok(fresolution::Component { decl: Some(..), .. }),
             "Could not resolve subpackaged component '{}' from context '{:?}'",
             subpackaged_component_url,
-            parent_component.resolution_context
+            parent_component.resolution_context.as_ref().map(|v| context_to_string(v))
+        );
+    }
+
+    #[fuchsia::test]
+    async fn resolves_component_in_anonymous_subpackage() {
+        let parent_component_url = "fuchsia-pkg://fuchsia.com/test-package#meta/foo.cm";
+        let subpackaged_component_url = SUBPACKAGE_NAME.to_string() + "#meta/subfoo.cm";
+
+        // Set up the base package index with the subpackage's hash that will
+        // be requested.
+        //
+        // `subpackage_as_base_package_url` is not resolveable, but is used
+        // in this test as a BasePackageIndex entry that can be resolved as
+        // a subpackage from ResolveWithContext.
+        let subpackage_as_base_package_url_string = format!(
+            "fuchsia-pkg://fuchsia.com/{}{}/0",
+            PackageName::PREFIX_FOR_INDEXED_SUBPACKAGES,
+            SUBPACKAGE_HASH
+        );
+        let subpackage_as_base_package_url: UnpinnedAbsolutePackageUrl =
+            subpackage_as_base_package_url_string.parse().unwrap();
+        let subpackage_blob_id = BlobId::parse(SUBPACKAGE_HASH).unwrap();
+        let index = hashmap! {
+            subpackage_as_base_package_url => subpackage_blob_id,
+        };
+        let base_package_index = BasePackageIndex::create_mock(index);
+
+        let packages_dir =
+            serve_executable_dir(build_fake_packages_dir_with_anonymous_subpackage());
+
+        assert_matches!(
+            resolve_component(
+                &format!("{subpackage_as_base_package_url_string}#meta/bar.cm"),
+                &packages_dir
+            )
+            .await,
+            Err(crate::ResolverError::AbsoluteUrlWithReservedName)
+        );
+
+        let parent_component = resolve_component(parent_component_url, &packages_dir)
+            .await
+            .expect("failed to resolve parent_component");
+
+        assert_matches!(parent_component.resolution_context, Some(..));
+        assert_matches!(
+            resolve_component_with_context(
+                &subpackaged_component_url,
+                parent_component.resolution_context.as_ref().unwrap(),
+                &packages_dir,
+                &base_package_index,
+            )
+            .await,
+            Ok(fresolution::Component { decl: Some(..), .. }),
+            "Could not resolve subpackaged component '{}' from context '{:?}'",
+            subpackaged_component_url,
+            parent_component.resolution_context.as_ref().map(|v| context_to_string(v))
         );
     }
 
@@ -484,14 +563,14 @@ mod tests {
 
         // Set up the base package index WITHOUT the subpackage's hash that will
         // be requested
-        let other_package_as_base_package_url: UnpinnedAbsolutePackageUrl =
+        let other_subpackage_as_base_package_url: UnpinnedAbsolutePackageUrl =
             "fuchsia-pkg://fuchsia.com/some-other-package".parse().unwrap();
-        let other_package_blob_id = BlobId::parse(OTHER_PACKAGE_HASH).unwrap();
+        let other_subpackage_blob_id = BlobId::parse(OTHER_SUBPACKAGE_HASH).unwrap();
         let index = hashmap! {
-            other_package_as_base_package_url => other_package_blob_id,
+            other_subpackage_as_base_package_url => other_subpackage_blob_id,
         };
         let base_package_index = BasePackageIndex::create_mock(index);
-        assert!(base_package_index.contains_package(&other_package_blob_id));
+        assert!(base_package_index.contains_package(&other_subpackage_blob_id));
 
         let packages_dir = serve_executable_dir(build_fake_packages_dir());
         let parent_component = resolve_component(parent_component_url, &packages_dir)
@@ -516,18 +595,20 @@ mod tests {
         let parent_component_url = "fuchsia-pkg://fuchsia.com/test-package#meta/foo.cm";
         let subpackaged_component_url = "subpackage_not_in_parent#meta/other_subfoo.cm";
 
-        // Set up the base package index WITHOUT the subpackage's hash that will
-        // be requested
-        let other_package_as_base_package_url: UnpinnedAbsolutePackageUrl =
-            "fuchsia-pkg://fuchsia.com/some-other-package".parse().unwrap();
-        let other_package_blob_id = BlobId::parse(OTHER_PACKAGE_HASH).unwrap();
+        // Set up the base package index with the subpackage's hash that will
+        // be requested, but can't be resolved because it's not a subpackage
+        // of the parent package. (The subpackage's top-level package name does
+        // not need to match any package-specific subpackage name.)
+        let other_subpackage_as_base_package_url: UnpinnedAbsolutePackageUrl =
+            "fuchsia-pkg://fuchsia.com/toplevel-other-subpackage".parse().unwrap();
+        let other_subpackage_blob_id = BlobId::parse(OTHER_SUBPACKAGE_HASH).unwrap();
         let index = hashmap! {
-            other_package_as_base_package_url => other_package_blob_id,
+            other_subpackage_as_base_package_url => other_subpackage_blob_id,
         };
         let base_package_index = BasePackageIndex::create_mock(index);
-        assert!(base_package_index.contains_package(&other_package_blob_id));
+        assert!(base_package_index.contains_package(&other_subpackage_blob_id));
 
-        let packages_dir = serve_executable_dir(build_fake_packages_dir());
+        let packages_dir = serve_executable_dir(build_fake_packages_dir_with_named_subpackage());
         let parent_component = resolve_component(parent_component_url, &packages_dir)
             .await
             .expect("failed to resolve parent_component");
@@ -585,6 +666,16 @@ mod tests {
     }
 
     fn build_fake_packages_dir() -> Arc<dyn vfs::directory::entry::DirectoryEntry> {
+        let parent_package = build_fake_package_dir();
+        vfs::pseudo_directory! {
+            "test-package" => vfs::pseudo_directory! {
+                "0" => parent_package,
+            },
+        }
+    }
+
+    fn build_fake_packages_dir_with_named_subpackage(
+    ) -> Arc<dyn vfs::directory::entry::DirectoryEntry> {
         let subpackage = build_fake_subpackage_dir();
         let parent_package = build_fake_package_dir();
         vfs::pseudo_directory! {
@@ -592,6 +683,22 @@ mod tests {
                 "0" => parent_package,
             },
             "toplevel-subpackage" => vfs::pseudo_directory! {
+                "0" => subpackage,
+            },
+        }
+    }
+
+    fn build_fake_packages_dir_with_anonymous_subpackage(
+    ) -> Arc<dyn vfs::directory::entry::DirectoryEntry> {
+        let subpackage = build_fake_subpackage_dir();
+        let parent_package = build_fake_package_dir();
+        vfs::pseudo_directory! {
+            "test-package" => vfs::pseudo_directory! {
+                "0" => parent_package,
+            },
+            &format!(
+                "{}{}", PackageName::PREFIX_FOR_INDEXED_SUBPACKAGES, SUBPACKAGE_HASH
+            ) => vfs::pseudo_directory! {
                 "0" => subpackage,
             },
         }
@@ -609,7 +716,9 @@ mod tests {
         vfs::pseudo_directory! {
             "meta" => vfs::pseudo_directory! {
                 "fuchsia.pkg" => vfs::pseudo_directory! {
-                    "subpackages" => vfs::file::vmo::asynchronous::read_only_const(&serde_json::to_vec(&subpackages).unwrap()),
+                    "subpackages" => vfs::file::vmo::asynchronous::read_only_const(
+                        &serde_json::to_vec(&subpackages).unwrap()
+                    ),
                 },
                 "foo.cm" => vfs::file::vmo::asynchronous::read_only_const(&cm_bytes),
                 "foo-with-config.cm" => vfs::file::vmo::asynchronous::read_only_const(

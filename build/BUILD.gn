@@ -318,6 +318,7 @@ group("declare_subpackages_allowlist") {
     "//sdk/ctf/release:*",
     "//sdk/ctf/test_realm:*",
     "//sdk/ctf/tests/*",
+    "//src/sys/base-resolver/tests/*",
     "//src/sys/component_manager/tests/collections:collections_integration_test_pkg.pm",
     "//src/sys/pkg/lib/fuchsia-pkg:*",
   ]

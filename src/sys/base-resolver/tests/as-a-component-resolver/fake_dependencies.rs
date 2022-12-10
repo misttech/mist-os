@@ -11,6 +11,8 @@ use {
     },
     fidl_fuchsia_pkg_ext::BlobId,
     fuchsia_async as fasync,
+    fuchsia_hash::Hash,
+    fuchsia_pkg::PackageName,
     fuchsia_url::UnpinnedAbsolutePackageUrl,
     futures::prelude::*,
     maplit::hashmap,
@@ -65,6 +67,8 @@ async fn main() {
 
     // Use VFS because ServiceFs does not support OPEN_RIGHT_EXECUTABLE, but /blob needs it.
     let system_image_hash = *system_image.meta_far_merkle_root();
+    let subpackage_hash: Hash =
+        *this_pkg.meta_subpackages().unwrap().subpackages().values().next().unwrap();
     let out_dir = vfs::pseudo_directory! {
         "svc" => vfs::pseudo_directory! {
             fboot::ArgumentsMarker::PROTOCOL_NAME =>
@@ -75,11 +79,21 @@ async fn main() {
                 vfs::service::host(move |stream: PackageCacheRequestStream| {
                     let mock_package_url: UnpinnedAbsolutePackageUrl =
                         "fuchsia-pkg://fuchsia.com/mock-package".parse().unwrap();
+                    let mock_subpackage_url: UnpinnedAbsolutePackageUrl =
+                        format!(
+                            "fuchsia-pkg://fuchsia.com/{}{}/0",
+                            PackageName::PREFIX_FOR_INDEXED_SUBPACKAGES,
+                            subpackage_hash,
+                        ).parse().unwrap();
                     let mock_package_blob_id = BlobId::parse(MOCK_PACKAGE_HASH).unwrap();
+                    let mock_subpackage_blob_id = BlobId::from(subpackage_hash);
                     let base_package_index = hashmap! {
                         mock_package_url => mock_package_blob_id,
+                        mock_subpackage_url => mock_subpackage_blob_id,
                     };
-                    let cache = MockPackageCacheService::new_with_base_packages(Arc::new(base_package_index));
+                    let cache = MockPackageCacheService::new_with_base_packages(
+                        Arc::new(base_package_index)
+                    );
                     cache.run_service(stream)
                 }),
         },
@@ -92,6 +106,18 @@ async fn main() {
                     fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
                 )
                 .unwrap()),
+            },
+            &format!(
+                "{}{}",
+                PackageName::PREFIX_FOR_INDEXED_SUBPACKAGES,
+                subpackage_hash,
+            ) => vfs::pseudo_directory! {
+                "0" => vfs::remote::remote_dir(
+                    fuchsia_fs::directory::open_in_namespace(
+                        "/pkg",
+                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+                    ).unwrap()
+                ),
             },
         },
     };

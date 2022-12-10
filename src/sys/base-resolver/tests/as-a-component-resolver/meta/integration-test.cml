@@ -17,16 +17,19 @@
             environment: "#base_resolver_env",
         },
 
+        // This will be resolved by the base package resolver.
+        {
+            name: "base-superpackage-component",
+            url: "fuchsia-pkg://fuchsia.com/mock-package#meta/mock-superpackage-component.cm",
+            environment: "#base_resolver_env",
+        },
+
         // This will be resolved by the pkg cache resolver.
         {
             name: "pkg-cache-stand-in",
             url: "fuchsia-pkg-cache:///#meta/pkg-cache.cm",
             environment: "#pkg_cache_resolver_env",
         },
-
-        // TODO(101213): Extend the integration test to resolve a component from
-        // a relative subpackage reference, either directly from this component,
-        // or perhaps as a subpackage of `mock-component`
     ],
     use: [
         {
@@ -40,6 +43,7 @@
             from: "parent",
             to: [
                 "#base-component",
+                "#base-superpackage-component",
                 "#pkg-cache-stand-in",
             ],
         },

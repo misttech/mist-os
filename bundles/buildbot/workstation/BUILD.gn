@@ -38,6 +38,7 @@ group("workstation") {
     # added to the workstation_eng packages, here:
     "//examples/components/routing/with_subpackages:tests",
     "//examples/components/subpackages:tests",
+    "//src/sys/base-resolver/tests",
   ]
 
   # Remove when all builder bots that use the workstation_eng product explicitly

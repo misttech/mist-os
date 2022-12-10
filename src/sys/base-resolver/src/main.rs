@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution};
+use {
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
+    fuchsia_pkg::PackageName,
+};
 
 mod base_resolver;
 mod pkg_cache_resolver;
@@ -71,6 +74,9 @@ enum ResolverError {
     #[error("the subpackage hash was not found in the system base package index: {0}")]
     SubpackageNotInBase(#[source] anyhow::Error),
 
+    #[error("a package name cannot start with '{}'", PackageName::PREFIX_FOR_INDEXED_SUBPACKAGES)]
+    AbsoluteUrlWithReservedName,
+
     #[error("missing context required to resolve relative url: {0}")]
     RelativeUrlMissingContext(String),
 
@@ -86,7 +92,7 @@ impl From<&ResolverError> for fresolution::ResolverError {
         use {fresolution::ResolverError as ferror, ResolverError::*};
         match err {
             InvalidUrl(_) | PackageHashNotSupported => ferror::InvalidArgs,
-            UnsupportedRepo => ferror::NotSupported,
+            UnsupportedRepo | AbsoluteUrlWithReservedName => ferror::NotSupported,
             ComponentNotFound(_) => ferror::ManifestNotFound,
             PackageNotFound(_) => ferror::PackageNotFound,
             ConfigValuesNotFound(_) => ferror::ConfigValuesNotFound,
@@ -102,5 +108,11 @@ impl From<&ResolverError> for fresolution::ResolverError {
             }
             SubpackageNotInBase(_) | SubpackageNotFound(_) => ferror::PackageNotFound,
         }
+    }
+}
+
+impl From<ResolverError> for fresolution::ResolverError {
+    fn from(err: ResolverError) -> fresolution::ResolverError {
+        (&err).into()
     }
 }

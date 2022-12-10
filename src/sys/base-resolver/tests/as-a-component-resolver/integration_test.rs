@@ -30,6 +30,27 @@ async fn base_resolver_test() {
 }
 
 #[fasync::run_singlethreaded(test)]
+async fn base_resolver_resolves_subpackages() {
+    let realm =
+        connect_to_protocol::<RealmMarker>().expect("failed to connect to fuchsia.component.Realm");
+    let (exposed_dir, server_end) = create_proxy().expect("failed to create proxy");
+    realm
+        .open_exposed_dir(
+            &mut ChildRef { name: "base-superpackage-component".into(), collection: None },
+            server_end,
+        )
+        .await
+        .expect("failed to call open_exposed_dir FIDL")
+        .expect("failed to open exposed dir of child");
+    let ping = connect_to_protocol_at_dir_root::<PingMarker>(&exposed_dir)
+        .expect("failed to connect to Ping protocol");
+    assert_eq!(
+        ping.ping("ping").await.expect("Ping FIDL call failed"),
+        "forwarded ping and returned ping pong"
+    );
+}
+
+#[fasync::run_singlethreaded(test)]
 async fn pkg_cache_resolver_test() {
     let realm =
         connect_to_protocol::<RealmMarker>().expect("failed to connect to fuchsia.component.Realm");
