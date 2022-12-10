@@ -1060,6 +1060,75 @@ is a `MoveError`. `TicTacToe_MakeMove_Response` is generated as a
 [struct](#structs) with the response parameters as its fields. In this case, it
 has a single field `new_state`, which is a `GameState`.
 
+### Unknown interaction handling {#unknown-interaction-handling}
+
+#### Server-side
+
+When a protocol is declared as `open` or `ajar`, the generated
+`fidl::WireServer<Protocol>` type will also inherit from
+`fidl::UnknownMethodHandler<Protocol>`. The `UnknownMethodHandler` defines a
+single abstract method which the server must implement, called
+`handle_unknown_method`, with this signature:
+
+```c++
+virtual void handle_unknown_method(UnknownMethodMetadata<Protocol> metadata,
+                                   UnknownMethodCompleter::Sync& completer) = 0;
+```
+
+The provided `UnknownMethodMetadata` is a struct with one or two fields
+depending on if the protocol is `ajar` or `open`. Here's what the metadata
+struct looks like, with template arguments omitted for simplicity:
+
+```c++
+struct UnknownMethodMetadata {
+  // Ordinal of the method that was called.
+  uint64_t method_ordinal;
+  // Whether the method that was called was a one-way method or a two-way
+  // method. This field is only defined if the protocol is open, since ajar
+  // protocols only handle one-way methods.
+  UnknownMethodType unknown_method_type;
+};
+```
+
+`UnknownMethodType` is an enum with two variants, `kOneWay` and `kTwoWay`, which
+tells which kind of method was called.
+
+The `UnknownMethodCompleter` is the same completer type as is used for one-way
+methods.
+
+#### Client-side
+
+There is no way for the client to tell if a `flexible` one-way method was known to
+the server or not. For `flexible` two-way methods, if the method is not known to
+the server the `fidl::WireResult` will have a `fidl::Status` of
+`ZX_ERR_NOT_SUPPORTED` with a reason of `fidl::Reason::kUnknownMethod`. The
+`kUnknownMethod` reason is only possible for a flexible two-way method.
+
+Aside from the possibility of getting an error with `Reason` of
+`kUnknownMethod`, there are no API differences between `strict` and `flexible`
+methods on the client.
+
+For `open` and `ajar` protocols, the generated
+`fidl::WireAsyncEventHandler<Protocol>` and
+`fidl::WireSyncEventHandler<Protocol>` will inherit from
+`fidl::UnknownEventHandler<Protocol>`. `UnknownEventHandler` defines a single
+method which event handlers must implement, called `handle_unknown_event`, with
+this signature:
+
+```c++
+virtual void handle_unknown_event(UnknownEventMetadata<Protocol> metadata) = 0;
+```
+
+The `UnknownEventMetadata` has this layout, with template arguments omitted for
+simplicity:
+
+```c++
+struct UnknownEventMetadata {
+  // Ordinal of the event that was received.
+  uint64_t event_ordinal;
+};
+```
+
 ### Protocol composition {#protocol-composition}
 
 FIDL does not have a concept of inheritance, and generates full code as
