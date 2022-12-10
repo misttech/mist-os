@@ -3638,7 +3638,19 @@ From //third_party/icu/default/config.gni:16
 ### images_config_label
 The images config information used during assembly.
 
-**Current value (from the default):** `false`
+**Current value for `target_cpu = "arm64"`:** `"//boards/images:arm64"`
+
+From //boards/arm64.gni:42
+
+**Overridden from the default:** `false`
+
+From //build/board.gni:109
+
+**Current value for `target_cpu = "x64"`:** `"//boards/images:x64"`
+
+From //boards/x64.gni:89
+
+**Overridden from the default:** `false`
 
 From //build/board.gni:109
 
@@ -5008,7 +5020,7 @@ From //build/packages/prebuilt_package_with_flavors.gni:29
 
 **Current value for `target_cpu = "arm64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/arm64.gni:43
+From //boards/arm64.gni:44
 
 **Overridden from the default:** `[]`
 
@@ -5016,7 +5028,7 @@ From //build/board.gni:114
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/x64.gni:90
+From //boards/x64.gni:91
 
 **Overridden from the default:** `[]`
 
@@ -5028,7 +5040,7 @@ product bundle.
 
 **Current value for `target_cpu = "arm64"`:** `"//boards/partitions:arm64"`
 
-From //boards/arm64.gni:42
+From //boards/arm64.gni:43
 
 **Overridden from the default:** `"//boards/partitions:default"`
 
@@ -5036,7 +5048,7 @@ From //build/board.gni:113
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/x64.gni:89
+From //boards/x64.gni:90
 
 **Overridden from the default:** `"//boards/partitions:default"`
 
