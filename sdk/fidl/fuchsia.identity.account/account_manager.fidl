@@ -106,9 +106,8 @@ protocol AccountManager {
     ///
     /// `lifetime` [required] The lifetime of the account
     /// `metadata` [required] Metadata for the new account
-    /// `interaction` [required] An `Interaction` channel enabling the user to
-    ///               select and enroll authentication mechanisms for the new
-    ///               account.
+    /// `interaction` An `Interaction` channel enabling the user to select and
+    ///               enroll authentication mechanisms for the new account.
     /// `auth_mechanism_id` An `AuthMechanismId` for a storage
     ///                     unlock-capable authentication mechanism. If
     ///                     provided, a single enrollment of that
@@ -117,7 +116,10 @@ protocol AccountManager {
     ///
     /// Returns: `account_id` The identifier of the newly added account
     ///
-    /// Fails with `ABORTED` if the client closes the `interaction` channel.
+    /// Fails with:
+    /// - `INVALID_REQUEST` if policy requires authentication factors for the
+    ///    new account but no `interaction` channel was supplied.
+    /// - `ABORTED` if the client closes the `interaction` channel.
     ProvisionNewAccount(resource table {
         1: lifetime Lifetime;
         2: metadata AccountMetadata;

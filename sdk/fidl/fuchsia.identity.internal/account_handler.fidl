@@ -80,9 +80,8 @@ protocol AccountHandlerControl {
     ///
     /// `id` [required] AccountId for the new account
     /// `metadata` [required] Metadata for the new account
-    /// `interaction` [required] An `Interaction` channel enabling the user to
-    ///               select and enroll authentication mechanisms for the new
-    ///               account.
+    /// `interaction` An `Interaction` channel enabling the user to select and
+    ///               enroll authentication mechanisms for the new account.
     /// `auth_mechanism_id` An `AuthMechanismId` for a storage
     ///                     unlock-capable authentication mechanism. If
     ///                     provided, a single enrollment of that
@@ -93,8 +92,10 @@ protocol AccountHandlerControl {
     /// use in future operations on the account.
     ///
     /// Fails with:
-    /// - FAILED_PRECONDITION if the AccountHandler is not in the
+    /// - `FAILED_PRECONDITION` if the AccountHandler is not in the
     ///   `Uninitialized` state.
+    /// - `INVALID_REQUEST` if policy requires authentication factors for the
+    ///    new account but no `interaction` channel was supplied.
     /// - `ABORTED` if the client closes the `interaction` channel.
     CreateAccount(resource table {
         1: id fuchsia.identity.account.AccountId;
@@ -113,7 +114,7 @@ protocol AccountHandlerControl {
     /// This moves the AccountHandler from the `Uninitialized` state to the
     /// `Locked` state.
     ///
-    /// Fails with FAILED_PRECONDITION if the AccountHandler is not in the
+    /// Fails with `FAILED_PRECONDITION` if the AccountHandler is not in the
     /// `Uninitialized` state.
     Preload(struct {
         pre_auth_state AccountPreAuthState;
@@ -129,7 +130,7 @@ protocol AccountHandlerControl {
     /// authentication state should be updated as a result of the operation.
     ///
     /// Fails with
-    /// - FAILED_PRECONDITION if the AccountHandler is not in the `Locked` or
+    /// - `FAILED_PRECONDITION` if the AccountHandler is not in the `Locked` or
     ///   `Initialized` state.
     /// - `ABORTED` if the client closes the `interaction` channel.
     UnlockAccount(resource table {
@@ -144,7 +145,7 @@ protocol AccountHandlerControl {
     /// On success, returns an `AccountPreAuthState` if the stored pre-
     /// authentication state should be updated as a result of the operation.
     ///
-    /// Fails with FAILED_PRECONDITION if the AccountHandler is not in the
+    /// Fails with `FAILED_PRECONDITION` if the AccountHandler is not in the
     /// `Initialized` or `Locked` state.
     LockAccount() -> (struct {
         pre_auth_state AccountPreAuthState:optional;
@@ -163,7 +164,7 @@ protocol AccountHandlerControl {
     ///
     /// `account` The server end of an `Account` channel
     ///
-    /// Fails with FAILED_PRECONDITION if the AccountHandler is not in the
+    /// Fails with `FAILED_PRECONDITION` if the AccountHandler is not in the
     /// `Initialized` state.
     GetAccount(resource struct {
         account server_end:fuchsia.identity.account.Account;
