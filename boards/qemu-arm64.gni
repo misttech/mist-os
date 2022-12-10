@@ -29,3 +29,5 @@ board_zedboot_bootfs_labels += _bootfs_deps
 # Supports only virtual devices.
 board_is_emu = true
 board_is_phys = false
+
+images_config_label = "//boards/images:qemu-arm64"

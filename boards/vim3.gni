@@ -100,3 +100,5 @@ fvm_emmc_partition_size = 3439329280
 # Supports only physical devices.
 board_is_emu = false
 board_is_phys = true
+
+images_config_label = "//boards/images:vim3"

@@ -61,3 +61,5 @@ custom_signing_script_tools = [
   # //zircon/tools/zbi/zbi.cc
   "//zircon/tools/zbi",
 ]
+
+images_config_label = "//boards/images:imx8mmevk"

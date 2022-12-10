@@ -127,6 +127,7 @@ firmware_prebuilts = [
   },
 ]
 
+images_config_label = "//boards/images:chromebook-x64"
 partitions_config_label = "//boards/partitions:chromebook-x64"
 partitions_config_contents +=
     [ "//prebuilt/third_party/firmware/atlas/fuchsia_image.dev.bin" ]

@@ -18,3 +18,11 @@ verify_zedboot_cmdline_params("verify_zedboot_cmdline_params_for_toulouse") {
   ]
   testonly = true
 }
+
+group("boards") {
+  testonly = true
+  public_deps = [
+    "images",
+    "partitions",
+  ]
+}

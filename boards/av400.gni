@@ -91,6 +91,7 @@ fvm_emmc_partition_size = 3221225472
 board_is_emu = false
 board_is_phys = true
 
+images_config_label = "//boards/images:av400"
 partitions_config_label = "//boards/partitions:av400"
 partitions_config_contents +=
     [ "//prebuilt/third_party/firmware/vim3/u-boot.bin.unsigned" ]

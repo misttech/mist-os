@@ -60,4 +60,5 @@ fvm_ftl_nand_block_count = 2048
 board_is_emu = false
 board_is_phys = true
 
+images_config_label = "//boards/images:clover"
 partitions_config_label = "//boards/partitions:clover"
