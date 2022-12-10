@@ -162,8 +162,8 @@ TEST_F(File, WaitForWritable) {
 TEST_F(File, GetVmoPropagatesError) {
   // Positive error codes are protocol-specific errors, and will not
   // occur in the system.
-  constexpr zx_status_t kGetAttrError = 1;
-  constexpr zx_status_t kGetBufferError = 2;
+  static constexpr zx_status_t kGetAttrError = 1;
+  static constexpr zx_status_t kGetBufferError = 2;
 
   class TestServer : public CloseCountingFileServer {
    public:

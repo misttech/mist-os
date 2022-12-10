@@ -1146,7 +1146,7 @@ TEST_F(DeviceImplTest, GetFramesMultiClient) {
   constexpr uint32_t kNumClients = 2;
   constexpr uint32_t kBufferId1 = 42;
   constexpr uint32_t kBufferId2 = 17;
-  constexpr uint32_t kMaxCampingBuffers = 1;
+  static constexpr uint32_t kMaxCampingBuffers = 1;
   fuchsia::camera3::StreamPtr original_stream;
   original_stream.set_error_handler(MakeErrorHandler("Stream"));
   std::unique_ptr<FakeLegacyStream> legacy_stream_fake;
