@@ -109,6 +109,7 @@ test("intel-i915-tgl-test") {
     "fake-dpcd-channel.h",
     "firmware-bridge-unittest.cc",
     "fuse-config-unittest.cc",
+    "gmbus-gpio-unittest.cc",
     "gtt-unittest.cc",
     "hardware-common-unittest.cc",
     "intel-i915-tgl-test.cc",

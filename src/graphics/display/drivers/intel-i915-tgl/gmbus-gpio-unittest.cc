@@ -94,8 +94,12 @@ TEST(GMBusPinPairTest, GetForDdi_Skylake) {
     EXPECT_EQ(pin_pair->number(), 0b0110);
     EXPECT_EQ(pin_pair->ddi_id(), DdiId::DDI_D);
   }
+  {
+    std::optional<GMBusPinPair> pin_pair = GMBusPinPair::GetForDdi(DdiId::DDI_E, kSkylake);
+    ASSERT_FALSE(pin_pair.has_value());
+  }
   for (const DdiId invalid_ddi :
-       {DdiId::DDI_TC_2, DdiId::DDI_TC_3, DdiId::DDI_TC_4, DdiId::DDI_TC_5, DdiId::DDI_TC_6}) {
+       {DdiId::DDI_TC_3, DdiId::DDI_TC_4, DdiId::DDI_TC_5, DdiId::DDI_TC_6}) {
     EXPECT_DEATH_IF_SUPPORTED({ GMBusPinPair::GetForDdi(invalid_ddi, kSkylake); }, "Invalid");
   }
 }
@@ -203,8 +207,12 @@ TEST(GpioPortTest, GetForDdi_Skylake) {
     EXPECT_EQ(gpio_port->number(), 0b0101);
     EXPECT_EQ(gpio_port->ddi_id(), DdiId::DDI_D);
   }
+  {
+    std::optional<GpioPort> gpio_port = GpioPort::GetForDdi(DdiId::DDI_E, kSkylake);
+    ASSERT_FALSE(gpio_port.has_value());
+  }
   for (const DdiId invalid_ddi :
-       {DdiId::DDI_TC_2, DdiId::DDI_TC_3, DdiId::DDI_TC_4, DdiId::DDI_TC_5, DdiId::DDI_TC_6}) {
+       {DdiId::DDI_TC_3, DdiId::DDI_TC_4, DdiId::DDI_TC_5, DdiId::DDI_TC_6}) {
     EXPECT_DEATH_IF_SUPPORTED({ GpioPort::GetForDdi(invalid_ddi, kSkylake); }, "Invalid");
   }
 }
@@ -221,7 +229,7 @@ TEST(GpioPortTest, HasValidPort_TigerLake) {
 TEST(GpioPortTest, HasValidPort_Skylake) {
   constexpr auto kSkylake = tgl_registers::Platform::kSkylake;
   for (const DdiId ddi_with_valid_port : {DdiId::DDI_B, DdiId::DDI_C, DdiId::DDI_D}) {
-    EXPECT_FALSE(GpioPort::HasValidPort(ddi_with_valid_port, kSkylake));
+    EXPECT_TRUE(GpioPort::HasValidPort(ddi_with_valid_port, kSkylake));
   }
   for (const DdiId ddi_without_valid_port : {DdiId::DDI_A, DdiId::DDI_TC_2, DdiId::DDI_TC_3,
                                              DdiId::DDI_TC_4, DdiId::DDI_TC_5, DdiId::DDI_TC_6}) {
