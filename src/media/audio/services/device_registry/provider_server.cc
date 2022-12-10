@@ -17,7 +17,7 @@
 namespace media_audio {
 
 // static
-uint32_t ProviderServer::count_ = 0;
+uint64_t ProviderServer::count_ = 0;
 
 std::shared_ptr<ProviderServer> ProviderServer::Create(
     std::shared_ptr<const FidlThread> thread,
@@ -65,7 +65,7 @@ void ProviderServer::AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sy
   ADR_LOG_OBJECT(kLogDeviceDetection)
       << "request to add " << *request.device_type() << " '" << *request.device_name() << "'";
 
-  // This kicks off device initialization, calling the parent with this completes.
+  // This kicks off device initialization, which notifies the parent when it completes.
   parent_->AddDevice(Device::Create(parent_, thread().dispatcher(), *request.device_name(),
                                     *request.device_type(),
                                     std::move(*request.stream_config_client())));

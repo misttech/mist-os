@@ -98,6 +98,10 @@ class Device : public std::enable_shared_from_this<Device>,
          std::string_view name, fuchsia_audio_device::DeviceType device_type,
          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> stream_config);
 
+  // fidl::AsyncEventHandler<fuchsia_hardware_audio::StreamConfig> implementation,
+  // called when the underlying driver disconnects its StreamConfig channel.
+  void on_fidl_error(fidl::UnbindInfo error) override;
+
   //
   // Actions during the initialization process.
   //

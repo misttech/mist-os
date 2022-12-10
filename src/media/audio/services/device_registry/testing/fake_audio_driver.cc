@@ -44,6 +44,12 @@ zx::channel FakeAudioDriver::Enable() {
   return std::move(stream_config_client_end_);
 }
 
+void FakeAudioDriver::DropStreamConfig() {
+  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+
+  stream_config_binding_->Close(ZX_ERR_PEER_CLOSED);
+}
+
 void FakeAudioDriver::GetHealthState(
     fuchsia::hardware::audio::StreamConfig::GetHealthStateCallback callback) {
   fuchsia::hardware::audio::HealthState health_state;

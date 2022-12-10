@@ -29,4 +29,6 @@ TEST_F(AudioDeviceRegistryServerTest, UnhealthyDevice) {
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 1u);
 }
 
+// TODO: StreamConfigDisconnect test, after added and healthy
+
 }  // namespace media_audio

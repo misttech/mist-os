@@ -44,6 +44,9 @@ inline constexpr bool kLogObjectCounts = true;
 inline constexpr bool kLogProviderServerMethods = false;
 inline constexpr bool kLogProviderServerResponses = false;
 
+inline constexpr bool kLogRegistryServerMethods = false;
+inline constexpr bool kLogRegistryServerResponses = false;
+
 std::string UidToString(std::optional<UniqueId> unique_instance_id);
 
 void LogStreamProperties(const fuchsia_hardware_audio::StreamProperties& props);

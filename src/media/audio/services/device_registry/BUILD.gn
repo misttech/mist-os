@@ -49,6 +49,7 @@ executable("device_registry_unittests_bin") {
     "device_detector_unittest.cc",
     "device_unittest.cc",
     "provider_server_unittest.cc",
+    "registry_server_unittest.cc",
   ]
 
   deps = [
@@ -65,6 +66,7 @@ executable("device_registry_warning_unittests_bin") {
     "audio_device_registry_warning_unittest.cc",
     "device_warning_unittest.cc",
     "provider_server_warning_unittest.cc",
+    "registry_server_warning_unittest.cc",
   ]
 
   deps = [ ":unittest_base" ]
@@ -85,6 +87,8 @@ source_set("device_registry_lib") {
     "logging.h",
     "provider_server.cc",
     "provider_server.h",
+    "registry_server.cc",
+    "registry_server.h",
     "validate.cc",
     "validate.h",
   ]
@@ -110,6 +114,7 @@ source_set("unittest_base") {
   testonly = true
 
   sources = [
+    # "adr_server_unittest_base.cc",
     "adr_server_unittest_base.h",
     "device_unittest.h",
   ]

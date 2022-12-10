@@ -27,4 +27,36 @@ TEST_F(DeviceWarningTest, DeviceUnhealthy) {
   EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
 }
 
+// TODO: Healthy device Added, then becomes Unhealthy.
+
+TEST_F(DeviceWarningTest, UnhealthyDeviceRemoved) {
+  fake_driver_->set_health_state(false);
+  device_ = InitializeDeviceForFakeDriver(fake_driver_);
+  ASSERT_TRUE(HasError(device_));
+  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 0u);
+  ASSERT_EQ(fake_device_presence_watcher_->error_devices().size(), 1u);
+
+  ASSERT_EQ(fake_device_presence_watcher_->on_ready_count(), 0u);
+  ASSERT_EQ(fake_device_presence_watcher_->on_error_count(), 1u);
+  ASSERT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+
+  RemoveDevice();
+
+  // zx::time deadline = zx::clock::get_monotonic() + kCommandTimeout;
+  // while (zx::clock::get_monotonic() < deadline) {
+  RunLoopUntilIdle();
+  // if (fake_device_presence_watcher_->error_devices().size() == 0u) {
+  //   break;
+  // }
+  // }
+
+  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 0u);
+  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+
+  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 0u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_removal_from_error_count(), 1u);
+}
+
 }  // namespace media_audio

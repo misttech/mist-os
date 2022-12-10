@@ -61,6 +61,8 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     return device;
   }
 
+  void RemoveDevice() { fake_driver_->DropStreamConfig(); }
+
   fuchsia_audio_device::Info GetDeviceInfo() const { return *device_->info(); }
 
   static bool HasError(std::shared_ptr<Device> device) {

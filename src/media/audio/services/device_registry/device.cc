@@ -88,6 +88,37 @@ Device::~Device() {
   LogObjectCounts();
 }
 
+// Invoked when the underlying driver disconnects its StreamConfig.
+void Device::on_fidl_error(fidl::UnbindInfo error) {
+  if (!error.is_dispatcher_shutdown() && !error.is_peer_closed() && !error.is_user_initiated()) {
+    FX_LOGS(WARNING) << __func__ << ":" << error;
+    OnError(error.status());
+  }
+
+  ADR_LOG_OBJECT(kLogStreamConfigFidlResponses || kLogObjectLifetimes)
+      << "StreamConfig disconnected:" << error.FormatDescription();
+
+  OnRemoval();
+}
+
+void Device::OnRemoval() {
+  ADR_LOG_OBJECT(kLogDeviceState);
+  if (state_ == State::Error) {
+    FX_LOGS(WARNING) << __func__ << ": device already has an error; no device state to unwind";
+    --Device::unhealthy_count_;
+  } else if (state_ != State::Initializing) {
+    --Device::initialized_count_;
+
+    // We completed initialization before this error, so notify clients so they can unwind.
+  }
+  LogObjectCounts();
+
+  // Regardless of whether device was pending / operational / unhealthy, notify the state watcher.
+  if (std::shared_ptr<DevicePresenceWatcher> pw = presence_watcher_.lock()) {
+    pw->DeviceIsRemoved(shared_from_this());
+  }
+}
+
 // Unwind any operational state or configuration the device might be in, and remove this device.
 void Device::OnError(zx_status_t error) {
   ADR_LOG_OBJECT(kLogDeviceState);
@@ -99,6 +130,11 @@ void Device::OnError(zx_status_t error) {
 
   FX_PLOGS(WARNING, error) << __func__;
 
+  if (state_ != State::Initializing) {
+    --Device::initialized_count_;
+
+    // We completed initialization before this error, so notify clients so they can unwind.
+  }
   ++Device::unhealthy_count_;
   SetStateError(error);
   LogObjectCounts();
@@ -120,7 +156,8 @@ void Device::OnHealthResponse() {
     return;
   }
   // Otherwise, we asked for, and received, health status after initialization (subsequent CL).
-  // TODO: potentially add DeviceIsHealthy to Notify interfaces, to notify observers/control.
+  // TODO(fxbug.dev/117199): Decide when we proactively call GetHealthState, if at all.
+  // Potentially add DeviceIsHealthy to Notify interfaces, to notify observers/control.
 }
 
 // An initialization command returned a successful response. Is initialization complete?
@@ -333,6 +370,7 @@ void Device::QueryPlugState() {
       });
 }
 
+// TODO(fxbug.dev/117199): Decide when we proactively call GetHealthState, if at all.
 void Device::QueryHealthState() {
   ADR_LOG_OBJECT(kLogStreamConfigFidlCalls);
 

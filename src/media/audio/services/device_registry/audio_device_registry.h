@@ -14,13 +14,16 @@
 #include <cstdint>
 #include <memory>
 #include <unordered_set>
+#include <vector>
 
 #include "src/media/audio/services/common/fidl_thread.h"
+#include "src/media/audio/services/common/vector_of_weak_ptr.h"
 #include "src/media/audio/services/device_registry/device_presence_watcher.h"
 
 namespace media_audio {
 
 class ProviderServer;
+class RegistryServer;
 
 class Device;
 class DeviceDetector;
@@ -55,8 +58,15 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
   std::shared_ptr<ProviderServer> CreateProviderServer(
       fidl::ServerEnd<fuchsia_audio_device::Provider> server_end);
 
+  // Registry support
+  std::shared_ptr<RegistryServer> CreateRegistryServer(
+      fidl::ServerEnd<fuchsia_audio_device::Registry> server_end);
+
  private:
   static inline const std::string_view kClassName = "AudioDeviceRegistry";
+
+  void NotifyRegistriesOfDeviceRemoval(uint64_t removed_device_id);
+  void GarbageCollectRegistries();
 
   std::shared_ptr<DeviceDetector> device_detector_;
 
@@ -73,6 +83,8 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
 
   std::shared_ptr<FidlThread> thread_;
   component::OutgoingDirectory outgoing_;
+
+  VectorOfWeakPtr<RegistryServer> registries_;
 };
 
 }  // namespace media_audio

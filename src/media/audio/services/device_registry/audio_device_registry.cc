@@ -18,6 +18,7 @@
 #include "src/media/audio/services/device_registry/device_detector.h"
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/provider_server.h"
+#include "src/media/audio/services/device_registry/registry_server.h"
 
 namespace media_audio {
 
@@ -68,11 +69,21 @@ void AudioDeviceRegistry::DeviceIsReady(std::shared_ptr<media_audio::Device> rea
     FX_LOGS(ERROR) << __func__ << ": device " << ready_device << " already in initialized list";
     return;
   }
+
+  // Notify registry clients of this new device.
+  for (auto& weak_registry : registries_) {
+    if (std::shared_ptr<RegistryServer> registry = weak_registry.lock()) {
+      registry->DeviceWasAdded(ready_device);
+    }
+  }
 }
 
 void AudioDeviceRegistry::DeviceHasError(std::shared_ptr<media_audio::Device> device_with_error) {
   if (devices_.erase(device_with_error)) {
     FX_LOGS(WARNING) << __func__ << " for previously-initialized device " << device_with_error;
+
+    // Device should have already notified any other associated objects.
+    NotifyRegistriesOfDeviceRemoval(device_with_error->token_id());
   }
 
   if (pending_devices_.erase(device_with_error)) {
@@ -93,6 +104,9 @@ void AudioDeviceRegistry::DeviceIsRemoved(std::shared_ptr<media_audio::Device> d
   ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods) << "for device " << device_to_remove;
 
   if (devices_.erase(device_to_remove)) {
+    // Device should have already notified any other associated objects.
+    NotifyRegistriesOfDeviceRemoval(device_to_remove->token_id());
+
     ADR_LOG_OBJECT(kLogObjectLifetimes)
         << "removed " << device_to_remove << " from active device list";
   }
@@ -108,20 +122,43 @@ void AudioDeviceRegistry::DeviceIsRemoved(std::shared_ptr<media_audio::Device> d
   }
 }
 
+// Notify registry clients of this device departure (whether from surprise-removal or error).
+void AudioDeviceRegistry::NotifyRegistriesOfDeviceRemoval(uint64_t removed_device_id) {
+  ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods);
+
+  for (auto weak_it = registries_.begin(); weak_it != registries_.end(); ++weak_it) {
+    if (auto registry = weak_it->lock()) {
+      registry->DeviceWasRemoved(removed_device_id);
+    }
+  }
+}
+
 zx_status_t AudioDeviceRegistry::RegisterAndServeOutgoing() {
   ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods);
 
   auto status = outgoing_.AddProtocol<fuchsia_audio_device::Provider>(
       [this](fidl::ServerEnd<fuchsia_audio_device::Provider> server_end) mutable {
         ADR_LOG_OBJECT(kLogProviderServerMethods)
-            << "Incoming connection for "
-            << fidl::DiscoverableProtocolName<fuchsia_audio_device::Provider>;
+            << "Incoming connection for fuchsia.audio.device.Provider";
 
         auto provider = CreateProviderServer(std::move(server_end));
       });
 
   if (status.is_error()) {
     FX_LOGS(ERROR) << "Failed to add Provider protocol: " << status.error_value() << " ("
+                   << status.status_string() << ")";
+    return status.status_value();
+  }
+
+  status = outgoing_.AddProtocol<fuchsia_audio_device::Registry>(
+      [this](fidl::ServerEnd<fuchsia_audio_device::Registry> server_end) mutable {
+        ADR_LOG_OBJECT(kLogRegistryServerMethods)
+            << "Incoming connection for fuchsia.audio.device.Registry";
+
+        auto registry = CreateRegistryServer(std::move(server_end));
+      });
+  if (status.is_error()) {
+    FX_LOGS(ERROR) << "Failed to add Registry protocol: " << status.error_value() << " ("
                    << status.status_string() << ")";
     return status.status_value();
   }
@@ -139,6 +176,19 @@ std::shared_ptr<ProviderServer> AudioDeviceRegistry::CreateProviderServer(
   ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods || kLogProviderServerMethods);
 
   return ProviderServer::Create(thread_, std::move(server_end), shared_from_this());
+}
+
+std::shared_ptr<RegistryServer> AudioDeviceRegistry::CreateRegistryServer(
+    fidl::ServerEnd<fuchsia_audio_device::Registry> server_end) {
+  ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods || kLogRegistryServerMethods);
+
+  auto new_registry = RegistryServer::Create(thread_, std::move(server_end), shared_from_this());
+  registries_.push_back(new_registry);
+
+  for (const auto& device : devices()) {
+    new_registry->DeviceWasAdded(device);
+  }
+  return new_registry;
 }
 
 }  // namespace media_audio
