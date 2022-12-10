@@ -1220,8 +1220,11 @@ impl<'a> TestInterface<'a> {
     }
 
     /// Removes an address and a subnet route.
-    pub async fn del_address_and_subnet_route(&self, subnet: fnet::Subnet) -> Result<bool> {
-        let subnet = fnet_ext::apply_subnet_mask(subnet);
+    pub async fn del_address_and_subnet_route(
+        &self,
+        mut addr_with_prefix: fnet::Subnet,
+    ) -> Result<bool> {
+        let subnet = fnet_ext::apply_subnet_mask(addr_with_prefix);
         let mut entry =
             fnet_stack::ForwardingEntry { subnet, device_id: self.id, next_hop: None, metric: 0 };
         let () = self.stack.del_forwarding_entry(&mut entry).await.squash_result().with_context(
@@ -1232,7 +1235,7 @@ impl<'a> TestInterface<'a> {
                 )
             },
         )?;
-        self.control.remove_address(&mut subnet.clone()).await.context("FIDL error").and_then(
+        self.control.remove_address(&mut addr_with_prefix).await.context("FIDL error").and_then(
             |res| {
                 res.map_err(|e: fnet_interfaces_admin::ControlRemoveAddressError| {
                     anyhow::anyhow!("{:?}", e)
@@ -1422,6 +1425,13 @@ pub trait RealmTcpStream: Sized {
         addr: std::net::SocketAddr,
     ) -> futures::future::LocalBoxFuture<'a, Result<Self>>;
 
+    /// Creates a TCP stream in `realm` bound to `local` and connected to `dst`.
+    fn bind_and_connect_in_realm<'a>(
+        realm: &'a TestRealm<'a>,
+        local: std::net::SocketAddr,
+        dst: std::net::SocketAddr,
+    ) -> futures::future::LocalBoxFuture<'a, Result<Self>>;
+
     // TODO: Implement this trait for std::net::TcpStream.
 }
 
@@ -1437,6 +1447,29 @@ impl RealmTcpStream for fuchsia_async::net::TcpStream {
                 .context("failed to create socket")?;
 
             let stream = fuchsia_async::net::TcpStream::connect_from_raw(sock, addr)
+                .context("failed to create client tcp stream")?
+                .await
+                .context("failed to connect to server")?;
+
+            Result::Ok(stream)
+        }
+        .boxed_local()
+    }
+
+    fn bind_and_connect_in_realm<'a>(
+        realm: &'a TestRealm<'a>,
+        local: std::net::SocketAddr,
+        dst: std::net::SocketAddr,
+    ) -> futures::future::LocalBoxFuture<'a, Result<Self>> {
+        async move {
+            let sock = realm
+                .stream_socket(get_socket2_domain(&dst), fposix_socket::StreamSocketProtocol::Tcp)
+                .await
+                .context("failed to create socket")?;
+
+            let () = sock.bind(&local.into()).context("failed to bind")?;
+
+            let stream = fuchsia_async::net::TcpStream::connect_from_raw(sock, dst)
                 .context("failed to create client tcp stream")?
                 .await
                 .context("failed to connect to server")?;

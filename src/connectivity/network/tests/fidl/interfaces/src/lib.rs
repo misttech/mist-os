@@ -8,12 +8,12 @@ use anyhow::Context as _;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_netemul_network as fnetemul_network;
-use fuchsia_async::TimeoutExt as _;
+use fuchsia_async::{self as fasync, TimeoutExt as _};
 use fuchsia_zircon as zx;
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_subnet, std_ip};
-use netemul::RealmUdpSocket as _;
+use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _};
 use netstack_testing_common::Result;
 use netstack_testing_common::{
     interfaces,
@@ -1384,4 +1384,61 @@ async fn test_watcher() {
     let want = fidl_fuchsia_net_interfaces::Event::Removed(id);
     assert_eq!(next(&mut blocking_stream).await, want);
     assert_eq!(next(&mut stream).await, want);
+}
+
+#[variants_test]
+async fn test_readded_address_present<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let network = sandbox.create_network(name).await.expect("create network");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+    let interface = realm
+        .join_network::<netemul::NetworkDevice, _>(&network, name)
+        .await
+        .expect("join network");
+
+    const SRC_IP: fidl_fuchsia_net::Subnet = fidl_subnet!("192.168.0.1/24");
+    interface
+        .add_address_and_subnet_route(SRC_IP)
+        .await
+        .expect("add source address and subnet route");
+
+    const DST_IP: fidl_fuchsia_net::Subnet = fidl_subnet!("192.168.0.254/24");
+    interface.add_address(DST_IP).await.expect("add destination address");
+
+    let std_socket_addr = |subnet, port| {
+        let fidl_fuchsia_net::Subnet { addr, prefix_len: _ } = subnet;
+        let fidl_fuchsia_net_ext::IpAddress(addr) = addr.into();
+        std::net::SocketAddr::new(addr, port)
+    };
+    let dst_sockaddr = std_socket_addr(DST_IP, 6789);
+    let listener: fasync::net::TcpListener =
+        fasync::net::TcpListener::listen_in_realm(&realm, dst_sockaddr).await.expect("listen");
+
+    // The presence of the connected socket means that the address will still be
+    // in-use after it is deleted.
+    let src_sockaddr = std_socket_addr(SRC_IP, 12345);
+    let _socket: fasync::net::TcpStream =
+        fasync::net::TcpStream::bind_and_connect_in_realm(&realm, src_sockaddr, dst_sockaddr)
+            .await
+            .expect("bind and connect");
+
+    let (_listener, _accepted, from): (fasync::net::TcpListener, fasync::net::TcpStream, _) =
+        listener.accept().await.expect("accept");
+    assert_eq!(from, src_sockaddr);
+
+    assert!(interface
+        .del_address_and_subnet_route(SRC_IP)
+        .await
+        .expect("delete address and subnet route"));
+
+    interface.add_address_and_subnet_route(SRC_IP).await.expect("re-add address and subnet route");
+    let addresses = interface.get_addrs().await.expect("get addresses");
+    assert!(
+        addresses.iter().any(
+            |&fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| { addr == SRC_IP }
+        ),
+        "{:?} missing from addresses {:?}",
+        SRC_IP,
+        addresses
+    );
 }
