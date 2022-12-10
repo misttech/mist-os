@@ -7,15 +7,10 @@ import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_test.gni")
-import("//build/security.gni")
 
 group("tests") {
   testonly = true
-
-  # base-resolver-tests require subpackage support
-  if (full_resolver_enable_subpackages) {
-    deps = [ ":base-resolver-tests" ]
-  }
+  deps = [ ":base-resolver-tests" ]
 }
 
 rustc_test("integration_test_bin") {
@@ -167,7 +162,6 @@ fuchsia_test_package("base-resolver-tests") {
     ":mock-superpackage-component",
     "//src/sys/base-resolver:base-resolver-component",
     "//src/sys/base-resolver:pkg-cache-resolver-component",
-    "//src/sys/base-resolver:values_from_gn",
   ]
 
   subpackages = [ ":subpackaged-component" ]

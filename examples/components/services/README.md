@@ -23,23 +23,23 @@ using the following command:
 -   **C++**
 
     ```bash
-    $ fx test service-examples-cpp
+    $ ffx test run fuchsia-pkg://fuchsia.com/service-examples-cpp#meta/default.cm
     ```
 
 -   **Rust**
 
     ```bash
-    $ fx test service-examples-rust
+    $ ffx test run fuchsia-pkg://fuchsia.com/service-examples-rust#meta/default.cm
     ```
 
 When the above command is run, you can see the following output in the test console
 in addition to the test cases passing:
 
 ```
-[bank_branch] INFO: creating BankAccount provider url=#meta/provider-a.cm name=a
-[bank_branch] INFO: open exposed dir of BankAccount provider name=a url=#meta/provider-a.cm
-[bank_branch] INFO: creating BankAccount provider name=b url=#meta/provider-b.cm
-[bank_branch] INFO: open exposed dir of BankAccount provider name=b url=#meta/provider-b.cm
+[bank_branch] INFO: creating BankAccount provider url=provider-a#meta/default.cm name=a
+[bank_branch] INFO: open exposed dir of BankAccount provider name=a url=provider-a#meta/default.cm
+[bank_branch] INFO: creating BankAccount provider name=b url=provider-b#meta/default.cm
+[bank_branch] INFO: open exposed dir of BankAccount provider name=b url=provider-b#meta/default.cm
 [account_providers:a] INFO: starting bank account provider balance=23 name=A
 [account_providers:b] INFO: starting bank account provider balance=42 name=B
 [bank_branch] INFO: retrieved account owner=A balance=23

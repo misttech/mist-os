@@ -280,11 +280,6 @@ group("workstation") {
 
     # Integration tests
     "//src/ui/tests:workstation_tests",
-
-    # TODO(fxbug.dev/102651): Remove these tests when Subpackages is made
-    # generally available. Until then, subpackage tests will only run in CQ if
-    # added to the workstation_eng packages, here:
-    "//examples:tests",
   ]
 
   deps += [ ":workstation_host_tests" ]

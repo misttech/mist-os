@@ -14,6 +14,7 @@ use {
 async fn routes_from_echo_server_to_peer_client() {
     let builder = RealmBuilder::new().await.unwrap();
 
+    // [START declare_children_dynamically]
     // Add the server component to the realm, fetched from a subpackage
     let echo_server = builder
         .add_child("echo_server", "my-echo-server#meta/default.cm", ChildOptions::new())
@@ -29,6 +30,7 @@ async fn routes_from_echo_server_to_peer_client() {
         .add_child("echo_client", "echo_client#meta/default.cm", ChildOptions::new().eager())
         .await
         .unwrap();
+    // [END declare_children_dynamically]
 
     builder
         .add_route(

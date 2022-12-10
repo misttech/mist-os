@@ -165,8 +165,7 @@ Follow the insructions for each tab, from left to right:
   * {Build Fuchsia}
 
     ```devsite-terminal
-    fx set core.x64 --with //{{ test_root }}:tests \
-        --args=full_resolver_enable_subpackages=true
+    fx set core.x64 --with //{{ test_root }}:tests
     fx build
     ```
 
@@ -230,4 +229,4 @@ The FAQ sections about [retiring tests] and [disabling tests].
 [disabling tests]: /docs/development/testing/ctf/faq.md#disable-a-test
 [retiring tests]: /docs/development/testing/ctf/faq.md#retire-a-test
 [allow list]: /sdk/ctf/build/internal/allowed_ctf_deps.gni
-[Subpackages]: /docs/contribute/governance/rfcs/0154_subpackages.md
+[Subpackages]: /docs/concepts/packages/subpackages.md

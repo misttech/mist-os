@@ -33,23 +33,20 @@ executable("provider-bin") {
   sources = [ "provider.cc" ]
 }
 
-fuchsia_component("branch-cmp") {
+fuchsia_package_with_default_component("branch") {
   testonly = true
-  component_name = "branch"
   manifest = "meta/branch.cml"
   deps = [ ":branch-bin" ]
 }
 
-fuchsia_component("provider-a-cmp") {
+fuchsia_package_with_default_component("provider-a") {
   testonly = true
-  component_name = "provider-a"
   manifest = "meta/provider-a.cml"
   deps = [ ":provider-bin" ]
 }
 
-fuchsia_component("provider-b-cmp") {
+fuchsia_package_with_default_component("provider-b") {
   testonly = true
-  component_name = "provider-b"
   manifest = "meta/provider-b.cml"
   deps = [ ":provider-bin" ]
 }

@@ -12,14 +12,8 @@ all components into a single package.
 If these components are not present in your build, they can be added by
 appending `--with //examples` to your `fx set` command. For example:
 
-<!--
-TODO(fxbug.dev/102652): Remove --args='full_resolver_enable_subpackages=true'
-when the feature flag is no longer needed:
--->
-
 ```bash
-$ fx set core.x64 --with //examples --with //examples:tests \
-  --args='full_resolver_enable_subpackages=true'
+$ fx set core.x64 --with //examples --with //examples:tests
 $ fx build
 ```
 

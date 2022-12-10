@@ -3,21 +3,14 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/security.gni")
-
-# TODO(fxbug.dev/102652): Remove security.gni when Subpackages are generally available
 
 group("subpackaged-echo-realm") {
   testonly = true
 
-  # This Subpackages example will only work if subpackage resolution is enabled
-  # in the full-resolver.
-  if (full_resolver_enable_subpackages) {
-    deps = [
-      ":subpackaged_echo_realm_cpp",
-      ":subpackaged_echo_realm_rust",
-    ]
-  }
+  deps = [
+    ":subpackaged_echo_realm_cpp",
+    ":subpackaged_echo_realm_rust",
+  ]
 }
 
 fuchsia_package_with_default_component("subpackaged_echo_realm_rust") {
@@ -38,13 +31,8 @@ fuchsia_package_with_default_component("subpackaged_echo_realm_cpp") {
 
 group("tests") {
   testonly = true
-
-  # This Subpackages example will only work if subpackage resolution is enabled
-  # in the full-resolver.
-  if (full_resolver_enable_subpackages) {
-    deps = [
-      "../integration_tests/cpp:subpackaged_echo_integration_test_cpp",
-      "../integration_tests/rust:subpackaged_echo_integration_test_rust",
-    ]
-  }
+  deps = [
+    "../integration_tests/cpp:subpackaged_echo_integration_test_cpp",
+    "../integration_tests/rust:subpackaged_echo_integration_test_rust",
+  ]
 }

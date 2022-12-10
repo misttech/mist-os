@@ -64,8 +64,8 @@ class BankAccountTest : public ::gtest::RealLoopFixture {
 
 TEST_F(BankAccountTest, ReadWriteMultipleServiceInstances) {
   // Launch two BankAccount providers into the `account_providers` collection.
-  StartProvider("a", "#meta/provider-a.cm");
-  StartProvider("b", "#meta/provider-b.cm");
+  StartProvider("a", "provider-a#meta/default.cm");
+  StartProvider("b", "provider-b#meta/default.cm");
 
   // List available instances of the BankAccount service
   auto service_aggregate =

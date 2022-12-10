@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//build/security.gni")
 
 group("tests") {
   testonly = true
@@ -23,12 +22,10 @@ rustc_binary("bin") {
   with_unit_tests = true
 
   deps = [
-    ":config_lib",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
-    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
@@ -52,41 +49,14 @@ rustc_binary("bin") {
   sources = [ "src/main.rs" ]
 }
 
-fuchsia_component_manifest("manifest") {
+fuchsia_component("component") {
   component_name = "full-resolver"
   manifest = "meta/full-resolver.cml"
-}
-
-fuchsia_component("component") {
-  cm_label = ":manifest"
   deps = [ ":bin" ]
 }
 
-fuchsia_structured_config_rust_lib("config_lib") {
-  cm_label = ":manifest"
-  name = "full_resolver_config"
-  visibility = [ ":*" ]
-}
-
-fuchsia_structured_config_values("config_values_from_gn") {
-  cm_label = ":manifest"
-  values = {
-    enable_subpackages = full_resolver_enable_subpackages
-  }
-}
-
-fuchsia_structured_config_values("config_values_from_gn_for_test") {
-  cm_label = ":manifest"
-  values = {
-    enable_subpackages = full_resolver_enable_subpackages
-  }
-}
-
 fuchsia_package("full-resolver") {
-  deps = [
-    ":component",
-    ":config_values_from_gn",
-  ]
+  deps = [ ":component" ]
 }
 
 fuchsia_component("example") {
@@ -99,6 +69,5 @@ fuchsia_unittest_package("unittests") {
   deps = [
     ":bin_test",
     ":component",
-    ":config_values_from_gn_for_test",
   ]
 }

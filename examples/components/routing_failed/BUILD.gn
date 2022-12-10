@@ -12,31 +12,29 @@ group("components-routing-failed-example") {
   ]
 }
 
-fuchsia_component("echo_realm") {
-  manifest = "meta/echo_realm.cml"
-}
-
 # Component manifest that contains an intentionally invalid executable name
-fuchsia_component("echo_server_bad") {
+fuchsia_package_with_default_component("echo_server_bad") {
   # This flag disables build-time checks on the executable path
   check_references = false
   manifest = "meta/echo_server_bad.cml"
 }
 
-fuchsia_package("components-routing-failed-example-rust") {
-  deps = [
-    ":echo_realm",
+fuchsia_package_with_default_component(
+    "components-routing-failed-example-rust") {
+  manifest = "meta/echo_realm.cml"
+  subpackages = [
     ":echo_server_bad",
     "rust:echo_client",
-    "//examples/components/routing/rust/echo_server:echo_server_cmp",
+    "//examples/components/routing/rust/echo_server",
   ]
 }
 
-fuchsia_package("components-routing-failed-example-cpp") {
-  deps = [
-    ":echo_realm",
+fuchsia_package_with_default_component(
+    "components-routing-failed-example-cpp") {
+  manifest = "meta/echo_realm.cml"
+  subpackages = [
     ":echo_server_bad",
     "cpp:echo_client",
-    "//examples/components/routing/cpp/echo_server:echo_server_cmp",
+    "//examples/components/routing/cpp/echo_server",
   ]
 }

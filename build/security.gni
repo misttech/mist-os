@@ -236,14 +236,14 @@ declare_args() {
   # example, because the package is in base).
   auto_update_packages = true
 
-  # Whether to allow base-resolver to resolve subpackages.
-  # TODO(fxbug.dev/102652): This configuration will be removed when subpackages
-  # is generally available.
+  # DEPRECATED: subpackages is generally available.
+  # TODO(fxbug.dev/102652): This configuration will be removed when no longer
+  # referenced.
   base_resolver_enable_subpackages = false
 
-  # Whether to allow full-resolver to resolve subpackages.
-  # TODO(fxbug.dev/102652): This configuration will be removed when subpackages
-  # is generally available.
+  # DEPRECATED: subpackages is generally available.
+  # TODO(fxbug.dev/102652): This configuration will be removed when no longer
+  # referenced.
   full_resolver_enable_subpackages = false
 }
 

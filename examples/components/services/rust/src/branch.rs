@@ -20,8 +20,8 @@ async fn read_and_write_to_multiple_service_instances() {
     // Launch two BankAccount providers into the `account_providers` collection.
     let realm = fuchsia_component::client::connect_to_protocol::<fcomponent::RealmMarker>()
         .expect("connect to Realm service");
-    start_provider(&realm, "a", "#meta/provider-a.cm").await;
-    start_provider(&realm, "b", "#meta/provider-b.cm").await;
+    start_provider(&realm, "a", "provider-a#meta/default.cm").await;
+    start_provider(&realm, "b", "provider-b#meta/default.cm").await;
 
     let service_dir = fclient::open_service::<fexamples::BankAccountMarker>()
         .expect("failed to open service dir");

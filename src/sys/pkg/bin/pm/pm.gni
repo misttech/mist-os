@@ -200,12 +200,7 @@ template("pm_build") {
     if (defined(invoker.meta_subpackages)) {
       meta_subpackages_outputs = get_target_outputs(invoker.meta_subpackages)
       meta_subpackages_file = meta_subpackages_outputs[0]
-      deps += [
-        "//build:declare_subpackages_allowlist",
-        invoker.meta_subpackages,
-
-        # Package targets must be in the allowlist to use subpackages
-      ]
+      deps += [ invoker.meta_subpackages ]
       inputs += [ meta_subpackages_file ]
     }
 

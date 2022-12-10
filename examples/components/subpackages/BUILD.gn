@@ -4,18 +4,10 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
-import("//build/security.gni")
-
-# TODO(fxbug.dev/102652): Remove security.gni when Subpackages are generally available
 
 group("tests") {
   testonly = true
-
-  # This Subpackages example will only work if subpackage resolution is enabled
-  # in the full-resolver.
-  if (full_resolver_enable_subpackages) {
-    deps = [ ":subpackage-examples" ]
-  }
+  deps = [ ":subpackage-examples" ]
 }
 
 rustc_test("bin") {
@@ -40,6 +32,7 @@ fuchsia_package_with_default_component("echo_client_with_subpackaged_server") {
 
 # Run with `fx test subpackage-examples` or
 # `ffx test run fuchsia-pkg://fuchsia.com/subpackage-examples#meta/default.cm`
+# [START declare_subpackages]
 fuchsia_test_package_with_default_component("subpackage-examples") {
   manifest = "meta/parent_realm.cml"
   deps = [ ":bin" ]
@@ -55,3 +48,4 @@ fuchsia_test_package_with_default_component("subpackage-examples") {
     },
   ]
 }
+# [END declare_subpackages]

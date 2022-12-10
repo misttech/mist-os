@@ -22,13 +22,13 @@ realm for development purposes:
 -   **C++**
 
     ```bash
-    $ ffx component create /core/ffx-laboratory:echo_realm fuchsia-pkg://fuchsia.com/components-routing-failed-example-cpp#meta/echo_realm.cm
+    $ ffx component run /core/ffx-laboratory:echo_realm fuchsia-pkg://fuchsia.com/components-routing-failed-example-cpp#meta/default.cm
     ```
 
 -   **Rust**
 
     ```bash
-    $ ffx component create /core/ffx-laboratory:echo_realm fuchsia-pkg://fuchsia.com/components-routing-failed-example-rust#meta/echo_realm.cm
+    $ ffx component run /core/ffx-laboratory:echo_realm fuchsia-pkg://fuchsia.com/components-routing-failed-example-rust#meta/default.cm
     ```
 
 Start the client component instance by passing its moniker to
@@ -43,14 +43,14 @@ with `fx log`. The `Echo` protocol request fails due to a routing error:
 
 ```
 [echo_client] WARNING: Required protocol `fidl.examples.routing.echo.Echo` was not available for target component `/core/ffx-laboratory:echo_realm/echo_client`:
-A `use from parent` declaration was found at `/core/ffx-laboratory:echo_realm/echo_client` for `fidl.examples.routing.echo.Echo`, but no matching `offer` declaration was found in the parent
+`/core/ffx-laboratory:echo_realm/echo_client` tried to use `fidl.examples.routing.echo.Echo` from its parent, but the parent does not offer that capability. Note, use clauses in CML default to using from parent.
 ```
 
 The `Echo2` protocol request fails due to an issue starting the component:
 
 ```
-[component_manager] WARN: Failed to start component `fuchsia-pkg://fuchsia.com/components-routing-failed-example#meta/echo_server_bad.cm`:
-unable to load component with url "fuchsia-pkg://fuchsia.com/components-routing-failed-example#meta/echo_server_bad.cm":
+[component_manager] WARN: Failed to start component `echo_server_bad#meta/default.cm`:
+unable to load component with url "echo_server_bad#meta/default.cm":
 error loading executable: "reading object at \"bin/routing_failed_echo_server_oops\" failed: A FIDL client's channel to the service (anonymous) File was closed: NOT_FOUND
 ```
 

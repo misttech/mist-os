@@ -24,3 +24,5 @@ toc:
   path: /docs/concepts/packages/system.md
 - title: "Software Update System"
   path: /docs/concepts/packages/software_update_system.md
+- title: "Subpackages"
+  path: /docs/concepts/packages/subpackages.md

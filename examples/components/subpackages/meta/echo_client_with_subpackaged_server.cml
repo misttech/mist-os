@@ -11,12 +11,16 @@
         binary: "bin/echo_client_rust",
         args: [ "Hello subpackaged server!" ],
     },
+
+    // [START declare_children_statically]
     children: [
         {
             name: "echo_server",
             url: "echo_server#meta/default.cm",
         },
     ],
+
+    // [END declare_children_statically]
     use: [
         {
             protocol: "fidl.examples.routing.echo.Echo",

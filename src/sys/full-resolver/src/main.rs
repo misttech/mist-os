@@ -8,7 +8,6 @@ use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
-    full_resolver_config::Config,
     futures::stream::{StreamExt as _, TryStreamExt as _},
     tracing::{error, info, warn},
 };
@@ -21,18 +20,13 @@ enum IncomingService {
 async fn main() -> anyhow::Result<()> {
     info!("started");
 
-    // Record configuration to inspect
-    let config = Config::take_from_startup_handle();
-    let inspector = fuchsia_inspect::component::inspector();
-    inspector.root().record_child("config", |node| config.record_inspect(node));
-
     let mut service_fs = ServiceFs::new_local();
     service_fs.dir("svc").add_fidl_service(IncomingService::Resolver);
     service_fs.take_and_serve_directory_handle().context("failed to serve outgoing namespace")?;
     service_fs
         .for_each_concurrent(None, |request| async {
             if let Err(err) = match request {
-                IncomingService::Resolver(stream) => serve(stream, &config).await,
+                IncomingService::Resolver(stream) => serve(stream).await,
             } {
                 error!("failed to serve resolve request: {:#}", err);
             }
@@ -42,10 +36,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn serve(
-    mut stream: fresolution::ResolverRequestStream,
-    config: &Config,
-) -> anyhow::Result<()> {
+async fn serve(mut stream: fresolution::ResolverRequestStream) -> anyhow::Result<()> {
     let package_resolver = connect_to_protocol::<fpkg::PackageResolverMarker>()
         .context("failed to connect to PackageResolver service")?;
     while let Some(request) =
@@ -72,31 +63,20 @@ async fn serve(
                 context,
                 responder,
             } => {
-                if config.enable_subpackages {
-                    let mut result =
-                        resolve_component_with_context(&component_url, &context, &package_resolver)
-                            .await
-                            .map_err(|err| {
-                                let fidl_err = (&err).into();
-                                warn!(
-                                    "failed to resolve component URL {} with context {:?}: {:#}",
-                                    component_url,
-                                    context,
-                                    anyhow!(err)
-                                );
-                                fidl_err
-                            });
-                    responder.send(&mut result).context("failed sending response")?;
-                } else {
-                    error!(
-                        "full-resolver ResolveWithContext is disabled. Config value `enable_subpackages` is false. Cannot resolve component URL {:?} with context {:?}",
-                        component_url,
-                        context
-                    );
-                    responder
-                        .send(&mut Err(fresolution::ResolverError::Internal))
-                        .context("failed sending response")?;
-                }
+                let mut result =
+                    resolve_component_with_context(&component_url, &context, &package_resolver)
+                        .await
+                        .map_err(|err| {
+                            let fidl_err = (&err).into();
+                            warn!(
+                                "failed to resolve component URL {} with context {:?}: {:#}",
+                                component_url,
+                                context,
+                                anyhow!(err)
+                            );
+                            fidl_err
+                        });
+                responder.send(&mut result).context("failed sending response")?;
             }
         }
     }
