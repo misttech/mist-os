@@ -131,7 +131,7 @@ fi
   $NUM_THREADS \
   $RUST_METADATA \
   $INTEGRATION_MANIFEST \
-  --overrides $FUCHSIA_DIR/third_party/rust_crates/owners.toml \
+  --overrides $FUCHSIA_DIR/third_party/owners.toml \
   --out-dir $FUCHSIA_BUILD_DIR \
   --gn-bin $PREBUILT_GN \
   $PROJECT_PATH \

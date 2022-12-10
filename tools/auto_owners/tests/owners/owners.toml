@@ -1,1 +1,1 @@
-foo = ["third_party/foo/OWNERS"]
+'third_party/rust_crates/vendor/foo'= ["third_party/foo/OWNERS"]

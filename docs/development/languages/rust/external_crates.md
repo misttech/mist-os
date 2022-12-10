@@ -320,7 +320,7 @@ Some crates have more users than can be relied upon to maintain
 domain like security and we would prefer for a specific team to be responsible
 for reviews of the code.
 
-In these cases, add an entry to `//third_party/rust_crates/owners.toml` with
+In these cases, add an entry to `//third_party/owners.toml` with
 the path(s) to other `OWNERS` files to reference, then re-run the tool.
 This replaces the reverse-dependency metadata ownership with the overridden
 paths.
