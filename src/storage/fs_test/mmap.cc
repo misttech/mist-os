@@ -467,13 +467,6 @@ TEST_P(MmapSharedWriteTest, BadPermissions) {
   ASSERT_EQ(errno, EACCES);
   errno = 0;
   ASSERT_EQ(close(fd.release()), 0);
-  // PROT_WRITE requires that the file is NOT append-only
-  fd.reset(open(myfile.c_str(), O_RDWR | O_APPEND));
-  ASSERT_TRUE(fd);
-  ASSERT_EQ(mmap(nullptr, PAGE_SIZE, PROT_WRITE, MAP_SHARED, fd.get(), 0), MAP_FAILED);
-  ASSERT_EQ(errno, EACCES);
-  errno = 0;
-  ASSERT_EQ(close(fd.release()), 0);
 
   ASSERT_EQ(unlink(myfile.c_str()), 0);
 }

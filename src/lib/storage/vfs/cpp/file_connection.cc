@@ -153,9 +153,6 @@ zx_status_t FileConnection::GetBackingMemoryInternal(fuchsia_io::wire::VmoFlags 
       (flags & fio::wire::VmoFlags::kSharedBuffer)) {
     return ZX_ERR_INVALID_ARGS;
   }
-  if (options().flags.append && (flags & fio::wire::VmoFlags::kWrite)) {
-    return ZX_ERR_ACCESS_DENIED;
-  }
   if (!options().rights.write && (flags & fio::wire::VmoFlags::kWrite)) {
     return ZX_ERR_ACCESS_DENIED;
   }
