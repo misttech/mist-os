@@ -135,3 +135,9 @@ pub(crate) enum IfaceManagerOperation {
     SetCountry(SetCountryOperationState),
     ReportDefect,
 }
+
+#[derive(Debug)]
+pub enum BssSelectionOperation {
+    FulfillConnectRequest(api::ConnectAttemptRequest, Option<client_types::ScannedCandidate>),
+    _LocalRoam(Option<client_types::ScannedCandidate>),
+}

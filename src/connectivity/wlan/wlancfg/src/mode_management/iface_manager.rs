@@ -143,9 +143,7 @@ pub(crate) struct IfaceManagerService {
         FuturesUnordered<future_with_metadata::FutureWithMetadata<(), StateMachineMetadata>>,
     network_selection_futures:
         FuturesUnordered<BoxFuture<'static, Option<client_types::ScannedCandidate>>>,
-    bss_selection_futures: FuturesUnordered<
-        BoxFuture<'static, (ConnectAttemptRequest, Option<client_types::ScannedCandidate>)>,
-    >,
+    bss_selection_futures: FuturesUnordered<BoxFuture<'static, BssSelectionOperation>>,
     telemetry_sender: TelemetrySender,
     // A sender to be cloned for each connection to send periodic data about connection quality.
     stats_sender: ConnectionStatsSender,
@@ -463,7 +461,7 @@ impl IfaceManagerService {
             Err(e) => error!("failed to send state update: {:?}", e),
         };
 
-        initiate_bss_selection(connect_request, self, network_selector).await
+        initiate_bss_selection_for_connect_request(connect_request, self, network_selector).await
     }
 
     async fn connect(&mut self, selection: client_types::ConnectSelection) -> Result<(), Error> {
@@ -946,14 +944,14 @@ async fn initiate_network_selection(
     }
 }
 
-async fn initiate_bss_selection(
+async fn initiate_bss_selection_for_connect_request(
     connect_request: ConnectAttemptRequest,
     iface_manager: &mut IfaceManagerService,
     network_selector: Arc<NetworkSelector>,
 ) -> Result<(), Error> {
     // Create connection selection future and enqueue.
     let fut = async move {
-        (
+        BssSelectionOperation::FulfillConnectRequest(
             connect_request.clone(),
             network_selector.find_and_select_scanned_candidate(Some(connect_request.network)).await,
         )
@@ -999,14 +997,14 @@ async fn handle_network_selection_results(
         fasync::Interval::new(zx::Duration::from_seconds(*reconnect_monitor_interval));
 }
 
-async fn handle_bss_selection_for_connect_request_results(
-    bss_selection_result: (ConnectAttemptRequest, Option<client_types::ScannedCandidate>),
+async fn handle_bss_selection_results_for_connect_request(
+    mut request: ConnectAttemptRequest,
+    result: Option<client_types::ScannedCandidate>,
     iface_manager: &mut IfaceManagerService,
     network_selector: Arc<NetworkSelector>,
 ) {
-    let (mut request, selection_result) = bss_selection_result;
     request.attempts += 1;
-    match selection_result {
+    match result {
         Some(scanned_candidate) => {
             let selection = client_types::ConnectSelection {
                 target: scanned_candidate,
@@ -1018,7 +1016,12 @@ async fn handle_bss_selection_for_connect_request_results(
         None => {
             if request.attempts < 3 {
                 debug!("No candidates found for connect request, queueing retrying.");
-                match initiate_bss_selection(request, iface_manager, network_selector.clone()).await
+                match initiate_bss_selection_for_connect_request(
+                    request,
+                    iface_manager,
+                    network_selector.clone(),
+                )
+                .await
                 {
                     Ok(_) => {}
                     Err(e) => error!("Failed to initiate bss selection for scan retry: {:?}", e),
@@ -1156,12 +1159,9 @@ fn handle_periodic_connection_stats(
     iface_manager: &mut IfaceManagerService,
     _iface_manager_client: Arc<Mutex<dyn IfaceManagerApi + Send>>,
     _network_selector: Arc<NetworkSelector>,
-    roaming_search_futures: &mut FuturesUnordered<
-        BoxFuture<'static, Option<client_types::ScannedCandidate>>,
-    >,
 ) {
-    // If a proactive network switch already being considered, ignore.
-    if !roaming_search_futures.is_empty() {
+    // If any kind of bss selection is in progress, ignore.
+    if !iface_manager.bss_selection_futures.is_empty() {
         return;
     }
 
@@ -1187,6 +1187,8 @@ fn handle_periodic_connection_stats(
 
         // Record that a roam scan happened and another should not happen again for a while.
         iface_manager.set_iface_roam_scan_time(connection_stats.iface_id, fasync::Time::now());
+
+        // TODO(fxbug.dev/116552): Add a bss selection for local roaming operation to bss selection futures.
     }
 }
 
@@ -1364,10 +1366,6 @@ pub(crate) async fn serve_iface_manager_requests(
     let mut connectivity_monitor_timer =
         fasync::Interval::new(zx::Duration::from_seconds(reconnect_monitor_interval));
 
-    // Scans will be initiated to look for candidate networks to roam to if the current connection
-    // is bad.
-    let mut roaming_search_futures = FuturesUnordered::new();
-
     loop {
         let mut atomic_iface_manager_requests = requests.get_atomic_oneshot_stream();
 
@@ -1404,14 +1402,17 @@ pub(crate) async fn serve_iface_manager_requests(
                     &mut connectivity_monitor_timer
                 ).await;
             },
-            bss_selection_result = iface_manager.bss_selection_futures.select_next_some() => {
-                // TODO(fxbug.dev/110825): There may be multiple reasons to do BSS selection,
-                // not just for connect requests. Create new enum.
-                handle_bss_selection_for_connect_request_results(
-                    bss_selection_result,
-                    &mut iface_manager,
-                    network_selector.clone(),
-                ).await;
+            bss_selection_result = iface_manager.bss_selection_futures.select_next_some() => match bss_selection_result {
+                BssSelectionOperation::FulfillConnectRequest(request, result) => {
+                    handle_bss_selection_results_for_connect_request(
+                        request,
+                        result,
+                        &mut iface_manager,
+                        network_selector.clone()
+                    ).await;
+                },
+                // TODO(fxbug.dev/116552): Handle result of bss selection for local roam.
+                BssSelectionOperation::_LocalRoam(_) => {}
             },
             connection_stats = stats_receiver.select_next_some() => {
                 handle_periodic_connection_stats(
@@ -1419,15 +1420,10 @@ pub(crate) async fn serve_iface_manager_requests(
                     &mut iface_manager,
                     iface_manager_client.clone(),
                     network_selector.clone(),
-                    &mut roaming_search_futures
                 );
             },
             defect = defect_receiver.select_next_some() => {
                 operation_futures.push(initiate_record_defect(iface_manager.phy_manager.clone(), defect))
-            },
-            _connection_candidate = roaming_search_futures.select_next_some() => {
-                // TODO(fxbug.dev/84548): decide whether the best network found is better than the
-                // current network, and if so trigger a connection
             },
             (token, req) = atomic_iface_manager_requests.select_next_some() => {
                 handle_iface_manager_request(
@@ -5458,8 +5454,9 @@ mod tests {
         assert!(!iface_manager.idle_clients().is_empty());
 
         {
-            let fut = handle_bss_selection_for_connect_request_results(
-                (request, Some(scanned_candidate)),
+            let fut = handle_bss_selection_results_for_connect_request(
+                request,
+                Some(scanned_candidate),
                 &mut iface_manager,
                 test_values.network_selector.clone(),
             );
