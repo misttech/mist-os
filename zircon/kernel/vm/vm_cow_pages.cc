@@ -988,16 +988,34 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
     // Although not all pages in page_list_ will end up existing in child, we don't know which ones
     // will get replaced, so we must update all of the backlinks.
     {
+      size_t batch_count{0};
       PageQueues* pq = pmm_page_queues();
-      Guard<CriticalMutex> guard{pq->get_lock()};
-      page_list_.ForEveryPage([pq, &child](auto* p, uint64_t off) {
-        // Only actual content pages have backlinks, References do not and so do not need to be
-        // updated.
+      Guard<SpinLock, IrqSave> guard{pq->get_lock()};
+
+      page_list_.ForEveryPage([pq, &child, &batch_count, &guard](auto* p, uint64_t off) {
+        // If we have processed our batch limit, drop the page_queue lock to
+        // give other threads a chance to perform operations, before
+        // re-acquiring the lock and continuing.
+        if (batch_count >= PageQueues::kMaxBatchSize) {
+          batch_count = 0;
+          guard.CallUnlocked([]() {
+            // TODO(johngro): Once our spinlocks have been updated to be more fair
+            // (ticket locks, MCS locks, whatever), come back here and remove this
+            // pessimistic cpu relax.
+            arch::Yield();
+          });
+        }
+
+        // Only actual content pages have backlinks, References do not and so do
+        // not need to be updated.
         if (p->IsPage()) {
-          AssertHeld<Lock<CriticalMutex>>(*pq->get_lock());
+          AssertHeld<Lock<SpinLock>, IrqSave>(*pq->get_lock());
+
           vm_page_t* page = p->Page();
           pq->ChangeObjectOffsetLocked(page, &child, off);
         }
+
+        ++batch_count;
         return ZX_ERR_NEXT;
       });
     }
