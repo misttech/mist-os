@@ -33,6 +33,7 @@ TQ_FINT_PARAMS_DIR = os.path.join(
     "fint_params", "global.ci")
 SUPPORTED_ARCHITECTURES = ["x64", "arm64"]
 SDK_ARCHIVE_JSON = "sdk_archives.json"
+RBE_BUILD_PARAMS = ["rust_rbe_enable", "cxx_rbe_enable"]
 FINT_BOOTSTRAP_SCRIPT = os.path.join(
     REPOSITORY_ROOT, "tools", "integration", "bootstrap.sh")
 FINT_OUTPUT = os.getenv("FX_CACHE_DIR", default="/tmp/fint")
@@ -56,10 +57,12 @@ FUCHSIA_FINT_PARAMS_MAP = {
 INTERNAL_FINT_PARAMS_MAP = {
     "x64":
         os.path.join(
-            TQ_FINT_PARAMS_DIR, "sdk-google-linux-x64-build_only.textproto"),
+            TQ_FINT_PARAMS_DIR,
+            "sdk-google-linux-x64-build_only.textproto"),
     "arm64":
         os.path.join(
-            TQ_FINT_PARAMS_DIR, "sdk-google-linux-arm64-build_only.textproto")
+            TQ_FINT_PARAMS_DIR,
+            "sdk-google-linux-arm64-build_only.textproto")
 }
 
 
@@ -75,7 +78,7 @@ def determine_build_dir(context_file):
                 return line.lstrip("build_dir: ").strip(' "\n')
 
 
-def build_for_arch(arch, fint, fint_params_files):
+def build_for_arch(arch, fint, fint_params_files, rbe):
     """
     Does the build for an architecture, as defined by the fint param files.
     """
@@ -84,17 +87,29 @@ def build_for_arch(arch, fint, fint_params_files):
     # Read the build dir from the context file here for simplicity
     # even though sometimes it was set by the script in the first place.
     build_dir = determine_build_dir(fint_params_files["context"])
+
+    # We have to rewrite the fint params as the base files have defaults for
+    # rbe parameters, so those values have to be replaced based on the flags
+    static_params_path = os.path.join(build_dir, "fint_params")
+    with open(static_params_path, 'w') as params:
+        with open(fint_params_files["static"]) as base_params:
+            for line in base_params.readlines():
+                if line.split(':')[0] in RBE_BUILD_PARAMS:
+                    params.write("{}: {}\n".format(line.split(':')[0], rbe))
+                else:
+                    params.write(line)
+
     subprocess.check_call(
         [
-            fint, "-log-level=error", "set", "-static",
-            fint_params_files["static"], "-context",
-            fint_params_files["context"]
+            fint, "-log-level=error", "set",
+            "-static", static_params_path,
+            "-context", fint_params_files["context"]
         ])
     subprocess.check_call(
         [
-            fint, "-log-level=error", "build", "-static",
-            fint_params_files["static"], "-context",
-            fint_params_files["context"]
+            fint, "-log-level=error", "build",
+            "-static", static_params_path,
+            "-context", fint_params_files["context"]
         ])
 
     # The sdk archives file contains several entries since some SDKs build
@@ -185,6 +200,8 @@ def main():
         "--internal",
         help="Build the google IDK if applicable (i.e. sdk-google-linux)",
         action='store_true')
+    parser.add_argument(
+        "--rbe", help="Enable remote build", action='store_true')
     build_params = parser.add_mutually_exclusive_group(required=True)
     build_params.add_argument(
         "--fint-config",
@@ -215,7 +232,7 @@ def main():
     fint_params = build_fint_params(args)
 
     for arch in fint_params:
-        sdk = build_for_arch(arch, args.fint_path, fint_params[arch])
+        sdk = build_for_arch(arch, args.fint_path, fint_params[arch], args.rbe)
         output_dirs.append(sdk)
 
     primary_dir = tempfile.TemporaryDirectory()
