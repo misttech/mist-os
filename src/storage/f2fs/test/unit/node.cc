@@ -113,7 +113,7 @@ TEST_F(NodeManagerTest, NatCache) {
 
   CursegInfo *curseg =
       fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegHotData);  // NAT Journal
-  SummaryBlock *sum = curseg->sum_blk;
+  SummaryBlock *sum = &curseg->sum_blk;
   ASSERT_EQ(GetSumType(&sum->footer), kSumTypeData);
 
   MapTester::GetNatCacheEntryCount(node_manager, num_tree, num_clean, num_dirty);

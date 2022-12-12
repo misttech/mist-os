@@ -351,7 +351,7 @@ class F2fs final {
   fbl::RefPtr<VnodeF2fs> root_vnode_;
   MountOptions mount_options_;
 
-  std::shared_ptr<Superblock> raw_sb_;
+  std::unique_ptr<Superblock> raw_sb_;
   std::unique_ptr<SuperblockInfo> superblock_info_;
   std::unique_ptr<SegmentManager> segment_manager_;
   std::unique_ptr<NodeManager> node_manager_;

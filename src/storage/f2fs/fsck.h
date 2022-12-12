@@ -97,8 +97,8 @@ class FsckWorker {
   }
   ~FsckWorker() { DoUmount(); }
 
-  zx_status_t ReadBlock(FsBlock &fs_block, block_t bno);
-  zx_status_t WriteBlock(FsBlock &fs_block, block_t bno);
+  zx_status_t ReadBlock(void *buffer, block_t bno);
+  zx_status_t WriteBlock(void *buffer, block_t bno);
 
   // This is the main logic of fsck.
   // It reads and validates a node block, updates the context and traverse along its child blocks.
@@ -107,18 +107,18 @@ class FsckWorker {
 
   // Even in a successful return, the returned pair can be |{*nullptr*, node_info}| if
   // |node_info.blkaddr| is |kNewAddr|.
-  zx::result<std::pair<std::unique_ptr<FsBlock>, NodeInfo>> ReadNodeBlock(nid_t nid);
-  zx_status_t ValidateNodeBlock(const Node &node_block, NodeInfo node_info,
-                                FileType ftype, NodeType ntype);
+  zx::result<NodeInfo> ReadNodeBlock(nid_t nid, FsBlock<Node> &block);
+  zx_status_t ValidateNodeBlock(const Node &node_block, NodeInfo node_info, FileType ftype,
+                                NodeType ntype);
   // This function checks the sanity of a node block with respect to the traverse context and
   // updates the context. In a successful return, this function returns a bool value to indicate
   // whether the caller should traverse deeper.
-  zx::result<bool> UpdateContext(const Node &node_block, NodeInfo node_info,
-                                 FileType ftype, NodeType ntype);
+  zx::result<bool> UpdateContext(const Node &node_block, NodeInfo node_info, FileType ftype,
+                                 NodeType ntype);
 
   // Below traverse functions describe how to iterate over for each data structures.
-  zx::result<TraverseResult> TraverseInodeBlock(const Node &node_block,
-                                                NodeInfo node_info, FileType ftype);
+  zx::result<TraverseResult> TraverseInodeBlock(const Node &node_block, NodeInfo node_info,
+                                                FileType ftype);
   zx::result<TraverseResult> TraverseDnodeBlock(const Inode *inode, const Node &node_block,
                                                 NodeInfo node_info, FileType ftype);
   zx::result<TraverseResult> TraverseIndirectNodeBlock(const Inode *inode, const Node &node_block,
@@ -186,10 +186,11 @@ class FsckWorker {
   zx_status_t Run();
 
   void InitSuperblockInfo();
-  zx::result<std::unique_ptr<FsBlock>> GetSuperblock(block_t index);
+  zx::result<> GetSuperblock(block_t index, FsBlock<> &superblock);
   zx_status_t SanityCheckRawSuper(const Superblock *raw_super);
   zx_status_t GetValidSuperblock();
-  zx::result<std::pair<std::unique_ptr<FsBlock>, uint64_t>> ValidateCheckpoint(block_t cp_addr);
+  zx::result<std::pair<std::unique_ptr<FsBlock<Checkpoint>>, uint64_t>> ValidateCheckpoint(
+      block_t cp_addr);
   zx_status_t SanityCheckCkpt();
   zx_status_t GetValidCheckpoint();
   zx_status_t InitNodeManager();
@@ -208,11 +209,11 @@ class FsckWorker {
   // this function reads each block's footer in the segment and
   // restores nid part of entries in |summary_block|.
   zx_status_t RestoreNodeSummary(uint32_t segno, SummaryBlock &summary_block);
-  std::pair<std::unique_ptr<FsBlock>, SegType> GetSumBlockInfo(uint32_t segno);
+  SegType GetSumBlockInfo(uint32_t segno, FsBlock<SummaryBlock> &summary_block);
   std::pair<SegType, Summary> GetSummaryEntry(uint32_t block_address);
   void ResetCurseg(CursegType type, int modified);
   zx_status_t RestoreCursegSummaries();
-  std::unique_ptr<FsBlock> GetCurrentSitPage(uint32_t segno);
+  std::unique_ptr<FsBlock<SitBlock>> GetCurrentSitPage(uint32_t segno);
   void SegmentInfoFromRawSit(SegmentEntry &segment_entry, const SitEntry &raw_sit);
   void CheckBlockCount(uint32_t segno, const SitEntry &raw_sit);
   zx::result<RawNatEntry> LookupNatInJournal(nid_t nid);
@@ -277,6 +278,7 @@ class FsckWorker {
   // Saves the traverse context. It should be re-initialized every traverse.
   FsckInfo fsck_;
   const FsckOptions fsck_options_;
+  std::unique_ptr<Superblock> sb_;
   SuperblockInfo superblock_info_;
   std::unique_ptr<NodeManager> node_manager_;
   std::unique_ptr<SegmentManager> segment_manager_;

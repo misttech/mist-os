@@ -1253,9 +1253,8 @@ TEST(FsyncRecoveryTest, AtomicFsync) {
   // 3. currupt invalid_fsync_file's last dnode page
   block_t last_dnode_blkaddr =
       fs->GetSegmentManager().NextFreeBlkAddr(CursegType::kCursegWarmNode) - 1;
-  auto fs_block = std::make_unique<FsBlock>();
-  fs->GetBc().Readblk(last_dnode_blkaddr, fs_block->GetData().data());
-  auto node_block = reinterpret_cast<Node *>(fs_block->GetData().data());
+  FsBlock<Node> node_block;
+  fs->GetBc().Readblk(last_dnode_blkaddr, &node_block);
   ASSERT_EQ(curr_checkpoint_ver, LeToCpu(node_block->footer.cp_ver));
   ASSERT_EQ(node_block->footer.ino, invalid_fsync_vnode->Ino());
   ASSERT_TRUE(TestBit(static_cast<uint32_t>(BitShift::kFsyncBitShift), &node_block->footer.flag));

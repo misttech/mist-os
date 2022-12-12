@@ -71,18 +71,13 @@ zx::result<std::unique_ptr<F2fs>> F2fs::Create(FuchsiaDispatcher dispatcher,
 }
 
 zx::result<std::unique_ptr<Superblock>> F2fs::LoadSuperblock(f2fs::Bcache& bc) {
-  FsBlock block;
-#ifdef __Fuchsia__
-  auto buffer = block.GetData().data();
-#else   // __Fuchsia__
-  auto buffer = block.GetData();
-#endif  // __Fuchsia__
+  FsBlock<> block;
   constexpr int kSuperblockCount = 2;
   zx_status_t status;
   for (auto i = 0; i < kSuperblockCount; ++i) {
-    if (status = bc.Readblk(kSuperblockStart + i, buffer); status == ZX_OK) {
+    if (status = bc.Readblk(kSuperblockStart + i, block.get()); status == ZX_OK) {
       auto superblock = std::make_unique<Superblock>();
-      std::memcpy(superblock.get(), buffer + kSuperOffset, sizeof(Superblock));
+      std::memcpy(superblock.get(), block.get<uint8_t>() + kSuperOffset, sizeof(Superblock));
       return zx::ok(std::move(superblock));
     }
   }

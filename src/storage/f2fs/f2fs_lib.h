@@ -160,6 +160,30 @@ inline T CheckedDivRoundUp(const T n, const T d) {
   return safemath::CheckDiv<T>(fbl::round_up(n, d), d).ValueOrDie();
 }
 
+constexpr uint32_t kBlockSize = 4096;  // F2fs block size in byte
+template <typename T = uint8_t>
+class FsBlock {
+ public:
+  FsBlock() { memset(data_, 0, kBlockSize); }
+  FsBlock(uint8_t (&block)[kBlockSize]) { memcpy(data_, block, kBlockSize); }
+  FsBlock(const FsBlock &block) = delete;
+  FsBlock &operator=(const FsBlock &block) = delete;
+  FsBlock &operator=(const uint8_t (&block)[kBlockSize]) {
+    memcpy(data_, block, kBlockSize);
+    return *this;
+  }
+  template <typename U = void>
+  U *get() {
+    return reinterpret_cast<U *>(data_);
+  }
+  T *operator->() { return get<T>(); }
+  T *operator&() { return get<T>(); }
+  T &operator*() { return *get<T>(); }
+
+ private:
+  uint64_t data_[kBlockSize / sizeof(uint64_t)];
+};
+
 }  // namespace f2fs
 
 #endif  // SRC_STORAGE_F2FS_F2FS_LIB_H_

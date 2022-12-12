@@ -20,6 +20,7 @@
 
 #include "src/storage/f2fs/bcache.h"
 #include "src/storage/f2fs/f2fs_layout.h"
+#include "src/storage/f2fs/f2fs_lib.h"
 
 namespace f2fs {
 

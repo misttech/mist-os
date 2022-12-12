@@ -762,7 +762,7 @@ TEST_F(CheckpointTest, SitJournal) {
       // 3. Check recovered journal
       CursegInfo *curseg = segment_manager.CURSEG_I(CursegType::kCursegColdData);
 
-      SummaryBlock *sum = curseg->sum_blk;
+      SummaryBlock *sum = &curseg->sum_blk;
       for (int i = 0; i < SitsInCursum(sum); ++i) {
         uint32_t segno = LeToCpu(SegnoInJournal(sum, i));
         ASSERT_EQ(segno, segnos[i]);
@@ -774,7 +774,7 @@ TEST_F(CheckpointTest, SitJournal) {
       CursegInfo *curseg = segment_manager.CURSEG_I(CursegType::kCursegColdData);
 
       // Clear SIT journal
-      if (SitsInCursum(curseg->sum_blk) >= static_cast<int>(kSitJournalEntries)) {
+      if (SitsInCursum(&curseg->sum_blk) >= static_cast<int>(kSitJournalEntries)) {
         SitInfo &sit_i = segment_manager.GetSitInfo();
         uint8_t *bitmap = sit_i.dirty_sentries_bitmap.get();
         block_t nsegs = segment_manager.TotalSegs();
@@ -843,7 +843,7 @@ TEST_F(CheckpointTest, NatJournal) {
       ASSERT_EQ(segment_manager.ReadCompactedSummaries(), ZX_OK);
 
       // 3. Check recovered journal
-      SummaryBlock *sum = curseg->sum_blk;
+      SummaryBlock *sum = &curseg->sum_blk;
       for (int i = 0; i < NatsInCursum(sum); ++i) {
         ASSERT_EQ(NidInJournal(sum, i), nids[i]);
         ASSERT_EQ(NatInJournal(sum, i).version, cp->checkpoint_ver - kMkfsCheckpointVersion);
@@ -851,7 +851,7 @@ TEST_F(CheckpointTest, NatJournal) {
 
       // 4. Fill compact data summary
       // Clear NAT journal
-      if (NatsInCursum(curseg->sum_blk) >= static_cast<int>(kNatJournalEntries)) {
+      if (NatsInCursum(&curseg->sum_blk) >= static_cast<int>(kNatJournalEntries)) {
         // Add dummy dirty NAT entries
         MapTester::DoWriteNat(fs_.get(), nid_offset, nid_offset,
                               static_cast<uint8_t>(cp->checkpoint_ver));

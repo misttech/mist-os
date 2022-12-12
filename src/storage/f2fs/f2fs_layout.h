@@ -14,7 +14,6 @@ namespace f2fs {
 constexpr uint64_t kSuperOffset = 1024;     // byte-size offset
 constexpr uint32_t kMinLogSectorSize = 9;   // 9 bits for 512 byte
 constexpr uint32_t kMaxLogSectorSize = 12;  // 12 bits for 4096 byte
-constexpr uint32_t kBlockSize = 4096;       // F2fs block size in byte
 constexpr int kMaxExtension = 64;           // # of extension entries
 
 constexpr block_t kNullAddr = 0x0U;
@@ -50,26 +49,6 @@ constexpr uint32_t kVolumeLabelLength = 16;
 constexpr int kMaxActiveLogs = 16;
 constexpr int kMaxActiveNodeLogs = 8;
 constexpr int kMaxActiveDataLogs = 8;
-
-class FsBlock {
- public:
-  FsBlock() { memset(data_, 0, kBlockSize); }
-  FsBlock(uint8_t (&block)[kBlockSize]) { memcpy(data_, block, kBlockSize); }
-  FsBlock(const FsBlock &block) = delete;
-  FsBlock &operator=(const FsBlock &block) = delete;
-  FsBlock &operator=(const uint8_t (&block)[kBlockSize]) {
-    memcpy(data_, block, kBlockSize);
-    return *this;
-  }
-#ifdef __Fuchsia__
-  cpp20::span<uint8_t> GetData() { return cpp20::span<uint8_t>(data_); }
-#else   // __Fuchsia__
-  uint8_t *GetData() { return data_; }
-#endif  // __Fuchsia__
-
- private:
-  uint8_t data_[kBlockSize];
-};
 
 struct GlobalParameters {
   uint32_t sector_size = 0;

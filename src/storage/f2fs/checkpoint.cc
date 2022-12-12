@@ -172,7 +172,7 @@ zx_status_t F2fs::ValidateCheckpoint(block_t cp_addr, uint64_t *version, LockedP
   Checkpoint *cp_block;
   uint64_t cur_version = 0, pre_version = 0;
   uint32_t crc = 0;
-  size_t crc_offset;
+  uint32_t crc_offset;
 
   // Read the 1st cp block in this CP pack
   if (zx_status_t ret = GetMetaPage(cp_addr, &cp_page_1); ret != ZX_OK) {
@@ -187,7 +187,7 @@ zx_status_t F2fs::ValidateCheckpoint(block_t cp_addr, uint64_t *version, LockedP
   }
 
   crc = *reinterpret_cast<uint32_t *>(reinterpret_cast<uint8_t *>(cp_block) + crc_offset);
-  if (!F2fsCrcValid(crc, cp_block, static_cast<uint32_t>(crc_offset))) {
+  if (!F2fsCrcValid(crc, cp_block, crc_offset)) {
     return ZX_ERR_BAD_STATE;
   }
 
@@ -206,7 +206,7 @@ zx_status_t F2fs::ValidateCheckpoint(block_t cp_addr, uint64_t *version, LockedP
   }
 
   crc = *reinterpret_cast<uint32_t *>(reinterpret_cast<uint8_t *>(cp_block) + crc_offset);
-  if (!F2fsCrcValid(crc, cp_block, static_cast<uint32_t>(crc_offset))) {
+  if (!F2fsCrcValid(crc, cp_block, crc_offset)) {
     return ZX_ERR_BAD_STATE;
   }
 
@@ -259,7 +259,7 @@ zx_status_t F2fs::GetValidCheckpoint() {
   cp_block = cur_page->GetAddress<Checkpoint>();
   memcpy(&superblock_info_->GetCheckpoint(), cp_block, blk_size);
 
-  std::vector<FsBlock> checkpoint_trailer(fsb.cp_payload);
+  std::vector<FsBlock<>> checkpoint_trailer(fsb.cp_payload);
   for (uint32_t i = 0; i < LeToCpu(fsb.cp_payload); ++i) {
     LockedPage cp_page;
     if (zx_status_t ret = GetMetaPage(cp_start_blk_no + 1 + i, &cp_page); ret != ZX_OK) {

@@ -311,7 +311,7 @@ int NodeManager::TryToFreeNats(int nr_shrink) {
 // This function returns always success
 void NodeManager::GetNodeInfo(nid_t nid, NodeInfo &out) {
   CursegInfo *curseg = fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegHotData);
-  SummaryBlock *sum = curseg->sum_blk;
+  SummaryBlock *sum = curseg->sum_blk.get<SummaryBlock>();
   nid_t start_nid = StartNid(nid);
   NatBlock *nat_blk;
   RawNatEntry ne;
@@ -1121,7 +1121,7 @@ int NodeManager::ScanNatPage(Page &nat_page, nid_t start_nid) {
 void NodeManager::BuildFreeNids() {
   FreeNid *fnid, *next_fnid;
   CursegInfo *curseg = fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegHotData);
-  SummaryBlock *sum = curseg->sum_blk;
+  SummaryBlock *sum = curseg->sum_blk.get<SummaryBlock>();
   nid_t nid = 0;
   bool is_cycled = false;
   uint64_t fcnt = 0;
@@ -1296,7 +1296,7 @@ zx_status_t NodeManager::RestoreNodeSummary(uint32_t segno, SummaryBlock &sum) {
 
 bool NodeManager::FlushNatsInJournal() {
   CursegInfo *curseg = fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegHotData);
-  SummaryBlock *sum = curseg->sum_blk;
+  SummaryBlock *sum = curseg->sum_blk.get<SummaryBlock>();
   int i;
 
   std::lock_guard curseg_lock(curseg->curseg_mutex);
@@ -1338,7 +1338,7 @@ bool NodeManager::FlushNatsInJournal() {
 // This function is called during the checkpointing process.
 zx_status_t NodeManager::FlushNatEntries() {
   CursegInfo *curseg = fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegHotData);
-  SummaryBlock *sum = curseg->sum_blk;
+  SummaryBlock *sum = curseg->sum_blk.get<SummaryBlock>();
   LockedPage page;
   NatBlock *nat_blk = nullptr;
   nid_t start_nid = 0, end_nid = 0;

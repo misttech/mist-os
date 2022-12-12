@@ -200,15 +200,15 @@ TEST(F2fsTest, FsBlock) {
   FsBlock block;
   uint8_t data[kBlockSize];
   memset(data, 0, kBlockSize);
-  ASSERT_EQ(memcmp(block.GetData().data(), data, kBlockSize), 0);
+  ASSERT_EQ(memcmp(block.get(), data, kBlockSize), 0);
 
   memset(data, 0xf2, kBlockSize);
   FsBlock data_block(data);
-  ASSERT_EQ(memcmp(data_block.GetData().data(), data, kBlockSize), 0);
+  ASSERT_EQ(memcmp(data_block.get(), data, kBlockSize), 0);
 
   memset(data, 0xf5, kBlockSize);
   data_block = data;
-  ASSERT_EQ(memcmp(data_block.GetData().data(), data, kBlockSize), 0);
+  ASSERT_EQ(memcmp(data_block.get(), data, kBlockSize), 0);
 }
 
 TEST(F2fsTest, GetFilesystemInfo) {

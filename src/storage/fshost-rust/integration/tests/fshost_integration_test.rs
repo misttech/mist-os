@@ -84,10 +84,6 @@ async fn data_formatted() {
 
 #[fuchsia::test]
 async fn data_reformatted_when_corrupt() {
-    if DATA_FILESYSTEM_FORMAT == "f2fs" {
-        // TODO(fxbug.dev/116784): Re-enable this test.
-        return;
-    }
     let mut builder = new_builder();
     builder.with_disk().format_data(true, DATA_FILESYSTEM_FORMAT).corrupt_data();
     let mut fixture = builder.build().await;

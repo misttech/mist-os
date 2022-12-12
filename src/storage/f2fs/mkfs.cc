@@ -129,13 +129,7 @@ void MkfsWorker::ConfigureExtensionList() {
   super_block_.extension_count = i;
 }
 
-zx_status_t MkfsWorker::WriteToDisk(FsBlock &buf, block_t bno) {
-#ifdef __Fuchsia__
-  return bc_->Writeblk(bno, buf.GetData().data());
-#else   // __Fuchsia__
-  return bc_->Writeblk(bno, buf.GetData());
-#endif  // __Fuchsia__
-}
+zx_status_t MkfsWorker::WriteToDisk(void *buf, block_t bno) { return bc_->Writeblk(bno, buf); }
 
 zx::result<uint32_t> MkfsWorker::GetCalculatedOp(uint32_t user_op) const {
   uint32_t max_op = 0;
@@ -433,14 +427,15 @@ zx_status_t MkfsWorker::PrepareSuperblock() {
 }
 
 zx_status_t MkfsWorker::InitSitArea() {
-  FsBlock sit_block;
+  FsBlock<> sit_block;
   uint32_t segment_count_sit_blocks = (1 << LeToCpu(super_block_.log_blocks_per_seg)) *
                                       (LeToCpu(super_block_.segment_count_sit) / 2);
 
   block_t sit_segment_block_num = LeToCpu(super_block_.sit_blkaddr);
 
   for (block_t index = 0; index < segment_count_sit_blocks; ++index) {
-    if (zx_status_t ret = WriteToDisk(sit_block, sit_segment_block_num + index); ret != ZX_OK) {
+    if (zx_status_t ret = WriteToDisk(sit_block.get(), sit_segment_block_num + index);
+        ret != ZX_OK) {
       FX_LOGS(ERROR) << "Error: While zeroing out the sit area on disk!!!";
       return ret;
     }
@@ -450,14 +445,15 @@ zx_status_t MkfsWorker::InitSitArea() {
 }
 
 zx_status_t MkfsWorker::InitNatArea() {
-  FsBlock nat_block;
+  FsBlock<> nat_block;
   uint32_t segment_count_nat_blocks = (1 << LeToCpu(super_block_.log_blocks_per_seg)) *
                                       (LeToCpu(super_block_.segment_count_nat) / 2);
 
   block_t nat_segment_block_num = LeToCpu(super_block_.nat_blkaddr);
 
   for (block_t index = 0; index < segment_count_nat_blocks; ++index) {
-    if (zx_status_t ret = WriteToDisk(nat_block, nat_segment_block_num + index); ret != ZX_OK) {
+    if (zx_status_t ret = WriteToDisk(nat_block.get(), nat_segment_block_num + index);
+        ret != ZX_OK) {
       FX_LOGS(ERROR) << "Error: While zeroing out the nat area on disk!!!";
       return ret;
     }
@@ -467,20 +463,7 @@ zx_status_t MkfsWorker::InitNatArea() {
 }
 
 zx_status_t MkfsWorker::WriteCheckPointPack() {
-  FsBlock checkpoint_block;
-#ifdef __Fuchsia__
-  Checkpoint *checkpoint = reinterpret_cast<Checkpoint *>(checkpoint_block.GetData().data());
-#else   // __Fuchsia__
-  Checkpoint *checkpoint = reinterpret_cast<Checkpoint *>(checkpoint_block.GetData());
-#endif  // __Fuchsia__
-
-  FsBlock summary_block;
-#ifdef __Fuchsia__
-  SummaryBlock *summary = reinterpret_cast<SummaryBlock *>(summary_block.GetData().data());
-#else   // __Fuchsia__
-  SummaryBlock *summary = reinterpret_cast<SummaryBlock *>(summary_block.GetData());
-#endif  // __Fuchsia__
-
+  FsBlock<Checkpoint> checkpoint;
   // 1. cp page 1 of checkpoint pack 1
   checkpoint->checkpoint_ver = 1;
   checkpoint->cur_node_segno[0] =
@@ -539,51 +522,52 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
 
   checkpoint->checksum_offset = CpuToLe(kChecksumOffset);
 
-  uint32_t crc = F2fsCalCrc32(kF2fsSuperMagic, checkpoint, LeToCpu(checkpoint->checksum_offset));
-  *(reinterpret_cast<uint32_t *>(reinterpret_cast<uint8_t *>(checkpoint) +
+  uint32_t crc =
+      F2fsCalCrc32(kF2fsSuperMagic, checkpoint.get(), LeToCpu(checkpoint->checksum_offset));
+  *(reinterpret_cast<uint32_t *>(checkpoint.get<uint8_t>() +
                                  LeToCpu(checkpoint->checksum_offset))) = crc;
 
   block_t cp_segment_block_num = LeToCpu(super_block_.segment0_blkaddr);
 
-  if (zx_status_t ret = WriteToDisk(checkpoint_block, cp_segment_block_num); ret != ZX_OK) {
+  if (zx_status_t ret = WriteToDisk(checkpoint.get(), cp_segment_block_num); ret != ZX_OK) {
     FX_LOGS(ERROR) << "Error: While writing the ckp to disk!!!";
     return ret;
   }
 
   for (uint32_t i = 0; i < super_block_.cp_payload; ++i) {
     ++cp_segment_block_num;
-    FsBlock zero_buffer;
-    if (zx_status_t ret = WriteToDisk(zero_buffer, cp_segment_block_num); ret != ZX_OK) {
+    FsBlock<> zero_block;
+    if (zx_status_t ret = WriteToDisk(zero_block.get(), cp_segment_block_num); ret != ZX_OK) {
       FX_LOGS(ERROR) << "Error: While zeroing out the sit bitmap area on disk!!!";
       return ret;
     }
   }
 
   // 2. Prepare and write Segment summary for data blocks
-  memset(summary, 0, sizeof(SummaryBlock));
+  FsBlock<SummaryBlock> summary;
   SetSumType((&summary->footer), kSumTypeData);
 
   summary->entries[0].nid = super_block_.root_ino;
   summary->entries[0].ofs_in_node = 0;
 
   ++cp_segment_block_num;
-  if (zx_status_t ret = WriteToDisk(summary_block, cp_segment_block_num); ret != ZX_OK) {
+  if (zx_status_t ret = WriteToDisk(summary.get(), cp_segment_block_num); ret != ZX_OK) {
     FX_LOGS(ERROR) << "Error: While writing the summary_block to disk!!!";
     return ret;
   }
 
   // 3. Fill segment summary for data block to zero.
-  memset(summary, 0, sizeof(SummaryBlock));
+  memset(summary.get(), 0, sizeof(SummaryBlock));
   SetSumType((&summary->footer), kSumTypeData);
 
   ++cp_segment_block_num;
-  if (zx_status_t ret = WriteToDisk(summary_block, cp_segment_block_num); ret != ZX_OK) {
+  if (zx_status_t ret = WriteToDisk(summary.get(), cp_segment_block_num); ret != ZX_OK) {
     FX_LOGS(ERROR) << "Error: While writing the summary_block to disk!!!";
     return ret;
   }
 
   // 4. Fill segment summary for data block to zero.
-  memset(summary, 0, sizeof(SummaryBlock));
+  memset(summary.get(), 0, sizeof(SummaryBlock));
   SetSumType((&summary->footer), kSumTypeData);
 
   // inode sit for root
@@ -612,47 +596,47 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
       CpuToLe(uint16_t{(static_cast<int>(CursegType::kCursegColdData) << 10)});
 
   ++cp_segment_block_num;
-  if (zx_status_t ret = WriteToDisk(summary_block, cp_segment_block_num); ret != ZX_OK) {
+  if (zx_status_t ret = WriteToDisk(summary.get(), cp_segment_block_num); ret != ZX_OK) {
     FX_LOGS(ERROR) << "Error: While writing the summary_block to disk!!!";
     return ret;
   }
 
   // 5. Prepare and write Segment summary for node blocks
-  memset(summary, 0, sizeof(SummaryBlock));
+  memset(summary.get(), 0, sizeof(SummaryBlock));
   SetSumType((&summary->footer), kSumTypeNode);
 
   summary->entries[0].nid = super_block_.root_ino;
   summary->entries[0].ofs_in_node = 0;
 
   ++cp_segment_block_num;
-  if (zx_status_t ret = WriteToDisk(summary_block, cp_segment_block_num); ret != ZX_OK) {
+  if (zx_status_t ret = WriteToDisk(summary.get(), cp_segment_block_num); ret != ZX_OK) {
     FX_LOGS(ERROR) << "Error: While writing the summary_block to disk!!!";
     return ret;
   }
 
   // 6. Fill segment summary for data block to zero.
-  memset(summary, 0, sizeof(SummaryBlock));
+  memset(summary.get(), 0, sizeof(SummaryBlock));
   SetSumType((&summary->footer), kSumTypeNode);
 
   ++cp_segment_block_num;
-  if (zx_status_t ret = WriteToDisk(summary_block, cp_segment_block_num); ret != ZX_OK) {
+  if (zx_status_t ret = WriteToDisk(summary.get(), cp_segment_block_num); ret != ZX_OK) {
     FX_LOGS(ERROR) << "Error: While writing the summary_block to disk!!!";
     return ret;
   }
 
   // 7. Fill segment summary for data block to zero.
-  memset(summary, 0, sizeof(SummaryBlock));
+  memset(summary.get(), 0, sizeof(SummaryBlock));
   SetSumType((&summary->footer), kSumTypeNode);
 
   ++cp_segment_block_num;
-  if (zx_status_t ret = WriteToDisk(summary_block, cp_segment_block_num); ret != ZX_OK) {
+  if (zx_status_t ret = WriteToDisk(summary.get(), cp_segment_block_num); ret != ZX_OK) {
     FX_LOGS(ERROR) << "Error: While writing the summary_block to disk!!!";
     return ret;
   }
 
   // 8. cp page2
   ++cp_segment_block_num;
-  if (zx_status_t ret = WriteToDisk(checkpoint_block, cp_segment_block_num); ret != ZX_OK) {
+  if (zx_status_t ret = WriteToDisk(checkpoint.get(), cp_segment_block_num); ret != ZX_OK) {
     FX_LOGS(ERROR) << "Error: While writing the checkpoint to disk!!!";
     return ret;
   }
@@ -661,20 +645,20 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
   // Initiatialize other checkpoint pack with version zero
   checkpoint->checkpoint_ver = 0;
 
-  crc = F2fsCalCrc32(kF2fsSuperMagic, checkpoint, LeToCpu(checkpoint->checksum_offset));
-  *(reinterpret_cast<uint32_t *>(reinterpret_cast<uint8_t *>(checkpoint) +
+  crc = F2fsCalCrc32(kF2fsSuperMagic, checkpoint.get(), LeToCpu(checkpoint->checksum_offset));
+  *(reinterpret_cast<uint32_t *>(checkpoint.get<uint8_t>() +
                                  LeToCpu(checkpoint->checksum_offset))) = crc;
 
   cp_segment_block_num = (LeToCpu(super_block_.segment0_blkaddr) + params_.blks_per_seg);
-  if (zx_status_t ret = WriteToDisk(checkpoint_block, cp_segment_block_num); ret != ZX_OK) {
+  if (zx_status_t ret = WriteToDisk(checkpoint.get(), cp_segment_block_num); ret != ZX_OK) {
     FX_LOGS(ERROR) << "Error: While writing the checkpoint to disk!!!";
     return ret;
   }
 
   for (uint32_t i = 0; i < super_block_.cp_payload; ++i) {
     ++cp_segment_block_num;
-    FsBlock zero_buffer;
-    if (zx_status_t ret = WriteToDisk(zero_buffer, cp_segment_block_num); ret != ZX_OK) {
+    FsBlock<> zero_buffer;
+    if (zx_status_t ret = WriteToDisk(zero_buffer.get(), cp_segment_block_num); ret != ZX_OK) {
       FX_LOGS(ERROR) << "Error: While zeroing out the sit bitmap area on disk!!!";
       return ret;
     }
@@ -682,7 +666,7 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
 
   cp_segment_block_num +=
       checkpoint->cp_pack_total_block_count - 1 - LeToCpu(super_block_.cp_payload);
-  if (zx_status_t ret = WriteToDisk(checkpoint_block, cp_segment_block_num); ret != ZX_OK) {
+  if (zx_status_t ret = WriteToDisk(checkpoint.get(), cp_segment_block_num); ret != ZX_OK) {
     FX_LOGS(ERROR) << "Error: While writing the checkpoint to disk!!!";
     return ret;
   }
@@ -691,17 +675,11 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
 }
 
 zx_status_t MkfsWorker::WriteSuperblock() {
-  FsBlock super_block;
-#ifdef __Fuchsia__
-  uint8_t *super_block_buff = reinterpret_cast<uint8_t *>(super_block.GetData().data());
-#else   // __Fuchsia__
-  uint8_t *super_block_buff = reinterpret_cast<uint8_t *>(super_block.GetData());
-#endif  // __Fuchsia__
-
-  memcpy(super_block_buff + kSuperOffset, &super_block_, sizeof(super_block_));
+  FsBlock<> super_block;
+  memcpy(super_block.get<uint8_t>() + kSuperOffset, &super_block_, sizeof(super_block_));
 
   for (block_t index = 0; index < 2; ++index) {
-    if (zx_status_t ret = WriteToDisk(super_block, index); ret != ZX_OK) {
+    if (zx_status_t ret = WriteToDisk(super_block.get(), index); ret != ZX_OK) {
       FX_LOGS(ERROR) << "Error: While while writing supe_blk on disk!!! index : " << index;
       return ret;
     }
@@ -711,12 +689,7 @@ zx_status_t MkfsWorker::WriteSuperblock() {
 }
 
 zx_status_t MkfsWorker::WriteRootInode() {
-  FsBlock raw_block;
-#ifdef __Fuchsia__
-  Node *raw_node = reinterpret_cast<Node *>(raw_block.GetData().data());
-#else   // __Fuchsia__
-  Node *raw_node = reinterpret_cast<Node *>(raw_block.GetData());
-#endif  // __Fuchsia__
+  FsBlock<Node> raw_node;
 
   raw_node->footer.nid = super_block_.root_ino;
   raw_node->footer.ino = super_block_.root_ino;
@@ -760,16 +733,11 @@ zx_status_t MkfsWorker::WriteRootInode() {
   node_segment_block_num += safemath::checked_cast<uint64_t>(
       params_.cur_seg[static_cast<int>(CursegType::kCursegHotNode)] * params_.blks_per_seg);
 
-  return WriteToDisk(raw_block, node_segment_block_num);
+  return WriteToDisk(raw_node.get(), node_segment_block_num);
 }
 
 zx_status_t MkfsWorker::UpdateNatRoot() {
-  FsBlock raw_nat_block;
-#ifdef __Fuchsia__
-  NatBlock *nat_block = reinterpret_cast<NatBlock *>(raw_nat_block.GetData().data());
-#else   // __Fuchsia__
-  NatBlock *nat_block = reinterpret_cast<NatBlock *>(raw_nat_block.GetData());
-#endif  // __Fuchsia__
+  FsBlock<NatBlock> nat_block;
 
   // update root
   nat_block->entries[super_block_.root_ino].block_addr =
@@ -787,16 +755,11 @@ zx_status_t MkfsWorker::UpdateNatRoot() {
 
   block_t nat_segment_block_num = LeToCpu(super_block_.nat_blkaddr);
 
-  return WriteToDisk(raw_nat_block, nat_segment_block_num);
+  return WriteToDisk(nat_block.get(), nat_segment_block_num);
 }
 
 zx_status_t MkfsWorker::AddDefaultDentryRoot() {
-  FsBlock raw_dent_block;
-#ifdef __Fuchsia__
-  DentryBlock *dent_block = reinterpret_cast<DentryBlock *>(raw_dent_block.GetData().data());
-#else   // __Fuchsia__
-  DentryBlock *dent_block = reinterpret_cast<DentryBlock *>(raw_dent_block.GetData());
-#endif  // __Fuchsia__
+  FsBlock<DentryBlock> dent_block;
 
   dent_block->dentry[0].hash_code = 0;
   dent_block->dentry[0].ino = super_block_.root_ino;
@@ -816,23 +779,18 @@ zx_status_t MkfsWorker::AddDefaultDentryRoot() {
       LeToCpu(super_block_.main_blkaddr) +
       params_.cur_seg[static_cast<int>(CursegType::kCursegHotData)] * params_.blks_per_seg;
 
-  return WriteToDisk(raw_dent_block, data_block_num);
+  return WriteToDisk(dent_block.get(), data_block_num);
 }
 
 zx_status_t MkfsWorker::PurgeNodeChain() {
-  FsBlock raw_block;
-#ifdef __Fuchsia__
-  Node *raw_node = reinterpret_cast<Node *>(raw_block.GetData().data());
-#else   // __Fuchsia__
-  Node *raw_node = reinterpret_cast<Node *>(raw_block.GetData());
-#endif  // __Fuchsia__
+  FsBlock<Node> raw_node;
   block_t node_segment_block_num = LeToCpu(super_block_.main_blkaddr);
   node_segment_block_num += safemath::checked_cast<uint64_t>(
       params_.cur_seg[static_cast<int>(CursegType::kCursegWarmNode)] * params_.blks_per_seg);
 
-  memset(raw_node, 0xff, sizeof(Node));
+  memset(raw_node.get(), 0xff, sizeof(Node));
   // Purge the 1st block of warm node cur_seg to avoid unnecessary roll-forward recovery.
-  return WriteToDisk(raw_block, node_segment_block_num);
+  return WriteToDisk(raw_node.get(), node_segment_block_num);
 }
 
 zx_status_t MkfsWorker::CreateRootDir() {

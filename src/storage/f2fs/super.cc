@@ -241,16 +241,15 @@ void F2fs::ParseOptions() {
 }
 
 zx_status_t F2fs::SanityCheckRawSuper() {
-  unsigned int blocksize;
-
   if (kF2fsSuperMagic != LeToCpu(raw_sb_->magic)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  // Currently, support 512/1024/2048/4096 block size
-  blocksize = 1 << LeToCpu(raw_sb_->log_blocksize);
+  block_t blocksize =
+      safemath::CheckLsh<block_t>(1, LeToCpu(raw_sb_->log_blocksize)).ValueOrDefault(kUint32Max);
   if (blocksize != kPageSize)
     return ZX_ERR_INVALID_ARGS;
+  // 512/1024/2048/4096 sector sizes are supported.
   if (LeToCpu(raw_sb_->log_sectorsize) > kMaxLogSectorSize ||
       LeToCpu(raw_sb_->log_sectorsize) < kMinLogSectorSize)
     return ZX_ERR_INVALID_ARGS;
@@ -316,9 +315,7 @@ void F2fs::InitSuperblockInfo() {
 }
 
 void F2fs::Reset() {
-  if (root_vnode_) {
-    root_vnode_.reset();
-  }
+  root_vnode_.reset();
   if (node_manager_) {
     node_manager_->DestroyNodeManager();
     node_manager_.reset();
@@ -327,12 +324,8 @@ void F2fs::Reset() {
     segment_manager_->DestroySegmentManager();
     segment_manager_.reset();
   }
-  if (gc_manager_) {
-    gc_manager_.reset();
-  }
-  if (superblock_info_) {
-    superblock_info_.reset();
-  }
+  gc_manager_.reset();
+  superblock_info_.reset();
 }
 
 zx_status_t F2fs::FillSuper() {
@@ -349,7 +342,7 @@ zx_status_t F2fs::FillSuper() {
     return err;
   }
 
-  superblock_info_->SetRawSuperblock(raw_sb_);
+  superblock_info_->SetRawSuperblock(raw_sb_.get());
   superblock_info_->ClearOnRecovery();
   InitSuperblockInfo();
 

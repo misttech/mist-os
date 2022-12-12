@@ -5,6 +5,7 @@
 #ifndef SRC_STORAGE_F2FS_F2FS_INTERNAL_H_
 #define SRC_STORAGE_F2FS_F2FS_INTERNAL_H_
 
+#include "src/storage/f2fs/f2fs_lib.h"
 #include "src/storage/f2fs/node_page.h"
 
 namespace f2fs {
@@ -201,7 +202,7 @@ class SuperblockInfo {
   SuperblockInfo() : nr_pages_{} {}
 
   Superblock &GetRawSuperblock() { return *raw_superblock_; }
-  void SetRawSuperblock(std::shared_ptr<Superblock> &raw_sb) { raw_superblock_ = raw_sb; }
+  void SetRawSuperblock(Superblock *raw_sb) { raw_superblock_ = raw_sb; }
 
   bool IsDirty() const { return is_dirty_; }
   void SetDirty() { is_dirty_ = true; }
@@ -235,9 +236,9 @@ class SuperblockInfo {
     return flags & static_cast<uint32_t>(flag);
   }
 
-  Checkpoint &GetCheckpoint() { return checkpoint_block_.checkpoint_; }
-  const std::vector<FsBlock> &GetCheckpointTrailer() const { return checkpoint_trailer_; }
-  void SetCheckpointTrailer(std::vector<FsBlock> checkpoint_trailer) {
+  Checkpoint &GetCheckpoint() { return *checkpoint_block_; }
+  const std::vector<FsBlock<>> &GetCheckpointTrailer() const { return checkpoint_trailer_; }
+  void SetCheckpointTrailer(std::vector<FsBlock<>> checkpoint_trailer) {
     checkpoint_trailer_ = std::move(checkpoint_trailer);
   }
 
@@ -404,30 +405,28 @@ class SuperblockInfo {
   void IncreaseDirtyDir() { ++n_dirty_dirs; }
   void DecreaseDirtyDir() { --n_dirty_dirs; }
 
-  uint32_t BitmapSize(MetaBitmap flag) const {
+  uint32_t BitmapSize(MetaBitmap flag) {
     if (flag == MetaBitmap::kNatBitmap) {
-      return LeToCpu(checkpoint_block_.checkpoint_.nat_ver_bitmap_bytesize);
+      return LeToCpu(checkpoint_block_->nat_ver_bitmap_bytesize);
     }
     // MetaBitmap::kSitBitmap
-    return LeToCpu(checkpoint_block_.checkpoint_.sit_ver_bitmap_bytesize);
+    return LeToCpu(checkpoint_block_->sit_ver_bitmap_bytesize);
   }
 
   void *BitmapPtr(MetaBitmap flag) {
     if (raw_superblock_->cp_payload > 0) {
       if (flag == MetaBitmap::kNatBitmap) {
-        return &checkpoint_block_.checkpoint_.sit_nat_version_bitmap;
+        return &checkpoint_block_->sit_nat_version_bitmap;
       }
       return checkpoint_trailer_.data();
     }
-    int offset = (flag == MetaBitmap::kNatBitmap)
-                     ? checkpoint_block_.checkpoint_.sit_ver_bitmap_bytesize
-                     : 0;
-    return &checkpoint_block_.checkpoint_.sit_nat_version_bitmap + offset;
+    int offset = (flag == MetaBitmap::kNatBitmap) ? checkpoint_block_->sit_ver_bitmap_bytesize : 0;
+    return &checkpoint_block_->sit_nat_version_bitmap + offset;
   }
 
   block_t StartCpAddr() {
     block_t start_addr;
-    uint64_t ckpt_version = LeToCpu(checkpoint_block_.checkpoint_.checkpoint_ver);
+    uint64_t ckpt_version = LeToCpu(checkpoint_block_->checkpoint_ver);
 
     start_addr = LeToCpu(raw_superblock_->cp_blkaddr);
 
@@ -440,19 +439,14 @@ class SuperblockInfo {
     return start_addr;
   }
 
-  block_t StartSumAddr() const { return LeToCpu(checkpoint_block_.checkpoint_.cp_pack_start_sum); }
+  block_t StartSumAddr() { return LeToCpu(checkpoint_block_->cp_pack_start_sum); }
 
  private:
-  std::shared_ptr<Superblock> raw_superblock_;  // raw super block pointer
-  bool is_dirty_ = false;                       // dirty flag for checkpoint
+  Superblock *raw_superblock_;  // raw super block pointer
+  bool is_dirty_ = false;       // dirty flag for checkpoint
 
-  union CheckpointBlock {
-    Checkpoint checkpoint_;
-    FsBlock fsblock_;
-    CheckpointBlock() {}
-  } checkpoint_block_;
-
-  std::vector<FsBlock> checkpoint_trailer_;
+  FsBlock<Checkpoint> checkpoint_block_;
+  std::vector<FsBlock<>> checkpoint_trailer_;
 
   fs::SharedMutex mutex_;                                             // for checkpoint data
   fs::SharedMutex fs_lock_[static_cast<int>(LockType::kNrLockType)];  // for blocking FS operations

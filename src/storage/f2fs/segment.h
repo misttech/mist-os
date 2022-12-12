@@ -76,8 +76,8 @@ struct SectionEntry {
 struct SitInfo {
   std::unique_ptr<uint8_t[]> sit_bitmap;             // SIT bitmap pointer
   std::unique_ptr<uint8_t[]> dirty_sentries_bitmap;  // bitmap for dirty sentries
-  SegmentEntry *sentries = nullptr;                  // SIT segment-level cache
-  SectionEntry *sec_entries = nullptr;               // SIT section-level cache
+  std::unique_ptr<SegmentEntry[]> sentries;          // SIT segment-level cache
+  std::unique_ptr<SectionEntry[]> sec_entries;       // SIT section-level cache
   block_t sit_base_addr = 0;                         // start block address of SIT area
   block_t sit_blocks = 0;                            // # of blocks used by SIT area
   block_t written_valid_blocks = 0;                  // # of valid blocks in main area
@@ -123,10 +123,7 @@ struct DirtySeglistInfo {
 
 // for active log information
 struct CursegInfo {
-  union {
-    SummaryBlock *sum_blk = nullptr;  // cached summary block
-    FsBlock *raw_blk;
-  };
+  FsBlock<SummaryBlock> sum_blk;
   uint32_t segno = 0;        // current segment number
   uint32_t zone = 0;         // current zone number
   uint32_t next_segno = 0;   // preallocated segment
@@ -177,7 +174,7 @@ class SegmentManager {
   void DestroySegmentManager();
 
   SegmentEntry &GetSegmentEntry(uint32_t segno);
-  SectionEntry *GetSectionEntry(uint32_t segno);
+  SectionEntry &GetSectionEntry(uint32_t segno);
   uint32_t GetValidBlocks(uint32_t segno, uint32_t section);
   void SegInfoFromRawSit(SegmentEntry &segment_entry, SitEntry &raw_sit);
   void SegInfoToRawSit(SegmentEntry &segment_entry, SitEntry &raw_sit);
@@ -283,7 +280,6 @@ class SegmentManager {
   void DestroyVictimSecmap();
   void DestroyDirtySegmap();
 
-  void DestroyCurseg();
   void DestroyFreeSegmap();
   void DestroySitInfo();
 

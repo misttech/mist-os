@@ -22,15 +22,15 @@ static int UpdateSitsInCursum(SummaryBlock *raw_summary, int i) {
 
 SegmentEntry &SegmentManager::GetSegmentEntry(uint32_t segno) { return sit_info_->sentries[segno]; }
 
-SectionEntry *SegmentManager::GetSectionEntry(uint32_t segno) {
-  return &sit_info_->sec_entries[GetSecNo(segno)];
+SectionEntry &SegmentManager::GetSectionEntry(uint32_t segno) {
+  return sit_info_->sec_entries[GetSecNo(segno)];
 }
 
 uint32_t SegmentManager::GetValidBlocks(uint32_t segno, uint32_t section) {
   // In order to get # of valid blocks in a section instantly from many
   // segments, f2fs manages two counting structures separately.
   if (section > 1) {
-    return GetSectionEntry(segno)->valid_blocks;
+    return GetSectionEntry(segno).valid_blocks;
   }
   return GetSegmentEntry(segno).valid_blocks;
 }
@@ -501,7 +501,7 @@ void SegmentManager::UpdateSitEntry(block_t blkaddr, int del) {
   sit_info_->written_valid_blocks += del;
 
   if (superblock_info_->GetSegsPerSec() > 1)
-    GetSectionEntry(segno)->valid_blocks += del;
+    GetSectionEntry(segno).valid_blocks += del;
 }
 
 void SegmentManager::RefreshSitEntry(block_t old_blkaddr, block_t new_blkaddr) {
@@ -529,9 +529,7 @@ void SegmentManager::InvalidateBlocks(block_t addr) {
 // This function should be resided under the curseg_mutex lock
 void SegmentManager::AddSumEntry(CursegType type, Summary *sum, uint16_t offset) {
   CursegInfo *curseg = CURSEG_I(type);
-  char *addr = reinterpret_cast<char *>(curseg->sum_blk);
-  (addr) += offset * sizeof(Summary);
-  memcpy(addr, sum, sizeof(Summary));
+  curseg->sum_blk->entries[offset] = *sum;
 }
 
 // Calculate the number of current summary pages for writing
@@ -704,7 +702,7 @@ void SegmentManager::NewCurseg(CursegType type, bool new_sec) {
   uint32_t segno = curseg->segno;
   int dir = static_cast<int>(AllocDirection::kAllocLeft);
 
-  WriteSumPage(curseg->sum_blk, GetSumBlock(curseg->segno));
+  WriteSumPage(&curseg->sum_blk, GetSumBlock(curseg->segno));
   if (type == CursegType::kCursegWarmData || type == CursegType::kCursegColdData)
     dir = static_cast<int>(AllocDirection::kAllocRight);
 
@@ -747,7 +745,7 @@ void SegmentManager::ChangeCurseg(CursegType type, bool reuse) {
   uint32_t new_segno = curseg->next_segno;
   SummaryBlock *sum_node;
 
-  WriteSumPage(curseg->sum_blk, GetSumBlock(curseg->segno));
+  WriteSumPage(&curseg->sum_blk, GetSumBlock(curseg->segno));
   SetTestAndInuse(new_segno);
 
   {
@@ -764,7 +762,7 @@ void SegmentManager::ChangeCurseg(CursegType type, bool reuse) {
     LockedPage sum_page;
     GetSumPage(new_segno, &sum_page);
     sum_node = sum_page->GetAddress<SummaryBlock>();
-    memcpy(curseg->sum_blk, sum_node, kSumEntrySize);
+    memcpy(curseg->sum_blk.get(), sum_node, kSumEntrySize);
   }
 }
 
@@ -1124,7 +1122,7 @@ zx_status_t SegmentManager::ReadNormalSummaries(int type) {
   curseg = CURSEG_I(static_cast<CursegType>(type));
   {
     std::lock_guard curseg_lock(curseg->curseg_mutex);
-    memcpy(curseg->sum_blk, sum, kPageSize);
+    memcpy(curseg->sum_blk.get(), sum, kPageSize);
     curseg->next_segno = segno;
     ResetCurseg(static_cast<CursegType>(type), 0);
     curseg->alloc_type = ckpt.alloc_type[type];
@@ -1213,7 +1211,7 @@ void SegmentManager::WriteNormalSummaries(block_t blkaddr, CursegType type) {
   for (int i = static_cast<int>(type); i < end; ++i) {
     CursegInfo *sum = CURSEG_I(static_cast<CursegType>(i));
     std::lock_guard curseg_lock(sum->curseg_mutex);
-    WriteSumPage(sum->sum_blk, blkaddr + (i - static_cast<int>(type)));
+    WriteSumPage(&sum->sum_blk, blkaddr + (i - static_cast<int>(type)));
   }
 }
 
@@ -1292,7 +1290,7 @@ zx::result<LockedPage> SegmentManager::GetNextSitPage(uint32_t start) {
 
 bool SegmentManager::FlushSitsInJournal() {
   CursegInfo *curseg = CURSEG_I(CursegType::kCursegColdData);
-  SummaryBlock *sum = curseg->sum_blk;
+  SummaryBlock *sum = &curseg->sum_blk;
 
   // If the journal area in the current summary is full of sit entries,
   // all the sit entries will be flushed. Otherwise the sit entries
@@ -1314,7 +1312,7 @@ bool SegmentManager::FlushSitsInJournal() {
 zx_status_t SegmentManager::FlushSitEntries() {
   uint8_t *bitmap = sit_info_->dirty_sentries_bitmap.get();
   CursegInfo *curseg = CURSEG_I(CursegType::kCursegColdData);
-  SummaryBlock *sum = curseg->sum_blk;
+  SummaryBlock *sum = &curseg->sum_blk;
   block_t nsegs = TotalSegs();
   LockedPage page;
   SitBlock *raw_sit = nullptr;
@@ -1391,7 +1389,7 @@ zx_status_t SegmentManager::BuildSitInfo() {
   sit_info_ = std::make_unique<SitInfo>();
 
   SitInfo *sit_i = sit_info_.get();
-  if (sit_i->sentries = new SegmentEntry[TotalSegs()]; !sit_i->sentries) {
+  if (sit_i->sentries = std::make_unique<SegmentEntry[]>(TotalSegs()); !sit_i->sentries) {
     return ZX_ERR_NO_MEMORY;
   }
 
@@ -1404,7 +1402,7 @@ zx_status_t SegmentManager::BuildSitInfo() {
   }
 
   if (superblock_info_->GetSegsPerSec() > 1) {
-    if (sit_i->sec_entries = new SectionEntry[superblock_info_->GetTotalSections()];
+    if (sit_i->sec_entries = std::make_unique<SectionEntry[]>(superblock_info_->GetTotalSections());
         !sit_i->sec_entries) {
       return ZX_ERR_NO_MEMORY;
     }
@@ -1463,9 +1461,7 @@ zx_status_t SegmentManager::BuildFreeSegmap() {
 
 zx_status_t SegmentManager::BuildCurseg() {
   for (auto &curseg : curseg_array_) {
-    if (curseg.raw_blk = new FsBlock(); !curseg.raw_blk) {
-      return ZX_ERR_NO_MEMORY;
-    }
+    memset(curseg.sum_blk.get(), 0, kBlockSize);
     curseg.segno = kNullSegNo;
     curseg.next_blkoff = 0;
   }
@@ -1474,7 +1470,7 @@ zx_status_t SegmentManager::BuildCurseg() {
 
 zx_status_t SegmentManager::BuildSitEntries() {
   CursegInfo *curseg = CURSEG_I(CursegType::kCursegColdData);
-  SummaryBlock *sum = curseg->sum_blk;
+  SummaryBlock *sum = &curseg->sum_blk;
 
   for (uint32_t start = 0; start < TotalSegs(); ++start) {
     SegmentEntry &segment_entry = sit_info_->sentries[start];
@@ -1504,8 +1500,8 @@ zx_status_t SegmentManager::BuildSitEntries() {
     CheckBlockCount(start, sit);
     SegInfoFromRawSit(segment_entry, sit);
     if (superblock_info_->GetSegsPerSec() > 1) {
-      SectionEntry *e = GetSectionEntry(start);
-      e->valid_blocks += segment_entry.valid_blocks;
+      SectionEntry &e = GetSectionEntry(start);
+      e.valid_blocks += segment_entry.valid_blocks;
     }
   }
   return ZX_OK;
@@ -1648,11 +1644,6 @@ void SegmentManager::DestroyDirtySegmap() {
   dirty_info_.reset();
 }
 
-void SegmentManager::DestroyCurseg() {
-  for (auto &curseg : curseg_array_)
-    delete curseg.raw_blk;
-}
-
 void SegmentManager::DestroyFreeSegmap() {
   if (!free_info_)
     return;
@@ -1671,15 +1662,12 @@ void SegmentManager::DestroySitInfo() {
       sit_info_->sentries[start].ckpt_valid_map.reset();
     }
   }
-  delete[] sit_info_->sentries;
-  delete[] sit_info_->sec_entries;
   sit_info_->dirty_sentries_bitmap.reset();
   sit_info_->sit_bitmap.reset();
 }
 
 void SegmentManager::DestroySegmentManager() {
   DestroyDirtySegmap();
-  DestroyCurseg();
   DestroyFreeSegmap();
   DestroySitInfo();
 }

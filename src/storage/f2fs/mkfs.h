@@ -59,7 +59,7 @@ class MkfsWorker {
 
   void ConfigureExtensionList();
 
-  zx_status_t WriteToDisk(FsBlock& buf, block_t bno);
+  zx_status_t WriteToDisk(void* buf, block_t bno);
 
   zx::result<uint32_t> GetCalculatedOp(uint32_t op) const;
 
