@@ -9,24 +9,46 @@ group("tests") {
   deps = [ ":bt-hci-marvell-tests" ]
 }
 
-fuchsia_unittest_package("bt-hci-marvell-tests") {
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
+_tests = [
+  "lifecycle",
+  "device-oracle",
+]
+
+foreach(test_name, _tests) {
+  fuchsia_unittest_component("${test_name}_component") {
+    deps = [ ":${test_name}-tests" ]
   }
-  deps = [ ":lifecycle-tests" ]
+}
+
+fuchsia_test_package("bt-hci-marvell-tests") {
+  test_components = []
+  foreach(test_name, _tests) {
+    test_components += [ ":${test_name}_component" ]
+  }
 }
 
 executable("lifecycle-tests") {
   testonly = true
   output_name = "bt-hci-marvell-lifecycle-tests"
-  sources = [ "lifecycle.cc" ]
+  sources = [
+    "bt-hci-mock-sdio-test.h",
+    "bt-hci-mock-sdio.h",
+    "lifecycle.cc",
+  ]
   deps = [
     "//sdk/banjo/fuchsia.hardware.sdio:fuchsia.hardware.sdio_banjo_cpp_mock",
     "//src/connectivity/bluetooth/hci/vendor/marvell:common",
-    "//src/devices/bus/testing/mock-sdio",
     "//src/devices/testing/mock-ddk",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("device-oracle-tests") {
+  testonly = true
+  output_name = "bt-hci-marvell-device-oracle-tests"
+  sources = [ "device-oracle.cc" ]
+  deps = [
+    "//src/connectivity/bluetooth/hci/vendor/marvell:common",
     "//zircon/system/ulib/zxtest",
   ]
 }

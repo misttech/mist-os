@@ -26,16 +26,19 @@ source_set("common") {
   sources = [
     "bt-hci-marvell.cc",
     "bt-hci-marvell.h",
+    "device-oracle.cc",
+    "device-oracle.h",
   ]
   deps = [
     ":bt_hci_marvell_bind",
-    "//sdk/banjo/fuchsia.hardware.bt.hci:fuchsia.hardware.bt.hci_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.sdio:fuchsia.hardware.sdio_banjo_cpp",
     "//src/devices/lib/driver",
     "//zircon/system/ulib/fbl",
   ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.bt.hci:fuchsia.hardware.bt.hci_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.sdio:fuchsia.hardware.sdio_banjo_cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
