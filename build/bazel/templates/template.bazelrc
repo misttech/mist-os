@@ -58,3 +58,6 @@ build:resultstore --bes_results_url=https://source.cloud.google.com/results/invo
 build:resultstore --bes_keywords=fuchsia
 build:resultstore --remote_instance_name=projects/{rbe_project}/instances/default
 
+# Set up DEFINE flags for libraries imported from @internal_sdk at a project
+# level. See fxbug.dev/115709 for more information.
+build --per_file_copt=src/lib/diagnostics/accessor2logger_accessor2logger/log_message.cc@-DRAPIDJSON_HAS_STDSTRING,-DRAPIDJSON_HAS_CXX11_RANGE_FOR,-DRAPIDJSON_HAS_CXX11_RVALUE_REFS,-DRAPIDJSON_HAS_CXX11_TYPETRAITS,-DRAPIDJSON_HAS_CXX11_NOEXCEPT
