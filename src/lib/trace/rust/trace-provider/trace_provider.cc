@@ -27,8 +27,13 @@ static std::once_flag init_once;
 // Shouldn't be calling this more than once during the lifetime of your program.
 static void trace_provider_with_fdio_thread_entry() {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  trace::TraceProviderWithFdio trace_provider(loop.dispatcher());
-  loop.Run();
+  std::unique_ptr<trace::TraceProviderWithFdio> trace_provider;
+  bool result = trace::TraceProviderWithFdio::CreateSynchronously(loop.dispatcher(), nullptr,
+                                                                  &trace_provider, nullptr);
+
+  if (result && trace_provider && trace_provider->is_valid()) {
+    loop.Run();
+  }
 }
 
 // Calling this function multiple times is idempotent, to ensure that resources

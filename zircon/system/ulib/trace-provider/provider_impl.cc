@@ -189,6 +189,7 @@ EXPORT trace_provider_t* trace_provider_create_synchronously(zx_handle_t to_serv
   if (const zx_status_t status = response.s; status != ZX_OK) {
     fprintf(stderr, "TraceProvider: registry failed: status=%d(%s)\n", status,
             zx_status_get_string(status));
+    return nullptr;
   }
   // Note: |to_service| can be closed now. Let it close as a consequence
   // of going out of scope.

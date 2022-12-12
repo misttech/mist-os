@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <stdio.h>
-
-#include <zircon/assert.h>
-#include <zircon/status.h>
-
 #include <lib/trace-provider/fdio_connect.h>
 #include <lib/trace-provider/provider.h>
 #include <lib/zx/process.h>
+#include <stdio.h>
+#include <zircon/assert.h>
+#include <zircon/status.h>
 
 #include "export.h"
 
@@ -53,6 +51,18 @@ EXPORT trace_provider_t* trace_provider_create_synchronously_with_fdio(
     fprintf(stderr, "TraceProvider: connection failed: status=%d(%s)\n", status,
             zx_status_get_string(status));
     return nullptr;
+  }
+
+  char self_name[ZX_MAX_NAME_LEN];
+  if (name == nullptr) {
+    auto self = zx::process::self();
+    auto status = self->get_property(ZX_PROP_NAME, self_name, sizeof(self_name));
+    if (status != ZX_OK) {
+      fprintf(stderr, "TraceProvider: error getting process name: status=%d(%s)\n", status,
+              zx_status_get_string(status));
+      self_name[0] = '\0';
+    }
+    name = self_name;
   }
 
   return trace_provider_create_synchronously(to_service, dispatcher, name,
