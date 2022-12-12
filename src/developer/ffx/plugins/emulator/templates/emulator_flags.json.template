@@ -66,6 +66,12 @@
             "name=etc/sercon-port,string=0",
         {{/if}}
         {{#if (eq host.acceleration "none")}}
+            {{! The QEMU system defaults to TCG for acceleration by default, but when Fuchsia is
+                run with the multi-threaded version it runs into clock-skew issues and crashes.
+                This tag makes it explicit that we always want the single-thread version, even if
+                it may be slower. }}
+            "-accel",
+            "tcg,thread=single",
             "-cpu",
             {{#if (eq device.cpu.architecture "arm64")}}
                 "cortex-a53",
