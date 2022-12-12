@@ -141,7 +141,7 @@ impl FsNodeOps for ExtFile {
             let bytes =
                 self.inner.fs().parser.read_data(self.inner.inode_num).map_err(ext_error)?;
             let vmo = zx::Vmo::create(bytes.len() as u64).map_err(vmo_error)?;
-            let name = [b"ext4:".as_slice(), &self.name].concat();
+            let name = [b"ext4!".as_slice(), &self.name].concat();
             let name_slice = &name[..std::cmp::min(name.len(), zx::sys::ZX_MAX_NAME_LEN - 1)];
             vmo.set_name(&std::ffi::CString::new(name_slice).unwrap()).unwrap_or_else(|_| {
                 panic!("failed to set_name({:?}) on ext4 vmo", String::from_utf8_lossy(name_slice))
