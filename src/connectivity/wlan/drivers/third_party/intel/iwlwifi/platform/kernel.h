@@ -9,6 +9,7 @@
 // routines that are typically provided by the Linux kernel API.
 
 #include <fuchsia/hardware/pci/c/banjo.h>
+#include <lib/async/time.h>
 #include <limits.h>
 #include <netinet/if_ether.h>
 #include <stdint.h>
@@ -16,6 +17,8 @@
 #include <string.h>
 #include <zircon/assert.h>
 #include <zircon/listnode.h>
+#include <zircon/syscalls.h>
+#include <zircon/time.h>
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/banjo/common.h"
 
@@ -213,6 +216,26 @@ static inline bool is_broadcast_addr(const uint8_t* mac) {
 }
 
 static inline bool is_multicast_addr(const uint8_t* mac) { return mac[0] & 1; }
+
+// Fuchsia doesn't really have bottom-half to disable.
+static inline void local_bh_disable(void) {}
+static inline void local_bh_enable(void) {}
+
+static inline unsigned int jiffies_to_msecs(zx_duration_t duration) {
+  return (unsigned int)zx_nsec_from_duration(duration) / 1000 / 1000;
+}
+
+static inline void udelay(int usec) {
+  zx_nanosleep(zx_deadline_after(ZX_USEC(usec)));
+}
+
+static inline void mdelay(int msec) {
+  zx_nanosleep(zx_deadline_after(ZX_MSEC(msec)));
+}
+
+static inline void msleep(int msec) {
+  zx_nanosleep(zx_deadline_after(ZX_MSEC(msec)));
+}
 
 #if defined(__cplusplus)
 }  // extern "C"

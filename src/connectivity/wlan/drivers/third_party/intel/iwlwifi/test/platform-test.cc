@@ -5,6 +5,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/align.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/compiler.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/debug.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/ieee80211.h"
@@ -220,6 +221,24 @@ TEST_F(PlatformTest, is_power_of_2) {
   EXPECT_FALSE(is_power_of_2(3));
   EXPECT_TRUE(is_power_of_2(0x10000000));
   EXPECT_FALSE(is_power_of_2(0xf0000000));
+}
+
+TEST_F(PlatformTest, ALIGN) {
+  EXPECT_EQ(8, ALIGN(5, 4));
+  EXPECT_EQ(14, ALIGN(11, 7));
+}
+
+TEST_F(PlatformTest, lower_upper) {
+  EXPECT_EQ(0x34567890, lower_32_bits(0x1234567890));
+  EXPECT_EQ(0x12, upper_32_bits(0x1234567890));
+}
+
+TEST_F(PlatformTest, ilog2) {
+  EXPECT_EQ(31, ilog2(0x80000000));
+  EXPECT_EQ(31, ilog2(0xffffffff));
+  EXPECT_EQ(1, ilog2(0x00000003));
+  EXPECT_EQ(0, ilog2(0x00000001));
+  EXPECT_EQ(-1, ilog2(0));
 }
 
 }  // namespace

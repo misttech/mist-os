@@ -51,8 +51,6 @@
 #endif
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/dbg-tlv.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-dbg-tlv.h"
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/ieee80211.h"
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/memory.h"
 
 __BEGIN_CDECLS
 

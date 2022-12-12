@@ -75,6 +75,12 @@ extern "C" {
 #define IEEE80211_HT_MCS_TX_MAX_STREAMS 4
 #define IEEE80211_HT_MCS_TX_UNEQUAL_MODULATION 0x10
 
+/* A-PMDU buffer sizes, which varies from 8KB to 1MB */
+#define IEEE80211_MIN_AMPDU_BUF 0x8
+#define IEEE80211_MAX_AMPDU_BUF_HT 0x40
+#define IEEE80211_MAX_AMPDU_BUF_HE 0x100
+#define IEEE80211_MAX_AMPDU_BUF_EHT 0x400
+
 // Ids of information elements referred in this driver.
 #define WLAN_EID_SSID 0
 

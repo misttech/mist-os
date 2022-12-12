@@ -116,8 +116,8 @@ static inline uint16_t be16_to_cpup(const uint16_t* x) {
   return be16toh(val);
 }
 
-#define lower_32_bits(x) (x & 0xffffffff)
-#define upper_32_bits(x) (x >> 32)
+#define lower_32_bits(x) ((x) & 0xffffffff)
+#define upper_32_bits(x) ((x) >> 32)
 
 #define BITS_PER_BYTE 8
 #define BITS_PER_INT (sizeof(int) * BITS_PER_BYTE)
@@ -265,6 +265,44 @@ size_t find_last_bit(unsigned int* bits, const size_t num_bits);
 #define BITARR_TYPE_NUM_BITS (sizeof(uint64_t) * 8)
 
 size_t find_next_bit(unsigned int* bitarr, size_t num_bits, size_t bit_offset);
+
+// Find the first asserted MSB in the given 'v'.  Returns -1 when v is 0.
+//
+#define ilog2(v) (  \
+    (v & (1UL << 31)) ? 31 :  \
+    (v & (1UL << 30)) ? 30 :  \
+    (v & (1UL << 29)) ? 29 :  \
+    (v & (1UL << 28)) ? 28 :  \
+    (v & (1UL << 27)) ? 27 :  \
+    (v & (1UL << 26)) ? 26 :  \
+    (v & (1UL << 25)) ? 25 :  \
+    (v & (1UL << 24)) ? 24 :  \
+    (v & (1UL << 23)) ? 23 :  \
+    (v & (1UL << 22)) ? 22 :  \
+    (v & (1UL << 21)) ? 21 :  \
+    (v & (1UL << 20)) ? 20 :  \
+    (v & (1UL << 19)) ? 19 :  \
+    (v & (1UL << 18)) ? 18 :  \
+    (v & (1UL << 17)) ? 17 :  \
+    (v & (1UL << 16)) ? 16 :  \
+    (v & (1UL << 15)) ? 15 :  \
+    (v & (1UL << 14)) ? 14 :  \
+    (v & (1UL << 13)) ? 13 :  \
+    (v & (1UL << 12)) ? 12 :  \
+    (v & (1UL << 11)) ? 11 :  \
+    (v & (1UL << 10)) ? 10 :  \
+    (v & (1UL << 9)) ? 9 :  \
+    (v & (1UL << 8)) ? 8 :  \
+    (v & (1UL << 7)) ? 7 :  \
+    (v & (1UL << 6)) ? 6 :  \
+    (v & (1UL << 5)) ? 5 :  \
+    (v & (1UL << 4)) ? 4 :  \
+    (v & (1UL << 3)) ? 3 :  \
+    (v & (1UL << 2)) ? 2 :  \
+    (v & (1UL << 1)) ? 1 :  \
+    (v & (1UL << 0)) ? 0 :  \
+    -1  \
+)
 
 #define for_each_set_bit(bit, bitarr, num_bits)                          \
   for ((bit) = find_first_bit((bitarr), (num_bits)); (bit) < (num_bits); \
