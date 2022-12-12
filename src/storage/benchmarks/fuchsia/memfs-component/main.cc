@@ -15,6 +15,7 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/status.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
@@ -25,7 +26,10 @@
 #include <memory>
 #include <mutex>
 
-#include "src/storage/memfs/scoped_memfs.h"
+#include <fbl/ref_ptr.h>
+
+#include "src/storage/memfs/memfs.h"
+#include "src/storage/memfs/vnode_dir.h"
 
 using component::OutgoingDirectory;
 namespace fio = fuchsia_io;
@@ -34,9 +38,7 @@ constexpr std::string_view kFsRoot = "root";
 class MemfsHandler {
  public:
   explicit MemfsHandler(OutgoingDirectory& outgoing_directory)
-      : loop_(&kAsyncLoopConfigNeverAttachToThread),
-        outgoing_directory_(outgoing_directory),
-        dispatcher_(loop_.dispatcher()) {
+      : loop_(&kAsyncLoopConfigNeverAttachToThread), outgoing_directory_(outgoing_directory) {
     ZX_ASSERT(loop_.StartThread("memfs-serving-thread") == ZX_OK);
   }
 
@@ -45,34 +47,49 @@ class MemfsHandler {
     if (memfs_ != nullptr) {
       return zx::error(ZX_ERR_ALREADY_EXISTS);
     }
-    auto memfs = ScopedMemfs::Create(dispatcher_);
-    if (memfs.is_error()) {
-      return memfs.take_error();
+
+    auto endpoints = fidl::CreateEndpoints<fio::Directory>();
+    if (endpoints.is_error()) {
+      return endpoints.take_error();
     }
-    memfs_ = std::make_unique<ScopedMemfs>(*std::move(memfs));
-    fidl::ClientEnd<fio::Directory> memfs_root(std::move(memfs_->root()));
-    return outgoing_directory_.AddDirectory(std::move(memfs_root), kFsRoot);
+    fbl::RefPtr<memfs::VnodeDir> root;
+    if (zx_status_t status = memfs::Memfs::Create(loop_.dispatcher(), "memfs", &memfs_, &root);
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+    memfs_->ServeDirectory(root, std::move(endpoints->server));
+
+    return outgoing_directory_.AddDirectory(std::move(endpoints->client), kFsRoot);
   }
 
   void Stop() {
     std::scoped_lock guard{mutex_};
     ZX_ASSERT(memfs_ != nullptr);
 
-    memfs_.reset();
     ZX_ASSERT(outgoing_directory_.RemoveDirectory(kFsRoot).is_ok());
+
+    libsync::Completion completer;
+    memfs_->Shutdown([&completer](zx_status_t status) {
+      ZX_ASSERT(status == ZX_OK);
+      completer.Signal();
+    });
+    completer.Wait();
+
+    memfs_.reset();
   }
 
  private:
-  // ScopedMemfs' destructor blocks its thread while the shutdown happens on the dispatcher. If the
+  // Memfs' destructor blocks its thread while the shutdown happens on the dispatcher. If the
   // Admin.Shutdown call happens on the same dispatcher that is running memfs then that dispatcher
-  // would require multiple threads. Giving memfs its own dispatcher thread avoids this problem and
-  // gives better control over the performance of memfs in multithreaded benchmarks.
+  // would require multiple threads. Memfs doesn't support running on a dispatcher with multiple
+  // threads so it's given a separate thread.
   async::Loop loop_;
 
   std::mutex mutex_;
   OutgoingDirectory& outgoing_directory_ __TA_GUARDED(mutex_);
-  async_dispatcher_t* dispatcher_ __TA_GUARDED(mutex_);
-  std::unique_ptr<ScopedMemfs> memfs_ __TA_GUARDED(mutex_);
+
+  // TODO(fxbug.dev/95299) Switch back to ScopedMemfs when it supports client side streams.
+  std::unique_ptr<memfs::Memfs> memfs_ __TA_GUARDED(mutex_);
 };
 
 class StartupImpl final : public fidl::WireServer<fuchsia_fs_startup::Startup> {
@@ -115,7 +132,7 @@ int main(int argc, char* argv[]) {
   async_dispatcher_t* dispatcher = loop.dispatcher();
 
   OutgoingDirectory outgoing_directory(dispatcher);
-  MemfsHandler memfs_handler_(outgoing_directory);
+  MemfsHandler memfs_handler(outgoing_directory);
 
   if (zx::result status = outgoing_directory.ServeFromStartupInfo(); status.is_error()) {
     FX_LOGS(ERROR) << "Failed to serve outgoing directory: " << status.status_string();
@@ -123,8 +140,8 @@ int main(int argc, char* argv[]) {
   }
 
   auto status = outgoing_directory.AddProtocol<fuchsia_fs_startup::Startup>(
-      [dispatcher, &memfs_handler_](fidl::ServerEnd<fuchsia_fs_startup::Startup> server_end) {
-        auto server = new StartupImpl(memfs_handler_);
+      [dispatcher, &memfs_handler](fidl::ServerEnd<fuchsia_fs_startup::Startup> server_end) {
+        auto server = new StartupImpl(memfs_handler);
         fidl::BindServer(
             dispatcher, std::move(server_end), server,
             [](StartupImpl* impl, fidl::UnbindInfo info,
@@ -136,8 +153,8 @@ int main(int argc, char* argv[]) {
   }
 
   status = outgoing_directory.AddProtocol<fuchsia_fs::Admin>(
-      [dispatcher, &memfs_handler_](fidl::ServerEnd<fuchsia_fs::Admin> server_end) {
-        auto server = new AdminImpl(memfs_handler_);
+      [dispatcher, &memfs_handler](fidl::ServerEnd<fuchsia_fs::Admin> server_end) {
+        auto server = new AdminImpl(memfs_handler);
         fidl::BindServer(dispatcher, std::move(server_end), server,
                          [](AdminImpl* impl, fidl::UnbindInfo info,
                             fidl::ServerEnd<fuchsia_fs::Admin> server_end) { delete impl; });

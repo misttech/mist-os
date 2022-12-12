@@ -13,9 +13,11 @@ executable("memfs-component-bin") {
     "//sdk/lib/fidl/cpp/wire",
     "//sdk/lib/syslog/cpp",
     "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp_wire",
-    "//src/storage/memfs:cpp",
+    "//src/storage/memfs:lib-with-client-side-streams",
     "//zircon/system/ulib/async",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zx",
   ]
   sources = [ "main.cc" ]
