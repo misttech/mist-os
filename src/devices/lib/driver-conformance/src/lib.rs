@@ -22,6 +22,7 @@ use {
         consts::signal::{SIGINT, SIGTERM},
         iterator::Signals,
     },
+    std::collections::HashSet,
     std::fs,
     std::io::stdout,
     std::path::{Path, PathBuf},
@@ -36,8 +37,13 @@ impl From<parser::TestInfo> for run_test_suite_lib::TestParams {
     }
 }
 
-fn process_test_list(tests: Vec<parser::TestInfo>) -> Result<Vec<run_test_suite_lib::TestParams>> {
-    Ok(tests.into_iter().map(Into::into).collect())
+fn process_test_list(
+    tests: HashSet<parser::TestInfo>,
+) -> Result<Vec<run_test_suite_lib::TestParams>> {
+    let mut ret: Vec<run_test_suite_lib::TestParams> = tests.into_iter().map(Into::into).collect();
+    // Sort so the order is deterministic.
+    ret.sort_by(|a, b| a.test_url.cmp(&b.test_url));
+    Ok(ret)
 }
 
 fn get_name(cmd: &TestCommand) -> String {
@@ -54,7 +60,7 @@ fn get_name(cmd: &TestCommand) -> String {
 
 /// Calls on the `ffx test` library to run the given set of tests.
 async fn run_tests(
-    tests: Vec<parser::TestInfo>,
+    tests: HashSet<parser::TestInfo>,
     builder_proxy: ftm::RunBuilderProxy,
     output_dir: &Path,
 ) -> Result<run_test_suite_lib::Outcome> {
@@ -210,8 +216,8 @@ async fn get_driver_and_devices(
 /// Filter the test list down further, if necessary.
 fn filter_tests(
     cmd: &TestCommand,
-    mut tests: Vec<parser::TestInfo>,
-) -> Result<Vec<parser::TestInfo>> {
+    mut tests: HashSet<parser::TestInfo>,
+) -> Result<HashSet<parser::TestInfo>> {
     if cmd.automated_only {
         tests.retain(|x| x.is_automated);
     } else if cmd.manual_only {
@@ -292,9 +298,9 @@ pub async fn conformance(
 
             // TODO(fxb/113736): Enforce the custom list to be a strict subset of the available
             // tests according to `get_tests_for_driver()`.
-            let filtered_tests: Option<Vec<parser::TestInfo>>;
+            let filtered_tests: Option<HashSet<parser::TestInfo>>;
             if let Some(custom_list) = &subcmd.tests {
-                filtered_tests = Some(metadata.tests_by_url(&custom_list.0[..]).unwrap());
+                filtered_tests = Some(metadata.tests_by_url(&custom_list.0[..])?);
             } else {
                 filtered_tests = Some(metadata.tests_by_driver(&driver_info)?);
             }
@@ -362,7 +368,7 @@ mod test {
             device_categories: Box::new([]),
             is_automated: true,
         };
-        let single = process_test_list(vec![obj_a.clone()]).unwrap();
+        let single = process_test_list(HashSet::from([obj_a.clone()])).unwrap();
         assert_eq!(single.len(), 1);
         assert!(
             single.contains(&run_test_suite_lib::TestParams {
@@ -373,7 +379,8 @@ mod test {
         );
 
         let multiple =
-            process_test_list(vec![obj_a.clone(), obj_b.clone(), obj_c.clone()]).unwrap();
+            process_test_list(HashSet::from([obj_a.clone(), obj_b.clone(), obj_c.clone()]))
+                .unwrap();
         assert_eq!(multiple.len(), 3);
         for e in vec!["abc", "def", "ghi"] {
             assert!(
@@ -399,7 +406,7 @@ mod test {
             device_categories: Box::new([]),
             is_automated: true,
         };
-        let urls = process_test_list(vec![obj_url_a, obj_url_b]).unwrap();
+        let urls = process_test_list(HashSet::from([obj_url_a, obj_url_b])).unwrap();
         assert_eq!(urls.len(), 2);
         for e in vec![
             "fuchsia-pkg://fuchsia.com/fake-test#meta/fake-test.cm",
@@ -644,14 +651,12 @@ mod test {
         assert_eq!(data.system_types.len(), 1);
         assert_eq!(data.certification_type.len(), 1);
         assert_eq!(data.device_category_types["imaging"].len(), 1);
-        for (key, _) in data.device_category_types["imaging"].iter() {
-            assert_eq!(key, &"camera".to_string());
-        }
+        assert!(data.device_category_types["imaging"].contains_key(&"camera".to_string()));
     }
 
     #[test]
     fn test_filter_tests() {
-        let tests = vec![
+        let tests = HashSet::from([
             parser::TestInfo {
                 url: "automated".to_string(),
                 is_automated: true,
@@ -662,7 +667,7 @@ mod test {
                 is_automated: false,
                 ..Default::default()
             },
-        ];
+        ]);
         let test0 = filter_tests(&TestCommand { ..Default::default() }, tests.clone());
         assert!(test0.is_ok());
         let test0_val = test0.unwrap();
@@ -675,14 +680,28 @@ mod test {
         assert!(test1.is_ok());
         let test1_val = test1.unwrap();
         assert_eq!(test1_val.len(), 1);
-        assert_eq!(test1_val.first().unwrap().url, "automated".to_string());
+        assert_eq!(
+            test1_val,
+            HashSet::from([parser::TestInfo {
+                url: "automated".to_string(),
+                is_automated: true,
+                ..Default::default()
+            }])
+        );
 
         let test2 =
             filter_tests(&TestCommand { manual_only: true, ..Default::default() }, tests.clone());
         assert!(test2.is_ok());
         let test2_val = test2.unwrap();
         assert_eq!(test2_val.len(), 1);
-        assert_eq!(test2_val.first().unwrap().url, "manual".to_string());
+        assert_eq!(
+            test2_val,
+            HashSet::from([parser::TestInfo {
+                url: "manual".to_string(),
+                is_automated: false,
+                ..Default::default()
+            }])
+        );
     }
 
     fn create_dummy_ffx_test_results(output: &Path) -> Result<()> {

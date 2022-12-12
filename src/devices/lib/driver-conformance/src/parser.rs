@@ -43,24 +43,24 @@ pub struct TestMetadata {
 
 /// Helper functions to filter the tests in the metadata by various criteria.
 pub trait FilterTests {
-    fn tests_by_url(&self, filter: &[String]) -> Result<Vec<TestInfo>>;
-    fn tests_by_test_type(&self, filter: &[String]) -> Result<Vec<TestInfo>>;
-    fn tests_by_device_category(&self, filter: &[DeviceCategory]) -> Result<Vec<TestInfo>>;
-    fn tests_by_driver(&self, driver: &fdd::DriverInfo) -> Result<Vec<TestInfo>>;
+    fn tests_by_url(&self, filter: &[String]) -> Result<HashSet<TestInfo>>;
+    fn tests_by_test_type(&self, filter: &[String]) -> Result<HashSet<TestInfo>>;
+    fn tests_by_device_category(&self, filter: &[DeviceCategory]) -> Result<HashSet<TestInfo>>;
+    fn tests_by_driver(&self, driver: &fdd::DriverInfo) -> Result<HashSet<TestInfo>>;
 }
 
 impl FilterTests for TestMetadata {
     /// Gets list of tests based on a provided list of test URLs.
     ///
     /// Will error if a given URL does not match a known test.
-    fn tests_by_url(&self, urls: &[String]) -> Result<Vec<TestInfo>> {
-        let mut ret = Vec::new();
+    fn tests_by_url(&self, urls: &[String]) -> Result<HashSet<TestInfo>> {
+        let mut ret = HashSet::new();
         for url in urls.iter() {
             let mut found = false;
             for test in self.tests.iter() {
                 if &test.url == url {
                     found = true;
-                    ret.push(test.clone());
+                    ret.insert(test.clone());
                 }
             }
             if !found {
@@ -71,7 +71,7 @@ impl FilterTests for TestMetadata {
     }
 
     /// WIP: Gets list of tests based on a provided list of test types.
-    fn tests_by_test_type(&self, _types: &[String]) -> Result<Vec<TestInfo>> {
+    fn tests_by_test_type(&self, _types: &[String]) -> Result<HashSet<TestInfo>> {
         Err(anyhow!("This function is not yet implemented."))
     }
 
@@ -82,7 +82,7 @@ impl FilterTests for TestMetadata {
     fn tests_by_device_category(
         &self,
         device_categories: &[DeviceCategory],
-    ) -> Result<Vec<TestInfo>> {
+    ) -> Result<HashSet<TestInfo>> {
         let mut ret = HashSet::new();
         for item in device_categories.iter() {
             // Validate that the device categories exist.
@@ -114,23 +114,23 @@ impl FilterTests for TestMetadata {
                 }
             }
         }
-        Ok(Vec::from_iter(ret))
+        Ok(ret)
     }
 
     /// Gets list of tests that can be run against the given driver.
-    fn tests_by_driver(&self, driver: &fdd::DriverInfo) -> Result<Vec<TestInfo>> {
+    fn tests_by_driver(&self, driver: &fdd::DriverInfo) -> Result<HashSet<TestInfo>> {
         if let Some(device_categories) = &driver.device_categories {
-            let mut category_list: Vec<DeviceCategory> = Vec::new();
+            let mut category_list: HashSet<DeviceCategory> = HashSet::new();
             for cats in device_categories.iter() {
                 match (&cats.category, &cats.subcategory) {
                     (Some(category), Some(subcategory)) => {
-                        category_list.push(DeviceCategory {
+                        category_list.insert(DeviceCategory {
                             category: category.to_string(),
                             subcategory: subcategory.to_string(),
                         });
                     }
                     (Some(category), None) => {
-                        category_list.push(DeviceCategory {
+                        category_list.insert(DeviceCategory {
                             category: category.to_string(),
                             subcategory: "".to_string(),
                         });
@@ -149,7 +149,9 @@ impl FilterTests for TestMetadata {
                     }
                 }
             }
-            return Ok(self.tests_by_device_category(&category_list[..])?);
+            return Ok(
+                self.tests_by_device_category(&category_list.into_iter().collect::<Vec<_>>()[..])?
+            );
         }
         return Err(anyhow!("The provided driver contains no device categories."));
     }
@@ -245,7 +247,24 @@ mod test {
         assert!(test0.is_ok());
         let test0u = test0.unwrap();
         assert_eq!(test0u.len(), 1);
-        assert_eq!(test0u[0].url, "fuchsia-pkg://a/f#meta/g.cm".to_string());
+        assert_eq!(
+            test0u,
+            HashSet::from([parser::TestInfo {
+                url: "fuchsia-pkg://a/f#meta/g.cm".to_string(),
+                test_types: Box::new(["functional".to_string()]),
+                device_categories: Box::new([
+                    parser::DeviceCategory {
+                        category: "imaging".to_string(),
+                        subcategory: "camera".to_string()
+                    },
+                    parser::DeviceCategory {
+                        category: "input".to_string(),
+                        subcategory: "touchpad".to_string()
+                    }
+                ]),
+                is_automated: true
+            }])
+        );
 
         let test1 = meta.tests_by_url(&[
             "fuchsia-pkg://a/f#meta/g.cm".to_string(),
