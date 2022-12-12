@@ -38,6 +38,10 @@
             rights: [ "rw*" ],
             path: "/dev",
         },
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
+        },
     ],
     expose: [
         {
