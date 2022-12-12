@@ -89,22 +89,33 @@ template("ctf_prebuilt_test") {
 #     The absolute path to the extracted CTF test archive.
 #     Type: path
 #
+#  disabled_tests
+#     A list of FAR archive names containing tests to skip.
+#     The archive names can be found in //prebult/cts/<version>/<platform>/cts.
+#
 #   visibility
 template("ctf_prebuilt_tests_from_manifest") {
   assert(defined(invoker.ctf_path), "ctf_path must be defined.")
 
+  if (!defined(invoker.disabled_tests)) {
+    invoker.disabled_tests = []
+  }
+
   tests = []
 
   foreach(test, read_file("${invoker.ctf_path}/test_manifest.json", "json")) {
-    # Support the legacy 'package=' instead of 'package_name='.
-    # Delete after the F9 CTF release falls off CQ.
-    if (!defined(test.package_name)) {
-      test.package_name = test.package
-    }
+    skip = filter_include(invoker.disabled_tests, [ test.archive_name ]) != []
+    if (!skip) {
+      # Support the legacy 'package=' instead of 'package_name='.
+      # Delete after the F9 CTF release falls off CQ.
+      if (!defined(test.package_name)) {
+        test.package_name = test.package
+      }
 
-    tests += [ ":${test.package_name}" ]
-    ctf_prebuilt_test(test.package_name) {
-      forward_variables_from(invoker, "*")
+      tests += [ ":${test.package_name}" ]
+      ctf_prebuilt_test(test.package_name) {
+        forward_variables_from(invoker, "*")
+      }
     }
   }
 

@@ -152,27 +152,20 @@ verifying, submit the CL and file a bug against the Release Team.
 
 ## How do I temporarily disable a CTF test? {#disable-a-test}
 
-You can disable a test by adding the test's archive name and component name to
-the list of `disabled_tests` on the appropriate `compatibility_test_suite`
-target in `//sdk/ctf/release/BUILD.gn`.
+You can disable a test by adding the test's archive name to the list of
+`disabled_tests` on the appropriate `compatibility_test_suite` target in
+`//sdk/ctf/release/BUILD.gn`.
 
-For example, a test running in Fuchsia's canary release might have the package
-URL:
-
-`fuchsia-pkg://fuchsia.com/my_test_8.20220629.3.1#meta/my_test_component.cm`
-
-This can be disabled as follows:
+For example:
 
 ```gn
 compatibility_test_suite("canary") {
-  {{ '<strong>' }}disabled_tests = [
-    {
-      archive_name = "my_test"
-      component_name = "my_test_component.cm"
-    },
-  ]{{ '</strong>' }}
+  {{ '<strong>' }}disabled_tests = [ "my_test" ]{{ '</strong>' }}
 }
 ```
+
+To find the archive name, check the //prebuilt/cts/$version>/$platform/cts/test_manifest.json
+file for the archive name corresponding to the test.
 
 Please include a comment with a bug ID as a reminder to enable the test again.
 Tests should be enabled again within 72 hours.

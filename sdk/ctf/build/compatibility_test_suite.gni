@@ -19,8 +19,8 @@ import("//sdk/ctf/build/internal/ctf.gni")
 #    Example: "//prebuilt/cts/canary/$host_platform/cts"
 #
 #  disabled_tests
-#    [list of scopes] List of scopes containing "package" and "component_name"
-#    entries to disable.
+#    A list of FAR archive names containing tests to skip.
+#    The archive names can be found in //prebult/cts/<version>/<platform>/cts.
 template("compatibility_test_suite") {
   assert(defined(invoker.path),
          "The path to the extracted CTF archive is required.")
