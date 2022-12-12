@@ -165,7 +165,8 @@ std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
 Device::Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
                std::optional<Device*> parent, driver::Logger* logger,
                async_dispatcher_t* dispatcher)
-    : name_(device.name),
+    : devfs_server_(*this, dispatcher),
+      name_(device.name),
       logger_(logger),
       dispatcher_(dispatcher),
       driver_(driver),
@@ -175,9 +176,9 @@ Device::Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
       executor_(dispatcher) {}
 
 Device::~Device() {
-  // Free the dev node early because the dev node holds a reference to the
-  // device which means the dev node's destructor may access the device.
-  dev_vnode_auto_free_.call();
+  // Free the dev node first so that nothing will call into the device as it's being destructed
+  // further.
+  devfs_server_auto_free_.call();
 
   // We only shut down the devices that have a parent, since that means that *this* compat driver
   // owns the device. If the device does not have a parent, then ops_ belongs to another driver, and
@@ -246,8 +247,12 @@ void Device::PerformUnbind() {
 }
 
 void Device::CompleteUnbind() {
-  ZX_ASSERT(unbind_completed_);
-  unbind_completed_();
+  // Our unbind is finished, so close all outstanding connections to devfs clients.
+  devfs_server_.CloseAllConnections([this]() {
+    // Now call our unbind completer.
+    ZX_ASSERT(unbind_completed_);
+    unbind_completed_();
+  });
 }
 
 const char* Device::Name() const { return name_.data(); }
@@ -279,8 +284,6 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
   if (driver()) {
     device->device_id_ = driver()->GetNextDeviceId();
   }
-
-  device->dev_vnode_ = fbl::MakeRefCounted<DevfsVnode>(device->ZxDevice(), dispatcher_);
 
   auto outgoing_name = device->OutgoingName();
 
@@ -352,14 +355,14 @@ fpromise::promise<void, zx_status_t> Device::Export() {
     options |= fuchsia_device_fs::wire::ExportOptions::kInvisible;
   }
 
-  auto devfs_status = driver()->ExportToDevfsSync(options, dev_vnode(), dev_vnode_name,
+  auto devfs_status = driver()->ExportToDevfsSync(options, devfs_server_, dev_vnode_name,
                                                   topological_path_, device_server_.proto_id());
   if (devfs_status.is_error()) {
     FDF_LOG(INFO, "Device %s failed to add to devfs: %s", topological_path_.c_str(),
             devfs_status.status_string());
     return fpromise::make_error_promise(devfs_status.status_value());
   }
-  dev_vnode_auto_free_ = std::move(*devfs_status);
+  devfs_server_auto_free_ = std::move(*devfs_status);
 
   // TODO(fxdebug.dev/90735): When DriverDevelopment works in DFv2, don't print
   // this.
@@ -1010,19 +1013,14 @@ void Device::Connect(ConnectRequestView request, ConnectCompleter::Sync& complet
   }
 }
 
-zx::result<std::string> Device::GetTopologicalPath() {
-  std::string path("/dev/");
-  path.append(topological_path());
-  return zx::ok(path);
+void Device::LogError(const char* error) {
+  FDF_LOG(ERROR, "%s: %s", topological_path_.c_str(), error);
 }
-
 bool Device::IsUnbound() { return pending_removal_; }
 
 void Device::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
                                  ConnectToDeviceFidlCompleter::Sync& completer) {
-  if (dev_vnode_) {
-    dev_vnode_->ConnectToDeviceFidl(std::move(request->server));
-  }
+  devfs_server_.ConnectToDeviceFidl(std::move(request->server));
 }
 
 void Device::Bind(BindRequestView request, BindCompleter::Sync& completer) {
@@ -1076,12 +1074,7 @@ void Device::ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) {
 }
 
 void Device::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
-  zx::result path = GetTopologicalPath();
-  if (path.is_error()) {
-    completer.ReplyError(path.error_value());
-    return;
-  }
-  completer.ReplySuccess(fidl::StringView::FromExternal(path.value()));
+  completer.ReplySuccess(fidl::StringView::FromExternal("/dev/" + topological_path_));
 }
 
 void Device::GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& completer) {
