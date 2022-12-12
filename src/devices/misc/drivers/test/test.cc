@@ -174,7 +174,11 @@ void TestRootDevice::CreateDevice(CreateDeviceRequestView request,
   size_t path_size = 0;
   zx_status_t status = CreateDeviceInternal(request->name.get(), std::move(request->device_request),
                                             path, sizeof(path), &path_size);
-  completer.Reply(status, fidl::StringView::FromExternal(path, path_size));
+  if (status != ZX_OK) {
+    completer.ReplyError(status);
+    return;
+  }
+  completer.ReplySuccess(fidl::StringView::FromExternal(path, path_size));
 }
 
 zx_status_t TestDriverBind(void* ctx, zx_device_t* dev) {

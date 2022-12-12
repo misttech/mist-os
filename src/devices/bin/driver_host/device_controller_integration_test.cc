@@ -44,7 +44,8 @@ void CreateTestDevice(const IsolatedDevmgr& devmgr, const char* driver_name,
   auto result =
       test_root->CreateDevice(fidl::StringView::FromExternal(driver_name), std::move(remote));
   ASSERT_OK(result.status());
-  ASSERT_OK(result.value().status);
+  ASSERT_TRUE(result->is_ok(), "CreateDevice failed %s",
+              zx_status_get_string(result->error_value()));
   *dev_channel = std::move(local);
 }
 

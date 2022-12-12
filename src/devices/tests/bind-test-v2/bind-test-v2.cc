@@ -57,9 +57,10 @@ class BindCompilerV2Test : public gtest::TestLoopFixture {
                                             endpoints->server.TakeChannel());
 
     ASSERT_EQ(result.status(), ZX_OK);
-    ASSERT_EQ(result.value().status, ZX_OK);
+    ASSERT_TRUE(result->is_ok()) << "CreateDevice failed "
+                                 << zx_status_get_string(result->error_value());
 
-    device_path_ = std::string(result.value().path.get());
+    device_path_ = std::string(result->value()->path.get());
 
     // Bind the test driver to the new device.
     auto response =

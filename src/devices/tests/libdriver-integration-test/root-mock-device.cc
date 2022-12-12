@@ -68,15 +68,14 @@ zx_status_t RootMockDevice::CreateFromTestRoot(
     std::unique_ptr<MockDeviceHooks> hooks, std::unique_ptr<RootMockDevice>* mock_out) {
   fidl::SynchronousInterfacePtr<fuchsia::device::test::Device> test_dev;
 
-  fidl::StringPtr devpath;
-  zx_status_t call_status;
+  fuchsia::device::test::RootDevice_CreateDevice_Result create_result;
   zx_status_t status =
-      test_root->CreateDevice("mock", test_dev.NewRequest().TakeChannel(), &call_status, &devpath);
+      test_root->CreateDevice("mock", test_dev.NewRequest().TakeChannel(), &create_result);
   if (status != ZX_OK) {
     return status;
   }
-  if (call_status != ZX_OK) {
-    return call_status;
+  if (create_result.is_err()) {
+    return create_result.err();
   }
 
   auto destroy_device = fit::defer([&test_dev] { test_dev->Destroy(); });
@@ -105,7 +104,7 @@ zx_status_t RootMockDevice::CreateFromTestRoot(
   if (result.is_err()) {
     return status;
   }
-  devpath = result.response().path;
+  fidl::StringPtr devpath = result.response().path;
   test_root.Bind(test_root_controller.Unbind().TakeChannel());
 
   const char* kDevPrefix = "/dev/";

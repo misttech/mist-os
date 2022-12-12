@@ -299,13 +299,10 @@ mod tests {
     ) -> Result<DeviceFile, Error> {
         // Create a test device under the `/dev/sys/test/test` root device.
         let (local, remote) = zx::Channel::create()?;
-        let (status, path) =
-            test_dev.create_device(name, Some(remote), zx::Time::after(TIMEOUT))?;
-        zx::Status::ok(status)?;
-        let relative_path =
-            Path::new(&path.ok_or(format_err!("RootDevice.CreateDevice returned null path"))?)
-                .strip_prefix(CONTROL_DEVICE)?
-                .to_owned();
+        let path = test_dev
+            .create_device(name, Some(remote), zx::Time::after(TIMEOUT))?
+            .map_err(|e| zx::Status::from_raw(e))?;
+        let relative_path = Path::new(&path).strip_prefix(CONTROL_DEVICE)?.to_owned();
         let file = fdio::create_fd(zx::Handle::from(local))?;
         let topo_path = PathBuf::from(fdio::device_get_topo_path(&file)?);
         Ok(DeviceFile { file, relative_path, topo_path })
