@@ -14,8 +14,16 @@ group("tests") {
 
 compatibility_test_suite("canary_tests") {
   path = "//prebuilt/cts/canary/$host_platform/cts"
+  disabled_tests = [
+    # TODO(https://fxbug.dev/116940): Remove this tests's dependency on the experimental //sdk/lib/device_watcher.
+    "driver_test_realm_cts_test",
+  ]
 }
 
 compatibility_test_suite("current_milestone_tests") {
   path = "//prebuilt/cts/current_milestone/$host_platform/cts"
+  disabled_tests = [
+    # TODO(https://fxbug.dev/116940): Remove this tests's dependency on the experimental //sdk/lib/device_watcher.
+    "driver_test_realm_cts_test",
+  ]
 }
