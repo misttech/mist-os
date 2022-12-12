@@ -166,7 +166,7 @@ class AuthService {
         name: password.isEmpty
             ? kSystemPickedAccountName
             : kUserPickedAccountName);
-    _account = faccount.AccountProxy();
+
     if (useNewAccountManager) {
       final passwordInteractionFlow =
           await _getPasswordInteractionFlowForEnroll(metadata);
@@ -174,6 +174,7 @@ class AuthService {
       final id = await passwordInteractionFlow.setPassword(password);
       clearPasswordInteractionFlow();
 
+      _account = faccount.AccountProxy();
       await _accountManager.getAccount(faccount.AccountManagerGetAccountRequest(
         id: id,
         account: _account!.ctrl.request(),
