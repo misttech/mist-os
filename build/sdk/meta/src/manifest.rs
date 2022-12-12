@@ -65,6 +65,14 @@ mod tests {
                 {
                     "meta": "pkg/foo/meta.json",
                     "type": "cc_source_library"
+                },
+                {
+                    "meta": "pkg/bar/meta.json",
+                    "type": "data"
+                },
+                {
+                    "meta": "history.json",
+                    "type": "version_history"
                 }
             ],
             "id": "foobarblah",

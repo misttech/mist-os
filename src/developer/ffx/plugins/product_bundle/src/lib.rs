@@ -109,7 +109,8 @@ where
     let sdk = ffx_config::global_env_context()
         .context("loading global environment context")?
         .get_sdk()
-        .await?;
+        .await
+        .context("getting sdk env context")?;
     let mut pbs_to_remove = Vec::new();
     if cmd.all {
         let entries = product_bundle_urls(&sdk).await.context("list pbms")?;
@@ -279,7 +280,8 @@ where
     let sdk = ffx_config::global_env_context()
         .context("loading global environment context")?
         .get_sdk()
-        .await?;
+        .await
+        .context("getting sdk env context")?;
     if !cmd.cached {
         let storage_dir = pbms::get_storage_dir().await?;
         update_metadata_all(&sdk, &storage_dir, select_auth(cmd.oob_auth, &cmd.auth), ui).await?;
@@ -340,7 +342,8 @@ where
     let sdk = ffx_config::global_env_context()
         .context("loading global environment context")?
         .get_sdk()
-        .await?;
+        .await
+        .context("getting sdk env context")?;
     let product_url = match determine_pbm_url(&sdk, cmd, ui).await {
         Ok(url) => url,
         Err(e) => {

@@ -97,6 +97,7 @@ pub enum SdkRoot {
 impl SdkRoot {
     /// Does a full load of the sdk configuration.
     pub fn get_sdk(&self) -> Result<Sdk> {
+        tracing::debug!("get_sdk");
         match self {
             Self::InTree { manifest, module } => Sdk::from_build_dir(&manifest, module.as_ref()),
             Self::Packaged(manifest) => Sdk::from_sdk_dir(&manifest),
@@ -146,6 +147,7 @@ impl Sdk {
     }
 
     pub fn from_sdk_dir(path_prefix: &Path) -> Result<Self> {
+        tracing::debug!("from_sdk_dir {:?}", path_prefix);
         let path_prefix = std::fs::canonicalize(path_prefix)
             .context(format!("canonicalizing sdk path prefix {}", path_prefix.display()))?;
         let manifest_path = path_prefix.join("meta/manifest.json");
@@ -177,6 +179,7 @@ impl Sdk {
         M: Fn(&str) -> Option<BufReader<T>>,
         T: io::Read,
     {
+        tracing::debug!("metas_from_sdk_manifest {:?}", version);
         let manifest: Manifest =
             serde_json::from_reader(manifest).context("Reading manifest file")?;
         // TODO: Check the schema version and log a warning if it's not what we expect.

@@ -184,8 +184,8 @@ pub enum ElementType {
     ProductBundle,
     ProductBundleContainer,
     Sysroot,
-    VirtualDevice,
     VersionHistory,
+    VirtualDevice,
     #[serde(other)]
     Unknown,
 }
