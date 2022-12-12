@@ -719,6 +719,7 @@
                     "/bootstrap/miscsvc",
                     "/bootstrap/sysinfo",
                     "/bootstrap/vboot-fwparam",
+                    "/core/account/account_manager/account_handlers:**",
                     "/core/account/password_authenticator",
                     "/core/appmgr",
                     "/core/audio_recording",
