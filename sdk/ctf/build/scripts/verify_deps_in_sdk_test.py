@@ -4,7 +4,6 @@
 # found in the LICENSE file.
 
 from tempfile import TemporaryDirectory
-import json
 import os
 import unittest
 
@@ -114,51 +113,13 @@ class VerifyDepsInSDKTests(unittest.TestCase):
             '//sdk/lib/private_atom:private_atom'
         ]
 
-        fdio_atom = {
-            "category":
-                "partner",
-            "deps": [],
-            "files": [],
-            "gn-label":
-                "//sdk/lib/fdio:fdio_sdk_manifest(//build/toolchain/fuchsia:x64)",
-            "id":
-                "sdk://pkg/fdio",
-            "meta":
-                "pkg/fdio/meta.json",
-            "type":
-                "cc_prebuilt_library"
-        }
-        fuchsia_io_atom = {
-            "category":
-                "partner",
-            "deps": [],
-            "files": [],
-            "gn-label":
-                "//sdk/fidl/fuchsia.io:fuchsia.io_sdk(//build/fidl:fidling)",
-            "id":
-                "sdk://fidl/fuchsia.io",
-            "meta":
-                "fidl/fuchsia.io/meta.json",
-            "type":
-                "fidl_library"
-        }
-        fuchsia_git_atom = {
-            "category":
-                "internal",
-            "deps": [],
-            "files": [],
-            "gn-label":
-                "//sdk/lib/private_atom:private_atom(//build/toolchain:fuchsia:x64)",
-            "id":
-                "sdk://fidl/private_atom",
-            "meta":
-                "fidl/fuchsia.io/meta.json",
-            "type":
-                "fidl_library"
-        }
-        manifest = {"atoms": [], "ids": []}
+        fdio_atom = '//sdk/lib/fdio:fdio_sdk_manifest'
+        fuchsia_io_atom = '//sdk/fidl/fuchsia.io:fuchsia.io_sdk'
+        fuchsia_git_atom = '//sdk/lib/private_atom:private_atom'
 
+        # Assert deps that are not in a manifest or allow list fail verification.
         with TemporaryDirectory() as root_build_dir:
+            manifest = []
             sdk_manifest = self.create_empty_sdk_manifest(
                 root_build_dir, "core")
 
@@ -168,45 +129,46 @@ class VerifyDepsInSDKTests(unittest.TestCase):
                 allowed_dirs, [sdk_manifest])
             self.assertEqual(deps, ctf_element.verify_deps_in_sdk(deps))
 
+        # Assert deps in manifest do not fail verification.
         with TemporaryDirectory() as root_build_dir:
+            manifest = []
             sdk_manifest = self.create_empty_sdk_manifest(
                 root_build_dir, "core")
-            ctf_element = VerifyDepsInSDK(
-                root_build_dir, output_file, invoker_label, deps, allowed_deps,
-                allowed_dirs, [sdk_manifest])
-
             deps = [
                 '//sdk/lib/fdio:fdio',
                 '//sdk/fidl/fuchsia.io:fuchsia.io',
                 '//sdk/lib/private_atom',
             ]
-            manifest['atoms'].append(fdio_atom)
+            ctf_element = VerifyDepsInSDK(
+                root_build_dir, output_file, invoker_label, deps, allowed_deps,
+                allowed_dirs, [sdk_manifest])
+
+            manifest.append(fdio_atom)
             with open(sdk_manifest, 'w') as f:
-                json.dump(manifest, f)
+                for atom in manifest:
+                    f.write(f'{atom}\n')
             self.assertEqual(deps[1:], ctf_element.verify_deps_in_sdk(deps))
 
-            manifest['atoms'].append(fuchsia_io_atom)
+            manifest.append(fuchsia_io_atom)
             with open(sdk_manifest, 'w') as f:
-                json.dump(manifest, f)
+                for atom in manifest:
+                    f.write(f'{atom}\n')
             self.assertEqual(deps[2:], ctf_element.verify_deps_in_sdk(deps))
 
-            manifest['atoms'].append(fuchsia_git_atom)
-            with open(sdk_manifest, 'w') as f:
-                json.dump(manifest, f)
-            self.assertEqual(deps[2:], ctf_element.verify_deps_in_sdk(deps))
-
-            manifest['atoms'] = []
-
+        # Assert deps are verified from multiple manifests.
         with TemporaryDirectory() as root_build_dir:
+            manifest = []
             manifest1 = self.create_empty_sdk_manifest(root_build_dir, "core")
-            manifest['atoms'].append(fdio_atom)
+            manifest.append(fdio_atom)
             with open(manifest1, 'w') as f:
-                json.dump(manifest, f)
-            manifest['atoms'] = []
+                for atom in manifest:
+                    f.write(f'{atom}\n')
+            manifest = []
             manifest2 = self.create_empty_sdk_manifest(root_build_dir, "core2")
-            manifest['atoms'].append(fuchsia_io_atom)
+            manifest.append(fuchsia_io_atom)
             with open(manifest2, 'w') as f:
-                json.dump(manifest, f)
+                for atom in manifest:
+                    f.write(f'{atom}\n')
 
             ctf_element = VerifyDepsInSDK(
                 root_build_dir, output_file, invoker_label, deps, allowed_deps,
@@ -225,6 +187,7 @@ class VerifyDepsInSDKTests(unittest.TestCase):
         allowed_deps = ['//zircon/system/ulib/zxtest:zxtest']
         allowed_dirs = ['//sdk/*']
 
+        # Verify deps from allowlisted directories do not fail verification.
         with TemporaryDirectory() as root_build_dir:
             sdk_manifests = [
                 self.create_empty_sdk_manifest(root_build_dir, "core")
@@ -269,28 +232,10 @@ class VerifyDepsInSDKTests(unittest.TestCase):
                 '//third_party/dart-pkg/pub/some-dart-pkg',
                 '//zircon/system/ulib/zxtest:zxtest',
             ]
-            manifest = {
-                "atoms":
-                    [
-                        {
-                            "category":
-                                "partner",
-                            "deps": [],
-                            "files": [],
-                            "gn-label":
-                                "//sdk/lib/fdio:fdio_sdk_manifest(//build/toolchain/fuchsia:x64)",
-                            "id":
-                                "sdk://pkg/fdio",
-                            "meta":
-                                "pkg/fdio/meta.json",
-                            "type":
-                                "cc_prebuilt_library"
-                        }
-                    ],
-                "ids": []
-            }
+            manifest = ['//sdk/lib/fdio:fdio_sdk_manifest']
             with open(sdk_manifests[0], 'w') as sdk_manifest:
-                json.dump(manifest, sdk_manifest)
+                for atom in manifest:
+                    sdk_manifest.write(f'{atom}\n')
             allowed_dirs = ['//third_party/dart-pkg/pub/*']
             ctf_element = VerifyDepsInSDK(
                 root_build_dir, output_file, invoker_label, deps, allowed_deps,

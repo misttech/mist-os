@@ -10,7 +10,6 @@ on stable API / ABI.
 """
 
 import argparse
-import json
 import os
 import re
 import sys
@@ -150,27 +149,24 @@ class VerifyDepsInSDK:
         Returns:
             The list of dependencies that are not released in an SDK.
         """
-        # SDK atoms are appended with one of the following and a
-        # toolchain, so we want to ignore them to match against the
-        # provided label.
-        match_label = re.compile(
-            "(?:(_sdk)|(_sdk_manifest)|(_sdk_legacy))\(.*\)")
+        # SDK atoms are appended with one of the following suffixes, so we want
+        # to ignore them to match against the provided label.
+        sdk_suffixes = ['_sdk_manifest', '_sdk_legacy', '_sdk']
 
-        sdk_atom_label_to_category = {}
+        atoms = set()
         for sdk_manifest in self.sdk_manifests:
-            try:
-                with open(sdk_manifest, 'r') as manifest:
-                    data = json.load(manifest)
-            except json.JSONDecodeError:
-                continue
-            for atom in data['atoms']:
-                label = re.sub(match_label, '', atom['gn-label'])
-                sdk_atom_label_to_category[label] = atom['category']
+            with open(sdk_manifest, 'r') as manifest:
+                data = manifest.read().splitlines()
+            for atom in data:
+                for suffix in sdk_suffixes:
+                    if atom.endswith(suffix):
+                        atom = atom[:-len(suffix)]
+                        break
+                atoms.add(atom)
 
         unaccepted_deps = []
         for dep in deps:
-            if dep not in sdk_atom_label_to_category or sdk_atom_label_to_category[
-                    dep] not in ['partner', 'public']:
+            if dep not in atoms:
                 unaccepted_deps.append(dep)
 
         return unaccepted_deps
