@@ -10,14 +10,12 @@ use component_events::matcher::*;
 use diagnostics_data::Severity;
 use diagnostics_reader::{ArchiveReader, Data, Logs};
 use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_component_decl as fdecl;
 use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_diagnostics_test::ControllerMarker;
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogMessage};
 use fuchsia_async as fasync;
-use fuchsia_component::client;
 use fuchsia_component_test::RealmInstance;
+use fuchsia_component_test::ScopedInstanceFactory;
 use fuchsia_syslog_listener::{run_log_listener_with_proxy, LogProcessor};
 use futures::{channel::mpsc, StreamExt};
 
@@ -132,36 +130,33 @@ async fn initialize_topology() -> RealmInstance {
     })
     .await
     .unwrap();
-    let _test_component = test_topology::add_lazy_child(
-        &test_realm,
-        LOGGING_COMPONENT,
-        constants::LOGGING_COMPONENT_URL,
-    )
-    .await
-    .unwrap();
+    test_topology::add_collection(&test_realm, "coll").await.unwrap();
     test_topology::expose_test_realm_protocol(&builder, &test_realm).await;
     builder.build().await.expect("create instance")
 }
 
-async fn run_logging_component(instance: &RealmInstance, event_stream: &mut EventStream) {
-    let mut child_ref = fdecl::ChildRef { name: LOGGING_COMPONENT.to_string(), collection: None };
+async fn run_logging_component(realm: &RealmInstance, event_stream: &mut EventStream) {
+    let realm_proxy =
+        realm.root.connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>().unwrap();
+    let mut instance = ScopedInstanceFactory::new("coll")
+        .with_realm_proxy(realm_proxy)
+        .new_named_instance(LOGGING_COMPONENT, constants::LOGGING_COMPONENT_URL)
+        .await
+        .unwrap();
 
-    let (exposed_dir, server_end) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    let realm =
-        instance.root.connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>().unwrap();
-    realm.open_exposed_dir(&mut child_ref, server_end).await.unwrap().unwrap();
-
-    let _ =
-        client::connect_to_protocol_at_dir_root::<fcomponent::BinderMarker>(&exposed_dir).unwrap();
-
+    // launch our child, wait for it to exit, and destroy (so all its outgoing log connections
+    // are processed) before asserting on its logs
+    let _ = instance.connect_to_protocol_at_exposed_dir::<fcomponent::BinderMarker>().unwrap();
     utils::wait_for_component_stopped_event(
-        instance.root.child_name(),
-        LOGGING_COMPONENT,
+        realm.root.child_name(),
+        &format!("coll:{}", LOGGING_COMPONENT),
         ExitStatusMatcher::Clean,
         event_stream,
     )
     .await;
+    let waiter = instance.take_destroy_waiter();
+    drop(instance);
+    waiter.await.unwrap();
 }
 
 struct Listener {

@@ -12,14 +12,13 @@ use diagnostics_reader::{assert_data_tree, ArchiveReader, Data, Logs};
 use fasync::Task;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_component::RealmMarker;
-use fidl_fuchsia_component_decl::ChildRef;
 use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_sys_internal::{LogConnectorRequest, LogConnectorRequestStream};
 use fuchsia_async as fasync;
-use fuchsia_component::{client, server::ServiceFs};
-use fuchsia_component_test::{Capability, ChildOptions, LocalComponentHandles, Ref, Route};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, Ref, Route, ScopedInstanceFactory,
+};
 use fuchsia_zircon as zx;
 use futures::{channel::mpsc, lock::Mutex, SinkExt, StreamExt};
 use std::sync::Arc;
@@ -116,17 +115,14 @@ async fn test_logs_lifecycle() {
     let (builder, test_realm) = test_topology::create(test_topology::Options::default())
         .await
         .expect("create base topology");
-    test_topology::add_lazy_child(&test_realm, LOG_AND_EXIT_COMPONENT, LOG_AND_EXIT_COMPONENT_URL)
-        .await
-        .expect("add log_and_exit");
+    test_topology::add_collection(&test_realm, "coll").await.unwrap();
 
     // Currently RealmBuilder doesn't support to expose a capability from framework, therefore we
     // manually update the decl that the builder creates.
     expose_test_realm_protocol(&builder, &test_realm).await;
-
-    let instance = builder.build().await.expect("create instance");
+    let realm = builder.build().await.unwrap();
     let accessor =
-        instance.root.connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>().unwrap();
+        realm.root.connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>().unwrap();
 
     let mut reader = ArchiveReader::new();
     reader
@@ -142,24 +138,25 @@ async fn test_logs_lifecycle() {
         }
     });
 
-    let moniker = format!("realm_builder:{}/test/log_and_exit", instance.root.child_name());
+    let moniker = format!("realm_builder:{}/test/coll:log_and_exit", realm.root.child_name());
 
     let mut event_stream = EventStream::open().await.unwrap();
-    let mut child_ref = ChildRef { name: LOG_AND_EXIT_COMPONENT.to_string(), collection: None };
     reader.retry_if_empty(true);
     for i in 1..50 {
-        // launch our child and wait for it to exit before asserting on its logs
-        let (exposed_dir, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let realm = instance.root.connect_to_protocol_at_exposed_dir::<RealmMarker>().unwrap();
-        realm.open_exposed_dir(&mut child_ref, server_end).await.unwrap().unwrap();
-
-        let _ = client::connect_to_protocol_at_dir_root::<fcomponent::BinderMarker>(&exposed_dir)
+        // launch our child, wait for it to exit, and destroy (so all its outgoing log connections
+        // are processed) before asserting on its logs
+        let realm_proxy =
+            realm.root.connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>().unwrap();
+        let mut instance = ScopedInstanceFactory::new("coll")
+            .with_realm_proxy(realm_proxy)
+            .new_named_instance(LOG_AND_EXIT_COMPONENT, LOG_AND_EXIT_COMPONENT_URL)
+            .await
             .unwrap();
+        let _ = instance.connect_to_protocol_at_exposed_dir::<fcomponent::BinderMarker>().unwrap();
 
         utils::wait_for_component_stopped_event(
-            instance.root.child_name(),
-            LOG_AND_EXIT_COMPONENT,
+            realm.root.child_name(),
+            &format!("coll:{}", LOG_AND_EXIT_COMPONENT),
             ExitStatusMatcher::Clean,
             &mut event_stream,
         )
@@ -173,6 +170,10 @@ async fn test_logs_lifecycle() {
         for message in all_messages {
             check_message(&moniker, message);
         }
+
+        let waiter = instance.take_destroy_waiter();
+        drop(instance);
+        waiter.await.unwrap();
     }
 }
 

@@ -4,6 +4,7 @@
 
 use crate::constants;
 use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_component_decl as fdecl;
 use fidl_fuchsia_diagnostics_test::ControllerMarker;
 use fuchsia_component_test::{
     error::Error, Capability, ChildOptions, ChildRef, RealmBuilder, Ref, Route, SubRealmBuilder,
@@ -95,21 +96,26 @@ pub async fn add_eager_child(
     Ok(child_ref)
 }
 
-pub async fn add_lazy_child(
-    test_realm: &SubRealmBuilder,
-    name: &str,
-    url: &str,
-) -> Result<ChildRef, Error> {
-    let child_ref = test_realm.add_child(name, url, ChildOptions::new()).await?;
+pub async fn add_collection(test_realm: &SubRealmBuilder, name: &str) -> Result<(), Error> {
+    let mut decl = test_realm.get_realm_decl().await?;
+    decl.collections.push(cm_rust::CollectionDecl {
+        name: name.into(),
+        durability: fdecl::Durability::Transient,
+        environment: None,
+        allowed_offers: cm_types::AllowedOffers::StaticOnly,
+        allow_long_names: false,
+        persistent_storage: None,
+    });
+    test_realm.replace_realm_decl(decl).await?;
     test_realm
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                 .from(Ref::child("archivist"))
-                .to(&child_ref),
+                .to(Ref::collection(name)),
         )
         .await?;
-    Ok(child_ref)
+    Ok(())
 }
 
 pub async fn expose_test_realm_protocol(builder: &RealmBuilder, test_realm: &SubRealmBuilder) {
