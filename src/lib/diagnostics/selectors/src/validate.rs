@@ -10,8 +10,6 @@ use crate::{
     },
 };
 use fidl_fuchsia_diagnostics as fdiagnostics;
-use lazy_static::lazy_static;
-use regex::RegexSet;
 
 // NOTE: if we could use the negative_impls unstable feature, we could have a single ValidateExt
 // trait instead of one for each type of selector we need.
@@ -231,15 +229,22 @@ impl<T: StringSelector> ValidateStringSelectorExt for T {
     }
 }
 
-lazy_static! {
-    static ref PATTERN_VALIDATOR: RegexSet = RegexSet::new(&[
-        // No glob expressions allowed.
-        r#"([^\\]\*\*|^\*\*)"#,
-        // No unescaped selector delimiters allowed.
-        r#"([^\\]:|^:)"#,
-        // No unescaped path delimiters allowed.
-        r#"([^\\]/|^/)"#,
-    ]).unwrap();
+/// Checks if the `target` string contains the `forbidden` string without the
+/// character `/` preceding the `forbidden` string.
+fn contains_unescaped(target: &str, forbidden: &str) -> bool {
+    if target.len() < forbidden.len() {
+        return false;
+    }
+    if target.starts_with(forbidden) {
+        return true;
+    }
+    let flen = forbidden.len();
+    for i in 1..(target.len() - flen + 1) {
+        if &target[i..i + flen] == forbidden && !target[i - 1..i + flen].starts_with("\\") {
+            return true;
+        }
+    }
+    false
 }
 
 fn validate_pattern(pattern: &str) -> Result<(), ValidationError> {
@@ -247,18 +252,17 @@ fn validate_pattern(pattern: &str) -> Result<(), ValidationError> {
         return Err(ValidationError::EmptyStringPattern);
     }
 
-    let validator_matches = PATTERN_VALIDATOR.matches(pattern);
-    if validator_matches.matched_any() {
-        let mut errors = vec![];
-        if validator_matches.matched(0) {
-            errors.push(StringPatternError::UnescapedGlob);
-        }
-        if validator_matches.matched(1) {
-            errors.push(StringPatternError::UnescapedColon);
-        }
-        if validator_matches.matched(2) {
-            errors.push(StringPatternError::UnescapedForwardSlash);
-        }
+    let mut errors = vec![];
+    if contains_unescaped(pattern, "**") {
+        errors.push(StringPatternError::UnescapedGlob);
+    }
+    if contains_unescaped(pattern, ":") {
+        errors.push(StringPatternError::UnescapedColon);
+    }
+    if contains_unescaped(pattern, "/") {
+        errors.push(StringPatternError::UnescapedForwardSlash);
+    }
+    if !errors.is_empty() {
         return Err(ValidationError::InvalidStringPattern(pattern.to_string(), errors));
     }
     Ok(())
@@ -397,6 +401,7 @@ impl<'a> StringSelector for types::Segment<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lazy_static::lazy_static;
 
     lazy_static! {
         static ref SHARED_PASSING_TEST_CASES: Vec<(Vec<&'static str>, &'static str)> = {
