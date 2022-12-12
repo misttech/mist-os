@@ -5,7 +5,7 @@
 use crate::{
     fxfs::cryptkeeper::{Args as CryptKeeperArgs, CryptKeeper},
     fxfs::log_and_map_err::LogThen,
-    state::{State, StateName},
+    state::{State, StateName, StateTransitionError},
     StorageManager as StorageManagerTrait,
 };
 use account_common::AccountManagerError;
@@ -24,7 +24,7 @@ use fuchsia_zircon::AsHandleRef;
 use futures::lock::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use tracing::{error, warn};
+use tracing::error;
 use typed_builder::TypedBuilder;
 
 mod cryptkeeper;
@@ -211,18 +211,11 @@ impl StorageManagerTrait for Fxfs {
             faccount::Error::Internal,
         )?;
 
-        match connect_to_protocol_at_dir_svc::<AdminMarker>(&fxfs_inner.outgoing_dir) {
-            Ok(proxy) => {
-                if let Err(e) = proxy.shutdown().await {
-                    error!("shutdown failed: {:?}", e);
-                    return Err(AccountManagerError::new(AccountApiError::Internal));
-                }
-            }
-            Err(e) => {
-                error!("Connect to Admin protocol failed: {:?}", e);
-                return Err(AccountManagerError::new(AccountApiError::Internal));
-            }
-        }
+        let () = connect_to_protocol_at_dir_svc::<AdminMarker>(&fxfs_inner.outgoing_dir)
+            .log_error_then("Connect to Admin protocol failed", AccountApiError::Internal)?
+            .shutdown()
+            .await
+            .log_error_then("shutdown failed", AccountApiError::Internal)?;
 
         let () = fxfs_inner
             .cryptkeeper
@@ -236,79 +229,111 @@ impl StorageManagerTrait for Fxfs {
     async fn destroy(&self) -> Result<(), AccountManagerError> {
         let mut state_lock = self.state.lock().await;
 
-        if matches!(&*state_lock, State::Uninitialized) {
-            error!(
-                "Could not destroy storage. Expected state to not already be Uninitialized, \
-                but it was."
-            );
-            return Err(AccountManagerError::new(AccountApiError::Internal));
-        }
-
-        let mut fxfs_inner: FxfsInner = match state_lock.try_destroy().log_error_then(
-            "Failed to destroy FxfsStorageManager state",
-            faccount::Error::Internal,
-        )? {
-            Some(fxfs_inner) => fxfs_inner,
-            None => {
-                warn!(
-                    "Did not need to not destroy FxfsStorageManager. Has it already been \
-                    destroyed?"
+        // Attempt to mark |state| as DESTROYED. If the state is in the wrong
+        // state, return an error. Otherwise, extract the inner struct; if we
+        // are transitioning from LOCKED it will be None; otherwise it will be
+        // Some(_).
+        let mut maybe_fxfs_inner: Option<FxfsInner> = match state_lock.try_destroy() {
+            Ok(maybe_fxfs_inner) => maybe_fxfs_inner,
+            Err(StateTransitionError::WrongPrecondition(state_name)) => {
+                error!(
+                    "Could not destroy storage. Expected state to be either Locked or \
+                        Available, but it was: {:?}",
+                    state_name
                 );
-                return Ok(());
+                return Err(AccountManagerError::new(AccountApiError::Internal));
             }
         };
 
-        let mut failed = false;
+        // Even if some actions fail, we want to try them all first before
+        // deciding whether or not to report an overall error.
 
         // First unmount the volume.
-        match connect_to_protocol_at_dir_svc::<AdminMarker>(&fxfs_inner.outgoing_dir) {
-            Ok(proxy) => {
-                if let Err(e) = proxy.shutdown().await {
-                    error!("shutdown failed: {:?}", e);
-                    failed = true;
+        if let Some(ref fxfs_inner) = maybe_fxfs_inner {
+            match connect_to_protocol_at_dir_svc::<AdminMarker>(&fxfs_inner.outgoing_dir) {
+                Ok(proxy) => match proxy.shutdown().await {
+                    Ok(_) => {}
+                    Err(e) => {
+                        error!("shutdown failed: {:?}", e);
+                    }
+                },
+                Err(e) => {
+                    error!("Connect to Admin protocol failed: {:?}", e);
                 }
-            }
-            Err(e) => {
-                error!("Connect to Admin protocol failed: {:?}", e);
-                failed = true;
             }
         }
 
         // Then remove the volume from the filesystem.
-        match connect_to_protocol_at_dir_root::<VolumesMarker>(&self.filesystem_dir) {
-            Ok(proxy) => {
-                match proxy.remove(&self.volume_label).await {
-                    Err(e) => {
-                        error!("remove FIDL failed: {:?}", e);
-                        failed = true;
-                    }
-                    Ok(Err(e)) => {
-                        error!("remove failed: {:?}", e);
-                        failed = true;
-                    }
-                    Ok(Ok(())) => {
-                        // The call to Volumes.Remove succeeded.
+        //  - If |did_remove| is true, then the volume was successfully removed.
+        //  - If |did_remove| is false, then the volume was not successfully removed.
+        let did_remove =
+            match connect_to_protocol_at_dir_root::<VolumesMarker>(&self.filesystem_dir) {
+                Ok(proxy) => {
+                    match proxy.remove(&self.volume_label).await {
+                        Err(e) => {
+                            error!("remove FIDL failed: {:?}", e);
+                            false
+                        }
+                        Ok(Err(e)) => {
+                            error!("remove failed: {:?}", e);
+                            false
+                        }
+                        Ok(Ok(())) => {
+                            // The call to Volumes.Remove succeeded.
+                            true
+                        }
                     }
                 }
-            }
-            Err(e) => {
-                error!("Connect to Volumes protocol failed: {:?}", e);
-                failed = true;
-            }
-        }
+                Err(e) => {
+                    error!("Connect to Volumes protocol failed: {:?}", e);
+                    false
+                }
+            };
 
         // Finally destroy the crypt component permanently, forgetting the keys.
-        if let Err(e) = fxfs_inner.cryptkeeper.destroy().await {
-            error!("Destroy crypt component failed: {:?}", e);
-            failed = true;
-        }
+        //  - If |did_delete_crypt| is None, it is because the storage manager
+        //    was locked, so there is no crypt component which needs to be
+        //    deleted.
+        //  - If |did_delete_crypt| is Some(true), the crypt component was
+        //    successfully deleted.
+        //  - If |did_delete_crypt| is Some(false), the crypt component exixsts
+        //    but was not deleted.
+        let did_delete_crypt = match maybe_fxfs_inner {
+            Some(ref mut fxfs_inner) => match fxfs_inner.cryptkeeper.destroy().await {
+                Err(e) => {
+                    error!("Destroy crypt component failed: {:?}", e);
+                    Some(false)
+                }
+                Ok(_) => Some(true),
+            },
+            None => None,
+        };
 
-        if failed {
-            error!("[FxfsStorageManager::destroy()] failed to lock.");
-            return Err(AccountManagerError::new(AccountApiError::Resource));
-        }
+        // Unmounting the directory is a prerequisite for removing the
+        // volume, but a failure to unmount doesn't necessarily mean that we
+        // failed to destroy the data, so we ignore it here.
 
-        Ok(())
+        match (did_remove, did_delete_crypt) {
+            // If we successfully performed all of the destructive actions,
+            // return Ok(_); the overall call to ::destroy() succeeded.
+            (true, Some(true) | None) => Ok(()),
+
+            // If we didn't destroy the cryptkeeper but we did successfully
+            // remove the volume, that's a success -- the cryptkeeper and the
+            // key may exist, but the underlying data is no longer accessible
+            // via FXFS.
+            (true, Some(false)) => Ok(()),
+
+            // If we didn't successfully perform either,
+            // return an error.
+            (false, Some(false)) => Err(AccountApiError::Resource.into()),
+
+            // If we didn't remove the volume but we did successfully destroy
+            // the cryptkeeper, that's not a successful volume destruction --
+            // the volume is still extant and anyone with the key could access
+            // it, so return an error.
+            (false, Some(true) | None) => Err(AccountApiError::Resource.into()),
+        }
     }
 
     async fn get_root_dir(&self) -> Result<fio::DirectoryProxy, AccountManagerError> {
