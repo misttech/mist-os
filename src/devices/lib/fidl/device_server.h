@@ -13,10 +13,9 @@ namespace devfs_fidl {
 
 class DeviceInterface : public fidl::WireServer<fuchsia_device::Controller> {
  public:
-  // Have the `DeviceInterface` log this error. This lets the `DeviceInterface`
-  // add extra context around the error, and supports logging in both the DFv1
-  // and DFv2 environments.
-  virtual void LogError(const char* error) = 0;
+  // Redeclare this fuchsia_device::Controller function to avoid implicit shadowing.
+  void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override = 0;
+  virtual zx::result<std::string> GetTopologicalPath() = 0;
 
   virtual bool IsUnbound() = 0;
   virtual zx_status_t MessageOp(fidl_incoming_msg_t* msg, fidl_txn_t* txn) = 0;

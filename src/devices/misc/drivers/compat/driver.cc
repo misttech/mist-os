@@ -20,7 +20,6 @@
 #include <zircon/dlfcn.h>
 
 #include "src/devices/misc/drivers/compat/loader.h"
-#include "src/lib/storage/vfs/cpp/service.h"
 
 namespace fboot = fuchsia_boot;
 namespace fdf {
@@ -643,7 +642,14 @@ zx_status_t Driver::AddDevice(Device* parent, device_add_args_t* args, zx_device
     }
 
     if (client_remote.is_valid()) {
-      child->devfs_server().ServeMultiplexed(std::move(client_remote));
+      auto options = fs::VnodeConnectionOptions::FromIoV1Flags(
+          fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable);
+      status = devfs_vfs_->Serve(child->dev_vnode(), std::move(client_remote), options);
+      if (status != ZX_OK) {
+        FDF_LOG(ERROR, "Failed to serve client remote for device %s: %s", args->name,
+                zx_status_get_string(status));
+        return status;
+      }
     }
 
     executor_.schedule_task(child->Export());
@@ -734,13 +740,9 @@ zx::result<std::string> Driver::GetVariable(const char* name) {
 }
 
 zx::result<fit::deferred_callback> Driver::ExportToDevfsSync(
-    fuchsia_device_fs::wire::ExportOptions options, devfs_fidl::DeviceServer& device_server,
+    fuchsia_device_fs::wire::ExportOptions options, fbl::RefPtr<fs::Vnode> dev_node,
     std::string name, std::string_view topological_path, uint32_t proto_id) {
-  auto service = fbl::MakeRefCounted<fs::Service>([&device_server](zx::channel channel) {
-    device_server.ServeMultiplexed(std::move(channel));
-    return ZX_OK;
-  });
-  zx_status_t add_status = devfs_dir_->AddEntry(name, service);
+  zx_status_t add_status = devfs_dir_->AddEntry(name, dev_node);
   if (add_status != ZX_OK) {
     return zx::error(add_status);
   }
@@ -748,8 +750,8 @@ zx::result<fit::deferred_callback> Driver::ExportToDevfsSync(
   if (status != ZX_OK) {
     return zx::error(status);
   }
-  auto callback = [this, service = std::move(service), name = std::move(name)]() {
-    devfs_vfs_->CloseAllConnectionsForVnode(*service, {});
+  auto callback = [this, dev_node = std::move(dev_node), name = std::move(name)]() {
+    devfs_vfs_->CloseAllConnectionsForVnode(*dev_node, {});
     devfs_dir_->RemoveEntry(name);
   };
   return zx::ok(fit::deferred_callback(callback));

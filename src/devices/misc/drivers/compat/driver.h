@@ -57,9 +57,8 @@ class Driver : public driver::DriverBase {
 
   // Export a device to devfs. If this returns success, the deferred callback
   // will remove the device from devfs when it goes out of scope.
-  // `device_server` must outlive the returned deferred callback.
   zx::result<fit::deferred_callback> ExportToDevfsSync(
-      fuchsia_device_fs::wire::ExportOptions options, devfs_fidl::DeviceServer& device_server,
+      fuchsia_device_fs::wire::ExportOptions options, fbl::RefPtr<fs::Vnode> dev_node,
       std::string name, std::string_view topological_path, uint32_t proto_id);
 
   Device& GetDevice() { return device_; }

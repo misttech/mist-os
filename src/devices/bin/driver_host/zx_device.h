@@ -473,10 +473,8 @@ struct zx_device
   void FreeInspect() { inspect_.reset(); }
 
  private:
-  zx::result<std::string> GetTopologicalPath();
-
   // Methods from the devfs_fidl::DeviceInterface class.
-  void LogError(const char* error) override;
+  zx::result<std::string> GetTopologicalPath() override;
   bool IsUnbound() override;
   zx_status_t MessageOp(fidl_incoming_msg_t* msg, fidl_txn_t* txn) override;
   void ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,

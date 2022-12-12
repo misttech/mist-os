@@ -13,6 +13,10 @@
 
 namespace devfs_fidl {
 
+namespace {
+constexpr char kLogTag[] = "devfs";
+}  // namespace
+
 DeviceServer::DeviceServer(DeviceInterface& device, async_dispatcher_t* dispatcher)
     : dev_(device), dispatcher_(dispatcher) {}
 
@@ -70,8 +74,9 @@ void DeviceServer::Serve(zx::channel channel, fidl::internal::IncomingMessageDis
 DeviceServer::Node::Node(DeviceServer& parent) : parent_(parent) {}
 
 void DeviceServer::Node::NotImplemented_(const std::string& name, fidl::CompleterBase& completer) {
-  std::string error = "Unsupported call to " + name;
-  parent_.dev_.LogError(error.c_str());
+  zx::result topo_path = parent_.dev_.GetTopologicalPath();
+  FX_LOGF(ERROR, kLogTag, "%s: unsupported call to %s", name.c_str(),
+          topo_path.is_ok() ? topo_path.value().c_str() : topo_path.status_string());
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -88,9 +93,10 @@ void DeviceServer::Node::Query(QueryCompleter::Sync& completer) {
 
 void DeviceServer::Node::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
   if (request->flags != fuchsia_io::wire::OpenFlags::kCloneSameRights) {
-    std::string error =
-        "Unsupported clone flags=0x" + std::to_string(static_cast<uint32_t>(request->flags));
-    parent_.dev_.LogError(error.c_str());
+    zx::result topo_path = parent_.dev_.GetTopologicalPath();
+    FX_LOGF(ERROR, kLogTag, "%s: unsupported clone flags=0x%x",
+            topo_path.is_ok() ? topo_path.value().c_str() : topo_path.status_string(),
+            static_cast<uint32_t>(request->flags));
     request->object.Close(ZX_ERR_NOT_SUPPORTED);
     return;
   }

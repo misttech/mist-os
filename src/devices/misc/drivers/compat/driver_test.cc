@@ -482,20 +482,6 @@ class DriverTest : public gtest::DriverTestLoopFixture {
     EXPECT_TRUE(node().HasChildren());
   }
 
-  void CallPrepareStop(compat::Driver& driver) {
-    libsync::Completion task_completion;
-    auto cb = [](PrepareStopContext* context, zx_status_t status) {
-      reinterpret_cast<libsync::Completion*>(context->driver)->Signal();
-    };
-    PrepareStopContext prepare_stop{
-        .driver = &task_completion,
-        .complete = cb,
-    };
-    async::PostTask(driver_dispatcher().async_dispatcher(),
-                    [&driver, &prepare_stop]() { driver.PrepareStop(&prepare_stop); });
-    task_completion.Wait();
-  }
-
   async_dispatcher_t* dispatcher() { return test_loop_.dispatcher(); }
 
   TestProfileProvider profile_provider_;
@@ -580,10 +566,7 @@ TEST_F(DriverTest, ClientRemote) {
     ASSERT_EQ(res->response.get(), kEchoString);
   }
 
-  // Remove the driver.
-  CallPrepareStop(*driver);
   RunOnDispatcher([&] { driver.reset(); });
-
   ShutdownDriverDispatcher();
   ASSERT_TRUE(RunTestLoopUntilIdle());
 }

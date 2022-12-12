@@ -373,12 +373,6 @@ zx::result<std::string> zx_device::GetTopologicalPath() {
   return zx::ok(std::string(buf));
 }
 
-void zx_device::LogError(const char* error) {
-  zx::result topo_path = GetTopologicalPath();
-  LOGF(ERROR, "%s: %s", topo_path.is_ok() ? topo_path.value().c_str() : topo_path.status_string(),
-       error);
-}
-
 bool zx_device::IsUnbound() { return flags_ & DEV_FLAG_UNBINDING; }
 
 zx_status_t zx_device::MessageOp(fidl_incoming_msg_t* msg, fidl_txn_t* txn) {

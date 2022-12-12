@@ -167,6 +167,7 @@ config("fidl-llcpp-deprecated-wire-try-dispatch") {
   # and replace the contents of `visibility` with the script output.
   visibility = [
     "//src/devices/lib/fidl:devfs_fidl",
+    "//src/devices/misc/drivers/compat:lib",
     "//src/lib/storage/vfs/cpp",
   ]
 }
