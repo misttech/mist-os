@@ -234,12 +234,28 @@ impl Archivist {
         }
 
         if config.enable_event_source {
-            match EventSource::new().await {
-                Err(err) => warn!(?err, "Failed to create event source"),
+            match EventSource::new("/events/log_sink_requested_event_stream").await {
+                Err(err) => warn!(?err, "Failed to create event source for log sink requests"),
                 Ok(mut event_source) => {
                     event_router.add_producer(ProducerConfig {
                         producer: &mut event_source,
-                        events: vec![EventType::LogSinkRequested, EventType::DiagnosticsReady],
+                        events: vec![EventType::LogSinkRequested],
+                    });
+                    incoming_external_event_producers.push(fasync::Task::spawn(async move {
+                        // This should never exit.
+                        let _ = event_source.spawn().await;
+                    }));
+                }
+            }
+
+            match EventSource::new("/events/diagnostics_ready_event_stream").await {
+                Err(err) => {
+                    warn!(?err, "Failed to create event source for diagnostics ready requests")
+                }
+                Ok(mut event_source) => {
+                    event_router.add_producer(ProducerConfig {
+                        producer: &mut event_source,
+                        events: vec![EventType::DiagnosticsReady],
                     });
                     incoming_external_event_producers.push(fasync::Task::spawn(async move {
                         // This should never exit.

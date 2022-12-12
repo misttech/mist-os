@@ -9,7 +9,7 @@ use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
 use futures::{
     channel::{mpsc, oneshot},
     task::{Context, Poll},
-    Future, SinkExt, Stream, StreamExt,
+    Future, Stream, StreamExt,
 };
 use lazy_static::lazy_static;
 use pin_project::pin_project;
@@ -21,7 +21,6 @@ use std::{
 use thiserror::Error;
 use tracing::{debug, error};
 
-const MAX_EVENT_BUS_CAPACITY: usize = 1024;
 const RECENT_EVENT_LIMIT: usize = 200;
 
 lazy_static! {
@@ -51,8 +50,8 @@ pub struct EventRouter {
     producers_registered: BTreeSet<EventType>,
 
     // Ends of the channel used by event producers.
-    sender: mpsc::Sender<Event>,
-    receiver: mpsc::Receiver<Event>,
+    sender: mpsc::UnboundedSender<Event>,
+    receiver: mpsc::UnboundedReceiver<Event>,
 
     inspect_logger: EventStreamLogger,
 }
@@ -60,7 +59,7 @@ pub struct EventRouter {
 impl EventRouter {
     /// Creates a new empty event router.
     pub fn new(node: inspect::Node) -> Self {
-        let (sender, receiver) = mpsc::channel(MAX_EVENT_BUS_CAPACITY);
+        let (sender, receiver) = mpsc::unbounded();
         Self {
             consumers: BTreeMap::new(),
             sender,
@@ -177,7 +176,7 @@ impl EventRouter {
 struct EventStream {
     /// The stream containing events.
     #[pin]
-    receiver: mpsc::Receiver<Event>,
+    receiver: mpsc::UnboundedReceiver<Event>,
 
     /// When this future is ready, the stream will be closed. Messages still in the buffer
     /// will be drained.
@@ -189,7 +188,7 @@ struct EventStream {
 }
 
 impl EventStream {
-    fn new(receiver: mpsc::Receiver<Event>) -> (TerminateHandle, Self) {
+    fn new(receiver: mpsc::UnboundedReceiver<Event>) -> (TerminateHandle, Self) {
         let (snd, rcv) = oneshot::channel();
         let (drain_snd, drain_rcv) = oneshot::channel();
         (
@@ -270,7 +269,7 @@ impl TerminateHandle {
 /// restricted set of types.
 pub struct Dispatcher {
     allowed_events: BTreeSet<EventType>,
-    sender: Option<mpsc::Sender<Event>>,
+    sender: Option<mpsc::UnboundedSender<Event>>,
 }
 
 /// Returns a no-op dispatcher.
@@ -281,24 +280,26 @@ impl Default for Dispatcher {
 }
 
 impl Dispatcher {
-    fn new(allowed_events: BTreeSet<EventType>, sender: mpsc::Sender<Event>) -> Self {
+    fn new(allowed_events: BTreeSet<EventType>, sender: mpsc::UnboundedSender<Event>) -> Self {
         Self { allowed_events, sender: Some(sender) }
     }
 
     /// Emits an event. If the event isn't in the restricted set of allowed types, this operation
     /// is a no-op. An error is returned when sending the event into the channel fails.
-    pub async fn emit(&mut self, event: Event) -> Result<(), mpsc::SendError> {
+    pub fn emit(&mut self, event: Event) -> Result<(), mpsc::TrySendError<Event>> {
         if let Some(sender) = &mut self.sender {
             if self.allowed_events.contains(&event.ty()) {
-                sender.send(event).await?;
+                sender.unbounded_send(event)?;
             }
         }
         Ok(())
     }
 
     #[cfg(test)]
-    pub fn new_for_test(allowed_events: BTreeSet<EventType>) -> (mpsc::Receiver<Event>, Self) {
-        let (sender, receiver) = mpsc::channel(100);
+    pub fn new_for_test(
+        allowed_events: BTreeSet<EventType>,
+    ) -> (mpsc::UnboundedReceiver<Event>, Self) {
+        let (sender, receiver) = mpsc::unbounded();
         (receiver, Self::new(allowed_events, sender))
     }
 }
@@ -405,7 +406,7 @@ mod tests {
     use fuchsia_async as fasync;
     use fuchsia_inspect::assert_data_tree;
     use fuchsia_zircon as zx;
-    use futures::{lock::Mutex, FutureExt};
+    use futures::{lock::Mutex, FutureExt, SinkExt};
     use lazy_static::lazy_static;
 
     const TEST_URL: &str = "NO-OP URL";
@@ -447,7 +448,7 @@ mod tests {
                     }),
                 },
             };
-            let _ = self.dispatcher.emit(event).await;
+            let _ = self.dispatcher.emit(event);
         }
     }
 
@@ -558,7 +559,6 @@ mod tests {
                     request_stream: Some(request_stream),
                 }),
             })
-            .await
             .unwrap();
 
         // The first consumer that was registered must receive the request stream. The second one
@@ -621,7 +621,6 @@ mod tests {
                     directory: None,
                 }),
             })
-            .await
             .unwrap();
 
         // We see the event only in the receiver which consumer wasn't dropped.
@@ -640,7 +639,6 @@ mod tests {
                     directory: None,
                 }),
             })
-            .await
             .unwrap();
         let event = second_receiver.next().await.unwrap();
         assert_matches!(event.payload, EventPayload::DiagnosticsReady(_));

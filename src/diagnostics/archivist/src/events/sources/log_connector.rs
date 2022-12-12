@@ -56,17 +56,13 @@ impl LogConnector {
                     };
                     let requests =
                         log_request.into_stream().expect("getting request stream from server end");
-                    if let Err(err) = self
-                        .dispatcher
-                        .emit(Event {
-                            timestamp: zx::Time::get_monotonic(),
-                            payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
-                                component,
-                                request_stream: Some(requests),
-                            }),
-                        })
-                        .await
-                    {
+                    if let Err(err) = self.dispatcher.emit(Event {
+                        timestamp: zx::Time::get_monotonic(),
+                        payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
+                            component,
+                            request_stream: Some(requests),
+                        }),
+                    }) {
                         if err.is_disconnected() {
                             break;
                         }

@@ -76,15 +76,13 @@ impl ComponentEventProvider {
     ) -> Result<(), EventError> {
         let component = ComponentIdentity::try_from(component)?;
         if let Ok(directory) = directory.into_proxy() {
-            self.dispatcher
-                .emit(Event {
-                    timestamp: zx::Time::get_monotonic(),
-                    payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                        component,
-                        directory: Some(directory),
-                    }),
-                })
-                .await?;
+            self.dispatcher.emit(Event {
+                timestamp: zx::Time::get_monotonic(),
+                payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
+                    component,
+                    directory: Some(directory),
+                }),
+            })?;
         }
         Ok(())
     }

@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::events::types::Event;
 use crate::events::{
     error::EventError,
     router::{Dispatcher, EventProducer},
@@ -10,108 +9,63 @@ use crate::events::{
 use anyhow::Error;
 use fidl_fuchsia_sys2 as fsys;
 use fsys::EventStream2Proxy;
-use fuchsia_async::Task;
 use fuchsia_component::client::connect_to_protocol_at_path;
-use futures::channel::mpsc;
-use futures::channel::mpsc::UnboundedSender;
-use futures::future::join_all;
-use futures::StreamExt;
-use std::convert::TryInto;
-use tracing::{info, warn};
+use tracing::warn;
 
 pub struct EventSource {
     dispatcher: Dispatcher,
-    event_streams: Option<Vec<EventStream2Proxy>>,
+    event_stream: EventStream2Proxy,
 }
 
 impl EventSource {
-    pub async fn new() -> Result<Self, Error> {
-        // Connect to /events/event_stream which contains our newer FIDL protocol
-        let event_streams = vec![
-            connect_to_protocol_at_path::<fsys::EventStream2Marker>(
-                "/events/log_sink_requested_event_stream",
-            )?,
-            connect_to_protocol_at_path::<fsys::EventStream2Marker>(
-                "/events/diagnostics_ready_event_stream",
-            )?,
-        ];
-        for event_stream in &event_streams {
-            // Swallow result for now. We have a fallback to use the legacy system below.
-            // Once we remove the legacy fallback, we should handle the potential error.
-            let _ = event_stream.wait_for_ready().await;
-        }
-        Ok(Self { event_streams: Some(event_streams), dispatcher: Dispatcher::default() })
+    pub async fn new(event_stream_path: &str) -> Result<Self, Error> {
+        let event_stream =
+            connect_to_protocol_at_path::<fsys::EventStream2Marker>(event_stream_path)?;
+        let _ = event_stream.wait_for_ready().await;
+        Ok(Self { event_stream, dispatcher: Dispatcher::default() })
     }
 
     #[cfg(test)]
     async fn new_for_test(event_stream: EventStream2Proxy) -> Result<Self, EventError> {
         // Connect to /events/event_stream which contains our newer FIDL protocol
-        Ok(Self { event_streams: Some(vec![event_stream]), dispatcher: Dispatcher::default() })
+        Ok(Self { event_stream, dispatcher: Dispatcher::default() })
     }
 
     pub async fn spawn(mut self) -> Result<(), Error> {
-        let (tx, mut rx) = mpsc::unbounded();
-        let event_streams = self.event_streams.take();
-        let _task = Task::spawn(async move {
-            let tx = tx.clone();
-            let tasks: Vec<_> = event_streams
-                .map(|event_streams| {
-                    let tx = tx.clone();
-                    event_streams
-                        .into_iter()
-                        .map(|event_stream| {
-                            let tx = tx.clone();
-                            async move { handle_event_stream(tx, event_stream).await }
-                        })
-                        .collect()
-                })
-                .unwrap_or_default();
-            join_all(tasks).await;
-        });
-        while let Some(event) = rx.next().await {
-            if let Err(err) = self.dispatcher.emit(event).await {
-                if err.is_disconnected() {
-                    break;
-                }
-            }
-        }
-        info!("Unable to acquire event stream");
-
-        Ok(())
-    }
-}
-
-async fn handle_event_stream(tx: UnboundedSender<Event>, event_stream: EventStream2Proxy) {
-    let tx = tx.clone();
-    while let Ok(events) = event_stream.get_next().await {
-        for event in events {
-            match event.try_into() {
-                Ok(event) => {
-                    if tx.unbounded_send(event).is_err() {
-                        return;
+        while let Ok(events) = self.event_stream.get_next().await {
+            for event in events {
+                match event.try_into() {
+                    Ok(event) => {
+                        if let Err(err) = self.dispatcher.emit(event) {
+                            if err.is_disconnected() {
+                                break;
+                            }
+                        }
+                    }
+                    Err(EventError::UnknownResult(fsys::EventResult::Error(
+                        fsys::EventError {
+                            error_payload:
+                                Some(fsys::EventErrorPayload::DirectoryReady(
+                                    fsys::DirectoryReadyError { .. },
+                                )),
+                            ..
+                        },
+                    ))) => {
+                        // The error was intended for cases when a component
+                        // declared it exposes inspect but doesn't actually serve it. Turns out this
+                        // is not very common and leads to spam in tests that end up having to
+                        // include the inspect shard transitevely and correctly do not expose
+                        // Inspect. Instead of logging a spammy and confusing error, ignore it, with
+                        // RFC168 this error will be obsolete also.
+                    }
+                    Err(err) => {
+                        warn!(?err, "Failed to interpret event");
                     }
                 }
-                Err(EventError::UnknownResult(fsys::EventResult::Error(fsys::EventError {
-                    error_payload:
-                        Some(fsys::EventErrorPayload::DirectoryReady(fsys::DirectoryReadyError {
-                            ..
-                        })),
-                    ..
-                }))) => {
-                    // The error was intended for cases when a component
-                    // declared it exposes inspect but doesn't actually serve it. Turns out this is
-                    // not very common and leads to spam in tests that end up having to include the
-                    // inspect shard transitevely and correctly do not expose inspect.
-                    // Instead of logging a spammy and confusing error, ignore it, with RFC168 this
-                    // error will be obsolete also.
-                }
-                Err(err) => {
-                    warn!(?err, "Failed to interpret event");
-                }
             }
         }
+        Ok(())
     }
-    warn!("EventSourceV2 stream server closed");
 }
 
 impl EventProducer for EventSource {

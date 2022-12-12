@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::events::types::{EventValidationError, SourceIdentityValidationError};
+use crate::events::types::{Event, EventValidationError, SourceIdentityValidationError};
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_sys2 as fsys;
 use futures::channel::mpsc;
@@ -50,7 +50,7 @@ pub enum EventError {
     ComponentError(fcomponent::Error),
 
     #[error(transparent)]
-    SendError(#[from] mpsc::SendError),
+    SendError(#[from] mpsc::TrySendError<Event>),
 }
 
 #[derive(Debug, Error)]

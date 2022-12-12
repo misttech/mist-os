@@ -27,7 +27,6 @@ impl UnattributedLogSinkSource {
                     request_stream: Some(stream),
                 }),
             })
-            .await
             .ok();
     }
 }
