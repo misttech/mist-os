@@ -5,6 +5,8 @@
 #include "src/security/lib/kms-stateless/kms-stateless.h"
 
 #include <fcntl.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
+#include <lib/fdio/fd.h>
 #include <lib/fdio/watcher.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/time.h>
@@ -209,15 +211,17 @@ zx_status_t WatchTee(int dirfd, int event, const char* filename, void* cookie) {
 
 zx_status_t GetHardwareDerivedKey(GetHardwareDerivedKeyCallback callback,
                                   uint8_t key_info[kExpectedKeyInfoSize]) {
-  if (wait_for_device(kDeviceClass, ZX_SEC(5)) != ZX_OK) {
-    fprintf(stderr, "Error waiting for tee device directory!\n");
-    return ZX_ERR_IO;
+  zx::result channel = device_watcher::RecursiveWaitForFile(kDeviceClass, zx::sec(5));
+  if (channel.is_error()) {
+    fprintf(stderr, "Error waiting for tee device directory: %s\n", channel.status_string());
+    return channel.error_value();
   }
-
-  fbl::unique_fd dirfd(open(kDeviceClass, O_RDONLY));
-  if (!dirfd.is_valid()) {
-    fprintf(stderr, "Failed to open tee device directory!\n");
-    return ZX_ERR_IO;
+  fbl::unique_fd dirfd;
+  if (zx_status_t status = fdio_fd_create(channel.value().release(), dirfd.reset_and_get_address());
+      status != ZX_OK) {
+    fprintf(stderr, "Failed to create tee device directory fd: %s!\n",
+            zx_status_get_string(status));
+    return status;
   }
   WatchTeeArgs args = {std::move(callback), std::move(key_info), kExpectedKeyInfoSize};
   zx_status_t watch_status =

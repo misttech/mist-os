@@ -25,6 +25,7 @@ test("biotime-test") {
   sources = [ "biotime-test.cc" ]
   output_name = "biotime-test"
   deps = [
+    "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
     "//src/lib/storage/ramdevice_client/cpp",
     "//zircon/system/ulib/fbl",

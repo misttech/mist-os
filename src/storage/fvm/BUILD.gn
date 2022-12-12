@@ -145,6 +145,7 @@ test("fvm-integration") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
     "//sdk/lib/fdio",
     "//src/devices/testing/driver-integration-test-shim",
+    "//src/lib/fxl",
     "//src/lib/storage/block_client/cpp",
     "//src/lib/storage/fs_management",
     "//src/lib/storage/ramdevice_client/cpp",

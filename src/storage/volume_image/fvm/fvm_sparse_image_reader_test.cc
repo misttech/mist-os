@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <lib/component/incoming/cpp/service_client.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/fdio.h>
 #include <lib/fzl/resizeable-vmo-mapper.h>
 #include <zircon/hw/gpt.h>
@@ -39,9 +40,9 @@ zx::result<std::string> AttachFvm(const std::string& device_path) {
   if (auto status = storage::BindFvm(device.value()); status.is_error())
     return status.take_error();
   std::string fvm_disk_path = device_path + "/fvm";
-  if (auto status = zx::make_result(wait_for_device(fvm_disk_path.c_str(), zx::sec(3).get()));
-      status.is_error()) {
-    return status.take_error();
+  if (zx::result channel = device_watcher::RecursiveWaitForFile(fvm_disk_path.c_str(), zx::sec(3));
+      channel.is_error()) {
+    return channel.take_error();
   }
   return zx::ok(fvm_disk_path);
 }

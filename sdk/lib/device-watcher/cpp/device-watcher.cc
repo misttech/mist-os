@@ -125,7 +125,8 @@ zx_status_t IterateDirectory(const int dir_fd, FileCallback callback) {
 
 namespace {
 
-zx::result<zx::channel> RecursiveWaitForFileHelper(const int dir_fd, std::string_view path) {
+zx::result<zx::channel> RecursiveWaitForFileHelper(const int dir_fd, std::string_view path,
+                                                   zx::time deadline) {
   const size_t slash = path.find_first_of('/');
   const std::string_view target = slash == std::string::npos ? path : path.substr(0, slash);
 
@@ -142,7 +143,7 @@ zx::result<zx::channel> RecursiveWaitForFileHelper(const int dir_fd, std::string
     };
     // Can't be const.
     std::string_view name = target;
-    if (zx_status_t status = fdio_watch_directory(dir_fd, watch_func, ZX_TIME_INFINITE, &name);
+    if (zx_status_t status = fdio_watch_directory(dir_fd, watch_func, deadline.get(), &name);
         status != ZX_ERR_STOP) {
       return zx::error(status);
     }
@@ -179,26 +180,28 @@ zx::result<zx::channel> RecursiveWaitForFileHelper(const int dir_fd, std::string
     return zx::error(status);
   }
   const auto close_subdir = fit::defer([subdir_fd]() { close(subdir_fd); });
-  return RecursiveWaitForFileHelper(subdir_fd, path.substr(slash + 1));
+  return RecursiveWaitForFileHelper(subdir_fd, path.substr(slash + 1), deadline);
 }
 
-zx::result<zx::channel> RecursiveWaitForFile(const int dir_fd, std::string_view target) {
+zx::result<zx::channel> RecursiveWaitForFile(const int dir_fd, std::string_view target,
+                                             zx::duration timeout) {
   if (target.length() > PATH_MAX) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
-  return RecursiveWaitForFileHelper(dir_fd, target);
+  return RecursiveWaitForFileHelper(dir_fd, target, zx::deadline_after(timeout));
 }
 
 }  // namespace
 
 __EXPORT
-zx::result<zx::channel> RecursiveWaitForFile(const int dir_fd, const char* path) {
+zx::result<zx::channel> RecursiveWaitForFile(const int dir_fd, const char* path,
+                                             zx::duration timeout) {
   std::string_view target{path};
-  return RecursiveWaitForFile(dir_fd, target);
+  return RecursiveWaitForFile(dir_fd, target, timeout);
 }
 
 __EXPORT
-zx::result<zx::channel> RecursiveWaitForFile(const char* path) {
+zx::result<zx::channel> RecursiveWaitForFile(const char* path, zx::duration timeout) {
   const std::string_view target{path};
   if (const size_t first_slash = target.find_first_of('/'); first_slash != 0) {
     // Relative paths are not supported.
@@ -228,7 +231,7 @@ zx::result<zx::channel> RecursiveWaitForFile(const char* path) {
     return zx::error(status);
   }
   const auto close_dir = fit::defer([dir_fd]() { close(dir_fd); });
-  return RecursiveWaitForFile(dir_fd, rest);
+  return RecursiveWaitForFile(dir_fd, rest, timeout);
 }
 
 }  // namespace device_watcher

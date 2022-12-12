@@ -5,6 +5,7 @@
 #include "src/storage/testing/ram_disk.h"
 
 #include <lib/component/incoming/cpp/service_client.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/job.h>
@@ -14,10 +15,11 @@
 namespace storage {
 
 zx::result<> WaitForRamctl(zx::duration time) {
-  auto status = zx::make_result(wait_for_device("/dev/sys/platform/00:00:2d/ramctl", time.get()));
-  if (status.is_error()) {
-    FX_LOGS(ERROR) << "Timed-out waiting for ramctl: " << status.status_string();
-    return status.take_error();
+  if (zx::result channel =
+          device_watcher::RecursiveWaitForFile("/dev/sys/platform/00:00:2d/ramctl", time);
+      channel.is_error()) {
+    FX_PLOGS(ERROR, channel.error_value()) << "Failed to wait for for ramctl";
+    return channel.take_error();
   }
   return zx::ok();
 }

@@ -4,6 +4,7 @@
 
 #include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/watcher.h>
 #include <zircon/assert.h>
@@ -12,6 +13,7 @@
 
 #include <string_view>
 
+#include <fbl/string.h>
 #include <fbl/string_printf.h>
 #include <gtest/gtest.h>
 #include <ramdevice-client/ramdisk.h>
@@ -665,10 +667,9 @@ class BlockWatcherTest : public testing::FshostIntegrationTest {
   }
 
   // TODO(https://fxbug.dev/117160): Avoid relying on predictable "device numbers".
-  static fbl::unique_fd WaitForBlockDevice(int number) {
-    auto path = fbl::StringPrintf("/dev/class/block/%03d", number);
-    EXPECT_EQ(wait_for_device(path.data(), ZX_TIME_INFINITE), ZX_OK);
-    return fbl::unique_fd(open(path.data(), O_RDWR));
+  static zx::result<zx::channel> WaitForBlockDevice(int number) {
+    fbl::String path = fbl::StringPrintf("/dev/class/block/%03d", number);
+    return device_watcher::RecursiveWaitForFile(path.c_str());
   }
 
   // Check that the number of block devices bound by the block watcher
@@ -685,22 +686,22 @@ class BlockWatcherTest : public testing::FshostIntegrationTest {
     ASSERT_NO_FATAL_FAILURE(ramdisk = CreateGptRamdisk());
 
     // Wait for the basic block driver to be bound
-    WaitForBlockDevice(next_device_number);
+    ASSERT_EQ(WaitForBlockDevice(next_device_number).status_value(), ZX_OK);
     next_device_number += 1;
 
     // And now, wait for the GPT driver to be bound, and the first
     // partition to appear.
-    fbl::unique_fd fd = WaitForBlockDevice(next_device_number);
+    zx::result channel = WaitForBlockDevice(next_device_number);
+    ASSERT_EQ(channel.status_value(), ZX_OK);
     next_device_number += 1;
 
     // Figure out the expected topological path of the last block device.
     std::string expected_path = ramdisk.path() + "/part-000/block";
 
-    fidl::ClientEnd<fuchsia_device::Controller> controller;
-    ASSERT_EQ(fdio_get_service_handle(fd.release(), controller.channel().reset_and_get_address()),
-              ZX_OK);
     // Get the actual topological path of the block device.
-    auto result = fidl::WireSyncClient(std::move(controller))->GetTopologicalPath();
+    auto result = fidl::WireSyncClient(
+                      fidl::ClientEnd<fuchsia_device::Controller>{std::move(channel.value())})
+                      ->GetTopologicalPath();
     ASSERT_EQ(result.status(), ZX_OK);
     ASSERT_FALSE(result->is_error());
 
@@ -740,7 +741,9 @@ TEST_F(BlockWatcherTest, TestBlockWatcherAdd) {
   ASSERT_NO_FATAL_FAILURE(client = CreateGptRamdisk());
 
   // Wait for fshost to bind the gpt driver.
-  EXPECT_EQ(wait_for_device((client.path() + "/part-000/block").c_str(), ZX_TIME_INFINITE), ZX_OK);
+  EXPECT_EQ(device_watcher::RecursiveWaitForFile((client.path() + "/part-000/block").c_str())
+                .status_value(),
+            ZX_OK);
 }
 
 TEST_F(BlockWatcherTest, TestBlockWatcherUnmatchedResume) {
@@ -783,7 +786,7 @@ TEST_F(BlockWatcherTest, TestResumeThenImmediatelyPause) {
   // Add another block device, which should also be ignored.
   storage::RamDisk client2;
   ASSERT_NO_FATAL_FAILURE(client2 = CreateGptRamdisk());
-  ASSERT_NO_FATAL_FAILURE(WaitForBlockDevice(next_device_number));
+  ASSERT_EQ(WaitForBlockDevice(next_device_number).status_value(), ZX_OK);
   next_device_number++;
 
   // Resume again.

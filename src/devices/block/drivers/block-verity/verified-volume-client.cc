@@ -7,14 +7,15 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.verified/cpp/wire.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/fdio.h>
+#include <zircon/status.h>
 
 #include <cstring>
 
 #include <fbl/string.h>
 #include <fbl/string_buffer.h>
-#include <ramdevice-client/ramdisk.h>  // for wait_for_device_at
 
 #include "lib/stdcompat/string_view.h"
 
@@ -85,35 +86,16 @@ zx_status_t VerifiedVolumeClient::CreateFromBlockDevice(
   fbl::String verity_path = fbl::String::Concat({block_dev_path, "/verity"});
 
   // Wait for the device to appear.
-  if (zx_status_t status =
-          wait_for_device_at(devfs_root_fd.get(), verity_path.c_str(), timeout.get());
-      status != ZX_OK) {
-    printf("VerifiedVolumeClient: verity device failed to appear: %s\n",
-           zx_status_get_string(status));
-    return status;
+  zx::result channel =
+      device_watcher::RecursiveWaitForFile(devfs_root_fd.get(), verity_path.c_str(), timeout);
+  if (channel.is_error()) {
+    printf("VerifiedVolumeClient: verity device failed to appear: %s\n", channel.status_string());
+    return channel.error_value();
   }
 
-  // Open the device.
-  fbl::unique_fd verity_fd(openat(devfs_root_fd.get(), verity_path.c_str(), O_RDONLY));
-  if (!verity_fd) {
-    printf("VerifiedVolumeClient: couldn't open verity device at %s\n", verity_path.c_str());
-    return ZX_ERR_NOT_FOUND;
-  }
-
-  // Take the channel from the FD.
-  fdio_cpp::FdioCaller verity_caller(std::move(verity_fd));
-  zx::result verity_chan = verity_caller.take_as<fuchsia_hardware_block_verified::DeviceManager>();
-  if (verity_chan.is_error()) {
-    printf("VerifiedVolumeClient: couldn't get verity channel from fd: %s\n",
-           verity_chan.status_string());
-    return verity_chan.status_value();
-  }
-
-  // Create client.
-  std::unique_ptr<VerifiedVolumeClient> vvc = std::make_unique<VerifiedVolumeClient>(
-      std::move(verity_chan.value()), std::move(devfs_root_fd));
-  // Move to caller's buffer.
-  *out = std::move(vvc);
+  *out = std::make_unique<VerifiedVolumeClient>(
+      fidl::ClientEnd<fuchsia_hardware_block_verified::DeviceManager>{std::move(channel.value())},
+      std::move(devfs_root_fd));
   return ZX_OK;
 }
 
@@ -151,31 +133,31 @@ zx_status_t VerifiedVolumeClient::OpenForAuthoring(const zx::duration& timeout,
   fbl::String mutable_path = fbl::String::Concat({verity_path, "/mutable"});
 
   // Wait for the `mutable` child device to appear
-  if (zx_status_t status =
-          wait_for_device_at(devfs_root_fd_.get(), mutable_path.c_str(), timeout.get());
-      status != ZX_OK) {
-    printf("VerifiedVolumeClient: mutable device failed to appear: %s\n",
-           zx_status_get_string(status));
-    return status;
+  if (zx::result channel =
+          device_watcher::RecursiveWaitForFile(devfs_root_fd_.get(), mutable_path.c_str(), timeout);
+      channel.is_error()) {
+    printf("VerifiedVolumeClient: mutable device failed to appear: %s\n", channel.status_string());
+    return channel.error_value();
   }
 
   // Then wait for the `block` child of that mutable device
   fbl::String mutable_block_path = fbl::String::Concat({mutable_path, "/block"});
-  if (zx_status_t status =
-          wait_for_device_at(devfs_root_fd_.get(), mutable_block_path.c_str(), timeout.get());
-      status != ZX_OK) {
+  zx::result channel = device_watcher::RecursiveWaitForFile(devfs_root_fd_.get(),
+                                                            mutable_block_path.c_str(), timeout);
+  if (channel.is_error()) {
     printf("VerifiedVolumeClient: mutable block device failed to appear: %s\n",
-           zx_status_get_string(status));
-    return status;
+           channel.status_string());
+    return channel.error_value();
   }
 
   // Open child device and return
-  mutable_block_fd_out.reset(openat(devfs_root_fd_.get(), mutable_block_path.c_str(), O_RDONLY));
-  if (!mutable_block_fd_out) {
-    printf("VerifiedVolumeClient: failed to open %s\n", mutable_block_path.c_str());
-    return ZX_ERR_NOT_FOUND;
+  if (zx_status_t status =
+          fdio_fd_create(channel.value().release(), mutable_block_fd_out.reset_and_get_address());
+      status != ZX_OK) {
+    printf("VerifiedVolumeClient: failed to open %s: %s\n", mutable_block_path.c_str(),
+           zx_status_get_string(status));
+    return status;
   }
-
   return ZX_OK;
 }
 
@@ -253,31 +235,30 @@ zx_status_t VerifiedVolumeClient::OpenForVerifiedRead(const digest::Digest& expe
   fbl::String verified_path = fbl::String::Concat({verity_path, "/verified"});
 
   // Wait for the `verified` child device to appear
-  fbl::unique_fd verified_fd;
-  if (zx_status_t status =
-          wait_for_device_at(devfs_root_fd_.get(), verified_path.c_str(), timeout.get());
-      status != ZX_OK) {
-    printf("VerifiedVolumeClient: verified device failed to appear: %s\n",
-           zx_status_get_string(status));
-    return status;
+  if (zx::result channel = device_watcher::RecursiveWaitForFile(devfs_root_fd_.get(),
+                                                                verified_path.c_str(), timeout);
+      channel.is_error()) {
+    printf("VerifiedVolumeClient: verified device failed to appear: %s\n", channel.status_string());
+    return channel.error_value();
   }
 
   // Then wait for the `block` child of that verified device
   fbl::String verified_block_path = fbl::String::Concat({verified_path, "/block"});
-  if (zx_status_t status =
-          wait_for_device_at(devfs_root_fd_.get(), verified_block_path.c_str(), timeout.get());
-      status != ZX_OK) {
+  zx::result channel = device_watcher::RecursiveWaitForFile(devfs_root_fd_.get(),
+                                                            verified_block_path.c_str(), timeout);
+  if (channel.is_error()) {
     printf("VerifiedVolumeClient: verified block device failed to appear: %s\n",
+           channel.status_string());
+    return channel.error_value();
+  }
+
+  if (zx_status_t status =
+          fdio_fd_create(channel.value().release(), verified_block_fd_out.reset_and_get_address());
+      status != ZX_OK) {
+    printf("VerifiedVolumeClient: failed to open %s: %s\n", verified_block_path.c_str(),
            zx_status_get_string(status));
     return status;
   }
-
-  verified_block_fd_out.reset(openat(devfs_root_fd_.get(), verified_block_path.c_str(), O_RDONLY));
-  if (!verified_block_fd_out) {
-    printf("VerifiedVolumeClient: failed to open %s\n", verified_block_path.c_str());
-    return ZX_ERR_NOT_FOUND;
-  }
-
   return ZX_OK;
 }
 

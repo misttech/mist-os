@@ -13,6 +13,7 @@
 #include <fuchsia/fs/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/incoming/cpp/service_client.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
@@ -49,7 +50,7 @@ namespace fs_test {
 namespace {
 
 /// Amount of time to wait for a given device to be available.
-constexpr zx_duration_t kDeviceWaitTime = zx::sec(30).get();
+constexpr zx::duration kDeviceWaitTime = zx::sec(30);
 
 // Creates a ram-disk with an optional FVM partition. Returns the ram-disk and the device path.
 zx::result<std::pair<storage::RamDisk, std::string>> CreateRamDisk(
@@ -144,12 +145,12 @@ zx::result<std::pair<ramdevice_client::RamNand, std::string>> CreateRamNand(
                                         kPageSize / kPagesPerBlock);
   }
 
-  auto status =
-      zx::make_result(wait_for_device("/dev/sys/platform/00:00:2e/nand-ctl", kDeviceWaitTime));
-  if (status.is_error()) {
+  if (zx::result channel = device_watcher::RecursiveWaitForFile(
+          "/dev/sys/platform/00:00:2e/nand-ctl", kDeviceWaitTime);
+      channel.is_error()) {
     std::cout << "Failed waiting for /dev/sys/platform/00:00:2e/nand-ctl to appear: "
-              << status.status_string() << std::endl;
-    return status.take_error();
+              << channel.status_string() << std::endl;
+    return channel.take_error();
   }
 
   std::optional<ramdevice_client::RamNand> ram_nand;
@@ -166,17 +167,19 @@ zx::result<std::pair<ramdevice_client::RamNand, std::string>> CreateRamNand(
           },
       .fail_after = options.fail_after,
   };
-  status = zx::make_result(ramdevice_client::RamNand::Create(std::move(config), &ram_nand));
-  if (status.is_error()) {
+  if (zx::result status =
+          zx::make_result(ramdevice_client::RamNand::Create(std::move(config), &ram_nand));
+      status.is_error()) {
     std::cout << "RamNand::Create failed: " << status.status_string() << std::endl;
     return status.take_error();
   }
 
   std::string ftl_path = std::string(ram_nand->path()) + "/ftl/block";
-  status = zx::make_result(wait_for_device(ftl_path.c_str(), kDeviceWaitTime));
-  if (status.is_error()) {
-    std::cout << "Timed out waiting for RamNand" << std::endl;
-    return status.take_error();
+  if (zx::result channel = device_watcher::RecursiveWaitForFile(ftl_path.c_str(), kDeviceWaitTime);
+      channel.is_error()) {
+    std::cout << "Failed waiting for " << ftl_path << " to appear: " << channel.status_string()
+              << std::endl;
+    return channel.take_error();
   }
   return zx::ok(std::make_pair(*std::move(ram_nand), std::move(ftl_path)));
 }
@@ -382,10 +385,12 @@ zx::result<std::pair<RamDevice, std::string>> OpenRamDevice(const TestFilesystem
     device_path.append("/fvm/fs-test-partition-p-1/block");
   }
 
-  auto status = zx::make_result(wait_for_device(device_path.c_str(), kDeviceWaitTime));
-  if (status.is_error()) {
-    std::cout << "Timed out waiting for partition to show up" << std::endl;
-    return status.take_error();
+  if (zx::result channel =
+          device_watcher::RecursiveWaitForFile(device_path.c_str(), kDeviceWaitTime);
+      channel.is_error()) {
+    std::cout << "Failed waiting for " << device_path << " to appear: " << channel.status_string()
+              << std::endl;
+    return channel.take_error();
   }
 
   return zx::ok(std::make_pair(std::move(ram_device), std::move(device_path)));

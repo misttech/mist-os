@@ -74,7 +74,9 @@ static_assert(sizeof(fuchsia_hardware_block_partition::wire::Guid) == sizeof kGu
 class Environment : public testing::Environment {
  public:
   void SetUp() override {
-    ASSERT_EQ(wait_for_device("/dev/sys/platform/00:00:2d/ramctl", ZX_TIME_INFINITE), ZX_OK);
+    ASSERT_EQ(
+        device_watcher::RecursiveWaitForFile("/dev/sys/platform/00:00:2d/ramctl").status_value(),
+        ZX_OK);
   }
 };
 
@@ -139,37 +141,6 @@ class RamdiskTest {
 
   ramdisk_client_t* ramdisk_;
 };
-
-TEST(RamdiskTests, RamdiskTestWaitForDevice) {
-  EXPECT_EQ(wait_for_device("/", ZX_SEC(1)), ZX_ERR_BAD_PATH);
-
-  char path[PATH_MAX];
-  char mod[PATH_MAX];
-  ramdisk_client_t* ramdisk = nullptr;
-  ASSERT_EQ(ramdisk_create(512, 64, &ramdisk), ZX_OK);
-  strlcpy(path, ramdisk_get_path(ramdisk), sizeof(path));
-
-  // Null path/zero timeout
-  EXPECT_EQ(wait_for_device(path, 0), ZX_ERR_INVALID_ARGS);
-  EXPECT_EQ(wait_for_device(nullptr, ZX_SEC(1)), ZX_ERR_INVALID_ARGS);
-
-  // Trailing slash:
-  // .../ramdisk-xxx/block/
-  snprintf(mod, sizeof(mod), "%s/", path);
-  EXPECT_EQ(wait_for_device(mod, ZX_SEC(1)), ZX_OK);
-
-  // Repeated slashes/empty path segment:
-  // .../ramdisk-xxx//block
-  char* sep = strrchr(path, '/');
-  ASSERT_NE(sep, nullptr);
-  size_t off = sep - path;
-  snprintf(&mod[off], sizeof(mod) - off, "/%s", sep);
-  EXPECT_EQ(wait_for_device(mod, ZX_SEC(1)), ZX_OK);
-
-  // .../ramdisk-xxx/block
-  EXPECT_EQ(wait_for_device(path, ZX_SEC(1)), ZX_OK);
-  ASSERT_GE(ramdisk_destroy(ramdisk), 0) << "Could not destroy ramdisk device";
-}
 
 TEST(RamdiskTests, RamdiskTestSimple) {
   std::vector<uint8_t> buf(zx_system_get_page_size());
@@ -595,7 +566,10 @@ TEST(RamdiskTests, RamdiskTestRebind) {
   ASSERT_TRUE(result.ok()) << result.FormatDescription();
   const fidl::WireResponse response = result.value();
   ASSERT_EQ(response.status, ZX_OK);
-  ASSERT_EQ(wait_for_device(ramdisk_get_path(ramdisk->ramdisk_client()), ZX_SEC(3)), ZX_OK);
+  ASSERT_EQ(
+      device_watcher::RecursiveWaitForFile(ramdisk_get_path(ramdisk->ramdisk_client()), zx::sec(3))
+          .status_value(),
+      ZX_OK);
 }
 
 TEST(RamdiskTests, RamdiskTestBadRequests) {
@@ -1661,9 +1635,10 @@ TEST(RamdiskTests, RamdiskCreateAt) {
   ramdisk_client_t* ramdisk = nullptr;
   ASSERT_EQ(ramdisk_create_at(devfs_fd.get(), zx_system_get_page_size() / 2, 512, &ramdisk), ZX_OK);
 
-  ASSERT_EQ(
-      wait_for_device((std::string("/dev/") + ramdisk_get_path(ramdisk)).c_str(), ZX_TIME_INFINITE),
-      ZX_OK);
+  ASSERT_EQ(device_watcher::RecursiveWaitForFile(
+                (std::string("/dev/") + ramdisk_get_path(ramdisk)).c_str())
+                .status_value(),
+            ZX_OK);
   ramdisk_destroy(ramdisk);
 }
 
@@ -1676,9 +1651,10 @@ TEST(RamdiskTests, RamdiskCreateAtGuid) {
                                         sizeof(kGuid), &ramdisk),
             ZX_OK);
 
-  ASSERT_EQ(
-      wait_for_device((std::string("/dev/") + ramdisk_get_path(ramdisk)).c_str(), ZX_TIME_INFINITE),
-      ZX_OK);
+  ASSERT_EQ(device_watcher::RecursiveWaitForFile(
+                (std::string("/dev/") + ramdisk_get_path(ramdisk)).c_str())
+                .status_value(),
+            ZX_OK);
   ramdisk_destroy(ramdisk);
 }
 
@@ -1691,9 +1667,10 @@ TEST(RamdiskTests, RamdiskCreateAtVmo) {
   ramdisk_client_t* ramdisk = nullptr;
   ASSERT_EQ(ramdisk_create_at_from_vmo(devfs_fd.get(), vmo.release(), &ramdisk), ZX_OK);
 
-  ASSERT_EQ(
-      wait_for_device((std::string("/dev/") + ramdisk_get_path(ramdisk)).c_str(), ZX_TIME_INFINITE),
-      ZX_OK);
+  ASSERT_EQ(device_watcher::RecursiveWaitForFile(
+                (std::string("/dev/") + ramdisk_get_path(ramdisk)).c_str())
+                .status_value(),
+            ZX_OK);
   ramdisk_destroy(ramdisk);
 }
 

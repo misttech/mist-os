@@ -8,8 +8,10 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <inttypes.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
+#include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
 #include <lib/zircon-internal/debug.h>
 #include <lib/zx/channel.h>
@@ -21,7 +23,6 @@
 
 #include <fbl/string_buffer.h>
 #include <fbl/vector.h>
-#include <ramdevice-client/ramdisk.h>  // Why does wait_for_device_at() come from here?
 
 #include "src/security/lib/kms-stateless/kms-stateless.h"
 
@@ -265,7 +266,6 @@ VolumeManager::VolumeManager(fbl::unique_fd&& block_dev_fd, fbl::unique_fd&& dev
     : block_dev_fd_(std::move(block_dev_fd)), devfs_root_fd_(std::move(devfs_root_fd)) {}
 
 zx_status_t VolumeManager::OpenInnerBlockDevice(const zx::duration& timeout, fbl::unique_fd* out) {
-  zx_status_t rc;
   fbl::String path_base;
 
   fdio_cpp::UnownedFdioCaller caller(block_dev_fd_.get());
@@ -274,33 +274,25 @@ zx_status_t VolumeManager::OpenInnerBlockDevice(const zx::duration& timeout, fbl
     return ZX_ERR_BAD_STATE;
   }
 
-  if ((rc = RelativeTopologicalPath(caller, &path_base)) != ZX_OK) {
-    xprintf("could not get topological path: %s\n", zx_status_get_string(rc));
-    return rc;
+  if (zx_status_t status = RelativeTopologicalPath(caller, &path_base); status != ZX_OK) {
+    xprintf("could not get topological path: %s\n", zx_status_get_string(status));
+    return status;
   }
   fbl::String path_block_exposed = fbl::String::Concat({path_base, "/zxcrypt/unsealed/block"});
 
-  // Early return if path_block_exposed is already present in the device tree
-  fbl::unique_fd fd(openat(devfs_root_fd_.get(), path_block_exposed.c_str(), O_RDONLY));
-  if (fd) {
-    out->reset(fd.release());
-    return ZX_OK;
-  }
-
   // Wait for the unsealed and block devices to bind
-  if ((rc = wait_for_device_at(devfs_root_fd_.get(), path_block_exposed.c_str(), timeout.get())) !=
-      ZX_OK) {
-    xprintf("timed out waiting for %s to exist: %s\n", path_block_exposed.c_str(),
-            zx_status_get_string(rc));
-    return rc;
+  zx::result channel = device_watcher::RecursiveWaitForFile(devfs_root_fd_.get(),
+                                                            path_block_exposed.c_str(), timeout);
+  if (channel.is_error()) {
+    xprintf("failure waiting for %s to exist: %s\n", path_block_exposed.c_str(),
+            channel.status_string());
+    return channel.error_value();
   }
-  fd.reset(openat(devfs_root_fd_.get(), path_block_exposed.c_str(), O_RDONLY));
-  if (!fd) {
-    xprintf("failed to open zxcrypt volume\n");
-    return ZX_ERR_NOT_FOUND;
+  if (zx_status_t status = fdio_fd_create(channel.value().release(), out->reset_and_get_address());
+      status != ZX_OK) {
+    xprintf("failed to open zxcrypt volume: %s\n", zx_status_get_string(status));
+    return status;
   }
-
-  out->reset(fd.release());
   return ZX_OK;
 }
 
@@ -315,51 +307,48 @@ zx_status_t VolumeManager::OpenClient(const zx::duration& timeout, zx::channel& 
 
 zx_status_t VolumeManager::OpenClientWithCaller(fdio_cpp::UnownedFdioCaller& caller,
                                                 const zx::duration& timeout, zx::channel& out) {
-  zx_status_t rc;
   fbl::String path_base;
 
-  if ((rc = RelativeTopologicalPath(caller, &path_base)) != ZX_OK) {
-    xprintf("could not get topological path: %s\n", zx_status_get_string(rc));
-    return rc;
+  if (zx_status_t status = RelativeTopologicalPath(caller, &path_base); status != ZX_OK) {
+    xprintf("could not get topological path: %s\n", zx_status_get_string(status));
+    return status;
   }
   fbl::String path_manager = fbl::String::Concat({path_base, "/zxcrypt"});
 
-  fbl::unique_fd fd(openat(devfs_root_fd_.get(), path_manager.c_str(), O_RDONLY));
-  if (!fd) {
-    // No manager device in the /dev tree yet.  Try binding the zxcrypt
-    // driver and waiting for it to appear.
-    auto resp = fidl::WireCall(caller.borrow_as<fuchsia_device::Controller>())
-                    ->Bind(::fidl::StringView::FromExternal(kDriverLib));
-    rc = resp.status();
-    if (rc == ZX_OK) {
-      if (resp->is_error()) {
-        rc = resp->error_value();
-      }
+  if (fbl::unique_fd fd(openat(devfs_root_fd_.get(), path_manager.c_str(), O_RDONLY));
+      fd.is_valid()) {
+    if (zx_status_t status = fdio_get_service_handle(fd.release(), out.reset_and_get_address());
+        status != ZX_OK) {
+      xprintf("failed to get service handle for zxcrypt manager: %s\n",
+              zx_status_get_string(status));
+      return status;
     }
-    if (rc != ZX_OK) {
-      xprintf("could not bind zxcrypt driver: %s\n", zx_status_get_string(rc));
-      return rc;
-    }
-
-    // Await the appearance of the zxcrypt device.
-    if ((rc = wait_for_device_at(devfs_root_fd_.get(), path_manager.c_str(), timeout.get())) !=
-        ZX_OK) {
-      xprintf("zxcrypt driver failed to bind: %s\n", zx_status_get_string(rc));
-      return rc;
-    }
-
-    fd.reset(openat(devfs_root_fd_.get(), path_manager.c_str(), O_RDONLY));
-    if (!fd) {
-      xprintf("failed to open zxcrypt manager\n");
-      return ZX_ERR_NOT_FOUND;
-    }
+    return ZX_OK;
   }
 
-  if ((rc = fdio_get_service_handle(fd.release(), out.reset_and_get_address())) != ZX_OK) {
-    xprintf("failed to get service handle for zxcrypt manager: %s\n", zx_status_get_string(rc));
-    return rc;
+  // No manager device in the /dev tree yet.  Try binding the zxcrypt
+  // driver and waiting for it to appear.
+  auto resp = fidl::WireCall(caller.borrow_as<fuchsia_device::Controller>())
+                  ->Bind(::fidl::StringView::FromExternal(kDriverLib));
+  zx_status_t status = resp.status();
+  if (status == ZX_OK) {
+    if (resp.value().is_error()) {
+      status = resp.value().error_value();
+    }
+  }
+  if (status != ZX_OK) {
+    xprintf("could not bind zxcrypt driver: %s\n", zx_status_get_string(status));
+    return status;
   }
 
+  // Await the appearance of the zxcrypt device.
+  zx::result channel =
+      device_watcher::RecursiveWaitForFile(devfs_root_fd_.get(), path_manager.c_str(), timeout);
+  if (channel.is_error()) {
+    xprintf("failue waiting for zxcrypt driver to bind: %s\n", channel.status_string());
+    return channel.error_value();
+  }
+  out = std::move(channel.value());
   return ZX_OK;
 }
 

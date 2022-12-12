@@ -18,12 +18,18 @@ namespace device_watcher {
 // Waits for the relative |path| starting in the directory represented by |dir_fd| to appear,
 // and opens it.
 // This method does not take ownership of |dir_fd|.
-zx::result<zx::channel> RecursiveWaitForFile(int dir_fd, const char* path);
+//
+// TODO(https://fxbug.dev/117188): Remove `timeout`.
+zx::result<zx::channel> RecursiveWaitForFile(int dir_fd, const char* path,
+                                             zx::duration timeout = zx::duration::infinite());
 
 // Waits for the absolute |path| to appear, and opens it.
 // NOTE: This only works for absolute paths,
 // otherwise it will return ZX_ERR_NOT_SUPPORTED.
-zx::result<zx::channel> RecursiveWaitForFile(const char* path);
+//
+// TODO(https://fxbug.dev/117188): Remove `timeout`.
+zx::result<zx::channel> RecursiveWaitForFile(const char* path,
+                                             zx::duration timeout = zx::duration::infinite());
 
 // Invokes |callback| on each entry in the directory, returning immediately after all entries have
 // been processed. |callback| is passed the file name and a channel for the file's fuchsia.io.Node
@@ -56,6 +62,8 @@ class DirWatcher {
 
   // Returns ZX_OK if |filename| is removed from the directory before the given timeout elapses.
   // If no filename is specified, this will wait for any file in the directory to be removed.
+  //
+  // TODO(https://fxbug.dev/117188): Remove `timeout`.
   zx_status_t WaitForRemoval(std::string_view filename, zx::duration timeout);
 
  private:

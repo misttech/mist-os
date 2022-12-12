@@ -106,10 +106,10 @@ std::unique_ptr<RamdiskRef> RamdiskRef::Create(const fbl::unique_fd& devfs_root,
     return nullptr;
   }
 
-  if (zx_status_t status =
-          wait_for_device_at(devfs_root.get(), kRamdiskCtlPath, kDeviceWaitTime.get());
-      status != ZX_OK) {
-    ADD_FAILURE("Failed to wait for RamCtl. Reason: %s", zx_status_get_string(status));
+  if (zx::result channel =
+          device_watcher::RecursiveWaitForFile(devfs_root.get(), kRamdiskCtlPath, kDeviceWaitTime);
+      channel.is_error()) {
+    ADD_FAILURE("Failed to wait for RamCtl. Reason: %s", channel.status_string());
     return nullptr;
   }
 
@@ -150,13 +150,13 @@ void BlockDeviceAdapter::CheckContentsAt(const fbl::Array<uint8_t>& data, uint64
 }
 
 zx_status_t BlockDeviceAdapter::WaitUntilVisible() const {
-  zx_status_t status =
-      wait_for_device_at(devfs_root_.get(), device()->path(), kDeviceWaitTime.get());
-
-  if (status != ZX_OK) {
-    ADD_FAILURE("Block device did not become visible at: %s", device()->path());
+  zx::result channel =
+      device_watcher::RecursiveWaitForFile(devfs_root_.get(), device()->path(), kDeviceWaitTime);
+  if (channel.is_error()) {
+    ADD_FAILURE("Block device did not become visible at %s: %s", device()->path(),
+                channel.status_string());
   }
-  return status;
+  return channel.status_value();
 }
 
 zx_status_t BlockDeviceAdapter::Rebind() {
@@ -290,8 +290,10 @@ std::unique_ptr<FvmAdapter> FvmAdapter::CreateGrowable(const fbl::unique_fd& dev
   fbl::StringBuffer<kPathMax> fvm_path;
   fvm_path.AppendPrintf("%s/fvm", device->path());
 
-  if (wait_for_device_at(devfs_root.get(), fvm_path.c_str(), kDeviceWaitTime.get()) != ZX_OK) {
-    ADD_FAILURE("Loading FVM driver timeout.");
+  if (zx::result channel =
+          device_watcher::RecursiveWaitForFile(devfs_root.get(), fvm_path.c_str(), kDeviceWaitTime);
+      channel.is_error()) {
+    ADD_FAILURE("Loading FVM driver: %s", channel.status_string());
     return nullptr;
   }
   return std::make_unique<FvmAdapter>(devfs_root, fvm_path.c_str(), device);
@@ -362,10 +364,11 @@ zx_status_t FvmAdapter::Rebind(fbl::Vector<VPartitionAdapter*> vpartitions) {
   }
 
   // Wait for FVM driver to become visible.
-  if (zx_status_t status = wait_for_device_at(devfs_root_.get(), path(), kDeviceWaitTime.get());
-      status != ZX_OK) {
-    ADD_FAILURE("Loading FVM driver timeout.");
-    return status;
+  if (zx::result channel =
+          device_watcher::RecursiveWaitForFile(devfs_root_.get(), path(), kDeviceWaitTime);
+      channel.is_error()) {
+    ADD_FAILURE("Loading FVM driver: %s", channel.status_string());
+    return channel.status_value();
   }
 
   for (auto* vpartition : vpartitions) {

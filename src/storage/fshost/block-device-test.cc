@@ -6,6 +6,7 @@
 
 #include <fcntl.h>
 #include <fidl/fuchsia.io/cpp/wire_test_base.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/namespace.h>
 #include <lib/fpromise/single_threaded_executor.h>
 #include <lib/inspect/cpp/reader.h>
@@ -77,7 +78,9 @@ class BlockDeviceTest : public testing::Test {
     if (use_guid)
       options.type_guid = std::array<uint8_t, GPT_GUID_LEN>(GUID_DATA_VALUE);
     ramdisk_ = storage::RamDisk::Create(kBlockSize, kBlockCount, options).value();
-    ASSERT_EQ(wait_for_device(ramdisk_->path().c_str(), zx::sec(10).get()), ZX_OK);
+    ASSERT_EQ(
+        device_watcher::RecursiveWaitForFile(ramdisk_->path().c_str(), zx::sec(10)).status_value(),
+        ZX_OK);
   }
 
   zx::result<fidl::ClientEnd<fuchsia_hardware_block::Block>> RamdiskDevice() const {

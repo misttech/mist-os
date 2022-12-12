@@ -11,6 +11,7 @@
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <lib/component/incoming/cpp/service_client.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fzl/vmo-mapper.h>
@@ -221,8 +222,7 @@ fbl::unique_fd TryBindToFvmDriver(const fbl::unique_fd& devfs_root,
   char fvm_path[PATH_MAX];
   snprintf(fvm_path, sizeof(fvm_path), "%s/fvm", &path[5]);
 
-  fbl::unique_fd fvm(openat(devfs_root.get(), fvm_path, O_RDONLY));
-  if (fvm) {
+  if (fbl::unique_fd fvm(openat(devfs_root.get(), fvm_path, O_RDONLY)); fvm) {
     return fvm;
   }
 
@@ -237,22 +237,22 @@ fbl::unique_fd TryBindToFvmDriver(const fbl::unique_fd& devfs_root,
     }
   }
   if (status != ZX_OK && status != ZX_ERR_ALREADY_BOUND) {
-    ERROR("Could not rebind fvm driver, Error %d\n", status);
+    ERROR("Could not rebind fvm driver: %s\n", zx_status_get_string(status));
     return fbl::unique_fd();
   }
 
-  if (wait_for_device_at(devfs_root.get(), fvm_path, timeout.get()) != ZX_OK) {
-    ERROR("Error waiting for fvm driver to bind\n");
+  zx::result channel = device_watcher::RecursiveWaitForFile(devfs_root.get(), fvm_path, timeout);
+  if (channel.is_error()) {
+    ERROR("Error waiting for fvm driver to bind: %s\n", channel.status_string());
     return fbl::unique_fd();
   }
-
-  auto fvm_device_fd = openat(devfs_root.get(), fvm_path, O_RDONLY);
-  if (fvm_device_fd == -1) {
-    ERROR("Failed to open fvm dev file at \"%s\": %s\n", fvm_path, strerror(errno));
+  fbl::unique_fd fd;
+  if (zx_status_t status = fdio_fd_create(channel.value().release(), fd.reset_and_get_address());
+      status != ZX_OK) {
+    ERROR("Failed to create fvm device fd at \"%s\": %s\n", fvm_path, zx_status_get_string(status));
     return fbl::unique_fd();
   }
-
-  return fbl::unique_fd(fvm_device_fd);
+  return fd;
 }
 
 fbl::unique_fd FvmPartitionFormat(const fbl::unique_fd& devfs_root, fbl::unique_fd partition_fd,

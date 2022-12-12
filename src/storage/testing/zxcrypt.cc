@@ -5,6 +5,7 @@
 #include "src/storage/testing/zxcrypt.h"
 
 #include <fcntl.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <ramdevice-client/ramdisk.h>
@@ -53,9 +54,12 @@ zx::result<std::string> CreateZxcryptVolume(const std::string& device_path) {
     return topological_path_or.take_error();
   }
   std::string zxcrypt_device_path = topological_path_or.value() + "/zxcrypt/unsealed/block";
-  status = zx::make_result(wait_for_device(zxcrypt_device_path.c_str(), zx::sec(2).get()));
-  if (status.is_error()) {
-    FX_LOGS(ERROR) << "Test zxcrypt device never appeared at " << zxcrypt_device_path;
+  if (zx::result channel =
+          device_watcher::RecursiveWaitForFile(zxcrypt_device_path.c_str(), zx::sec(2));
+      channel.is_error()) {
+    FX_PLOGS(ERROR, channel.error_value())
+        << "Test zxcrypt device never appeared at " << zxcrypt_device_path;
+    return channel.take_error();
   }
   return zx::ok(std::move(zxcrypt_device_path));
 }

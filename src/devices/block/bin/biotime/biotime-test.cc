@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/spawn.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/process.h>
@@ -19,7 +20,7 @@ namespace {
 // returns a success status.
 void run_biotime(fbl::Vector<const char*>&& args) {
   ramdisk_client_t* ramdisk;
-  ASSERT_EQ(wait_for_device("/dev/sys/platform/00:00:2d/ramctl", ZX_TIME_INFINITE), ZX_OK);
+  ASSERT_OK(device_watcher::RecursiveWaitForFile("/dev/sys/platform/00:00:2d/ramctl"));
   ASSERT_EQ(ramdisk_create(1024, 100, &ramdisk), ZX_OK);
   auto cleanup = fit::defer([&] { EXPECT_EQ(ramdisk_destroy(ramdisk), 0); });
 

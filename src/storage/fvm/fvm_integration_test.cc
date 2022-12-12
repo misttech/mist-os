@@ -11,6 +11,7 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/driver-integration-test/fixture.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/namespace.h>
@@ -47,12 +48,14 @@
 #include <fbl/auto_lock.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
+#include <fbl/string.h>
 #include <fbl/unique_fd.h>
 #include <fbl/vector.h>
 #include <ramdevice-client/ramdisk.h>
 #include <zxtest/zxtest.h>
 
 #include "lib/fidl/cpp/wire/internal/transport_channel.h"
+#include "src/lib/fxl/strings/string_printf.h"
 #include "src/lib/storage/block_client/cpp/client.h"
 #include "src/lib/storage/block_client/cpp/remote_block_device.h"
 #include "src/lib/storage/fs_management/cpp/admin.h"
@@ -91,8 +94,8 @@ class FvmTest : public zxtest::Test {
     args.disable_block_watcher = true;
 
     ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr_));
-    ASSERT_OK(wait_for_device_at(devfs_root().get(), "sys/platform/00:00:2d/ramctl",
-                                 zx::duration::infinite().get()));
+    ASSERT_OK(
+        device_watcher::RecursiveWaitForFile(devfs_root().get(), "sys/platform/00:00:2d/ramctl"));
 
     ASSERT_OK(loop_.StartThread());
 
@@ -111,9 +114,11 @@ class FvmTest : public zxtest::Test {
     ASSERT_OK(ramdisk_destroy(ramdisk_));
   }
 
-  fbl::unique_fd fvm_device() const { return fbl::unique_fd(open(fvm_driver_path_, O_RDONLY)); }
+  fbl::String fvm_path() const { return fxl::StringPrintf("%s/fvm", ramdisk_get_path(ramdisk_)); }
 
-  const char* fvm_path() const { return fvm_driver_path_; }
+  fbl::unique_fd fvm_device() const {
+    return fbl::unique_fd(openat(devfs_root().get(), fvm_path().c_str(), O_RDONLY));
+  }
 
   fidl::UnownedClientEnd<fuchsia_device::Controller> ramdisk_controller_interface() const {
     return fidl::UnownedClientEnd<fuchsia_device::Controller>(
@@ -126,8 +131,6 @@ class FvmTest : public zxtest::Test {
   }
 
   const ramdisk_client* ramdisk() const { return ramdisk_; }
-
-  const char* ramdisk_path() const { return ramdisk_path_; }
 
   void FVMRebind();
 
@@ -174,13 +177,10 @@ class FvmTest : public zxtest::Test {
   IsolatedDevmgr devmgr_;
   ramdisk_client_t* ramdisk_ = nullptr;
   fs_management::MountOptions mounting_options_;
-  char ramdisk_path_[PATH_MAX] = {};
-  char fvm_driver_path_[PATH_MAX] = {};
 };
 
 void FvmTest::CreateRamdisk(uint64_t block_size, uint64_t block_count) {
   ASSERT_OK(ramdisk_create_at(devfs_root().get(), block_size, block_count, &ramdisk_));
-  snprintf(ramdisk_path_, PATH_MAX, "%s/%s", kTestDevPath, ramdisk_get_path(ramdisk_));
 }
 
 void FvmTest::CreateFVM(uint64_t block_size, uint64_t block_count, uint64_t slice_size) {
@@ -194,8 +194,7 @@ void FvmTest::CreateFVM(uint64_t block_size, uint64_t block_count, uint64_t slic
   ASSERT_OK(resp.status());
   ASSERT_TRUE(resp->is_ok());
 
-  snprintf(fvm_driver_path_, PATH_MAX, "%s/fvm", ramdisk_path_);
-  ASSERT_OK(wait_for_device(fvm_driver_path_, zx::duration::infinite().get()));
+  ASSERT_OK(device_watcher::RecursiveWaitForFile(devfs_root().get(), fvm_path().c_str()));
 }
 
 void FvmTest::FVMRebind() {
@@ -204,9 +203,7 @@ void FvmTest::FVMRebind() {
   ASSERT_OK(resp.status());
   ASSERT_TRUE(resp->is_ok());
 
-  char path[PATH_MAX];
-  snprintf(path, sizeof(path), "%s/fvm", ramdisk_path_);
-  ASSERT_OK(wait_for_device(path, zx::duration::infinite().get()));
+  ASSERT_OK(device_watcher::RecursiveWaitForFile(devfs_root().get(), fvm_path().c_str()));
 }
 
 void FVMCheckSliceSize(const fbl::unique_fd& fd, size_t expected_slice_size) {
@@ -528,7 +525,6 @@ TEST_F(FvmTest, TestTooSmall) {
 
 // Test initializing the FVM on a large partition, with metadata size > the max transfer size
 TEST_F(FvmTest, TestLarge) {
-  char fvm_path[PATH_MAX];
   constexpr uint64_t kBlockSize = 512;
   constexpr uint64_t kBlockCount{UINT64_C(8) * (1 << 20)};
   CreateRamdisk(kBlockSize, kBlockCount);
@@ -551,8 +547,7 @@ TEST_F(FvmTest, TestLarge) {
   ASSERT_OK(resp.status());
   ASSERT_TRUE(resp->is_ok());
 
-  snprintf(fvm_path, sizeof(fvm_path), "%s/fvm", ramdisk_path());
-  ASSERT_OK(wait_for_device(fvm_path, zx::duration::infinite().get()));
+  ASSERT_OK(device_watcher::RecursiveWaitForFile(devfs_root().get(), fvm_path().c_str()));
   ValidateFVM(ramdisk_block_interface());
 }
 
@@ -2813,9 +2808,7 @@ TEST_F(FvmTest, TestAbortDriverLoadSmallDevice) {
       fidl::WireCall(ramdisk_controller_interface())->Rebind(fidl::StringView(FVM_DRIVER_LIB));
   ASSERT_OK(resp2.status());
   ASSERT_TRUE(resp2->is_ok());
-  char fvm_path[PATH_MAX];
-  snprintf(fvm_path, sizeof(fvm_path), "%s/fvm", ramdisk_path());
-  ASSERT_OK(wait_for_device(fvm_path, zx::duration::infinite().get()));
+  ASSERT_OK(device_watcher::RecursiveWaitForFile(devfs_root().get(), fvm_path().c_str()));
 }
 
 TEST_F(FvmTest, TestPreventDuplicateDeviceNames) {

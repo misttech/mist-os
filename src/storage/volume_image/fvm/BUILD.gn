@@ -192,6 +192,7 @@ test("fvm_sparse_image_reader_test") {
   deps = [
     ":fvm-sparse-image",
     "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/device-watcher/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/storage/block_client/cpp",
     "//src/lib/storage/fs_management",

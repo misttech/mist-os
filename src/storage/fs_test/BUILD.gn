@@ -22,6 +22,7 @@ static_library("fs_test") {
     "//sdk/fidl/fuchsia.fs:fuchsia.fs_hlcpp",
     "//sdk/fidl/fuchsia.hardware.ramdisk:fuchsia.hardware.ramdisk_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/sys/cpp",
     "//src/lib/json_parser",

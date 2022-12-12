@@ -10,6 +10,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/service_client.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
 #include <lib/fdio/watcher.h>
@@ -18,6 +19,7 @@
 #include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
+#include <lib/zx/time.h>
 #include <zircon/boot/image.h>
 #include <zircon/dlfcn.h>
 #include <zircon/processargs.h>
@@ -87,17 +89,17 @@ zx_status_t get_ramdisk(zx::vmo* ramdisk_vmo) {
 }
 
 int RamctlWatcher(void* arg) {
-  zx_status_t status = wait_for_device("/dev/sys/platform/00:00:2d/ramctl", ZX_TIME_INFINITE);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "failed to open /dev/sys/platform/00:00:2d/ramctl: " << strerror(errno);
+  if (zx::result channel =
+          device_watcher::RecursiveWaitForFile("/dev/sys/platform/00:00:2d/ramctl");
+      channel.is_error()) {
+    FX_PLOGS(ERROR, channel.error_value()) << "failed to open /dev/sys/platform/00:00:2d/ramctl";
     return -1;
   }
 
   zx::vmo ramdisk_vmo(static_cast<zx_handle_t>(reinterpret_cast<uintptr_t>(arg)));
 
   zbi_header_t header;
-  status = ramdisk_vmo.read(&header, 0, sizeof(header));
-  if (status != ZX_OK) {
+  if (zx_status_t status = ramdisk_vmo.read(&header, 0, sizeof(header)); status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "cannot read ZBI_TYPE_STORAGE_RAMDISK item header";
     return -1;
   }
@@ -109,13 +111,13 @@ int RamctlWatcher(void* arg) {
 
   zx::vmo vmo;
   if (header.flags & ZBI_FLAGS_STORAGE_COMPRESSED) {
-    status = zx::vmo::create(header.extra, 0, &vmo);
-    if (status != ZX_OK) {
+    if (zx_status_t status = zx::vmo::create(header.extra, 0, &vmo); status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "cannot create VMO for uncompressed RAMDISK";
       return -1;
     }
-    status = DecompressZstd(ramdisk_vmo, sizeof(zbi_header_t), header.length, vmo, 0, header.extra);
-    if (status != ZX_OK) {
+    if (zx_status_t status =
+            DecompressZstd(ramdisk_vmo, sizeof(zbi_header_t), header.length, vmo, 0, header.extra);
+        status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "failed to decompress RAMDISK";
       return -1;
     }
@@ -130,8 +132,7 @@ int RamctlWatcher(void* arg) {
   }
 
   ramdisk_client* client;
-  status = ramdisk_create_from_vmo(vmo.release(), &client);
-  if (status != ZX_OK) {
+  if (zx_status_t status = ramdisk_create_from_vmo(vmo.release(), &client); status != ZX_OK) {
     FX_LOGS(ERROR) << "failed to create ramdisk from ZBI_TYPE_STORAGE_RAMDISK";
   } else {
     FX_LOGS(INFO) << "ZBI_TYPE_STORAGE_RAMDISK attached";
