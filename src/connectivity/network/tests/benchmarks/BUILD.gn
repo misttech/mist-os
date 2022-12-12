@@ -104,32 +104,32 @@ group("tests") {
 # Perftest Section #
 ####################
 
-fuchsia_test_component("socket_benchmark_component") {
-  component_name = "socket_benchmark"
+fuchsia_test_component("socket_benchmarks_component") {
+  component_name = "socket_benchmarks"
   manifest = "meta/socket-benchmarks-perftest.cml"
   deps = [ ":socket_benchmarks" ]
 }
 
-fuchsia_test_component("socket_benchmark_with_fast_udp_component") {
-  component_name = "socket_benchmark_with_fast_udp"
+fuchsia_test_component("socket_benchmarks_with_fast_udp_component") {
+  component_name = "socket_benchmarks_with_fast_udp"
   manifest = "meta/socket-benchmarks-with-fast-udp-perftest.cml"
   deps = [ ":socket_benchmarks" ]
 }
 
-fuchsia_test_component("socket_benchmark_with_netstack3_component") {
-  component_name = "socket_benchmark_with_netstack3"
+fuchsia_test_component("socket_benchmarks_with_netstack3_component") {
+  component_name = "socket_benchmarks_with_netstack3"
   manifest = "meta/socket-benchmarks-with-netstack3-perftest.cml"
   deps = [ ":socket_benchmarks" ]
 }
 
-fuchsia_test_component("socket_benchmark_with_fake_netstack_component") {
-  component_name = "socket_benchmark_with_fake_netstack"
+fuchsia_test_component("socket_benchmarks_with_fake_netstack_component") {
+  component_name = "socket_benchmarks_with_fake_netstack"
   manifest = "meta/socket-benchmarks-with-fake-netstack-perftest.cml"
   deps = [ ":socket_benchmarks" ]
 }
 
-fuchsia_test_component("udp_serde_benchmark_component") {
-  component_name = "udp_serde_benchmark"
+fuchsia_test_component("udp_serde_benchmarks_component") {
+  component_name = "udp_serde_benchmarks"
   manifest = "meta/udp-serde-benchmarks-perftest.cml"
   deps = [ ":udp_serde_benchmarks" ]
 }
@@ -137,11 +137,11 @@ fuchsia_test_component("udp_serde_benchmark_component") {
 fuchsia_test_package("netstack_perftest_pkg") {
   package_name = "netstack-perftest"
   test_components = [
-    ":socket_benchmark_component",
-    ":socket_benchmark_with_fake_netstack_component",
-    ":socket_benchmark_with_fast_udp_component",
-    ":socket_benchmark_with_netstack3_component",
-    ":udp_serde_benchmark_component",
+    ":socket_benchmarks_component",
+    ":socket_benchmarks_with_fake_netstack_component",
+    ":socket_benchmarks_with_fast_udp_component",
+    ":socket_benchmarks_with_netstack3_component",
+    ":udp_serde_benchmarks_component",
   ]
   deps = [
     "//src/connectivity/network/netstack:component",
