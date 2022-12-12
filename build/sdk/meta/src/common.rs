@@ -173,6 +173,7 @@ pub enum ElementType {
     CompanionHostTool,
     Config,
     DartLibrary,
+    Data,
     Documentation,
     FfxTool,
     FidlLibrary,
@@ -184,6 +185,9 @@ pub enum ElementType {
     ProductBundleContainer,
     Sysroot,
     VirtualDevice,
+    VersionHistory,
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
