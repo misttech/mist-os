@@ -66,7 +66,7 @@ class SdioControllerDevice : public SdioControllerDeviceType,
   zx_status_t SdioRegisterVmo(uint8_t fn_idx, uint32_t vmo_id, zx::vmo vmo, uint64_t offset,
                               uint64_t size, uint32_t vmo_rights);
   zx_status_t SdioUnregisterVmo(uint8_t fn_idx, uint32_t vmo_id, zx::vmo* out_vmo);
-  zx_status_t SdioDoRwTxnNew(uint8_t fn_idx, const sdio_rw_txn_new_t* txn);
+  zx_status_t SdioDoRwTxn(uint8_t fn_idx, const sdio_rw_txn_t* txn);
   void SdioRunDiagnostics();
 
   void InBandInterruptCallback();
@@ -137,7 +137,7 @@ class SdioControllerDevice : public SdioControllerDeviceType,
   };
 
   // Returns an SdioTxnPosition representing the new position in the buffers list.
-  zx::result<SdioTxnPosition> DoOneRwTxnRequest(uint8_t fn_idx, const sdio_rw_txn_new_t& txn,
+  zx::result<SdioTxnPosition> DoOneRwTxnRequest(uint8_t fn_idx, const sdio_rw_txn_t& txn,
                                                 SdioTxnPosition current_position) TA_REQ(lock_);
 
   int SdioIrqThread();

@@ -59,7 +59,7 @@ type SdmmcBufferRegion = resource struct {
     size uint64;
 };
 
-type SdmmcReqNew = resource struct {
+type SdmmcReq = resource struct {
     cmd_idx uint32;
     cmd_flags uint32;
     arg uint32;
@@ -81,38 +81,6 @@ type SdmmcReqNew = resource struct {
 /// matches DMA_DESC_COUNT in dev/block/sdhci
 /// (PAGE_SIZE / sizeof(zx_paddr_t))
 const SDMMC_PAGES_COUNT uint64 = 512;
-
-/// sdmmc requests. one per command
-type SdmmcReq = resource struct {
-    cmd_idx uint32;
-    cmd_flags uint32;
-    arg uint32;
-
-    /// data command parameters
-    blockcount uint16;
-    blocksize uint16;
-    use_dma bool;
-    /// Used if use_dma is true
-    dma_vmo zx.handle:VMO;
-    /// Used if use_dma is false
-    @mutable
-    @buffer
-    virt vector<uint8>:MAX;
-    /// offset into dma_vmo or virt
-    buf_offset uint64;
-    pmt zx.handle;
-
-    /// If true, the SDMMC driver should reduce the log level of any error
-    /// messages that this request produces. This will be set on requests for
-    /// which errors are expected or not fatal.
-    suppress_error_messages bool;
-
-    /// response data
-    response array<uint32, 4>;
-
-    /// status
-    status zx.status;
-};
 
 type SdmmcHostCap = strict enum : uint64 {
     BUS_WIDTH_8 = 0x1;
@@ -195,13 +163,6 @@ protocol Sdmmc {
     }) -> (struct {
         s zx.status;
     });
-    /// Issue a request.
-    Request(resource struct {
-        @in_out
-        req SdmmcReq;
-    }) -> (struct {
-        s zx.status;
-    });
     /// Register the given callback to be called when an in-band interrupt is received from the
     /// card. Before calling the callback the protocol implementation will disable the in-band
     /// interrupt in the controller. In-band interrupts can be re-enabled by calling
@@ -253,15 +214,15 @@ protocol Sdmmc {
     ///   have been mapped by the client.
     /// - Call zx_vmo_op_range with ZX_VMO_OP_CACHE_CLEAN_INVALIDATE on all other buffers.
     ///
-    /// Note that writing to any portion of a buffer before DoRwTxnNew has returned can corrupt the
+    /// Note that writing to any portion of a buffer before Request has returned can corrupt the
     /// received data.
     ///
     /// Before write requests:
     /// - Call zx_cache_flush with ZX_CACHE_FLUSH_DATA on buffers that have been mapped by the
     ///   client.
     /// - Call zx_vmo_op_range with ZX_VMO_OP_CACHE_CLEAN on all other buffers.
-    RequestNew(resource struct {
-        req SdmmcReqNew;
+    Request(resource struct {
+        req SdmmcReq;
     }) -> (struct {
         status zx.status;
         response array<uint32, 4>;

@@ -41,7 +41,7 @@ class TestSdhci : public Sdhci {
 
   zx_status_t SdmmcRequest(sdmmc_req_t* req) { return ZX_ERR_NOT_SUPPORTED; }
 
-  zx_status_t SdmmcRequestNew(const sdmmc_req_new_t* req, uint32_t out_response[4]) {
+  zx_status_t SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]) {
     cpp20::span<const sdmmc_buffer_region_t> buffers(req->buffers_list, req->buffers_count);
     size_t bytes = 0;
     for (const sdmmc_buffer_region_t& buffer : buffers) {
@@ -49,7 +49,7 @@ class TestSdhci : public Sdhci {
     }
     blocks_remaining_ = req->blocksize ? static_cast<uint16_t>(bytes / req->blocksize) : 0;
     current_block_ = 0;
-    return Sdhci::SdmmcRequestNew(req, out_response);
+    return Sdhci::SdmmcRequest(req, out_response);
   }
 
   void DdkUnbind(ddk::UnbindTxn txn) {
@@ -450,7 +450,7 @@ TEST_F(SdhciTest, RequestCommandOnly) {
   Capabilities0::Get().FromValue(0).set_adma2_support(1).WriteTo(&mmio_);
   EXPECT_OK(dut_->Init());
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_SEND_STATUS,
       .cmd_flags = SDMMC_SEND_STATUS_FLAGS,
       .arg = 0x7b7d9fbd,
@@ -459,7 +459,7 @@ TEST_F(SdhciTest, RequestCommandOnly) {
 
   Response::Get(0).FromValue(0xf3bbf2c0).WriteTo(&mmio_);
   uint32_t response[4] = {};
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   auto command = Command::Get().FromValue(0);
 
@@ -484,7 +484,7 @@ TEST_F(SdhciTest, RequestCommandOnly) {
   Response::Get(1).FromValue(0x89aaba9e).WriteTo(&mmio_);
   Response::Get(2).FromValue(0xc14b059e).WriteTo(&mmio_);
   Response::Get(3).FromValue(0x7329a9e3).WriteTo(&mmio_);
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   EXPECT_EQ(Argument::Get().ReadFrom(&mmio_).reg_value(), 0x9c1dc1ed);
   EXPECT_EQ(command.ReadFrom(&mmio_).command_index(), SDMMC_SEND_CSD);
@@ -521,7 +521,7 @@ TEST_F(SdhciTest, RequestAbort) {
       .size = 1024,
   };
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
       .arg = 0,
@@ -533,7 +533,7 @@ TEST_F(SdhciTest, RequestAbort) {
   dut_->reset_mask();
 
   uint32_t unused_response[4];
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, unused_response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, unused_response));
   EXPECT_EQ(dut_->reset_mask(), 0);
 
   request.cmd_idx = SDMMC_STOP_TRANSMISSION;
@@ -541,7 +541,7 @@ TEST_F(SdhciTest, RequestAbort) {
   request.blocksize = 0;
   request.buffers_list = nullptr;
   request.buffers_count = 0;
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, unused_response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, unused_response));
   EXPECT_EQ(dut_->reset_mask(),
             SoftwareReset::Get().FromValue(0).set_reset_dat(1).set_reset_cmd(1).reg_value());
 
@@ -573,14 +573,14 @@ TEST_F(SdhciTest, SdioInBandInterrupt) {
   sync_completion_wait(&callback_called, ZX_TIME_INFINITE);
   sync_completion_reset(&callback_called);
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_SEND_CSD,
       .cmd_flags = SDMMC_SEND_CSD_FLAGS,
       .arg = 0x9c1dc1ed,
       .buffers_count = 0,
   };
   uint32_t unused_response[4];
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, unused_response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, unused_response));
 
   dut_->SdmmcAckInBandInterrupt();
 
@@ -648,7 +648,7 @@ TEST_F(SdhciTest, DmaRequest64Bit) {
       },
   };
 
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -659,7 +659,7 @@ TEST_F(SdhciTest, DmaRequest64Bit) {
       .buffers_count = std::size(buffers),
   };
   uint32_t response[4] = {};
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   EXPECT_EQ(AdmaSystemAddress::Get(0).ReadFrom(&mmio_).reg_value(), zx_system_get_page_size());
   EXPECT_EQ(AdmaSystemAddress::Get(1).ReadFrom(&mmio_).reg_value(), 0);
@@ -753,7 +753,7 @@ TEST_F(SdhciTest, DmaRequest32Bit) {
       },
   };
 
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -764,7 +764,7 @@ TEST_F(SdhciTest, DmaRequest32Bit) {
       .buffers_count = std::size(buffers),
   };
   uint32_t response[4] = {};
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   EXPECT_EQ(AdmaSystemAddress::Get(0).ReadFrom(&mmio_).reg_value(), zx_system_get_page_size());
   EXPECT_EQ(AdmaSystemAddress::Get(1).ReadFrom(&mmio_).reg_value(), 0);
@@ -834,7 +834,7 @@ TEST_F(SdhciTest, DmaSplitOneBoundary) {
       .size = (zx_system_get_page_size() * 2) + 256,
   };
 
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -845,7 +845,7 @@ TEST_F(SdhciTest, DmaSplitOneBoundary) {
       .buffers_count = 1,
   };
   uint32_t response[4] = {};
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   EXPECT_EQ(AdmaSystemAddress::Get(0).ReadFrom(&mmio_).reg_value(), kDescriptorAddress);
   EXPECT_EQ(AdmaSystemAddress::Get(1).ReadFrom(&mmio_).reg_value(), 0);
@@ -900,7 +900,7 @@ TEST_F(SdhciTest, DmaSplitManyBoundaries) {
       .size = 16 * 64,
   };
 
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -911,7 +911,7 @@ TEST_F(SdhciTest, DmaSplitManyBoundaries) {
       .buffers_count = 1,
   };
   uint32_t response[4] = {};
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   EXPECT_EQ(AdmaSystemAddress::Get(0).ReadFrom(&mmio_).reg_value(), kDescriptorAddress);
   EXPECT_EQ(AdmaSystemAddress::Get(1).ReadFrom(&mmio_).reg_value(), 0);
@@ -977,7 +977,7 @@ TEST_F(SdhciTest, DmaNoBoundaries) {
       .size = (zx_system_get_page_size() * 2) + 256,
   };
 
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -988,7 +988,7 @@ TEST_F(SdhciTest, DmaNoBoundaries) {
       .buffers_count = 1,
   };
   uint32_t response[4] = {};
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   EXPECT_EQ(AdmaSystemAddress::Get(0).ReadFrom(&mmio_).reg_value(), kDescriptorAddress);
   EXPECT_EQ(AdmaSystemAddress::Get(1).ReadFrom(&mmio_).reg_value(), 0);
@@ -1033,7 +1033,7 @@ TEST_F(SdhciTest, CommandSettingsMultiBlock) {
       .size = 1024,
   };
 
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234'abcd,
@@ -1050,7 +1050,7 @@ TEST_F(SdhciTest, CommandSettingsMultiBlock) {
   Response::Get(3).FromValue(0).set_reg_value(0xaabb'ccdd).WriteTo(&mmio_);
 
   uint32_t response[4] = {};
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   EXPECT_EQ(response[0], 0xabcd'1234);
   EXPECT_EQ(response[1], 0);
@@ -1105,7 +1105,7 @@ TEST_F(SdhciTest, CommandSettingsSingleBlock) {
       .size = 128,
   };
 
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_BLOCK,
       .cmd_flags = SDMMC_READ_BLOCK_FLAGS,
       .arg = 0x1234'abcd,
@@ -1122,7 +1122,7 @@ TEST_F(SdhciTest, CommandSettingsSingleBlock) {
   Response::Get(3).FromValue(0).set_reg_value(0xaabb'ccdd).WriteTo(&mmio_);
 
   uint32_t response[4] = {};
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   EXPECT_EQ(response[0], 0xabcd'1234);
   EXPECT_EQ(response[1], 0);
@@ -1162,7 +1162,7 @@ TEST_F(SdhciTest, CommandSettingsBusyResponse) {
       .WriteTo(&mmio_);
   EXPECT_OK(dut_->Init());
 
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = 55,
       .cmd_flags = SDMMC_RESP_LEN_48B | SDMMC_CMD_TYPE_NORMAL | SDMMC_RESP_CRC_CHECK |
                    SDMMC_RESP_CMD_IDX_CHECK,
@@ -1180,7 +1180,7 @@ TEST_F(SdhciTest, CommandSettingsBusyResponse) {
   Response::Get(3).FromValue(0).set_reg_value(0xaabb'ccdd).WriteTo(&mmio_);
 
   uint32_t response[4] = {};
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   EXPECT_EQ(response[0], 0xabcd'1234);
   EXPECT_EQ(response[1], 0);
@@ -1265,7 +1265,7 @@ TEST_F(SdhciTest, ZeroBlockSize) {
       },
   };
 
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1276,7 +1276,7 @@ TEST_F(SdhciTest, ZeroBlockSize) {
       .buffers_count = std::size(buffers),
   };
   uint32_t response[4] = {};
-  EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 
   dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
 }
@@ -1307,7 +1307,7 @@ TEST_F(SdhciTest, NoBuffers) {
       .size = 512,
   };
 
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1318,7 +1318,7 @@ TEST_F(SdhciTest, NoBuffers) {
       .buffers_count = 0,
   };
   uint32_t response[4] = {};
-  EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 
   dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
 }
@@ -1382,7 +1382,7 @@ TEST_F(SdhciTest, OwnedAndUnownedBuffers) {
       },
   };
 
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1396,7 +1396,7 @@ TEST_F(SdhciTest, OwnedAndUnownedBuffers) {
   EXPECT_NO_FAILURES(ExpectPmoCount(3));
 
   uint32_t response[4] = {};
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   // Unowned buffers should have been unpinned.
   EXPECT_NO_FAILURES(ExpectPmoCount(3));
@@ -1470,7 +1470,7 @@ TEST_F(SdhciTest, CombineContiguousRegions) {
       .size = zx_system_get_page_size() * 4,
   };
 
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1484,7 +1484,7 @@ TEST_F(SdhciTest, CombineContiguousRegions) {
   EXPECT_NO_FAILURES(ExpectPmoCount(1));
 
   uint32_t response[4] = {};
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   EXPECT_NO_FAILURES(ExpectPmoCount(1));
 
@@ -1547,7 +1547,7 @@ TEST_F(SdhciTest, DiscontiguousRegions) {
       .size = (zx_system_get_page_size() * 12) - 512 - 1024,
   };
 
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1561,7 +1561,7 @@ TEST_F(SdhciTest, DiscontiguousRegions) {
   EXPECT_NO_FAILURES(ExpectPmoCount(1));
 
   uint32_t response[4] = {};
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   EXPECT_NO_FAILURES(ExpectPmoCount(1));
 
@@ -1642,7 +1642,7 @@ TEST_F(SdhciTest, RegionStartAndEndOffsets) {
       .size = zx_system_get_page_size(),
   };
 
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1654,7 +1654,7 @@ TEST_F(SdhciTest, RegionStartAndEndOffsets) {
   };
 
   uint32_t response[4] = {};
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   const Sdhci::AdmaDescriptor64* const descriptors =
       reinterpret_cast<Sdhci::AdmaDescriptor64*>(dut_->iobuf_virt());
@@ -1666,7 +1666,7 @@ TEST_F(SdhciTest, RegionStartAndEndOffsets) {
   buffer.offset = 512;
   buffer.size = zx_system_get_page_size() - 512;
 
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   EXPECT_EQ(descriptors[0].attr, 0b100'011);
   EXPECT_EQ(descriptors[0].address, kStartAddress + zx_system_get_page_size() + 512);
@@ -1675,7 +1675,7 @@ TEST_F(SdhciTest, RegionStartAndEndOffsets) {
   buffer.offset = 0;
   buffer.size = zx_system_get_page_size() - 512;
 
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   EXPECT_EQ(descriptors[0].attr, 0b100'011);
   EXPECT_EQ(descriptors[0].address, kStartAddress + (zx_system_get_page_size() * 2));
@@ -1684,7 +1684,7 @@ TEST_F(SdhciTest, RegionStartAndEndOffsets) {
   buffer.offset = 512;
   buffer.size = zx_system_get_page_size() - 1024;
 
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   EXPECT_EQ(descriptors[0].attr, 0b100'011);
   EXPECT_EQ(descriptors[0].address, kStartAddress + (zx_system_get_page_size() * 3) + 512);
@@ -1745,7 +1745,7 @@ TEST_F(SdhciTest, BufferZeroSize) {
         },
     };
 
-    const sdmmc_req_new_t request = {
+    const sdmmc_req_t request = {
         .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
         .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
         .arg = 0x1234abcd,
@@ -1757,7 +1757,7 @@ TEST_F(SdhciTest, BufferZeroSize) {
     };
 
     uint32_t response[4] = {};
-    EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, response));
+    EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
   }
 
   {
@@ -1791,7 +1791,7 @@ TEST_F(SdhciTest, BufferZeroSize) {
         },
     };
 
-    const sdmmc_req_new_t request = {
+    const sdmmc_req_t request = {
         .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
         .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
         .arg = 0x1234abcd,
@@ -1803,7 +1803,7 @@ TEST_F(SdhciTest, BufferZeroSize) {
     };
 
     uint32_t response[4] = {};
-    EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, response));
+    EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
   }
 
   dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
@@ -1832,7 +1832,7 @@ TEST_F(SdhciTest, TransferError) {
       .offset = 0,
       .size = 512,
   };
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1845,7 +1845,7 @@ TEST_F(SdhciTest, TransferError) {
 
   dut_->InjectTransferError();
   uint32_t response[4] = {};
-  EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 
   dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
 }
@@ -1881,7 +1881,7 @@ TEST_F(SdhciTest, MaxTransferSize) {
       .offset = 0,
       .size = 512 * zx_system_get_page_size(),
   };
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1893,7 +1893,7 @@ TEST_F(SdhciTest, MaxTransferSize) {
   };
 
   uint32_t response[4] = {};
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   const Sdhci::AdmaDescriptor96* const descriptors =
       reinterpret_cast<Sdhci::AdmaDescriptor96*>(dut_->iobuf_virt());
@@ -1939,7 +1939,7 @@ TEST_F(SdhciTest, TransferSizeExceeded) {
       .offset = 0,
       .size = 513 * zx_system_get_page_size(),
   };
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1951,7 +1951,7 @@ TEST_F(SdhciTest, TransferSizeExceeded) {
   };
 
   uint32_t response[4] = {};
-  EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 
   dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
 }
@@ -1989,7 +1989,7 @@ TEST_F(SdhciTest, DmaSplitSizeAndAligntmentBoundaries) {
       .size = 0x4'0000,
   };
 
-  const sdmmc_req_new_t request = {
+  const sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -2000,7 +2000,7 @@ TEST_F(SdhciTest, DmaSplitSizeAndAligntmentBoundaries) {
       .buffers_count = 1,
   };
   uint32_t response[4] = {};
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
 
   EXPECT_EQ(AdmaSystemAddress::Get(0).ReadFrom(&mmio_).reg_value(), kDescriptorAddress);
   EXPECT_EQ(AdmaSystemAddress::Get(1).ReadFrom(&mmio_).reg_value(), 0);

@@ -26,10 +26,6 @@
 
 // This is required to use ddk::MockSdio.
 bool operator==(const sdio_rw_txn_t& lhs, const sdio_rw_txn_t& rhs) {
-  return (lhs.addr == rhs.addr && lhs.data_size == rhs.data_size && lhs.incr == rhs.incr &&
-          lhs.write == rhs.write && lhs.buf_offset == rhs.buf_offset);
-}
-bool operator==(const sdio_rw_txn_new_t& lhs, const sdio_rw_txn_new_t& rhs) {
   if (lhs.incr == rhs.incr && lhs.write == rhs.write && lhs.addr == rhs.addr &&
       lhs.buffers_count == rhs.buffers_count) {
     for (size_t i = 0; i < lhs.buffers_count; ++i) {
@@ -215,7 +211,7 @@ TEST_F(SdioBusTest, WriteRegister) {
             bus.mlan_dev.callbacks.moal_write_reg(bus.mlan_dev.pmoal_handle, kAddress, kValue));
 }
 
-TEST_F(SdioBusTest, ReadDataSyncNewTxn) {
+TEST_F(SdioBusTest, ReadDataSyncTxn) {
   SdioBusInfo bus;
   CreateBus(&bus);
 
@@ -228,7 +224,7 @@ TEST_F(SdioBusTest, ReadDataSyncNewTxn) {
   constexpr uint32_t kDataSize = 3 * kSdioBlockSize;
   constexpr size_t kDataBufferSize = kDataSize + kOffset;
 
-  sdio_.mock_do_rw_txn_new().ExpectCallWithMatcher([&](sdio_rw_txn_new_t txn) {
+  sdio_.mock_do_rw_txn().ExpectCallWithMatcher([&](sdio_rw_txn_t txn) {
     EXPECT_EQ(kPort & 0xfffff, txn.addr);
     EXPECT_EQ(1u, txn.buffers_count);
     EXPECT_EQ(SDMMC_BUFFER_TYPE_VMO_ID, txn.buffers_list[0].type);
@@ -248,7 +244,7 @@ TEST_F(SdioBusTest, ReadDataSyncNewTxn) {
 }
 
 // Allocate a buffer from the internal memory allocator for a read request and pass it on to SDIO.
-TEST_F(SdioBusTest, ReadDataSyncNewTxnWithRegion) {
+TEST_F(SdioBusTest, ReadDataSyncTxnWithRegion) {
   SdioBusInfo bus;
   CreateBus(&bus);
 
@@ -262,7 +258,7 @@ TEST_F(SdioBusTest, ReadDataSyncNewTxnWithRegion) {
   uint32_t vmo_id;
   uint64_t vmo_offset;
 
-  sdio_.mock_do_rw_txn_new().ExpectCallWithMatcher([&](sdio_rw_txn_new_t txn) {
+  sdio_.mock_do_rw_txn().ExpectCallWithMatcher([&](sdio_rw_txn_t txn) {
     EXPECT_EQ(kPort & 0xfffff, txn.addr);
     EXPECT_EQ(1u, txn.buffers_count);
     EXPECT_EQ(SDMMC_BUFFER_TYPE_VMO_ID, txn.buffers_list[0].type);
@@ -296,7 +292,7 @@ TEST_F(SdioBusTest, ReadDataSyncNewTxnWithRegion) {
   dev_context->internal_mem_allocator_->Free(buffer);
 }
 
-TEST_F(SdioBusTest, WriteDataSyncNewTxn) {
+TEST_F(SdioBusTest, WriteDataSyncTxn) {
   SdioBusInfo bus;
   CreateBus(&bus);
 
@@ -309,7 +305,7 @@ TEST_F(SdioBusTest, WriteDataSyncNewTxn) {
   constexpr uint32_t kDataSize = 3 * kSdioBlockSize;
   constexpr size_t kDataBufferSize = kDataSize + kOffset;
 
-  sdio_.mock_do_rw_txn_new().ExpectCallWithMatcher([&](sdio_rw_txn_new_t txn) {
+  sdio_.mock_do_rw_txn().ExpectCallWithMatcher([&](sdio_rw_txn_t txn) {
     EXPECT_EQ(kPort & 0xfffff, txn.addr);
     EXPECT_EQ(1u, txn.buffers_count);
     EXPECT_EQ(SDMMC_BUFFER_TYPE_VMO_ID, txn.buffers_list[0].type);
@@ -329,7 +325,7 @@ TEST_F(SdioBusTest, WriteDataSyncNewTxn) {
 }
 
 // Allocate a buffer from the internal memory allocator for a write request and pass it on to SDIO.
-TEST_F(SdioBusTest, WriteDataSyncNewTxnWithRegion) {
+TEST_F(SdioBusTest, WriteDataSyncTxnWithRegion) {
   SdioBusInfo bus;
   CreateBus(&bus);
 
@@ -343,7 +339,7 @@ TEST_F(SdioBusTest, WriteDataSyncNewTxnWithRegion) {
   uint32_t vmo_id;
   uint64_t vmo_offset;
 
-  sdio_.mock_do_rw_txn_new().ExpectCallWithMatcher([&](sdio_rw_txn_new_t txn) {
+  sdio_.mock_do_rw_txn().ExpectCallWithMatcher([&](sdio_rw_txn_t txn) {
     EXPECT_EQ(kPort & 0xfffff, txn.addr);
     EXPECT_EQ(1u, txn.buffers_count);
     EXPECT_EQ(SDMMC_BUFFER_TYPE_VMO_ID, txn.buffers_list[0].type);

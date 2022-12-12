@@ -331,14 +331,14 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxn) {
       .offset = 16,
       .size = 36,
   };
-  sdio_rw_txn_new_t txn = {
+  sdio_rw_txn_t txn = {
       .addr = 0x1ab08,
       .incr = false,
       .write = true,
       .buffers_list = &region,
       .buffers_count = 1,
   };
-  EXPECT_OK(dut_->SdioDoRwTxnNew(3, &txn));
+  EXPECT_OK(dut_->SdioDoRwTxn(3, &txn));
 
   ASSERT_EQ(sdmmc_.requests().size(), 5);
 
@@ -378,7 +378,7 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxn) {
       .buffers_list = &region,
       .buffers_count = 1,
   };
-  EXPECT_OK(dut_->SdioDoRwTxnNew(3, &txn));
+  EXPECT_OK(dut_->SdioDoRwTxn(3, &txn));
 
   ASSERT_EQ(sdmmc_.requests().size(), 5);
 
@@ -447,14 +447,14 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxnMultiBlock) {
       .offset = 64,
       .size = 68,
   };
-  sdio_rw_txn_new_t txn = {
+  sdio_rw_txn_t txn = {
       .addr = 0x1ab08,
       .incr = false,
       .write = false,
       .buffers_list = &region,
       .buffers_count = 1,
   };
-  EXPECT_OK(dut_->SdioDoRwTxnNew(7, &txn));
+  EXPECT_OK(dut_->SdioDoRwTxn(7, &txn));
 
   uint8_t buffer[sizeof(kTestData)];
   EXPECT_OK(vmo.read(buffer, 0, sizeof(buffer)));
@@ -477,7 +477,7 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxnMultiBlock) {
       .buffers_list = &region,
       .buffers_count = 1,
   };
-  EXPECT_OK(dut_->SdioDoRwTxnNew(7, &txn));
+  EXPECT_OK(dut_->SdioDoRwTxn(7, &txn));
 
   EXPECT_BYTES_EQ(sdmmc_.Read(0x12308, 68, 7).data(), kTestData + 64, 68);
 }
@@ -827,7 +827,7 @@ TEST_F(SdioControllerDeviceTest, ProbeRetriesRequests) {
     out_response[0] = OpCondFunctions(5) | SDIO_SEND_OP_COND_RESP_S18A;
   });
   uint32_t tries = 0;
-  sdmmc_.set_command_callback(SDIO_IO_RW_DIRECT, [&](const sdmmc_req_new_t& req) -> zx_status_t {
+  sdmmc_.set_command_callback(SDIO_IO_RW_DIRECT, [&](const sdmmc_req_t& req) -> zx_status_t {
     const bool write = req.arg & SDIO_IO_RW_DIRECT_RW_FLAG;
     const uint32_t fn_idx =
         (req.arg & SDIO_IO_RW_DIRECT_FN_IDX_MASK) >> SDIO_IO_RW_DIRECT_FN_IDX_LOC;
@@ -850,14 +850,14 @@ TEST_F(SdioControllerDeviceTest, IoAbortSetsAbortFlag) {
 
   EXPECT_OK(dut_->Probe());
 
-  sdmmc_.set_command_callback(SDIO_IO_RW_DIRECT, [](const sdmmc_req_new_t& req) -> void {
+  sdmmc_.set_command_callback(SDIO_IO_RW_DIRECT, [](const sdmmc_req_t& req) -> void {
     EXPECT_EQ(req.cmd_idx, SDIO_IO_RW_DIRECT);
     EXPECT_FALSE(req.cmd_flags & SDMMC_CMD_TYPE_ABORT);
     EXPECT_EQ(req.arg, 0xb024'68ab);
   });
   EXPECT_OK(dut_->SdioDoRwByte(true, 3, 0x1234, 0xab, nullptr));
 
-  sdmmc_.set_command_callback(SDIO_IO_RW_DIRECT, [](const sdmmc_req_new_t& req) -> void {
+  sdmmc_.set_command_callback(SDIO_IO_RW_DIRECT, [](const sdmmc_req_t& req) -> void {
     EXPECT_EQ(req.cmd_idx, SDIO_IO_RW_DIRECT);
     EXPECT_TRUE(req.cmd_flags & SDMMC_CMD_TYPE_ABORT);
     EXPECT_EQ(req.arg, 0x8000'0c03);
@@ -1188,14 +1188,14 @@ TEST_F(SdioScatterGatherTest, ScatterGatherByteMode) {
   buffers[1] = MakeBufferRegion(vmo2_, 4, 1);
   buffers[2] = MakeBufferRegion(3, 0, 2);
 
-  sdio_rw_txn_new_t txn = {
+  sdio_rw_txn_t txn = {
       .addr = 0x1000,
       .incr = true,
       .write = true,
       .buffers_list = buffers,
       .buffers_count = std::size(buffers),
   };
-  EXPECT_OK(dut_->SdioDoRwTxnNew(3, &txn));
+  EXPECT_OK(dut_->SdioDoRwTxn(3, &txn));
 
   std::vector<uint8_t> actual = sdmmc_.Read(0x1000, 6, 3);
   EXPECT_BYTES_EQ(actual.data(), kTestData1 + 8, 2);
@@ -1232,14 +1232,14 @@ TEST_F(SdioScatterGatherTest, ScatterGatherBlockMode) {
 
   sdmmc_.Write(0x5000, cpp20::span(kTestData1, std::size(kTestData1)), 3);
 
-  sdio_rw_txn_new_t txn = {
+  sdio_rw_txn_t txn = {
       .addr = 0x5000,
       .incr = false,
       .write = false,
       .buffers_list = buffers,
       .buffers_count = std::size(buffers),
   };
-  EXPECT_OK(dut_->SdioDoRwTxnNew(3, &txn));
+  EXPECT_OK(dut_->SdioDoRwTxn(3, &txn));
 
   EXPECT_BYTES_EQ(static_cast<uint8_t*>(mapper1_.start()) + 8, kTestData1, 7);
   EXPECT_BYTES_EQ(static_cast<uint8_t*>(mapper2_.start()) + 4, kTestData1 + 7, 3);
@@ -1276,14 +1276,14 @@ TEST_F(SdioScatterGatherTest, ScatterGatherBlockModeNoMultiBlock) {
   buffers[1] = MakeBufferRegion(vmo2_, 4, 3);
   buffers[2] = MakeBufferRegion(3, 0, 5);
 
-  sdio_rw_txn_new_t txn = {
+  sdio_rw_txn_t txn = {
       .addr = 0x1000,
       .incr = true,
       .write = true,
       .buffers_list = buffers,
       .buffers_count = std::size(buffers),
   };
-  EXPECT_OK(dut_->SdioDoRwTxnNew(5, &txn));
+  EXPECT_OK(dut_->SdioDoRwTxn(5, &txn));
 
   std::vector<uint8_t> actual = sdmmc_.Read(0x1000, 16, 5);
   EXPECT_BYTES_EQ(actual.data(), kTestData1 + 8, 7);
@@ -1337,14 +1337,14 @@ TEST_F(SdioScatterGatherTest, ScatterGatherBlockModeMultipleFinalBuffers) {
   buffers[2] = MakeBufferRegion(3, 0, 3);
   buffers[3] = MakeBufferRegion(1, 0, 2);
 
-  sdio_rw_txn_new_t txn = {
+  sdio_rw_txn_t txn = {
       .addr = 0x3000,
       .incr = true,
       .write = false,
       .buffers_list = buffers,
       .buffers_count = std::size(buffers),
   };
-  EXPECT_OK(dut_->SdioDoRwTxnNew(1, &txn));
+  EXPECT_OK(dut_->SdioDoRwTxn(1, &txn));
 
   EXPECT_BYTES_EQ(static_cast<uint8_t*>(mapper1_.start()) + 8, kTestData1, 7);
   EXPECT_BYTES_EQ(static_cast<uint8_t*>(mapper2_.start()) + 4, kTestData1 + 7, 3);
@@ -1382,14 +1382,14 @@ TEST_F(SdioScatterGatherTest, ScatterGatherBlockModeLastAligned) {
   buffers[1] = MakeBufferRegion(vmo2_, 4, 5);
   buffers[2] = MakeBufferRegion(3, 0, 3);
 
-  sdio_rw_txn_new_t txn = {
+  sdio_rw_txn_t txn = {
       .addr = 0x1000,
       .incr = true,
       .write = true,
       .buffers_list = buffers,
       .buffers_count = std::size(buffers),
   };
-  EXPECT_OK(dut_->SdioDoRwTxnNew(3, &txn));
+  EXPECT_OK(dut_->SdioDoRwTxn(3, &txn));
 
   std::vector<uint8_t> actual = sdmmc_.Read(0x1000, 16, 3);
   EXPECT_BYTES_EQ(actual.data(), kTestData1 + 8, 7);
@@ -1428,14 +1428,14 @@ TEST_F(SdioScatterGatherTest, ScatterGatherOnlyFullBlocks) {
   buffers[1] = MakeBufferRegion(vmo2_, 4, 5);
   buffers[2] = MakeBufferRegion(3, 0, 4);
 
-  sdio_rw_txn_new_t txn = {
+  sdio_rw_txn_t txn = {
       .addr = 0x1000,
       .incr = true,
       .write = true,
       .buffers_list = buffers,
       .buffers_count = std::size(buffers),
   };
-  EXPECT_OK(dut_->SdioDoRwTxnNew(3, &txn));
+  EXPECT_OK(dut_->SdioDoRwTxn(3, &txn));
 
   std::vector<uint8_t> actual = sdmmc_.Read(0x1000, 17, 3);
   EXPECT_BYTES_EQ(actual.data(), kTestData1 + 8, 7);
@@ -1466,14 +1466,14 @@ TEST_F(SdioScatterGatherTest, ScatterGatherOverMaxTransferSize) {
   buffers[1] = MakeBufferRegion(vmo2_, 4, 800 * 4);
   buffers[2] = MakeBufferRegion(3, 0, 100);
 
-  sdio_rw_txn_new_t txn = {
+  sdio_rw_txn_t txn = {
       .addr = 0x1000,
       .incr = true,
       .write = true,
       .buffers_list = buffers,
       .buffers_count = std::size(buffers),
   };
-  EXPECT_OK(dut_->SdioDoRwTxnNew(3, &txn));
+  EXPECT_OK(dut_->SdioDoRwTxn(3, &txn));
 
   ASSERT_EQ(sdmmc_.requests().size(), 3);
 

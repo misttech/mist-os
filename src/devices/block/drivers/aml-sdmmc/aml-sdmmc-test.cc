@@ -1170,10 +1170,10 @@ TEST_F(AmlSdmmcTest, ClearStatus) {
 
   // Set end_of_chain to indicate we're done and to have something to clear
   dut_->SetRequestInterruptStatus(1 << 13);
-  sdmmc_req_new_t request;
+  sdmmc_req_t request;
   memset(&request, 0, sizeof(request));
   uint32_t unused_response[4];
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, unused_response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, unused_response));
 
   auto status = AmlSdmmcStatus::Get().FromValue(0);
   EXPECT_EQ(AmlSdmmcStatus::kClearStatus, status.ReadFrom(&mmio_).reg_value());
@@ -1184,10 +1184,10 @@ TEST_F(AmlSdmmcTest, TxCrcError) {
 
   // Set TX CRC error bit (8) and desc_busy bit (30)
   dut_->SetRequestInterruptStatus(1 << 8 | 1 << 30);
-  sdmmc_req_new_t request;
+  sdmmc_req_t request;
   memset(&request, 0, sizeof(request));
   uint32_t unused_response[4];
-  EXPECT_EQ(ZX_ERR_IO_DATA_INTEGRITY, dut_->SdmmcRequestNew(&request, unused_response));
+  EXPECT_EQ(ZX_ERR_IO_DATA_INTEGRITY, dut_->SdmmcRequest(&request, unused_response));
 
   auto start = AmlSdmmcStart::Get().FromValue(0);
   // The desc busy bit should now have been cleared because of the error
@@ -1197,15 +1197,15 @@ TEST_F(AmlSdmmcTest, TxCrcError) {
 TEST_F(AmlSdmmcTest, RequestsFailAfterSuspend) {
   ASSERT_OK(dut_->Init({}));
 
-  sdmmc_req_new_t request;
+  sdmmc_req_t request;
   memset(&request, 0, sizeof(request));
   uint32_t unused_response[4];
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, unused_response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, unused_response));
 
   ddk::SuspendTxn txn(fake_ddk::kFakeDevice, 0, false, 0);
   dut_->DdkSuspend(std::move(txn));
 
-  EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, unused_response));
+  EXPECT_NOT_OK(dut_->SdmmcRequest(&request, unused_response));
 }
 
 TEST_F(AmlSdmmcTest, UnownedVmosBlockMode) {
@@ -1228,7 +1228,7 @@ TEST_F(AmlSdmmcTest, UnownedVmosBlockMode) {
     };
   }
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1240,7 +1240,7 @@ TEST_F(AmlSdmmcTest, UnownedVmosBlockMode) {
   };
   uint32_t response[4] = {};
   AmlSdmmcCmdResp::Get().FromValue(0xfedc9876).WriteTo(&mmio_);
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
   const aml_sdmmc_desc_t* descs = dut_->descs();
@@ -1294,7 +1294,7 @@ TEST_F(AmlSdmmcTest, UnownedVmosNotBlockSizeMultiple) {
 
   buffers[5].size = 25;
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1305,7 +1305,7 @@ TEST_F(AmlSdmmcTest, UnownedVmosNotBlockSizeMultiple) {
       .buffers_count = std::size(buffers),
   };
   uint32_t response[4] = {};
-  EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
 TEST_F(AmlSdmmcTest, UnownedVmosByteMode) {
@@ -1328,7 +1328,7 @@ TEST_F(AmlSdmmcTest, UnownedVmosByteMode) {
     };
   }
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1340,7 +1340,7 @@ TEST_F(AmlSdmmcTest, UnownedVmosByteMode) {
   };
   uint32_t response[4] = {};
   AmlSdmmcCmdResp::Get().FromValue(0xfedc9876).WriteTo(&mmio_);
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
   const aml_sdmmc_desc_t* descs = dut_->descs();
@@ -1389,7 +1389,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoByteModeMultiBlock) {
       .size = 400,
   };
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1401,7 +1401,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoByteModeMultiBlock) {
   };
   uint32_t response[4] = {};
   AmlSdmmcCmdResp::Get().FromValue(0xfedc9876).WriteTo(&mmio_);
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
   const aml_sdmmc_desc_t* descs = dut_->descs();
@@ -1450,7 +1450,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoOffsetNotAligned) {
       .size = 64,
   };
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1462,7 +1462,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoOffsetNotAligned) {
   };
   uint32_t response[4] = {};
   AmlSdmmcCmdResp::Get().FromValue(0xfedc9876).WriteTo(&mmio_);
-  EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
 TEST_F(AmlSdmmcTest, UnownedVmoSingleBufferMultipleDescriptors) {
@@ -1484,7 +1484,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoSingleBufferMultipleDescriptors) {
       .size = 32 * 513,
   };
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1496,7 +1496,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoSingleBufferMultipleDescriptors) {
   };
   uint32_t response[4] = {};
   AmlSdmmcCmdResp::Get().FromValue(0xfedc9876).WriteTo(&mmio_);
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
   const aml_sdmmc_desc_t* descs = dut_->descs();
@@ -1548,7 +1548,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoSingleBufferNotPageAligned) {
       .size = 32 * 513,
   };
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1560,7 +1560,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoSingleBufferNotPageAligned) {
   };
   uint32_t response[4] = {};
   AmlSdmmcCmdResp::Get().FromValue(0xfedc9876).WriteTo(&mmio_);
-  EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
 TEST_F(AmlSdmmcTest, UnownedVmoSingleBufferPageAligned) {
@@ -1582,7 +1582,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoSingleBufferPageAligned) {
       .size = 32 * 513,
   };
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1594,7 +1594,7 @@ TEST_F(AmlSdmmcTest, UnownedVmoSingleBufferPageAligned) {
   };
   uint32_t response[4] = {};
   AmlSdmmcCmdResp::Get().FromValue(0xfedc9876).WriteTo(&mmio_);
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
   const aml_sdmmc_desc_t* descs = dut_->descs();
@@ -1651,7 +1651,7 @@ TEST_F(AmlSdmmcTest, OwnedVmosBlockMode) {
   zx::vmo vmo;
   EXPECT_NOT_OK(dut_->SdmmcUnregisterVmo(3, 1, &vmo));
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1663,7 +1663,7 @@ TEST_F(AmlSdmmcTest, OwnedVmosBlockMode) {
   };
   uint32_t response[4] = {};
   AmlSdmmcCmdResp::Get().FromValue(0xfedc9876).WriteTo(&mmio_);
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
   const aml_sdmmc_desc_t* descs = dut_->descs();
@@ -1695,13 +1695,13 @@ TEST_F(AmlSdmmcTest, OwnedVmosBlockMode) {
   }
 
   request.client_id = 7;
-  EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 
   EXPECT_OK(dut_->SdmmcUnregisterVmo(3, 0, &vmo));
   EXPECT_NOT_OK(dut_->SdmmcRegisterVmo(2, 0, std::move(vmo), 0, 512, SDMMC_VMO_RIGHT_WRITE));
 
   request.client_id = 0;
-  EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
 TEST_F(AmlSdmmcTest, OwnedVmosNotBlockSizeMultiple) {
@@ -1727,7 +1727,7 @@ TEST_F(AmlSdmmcTest, OwnedVmosNotBlockSizeMultiple) {
 
   buffers[5].size = 25;
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1738,7 +1738,7 @@ TEST_F(AmlSdmmcTest, OwnedVmosNotBlockSizeMultiple) {
       .buffers_count = std::size(buffers),
   };
   uint32_t response[4] = {};
-  EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
 TEST_F(AmlSdmmcTest, OwnedVmosByteMode) {
@@ -1762,7 +1762,7 @@ TEST_F(AmlSdmmcTest, OwnedVmosByteMode) {
     };
   }
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1774,7 +1774,7 @@ TEST_F(AmlSdmmcTest, OwnedVmosByteMode) {
   };
   uint32_t response[4] = {};
   AmlSdmmcCmdResp::Get().FromValue(0xfedc9876).WriteTo(&mmio_);
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
   const aml_sdmmc_desc_t* descs = dut_->descs();
@@ -1824,7 +1824,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoByteModeMultiBlock) {
       .size = 400,
   };
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1836,7 +1836,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoByteModeMultiBlock) {
   };
   uint32_t response[4] = {};
   AmlSdmmcCmdResp::Get().FromValue(0xfedc9876).WriteTo(&mmio_);
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
   const aml_sdmmc_desc_t* descs = dut_->descs();
@@ -1886,7 +1886,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoOffsetNotAligned) {
       .size = 64,
   };
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1898,7 +1898,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoOffsetNotAligned) {
   };
   uint32_t response[4] = {};
   AmlSdmmcCmdResp::Get().FromValue(0xfedc9876).WriteTo(&mmio_);
-  EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
 TEST_F(AmlSdmmcTest, OwnedVmoSingleBufferMultipleDescriptors) {
@@ -1922,7 +1922,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoSingleBufferMultipleDescriptors) {
       .size = 32 * 513,
   };
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -1934,7 +1934,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoSingleBufferMultipleDescriptors) {
   };
   uint32_t response[4] = {};
   AmlSdmmcCmdResp::Get().FromValue(0xfedc9876).WriteTo(&mmio_);
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
   const aml_sdmmc_desc_t* descs = dut_->descs();
@@ -1989,7 +1989,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoSingleBufferNotPageAligned) {
       .size = 32 * 513,
   };
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -2001,7 +2001,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoSingleBufferNotPageAligned) {
   };
   uint32_t response[4] = {};
   AmlSdmmcCmdResp::Get().FromValue(0xfedc9876).WriteTo(&mmio_);
-  EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
 TEST_F(AmlSdmmcTest, OwnedVmoSingleBufferPageAligned) {
@@ -2025,7 +2025,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoSingleBufferPageAligned) {
       .size = 32 * 513,
   };
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -2037,7 +2037,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoSingleBufferPageAligned) {
   };
   uint32_t response[4] = {};
   AmlSdmmcCmdResp::Get().FromValue(0xfedc9876).WriteTo(&mmio_);
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
   const aml_sdmmc_desc_t* descs = dut_->descs();
@@ -2090,7 +2090,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoWritePastEnd) {
       .size = 32 * 383,
   };
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -2102,7 +2102,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoWritePastEnd) {
   };
   uint32_t response[4] = {};
   AmlSdmmcCmdResp::Get().FromValue(0xfedc9876).WriteTo(&mmio_);
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
   const aml_sdmmc_desc_t* descs = dut_->descs();
@@ -2135,7 +2135,7 @@ TEST_F(AmlSdmmcTest, OwnedVmoWritePastEnd) {
   }
 
   buffer.size = 32 * 384;
-  EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
 TEST_F(AmlSdmmcTest, SeparateClientVmoSpaces) {
@@ -2218,7 +2218,7 @@ TEST_F(AmlSdmmcTest, RequestWithOwnedAndUnownedVmos) {
   zx::vmo vmo;
   EXPECT_NOT_OK(dut_->SdmmcUnregisterVmo(3, 1, &vmo));
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0x1234abcd,
@@ -2230,7 +2230,7 @@ TEST_F(AmlSdmmcTest, RequestWithOwnedAndUnownedVmos) {
   };
   uint32_t response[4] = {};
   AmlSdmmcCmdResp::Get().FromValue(0xfedc9876).WriteTo(&mmio_);
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(response[0], 0xfedc9876);
 
   const aml_sdmmc_desc_t* descs = dut_->descs();
@@ -2328,7 +2328,7 @@ TEST_F(AmlSdmmcTest, ResetCmdInfoBits) {
       .size = 10752,
   };
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDIO_IO_RW_DIRECT_EXTENDED,
       .cmd_flags = SDIO_IO_RW_DIRECT_EXTENDED_FLAGS | SDMMC_CMD_READ,
       .arg = 0x29000015,
@@ -2340,7 +2340,7 @@ TEST_F(AmlSdmmcTest, ResetCmdInfoBits) {
   };
   uint32_t response[4] = {};
   AmlSdmmcCfg::Get().ReadFrom(&mmio_).set_blk_len(0).WriteTo(&mmio_);
-  EXPECT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
   EXPECT_EQ(AmlSdmmcCfg::Get().ReadFrom(&mmio_).blk_len(), 9);
 
   const aml_sdmmc_desc_t* descs = dut_->descs();
@@ -2395,7 +2395,7 @@ TEST_F(AmlSdmmcTest, WriteToReadOnlyVmo) {
     };
   }
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDIO_IO_RW_DIRECT_EXTENDED,
       .cmd_flags = SDIO_IO_RW_DIRECT_EXTENDED_FLAGS | SDMMC_CMD_READ,
       .arg = 0x29000015,
@@ -2406,7 +2406,7 @@ TEST_F(AmlSdmmcTest, WriteToReadOnlyVmo) {
       .buffers_count = std::size(buffers),
   };
   uint32_t response[4] = {};
-  EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
 TEST_F(AmlSdmmcTest, ReadFromWriteOnlyVmo) {
@@ -2431,7 +2431,7 @@ TEST_F(AmlSdmmcTest, ReadFromWriteOnlyVmo) {
     };
   }
 
-  sdmmc_req_new_t request = {
+  sdmmc_req_t request = {
       .cmd_idx = SDIO_IO_RW_DIRECT_EXTENDED,
       .cmd_flags = SDIO_IO_RW_DIRECT_EXTENDED_FLAGS,
       .arg = 0x29000015,
@@ -2442,7 +2442,7 @@ TEST_F(AmlSdmmcTest, ReadFromWriteOnlyVmo) {
       .buffers_count = std::size(buffers),
   };
   uint32_t response[4] = {};
-  EXPECT_NOT_OK(dut_->SdmmcRequestNew(&request, response));
+  EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 }
 
 TEST_F(AmlSdmmcTest, ConsecutiveErrorLogging) {
@@ -2450,25 +2450,25 @@ TEST_F(AmlSdmmcTest, ConsecutiveErrorLogging) {
 
   // First data error.
   dut_->SetRequestInterruptStatus(1 << 8);
-  sdmmc_req_new_t request;
+  sdmmc_req_t request;
   memset(&request, 0, sizeof(request));
   uint32_t unused_response[4];
-  EXPECT_EQ(ZX_ERR_IO_DATA_INTEGRITY, dut_->SdmmcRequestNew(&request, unused_response));
+  EXPECT_EQ(ZX_ERR_IO_DATA_INTEGRITY, dut_->SdmmcRequest(&request, unused_response));
 
   // First cmd error.
   dut_->SetRequestInterruptStatus(1 << 11);
   memset(&request, 0, sizeof(request));
-  EXPECT_EQ(ZX_ERR_TIMED_OUT, dut_->SdmmcRequestNew(&request, unused_response));
+  EXPECT_EQ(ZX_ERR_TIMED_OUT, dut_->SdmmcRequest(&request, unused_response));
 
   // Second data error.
   dut_->SetRequestInterruptStatus(1 << 7);
   memset(&request, 0, sizeof(request));
-  EXPECT_EQ(ZX_ERR_IO_DATA_INTEGRITY, dut_->SdmmcRequestNew(&request, unused_response));
+  EXPECT_EQ(ZX_ERR_IO_DATA_INTEGRITY, dut_->SdmmcRequest(&request, unused_response));
 
   // Second cmd error.
   dut_->SetRequestInterruptStatus(1 << 11);
   memset(&request, 0, sizeof(request));
-  EXPECT_EQ(ZX_ERR_TIMED_OUT, dut_->SdmmcRequestNew(&request, unused_response));
+  EXPECT_EQ(ZX_ERR_TIMED_OUT, dut_->SdmmcRequest(&request, unused_response));
 
   zx::vmo vmo;
   EXPECT_OK(zx::vmo::create(32, 0, &vmo));
@@ -2486,17 +2486,17 @@ TEST_F(AmlSdmmcTest, ConsecutiveErrorLogging) {
   request.blocksize = 32;
   request.buffers_list = &region;
   request.buffers_count = 1;
-  EXPECT_EQ(ZX_OK, dut_->SdmmcRequestNew(&request, unused_response));
+  EXPECT_EQ(ZX_OK, dut_->SdmmcRequest(&request, unused_response));
 
   // Third data error.
   dut_->SetRequestInterruptStatus(1 << 7);
   memset(&request, 0, sizeof(request));
-  EXPECT_EQ(ZX_ERR_IO_DATA_INTEGRITY, dut_->SdmmcRequestNew(&request, unused_response));
+  EXPECT_EQ(ZX_ERR_IO_DATA_INTEGRITY, dut_->SdmmcRequest(&request, unused_response));
 
   // Third cmd error.
   dut_->SetRequestInterruptStatus(1 << 11);
   memset(&request, 0, sizeof(request));
-  EXPECT_EQ(ZX_ERR_TIMED_OUT, dut_->SdmmcRequestNew(&request, unused_response));
+  EXPECT_EQ(ZX_ERR_TIMED_OUT, dut_->SdmmcRequest(&request, unused_response));
 }
 
 }  // namespace sdmmc

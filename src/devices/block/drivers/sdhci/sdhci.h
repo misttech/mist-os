@@ -96,7 +96,7 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
   zx_status_t SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo, uint64_t offset,
                                uint64_t size, uint32_t vmo_rights);
   zx_status_t SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo);
-  zx_status_t SdmmcRequestNew(const sdmmc_req_new_t* req, uint32_t out_response[4]) TA_EXCL(mtx_);
+  zx_status_t SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]) TA_EXCL(mtx_);
 
   // Visible for testing.
   zx_status_t Init();
@@ -152,7 +152,7 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
 
   using SdmmcVmoStore = vmo_store::VmoStore<vmo_store::HashTableStorage<uint32_t, OwnedVmoInfo>>;
 
-  static void PrepareCmd(const sdmmc_req_new_t& req, TransferMode* transfer_mode, Command* command);
+  static void PrepareCmd(const sdmmc_req_t& req, TransferMode* transfer_mode, Command* command);
 
   bool SupportsAdma2() const {
     return (info_.caps & SDMMC_HOST_CAP_DMA) && !(quirks_ & SDHCI_QUIRK_NO_DMA);
@@ -167,10 +167,9 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
   int IrqThread() TA_EXCL(mtx_);
   void HandleTransferInterrupt(InterruptStatus status) TA_REQ(mtx_);
 
-  zx_status_t StartRequest(const sdmmc_req_new_t& request, DmaDescriptorBuilder& builder)
-      TA_REQ(mtx_);
-  zx_status_t SetUpDma(const sdmmc_req_new_t& request, DmaDescriptorBuilder& builder) TA_REQ(mtx_);
-  zx_status_t FinishRequest(const sdmmc_req_new_t& request, uint32_t out_response[4]) TA_REQ(mtx_);
+  zx_status_t StartRequest(const sdmmc_req_t& request, DmaDescriptorBuilder& builder) TA_REQ(mtx_);
+  zx_status_t SetUpDma(const sdmmc_req_t& request, DmaDescriptorBuilder& builder) TA_REQ(mtx_);
+  zx_status_t FinishRequest(const sdmmc_req_t& request, uint32_t out_response[4]) TA_REQ(mtx_);
 
   void CompleteRequest() TA_REQ(mtx_);
 
@@ -212,13 +211,13 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
   std::array<SdmmcVmoStore, SDMMC_MAX_CLIENT_ID + 1> registered_vmo_stores_;
 
   // Used to synchronize the request thread(s) with the interrupt thread for requests through
-  // SdmmcRequestNew. See above for SdmmcRequest requests.
+  // SdmmcRequest. See above for SdmmcRequest requests.
   struct PendingRequest {
     PendingRequest() { Reset(); }
 
     // Initializes the PendingRequest based on the command index and flags. cmd_done is set to false
     // to indicate that there is now a request pending.
-    void Init(const sdmmc_req_new_t& request) {
+    void Init(const sdmmc_req_t& request) {
       cmd_idx = request.cmd_idx;
       cmd_flags = request.cmd_flags;
       cmd_done = false;

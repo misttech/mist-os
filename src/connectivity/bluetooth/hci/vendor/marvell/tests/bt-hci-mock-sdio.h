@@ -14,12 +14,6 @@
 // not expected to be used, so fail if it is.
 bool operator==(const sdio_rw_txn_t& actual, const sdio_rw_txn_t& expected) { return false; }
 
-// This function is used by the mock SDIO library to validate calls to DoRwTxnNew. This is currently
-// not expected to be used, so fail if it is.
-bool operator==(const sdio_rw_txn_new_t& expected, const sdio_rw_txn_new_t& actual) {
-  return false;
-}
-
 namespace bt_hci_marvell {
 
 // An implementation of MockSdio designed for use with testing general lifecycle operation.

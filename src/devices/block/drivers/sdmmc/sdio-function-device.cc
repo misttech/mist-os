@@ -72,8 +72,6 @@ zx_status_t SdioFunctionDevice::SdioGetBlockSize(uint16_t* out_cur_blk_size) {
   return sdio_parent_->SdioGetBlockSize(function_, out_cur_blk_size);
 }
 
-zx_status_t SdioFunctionDevice::SdioDoRwTxn(sdio_rw_txn_t* txn) { return ZX_ERR_NOT_SUPPORTED; }
-
 zx_status_t SdioFunctionDevice::SdioDoRwByte(bool write, uint32_t addr, uint8_t write_byte,
                                              uint8_t* out_read_byte) {
   return sdio_parent_->SdioDoRwByte(write, function_, addr, write_byte, out_read_byte);
@@ -231,8 +229,8 @@ zx_status_t SdioFunctionDevice::SdioUnregisterVmo(uint32_t vmo_id, zx::vmo* out_
   return sdio_parent_->SdioUnregisterVmo(function_, vmo_id, out_vmo);
 }
 
-zx_status_t SdioFunctionDevice::SdioDoRwTxnNew(const sdio_rw_txn_new_t* txn) {
-  return sdio_parent_->SdioDoRwTxnNew(function_, txn);
+zx_status_t SdioFunctionDevice::SdioDoRwTxn(const sdio_rw_txn_t* txn) {
+  return sdio_parent_->SdioDoRwTxn(function_, txn);
 }
 
 void SdioFunctionDevice::SdioRunDiagnostics() { return sdio_parent_->SdioRunDiagnostics(); }

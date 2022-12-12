@@ -44,7 +44,6 @@ class SdioFunctionDevice : public SdioFunctionDeviceType,
   zx_status_t SdioDisableFnIntr();
   zx_status_t SdioUpdateBlockSize(uint16_t blk_sz, bool deflt);
   zx_status_t SdioGetBlockSize(uint16_t* out_cur_blk_size);
-  zx_status_t SdioDoRwTxn(sdio_rw_txn_t* txn);
   zx_status_t SdioDoRwByte(bool write, uint32_t addr, uint8_t write_byte, uint8_t* out_read_byte);
   zx_status_t SdioGetInBandIntr(zx::interrupt* out_irq);
   void SdioAckInBandIntr();
@@ -55,7 +54,7 @@ class SdioFunctionDevice : public SdioFunctionDeviceType,
   zx_status_t SdioRegisterVmo(uint32_t vmo_id, zx::vmo vmo, uint64_t offset, uint64_t size,
                               uint32_t vmo_rights);
   zx_status_t SdioUnregisterVmo(uint32_t vmo_id, zx::vmo* out_vmo);
-  zx_status_t SdioDoRwTxnNew(const sdio_rw_txn_new_t* txn);
+  zx_status_t SdioDoRwTxn(const sdio_rw_txn_t* txn);
   void SdioRunDiagnostics();
 
   // FIDL methods

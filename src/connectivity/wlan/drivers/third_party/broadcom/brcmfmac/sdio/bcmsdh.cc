@@ -269,7 +269,7 @@ static zx_status_t brcmf_sdiod_transfer_vmo(struct brcmf_sdio_dev* sdiodev,
       .offset = frame.VmoOffset(),
       .size = size,
   };
-  sdio_rw_txn_new_t txn = {
+  sdio_rw_txn_t txn = {
       .addr = addr,
       .incr = !fifo,
       .write = write,
@@ -285,8 +285,8 @@ static zx_status_t brcmf_sdiod_transfer_vmo(struct brcmf_sdio_dev* sdiodev,
     return err;
   }
 
-  TRACE_DURATION("brcmfmac:isr", "sdio_do_rw_txn_new");
-  zx_status_t result = sdio_do_rw_txn_new(proto, &txn);
+  TRACE_DURATION("brcmfmac:isr", "sdio_do_rw_txn");
+  zx_status_t result = sdio_do_rw_txn(proto, &txn);
   if (result != ZX_OK) {
     BRCMF_ERR("SDIO transaction failed: %s", zx_status_get_string(result));
     return result;
@@ -334,7 +334,7 @@ static zx_status_t brcmf_sdiod_transfer_vmos(struct brcmf_sdio_dev* sdiodev,
     }
   }
 
-  sdio_rw_txn_new_t txn = {
+  sdio_rw_txn_t txn = {
       .addr = addr,
       .incr = !fifo,
       .write = write,
@@ -342,8 +342,8 @@ static zx_status_t brcmf_sdiod_transfer_vmos(struct brcmf_sdio_dev* sdiodev,
       .buffers_count = buffer,
   };
 
-  TRACE_DURATION("brcmfmac:isr", "sdio_do_rw_txn_new");
-  zx_status_t result = sdio_do_rw_txn_new(proto, &txn);
+  TRACE_DURATION("brcmfmac:isr", "sdio_do_rw_txn");
+  zx_status_t result = sdio_do_rw_txn(proto, &txn);
   if (result != ZX_OK) {
     BRCMF_ERR("SDIO transaction failed: %s", zx_status_get_string(result));
   }

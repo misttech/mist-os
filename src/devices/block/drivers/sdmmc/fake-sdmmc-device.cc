@@ -17,10 +17,7 @@ zx_status_t FakeSdmmcDevice::SdmmcHostInfo(sdmmc_host_info_t* out_info) {
   return ZX_OK;
 }
 
-zx_status_t FakeSdmmcDevice::SdmmcRequest(sdmmc_req_t* req) { return ZX_ERR_NOT_SUPPORTED; }
-
-zx_status_t FakeSdmmcDevice::SdmmcRequestInternal(const sdmmc_req_new_t& req,
-                                                  uint32_t out_response[4],
+zx_status_t FakeSdmmcDevice::SdmmcRequestInternal(const sdmmc_req_t& req, uint32_t out_response[4],
                                                   cpp20::span<uint8_t> out_data) {
   command_counts_[req.cmd_idx]++;
 
@@ -197,7 +194,7 @@ zx_status_t FakeSdmmcDevice::SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_
   return registered_vmos_[client_id]->Unregister(vmo_id).status_value();
 }
 
-zx_status_t FakeSdmmcDevice::SdmmcRequestNew(const sdmmc_req_new_t* req, uint32_t out_response[4]) {
+zx_status_t FakeSdmmcDevice::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]) {
   if (req->client_id >= std::size(registered_vmos_)) {
     return ZX_ERR_OUT_OF_RANGE;
   }

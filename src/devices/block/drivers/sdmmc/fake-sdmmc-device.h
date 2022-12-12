@@ -28,12 +28,11 @@ class FakeSdmmcDevice : public ddk::SdmmcProtocol<FakeSdmmcDevice> {
 
   // Convenience types to allow command callbacks with different combinations of arguments and
   // return values.
-  using CommandCallbackRequestOnly = fit::function<void(const sdmmc_req_new_t&)>;
+  using CommandCallbackRequestOnly = fit::function<void(const sdmmc_req_t&)>;
   using CommandCallbackResponseOnly = fit::function<void(uint32_t[4])>;
-  using CommandCallbackRequestAndResponse =
-      fit::function<void(const sdmmc_req_new_t&, uint32_t[4])>;
+  using CommandCallbackRequestAndResponse = fit::function<void(const sdmmc_req_t&, uint32_t[4])>;
   using CommandCallbackWithData = fit::function<void(cpp20::span<uint8_t>)>;
-  using CommandCallbackWithStatus = fit::function<zx_status_t(const sdmmc_req_new_t&)>;
+  using CommandCallbackWithStatus = fit::function<zx_status_t(const sdmmc_req_t&)>;
 
   using CommandCallback = std::variant<CommandCallbackRequestOnly, CommandCallbackResponseOnly,
                                        CommandCallbackRequestAndResponse, CommandCallbackWithData,
@@ -61,7 +60,7 @@ class FakeSdmmcDevice : public ddk::SdmmcProtocol<FakeSdmmcDevice> {
   void set_host_info(const sdmmc_host_info_t& host_info) { host_info_ = host_info; }
 
   const std::map<Command, uint32_t>& command_counts() const { return command_counts_; }
-  std::vector<sdmmc_req_new_t>& requests() { return requests_; }
+  std::vector<sdmmc_req_t>& requests() { return requests_; }
 
   void Reset() {
     for (auto& sector : sectors_) {
@@ -93,13 +92,12 @@ class FakeSdmmcDevice : public ddk::SdmmcProtocol<FakeSdmmcDevice> {
   void SdmmcHwReset() {}
   zx_status_t SdmmcPerformTuning(uint32_t cmd_idx) { return perform_tuning_status_; }
 
-  zx_status_t SdmmcRequest(sdmmc_req_t* req);
   zx_status_t SdmmcRegisterInBandInterrupt(const in_band_interrupt_protocol_t* interrupt_cb);
   void SdmmcAckInBandInterrupt() {}
   zx_status_t SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo, uint64_t offset,
                                uint64_t size, uint32_t vmo_rights);
   zx_status_t SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo);
-  zx_status_t SdmmcRequestNew(const sdmmc_req_new_t* req, uint32_t out_response[4]);
+  zx_status_t SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]);
 
   std::vector<uint8_t> Read(size_t address, size_t size, uint8_t func = 0);
   void Write(size_t address, cpp20::span<const uint8_t> data, uint8_t func = 0);
@@ -134,7 +132,7 @@ class FakeSdmmcDevice : public ddk::SdmmcProtocol<FakeSdmmcDevice> {
 
   using SdmmcVmoStore = vmo_store::VmoStore<vmo_store::HashTableStorage<uint32_t, OwnedVmoInfo>>;
 
-  zx_status_t SdmmcRequestInternal(const sdmmc_req_new_t& req, uint32_t out_response[4],
+  zx_status_t SdmmcRequestInternal(const sdmmc_req_t& req, uint32_t out_response[4],
                                    cpp20::span<uint8_t> out_data);
 
   static zx_status_t CopySdmmcRegions(cpp20::span<const sdmmc_buffer_region_t> regions,
@@ -145,7 +143,7 @@ class FakeSdmmcDevice : public ddk::SdmmcProtocol<FakeSdmmcDevice> {
   std::array<std::map<size_t, std::unique_ptr<uint8_t[]>>, SDIO_MAX_FUNCS> sectors_;
   std::map<Command, uint32_t> command_counts_;
   std::map<Command, CommandCallback> command_callbacks_;
-  std::vector<sdmmc_req_new_t> requests_;
+  std::vector<sdmmc_req_t> requests_;
   in_band_interrupt_protocol_t interrupt_cb_ = {};
   zx_status_t set_signal_voltage_status_ = ZX_OK;
   zx_status_t set_bus_width_status_ = ZX_OK;

@@ -246,7 +246,7 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const block_read_write_t& txn,
       .offset = offset_vmo,
       .size = length,
   };
-  const sdmmc_req_new_t req = {
+  const sdmmc_req_t req = {
       .cmd_idx = cmd_idx,
       .cmd_flags = cmd_flags,
       .arg = static_cast<uint32_t>(txn.offset_dev),
@@ -296,13 +296,13 @@ zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition 
   constexpr uint32_t kEraseErrorFlags =
       MMC_STATUS_ADDR_OUT_OF_RANGE | MMC_STATUS_ERASE_SEQ_ERR | MMC_STATUS_ERASE_PARAM;
 
-  const sdmmc_req_new_t discard_start = {
+  const sdmmc_req_t discard_start = {
       .cmd_idx = MMC_ERASE_GROUP_START,
       .cmd_flags = MMC_ERASE_GROUP_START_FLAGS,
       .arg = static_cast<uint32_t>(txn.offset_dev),
   };
   uint32_t response[4] = {};
-  if ((status = sdmmc_.host().RequestNew(&discard_start, response)) != ZX_OK) {
+  if ((status = sdmmc_.host().Request(&discard_start, response)) != ZX_OK) {
     zxlogf(ERROR, "failed to set discard group start: %d", status);
     io_errors_.Add(1);
     return status;
@@ -313,12 +313,12 @@ zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition 
     return ZX_ERR_IO;
   }
 
-  const sdmmc_req_new_t discard_end = {
+  const sdmmc_req_t discard_end = {
       .cmd_idx = MMC_ERASE_GROUP_END,
       .cmd_flags = MMC_ERASE_GROUP_END_FLAGS,
       .arg = static_cast<uint32_t>(txn.offset_dev + txn.length - 1),
   };
-  if ((status = sdmmc_.host().RequestNew(&discard_end, response)) != ZX_OK) {
+  if ((status = sdmmc_.host().Request(&discard_end, response)) != ZX_OK) {
     zxlogf(ERROR, "failed to set discard group end: %d", status);
     io_errors_.Add(1);
     return status;
@@ -329,12 +329,12 @@ zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition 
     return ZX_ERR_IO;
   }
 
-  const sdmmc_req_new_t discard = {
+  const sdmmc_req_t discard = {
       .cmd_idx = SDMMC_ERASE,
       .cmd_flags = SDMMC_ERASE_FLAGS,
       .arg = MMC_ERASE_DISCARD_ARG,
   };
-  if ((status = sdmmc_.host().RequestNew(&discard, response)) != ZX_OK) {
+  if ((status = sdmmc_.host().Request(&discard, response)) != ZX_OK) {
     zxlogf(ERROR, "discard failed: %d", status);
     io_errors_.Add(1);
     return status;
@@ -362,13 +362,13 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
     return status;
   }
 
-  const sdmmc_req_new_t set_tx_block_count = {
+  const sdmmc_req_t set_tx_block_count = {
       .cmd_idx = SDMMC_SET_BLOCK_COUNT,
       .cmd_flags = SDMMC_SET_BLOCK_COUNT_FLAGS,
       .arg = MMC_SET_BLOCK_COUNT_RELIABLE_WRITE | static_cast<uint32_t>(tx_frame_count),
   };
   uint32_t unused_response[4];
-  if ((status = sdmmc_.host().RequestNew(&set_tx_block_count, unused_response)) != ZX_OK) {
+  if ((status = sdmmc_.host().Request(&set_tx_block_count, unused_response)) != ZX_OK) {
     zxlogf(ERROR, "failed to set block count for RPMB request: %d", status);
     io_errors_.Add(1);
     return status;
@@ -380,7 +380,7 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
       .offset = request.tx_frames.offset,
       .size = tx_frame_count * kFrameSize,
   };
-  const sdmmc_req_new_t write_tx_frames = {
+  const sdmmc_req_t write_tx_frames = {
       .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
       .arg = 0,  // Ignored by the card.
@@ -388,7 +388,7 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
       .buffers_list = &write_region,
       .buffers_count = 1,
   };
-  if ((status = sdmmc_.host().RequestNew(&write_tx_frames, unused_response)) != ZX_OK) {
+  if ((status = sdmmc_.host().Request(&write_tx_frames, unused_response)) != ZX_OK) {
     zxlogf(ERROR, "failed to write RPMB frames: %d", status);
     io_errors_.Add(1);
     return status;
@@ -398,12 +398,12 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
     return ZX_OK;
   }
 
-  const sdmmc_req_new_t set_rx_block_count = {
+  const sdmmc_req_t set_rx_block_count = {
       .cmd_idx = SDMMC_SET_BLOCK_COUNT,
       .cmd_flags = SDMMC_SET_BLOCK_COUNT_FLAGS,
       .arg = static_cast<uint32_t>(rx_frame_count),
   };
-  if ((status = sdmmc_.host().RequestNew(&set_rx_block_count, unused_response)) != ZX_OK) {
+  if ((status = sdmmc_.host().Request(&set_rx_block_count, unused_response)) != ZX_OK) {
     zxlogf(ERROR, "failed to set block count for RPMB request: %d", status);
     io_errors_.Add(1);
     return status;
@@ -415,7 +415,7 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
       .offset = request.rx_frames.offset,
       .size = rx_frame_count * kFrameSize,
   };
-  const sdmmc_req_new_t read_rx_frames = {
+  const sdmmc_req_t read_rx_frames = {
       .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
       .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
       .arg = 0,
@@ -423,7 +423,7 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
       .buffers_list = &read_region,
       .buffers_count = 1,
   };
-  if ((status = sdmmc_.host().RequestNew(&read_rx_frames, unused_response)) != ZX_OK) {
+  if ((status = sdmmc_.host().Request(&read_rx_frames, unused_response)) != ZX_OK) {
     zxlogf(ERROR, "failed to read RPMB frames: %d", status);
     io_errors_.Add(1);
     return status;

@@ -44,11 +44,7 @@
 #define ALIGNED_SIZE 1544
 
 // This is required to use ddk::MockSdio.
-bool operator==(const sdio_rw_txn_t& lhs, const sdio_rw_txn_t& rhs) {
-  return (lhs.addr == rhs.addr && lhs.data_size == rhs.data_size && lhs.incr == rhs.incr &&
-          lhs.write == rhs.write && lhs.buf_offset == rhs.buf_offset);
-}
-bool operator==(const sdio_rw_txn_new_t& lhs, const sdio_rw_txn_new_t& rhs) { return false; }
+bool operator==(const sdio_rw_txn_t& lhs, const sdio_rw_txn_t& rhs) { return false; }
 
 zx_status_t get_wifi_metadata(struct brcmf_bus* bus, void* data, size_t exp_size, size_t* actual) {
   return bus->bus_priv.sdio->drvr->device->DeviceGetMetadata(DEVICE_METADATA_WIFI_CONFIG, data,
@@ -144,9 +140,9 @@ class FakeSdioBus {
     }
   }
 
-  void ExpectDoRwTxnNew(MockSdio& sdio, zx_status_t return_status, uint32_t addr, uint32_t size,
-                        bool incr, bool write) {
-    sdio.mock_do_rw_txn_new().ExpectCallWithMatcher([=](sdio_rw_txn_new_t txn) {
+  void ExpectDoRwTxn(MockSdio& sdio, zx_status_t return_status, uint32_t addr, uint32_t size,
+                     bool incr, bool write) {
+    sdio.mock_do_rw_txn().ExpectCallWithMatcher([=](sdio_rw_txn_t txn) {
       EXPECT_EQ(txn.addr, addr);
       EXPECT_EQ(txn.write, write);
       EXPECT_EQ(txn.incr, incr);
@@ -303,8 +299,8 @@ TEST(Sdio, Transfer) {
   sdio_dev.sdio_proto_fn1 = *sdio1.GetProto();
   sdio_dev.sdio_proto_fn2 = *sdio2.GetProto();
 
-  sdio_bus->ExpectDoRwTxnNew(sdio1, ZX_OK, 0x458ef43b, FakeSdioBus::kFrameSize / 2, true, true);
-  sdio_bus->ExpectDoRwTxnNew(sdio2, ZX_OK, 0x216977b9, FakeSdioBus::kFrameSize, true, true);
+  sdio_bus->ExpectDoRwTxn(sdio1, ZX_OK, 0x458ef43b, FakeSdioBus::kFrameSize / 2, true, true);
+  sdio_bus->ExpectDoRwTxn(sdio2, ZX_OK, 0x216977b9, FakeSdioBus::kFrameSize, true, true);
 
   uint8_t some_data[FakeSdioBus::kFrameSize] = {};
 
@@ -351,11 +347,11 @@ TEST(Sdio, RamRw) {
   sdio_dev.sdio_proto_fn1 = *sdio1.GetProto();
   sdio_dev.func1 = &func1;
 
-  sdio_bus->ExpectDoRwTxnNew(sdio1, ZX_OK, 0x0000ffe0, 0x00000020, true, true);
+  sdio_bus->ExpectDoRwTxn(sdio1, ZX_OK, 0x0000ffe0, 0x00000020, true, true);
   sdio_bus->ExpectWriteByte(sdio1, ZX_OK, 0x0001000a, 0x80);
   sdio_bus->ExpectWriteByte(sdio1, ZX_OK, 0x0001000b, 0x00);
   sdio_bus->ExpectWriteByte(sdio1, ZX_OK, 0x0001000c, 0x00);
-  sdio_bus->ExpectDoRwTxnNew(sdio1, ZX_OK, 0x00008000, 0x00000020, true, true);
+  sdio_bus->ExpectDoRwTxn(sdio1, ZX_OK, 0x00008000, 0x00000020, true, true);
 
   /* In this test the address is set to 0x000007fe0, and when running, this function
    will chunk the data which is originally 0x40 bytes big into two pieces to align
@@ -384,7 +380,7 @@ TEST(Sdio, AlignSize) {
   sdio_dev.sdio_proto_fn1 = *sdio1.GetProto();
   sdio_dev.func1 = &func1;
 
-  sdio_bus->ExpectDoRwTxnNew(sdio1, ZX_OK, 0x00008000, 0x00000020, true, true);
+  sdio_bus->ExpectDoRwTxn(sdio1, ZX_OK, 0x00008000, 0x00000020, true, true);
 
   uint8_t some_data[128] = {};
   // 4-byte-aligned size should succeed.

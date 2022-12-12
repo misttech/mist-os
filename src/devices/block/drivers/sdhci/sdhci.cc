@@ -72,7 +72,7 @@ namespace sdhci {
 // needed, and unpinned upon destruction.
 class Sdhci::DmaDescriptorBuilder {
  public:
-  DmaDescriptorBuilder(const sdmmc_req_new_t& request, SdmmcVmoStore& registered_vmos,
+  DmaDescriptorBuilder(const sdmmc_req_t& request, SdmmcVmoStore& registered_vmos,
                        uint64_t dma_boundary_alignment, zx::unowned_bti bti)
       : request_(request),
         registered_vmos_(registered_vmos),
@@ -110,7 +110,7 @@ class Sdhci::DmaDescriptorBuilder {
   // split if needed according to hardware restrictions on size or alignment.
   zx_status_t AppendRegions(cpp20::span<const fzl::PinnedVmo::Region> regions);
 
-  const sdmmc_req_new_t& request_;
+  const sdmmc_req_t& request_;
   SdmmcVmoStore& registered_vmos_;
   const uint64_t dma_boundary_alignment_;
   std::array<fzl::PinnedVmo::Region, SDMMC_PAGES_COUNT> regions_ = {};
@@ -122,7 +122,7 @@ class Sdhci::DmaDescriptorBuilder {
   const zx::unowned_bti bti_;
 };
 
-void Sdhci::PrepareCmd(const sdmmc_req_new_t& req, TransferMode* transfer_mode, Command* command) {
+void Sdhci::PrepareCmd(const sdmmc_req_t& req, TransferMode* transfer_mode, Command* command) {
   command->set_command_index(static_cast<uint16_t>(req.cmd_idx));
 
   if (req.cmd_flags & SDMMC_RESP_LEN_EMPTY) {
@@ -423,7 +423,7 @@ zx_status_t Sdhci::SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vm
   return registered_vmo_stores_[client_id].Unregister(vmo_id).status_value();
 }
 
-zx_status_t Sdhci::SdmmcRequestNew(const sdmmc_req_new_t* req, uint32_t out_response[4]) {
+zx_status_t Sdhci::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]) {
   if (req->client_id >= std::size(registered_vmo_stores_)) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -455,7 +455,7 @@ zx_status_t Sdhci::SdmmcRequestNew(const sdmmc_req_new_t* req, uint32_t out_resp
   return FinishRequest(*req, out_response);
 }
 
-zx_status_t Sdhci::StartRequest(const sdmmc_req_new_t& request, DmaDescriptorBuilder& builder) {
+zx_status_t Sdhci::StartRequest(const sdmmc_req_t& request, DmaDescriptorBuilder& builder) {
   using BlockSizeType = decltype(BlockSize::Get().FromValue(0).reg_value());
   using BlockCountType = decltype(BlockCount::Get().FromValue(0).reg_value());
 
@@ -536,7 +536,7 @@ zx_status_t Sdhci::StartRequest(const sdmmc_req_new_t& request, DmaDescriptorBui
   return ZX_OK;
 }
 
-zx_status_t Sdhci::SetUpDma(const sdmmc_req_new_t& request, DmaDescriptorBuilder& builder) {
+zx_status_t Sdhci::SetUpDma(const sdmmc_req_t& request, DmaDescriptorBuilder& builder) {
   const cpp20::span buffers{request.buffers_list, request.buffers_count};
   zx_status_t status;
   for (const auto& buffer : buffers) {
@@ -573,7 +573,7 @@ zx_status_t Sdhci::SetUpDma(const sdmmc_req_new_t& request, DmaDescriptorBuilder
   return ZX_OK;
 }
 
-zx_status_t Sdhci::FinishRequest(const sdmmc_req_new_t& request, uint32_t out_response[4]) {
+zx_status_t Sdhci::FinishRequest(const sdmmc_req_t& request, uint32_t out_response[4]) {
   if (pending_request_.cmd_done) {
     memcpy(out_response, pending_request_.response, sizeof(uint32_t) * 4);
   }
@@ -1108,7 +1108,7 @@ zx_status_t Sdhci::SdmmcPerformTuning(uint32_t cmd_idx) {
     ctrl2.ReadFrom(&regs_mmio_buffer_).set_execute_tuning(1).WriteTo(&regs_mmio_buffer_);
   }
 
-  const sdmmc_req_new_t req = {
+  const sdmmc_req_t req = {
       .cmd_idx = cmd_idx,
       .cmd_flags = MMC_SEND_TUNING_BLOCK_FLAGS,
       .arg = 0,
@@ -1120,7 +1120,7 @@ zx_status_t Sdhci::SdmmcPerformTuning(uint32_t cmd_idx) {
   uint32_t unused_response[4];
 
   for (int count = 0; (count < kMaxTuningCount) && ctrl2.execute_tuning(); count++) {
-    zx_status_t st = SdmmcRequestNew(&req, unused_response);
+    zx_status_t st = SdmmcRequest(&req, unused_response);
     if (st != ZX_OK) {
       zxlogf(ERROR, "sdhci: MMC_SEND_TUNING_BLOCK error, retcode = %d", st);
       return st;

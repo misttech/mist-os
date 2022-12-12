@@ -385,7 +385,7 @@ zx_status_t SdioBus::DoSyncRwTxn(pmlan_buffer pmbuf, t_u32 port, bool write) {
     };
   }
 
-  const sdio_rw_txn_new_t txn{
+  const sdio_rw_txn_t txn{
       .addr = io_port, .incr = false, .write = write, .buffers_list = &region, .buffers_count = 1};
 
   // For write operations flush the cache to ensure that any modifications through mapped memory
@@ -402,7 +402,7 @@ zx_status_t SdioBus::DoSyncRwTxn(pmlan_buffer pmbuf, t_u32 port, bool write) {
 
   {
     std::lock_guard lock(func1_mutex_);
-    result = func1_.DoRwTxnNew(&txn);
+    result = func1_.DoRwTxn(&txn);
     if (result != ZX_OK) {
       NXPF_ERR("SDIO transaction failed: %s", zx_status_get_string(result));
       return result;

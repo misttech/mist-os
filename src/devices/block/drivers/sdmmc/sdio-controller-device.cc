@@ -677,7 +677,7 @@ zx::result<uint8_t> SdioControllerDevice::ReadCccrByte(uint32_t addr) {
 }
 
 zx::result<SdioControllerDevice::SdioTxnPosition> SdioControllerDevice::DoOneRwTxnRequest(
-    uint8_t fn_idx, const sdio_rw_txn_new_t& txn, SdioTxnPosition current_position) {
+    uint8_t fn_idx, const sdio_rw_txn_t& txn, SdioTxnPosition current_position) {
   const uint32_t func_blk_size = funcs_[fn_idx].cur_blk_size;
   const bool mbs = hw_info_.caps & SDIO_CARD_MULTI_BLOCK;
   const size_t max_transfer_size = func_blk_size * (mbs ? SDIO_IO_RW_EXTD_MAX_BLKS_PER_CMD : 1);
@@ -761,7 +761,7 @@ zx::result<SdioControllerDevice::SdioTxnPosition> SdioControllerDevice::DoOneRwT
   });
 }
 
-zx_status_t SdioControllerDevice::SdioDoRwTxnNew(uint8_t fn_idx, const sdio_rw_txn_new_t* txn) {
+zx_status_t SdioControllerDevice::SdioDoRwTxn(uint8_t fn_idx, const sdio_rw_txn_t* txn) {
   if (!SdioFnIdxValid(fn_idx)) {
     return ZX_ERR_INVALID_ARGS;
   }

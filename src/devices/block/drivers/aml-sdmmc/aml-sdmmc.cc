@@ -122,7 +122,7 @@ void AmlSdmmc::Inspect::Init(const pdev_device_info_t& device_info) {
 }
 
 zx::result<std::array<uint32_t, AmlSdmmc::kResponseCount>> AmlSdmmc::WaitForInterrupt(
-    const sdmmc_req_new_t& req) {
+    const sdmmc_req_t& req) {
   zx_status_t status = WaitForInterruptImpl();
 
   if (status != ZX_OK) {
@@ -366,7 +366,7 @@ zx_status_t AmlSdmmc::SdmmcSetSignalVoltage(sdmmc_voltage_t voltage) {
   return ZX_OK;
 }
 
-aml_sdmmc_desc_t* AmlSdmmc::SetupCmdDesc(const sdmmc_req_new_t& req) {
+aml_sdmmc_desc_t* AmlSdmmc::SetupCmdDesc(const sdmmc_req_t& req) {
   aml_sdmmc_desc_t* const desc = reinterpret_cast<aml_sdmmc_desc_t*>(descs_buffer_.virt());
   auto cmd_cfg = AmlSdmmcCmdCfg::Get().FromValue(0);
   if (req.cmd_flags == 0) {
@@ -400,7 +400,7 @@ aml_sdmmc_desc_t* AmlSdmmc::SetupCmdDesc(const sdmmc_req_new_t& req) {
 }
 
 zx::result<std::pair<aml_sdmmc_desc_t*, std::vector<fzl::PinnedVmo>>> AmlSdmmc::SetupDataDescs(
-    const sdmmc_req_new_t& req, aml_sdmmc_desc_t* const cur_desc) {
+    const sdmmc_req_t& req, aml_sdmmc_desc_t* const cur_desc) {
   const uint32_t req_blk_len = log2_ceil(req.blocksize);
   if (req_blk_len > AmlSdmmcCfg::kMaxBlkLen) {
     AML_SDMMC_ERROR("blocksize %u is greater than the max (%u)", 1 << req_blk_len,
@@ -447,7 +447,7 @@ zx::result<std::pair<aml_sdmmc_desc_t*, std::vector<fzl::PinnedVmo>>> AmlSdmmc::
   return zx::ok(std::pair{desc - 1, std::move(pinned_vmos)});
 }
 
-zx::result<aml_sdmmc_desc_t*> AmlSdmmc::SetupOwnedVmoDescs(const sdmmc_req_new_t& req,
+zx::result<aml_sdmmc_desc_t*> AmlSdmmc::SetupOwnedVmoDescs(const sdmmc_req_t& req,
                                                            const sdmmc_buffer_region_t& buffer,
                                                            vmo_store::StoredVmo<OwnedVmoInfo>& vmo,
                                                            aml_sdmmc_desc_t* const cur_desc) {
@@ -501,8 +501,7 @@ zx::result<aml_sdmmc_desc_t*> AmlSdmmc::SetupOwnedVmoDescs(const sdmmc_req_new_t
 }
 
 zx::result<std::pair<aml_sdmmc_desc_t*, fzl::PinnedVmo>> AmlSdmmc::SetupUnownedVmoDescs(
-    const sdmmc_req_new_t& req, const sdmmc_buffer_region_t& buffer,
-    aml_sdmmc_desc_t* const cur_desc) {
+    const sdmmc_req_t& req, const sdmmc_buffer_region_t& buffer, aml_sdmmc_desc_t* const cur_desc) {
   const bool is_read = req.cmd_flags & SDMMC_CMD_READ;
   const uint64_t pagecount =
       ((buffer.offset & PageMask()) + buffer.size + PageMask()) / zx_system_get_page_size();
@@ -557,7 +556,7 @@ zx::result<std::pair<aml_sdmmc_desc_t*, fzl::PinnedVmo>> AmlSdmmc::SetupUnownedV
   return zx::ok(std::pair{desc, std::move(pinned_vmo)});
 }
 
-zx::result<aml_sdmmc_desc_t*> AmlSdmmc::PopulateDescriptors(const sdmmc_req_new_t& req,
+zx::result<aml_sdmmc_desc_t*> AmlSdmmc::PopulateDescriptors(const sdmmc_req_t& req,
                                                             aml_sdmmc_desc_t* const cur_desc,
                                                             fzl::PinnedVmo::Region region) {
   if (region.phys_addr > UINT32_MAX || (region.phys_addr + region.size) > UINT32_MAX) {
@@ -625,7 +624,7 @@ zx::result<aml_sdmmc_desc_t*> AmlSdmmc::PopulateDescriptors(const sdmmc_req_new_
   return zx::ok(desc);
 }
 
-zx_status_t AmlSdmmc::FinishReq(const sdmmc_req_new_t& req) {
+zx_status_t AmlSdmmc::FinishReq(const sdmmc_req_t& req) {
   if ((req.cmd_flags & SDMMC_RESP_DATA_PRESENT) && (req.cmd_flags & SDMMC_CMD_READ)) {
     const cpp20::span<const sdmmc_buffer_region_t> regions{req.buffers_list, req.buffers_count};
     for (const auto& region : regions) {
@@ -661,7 +660,7 @@ zx_status_t AmlSdmmc::TuningDoTransfer(zx::unowned_vmo received_block, size_t bl
       .offset = 0,
       .size = blk_pattern_size,
   };
-  const sdmmc_req_new_t tuning_req{
+  const sdmmc_req_t tuning_req{
       .cmd_idx = tuning_cmd_idx,
       .cmd_flags = MMC_SEND_TUNING_BLOCK_FLAGS,
       .arg = 0,
@@ -673,7 +672,7 @@ zx_status_t AmlSdmmc::TuningDoTransfer(zx::unowned_vmo received_block, size_t bl
   };
 
   uint32_t unused_response[4];
-  return AmlSdmmc::SdmmcRequestNew(&tuning_req, unused_response);
+  return AmlSdmmc::SdmmcRequest(&tuning_req, unused_response);
 }
 
 bool AmlSdmmc::TuningTestSettings(cpp20::span<const uint8_t> tuning_blk, uint32_t tuning_cmd_idx,
@@ -1050,7 +1049,7 @@ zx_status_t AmlSdmmc::SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx:
   return registered_vmos_[client_id]->Unregister(vmo_id).status_value();
 }
 
-zx_status_t AmlSdmmc::SdmmcRequestNew(const sdmmc_req_new_t* req, uint32_t out_response[4]) {
+zx_status_t AmlSdmmc::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]) {
   if (req->client_id >= std::size(registered_vmos_)) {
     return ZX_ERR_OUT_OF_RANGE;
   }

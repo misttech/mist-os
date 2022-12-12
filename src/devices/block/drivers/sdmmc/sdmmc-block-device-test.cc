@@ -385,10 +385,10 @@ TEST_F(SdmmcBlockDeviceTest, MultiBlockACmd12) {
 
   CallbackContext ctx(5);
 
-  sdmmc_.set_command_callback(SDMMC_READ_MULTIPLE_BLOCK, [](const sdmmc_req_new_t& req) -> void {
+  sdmmc_.set_command_callback(SDMMC_READ_MULTIPLE_BLOCK, [](const sdmmc_req_t& req) -> void {
     EXPECT_TRUE(req.cmd_flags & SDMMC_CMD_AUTO12);
   });
-  sdmmc_.set_command_callback(SDMMC_WRITE_MULTIPLE_BLOCK, [](const sdmmc_req_new_t& req) -> void {
+  sdmmc_.set_command_callback(SDMMC_WRITE_MULTIPLE_BLOCK, [](const sdmmc_req_t& req) -> void {
     EXPECT_TRUE(req.cmd_flags & SDMMC_CMD_AUTO12);
   });
 
@@ -432,10 +432,10 @@ TEST_F(SdmmcBlockDeviceTest, MultiBlockNoACmd12) {
 
   CallbackContext ctx(5);
 
-  sdmmc_.set_command_callback(SDMMC_READ_MULTIPLE_BLOCK, [](const sdmmc_req_new_t& req) -> void {
+  sdmmc_.set_command_callback(SDMMC_READ_MULTIPLE_BLOCK, [](const sdmmc_req_t& req) -> void {
     EXPECT_FALSE(req.cmd_flags & SDMMC_CMD_AUTO12);
   });
-  sdmmc_.set_command_callback(SDMMC_WRITE_MULTIPLE_BLOCK, [](const sdmmc_req_new_t& req) -> void {
+  sdmmc_.set_command_callback(SDMMC_WRITE_MULTIPLE_BLOCK, [](const sdmmc_req_t& req) -> void {
     EXPECT_FALSE(req.cmd_flags & SDMMC_CMD_AUTO12);
   });
 
@@ -614,14 +614,14 @@ TEST_F(SdmmcBlockDeviceTest, TrimErrors) {
   ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_TRIM, 10, 110, &op5));
 
   sdmmc_.set_command_callback(MMC_ERASE_GROUP_START,
-                              [](const sdmmc_req_new_t& req, uint32_t out_response[4]) {
+                              [](const sdmmc_req_t& req, uint32_t out_response[4]) {
                                 if (req.arg == 100) {
                                   out_response[0] |= MMC_STATUS_ERASE_SEQ_ERR;
                                 }
                               });
 
   sdmmc_.set_command_callback(MMC_ERASE_GROUP_END,
-                              [](const sdmmc_req_new_t& req, uint32_t out_response[4]) {
+                              [](const sdmmc_req_t& req, uint32_t out_response[4]) {
                                 if (req.arg == 119) {
                                   out_response[0] |= MMC_STATUS_ADDR_OUT_OF_RANGE;
                                 }
@@ -824,7 +824,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeMmcSendStatusRetry) {
     out_data[MMC_EXT_CSD_DEVICE_TYPE] = 1 << 4;
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 1;
   });
-  sdmmc_.set_command_callback(SDMMC_SEND_STATUS, [](const sdmmc_req_new_t& req) {
+  sdmmc_.set_command_callback(SDMMC_SEND_STATUS, [](const sdmmc_req_t& req) {
     // Fail twice before succeeding.
     static uint32_t call_count = 0;
     if (++call_count >= 3) {
@@ -845,7 +845,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeMmcSendStatusFail) {
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 1;
   });
   sdmmc_.set_command_callback(SDMMC_SEND_STATUS,
-                              [](const sdmmc_req_new_t& req) { return ZX_ERR_IO_DATA_INTEGRITY; });
+                              [](const sdmmc_req_t& req) { return ZX_ERR_IO_DATA_INTEGRITY; });
 
   SdmmcBlockDevice dut(parent_.get(), SdmmcDevice(sdmmc_.GetClient()));
   EXPECT_NOT_OK(dut.ProbeMmc());
@@ -893,7 +893,7 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitions) {
 
   CallbackContext ctx(1);
 
-  sdmmc_.set_command_callback(MMC_SWITCH, [](const sdmmc_req_new_t& req) {
+  sdmmc_.set_command_callback(MMC_SWITCH, [](const sdmmc_req_t& req) {
     const uint32_t index = (req.arg >> 16) & 0xff;
     const uint32_t value = (req.arg >> 8) & 0xff;
     EXPECT_EQ(index, MMC_EXT_CSD_PARTITION_CONFIG);
@@ -906,7 +906,7 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitions) {
   ctx.expected_operations = 1;
   sync_completion_reset(&ctx.completion);
 
-  sdmmc_.set_command_callback(MMC_SWITCH, [](const sdmmc_req_new_t& req) {
+  sdmmc_.set_command_callback(MMC_SWITCH, [](const sdmmc_req_t& req) {
     const uint32_t index = (req.arg >> 16) & 0xff;
     const uint32_t value = (req.arg >> 8) & 0xff;
     EXPECT_EQ(index, MMC_EXT_CSD_PARTITION_CONFIG);
@@ -919,7 +919,7 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitions) {
   ctx.expected_operations = 1;
   sync_completion_reset(&ctx.completion);
 
-  sdmmc_.set_command_callback(MMC_SWITCH, [](const sdmmc_req_new_t& req) {
+  sdmmc_.set_command_callback(MMC_SWITCH, [](const sdmmc_req_t& req) {
     const uint32_t index = (req.arg >> 16) & 0xff;
     const uint32_t value = (req.arg >> 8) & 0xff;
     EXPECT_EQ(index, MMC_EXT_CSD_PARTITION_CONFIG);
@@ -962,7 +962,7 @@ TEST_F(SdmmcBlockDeviceTest, BootPartitionRepeatedAccess) {
 
   CallbackContext ctx(1);
 
-  sdmmc_.set_command_callback(MMC_SWITCH, [](const sdmmc_req_new_t& req) {
+  sdmmc_.set_command_callback(MMC_SWITCH, [](const sdmmc_req_t& req) {
     const uint32_t index = (req.arg >> 16) & 0xff;
     const uint32_t value = (req.arg >> 8) & 0xff;
     EXPECT_EQ(index, MMC_EXT_CSD_PARTITION_CONFIG);
@@ -976,7 +976,7 @@ TEST_F(SdmmcBlockDeviceTest, BootPartitionRepeatedAccess) {
   sync_completion_reset(&ctx.completion);
 
   // Repeated accesses to one partition should not generate more than one MMC_SWITCH command.
-  sdmmc_.set_command_callback(MMC_SWITCH, [](const sdmmc_req_new_t& req) { FAIL(); });
+  sdmmc_.set_command_callback(MMC_SWITCH, [](const sdmmc_req_t& req) { FAIL(); });
 
   boot2_.Queue(op2->operation(), OperationCallback, &ctx);
   boot2_.Queue(op3->operation(), OperationCallback, &ctx);
@@ -1090,7 +1090,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeHs400) {
   });
 
   uint32_t timing = MMC_EXT_CSD_HS_TIMING_LEGACY;
-  sdmmc_.set_command_callback(SDMMC_SEND_STATUS, [&](const sdmmc_req_new_t& req) {
+  sdmmc_.set_command_callback(SDMMC_SEND_STATUS, [&](const sdmmc_req_t& req) {
     // SDMMC_SEND_STATUS is the first command sent to the card after MMC_SWITCH. When initializing
     // HS400 mode the host sets the card timing to HS200 and then to HS, and should change the
     // timing and frequency on the host before issuing SDMMC_SEND_STATUS.
@@ -1100,7 +1100,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeHs400) {
     }
   });
 
-  sdmmc_.set_command_callback(MMC_SWITCH, [&](const sdmmc_req_new_t& req) {
+  sdmmc_.set_command_callback(MMC_SWITCH, [&](const sdmmc_req_t& req) {
     const uint32_t index = (req.arg >> 16) & 0xff;
     if (index == MMC_EXT_CSD_HS_TIMING) {
       const uint32_t value = (req.arg >> 8) & 0xff;
@@ -1120,10 +1120,9 @@ TEST_F(SdmmcBlockDeviceTest, ProbeHs400) {
 }
 
 TEST_F(SdmmcBlockDeviceTest, ProbeSd) {
-  sdmmc_.set_command_callback(SD_SEND_IF_COND,
-                              [](const sdmmc_req_new_t& req, uint32_t out_response[4]) {
-                                out_response[0] = req.arg & 0xfff;
-                              });
+  sdmmc_.set_command_callback(
+      SD_SEND_IF_COND,
+      [](const sdmmc_req_t& req, uint32_t out_response[4]) { out_response[0] = req.arg & 0xfff; });
 
   sdmmc_.set_command_callback(SD_APP_SEND_OP_COND, [](uint32_t out_response[4]) {
     out_response[0] = 0xc000'0000;  // Set busy and CCS bits.
@@ -1209,7 +1208,7 @@ TEST_F(SdmmcBlockDeviceTest, RpmbPartition) {
   write_read_request.rx_frames =
       fidl::ObjectView<fuchsia_mem::wire::Range>::FromExternal(&rx_frames_range);
 
-  sdmmc_.set_command_callback(MMC_SWITCH, [](const sdmmc_req_new_t& req) {
+  sdmmc_.set_command_callback(MMC_SWITCH, [](const sdmmc_req_t& req) {
     const uint32_t index = (req.arg >> 16) & 0xff;
     const uint32_t value = (req.arg >> 8) & 0xff;
     EXPECT_EQ(index, MMC_EXT_CSD_PARTITION_CONFIG);
@@ -1242,10 +1241,9 @@ TEST_F(SdmmcBlockDeviceTest, RpmbPartition) {
   FillVmo(tx_frames_mapper, 4, 0);
 
   // Repeated accesses to one partition should not generate more than one MMC_SWITCH command.
-  sdmmc_.set_command_callback(MMC_SWITCH,
-                              []([[maybe_unused]] const sdmmc_req_new_t& req) { FAIL(); });
+  sdmmc_.set_command_callback(MMC_SWITCH, []([[maybe_unused]] const sdmmc_req_t& req) { FAIL(); });
 
-  sdmmc_.set_command_callback(SDMMC_SET_BLOCK_COUNT, [](const sdmmc_req_new_t& req) {
+  sdmmc_.set_command_callback(SDMMC_SET_BLOCK_COUNT, [](const sdmmc_req_t& req) {
     EXPECT_TRUE(req.arg & MMC_SET_BLOCK_COUNT_RELIABLE_WRITE);
   });
 
@@ -1625,7 +1623,7 @@ TEST_F(SdmmcBlockDeviceTest, Inspect) {
 
   // IO error count should be incremented after a failed block op.
   sdmmc_.set_command_callback(SDMMC_WRITE_MULTIPLE_BLOCK,
-                              [](const sdmmc_req_new_t& req) -> zx_status_t { return ZX_ERR_IO; });
+                              [](const sdmmc_req_t& req) -> zx_status_t { return ZX_ERR_IO; });
 
   std::optional<block::Operation<OperationContext>> op2;
   ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 5, 0x8000, &op2));
@@ -1668,7 +1666,7 @@ TEST_F(SdmmcBlockDeviceTest, InspectCmd12NotDoubleCounted) {
 
   // Transfer failed, stop succeeded, error count should increment.
   sdmmc_.set_command_callback(SDMMC_WRITE_MULTIPLE_BLOCK,
-                              [](const sdmmc_req_new_t& req) -> zx_status_t { return ZX_ERR_IO; });
+                              [](const sdmmc_req_t& req) -> zx_status_t { return ZX_ERR_IO; });
 
   std::optional<block::Operation<OperationContext>> op1;
   ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 5, 0x8000, &op1));
@@ -1695,9 +1693,9 @@ TEST_F(SdmmcBlockDeviceTest, InspectCmd12NotDoubleCounted) {
 
   // Transfer succeeded, stop failed, error count should increment.
   sdmmc_.set_command_callback(SDMMC_WRITE_MULTIPLE_BLOCK,
-                              [](const sdmmc_req_new_t& req) -> zx_status_t { return ZX_OK; });
+                              [](const sdmmc_req_t& req) -> zx_status_t { return ZX_OK; });
   sdmmc_.set_command_callback(SDMMC_STOP_TRANSMISSION,
-                              [](const sdmmc_req_new_t& req) -> zx_status_t { return ZX_ERR_IO; });
+                              [](const sdmmc_req_t& req) -> zx_status_t { return ZX_ERR_IO; });
 
   std::optional<block::Operation<OperationContext>> op2;
   ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 5, 0x8000, &op2));
@@ -1723,7 +1721,7 @@ TEST_F(SdmmcBlockDeviceTest, InspectCmd12NotDoubleCounted) {
 
   // Transfer and stop failed, error count should only increase by 1.
   sdmmc_.set_command_callback(SDMMC_WRITE_MULTIPLE_BLOCK,
-                              [](const sdmmc_req_new_t& req) -> zx_status_t { return ZX_ERR_IO; });
+                              [](const sdmmc_req_t& req) -> zx_status_t { return ZX_ERR_IO; });
 
   std::optional<block::Operation<OperationContext>> op3;
   ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 5, 0x8000, &op3));

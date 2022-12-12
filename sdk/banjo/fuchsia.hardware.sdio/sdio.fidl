@@ -53,28 +53,12 @@ type SdioHwInfo = struct {
     host_max_transfer_size uint32;
 };
 
-type SdioRwTxnNew = resource struct {
+type SdioRwTxn = resource struct {
     addr uint32;
     incr bool;
     write bool;
 
     buffers vector<fuchsia.hardware.sdmmc.SdmmcBufferRegion>:MAX;
-};
-
-type SdioRwTxn = resource struct {
-    addr uint32;
-    data_size uint32;
-    incr bool;
-    write bool;
-    use_dma bool;
-    /// Used if use_dma is true
-    dma_vmo zx.handle:VMO;
-    /// Used if use_dma is false
-    @mutable
-    @buffer
-    virt vector<uint8>:MAX;
-    /// offset into dma_vmo or virt
-    buf_offset uint64;
 };
 
 @transport("Banjo")
@@ -105,12 +89,6 @@ protocol Sdio {
     GetBlockSize() -> (struct {
         s zx.status;
         cur_blk_size uint16;
-    });
-    DoRwTxn(resource struct {
-        @in_out
-        txn SdioRwTxn;
-    }) -> (struct {
-        s zx.status;
     });
     DoRwByte(struct {
         write bool;
@@ -174,15 +152,15 @@ protocol Sdio {
     ///   have been mapped by the client.
     /// - Call zx_vmo_op_range with ZX_VMO_OP_CACHE_CLEAN_INVALIDATE on all other buffers.
     ///
-    /// Note that writing to any portion of a buffer before DoRwTxnNew has returned can corrupt the
+    /// Note that writing to any portion of a buffer before DoRwTxn has returned can corrupt the
     /// received data.
     ///
     /// Before write requests:
     /// - Call zx_cache_flush with ZX_CACHE_FLUSH_DATA on buffers that have been mapped by the
     ///   client.
     /// - Call zx_vmo_op_range with ZX_VMO_OP_CACHE_CLEAN on all other buffers.
-    DoRwTxnNew(resource struct {
-        txn SdioRwTxnNew;
+    DoRwTxn(resource struct {
+        txn SdioRwTxn;
     }) -> (struct {
         status zx.status;
     });
