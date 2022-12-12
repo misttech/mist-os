@@ -116,6 +116,7 @@ pub enum FsckWarning {
     LimitForNonExistentStore(u64, u64),
     OrphanedAttribute(u64, u64, u64),
     OrphanedObject(u64, u64),
+    OrphanedKeys(u64, u64),
 }
 
 impl FsckWarning {
@@ -161,6 +162,9 @@ impl FsckWarning {
             FsckWarning::OrphanedObject(store_id, object_id) => {
                 format!("Orphaned object {} was found in store {}", object_id, store_id)
             }
+            FsckWarning::OrphanedKeys(store_id, object_id) => {
+                format!("Orphaned keys for object {} were found in store {}", object_id, store_id)
+            }
         }
     }
 
@@ -189,6 +193,9 @@ impl FsckWarning {
             }
             FsckWarning::OrphanedObject(store_id, oid) => {
                 warn!(oid, store_id, "Orphaned object");
+            }
+            FsckWarning::OrphanedKeys(store_id, oid) => {
+                warn!(oid, store_id, "Orphaned keys");
             }
         }
     }
@@ -225,6 +232,9 @@ pub enum FsckError {
     UnexpectedRecordInObjectStore(u64, Key, Value),
     VolumeInChildStore(u64, u64),
     BadGraveyardValue(u64, u64),
+    MissingEncryptionKeys(u64, u64),
+    MissingKey(u64, u64, u64),
+    DuplicateKey(u64, u64, u64),
 }
 
 impl FsckError {
@@ -353,6 +363,15 @@ impl FsckError {
             FsckError::BadGraveyardValue(store_id, object_id) => {
                 format!("Bad graveyard value with key <{}, {}>", store_id, object_id)
             }
+            FsckError::MissingEncryptionKeys(store_id, object_id) => {
+                format!("Missing encryption keys for <{}, {}>", store_id, object_id)
+            }
+            FsckError::MissingKey(store_id, object_id, key_id) => {
+                format!("Missing encryption key for <{}, {}, {}>", store_id, object_id, key_id)
+            }
+            FsckError::DuplicateKey(store_id, object_id, key_id) => {
+                format!("Duplicate key for <{}, {}, {}>", store_id, object_id, key_id)
+            }
         }
     }
 
@@ -447,6 +466,15 @@ impl FsckError {
             }
             FsckError::BadGraveyardValue(store_id, oid) => {
                 error!(store_id, oid, "Bad graveyard value");
+            }
+            FsckError::MissingEncryptionKeys(store_id, oid) => {
+                error!(store_id, oid, "Missing encryption keys");
+            }
+            FsckError::MissingKey(store_id, oid, key_id) => {
+                error!(store_id, oid, key_id, "Missing encryption key");
+            }
+            FsckError::DuplicateKey(store_id, oid, key_id) => {
+                error!(store_id, oid, key_id, "Duplicate key")
             }
         }
     }

@@ -4,6 +4,7 @@
 
 use {
     crate::{
+        crypt::WrappedKeys,
         fsck::{
             errors::{FsckError, FsckFatal, FsckWarning},
             Fsck,
@@ -13,15 +14,18 @@ use {
         object_store::{
             allocator::{self, AllocatorKey, AllocatorValue},
             graveyard::Graveyard,
-            AttributeKey, ExtentKey, ExtentValue, ObjectDescriptor, ObjectKey, ObjectKeyData,
-            ObjectKind, ObjectStore, ObjectValue, DEFAULT_DATA_ATTRIBUTE_ID,
+            AttributeKey, EncryptionKeys, ExtentKey, ExtentValue, ObjectDescriptor, ObjectKey,
+            ObjectKeyData, ObjectKind, ObjectStore, ObjectValue, DEFAULT_DATA_ATTRIBUTE_ID,
         },
         range::RangeExt,
         round::round_up,
     },
     anyhow::{self, Error},
     std::{
-        cell::UnsafeCell, collections::btree_map::BTreeMap, convert::TryInto, iter::Iterator,
+        cell::UnsafeCell,
+        collections::{btree_map::BTreeMap, hash_set::HashSet},
+        convert::TryInto,
+        iter::Iterator,
         ops::Bound,
     },
 };
@@ -78,6 +82,13 @@ struct ScannedStore<'a> {
     root_objects: Vec<u64>,
     store_id: u64,
     is_root_store: bool,
+    is_encrypted: bool,
+    current_file: Option<CurrentFile>,
+}
+
+struct CurrentFile {
+    object_id: u64,
+    key_ids: HashSet<u64>,
 }
 
 impl<'a> ScannedStore<'a> {
@@ -86,6 +97,7 @@ impl<'a> ScannedStore<'a> {
         root_objects: impl AsRef<[u64]>,
         store_id: u64,
         is_root_store: bool,
+        is_encrypted: bool,
     ) -> Self {
         Self {
             fsck,
@@ -93,6 +105,8 @@ impl<'a> ScannedStore<'a> {
             root_objects: root_objects.as_ref().into(),
             store_id,
             is_root_store,
+            is_encrypted,
+            current_file: None,
         }
     }
 
@@ -119,6 +133,8 @@ impl<'a> ScannedStore<'a> {
                     ObjectValue::Object {
                         kind: ObjectKind::File { refs, allocated_size }, ..
                     } => {
+                        self.current_file =
+                            Some(CurrentFile { object_id: key.object_id, key_ids: HashSet::new() });
                         let kind =
                             ObjectKind::File { refs: *refs, allocated_size: *allocated_size };
                         match self.objects.get_mut(&key.object_id) {
@@ -224,8 +240,30 @@ impl<'a> ScannedStore<'a> {
                 }
             }
             ObjectKeyData::Keys => {
-                // TODO(fxbug.dev/101467): Check encryption keys.
-                if let ObjectValue::Keys(_) = value {
+                if let ObjectValue::Keys(keys) = value {
+                    match keys {
+                        EncryptionKeys::AES256XTS(WrappedKeys(keys)) => {
+                            if let Some(current_file) = &mut self.current_file {
+                                // Duplicates items should have already been checked, but not
+                                // duplicate key IDs.
+                                assert!(current_file.key_ids.is_empty());
+                                for (key_id, _) in keys {
+                                    if !current_file.key_ids.insert(*key_id) {
+                                        self.fsck.error(FsckError::DuplicateKey(
+                                            self.store_id,
+                                            key.object_id,
+                                            *key_id,
+                                        ))?;
+                                    }
+                                }
+                            } else {
+                                self.fsck.warning(FsckWarning::OrphanedKeys(
+                                    self.store_id,
+                                    key.object_id,
+                                ))?;
+                            }
+                        }
+                    }
                 } else {
                     self.fsck.error(FsckError::MalformedObjectRecord(
                         self.store_id,
@@ -276,11 +314,26 @@ impl<'a> ScannedStore<'a> {
                     }
                 }
             }
-            // Ignore extents on this pass. We'll process them later.
+            // Mostly ignore extents on this pass. We'll process them later.
             ObjectKeyData::Attribute(_, AttributeKey::Extent(_)) => {
                 match value {
                     // Regular extent record.
-                    ObjectValue::Extent(ExtentValue::Some { .. }) => {}
+                    ObjectValue::Extent(ExtentValue::Some { key_id, .. }) => {
+                        if let Some(current_file) = &self.current_file {
+                            if !self.is_encrypted && *key_id == 0 && current_file.key_ids.is_empty()
+                            {
+                                // Unencrypted files in unencrypted stores should use key ID 0.
+                            } else if !current_file.key_ids.contains(key_id) {
+                                self.fsck.error(FsckError::MissingKey(
+                                    self.store_id,
+                                    key.object_id,
+                                    *key_id,
+                                ))?;
+                            }
+                        } else {
+                            // This must be an orphaned extent, which should get picked up later.
+                        }
+                    }
                     // Deleted extent.
                     ObjectValue::Extent(ExtentValue::None) => {}
                     _ => {
@@ -480,6 +533,21 @@ impl<'a> ScannedStore<'a> {
     fn iter_bfs(&self) -> ScannedStoreIterator<'_, 'a> {
         ScannedStoreIterator(self, self.root_objects.clone())
     }
+
+    // Called when all items for the current file have been processed.
+    fn finish_file(&mut self) -> Result<(), Error> {
+        if let Some(current_file) = self.current_file.take() {
+            // If the store is unencrypted, then the file might or might not have encryption keys
+            // (e.g. the root store has encrypted layer files).
+            if self.is_encrypted && current_file.key_ids.is_empty() {
+                self.fsck.error(FsckError::MissingEncryptionKeys(
+                    self.store_id,
+                    current_file.object_id,
+                ))?;
+            }
+        }
+        Ok(())
+    }
 }
 
 // Implements a BFS iterator for a store.  Orphaned objects and graveyard objects won't be
@@ -634,7 +702,8 @@ pub(super) async fn scan_store(
 ) -> Result<(), Error> {
     let store_id = store.store_object_id();
 
-    let mut scanned = ScannedStore::new(fsck, root_objects, store_id, store.is_root());
+    let mut scanned =
+        ScannedStore::new(fsck, root_objects, store_id, store.is_root(), store.is_encrypted());
 
     // Scan the store for objects, attributes, and parent/child relationships.
     let layer_set = store.tree().layer_set();
@@ -655,10 +724,16 @@ pub(super) async fn scan_store(
                 item.value.into(),
             ))?;
         }
+        if let Some(current_file) = &scanned.current_file {
+            if item.key.object_id != current_file.object_id {
+                scanned.finish_file()?;
+            }
+        }
         scanned.process(item.key, item.value)?;
         last_item = Some(item.cloned());
         fsck.assert(iter.advance().await, FsckFatal::MalformedStore(store_id))?;
     }
+    scanned.finish_file()?;
 
     // Add a reference for files in the graveyard (which acts as the file's parent until it is
     // purged, leaving only the Object record in the original store and no links to the file).

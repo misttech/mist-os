@@ -130,8 +130,9 @@ pub enum ExtentValue {
     /// Indicates a deleted extent; that is, the logical range described by the extent key is
     /// considered to be deleted.
     None,
-    /// The location of the extent and other related information.  `key_id` identifies which
-    /// of the object's keys should be used.  `checksums` hold post-encryption checksums.
+    /// The location of the extent and other related information.  `key_id` identifies which of the
+    /// object's keys should be used.  Unencrypted files should use 0 (which can also be used for
+    /// encrypted files).  `checksums` hold post-encryption checksums.
     Some { device_offset: u64, checksums: Checksums, key_id: u64 },
 }
 

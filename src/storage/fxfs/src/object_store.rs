@@ -1523,6 +1523,10 @@ impl ObjectStore {
         matches!(*self.lock_state.lock().unwrap(), LockState::Unknown)
     }
 
+    pub fn is_encrypted(&self) -> bool {
+        self.store_info.lock().unwrap().info().unwrap().mutations_key.is_some()
+    }
+
     // Locks a store.  This assumes no other concurrent access to the store.  Whilst this can return
     // an error, the store will be placed into an unusable but safe state (i.e. no lingering
     // unencrypted data) if an error is encountered.
