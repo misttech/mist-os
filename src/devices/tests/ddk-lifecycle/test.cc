@@ -139,7 +139,14 @@ TEST_F(LifecycleTest, Init) {
 
 constexpr char kPath[] = "sys/platform/11:10:0/ddk-lifecycle-test/ddk-lifecycle-test-child-0";
 
-TEST_F(LifecycleTest, CloseAllConnectionsOnChildUnbind) {
+// TODO(https://fxbug.dev/116750): Implement in DFv2 and remove this test skip.
+#ifdef DFV2
+#define MAYBE_CloseAllConnectionsOnChildUnbind DISABLED_CloseAllConnectionsOnChildUnbind
+#else
+#define MAYBE_CloseAllConnectionsOnChildUnbind CloseAllConnectionsOnChildUnbind
+#endif  // __DFV2
+
+TEST_F(LifecycleTest, MAYBE_CloseAllConnectionsOnChildUnbind) {
   auto result = fidl::WireCall(chan_)->AddChild(true /* complete_init */, ZX_OK /* init_status */);
   ASSERT_OK(result.status());
   ASSERT_FALSE(result->is_error());
@@ -157,6 +164,13 @@ TEST_F(LifecycleTest, CloseAllConnectionsOnChildUnbind) {
   ASSERT_NO_FATAL_FAILURE(WaitPreRelease(child_id));
 }
 
+// TODO(https://fxbug.dev/116750): Implement in DFv2 and remove this test skip.
+#ifdef DFV2
+#define MAYBE_CallsFailDuringUnbind DISABLED_CallsFailDuringUnbind
+#else
+#define MAYBE_CallsFailDuringUnbind CallsFailDuringUnbind
+#endif  // __DFV2
+
 template <typename Protocol>
 zx::result<fidl::WireClient<Protocol>> MakeClient(const fbl::unique_fd& fd, const char* path,
                                                   async_dispatcher_t* dispatcher) {
@@ -168,7 +182,7 @@ zx::result<fidl::WireClient<Protocol>> MakeClient(const fbl::unique_fd& fd, cons
                                            dispatcher));
 }
 
-TEST_F(LifecycleTest, CallsFailDuringUnbind) {
+TEST_F(LifecycleTest, MAYBE_CallsFailDuringUnbind) {
   auto result = fidl::WireCall(chan_)->AddChild(true /* complete_init */, ZX_OK /* init_status */);
   ASSERT_OK(result.status());
   ASSERT_FALSE(result->is_error());
