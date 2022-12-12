@@ -14,6 +14,7 @@ use crate::fs::socket::SocketAddress;
 use crate::fs::{FileOps, FileSystemHandle, FsNode};
 use crate::lock::RwLock;
 use crate::logging::set_zx_name;
+use crate::mm::FutexTable;
 use crate::task::*;
 use crate::types::{DeviceType, Errno, OpenFlags};
 
@@ -77,6 +78,9 @@ pub struct Kernel {
 
     /// The iptables used for filtering network packets.
     pub iptables: RwLock<IpTables>,
+
+    /// The futexes shared across processes.
+    pub shared_futexes: FutexTable,
 }
 
 impl Kernel {
@@ -110,6 +114,7 @@ impl Kernel {
             framebuffer: Framebuffer::new().expect("Failed to create framebuffer"),
             binders: Default::default(),
             iptables: RwLock::new(IpTables::new()),
+            shared_futexes: Default::default(),
         })
     }
 

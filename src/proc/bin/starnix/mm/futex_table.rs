@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::lock::Mutex;
-use crate::mm::MemoryAccessorExt;
+use crate::logging::impossible_error;
 use crate::task::*;
 use crate::types::*;
 
@@ -18,10 +18,18 @@ use crate::types::*;
 /// only for those addresses that have ever actually had a futex operation performed on them.
 #[derive(Default)]
 pub struct FutexTable {
-    /// The futexes associated with each address in the address space.
+    /// The futexes associated with each address in each VMO.
     ///
     /// This HashMap is populated on-demand when futexes are used.
-    state: Mutex<HashMap<UserAddress, Arc<Mutex<WaitQueue>>>>,
+    state: Mutex<HashMap<FutexKey, Arc<Mutex<WaitQueue>>>>,
+}
+
+#[derive(Eq, Hash, PartialEq)]
+struct FutexKey {
+    // No chance of collisions since koids are never reused:
+    // https://fuchsia.dev/fuchsia-src/concepts/kernel/concepts#kernel_object_ids
+    koid: zx::Koid,
+    offset: u64,
 }
 
 impl FutexTable {
@@ -36,45 +44,78 @@ impl FutexTable {
         mask: u32,
         deadline: zx::Time,
     ) -> Result<(), Errno> {
-        let user_current = UserRef::<u32>::new(addr);
+        let (vmo, key) = self.get_vmo_and_key(current_task, addr)?;
+        let offset = key.offset;
+
         let waiter = Waiter::new();
         {
-            let waiters = self.get_waiters(addr);
+            let waiters = self.get_waiters(key);
             let mut waiters = waiters.lock();
             // TODO: This read should be atomic.
-            if current_task.mm.read_object(user_current)? != value {
+            let mut buf = [0u8; 4];
+            vmo.read(&mut buf, offset).map_err(impossible_error)?;
+            if u32::from_ne_bytes(buf) != value {
                 return Ok(());
             }
 
             waiters.wait_async_mask(&waiter, mask, WaitCallback::none());
         }
+        // TODO(tbodt): Delete the wait queue from the hashmap when it becomes empty. Not doing
+        // this is a memory leak.
         waiter.wait_until(current_task, deadline)
     }
 
     /// Wake the given number of waiters on futex at the given address.
     ///
     /// See FUTEX_WAKE.
-    pub fn wake(&self, addr: UserAddress, count: usize, mask: u32) {
-        self.get_waiters(addr).lock().notify_mask_count(mask, count);
+    pub fn wake(
+        &self,
+        current_task: &CurrentTask,
+        addr: UserAddress,
+        count: usize,
+        mask: u32,
+    ) -> Result<(), Errno> {
+        let (_, key) = self.get_vmo_and_key(current_task, addr)?;
+        self.get_waiters(key).lock().notify_mask_count(mask, count);
+        Ok(())
     }
 
-    /// Requeue the waitersd to another address.
+    /// Requeue the waiters to another address.
     ///
     /// See FUTEX_REQUEUE
-    pub fn requeue(&self, addr: UserAddress, count: usize, new_addr: UserAddress) {
+    pub fn requeue(
+        &self,
+        current_task: &CurrentTask,
+        addr: UserAddress,
+        count: usize,
+        new_addr: UserAddress,
+    ) -> Result<(), Errno> {
+        let (_, key) = self.get_vmo_and_key(current_task, addr)?;
+        let (_, new_key) = self.get_vmo_and_key(current_task, new_addr)?;
         let mut waiters = WaitQueue::default();
-        if let Some(old_waiters) = self.state.lock().remove(&addr) {
+        if let Some(old_waiters) = self.state.lock().remove(&key) {
             waiters.transfer(&mut old_waiters.lock());
         }
         waiters.notify_mask_count(FUTEX_BITSET_MATCH_ANY, count);
-        let new_waiters = self.get_waiters(new_addr);
+        let new_waiters = self.get_waiters(new_key);
         new_waiters.lock().transfer(&mut waiters);
+        Ok(())
+    }
+
+    fn get_vmo_and_key(
+        &self,
+        current_task: &CurrentTask,
+        addr: UserAddress,
+    ) -> Result<(Arc<zx::Vmo>, FutexKey), Errno> {
+        let (vmo, offset) = current_task.mm.get_mapping_vmo(addr, zx::VmarFlags::PERM_READ)?;
+        let koid = vmo.info().map_err(impossible_error)?.koid;
+        Ok((vmo, FutexKey { koid, offset }))
     }
 
     /// Returns the WaitQueue for a given address.
-    fn get_waiters(&self, addr: UserAddress) -> Arc<Mutex<WaitQueue>> {
+    fn get_waiters(&self, key: FutexKey) -> Arc<Mutex<WaitQueue>> {
         let mut state = self.state.lock();
-        let waiters = state.entry(addr).or_insert_with(|| Arc::new(Default::default()));
+        let waiters = state.entry(key).or_default();
         Arc::clone(waiters)
     }
 }

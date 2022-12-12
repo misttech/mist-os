@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_runtime::duplicate_utc_clock_handle;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::ffi::CStr;
 use std::sync::Arc;
@@ -246,6 +247,80 @@ pub fn sys_membarrier(
         uapi::membarrier_cmd_MEMBARRIER_CMD_PRIVATE_EXPEDITED_RSEQ => Ok(0),
         _ => error!(EINVAL),
     }
+}
+
+fn realtime_deadline_to_monotonic(deadline: timespec) -> Result<zx::Time, Errno> {
+    let utc_clock = duplicate_utc_clock_handle(zx::Rights::READ).map_err(|_| errno!(EACCES))?;
+    let details = utc_clock.get_details().map_err(|_| errno!(EACCES))?;
+    let utc_time = time_from_timespec(deadline)?;
+    Ok(details.mono_to_synthetic.apply_inverse(utc_time))
+}
+
+pub fn sys_futex(
+    current_task: &CurrentTask,
+    addr: UserAddress,
+    op: u32,
+    value: u32,
+    utime: UserRef<timespec>,
+    addr2: UserAddress,
+    value3: u32,
+) -> Result<(), Errno> {
+    let futexes = if op & FUTEX_PRIVATE_FLAG != 0 {
+        &current_task.mm.futex
+    } else {
+        &current_task.kernel().shared_futexes
+    };
+
+    let is_realtime = op & FUTEX_CLOCK_REALTIME != 0;
+    let cmd = op & (FUTEX_CMD_MASK as u32);
+    match cmd {
+        FUTEX_WAIT => {
+            let deadline = if utime.is_null() {
+                zx::Time::INFINITE
+            } else {
+                // In theory, we should adjust this for a realtime
+                // futex when the system gets suspended, but Zircon
+                // does  not give us a way to do this.
+                let duration = current_task.mm.read_object(utime)?;
+                zx::Time::after(duration_from_timespec(duration)?)
+            };
+            futexes.wait(current_task, addr, value, FUTEX_BITSET_MATCH_ANY, deadline)?;
+        }
+        FUTEX_WAKE => {
+            futexes.wake(current_task, addr, value as usize, FUTEX_BITSET_MATCH_ANY)?;
+        }
+        FUTEX_WAIT_BITSET => {
+            if value3 == 0 {
+                return error!(EINVAL);
+            }
+            // The timeout is interpreted differently by WAIT and WAIT_BITSET: WAIT takes a
+            // timeout and WAIT_BITSET takes a deadline.
+            let deadline = if utime.is_null() {
+                zx::Time::INFINITE
+            } else if is_realtime {
+                realtime_deadline_to_monotonic(current_task.mm.read_object(utime)?)?
+            } else {
+                let deadline = current_task.mm.read_object(utime)?;
+                time_from_timespec(deadline)?
+            };
+            futexes.wait(current_task, addr, value, value3, deadline)?;
+        }
+        FUTEX_WAKE_BITSET => {
+            if value3 == 0 {
+                return error!(EINVAL);
+            }
+            futexes.wake(current_task, addr, value as usize, value3)?;
+        }
+        FUTEX_REQUEUE => {
+            futexes.requeue(current_task, addr, value as usize, addr2)?;
+        }
+        _ => {
+            not_implemented!(current_task, "futex: command 0x{:x} not implemented.", cmd);
+            return error!(ENOSYS);
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

@@ -1345,6 +1345,21 @@ impl MemoryManager {
         }
     }
 
+    /// Returns the VMO mapped at the address and the offset into the VMO of the address. Intended
+    /// for implementing futexes.
+    pub fn get_mapping_vmo(
+        &self,
+        addr: UserAddress,
+        perms: zx::VmarFlags,
+    ) -> Result<(Arc<zx::Vmo>, u64), Errno> {
+        let state = self.state.read();
+        let (_, mapping) = state.mappings.get(&addr).ok_or_else(|| errno!(EFAULT))?;
+        if !mapping.permissions.contains(perms) {
+            return error!(EACCES);
+        }
+        Ok((Arc::clone(&mapping.vmo), mapping.address_to_offset(addr)))
+    }
+
     #[cfg(test)]
     pub fn get_mapping_name(&self, addr: UserAddress) -> Result<CString, Errno> {
         let state = self.state.read();
