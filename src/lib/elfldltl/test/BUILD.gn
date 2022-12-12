@@ -48,9 +48,8 @@ test("elfldltl-unittests") {
     "//src/lib/symbolizer-markup",
   ]
 
-  # TODO(fxbug.dev/117207): Enable these tests on Fuchsia too.
-  if (is_elf && !is_fuchsia) {
-    deps += [ ":load-tests" ]
+  if (is_elf) {
+    deps += [ ":loader-tests" ]
   }
 }
 
@@ -59,13 +58,22 @@ source_set("test-utils") {
   testonly = true
 
   public = [ "tests.h" ]
-
-  sources = [ "tests.cc" ]
-
   public_deps = [
     "..",
     "//third_party/googletest:gtest",
+    "//zircon/system/ulib/fbl",
   ]
+
+  sources = [ "get-test-data-path.cc" ]
+  deps = []
+  if (is_fuchsia) {
+    sources += [ "get-test-lib.cc" ]
+    deps += [
+      "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp",
+      "//sdk/lib/fdio",
+      "//zircon/system/ulib/zx",
+    ]
+  }
 }
 
 if (current_os == "linux") {
@@ -207,7 +215,7 @@ load_test_lib("elfldltl-test-ret24") {
 }
 
 if (is_host && is_elf) {
-  host_test_data("elfldltl-load-test-libs") {
+  host_test_data("loader-test-libs") {
     deps = []
     sources = []
 
@@ -220,14 +228,16 @@ if (is_host && is_elf) {
     outputs = [ "$root_out_dir/test_data/elfldltl/{{source_file_part}}" ]
   }
 } else {
-  group("elfldltl-load-test-libs") {
+  # On Fuchsia these are just included in /pkg/lib implicitly by dint
+  # of being in data_deps of the test code.
+  group("loader-test-libs") {
     testonly = true
 
     deps = [ ":elfldltl-test-ret24" ]
   }
 }
 
-source_set("load-tests") {
+source_set("loader-tests") {
   visibility = [ ":*" ]
   testonly = true
 
@@ -241,7 +251,7 @@ source_set("load-tests") {
     "//zircon/system/ulib/fbl",
   ]
 
-  data_deps = [ ":elfldltl-load-test-libs" ]
+  data_deps = [ ":loader-test-libs" ]
 }
 
 # Make that into a bootable ZBI with just the kernel.

@@ -35,9 +35,8 @@ class ElfldltlLoaderTests : public testing::Test {
 
     auto diag = ExpectOkDiagnostics();
 
-    std::filesystem::path path = GetTestDataPath(so_path);
-    fbl::unique_fd fd{open(path.c_str(), O_RDONLY)};
-    ASSERT_TRUE(fd) << path;
+    fbl::unique_fd fd = GetTestLib(so_path);
+    ASSERT_TRUE(fd) << so_path;
 
     elfldltl::FdFile fdfile{fd.get(), diag};
 

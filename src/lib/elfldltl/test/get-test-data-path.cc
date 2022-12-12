@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fcntl.h>
 #include <stdlib.h>
 
 #include <filesystem>
@@ -31,3 +32,10 @@ std::filesystem::path GetTestDataPath(std::string_view filename) {
 #endif
   return path / "test_data/elfldltl" / filename;
 }
+
+#ifndef __Fuchsia__
+// See get-test-lib.cc for the Fuchsia case; elsewhere this is a normal open.
+fbl::unique_fd GetTestLib(std::string_view libname) {
+  return fbl::unique_fd(open(GetTestDataPath(libname).c_str(), O_RDONLY));
+}
+#endif

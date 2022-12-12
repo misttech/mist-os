@@ -16,7 +16,14 @@
 #include <tuple>
 #include <type_traits>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
+
+// Get the full path to an arbitrary test data file.
+std::filesystem::path GetTestDataPath(std::string_view filename);
+
+// Get an open fd specifically on a test DSO file.
+fbl::unique_fd GetTestLib(std::string_view libname);
 
 template <class... Elf>
 struct TestAllFormatsHelper {
@@ -116,7 +123,5 @@ constexpr auto ExpectOkDiagnostics() {
   };
   return elfldltl::Diagnostics(fail, elfldltl::DiagnosticsFlags{.extra_checking = true});
 }
-
-std::filesystem::path GetTestDataPath(std::string_view filename);
 
 #endif  // SRC_LIB_ELFLDLTL_TEST_TESTS_H_
