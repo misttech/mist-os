@@ -26,6 +26,9 @@
 #     Useful for allowing all third_party dependencies.
 #     e.g. [ "//third_party/rust_crates/*" ]
 #     type: list
+#   fidl_only (optional)
+#     Verify that only fidl dependencies are released in an SDK.
+#     type: bool
 template("verify_deps_in_sdk") {
   assert(defined(invoker.deps_to_verify))
   assert(defined(invoker.invoker_label))
@@ -34,54 +37,72 @@ template("verify_deps_in_sdk") {
   assert(!defined(invoker.public_deps),
          "All dependencies should be added to \"deps_to_verify\"")
 
+  if (defined(invoker.fidl_only) && invoker.fidl_only == true) {
+    deps_to_verify = filter_include(invoker.deps_to_verify,
+                                    [
+                                      "*_rust",
+                                      "*_hlcpp",
+                                      "*_cpp_wire",
+                                    ])
+  } else {
+    deps_to_verify = invoker.deps_to_verify
+  }
+
   fully_qualified_deps = []
-  foreach(dep, invoker.deps_to_verify) {
+  foreach(dep, deps_to_verify) {
     fully_qualified_deps += [ get_label_info(dep, "label_no_toolchain") ]
   }
 
-  action(target_name) {
-    forward_variables_from(invoker, "*")
+  if (fully_qualified_deps != []) {
+    action(target_name) {
+      forward_variables_from(invoker, "*")
 
-    deps = []
-    inputs = [
-      "//sdk/manifests/atoms/core.golden",
-      "//sdk/manifests/atoms/core_testing.golden",
-      "//sdk/manifests/atoms/e2e_testing.golden",
-      "//sdk/manifests/atoms/zircon_sysroot.golden",
-    ]
+      deps = []
+      inputs = [
+        "//sdk/manifests/atoms/core.golden",
+        "//sdk/manifests/atoms/core_testing.golden",
+        "//sdk/manifests/atoms/e2e_testing.golden",
+        "//sdk/manifests/atoms/zircon_sysroot.golden",
+      ]
 
-    metadata = {
-      # expect_includes are not relevant for dependency verification, so disarm
-      # them here to avoid spurious include errors.
-      expect_includes_barrier = []
+      metadata = {
+        # expect_includes are not relevant for dependency verification, so disarm
+        # them here to avoid spurious include errors.
+        expect_includes_barrier = []
+      }
+
+      testonly = true
+
+      script = "//sdk/ctf/build/scripts/verify_deps_in_sdk.py"
+
+      # GN requires an action to output a file. This file is written, but not used.
+      outputs = [ "${target_gen_dir}/${target_name}.unused" ]
+
+      args = [
+        "--root_build_dir",
+        rebase_path(root_build_dir, root_build_dir),
+        "--output",
+        rebase_path(outputs[0], root_build_dir),
+        "--invoker_label",
+        invoker_label,
+        "--deps_to_verify",
+      ]
+      args += fully_qualified_deps
+      if (defined(allowed_deps)) {
+        args += [ "--allowed_deps" ]
+        args += allowed_deps
+      }
+      if (defined(allowed_dirs)) {
+        args += [ "--allowed_dirs" ]
+        args += allowed_dirs
+      }
+      args += [ "--sdk_manifests" ]
+      args += rebase_path(inputs, root_build_dir)
     }
-
-    testonly = true
-
-    script = "//sdk/ctf/build/scripts/verify_deps_in_sdk.py"
-
-    # GN requires an action to output a file. This file is written, but not used.
-    outputs = [ "${target_gen_dir}/${target_name}.unused" ]
-
-    args = [
-      "--root_build_dir",
-      rebase_path(root_build_dir, root_build_dir),
-      "--output",
-      rebase_path(outputs[0], root_build_dir),
-      "--invoker_label",
-      invoker_label,
-      "--deps_to_verify",
-    ]
-    args += fully_qualified_deps
-    if (defined(allowed_deps)) {
-      args += [ "--allowed_deps" ]
-      args += allowed_deps
+  } else {
+    group(target_name) {
+      not_needed("*")
+      not_needed(invoker, "*")
     }
-    if (defined(allowed_dirs)) {
-      args += [ "--allowed_dirs" ]
-      args += allowed_dirs
-    }
-    args += [ "--sdk_manifests" ]
-    args += rebase_path(inputs, root_build_dir)
   }
 }
