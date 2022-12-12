@@ -79,6 +79,12 @@ foreach(target_name, test_list) {
         sherlock_env,
       ]
     }
+
+    # We don't enable this test on Astro because of the potential for
+    # it to cause extra flash wear on that device type.
+    if (target_name == "storage_benchmarks_test") {
+      environments += [ sherlock_env ]
+    }
   }
 }
 
@@ -296,6 +302,8 @@ group("tests_to_run_on_internal_builders") {
   deps = [
     ":audio_mixer_profiler_test($host_toolchain)",
     ":kernel_boot_stats_test($host_toolchain)",
+    ":storage_benchmarks_test($host_toolchain)",
+    "//src/storage/benchmarks",
     "//src/tests/benchmarks:kernel-boot-benchmarks",
   ]
 }
