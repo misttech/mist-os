@@ -68,6 +68,13 @@ impl VmoRamdiskClientBuilder {
         self
     }
 
+    /// Create the ramdisk without waiting for its presence in devfs.
+    ///
+    /// TODO: remove this after soft transition in v/g.
+    pub fn build_sync(self) -> Result<RamdiskClient, zx::Status> {
+        self.build()
+    }
+
     /// Create the ramdisk.
     pub fn build(self) -> Result<RamdiskClient, zx::Status> {
         let Self { vmo, block_size, dev_root, guid } = self;
@@ -135,6 +142,13 @@ impl RamdiskClientBuilder {
     pub fn guid(mut self, guid: [u8; GUID_LEN]) -> Self {
         self.guid = Some(guid);
         self
+    }
+
+    /// Create the ramdisk without waiting for its presence in devfs.
+    ///
+    /// TODO: remove this after soft transition in v/g.
+    pub fn build_sync(self) -> Result<RamdiskClient, zx::Status> {
+        self.build()
     }
 
     /// Create the ramdisk.
