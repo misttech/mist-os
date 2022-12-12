@@ -7,5 +7,8 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.starnix.binder") {
   sdk_category = "internal"
   sources = [ "binder.fidl" ]
-  public_deps = [ "//zircon/vdso/zx" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.posix",
+    "//zircon/vdso/zx",
+  ]
 }

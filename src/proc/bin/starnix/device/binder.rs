@@ -30,6 +30,7 @@ use crate::types::*;
 use bitflags::bitflags;
 use derivative::Derivative;
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
+use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
@@ -2004,20 +2005,20 @@ impl BinderDriver {
                             let cloned_binder_process = binder_process.clone();
 
                             driver.thread_pool.dispatch(move || {
-                                let result = cloned_driver.ioctl(
-                                    &*cloned_remote_binder_task,
-                                    &cloned_binder_process,
-                                    &binder_thread,
-                                    request,
-                                    parameter.into(),
-                                );
-                                let errno = if let Err(errno) = result {
-                                    errno.code.error_code()
-                                } else {
-                                    0
-                                };
-
-                                let _ = responder.send(errno as u16);
+                                let mut result = cloned_driver
+                                    .ioctl(
+                                        &*cloned_remote_binder_task,
+                                        &cloned_binder_process,
+                                        &binder_thread,
+                                        request,
+                                        parameter.into(),
+                                    )
+                                    .map(|_| ())
+                                    .map_err(|e| {
+                                        fposix::Errno::from_primitive(e.code.error_code() as i32)
+                                            .unwrap_or(fposix::Errno::Einval)
+                                    });
+                                let _ = responder.send(&mut result);
                             });
                         }
                     }
@@ -5742,12 +5743,13 @@ mod tests {
         binder_proxy.set_vmo(vmo, addr as u64).expect("set_vmo");
         let mut version = binder_version { protocol_version: 0 };
         let version_ref = &mut version as *mut binder_version;
-        let code =
-            binder_proxy.ioctl(42, uapi::BINDER_VERSION, version_ref as u64).await.expect("ioctl")
-                as u32;
+        binder_proxy
+            .ioctl(42, uapi::BINDER_VERSION, version_ref as u64)
+            .await
+            .expect("ioctl")
+            .expect("ioctl");
         // SAFETY This is safe, because version is repr(C)
         let version = unsafe { std::ptr::read_volatile(version_ref) };
-        assert_eq!(code, 0);
         assert_eq!(version.protocol_version, BINDER_CURRENT_PROTOCOL_VERSION as i32);
         std::mem::drop(binder_proxy);
         task.await;

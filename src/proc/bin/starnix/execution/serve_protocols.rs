@@ -61,8 +61,11 @@ pub async fn serve_dev_binder(
 ) -> Result<(), Error> {
     while let Some(event) = request_stream.try_next().await? {
         match event {
-            fbinder::DevBinderRequest::Open { path, process, binder, control_handle } => {
+            fbinder::DevBinderRequest::Open { payload, control_handle } => {
                 let result: Result<(), Error> = (|| {
+                    let path = payload.path.ok_or_else(|| errno!(EINVAL))?;
+                    let process = payload.process.ok_or_else(|| errno!(EINVAL))?;
+                    let binder = payload.binder.ok_or_else(|| errno!(EINVAL))?;
                     let node = galaxy.system_task.lookup_path_from_root(&path)?;
                     let device_type = node.entry.node.info().rdev;
                     let binder_driver = galaxy
