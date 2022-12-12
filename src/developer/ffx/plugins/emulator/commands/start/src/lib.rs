@@ -71,12 +71,6 @@ pub async fn start(cmd: StartCommand, proxy: TargetCollectionProxy) -> Result<()
         }
     };
 
-    if cmd.edit {
-        if let Err(e) = edit_configuration(engine.emu_config_mut()) {
-            ffx_bail!("{:?}", e.context("Problem editing configuration."));
-        }
-    }
-
     // We do an initial build here, because we need an initial configuration before staging.
     let mut emulator_cmd = engine.build_emulator_cmd();
 
@@ -105,6 +99,12 @@ pub async fn start(cmd: StartCommand, proxy: TargetCollectionProxy) -> Result<()
             if cmd.stage {
                 return Ok(());
             }
+        }
+    }
+
+    if cmd.edit {
+        if let Err(e) = edit_configuration(engine.emu_config_mut()) {
+            ffx_bail!("{:?}", e.context("Problem editing configuration."));
         }
     }
 
