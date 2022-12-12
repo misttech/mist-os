@@ -8,7 +8,7 @@ use anyhow::Context;
 use async_trait::async_trait;
 use errors::FfxError;
 use ffx_assembly_args::*;
-use fho::{AvailabilityFlag, FfxMain, FfxTool, Result};
+use fho::{AvailabilityFlag, FfxMain, FfxTool, Result, SimpleWriter};
 
 mod base_package;
 mod blob_json_generator;
@@ -35,7 +35,8 @@ fho::embedded_plugin!(AssemblyTool);
 
 #[async_trait(?Send)]
 impl FfxMain for AssemblyTool {
-    async fn main(self) -> Result<()> {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: &SimpleWriter) -> Result<()> {
         // Dispatch to the correct operation based on the command.
         // The context() is used to display which operation failed in the event of
         // an error.

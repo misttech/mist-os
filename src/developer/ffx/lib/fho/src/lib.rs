@@ -19,6 +19,9 @@ pub use fho_macro::FfxTool;
 // so you don't have to pull both in all the time.
 pub use ffx_command::{Error, FfxContext, Result};
 
+// Re-expose the ffx_writer::Writer as the 'simple writer'
+pub use ffx_writer::Writer as SimpleWriter;
+
 /// Versions of FHO and their extended metadata
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Hash)]
 pub enum FhoVersion {

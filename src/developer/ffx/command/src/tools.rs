@@ -77,7 +77,7 @@ pub trait ToolSuite: Sized {
         &self,
         cmd: &FfxCommandLine,
         args: &[&str],
-    ) -> Result<Option<Box<dyn ToolRunner>>, Error>;
+    ) -> Result<Option<Box<dyn ToolRunner + '_>>, Error>;
 
     /// Parses the given command line into a command, then returns a redacted string usable in
     /// analytics. See [`FromArgs::redact_arg_values`] for the kind of output to expect.
@@ -86,7 +86,7 @@ pub trait ToolSuite: Sized {
     /// Parses the given command line information into a runnable command
     /// object, exiting and printing the early exit output if help is requested
     /// or an error occurs.
-    fn from_args(&self, cmd: &FfxCommandLine, args: &[&str]) -> Option<Box<dyn ToolRunner>> {
+    fn from_args(&self, cmd: &FfxCommandLine, args: &[&str]) -> Option<Box<dyn ToolRunner + '_>> {
         self.try_from_args(cmd, args).unwrap_or_else(|early_exit| {
             print!("{}", early_exit);
 

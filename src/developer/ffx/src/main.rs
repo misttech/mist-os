@@ -54,7 +54,7 @@ impl ToolSuite for FfxSuite {
         &self,
         ffx_cmd: &FfxCommandLine,
         args: &[&str],
-    ) -> Result<Option<Box<(dyn ToolRunner + 'static)>>> {
+    ) -> Result<Option<Box<(dyn ToolRunner + '_)>>> {
         let context = self.context.clone();
         let app = self.app.clone();
         match args.first().copied() {

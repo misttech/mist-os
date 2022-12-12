@@ -21,8 +21,9 @@ macro_rules! embedded_plugin {
 
             let env = $crate::FhoEnvironment { ffx, context, injector };
 
+            let writer = $crate::TryFromEnv::try_from_env(&env).await?;
             let tool = <$tool as $crate::FfxTool>::from_env(env, cmd).await?;
-            match $crate::FfxMain::main(tool).await {
+            match $crate::FfxMain::main(tool, &writer).await {
                 Ok(ok) => Ok(ok),
                 Err($crate::Error::User(err)) => Err(err),
                 Err($crate::Error::Unexpected(err)) => Err(err),
@@ -31,11 +32,13 @@ macro_rules! embedded_plugin {
         }
 
         pub fn ffx_plugin_writer_output() -> String {
-            String::from("Not supported")
+            use $crate::FfxToolIo;
+            <$tool as $crate::FfxMain>::Writer::machine_writer_output()
         }
 
         pub fn ffx_plugin_is_machine_supported() -> bool {
-            false
+            use $crate::FfxToolIo;
+            <$tool as $crate::FfxMain>::Writer::is_machine_supported()
         }
     };
 }

@@ -164,15 +164,15 @@ mod internal {
         from_env_string: NewTypeString,
         #[command]
         fake_command: FakeCommand,
-        writer: ffx_writer::Writer,
     }
 
     #[async_trait(?Send)]
     impl FfxMain for FakeTool {
-        async fn main(self) -> Result<()> {
+        type Writer = ffx_writer::Writer;
+        async fn main(self, writer: &Self::Writer) -> Result<()> {
             assert_eq!(self.from_env_string.0, "foobar");
             assert_eq!(self.fake_command.stuff, "stuff");
-            self.writer.line("junk-line").unwrap();
+            writer.line("junk-line").unwrap();
             Ok(())
         }
     }

@@ -6,7 +6,6 @@ use async_trait::async_trait;
 use ffx_writer::Writer;
 use fho::{FfxContext, FfxMain, FfxTool, Result};
 use fidl_fuchsia_developer_ffx as ffx;
-use std::rc::Rc;
 
 #[derive(FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "echo", description = "run echo test against the daemon")]
@@ -21,19 +20,19 @@ pub struct EchoTool {
     #[command]
     cmd: EchoCommand,
     echo_proxy: fho::DaemonProtocol<ffx::EchoProxy>,
-    writer: Rc<Writer>,
 }
 
 #[async_trait(?Send)]
 impl FfxMain for EchoTool {
-    async fn main(self) -> Result<()> {
+    type Writer = Writer;
+    async fn main(self, writer: &Writer) -> Result<()> {
         let text = self.cmd.text.as_deref().unwrap_or("FFX");
         let echo_out = self
             .echo_proxy
             .echo_string(text)
             .await
             .user_message("Error returned from echo service")?;
-        self.writer.line(echo_out)?;
+        writer.line(echo_out)?;
         Ok(())
     }
 }
@@ -64,9 +63,9 @@ mod tests {
         const ECHO: &'static str = "foo";
         let cmd = EchoCommand { text: Some(ECHO.to_owned()) };
         let echo_proxy = setup_fake_echo_proxy();
-        let writer = Rc::new(Writer::new_test(None));
-        let tool = EchoTool { cmd, echo_proxy, writer: writer.clone() };
-        tool.main().await.unwrap();
+        let writer = Writer::new_test(None);
+        let tool = EchoTool { cmd, echo_proxy };
+        tool.main(&writer).await.unwrap();
         assert_eq!(format!("{ECHO}\n"), writer.test_output().unwrap());
     }
 }

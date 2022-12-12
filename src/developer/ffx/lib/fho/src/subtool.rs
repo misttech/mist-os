@@ -22,6 +22,41 @@ use std::{fs::File, path::PathBuf, rc::Rc, sync::Arc};
 
 use crate::FhoToolMetadata;
 
+#[async_trait(?Send)]
+pub trait FfxTool: Sized {
+    type Command: FromArgs + SubCommand;
+    type Main<'a>: FfxMain;
+
+    fn forces_stdout_log() -> bool;
+    async fn from_env(env: FhoEnvironment<'_>, cmd: Self::Command) -> Result<Self::Main<'_>>;
+
+    /// Executes the tool. This is intended to be invoked by the user in main.
+    async fn execute_tool() {
+        let result = ffx_command::run::<FhoSuite<Self>>().await;
+        ffx_command::exit(result).await;
+    }
+}
+
+#[async_trait(?Send)]
+pub trait FfxMain: Sized {
+    type Writer: FfxToolIo + TryFromEnv;
+
+    /// The entrypoint of the tool. Once FHO has set up the environment for the tool, this is
+    /// invoked. Should not be invoked directly unless for testing.
+    async fn main(self, writer: &Self::Writer) -> Result<()>;
+}
+
+pub trait FfxToolIo {
+    fn machine_writer_output() -> String {
+        String::from("Not supported")
+    }
+
+    fn is_machine_supported() -> bool {
+        false
+    }
+}
+impl FfxToolIo for ffx_writer::Writer {}
+
 #[derive(FromArgs)]
 #[argh(subcommand)]
 pub(crate) enum FhoHandler<M: FfxTool> {
@@ -87,17 +122,22 @@ impl MetadataCmd {
 }
 
 #[async_trait(?Send)]
-impl<M: FfxTool> ToolRunner for FhoTool<M> {
+impl<T: FfxTool> ToolRunner for FhoTool<T> {
     fn forces_stdout_log(&self) -> bool {
-        M::forces_stdout_log()
+        T::forces_stdout_log()
     }
 
     async fn run(self: Box<Self>) -> Result<ExitStatus> {
         match self.command.subcommand {
-            FhoHandler::Metadata(metadata) => metadata.print(M::Command::COMMAND),
+            FhoHandler::Metadata(metadata) => metadata.print(T::Command::COMMAND),
             FhoHandler::Standalone(tool) => {
                 let cache_path = self.suite.context.get_cache_path()?;
-                let hoist_cache_dir = std::fs::create_dir_all(&cache_path).and_then(|_| tempfile::tempdir_in(&cache_path)).with_user_message(|| format!("Could not create hoist cache root in {}. Do you have permission to write to its parent?", cache_path.display()))?;
+                let hoist_cache_dir = std::fs::create_dir_all(&cache_path)
+                    .and_then(|_| tempfile::tempdir_in(&cache_path))
+                    .with_user_message(|| format!(
+                        "Could not create hoist cache root in {}. Do you have permission to write to its parent?", 
+                        cache_path.display()
+                    ))?;
                 let build_info = self.suite.context.build_info();
                 let injector = self
                     .suite
@@ -113,8 +153,9 @@ impl<M: FfxTool> ToolRunner for FhoTool<M> {
                     context: &self.suite.context,
                     injector: &injector,
                 };
-                let main = M::from_env(env, tool).await?;
-                main.main().await.map(|_| ExitStatus::from_raw(0))
+                let writer = TryFromEnv::try_from_env(&env).await?;
+                let main = T::from_env(env, tool).await?;
+                main.main(&writer).await.map(|_| ExitStatus::from_raw(0))
             }
         }
     }
@@ -135,7 +176,7 @@ impl<M: FfxTool> ToolSuite for FhoSuite<M> {
         &self,
         cmd: &FfxCommandLine,
         args: &[&str],
-    ) -> Result<Option<Box<dyn ToolRunner>>> {
+    ) -> Result<Option<Box<dyn ToolRunner + '_>>> {
         let found = FhoTool {
             suite: self.clone(),
             command: ToolCommand::<M>::from_args(&Vec::from_iter(cmd.cmd_iter()), args)
@@ -148,28 +189,6 @@ impl<M: FfxTool> ToolSuite for FhoSuite<M> {
         let cmd_vec = Vec::from_iter(cmd.cmd_iter());
         ToolCommand::<M>::redact_arg_values(&cmd_vec, args).map_err(argh_to_ffx_err)
     }
-}
-
-#[async_trait(?Send)]
-pub trait FfxTool: Sized + 'static {
-    type Command: FromArgs + SubCommand + 'static;
-    type Main<'a>: FfxMain;
-
-    fn forces_stdout_log() -> bool;
-    async fn from_env(env: FhoEnvironment<'_>, cmd: Self::Command) -> Result<Self::Main<'_>>;
-
-    /// Executes the tool. This is intended to be invoked by the user in main.
-    async fn execute_tool() {
-        let result = ffx_command::run::<FhoSuite<Self>>().await;
-        ffx_command::exit(result).await;
-    }
-}
-
-#[async_trait(?Send)]
-pub trait FfxMain: Sized {
-    /// The entrypoint of the tool. Once FHO has set up the environment for the tool, this is
-    /// invoked. Should not be invoked directly unless for testing.
-    async fn main(self) -> Result<()>;
 }
 
 #[async_trait(?Send)]
@@ -436,6 +455,7 @@ mod tests {
     use crate::FhoVersion;
     use argh::FromArgs;
     use async_trait::async_trait;
+    use ffx_writer::Writer;
     use fho_macro::FfxTool;
 
     // The main testing part will happen in the `main()` function of the tool.
@@ -444,6 +464,7 @@ mod tests {
         let context = ffx_config::EnvironmentContext::default();
         let (ffx, injector, tool_cmd) = setup_fho_items::<FakeTool>();
         let fho_env = FhoEnvironment { ffx: &ffx, context: &context, injector: &injector };
+        let writer = Writer::try_from_env(&fho_env).await.expect("creating writer");
 
         assert_eq!(
             SIMPLE_CHECK_COUNTER.with(|counter| *counter.borrow()),
@@ -459,7 +480,7 @@ mod tests {
             1,
             "tool pre-check should have been called once"
         );
-        fake_tool.main().await.unwrap();
+        fake_tool.main(&writer).await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -472,7 +493,8 @@ mod tests {
         }
         #[async_trait(?Send)]
         impl FfxMain for FakeToolWillFail {
-            async fn main(self) -> Result<()> {
+            type Writer = ffx_writer::Writer;
+            async fn main(self, _writer: &Self::Writer) -> Result<()> {
                 panic!("This should never get called")
             }
         }

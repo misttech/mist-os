@@ -25,7 +25,8 @@ fho::embedded_plugin!(Efi);
 
 #[async_trait(?Send)]
 impl fho::FfxMain for Efi {
-    async fn main(self) -> fho::Result<()> {
+    type Writer = fho::SimpleWriter;
+    async fn main(self, _writer: &Self::Writer) -> fho::Result<()> {
         command(self.cmd).await.map_err(|e| e.into())
     }
 }
