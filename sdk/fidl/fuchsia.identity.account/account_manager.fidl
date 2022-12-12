@@ -39,7 +39,11 @@ protocol AccountManager {
     ///               authentication challenges if these are necessary.
     /// `account` [required] The server end of an `Account` channel
     ///
-    /// Fails with `ABORTED` if the client closes the `interaction` channel.
+    /// Fails with:
+    /// - `INVALID_REQUEST` if the `id` does not exist.
+    /// - `FAILED_PRECONDITION` if the account is locked but no `interaction`
+    ///   channel was supplied to perform authentication.
+    /// - `ABORTED` if the client closes the `interaction` channel.
     GetAccount(resource table {
         1: id AccountId;
         2: interaction server_end:fuchsia.identity.authentication.Interaction;
@@ -100,9 +104,9 @@ protocol AccountManager {
         id AccountId;
     }) -> () error Error;
 
-    /// Adds a new account to the device. If a storage unlock-capable
-    /// authentication mechanism is provided, a single enrollment will be
-    /// created of that mechanism.
+    /// Adds a new account to the device. If this operation if successful the
+    /// newly created account will be unlocked and may be accessed using
+    /// `GetAccount` without further authentication.
     ///
     /// `lifetime` [required] The lifetime of the account
     /// `metadata` [required] Metadata for the new account
