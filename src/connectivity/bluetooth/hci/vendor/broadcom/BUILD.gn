@@ -89,7 +89,6 @@ executable("tests_executable") {
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_c",
     "//sdk/lib/fdio",
     "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/bus/testing/mock-sdio",
     "//src/devices/testing/mock-ddk",
     "//src/lib/ddk",
     "//src/lib/ddktl",
