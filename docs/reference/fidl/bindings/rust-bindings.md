@@ -495,7 +495,9 @@ struct FakeTicTacToeProxy {
 }
 
 impl TicTacToeProxyInterface for FakeTicTacToeProxy {
-    fn start_game(&self, mut start_first: bool) -> Result<(), fidl::Error> {}
+    fn start_game(&self, mut start_first: bool) -> Result<(), fidl::Error> {
+      Ok(())
+    }
 
     type MakeMoveResponseFut = Ready<fidl::Result<(bool, Option<Box<GameState>>)>>;
     fn make_move(&self, mut row: u8, mut col: u8) -> Self::MakeMoveResponseFut {
@@ -642,6 +644,59 @@ The FIDL toolchain generates a public `TicTacToeMakeMoveResult` type alias for
 this method is generated as if it has a single response parameter `result` of
 type `TicTacToeMakeMoveResult`. The type used for a successful result follows
 the [parameter type conversion rules](#request-response-event-parameters).
+
+### Unknown interaction handling {#unknown-interaction-handling}
+
+#### Server-side
+
+When a protocol is declared as `open` or `ajar`, the generated [request
+enum](#request-enum) will will have an additional variant called
+`_UnknownMethod` which has these fields:
+
+```rust
+#[non_exhausitve]
+_UnknownMethod {
+    /// Ordinal of the method that was called.
+    ordinal: u64,
+    /// Control handle for the protocol.
+    control_handle: TicTacToeControlHandle,
+    /// Enum indicating whether the method is a one-way method or a two way
+    /// method. This field only exists if the protocol is open.
+    unknown_method_type: fidl::endpoints::UnknownMethodType,
+}
+```
+
+`UnknownMethodType` is an enum with two unit variants, `OneWay` and `TwoWay`,
+which tells which kind of method was called.
+
+Whenever the server receives a flexible unknown event, the request stream will
+emit this variant of the request enum.
+
+#### Client-side
+
+There is no way for the client to tell if a `flexible` one-way method was known
+to the server or not. For `flexible` two-way methods, if the method is not known
+to the server, the client will receive an `Err` result with a value of
+`fidl::Error::UnsupportedMethod`. The `UnsupportedMethod` error is only possible
+for a flexible two-way method.
+
+Aside from the possibility of getting an `UnsupportedMethod` error, there are no
+API differences between `strict` and `flexible` methods on the client.
+
+For `open` and `ajar` protocols, the generated [event
+enum](#protocols-events-client) will have an additional variant called
+`_UnknownEvent` which has these fields:
+
+```rust
+#[non_exhaustive]
+_UnknownEvent {
+    /// Ordinal of the event that was sent.
+    ordinal: u64,
+}
+```
+
+Whenever the client receives an unknown event, the client event stream will emit
+this variant of the event enum.
 
 ### Protocol composition {#protocol-composition}
 
