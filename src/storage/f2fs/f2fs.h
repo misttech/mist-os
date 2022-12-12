@@ -26,7 +26,6 @@
 
 #include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/listnode.h>
 #include <zircon/types.h>
 
 #include <lib/syslog/cpp/macros.h>

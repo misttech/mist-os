@@ -197,42 +197,26 @@ TEST_F(NodeManagerTest, NatCache) {
 
 TEST_F(NodeManagerTest, FreeNid) {
   NodeManager &node_manager = fs_->GetNodeManager();
+  auto init_fcnt = node_manager.GetFreeNidCount();
 
-  ASSERT_EQ(node_manager.GetFirstScanNid(), static_cast<nid_t>(4));
+  nid_t nid = MapTester::ScanFreeNidList(node_manager);
+  // |nid| is the last element in free nid tree.
+  ASSERT_EQ(nid + 1, node_manager.GetNextScanNid());
 
-  nid_t nid = node_manager.GetFirstScanNid();
-  nid_t init_fcnt = node_manager.GetFreeNidCount();
-
-  nid = MapTester::ScanFreeNidList(node_manager, nid);
-  ASSERT_EQ(nid, node_manager.GetNextScanNid());
-
-  // Alloc Done
-  fs_->GetNodeManager().AllocNid(nid);
+  ASSERT_TRUE(fs_->GetNodeManager().AllocNid(nid).is_ok());
   ASSERT_EQ(nid, static_cast<nid_t>(4));
   ASSERT_EQ(node_manager.GetFreeNidCount(), init_fcnt - 1);
 
-  FreeNid *fi = MapTester::GetNextFreeNidInList(node_manager);
-  ASSERT_EQ(fi->nid, static_cast<nid_t>(4));
-  ASSERT_EQ(fi->state, static_cast<int>(NidState::kNidAlloc));
+  nid = MapTester::GetNextFreeNidInList(node_manager);
+  ASSERT_EQ(nid, static_cast<nid_t>(5));
 
-  fs_->GetNodeManager().AllocNidDone(nid);
-  fi = MapTester::GetNextFreeNidInList(node_manager);
-  ASSERT_EQ(fi->nid, static_cast<nid_t>(5));
-  ASSERT_EQ(fi->state, static_cast<int>(NidState::kNidNew));
-
-  // Alloc Failed
-  fs_->GetNodeManager().AllocNid(nid);
+  ASSERT_TRUE(fs_->GetNodeManager().AllocNid(nid).is_ok());
   ASSERT_EQ(nid, static_cast<nid_t>(5));
   ASSERT_EQ(node_manager.GetFreeNidCount(), init_fcnt - 2);
 
-  fi = MapTester::GetNextFreeNidInList(node_manager);
-  ASSERT_EQ(fi->nid, static_cast<nid_t>(5));
-  ASSERT_EQ(fi->state, static_cast<int>(NidState::kNidAlloc));
-
-  fs_->GetNodeManager().AllocNidFailed(nid);
-  fi = MapTester::GetTailFreeNidInList(node_manager);
-  ASSERT_EQ(fi->nid, static_cast<nid_t>(5));
-  ASSERT_EQ(fi->state, static_cast<int>(NidState::kNidNew));
+  fs_->GetNodeManager().AddFreeNid(nid);
+  nid = MapTester::GetNextFreeNidInList(node_manager);
+  ASSERT_EQ(nid, static_cast<nid_t>(5));
 }
 
 TEST_F(NodeManagerTest, NodePage) {

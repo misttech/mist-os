@@ -57,14 +57,12 @@ bool NodeManager::IncValidNodeCount(VnodeF2fs *vnode, uint32_t count, bool isIno
   return true;
 }
 
-zx_status_t NodeManager::NextFreeNid(nid_t *nid) {
-  if (free_nid_count_ <= 0)
-    return ZX_ERR_NO_RESOURCES;
-
-  std::lock_guard free_nid_lock(free_nid_list_lock_);
-  FreeNid *fnid = containerof(free_nid_list_.next, FreeNid, list);
-  *nid = fnid->nid;
-  return ZX_OK;
+zx::result<nid_t> NodeManager::GetNextFreeNid() {
+  fs::SharedLock free_nid_lock(free_nid_tree_lock_);
+  if (free_nid_tree_.empty()) {
+    return zx::error(ZX_ERR_NO_RESOURCES);
+  }
+  return zx::ok(*free_nid_tree_.begin());
 }
 
 void NodeManager::GetNatBitmap(void *out) {
@@ -545,18 +543,17 @@ zx_status_t NodeManager::GetLockedDnodePage(VnodeF2fs &vnode, pgoff_t index, Loc
     LockedPage node_page;
     if (!nid && i > 0) {
       // alloc new node
-      if (!AllocNid(nid)) {
+      if (AllocNid(nid).is_error()) {
         return ZX_ERR_NO_SPACE;
       }
 
       if (zx_status_t err = NewNodePage(vnode, nid, noffset[i], &node_page); err != ZX_OK) {
-        AllocNidFailed(nid);
+        AddFreeNid(nid);
         return err;
       }
 
       parent.GetPage<NodePage>().SetNid(offset[i - 1], nid, IsInode(*parent));
       parent.SetDirty();
-      AllocNidDone(nid);
     } else {
       if (zx_status_t err = GetNodePage(nid, &node_page); err != ZX_OK) {
         return err;
@@ -1051,114 +1048,93 @@ int NodeManager::F2fsWriteNodePages(struct address_space *mapping, WritebackCont
 }
 #endif
 
-FreeNid *NodeManager::LookupFreeNidList(nid_t n) {
-  list_node_t *this_list;
-  FreeNid *i = nullptr;
-  list_for_every(&free_nid_list_, this_list) {
-    i = containerof(this_list, FreeNid, list);
-    if (i->nid == n)
-      break;
-    i = nullptr;
+zx::result<> NodeManager::LookupFreeNidList(nid_t n) {
+  if (auto iter = free_nid_tree_.find(n); iter != free_nid_tree_.end()) {
+    return zx::ok();
   }
-  return i;
-}
-
-void NodeManager::DelFromFreeNidList(FreeNid *i) {
-  list_delete(&i->list);
-  delete i;
+  return zx::error(ZX_ERR_NOT_FOUND);
 }
 
 int NodeManager::AddFreeNid(nid_t nid) {
-  FreeNid *i;
-
-  if (free_nid_count_ > 2 * kMaxFreeNids)
-    return 0;
-  do {
-    i = new FreeNid;
-    sleep(0);
-  } while (!i);
-  i->nid = nid;
-  i->state = static_cast<int>(NidState::kNidNew);
-
-  std::lock_guard free_nid_lock(free_nid_list_lock_);
-  if (LookupFreeNidList(nid)) {
-    delete i;
+  std::lock_guard free_nid_lock(free_nid_tree_lock_);
+  // We have enough free nids.
+  if (free_nid_tree_.size() > 2 * kMaxFreeNids) {
     return 0;
   }
-  list_add_tail(&free_nid_list_, &i->list);
-  ++free_nid_count_;
-  return 1;
+  int ret = 0;
+  if (const auto [iter, inserted] = free_nid_tree_.insert(nid); inserted) {
+    ++ret;
+  }
+  return ret;
 }
 
 void NodeManager::RemoveFreeNid(nid_t nid) {
-  FreeNid *i;
-  std::lock_guard free_nid_lock(free_nid_list_lock_);
-  i = LookupFreeNidList(nid);
-  if (i && i->state == static_cast<int>(NidState::kNidNew)) {
-    DelFromFreeNidList(i);
-    --free_nid_count_;
+  std::lock_guard free_nid_lock(free_nid_tree_lock_);
+  RemoveFreeNidUnsafe(nid);
+}
+
+void NodeManager::RemoveFreeNidUnsafe(nid_t nid) {
+  if (auto state_or = LookupFreeNidList(nid); state_or.is_ok()) {
+    free_nid_tree_.erase(nid);
   }
 }
 
 int NodeManager::ScanNatPage(Page &nat_page, nid_t start_nid) {
   NatBlock *nat_blk = nat_page.GetAddress<NatBlock>();
   block_t blk_addr;
-  int fcnt = 0;
+  int free_nids = 0;
 
   // 0 nid should not be used
-  if (start_nid == 0)
+  if (start_nid == 0) {
     ++start_nid;
+  }
 
   for (uint32_t i = start_nid % kNatEntryPerBlock; i < kNatEntryPerBlock; ++i, ++start_nid) {
     blk_addr = LeToCpu(nat_blk->entries[i].block_addr);
     ZX_ASSERT(blk_addr != kNewAddr);
-    if (blk_addr == kNullAddr)
-      fcnt += AddFreeNid(start_nid);
+    if (blk_addr == kNullAddr) {
+      free_nids += AddFreeNid(start_nid);
+    }
   }
-  return fcnt;
+  return free_nids;
 }
 
 void NodeManager::BuildFreeNids() {
-  FreeNid *fnid, *next_fnid;
-  CursegInfo *curseg = fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegHotData);
-  SummaryBlock *sum = curseg->sum_blk.get<SummaryBlock>();
-  nid_t nid = 0;
-  bool is_cycled = false;
-  uint64_t fcnt = 0;
+  {
+    std::lock_guard lock(build_lock_);
+    nid_t nid = next_scan_nid_, init_scan_nid = next_scan_nid_;
+    bool is_cycled = false;
+    uint64_t free_nids = 0;
 
-  nid = next_scan_nid_;
-  init_scan_nid_ = nid;
+    RaNatPages(nid);
+    while (true) {
+      {
+        LockedPage page;
+        GetCurrentNatPage(nid, &page);
+        free_nids += ScanNatPage(*page, nid);
+      }
 
-  RaNatPages(nid);
-
-  while (true) {
-    {
-      LockedPage page;
-      GetCurrentNatPage(nid, &page);
-
-      fcnt += ScanNatPage(*page, nid);
+      nid += (kNatEntryPerBlock - (nid % kNatEntryPerBlock));
+      if (nid >= max_nid_) {
+        nid = 0;
+        is_cycled = true;
+      }
+      // If we already have enough nids or check every nid, stop it.
+      if (free_nids > kMaxFreeNids || (is_cycled && init_scan_nid <= nid)) {
+        break;
+      }
     }
-
-    nid += (kNatEntryPerBlock - (nid % kNatEntryPerBlock));
-
-    if (nid >= max_nid_) {
-      nid = 0;
-      is_cycled = true;
-    }
-    if (fcnt > kMaxFreeNids)
-      break;
-    if (is_cycled && init_scan_nid_ <= nid)
-      break;
+    next_scan_nid_ = nid;
   }
-
-  next_scan_nid_ = nid;
 
   {
     // find free nids from current sum_pages
+    CursegInfo *curseg = fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegHotData);
     std::lock_guard curseg_lock(curseg->curseg_mutex);
+    SummaryBlock *sum = curseg->sum_blk.get<SummaryBlock>();
     for (int i = 0; i < NatsInCursum(sum); ++i) {
       block_t addr = LeToCpu(NatInJournal(sum, i).block_addr);
-      nid = LeToCpu(NidInJournal(sum, i));
+      nid_t nid = LeToCpu(NidInJournal(sum, i));
       if (addr == kNullAddr) {
         AddFreeNid(nid);
       } else {
@@ -1168,11 +1144,12 @@ void NodeManager::BuildFreeNids() {
   }
 
   // remove the free nids from current allocated nids
-  list_for_every_entry_safe (&free_nid_list_, fnid, next_fnid, FreeNid, list) {
+  std::lock_guard lock(free_nid_tree_lock_);
+  for (auto nid : free_nid_tree_) {
     fs::SharedLock nat_lock(nat_tree_lock_);
-    NatEntry *entry = LookupNatCache(fnid->nid);
+    NatEntry *entry = LookupNatCache(nid);
     if (entry && entry->GetBlockAddress() != kNullAddr) {
-      RemoveFreeNid(fnid->nid);
+      RemoveFreeNidUnsafe(nid);
     }
   }
 }
@@ -1180,60 +1157,27 @@ void NodeManager::BuildFreeNids() {
 // If this function returns success, caller can obtain a new nid
 // from second parameter of this function.
 // The returned nid could be used ino as well as nid when inode is created.
-bool NodeManager::AllocNid(nid_t &out) {
-  FreeNid *i = nullptr;
-  list_node_t *this_list;
+zx::result<> NodeManager::AllocNid(nid_t &out) {
   do {
-    {
-      std::lock_guard lock(build_lock_);
-      if (!free_nid_count_) {
-        // scan NAT in order to build free nid list
-        BuildFreeNids();
-        if (!free_nid_count_) {
-#ifdef __Fuchsia__
-          fs_->GetInspectTree().OnOutOfSpace();
-#endif
-          return false;
-        }
+    if (!GetFreeNidCount()) {
+      // scan NAT in order to build free nid tree
+      BuildFreeNids();
+      if (!GetFreeNidCount()) {
+        fs_->GetInspectTree().OnOutOfSpace();
+        return zx::error(ZX_ERR_NO_SPACE);
       }
     }
-    // We check fcnt again since previous check is racy as
-    // we didn't hold free_nid_list_lock. So other thread
+    // We check free nid counts again since previous check is racy as
+    // we didn't hold free_nid_tree_lock. So other thread
     // could consume all of free nids.
-  } while (!free_nid_count_);
+  } while (!GetFreeNidCount());
 
-  std::lock_guard lock(free_nid_list_lock_);
-  ZX_ASSERT(!list_is_empty(&free_nid_list_));
-
-  list_for_every(&free_nid_list_, this_list) {
-    i = containerof(this_list, FreeNid, list);
-    if (i->state == static_cast<int>(NidState::kNidNew))
-      break;
-  }
-
-  ZX_ASSERT(i->state == static_cast<int>(NidState::kNidNew));
-  out = i->nid;
-  i->state = static_cast<int>(NidState::kNidAlloc);
-  --free_nid_count_;
-  return true;
-}
-
-// alloc_nid() should be called prior to this function.
-void NodeManager::AllocNidDone(nid_t nid) {
-  FreeNid *i;
-
-  std::lock_guard free_nid_lock(free_nid_list_lock_);
-  i = LookupFreeNidList(nid);
-  if (i) {
-    ZX_ASSERT(i->state == static_cast<int>(NidState::kNidAlloc));
-    DelFromFreeNidList(i);
-  }
-}
-
-// alloc_nid() should be called prior to this function.
-void NodeManager::AllocNidFailed(nid_t nid) {
-  AllocNidDone(nid);
-  AddFreeNid(nid);
+  std::lock_guard lock(free_nid_tree_lock_);
+  ZX_ASSERT(!free_nid_tree_.empty());
+  auto free_nid = free_nid_tree_.begin();
+  out = *free_nid;
+  free_nid_tree_.erase(free_nid);
+  return zx::ok();
 }
 
 zx_status_t NodeManager::RecoverInodePage(NodePage &page) {
@@ -1246,7 +1190,7 @@ zx_status_t NodeManager::RecoverInodePage(NodePage &page) {
     return ret;
   }
 
-  // Should not use this inode  from free nid list
+  // Should not use this inode from free nid tree
   RemoveFreeNid(ino);
 
   GetNodeInfo(ino, old_node_info);
@@ -1447,15 +1391,12 @@ zx_status_t NodeManager::InitNodeManager() {
   nat_segs = LeToCpu(sb_raw.segment_count_nat) >> 1;
   nat_blocks = nat_segs << LeToCpu(sb_raw.log_blocks_per_seg);
   max_nid_ = kNatEntryPerBlock * nat_blocks;
-  free_nid_count_ = 0;
-  nat_entries_count_ = 0;
-
-  list_initialize(&free_nid_list_);
+  {
+    std::lock_guard lock(build_lock_);
+    next_scan_nid_ = LeToCpu(GetSuperblockInfo().GetCheckpoint().next_free_nid);
+  }
 
   nat_bitmap_size_ = GetSuperblockInfo().BitmapSize(MetaBitmap::kNatBitmap);
-  init_scan_nid_ = LeToCpu(GetSuperblockInfo().GetCheckpoint().next_free_nid);
-  next_scan_nid_ = LeToCpu(GetSuperblockInfo().GetCheckpoint().next_free_nid);
-
   nat_bitmap_ = std::make_unique<uint8_t[]>(nat_bitmap_size_);
   memset(nat_bitmap_.get(), 0, nat_bitmap_size_);
   nat_prev_bitmap_ = std::make_unique<uint8_t[]>(nat_bitmap_size_);
@@ -1481,20 +1422,14 @@ zx_status_t NodeManager::BuildNodeManager() {
 }
 
 void NodeManager::DestroyNodeManager() {
-  FreeNid *i, *next_i;
   NatEntry *natvec[kNatvecSize];
   uint32_t found;
 
   {
-    // destroy free nid list
-    std::lock_guard free_nid_lock(free_nid_list_lock_);
-    list_for_every_entry_safe (&free_nid_list_, i, next_i, FreeNid, list) {
-      ZX_ASSERT(i->state != static_cast<int>(NidState::kNidAlloc));
-      DelFromFreeNidList(i);
-      --free_nid_count_;
-    }
+    // destroy free nid tree
+    std::lock_guard free_nid_lock(free_nid_tree_lock_);
+    free_nid_tree_.clear();
   }
-  ZX_ASSERT(!free_nid_count_);
 
   {
     // destroy nat cache

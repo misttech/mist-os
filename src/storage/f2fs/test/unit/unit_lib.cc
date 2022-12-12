@@ -185,13 +185,12 @@ void FileTester::DeleteChildren(std::vector<fbl::RefPtr<VnodeF2fs>> &vnodes,
 
 void FileTester::VnodeWithoutParent(F2fs *fs, uint32_t mode, fbl::RefPtr<VnodeF2fs> &vnode) {
   nid_t inode_nid;
-  ASSERT_TRUE(fs->GetNodeManager().AllocNid(inode_nid));
+  ASSERT_TRUE(fs->GetNodeManager().AllocNid(inode_nid).is_ok());
 
   VnodeF2fs::Allocate(fs, inode_nid, mode, &vnode);
   ASSERT_EQ(vnode->Open(vnode->ValidateOptions(fs::VnodeConnectionOptions()).value(), nullptr),
             ZX_OK);
   vnode->UnlockNewInode();
-  fs->GetNodeManager().AllocNidDone(vnode->Ino());
 
   fs->InsertVnode(vnode.get());
   vnode->MarkInodeDirty();
@@ -336,13 +335,11 @@ void MapTester::CheckNodeLevel(F2fs *fs, VnodeF2fs *vn, uint32_t level) {
 void MapTester::CheckNidsFree(F2fs *fs, std::unordered_set<nid_t> &nids) {
   NodeManager &nm_i = fs->GetNodeManager();
 
-  std::lock_guard lock(nm_i.free_nid_list_lock_);
+  std::lock_guard lock(nm_i.free_nid_tree_lock_);
   for (auto nid : nids) {
     bool found = false;
-    list_node_t *iter;
-    list_for_every(&nm_i.free_nid_list_, iter) {
-      FreeNid *fnid = containerof(iter, FreeNid, list);
-      if (fnid->nid == nid) {
+    for (const auto &iter : nm_i.free_nid_tree_) {
+      if (iter == nid) {
         found = true;
         break;
       }
@@ -354,13 +351,11 @@ void MapTester::CheckNidsFree(F2fs *fs, std::unordered_set<nid_t> &nids) {
 void MapTester::CheckNidsInuse(F2fs *fs, std::unordered_set<nid_t> &nids) {
   NodeManager &nm_i = fs->GetNodeManager();
 
-  std::lock_guard lock(nm_i.free_nid_list_lock_);
+  std::lock_guard lock(nm_i.free_nid_tree_lock_);
   for (auto nid : nids) {
     bool found = false;
-    list_node_t *iter;
-    list_for_every(&nm_i.free_nid_list_, iter) {
-      FreeNid *fnid = containerof(iter, FreeNid, list);
-      if (fnid->nid == nid) {
+    for (const auto &iter : nm_i.free_nid_tree_) {
+      if (iter == nid) {
         found = true;
         break;
       }
@@ -476,17 +471,9 @@ void MapTester::RemoveAllNatEntries(NodeManager &manager) {
   manager.nat_cache_.clear();
 }
 
-nid_t MapTester::ScanFreeNidList(NodeManager &manager, nid_t start) {
-  // Check initial free list (BuildFreeNids)
-  list_node_t *this_list;
-  std::lock_guard nat_lock(manager.free_nid_list_lock_);
-  list_for_every(&manager.free_nid_list_, this_list) {
-    FreeNid *fi = containerof(this_list, FreeNid, list);
-    ZX_ASSERT(fi->nid == start);
-    ZX_ASSERT(fi->state == static_cast<int>(NidState::kNidNew));
-    ++start;
-  }
-  return start;
+nid_t MapTester::ScanFreeNidList(NodeManager &manager) {
+  std::lock_guard free_nid_lock(manager.free_nid_tree_lock_);
+  return manager.free_nid_tree_.empty() ? 0 : *manager.free_nid_tree_.rbegin();
 }
 
 void MapTester::GetCachedNatEntryBlockAddress(NodeManager &manager, nid_t nid, block_t &out) {

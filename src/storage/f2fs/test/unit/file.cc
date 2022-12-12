@@ -487,12 +487,12 @@ TEST(FileTest2, FailedNidReuse) {
     tmp_child = nullptr;
   }
 
-  const uint32_t kIteration = fs->GetNodeManager().GetFreeNidCount() + 1;
-  for (uint32_t i = 0; i < kIteration; ++i) {
+  const size_t kIteration = fs->GetNodeManager().GetFreeNidCount() + 1;
+  for (size_t i = 0; i < kIteration; ++i) {
     ASSERT_EQ(root_dir->Create(std::to_string(++iter), S_IFREG, &tmp_child), ZX_ERR_NO_SPACE);
   }
 
-  for (uint32_t i = 0; i < kIteration; ++i) {
+  for (size_t i = 0; i < kIteration; ++i) {
     ASSERT_EQ(root_dir->Create(std::to_string(++iter), S_IFDIR, &tmp_child), ZX_ERR_NO_SPACE);
   }
 

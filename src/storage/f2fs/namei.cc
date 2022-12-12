@@ -20,7 +20,7 @@ zx_status_t Dir::NewInode(uint32_t mode, fbl::RefPtr<VnodeF2fs> *out) {
 
   do {
     fs::SharedLock rlock(superblock_info.GetFsLock(LockType::kFileOp));
-    if (!fs()->GetNodeManager().AllocNid(ino)) {
+    if (fs()->GetNodeManager().AllocNid(ino).is_error()) {
       return ZX_ERR_NO_SPACE;
     }
   } while (false);
@@ -114,15 +114,12 @@ zx_status_t Dir::DoCreate(std::string_view name, uint32_t mode, fbl::RefPtr<fs::
       vnode->ClearNlink();
       vnode->UnlockNewInode();
       fs()->GetVCache().RemoveDirty(vnode);
-      fs()->GetNodeManager().AllocNidFailed(vnode->Ino());
+      fs()->GetNodeManager().AddFreeNid(vnode->Ino());
       return err;
     }
   }
 
-  fs()->GetNodeManager().AllocNidDone(vnode->Ino());
-
   vnode->UnlockNewInode();
-
   *out = std::move(vnode_refptr);
   return ZX_OK;
 }
@@ -285,11 +282,10 @@ zx_status_t Dir::Mkdir(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vno
       vnode->ClearNlink();
       vnode->UnlockNewInode();
       fs()->GetVCache().RemoveDirty(vnode);
-      fs()->GetNodeManager().AllocNidFailed(vnode->Ino());
+      fs()->GetNodeManager().AddFreeNid(vnode->Ino());
       return err;
     }
   }
-  fs()->GetNodeManager().AllocNidDone(vnode->Ino());
   vnode->UnlockNewInode();
 
   *out = std::move(vnode_refptr);

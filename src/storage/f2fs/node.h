@@ -90,18 +90,6 @@ class NatEntry : public fbl::WAVLTreeContainable<std::unique_ptr<NatEntry>>,
 
 inline uint8_t IncNodeVersion(uint8_t version) { return ++version; }
 
-// For free nid mangement
-enum class NidState {
-  kNidNew = 0,  // newly added to free nid list
-  kNidAlloc,    // it is allocated
-};
-
-struct FreeNid {
-  list_node_t list;  // for free node id list
-  nid_t nid = 0;     // node id
-  int state = 0;     // in use or not: kNidNew or kNidAlloc
-};
-
 class MapTester;
 
 class NodeManager {
@@ -114,7 +102,6 @@ class NodeManager {
 
   explicit NodeManager(F2fs *fs);
 
-  zx_status_t NextFreeNid(nid_t *nid);
   void NodeInfoFromRawNat(NodeInfo &ni, RawNatEntry &raw_ne);
   zx_status_t BuildNodeManager();
   void DestroyNodeManager();
@@ -158,9 +145,6 @@ class NodeManager {
   pgoff_t FlushDirtyNodePages(WritebackOperation &operation);
   pgoff_t FsyncNodePages(VnodeF2fs &vnode);
 
-  bool AllocNid(nid_t &out);
-  void AllocNidFailed(nid_t nid);
-  void AllocNidDone(nid_t nid);
   zx_status_t TruncateInodeBlocks(VnodeF2fs &vnode, pgoff_t from);
 
   // Caller should acquire LockType:kFileOp.
@@ -187,12 +171,16 @@ class NodeManager {
   nid_t GetMaxNid() const { return max_nid_; }
   void SetNatAddress(const block_t value) { nat_blkaddr_ = value; }
   block_t GetNatAddress() const { return nat_blkaddr_; }
-  void SetFirstScanNid(const nid_t value) { init_scan_nid_ = value; }
-  nid_t GetFirstScanNid() const { return init_scan_nid_; }
-  void SetNextScanNid(const nid_t value) { next_scan_nid_ = value; }
-  nid_t GetNextScanNid() const { return next_scan_nid_; }
+
+  void SetNextScanNid(const nid_t value) __TA_EXCLUDES(build_lock_) {
+    std::lock_guard lock(build_lock_);
+    next_scan_nid_ = value;
+  }
+  nid_t GetNextScanNid() __TA_EXCLUDES(build_lock_) {
+    std::lock_guard lock(build_lock_);
+    return next_scan_nid_;
+  }
   nid_t GetNatCount() const { return nat_entries_count_; }
-  nid_t GetFreeNidCount() const { return free_nid_count_; }
   zx_status_t AllocNatBitmap(const uint32_t size) {
     nat_bitmap_size_ = size;
     nat_bitmap_ = std::make_unique<uint8_t[]>(nat_bitmap_size_);
@@ -204,6 +192,14 @@ class NodeManager {
   void GetNatBitmap(void *out);
 
   SuperblockInfo &GetSuperblockInfo();
+
+  zx::result<> AllocNid(nid_t &out) __TA_EXCLUDES(free_nid_tree_lock_);
+  zx::result<nid_t> GetNextFreeNid() __TA_EXCLUDES(free_nid_tree_lock_);
+  int AddFreeNid(nid_t nid) __TA_EXCLUDES(free_nid_tree_lock_);
+  size_t GetFreeNidCount() __TA_EXCLUDES(free_nid_tree_lock_) {
+    fs::SharedLock free_nid_lock(free_nid_tree_lock_);
+    return free_nid_tree_.size();
+  }
 
  private:
   friend class MapTester;
@@ -241,21 +237,18 @@ class NodeManager {
                                    const int32_t (&offset)[kMaxNodeBlockLevel], int32_t depth);
   zx_status_t NewNodePage(VnodeF2fs &vnode, nid_t nid, uint32_t ofs, LockedPage *out);
 
-  FreeNid *LookupFreeNidList(nid_t n);
-  void DelFromFreeNidList(FreeNid *i);
-  int AddFreeNid(nid_t nid);
-  void RemoveFreeNid(nid_t nid);
+  void BuildFreeNids() __TA_EXCLUDES(free_nid_tree_lock_) __TA_EXCLUDES(build_lock_);
+  zx::result<> LookupFreeNidList(nid_t n) __TA_REQUIRES(free_nid_tree_lock_);
+  void RemoveFreeNid(nid_t nid) __TA_EXCLUDES(free_nid_tree_lock_);
+  void RemoveFreeNidUnsafe(nid_t nid) __TA_REQUIRES(free_nid_tree_lock_);
+
   int ScanNatPage(Page &nat_page, nid_t start_nid);
-  void BuildFreeNids();
+
   zx_status_t InitNodeManager();
 
   F2fs *fs_ = nullptr;
   SuperblockInfo *superblock_info_ = nullptr;
-  block_t nat_blkaddr_ = 0;   // starting block address of NAT
-  nid_t max_nid_ = 0;         // the maximum number of node ids
-  nid_t init_scan_nid_ = 0;   // the first nid to be scanned
-  nid_t next_scan_nid_ = 0;   // the next nid to be scanned
-  nid_t free_nid_count_ = 0;  // the number of free node id
+  block_t nat_blkaddr_ = 0;  // starting block address of NAT
 
   fs::SharedMutex nat_tree_lock_;   // protect nat_tree_lock
   uint32_t nat_entries_count_ = 0;  // the number of nat cache entries
@@ -268,9 +261,11 @@ class NodeManager {
   NatList clean_nat_list_ __TA_GUARDED(nat_tree_lock_);  // a list for cached clean nats
   NatList dirty_nat_list_ __TA_GUARDED(nat_tree_lock_);  // a list for cached dirty nats
 
-  std::mutex free_nid_list_lock_;                                // protect free nid list
-  list_node_t free_nid_list_ __TA_GUARDED(free_nid_list_lock_);  // a list for free nids
-  std::mutex build_lock_;                                        // lock for building free nids
+  fs::SharedMutex free_nid_tree_lock_;                 // protect free nid list
+  std::mutex build_lock_;                              // lock for building free nids
+  nid_t max_nid_ = 0;                                  // the maximum number of node ids
+  nid_t next_scan_nid_ __TA_GUARDED(build_lock_) = 0;  // the next nid to be scanned
+  std::set<nid_t> free_nid_tree_ __TA_GUARDED(free_nid_tree_lock_);  // tree for free nids
 
   std::unique_ptr<uint8_t[]> nat_bitmap_ = nullptr;       // NAT bitmap pointer
   std::unique_ptr<uint8_t[]> nat_prev_bitmap_ = nullptr;  // NAT previous checkpoint bitmap pointer

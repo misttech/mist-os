@@ -339,7 +339,6 @@ void F2fs::UnblockOperations() const __TA_NO_THREAD_SAFETY_ANALYSIS {
 zx_status_t F2fs::DoCheckpoint(bool is_umount) {
   SuperblockInfo &superblock_info = GetSuperblockInfo();
   Checkpoint &ckpt = superblock_info.GetCheckpoint();
-  nid_t last_nid = 0;
   block_t start_blk;
   uint32_t data_sum_blocks, orphan_blocks;
   uint32_t crc32 = 0;
@@ -351,7 +350,12 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
   }
 
   ScheduleWriter();
-  GetNodeManager().NextFreeNid(&last_nid);
+
+  if (auto last_nid_or = GetNodeManager().GetNextFreeNid(); last_nid_or.is_ok()) {
+    ckpt.next_free_nid = CpuToLe(*last_nid_or);
+  } else {
+    ckpt.next_free_nid = CpuToLe(GetNodeManager().GetNextScanNid());
+  }
 
   // modify checkpoint
   // version number is already updated
@@ -377,7 +381,6 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
 
   ckpt.valid_node_count = CpuToLe(ValidNodeCount());
   ckpt.valid_inode_count = CpuToLe(ValidInodeCount());
-  ckpt.next_free_nid = CpuToLe(last_nid);
 
   // 2 cp  + n data seg summary + orphan inode blocks
   data_sum_blocks = GetSegmentManager().NpagesForSummaryFlush();

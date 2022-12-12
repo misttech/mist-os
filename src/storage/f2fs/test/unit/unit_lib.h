@@ -103,23 +103,17 @@ class MapTester {
   static bool IsCachedNat(NodeManager &node_manager, nid_t n)
       __TA_EXCLUDES(node_manager.nat_tree_lock_);
   static void RemoveAllNatEntries(NodeManager &manager) __TA_EXCLUDES(manager.nat_tree_lock_);
-  static nid_t ScanFreeNidList(NodeManager &manager, nid_t start)
-      __TA_EXCLUDES(manager.free_nid_list_lock_);
+  static nid_t ScanFreeNidList(NodeManager &manager) __TA_EXCLUDES(manager.free_nid_tree_lock_);
   static void GetCachedNatEntryBlockAddress(NodeManager &manager, nid_t nid, block_t &out)
-      __TA_EXCLUDES(manager.free_nid_list_lock_);
+      __TA_EXCLUDES(manager.free_nid_tree_lock_);
   static void SetCachedNatEntryBlockAddress(NodeManager &manager, nid_t nid, block_t address)
-      __TA_EXCLUDES(manager.free_nid_list_lock_);
+      __TA_EXCLUDES(manager.free_nid_tree_lock_);
   static void SetCachedNatEntryCheckpointed(NodeManager &manager, nid_t nid)
-      __TA_EXCLUDES(manager.free_nid_list_lock_);
-  static FreeNid *GetNextFreeNidInList(NodeManager &manager)
-      __TA_EXCLUDES(manager.free_nid_list_lock_) {
-    std::lock_guard nat_lock(manager.free_nid_list_lock_);
-    return containerof(manager.free_nid_list_.next, FreeNid, list);
-  }
-  static FreeNid *GetTailFreeNidInList(NodeManager &manager)
-      __TA_EXCLUDES(manager.free_nid_list_lock_) {
-    std::lock_guard nat_lock(manager.free_nid_list_lock_);
-    return containerof(list_peek_tail(&manager.free_nid_list_), FreeNid, list);
+      __TA_EXCLUDES(manager.free_nid_tree_lock_);
+  static nid_t GetNextFreeNidInList(NodeManager &manager)
+      __TA_EXCLUDES(manager.free_nid_tree_lock_) {
+    std::lock_guard nat_lock(manager.free_nid_tree_lock_);
+    return manager.free_nid_tree_.empty() ? 0 : *manager.free_nid_tree_.begin();
   }
   static void GetNatCacheEntryCount(NodeManager &manager, size_t &num_tree, size_t &num_clean,
                                     size_t &num_dirty) __TA_EXCLUDES(manager.nat_tree_lock_) {

@@ -71,9 +71,8 @@ TEST(Teardown, ShutdownOnNoConnections) {
 
   // Create root directory connection.
   nid_t root_nid;
-  ASSERT_TRUE(fs->GetNodeManager().AllocNid(root_nid));
+  ASSERT_TRUE(fs->GetNodeManager().AllocNid(root_nid).is_ok());
   auto root_dir = fbl::AdoptRef(new AsyncTearDownVnode(fs, root_nid, root_completions));
-  fs->GetNodeManager().AllocNidDone(root_nid);
   root_dir->SetMode(S_IFDIR);
 
   async::Loop clients_loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -90,9 +89,8 @@ TEST(Teardown, ShutdownOnNoConnections) {
 
   // Create child vnode connection.
   nid_t child_nid;
-  ASSERT_TRUE(fs->GetNodeManager().AllocNid(child_nid));
+  ASSERT_TRUE(fs->GetNodeManager().AllocNid(child_nid).is_ok());
   auto child_dir = fbl::AdoptRef(new AsyncTearDownVnode(fs, child_nid, child_completions));
-  fs->GetNodeManager().AllocNidDone(child_nid);
   child_dir->SetMode(S_IFDIR);
 
   fuchsia::io::DirectoryPtr child_client;

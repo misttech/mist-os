@@ -1494,7 +1494,6 @@ zx_status_t FsckWorker::InitNodeManager() {
   nat_segs = LeToCpu(sb_raw.segment_count_nat) >> 1;
   nat_blocks = nat_segs << LeToCpu(sb_raw.log_blocks_per_seg);
   node_manager_->SetMaxNid(kNatEntryPerBlock * nat_blocks);
-  node_manager_->SetFirstScanNid(LeToCpu(superblock_info_.GetCheckpoint().next_free_nid));
   node_manager_->SetNextScanNid(LeToCpu(superblock_info_.GetCheckpoint().next_free_nid));
   if (zx_status_t status =
           node_manager_->AllocNatBitmap(superblock_info_.BitmapSize(MetaBitmap::kNatBitmap));
