@@ -10,18 +10,22 @@ use {
     ramdevice_client::{RamdiskClient, VmoRamdiskClientBuilder},
     std::path::{Path, PathBuf},
     storage_isolated_driver_manager::{
-        create_random_guid, fvm, wait_for_block_device, wait_for_ramctl, BlockDeviceMatcher,
+        create_random_guid, fvm, wait_for_block_device, BlockDeviceMatcher,
     },
 };
 
 pub use storage_isolated_driver_manager::Guid;
 
-fn create_ramdisk(vmo: &Vmo, ramdisk_block_size: u64) -> RamdiskClient {
+async fn create_ramdisk(vmo: &Vmo, ramdisk_block_size: u64) -> RamdiskClient {
     let duplicated_handle = vmo.as_handle_ref().duplicate(Rights::SAME_RIGHTS).unwrap();
     let duplicated_vmo = Vmo::from(duplicated_handle);
 
     // Create the ramdisks
-    VmoRamdiskClientBuilder::new(duplicated_vmo).block_size(ramdisk_block_size).build().unwrap()
+    VmoRamdiskClientBuilder::new(duplicated_vmo)
+        .block_size(ramdisk_block_size)
+        .build()
+        .await
+        .unwrap()
 }
 
 async fn start_fvm_driver(ramdisk_path: &Path) -> VolumeManagerProxy {
@@ -56,9 +60,7 @@ impl FvmInstance {
     /// Start an isolated FVM driver against the given VMO.
     /// If `init` is true, initialize the VMO with FVM layout first.
     pub async fn new(init: bool, vmo: &Vmo, fvm_slice_size: u64, ramdisk_block_size: u64) -> Self {
-        wait_for_ramctl().await.unwrap();
-
-        let ramdisk = create_ramdisk(&vmo, ramdisk_block_size);
+        let ramdisk = create_ramdisk(&vmo, ramdisk_block_size).await;
         let ramdisk_path = Path::new(ramdisk.get_path());
 
         if init {

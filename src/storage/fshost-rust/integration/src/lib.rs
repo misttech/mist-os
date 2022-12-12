@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    device_watcher::recursive_wait_and_open_node,
     fidl::endpoints::{create_proxy, Proxy},
     fidl_fuchsia_boot as fboot, fidl_fuchsia_feedback as ffeedback, fidl_fuchsia_io as fio,
     fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fprocess,
@@ -189,14 +188,14 @@ impl TestFixture {
     pub async fn add_ramdisk(&mut self, vmo: zx::Vmo) {
         let dev = self.dir("dev-topological");
 
-        recursive_wait_and_open_node(&dev, "sys/platform/00:00:2d/ramctl")
-            .await
-            .expect("recursive_wait_and_open_node failed");
-
         let dev_fd = fdio::create_fd(dev.into_channel().unwrap().into_zx_channel().into()).unwrap();
 
-        let ramdisk =
-            VmoRamdiskClientBuilder::new(vmo).dev_root(dev_fd).block_size(512).build().unwrap();
+        let ramdisk = VmoRamdiskClientBuilder::new(vmo)
+            .dev_root(dev_fd)
+            .block_size(512)
+            .build()
+            .await
+            .unwrap();
         self.ramdisks.push(ramdisk);
     }
 

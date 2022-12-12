@@ -30,13 +30,7 @@ const RAMDISK_BLOCK_COUNT: u64 = 16 * 1024;
 
 async fn make_ramdisk() -> (RamdiskClient, RemoteBlockClient) {
     let client = RamdiskClient::builder(RAMDISK_BLOCK_SIZE, RAMDISK_BLOCK_COUNT);
-    ramdevice_client::wait_for_device(
-        "/dev/sys/platform/00:00:2d/ramctl",
-        std::time::Duration::from_secs(30),
-    )
-    .expect("/dev/sys/platform/00:00:2d/ramctl did not appear");
-
-    let ramdisk = client.build().expect("RamdiskClientBuilder.build() failed");
+    let ramdisk = client.build().await.expect("RamdiskClientBuilder.build() failed");
     let client_end = ramdisk.open().expect("ramdisk.open failed");
     let proxy = client_end.into_proxy().expect("into_proxy failed");
     let remote_block_device = RemoteBlockClient::new(proxy).await.expect("new failed");

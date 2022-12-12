@@ -16,8 +16,7 @@ use {
     std::path::{Path, PathBuf},
     storage_benchmarks::{BlockDevice, BlockDeviceConfig, BlockDeviceFactory},
     storage_isolated_driver_manager::{
-        create_random_guid, fvm, wait_for_block_device, wait_for_ramctl, zxcrypt,
-        BlockDeviceMatcher, Guid,
+        create_random_guid, fvm, wait_for_block_device, zxcrypt, BlockDeviceMatcher, Guid,
     },
 };
 
@@ -33,7 +32,6 @@ pub struct RamdiskFactory {
 impl RamdiskFactory {
     #[allow(dead_code)]
     pub async fn new(block_size: u64, block_count: u64) -> Self {
-        wait_for_ramctl().await.expect("ramctl did not appear");
         Self { block_size, block_count }
     }
 }
@@ -53,8 +51,9 @@ pub struct Ramdisk {
 
 impl Ramdisk {
     async fn new(block_size: u64, block_count: u64, config: &BlockDeviceConfig) -> Self {
-        let ramdisk =
-            RamdiskClient::create(block_size, block_count).expect("Failed to create RamdiskClient");
+        let ramdisk = RamdiskClient::create(block_size, block_count)
+            .await
+            .expect("Failed to create RamdiskClient");
 
         let volume_manager = fvm::set_up_fvm(Path::new(ramdisk.get_path()), RAMDISK_FVM_SLICE_SIZE)
             .await
@@ -286,9 +285,9 @@ mod tests {
         // The tests are run in an isolated devmgr which doesn't have access to the real FVM or
         // blobfs. Create a ramdisk, set up fvm, and add a blobfs volume for `FvmVolumeFactory` to
         // find.
-        wait_for_ramctl().await.expect("ramctl did not appear");
-        let ramdisk_client =
-            RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).expect("Failed to create RamdiskClient");
+        let ramdisk_client = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT)
+            .await
+            .expect("Failed to create RamdiskClient");
         let volume_manager =
             fvm::set_up_fvm(Path::new(ramdisk_client.get_path()), RAMDISK_FVM_SLICE_SIZE)
                 .await

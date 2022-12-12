@@ -744,7 +744,7 @@ mod tests {
             .await
             .unwrap();
 
-        let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().unwrap();
+        let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.unwrap();
         let blobfs_dir = blobfs.root_dir().unwrap();
 
         present_package0.write_to_blobfs_dir(&blobfs_dir);

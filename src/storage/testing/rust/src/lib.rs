@@ -4,7 +4,6 @@
 
 use {
     anyhow::{anyhow, Context, Result},
-    device_watcher::recursive_wait_and_open_node,
     fidl_fuchsia_device::ControllerProxy,
     fidl_fuchsia_hardware_block_partition::{PartitionMarker, PartitionProxy},
     fidl_fuchsia_io as fio,
@@ -26,16 +25,6 @@ pub fn create_random_guid() -> Guid {
 
 pub async fn bind_fvm(proxy: &ControllerProxy) -> Result<()> {
     fvm::bind_fvm_driver(proxy).await
-}
-
-/// Waits for the ramctl device to be ready.
-pub async fn wait_for_ramctl() -> Result<()> {
-    let dev = fuchsia_fs::directory::open_in_namespace(
-        "/dev",
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    )?;
-    recursive_wait_and_open_node(&dev, "sys/platform/00:00:2d/ramctl").await?;
-    Ok(())
 }
 
 async fn partition_type_guid_matches(guid: &Guid, partition: &PartitionProxy) -> Result<bool> {
@@ -132,8 +121,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn wait_for_block_device_with_all_match_criteria() {
-        wait_for_ramctl().await.unwrap();
-        let ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).unwrap();
+        let ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).await.unwrap();
         let fvm = fvm::set_up_fvm(Path::new(ramdisk.get_path()), FVM_SLICE_SIZE)
             .await
             .expect("Failed to format ramdisk with FVM");

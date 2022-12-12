@@ -219,6 +219,7 @@ async fn base_superpackage_base_subpackage_succeeds() {
         SystemImageBuilder::new().static_packages(&[&superpackage, &subpackage]).build().await;
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&superpackage, &subpackage])
+        .await
         .build()
         .await;
     let (_, context) = env
@@ -250,6 +251,7 @@ async fn non_base_superpackage_base_subpackage_succeeds() {
         SystemImageBuilder::new().static_packages(&[&subpackage]).build().await;
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&subpackage])
+        .await
         .build()
         .await;
     let repo = Arc::new(

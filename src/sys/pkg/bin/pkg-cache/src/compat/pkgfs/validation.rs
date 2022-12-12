@@ -174,7 +174,7 @@ mod tests {
             base_blobs: HashSet<fuchsia_hash::Hash>,
             blobfs_contents: impl IntoIterator<Item = (fuchsia_hash::Hash, Vec<u8>)>,
         ) -> (Self, Validation) {
-            let blobfs = BlobfsRamdisk::start().unwrap();
+            let blobfs = BlobfsRamdisk::start().await.unwrap();
             for (hash, contents) in blobfs_contents.into_iter() {
                 blobfs.add_blob_from(&hash, contents.as_slice()).unwrap()
             }

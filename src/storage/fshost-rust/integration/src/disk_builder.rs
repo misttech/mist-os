@@ -286,18 +286,6 @@ impl DiskBuilder {
     }
 
     pub async fn build(self) -> zx::Vmo {
-        let (dev, server) = create_proxy::<fio::DirectoryMarker>().unwrap();
-        fdio::open(
-            "/dev",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            server.into_channel(),
-        )
-        .unwrap();
-
-        recursive_wait_and_open_node(&dev, "sys/platform/00:00:2d/ramctl")
-            .await
-            .expect("recursive_wait_and_open_node failed");
-
         let vmo = zx::Vmo::create(self.size).unwrap();
 
         // Initialize the VMO with GPT headers and an *empty* FVM partition.
@@ -314,7 +302,14 @@ impl DiskBuilder {
             VmoRamdiskClientBuilder::new(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap())
                 .block_size(RAMDISK_BLOCK_SIZE)
                 .build()
+                .await
                 .unwrap();
+
+        let dev = fuchsia_fs::directory::open_in_namespace(
+            "/dev",
+            fidl_fuchsia_io::OpenFlags::RIGHT_READABLE,
+        )
+        .unwrap();
 
         // Path to block device or partition which will back the FVM. Assumed to be empty/zeroed.
         let base_path = if self.gpt {

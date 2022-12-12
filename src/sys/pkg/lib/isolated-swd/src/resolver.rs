@@ -305,7 +305,8 @@ pub mod tests {
 
         let realm_builder = RealmBuilder::new().await.unwrap();
         let served_repo = Arc::new(Arc::clone(&repo).server().start().unwrap());
-        let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().context("starting blobfs").unwrap();
+        let blobfs =
+            blobfs_ramdisk::BlobfsRamdisk::start().await.context("starting blobfs").unwrap();
         let _resolver_realm = ResolverForTest::realm_setup(
             &realm_builder,
             Arc::clone(&served_repo),
@@ -348,7 +349,8 @@ pub mod tests {
 
         let realm_builder = RealmBuilder::new().await.unwrap();
         let served_repo = Arc::new(Arc::clone(&repo).server().start().unwrap());
-        let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().context("starting blobfs").unwrap();
+        let blobfs =
+            blobfs_ramdisk::BlobfsRamdisk::start().await.context("starting blobfs").unwrap();
         let _resolver_realm = ResolverForTest::realm_setup(
             &realm_builder,
             Arc::clone(&served_repo),

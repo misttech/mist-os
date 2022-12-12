@@ -9,12 +9,7 @@ use {
 
 #[fuchsia::test]
 async fn test_multiple_sessions() {
-    ramdevice_client::wait_for_device(
-        "/dev/sys/platform/00:00:2d/ramctl",
-        std::time::Duration::from_secs(60),
-    )
-    .unwrap();
-    let ramdisk = RamdiskClient::create(512, 1 << 16).unwrap();
+    let ramdisk = RamdiskClient::create(512, 1 << 16).await.unwrap();
     let device_channel = ramdisk.open().expect("open failed");
     let device_proxy = device_channel.into_proxy().expect("into_proxy failed");
     let block_client1 = RemoteBlockClient::new(device_proxy).await.expect("new failed");

@@ -3,18 +3,14 @@
 // found in the LICENSE file.
 
 use {
-    blackout_target::{dev, find_partition, set_up_partition},
-    device_watcher::recursive_wait_and_open_node,
+    blackout_target::{find_partition, set_up_partition},
     fuchsia_async as fasync,
     ramdevice_client::RamdiskClient,
 };
 
 #[fasync::run_singlethreaded(test)]
 async fn setup_then_find_with_path() {
-    recursive_wait_and_open_node(&dev(), "sys/platform/00:00:2d/ramctl")
-        .await
-        .expect("failed to wait");
-    let ramdisk = RamdiskClient::create(8192, 128).unwrap();
+    let ramdisk = RamdiskClient::create(8192, 128).await.unwrap();
     let ramdisk_path = ramdisk.get_path();
 
     let setup_device_path = set_up_partition("test-label", Some(ramdisk_path), false)

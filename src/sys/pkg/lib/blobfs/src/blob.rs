@@ -357,7 +357,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn empty_blob_is_present_after_truncate() {
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         //              _ -  - _
@@ -384,7 +384,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn detects_corrupt_empty_blob() {
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         // The empty blob is always named
@@ -400,7 +400,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn detects_corrupt_blob() {
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         // The merkle root of b"test" is not all f's, so this blob is corrupt.
@@ -415,7 +415,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn create_already_present_empty_blob_fails() {
-        let blobfs = BlobfsRamdisk::builder().with_blob(&b""[..]).start().unwrap();
+        let blobfs = BlobfsRamdisk::builder().with_blob(&b""[..]).start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         let hash = MerkleTree::from_reader(&b""[..]).unwrap().root();
@@ -429,7 +429,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn create_already_present_blob_fails() {
-        let blobfs = BlobfsRamdisk::builder().with_blob(&b"present"[..]).start().unwrap();
+        let blobfs = BlobfsRamdisk::builder().with_blob(&b"present"[..]).start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         let hash = MerkleTree::from_reader(&b"present"[..]).unwrap().root();
@@ -443,7 +443,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn write_read_small_blob() {
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         let contents = [3; 1024];
@@ -467,7 +467,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn write_small_blob_slowly() {
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         let contents = [4; 1024];
@@ -493,7 +493,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn write_large_blob() {
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         let contents = (0u8..=255u8).cycle().take(1_000_000).collect::<Vec<u8>>();
@@ -513,7 +513,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn close_blob_closer() {
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         let contents = [3; 1024];
@@ -536,7 +536,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn disarm_blob_closer() {
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         let contents = [3; 1024];
@@ -554,7 +554,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn concurrent_write_at_truncate() {
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         let contents = [3; 1024];
@@ -573,7 +573,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn concurrent_write_at_create() {
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         let contents = [3; 1024];
@@ -591,8 +591,14 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn write_too_big_blob_fails_with_no_space() {
-        let tiny_blobfs =
-            Ramdisk::builder().block_count(4096).into_blobfs_builder().unwrap().start().unwrap();
+        let tiny_blobfs = Ramdisk::builder()
+            .block_count(4096)
+            .into_blobfs_builder()
+            .await
+            .unwrap()
+            .start()
+            .await
+            .unwrap();
         let client = Client::for_ramdisk(&tiny_blobfs);
 
         // Deterministically generate a blob that cannot be compressed and is bigger than blobfs

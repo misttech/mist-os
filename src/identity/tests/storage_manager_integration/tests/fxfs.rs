@@ -19,16 +19,15 @@ use {
     },
 };
 
-const RAMCTL_PATH: &str = "/dev/sys/platform/00:00:2d/ramctl";
 const BLOCK_SIZE: u64 = 4096;
 const BLOCK_COUNT: u64 = 1024; // 4MB RAM ought to be good enough
 const ACCOUNT_LABEL: &str = "account";
 
-fn ramdisk() -> RamdiskClient {
-    ramdevice_client::wait_for_device(RAMCTL_PATH, std::time::Duration::from_secs(60))
-        .expect("Could not wait for ramctl from isolated-devmgr");
-
-    RamdiskClientBuilder::new(BLOCK_SIZE, BLOCK_COUNT).build().expect("Could not create ramdisk")
+async fn ramdisk() -> RamdiskClient {
+    RamdiskClientBuilder::new(BLOCK_SIZE, BLOCK_COUNT)
+        .build()
+        .await
+        .expect("Could not create ramdisk")
 }
 
 fn new_fs<FSC: FSConfig>(ramdisk: &RamdiskClient, config: FSC) -> Filesystem<FSC> {
@@ -37,7 +36,7 @@ fn new_fs<FSC: FSConfig>(ramdisk: &RamdiskClient, config: FSC) -> Filesystem<FSC
 
 async fn make_ramdisk_and_filesystem(
 ) -> Result<(RamdiskClient, Filesystem<FxfsConfig>, ServingMultiVolumeFilesystem), Error> {
-    let ramdisk = ramdisk();
+    let ramdisk = ramdisk().await;
 
     let mut fxfs: Filesystem<_> = new_fs(&ramdisk, FxfsConfig::default());
 

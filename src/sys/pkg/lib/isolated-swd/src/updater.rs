@@ -238,7 +238,7 @@ pub(crate) mod for_tests {
             );
 
             let realm_builder = RealmBuilder::new().await.unwrap();
-            let blobfs = BlobfsRamdisk::start().context("starting blobfs").unwrap();
+            let blobfs = BlobfsRamdisk::start().await.context("starting blobfs").unwrap();
 
             let served_repo = Arc::new(Arc::clone(&repo).server().start().unwrap());
 

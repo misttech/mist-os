@@ -296,7 +296,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn sends_content_blob() {
         let blob_recorder = MockBlobRecorder::new();
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let pkg = PackageBuilder::new("pkg")
             .add_resource_at("content-blob", "blob-contents".as_bytes())
             .build()
@@ -323,7 +323,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn filters_content_blobs_from_blobfs() {
         let blob_recorder = MockBlobRecorder::new();
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let pkg = PackageBuilder::new("pkg")
             .add_resource_at("filter-me", "blob-contents".as_bytes())
             .build()
@@ -349,7 +349,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn deduplicates_content_blobs_within_root_dir() {
         let blob_recorder = MockBlobRecorder::new();
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let pkg = PackageBuilder::new("pkg")
             .add_resource_at("content-blob", "blob-contents".as_bytes())
             .add_resource_at("duplicate", "blob-contents".as_bytes())
@@ -377,7 +377,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn deduplicates_content_blobs_across_root_dirs() {
         let blob_recorder = MockBlobRecorder::new();
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let subpackage = PackageBuilder::new("subpackage")
             .add_resource_at("content-blob", "blob-contents".as_bytes())
             .build()
@@ -420,7 +420,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn sends_subpackage_meta_far() {
         let blob_recorder = MockBlobRecorder::new();
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let subpackage = PackageBuilder::new("subpackage").build().await.unwrap();
 
         let superpackage = PackageBuilder::new("superpackage")
@@ -453,7 +453,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn already_cached_subpackage_meta_far_is_recursed_instead_of_sent() {
         let blob_recorder = MockBlobRecorder::new();
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let subsubpackage = PackageBuilder::new("subsubpackage").build().await.unwrap();
 
         let subpackage = PackageBuilder::new("subpackage")
@@ -497,7 +497,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn deduplicates_content_blobs_with_subpackage_meta_fars() {
         let blob_recorder = MockBlobRecorder::new();
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let subpackage = PackageBuilder::new("subpackage").build().await.unwrap();
         let (subpackage_meta_far, _) = subpackage.contents();
 
@@ -537,7 +537,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn deduplicates_subpackage_meta_fars_with_content_blobs() {
         let blob_recorder = MockBlobRecorder::new();
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let subsubpackage = PackageBuilder::new("subsubpackage").build().await.unwrap();
         let (subsubpackage_meta_far, _) = subsubpackage.contents();
 

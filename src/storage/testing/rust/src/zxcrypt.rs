@@ -103,8 +103,8 @@ pub async fn unseal_insecure_zxcrypt(block_device: &Path) -> Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, crate::wait_for_ramctl, fidl_fuchsia_hardware_block::BlockMarker,
-        ramdevice_client::RamdiskClient, test_util::assert_lt,
+        super::*, fidl_fuchsia_hardware_block::BlockMarker, ramdevice_client::RamdiskClient,
+        test_util::assert_lt,
     };
 
     const BLOCK_SIZE: u64 = 512;
@@ -112,8 +112,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn set_up_insecure_zxcrypt_test() {
-        wait_for_ramctl().await.unwrap();
-        let ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).unwrap();
+        let ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).await.unwrap();
 
         let path = set_up_insecure_zxcrypt(Path::new(ramdisk.get_path()))
             .await

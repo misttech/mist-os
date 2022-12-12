@@ -200,7 +200,7 @@ async fn create_blobfs_and_boot_args_from_this_package() -> (BlobfsRamdisk, Boot
         .build()
         .await
         .expect("build system_image package");
-    let blobfs = BlobfsRamdisk::start().expect("start blobfs");
+    let blobfs = BlobfsRamdisk::start().await.expect("start blobfs");
     let () = system_image.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
 
     let () = this_pkg.write_to_blobfs_dir(&blobfs.root_dir().unwrap());

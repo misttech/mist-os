@@ -9,8 +9,7 @@
 
 use {
     anyhow::{ensure, Context, Error},
-    device_watcher::recursive_wait_and_open_node,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon as zx,
     futures::TryFutureExt,
@@ -71,14 +70,9 @@ async fn create_ramdisk(zbi_vmo: zx::Vmo) -> Result<(), Error> {
         zstd::decode_all(compressed_buf.as_slice()).context("zstd decompression failed")?;
     ramdisk_vmo.write(&decompressed_buf, 0).context("writing decompressed contents to vmo")?;
 
-    let dev = fuchsia_fs::directory::open_in_namespace("/dev", fio::OpenFlags::RIGHT_READABLE)
-        .context("opening /dev")?;
-    recursive_wait_and_open_node(&dev, "sys/platform/00:00:2d/ramctl")
-        .await
-        .context("waiting for ramctl")?;
-
     let ramdisk = ramdevice_client::VmoRamdiskClientBuilder::new(ramdisk_vmo)
         .build()
+        .await
         .context("building ramdisk from vmo")?;
     // We want the ramdisk to continue to exist for the lifetime of the system, so we just leak the
     // pointer instead of running the Drop implementation, which attempts to destroy the ramdisk.

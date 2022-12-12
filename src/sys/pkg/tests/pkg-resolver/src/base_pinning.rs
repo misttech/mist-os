@@ -32,6 +32,7 @@ async fn test_base_package_found() {
         SystemImageBuilder::new().static_packages(&[&base_pkg]).build().await;
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&base_pkg])
+        .await
         .build()
         .await;
 
@@ -73,6 +74,7 @@ async fn test_base_pinning_rejects_urls_with_resource() {
     let system_image_package = SystemImageBuilder::new().static_packages(&[&pkg]).build().await;
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&pkg])
+        .await
         .build()
         .await;
 
@@ -97,6 +99,7 @@ async fn test_base_package_with_variant_found() {
         SystemImageBuilder::new().static_packages(&[&base_pkg]).build().await;
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&base_pkg])
+        .await
         .build()
         .await;
 
@@ -136,6 +139,7 @@ async fn test_base_package_with_merkle_pin() {
         SystemImageBuilder::new().static_packages(&[&base_pkg]).build().await;
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&base_pkg])
+        .await
         .build()
         .await;
 
@@ -173,6 +177,7 @@ async fn test_base_package_while_tuf_broken() {
         SystemImageBuilder::new().static_packages(&[&base_pkg]).build().await;
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&base_pkg])
+        .await
         .build()
         .await;
 
@@ -204,6 +209,7 @@ async fn test_base_package_without_repo_configured() {
         SystemImageBuilder::new().static_packages(&[&base_pkg]).build().await;
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&base_pkg])
+        .await
         .build()
         .await;
 
@@ -238,6 +244,7 @@ async fn test_base_package_while_queue_full() {
         SystemImageBuilder::new().static_packages(&[&base_pkg]).build().await;
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&base_pkg])
+        .await
         .build()
         .await;
 

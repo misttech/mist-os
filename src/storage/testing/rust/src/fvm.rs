@@ -115,7 +115,7 @@ pub async fn create_fvm_volume(
 mod tests {
     use {
         super::*,
-        crate::{wait_for_block_device, wait_for_ramctl, BlockDeviceMatcher},
+        crate::{wait_for_block_device, BlockDeviceMatcher},
         fidl_fuchsia_hardware_block_volume::VolumeMarker,
         fidl_fuchsia_hardware_block_volume::ALLOCATE_PARTITION_FLAG_INACTIVE,
         ramdevice_client::RamdiskClient,
@@ -136,8 +136,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn set_up_fvm_test() {
-        wait_for_ramctl().await.unwrap();
-        let ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).unwrap();
+        let ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).await.unwrap();
         let fvm = set_up_fvm(Path::new(ramdisk.get_path()), FVM_SLICE_SIZE)
             .await
             .expect("Failed to set up FVM");
@@ -151,8 +150,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn create_fvm_volume_without_volume_size_has_one_slice() {
-        wait_for_ramctl().await.unwrap();
-        let ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).unwrap();
+        let ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).await.unwrap();
         let fvm = set_up_fvm(Path::new(ramdisk.get_path()), FVM_SLICE_SIZE)
             .await
             .expect("Failed to set up FVM");
@@ -186,8 +184,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn create_fvm_volume_with_unaligned_volume_size_rounds_up_to_slice_multiple() {
-        wait_for_ramctl().await.unwrap();
-        let ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).unwrap();
+        let ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).await.unwrap();
         let fvm = set_up_fvm(Path::new(ramdisk.get_path()), FVM_SLICE_SIZE)
             .await
             .expect("Failed to set up FVM");

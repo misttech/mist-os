@@ -235,7 +235,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     pub async fn test_cache_handles_sync() {
         let realm_builder = RealmBuilder::new().await.unwrap();
-        let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().expect("starting blobfs");
+        let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.expect("starting blobfs");
 
         let _cache_ref =
             CacheForTest::realm_setup(&realm_builder, &blobfs).await.expect("setting up realm");
@@ -249,7 +249,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     pub async fn test_cache_handles_gc() {
         let realm_builder = RealmBuilder::new().await.unwrap();
-        let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().expect("starting blobfs");
+        let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.expect("starting blobfs");
         let _cache_ref =
             CacheForTest::realm_setup(&realm_builder, &blobfs).await.expect("setting up realm");
         let realm_instance = realm_builder.build().await.unwrap();

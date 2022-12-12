@@ -358,8 +358,8 @@ mod tests {
     }
 
     impl FakeStorage {
-        pub fn new() -> Result<Self, Error> {
-            let blobfs = BlobfsRamdisk::start().context("launching blobfs")?;
+        pub async fn new() -> Result<Self, Error> {
+            let blobfs = BlobfsRamdisk::start().await.context("launching blobfs")?;
             Ok(FakeStorage { blobfs })
         }
 
@@ -451,11 +451,11 @@ mod tests {
     }
 
     impl TestOtaEnv {
-        pub fn new() -> Result<Self, Error> {
+        pub async fn new() -> Result<Self, Error> {
             Ok(TestOtaEnv {
                 images: HashMap::new(),
                 packages: vec![],
-                storage: FakeStorage::new().context("Starting fake storage")?,
+                storage: FakeStorage::new().await.context("Starting fake storage")?,
             })
         }
 
@@ -591,7 +591,8 @@ mod tests {
             .build()
             .await
             .unwrap();
-        let mut env = TestOtaEnv::new()?
+        let mut env = TestOtaEnv::new()
+            .await?
             .add_package(package)
             .add_image("zbi.signed", "zbi image")
             .add_image("fuchsia.vbmeta", "fuchsia vbmeta")

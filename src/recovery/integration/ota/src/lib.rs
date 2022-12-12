@@ -110,7 +110,7 @@ impl TestExecutor<Result<TestResult, Error>> for OtaComponentTestExecutor {
             .await;
         }
 
-        let blobfs = BlobfsRamdisk::start().expect("launching blobfs");
+        let blobfs = BlobfsRamdisk::start().await.expect("launching blobfs");
         let progress_rx = route_and_serve_local_mocks(
             &builder,
             &system_recovery_ota_child,

@@ -130,6 +130,7 @@ async fn test_eager_resolve_package() {
 
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&pkg])
+        .await
         .mounts(
             MountsBuilder::new()
                 .eager_packages(vec![(pkg_url.clone(), cup_data.clone())])
@@ -198,6 +199,7 @@ async fn test_eager_resolve_package_while_updating() {
 
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&pkg])
+        .await
         .mounts(
             MountsBuilder::new()
                 .static_repository(repo_config)
@@ -278,6 +280,7 @@ async fn test_eager_get_hash() {
 
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&pkg])
+        .await
         .mounts(
             MountsBuilder::new()
                 .eager_packages(vec![(pkg_url.clone(), cup_data.clone())])
@@ -418,6 +421,7 @@ async fn test_cup_get_info_persisted() {
 
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&pkg])
+        .await
         .mounts(
             MountsBuilder::new()
                 .eager_packages(vec![(pkg_url.clone(), cup_data.clone())])

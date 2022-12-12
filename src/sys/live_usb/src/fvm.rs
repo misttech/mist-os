@@ -141,8 +141,10 @@ impl FvmRamdisk {
     /// and automatically rebinds the appropriate drivers so the GPT is parsed.
     async fn create_ramdisk_with_fvm(size: u64) -> Result<RamdiskClient, Error> {
         let blocks = size / BLOCK_SIZE;
-        let ramdisk =
-            RamdiskClientBuilder::new(BLOCK_SIZE, blocks).build().context("building ramdisk")?;
+        let ramdisk = RamdiskClientBuilder::new(BLOCK_SIZE, blocks)
+            .build()
+            .await
+            .context("building ramdisk")?;
         let channel = ramdisk.open().context("Opening ramdisk")?;
         let block_client = remote_block_device::RemoteBlockClientSync::new(channel)
             .context("creating remote block client")?;

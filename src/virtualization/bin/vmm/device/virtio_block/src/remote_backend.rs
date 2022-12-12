@@ -166,12 +166,6 @@ mod tests {
         async fn create_with_size(
             size: u64,
         ) -> Result<(RemoteBackend, RemoteBackendController), Error> {
-            ramdevice_client::wait_for_device(
-                "/dev/sys/platform/00:00:2d/ramctl",
-                std::time::Duration::from_secs(10),
-            )
-            .unwrap();
-
             // Create a VMO to use for the ramdisk. The controller will interface with the VMO
             // directly to verify what has been written to the disk.
             let vmo = zx::Vmo::create(size).unwrap();
@@ -180,6 +174,7 @@ mod tests {
             )
             .block_size(BLOCK_SIZE)
             .build()
+            .await
             .unwrap();
 
             // Open a connection to the ramdisk and use it to create the RemoteBackend.

@@ -67,7 +67,8 @@ async fn pkg_cache_open_failure() {
 async fn pkg_cache_open_success() {
     let system_image_package = SystemImageBuilder::new().build().await;
 
-    let env = TestEnv::builder().blobfs_from_system_image(&system_image_package).build().await;
+    let env =
+        TestEnv::builder().blobfs_from_system_image(&system_image_package).await.build().await;
 
     assert_eq!(
         env.open_package(&system_image_package.meta_far_merkle_root().clone().to_string())

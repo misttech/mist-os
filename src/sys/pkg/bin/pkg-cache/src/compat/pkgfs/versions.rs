@@ -228,13 +228,13 @@ mod tests {
     }
 
     impl TestEnv {
-        pub fn new(
+        pub async fn new(
             base_packages: impl IntoIterator<Item = (PackagePath, Hash)>,
             non_static_allow_list: NonStaticAllowList,
             executability_restrictions: ExecutabilityRestrictions,
             packages_on_disk: &[&Package],
         ) -> (Self, Arc<PkgfsVersions>) {
-            let blobfs = BlobfsRamdisk::start().unwrap();
+            let blobfs = BlobfsRamdisk::start().await.unwrap();
 
             for pkg in packages_on_disk {
                 pkg.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
@@ -277,7 +277,8 @@ mod tests {
             non_static_allow_list(&[]),
             ExecutabilityRestrictions::Enforce,
             &[],
-        );
+        )
+        .await;
 
         register_dynamic_package(&env.package_index, create_path("dynamic_package"), hash(1)).await;
 
@@ -293,7 +294,8 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn readdir_empty() {
         let (_env, pkgfs_versions) =
-            TestEnv::new([], non_static_allow_list(&[]), ExecutabilityRestrictions::Enforce, &[]);
+            TestEnv::new([], non_static_allow_list(&[]), ExecutabilityRestrictions::Enforce, &[])
+                .await;
 
         // Given adequate buffer space, the only entry is itself (".").
         let (pos, sealed) = Directory::read_dirents(
@@ -322,7 +324,8 @@ mod tests {
             non_static_allow_list(&[]),
             ExecutabilityRestrictions::Enforce,
             &[],
-        );
+        )
+        .await;
 
         register_dynamic_package(&env.package_index, create_path("same-hash"), hash(2)).await;
         register_dynamic_package(&env.package_index, create_path("allowed"), hash(10)).await;
@@ -359,7 +362,8 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn executable_open_access_denied_not_allowlisted() {
         let (env, pkgfs_versions) =
-            TestEnv::new([], non_static_allow_list(&[]), ExecutabilityRestrictions::Enforce, &[]);
+            TestEnv::new([], non_static_allow_list(&[]), ExecutabilityRestrictions::Enforce, &[])
+                .await;
 
         register_dynamic_package(&env.package_index, create_path("dynamic"), hash(1)).await;
 
@@ -386,7 +390,8 @@ mod tests {
             non_static_allow_list(&[]),
             ExecutabilityRestrictions::Enforce,
             &[&pkg],
-        );
+        )
+        .await;
 
         register_dynamic_package(
             &env.package_index,
@@ -424,7 +429,8 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_strips_posix_write() {
         let (_env, pkgfs_versions) =
-            TestEnv::new([], non_static_allow_list(&[]), ExecutabilityRestrictions::Enforce, &[]);
+            TestEnv::new([], non_static_allow_list(&[]), ExecutabilityRestrictions::Enforce, &[])
+                .await;
 
         let proxy =
             pkgfs_versions.proxy(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE);
@@ -437,7 +443,8 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_not_found_takes_precedence_over_access_denied() {
         let (_env, pkgfs_versions) =
-            TestEnv::new([], non_static_allow_list(&[]), ExecutabilityRestrictions::Enforce, &[]);
+            TestEnv::new([], non_static_allow_list(&[]), ExecutabilityRestrictions::Enforce, &[])
+                .await;
 
         let proxy =
             pkgfs_versions.proxy(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE);
@@ -460,7 +467,8 @@ mod tests {
             non_static_allow_list(&[]),
             ExecutabilityRestrictions::DoNotEnforce,
             &[],
-        );
+        )
+        .await;
 
         let proxy =
             pkgfs_versions.proxy(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE);
@@ -493,7 +501,8 @@ mod tests {
             non_static_allow_list(&[]),
             ExecutabilityRestrictions::DoNotEnforce,
             &[],
-        );
+        )
+        .await;
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
         vfs::directory::entry::DirectoryEntry::open(
@@ -527,7 +536,8 @@ mod tests {
             non_static_allow_list(&["dynamic"]),
             ExecutabilityRestrictions::Enforce,
             &[&pkg],
-        );
+        )
+        .await;
 
         register_dynamic_package(
             &env.package_index,

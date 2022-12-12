@@ -33,7 +33,7 @@ async fn main_inner() -> Result<(), Error> {
     let test_package = make_test_package().await;
     let system_image_package =
         SystemImageBuilder::new().static_packages(&[&test_package]).build().await;
-    let blobfs = BlobfsRamdisk::start().expect("started blobfs");
+    let blobfs = BlobfsRamdisk::start().await.expect("started blobfs");
     let blobfs_root_dir = blobfs.root_dir().expect("getting blobfs root dir");
     test_package.write_to_blobfs_dir(&blobfs_root_dir);
     system_image_package.write_to_blobfs_dir(&blobfs_root_dir);

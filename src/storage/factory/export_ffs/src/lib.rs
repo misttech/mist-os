@@ -458,12 +458,7 @@ mod tests {
             endpoints::ServerEnd::new(dir_server.into_channel()),
         );
 
-        ramdevice_client::wait_for_device(
-            "/dev/sys/platform/00:00:2d/ramctl",
-            std::time::Duration::from_secs(10),
-        )
-        .unwrap();
-        let ramdisk = RamdiskClient::create(512, 1 << 16).unwrap();
+        let ramdisk = RamdiskClient::create(512, 1 << 16).await.unwrap();
         let channel = ramdisk.open().unwrap();
 
         assert_matches!(export_directory(&dir_proxy, channel).await, Ok(()));

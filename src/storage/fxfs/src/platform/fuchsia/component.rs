@@ -471,7 +471,7 @@ mod tests {
         fuchsia_zircon as zx,
         futures::future::{BoxFuture, FusedFuture},
         futures::{future::FutureExt, pin_mut, select},
-        ramdevice_client::{wait_for_device, RamdiskClientBuilder},
+        ramdevice_client::RamdiskClientBuilder,
         std::{collections::HashSet, pin::Pin},
         storage_device::block_device::BlockDevice,
         storage_device::DeviceHolder,
@@ -480,12 +480,8 @@ mod tests {
     async fn run_test(
         callback: impl Fn(&fio::DirectoryProxy, LifecycleProxy) -> BoxFuture<'static, ()>,
     ) -> Pin<Box<impl FusedFuture>> {
-        const WAIT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
-        wait_for_device("/dev/sys/platform/00:00:2d/ramctl", WAIT_TIMEOUT)
-            .expect("ramctl did not appear");
-
         let ramdisk =
-            RamdiskClientBuilder::new(512, 16384).build().expect("Failed to build ramdisk");
+            RamdiskClientBuilder::new(512, 16384).build().await.expect("Failed to build ramdisk");
 
         {
             let fs = FxFilesystem::new_empty(DeviceHolder::new(

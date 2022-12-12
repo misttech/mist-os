@@ -13,10 +13,7 @@ use {
 
 #[fasync::run_singlethreaded(test)]
 async fn setup_then_find_no_path() {
-    recursive_wait_and_open_node(&dev(), "sys/platform/00:00:2d/ramctl")
-        .await
-        .expect("failed to wait");
-    let ramdisk = RamdiskClient::create(8192, 128).unwrap();
+    let ramdisk = RamdiskClient::create(8192, 128).await.unwrap();
     let ramdisk_path = ramdisk.get_path();
 
     {

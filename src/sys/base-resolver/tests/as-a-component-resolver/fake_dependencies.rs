@@ -60,7 +60,7 @@ async fn main() {
         .build()
         .await
         .expect("build system_image package");
-    let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().expect("start blobfs");
+    let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.expect("start blobfs");
     let () = system_image.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
 
     let () = this_pkg.write_to_blobfs_dir(&blobfs.root_dir().unwrap());

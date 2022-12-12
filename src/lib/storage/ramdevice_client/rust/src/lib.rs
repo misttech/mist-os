@@ -3,21 +3,6 @@
 // found in the LICENSE file.
 
 //! A safe rust wrapper for creating and using ramdisks.
-//!
-//! When creating a ramdisk always wait for the ramctl device to be ready to avoid racing with
-//! device start up. The ramctl device is normally located at "sys/platform/00:00:2d/ramctl".
-//! ```
-//! wait_for_device(
-//!     "/dev/sys/platform/00:00:2d/ramctl",
-//!     std::time::Duration::from_secs(60)
-//! ).expect("ramctl did not appear"));
-//!
-//! ```
-//! Then a ram device can be created and opened.
-//! ```
-//! let ramdisk = RamdiskClient::create(512, 2048).unwrap();
-//! let client_end = ramdisk.open().unwrap();
-//! ```
 
 #![deny(missing_docs)]
 
@@ -25,8 +10,8 @@
 mod ramdevice_sys;
 
 use {
-    anyhow::Error,
-    fidl_fuchsia_hardware_block as fhardware_block, fuchsia_zircon as zx,
+    anyhow::{Context as _, Error},
+    fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::{ffi, fs, os::unix::io::AsRawFd as _, ptr},
     zx::HandleBased as _,
 };
@@ -35,6 +20,8 @@ enum DevRoot {
 }
 
 const GUID_LEN: usize = 16;
+const DEV_PATH: &str = "/dev";
+const RAMCTL_PATH: &str = "sys/platform/00:00:2d/ramctl";
 
 /// A type to help construct a [`RamdeviceClient`] from an existing VMO.
 pub struct VmoRamdiskClientBuilder {
@@ -72,11 +59,6 @@ impl VmoRamdiskClientBuilder {
     ///
     /// TODO: remove this after soft transition in v/g.
     pub fn build_sync(self) -> Result<RamdiskClient, zx::Status> {
-        self.build()
-    }
-
-    /// Create the ramdisk.
-    pub fn build(self) -> Result<RamdiskClient, zx::Status> {
         let Self { vmo, block_size, dev_root, guid } = self;
         let vmo_handle = vmo.into_raw();
         let mut ramdisk: *mut ramdevice_sys::ramdisk_client_t = ptr::null_mut();
@@ -85,14 +67,14 @@ impl VmoRamdiskClientBuilder {
             if let Some(guid) = guid.as_ref() { guid.as_ptr() } else { std::ptr::null() };
 
         let status = if let Some(dev_root) = dev_root {
-            let dev_root_fd = match &dev_root {
-                DevRoot::Provided(f) => f.as_raw_fd(),
+            let dev_root = match &dev_root {
+                DevRoot::Provided(f) => f,
             };
             // Safe because ramdisk_create_at_from_vmo_with_params creates a duplicate fd
             // of the provided dev_root_fd.
             unsafe {
                 ramdevice_sys::ramdisk_create_at_from_vmo_with_params(
-                    dev_root_fd,
+                    dev_root.as_raw_fd(),
                     vmo_handle,
                     block_size,
                     type_guid,
@@ -115,6 +97,26 @@ impl VmoRamdiskClientBuilder {
         // The returned ramdisk is valid iff the FFI method returns ZX_OK.
         zx::Status::ok(status)?;
         Ok(RamdiskClient { ramdisk })
+    }
+
+    /// Create the ramdisk.
+    pub async fn build(self) -> Result<RamdiskClient, Error> {
+        let directory = if let Some(dev_root) = &self.dev_root {
+            let dev_root = match &dev_root {
+                DevRoot::Provided(f) => f,
+            };
+            let directory = fdio::clone_channel(dev_root).context("clone channel")?;
+            let directory: fidl::endpoints::ClientEnd<fio::DirectoryMarker> = directory.into();
+            directory.into_proxy().context("into proxy")?
+        } else {
+            fuchsia_fs::directory::open_in_namespace(DEV_PATH, fio::OpenFlags::RIGHT_READABLE)
+                .with_context(|| format!("open {}", DEV_PATH))?
+        };
+        let _: fio::NodeProxy =
+            device_watcher::recursive_wait_and_open_node(&directory, RAMCTL_PATH)
+                .await
+                .with_context(|| format!("waiting for {}", RAMCTL_PATH))?;
+        self.build_sync().context("build via FFI")
     }
 }
 
@@ -148,24 +150,19 @@ impl RamdiskClientBuilder {
     ///
     /// TODO: remove this after soft transition in v/g.
     pub fn build_sync(self) -> Result<RamdiskClient, zx::Status> {
-        self.build()
-    }
-
-    /// Create the ramdisk.
-    pub fn build(self) -> Result<RamdiskClient, zx::Status> {
         let Self { block_size, block_count, dev_root, guid } = self;
         let type_guid: *const u8 =
             if let Some(guid) = guid.as_ref() { guid.as_ptr() } else { std::ptr::null() };
         let mut ramdisk: *mut ramdevice_sys::ramdisk_client_t = ptr::null_mut();
 
         let status = if let Some(dev_root) = dev_root {
-            let dev_root_fd = match &dev_root {
-                DevRoot::Provided(f) => f.as_raw_fd(),
+            let dev_root = match &dev_root {
+                DevRoot::Provided(f) => f,
             };
             // Safe because ramdisk_create_at creates a duplicate fd of the provided dev_root_fd.
             unsafe {
                 ramdevice_sys::ramdisk_create_at_with_guid(
-                    dev_root_fd,
+                    dev_root.as_raw_fd(),
                     block_size,
                     block_count,
                     type_guid,
@@ -189,6 +186,26 @@ impl RamdiskClientBuilder {
         zx::Status::ok(status)?;
         Ok(RamdiskClient { ramdisk })
     }
+
+    /// Create the ramdisk.
+    pub async fn build(self) -> Result<RamdiskClient, Error> {
+        let directory = if let Some(dev_root) = &self.dev_root {
+            let dev_root = match &dev_root {
+                DevRoot::Provided(f) => f,
+            };
+            let directory = fdio::clone_channel(dev_root).context("clone channel")?;
+            let directory: fidl::endpoints::ClientEnd<fio::DirectoryMarker> = directory.into();
+            directory.into_proxy().context("into proxy")?
+        } else {
+            fuchsia_fs::directory::open_in_namespace(DEV_PATH, fio::OpenFlags::RIGHT_READABLE)
+                .with_context(|| format!("open {}", DEV_PATH))?
+        };
+        let _: fio::NodeProxy =
+            device_watcher::recursive_wait_and_open_node(&directory, RAMCTL_PATH)
+                .await
+                .with_context(|| format!("waiting for {}", RAMCTL_PATH))?;
+        self.build_sync().context("build via FFI")
+    }
 }
 
 /// A client for managing a ramdisk. This can be created with the [`RamdiskClient::create`]
@@ -208,8 +225,8 @@ impl RamdiskClient {
     }
 
     /// Create a new ramdisk.
-    pub fn create(block_size: u64, block_count: u64) -> Result<Self, zx::Status> {
-        Self::builder(block_size, block_count).build()
+    pub async fn create(block_size: u64, block_count: u64) -> Result<Self, Error> {
+        Self::builder(block_size, block_count).build().await
     }
 
     /// Get the device path of the associated ramdisk. Note that if this ramdisk was created with a
@@ -298,7 +315,7 @@ pub fn wait_for_device_at(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fidl_fuchsia_io as fio};
+    use super::*;
 
     // Note that if these tests flake, all downstream tests that depend on this crate may too.
 
@@ -307,58 +324,49 @@ mod tests {
         0x10,
     ];
 
-    const WAIT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
-
-    #[test]
-    fn create_get_path_destroy() {
-        wait_for_device("/dev/sys/platform/00:00:2d/ramctl", WAIT_TIMEOUT)
-            .expect("ramctl did not appear");
+    #[fuchsia::test]
+    async fn create_get_path_destroy() {
         // just make sure all the functions are hooked up properly.
-        let ramdisk = RamdiskClient::builder(512, 2048).build().expect("failed to create ramdisk");
+        let ramdisk =
+            RamdiskClient::builder(512, 2048).build().await.expect("failed to create ramdisk");
         let _path = ramdisk.get_path();
         assert_eq!(ramdisk.destroy(), Ok(()));
     }
 
-    #[test]
-    fn create_with_dev_root_and_guid_get_path_destroy() {
-        wait_for_device("/dev/sys/platform/00:00:2d/ramctl", WAIT_TIMEOUT)
-            .expect("ramctl did not appear");
+    #[fuchsia::test]
+    async fn create_with_dev_root_and_guid_get_path_destroy() {
         let devroot = std::fs::File::open("/dev").unwrap();
         let ramdisk = RamdiskClient::builder(512, 2048)
             .dev_root(devroot)
             .guid(TEST_GUID)
             .build()
+            .await
             .expect("failed to create ramdisk");
         let _path = ramdisk.get_path();
         assert_eq!(ramdisk.destroy(), Ok(()));
     }
 
-    #[test]
-    fn create_with_guid_get_path_destroy() {
-        wait_for_device("/dev/sys/platform/00:00:2d/ramctl", WAIT_TIMEOUT)
-            .expect("ramctl did not appear");
+    #[fuchsia::test]
+    async fn create_with_guid_get_path_destroy() {
         let ramdisk = RamdiskClient::builder(512, 2048)
             .guid(TEST_GUID)
             .build()
+            .await
             .expect("failed to create ramdisk");
         let _path = ramdisk.get_path();
         assert_eq!(ramdisk.destroy(), Ok(()));
     }
 
-    #[test]
-    fn create_open_destroy() {
-        wait_for_device("/dev/sys/platform/00:00:2d/ramctl", WAIT_TIMEOUT)
-            .expect("ramctl did not appear");
-        let ramdisk = RamdiskClient::create(512, 2048).unwrap();
+    #[fuchsia::test]
+    async fn create_open_destroy() {
+        let ramdisk = RamdiskClient::create(512, 2048).await.unwrap();
         let _: fidl::endpoints::ClientEnd<fhardware_block::BlockMarker> = ramdisk.open().unwrap();
         assert_eq!(ramdisk.destroy(), Ok(()));
     }
 
     #[fuchsia::test]
     async fn create_describe_destroy() {
-        wait_for_device("/dev/sys/platform/00:00:2d/ramctl", WAIT_TIMEOUT)
-            .expect("ramctl did not appear");
-        let ramdisk = RamdiskClient::create(512, 2048).unwrap();
+        let ramdisk = RamdiskClient::create(512, 2048).await.unwrap();
         let client_end = ramdisk.open().unwrap();
 
         // Ask it to describe itself using the Node interface.

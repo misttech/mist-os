@@ -11,7 +11,7 @@ use {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn expose_pkgfs_ctl_validation_missing_file() {
-    let blobfs = BlobfsRamdisk::start().unwrap();
+    let blobfs = BlobfsRamdisk::start().await.unwrap();
     let base_package_with_missing_blob = PackageBuilder::new("has-missing-blob")
         .add_resource_at("missing-blob", b"missing-blob-contents".as_slice())
         .build()
@@ -58,7 +58,8 @@ async fn expose_pkgfs_ctl_validation_missing_file() {
 #[fuchsia_async::run_singlethreaded(test)]
 async fn expose_system_image_package_as_system_directory() {
     let system_image_package = SystemImageBuilder::new().build().await;
-    let env = TestEnv::builder().blobfs_from_system_image(&system_image_package).build().await;
+    let env =
+        TestEnv::builder().blobfs_from_system_image(&system_image_package).await.build().await;
 
     system_image_package.verify_contents(&env.system_dir().await).await.unwrap();
 
@@ -68,7 +69,8 @@ async fn expose_system_image_package_as_system_directory() {
 #[fuchsia_async::run_singlethreaded(test)]
 async fn expose_pkgfs_packages_directory() {
     let system_image_package = SystemImageBuilder::new().build().await;
-    let env = TestEnv::builder().blobfs_from_system_image(&system_image_package).build().await;
+    let env =
+        TestEnv::builder().blobfs_from_system_image(&system_image_package).await.build().await;
 
     assert_eq!(
         fuchsia_fs::directory::readdir(&env.proxies.pkgfs_packages).await.unwrap(),
@@ -84,7 +86,8 @@ async fn expose_pkgfs_packages_directory() {
 #[fuchsia_async::run_singlethreaded(test)]
 async fn expose_pkgfs_versions_directory() {
     let system_image_package = SystemImageBuilder::new().build().await;
-    let env = TestEnv::builder().blobfs_from_system_image(&system_image_package).build().await;
+    let env =
+        TestEnv::builder().blobfs_from_system_image(&system_image_package).await.build().await;
 
     assert_eq!(
         fuchsia_fs::directory::readdir(&env.proxies.pkgfs_versions).await.unwrap(),

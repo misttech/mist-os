@@ -76,9 +76,9 @@ impl Client {
     pub fn open_from_namespace_rwx() -> Result<Self, BlobfsError> {
         let proxy = fuchsia_fs::directory::open_in_namespace(
             "/blob",
-            fidl_fuchsia_io::OpenFlags::RIGHT_READABLE
-                | fidl_fuchsia_io::OpenFlags::RIGHT_WRITABLE
-                | fidl_fuchsia_io::OpenFlags::RIGHT_EXECUTABLE,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::RIGHT_EXECUTABLE,
         )?;
         Ok(Client { proxy })
     }
@@ -376,7 +376,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn list_known_blobs_empty() {
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         assert_eq!(client.list_known_blobs().await.unwrap(), HashSet::new());
@@ -389,6 +389,7 @@ mod tests {
             .with_blob(&b"blob 1"[..])
             .with_blob(&b"blob 2"[..])
             .start()
+            .await
             .unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
@@ -403,6 +404,7 @@ mod tests {
             .with_blob(&b"blob 1"[..])
             .with_blob(&b"blob 2"[..])
             .start()
+            .await
             .unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
@@ -416,7 +418,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn delete_non_existing_blob() {
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
         let blob_merkle = Hash::from([1; 32]);
 
@@ -447,7 +449,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn has_blob() {
-        let blobfs = BlobfsRamdisk::builder().with_blob(&b"blob 1"[..]).start().unwrap();
+        let blobfs = BlobfsRamdisk::builder().with_blob(&b"blob 1"[..]).start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         assert_eq!(
@@ -461,7 +463,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn has_blob_return_false_if_blob_is_partially_written() {
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         let blob = [3; 1024];
@@ -545,7 +547,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn filter_to_missing_blobs_without_heuristic() {
-        let blobfs = BlobfsRamdisk::builder().start().unwrap();
+        let blobfs = BlobfsRamdisk::builder().start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         let missing_hash0 = Hash::from([0; 32]);
@@ -572,7 +574,7 @@ mod tests {
     /// Similar to the above test, except also test that partially written blobs count as missing.
     #[fasync::run_singlethreaded(test)]
     async fn filter_to_missing_blobs_without_heuristic_and_with_partially_written_blobs() {
-        let blobfs = BlobfsRamdisk::builder().start().unwrap();
+        let blobfs = BlobfsRamdisk::builder().start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         // Some blobs are created (but not yet truncated).
@@ -602,7 +604,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn filter_to_missing_blobs_with_heuristic() {
-        let blobfs = BlobfsRamdisk::builder().start().unwrap();
+        let blobfs = BlobfsRamdisk::builder().start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         let missing_hash0 = Hash::from([0; 32]);
@@ -654,7 +656,7 @@ mod tests {
     /// Similar to the above test, except also test that partially written blobs count as missing.
     #[fasync::run_singlethreaded(test)]
     async fn filter_to_missing_blobs_with_heuristic_and_with_partially_written_blobs() {
-        let blobfs = BlobfsRamdisk::builder().start().unwrap();
+        let blobfs = BlobfsRamdisk::builder().start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
 
         // Some blobs are created (but not yet truncated).

@@ -8,12 +8,9 @@ use {
     ramdevice_client::RamdiskClient,
 };
 
-const RAMDISK_PATH: &str = "/dev/sys/platform/00:00:2d/ramctl";
-
 #[fuchsia::test]
 async fn open_partition_test() {
-    ramdevice_client::wait_for_device(RAMDISK_PATH, std::time::Duration::from_secs(60)).unwrap();
-    let _ramdisk = RamdiskClient::create(1024, 1 << 16).unwrap();
+    let _ramdisk = RamdiskClient::create(1024, 1 << 16).await.unwrap();
     let matcher = PartitionMatcher {
         parent_device: Some(String::from("/dev/sys/platform")),
         ..Default::default()
@@ -21,6 +18,6 @@ async fn open_partition_test() {
 
     assert_eq!(
         open_partition(matcher, Duration::from_seconds(10)).await.unwrap(),
-        RAMDISK_PATH.to_string() + "/ramdisk-0/block"
+        "/dev/sys/platform/00:00:2d/ramctl/ramdisk-0/block",
     );
 }

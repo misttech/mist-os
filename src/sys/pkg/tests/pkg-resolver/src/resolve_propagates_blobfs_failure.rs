@@ -206,7 +206,7 @@ async fn handle_file_req_fail_write(call_count: Arc<AtomicU64>, req: fio::FileRe
 }
 
 async fn make_blobfs_with_minimal_system_image() -> (BlobfsRamdisk, Hash) {
-    let blobfs = BlobfsRamdisk::start().unwrap();
+    let blobfs = BlobfsRamdisk::start().await.unwrap();
     let system_image = SystemImageBuilder::new().build().await;
     system_image.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
     (blobfs, *system_image.meta_far_merkle_root())

@@ -296,7 +296,7 @@ impl TestEnvBuilder<BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>> {
             blobfs_and_system_image: async {
                 let system_image_package =
                     fuchsia_pkg_testing::SystemImageBuilder::new().build().await;
-                let blobfs = BlobfsRamdisk::start().unwrap();
+                let blobfs = BlobfsRamdisk::start().await.unwrap();
                 let () = system_image_package.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
                 (blobfs, Some(*system_image_package.meta_far_merkle_root()))
             }
@@ -333,21 +333,21 @@ where
 
     /// Creates a BlobfsRamdisk loaded with, and configures pkg-cache to use, the supplied
     /// `system_image` package.
-    fn blobfs_from_system_image(
+    async fn blobfs_from_system_image(
         self,
         system_image: &Package,
     ) -> TestEnvBuilder<future::Ready<(BlobfsRamdisk, Option<Hash>)>> {
-        self.blobfs_from_system_image_and_extra_packages(system_image, &[])
+        self.blobfs_from_system_image_and_extra_packages(system_image, &[]).await
     }
 
     /// Creates a BlobfsRamdisk loaded with the supplied packages and configures the system to use
     /// the supplied `system_image` package.
-    fn blobfs_from_system_image_and_extra_packages(
+    async fn blobfs_from_system_image_and_extra_packages(
         self,
         system_image: &Package,
         extra_packages: &[&Package],
     ) -> TestEnvBuilder<future::Ready<(BlobfsRamdisk, Option<Hash>)>> {
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let root_dir = blobfs.root_dir().unwrap();
         let () = system_image.write_to_blobfs_dir(&root_dir);
         for pkg in extra_packages {

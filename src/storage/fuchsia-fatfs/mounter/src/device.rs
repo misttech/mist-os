@@ -286,16 +286,11 @@ pub mod test {
         assert_eq!(result.expect("Find partition succeeds"), None);
     }
 
-    pub fn create_ramdisk() -> RamdiskClient {
-        ramdevice_client::wait_for_device(
-            "/dev/sys/platform/00:00:2d/ramctl",
-            std::time::Duration::from_secs(10),
-        )
-        .expect("ramctl did not appear");
-
+    pub async fn create_ramdisk() -> RamdiskClient {
         ramdevice_client::RamdiskClientBuilder::new(512, 1024 * 1024)
             .guid(MICROSOFT_BASIC_DATA_GUID)
             .build()
+            .await
             .expect("Create ramdisk client succeeds")
     }
 
@@ -340,7 +335,7 @@ pub mod test {
 
     #[fuchsia::test]
     async fn test_mount_device_succeeds() {
-        let ramdisk = create_ramdisk();
+        let ramdisk = create_ramdisk().await;
         let channel = ramdisk.open().expect("Opening ramdisk succeeds");
         format(channel);
         let channel = ramdisk.open().expect("Opening ramdisk succeeds");
@@ -364,7 +359,7 @@ pub mod test {
     #[fuchsia::test]
     async fn test_mount_invalid_device_fails() {
         // This ramdisk will have the right GUID, but no FAT partition.
-        let _ramdisk = create_ramdisk();
+        let _ramdisk = create_ramdisk().await;
 
         match FatDevice::new().await {
             Ok(_) => panic!("Expected FatDevice::new() to fail"),
@@ -374,13 +369,13 @@ pub mod test {
 
     #[fuchsia::test]
     async fn test_multiple_devices_opens_first() {
-        let ramdisk1 = create_ramdisk();
+        let ramdisk1 = create_ramdisk().await;
         let channel = ramdisk1.open().expect("Opening ramdisk succeeds");
         format(channel);
         let channel = ramdisk1.open().expect("Opening ramdisk succeeds");
         setup_test_fs(channel, "ramdisk1");
 
-        let ramdisk2 = create_ramdisk();
+        let ramdisk2 = create_ramdisk().await;
         let channel = ramdisk2.open().expect("Opening ramdisk succeeds");
         format(channel);
         let channel = ramdisk2.open().expect("Opening ramdisk succeeds");
@@ -403,9 +398,9 @@ pub mod test {
 
     #[fuchsia::test]
     async fn test_multiple_devices_opens_first_when_invalid() {
-        let _ramdisk1 = create_ramdisk();
+        let _ramdisk1 = create_ramdisk().await;
 
-        let ramdisk2 = create_ramdisk();
+        let ramdisk2 = create_ramdisk().await;
         let channel = ramdisk2.open().expect("Opening ramdisk succeeds");
         format(channel);
         let channel = ramdisk2.open().expect("Opening ramdisk succeeds");

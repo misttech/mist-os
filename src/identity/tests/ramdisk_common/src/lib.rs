@@ -6,14 +6,11 @@
 #![allow(clippy::expect_fun_call)]
 
 use {
-    fidl::{
-        endpoints::{Proxy, ServerEnd},
-        HandleBased,
-    },
+    fidl::{endpoints::Proxy as _, HandleBased as _},
     fidl_fuchsia_device::ControllerMarker,
     fidl_fuchsia_hardware_block_encrypted::{DeviceManagerMarker, DeviceManagerProxy},
     fidl_fuchsia_hardware_block_partition::Guid,
-    fidl_fuchsia_hardware_block_volume::VolumeManagerMarker,
+    fidl_fuchsia_hardware_block_volume::VolumeManagerProxy,
     fidl_fuchsia_io as fio,
     fuchsia_component_test::RealmInstance,
     fuchsia_driver_test as _,
@@ -23,21 +20,15 @@ use {
     },
     ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
     rand::{rngs::SmallRng, Rng, SeedableRng},
-    std::{fs, time::Duration},
+    std::fs,
     storage_isolated_driver_manager::bind_fvm,
 };
 
-const RAMCTL_PATH: &str = "sys/platform/00:00:2d/ramctl";
 const BLOCK_SIZE: u64 = 4096;
 const BLOCK_COUNT: u64 = 1024; // 4MB RAM ought to be good enough
 
 // 1 block for zxcrypt, and minfs needs at least 3 blocks.
 const FVM_SLICE_SIZE: usize = BLOCK_SIZE as usize * 4;
-
-// The maximum time to wait for a `wait_for_device_at` call. For whatever reason, using
-// `Duration::MAX` seems to trigger immediate ZX_ERR_TIMED_OUT in the wait_for_device_at calls, so
-// we just set a quite large timeout here.
-const DEVICE_WAIT_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[link(name = "fvm")]
 extern "C" {
@@ -86,16 +77,13 @@ pub async fn setup_ramdisk(
     mut type_guid: Guid,
     name: &str,
 ) -> RamdiskClient {
-    let dev_root_fd = get_dev_root_fd(realm_instance);
-
-    // Wait for ramctl in namespace at /dev/sys/platform/00:00:2d/ramctl
-    ramdevice_client::wait_for_device_at(&dev_root_fd, RAMCTL_PATH, DEVICE_WAIT_TIMEOUT)
-        .expect("Could not wait for ramctl from isolated-devmgr");
+    let dev_root_proxy = get_dev_root(realm_instance);
 
     // Create ramdisk
     let ramdisk = RamdiskClientBuilder::new(BLOCK_SIZE, BLOCK_COUNT)
         .dev_root(get_dev_root_fd(realm_instance))
         .build()
+        .await
         .expect("Could not create ramdisk");
 
     // Open ramdisk device and initialize FVM
@@ -119,20 +107,13 @@ pub async fn setup_ramdisk(
 
     // wait for /fvm child device to appear and open it
     let fvm_path = ramdisk.get_path().to_string() + "/fvm";
-    ramdevice_client::wait_for_device_at(&dev_root_fd, &fvm_path, DEVICE_WAIT_TIMEOUT)
-        .expect("Could not wait for fvm from isolated-devmgr");
-
-    let (volume_manager_client, volume_manager_server) =
-        fidl::endpoints::create_proxy::<VolumeManagerMarker>()
-            .expect("Could not create volume manager channel pair");
-    get_dev_root(realm_instance)
-        .open(
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_SERVICE,
-            &fvm_path,
-            ServerEnd::new(volume_manager_server.into_channel()),
-        )
-        .expect("Could not connect to VolumeManager");
+    let volume_manager_client =
+        device_watcher::recursive_wait_and_open_node(&dev_root_proxy, &fvm_path)
+            .await
+            .expect("Could not wait for fvm from isolated-devmgr")
+            .into_channel()
+            .map(VolumeManagerProxy::from_channel)
+            .expect("Could not get fvm channel");
 
     // create FVM child volume with desired GUID/label
     let mut rng = SmallRng::from_entropy();
@@ -144,8 +125,10 @@ pub async fn setup_ramdisk(
     Status::ok(status).expect("Could not create volume");
 
     let fvm_inner_block_path = fvm_path + "/" + name + "-p-1/block";
-    ramdevice_client::wait_for_device_at(&dev_root_fd, &fvm_inner_block_path, DEVICE_WAIT_TIMEOUT)
-        .expect("Could not wait for inner fvm block device");
+    let _: fio::NodeProxy =
+        device_watcher::recursive_wait_and_open_node(&dev_root_proxy, &fvm_inner_block_path)
+            .await
+            .expect("Could not wait for inner fvm block device");
 
     // Return handle to ramdisk since RamdiskClient's Drop impl destroys the ramdisk.
     ramdisk
@@ -190,9 +173,11 @@ pub async fn format_zxcrypt(realm_instance: &RealmInstance, ramdisk: &RamdiskCli
 
     // Wait for zxcrypt device manager node to appear
     let zxcrypt_path = block_path + "/zxcrypt";
-    let dev_root_fd = get_dev_root_fd(realm_instance);
-    ramdevice_client::wait_for_device_at(&dev_root_fd, &zxcrypt_path, DEVICE_WAIT_TIMEOUT)
-        .expect("wait for zxcrypt from isolated-devmgr");
+    let dev_root_proxy = get_dev_root(realm_instance);
+    let _: fio::NodeProxy =
+        device_watcher::recursive_wait_and_open_node(&dev_root_proxy, &zxcrypt_path)
+            .await
+            .expect("wait for zxcrypt from isolated-devmgr");
 
     // Open zxcrypt device manager node
     let manager = open_zxcrypt_manager(realm_instance, ramdisk, name);

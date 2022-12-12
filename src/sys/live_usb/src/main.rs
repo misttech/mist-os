@@ -165,12 +165,7 @@ mod tests {
         let ramdisk_size: u64 = 16 * 1024 * 1024;
 
         let builder = RamdiskClientBuilder::new(512, ramdisk_size / 512);
-        ramdevice_client::wait_for_device(
-            "/dev/sys/platform/00:00:2d/ramctl",
-            std::time::Duration::from_secs(10),
-        )
-        .expect("ramctl appears");
-        let ramdisk = builder.build().expect("creating ramdisk succeeds");
+        let ramdisk = builder.build().await.expect("creating ramdisk succeeds");
         let channel = ramdisk.open().expect("opening ramdisk succeeds");
         let block_client = remote_block_device::RemoteBlockClientSync::new(channel)
             .expect("creating remote block client succeeds");

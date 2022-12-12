@@ -76,6 +76,7 @@ async fn gc_error_pending_commit() {
     let system_image_package = SystemImageBuilder::new().build().await;
     let env = TestEnv::builder()
         .blobfs_from_system_image(&system_image_package)
+        .await
         .paver_service_builder(
             MockPaverServiceBuilder::new()
                 .insert_hook(throttle_hook)
@@ -111,7 +112,7 @@ async fn setup_test_env(
 ) -> (TestEnv, Package) {
     let blobfs = match blobfs {
         Some(fs) => fs,
-        None => BlobfsRamdisk::start().unwrap(),
+        None => BlobfsRamdisk::start().await.unwrap(),
     };
     let system_image_package =
         SystemImageBuilder::new().static_packages(static_packages).build().await;
@@ -262,6 +263,7 @@ async fn gc_random_blobs() {
     let blobfs = BlobfsRamdisk::builder()
         .with_blob(b"blobby mcblobberson".to_vec())
         .start()
+        .await
         .expect("blobfs creation to succeed with stray blob");
     let gced_blob = blobfs
         .list_blobs()
@@ -395,8 +397,10 @@ async fn blob_write_fails_when_out_of_space() {
     let very_small_blobfs = Ramdisk::builder()
         .block_count(4096)
         .into_blobfs_builder()
+        .await
         .expect("made blobfs builder")
         .start()
+        .await
         .expect("started blobfs");
     system_image_package
         .write_to_blobfs_dir(&very_small_blobfs.root_dir().expect("wrote system image to blobfs"));

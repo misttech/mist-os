@@ -40,6 +40,7 @@ async fn test_resolve_persisted_package_succeeds() {
                 .build(),
         )
         .system_image_and_extra_packages(&system_image_package, &[&cache_pkg])
+        .await
         .build()
         .await;
 
@@ -103,6 +104,7 @@ async fn test_resolve_empty_config_fails() {
                 .build(),
         )
         .system_image_and_extra_packages(&system_image_package, &[&cache_pkg])
+        .await
         .build()
         .await;
 
@@ -166,6 +168,7 @@ async fn test_resolve_dynamic_disabled_fails() {
                 .build(),
         )
         .system_image_and_extra_packages(&system_image_package, &[&cache_pkg])
+        .await
         .build()
         .await;
 
@@ -233,6 +236,7 @@ async fn test_resolve_no_config_fails() {
                 .build(),
         )
         .system_image_and_extra_packages(&system_image_package, &[&cache_pkg])
+        .await
         .build()
         .await;
 

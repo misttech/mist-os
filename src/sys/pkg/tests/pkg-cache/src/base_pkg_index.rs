@@ -19,6 +19,7 @@ async fn setup_test_env(static_packages: &[&Package]) -> TestEnv {
         SystemImageBuilder::new().static_packages(static_packages).build().await;
     let env = TestEnv::builder()
         .blobfs_from_system_image_and_extra_packages(&system_image_package, static_packages)
+        .await
         .build()
         .await;
     env.block_until_started().await;
@@ -80,7 +81,7 @@ async fn verify_base_packages_iterator(
 #[fasync::run_singlethreaded(test)]
 async fn no_base_package_error() {
     let env = TestEnv::builder()
-        .blobfs_and_system_image_hash(BlobfsRamdisk::start().unwrap(), Some([0u8; 32].into()))
+        .blobfs_and_system_image_hash(BlobfsRamdisk::start().await.unwrap(), Some([0u8; 32].into()))
         .build()
         .await;
     let res = env.proxies.package_cache.sync().await;
@@ -154,6 +155,7 @@ async fn base_pkg_index_verify_multiple_chunks() {
 
     let env = TestEnv::builder()
         .blobfs_from_system_image_and_extra_packages(&system_image, &[&pkg_0])
+        .await
         .build()
         .await;
 

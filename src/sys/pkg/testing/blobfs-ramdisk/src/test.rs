@@ -24,7 +24,7 @@ fn ls_simple(d: openat::DirIter) -> Result<Vec<String>, Error> {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn blobfs() -> Result<(), Error> {
-    let blobfs_server = BlobfsRamdisk::start()?;
+    let blobfs_server = BlobfsRamdisk::start().await?;
 
     let d = blobfs_server.root_dir().context("get root dir")?;
     assert_eq!(
@@ -170,7 +170,7 @@ async fn wait_for_blob_to_be_creatable(blobfs: &fio::DirectoryProxy, merkle: &st
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn open_for_create_create() -> Result<(), Error> {
-    let blobfs_server = BlobfsRamdisk::start()?;
+    let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
     let (_blob, _) =
@@ -184,7 +184,7 @@ async fn open_for_create_create() -> Result<(), Error> {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn open_resize_drop_create() -> Result<(), Error> {
-    let blobfs_server = BlobfsRamdisk::start()?;
+    let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
     let (blob, _) =
@@ -201,7 +201,7 @@ async fn open_resize_drop_create() -> Result<(), Error> {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn open_partial_write_drop_create() -> Result<(), Error> {
-    let blobfs_server = BlobfsRamdisk::start()?;
+    let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
     let (blob, _) =
@@ -219,7 +219,7 @@ async fn open_partial_write_drop_create() -> Result<(), Error> {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn open_partial_write_close_create() -> Result<(), Error> {
-    let blobfs_server = BlobfsRamdisk::start()?;
+    let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
     let (blob, _) =
@@ -236,7 +236,7 @@ async fn open_partial_write_close_create() -> Result<(), Error> {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn open_resize_open_for_create_fails() -> Result<(), Error> {
-    let blobfs_server = BlobfsRamdisk::start()?;
+    let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
     let (blob, _) =
@@ -255,7 +255,7 @@ async fn open_resize_open_for_create_fails() -> Result<(), Error> {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn open_open_resize_resize_fails() -> Result<(), Error> {
-    let blobfs_server = BlobfsRamdisk::start()?;
+    let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
     let (blob0, _) =
@@ -273,7 +273,7 @@ async fn open_open_resize_resize_fails() -> Result<(), Error> {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn open0_open1_resize1_write1_succeeds() {
-    let blobfs_server = BlobfsRamdisk::start().unwrap();
+    let blobfs_server = BlobfsRamdisk::start().await.unwrap();
     let root_dir = blobfs_server.root_dir_proxy().unwrap();
 
     let (_blob0, _) =
@@ -297,7 +297,7 @@ async fn open0_open1_resize1_write1_succeeds() {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn open0_open1_resize0_write0_succeeds() {
-    let blobfs_server = BlobfsRamdisk::start().unwrap();
+    let blobfs_server = BlobfsRamdisk::start().await.unwrap();
     let root_dir = blobfs_server.root_dir_proxy().unwrap();
 
     let (blob0, _) =
@@ -322,7 +322,7 @@ async fn open0_open1_resize0_write0_succeeds() {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn open_resize_open_read_fails() -> Result<(), Error> {
-    let blobfs_server = BlobfsRamdisk::start()?;
+    let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
     let (blob0, _) =
@@ -340,7 +340,7 @@ async fn open_resize_open_read_fails() -> Result<(), Error> {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn open_for_create_wait_for_signal() -> Result<(), Error> {
-    let blobfs_server = BlobfsRamdisk::start()?;
+    let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
     let (blob0, _) =
@@ -365,7 +365,7 @@ async fn open_for_create_wait_for_signal() -> Result<(), Error> {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn open_resize_wait_for_signal() -> Result<(), Error> {
-    let blobfs_server = BlobfsRamdisk::start()?;
+    let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
     let (blob0, _) =
@@ -390,7 +390,7 @@ async fn open_resize_wait_for_signal() -> Result<(), Error> {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn open_missing_fails() -> Result<(), Error> {
-    let blobfs_server = BlobfsRamdisk::start()?;
+    let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
     let res = open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::RIGHT_READABLE).await;
@@ -429,7 +429,7 @@ impl BlobfsRamdisk {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn corrupt_blob() {
-    let blobfs = BlobfsRamdisk::start().unwrap();
+    let blobfs = BlobfsRamdisk::start().await.unwrap();
 
     // write a few blobs and verify they are valid
     let first = TestBlob::new(b"corrupt me bro");
@@ -442,7 +442,7 @@ async fn corrupt_blob() {
     // unmount blobfs, corrupt the first blob, and restart blobfs
     let ramdisk = blobfs.unmount().await.unwrap();
     ramdisk.corrupt_blob(&first.merkle).await;
-    let blobfs = BlobfsRamdisk::builder().ramdisk(ramdisk).start().unwrap();
+    let blobfs = BlobfsRamdisk::builder().ramdisk(ramdisk).start().await.unwrap();
 
     // verify the first blob is now corrupt and the second is still not
     assert_eq!(blobfs.verify_blob(&first).await, Err(Status::IO_DATA_INTEGRITY));
@@ -453,7 +453,7 @@ async fn corrupt_blob() {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn corrupt_blob_with_many_blobs() {
-    let blobfs = BlobfsRamdisk::start().unwrap();
+    let blobfs = BlobfsRamdisk::start().await.unwrap();
 
     const LIPSUM: &[u8] = b"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque ultrices pharetra ullamcorper. Duis vestibulum nulla eget porta lacinia. Nulla nunc nibh, dictum nec risus aliquam, accumsan aliquet tellus. Sed eget lectus sit amet odio ultrices maximus. Vestibulum eget mi ut eros porta consequat. Quisque a risus id purus cursus faucibus pulvinar et mi. Etiam vel scelerisque risus, eget ullamcorper quam.";
 
@@ -487,7 +487,7 @@ async fn corrupt_blob_with_many_blobs() {
     // unmount blobfs, corrupt the blob, and restart blobfs
     let ramdisk = blobfs.unmount().await.unwrap();
     ramdisk.corrupt_blob(&corrupt.merkle).await;
-    let blobfs = BlobfsRamdisk::builder().ramdisk(ramdisk).start().unwrap();
+    let blobfs = BlobfsRamdisk::builder().ramdisk(ramdisk).start().await.unwrap();
 
     // verify all the blobs are still considered present
     assert_eq!(blobfs.list_blobs().unwrap(), ls);
@@ -503,7 +503,7 @@ async fn corrupt_blob_with_many_blobs() {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn corrupt_create_fails_on_last_byte_write() -> Result<(), Error> {
-    let blobfs_server = BlobfsRamdisk::start()?;
+    let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
     let (blob, _) =

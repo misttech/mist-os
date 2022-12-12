@@ -39,6 +39,7 @@ async fn test_cache_fallback_succeeds_no_network() {
         SystemImageBuilder::new().cache_packages(&[&cache_pkg]).build().await;
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&cache_pkg])
+        .await
         .build()
         .await;
 
@@ -79,6 +80,7 @@ async fn test_cache_fallback_succeeds_if_url_merkle_matches() {
     let system_image_package = SystemImageBuilder::new().cache_packages(&[&pkg]).build().await;
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&pkg])
+        .await
         .build()
         .await;
 
@@ -124,6 +126,7 @@ async fn test_cache_fallback_fails_if_url_merkle_differs() {
     let system_image_package = SystemImageBuilder::new().cache_packages(&[&pkg]).build().await;
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&pkg])
+        .await
         .build()
         .await;
 
@@ -167,6 +170,7 @@ async fn test_cache_fallback_succeeds_no_targets() {
         SystemImageBuilder::new().cache_packages(&[&cache_pkg]).build().await;
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&cache_pkg])
+        .await
         .build()
         .await;
 
@@ -215,6 +219,7 @@ async fn test_cache_fallback_succeeds_rewrite_rule() {
         SystemImageBuilder::new().cache_packages(&[&cache_pkg]).build().await;
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&cache_pkg])
+        .await
         .build()
         .await;
 
@@ -274,8 +279,10 @@ async fn test_blobfs_out_of_space_does_not_fall_back_to_cache_packages_with_larg
     let very_small_blobfs = Ramdisk::builder()
         .block_count(4096)
         .into_blobfs_builder()
+        .await
         .expect("made blobfs builder")
         .start()
+        .await
         .expect("started blobfs");
     system_image_package
         .write_to_blobfs_dir(&very_small_blobfs.root_dir().expect("wrote system image to blobfs"));
@@ -351,8 +358,10 @@ async fn test_blobfs_out_of_space_does_not_fall_back_to_cache_packages() {
     let very_small_blobfs = Ramdisk::builder()
         .block_count(4096)
         .into_blobfs_builder()
+        .await
         .expect("made blobfs builder")
         .start()
+        .await
         .expect("started blobfs");
     system_image_package
         .write_to_blobfs_dir(&very_small_blobfs.root_dir().expect("wrote system image to blobfs"));
@@ -405,8 +414,10 @@ async fn test_blobfs_out_of_space_does_not_fall_back_to_previous_ephemeral_packa
     let very_small_blobfs = Ramdisk::builder()
         .block_count(4096)
         .into_blobfs_builder()
+        .await
         .expect("made blobfs builder")
         .start()
+        .await
         .expect("started blobfs");
     let system_image_package = SystemImageBuilder::new();
     let system_image_package = system_image_package.build().await;
@@ -478,6 +489,7 @@ async fn test_resolve_fails_not_in_repo() {
     let system_image_package = SystemImageBuilder::new().cache_packages(&[&pkg]).build().await;
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&pkg])
+        .await
         .build()
         .await;
 
@@ -515,6 +527,7 @@ async fn test_resolve_falls_back_not_in_repo() {
         SystemImageBuilder::new().cache_packages(&[&cache_pkg]).build().await;
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&cache_pkg])
+        .await
         .build()
         .await;
 
@@ -581,6 +594,7 @@ async fn test_resolve_prefers_repo() {
         SystemImageBuilder::new().cache_packages(&[&cache_pkg]).build().await;
     let env = TestEnvBuilder::new()
         .system_image_and_extra_packages(&system_image_package, &[&cache_pkg])
+        .await
         .build()
         .await;
 

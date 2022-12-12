@@ -47,6 +47,7 @@ async fn cached_packages_are_retained() {
             &system_image_package,
             &packages.iter().chain(garbage_packages.iter()).collect::<Vec<_>>(),
         )
+        .await
         .build()
         .await;
 

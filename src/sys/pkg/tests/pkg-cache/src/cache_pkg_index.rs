@@ -40,6 +40,7 @@ async fn missing_cache_package_manifest_empty_iterator() {
     let system_image_package = SystemImageBuilder::new().build().await;
     let env = TestEnv::builder()
         .blobfs_from_system_image_and_extra_packages(&system_image_package, &[])
+        .await
         .build()
         .await;
     env.block_until_started().await;
@@ -53,6 +54,7 @@ async fn present_cache_package_manifest() {
     let system_image_package = SystemImageBuilder::new().cache_packages(&[&pkg]).build().await;
     let env = TestEnv::builder()
         .blobfs_from_system_image_and_extra_packages(&system_image_package, &[&pkg])
+        .await
         .build()
         .await;
     env.block_until_started().await;

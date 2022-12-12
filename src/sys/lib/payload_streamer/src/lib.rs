@@ -379,15 +379,10 @@ mod tests {
         return Ok((client_end.into_proxy()?, status, server));
     }
 
-    fn create_ramdisk(src: Vec<u8>) -> Result<RamdiskClient, Error> {
-        ramdevice_client::wait_for_device(
-            "/dev/sys/platform/00:00:2d/ramctl",
-            std::time::Duration::from_secs(10),
-        )
-        .expect("ramctl did not appear");
+    async fn create_ramdisk(src: Vec<u8>) -> Result<RamdiskClient, Error> {
         let vmo = zx::Vmo::create(src.len() as u64).context("failed to create vmo")?;
         vmo.write(&src, 0).context("failed to write vmo")?;
-        VmoRamdiskClientBuilder::new(vmo).build().context("failed to create ramdisk client")
+        VmoRamdiskClientBuilder::new(vmo).build().await.context("failed to create ramdisk client")
     }
 
     async fn attach_vmo(
@@ -475,7 +470,7 @@ mod tests {
         let ramdisk_client: RamdiskClient;
 
         let streamer: Box<dyn PayloadStreamer> = if use_block_device_streamer {
-            ramdisk_client = create_ramdisk(buf)?;
+            ramdisk_client = create_ramdisk(buf).await?;
             Box::new(BlockDevicePayloadStreamer::new(ramdisk_client.get_path()).await?)
         } else {
             Box::new(ReaderPayloadStreamer::new(Box::new(Cursor::new(buf)), src_size))
@@ -554,7 +549,7 @@ mod tests {
         let dst_size = 8192;
         let byte: u8 = 0xab;
         let buf: Vec<u8> = vec![byte; src_size];
-        let ramdisk_client = create_ramdisk(buf)?;
+        let ramdisk_client = create_ramdisk(buf).await?;
         let streamer: Box<dyn PayloadStreamer> =
             Box::new(BlockDevicePayloadStreamer::new(ramdisk_client.get_path()).await?);
         let (proxy, _, server) = serve_payload(streamer).await?;

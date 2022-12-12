@@ -765,13 +765,8 @@ mod tests {
         },
     };
 
-    fn ramdisk(block_size: u64) -> RamdiskClient {
-        ramdevice_client::wait_for_device(
-            "/dev/sys/platform/00:00:2d/ramctl",
-            std::time::Duration::from_secs(60),
-        )
-        .unwrap();
-        RamdiskClient::create(block_size, 1 << 16).unwrap()
+    async fn ramdisk(block_size: u64) -> RamdiskClient {
+        RamdiskClient::create(block_size, 1 << 16).await.unwrap()
     }
 
     fn new_fs<FSC: FSConfig>(ramdisk: &RamdiskClient, config: FSC) -> Filesystem<FSC> {
@@ -781,7 +776,7 @@ mod tests {
     #[fuchsia::test]
     async fn blobfs_custom_config() {
         let block_size = 512;
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let config = Blobfs {
             verbose: true,
             readonly: true,
@@ -801,7 +796,7 @@ mod tests {
     #[fuchsia::test]
     async fn blobfs_format_fsck_success() {
         let block_size = 512;
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let mut blobfs = new_fs(&ramdisk, Blobfs::default());
 
         blobfs.format().await.expect("failed to format blobfs");
@@ -815,7 +810,7 @@ mod tests {
     async fn blobfs_format_fsck_error() {
         const BLOCK_SIZE: usize = 512;
 
-        let ramdisk = ramdisk(BLOCK_SIZE.try_into().expect("overflow"));
+        let ramdisk = ramdisk(BLOCK_SIZE.try_into().expect("overflow")).await;
         let mut blobfs = new_fs(&ramdisk, Blobfs::default());
         let () = blobfs.format().await.expect("failed to format blobfs");
 
@@ -841,7 +836,7 @@ mod tests {
     #[fuchsia::test]
     async fn blobfs_format_serve_write_query_restart_read_shutdown() {
         let block_size = 512;
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let mut blobfs = new_fs(&ramdisk, Blobfs::default());
 
         blobfs.format().await.expect("failed to format blobfs");
@@ -917,7 +912,7 @@ mod tests {
         let block_size = 512;
         let merkle = "be901a14ec42ee0a8ee220eb119294cdd40d26d573139ee3d51e4430e7d08c28";
         let test_content = b"test content";
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let mut blobfs = new_fs(&ramdisk, Blobfs::default());
 
         blobfs.format().await.expect("failed to format blobfs");
@@ -946,7 +941,7 @@ mod tests {
     #[fuchsia::test]
     async fn minfs_custom_config() {
         let block_size = 512;
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let config = Minfs { verbose: true, readonly: true, fsck_after_every_transaction: true };
         let mut minfs = new_fs(&ramdisk, config);
 
@@ -960,7 +955,7 @@ mod tests {
     #[fuchsia::test]
     async fn minfs_format_fsck_success() {
         let block_size = 8192;
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let mut minfs = new_fs(&ramdisk, Minfs::default());
 
         minfs.format().await.expect("failed to format minfs");
@@ -973,7 +968,7 @@ mod tests {
     async fn minfs_format_fsck_error() {
         const BLOCK_SIZE: usize = 8192;
 
-        let ramdisk = ramdisk(BLOCK_SIZE.try_into().expect("overflow"));
+        let ramdisk = ramdisk(BLOCK_SIZE.try_into().expect("overflow")).await;
         let mut minfs = new_fs(&ramdisk, Minfs::default());
 
         let () = minfs.format().await.expect("failed to format minfs");
@@ -1008,7 +1003,7 @@ mod tests {
     #[fuchsia::test]
     async fn minfs_format_serve_write_query_restart_read_shutdown() {
         let block_size = 8192;
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let mut minfs = new_fs(&ramdisk, Minfs::default());
 
         minfs.format().await.expect("failed to format minfs");
@@ -1076,7 +1071,7 @@ mod tests {
     async fn minfs_bind_to_path() {
         let block_size = 8192;
         let test_content = b"test content";
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let mut minfs = new_fs(&ramdisk, Minfs::default());
 
         minfs.format().await.expect("failed to format minfs");
@@ -1104,7 +1099,7 @@ mod tests {
     #[fuchsia::test]
     async fn f2fs_custom_config() {
         let block_size = 4096;
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let config = F2fs { verbose: true, readonly: true };
         let mut f2fs = new_fs(&ramdisk, config);
 
@@ -1118,7 +1113,7 @@ mod tests {
     #[fuchsia::test]
     async fn f2fs_format_fsck_success() {
         let block_size = 4096;
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let mut f2fs = new_fs(&ramdisk, F2fs::default());
 
         f2fs.format().await.expect("failed to format f2fs");
@@ -1130,7 +1125,7 @@ mod tests {
     #[fuchsia::test]
     async fn f2fs_format_serve_write_query_restart_read_shutdown() {
         let block_size = 4096;
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let mut f2fs = new_fs(&ramdisk, F2fs::default());
 
         f2fs.format().await.expect("failed to format f2fs");
@@ -1199,7 +1194,7 @@ mod tests {
     async fn f2fs_bind_to_path() {
         let block_size = 4096;
         let test_content = b"test content";
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let mut f2fs = new_fs(&ramdisk, F2fs::default());
 
         f2fs.format().await.expect("failed to format f2fs");
@@ -1227,7 +1222,7 @@ mod tests {
     #[fuchsia::test]
     async fn factoryfs_custom_config() {
         let block_size = 512;
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let config = Factoryfs { verbose: true };
         let mut factoryfs = new_fs(&ramdisk, config);
 
@@ -1241,7 +1236,7 @@ mod tests {
     #[fuchsia::test]
     async fn factoryfs_format_fsck_success() {
         let block_size = 512;
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let mut factoryfs = new_fs(&ramdisk, Factoryfs::default());
 
         factoryfs.format().await.expect("failed to format factoryfs");
@@ -1253,7 +1248,7 @@ mod tests {
     #[fuchsia::test]
     async fn factoryfs_format_serve_shutdown() {
         let block_size = 512;
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let mut factoryfs = new_fs(&ramdisk, Factoryfs::default());
 
         factoryfs.format().await.expect("failed to format factoryfs");
@@ -1266,7 +1261,7 @@ mod tests {
     #[fuchsia::test]
     async fn factoryfs_bind_to_path() {
         let block_size = 512;
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let mut factoryfs = new_fs(&ramdisk, Factoryfs::default());
 
         factoryfs.format().await.expect("failed to format factoryfs");
@@ -1291,7 +1286,7 @@ mod tests {
     #[fuchsia::test]
     async fn fxfs_shutdown_component_when_dropped() {
         let block_size = 512;
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let mut fxfs = new_fs(&ramdisk, Fxfs::default());
 
         fxfs.format().await.expect("failed to format fxfs");
@@ -1320,7 +1315,7 @@ mod tests {
     #[fuchsia::test]
     async fn fxfs_open_volume() {
         let block_size = 512;
-        let ramdisk = ramdisk(block_size);
+        let ramdisk = ramdisk(block_size).await;
         let mut fxfs = new_fs(&ramdisk, Fxfs::default());
 
         fxfs.format().await.expect("failed to format fxfs");

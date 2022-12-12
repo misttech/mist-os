@@ -25,7 +25,8 @@ use {
 #[fasync::run_singlethreaded(test)]
 async fn system_image_hash_present() {
     let system_image_package = SystemImageBuilder::new().build().await;
-    let env = TestEnv::builder().blobfs_from_system_image(&system_image_package).build().await;
+    let env =
+        TestEnv::builder().blobfs_from_system_image(&system_image_package).await.build().await;
     env.block_until_started().await;
 
     let hierarchy = env.inspect_hierarchy().await;
@@ -59,7 +60,8 @@ async fn non_static_allow_list() {
         .pkgfs_non_static_packages_allowlist(&["a-package-name", "another-name"])
         .build()
         .await;
-    let env = TestEnv::builder().blobfs_from_system_image(&system_image_package).build().await;
+    let env =
+        TestEnv::builder().blobfs_from_system_image(&system_image_package).await.build().await;
     env.block_until_started().await;
 
     let hierarchy = env.inspect_hierarchy().await;
@@ -94,6 +96,7 @@ async fn assert_base_blob_count(
                 .chain(cache_packages.unwrap_or(&[]).iter().cloned())
                 .collect::<Vec<_>>(),
         )
+        .await
         .build()
         .await;
     env.block_until_started().await;
@@ -181,7 +184,8 @@ async fn executability_restrictions_enabled() {
 async fn executability_restrictions_disabled() {
     let system_image_package =
         SystemImageBuilder::new().pkgfs_disable_executability_restrictions().build().await;
-    let env = TestEnv::builder().blobfs_from_system_image(&system_image_package).build().await;
+    let env =
+        TestEnv::builder().blobfs_from_system_image(&system_image_package).await.build().await;
     env.block_until_started().await;
 
     let hierarchy = env.inspect_hierarchy().await;
@@ -198,7 +202,8 @@ async fn executability_restrictions_disabled() {
 #[fasync::run_singlethreaded(test)]
 async fn dynamic_index_inital_state() {
     let system_image_package = SystemImageBuilder::new().build().await;
-    let env = TestEnv::builder().blobfs_from_system_image(&system_image_package).build().await;
+    let env =
+        TestEnv::builder().blobfs_from_system_image(&system_image_package).await.build().await;
     env.block_until_started().await;
 
     let hierarchy = env.inspect_hierarchy().await;
@@ -227,6 +232,7 @@ async fn dynamic_index_with_cache_packages() {
 
     let env = TestEnv::builder()
         .blobfs_from_system_image_and_extra_packages(&system_image_package, &[&cache_package])
+        .await
         .build()
         .await;
     env.block_until_started().await;

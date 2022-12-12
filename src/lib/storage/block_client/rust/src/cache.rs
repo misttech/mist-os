@@ -305,13 +305,9 @@ mod tests {
     const RAMDISK_BLOCK_COUNT: u64 = 1023; // Deliberate for testing max offset.
     const RAMDISK_SIZE: u64 = RAMDISK_BLOCK_SIZE * RAMDISK_BLOCK_COUNT;
 
-    pub fn make_ramdisk() -> (RamdiskClient, RemoteBlockClientSync) {
-        ramdevice_client::wait_for_device(
-            "/dev/sys/platform/00:00:2d/ramctl",
-            std::time::Duration::from_secs(30),
-        )
-        .expect("ramctl did not appear");
+    pub async fn make_ramdisk() -> (RamdiskClient, RemoteBlockClientSync) {
         let ramdisk = RamdiskClient::create(RAMDISK_BLOCK_SIZE, RAMDISK_BLOCK_COUNT)
+            .await
             .expect("RamdiskClient::create failed");
         let client_end = ramdisk.open().expect("ramdisk.open failed");
         let remote_block_device =
@@ -319,9 +315,9 @@ mod tests {
         (ramdisk, remote_block_device)
     }
 
-    #[test]
-    fn test_cache_read_at_and_write_at_with_no_hits() {
-        let (_ramdisk, remote_block_device) = make_ramdisk();
+    #[fuchsia::test]
+    async fn test_cache_read_at_and_write_at_with_no_hits() {
+        let (_ramdisk, remote_block_device) = make_ramdisk().await;
         let mut cache = Cache::new(remote_block_device).expect("Cache::new failed");
         let mut offset = 5;
         const TEST_COUNT: usize = super::BLOCK_COUNT * 2; // Chosen so there are no cache hits.
@@ -357,9 +353,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_cache_read_at_and_write_at_with_hit() {
-        let (_ramdisk, remote_block_device) = make_ramdisk();
+    #[fuchsia::test]
+    async fn test_cache_read_at_and_write_at_with_hit() {
+        let (_ramdisk, remote_block_device) = make_ramdisk().await;
         let mut cache = Cache::new(remote_block_device).expect("Cache::new failed");
         const OFFSET: u64 = 11;
         const DATA: &[u8] = b"hello";
@@ -370,9 +366,9 @@ mod tests {
         assert_eq!(cache.stats(), &Stats { read_count: 1, write_count: 0, cache_hits: 1 });
     }
 
-    #[test]
-    fn test_cache_aligned_read_at_and_write_at() {
-        let (_ramdisk, remote_block_device) = make_ramdisk();
+    #[fuchsia::test]
+    async fn test_cache_aligned_read_at_and_write_at() {
+        let (_ramdisk, remote_block_device) = make_ramdisk().await;
         let mut cache = Cache::new(remote_block_device).expect("Cache::new failed");
         const OFFSET: u64 = 11;
         const BLOCKS: usize = 3;
@@ -393,10 +389,10 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_cache_aligned_read_at_and_write_at_cold() {
+    #[fuchsia::test]
+    async fn test_cache_aligned_read_at_and_write_at_cold() {
         // The same as the previous test, but tear down the cache after the writes.
-        let (ramdisk, remote_block_device) = make_ramdisk();
+        let (ramdisk, remote_block_device) = make_ramdisk().await;
         let mut cache = Cache::new(remote_block_device).expect("Cache::new failed");
         const OFFSET: u64 = 11;
         const BLOCKS: usize = 3;
@@ -425,9 +421,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_io_read_write_and_seek() {
-        let (_ramdisk, remote_block_device) = make_ramdisk();
+    #[fuchsia::test]
+    async fn test_io_read_write_and_seek() {
+        let (_ramdisk, remote_block_device) = make_ramdisk().await;
         let mut cache = Cache::new(remote_block_device).expect("Cache::new failed");
         const OFFSET: u64 = 11;
         const DATA: &[u8] = b"hello";
@@ -442,9 +438,9 @@ mod tests {
         assert_eq!(&buf, DATA);
     }
 
-    #[test]
-    fn test_io_read_write_and_seek_at_max_offset() {
-        let (_ramdisk, remote_block_device) = make_ramdisk();
+    #[fuchsia::test]
+    async fn test_io_read_write_and_seek_at_max_offset() {
+        let (_ramdisk, remote_block_device) = make_ramdisk().await;
         let mut cache = Cache::new(remote_block_device).expect("Cache::new failed");
         const DATA: &[u8] = b"hello";
         assert_eq!(cache.seek(SeekFrom::End(-1)).expect("seek failed"), RAMDISK_SIZE - 1);
@@ -455,43 +451,43 @@ mod tests {
         assert_eq!(&buf, &[0, 0, 0, b'h', 0x56]);
     }
 
-    #[test]
-    fn test_read_beyond_max_offset_returns_error() {
-        let (_ramdisk, remote_block_device) = make_ramdisk();
+    #[fuchsia::test]
+    async fn test_read_beyond_max_offset_returns_error() {
+        let (_ramdisk, remote_block_device) = make_ramdisk().await;
         let mut cache = Cache::new(remote_block_device).expect("Cache::new failed");
         let mut buf = [0u8; 2];
         cache.read_at(&mut buf, RAMDISK_SIZE).expect_err("read_at succeeded");
         cache.read_at(&mut buf, RAMDISK_SIZE - 1).expect_err("read_at succeeded");
     }
 
-    #[test]
-    fn test_write_beyond_max_offset_returns_error() {
-        let (_ramdisk, remote_block_device) = make_ramdisk();
+    #[fuchsia::test]
+    async fn test_write_beyond_max_offset_returns_error() {
+        let (_ramdisk, remote_block_device) = make_ramdisk().await;
         let mut cache = Cache::new(remote_block_device).expect("Cache::new failed");
         let buf = [0u8; 2];
         cache.write_at(&buf, RAMDISK_SIZE).expect_err("write_at succeeded");
         cache.write_at(&buf, RAMDISK_SIZE - 1).expect_err("write_at succeeded");
     }
 
-    #[test]
-    fn test_read_with_overflow_returns_error() {
-        let (_ramdisk, remote_block_device) = make_ramdisk();
+    #[fuchsia::test]
+    async fn test_read_with_overflow_returns_error() {
+        let (_ramdisk, remote_block_device) = make_ramdisk().await;
         let mut cache = Cache::new(remote_block_device).expect("Cache::new failed");
         let mut buf = [0u8; 2];
         cache.read_at(&mut buf, u64::MAX - 1).expect_err("read_at succeeded");
     }
 
-    #[test]
-    fn test_write_with_overflow_returns_error() {
-        let (_ramdisk, remote_block_device) = make_ramdisk();
+    #[fuchsia::test]
+    async fn test_write_with_overflow_returns_error() {
+        let (_ramdisk, remote_block_device) = make_ramdisk().await;
         let mut cache = Cache::new(remote_block_device).expect("Cache::new failed");
         let buf = [0u8; 2];
         cache.write_at(&buf, u64::MAX - 1).expect_err("write_at succeeded");
     }
 
-    #[test]
-    fn test_read_and_write_at_max_offset_suceeds() {
-        let (_ramdisk, remote_block_device) = make_ramdisk();
+    #[fuchsia::test]
+    async fn test_read_and_write_at_max_offset_suceeds() {
+        let (_ramdisk, remote_block_device) = make_ramdisk().await;
         let mut cache = Cache::new(remote_block_device).expect("Cache::new failed");
         let buf = [0xd4u8; 2];
         cache.write_at(&buf, RAMDISK_SIZE - buf.len() as u64).expect("write_at failed");
@@ -500,23 +496,19 @@ mod tests {
         assert_eq!(&buf, &read_buf);
     }
 
-    #[test]
-    fn test_seek_with_bad_delta_returns_error() {
-        let (_ramdisk, remote_block_device) = make_ramdisk();
+    #[fuchsia::test]
+    async fn test_seek_with_bad_delta_returns_error() {
+        let (_ramdisk, remote_block_device) = make_ramdisk().await;
         let mut cache = Cache::new(remote_block_device).expect("Cache::new failed");
         cache.seek(SeekFrom::End(-(RAMDISK_SIZE as i64) - 1)).expect_err("seek suceeded");
         cache.seek(SeekFrom::Current(-1)).expect_err("seek succeeded");
     }
 
-    #[test]
-    fn test_ramdisk_with_large_block_size_returns_error() {
-        ramdevice_client::wait_for_device(
-            "/dev/sys/platform/00:00:2d/ramctl",
-            std::time::Duration::from_secs(30),
-        )
-        .expect("ramctl did not appear");
-        let ramdisk =
-            RamdiskClient::create(super::BLOCK_SIZE * 2, 10).expect("RamdiskClient::create failed");
+    #[fuchsia::test]
+    async fn test_ramdisk_with_large_block_size_returns_error() {
+        let ramdisk = RamdiskClient::create(super::BLOCK_SIZE * 2, 10)
+            .await
+            .expect("RamdiskClient::create failed");
         let client_end = ramdisk.open().expect("ramdisk.open failed");
         let remote_block_device =
             RemoteBlockClientSync::new(client_end).expect("RemoteBlockClientSync::new failed");

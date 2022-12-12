@@ -73,12 +73,12 @@ impl BlobfsRamdiskBuilder {
     }
 
     /// Starts a blobfs server with the current configuration options.
-    pub fn start(self) -> Result<BlobfsRamdisk, Error> {
+    pub async fn start(self) -> Result<BlobfsRamdisk, Error> {
         // Use the provided ramdisk or format a fresh one with blobfs.
         let ramdisk = if let Some(ramdisk) = self.ramdisk {
             ramdisk
         } else {
-            Ramdisk::start().context("creating backing ramdisk for blobfs")?.format()?
+            Ramdisk::start().await.context("creating backing ramdisk for blobfs")?.format()?
         };
 
         // Spawn blobfs on top of the ramdisk.
@@ -149,8 +149,8 @@ impl BlobfsRamdisk {
     }
 
     /// Starts a blobfs server backed by a freshly formatted ramdisk.
-    pub fn start() -> Result<Self, Error> {
-        Self::builder().start()
+    pub async fn start() -> Result<Self, Error> {
+        Self::builder().start().await
     }
 
     /// Returns a new connection to blobfs using the blobfs::Client wrapper type.
@@ -264,14 +264,9 @@ impl RamdiskBuilder {
     }
 
     /// Starts a new ramdisk.
-    pub fn start(self) -> Result<Ramdisk, Error> {
+    pub async fn start(self) -> Result<Ramdisk, Error> {
         let client = RamdiskClient::builder(RAMDISK_BLOCK_SIZE, self.block_count);
-        ramdevice_client::wait_for_device(
-            "/dev/sys/platform/00:00:2d/ramctl",
-            std::time::Duration::from_secs(30),
-        )
-        .context("/dev/sys/platform/00:00:2d/ramctl did not appear")?;
-        let client = client.build()?;
+        let client = client.build().await?;
         let block = client.open()?;
         let client_end = ClientEnd::<fio::NodeMarker>::new(block.into_channel());
         let proxy = client_end.into_proxy()?;
@@ -279,8 +274,8 @@ impl RamdiskBuilder {
     }
 
     /// Create a [`BlobfsRamdiskBuilder`] that uses this as its backing ramdisk.
-    pub fn into_blobfs_builder(self) -> Result<BlobfsRamdiskBuilder, Error> {
-        Ok(BlobfsRamdiskBuilder::new().ramdisk(self.start()?.format()?))
+    pub async fn into_blobfs_builder(self) -> Result<BlobfsRamdiskBuilder, Error> {
+        Ok(BlobfsRamdiskBuilder::new().ramdisk(self.start().await?.format()?))
     }
 }
 
@@ -300,8 +295,8 @@ impl Ramdisk {
 
     /// Starts a new ramdisk with 1024 * 1024 blocks and a block size of 512 bytes, resulting in a
     /// drive with 512MiB capacity.
-    pub fn start() -> Result<Self, Error> {
-        Self::builder().start()
+    pub async fn start() -> Result<Self, Error> {
+        Self::builder().start().await
     }
 
     fn clone_channel(&self) -> Result<zx::Channel, Error> {
@@ -439,7 +434,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn clean_start_and_stop() {
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
 
         let proxy = blobfs.root_dir_proxy().unwrap();
         drop(proxy);
@@ -449,7 +444,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn clean_start_contains_no_blobs() {
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
 
         assert_eq!(blobfs.list_blobs().unwrap(), btreeset![]);
 
@@ -483,10 +478,12 @@ mod tests {
             .with_blob(blob.clone())
             .with_blob(blob.clone())
             .start()
+            .await
             .unwrap();
         assert_eq!(blobfs.list_blobs().unwrap(), btreeset![blob.merkle]);
 
-        let blobfs = blobfs.into_builder().await.unwrap().with_blob(blob.clone()).start().unwrap();
+        let blobfs =
+            blobfs.into_builder().await.unwrap().with_blob(blob.clone()).start().await.unwrap();
         assert_eq!(blobfs.list_blobs().unwrap(), btreeset![blob.merkle]);
     }
 
@@ -496,6 +493,7 @@ mod tests {
             .with_blob(&b"blob 1"[..])
             .with_blob(&b"blob 2"[..])
             .start()
+            .await
             .unwrap();
 
         let expected = btreeset![
@@ -510,10 +508,10 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn remount() {
-        let blobfs = BlobfsRamdisk::builder().with_blob(&b"test"[..]).start().unwrap();
+        let blobfs = BlobfsRamdisk::builder().with_blob(&b"test"[..]).start().await.unwrap();
         let blobs = blobfs.list_blobs().unwrap();
 
-        let blobfs = blobfs.into_builder().await.unwrap().start().unwrap();
+        let blobfs = blobfs.into_builder().await.unwrap().start().await.unwrap();
 
         assert_eq!(blobs, blobfs.list_blobs().unwrap());
 
@@ -522,7 +520,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn blob_appears_in_readdir() {
-        let blobfs = BlobfsRamdisk::start().unwrap();
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
         let root = blobfs.root_dir().unwrap();
 
         let hello_merkle = write_blob(&root, "Hello blobfs!".as_bytes());
@@ -555,7 +553,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn ramdisk_builder_sets_block_count() {
         for block_count in [1, 2, 3, 16] {
-            let ramdisk = Ramdisk::builder().block_count(block_count).start().unwrap();
+            let ramdisk = Ramdisk::builder().block_count(block_count).start().await.unwrap();
             let client_end = ramdisk.client.open().unwrap();
             let proxy = client_end.into_proxy().unwrap();
             let info = proxy.get_info().await.unwrap().unwrap();
@@ -565,6 +563,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn ramdisk_into_blobfs_formats_ramdisk() {
-        let _: BlobfsRamdisk = Ramdisk::builder().into_blobfs_builder().unwrap().start().unwrap();
+        let _: BlobfsRamdisk =
+            Ramdisk::builder().into_blobfs_builder().await.unwrap().start().await.unwrap();
     }
 }

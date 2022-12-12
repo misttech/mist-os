@@ -238,12 +238,7 @@ mod tests {
         let dist = EntryDistribution::new(depth);
         let tree: DirectoryEntry = rng.sample(dist);
 
-        ramdevice_client::wait_for_device(
-            "/dev/sys/platform/00:00:2d/ramctl",
-            std::time::Duration::from_secs(10),
-        )
-        .expect("ramctl did not appear");
-        let ramdisk = RamdiskClient::create(512, 1 << 16).expect("failed to make ramdisk");
+        let ramdisk = RamdiskClient::create(512, 1 << 16).await.expect("failed to make ramdisk");
         let device_path = ramdisk.get_path();
 
         let mut minfs = Minfs::new(device_path).expect("failed to make new minfs");

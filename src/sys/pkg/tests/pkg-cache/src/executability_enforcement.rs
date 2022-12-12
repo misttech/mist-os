@@ -49,6 +49,7 @@ async fn verify_package_executability(
     let system_image = system_image.build().await;
     let env = TestEnv::builder()
         .blobfs_from_system_image_and_extra_packages(&system_image, &[&pkg])
+        .await
         .build()
         .await;
 

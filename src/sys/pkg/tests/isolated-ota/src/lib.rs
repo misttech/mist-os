@@ -254,7 +254,7 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
         let (blobfs_ramdisk, blobfs_handle) = match params.blobfs {
             Some(blobfs_handle) => (None, blobfs_handle),
             None => {
-                let blobfs_ramdisk = BlobfsRamdisk::start().expect("launching blobfs");
+                let blobfs_ramdisk = BlobfsRamdisk::start().await.expect("launching blobfs");
                 let blobfs_handle =
                     blobfs_ramdisk.root_dir_handle().expect("getting blobfs root handle");
                 (Some(blobfs_ramdisk), blobfs_handle)

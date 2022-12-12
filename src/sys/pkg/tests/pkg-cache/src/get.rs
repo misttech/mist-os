@@ -282,6 +282,7 @@ async fn get_package_already_present_on_fs() {
     let system_image_package = SystemImageBuilder::new().cache_packages(&[&pkg]).build().await;
     let env = TestEnv::builder()
         .blobfs_from_system_image_and_extra_packages(&system_image_package, &[&pkg])
+        .await
         .build()
         .await;
 
@@ -336,6 +337,7 @@ async fn get_package_already_present_on_fs_with_pre_closed_needed_blobs() {
     let system_image_package = SystemImageBuilder::new().cache_packages(&[&pkg]).build().await;
     let env = TestEnv::builder()
         .blobfs_from_system_image_and_extra_packages(&system_image_package, &[&pkg])
+        .await
         .build()
         .await;
 
