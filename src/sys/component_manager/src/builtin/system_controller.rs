@@ -6,7 +6,6 @@ use {
     crate::{
         capability::{CapabilityProvider, CapabilitySource},
         model::{
-            actions::{ActionSet, ShutdownAction},
             error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
@@ -124,7 +123,7 @@ impl SystemControllerCapabilityProvider {
                     .detach();
                     let root =
                         self.model.upgrade().ok_or(format_err!("model is dropped"))?.root().clone();
-                    ActionSet::register(root, ShutdownAction::new())
+                    root.shutdown()
                         .await
                         .context("got error waiting for shutdown action to complete")?;
                     match responder.send() {

@@ -521,7 +521,7 @@ mod tests {
         }
 
         // Check for shut_down:
-        let _ = child.stop_instance(true, false).await;
+        let _ = child.stop_instance_internal(true, false).await;
         let execution = child.lock_execution().await;
         assert!(execution.is_shut_down());
         assert_matches!(

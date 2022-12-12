@@ -1197,7 +1197,7 @@ mod tests {
         };
 
         // The stop should trigger a delete/purge.
-        child.stop_instance(false, false).await.unwrap();
+        child.stop_instance_internal(false, false).await.unwrap();
 
         let event_a = event_stream
             .wait_until(EventType::Destroyed, vec!["system", "coll:a"].into())

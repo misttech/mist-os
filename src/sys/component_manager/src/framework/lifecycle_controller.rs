@@ -123,7 +123,7 @@ impl LifecycleController {
         let moniker = join_monikers(scope_moniker, &moniker)?;
         let component =
             self.model.find(&moniker).await.ok_or(fcomponent::Error::InstanceNotFound)?;
-        component.stop_instance(false, is_recursive).await.map_err(|error| {
+        component.stop(is_recursive).await.map_err(|error| {
             warn!(%moniker, ?error, "LifecycleController could not stop");
             fcomponent::Error::Internal
         })

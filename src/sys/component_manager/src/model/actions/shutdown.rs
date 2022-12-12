@@ -51,7 +51,7 @@ async fn shutdown_component(target: ShutdownInfo) -> Result<ComponentRef, ModelE
             // TODO: Put `self` in a "shutting down" state so that if it creates
             // new instances after this point, they are created in a shut down
             // state.
-            target.component.stop_instance(true, false).await?;
+            target.component.stop_instance_internal(true, false).await?;
         }
         ComponentRef::Child(_) => {
             ActionSet::register(target.component, ShutdownAction::new()).await?;
@@ -246,7 +246,7 @@ async fn do_shutdown(component: &Arc<ComponentInstance>) -> Result<(), ModelErro
     // Control flow arrives here if the component isn't resolved.
     // TODO: Put this component in a "shutting down" state so that if it creates new instances
     // after this point, they are created in a shut down state.
-    component.stop_instance(true, false).await?;
+    component.stop_instance_internal(true, false).await?;
 
     Ok(())
 }

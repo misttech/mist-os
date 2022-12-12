@@ -6,7 +6,7 @@ use {
     crate::model::{
         actions::{
             shutdown, start, ActionSet, DestroyChildAction, DiscoverAction, ResolveAction,
-            StartAction, StopAction, UnresolveAction,
+            ShutdownAction, StartAction, StopAction, UnresolveAction,
         },
         context::{ModelContext, WeakModelContext},
         environment::Environment,
@@ -56,7 +56,7 @@ use {
     fuchsia_component::client,
     fuchsia_zircon as zx,
     futures::{
-        future::{join_all, AbortHandle, Abortable, BoxFuture, Either, FutureExt, TryFutureExt},
+        future::{join_all, BoxFuture, Either, FutureExt},
         lock::{MappedMutexGuard, Mutex, MutexGuard},
     },
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase},
@@ -67,12 +67,11 @@ use {
         collections::{HashMap, HashSet},
         convert::{TryFrom, TryInto},
         fmt,
-        ops::Drop,
         path::PathBuf,
         sync::{Arc, Weak},
         time::Duration,
     },
-    tracing::{error, warn},
+    tracing::warn,
     vfs::{execution_scope::ExecutionScope, path::Path},
 };
 
@@ -754,11 +753,29 @@ impl ComponentInstance {
         .await
     }
 
-    /// Performs the stop protocol for this component instance. `shut_down` determines whether
-    /// the instance is to be put in the shutdown state; see documentation on [ExecutionState].
+    /// Stops this component.
+    ///
+    /// If `is_recursive` is true, all descendants will be stopped as well as the component itself.
+    pub async fn stop(self: &Arc<Self>, is_recursive: bool) -> Result<(), ModelError> {
+        ActionSet::register(self.clone(), StopAction::new(false, is_recursive)).await
+    }
+
+    /// Shuts down this component. This means the component and its subrealm are stopped and never
+    /// allowed to restart again.
+    pub async fn shutdown(self: &Arc<Self>) -> Result<(), ModelError> {
+        ActionSet::register(self.clone(), ShutdownAction::new()).await
+    }
+
+    /// Performs the stop protocol for this component instance. `shut_down` determines whether the
+    /// instance is to be put in the shutdown state; see documentation on [ExecutionState].
+    ///
+    /// Clients should not call this function directly, except for `StopAction` and
+    /// `ShutdownAction`.
+    ///
+    /// TODO(fxbug.dev/116076): Limit the clients that call this directly.
     ///
     /// REQUIRES: All dependents have already been stopped.
-    pub async fn stop_instance(
+    pub async fn stop_instance_internal(
         self: &Arc<Self>,
         shut_down: bool,
         is_recursive: bool,
@@ -808,6 +825,20 @@ impl ComponentInstance {
                         let top_instance = self.top_instance().await?;
                         top_instance.trigger_reboot().await;
                     }
+
+                    // Drop the controller and join on the exit listener. Dropping the controller
+                    // should cause the exit listener to stop waiting for the channel epitaph and
+                    // exit.
+                    //
+                    // Note: this is more reliable than just cancelling `exit_listener` because
+                    // even after cancellation future may still run for a short period of time
+                    // before getting dropped. If that happens there is a chance of scheduling a
+                    // duplicate Stop action.
+                    let _ = runtime.controller.take();
+                    if let Some(exit_listener) = runtime.exit_listener.take() {
+                        exit_listener.await;
+                    }
+
                     ret.component_exit_status
                 } else {
                     zx::Status::PEER_CLOSED
@@ -1850,10 +1881,9 @@ pub struct Runtime {
     /// Describes why the component instance was started
     pub start_reason: StartReason,
 
-    /// Allows the spawned background context, which is watching for the
-    /// controller channel to close, to be aborted when the `Runtime` is
-    /// dropped.
-    exit_listener: Option<AbortHandle>,
+    /// Listens for the controller channel to close in the background. This task is cancelled when
+    /// the `Runtime` is dropped.
+    exit_listener: Option<fasync::Task<()>>,
 
     /// Channels scoped to lifetime of this component's execution context. This
     /// should only be used for the server_end of the `fuchsia.component.Binder`
@@ -1953,20 +1983,24 @@ impl Runtime {
     pub fn watch_for_exit(&mut self, component: WeakComponentInstance) {
         if let Some(controller) = &self.controller {
             let epitaph_fut = controller.wait_for_epitaph();
-            let (abort_client, abort_server) = AbortHandle::new_pair();
-            let watcher = Abortable::new(
-                async move {
-                    epitaph_fut.await;
-                    if let Ok(component) = component.upgrade() {
-                        ActionSet::register(component, StopAction::new(false, false))
-                            .await
-                            .unwrap_or_else(|error| error!(%error, "failed to register action"));
-                    }
-                },
-                abort_server,
-            );
-            fasync::Task::spawn(watcher.unwrap_or_else(|_| ())).detach();
-            self.exit_listener = Some(abort_client);
+            let exit_listener = fasync::Task::spawn(async move {
+                epitaph_fut.await;
+                if let Ok(component) = component.upgrade() {
+                    let mut actions = component.lock_actions().await;
+                    let stop_nf =
+                        actions.register_no_wait(&component, StopAction::new(false, false));
+                    drop(actions);
+                    component
+                        .nonblocking_task_scope()
+                        .add_task(fasync::Task::spawn(async move {
+                            let _ = stop_nf
+                                .await
+                                .map_err(|err| warn!(%err, "watch_for_exit: Stop failed"));
+                        }))
+                        .await;
+                }
+            });
+            self.exit_listener = Some(exit_listener);
         }
     }
 
@@ -2001,14 +2035,6 @@ impl Runtime {
     /// Add a channel scoped to the lifetime of this object.
     pub fn add_scoped_server_end(&mut self, server_end: zx::Channel) {
         self.binder_server_ends.push(server_end);
-    }
-}
-
-impl Drop for Runtime {
-    fn drop(&mut self) {
-        if let Some(watcher) = &self.exit_listener {
-            watcher.abort();
-        }
     }
 }
 
