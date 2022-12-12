@@ -27,10 +27,17 @@ using EchoService = fidl_service_test::EchoService;
 
 class EchoCommon : public fidl::WireServer<Echo> {
  public:
-  explicit EchoCommon(const char* prefix) : prefix_(prefix) {}
+  explicit EchoCommon(const char* prefix, async_dispatcher_t* dispatcher)
+      : prefix_(prefix), dispatcher_(dispatcher) {}
 
   zx_status_t Connect(async_dispatcher_t* dispatcher, fidl::ServerEnd<Echo> request) {
     return fidl::BindSingleInFlightOnly(dispatcher, std::move(request), this);
+  }
+
+  void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) override {
+    zx_status_t status = fidl::BindSingleInFlightOnly(
+        dispatcher_, fidl::ServerEnd<Echo>(request->request.TakeChannel()), this);
+    ASSERT_OK(status);
   }
 
   void EchoString(EchoStringRequestView request, EchoStringCompleter::Sync& completer) override {
@@ -40,13 +47,20 @@ class EchoCommon : public fidl::WireServer<Echo> {
 
  private:
   std::string prefix_;
+  async_dispatcher_t* dispatcher_;
 };
 
 }  // namespace
 
 class ServerTest : public zxtest::Test {
  protected:
-  ServerTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread), outgoing_(loop_.dispatcher()) {}
+  ServerTest()
+      : loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
+        outgoing_(loop_.dispatcher()),
+        default_foo_("default-foo", loop_.dispatcher()),
+        default_bar_("default-bar", loop_.dispatcher()),
+        other_foo_("other-foo", loop_.dispatcher()),
+        other_bar_("other-bar", loop_.dispatcher()) {}
 
   component::ServiceInstanceHandler SetUpInstance(fidl::WireServer<Echo>* foo_impl,
                                                   fidl::WireServer<Echo>* bar_impl) {
@@ -76,14 +90,13 @@ class ServerTest : public zxtest::Test {
   async::Loop& loop() { return loop_; }
   async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
 
-  EchoCommon default_foo_{"default-foo"};
-  EchoCommon default_bar_{"default-bar"};
-  EchoCommon other_foo_{"other-foo"};
-  EchoCommon other_bar_{"other-bar"};
-
   async::Loop loop_;
   fidl::ClientEnd<fuchsia_io::Directory> local_root_;
   component::OutgoingDirectory outgoing_;
+  EchoCommon default_foo_;
+  EchoCommon default_bar_;
+  EchoCommon other_foo_;
+  EchoCommon other_bar_;
 };
 
 TEST_F(ServerTest, ConnectsToDefaultMember) {

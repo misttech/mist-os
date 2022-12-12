@@ -3,12 +3,15 @@
 // found in the LICENSE file.
 
 #include <fidl/fidl.service.test/cpp/wire.h>
+#include <fidl/fidl.service.test/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/service_client.h>
 #include <lib/fidl-async/cpp/bind.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/time.h>
+#include <zircon/errors.h>
 
 #include <latch>
 
@@ -25,10 +28,17 @@ using EchoService = fidl_service_test::EchoService;
 
 class EchoCommon : public fidl::WireServer<Echo> {
  public:
-  explicit EchoCommon(const char* prefix) : prefix_(prefix) {}
+  explicit EchoCommon(const char* prefix, async_dispatcher_t* dispatcher)
+      : prefix_(prefix), dispatcher_(dispatcher) {}
 
-  zx_status_t Connect(async_dispatcher_t* dispatcher, fidl::ServerEnd<Echo> request) {
-    return fidl::BindSingleInFlightOnly(dispatcher, std::move(request), this);
+  zx_status_t Connect(fidl::ServerEnd<Echo> request) {
+    return fidl::BindSingleInFlightOnly(dispatcher_, std::move(request), this);
+  }
+
+  void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) override {
+    zx_status_t status = fidl::BindSingleInFlightOnly(
+        dispatcher_, fidl::ServerEnd<Echo>(request->request.TakeChannel()), this);
+    ASSERT_OK(status);
   }
 
   void EchoString(EchoStringRequestView request, EchoStringCompleter::Sync& completer) override {
@@ -38,6 +48,7 @@ class EchoCommon : public fidl::WireServer<Echo> {
 
  private:
   std::string prefix_;
+  async_dispatcher_t* dispatcher_;
 };
 
 class MockEchoService {
@@ -55,25 +66,23 @@ class MockEchoService {
   //                                       bar (Echo)
   //
   explicit MockEchoService(async_dispatcher_t* dispatcher)
-      : dispatcher_(dispatcher), vfs_(dispatcher) {
-    auto default_member_foo =
-        fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<Echo> request) {
-          return default_foo_.Connect(dispatcher_, std::move(request));
-        });
-    auto default_member_bar =
-        fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<Echo> request) {
-          return default_bar_.Connect(dispatcher_, std::move(request));
-        });
+      : vfs_(dispatcher),
+        default_foo_("default-foo", dispatcher),
+        default_bar_("default-bar", dispatcher),
+        other_foo_("other-foo", dispatcher),
+        other_bar_("other-bar", dispatcher) {
+    auto default_member_foo = fbl::MakeRefCounted<fs::Service>(
+        [this](fidl::ServerEnd<Echo> request) { return default_foo_.Connect(std::move(request)); });
+    auto default_member_bar = fbl::MakeRefCounted<fs::Service>(
+        [this](fidl::ServerEnd<Echo> request) { return default_bar_.Connect(std::move(request)); });
     auto default_instance = fbl::MakeRefCounted<fs::PseudoDir>();
     default_instance->AddEntry("foo", std::move(default_member_foo));
     default_instance->AddEntry("bar", std::move(default_member_bar));
 
-    auto other_member_foo = fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<Echo> request) {
-      return other_foo_.Connect(dispatcher_, std::move(request));
-    });
-    auto other_member_bar = fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<Echo> request) {
-      return other_bar_.Connect(dispatcher_, std::move(request));
-    });
+    auto other_member_foo = fbl::MakeRefCounted<fs::Service>(
+        [this](fidl::ServerEnd<Echo> request) { return other_foo_.Connect(std::move(request)); });
+    auto other_member_bar = fbl::MakeRefCounted<fs::Service>(
+        [this](fidl::ServerEnd<Echo> request) { return other_bar_.Connect(std::move(request)); });
     auto other_instance = fbl::MakeRefCounted<fs::PseudoDir>();
     other_instance->AddEntry("foo", std::move(other_member_foo));
     other_instance->AddEntry("bar", std::move(other_member_bar));
@@ -93,12 +102,11 @@ class MockEchoService {
   fidl::UnownedClientEnd<fuchsia_io::Directory> svc() { return svc_local_; }
 
  private:
-  async_dispatcher_t* dispatcher_;
   fs::SynchronousVfs vfs_;
-  EchoCommon default_foo_{"default-foo"};
-  EchoCommon default_bar_{"default-bar"};
-  EchoCommon other_foo_{"other-foo"};
-  EchoCommon other_bar_{"other-bar"};
+  EchoCommon default_foo_;
+  EchoCommon default_bar_;
+  EchoCommon other_foo_;
+  EchoCommon other_bar_;
   fidl::ClientEnd<fuchsia_io::Directory> svc_local_;
 };
 
@@ -137,7 +145,7 @@ TEST_F(ClientTest, ConnectsToDefault) {
   auto response = echo_result.Unwrap();
 
   std::string result_string(response->response.data(), response->response.size());
-  ASSERT_EQ(result_string, "default-foo: hello");
+  ASSERT_STREQ(result_string.c_str(), "default-foo: hello");
 }
 
 TEST_F(ClientTest, ConnectsToDefaultExternalServerEnd) {
@@ -160,7 +168,7 @@ TEST_F(ClientTest, ConnectsToDefaultExternalServerEnd) {
   auto response = echo_result.Unwrap();
 
   std::string result_string(response->response.data(), response->response.size());
-  ASSERT_EQ(result_string, "default-foo: hello");
+  ASSERT_STREQ(result_string.c_str(), "default-foo: hello");
 }
 
 TEST_F(ClientTest, ConnectsToOther) {
@@ -192,14 +200,14 @@ TEST_F(ClientTest, FilePathTooLong) {
   zx::result<EchoService::ServiceClient> open_result =
       component::OpenServiceAt<EchoService>(svc_, illegal_path);
   ASSERT_TRUE(open_result.is_error());
-  ASSERT_EQ(open_result.status_value(), ZX_ERR_INVALID_ARGS);
+  ASSERT_STATUS(open_result.status_value(), ZX_ERR_INVALID_ARGS);
 
   // Use a service name that is too long.
   zx::channel local, remote;
   ASSERT_OK(zx::channel::create(0, &local, &remote));
-  ASSERT_EQ(component::OpenNamedServiceAt(svc_, illegal_path, "default", std::move(remote))
-                .status_value(),
-            ZX_ERR_INVALID_ARGS);
+  ASSERT_STATUS(component::OpenNamedServiceAt(svc_, illegal_path, "default", std::move(remote))
+                    .status_value(),
+                ZX_ERR_INVALID_ARGS);
 }
 
 //
@@ -267,6 +275,23 @@ TEST(SingletonService, ConnectAt) {
   loop.Shutdown();
 }
 
+// Tests for cloning on |fuchsia.unknown/Cloneable| protocols.
+TEST_F(ClientTest, CloneableEcho) {
+  auto client_end =
+      component::ConnectAt<Echo>(svc_, (std::string(EchoService::Name) + "/default/foo").c_str());
+  ASSERT_OK(client_end.status_value());
+
+  auto clone_result = component::Clone(*client_end);
+  ASSERT_OK(clone_result.status_value());
+
+  fidl::WireSyncClient echo_clone(std::move(*clone_result));
+
+  auto result = echo_clone->EchoString("foo");
+  ASSERT_OK(result.status());
+  ASSERT_STREQ(std::string(result.value().response.data(), result.value().response.size()).c_str(),
+               "default-foo: foo");
+}
+
 //
 // Tests for cloning |fuchsia.io/Node|-like services.
 //
@@ -290,12 +315,64 @@ TEST_F(ClientTest, CloneServiceDirectory) {
                "default-foo: foo");
 }
 
+TEST(CloneService, AssumeProtocolComposesNodeAlwaysDispatchesToNode) {
+  using Empty = fidl_service_test::Empty;
+  using EmptyCloneableNode = fidl_service_test::EmptyCloneableNode;
+
+  // |EmptyCloneableNode| server that asserts that only |fuchsia.io/Node.Clone| is called.
+  class EmptyCloneableNodeServer : public fidl::testing::WireTestBase<EmptyCloneableNode> {
+   public:
+    explicit EmptyCloneableNodeServer(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
+
+    fidl::ServerBindingRef<EmptyCloneableNode> Connect(
+        fidl::ServerEnd<EmptyCloneableNode> request) {
+      return fidl::BindServer(dispatcher_, std::move(request), this);
+    }
+
+    void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) override {
+      ADD_FATAL_FAILURE("The wrong clone was called: fuchsia.unknown/Cloneable.Clone2");
+      completer.Close(ZX_ERR_BAD_STATE);
+    }
+    void Clone(CloneRequestView request, CloneCompleter::Sync& completer) override {
+      fidl::BindServer(dispatcher_,
+                       fidl::ServerEnd<EmptyCloneableNode>(request->object.TakeChannel()), this);
+    }
+
+    void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+      ADD_FATAL_FAILURE("Unexpected FIDL message: %s", name.c_str());
+      completer.Close(ZX_ERR_BAD_STATE);
+    }
+
+   private:
+    async_dispatcher_t* dispatcher_;
+  };
+
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  ASSERT_OK(loop.StartThread());
+  EmptyCloneableNodeServer server(loop.dispatcher());
+
+  auto endpoints = fidl::CreateEndpoints<EmptyCloneableNode>();
+  ASSERT_OK(endpoints.status_value());
+
+  server.Connect(std::move(endpoints->server));
+
+  // Manually convert to the |Empty| protocol.
+  auto empty = fidl::ClientEnd<Empty>(endpoints->client.TakeChannel());
+  auto empty_clone = component::Clone(empty, component::AssumeProtocolComposesNode);
+  ASSERT_OK(empty_clone.status_value());
+
+  // The channel should not have been closed with an error.
+  ASSERT_STATUS(empty_clone->channel().wait_one(ZX_CHANNEL_PEER_CLOSED,
+                                                zx::deadline_after(zx::msec(500)), nullptr),
+                ZX_ERR_TIMED_OUT);
+}
+
 TEST(CloneService, Error) {
   auto bad_endpoint = fidl::CreateEndpoints<fuchsia_io::Directory>();
   bad_endpoint->server.reset();
 
   auto failure = component::Clone(bad_endpoint->client);
-  ASSERT_EQ(ZX_ERR_PEER_CLOSED, failure.status_value());
+  ASSERT_STATUS(failure.status_value(), ZX_ERR_PEER_CLOSED);
 
   auto invalid = component::MaybeClone(bad_endpoint->client);
   ASSERT_FALSE(invalid.is_valid());

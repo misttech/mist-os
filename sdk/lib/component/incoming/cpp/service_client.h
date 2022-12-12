@@ -6,11 +6,13 @@
 #define LIB_COMPONENT_INCOMING_CPP_SERVICE_CLIENT_H_
 
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.unknown/cpp/wire.h>
 #include <lib/component/incoming/cpp/constants.h>
 #include <lib/fidl/cpp/wire/string_view.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 
+#include <type_traits>
 #include <utility>
 
 namespace component {
@@ -33,23 +35,53 @@ zx::result<> ConnectAtRaw(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
                           zx::channel server_end, std::string_view protocol_name);
 
 // Implementations of |component::Clone| that is independent from the actual |Protocol|.
-zx::result<zx::channel> CloneRaw(zx::unowned_channel&& node);
-zx::result<> CloneRaw(zx::unowned_channel&& node, zx::channel server_end);
+zx::result<> CloneRaw(fidl::UnownedClientEnd<fuchsia_io::Node>&& node, zx::channel server_end);
+zx::result<> CloneRaw(fidl::UnownedClientEnd<fuchsia_unknown::Cloneable>&& cloneable,
+                      zx::channel server_end);
+template <typename Protocol>
+zx::result<zx::channel> CloneRaw(fidl::UnownedClientEnd<Protocol>&& client) {
+  zx::channel client_end, server_end;
+  if (zx_status_t status = zx::channel::create(0, &client_end, &server_end); status != ZX_OK) {
+    return zx::error(status);
+  }
+  if (zx::result<> status = CloneRaw(std::move(client), std::move(server_end)); status.is_error()) {
+    return status.take_error();
+  }
+  return zx::ok(std::move(client_end));
+}
 
 // Determines if |Protocol| contains a method named |Clone|.
+//
 // TODO(fxbug.dev/65964): This template is coupled to LLCPP codegen details,
 // and as such would need to be adapted when e.g. we change the LLCPP generated
 // namespace and hierarchies.
 template <typename Protocol, typename = void>
-struct has_fidl_method_named_clone : public ::std::false_type {};
+struct has_fidl_method_fuchsia_io_clone : public ::std::false_type {};
 template <typename Protocol>
-struct has_fidl_method_named_clone<
+struct has_fidl_method_fuchsia_io_clone<
     Protocol, std::void_t<decltype(fidl::WireRequest<typename Protocol::Clone>{
                   std::declval<fuchsia_io::wire::OpenFlags>() /* flags */,
                   std::declval<fidl::ServerEnd<fuchsia_io::Node>&&>() /* object */})>>
     : public std::true_type {};
 template <typename Protocol>
-constexpr inline auto has_fidl_method_named_clone_v = has_fidl_method_named_clone<Protocol>::value;
+constexpr inline auto has_fidl_method_fuchsia_io_clone_v =
+    has_fidl_method_fuchsia_io_clone<Protocol>::value;
+
+// Determines if |Protocol| contains the |fuchsia.unknown/Cloneable.Clone2| method.
+//
+// TODO(fxbug.dev/65964): This template is coupled to LLCPP codegen details,
+// and as such would need to be adapted when e.g. we change the LLCPP generated
+// namespace and hierarchies.
+template <typename Protocol, typename = void>
+struct has_fidl_method_fuchsia_unknown_clone : public ::std::false_type {};
+template <typename Protocol>
+struct has_fidl_method_fuchsia_unknown_clone<
+    Protocol, std::void_t<decltype(fidl::WireRequest<typename Protocol::Clone2>{
+                  std::declval<fidl::ServerEnd<fuchsia_unknown::Cloneable>&&>() /* request */})>>
+    : public std::true_type {};
+template <typename Protocol>
+constexpr inline auto has_fidl_method_fuchsia_unknown_clone_v =
+    has_fidl_method_fuchsia_unknown_clone<Protocol>::value;
 
 // Determines if |T| is fully defined i.e. |sizeof(T)| can be evaluated.
 template <typename T, typename = void>
@@ -61,22 +93,6 @@ template <typename T>
 constexpr inline auto is_complete_v = is_complete<T>::value;
 
 enum class AssumeProtocolComposesNodeTag { kAssumeProtocolComposesNode };
-
-template <typename Protocol>
-void CheckProtocolForClone(fidl::UnownedClientEnd<Protocol> node, std::nullptr_t tag) {
-  static_assert(internal::is_complete_v<Protocol>,
-                "|Protocol| must be fully defined in order to use |component::Clone|");
-  static_assert(internal::has_fidl_method_named_clone_v<Protocol>,
-                "|Protocol| should be or compose the |fuchsia.io/Node| protocol");
-}
-
-template <typename Protocol>
-void CheckProtocolForClone(fidl::UnownedClientEnd<Protocol> node,
-                           AssumeProtocolComposesNodeTag tag) {
-  static_assert(!internal::has_fidl_method_named_clone_v<Protocol>,
-                "|Protocol| already appears to compose the |fuchsia.io/Node| protocol. "
-                "There is no need to specify |AssumeProtocolComposesNode|.");
-}
 }  // namespace internal
 
 // Gets the relative path to a service member.
@@ -214,47 +230,85 @@ zx::result<> ConnectAt(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
 constexpr inline auto AssumeProtocolComposesNode =
     internal::AssumeProtocolComposesNodeTag::kAssumeProtocolComposesNode;
 
-// Typed channel wrapper around |fuchsia.io/Node.Clone|.
+// Typed channel wrapper around |fuchsia.unknown/Cloneable.Clone| and |fuchsia.io/Node.Clone|.
 //
-// Given an unowned client end |node|, returns an owned clone as a new
-// connection using protocol request pipelining.
+// Given an unowned client end |client|, returns an owned clone as a new connection using protocol
+// request pipelining.
 //
-// |node| must be a channel that implements the |fuchsia.io/Node| protocol,
-// or one that composes such a protocol.
+// |client| must be a channel that supports at least one of the following protocols:
+//   * |fuchsia.unknown/Cloneable|
+//   * |fuchsia.io/Node|
 //
 // This function looks a little involved due to the template programming; here
 // is an example how it could be used:
 //
-//     // |node| could be |fidl::ClientEnd| or |fidl::UnownedClientEnd|.
-//     auto clone = component::Clone(node);
+// ```
+//   // |node| could be |fidl::ClientEnd| or |fidl::UnownedClientEnd|.
+//   auto clone = component::Clone(node);
+// ```
 //
 // By default, this function will verify that the protocol type supports cloning
-// (i.e. it has a FIDL method named "Clone"), which is generally satisfied by
-// composing |fuchsia.io/Node|. Under special circumstances, it is possible to
-// explicitly state that the protocol actually composes |fuchsia.io/Node| at
-// run-time, even though it may not be defined this way in the FIDL schema. This
-// could happen as a result of implicit or unsupported multiplexing of FIDL
-// protocols. There will not be any compile-time validation that the cloning is
-// supported, if the extra |component::AssumeProtocolComposeseNode| argument is
-// provided. Note that if the channel does not implement |fuchsia.io/Node.Clone|,
-// the remote endpoint of the cloned node will be asynchronously closed.
+// (i.e. satisfies the protocol requirement above). Under special circumstances,
+// it is possible to explicitly state that the protocol actually composes
+// |fuchsia.io/Node| at run-time, even though it may not be defined this way
+// in the FIDL schema. This could happen as a result of implicit or unsupported
+// multiplexing of FIDL protocols. There will not be any compile-time
+// validation that the cloning is supported, if the extra
+// |component::AssumeProtocolComposeseNode| argument is provided. Note that if
+// the channel does not implement |fuchsia.io/Node.Clone|, the remote endpoint
+// of the cloned node will be asynchronously closed.
 //
 // As such, this override should be used sparingly, and with caution:
 //
-//     // Assume that |node| supports the |fuchsia.io/Node.Clone| method call.
-//     // If that is not the case, there will be runtime failures at a later
-//     // stage when |clone| is actually used.
-//     auto clone = component::Clone(node, component::AssumeProtocolComposesNode);
+// ```
+//   // Assume that |node| supports the |fuchsia.io/Node.Clone| method call.
+//   // If that is not the case, there will be runtime failures at a later
+//   // stage when |clone| is actually used.
+//   auto clone = component::Clone(node, component::AssumeProtocolComposesNode);
+// ```
 //
 // See documentation on |fuchsia.io/Node.Clone| for details.
 template <typename Protocol, typename Tag = std::nullptr_t,
           typename = std::enable_if_t<
               std::disjunction_v<std::is_same<Tag, std::nullptr_t>,
                                  std::is_same<Tag, internal::AssumeProtocolComposesNodeTag>>>>
-zx::result<fidl::ClientEnd<Protocol>> Clone(fidl::UnownedClientEnd<Protocol> node,
+zx::result<fidl::ClientEnd<Protocol>> Clone(fidl::UnownedClientEnd<Protocol> client,
                                             Tag tag = nullptr) {
-  internal::CheckProtocolForClone(node, tag);
-  auto result = internal::CloneRaw(node.channel());
+  static_assert(internal::is_complete_v<Protocol>,
+                "|Protocol| must be fully defined in order to use |component::Clone|");
+  static_assert(
+      !(internal::has_fidl_method_fuchsia_unknown_clone_v<Protocol> &&
+        internal::has_fidl_method_fuchsia_io_clone_v<Protocol>),
+      "|Protocol| must not compose both |fuchsia.unknown/Cloneable| and |fuchsia.io/Node| when "
+      "using |component::Clone|. Otherwise, the correct clone implementation to dispatch to is "
+      "ambiguous.");
+
+  constexpr bool kShouldAssumeProtocolComposesNode =
+      std::is_same_v<Tag, internal::AssumeProtocolComposesNodeTag>;
+
+  zx::result<zx::channel> result;
+  if constexpr (internal::has_fidl_method_fuchsia_unknown_clone_v<Protocol>) {
+    static_assert(!kShouldAssumeProtocolComposesNode,
+                  "|Protocol| already appears to compose the |fuchsia.unknown/Cloneable| protocol. "
+                  "There is no need to specify |AssumeProtocolComposesNode|.");
+    result =
+        internal::CloneRaw(fidl::UnownedClientEnd<fuchsia_unknown::Cloneable>(client.channel()));
+  } else if constexpr (kShouldAssumeProtocolComposesNode ||
+                       internal::has_fidl_method_fuchsia_io_clone_v<Protocol>) {
+    static_assert(!(internal::has_fidl_method_fuchsia_io_clone_v<Protocol> &&
+                    kShouldAssumeProtocolComposesNode),
+                  "|Protocol| already appears to compose the |fuchsia.io/Node| protocol. "
+                  "There is no need to specify |AssumeProtocolComposesNode|.");
+    result = internal::CloneRaw(fidl::UnownedClientEnd<fuchsia_io::Node>(client.channel()));
+  } else {
+    // This assertion will always fail.
+    static_assert(
+        internal::has_fidl_method_fuchsia_io_clone_v<Protocol> ||
+            internal::has_fidl_method_fuchsia_unknown_clone_v<Protocol>,
+        "|Protocol| should compose either |fuchsia.unknown/Cloneable| or |fuchsia.io/Node|.");
+    __builtin_unreachable();
+  }
+
   if (!result.is_ok()) {
     return result.take_error();
   }

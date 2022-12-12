@@ -3,12 +3,24 @@
 // found in the LICENSE file.
 library fidl.service.test;
 
+using fuchsia.io;
+using fuchsia.unknown;
+
 protocol Echo {
+    compose fuchsia.unknown.Cloneable;
+
     EchoString(struct {
         value string:optional;
     }) -> (struct {
         response string:optional;
     });
+};
+
+protocol Empty {};
+
+protocol EmptyCloneableNode {
+    compose fuchsia.unknown.Cloneable;
+    compose fuchsia.io.Node;
 };
 
 /// A service that provides multiple Echo implementations.
