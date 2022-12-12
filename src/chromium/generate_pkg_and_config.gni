@@ -39,11 +39,11 @@ template("generate_package_flavors") {
     forward_variables_from(invoker,
                            [
                              "deps",
+                             "package_name",
+                             "repository",
                              "selections",
                              "testonly",
                              "visibility",
-                             "package_name",
-                             "repository",
                            ])
 
     if (defined(invoker.package_name)) {
@@ -52,7 +52,10 @@ template("generate_package_flavors") {
       package_name = invoker.target_name
     }
 
-    visibility = [ ":${invoker.target_name}" ]
+    if (!defined(visibility)) {
+      visibility = []
+    }
+    visibility += [ ":${invoker.target_name}" ]
     default = "release"
     flavors = [
       {
@@ -84,8 +87,12 @@ template("generate_config") {
                              "outputs",
                              "sources",
                              "testonly",
+                             "visibility",
                            ])
-    visibility = [ ":${invoker.target_name}" ]
+    if (!defined(visibility)) {
+      visibility = []
+    }
+    visibility += [ ":${invoker.target_name}" ]
   }
 }
 
@@ -99,9 +106,10 @@ template("generate_package_flavors_and_config") {
                            [
                              "custom_package_path",
                              "prebuilt_archive_base_path",
+                             "repository",
                              "selections",
                              "testonly",
-                             "repository",
+                             "visibility",
                            ])
   }
   generate_config(target_name) {
@@ -111,6 +119,7 @@ template("generate_package_flavors_and_config") {
                              "outputs",
                              "sources",
                              "testonly",
+                             "visibility",
                            ])
   }
 }
