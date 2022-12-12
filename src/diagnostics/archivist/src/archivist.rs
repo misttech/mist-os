@@ -330,7 +330,7 @@ impl Archivist {
         let log_server = self.log_server;
         let accessor_server = self.accessor_server;
         let incoming_external_event_producers = self.incoming_external_event_producers;
-        let logs_repo = self.logs_repository;
+        let logs_repo = self.logs_repository.clone();
         let stop_fut = match self.stop_recv {
             Some(stop_recv) => async move {
                 stop_recv.into_future().await.ok();
@@ -346,6 +346,10 @@ impl Archivist {
             .left_future(),
             None => future::ready(()).right_future(),
         };
+
+        // Ensure logs repo remains alive since it holds BudgetManager which
+        // should remain alive.
+        let _logs_repo = self.logs_repository;
 
         info!("archivist: Entering core loop.");
         // Combine all three futures into a main future.
