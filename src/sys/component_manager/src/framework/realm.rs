@@ -6,7 +6,7 @@ use {
     crate::{
         capability::{CapabilityProvider, CapabilitySource},
         model::{
-            component::{ComponentInstance, StartReason, WeakComponentInstance},
+            component::{ComponentInstance, WeakComponentInstance},
             error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
@@ -177,16 +177,7 @@ impl RealmCapabilityHost {
         }
         let child_decl = child_decl.fidl_into_native();
         match component.add_dynamic_child(collection.name.clone(), &child_decl, child_args).await {
-            Ok(fdecl::Durability::SingleRun) => {
-                // Creating a child in a `SingleRun` collection automatically starts it, so
-                // start the component.
-                let child_ref =
-                    fdecl::ChildRef { name: child_decl.name, collection: Some(collection.name) };
-                let weak_component = WeakComponentInstance::new(&component);
-                RealmCapabilityHost::start_child(&weak_component, child_ref, StartReason::SingleRun)
-                    .await
-            }
-            Ok(_) => Ok(()),
+            Ok(()) => Ok(()),
             Err(e) => {
                 warn!(
                     "Failed to create child \"{}\" in collection \"{}\" of component \"{}\": {}",
@@ -208,36 +199,6 @@ impl RealmCapabilityHost {
                 }
             }
         }
-    }
-
-    async fn start_child(
-        component: &WeakComponentInstance,
-        child: fdecl::ChildRef,
-        start_reason: StartReason,
-    ) -> Result<(), fcomponent::Error> {
-        match Self::get_child(component, child.clone()).await? {
-            Some(child) => {
-                child.start(&start_reason).await.map_err(|e| match e {
-                    ModelError::ResolverError { err: error, .. } => {
-                        debug!(%error, "failed to resolve child");
-                        fcomponent::Error::InstanceCannotResolve
-                    }
-                    ModelError::RunnerError { err: error } => {
-                        debug!(%error, "failed to start child");
-                        fcomponent::Error::InstanceCannotStart
-                    }
-                    error => {
-                        error!(%error, "start() failed");
-                        fcomponent::Error::Internal
-                    }
-                })?;
-            }
-            None => {
-                debug!(?child, "start_child() failed: instance not found");
-                return Err(fcomponent::Error::InstanceNotFound);
-            }
-        }
-        Ok(())
     }
 
     async fn open_exposed_dir(
