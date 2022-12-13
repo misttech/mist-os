@@ -473,6 +473,7 @@ zx_status_t Device::CreateNode() {
         // Device's child Driver exiting, and in that instance we want to
         // Remove the Device.
         if (auto ptr = device.lock()) {
+          ptr->controller_ = {};
           if (ptr->pending_removal_) {
             // TODO(fxbug.dev/100470): We currently do not remove the DFv1 child
             // if the NodeController is removed but the driver didn't asked to be
@@ -572,48 +573,43 @@ fpromise::promise<void> Device::Remove() {
   fpromise::bridge<void> finished_bridge;
   remove_completers_.push_back(std::move(finished_bridge.completer));
 
-  executor_.schedule_task(
-      WaitForInitToComplete().then([this](fpromise::result<void, zx_status_t>& init) {
-        pending_removal_ = true;
-        // This should be called if we hit an error trying to remove the controller.
-        auto schedule_removal = fit::defer([this]() {
-          if (parent_.has_value()) {
-            auto shared = shared_from_this();
-            // We schedule our removal on our parent's executor because we can't be removed
-            // while being run in a promise on our own executor.
-            (*parent_)->executor_.schedule_task(fpromise::make_promise(
-                [shared = std::move(shared)]() mutable { shared->UnbindAndRelease(); }));
-          }
-        });
+  // If we don't have a controller, return early.
+  // We are probably in a state where we are waiting for the controller to finish being removed.
+  if (!controller_) {
+    if (!pending_removal_) {
+      // Our controller is already gone but we weren't in a removal, so manually remove ourself now.
+      pending_removal_ = true;
+      UnbindAndRelease();
+    }
+    return finished_bridge.consumer.promise();
+  }
 
-        if (!controller_) {
-          FDF_LOG(ERROR, "Failed to remove device '%s', invalid node controller", Name());
-          return;
-        }
-        auto result = controller_->Remove();
-
-        // If we hit an error calling remove, we should log it.
-        // We don't need to log if the error is that we cannot connect
-        // to the protocol, because that means we are already in the process
-        // of shutting down.
-        if (!result.ok() && !result.is_peer_closed() && !result.is_canceled()) {
-          FDF_LOG(ERROR, "Failed to remove device '%s': %s", Name(),
-                  result.FormatDescription().data());
-        }
-        schedule_removal.cancel();
-      }));
+  pending_removal_ = true;
+  auto result = controller_->Remove();
+  // If we hit an error calling remove, we should log it.
+  // We don't need to log if the error is that we cannot connect
+  // to the protocol, because that means we are already in the process
+  // of shutting down.
+  if (!result.ok() && !result.is_peer_closed() && !result.is_canceled()) {
+    FDF_LOG(ERROR, "Failed to remove device '%s': %s", Name(), result.FormatDescription().data());
+  }
   return finished_bridge.consumer.promise();
 }
 
 void Device::UnbindAndRelease() {
-  UnbindOp([this]() {
-    if (!parent_.has_value()) {
-      return;
-    }
-    // Removing ourselves from our parent's list of children will call our destructor,
-    // since our parent should be the only one holding a strong reference to us.
-    parent_.value()->children_.remove(shared_from_this());
-  });
+  ZX_ASSERT_MSG(parent_.has_value(), "UnbindAndRelease called without a parent_: %s",
+                topological_path_.c_str());
+
+  // We schedule our removal on our parent's executor because we can't be removed
+  // while being run in a promise on our own executor.
+  parent_.value()->executor_.schedule_task(WaitForInitToComplete().then(
+      [device = shared_from_this()](fpromise::result<void, zx_status_t>& init) {
+        device->UnbindOp([device = std::move(device)]() {
+          // Our device should be destructed at the end of this callback when the reference to the
+          // shared pointer is removed.
+          device->parent_.value()->children_.remove(device);
+        });
+      }));
 }
 
 void Device::InsertOrUpdateProperty(fuchsia_driver_framework::wire::NodePropertyKey key,

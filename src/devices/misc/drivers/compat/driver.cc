@@ -128,7 +128,11 @@ Driver::Driver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver
       executor_(dispatcher()),
       driver_path_(driver_path),
       device_(device, ops, this, std::nullopt, nullptr, dispatcher()) {
+  // Give the parent device the correct node.
   device_.Bind({std::move(node()), dispatcher()});
+  // Call this so the parent device is in the post-init state.
+  device_.InitReply(ZX_OK);
+
   global_driver_list.AddDriver(this);
   ZX_ASSERT(url().has_value());
 }
