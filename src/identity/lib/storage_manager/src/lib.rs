@@ -103,3 +103,51 @@ pub trait StorageManager: Sized {
     /// The `StorageManager` must be in the available state.
     async fn get_root_dir(&self) -> Result<fio::DirectoryProxy, AccountManagerError>;
 }
+
+// Muxer for holding one implementation of StorageManager without needing a trait-safe object.
+// TODO(fxb/116774): Replace with trait_enum crate if possible.
+pub enum StorageManagerEnum {
+    Fxfs(fxfs::Fxfs),
+    Minfs(minfs::StorageManager<minfs::disk::DevDiskManager>),
+}
+
+#[async_trait]
+impl StorageManager for StorageManagerEnum {
+    type Key = [u8; 32];
+
+    async fn provision(&self, key: &Self::Key) -> Result<(), AccountManagerError> {
+        match self {
+            StorageManagerEnum::Fxfs(f) => f.provision(key),
+            StorageManagerEnum::Minfs(m) => m.provision(key),
+        }
+        .await
+    }
+    async fn unlock_storage(&self, key: &Self::Key) -> Result<(), AccountManagerError> {
+        match self {
+            StorageManagerEnum::Fxfs(f) => f.unlock_storage(key),
+            StorageManagerEnum::Minfs(m) => m.unlock_storage(key),
+        }
+        .await
+    }
+    async fn lock_storage(&self) -> Result<(), AccountManagerError> {
+        match self {
+            StorageManagerEnum::Fxfs(f) => f.lock_storage(),
+            StorageManagerEnum::Minfs(m) => m.lock_storage(),
+        }
+        .await
+    }
+    async fn destroy(&self) -> Result<(), AccountManagerError> {
+        match self {
+            StorageManagerEnum::Fxfs(f) => f.destroy(),
+            StorageManagerEnum::Minfs(m) => m.destroy(),
+        }
+        .await
+    }
+    async fn get_root_dir(&self) -> Result<fio::DirectoryProxy, AccountManagerError> {
+        match self {
+            StorageManagerEnum::Fxfs(f) => f.get_root_dir(),
+            StorageManagerEnum::Minfs(m) => m.get_root_dir(),
+        }
+        .await
+    }
+}

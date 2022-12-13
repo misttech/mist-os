@@ -69,7 +69,7 @@
         is_ephemeral: { type: "bool" },
 
         // Which backing storage manager to use. Options are currently:
-        // one of [ "MINFS" ].
+        // one of [ "MINFS", "FXFS" ].
         storage_manager: {
             type: "string",
             max_size: 32,

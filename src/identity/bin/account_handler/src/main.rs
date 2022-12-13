@@ -41,13 +41,20 @@ use {
     futures::StreamExt,
     std::sync::Arc,
     storage_manager::{
+        fxfs::{Args as FxfsStorageManagerArgs, Fxfs as FxfsStorageManager},
         minfs::{disk::DevDiskManager, StorageManager as MinfsStorageManager},
-        StorageManager,
+        StorageManager, StorageManagerEnum,
     },
     tracing::{error, info},
 };
 
 const DATA_DIR: &str = "/data";
+const ACCOUNT_LABEL: &str = "account";
+
+// These values should match the source of truth in account_handler.cml's
+// config.storage_manager.
+const FXFS: &str = "FXFS";
+const MINFS: &str = "MINFS";
 
 fn set_up_lifecycle_watcher<SM>(account_handler: Arc<AccountHandler<SM>>) -> fasync::Task<()>
 where
@@ -65,24 +72,29 @@ where
     )
 }
 
-fn get_storage_manager(
-    config: &Config,
-) -> impl StorageManager<Key = [u8; 32]> + Send + Sync + 'static {
+fn get_dev_directory() -> fio::DirectoryProxy {
+    open_in_namespace("/dev", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE)
+        .expect("open /dev root for disk manager")
+}
+
+fn get_storagemanager(config: &Config) -> StorageManagerEnum {
     match config.storage_manager.as_str() {
-        "MINFS" => MinfsStorageManager::new(DevDiskManager::new(
-            open_in_namespace(
-                "/dev",
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            )
-            .expect("open /dev root for disk manager"),
+        FXFS => StorageManagerEnum::Fxfs(FxfsStorageManager::new(
+            FxfsStorageManagerArgs::builder()
+                // TODO(https://fxbug.dev/117284): Use the real account name.
+                .volume_label(ACCOUNT_LABEL.to_string())
+                .filesystem_dir(get_dev_directory())
+                .build(),
         )),
-        other => {
-            panic!(
-                "AccountHandler was configured with invalid argument: storage_manager={:?}. \
-                See the CML declaration for valid values.",
-                other
-            );
-        }
+        MINFS => StorageManagerEnum::Minfs(MinfsStorageManager::new(DevDiskManager::new(
+            get_dev_directory(),
+        ))),
+        other => panic!(
+            "AccountHandler was configured with invalid argument: \
+                             storage_manager={:?}. See the CML declaration for \
+                             valid values.",
+            other
+        ),
     }
 }
 
@@ -105,7 +117,7 @@ fn main() -> Result<(), Error> {
     inspect_runtime::serve(&inspector, &mut fs)?;
 
     let account_handler =
-        Arc::new(AccountHandler::new(lifetime, &inspector, get_storage_manager(&config)));
+        Arc::new(AccountHandler::new(lifetime, &inspector, get_storagemanager(&config)));
 
     let _lifecycle_task: fuchsia_async::Task<()> =
         set_up_lifecycle_watcher(Arc::clone(&account_handler));
