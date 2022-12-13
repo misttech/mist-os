@@ -23,7 +23,7 @@ static constexpr size_t BULK_MAX_PACKET = 512;  // FIXME(voydanoff) USB 3.0 supp
 // FIXME(voydanoff) Increase this when DCI drivers support
 // non-contiguous DMA buffers.
 static constexpr size_t BULK_REQ_SIZE = 512;
-static constexpr size_t INTR_REQ_SIZE = 1024;
+static constexpr size_t INTR_REQ_SIZE = 64;
 static constexpr size_t INTR_MAX_PACKET = 64;
 
 namespace usb_function_test {
@@ -57,7 +57,8 @@ class UsbTest : public UsbTestType, public ddk::UsbFunctionInterfaceProtocol<Usb
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
  private:
-  void TestIntrComplete(usb_request_t* req);
+  void TestIntrInComplete(usb_request_t* req);
+  void TestIntrOutComplete(usb_request_t* req);
   void TestBulkOutComplete(usb_request_t* req);
   void TestBulkInComplete(usb_request_t* req);
   ddk::UsbFunctionProtocolClient function_;
@@ -65,7 +66,8 @@ class UsbTest : public UsbTestType, public ddk::UsbFunctionInterfaceProtocol<Usb
   // These are lists of usb_request_t.
   usb::RequestQueue<void> bulk_out_reqs_ __TA_GUARDED(lock_);
   usb::RequestQueue<void> bulk_in_reqs_ __TA_GUARDED(lock_);
-  usb::RequestQueue<void> intr_reqs_ __TA_GUARDED(lock_);
+  usb::RequestQueue<void> intr_in_reqs_ __TA_GUARDED(lock_);
+  usb::RequestQueue<void> intr_out_reqs_ __TA_GUARDED(lock_);
   usb::RequestQueue<void> requests_;
 
   uint8_t test_data_[INTR_REQ_SIZE];
@@ -75,15 +77,17 @@ class UsbTest : public UsbTestType, public ddk::UsbFunctionInterfaceProtocol<Usb
 
   fbl::Mutex lock_;
 
-  uint8_t bulk_out_addr_;
   std::atomic_bool suspending_ = false;
+  uint8_t bulk_out_addr_;
   uint8_t bulk_in_addr_;
-  uint8_t intr_addr_;
+  uint8_t intr_out_addr_;
+  uint8_t intr_in_addr_;
   size_t parent_req_size_;
 
   struct {
     usb_interface_descriptor_t intf;
-    usb_endpoint_descriptor_t intr_ep;
+    usb_endpoint_descriptor_t intr_out_ep;
+    usb_endpoint_descriptor_t intr_in_ep;
     usb_endpoint_descriptor_t bulk_out_ep;
     usb_endpoint_descriptor_t bulk_in_ep;
   } descriptors_ = {
@@ -93,13 +97,22 @@ class UsbTest : public UsbTestType, public ddk::UsbFunctionInterfaceProtocol<Usb
               .b_descriptor_type = USB_DT_INTERFACE,
               .b_interface_number = 0,  // set later
               .b_alternate_setting = 0,
-              .b_num_endpoints = 3,
+              .b_num_endpoints = 4,
               .b_interface_class = USB_CLASS_VENDOR,
               .b_interface_sub_class = 0,
               .b_interface_protocol = 0,
               .i_interface = 0,
           },
-      .intr_ep =
+      .intr_out_ep =
+          {
+              .b_length = sizeof(usb_endpoint_descriptor_t),
+              .b_descriptor_type = USB_DT_ENDPOINT,
+              .b_endpoint_address = 0,  // set later
+              .bm_attributes = USB_ENDPOINT_INTERRUPT,
+              .w_max_packet_size = htole16(INTR_MAX_PACKET),
+              .b_interval = 8,
+          },
+      .intr_in_ep =
           {
               .b_length = sizeof(usb_endpoint_descriptor_t),
               .b_descriptor_type = USB_DT_ENDPOINT,

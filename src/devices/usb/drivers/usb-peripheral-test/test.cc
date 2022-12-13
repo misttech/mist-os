@@ -27,6 +27,7 @@ namespace {
 struct usb_device* dev = nullptr;
 struct usb_endpoint_descriptor* bulk_out_ep = nullptr;
 struct usb_endpoint_descriptor* bulk_in_ep = nullptr;
+struct usb_endpoint_descriptor* intr_out_ep = nullptr;
 struct usb_endpoint_descriptor* intr_in_ep = nullptr;
 
 static uint8_t test_interface;
@@ -35,6 +36,7 @@ constexpr uint64_t kSecondsToNanoseconds = 1'000'000'000;
 constexpr uint64_t kMicrosecondsToNanoseconds = 1000;
 constexpr uint64_t kNanosecondsToMilliseconds = 1'000'000;
 constexpr uint64_t kBulkRequestSize = 512;
+constexpr uint64_t kInterruptRequestSize = 64;
 
 constexpr char kUsageMsg[] = R"(
     [OPTIONS]
@@ -249,7 +251,61 @@ void bulk_test(uint64_t buffer_size, size_t bulk_iterations) {
   usb_request_free(receive_req);
 }
 
+void interrupt_test(size_t transfer_bytes) {
+  transfer_bytes = fbl::round_up(transfer_bytes, kInterruptRequestSize);
+  uint8_t distinct_buffer_number = 3;
+  std::unique_ptr<uint8_t[]> send_buffer = std::make_unique<uint8_t[]>(transfer_bytes);
+  std::unique_ptr<uint8_t[]> receive_buffer = std::make_unique<uint8_t[]>(transfer_bytes);
+
+  // Initialize the buffer
+  memset(send_buffer.get(), 9, transfer_bytes);
+  memset(receive_buffer.get(), 9, transfer_bytes);
+
+  auto* send_req = usb_request_new(dev, intr_out_ep);
+  ASSERT_NE(send_req, nullptr);
+  send_req->buffer = send_buffer.get();
+  send_req->buffer_length = static_cast<int>(transfer_bytes);
+
+  auto* receive_req = usb_request_new(dev, intr_in_ep);
+  ASSERT_NE(receive_req, nullptr);
+  receive_req->buffer = receive_buffer.get();
+  receive_req->buffer_length = static_cast<int>(transfer_bytes);
+
+  pattern_buffer({send_buffer.get(), transfer_bytes}, distinct_buffer_number);
+
+  // Create a thread to wait for request completions.
+  auto thread_func = [](struct usb_request** reqs) -> void {
+    *reqs++ = usb_request_wait(dev, kUsbTimoutMilliseconds);
+    *reqs = usb_request_wait(dev, kUsbTimoutMilliseconds);
+  };
+
+  struct usb_request* complete_reqs[2] = {};
+  std::thread wait_thread(thread_func, complete_reqs);
+
+  // Queue requests in both directions
+  int res = usb_request_queue(send_req);
+  EXPECT_EQ(res, 0);
+  res = usb_request_queue(receive_req);
+  EXPECT_EQ(res, 0);
+
+  wait_thread.join();
+
+  EXPECT_NE(complete_reqs[0], nullptr);
+  EXPECT_NE(complete_reqs[1], nullptr);
+
+  // Sent and received data should match.
+  EXPECT_EQ(memcmp(send_buffer.get(), receive_buffer.get(), transfer_bytes), 0);
+
+  usb_request_free(send_req);
+  usb_request_free(receive_req);
+}
+
 // ====================== User configurable tests ===================================
+
+// Tests end to end interrupt transfer.
+TEST_F(UsbPeripheralConfigurableTests, interrupt_function) {
+  ASSERT_NO_FATAL_FAILURE(interrupt_test(bytes_));
+}
 
 // Tests bulk transfer for long periods of time. Time is user determined.
 TEST_F(UsbPeripheralConfigurableTests, stress_test_configurable) {
@@ -286,10 +342,16 @@ TEST_F(UsbPeripheralConfigurableTests, retest_transfer_type_test) {
   Timer timer;
   switch (retest_config_) {
     case TransferOptions::CONTROL:
-    case TransferOptions::INTERRUPT:
       for (int i = 0; i < retest_iterations_; i++) {
         timer.Start();
         ASSERT_NO_FATAL_FAILURE(control_interrupt_test(bytes_));
+        recorded_times.push_back(timer.Stop());
+      }
+      break;
+    case TransferOptions::INTERRUPT:
+      for (int i = 0; i < retest_iterations_; i++) {
+        timer.Start();
+        ASSERT_NO_FATAL_FAILURE(interrupt_test(bytes_));
         recorded_times.push_back(timer.Stop());
       }
       break;
@@ -383,12 +445,14 @@ int usb_device_added(const char* dev_name, void* client_data) {
       } else if (usb_endpoint_type(ep) == USB_ENDPOINT_XFER_INT) {
         if (usb_endpoint_dir_in(ep)) {
           intr_in_ep = ep;
+        } else {
+          intr_out_ep = ep;
         }
       }
     }
   }
 
-  if (!intf || !bulk_out_ep || !bulk_in_ep || !intr_in_ep) {
+  if (!intf || !bulk_out_ep || !bulk_in_ep || !intr_in_ep || !intr_out_ep) {
     fprintf(stderr, "could not find all our endpoints\n");
     return 1;
   }

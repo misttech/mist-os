@@ -56,7 +56,12 @@ zx_status_t UsbTest::Init() {
     zxlogf(ERROR, "%s: usb_function_alloc_ep failed", __func__);
     return status;
   }
-  status = function_.AllocEp(USB_DIR_IN, &intr_addr_);
+  status = function_.AllocEp(USB_DIR_OUT, &intr_out_addr_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: usb_function_alloc_ep failed", __func__);
+    return status;
+  }
+  status = function_.AllocEp(USB_DIR_IN, &intr_in_addr_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: usb_function_alloc_ep failed", __func__);
     return status;
@@ -64,7 +69,8 @@ zx_status_t UsbTest::Init() {
 
   descriptors_.bulk_out_ep.b_endpoint_address = bulk_out_addr_;
   descriptors_.bulk_in_ep.b_endpoint_address = bulk_in_addr_;
-  descriptors_.intr_ep.b_endpoint_address = intr_addr_;
+  descriptors_.intr_out_ep.b_endpoint_address = intr_out_addr_;
+  descriptors_.intr_in_ep.b_endpoint_address = intr_in_addr_;
 
   // Allocate bulk out usb requests.
   std::optional<usb::Request<void>> req;
@@ -87,15 +93,25 @@ zx_status_t UsbTest::Init() {
     ZX_DEBUG_ASSERT(status == ZX_OK);
   }
 
-  // Allocate interrupt requests.
+  // Allocate interrupt out requests.
   for (size_t i = 0; i < INTR_COUNT; i++) {
-    status = usb::Request<void>::Alloc(&req, INTR_REQ_SIZE, intr_addr_, parent_req_size_);
+    status = usb::Request<void>::Alloc(&req, INTR_REQ_SIZE, intr_out_addr_, parent_req_size_);
     if (status != ZX_OK) {
       return status;
     }
-    intr_reqs_.push_next(std::move(*req));
+    intr_out_reqs_.push_next(std::move(*req));
     ZX_DEBUG_ASSERT(status == ZX_OK);
   }
+  // Allocate interrupt in requests.
+  for (size_t i = 0; i < INTR_COUNT; i++) {
+    status = usb::Request<void>::Alloc(&req, INTR_REQ_SIZE, intr_in_addr_, parent_req_size_);
+    if (status != ZX_OK) {
+      return status;
+    }
+    intr_in_reqs_.push_next(std::move(*req));
+    ZX_DEBUG_ASSERT(status == ZX_OK);
+  }
+
   DdkAdd("usb-function-test", DEVICE_ADD_NON_BINDABLE);
 
   if (status != ZX_OK) {
@@ -108,14 +124,64 @@ zx_status_t UsbTest::Init() {
   return ZX_OK;
 }
 
-void UsbTest::TestIntrComplete(usb_request_t* req) {
+void UsbTest::TestIntrInComplete(usb_request_t* req) {
   zxlogf(SERIAL, "%s %d %ld", __func__, req->response.status, req->response.actual);
   if (suspending_) {
     usb_request_release(req);
     return;
   }
   fbl::AutoLock lock(&lock_);
-  intr_reqs_.push(usb::Request<void>(req, parent_req_size_));
+  intr_in_reqs_.push(usb::Request<void>(req, parent_req_size_));
+}
+
+void UsbTest::TestIntrOutComplete(usb_request_t* req) {
+  zxlogf(SERIAL, "%s %d %ld", __func__, req->response.status, req->response.actual);
+
+  if (suspending_) {
+    usb_request_release(req);
+    return;
+  }
+  if (req->response.status == ZX_ERR_IO_NOT_PRESENT) {
+    fbl::AutoLock lock(&lock_);
+    intr_out_reqs_.push_next(usb::Request<void>(req, parent_req_size_));
+    return;
+  }
+  if (req->response.status == ZX_OK) {
+    lock_.Acquire();
+    std::optional<usb::Request<void>> in_req = intr_in_reqs_.pop();
+    lock_.Release();
+    if (in_req) {
+      // Send data back to host.
+      void* buffer;
+      usb_request_mmap(req, &buffer);
+      size_t result = in_req->CopyTo(buffer, req->response.actual, 0);
+      ZX_ASSERT(result == req->response.actual);
+      req->header.length = req->response.actual;
+
+      usb_request_complete_callback_t complete = {
+          .callback =
+              [](void* ctx, usb_request_t* req) {
+                static_cast<UsbTest*>(ctx)->TestIntrInComplete(req);
+              },
+          .ctx = this,
+      };
+      hw_mb();
+      usb_request_cache_flush(in_req->request(), 0, in_req->request()->response.actual);
+      function_.RequestQueue(in_req->take(), &complete);
+    } else {
+      zxlogf(ERROR, "%s: no intr in request available", __func__);
+    }
+  } else {
+    zxlogf(ERROR, "%s: usb_read_complete called with status %d", __func__, req->response.status);
+  }
+
+  // Requeue read.
+  usb_request_complete_callback_t complete = {
+      .callback = [](void* ctx,
+                     usb_request_t* req) { static_cast<UsbTest*>(ctx)->TestIntrOutComplete(req); },
+      .ctx = this,
+  };
+  function_.RequestQueue(req, &complete);
 }
 
 void UsbTest::TestBulkOutComplete(usb_request_t* req) {
@@ -213,7 +279,7 @@ zx_status_t UsbTest::UsbFunctionInterfaceControl(const usb_setup_t* setup,
   } else if (setup->bm_request_type == (USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_INTERFACE) &&
              setup->b_request == USB_PERIPHERAL_TEST_SEND_INTERUPT) {
     lock_.Acquire();
-    std::optional<usb::Request<void>> req = intr_reqs_.pop();
+    std::optional<usb::Request<void>> req = intr_in_reqs_.pop();
     lock_.Release();
     if (!req) {
       zxlogf(ERROR, "%s: no interrupt request available", __func__);
@@ -226,9 +292,11 @@ zx_status_t UsbTest::UsbFunctionInterfaceControl(const usb_setup_t* setup,
 
     usb_request_complete_callback_t complete = {
         .callback = [](void* ctx,
-                       usb_request_t* req) { static_cast<UsbTest*>(ctx)->TestIntrComplete(req); },
+                       usb_request_t* req) { static_cast<UsbTest*>(ctx)->TestIntrInComplete(req); },
         .ctx = this,
     };
+    hw_mb();
+    usb_request_cache_flush(req->request(), 0, req->request()->response.actual);
     function_.RequestQueue(req->take(), &complete);
     return ZX_OK;
   } else {
@@ -241,7 +309,8 @@ zx_status_t UsbTest::UsbFunctionInterfaceSetConfigured(bool configured, usb_spee
   zx_status_t status;
 
   if (configured) {
-    if ((status = function_.ConfigEp(&descriptors_.intr_ep, NULL)) != ZX_OK ||
+    if ((status = function_.ConfigEp(&descriptors_.intr_in_ep, NULL)) != ZX_OK ||
+        (status = function_.ConfigEp(&descriptors_.intr_out_ep, NULL)) != ZX_OK ||
         (status = function_.ConfigEp(&descriptors_.bulk_out_ep, NULL)) != ZX_OK ||
         (status = function_.ConfigEp(&descriptors_.bulk_in_ep, NULL)) != ZX_OK) {
       zxlogf(ERROR, "%s: function_.ConfigEp( failed", __func__);
@@ -250,7 +319,8 @@ zx_status_t UsbTest::UsbFunctionInterfaceSetConfigured(bool configured, usb_spee
   } else {
     function_.DisableEp(bulk_out_addr_);
     function_.DisableEp(bulk_in_addr_);
-    function_.DisableEp(intr_addr_);
+    function_.DisableEp(intr_out_addr_);
+    function_.DisableEp(intr_in_addr_);
   }
   configured_ = configured;
 
@@ -263,6 +333,17 @@ zx_status_t UsbTest::UsbFunctionInterfaceSetConfigured(bool configured, usb_spee
           .callback =
               [](void* ctx, usb_request_t* req) {
                 static_cast<UsbTest*>(ctx)->TestBulkOutComplete(req);
+              },
+          .ctx = this,
+      };
+      function_.RequestQueue(req->take(), &complete);
+    }
+
+    while ((req = intr_out_reqs_.pop())) {
+      usb_request_complete_callback_t complete = {
+          .callback =
+              [](void* ctx, usb_request_t* req) {
+                static_cast<UsbTest*>(ctx)->TestIntrOutComplete(req);
               },
           .ctx = this,
       };
@@ -281,7 +362,8 @@ void UsbTest::DdkSuspend(ddk::SuspendTxn txn) {
   // Set suspend bit so that all requests are free'd when complete
   suspending_ = true;
   function_.CancelAll(bulk_out_addr_);
-  function_.CancelAll(intr_addr_);
+  function_.CancelAll(intr_out_addr_);
+  function_.CancelAll(intr_in_addr_);
   function_.CancelAll(bulk_in_addr_);
   txn.Reply(ZX_OK, 0);
 }
