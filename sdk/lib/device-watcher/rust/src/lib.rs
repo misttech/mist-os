@@ -136,9 +136,6 @@ async fn recursive_wait_and_open_node_with_flags(
 /// Open the path `name` within `dir`. This function waits for each directory to
 /// be available before it opens it. If the path never appears this function
 /// will wait forever.
-///
-/// This function opens node as a RW service. This has the correct permissions
-/// to connect to a driver's API.
 pub async fn recursive_wait_and_open_node(
     dir: &fio::DirectoryProxy,
     name: &str,
@@ -146,7 +143,7 @@ pub async fn recursive_wait_and_open_node(
     recursive_wait_and_open_node_with_flags(
         Clone::clone(dir),
         name,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        fio::OpenFlags::RIGHT_READABLE,
         fio::MODE_TYPE_SERVICE,
     )
     .await
