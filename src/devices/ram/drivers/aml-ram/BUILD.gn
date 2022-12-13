@@ -51,9 +51,8 @@ test("aml-ram-test-bin") {
     ":common",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/fake-mmio-reg",
-
-    # TODO(fxb/115063): Migrate from fake_ddk to mock-ddk.
-    "//src/devices/testing/fake_ddk",
+    "//src/devices/testing/mock-ddk",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/mock-function",
     "//zircon/system/ulib/zxtest",
   ]
@@ -86,6 +85,9 @@ fuchsia_unittest_package("aml-ram-test") {
   deps = [ ":aml-ram-test-bin" ]
   test_specs = {
     environments = basic_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
 }
 

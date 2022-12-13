@@ -5,10 +5,9 @@
 #include "aml-ram.h"
 
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev.h>
-#include <lib/fake_ddk/fake_ddk.h>
-#include <lib/fake_ddk/fidl-helper.h>
 
 #include <atomic>
 #include <memory>
@@ -18,6 +17,7 @@
 #include <zxtest/zxtest.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace amlogic_ram {
 
@@ -44,25 +44,6 @@ class FakeMmio {
   std::unique_ptr<ddk_fake::FakeMmioRegRegion> mmio_;
 };
 
-class Ddk : public fake_ddk::Bind {
- public:
-  Ddk() {}
-  bool added() { return add_called_; }
-  const device_add_args_t& args() { return add_args_; }
-
- private:
-  zx_status_t DeviceAdd(zx_driver_t* drv, zx_device_t* parent, device_add_args_t* args,
-                        zx_device_t** out) override {
-    zx_status_t status = fake_ddk::Bind::DeviceAdd(drv, parent, args, out);
-    if (status != ZX_OK) {
-      return status;
-    }
-    add_args_ = *args;
-    return ZX_OK;
-  }
-  device_add_args_t add_args_;
-};
-
 class AmlRamDeviceTest : public zxtest::Test {
  public:
   void SetUp() override {
@@ -76,26 +57,36 @@ class AmlRamDeviceTest : public zxtest::Test {
 
     pdev_.set_mmio(0, mmio_.mmio_info());
 
-    ddk_.SetProtocol(ZX_PROTOCOL_PDEV, pdev_.proto());
+    fake_parent_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx);
 
-    EXPECT_OK(amlogic_ram::AmlRam::Create(nullptr, fake_ddk::FakeParent()));
+    EXPECT_OK(amlogic_ram::AmlRam::Create(nullptr, fake_parent_.get()));
   }
 
-  void TearDown() override {
-    auto device = static_cast<amlogic_ram::AmlRam*>(ddk_.args().ctx);
-    device->DdkAsyncRemove();
-    EXPECT_TRUE(ddk_.Ok());
+  void TearDown() override { loop_.Shutdown(); }
 
-    device->DdkRelease();
+  fidl::ClientEnd<ram_metrics::Device> ConnectToFidl() {
+    loop_.StartThread("aml-ram-test-thread");
+
+    EXPECT_EQ(1, fake_parent_->child_count());
+    auto* child = fake_parent_->GetLatestChild();
+    EXPECT_NOT_NULL(child);
+
+    auto endpoints = fidl::CreateEndpoints<ram_metrics::Device>();
+    EXPECT_TRUE(endpoints.is_ok());
+    binding_ = fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server),
+                                child->GetDeviceContext<AmlRam>());
+    return std::move(endpoints->client);
   }
 
   void InjectInterrupt() { irq_signaller_->trigger(0, zx::time()); }
 
  protected:
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+  std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
   FakeMmio mmio_;
   fake_pdev::FakePDev pdev_;
   zx::unowned_interrupt irq_signaller_;
-  Ddk ddk_;
+  std::optional<fidl::ServerBindingRef<ram_metrics::Device>> binding_;
 
   // DMC Register Offset
   dmc_reg_ctl_t dmc_offsets_;
@@ -115,7 +106,7 @@ TEST_F(AmlRamDeviceTest, MalformedRequests) {
   mmio_.reg(dmc_offsets_.port_ctrl_offset).SetWriteCallback(&WriteDisallowed);
   mmio_.reg(dmc_offsets_.timer_offset).SetWriteCallback(&WriteDisallowed);
 
-  fidl::WireSyncClient<ram_metrics::Device> client{std::move(ddk_.FidlClient())};
+  auto client = fidl::WireSyncClient<ram_metrics::Device>(ConnectToFidl());
 
   // Invalid cycles (too low).
   {
@@ -222,7 +213,7 @@ TEST_F(AmlRamDeviceTest, ValidRequest) {
             return value;
           });
 
-  fidl::WireSyncClient<ram_metrics::Device> client{std::move(ddk_.FidlClient())};
+  auto client = fidl::WireSyncClient<ram_metrics::Device>(ConnectToFidl());
   auto info = client->MeasureBandwidth(config);
   ASSERT_TRUE(info.ok());
   ASSERT_FALSE(info->is_error());
