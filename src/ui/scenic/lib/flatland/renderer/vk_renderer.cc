@@ -255,6 +255,29 @@ std::vector<vk::ImageFormatConstraintsInfoFUCHSIA> GetVulkanImageFormatConstrain
   return constraint_infos;
 }
 
+bool IsValidImage(const allocation::ImageMetadata& metadata) {
+  // The metadata can't have an invalid collection id.
+  if (metadata.collection_id == allocation::kInvalidId) {
+    FX_LOGS(WARNING) << "Image has invalid collection id.";
+    return false;
+  }
+
+  // The metadata can't have an invalid identifier.
+  if (metadata.identifier == allocation::kInvalidImageId) {
+    FX_LOGS(WARNING) << "Image has invalid identifier.";
+    return false;
+  }
+
+  // Check we have valid dimensions.
+  if (metadata.width == 0 || metadata.height == 0) {
+    FX_LOGS(WARNING) << "Image has invalid dimensions: "
+                     << "(" << metadata.width << ", " << metadata.height << ").";
+    return false;
+  }
+
+  return true;
+}
+
 }  // anonymous namespace
 
 namespace flatland {
@@ -323,6 +346,37 @@ std::optional<vk::BufferCollectionFUCHSIA> VkRenderer::CreateVulkanBufferCollect
   }
 
   return vk_collection;
+}
+
+std::optional<vk::BufferCollectionFUCHSIA> VkRenderer::GetAllocatedVulkanBufferCollection(
+    const allocation::GlobalBufferCollectionId collection_id, const BufferCollectionUsage usage) {
+  std::scoped_lock lock(lock_);
+  // Make sure that the collection that will back this image's memory
+  // is actually registered with the renderer.
+  std::unordered_map<GlobalBufferCollectionId, CollectionData>* collections =
+      UsageToCollection(usage);
+  const auto collection_itr = collections->find(collection_id);
+  if (collection_itr == collections->end()) {
+    FX_LOGS(WARNING) << "Collection with id " << collection_id << " does not exist.";
+    return std::nullopt;
+  }
+
+  // Check to see if the buffers are allocated and return std::nullptr if not.
+  zx_status_t allocation_status = ZX_OK;
+  if (const zx_status_t status =
+          collection_itr->second.collection->CheckBuffersAllocated(&allocation_status);
+      status != ZX_OK) {
+    FX_LOGS(WARNING) << "Collection was not allocated (FIDL status: "
+                     << zx_status_get_string(status) << ").";
+    return std::nullopt;
+  }
+  if (allocation_status != ZX_OK) {
+    FX_LOGS(WARNING) << "Collection was not allocated (allocation status: "
+                     << zx_status_get_string(allocation_status) << ").";
+    return std::nullopt;
+  }
+
+  return collection_itr->second.vk_collection;
 }
 
 bool VkRenderer::ImportBufferCollection(
@@ -411,133 +465,121 @@ void VkRenderer::ReleaseBufferCollection(GlobalBufferCollectionId collection_id,
   collections->erase(collection_id);
 }
 
-bool VkRenderer::ImportBufferImage(const allocation::ImageMetadata& metadata,
-                                   BufferCollectionUsage usage) {
-  // Called from main thread or Flatland threads.
-  TRACE_DURATION("gfx", "flatland::VkRenderer::ImportBufferImage");
-
+bool VkRenderer::ImageIsAlreadyRegisteredForUsage(const allocation::GlobalImageId image_id,
+                                                  const BufferCollectionUsage usage) {
   std::scoped_lock lock(lock_);
-
-  // The metadata can't have an invalid collection id.
-  if (metadata.collection_id == allocation::kInvalidId) {
-    FX_LOGS(WARNING) << "Image has invalid collection id.";
-    return false;
-  }
-
-  // The metadata can't have an invalid identifier.
-  if (metadata.identifier == allocation::kInvalidImageId) {
-    FX_LOGS(WARNING) << "Image has invalid identifier.";
-    return false;
-  }
-
-  // Check we have valid dimensions.
-  if (metadata.width == 0 || metadata.height == 0) {
-    FX_LOGS(WARNING) << "Image has invalid dimensions: "
-                     << "(" << metadata.width << ", " << metadata.height << ").";
-    return false;
-  }
-
-  // Make sure that the collection that will back this image's memory
-  // is actually registered with the renderer.
-  std::unordered_map<GlobalBufferCollectionId, CollectionData>* collections =
-      UsageToCollection(usage);
-  auto collection_itr = collections->find(metadata.collection_id);
-  if (collection_itr == collections->end()) {
-    FX_LOGS(WARNING) << "Collection with id " << metadata.collection_id << " does not exist.";
-    return false;
-  }
-
-  // Check to see if the buffers are allocated and return false if not.
-  zx_status_t allocation_status = ZX_OK;
-  zx_status_t status = collection_itr->second.collection->CheckBuffersAllocated(&allocation_status);
-  if (status != ZX_OK) {
-    FX_LOGS(WARNING) << "Collection was not allocated (FIDL status: "
-                     << zx_status_get_string(status) << ").";
-  } else if (allocation_status != ZX_OK) {
-    FX_LOGS(WARNING) << "Collection was not allocated (allocation status: "
-                     << zx_status_get_string(status) << ").";
-    return false;
-  }
-
-  // Make sure we're not reusing the same image identifier for the specific usage..
   switch (usage) {
     case BufferCollectionUsage::kRenderTarget:
-      if (render_target_map_.find(metadata.identifier) != render_target_map_.end()) {
-        FX_LOGS(WARNING) << "An image with this identifier already exists.";
-        return false;
-      }
-      break;
+      return render_target_map_.find(image_id) != render_target_map_.end();
     case BufferCollectionUsage::kReadback:
-      if (readback_image_map_.find(metadata.identifier) != readback_image_map_.end()) {
-        FX_LOGS(WARNING) << "An image with this identifier already exists.";
-        return false;
-      }
-      break;
+      return readback_image_map_.find(image_id) != readback_image_map_.end();
+    case BufferCollectionUsage::kClientImage:
+      return texture_map_.find(image_id) != texture_map_.end();
     default:
-      if (texture_map_.find(metadata.identifier) != texture_map_.end()) {
-        FX_LOGS(WARNING) << "An image with this identifier already exists.";
-        return false;
-      }
-      break;
+      FX_NOTREACHED();
+      return false;
+  }
+}
+bool VkRenderer::ImportRenderTargetImage(const allocation::ImageMetadata& metadata,
+                                         const vk::BufferCollectionFUCHSIA vk_collection) {
+  std::scoped_lock lock(lock_);
+  const bool needs_readback =
+      readback_collections_.find(metadata.collection_id) != readback_collections_.end();
+
+  const vk::ImageUsageFlags kRenderTargetAsReadbackSourceUsageFlags =
+      escher::RectangleCompositor::kRenderTargetUsageFlags | vk::ImageUsageFlagBits::eTransferSrc;
+  auto image = ExtractImage(metadata, BufferCollectionUsage::kRenderTarget, vk_collection,
+                            needs_readback ? kRenderTargetAsReadbackSourceUsageFlags
+                                           : escher::RectangleCompositor::kRenderTargetUsageFlags);
+  if (!image) {
+    FX_LOGS(ERROR) << "Could not extract render target.";
+    return false;
   }
 
+  image->set_swapchain_layout(vk::ImageLayout::eColorAttachmentOptimal);
+  render_target_map_[metadata.identifier] = image;
+  depth_target_map_[metadata.identifier] = CreateDepthTexture(escher_.get(), image);
+  pending_render_targets_.insert(metadata.identifier);
+  return true;
+}
+
+bool VkRenderer::ImportReadbackImage(const allocation::ImageMetadata& metadata,
+                                     const vk::BufferCollectionFUCHSIA vk_collection) {
+  std::scoped_lock lock(lock_);
+  const auto readback_collection_itr = readback_collections_.find(metadata.collection_id);
+  // Check to see if the buffers are allocated and return false if not.
+  zx_status_t allocation_status = ZX_OK;
+  const zx_status_t status =
+      readback_collection_itr->second.collection->CheckBuffersAllocated(&allocation_status);
+  if (status != ZX_OK || allocation_status != ZX_OK) {
+    FX_LOGS(ERROR) << "Readback collection was not allocated: " << zx_status_get_string(status)
+                   << " ;alloc: " << zx_status_get_string(allocation_status);
+    return false;
+  }
+
+  const escher::ImagePtr readback_image = ExtractImage(
+      metadata, BufferCollectionUsage::kReadback, readback_collection_itr->second.vk_collection,
+      vk::ImageUsageFlagBits::eTransferDst);
+  if (!readback_image) {
+    FX_LOGS(ERROR) << "Could not extract readback image.";
+    return false;
+  }
+  readback_image_map_[metadata.identifier] = readback_image;
+  return true;
+}
+
+bool VkRenderer::ImportClientImage(const allocation::ImageMetadata& metadata,
+                                   const vk::BufferCollectionFUCHSIA vk_collection) {
+  std::scoped_lock lock(lock_);
+  const auto texture = ExtractTexture(metadata, vk_collection);
+  if (!texture) {
+    FX_LOGS(ERROR) << "Could not extract client texture image.";
+    return false;
+  }
+  texture_map_[metadata.identifier] = texture;
+  pending_textures_.insert(metadata.identifier);
+  return true;
+}
+
+bool VkRenderer::ImportBufferImage(const allocation::ImageMetadata& metadata,
+                                   const BufferCollectionUsage usage) {
+  TRACE_DURATION("gfx", "flatland::VkRenderer::ImportBufferImage");
+
+  if (!IsValidImage(metadata)) {
+    return false;
+  }
+
+  vk::BufferCollectionFUCHSIA vk_collection;
+  if (const auto collection = GetAllocatedVulkanBufferCollection(metadata.collection_id, usage)) {
+    vk_collection = *collection;
+  } else {
+    return false;
+  }
+
+  if (ImageIsAlreadyRegisteredForUsage(metadata.identifier, usage)) {
+    FX_LOGS(WARNING) << "An image with identifier " << metadata.identifier
+                     << " has already been registered for usage: " << static_cast<uint32_t>(usage);
+    return false;
+  }
+
+  bool import_result = false;
   switch (usage) {
     case BufferCollectionUsage::kRenderTarget: {
-      auto readback_collection_itr = readback_collections_.find(metadata.collection_id);
-      const bool needs_readback = readback_collection_itr != readback_collections_.end();
-
-      const vk::ImageUsageFlags kRenderTargetAsReadbackSourceUsageFlags =
-          escher::RectangleCompositor::kRenderTargetUsageFlags |
-          vk::ImageUsageFlagBits::eTransferSrc;
-      auto image = ExtractImage(
-          metadata, BufferCollectionUsage::kRenderTarget, collection_itr->second.vk_collection,
-          needs_readback ? kRenderTargetAsReadbackSourceUsageFlags
-                         : escher::RectangleCompositor::kRenderTargetUsageFlags);
-      if (!image) {
-        FX_LOGS(ERROR) << "Could not extract render target.";
-        return false;
-      }
-
-      image->set_swapchain_layout(vk::ImageLayout::eColorAttachmentOptimal);
-      render_target_map_[metadata.identifier] = image;
-      depth_target_map_[metadata.identifier] = CreateDepthTexture(escher_.get(), image);
-      pending_render_targets_.insert(metadata.identifier);
+      import_result = ImportRenderTargetImage(metadata, vk_collection);
       break;
     }
     case BufferCollectionUsage::kReadback: {
-      auto readback_collection_itr = readback_collections_.find(metadata.collection_id);
-      // Check to see if the buffers are allocated and return false if not.
-      zx_status_t allocation_status = ZX_OK;
-      zx_status_t status =
-          readback_collection_itr->second.collection->CheckBuffersAllocated(&allocation_status);
-      if (status != ZX_OK || allocation_status != ZX_OK) {
-        FX_LOGS(ERROR) << "Readback collection was not allocated: " << zx_status_get_string(status)
-                       << " ;alloc: " << zx_status_get_string(allocation_status);
-        return false;
-      }
-
-      escher::ImagePtr readback_image = ExtractImage(metadata, BufferCollectionUsage::kReadback,
-                                                     readback_collection_itr->second.vk_collection,
-                                                     vk::ImageUsageFlagBits::eTransferDst);
-      if (!readback_image) {
-        FX_LOGS(ERROR) << "Could not extract readback image.";
-        return false;
-      }
-      readback_image_map_[metadata.identifier] = readback_image;
+      import_result = ImportReadbackImage(metadata, vk_collection);
       break;
     }
     case BufferCollectionUsage::kClientImage: {
-      auto texture = ExtractTexture(metadata, collection_itr->second.vk_collection);
-      if (!texture) {
-        FX_LOGS(ERROR) << "Could not extract client texture image.";
-        return false;
-      }
-      texture_map_[metadata.identifier] = texture;
-      pending_textures_.insert(metadata.identifier);
+      import_result = ImportClientImage(metadata, vk_collection);
       break;
     }
+    default:
+      FX_NOTREACHED();
   }
-  return true;
+  return import_result;
 }
 
 void VkRenderer::ReleaseBufferImage(allocation::GlobalImageId image_id) {

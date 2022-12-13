@@ -104,6 +104,18 @@ class VkRenderer final : public Renderer {
       fuchsia::sysmem::BufferCollectionTokenSyncPtr token, BufferCollectionUsage usage,
       std::optional<fuchsia::math::SizeU> size);
 
+  // Finds the relevant vulkan buffer collection, checks that it is allocated, and returns it.
+  // If the buffer is missing or not allocated it returns std::nullopt.
+  std::optional<vk::BufferCollectionFUCHSIA> GetAllocatedVulkanBufferCollection(
+      allocation::GlobalBufferCollectionId collection_id, BufferCollectionUsage usage);
+
+  bool ImportRenderTargetImage(const allocation::ImageMetadata& metadata,
+                               vk::BufferCollectionFUCHSIA vk_collection);
+  bool ImportReadbackImage(const allocation::ImageMetadata& metadata,
+                           vk::BufferCollectionFUCHSIA vk_collection);
+  bool ImportClientImage(const allocation::ImageMetadata& metadata,
+                         vk::BufferCollectionFUCHSIA vk_collection);
+
   // The function ExtractImage() creates an escher Image from a sysmem collection vmo.
   escher::ImagePtr ExtractImage(const ImageMetadata& metadata, BufferCollectionUsage bc_usage,
                                 vk::BufferCollectionFUCHSIA collection, vk::ImageUsageFlags usage,
@@ -117,6 +129,10 @@ class VkRenderer final : public Renderer {
   void BlitRenderTarget(escher::CommandBuffer* command_buffer, escher::ImagePtr source_image,
                         vk::ImageLayout* source_image_layout, escher::ImagePtr dest_image,
                         const ImageMetadata& metadata);
+
+  // Returns whether an image with |image_id| and |usage| is already registered.
+  bool ImageIsAlreadyRegisteredForUsage(allocation::GlobalImageId image_id,
+                                        BufferCollectionUsage usage);
 
   // Returns a reference to the appropriate map of buffer collections for |usage|.
   std::unordered_map<GlobalBufferCollectionId, CollectionData>* UsageToCollection(
