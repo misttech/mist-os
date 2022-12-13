@@ -147,16 +147,6 @@ protocol Node1 {
         object server_end:Node;
     });
 
-    /// Returns extra information about the type of the object.
-    /// If the `Describe` operation fails, the connection is closed.
-    ///
-    /// This method does not require any rights.
-    @selector("fuchsia.io1/Node.Describe")
-    @deprecated("replaced by fuchsia.unknown/Queryable.Query")
-    DescribeDeprecated() -> (resource struct {
-        info NodeInfoDeprecated;
-    });
-
     /// An event produced eagerly by a FIDL server if requested by `OpenFlags.DESCRIBE`.
     ///
     /// Indicates the success or failure of the open operation, and optionally describes the

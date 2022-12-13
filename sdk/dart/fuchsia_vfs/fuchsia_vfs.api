@@ -734,16 +734,6 @@
               "returnType": "FileInfo",
               "type": "MethodDeclarationImpl"
             },
-            "describeDeprecated": {
-              "isAbstract": false,
-              "isGetter": false,
-              "isOperator": false,
-              "isSetter": false,
-              "isStatic": false,
-              "name": "describeDeprecated",
-              "returnType": "NodeInfoDeprecated",
-              "type": "MethodDeclarationImpl"
-            },
             "getBackingMemory": {
               "SimpleFormalParameterImpl": {
                 "flags": {
@@ -828,16 +818,6 @@
             "type": "extends"
           },
           "MethodDeclarationImpl": {
-            "describeDeprecated": {
-              "isAbstract": false,
-              "isGetter": false,
-              "isOperator": false,
-              "isSetter": false,
-              "isStatic": false,
-              "name": "describeDeprecated",
-              "returnType": "NodeInfoDeprecated",
-              "type": "MethodDeclarationImpl"
-            },
             "getBackingMemory": {
               "SimpleFormalParameterImpl": {
                 "flags": {
@@ -1312,16 +1292,6 @@
             "type": "extends"
           },
           "MethodDeclarationImpl": {
-            "describeDeprecated": {
-              "isAbstract": false,
-              "isGetter": false,
-              "isOperator": false,
-              "isSetter": false,
-              "isStatic": false,
-              "name": "describeDeprecated",
-              "returnType": "NodeInfoDeprecated",
-              "type": "MethodDeclarationImpl"
-            },
             "getBackingMemory": {
               "SimpleFormalParameterImpl": {
                 "flags": {

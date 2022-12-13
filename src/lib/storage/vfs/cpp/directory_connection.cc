@@ -113,17 +113,6 @@ void DirectoryConnection::Query(QueryCompleter::Sync& completer) {
   completer.Reply(Connection::NodeQuery());
 }
 
-void DirectoryConnection::DescribeDeprecated(DescribeDeprecatedCompleter::Sync& completer) {
-  zx::result result = Connection::NodeDescribe();
-  if (result.is_error()) {
-    completer.Close(result.status_value());
-    return;
-  }
-  ConvertToIoV1NodeInfo(std::move(result).value(), [&](fio::wire::NodeInfoDeprecated&& info) {
-    completer.Reply(std::move(info));
-  });
-}
-
 void DirectoryConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
   completer.Reply({});
 }

@@ -56,17 +56,6 @@ void NodeConnection::Query(QueryCompleter::Sync& completer) {
   }
 }
 
-void NodeConnection::DescribeDeprecated(DescribeDeprecatedCompleter::Sync& completer) {
-  zx::result result = Connection::NodeDescribe();
-  if (result.is_error()) {
-    completer.Close(result.status_value());
-  } else {
-    ConvertToIoV1NodeInfo(std::move(result).value(), [&](fio::wire::NodeInfoDeprecated&& info) {
-      completer.Reply(std::move(info));
-    });
-  }
-}
-
 void NodeConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
   completer.Reply({});
 }

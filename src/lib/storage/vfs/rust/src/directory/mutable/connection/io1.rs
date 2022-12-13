@@ -148,7 +148,6 @@ impl MutableConnection {
             | fio::DirectoryRequest::AdvisoryLock { .. }
             | fio::DirectoryRequest::Clone { .. }
             | fio::DirectoryRequest::Close { .. }
-            | fio::DirectoryRequest::DescribeDeprecated { .. }
             | fio::DirectoryRequest::GetConnectionInfo { .. }
             | fio::DirectoryRequest::Enumerate { .. }
             | fio::DirectoryRequest::GetAttr { .. }

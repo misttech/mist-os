@@ -137,10 +137,6 @@ impl Connection {
                 responder.send(&mut Ok(()))?;
                 return Ok(ConnectionState::Closed);
             }
-            fio::NodeRequest::DescribeDeprecated { responder } => {
-                let mut info = fio::NodeInfoDeprecated::Service(fio::Service);
-                responder.send(&mut info)?;
-            }
             fio::NodeRequest::GetConnectionInfo { responder } => {
                 // TODO(https://fxbug.dev/77623): Fill in rights and available operations.
                 let info = fio::ConnectionInfo { ..fio::ConnectionInfo::EMPTY };

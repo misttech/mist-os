@@ -71,11 +71,6 @@ class TestMounter : public FilesystemMounter {
       completer.Close(ZX_ERR_NOT_SUPPORTED);
     }
 
-    void DescribeDeprecated(DescribeDeprecatedCompleter::Sync& completer) override {
-      completer.Reply(
-          fuchsia_io::wire::NodeInfoDeprecated::WithDirectory(fuchsia_io::wire::DirectoryObject()));
-    }
-
     void Open(OpenRequestView request, OpenCompleter::Sync& _completer) override {}
   };
 

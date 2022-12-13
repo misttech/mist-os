@@ -200,12 +200,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.io/Directory.DescribeDeprecated",
-        "ordinal": "1152055232528178848",
-        "type": "() -> (fuchsia.io/NodeInfoDeprecated info)"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.io/Directory.Enumerate",
         "ordinal": "3937494568478622589",
         "type": "(fuchsia.io/DirectoryEnumerateOptions options,server_end:fuchsia.io/DirectoryIterator iterator)"
@@ -351,12 +345,6 @@
         "name": "fuchsia.io/Directory1.Clone",
         "ordinal": "6512600400724287855",
         "type": "(fuchsia.io/OpenFlags flags,server_end:fuchsia.io/Node object)"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/Directory1.DescribeDeprecated",
-        "ordinal": "1152055232528178848",
-        "type": "() -> (fuchsia.io/NodeInfoDeprecated info)"
     },
     {
         "kind": "protocol/member",
@@ -709,12 +697,6 @@
         "name": "fuchsia.io/File.Describe",
         "ordinal": "7545125870053689020",
         "type": "() -> (fuchsia.io/FileInfo payload)"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/File.DescribeDeprecated",
-        "ordinal": "1152055232528178848",
-        "type": "() -> (fuchsia.io/NodeInfoDeprecated info)"
     },
     {
         "kind": "protocol/member",
@@ -1433,12 +1415,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.io/Node.DescribeDeprecated",
-        "ordinal": "1152055232528178848",
-        "type": "() -> (fuchsia.io/NodeInfoDeprecated info)"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.io/Node.GetAttr",
         "ordinal": "8689798978500614909",
         "type": "() -> (int32 s,fuchsia.io/NodeAttributes attributes)"
@@ -1524,12 +1500,6 @@
         "name": "fuchsia.io/Node1.Clone",
         "ordinal": "6512600400724287855",
         "type": "(fuchsia.io/OpenFlags flags,server_end:fuchsia.io/Node object)"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/Node1.DescribeDeprecated",
-        "ordinal": "1152055232528178848",
-        "type": "() -> (fuchsia.io/NodeInfoDeprecated info)"
     },
     {
         "kind": "protocol/member",

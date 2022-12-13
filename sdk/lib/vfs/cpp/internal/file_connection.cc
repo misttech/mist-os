@@ -46,12 +46,8 @@ void FileConnection::Query(QueryCallback callback) {
   callback({kProtocol.begin(), kProtocol.end()});
 }
 
-void FileConnection::DescribeDeprecated(DescribeDeprecatedCallback callback) {
-  Connection::Describe(vn_, std::move(callback));
-}
-
 void FileConnection::Describe(DescribeCallback callback) {
-  DescribeDeprecated([callback = std::move(callback)](fuchsia::io::NodeInfoDeprecated node) {
+  Connection::Describe(vn_, [callback = std::move(callback)](fuchsia::io::NodeInfoDeprecated node) {
     ZX_ASSERT_MSG(node.is_file(), "FileConnection::Describe returned %lu, expected %lu",
                   node.Which(), fuchsia::io::NodeInfoDeprecated::Tag::kFile);
     fuchsia::io::FileObject& object = node.file();

@@ -55,16 +55,6 @@ void FileConnection::Query(QueryCompleter::Sync& completer) {
   completer.Reply(Connection::NodeQuery());
 }
 
-void FileConnection::DescribeDeprecated(DescribeDeprecatedCompleter::Sync& completer) {
-  zx::result result = Connection::NodeDescribe();
-  if (result.is_error()) {
-    return completer.Close(result.status_value());
-  }
-  ConvertToIoV1NodeInfo(std::move(result).value(), [&](fio::wire::NodeInfoDeprecated&& info) {
-    completer.Reply(std::move(info));
-  });
-}
-
 void FileConnection::Describe(DescribeCompleter::Sync& completer) {
   zx::result result = Connection::NodeDescribe();
   if (result.is_error()) {

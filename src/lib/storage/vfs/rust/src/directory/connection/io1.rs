@@ -182,10 +182,6 @@ where
                 responder.send(&mut self.directory.close().map_err(|status| status.into_raw()))?;
                 return Ok(ConnectionState::Closed);
             }
-            fio::DirectoryRequest::DescribeDeprecated { responder } => {
-                fuchsia_trace::duration!("storage", "Directory::Describe");
-                responder.send(&mut self.node_info())?;
-            }
             fio::DirectoryRequest::GetConnectionInfo { responder } => {
                 fuchsia_trace::duration!("storage", "Directory::GetConnectionInfo");
                 let _ = responder;

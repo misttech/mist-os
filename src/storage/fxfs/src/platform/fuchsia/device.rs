@@ -477,11 +477,6 @@ impl BlockServer {
                 responder.send(&mut Ok(()))?;
             }
             // TODO(fxbug.dev/89873)
-            VolumeAndNodeRequest::DescribeDeprecated { responder } => {
-                let mut info = fio::NodeInfoDeprecated::Service(fio::Service);
-                responder.send(&mut info)?;
-            }
-            // TODO(fxbug.dev/89873)
             VolumeAndNodeRequest::GetConnectionInfo { responder } => {
                 // TODO(https://fxbug.dev/77623): Fill in rights and available operations.
                 let info = fio::ConnectionInfo { ..fio::ConnectionInfo::EMPTY };

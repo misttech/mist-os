@@ -585,9 +585,6 @@ async fn serve_failing_blobfs(
             fio::DirectoryRequest::Close { responder } => {
                 responder.send(&mut Err(zx::Status::IO.into_raw())).context("failing close")?
             }
-            fio::DirectoryRequest::DescribeDeprecated { responder } => responder
-                .send(&mut fio::NodeInfoDeprecated::Directory(fio::DirectoryObject))
-                .context("describing")?,
             fio::DirectoryRequest::GetConnectionInfo { responder } => {
                 let _ = responder;
                 todo!("https://fxbug.dev/77623");

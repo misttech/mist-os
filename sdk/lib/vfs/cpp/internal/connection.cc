@@ -30,7 +30,7 @@ void Connection::Close(Node* vn, fuchsia::io::Node::CloseCallback callback) {
   // |this| is destroyed at this point.
 }
 
-void Connection::Describe(Node* vn, fuchsia::io::Node::DescribeDeprecatedCallback callback) {
+void Connection::Describe(Node* vn, fit::function<void(fuchsia::io::NodeInfoDeprecated)> callback) {
   fuchsia::io::NodeInfoDeprecated info{};
   vn->Describe(&info);
   if (info.has_invalid_tag()) {

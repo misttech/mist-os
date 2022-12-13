@@ -29,7 +29,7 @@ zx_status_t zxio_create_with_allocator(zx::handle handle, zxio_storage_alloc all
                                        void** out_context);
 
 // Like zxio_create_with_allocator but the caller supplies information about
-// |channel| provided by the server through a Describe call or OnOpen event.
+// |channel| provided by the server through an OnOpen event.
 //
 // Always consumes |node|. May mutate |info| on success.
 zx_status_t zxio_create_with_allocator(fidl::ClientEnd<fuchsia_io::Node> node,

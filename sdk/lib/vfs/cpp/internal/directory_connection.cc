@@ -47,10 +47,6 @@ void DirectoryConnection::Query(QueryCallback callback) {
   callback({kProtocol.begin(), kProtocol.end()});
 }
 
-void DirectoryConnection::DescribeDeprecated(DescribeDeprecatedCallback callback) {
-  Connection::Describe(vn_, std::move(callback));
-}
-
 void DirectoryConnection::GetConnectionInfo(GetConnectionInfoCallback callback) {
   Connection::GetConnectionInfo(vn_, std::move(callback));
 }

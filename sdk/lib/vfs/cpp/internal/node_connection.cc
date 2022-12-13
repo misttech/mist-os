@@ -40,10 +40,6 @@ void NodeConnection::Query(QueryCallback callback) {
   callback({kProtocol.begin(), kProtocol.end()});
 }
 
-void NodeConnection::DescribeDeprecated(DescribeDeprecatedCallback callback) {
-  Connection::Describe(vn_, std::move(callback));
-}
-
 void NodeConnection::GetConnectionInfo(GetConnectionInfoCallback callback) {
   Connection::GetConnectionInfo(vn_, std::move(callback));
 }

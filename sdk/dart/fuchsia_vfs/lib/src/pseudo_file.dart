@@ -139,10 +139,6 @@ class PseudoFile extends Vnode {
     return DirentType.file;
   }
 
-  NodeInfoDeprecated describeDeprecated() {
-    return NodeInfoDeprecated.withFile(FileObject(event: null));
-  }
-
   FileInfo describe() {
     return FileInfo();
   }
@@ -297,8 +293,8 @@ class _FileConnection extends File {
     if ((flags & OpenFlags.describe) == OpenFlags.$none) {
       d = File$OnOpen$Response(ZX.ERR_NOT_FILE, null);
     } else {
-      NodeInfoDeprecated nodeInfo = file.describeDeprecated();
-      d = File$OnOpen$Response(ZX.OK, nodeInfo);
+      d = File$OnOpen$Response(
+          ZX.OK, NodeInfoDeprecated.withFile(FileObject()));
     }
     return Stream.fromIterable([d]);
   }
@@ -369,10 +365,6 @@ class _FileConnection extends File {
   Future<Uint8List> query() async {
     return Utf8Encoder().convert(fileProtocolName);
   }
-
-  @override
-  Future<NodeInfoDeprecated> describeDeprecated() async =>
-      file.describeDeprecated();
 
   @override
   Future<FileInfo> describe() async => file.describe();

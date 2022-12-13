@@ -36,11 +36,6 @@ class PseudoVmoFile extends PseudoFile {
   }
 
   @override
-  NodeInfoDeprecated describeDeprecated() {
-    return NodeInfoDeprecated.withFile(FileObject());
-  }
-
-  @override
   ConnectionInfo getConnectionInfo() {
     return ConnectionInfo();
   }

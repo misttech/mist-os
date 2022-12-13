@@ -662,11 +662,6 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
                 responder.send(&mut self.file.close().await.map_err(|status| status.into_raw()))?;
                 return Ok(ConnectionState::Closed);
             }
-            fio::FileRequest::DescribeDeprecated { responder } => {
-                fuchsia_trace::duration!("storage", "File::Describe");
-                let mut info = self.node_info()?;
-                responder.send(&mut info)?;
-            }
             fio::FileRequest::Describe { responder } => {
                 fuchsia_trace::duration!("storage", "File::Describe");
                 let stream = self.file.duplicate_stream()?;
