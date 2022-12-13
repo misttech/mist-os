@@ -62,7 +62,7 @@ pub async fn handle_launch<P: PlatformServices>(
     }
 
     if !args.detach {
-        if let Err(err) = attach(guest.unwrap()).await {
+        if let Err(err) = attach(guest.unwrap(), false).await {
             return LaunchResult::AttachFailed(format!("{}", err));
         }
     }

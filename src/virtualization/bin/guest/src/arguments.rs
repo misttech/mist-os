@@ -21,7 +21,6 @@ pub enum SubCommands {
     Stop(stop_args::StopArgs),
     Balloon(BalloonArgs),
     BalloonStats(BalloonStatsArgs),
-    Serial(SerialArgs),
     List(list_args::ListArgs),
     Socat(SocatArgs),
     SocatListen(SocatListenArgs),

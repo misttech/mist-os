@@ -51,7 +51,6 @@ rustc_binary("bin") {
     "src/arguments.rs",
     "src/balloon.rs",
     "src/main.rs",
-    "src/serial.rs",
     "src/services.rs",
     "src/socat.rs",
     "src/vsh.rs",

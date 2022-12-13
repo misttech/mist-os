@@ -103,7 +103,6 @@ pub enum SubCommands {
     Stop(crate::stop_args::StopArgs),
     Balloon(BalloonArgs),
     BalloonStats(BalloonStatsArgs),
-    Serial(SerialArgs),
     List(crate::list_args::ListArgs),
     Socat(SocatArgs),
     SocatListen(SocatListenArgs),
@@ -128,15 +127,6 @@ pub struct BalloonArgs {
 /// See the stats of a guest's memory balloon. Usage: guest balloon-stats guest-type
 #[argh(subcommand, name = "balloon-stats")]
 pub struct BalloonStatsArgs {
-    #[argh(positional)]
-    /// type of the guest
-    pub guest_type: GuestType,
-}
-
-#[derive(FromArgs, PartialEq, Debug)]
-/// Access the serial output for a guest. Usage: guest serial guest-type
-#[argh(subcommand, name = "serial")]
-pub struct SerialArgs {
     #[argh(positional)]
     /// type of the guest
     pub guest_type: GuestType,
@@ -291,5 +281,8 @@ pub mod attach_args {
         /// guest type to attach to e.g. 'debian'
         #[argh(positional)]
         pub guest_type: GuestType,
+        /// attach via serial instead of virtio-console
+        #[argh(switch)]
+        pub serial: bool,
     }
 }

@@ -48,14 +48,23 @@ pub async fn handle_attach<P: PlatformServices>(
         .map_err(|err| anyhow!("failed to get a connect response: {}", err))?
         .map_err(|err| anyhow!("connect failed with: {:?}", err))?;
 
-    Ok(match attach(guest_endpoint).await {
+    Ok(match attach(guest_endpoint, args.serial).await {
         Ok(()) => AttachResult::Attached,
         Err(_) => AttachResult::AttachFailure,
     })
 }
 
-// Attach to a running guest, using a combined stdout and serial for output, and stdin for input.
-pub async fn attach(guest: GuestProxy) -> Result<(), Error> {
+pub async fn attach(guest: GuestProxy, serial_only: bool) -> Result<(), Error> {
+    if serial_only {
+        attach_serial(guest).await
+    } else {
+        attach_console_and_serial(guest).await
+    }
+}
+
+// Attach to a running guest, using the guest's virtio-console and serial output for stdout, and
+// the guest's virtio-console for stdin.
+async fn attach_console_and_serial(guest: GuestProxy) -> Result<(), Error> {
     // Tie serial output to stdout.
     let guest_serial_response = guest.get_serial().await?;
     let guest_serial = fasync::Socket::from_socket(guest_serial_response)?;
@@ -78,6 +87,17 @@ pub async fn attach(guest: GuestProxy) -> Result<(), Error> {
         .map_err(anyhow::Error::from)
 }
 
+// Attach to a running guest using serial for stdout and stdin.
+async fn attach_serial(guest: GuestProxy) -> Result<(), Error> {
+    // Host doesn't currently support duplicating Fuchsia handles, so just call get serial twice
+    // and let the VMM duplicate the socket for reading and writing.
+    let serial_input = guest.get_serial().await?;
+    let serial_output = guest.get_serial().await?;
+
+    let guest_console = GuestConsole::new(serial_input, serial_output)?;
+    guest_console.run_with_stdio().await
+}
+
 #[cfg(test)]
 mod test {
     use {
@@ -88,7 +108,7 @@ mod test {
         futures::StreamExt,
     };
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fasync::run_until_stalled(test)]
     async fn launch_invalid_console_returns_error() {
         let (guest_proxy, mut guest_stream) = create_proxy_and_stream::<GuestMarker>().unwrap();
         let (serial_launch_sock, _serial_server_sock) = Socket::create(SocketOpts::STREAM).unwrap();
@@ -101,7 +121,7 @@ mod test {
                 .expect("Failed to parse request")
                 .into_get_serial()
                 .expect("Unexpected call to Guest Proxy");
-            serial_responder.send(serial_launch_sock).expect("Failed to send request to proxy");
+            serial_responder.send(serial_launch_sock).expect("Failed to send response to proxy");
 
             let console_responder = guest_stream
                 .next()
@@ -112,10 +132,10 @@ mod test {
                 .expect("Unexpected call to Guest Proxy");
             console_responder
                 .send(&mut Err(GuestError::DeviceNotPresent))
-                .expect("Failed to send request to proxy");
+                .expect("Failed to send response to proxy");
         };
 
-        let client = attach(guest_proxy);
+        let client = attach(guest_proxy, false);
         let (_, client_res) = join(server, client).await;
         assert!(client_res.is_err());
     }

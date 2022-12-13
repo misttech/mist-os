@@ -8,7 +8,6 @@ use {
 
 mod arguments;
 mod balloon;
-mod serial;
 mod services;
 mod socat;
 mod vsh;
@@ -49,10 +48,6 @@ async fn main() -> Result<(), Error> {
             let output = balloon::handle_balloon_stats(balloon_controller).await?;
             println!("{}", output);
             Ok(())
-        }
-        SubCommands::Serial(serial_args) => {
-            let guest = services::connect(serial_args.guest_type).await?;
-            serial::handle_serial(guest).await
         }
         SubCommands::List(list_args) => {
             let output = guest_cli::list::handle_list(&services, &list_args).await?;
