@@ -57,7 +57,7 @@ class Device : public std::enable_shared_from_this<Device>,
   void Unbind();
 
   // Call the Unbind op for the device.
-  void UnbindOp(fit::callback<void()> unbind_completed);
+  fpromise::promise<void> UnbindOp();
 
   // Removes all of the child devices.
   fpromise::promise<void> RemoveChildren();
@@ -200,9 +200,8 @@ class Device : public std::enable_shared_from_this<Device>,
   bool pending_rebind_ = false;
   bool pending_removal_ = false;
 
-  // Called when unbind is replied to.
-  fit::callback<void()> unbind_completed_;
-  std::atomic<size_t> children_to_unbind_;
+  // Completed when unbind is replied to.
+  fpromise::completer<void> unbind_completer_;
 
   // The default protocol of the device.
   device_t compat_symbol_;

@@ -212,42 +212,29 @@ void Device::Unbind() {
   node_ = {};
 }
 
-void Device::UnbindOp(fit::callback<void()> unbind_completed) {
-  ZX_ASSERT_MSG(!unbind_completed_, "Cannot call UnbindOp twice");
-  unbind_completed_ = std::move(unbind_completed);
+fpromise::promise<void> Device::UnbindOp() {
+  ZX_ASSERT_MSG(!unbind_completer_, "Cannot call UnbindOp twice");
+  fpromise::bridge<void> finished_bridge;
+  unbind_completer_ = std::move(finished_bridge.completer);
 
-  // We conduct a post-order traversal. That is all children must be unbound prior to calling unbind
-  // on ourself.
-  if (HasChildren()) {
-    children_to_unbind_ = std::size(children_);
-    for (auto& child : children_) {
-      child->UnbindOp([this]() {
-        if (--children_to_unbind_ == 0) {
-          // We post this as a task in case unbind is completed in a different thread. We need to
-          // invoke unbind in the dispatcher_'s thread context.
-          async::PostTask(dispatcher_, fit::bind_member(this, &Device::PerformUnbind));
+  // If we are being unbound we have to remove all of our children first.
+  return RemoveChildren().then(
+      [this, bridge = std::move(finished_bridge)](fpromise::result<>& result) mutable {
+        // We don't call unbind on the root parent device because it belongs to another driver.
+        // We find the root parent device because it does not have parent_ set.
+        if (parent_.has_value() && HasOp(ops_, &zx_protocol_device_t::unbind)) {
+          // CompleteUnbind will be called from |device_unbind_reply|.
+          ops_->unbind(compat_symbol_.context);
+        } else {
+          CompleteUnbind();
         }
+        return bridge.consumer.promise();
       });
-    }
-  } else {
-    PerformUnbind();
-  }
-}
-
-void Device::PerformUnbind() {
-  // We don't call unbind on the root parent device because it belongs to another driver. We use the
-  // fact that the root parent doesn't have a parent_ to determine we are the parent.
-  if (parent_.has_value() && HasOp(ops_, &zx_protocol_device_t::unbind)) {
-    // CompleteUnbind will be called from |device_unbind_reply|.
-    ops_->unbind(compat_symbol_.context);
-  } else {
-    CompleteUnbind();
-  }
 }
 
 void Device::CompleteUnbind() {
-  ZX_ASSERT(unbind_completed_);
-  unbind_completed_();
+  ZX_ASSERT(unbind_completer_);
+  unbind_completer_.complete_ok();
 }
 
 const char* Device::Name() const { return name_.data(); }
@@ -602,14 +589,16 @@ void Device::UnbindAndRelease() {
 
   // We schedule our removal on our parent's executor because we can't be removed
   // while being run in a promise on our own executor.
-  parent_.value()->executor_.schedule_task(WaitForInitToComplete().then(
-      [device = shared_from_this()](fpromise::result<void, zx_status_t>& init) {
-        device->UnbindOp([device = std::move(device)]() {
-          // Our device should be destructed at the end of this callback when the reference to the
-          // shared pointer is removed.
-          device->parent_.value()->children_.remove(device);
-        });
-      }));
+  parent_.value()->executor_.schedule_task(
+      WaitForInitToComplete()
+          .then([device = shared_from_this()](fpromise::result<void, zx_status_t>& init) {
+            return device->UnbindOp();
+          })
+          .then([device = shared_from_this()](fpromise::result<void>& init) {
+            // Our device should be destructed at the end of this callback when the reference to the
+            // shared pointer is removed.
+            device->parent_.value()->children_.remove(device);
+          }));
 }
 
 void Device::InsertOrUpdateProperty(fuchsia_driver_framework::wire::NodePropertyKey key,
