@@ -34,10 +34,6 @@ protocol BaseSocket {
     compose fuchsia.unknown.Closeable;
     compose fuchsia.unknown.Queryable;
 
-    // TODO(https://fxbug.dev/105607): Remove this and all comments referencing
-    // fuchsia.io/Node.Describe. When?
-    compose fuchsia.io.Node;
-
     /// Set `SOL_SOCKET` -> `SO_REUSEADDR`.
     SetReuseAddress(struct {
         value bool;
@@ -651,9 +647,6 @@ const FAST_UDP_WAIT_MANY_MAXIMUM_ITEMS uint32 = 63;
 const DATAGRAM_SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket/DatagramSocket";
 
 /// A datagram socket.
-///
-/// This type's [`fuchsia.io/Node.Describe`] method returns a zircon socket which can be
-/// used to perform unacknowledged IO.
 protocol DatagramSocket {
     compose BaseDatagramSocket;
 
@@ -752,10 +745,6 @@ const SYNCHRONOUS_DATAGRAM_SOCKET_PROTOCOL_NAME string
 /// payloads over a channel. All methods are nonblocking; their behavior roughly
 /// matches their Linux counterparts.
 ///
-/// This protocol's [`fuchsia.io/Node.Describe`] method returns an eventpair which
-/// is used to signal additional information about the state of the socket such
-/// as readiness or shutdown-ness.
-///
 /// *Warning:* This protocol is not yet ready for direct use by clients.
 /// Instead, clients should use the BSD sockets API to interact with sockets.
 /// We plan to change this protocol substantially and clients that couple
@@ -817,12 +806,6 @@ protocol SynchronousDatagramSocket {
 const STREAM_SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket/StreamSocket";
 
 /// A stream socket.
-///
-/// This type's [`fuchsia.io/Node.Describe`] method returns a socket which is
-/// used to transfer data to and from the caller. Signals are used to
-/// communicate additional information about the state of the socket such as
-/// connectedness and the presence of incoming connections in the case of a
-/// listening socket.
 ///
 /// All methods on this type are nonblocking; their exact behaviors match their
 /// Linux counterparts.

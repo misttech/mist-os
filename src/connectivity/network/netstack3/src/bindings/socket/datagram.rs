@@ -14,7 +14,6 @@ use std::{
     sync::Arc,
 };
 
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
@@ -22,10 +21,10 @@ use fidl_fuchsia_posix_socket as fposix_socket;
 use assert_matches::assert_matches;
 use async_utils::stream::OneOrMany;
 use explicit::ResultExt as _;
-use fidl::endpoints::{ControlHandle as _, RequestStream as _, ServerEnd};
+use fidl::endpoints::{ControlHandle as _, RequestStream as _};
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, prelude::HandleBased as _, Peered as _};
-use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _};
+use futures::{StreamExt as _, TryFutureExt as _};
 use log::{error, trace, warn};
 use net_types::{
     ip::{Ip, IpVersion, Ipv4, Ipv6},
@@ -1462,7 +1461,6 @@ struct SocketWorker<I: Ip, T: Transport<I>, C> {
 
 struct NewStream {
     stream: fposix_socket::SynchronousDatagramSocketRequestStream,
-    flags: fio::OpenFlags,
 }
 
 impl<I, T, SC> SocketWorker<I, T, SC>
@@ -1529,17 +1527,9 @@ where
         mut self,
         events: fposix_socket::SynchronousDatagramSocketRequestStream,
     ) -> Result<(), fidl::Error> {
-        // Construct the flags for the initial stream.
-        let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-
-        // Define `with_flags` out of line so that when futures are pushed into
-        // the `OneOrMany`, they all use the same anonymous closure type.
-        let with_flags = |flags: fio::OpenFlags| move |x| (x, flags);
-        let events = events.into_future().map(with_flags(rights));
-
-        let mut futures = OneOrMany::new(events);
+        let mut futures = OneOrMany::new(events.into_future());
         let deferred_close = loop {
-            let Some(((request, request_stream), rights)) = futures.next().await  else {
+            let Some((request, request_stream)) = futures.next().await else {
                 // No close request needs to be deferred.
                 break None
             };
@@ -1558,7 +1548,7 @@ where
                 }
                 Some(Ok(t)) => t,
             };
-            match RequestHandler::new(&mut self, &rights).handle_request(request).await {
+            match RequestHandler::new(&mut self).handle_request(request).await {
                 ControlFlow::Continue(None) => {}
                 ControlFlow::Break(close_responder) => {
                     let do_close = move || {
@@ -1573,11 +1563,11 @@ where
                     do_close();
                     continue;
                 }
-                ControlFlow::Continue(Some(NewStream { stream, flags })) => {
-                    futures.push(stream.into_future().map(with_flags(flags)))
+                ControlFlow::Continue(Some(NewStream { stream })) => {
+                    futures.push(stream.into_future())
                 }
             };
-            futures.push(request_stream.into_future().map(with_flags(rights)));
+            futures.push(request_stream.into_future());
         };
 
         self.close_core().await;
@@ -1677,18 +1667,16 @@ where
     type NonSyncCtx = C::NonSyncCtx;
 }
 
-/// A borrow into a [`SocketWorker`]'s state along with the flags used to handle
-/// any requests.
+/// A borrow into a [`SocketWorker`]'s state.
 struct RequestHandler<'a, I: Ip, T: Transport<I>, C> {
     ctx: &'a mut C,
     data: &'a mut BindingData<I, T>,
-    flags: &'a fio::OpenFlags,
 }
 
 impl<'a, I: Ip, T: Transport<I>, SC> RequestHandler<'a, I, T, SC> {
-    fn new(worker: &'a mut SocketWorker<I, T, SC>, flags: &'a fio::OpenFlags) -> Self {
+    fn new(worker: &'a mut SocketWorker<I, T, SC>) -> Self {
         let SocketWorker { ctx, data, _marker } = worker;
-        Self { ctx, data, flags }
+        Self { ctx, data }
     }
 }
 
@@ -1712,33 +1700,16 @@ where
     ) -> ControlFlow<fposix_socket::SynchronousDatagramSocketCloseResponder, Option<NewStream>>
     {
         match request {
-            fposix_socket::SynchronousDatagramSocketRequest::DescribeDeprecated { responder } => {
-                // If the call to duplicate_handle fails, we have no
-                // choice but to drop the responder and close the
-                // channel, since Describe must be infallible.
-                if let Some(mut info) =
-                    self.describe().map(fio::NodeInfoDeprecated::SynchronousDatagramSocket)
-                {
-                    responder_send!(responder, &mut info);
-                }
-            }
             fposix_socket::SynchronousDatagramSocketRequest::Describe { responder } => {
-                // If the call to duplicate_handle fails, we have no
-                // choice but to drop the responder and close the
-                // channel, since Describe must be infallible.
-                if let Some(fio::SynchronousDatagramSocket { event }) = self.describe() {
-                    responder_send!(
-                        responder,
-                        fposix_socket::SynchronousDatagramSocketDescribeResponse {
-                            event: Some(event),
-                            ..fposix_socket::SynchronousDatagramSocketDescribeResponse::EMPTY
-                        }
-                    );
+                match self.describe() {
+                    Ok(response) => responder_send!(responder, response),
+                    Err(status) => {
+                        // If the call to duplicate_handle fails, we have no
+                        // choice but to drop the responder and close the
+                        // channel, since Describe must be infallible.
+                        let _: zx::Status = status;
+                    }
                 }
-            }
-            fposix_socket::SynchronousDatagramSocketRequest::GetConnectionInfo { responder } => {
-                let _ = responder;
-                todo!("https://fxbug.dev/77623");
             }
             fposix_socket::SynchronousDatagramSocketRequest::Connect { addr, responder } => {
                 responder_send!(responder, &mut self.connect(addr).await);
@@ -1746,67 +1717,18 @@ where
             fposix_socket::SynchronousDatagramSocketRequest::Disconnect { responder } => {
                 responder_send!(responder, &mut self.disconnect().await);
             }
-            fposix_socket::SynchronousDatagramSocketRequest::Clone { flags, object, .. } => {
-                if let Some((stream, flags)) = self.handle_clone(object, flags) {
-                    return ControlFlow::Continue(Some(NewStream { stream, flags }));
-                }
-            }
             fposix_socket::SynchronousDatagramSocketRequest::Clone2 {
                 request,
                 control_handle: _,
             } => {
-                if let Some((stream, flags)) =
-                    self.handle_clone(request, fio::OpenFlags::CLONE_SAME_RIGHTS)
-                {
-                    return ControlFlow::Continue(Some(NewStream { stream, flags }));
-                }
-            }
-            fposix_socket::SynchronousDatagramSocketRequest::Reopen {
-                rights_request,
-                object_request,
-                control_handle: _,
-            } => {
-                let _ = object_request;
-                todo!("https://fxbug.dev/77623: rights_request={:?}", rights_request);
+                let channel = fidl::AsyncChannel::from_channel(request.into_channel())
+                    .expect("failed to create async channel");
+                let stream =
+                    fposix_socket::SynchronousDatagramSocketRequestStream::from_channel(channel);
+                return ControlFlow::Continue(Some(NewStream { stream }));
             }
             fposix_socket::SynchronousDatagramSocketRequest::Close { responder } => {
                 return ControlFlow::Break(responder);
-            }
-            fposix_socket::SynchronousDatagramSocketRequest::Sync { responder } => {
-                responder_send!(responder, &mut Err(zx::Status::NOT_SUPPORTED.into_raw()));
-            }
-            fposix_socket::SynchronousDatagramSocketRequest::GetAttr { responder } => {
-                responder_send!(
-                    responder,
-                    zx::Status::NOT_SUPPORTED.into_raw(),
-                    &mut fio::NodeAttributes {
-                        mode: 0,
-                        id: 0,
-                        content_size: 0,
-                        storage_size: 0,
-                        link_count: 0,
-                        creation_time: 0,
-                        modification_time: 0
-                    }
-                );
-            }
-            fposix_socket::SynchronousDatagramSocketRequest::SetAttr {
-                flags: _,
-                attributes: _,
-                responder,
-            } => {
-                responder_send!(responder, zx::Status::NOT_SUPPORTED.into_raw());
-            }
-            fposix_socket::SynchronousDatagramSocketRequest::GetAttributes { query, responder } => {
-                let _ = responder;
-                todo!("https://fxbug.dev/77623: query={:?}", query);
-            }
-            fposix_socket::SynchronousDatagramSocketRequest::UpdateAttributes {
-                payload,
-                responder,
-            } => {
-                let _ = responder;
-                todo!("https://fxbug.dev/77623: payload={:?}", payload);
             }
             fposix_socket::SynchronousDatagramSocketRequest::Bind { addr, responder } => {
                 responder_send!(responder, &mut self.bind(addr).await);
@@ -1816,9 +1738,6 @@ where
                     responder,
                     fposix_socket::SYNCHRONOUS_DATAGRAM_SOCKET_PROTOCOL_NAME.as_bytes()
                 );
-            }
-            fposix_socket::SynchronousDatagramSocketRequest::QueryFilesystem { responder } => {
-                responder_send!(responder, zx::Status::NOT_SUPPORTED.into_raw(), None);
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetSockName { responder } => {
                 responder_send!(responder, &mut self.get_sock_name().await);
@@ -1851,16 +1770,6 @@ where
             } => {
                 // TODO(https://fxbug.dev/21106): handle control.
                 responder_send!(responder, &mut self.send_msg(addr.map(|addr| *addr), data).await);
-            }
-            fposix_socket::SynchronousDatagramSocketRequest::GetFlags { responder } => {
-                responder_send!(
-                    responder,
-                    zx::Status::NOT_SUPPORTED.into_raw(),
-                    fio::OpenFlags::empty()
-                );
-            }
-            fposix_socket::SynchronousDatagramSocketRequest::SetFlags { flags: _, responder } => {
-                responder_send!(responder, zx::Status::NOT_SUPPORTED.into_raw());
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetInfo { responder } => {
                 responder_send!(responder, &mut self.get_sock_info())
@@ -2207,94 +2116,20 @@ where
         ControlFlow::Continue(None)
     }
 
-    /// Returns the intersection of the requested flags against the current
-    /// rights.
-    ///
-    /// If the requested flags contains invalid flags, or requests rights that
-    /// aren't held by `self.flags`, returns `None`. Otherwise returns the new
-    /// flags.
-    fn new_rights(&self, request_flags: fio::OpenFlags) -> Option<fio::OpenFlags> {
-        // Datagram sockets don't understand the following flags.
-        if request_flags.intersects(fio::OpenFlags::APPEND) {
-            return None;
-        }
-        // Datagram sockets are neither mountable nor executable.
-        if request_flags.intersects(fio::OpenFlags::RIGHT_EXECUTABLE) {
-            return None;
-        }
-        // Cannot specify CLONE_FLAGS_SAME_RIGHTS together with
-        // OPEN_RIGHT_* flags.
-        if request_flags.intersects(fio::OpenFlags::CLONE_SAME_RIGHTS)
-            && (request_flags.intersects(fio::OpenFlags::RIGHT_READABLE)
-                || request_flags.intersects(fio::OpenFlags::RIGHT_WRITABLE))
-        {
-            return None;
-        }
-        // If CLONE_SAME_RIGHTS is not set, then use the intersection of the
-        // inherited rights and the newly specified rights.
-        if request_flags.intersects(fio::OpenFlags::CLONE_SAME_RIGHTS) {
-            return Some(self.flags.clone());
-        }
-
-        // Check that the new rights are a subset of the current rights.
-        let new_rights =
-            request_flags & (fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
-        if !self.flags.contains(new_rights) {
-            return None;
-        }
-
-        Some(self.flags.clone() & new_rights)
-    }
-
-    fn handle_clone(
-        self,
-        request: ServerEnd<impl super::CanClone>,
-        requested_flags: fio::OpenFlags,
-    ) -> Option<(fposix_socket::SynchronousDatagramSocketRequestStream, fio::OpenFlags)> {
-        let channel = fidl::AsyncChannel::from_channel(request.into_channel())
-            .expect("failed to create async channel");
-        let request_stream =
-            fposix_socket::SynchronousDatagramSocketRequestStream::from_channel(channel);
-        let control_handle = request_stream.control_handle();
-        let send_on_open = |status: i32, info: Option<&mut fio::NodeInfoDeprecated>| {
-            let () = control_handle.send_on_open_(status, info).unwrap_or_else(|e| {
-                log::log!(
-                    util::fidl_err_log_level(&e),
-                    "failed to send OnOpen event with status ({}): {}",
-                    status,
-                    e
-                )
-            });
-        };
-
-        match self.new_rights(requested_flags) {
-            None => {
-                send_on_open(zx::sys::ZX_ERR_INVALID_ARGS, None);
-                None
+    fn describe(
+        &self,
+    ) -> Result<fposix_socket::SynchronousDatagramSocketDescribeResponse, zx::Status> {
+        let Self { ctx: _, data: BindingData { peer_event, info: _, messages: _ } } = self;
+        peer_event.duplicate_handle(zx::Rights::BASIC).map(|peer| {
+            fposix_socket::SynchronousDatagramSocketDescribeResponse {
+                event: Some(peer),
+                ..fposix_socket::SynchronousDatagramSocketDescribeResponse::EMPTY
             }
-            Some(flags) => {
-                if requested_flags.intersects(fio::OpenFlags::DESCRIBE) {
-                    let mut info =
-                        self.describe().map(fio::NodeInfoDeprecated::SynchronousDatagramSocket);
-                    send_on_open(zx::sys::ZX_OK, info.as_mut());
-                }
-                Some((request_stream, flags))
-            }
-        }
-    }
-
-    fn describe(&self) -> Option<fio::SynchronousDatagramSocket> {
-        let Self { ctx: _, data: BindingData { peer_event, info: _, messages: _ }, flags: _ } =
-            self;
-        peer_event
-            .duplicate_handle(zx::Rights::BASIC)
-            .map(|peer| fio::SynchronousDatagramSocket { event: peer })
-            .ok()
+        })
     }
 
     fn get_max_receive_buffer_size(&self) -> u64 {
-        let Self { ctx: _, data: BindingData { peer_event: _, info: _, messages }, flags: _ } =
-            self;
+        let Self { ctx: _, data: BindingData { peer_event: _, info: _, messages } } = self;
         messages.lock().queue.max_available_messages_size.try_into().unwrap_or(u64::MAX)
     }
 
@@ -2307,8 +2142,7 @@ where
             std::cmp::max(max_bytes, MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE),
             MAX_OUTSTANDING_APPLICATION_MESSAGES_SIZE,
         );
-        let Self { ctx: _, data: BindingData { peer_event: _, info: _, messages }, flags: _ } =
-            self;
+        let Self { ctx: _, data: BindingData { peer_event: _, info: _, messages } } = self;
         messages.lock().queue.max_available_messages_size = max_bytes
     }
 
@@ -2560,14 +2394,6 @@ where
         }
     }
 
-    fn need_rights(&self, required: fio::OpenFlags) -> Result<(), fposix::Errno> {
-        if *self.flags & required == required {
-            Ok(())
-        } else {
-            Err(fposix::Errno::Eperm)
-        }
-    }
-
     async fn recv_msg(
         self,
         want_addr: bool,
@@ -2582,8 +2408,7 @@ where
         ),
         fposix::Errno,
     > {
-        let () = self.need_rights(fio::OpenFlags::RIGHT_READABLE)?;
-        let Self { ctx: _, data: BindingData { peer_event: _, info, messages }, flags: _ } = self;
+        let Self { ctx: _, data: BindingData { peer_event: _, info, messages } } = self;
         let mut messages = messages.lock();
         let front = if recv_flags.contains(fposix_socket::RecvMsgFlags::PEEK) {
             messages.peek().cloned()
@@ -2634,7 +2459,6 @@ where
         addr: Option<fnet::SocketAddress>,
         data: Vec<u8>,
     ) -> Result<i64, fposix::Errno> {
-        let () = self.need_rights(fio::OpenFlags::RIGHT_WRITABLE)?;
         let remote_addr = addr.map(I::SocketAddress::from_sock_addr).transpose()?;
 
         let mut ctx = self.ctx.lock().await;
@@ -2768,7 +2592,7 @@ where
     }
 
     async fn shutdown(self, how: fposix_socket::ShutdownMode) -> Result<(), fposix::Errno> {
-        let Self { data: BindingData { peer_event: _, info, messages }, ctx: _, flags: _ } = self;
+        let Self { data: BindingData { peer_event: _, info, messages }, ctx: _ } = self;
 
         // Only "connected" sockets can be shutdown.
         if let SocketState::BoundConnect { ref mut shutdown_read, ref mut shutdown_write, .. } =

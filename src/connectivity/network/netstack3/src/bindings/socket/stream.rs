@@ -19,7 +19,6 @@ use fidl::{
     endpoints::{ClientEnd, ControlHandle as _, RequestStream as _},
     HandleBased as _,
 };
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
@@ -813,16 +812,6 @@ where
             fposix_socket::StreamSocketRequest::Connect { addr, responder } => {
                 responder_send!(responder, &mut self.connect(addr).await);
             }
-            fposix_socket::StreamSocketRequest::DescribeDeprecated { responder } => {
-                let socket = self
-                    .peer
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("failed to duplicate the socket handle");
-                responder_send!(
-                    responder,
-                    &mut fio::NodeInfoDeprecated::StreamSocket(fio::StreamSocket { socket })
-                );
-            }
             fposix_socket::StreamSocketRequest::Describe { responder } => {
                 let socket = self
                     .peer
@@ -842,37 +831,12 @@ where
             fposix_socket::StreamSocketRequest::Accept { want_addr, responder } => {
                 responder_send!(responder, &mut self.accept(want_addr).await);
             }
-            fposix_socket::StreamSocketRequest::Reopen {
-                rights_request,
-                object_request: _,
-                control_handle: _,
-            } => {
-                todo!("https://fxbug.dev/77623: rights_request={:?}", rights_request);
-            }
             fposix_socket::StreamSocketRequest::Close { responder } => {
                 // We don't just close the socket because this socket worker is
                 // potentially shared by a bunch of sockets because the client
                 // can call `dup` on this socket. We will do the cleanup at the
                 // end of this task.
                 return ControlFlow::Break(responder);
-            }
-            fposix_socket::StreamSocketRequest::GetConnectionInfo { responder: _ } => {
-                todo!("https://fxbug.dev/77623");
-            }
-            fposix_socket::StreamSocketRequest::GetAttributes { query, responder: _ } => {
-                todo!("https://fxbug.dev/77623: query={:?}", query);
-            }
-            fposix_socket::StreamSocketRequest::UpdateAttributes { payload, responder: _ } => {
-                todo!("https://fxbug.dev/77623: attributes={:?}", payload);
-            }
-            fposix_socket::StreamSocketRequest::Sync { responder } => {
-                responder_send!(responder, &mut Err(zx::Status::NOT_SUPPORTED.into_raw()));
-            }
-            fposix_socket::StreamSocketRequest::Clone { flags: _, object, control_handle: _ } => {
-                let channel = fidl::AsyncChannel::from_channel(object.into_channel())
-                    .expect("failed to create async channel");
-                let events = fposix_socket::StreamSocketRequestStream::from_channel(channel);
-                return ControlFlow::Continue(Some(events));
             }
             fposix_socket::StreamSocketRequest::Clone2 { request, control_handle: _ } => {
                 let channel = fidl::AsyncChannel::from_channel(request.into_channel())
@@ -884,39 +848,8 @@ where
                 let identifier = (!value.is_empty()).then_some(value.as_str());
                 responder_send!(responder, &mut self.set_bind_to_device(identifier).await);
             }
-            fposix_socket::StreamSocketRequest::GetAttr { responder } => {
-                responder_send!(
-                    responder,
-                    zx::Status::NOT_SUPPORTED.into_raw(),
-                    &mut fio::NodeAttributes {
-                        mode: 0,
-                        id: 0,
-                        content_size: 0,
-                        storage_size: 0,
-                        link_count: 0,
-                        creation_time: 0,
-                        modification_time: 0
-                    }
-                );
-            }
-            fposix_socket::StreamSocketRequest::SetAttr { flags: _, attributes: _, responder } => {
-                responder_send!(responder, zx::Status::NOT_SUPPORTED.into_raw());
-            }
-            fposix_socket::StreamSocketRequest::GetFlags { responder } => {
-                responder_send!(
-                    responder,
-                    zx::Status::NOT_SUPPORTED.into_raw(),
-                    fio::OpenFlags::empty()
-                );
-            }
-            fposix_socket::StreamSocketRequest::SetFlags { flags: _, responder } => {
-                responder_send!(responder, zx::Status::NOT_SUPPORTED.into_raw());
-            }
             fposix_socket::StreamSocketRequest::Query { responder } => {
                 responder_send!(responder, fposix_socket::STREAM_SOCKET_PROTOCOL_NAME.as_bytes());
-            }
-            fposix_socket::StreamSocketRequest::QueryFilesystem { responder } => {
-                responder_send!(responder, zx::Status::NOT_SUPPORTED.into_raw(), None);
             }
             fposix_socket::StreamSocketRequest::SetReuseAddress { value: _, responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));

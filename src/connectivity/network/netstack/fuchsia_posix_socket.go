@@ -337,50 +337,6 @@ func (ep *endpoint) decRef() bool {
 	return doClose
 }
 
-func (ep *endpoint) Sync(fidl.Context) (fidlio.Node2SyncResult, error) {
-	_ = syslog.DebugTf("Sync", "%p", ep)
-
-	return fidlio.Node2SyncResultWithErr(int32(zx.ErrNotSupported)), nil
-}
-
-func (ep *endpoint) GetAttr(fidl.Context) (int32, fidlio.NodeAttributes, error) {
-	_ = syslog.DebugTf("GetAttr", "%p", ep)
-
-	return 0, fidlio.NodeAttributes{}, &zx.Error{Status: zx.ErrNotSupported, Text: fmt.Sprintf("%T", ep)}
-}
-
-func (ep *endpoint) GetAttributes(_ fidl.Context, query fidlio.NodeAttributesQuery) (fidlio.Node2GetAttributesResult, error) {
-	_ = syslog.DebugTf("GetAttributes", "%p: query=%#v", ep, query)
-	return fidlio.Node2GetAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
-}
-
-func (ep *endpoint) SetAttr(fidl.Context, fidlio.NodeAttributeFlags, fidlio.NodeAttributes) (int32, error) {
-	_ = syslog.DebugTf("SetAttr", "%p", ep)
-
-	return 0, &zx.Error{Status: zx.ErrNotSupported, Text: fmt.Sprintf("%T", ep)}
-}
-
-func (ep *endpoint) UpdateAttributes(_ fidl.Context, attributes fidlio.MutableNodeAttributes) (fidlio.Node2UpdateAttributesResult, error) {
-	_ = syslog.DebugTf("UpdateAttributes", "%p: attributes=%#v", ep, attributes)
-	return fidlio.Node2UpdateAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
-}
-
-func (ep *endpoint) GetFlags(fidl.Context) (int32, fidlio.OpenFlags, error) {
-	_ = syslog.DebugTf("GetFlags", "%p", ep)
-
-	return 0, 0, &zx.Error{Status: zx.ErrNotSupported, Text: fmt.Sprintf("%T", ep)}
-}
-
-func (ep *endpoint) SetFlags(_ fidl.Context, flags fidlio.OpenFlags) (int32, error) {
-	_ = syslog.DebugTf("GetFlags", "%p", ep)
-
-	return 0, &zx.Error{Status: zx.ErrNotSupported, Text: fmt.Sprintf("%T", ep)}
-}
-
-func (ep *endpoint) QueryFilesystem(fidl.Context) (int32, *fidlio.FilesystemInfo, error) {
-	return int32(zx.ErrNotSupported), nil, nil
-}
-
 func (ep *endpoint) Bind(_ fidl.Context, sockaddr fidlnet.SocketAddress) (socket.BaseNetworkSocketBindResult, error) {
 	addr := fidlconv.ToTCPIPFullAddress(sockaddr)
 	if err := ep.ep.Bind(addr); err != nil {
@@ -2542,27 +2498,10 @@ func (s *datagramSocketImpl) GetIpv6ReceivePacketInfo(fidl.Context) (socket.Base
 	return socket.BaseNetworkSocketGetIpv6ReceivePacketInfoResultWithResponse(socket.BaseNetworkSocketGetIpv6ReceivePacketInfoResponse{Value: s.sharedState.cmsgCacheMu.cmsgCache.ipv6PktInfo}), nil
 }
 
-func (s *datagramSocketImpl) Clone(ctx fidl.Context, flags fidlio.OpenFlags, object fidlio.NodeWithCtxInterfaceRequest) error {
-	s.addConnection(ctx, object.Channel)
-
-	_ = syslog.DebugTf("Clone", "%p: flags=%b", s.endpointWithSocket, flags)
-
-	return nil
-}
-
 func (s *datagramSocketImpl) Clone2(ctx fidl.Context, object unknown.CloneableWithCtxInterfaceRequest) error {
 	s.addConnection(ctx, object.Channel)
 
 	_ = syslog.DebugTf("Clone", "%p", s.endpointWithSocket)
-
-	return nil
-}
-
-func (s *datagramSocketImpl) Reopen(ctx fidl.Context, rights *fidlio.RightsRequest, channel zx.Channel) error {
-	// TODO(https://fxbug.dev/77623): Implement.
-	_ = channel.Close()
-
-	_ = syslog.DebugTf("Reopen", "%p: rights=%#v", s.endpointWithSocket, rights)
 
 	return nil
 }
@@ -2585,19 +2524,6 @@ func (s *datagramSocketImpl) Close(fidl.Context) (unknown.CloseableCloseResult, 
 	return unknown.CloseableCloseResultWithResponse(unknown.CloseableCloseResponse{}), nil
 }
 
-func (s *datagramSocketImpl) DescribeDeprecated(fidl.Context) (fidlio.NodeInfoDeprecated, error) {
-	handle, err := s.describe()
-	if err != nil {
-		return fidlio.NodeInfoDeprecated{}, err
-	}
-	return fidlio.NodeInfoDeprecatedWithDatagramSocket(fidlio.DatagramSocket{
-		Socket:                          zx.Socket(handle),
-		TxMetaBufSize:                   uint64(udpTxPreludeSize),
-		RxMetaBufSize:                   uint64(udpRxPreludeSize),
-		MetadataEncodingProtocolVersion: fidlio.UdpMetadataEncodingProtocolVersionZero,
-	}), nil
-}
-
 func (*datagramSocketImpl) Query(fidl.Context) ([]uint8, error) {
 	return []byte(socket.DatagramSocketProtocolName), nil
 }
@@ -2613,14 +2539,6 @@ func (s *datagramSocketImpl) Describe(fidl.Context) (socket.DatagramSocketDescri
 	response.SetRxMetaBufSize(uint64(udpRxPreludeSize))
 	response.SetMetadataEncodingProtocolVersion(fidlio.UdpMetadataEncodingProtocolVersionZero)
 	return response, nil
-}
-
-func (s *datagramSocketImpl) GetConnectionInfo(fidl.Context) (fidlio.ConnectionInfo, error) {
-	var connectionInfo fidlio.ConnectionInfo
-	// TODO(https://fxbug.dev/77623): Populate the rights requested by the client at connection.
-	rights := fidlio.RStarDir
-	connectionInfo.SetRights(rights)
-	return connectionInfo, nil
 }
 
 func (s *datagramSocketImpl) GetInfo(fidl.Context) (socket.BaseDatagramSocketGetInfoResult, error) {
@@ -2760,16 +2678,6 @@ type synchronousDatagramSocketImpl struct {
 
 var _ socket.SynchronousDatagramSocketWithCtx = (*synchronousDatagramSocketImpl)(nil)
 
-func (s *synchronousDatagramSocketImpl) DescribeDeprecated(fidl.Context) (fidlio.NodeInfoDeprecated, error) {
-	event, err := s.describe()
-	if err != nil {
-		return fidlio.NodeInfoDeprecated{}, err
-	}
-	return fidlio.NodeInfoDeprecatedWithSynchronousDatagramSocket(fidlio.SynchronousDatagramSocket{
-		Event: event,
-	}), nil
-}
-
 func (*synchronousDatagramSocketImpl) Query(fidl.Context) ([]byte, error) {
 	return []byte(socket.SynchronousDatagramSocketProtocolName), nil
 }
@@ -2782,14 +2690,6 @@ func (s *synchronousDatagramSocketImpl) Describe(fidl.Context) (socket.Synchrono
 	}
 	response.SetEvent(event)
 	return response, nil
-}
-
-func (s *synchronousDatagramSocketImpl) GetConnectionInfo(fidl.Context) (fidlio.ConnectionInfo, error) {
-	var connectionInfo fidlio.ConnectionInfo
-	// TODO(https://fxbug.dev/77623): Populate the rights requested by the client at connection.
-	rights := fidlio.RStarDir
-	connectionInfo.SetRights(rights)
-	return connectionInfo, nil
 }
 
 func (s *synchronousDatagramSocket) socketControlMessagesToFIDL(cmsg tcpip.ReceivableControlMessages) socket.SocketRecvControlData {
@@ -2976,27 +2876,10 @@ func (s *synchronousDatagramSocket) addConnection(prefix string, channel zx.Chan
 	}()
 }
 
-func (s *synchronousDatagramSocketImpl) Clone(ctx fidl.Context, flags fidlio.OpenFlags, object fidlio.NodeWithCtxInterfaceRequest) error {
-	s.addConnection(ctx, object.Channel)
-
-	_ = syslog.DebugTf("Clone", "%p: flags=%b", s.endpointWithEvent, flags)
-
-	return nil
-}
-
 func (s *synchronousDatagramSocketImpl) Clone2(ctx fidl.Context, object unknown.CloneableWithCtxInterfaceRequest) error {
 	s.addConnection(ctx, object.Channel)
 
 	_ = syslog.DebugTf("Clone", "%p", s.endpointWithEvent)
-
-	return nil
-}
-
-func (s *synchronousDatagramSocketImpl) Reopen(ctx fidl.Context, rights *fidlio.RightsRequest, channel zx.Channel) error {
-	// TODO(https://fxbug.dev/77623): Implement.
-	_ = channel.Close()
-
-	_ = syslog.DebugTf("Reopen", "%p: rights=%#v", s.endpointWithEvent, rights)
 
 	return nil
 }
@@ -3313,39 +3196,12 @@ func (s *streamSocketImpl) addConnection(_ fidl.Context, channel zx.Channel) {
 	}
 }
 
-func (s *streamSocketImpl) Clone(ctx fidl.Context, flags fidlio.OpenFlags, object fidlio.NodeWithCtxInterfaceRequest) error {
-	s.addConnection(ctx, object.Channel)
-
-	_ = syslog.DebugTf("Clone", "%p: flags=%b", s.endpointWithSocket, flags)
-
-	return nil
-}
-
 func (s *streamSocketImpl) Clone2(ctx fidl.Context, object unknown.CloneableWithCtxInterfaceRequest) error {
 	s.addConnection(ctx, object.Channel)
 
 	_ = syslog.DebugTf("Clone", "%p", s.endpointWithSocket)
 
 	return nil
-}
-
-func (s *streamSocketImpl) Reopen(ctx fidl.Context, rights *fidlio.RightsRequest, channel zx.Channel) error {
-	// TODO(https://fxbug.dev/77623): Implement.
-	_ = channel.Close()
-
-	_ = syslog.DebugTf("Reopen", "%p: rights=%#v", s.endpointWithSocket, rights)
-
-	return nil
-}
-
-func (s *streamSocketImpl) DescribeDeprecated(fidl.Context) (fidlio.NodeInfoDeprecated, error) {
-	handle, err := s.describe()
-	if err != nil {
-		return fidlio.NodeInfoDeprecated{}, err
-	}
-	return fidlio.NodeInfoDeprecatedWithStreamSocket(fidlio.StreamSocket{
-		Socket: zx.Socket(handle),
-	}), nil
 }
 
 func (*streamSocketImpl) Query(fidl.Context) ([]uint8, error) {
@@ -3360,14 +3216,6 @@ func (s *streamSocketImpl) Describe(fidl.Context) (socket.StreamSocketDescribeRe
 	}
 	response.SetSocket(zx.Socket(handle))
 	return response, nil
-}
-
-func (s *streamSocketImpl) GetConnectionInfo(fidl.Context) (fidlio.ConnectionInfo, error) {
-	var connectionInfo fidlio.ConnectionInfo
-	// TODO(https://fxbug.dev/77623): Populate the rights requested by the client at connection.
-	rights := fidlio.RStarDir
-	connectionInfo.SetRights(rights)
-	return connectionInfo, nil
 }
 
 func (s *streamSocketImpl) Accept(_ fidl.Context, wantAddr bool) (socket.StreamSocketAcceptResult, error) {
@@ -4082,16 +3930,6 @@ type rawSocketImpl struct {
 
 var _ rawsocket.SocketWithCtx = (*rawSocketImpl)(nil)
 
-func (s *rawSocketImpl) DescribeDeprecated(fidl.Context) (fidlio.NodeInfoDeprecated, error) {
-	event, err := s.describe()
-	if err != nil {
-		return fidlio.NodeInfoDeprecated{}, err
-	}
-	return fidlio.NodeInfoDeprecatedWithRawSocket(fidlio.RawSocket{
-		Event: event,
-	}), nil
-}
-
 func (*rawSocketImpl) Query(fidl.Context) ([]byte, error) {
 	return []byte(rawsocket.SocketProtocolName), nil
 }
@@ -4106,14 +3944,6 @@ func (s *rawSocketImpl) Describe(fidl.Context) (rawsocket.SocketDescribeResponse
 	return response, nil
 }
 
-func (s *rawSocketImpl) GetConnectionInfo(fidl.Context) (fidlio.ConnectionInfo, error) {
-	var connectionInfo fidlio.ConnectionInfo
-	// TODO(https://fxbug.dev/77623): Populate the rights requested by the client at connection.
-	rights := fidlio.RStarDir
-	connectionInfo.SetRights(rights)
-	return connectionInfo, nil
-}
-
 func (s *rawSocketImpl) addConnection(_ fidl.Context, channel zx.Channel) {
 	{
 		sCopy := *s
@@ -4124,27 +3954,10 @@ func (s *rawSocketImpl) addConnection(_ fidl.Context, channel zx.Channel) {
 	}
 }
 
-func (s *rawSocketImpl) Clone(ctx fidl.Context, flags fidlio.OpenFlags, object fidlio.NodeWithCtxInterfaceRequest) error {
-	s.addConnection(ctx, object.Channel)
-
-	_ = syslog.DebugTf("Clone", "%p: flags=%b", s.endpointWithEvent, flags)
-
-	return nil
-}
-
 func (s *rawSocketImpl) Clone2(ctx fidl.Context, object unknown.CloneableWithCtxInterfaceRequest) error {
 	s.addConnection(ctx, object.Channel)
 
 	_ = syslog.DebugTf("Clone", "%p", s.endpointWithEvent)
-
-	return nil
-}
-
-func (s *rawSocketImpl) Reopen(ctx fidl.Context, rights *fidlio.RightsRequest, channel zx.Channel) error {
-	// TODO(https://fxbug.dev/77623): Implement.
-	_ = channel.Close()
-
-	_ = syslog.DebugTf("Reopen", "%p: rights=%#v", s.endpointWithEvent, rights)
 
 	return nil
 }
@@ -4440,16 +4253,6 @@ type packetSocketImpl struct {
 	kind packetsocket.Kind
 }
 
-func (s *packetSocketImpl) DescribeDeprecated(fidl.Context) (fidlio.NodeInfoDeprecated, error) {
-	event, err := s.describe()
-	if err != nil {
-		return fidlio.NodeInfoDeprecated{}, err
-	}
-	return fidlio.NodeInfoDeprecatedWithPacketSocket(fidlio.PacketSocket{
-		Event: event,
-	}), nil
-}
-
 func (*packetSocketImpl) Query(fidl.Context) ([]uint8, error) {
 	return []byte(packetsocket.SocketProtocolName), nil
 }
@@ -4464,35 +4267,10 @@ func (s *packetSocketImpl) Describe(fidl.Context) (packetsocket.SocketDescribeRe
 	return response, nil
 }
 
-func (s *packetSocketImpl) GetConnectionInfo(fidl.Context) (fidlio.ConnectionInfo, error) {
-	var connectionInfo fidlio.ConnectionInfo
-	// TODO(https://fxbug.dev/77623): Populate the rights requested by the client at connection.
-	rights := fidlio.RStarDir
-	connectionInfo.SetRights(rights)
-	return connectionInfo, nil
-}
-
-func (s *packetSocketImpl) Clone(ctx fidl.Context, flags fidlio.OpenFlags, object fidlio.NodeWithCtxInterfaceRequest) error {
-	s.addConnection(ctx, object.Channel)
-
-	_ = syslog.DebugTf("Clone", "%p: flags=%b", s.endpointWithEvent, flags)
-
-	return nil
-}
-
 func (s *packetSocketImpl) Clone2(ctx fidl.Context, object unknown.CloneableWithCtxInterfaceRequest) error {
 	s.addConnection(ctx, object.Channel)
 
 	_ = syslog.DebugTf("Clone", "%p", s.endpointWithEvent)
-
-	return nil
-}
-
-func (s *packetSocketImpl) Reopen(ctx fidl.Context, rights *fidlio.RightsRequest, channel zx.Channel) error {
-	// TODO(https://fxbug.dev/77623): Implement.
-	_ = channel.Close()
-
-	_ = syslog.DebugTf("Reopen", "%p: rights=%#v", s.endpointWithEvent, rights)
 
 	return nil
 }
