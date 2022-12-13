@@ -16,7 +16,6 @@
 #include <fbl/ref_ptr.h>
 
 #include "src/lib/storage/vfs/cpp/connection.h"
-#include "src/lib/storage/vfs/cpp/vfs.h"
 #include "src/lib/storage/vfs/cpp/vfs_types.h"
 #include "src/lib/storage/vfs/cpp/vnode.h"
 
@@ -33,6 +32,8 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   ~FileConnection() override = default;
 
  protected:
+  void Dispatch(fidl::IncomingHeaderAndMessage&&, fidl::Transaction*) override;
+
   void OnTeardown() override;
 
   //

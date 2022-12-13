@@ -28,7 +28,9 @@ class DirectoryConnection final : public Connection,
   ~DirectoryConnection() final = default;
 
  protected:
-  void OnTeardown();
+  void Dispatch(fidl::IncomingHeaderAndMessage&&, fidl::Transaction*) override;
+
+  void OnTeardown() override;
 
  private:
   //

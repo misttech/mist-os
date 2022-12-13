@@ -25,7 +25,6 @@
 
 #include "src/lib/storage/vfs/cpp/advisory_lock.h"
 #include "src/lib/storage/vfs/cpp/debug.h"
-#include "src/lib/storage/vfs/cpp/fidl_transaction.h"
 #include "src/lib/storage/vfs/cpp/vfs_types.h"
 #include "src/lib/storage/vfs/cpp/vnode.h"
 
@@ -92,8 +91,11 @@ namespace internal {
 
 DirectoryConnection::DirectoryConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
                                          VnodeProtocol protocol, VnodeConnectionOptions options)
-    : Connection(vfs, std::move(vnode), protocol, options,
-                 FidlProtocol::Create<fuchsia_io::Directory>(this)) {}
+    : Connection(vfs, std::move(vnode), protocol, options) {}
+
+void DirectoryConnection::Dispatch(fidl::IncomingHeaderAndMessage&& msg, fidl::Transaction* txn) {
+  fidl::WireDispatch(this, std::forward<fidl::IncomingHeaderAndMessage>(msg), txn);
+}
 
 void DirectoryConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
   // TODO(https://fxbug.dev/111302): test this.

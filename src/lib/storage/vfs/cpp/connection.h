@@ -98,57 +98,7 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   zx::result<VnodeRepresentation> GetNodeRepresentation() { return NodeDescribe(); }
 
  protected:
-  // Subclasses of |Connection| should implement a particular |fuchsia.io| protocol. This is a
-  // utility for creating corresponding message dispatch functions which decodes a FIDL message and
-  // invokes a handler on |protocol_impl|. In essence, it partially-applies the |impl| argument in
-  // the LLCPP |TryDispatch| function.
-  class FidlProtocol {
-   public:
-    // Factory function to create a |FidlProtocol|.
-    // |Protocol| should be an LLCPP generated class e.g. |fuchsia_io::File|.
-    // |protocol_impl| should be the |this| pointer when used from a subclass.
-    template <typename Protocol>
-    static FidlProtocol Create(typename fidl::WireServer<Protocol>* protocol_impl) {
-      return FidlProtocol(
-          static_cast<void*>(protocol_impl),
-          [](void* impl, fidl::IncomingHeaderAndMessage&& msg, fidl::Transaction* txn) {
-            return fidl::WireDispatch<Protocol>(
-                static_cast<typename fidl::WireServer<Protocol>*>(impl),
-                std::forward<fidl::IncomingHeaderAndMessage>(msg), txn);
-          });
-    }
-
-    // Dispatches |message| on |Protocol|. The function consumes the message and returns true if the
-    // method was recognized by the protocol. Otherwise, it leaves the message intact and returns
-    // false.
-    void Dispatch(fidl::IncomingHeaderAndMessage&& message, fidl::Transaction* transaction) {
-      return dispatch_fn_(protocol_impl_, std::forward<fidl::IncomingHeaderAndMessage>(message),
-                          transaction);
-    }
-
-    FidlProtocol(const FidlProtocol&) = default;
-    FidlProtocol(FidlProtocol&&) = default;
-    FidlProtocol& operator=(const FidlProtocol&) = delete;
-    FidlProtocol& operator=(FidlProtocol&&) = delete;
-    ~FidlProtocol() = default;
-
-   private:
-    using TypeErasedDispatchFn = void (*)(void* impl, fidl::IncomingHeaderAndMessage&&,
-                                          fidl::Transaction*);
-
-    FidlProtocol() = delete;
-    FidlProtocol(void* protocol_impl, TypeErasedDispatchFn dispatch_fn)
-        : protocol_impl_(protocol_impl), dispatch_fn_(dispatch_fn) {}
-
-    // Pointer to the FIDL protocol implementation.
-    // Note that this is not necessarily the address of the |Connection| instance
-    // due to multiple inheritance.
-    void* const protocol_impl_;
-
-    // The FIDL method dispatch function corresponding to the specific FIDL
-    // protocol implemented by a subclass of |Connection|.
-    TypeErasedDispatchFn const dispatch_fn_;
-  };
+  virtual void Dispatch(fidl::IncomingHeaderAndMessage&&, fidl::Transaction*) = 0;
 
   // Create a connection bound to a particular vnode.
   //
@@ -162,7 +112,7 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   //           rights passed during the |fuchsia.io/Directory.Open| or |fuchsia.io/Node.Clone| FIDL
   //           call.
   Connection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol,
-             VnodeConnectionOptions options, FidlProtocol fidl_protocol);
+             VnodeConnectionOptions options);
 
   VnodeProtocol protocol() const { return protocol_; }
 
@@ -237,9 +187,6 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   // Handle to event which allows client to refer to open vnodes in multi-path operations (see:
   // link, rename). Defaults to ZX_HANDLE_INVALID. Validated on the server-side using cookies.
   zx::event token_ = {};
-
-  // See documentation on |FidlProtocol|.
-  FidlProtocol fidl_protocol_;
 };
 
 // |Binding| contains state related to FIDL message dispatching. After starting FIDL message

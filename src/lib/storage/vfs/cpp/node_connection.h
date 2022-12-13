@@ -29,6 +29,8 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
   ~NodeConnection() final = default;
 
  private:
+  void Dispatch(fidl::IncomingHeaderAndMessage&&, fidl::Transaction*) override;
+
   //
   // |fuchsia.io/Node| operations.
   //

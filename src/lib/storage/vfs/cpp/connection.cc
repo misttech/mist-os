@@ -92,13 +92,12 @@ Binding::Binding(Connection& connection, async_dispatcher_t* dispatcher, zx::cha
 Binding::~Binding() { CancelDispatching(); }
 
 Connection::Connection(FuchsiaVfs* vfs, fbl::RefPtr<Vnode> vnode, VnodeProtocol protocol,
-                       VnodeConnectionOptions options, FidlProtocol fidl_protocol)
+                       VnodeConnectionOptions options)
     : vnode_is_open_(!options.flags.node_reference),
       vfs_(vfs),
       vnode_(std::move(vnode)),
       protocol_(protocol),
-      options_(VnodeConnectionOptions::FilterForNewConnection(options)),
-      fidl_protocol_(fidl_protocol) {
+      options_(VnodeConnectionOptions::FilterForNewConnection(options)) {
   ZX_DEBUG_ASSERT(vfs);
   ZX_DEBUG_ASSERT(vnode_);
 }
@@ -196,7 +195,7 @@ bool Connection::OnMessage() {
 
   auto* header = msg.header();
   FidlTransaction txn(header->txid, binding);
-  fidl_protocol_.Dispatch(std::move(msg), &txn);
+  Dispatch(std::move(msg), &txn);
 
   switch (txn.ToResult()) {
     case FidlTransaction::Result::kRepliedSynchronously:

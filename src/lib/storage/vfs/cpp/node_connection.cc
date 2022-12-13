@@ -22,8 +22,6 @@
 
 #include <fbl/string_buffer.h>
 
-#include "src/lib/storage/vfs/cpp/debug.h"
-#include "src/lib/storage/vfs/cpp/fidl_transaction.h"
 #include "src/lib/storage/vfs/cpp/vfs_types.h"
 #include "src/lib/storage/vfs/cpp/vnode.h"
 
@@ -35,7 +33,11 @@ namespace internal {
 
 NodeConnection::NodeConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
                                VnodeProtocol protocol, VnodeConnectionOptions options)
-    : Connection(vfs, std::move(vnode), protocol, options, FidlProtocol::Create<fio::Node>(this)) {}
+    : Connection(vfs, std::move(vnode), protocol, options) {}
+
+void NodeConnection::Dispatch(fidl::IncomingHeaderAndMessage&& msg, fidl::Transaction* txn) {
+  fidl::WireDispatch(this, std::forward<fidl::IncomingHeaderAndMessage>(msg), txn);
+}
 
 void NodeConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
   Connection::NodeClone(request->flags, std::move(request->object));
