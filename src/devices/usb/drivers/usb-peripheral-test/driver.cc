@@ -10,6 +10,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/hw/arch_ops.h>
+#include <lib/sync/completion.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -286,6 +287,7 @@ zx_status_t UsbTest::UsbFunctionInterfaceControl(const usb_setup_t* setup,
       // TODO(voydanoff) maybe stall in this case?
       return ZX_OK;
     }
+
     size_t result = req->CopyTo(test_data_, test_data_length_, 0);
     ZX_ASSERT(result == test_data_length_);
     req->request()->header.length = test_data_length_;
@@ -298,6 +300,65 @@ zx_status_t UsbTest::UsbFunctionInterfaceControl(const usb_setup_t* setup,
     hw_mb();
     usb_request_cache_flush(req->request(), 0, req->request()->response.actual);
     function_.RequestQueue(req->take(), &complete);
+    return ZX_OK;
+  } else if (setup->bm_request_type == (USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_INTERFACE) &&
+             setup->b_request == USB_PERIPHERAL_TEST_BULK_TRANSFER_SIZE) {
+    if (sizeof(uint64_t) != write_size) {
+      zxlogf(ERROR, "Unexpected argument size %lu should be %lu", write_size, sizeof(uint64_t));
+      return ZX_ERR_INVALID_ARGS;
+    }
+    uint64_t buffer_size = *reinterpret_cast<const uint64_t*>(write_buffer);
+    if (buffer_size >= 4096) {
+      zxlogf(ERROR, "Buffer size is too big, buffer size = %lu", buffer_size);
+      return ZX_ERR_INVALID_ARGS;
+    }
+
+    std::unique_ptr<uint8_t[]> size_buffer = std::make_unique<uint8_t[]>(buffer_size);
+    memset(size_buffer.get(), 0x1, buffer_size);
+
+    // Creating a bulk out request since the test starts in the driver side.
+    std::optional<usb::Request<void>> req_out;
+    zx_status_t status =
+        usb::Request<void>::Alloc(&req_out, BULK_REQ_SIZE, bulk_out_addr_, parent_req_size_);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "%s: allocating bulk request is unavailable", __func__);
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+
+    req_out->request()->header.length = buffer_size;
+    size_t result_out = req_out->CopyTo(size_buffer.get(), buffer_size, 0);
+    ZX_ASSERT(result_out == BULK_REQ_SIZE);
+    sync_completion_t call_completion;
+
+    usb_request_complete_callback_t complete_out = {
+        .callback =
+            [](void* ctx, usb_request_t* req) {
+              sync_completion_signal(static_cast<sync_completion_t*>(ctx));
+            },
+        .ctx = &call_completion,
+    };
+    function_.RequestQueue(req_out->take(), &complete_out);
+    sync_completion_wait(&call_completion, ZX_TIME_INFINITE);
+
+    // Obtaining a bulk in request.
+    lock_.Acquire();
+    std::optional<usb::Request<void>> req_in = bulk_in_reqs_.pop();
+    lock_.Release();
+    if (!req_in) {
+      zxlogf(ERROR, "%s: No valid bulk_in request", __func__);
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+    size_t result_in = req_in->CopyTo(size_buffer.get(), buffer_size, 0);
+    ZX_ASSERT(result_in == BULK_REQ_SIZE);
+
+    usb_request_complete_callback_t complete_in = {
+        .callback = [](void* ctx,
+                       usb_request_t* req) { static_cast<UsbTest*>(ctx)->TestBulkInComplete(req); },
+        .ctx = this,
+    };
+    hw_mb();
+    usb_request_cache_flush(req_in->request(), 0, req_in->request()->header.length);
+    function_.RequestQueue(req_in->take(), &complete_in);
     return ZX_OK;
   } else {
     return ZX_ERR_NOT_SUPPORTED;

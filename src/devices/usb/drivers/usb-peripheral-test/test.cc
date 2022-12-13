@@ -12,6 +12,7 @@
 #include <zircon/status.h>
 #include <zircon/types.h>
 
+#include <algorithm>
 #include <numeric>
 #include <span>
 #include <thread>
@@ -31,7 +32,7 @@ struct usb_endpoint_descriptor* intr_out_ep = nullptr;
 struct usb_endpoint_descriptor* intr_in_ep = nullptr;
 
 static uint8_t test_interface;
-constexpr uint64_t kUsbTimoutMilliseconds = 1000;  // 1 second
+constexpr uint64_t kUsbTimeoutMilliseconds = 1000;  // 1 second
 constexpr uint64_t kSecondsToNanoseconds = 1'000'000'000;
 constexpr uint64_t kMicrosecondsToNanoseconds = 1000;
 constexpr uint64_t kNanosecondsToMilliseconds = 1'000'000;
@@ -42,7 +43,7 @@ constexpr char kUsageMsg[] = R"(
     [OPTIONS]
     --help -help [-h]                             Prints this message.
     --time -time [-t]                             Configurable time for tests to run.
-    --bytes -bytes [-b]                           Conifgurable transfer bytes for data transfer.
+    --bytes -bytes [-b]                           Configurable transfer bytes for data transfer.
     --bulk-iterations -bulk-iterations [-i]       Configurable iteration for bulk transfer.
     --buffersize -buffersize [-s]                 Configurable buffer size. Default buffer size set to 4096 bytes.
     --retest -retest [-r]                         Configurable retest transfer type. Specify one of 
@@ -53,13 +54,13 @@ constexpr char kUsageMsg[] = R"(
 class UsbPeripheralConfigurableTests : public ::zxtest::Test {
  public:
   // User configurable time (in milliseconds) for USB peripheral tests.
-  inline static int64_t time_ms_ = 5000;
+  inline static int64_t time_ms_ = 100;
 
   // User configurable transfer byte size.
   inline static size_t bytes_ = 64;
 
   // User configurable iterations for bulk transfer test.
-  inline static int bulk_iterations_ = 5;
+  inline static int bulk_iterations_ = 2;
 
   // User configurable buffer size.
   inline static uint64_t buffer_size_ = 4096;
@@ -67,7 +68,7 @@ class UsbPeripheralConfigurableTests : public ::zxtest::Test {
   // User configurable to repeat test.
   enum class TransferOptions { CONTROL, INTERRUPT, BULK, NONE };
   inline static TransferOptions retest_config_ = TransferOptions::BULK;
-  inline static int retest_iterations_ = 2;
+  inline static int retest_iterations_ = 1;
   static zx_status_t SetRetestConfigFromString(const std::string& str);
 
   // Help option.
@@ -143,14 +144,14 @@ void control_interrupt_test(size_t transfer_size) {
   // Send data to device via OUT control request.
   int ret = usb_device_control_transfer(
       dev, USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_INTERFACE, USB_PERIPHERAL_TEST_SET_DATA, 0,
-      test_interface, send_buffer.get(), static_cast<int>(transfer_size), kUsbTimoutMilliseconds);
+      test_interface, send_buffer.get(), static_cast<int>(transfer_size), kUsbTimeoutMilliseconds);
   ASSERT_EQ(ret, static_cast<int>(transfer_size));
 
   // Receive data back from device via IN control request.
   ret = usb_device_control_transfer(dev, USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_INTERFACE,
                                     USB_PERIPHERAL_TEST_GET_DATA, 0, test_interface,
                                     receive_buffer.get(), static_cast<int>(transfer_size),
-                                    kUsbTimoutMilliseconds);
+                                    kUsbTimeoutMilliseconds);
   ASSERT_EQ(ret, static_cast<int>(transfer_size));
 
   // Sent and received data should match.
@@ -158,7 +159,7 @@ void control_interrupt_test(size_t transfer_size) {
 
   // Create a thread to wait for interrupt request.
   auto thread_func = [](struct usb_request** req) -> void {
-    *req = usb_request_wait(dev, kUsbTimoutMilliseconds);
+    *req = usb_request_wait(dev, kUsbTimeoutMilliseconds);
   };
 
   struct usb_request* complete_req = nullptr;
@@ -175,12 +176,12 @@ void control_interrupt_test(size_t transfer_size) {
   // Ask the device to send us an interrupt request containing the data we sent earlier.
   ret = usb_device_control_transfer(dev, USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_INTERFACE,
                                     USB_PERIPHERAL_TEST_SEND_INTERUPT, 0, test_interface, nullptr,
-                                    0, kUsbTimoutMilliseconds);
+                                    0, kUsbTimeoutMilliseconds);
   ASSERT_EQ(ret, 0);
 
   wait_thread.join();
 
-  EXPECT_EQ(complete_req, req);
+  ASSERT_EQ(complete_req, req);
   EXPECT_EQ(static_cast<size_t>(req->actual_length), transfer_size);
 
   // Sent data should match payload of interrupt request.
@@ -218,8 +219,8 @@ void bulk_test(uint64_t buffer_size, size_t bulk_iterations) {
 
     // Create a thread to wait for request completions.
     auto thread_func = [](struct usb_request** reqs) -> void {
-      *reqs++ = usb_request_wait(dev, kUsbTimoutMilliseconds);
-      *reqs = usb_request_wait(dev, kUsbTimoutMilliseconds);
+      *reqs++ = usb_request_wait(dev, kUsbTimeoutMilliseconds);
+      *reqs = usb_request_wait(dev, kUsbTimeoutMilliseconds);
     };
 
     struct usb_request* complete_reqs[2] = {};
@@ -275,8 +276,8 @@ void interrupt_test(size_t transfer_bytes) {
 
   // Create a thread to wait for request completions.
   auto thread_func = [](struct usb_request** reqs) -> void {
-    *reqs++ = usb_request_wait(dev, kUsbTimoutMilliseconds);
-    *reqs = usb_request_wait(dev, kUsbTimoutMilliseconds);
+    *reqs++ = usb_request_wait(dev, kUsbTimeoutMilliseconds);
+    *reqs = usb_request_wait(dev, kUsbTimeoutMilliseconds);
   };
 
   struct usb_request* complete_reqs[2] = {};
@@ -301,7 +302,6 @@ void interrupt_test(size_t transfer_bytes) {
 }
 
 // ====================== User configurable tests ===================================
-
 // Tests end to end interrupt transfer.
 TEST_F(UsbPeripheralConfigurableTests, interrupt_function) {
   ASSERT_NO_FATAL_FAILURE(interrupt_test(bytes_));
@@ -384,6 +384,71 @@ TEST_F(UsbPeripheralConfigurableTests, bulk_test) {
 // Test control and interrupt requests from the user configurable data
 TEST_F(UsbPeripheralConfigurableTests, control_interrupt_test_configurable) {
   ASSERT_NO_FATAL_FAILURE(control_interrupt_test(bytes_));
+}
+
+// Tests the buffer size of Bulk transfers.
+TEST_F(UsbPeripheralConfigurableTests, size_transfer_bytes) {
+  // To run this test, first it checks if the control transfer is working. If it succeeds, it goes
+  // on to test the size transfer.
+  std::unique_ptr<uint8_t[]> send_buf = std::make_unique<uint8_t[]>(bytes_);
+  std::unique_ptr<uint8_t[]> receive_buf = std::make_unique<uint8_t[]>(bytes_);
+
+  memset(send_buf.get(), 9, bytes_);
+
+  int res = usb_device_control_transfer(
+      dev, USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_INTERFACE, USB_PERIPHERAL_TEST_SET_DATA, 0,
+      test_interface, send_buf.get(), static_cast<int>(bytes_), kUsbTimeoutMilliseconds);
+  ASSERT_EQ(res, static_cast<int>(bytes_));
+
+  // Receive data back from device via IN control request.
+  res = usb_device_control_transfer(
+      dev, USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_INTERFACE, USB_PERIPHERAL_TEST_GET_DATA, 0,
+      test_interface, receive_buf.get(), static_cast<int>(bytes_), kUsbTimeoutMilliseconds);
+  ASSERT_EQ(res, static_cast<int>(bytes_));
+
+  // Sent and received data should match.
+  ASSERT_EQ(memcmp(send_buf.get(), receive_buf.get(), bytes_), 0);
+
+  // Now the size_test can run. A temporary buffer size that is not a multiple of kBulkRequestSize.
+  uint64_t temp_buffer_size = 700;
+  uint8_t distinct_buffer_number = 1;
+  std::unique_ptr<uint8_t[]> receive_buffer = std::make_unique<uint8_t[]>(temp_buffer_size);
+
+  pattern_buffer({receive_buffer.get(), temp_buffer_size}, distinct_buffer_number);
+
+  auto* receive_req = usb_request_new(dev, bulk_in_ep);
+  EXPECT_NE(receive_req, nullptr);
+  receive_req->buffer = receive_buffer.get();
+  receive_req->buffer_length = kBulkRequestSize;
+
+  int ret =
+      usb_device_control_transfer(dev, USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_INTERFACE,
+                                  USB_PERIPHERAL_TEST_BULK_TRANSFER_SIZE, 0, test_interface,
+                                  &temp_buffer_size, sizeof(uint64_t), kUsbTimeoutMilliseconds);
+  ASSERT_EQ(ret, sizeof(uint64_t));
+
+  auto thread_func = [](struct usb_request** req) -> void {
+    *req = usb_request_wait(dev, kUsbTimeoutMilliseconds);
+  };
+
+  struct usb_request* complete_req = nullptr;
+  std::thread wait_thread(thread_func, &complete_req);
+
+  // Queue read for bulk request
+  ret = usb_request_queue(receive_req);
+  EXPECT_EQ(ret, 0);
+
+  wait_thread.join();
+
+  EXPECT_EQ(receive_req, complete_req);
+
+  // Transfer is expected to fail due to incorrect buffer size and the receive buffer will
+  // be different.
+  EXPECT_FALSE(std::all_of(
+      receive_buffer.get(), receive_buffer.get() + temp_buffer_size,
+      [distinct_buffer_number](uint8_t elem) { return elem == distinct_buffer_number; }));
+
+  usb_request_free(receive_req);
 }
 
 // =============================== Fixed tests ===================================
