@@ -685,61 +685,48 @@ impl ComponentInstance {
         collection_name: String,
         child_decl: &ChildDecl,
         child_args: fcomponent::CreateChildArgs,
-    ) -> Result<(), ModelError> {
+    ) -> Result<fdecl::Durability, ModelError> {
         match child_decl.startup {
             fdecl::StartupMode::Lazy => {}
             fdecl::StartupMode::Eager => {
                 return Err(ModelError::unsupported("Eager startup"));
             }
         }
-        let (child, durability) = {
-            let mut state = self.lock_resolved_state().await?;
-            let collection_decl = state
-                .decl()
-                .find_collection(&collection_name)
-                .ok_or_else(|| ModelError::collection_not_found(collection_name.clone()))?
-                .clone();
+        let mut state = self.lock_resolved_state().await?;
+        let collection_decl = state
+            .decl()
+            .find_collection(&collection_name)
+            .ok_or_else(|| ModelError::collection_not_found(collection_name.clone()))?
+            .clone();
 
-            if let Some(handles) = &child_args.numbered_handles {
-                if !handles.is_empty() && collection_decl.durability != fdecl::Durability::SingleRun
-                {
-                    return Err(ModelError::unsupported(
-                        "Numbered handles to child in a collection that is not SingleRun",
-                    ));
-                }
+        if let Some(handles) = &child_args.numbered_handles {
+            if !handles.is_empty() && collection_decl.durability != fdecl::Durability::SingleRun {
+                return Err(ModelError::unsupported(
+                    "Numbered handles to child in a collection that is not SingleRun",
+                ));
             }
-
-            if !collection_decl.allow_long_names
-                && child_decl.name.len() > cm_types::MAX_NAME_LENGTH
-            {
-                return Err(ModelError::name_too_long(cm_types::MAX_NAME_LENGTH));
-            }
-
-            if child_args.dynamic_offers.as_ref().map(|v| v.first()).flatten().is_some()
-                && collection_decl.allowed_offers != cm_types::AllowedOffers::StaticAndDynamic
-            {
-                return Err(ModelError::dynamic_offers_not_allowed(&collection_name));
-            }
-            let (child, discover_future) = state
-                .add_child(
-                    self,
-                    child_decl,
-                    Some(&collection_decl),
-                    child_args.numbered_handles,
-                    child_args.dynamic_offers,
-                )
-                .await?;
-            discover_future.await?;
-
-            (child, collection_decl.durability)
-        };
-
-        if durability == fdecl::Durability::SingleRun {
-            // If the component is in a single-run collection, start it.
-            child.start(&StartReason::SingleRun).await?;
         }
 
-        Ok(())
+        if !collection_decl.allow_long_names && child_decl.name.len() > cm_types::MAX_NAME_LENGTH {
+            return Err(ModelError::name_too_long(cm_types::MAX_NAME_LENGTH));
+        }
+
+        if child_args.dynamic_offers.as_ref().map(|v| v.first()).flatten().is_some()
+            && collection_decl.allowed_offers != cm_types::AllowedOffers::StaticAndDynamic
+        {
+            return Err(ModelError::dynamic_offers_not_allowed(&collection_name));
+        }
+        let durability_nf = state
+            .add_child(
+                self,
+                child_decl,
+                Some(&collection_decl),
+                child_args.numbered_handles,
+                child_args.dynamic_offers,
+            )
+            .await?;
+        durability_nf.await?;
+        Ok(collection_decl.durability)
     }
 
     /// Removes the dynamic child, returning a future that will execute the
@@ -1669,11 +1656,11 @@ impl ResolvedInstanceState {
         }
     }
 
-    /// Adds a new child of this instance for the given `ChildDecl`. Returns the created
-    /// child and a future to wait on the child's `Discover` action.
-    ///
-    /// An error returned by the future means that the `Discover` action failed, but the creation
-    /// of the child still succeeded.
+    /// Adds a new child of this instance for the given `ChildDecl`. Returns a
+    /// future to wait on the child's `Discover` action, or `None` if a child
+    /// with the same name already existed. This function always succeeds - an
+    /// error returned by the `Future` means that the `Discover` action failed,
+    /// but the creation of the child still succeeded.
     async fn add_child(
         &mut self,
         component: &Arc<ComponentInstance>,
@@ -1681,8 +1668,7 @@ impl ResolvedInstanceState {
         collection: Option<&CollectionDecl>,
         numbered_handles: Option<Vec<fidl_fuchsia_process::HandleInfo>>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
-    ) -> Result<(Arc<ComponentInstance>, BoxFuture<'static, Result<(), ModelError>>), ModelError>
-    {
+    ) -> Result<BoxFuture<'static, Result<(), ModelError>>, ModelError> {
         let child = self.add_child_internal(
             component,
             child,
@@ -1692,11 +1678,8 @@ impl ResolvedInstanceState {
         )?;
         // We can dispatch a Discovered event for the component now that it's installed in the
         // tree, which means any Discovered hooks will capture it.
-        let discover_future = {
-            let mut actions = child.lock_actions().await;
-            actions.register_no_wait(&child, DiscoverAction::new()).boxed()
-        };
-        Ok((child, discover_future))
+        let mut actions = child.lock_actions().await;
+        Ok(actions.register_no_wait(&child, DiscoverAction::new()).boxed())
     }
 
     /// Adds a new child of this instance for the given `ChildDecl`. Returns
@@ -1829,7 +1812,7 @@ impl ResolvedInstanceState {
         decl: &ComponentDecl,
     ) -> Result<(), ModelError> {
         for child in decl.children.iter() {
-            let (_, _) = self.add_child(component, child, None, None, None).await?;
+            self.add_child(component, child, None, None, None).await?;
         }
         Ok(())
     }
