@@ -9,21 +9,9 @@
     },
     use: [
         {
-            directory: "dev-ethernet",
-            rights: [ "r*" ],
-            path: "/dev/class/ethernet",
-        },
-        {
             directory: "dev-network",
             rights: [ "r*" ],
             path: "/dev/class/network",
-        },
-        {
-            protocol: [
-                "fuchsia.hardware.network.MacAddressing",
-                "fuchsia.hardware.network.Port",
-            ],
-            from: "parent",
         },
     ],
 }

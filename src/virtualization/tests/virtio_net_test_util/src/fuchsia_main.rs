@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use ethernet as eth;
-use fidl_fuchsia_hardware_ethernet_ext::MacAddress;
+use fidl_fuchsia_net_ext::MacAddress;
 use fuchsia_async::TimeoutExt as _;
 use fuchsia_zircon as zx;
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use std::convert::TryInto as _;
-use std::fs::{self, File};
 use std::str::FromStr;
 use structopt::StructOpt;
 
-const ETH_DIRECTORY: &str = "/dev/class/ethernet";
 const NETDEV_DIRECTORY: &str = "/dev/class/network";
 
 #[derive(StructOpt, Debug)]
@@ -21,26 +18,6 @@ struct Config {
     receive_byte: u8,
     length: usize,
     mac: String,
-}
-
-async fn find_ethernet_device(mac: MacAddress) -> Result<eth::Client, anyhow::Error> {
-    let eth_devices = fs::read_dir(ETH_DIRECTORY)?;
-
-    for device in eth_devices {
-        let dev = File::open(device?.path().to_str().unwrap())?;
-        let vmo = zx::Vmo::create(256 * eth::DEFAULT_BUFFER_SIZE as u64)?;
-
-        let eth_client = eth::Client::from_file(dev, vmo, eth::DEFAULT_BUFFER_SIZE, "test").await?;
-
-        eth_client.start().await?;
-
-        let eth_info = eth_client.info().await?;
-        if eth_info.mac == mac {
-            return Ok(eth_client);
-        }
-    }
-
-    return Err(anyhow::format_err!("Could not find {}", mac));
 }
 
 async fn find_network_device(
@@ -105,36 +82,6 @@ async fn find_network_device(
     results.next().await.unwrap_or_else(|| panic!("netdevice with mac {} not found", mac))
 }
 
-async fn ethernet_device_send(
-    mut client: eth::Client,
-    config: Config,
-) -> Result<(), anyhow::Error> {
-    let buf = vec![config.send_byte; config.length];
-    client.send(&buf);
-    let mut events = client.get_stream();
-
-    // Wait for reply.
-    let mut buf = vec![0; config.length];
-    while let Some(evt) = events.try_next().await? {
-        match evt {
-            eth::Event::Receive(rx, flags) => {
-                if flags == eth::EthernetQueueFlags::RX_OK && rx.len() == config.length {
-                    rx.read(&mut buf);
-                    break;
-                }
-            }
-            _ => (),
-        }
-    }
-    assert!(
-        buf.iter().all(|b| *b == config.receive_byte),
-        "expected entire buffer to be {:x}, found {:x?}",
-        config.receive_byte,
-        buf,
-    );
-    Ok(())
-}
-
 async fn network_device_send(
     client: netdevice_client::Client,
     port: netdevice_client::Port,
@@ -189,15 +136,8 @@ async fn network_device_send(
 #[fuchsia::main(logging_minimum_severity = "debug")]
 async fn main() -> Result<(), anyhow::Error> {
     let config = Config::from_args();
-    match find_ethernet_device(MacAddress::from_str(&config.mac)?).await {
-        Ok(client) => {
-            ethernet_device_send(client, config).await.expect("failed to send on ethernet device");
-        }
-        Err(_) => {
-            let (client, port) = find_network_device(MacAddress::from_str(&config.mac)?).await;
-            network_device_send(client, port, config).await;
-        }
-    }
+    let (client, port) = find_network_device(MacAddress::from_str(&config.mac)?).await;
+    network_device_send(client, port, config).await;
     // Test output requires this print, do not remove.
     println!("PASS");
     Ok(())
