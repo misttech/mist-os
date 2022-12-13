@@ -593,3 +593,13 @@
 	url = https://fuchsia.googlesource.com/third_party/android/device/generic/vulkan-cereal
 	name = third_party/android/device/generic/vulkan-cereal
 	ignore = all
+[submodule "third_party/linux-syscall-support/src"]
+	path = third_party/linux-syscall-support/src
+	url = https://chromium.googlesource.com/linux-syscall-support
+	name = linux-syscall-support
+	ignore = all
+[submodule "third_party/mini_chromium/src"]
+	path = third_party/mini_chromium/src
+	url = https://chromium.googlesource.com/chromium/mini_chromium
+	name = chromium/mini_chromium
+	ignore = all
