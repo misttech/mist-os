@@ -21,6 +21,8 @@ rustc_library("guest_cli") {
     "//src/virtualization/lib/cli/args:guest_cli_args",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:blocking",
+    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:prettytable-rs",
     "//third_party/rust_crates:serde",
   ]
@@ -44,6 +46,7 @@ rustc_library("guest_cli") {
   ]
 
   sources = [
+    "src/launch.rs",
     "src/lib.rs",
     "src/list.rs",
     "src/platform/fuchsia.rs",

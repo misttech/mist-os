@@ -50,7 +50,6 @@ rustc_binary("bin") {
   sources = [
     "src/arguments.rs",
     "src/balloon.rs",
-    "src/launch.rs",
     "src/main.rs",
     "src/serial.rs",
     "src/services.rs",

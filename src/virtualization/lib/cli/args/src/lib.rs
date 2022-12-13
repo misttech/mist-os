@@ -98,7 +98,7 @@ pub struct GuestOptions {
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum SubCommands {
-    Launch(LaunchArgs),
+    Launch(crate::launch_args::LaunchArgs),
     Stop(crate::stop_args::StopArgs),
     Balloon(BalloonArgs),
     BalloonStats(BalloonStatsArgs),
@@ -215,49 +215,53 @@ pub struct VsockPerfArgs {
     pub guest_type: GuestType,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
-/// Launch a guest image. Usage: guest launch guest_type [--cmdline-add <arg>...] [--default-net <bool>] [--memory <memory-size>] [--cpus <num-cpus>] [--virtio-* <bool>]
-#[argh(subcommand, name = "launch")]
-pub struct LaunchArgs {
-    #[argh(positional)]
-    /// guest type to launch e.g. 'zircon'.
-    pub guest_type: GuestType,
-    /// adds provided strings to the existing kernel command line
-    #[argh(option)]
-    pub cmdline_add: Vec<String>,
-    /// enable a default net device
-    #[argh(option)]
-    pub default_net: Option<bool>,
-    /// allocate 'bytes' of memory for the guest
-    #[argh(option)]
-    pub memory: Option<u64>,
-    /// number of virtual cpus available for the guest
-    #[argh(option)]
-    pub cpus: Option<u8>,
-    /// enable virtio-balloon
-    #[argh(option)]
-    pub virtio_balloon: Option<bool>,
-    /// enable virtio-console
-    #[argh(option)]
-    pub virtio_console: Option<bool>,
-    /// enable virtio-gpu and virtio-input
-    #[argh(option)]
-    pub virtio_gpu: Option<bool>,
-    /// enable virtio-rng
-    #[argh(option)]
-    pub virtio_rng: Option<bool>,
-    /// enable virtio-sound
-    #[argh(option)]
-    pub virtio_sound: Option<bool>,
-    /// enable virtio-sound-input
-    #[argh(option)]
-    pub virtio_sound_input: Option<bool>,
-    /// enable virtio-vsock
-    #[argh(option)]
-    pub virtio_vsock: Option<bool>,
-    /// detach from a guest allowing it to run in the background
-    #[argh(switch, short = 'd')]
-    pub detach: bool,
+pub mod launch_args {
+    use super::*;
+    #[derive(FromArgs, PartialEq, Debug)]
+    /// Launch a guest image. Usage: guest launch guest_type [--cmdline-add <arg>...] [--default-net <bool>] [--memory <memory-size>] [--cpus <num-cpus>] [--virtio-* <bool>]
+    #[argh(subcommand, name = "launch")]
+    #[cfg_attr(not(target_os = "fuchsia"), ffx_command())]
+    pub struct LaunchArgs {
+        #[argh(positional)]
+        /// guest type to launch e.g. 'zircon'.
+        pub guest_type: GuestType,
+        /// adds provided strings to the existing kernel command line
+        #[argh(option)]
+        pub cmdline_add: Vec<String>,
+        /// enable a default net device
+        #[argh(option)]
+        pub default_net: Option<bool>,
+        /// allocate 'bytes' of memory for the guest
+        #[argh(option)]
+        pub memory: Option<u64>,
+        /// number of virtual cpus available for the guest
+        #[argh(option)]
+        pub cpus: Option<u8>,
+        /// enable virtio-balloon
+        #[argh(option)]
+        pub virtio_balloon: Option<bool>,
+        /// enable virtio-console
+        #[argh(option)]
+        pub virtio_console: Option<bool>,
+        /// enable virtio-gpu and virtio-input
+        #[argh(option)]
+        pub virtio_gpu: Option<bool>,
+        /// enable virtio-rng
+        #[argh(option)]
+        pub virtio_rng: Option<bool>,
+        /// enable virtio-sound
+        #[argh(option)]
+        pub virtio_sound: Option<bool>,
+        /// enable virtio-sound-input
+        #[argh(option)]
+        pub virtio_sound_input: Option<bool>,
+        /// enable virtio-vsock
+        #[argh(option)]
+        pub virtio_vsock: Option<bool>,
+        /// detach from a guest allowing it to run in the background
+        #[argh(switch, short = 'd')]
+        pub detach: bool,
+    }
 }
 
 pub mod stop_args {

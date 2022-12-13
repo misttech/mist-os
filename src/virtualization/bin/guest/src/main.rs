@@ -8,7 +8,6 @@ use {
 
 mod arguments;
 mod balloon;
-mod launch;
 mod serial;
 mod services;
 mod socat;
@@ -21,7 +20,11 @@ async fn main() -> Result<(), Error> {
     let services = guest_cli::platform::FuchsiaPlatformServices::new();
 
     match options.nested {
-        SubCommands::Launch(launch_args) => launch::handle_launch(&launch_args).await,
+        SubCommands::Launch(launch_args) => {
+            let output = guest_cli::launch::handle_launch(&services, &launch_args).await;
+            println!("{}", output);
+            Ok(())
+        }
         SubCommands::Stop(stop_args) => {
             let output = guest_cli::stop::handle_stop(&services, &stop_args).await?;
             println!("{}", output);
