@@ -315,25 +315,30 @@ NO_ASAN static void dump_free(header_t* header) TA_REQ(TheHeapLock::Get()) {
           (uintptr_t)header + header->size, header->size, header->size);
 }
 
-NO_ASAN static void cmpct_dump_locked() TA_REQ(TheHeapLock::Get()) {
+NO_ASAN static void cmpct_dump_locked(CmpctDumpOptions options) TA_REQ(TheHeapLock::Get()) {
   // This function accesses free_t * that are poisoned so it has to be NO_ASAN
   dprintf(INFO, "Heap dump (using cmpctmalloc):\n");
-  dprintf(INFO, "\tsize %lu, remaining %lu, cached free %lu\n", (unsigned long)theheap.size,
-          (unsigned long)theheap.remaining,
+  dprintf(INFO, "\tsize %lu, remaining %lu, (used %lu) cached free %lu\n",
+          static_cast<unsigned long>(theheap.size), static_cast<unsigned long>(theheap.remaining),
+          static_cast<unsigned long>(theheap.size - theheap.remaining),
           theheap.cached_os_alloc ? theheap.cached_os_alloc->size : 0);
 
-  dprintf(INFO, "\tfree list:\n");
-  for (int i = 0; i < NUMBER_OF_BUCKETS; i++) {
-    bool header_printed = false;
-    free_t* free_area = theheap.free_lists[i];
-    for (; free_area != NULL; free_area = free_area->next) {
-      ZX_ASSERT(free_area != free_area->next);
-      if (!header_printed) {
-        dprintf(INFO, "\tbucket %d\n", i);
-        header_printed = true;
+  if (static_cast<bool>(options & CmpctDumpOptions::Verbose)) {
+    dprintf(INFO, "\tfree list:\n");
+    for (int i = 0; i < NUMBER_OF_BUCKETS; i++) {
+      bool header_printed = false;
+      free_t* free_area = theheap.free_lists[i];
+      for (; free_area != NULL; free_area = free_area->next) {
+        ZX_ASSERT(free_area != free_area->next);
+        if (!header_printed) {
+          dprintf(INFO, "\tbucket %d\n", i);
+          header_printed = true;
+        }
+        dump_free(&free_area->header);
       }
-      dump_free(&free_area->header);
     }
+  } else {
+    dprintf(INFO, "Verbose options not passed. Skipping free list dump\n");
   }
 }
 
@@ -1126,13 +1131,13 @@ void cmpct_init(void) {
   heap_grow(kHeapUsableGrowSize);
 }
 
-void cmpct_dump(bool panic_time) {
-  if (panic_time) {
+void cmpct_dump(CmpctDumpOptions options) {
+  if (static_cast<bool>(options & CmpctDumpOptions::PanicTime)) {
     // If we are panic'ing, just skip the lock.  All bets are off anyway.
-    ([]() TA_NO_THREAD_SAFETY_ANALYSIS { cmpct_dump_locked(); })();
+    ([options]() TA_NO_THREAD_SAFETY_ANALYSIS { cmpct_dump_locked(options); })();
   } else {
     LockGuard guard(TheHeapLock::Get());
-    cmpct_dump_locked();
+    cmpct_dump_locked(options);
   }
 }
 

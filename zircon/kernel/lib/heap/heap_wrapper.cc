@@ -227,7 +227,7 @@ void sized_free(void* ptr, size_t s) {
   cmpct_sized_free(ptr, s);
 }
 
-static void heap_dump(bool panic_time) { cmpct_dump(panic_time); }
+static void heap_dump(CmpctDumpOptions options) { cmpct_dump(options); }
 
 void heap_get_info(size_t* total_bytes, size_t* free_bytes) {
   size_t used_bytes;
@@ -327,7 +327,7 @@ static int cmd_heap(int argc, const cmd_args* argv, uint32_t flags) {
   if (argc < 2) {
   usage:
     printf("usage:\n");
-    printf("\t%s info\n", argv[0].str);
+    printf("\t%s info [-v]\n", argv[0].str);
     if (HEAP_COLLECT_STATS) {
       printf("\t%s stats\n", argv[0].str);
     }
@@ -340,7 +340,19 @@ static int cmd_heap(int argc, const cmd_args* argv, uint32_t flags) {
   }
 
   if (strcmp(argv[1].str, "info") == 0) {
-    heap_dump(flags & CMD_FLAG_PANIC);
+    CmpctDumpOptions options =
+        flags & CMD_FLAG_PANIC ? CmpctDumpOptions::PanicTime : CmpctDumpOptions::None;
+
+    for (int i = 2; i < argc; ++i) {
+      if (strcmp(argv[i].str, "-v") == 0) {
+        options |= CmpctDumpOptions::Verbose;
+      } else {
+        printf("unrecognized option (\"%s\") for info command\n", argv[i].str);
+        goto usage;
+      }
+    }
+
+    heap_dump(options);
   } else if (HEAP_COLLECT_STATS && strcmp(argv[1].str, "stats") == 0) {
     dump_stats();
   } else if (!(flags & CMD_FLAG_PANIC) && strcmp(argv[1].str, "test") == 0) {

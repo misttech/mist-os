@@ -11,6 +11,8 @@
 #include <lib/zircon-internal/thread_annotations.h>
 #include <stddef.h>
 
+#include <fbl/enum_bits.h>
+
 #ifdef _KERNEL
 #include <kernel/mutex.h>
 
@@ -26,6 +28,13 @@ struct TheHeapLock {
 };
 #endif
 
+enum class CmpctDumpOptions : uint32_t {
+  None = 0x0,
+  PanicTime = 0x1,
+  Verbose = 0x2,
+};
+FBL_ENABLE_ENUM_BITS(CmpctDumpOptions)
+
 // The maximum size that |cmpct_alloc| can allocate. Any larger of a size would
 // yield a nullptr.
 extern const size_t kHeapMaxAllocSize;
@@ -38,8 +47,9 @@ void* cmpct_memalign(size_t alignment, size_t size) TA_EXCL(TheHeapLock::Get());
 // Zero-fill allocations smaller than |size|
 void cmpct_set_fill_on_alloc_threshold(size_t size);
 void cmpct_init(void) TA_EXCL(TheHeapLock::Get());
-void cmpct_dump(bool panic_time) TA_EXCL(TheHeapLock::Get());
-void cmpct_get_info(size_t* used_bytes, size_t* free_bytes, size_t* cached_bytes) TA_EXCL(TheHeapLock::Get());
+void cmpct_dump(CmpctDumpOptions options) TA_EXCL(TheHeapLock::Get());
+void cmpct_get_info(size_t* used_bytes, size_t* free_bytes, size_t* cached_bytes)
+    TA_EXCL(TheHeapLock::Get());
 void cmpct_test(void) TA_EXCL(TheHeapLock::Get());
 
 #endif  // ZIRCON_KERNEL_LIB_HEAP_CMPCTMALLOC_INCLUDE_LIB_CMPCTMALLOC_H_
