@@ -67,7 +67,7 @@ func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string)
 // Template functions.
 //
 
-func primitiveTypeName(typ fidlgen.PrimitiveSubtype) string {
+func PrimitiveTypeName(typ fidlgen.PrimitiveSubtype) string {
 	switch typ {
 	case fidlgen.ZxExperimentalUchar:
 		return "byte"
@@ -103,7 +103,7 @@ func ConstType(c zither.Const) string {
 	case zither.TypeKindBool, zither.TypeKindString:
 		return c.Type
 	case zither.TypeKindInteger, zither.TypeKindSize:
-		return primitiveTypeName(fidlgen.PrimitiveSubtype(c.Type))
+		return PrimitiveTypeName(fidlgen.PrimitiveSubtype(c.Type))
 	case zither.TypeKindEnum, zither.TypeKindBits:
 		return zither.UpperCamelCase(c.Element.Decl)
 	default:
@@ -142,7 +142,7 @@ func ConstValue(c zither.Const) string {
 func DescribeType(desc zither.TypeDescriptor) string {
 	switch desc.Kind {
 	case zither.TypeKindBool, zither.TypeKindInteger, zither.TypeKindSize:
-		return primitiveTypeName(fidlgen.PrimitiveSubtype(desc.Type))
+		return PrimitiveTypeName(fidlgen.PrimitiveSubtype(desc.Type))
 	case zither.TypeKindEnum, zither.TypeKindBits, zither.TypeKindStruct:
 		layout, _ := fidlgen.MustReadName(desc.Type).SplitMember()
 		return fidlgen.ToUpperCamelCase(layout.DeclarationName())

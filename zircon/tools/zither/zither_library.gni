@@ -19,12 +19,21 @@ supported_zither_backends = [
   "zircon_ifs",  # Syscall text ABI bindings.
   "kernel",  # Internal kernel bindings.
   "rust_syscall",  # Thin Rust FFI syscall wrappers.
+  "go_runtime",  # go.git source files for Fuchsia support.
 ]
 
 _clang_format = {
   script = "$clang_prefix/clang-format"
   inputs = [ "//.clang-format" ]
   args = [ "--style=file:" + rebase_path(inputs[0], root_build_dir) ]
+}
+
+_gofmt = {
+  script = "//prebuilt/third_party/go/$host_platform/bin/gofmt"
+
+  # The go backends emits both go and non-go files (e.g., text and assembly);
+  # restrict the use of the formatter to the go files.
+  extensions = [ "go" ]
 }
 
 # Information on supported backends, accessible via
@@ -107,13 +116,7 @@ supported_zither_backend_info = {
     output_subdir = {
       library_name_separator = "/"
     }
-    formatter = {
-      script = "//prebuilt/third_party/go/$host_platform/bin/gofmt"
-
-      # The go backend emits both go and text files; restrict the use of the
-      # formatter to the go files.
-      extensions = [ "go" ]
-    }
+    formatter = _gofmt
 
     _library_template = "_zither_go_library"
   }
@@ -159,6 +162,13 @@ supported_zither_backend_info = {
   }
 
   rust_syscall = rust
+
+  go_runtime = {
+    output_subdir = {
+    }
+    formatter = _gofmt
+    _library_template = "_zither_go_runtime_sources"
+  }
 }
 
 # Internal Zither invocation helper template used by `zither_library()`.
@@ -604,6 +614,51 @@ template("_zither_legacy_syscall_cdecl_sources") {
   }
 }
 
+template("_zither_go_runtime_sources") {
+  assert(invoker.backend == "go_runtime")
+
+  main_target = target_name
+  zither_target = "$target_name.gen"
+
+  not_needed(invoker, [ "source_names" ])
+
+  _zither(zither_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                             "deps",
+                             "fidl_ir_json",
+                             "fidl_ir_target",
+                             "formatter",
+                             "output_dir",
+                           ])
+    backend = "go_runtime"
+    generated_files = [
+      "${output_dir}/src/runtime/vdso_keys_fuchsia.go",
+      "${output_dir}/src/syscall/zx/syscalls_fuchsia.go",
+
+      # TODO(fxbug.dev/110295): And the rest...
+      #"${output_dir}/src/runtime/vdsocalls_fuchsia_amd64.s",
+      #"${output_dir}/src/runtime/vdsocalls_fuchsia_arm64.s",
+      #"${output_dir}/src/syscall/zx/syscalls_fuchsia_amd64.s",
+      #"${output_dir}/src/syscall/zx/syscalls_fuchsia_arm64.s",
+    ]
+  }
+
+  group(main_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    deps = [
+      ":${zither_target}($default_toolchain)",
+      ":${zither_target}.check($default_toolchain)",
+    ]
+  }
+}
+
 # Define a full set of per-backend targets for a Zither library.
 #
 # `zither_library()` is meant to be instantiated within `fidl()`. It consumes
@@ -658,6 +713,9 @@ template("_zither_legacy_syscall_cdecl_sources") {
 #
 #   * Rust syscall backend: ${target_name}.rust_syscall
 #     Generates a crate consisting of thin FFI syscall wrappers.
+#
+#   * Go runtime backend: ${target_name}.go_runtime
+#     Generates go.git sources for Fuchsia support.
 #
 # Parameters:
 #
