@@ -481,8 +481,8 @@ zx_status_t Device::CreateNode() {
                      (ptr)->topological_path_.data());
           }
           // Only remove us if the driver requested it (normally via device_async_remove)
-          if (ptr->parent_.has_value() && ptr->pending_removal_ && !ptr->pending_rebind_) {
-            (*ptr->parent_)->RemoveChild(ptr);
+          if (ptr->pending_removal_ && !ptr->pending_rebind_) {
+            ptr->UnbindAndRelease();
           }
         }
         completer.complete_ok();
@@ -581,10 +581,8 @@ fpromise::promise<void> Device::Remove() {
             auto shared = shared_from_this();
             // We schedule our removal on our parent's executor because we can't be removed
             // while being run in a promise on our own executor.
-            (*parent_)->executor_.schedule_task(
-                fpromise::make_promise([parent = *parent_, shared = std::move(shared)]() mutable {
-                  parent->RemoveChild(shared);
-                }));
+            (*parent_)->executor_.schedule_task(fpromise::make_promise(
+                [shared = std::move(shared)]() mutable { shared->UnbindAndRelease(); }));
           }
         });
 
@@ -607,8 +605,15 @@ fpromise::promise<void> Device::Remove() {
   return finished_bridge.consumer.promise();
 }
 
-void Device::RemoveChild(std::shared_ptr<Device>& child) {
-  child->UnbindOp([this, child]() { children_.remove(child); });
+void Device::UnbindAndRelease() {
+  UnbindOp([this]() {
+    if (!parent_.has_value()) {
+      return;
+    }
+    // Removing ourselves from our parent's list of children will call our destructor,
+    // since our parent should be the only one holding a strong reference to us.
+    parent_.value()->children_.remove(shared_from_this());
+  });
 }
 
 void Device::InsertOrUpdateProperty(fuchsia_driver_framework::wire::NodePropertyKey key,

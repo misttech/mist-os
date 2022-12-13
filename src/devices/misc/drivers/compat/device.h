@@ -157,7 +157,9 @@ class Device : public std::enable_shared_from_this<Device>,
   void SetPerformanceState(SetPerformanceStateRequestView request,
                            SetPerformanceStateCompleter::Sync& completer) override;
 
-  void RemoveChild(std::shared_ptr<Device>& child);
+  // This calls Unbind on the device and then frees it.
+  void UnbindAndRelease();
+
   void InsertOrUpdateProperty(fuchsia_driver_framework::wire::NodePropertyKey key,
                               fuchsia_driver_framework::wire::NodePropertyValue value);
 
