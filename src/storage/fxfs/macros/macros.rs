@@ -157,11 +157,21 @@ pub fn derive_versioned(input: TokenStream) -> TokenStream {
     TokenStream::from(quote! { impl Versioned for #ident {} })
 }
 
+/// This does nothing by itself, but with the Migrate derive macro, it signals that the struct being
+/// migrated to, does not require a Default implementation, since all the fields are available in
+/// both.
+#[proc_macro_attribute]
+pub fn migrate_nodefault(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
 /// Adds a From implementation to help migrate structs or enums.  This will support the following
 /// migrations:
 ///
 ///   1. Adding a new member to a struct where the member has a Default implementation.
-///   2. Changing an enum variant's fields where the all the fields implement From.
+///   2. Changing the type of a member with the same name, where all the fields implement From.
+///      Default is not needed in this case by including the the migrate_nodefault attribute.
+///   3. Changing an enum variant's fields where the all the fields implement From.
 ///
 /// This will also work if a new variant is added to an enum, but if that's the only change, and
 /// it's added to the end of the exsting variants, it will automatically be backward compatible
@@ -218,12 +228,30 @@ pub fn derive_migrate(input: TokenStream) -> TokenStream {
         Data::Struct(s) => {
             let field_names = s.fields.iter().map(|f| &f.ident);
 
+            let default_string = if input
+                .attrs
+                .iter()
+                .filter(|a| {
+                    a.style == syn::AttrStyle::Outer
+                        && a.path.get_ident().is_some()
+                        && a.path.get_ident().unwrap().to_string() == "migrate_nodefault"
+                })
+                .collect::<Vec<&syn::Attribute>>()
+                .is_empty()
+            {
+                quote! {
+                    ..Default::default()
+                }
+            } else {
+                quote! {}
+            };
+
             quote! {
                 impl From<#ident> for #latest {
                     fn from(from: #ident) -> Self {
                         #latest {
                             #(#field_names: from.#field_names.into()),*,
-                            ..Default::default()
+                            #default_string
                         }
                     }
                 }

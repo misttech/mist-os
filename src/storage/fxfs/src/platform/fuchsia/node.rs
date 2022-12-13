@@ -3,7 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::platform::fuchsia::{directory::FxDirectory, file::FxFile},
+    crate::{
+        object_handle::ObjectProperties,
+        platform::fuchsia::{directory::FxDirectory, file::FxFile},
+    },
+    anyhow::Error,
+    async_trait::async_trait,
     futures::future::poll_fn,
     std::{
         any::TypeId,
@@ -17,12 +22,14 @@ use {
 };
 
 /// FxNode is a node in the filesystem hierarchy (either a file or directory).
+#[async_trait]
 pub trait FxNode: IntoAny + Send + Sync + 'static {
     fn object_id(&self) -> u64;
     fn parent(&self) -> Option<Arc<FxDirectory>>;
     fn set_parent(&self, parent: Arc<FxDirectory>);
     fn open_count_add_one(&self);
     fn open_count_sub_one(&self);
+    async fn get_properties(&self) -> Result<ObjectProperties, Error>;
 }
 
 struct PlaceholderInner {
@@ -33,6 +40,7 @@ struct PlaceholderInner {
 
 struct Placeholder(Mutex<PlaceholderInner>);
 
+#[async_trait]
 impl FxNode for Placeholder {
     fn object_id(&self) -> u64 {
         self.0.lock().unwrap().object_id
@@ -45,6 +53,9 @@ impl FxNode for Placeholder {
     }
     fn open_count_add_one(&self) {}
     fn open_count_sub_one(&self) {}
+    async fn get_properties(&self) -> Result<ObjectProperties, Error> {
+        unreachable!();
+    }
 }
 
 /// PlaceholderOwner is a reserved slot in the node cache.
@@ -246,10 +257,15 @@ impl<N: FxNode + ?Sized> std::ops::Deref for OpenedNode<N> {
 #[cfg(test)]
 mod tests {
     use {
-        crate::platform::fuchsia::{
-            directory::FxDirectory,
-            node::{FxNode, GetResult, NodeCache},
+        crate::{
+            object_handle::ObjectProperties,
+            platform::fuchsia::{
+                directory::FxDirectory,
+                node::{FxNode, GetResult, NodeCache},
+            },
         },
+        anyhow::Error,
+        async_trait::async_trait,
         fuchsia_async as fasync,
         futures::future::join_all,
         std::{
@@ -262,6 +278,7 @@ mod tests {
     };
 
     struct FakeNode(u64, Arc<NodeCache>);
+    #[async_trait]
     impl FxNode for FakeNode {
         fn object_id(&self) -> u64 {
             self.0
@@ -274,6 +291,9 @@ mod tests {
         }
         fn open_count_add_one(&self) {}
         fn open_count_sub_one(&self) {}
+        async fn get_properties(&self) -> Result<ObjectProperties, Error> {
+            unreachable!();
+        }
     }
     impl Drop for FakeNode {
         fn drop(&mut self) {

@@ -7,7 +7,7 @@ use {
         errors::FxfsError,
         filesystem::SyncOptions,
         log::*,
-        object_handle::INVALID_OBJECT_ID,
+        object_handle::{ObjectProperties, INVALID_OBJECT_ID},
         object_store::{
             self,
             directory::{self, ObjectDescriptor, ReplacedChild},
@@ -275,6 +275,7 @@ impl Drop for FxDirectory {
     }
 }
 
+#[async_trait]
 impl FxNode for FxDirectory {
     fn object_id(&self) -> u64 {
         self.directory.object_id()
@@ -294,6 +295,10 @@ impl FxNode for FxDirectory {
     fn open_count_add_one(&self) {}
 
     fn open_count_sub_one(&self) {}
+
+    async fn get_properties(&self) -> Result<ObjectProperties, Error> {
+        self.directory.get_properties().await
+    }
 }
 
 #[async_trait]
@@ -716,7 +721,7 @@ impl Directory for FxDirectory {
     }
 
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        let props = self.directory.get_properties().await.map_err(map_to_status)?;
+        let props = self.get_properties().await.map_err(map_to_status)?;
         Ok(fio::NodeAttributes {
             mode: fio::MODE_TYPE_DIRECTORY
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false),

@@ -7,7 +7,7 @@ use {
         async_enter,
         filesystem::SyncOptions,
         log::*,
-        object_handle::{ObjectHandle, ReadObjectHandle},
+        object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle},
         object_store::{StoreObjectHandle, Timestamp},
         platform::fuchsia::{
             directory::FxDirectory,
@@ -258,6 +258,7 @@ impl Drop for FxFile {
     }
 }
 
+#[async_trait]
 impl FxNode for FxFile {
     fn object_id(&self) -> u64 {
         self.handle.object_id()
@@ -286,6 +287,10 @@ impl FxNode for FxFile {
                 .graveyard()
                 .queue_tombstone(store.store_object_id(), self.object_id());
         }
+    }
+
+    async fn get_properties(&self) -> Result<ObjectProperties, Error> {
+        self.handle.get_properties().await
     }
 }
 
@@ -368,7 +373,7 @@ impl File for FxFile {
     }
 
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        let props = self.handle.get_properties().await.map_err(map_to_status)?;
+        let props = self.get_properties().await.map_err(map_to_status)?;
         Ok(fio::NodeAttributes {
             mode: fio::MODE_TYPE_FILE
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false),

@@ -8,7 +8,7 @@ use {
         crypt::WrappedKeys,
         lsm_tree::types::{Item, ItemRef, NextKey, OrdLowerBound, OrdUpperBound, RangeKey},
         object_store::extent_record::{Checksums, ExtentKey, ExtentValue},
-        serialized_types::Versioned,
+        serialized_types::{migrate_nodefault, Migrate, Versioned},
     },
     serde::{Deserialize, Serialize},
     std::convert::From,
@@ -43,6 +43,21 @@ pub enum ObjectKeyData {
     Child { name: String },
     /// A graveyard entry.
     GraveyardEntry { object_id: u64 },
+    /// Project ID limit info, where the id is the associated id number. This should only be
+    /// attached to the volume's root node.
+    ProjectLimit { project_id: u64 },
+    /// Project ID usage info, where the is the associated id number. This should only be attached
+    /// to the volume's root node.
+    ProjectUsage { project_id: u64 },
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize)]
+pub enum ObjectKeyDataV5 {
+    Object,
+    Keys,
+    Attribute(u64, AttributeKey),
+    Child { name: String },
+    GraveyardEntry { object_id: u64 },
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeHash)]
@@ -62,6 +77,13 @@ pub struct ObjectKey {
     pub object_id: u64,
     /// The type and data of the key.
     pub data: ObjectKeyData,
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+#[migrate_nodefault]
+pub struct ObjectKeyV5 {
+    pub object_id: u64,
+    pub data: ObjectKeyDataV5,
 }
 
 impl ObjectKey {
@@ -107,6 +129,16 @@ impl ObjectKey {
     /// Creates a graveyard entry.
     pub fn graveyard_entry(graveyard_object_id: u64, object_id: u64) -> Self {
         Self { object_id: graveyard_object_id, data: ObjectKeyData::GraveyardEntry { object_id } }
+    }
+
+    /// Creates an ObjectKey for a ProjectLimit entry.
+    pub fn project_limit(object_id: u64, project_id: u64) -> Self {
+        Self { object_id, data: ObjectKeyData::ProjectLimit { project_id } }
+    }
+
+    /// Creates an ObjectKey for a ProjectUsage entry.
+    pub fn project_usage(object_id: u64, project_id: u64) -> Self {
+        Self { object_id, data: ObjectKeyData::ProjectUsage { project_id } }
     }
 
     /// Returns the search key for this extent; that is, a key which is <= this key under Ord and
@@ -274,13 +306,21 @@ pub enum EncryptionKeys {
 /// Object-level attributes.  Note that these are not the same as "attributes" in the
 /// ObjectValue::Attribute sense, which refers to an arbitrary data payload associated with an
 /// object.  This naming collision is unfortunate.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeHash)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, TypeHash)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub struct ObjectAttributes {
     /// The timestamp at which the object was created (i.e. crtime).
     pub creation_time: Timestamp,
     /// The timestamp at which the object's data was last modified (i.e. mtime).
     pub modification_time: Timestamp,
+    /// The project id to associate this object's resource usage with. Zero means none.
+    pub project_id: u64,
+}
+
+#[derive(Debug, Default, Deserialize, Migrate, Serialize)]
+pub struct ObjectAttributesV5 {
+    creation_time: Timestamp,
+    modification_time: Timestamp,
 }
 
 /// ObjectValue is the value of an item in the object store.
@@ -311,6 +351,21 @@ pub enum ObjectValue {
     /// EOF to be trimmed at mount time.  This is used in cases where shrinking a file can exceed
     /// the bounds of a single transaction.
     Trim,
+    /// Tracking a bytes and nodes pair. Added to support tracking Project ID usage and limits.
+    BytesAndNodes { bytes: u64, nodes: u64 },
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+pub enum ObjectValueV5 {
+    None,
+    Some,
+    Object { kind: ObjectKind, attributes: ObjectAttributesV5 },
+    Keys(EncryptionKeys),
+    Attribute { size: u64 },
+    Extent(ExtentValue),
+    Child { object_id: u64, object_descriptor: ObjectDescriptor },
+    Trim,
+    BytesAndNodes { bytes: u64, nodes: u64 },
 }
 
 impl ObjectValue {
@@ -320,10 +375,11 @@ impl ObjectValue {
         allocated_size: u64,
         creation_time: Timestamp,
         modification_time: Timestamp,
+        project_id: u64,
     ) -> ObjectValue {
         ObjectValue::Object {
             kind: ObjectKind::File { refs, allocated_size },
-            attributes: ObjectAttributes { creation_time, modification_time },
+            attributes: ObjectAttributes { creation_time, modification_time, project_id },
         }
     }
     pub fn keys(keys: EncryptionKeys) -> ObjectValue {
@@ -352,6 +408,7 @@ impl ObjectValue {
 }
 
 pub type ObjectItem = Item<ObjectKey, ObjectValue>;
+pub type ObjectItemV5 = Item<ObjectKeyV5, ObjectValueV5>;
 
 impl ObjectItem {
     pub fn is_tombstone(&self) -> bool {

@@ -38,13 +38,15 @@ use {
                 writer::JournalWriter,
                 JournalCheckpoint,
             },
-            object_record::ObjectItem,
+            object_record::{ObjectItem, ObjectItemV5},
             transaction::{AssocObj, Options},
             tree::MajorCompactable,
             HandleOptions, Mutation, ObjectKey, ObjectStore, ObjectValue, StoreObjectHandle,
         },
         range::RangeExt,
-        serialized_types::{Version, Versioned, VersionedLatest, EARLIEST_SUPPORTED_VERSION},
+        serialized_types::{
+            Migrate, Version, Versioned, VersionedLatest, EARLIEST_SUPPORTED_VERSION,
+        },
     },
     anyhow::{bail, ensure, Context, Error},
     serde::{Deserialize, Serialize},
@@ -206,6 +208,13 @@ pub enum SuperBlockRecord {
     ObjectItem(ObjectItem),
 
     // Marks the end of the full super-block.
+    End,
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+pub enum SuperBlockRecordV5 {
+    Extent(Range<u64>),
+    ObjectItem(ObjectItemV5),
     End,
 }
 

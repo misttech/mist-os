@@ -29,7 +29,8 @@ use {
     fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream},
     fidl_fuchsia_fxfs::{
-        CheckOptions, CryptMarker, CryptProxy, MountOptions, VolumeRequest, VolumeRequestStream,
+        CheckOptions, CryptMarker, CryptProxy, MountOptions, ProjectIdMarker, VolumeRequest,
+        VolumeRequestStream,
     },
     fidl_fuchsia_io as fio,
     fs_inspect::{FsInspectTree, FsInspectVolume},
@@ -155,7 +156,7 @@ impl VolumesDirectory {
     }
 
     #[cfg(test)]
-    async fn mount_volume(
+    pub async fn mount_volume(
         self: &Arc<Self>,
         name: &str,
         crypt: Option<Arc<dyn Crypt>>,
@@ -274,6 +275,16 @@ impl VolumesDirectory {
                 let me = me.clone();
                 async move {
                     let _ = me.handle_admin_requests(requests, store_id).await;
+                }
+            }),
+        )?;
+        let project_handler = volume.clone();
+        svc_dir.add_entry(
+            ProjectIdMarker::PROTOCOL_NAME,
+            vfs::service::host(move |requests| {
+                let project_handler = project_handler.clone();
+                async move {
+                    let _ = project_handler.handle_project_id_requests(requests).await;
                 }
             }),
         )?;
@@ -544,7 +555,132 @@ impl VolumesDirectory {
         }
         Ok(())
     }
+    /*
+        async fn handle_set_project_limit(
+            self: &Arc<Self>,
+            store_id: u64,
+            project_id: u64,
+            bytes: u64,
+            nodes: u64,
+        ) -> Result<(), Error> {
+            let volume = self
+                .mounted_volumes
+                .lock()
+                .await
+                .get(&store_id)
+                .ok_or::<Error>(FxfsError::NotPresent.into())?
+                .clone();
+            let fs = self.root_volume.volume_directory().store().filesystem();
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    &vec![LockKey::ProjectId { store_object_id: store_id, project_id }],
+                    Options::default(),
+                )
+                .await?;
+            volume.set_project_limit(&mut transaction, project_id, bytes, nodes).await?;
+            transaction.commit().await?;
+            Ok(())
+        }
 
+        async fn handle_clear_project_limit(
+            self: &Arc<Self>,
+            store_id: u64,
+            project_id: u64,
+        ) -> Result<(), Error> {
+            let volume = self
+                .mounted_volumes
+                .lock()
+                .await
+                .get(&store_id)
+                .ok_or::<Error>(FxfsError::NotPresent.into())?
+                .clone();
+            let fs = self.root_volume.volume_directory().store().filesystem();
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    &vec![LockKey::ProjectId { store_object_id: store_id, project_id }],
+                    Options::default(),
+                )
+                .await?;
+            volume.clear_project_limit(&mut transaction, project_id).await?;
+            transaction.commit().await?;
+            Ok(())
+        }
+
+        async fn handle_set_project_for_node(
+            self: &Arc<Self>,
+            store_id: u64,
+            node_id: u64,
+            project_id: u64,
+        ) -> Result<(), Error> {
+            let volume = self
+                .mounted_volumes
+                .lock()
+                .await
+                .get(&store_id)
+                .ok_or::<Error>(FxfsError::NotPresent.into())?
+                .clone();
+            let fs = self.root_volume.volume_directory().store().filesystem();
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    &vec![
+                        LockKey::ProjectId { store_object_id: store_id, project_id },
+                        LockKey::object(store_id, node_id),
+                    ],
+                    Options::default(),
+                )
+                .await?;
+            volume.set_project_for_node(&mut transaction, node_id, project_id).await?;
+            transaction.commit().await?;
+            Ok(())
+        }
+
+        async fn handle_get_project_for_node(
+            self: &Arc<Self>,
+            store_id: u64,
+            node_id: u64,
+        ) -> Result<u64, Error> {
+            let volume = self
+                .mounted_volumes
+                .lock()
+                .await
+                .get(&store_id)
+                .ok_or::<Error>(FxfsError::NotPresent.into())?
+                .clone();
+            volume.get_project_for_node(node_id).await
+        }
+
+        async fn handle_clear_project_for_node(
+            self: &Arc<Self>,
+            store_id: u64,
+            node_id: u64,
+        ) -> Result<(), Error> {
+            let volume = self
+                .mounted_volumes
+                .lock()
+                .await
+                .get(&store_id)
+                .ok_or::<Error>(FxfsError::NotPresent.into())?
+                .clone();
+            let project_id = volume.get_project_for_node(node_id).await?;
+            let fs = self.root_volume.volume_directory().store().filesystem();
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    &vec![
+                        LockKey::ProjectId { store_object_id: store_id, project_id },
+                        LockKey::object(store_id, node_id),
+                    ],
+                    Options::default(),
+                )
+                .await?;
+            volume.clear_project_for_node(&mut transaction, node_id, project_id).await?;
+            transaction.commit().await?;
+            Ok(())
+        }
+    */
     // Unmounts the volume identified by `store_id`.  The caller should take locks to avoid races if
     // necessary.
     async fn unmount(&self, store_id: u64) -> Result<(), Error> {

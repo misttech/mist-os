@@ -5,14 +5,15 @@
 use {
     crate::{
         errors::FxfsError,
-        filesystem::{self, SyncOptions},
+        filesystem::{self, Filesystem, SyncOptions},
         log::*,
         object_store::{
             directory::{Directory, ObjectDescriptor},
-            transaction::Options,
-            HandleOptions, HandleOwner, ObjectStore,
+            transaction::{LockKey, Mutation, Options},
+            HandleOptions, HandleOwner, ObjectKey, ObjectKind, ObjectStore, ObjectValue,
         },
         platform::fuchsia::{
+            component::map_to_raw_status,
             directory::FxDirectory,
             file::FxFile,
             memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
@@ -22,8 +23,9 @@ use {
             volumes_directory::VolumesDirectory,
         },
     },
-    anyhow::{bail, Error},
+    anyhow::{anyhow, bail, ensure, Error},
     async_trait::async_trait,
+    fidl_fuchsia_fxfs::{ProjectIdRequest, ProjectIdRequestStream},
     fidl_fuchsia_io as fio,
     fs_inspect::{FsInspectVolume, VolumeData},
     fuchsia_async as fasync,
@@ -31,7 +33,7 @@ use {
         self,
         channel::oneshot,
         stream::{self, FusedStream, Stream},
-        FutureExt, StreamExt,
+        FutureExt, StreamExt, TryStreamExt,
     },
     std::{
         convert::TryInto,
@@ -405,6 +407,302 @@ impl FxVolumeAndRoot {
         &self.root
     }
 
+    fn get_fs(&self) -> Arc<dyn Filesystem> {
+        self.volume.store.filesystem()
+    }
+
+    pub async fn handle_project_id_requests(
+        &self,
+        mut requests: ProjectIdRequestStream,
+    ) -> Result<(), Error> {
+        let store_id = self.volume.store.store_object_id();
+        while let Some(request) = requests.try_next().await? {
+            match request {
+                ProjectIdRequest::SetLimit { responder, project_id, bytes, nodes } => responder
+                    .send(&mut self.set_project_limit(project_id, bytes, nodes).await.map_err(
+                        |e| {
+                            error!(?e, store_id, project_id, "Failed to set project limit");
+                            map_to_raw_status(e)
+                        },
+                    ))?,
+                ProjectIdRequest::Clear { responder, project_id } => responder.send(
+                    &mut self.clear_project_limit(project_id).await.map_err(|e| {
+                        error!(?e, store_id, project_id, "Failed to clear project limit");
+                        map_to_raw_status(e)
+                    }),
+                )?,
+                ProjectIdRequest::SetForNode { responder, node_id, project_id } => responder.send(
+                    &mut self.set_project_for_node(node_id, project_id).await.map_err(|e| {
+                        error!(?e, store_id, node_id, project_id, "Failed to apply node.");
+                        map_to_raw_status(e)
+                    }),
+                )?,
+                ProjectIdRequest::GetForNode { responder, node_id } => {
+                    responder.send(&mut self.get_project_for_node(node_id).await.map_err(|e| {
+                        error!(?e, store_id, node_id, "Failed to apply node.");
+                        map_to_raw_status(e)
+                    }))?
+                }
+                ProjectIdRequest::ClearForNode { responder, node_id } => responder.send(
+                    &mut self.clear_project_for_node(node_id).await.map_err(|e| {
+                        error!(?e, store_id, node_id, "Failed to apply node.");
+                        map_to_raw_status(e)
+                    }),
+                )?,
+            }
+        }
+        Ok(())
+    }
+
+    /// Adds a mutation to set the project limit as an attribute with `bytes` and `nodes` to root
+    /// node. Adds a zero initialized usage tracking attribute for the project at the same time.
+    async fn set_project_limit(
+        &self,
+        project_id: u64,
+        bytes: u64,
+        nodes: u64,
+    ) -> Result<(), Error> {
+        let store = self.volume.store();
+        let root_id = self.root.directory().object_id();
+        let mut transaction = self
+            .get_fs()
+            .new_transaction(
+                &vec![LockKey::ProjectId { store_object_id: store.store_object_id(), project_id }],
+                Options::default(),
+            )
+            .await?;
+        transaction.add(
+            store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::project_limit(root_id, project_id),
+                ObjectValue::BytesAndNodes { bytes, nodes },
+            ),
+        );
+        let usage_key = ObjectKey::project_usage(root_id, project_id);
+        let usage = store.tree().find(&usage_key).await?;
+        if usage == None || usage.unwrap().value == ObjectValue::None {
+            transaction.add(
+                store.store_object_id(),
+                Mutation::replace_or_insert_object(
+                    usage_key,
+                    ObjectValue::BytesAndNodes { bytes: 0, nodes: 0 },
+                ),
+            );
+        }
+        transaction.commit().await?;
+        Ok(())
+    }
+
+    /// Clear the limit for a project by tombstoning the limits and usage attributes for the
+    /// given `project_id`. Fails if the project is still in use by one or more nodes.
+    async fn clear_project_limit(&self, project_id: u64) -> Result<(), Error> {
+        let store = self.volume.store();
+        let root_id = self.root.directory().object_id();
+        let mut transaction = self
+            .get_fs()
+            .new_transaction(
+                &vec![LockKey::ProjectId { store_object_id: store.store_object_id(), project_id }],
+                Options::default(),
+            )
+            .await?;
+        match store
+            .tree()
+            .find(&ObjectKey::project_usage(root_id, project_id))
+            .await?
+            .ok_or(FxfsError::NotFound)?
+            .value
+        {
+            ObjectValue::BytesAndNodes { nodes, .. } => {
+                ensure!(nodes == 0, FxfsError::NotEmpty);
+                // TODO(fxbug.dev/114744): Check for zero bytes as well after size updates
+                // are properly applied to file changes.
+            }
+            ObjectValue::None => {
+                Err(anyhow!(FxfsError::NotFound))?;
+            }
+            _ => {
+                Err(anyhow!(FxfsError::Inconsistent))?;
+            }
+        };
+        transaction.add(
+            store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::project_limit(root_id, project_id),
+                ObjectValue::None,
+            ),
+        );
+        transaction.add(
+            store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::project_usage(root_id, project_id),
+                ObjectValue::None,
+            ),
+        );
+        transaction.commit().await?;
+        Ok(())
+    }
+
+    /// Apply a `project_id` to a given node, as well as indicating a need to `force_inherit` the
+    /// attribute to new child nodes. Needs to correctly indicate if the node `is_dir` or not to
+    /// enable searching for it.
+    async fn set_project_for_node(&self, node_id: u64, project_id: u64) -> Result<(), Error> {
+        let store = self.volume.store();
+        let root_id = self.root.directory().object_id();
+        let mut transaction = self
+            .get_fs()
+            .new_transaction(
+                &vec![
+                    LockKey::ProjectId { store_object_id: store.store_object_id(), project_id },
+                    LockKey::object(store.store_object_id(), node_id),
+                ],
+                Options::default(),
+            )
+            .await?;
+        // Ensure project exists.
+        let (bytes, nodes) = match store
+            .tree()
+            .find(&ObjectKey::project_usage(root_id, project_id))
+            .await?
+            .ok_or(FxfsError::NotFound)?
+            .value
+        {
+            ObjectValue::BytesAndNodes { bytes, nodes } => (bytes, nodes),
+            ObjectValue::None => Err(anyhow!(FxfsError::NotFound))?,
+            _ => Err(anyhow!(FxfsError::Inconsistent))?,
+        };
+
+        let object_key = ObjectKey::object(node_id);
+        let (kind, mut attributes) =
+            match store.tree().find(&object_key).await?.ok_or(FxfsError::NotFound)?.value {
+                ObjectValue::Object { kind, attributes } => (kind, attributes),
+                ObjectValue::None => return Err(FxfsError::NotFound.into()),
+                _ => return Err(FxfsError::Inconsistent.into()),
+            };
+        // Prevent updating this if it is already set.
+        if attributes.project_id != 0 {
+            return Err(FxfsError::AlreadyExists.into());
+        }
+        // TODO(fxbug.dev/114744): This is currently always zero size for directories Either update
+        // this to be more intelligent, or hardcode this to zero for directories before making
+        // project id generally available.
+        let storage_size = match kind {
+            ObjectKind::File { allocated_size, .. } => allocated_size,
+            ObjectKind::Directory { .. } => 0,
+            _ => return Err(FxfsError::Inconsistent.into()),
+        };
+
+        attributes.project_id = project_id;
+
+        transaction.add(
+            store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                object_key,
+                ObjectValue::Object { kind, attributes },
+            ),
+        );
+        transaction.add(
+            store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::project_usage(root_id, project_id),
+                ObjectValue::BytesAndNodes { bytes: bytes + storage_size, nodes: nodes + 1 },
+            ),
+        );
+        transaction.commit().await?;
+        Ok(())
+    }
+
+    /// Return the project_id associated with the given `node_id`, or a NotFound error if one is not
+    /// applied.
+    async fn get_project_for_node(&self, node_id: u64) -> Result<u64, Error> {
+        match self
+            .volume
+            .store
+            .tree()
+            .find(&ObjectKey::object(node_id))
+            .await?
+            .ok_or(FxfsError::NotFound)?
+            .value
+        {
+            ObjectValue::Object { attributes, .. } => match attributes.project_id {
+                0 => return Err(FxfsError::NotFound.into()),
+                id => Ok(id),
+            },
+            ObjectValue::None => return Err(FxfsError::NotFound.into()),
+            _ => return Err(FxfsError::Inconsistent.into()),
+        }
+    }
+
+    /// Remove the project id for a given `node_id`. The call will fail if the `node_id` is not
+    /// currently associated with any project id.
+    async fn clear_project_for_node(&self, node_id: u64) -> Result<(), Error> {
+        let store = self.volume.store();
+        let root_id = self.root.directory().object_id();
+        // Need to know the project_id up front, so that we can lock properly.
+        let project_id = self.get_project_for_node(node_id).await?;
+        let mut transaction = self
+            .get_fs()
+            .new_transaction(
+                &vec![
+                    LockKey::ProjectId { store_object_id: store.store_object_id(), project_id },
+                    LockKey::object(store.store_object_id(), node_id),
+                ],
+                Options::default(),
+            )
+            .await?;
+        let (bytes, nodes) = match store
+            .tree()
+            .find(&ObjectKey::project_usage(root_id, project_id))
+            .await?
+            .ok_or(FxfsError::NotFound)?
+            .value
+        {
+            ObjectValue::BytesAndNodes { bytes, nodes } => (bytes, nodes),
+            // Finding a tombstone would also indicate inconsistency here.
+            _ => Err(anyhow!(FxfsError::Inconsistent))?,
+        };
+
+        let object_key = ObjectKey::object(node_id);
+        let (kind, mut attributes) =
+            match store.tree().find(&object_key).await?.ok_or(FxfsError::NotFound)?.value {
+                ObjectValue::Object { kind, attributes } => (kind, attributes),
+                ObjectValue::None => return Err(FxfsError::NotFound.into()),
+                _ => return Err(FxfsError::Inconsistent.into()),
+            };
+        // Need to verify that the project on the node is correct, since the lock on the project
+        // id could not have been taken until after the original lookup.
+        if attributes.project_id != project_id {
+            return Err(FxfsError::NotFound.into());
+        }
+
+        // TODO(fxbug.dev/114744): This is currently always zero size for directories Either update
+        // this to be more intelligent, or hardcode this to zero for directories before making
+        // project id generally available.
+        let storage_size = match kind {
+            ObjectKind::File { allocated_size, .. } => allocated_size,
+            ObjectKind::Directory { .. } => 0,
+            _ => return Err(FxfsError::Inconsistent.into()),
+        };
+
+        attributes.project_id = 0;
+
+        transaction.add(
+            store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                object_key,
+                ObjectValue::Object { kind, attributes },
+            ),
+        );
+        transaction.add(
+            store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::project_usage(root_id, project_id),
+                ObjectValue::BytesAndNodes { bytes: bytes - storage_size, nodes: nodes - 1 },
+            ),
+        );
+        transaction.commit().await?;
+        Ok(())
+    }
+
     #[cfg(test)]
     pub(super) fn into_volume(self) -> Arc<FxVolume> {
         self.volume
@@ -450,13 +748,15 @@ mod tests {
     use {
         crate::{
             crypt::insecure::InsecureCrypt,
+            errors::FxfsError,
             filesystem::FxFilesystem,
+            fsck::{fsck, fsck_volume},
             object_handle::{ObjectHandle, ObjectHandleExt},
             object_store::{
                 directory::ObjectDescriptor,
                 transaction::{Options, TransactionHandler},
                 volume::root_volume,
-                HandleOptions, ObjectStore,
+                HandleOptions, ObjectKey, ObjectStore, ObjectValue,
             },
             platform::fuchsia::{
                 file::FxFile,
@@ -465,10 +765,15 @@ mod tests {
                     close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
                     open_file_checked, write_at, TestFixture,
                 },
-                volume::{FlushTaskConfig, FxVolumeAndRoot},
+                volume::{FlushTaskConfig, FxVolume, FxVolumeAndRoot},
+                volumes_directory::VolumesDirectory,
             },
         },
+        anyhow::Error,
+        fidl::endpoints::ServerEnd,
+        fidl_fuchsia_fxfs::{ProjectIdMarker, VolumeMarker},
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
+        fuchsia_component::client::connect_to_protocol_at_dir_svc,
         fuchsia_fs::file,
         fuchsia_zircon::Status,
         std::{
@@ -476,6 +781,7 @@ mod tests {
             time::Duration,
         },
         storage_device::{fake_device::FakeDevice, DeviceHolder},
+        vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
     };
 
     #[fuchsia::test(threads = 10)]
@@ -980,6 +1286,255 @@ mod tests {
         filesystem.close().await.expect("close filesystem failed");
         let device = filesystem.take_device().await;
         device.ensure_unique();
+    }
+
+    /// Return the project limit for a give `project_id` as a (bytes, nodes) tuple.
+    async fn get_project_limit(
+        volume: &Arc<FxVolume>,
+        project_id: u64,
+    ) -> Result<(u64, u64), Error> {
+        let store = volume.store();
+        let root_object_id = store.root_directory_object_id();
+        let item = store
+            .tree()
+            .find(&ObjectKey::project_limit(root_object_id, project_id))
+            .await?
+            .ok_or(FxfsError::NotFound)?;
+        match item.value {
+            ObjectValue::BytesAndNodes { bytes, nodes } => Ok((bytes, nodes)),
+            ObjectValue::None => Err(FxfsError::NotFound.into()),
+            _ => Err(FxfsError::Inconsistent.into()),
+        }
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_project_limit_persistence() {
+        const BYTES_LIMIT_1: u64 = 123456;
+        const NODES_LIMIT_1: u64 = 4321;
+        const BYTES_LIMIT_2: u64 = 456789;
+        const NODES_LIMIT_2: u64 = 9876;
+        const VOLUME_NAME: &str = "A";
+        const FILE_NAME: &str = "B";
+        const PROJECT_ID: u64 = 42;
+        let volume_store_id;
+        let node_id;
+        let mut device = DeviceHolder::new(FakeDevice::new(8192, 512));
+        {
+            let filesystem = FxFilesystem::new_empty(device).await.unwrap();
+            let volumes_directory = VolumesDirectory::new(
+                root_volume(filesystem.clone()).await.unwrap(),
+                Weak::new(),
+                None,
+            )
+            .await
+            .unwrap();
+
+            let volume_and_root = volumes_directory
+                .create_volume(VOLUME_NAME, None)
+                .await
+                .expect("create unencrypted volume failed");
+            volume_store_id = volume_and_root.volume().store().store_object_id();
+
+            let (volume_proxy, volume_server_end) =
+                fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
+            volumes_directory.directory_node().clone().open(
+                ExecutionScope::new(),
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                0,
+                Path::validate_and_split(VOLUME_NAME).unwrap(),
+                volume_server_end.into_channel().into(),
+            );
+
+            let (volume_dir_proxy, dir_server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                    .expect("Create dir proxy to succeed");
+            volumes_directory
+                .serve_volume(&volume_and_root, dir_server_end)
+                .await
+                .expect("serve_volume failed");
+
+            let project_proxy =
+                connect_to_protocol_at_dir_svc::<ProjectIdMarker>(&volume_dir_proxy)
+                    .expect("Unable to connect to project id service");
+
+            project_proxy
+                .set_limit(PROJECT_ID, BYTES_LIMIT_1, NODES_LIMIT_1)
+                .await
+                .unwrap()
+                .expect("To set limits");
+            {
+                // Should just be one open volume.
+                let (bytes, nodes) = get_project_limit(volume_and_root.volume(), PROJECT_ID)
+                    .await
+                    .expect("Fetching limits");
+                assert_eq!(bytes, BYTES_LIMIT_1);
+                assert_eq!(nodes, NODES_LIMIT_1);
+            }
+
+            let file_proxy = {
+                let (root_proxy, root_server_end) =
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                        .expect("Create dir proxy to succeed");
+                volume_dir_proxy
+                    .open(
+                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                        fio::MODE_TYPE_DIRECTORY,
+                        "root",
+                        ServerEnd::new(root_server_end.into_channel()),
+                    )
+                    .expect("Failed to open volume root");
+
+                open_file_checked(
+                    &root_proxy,
+                    fio::OpenFlags::CREATE
+                        | fio::OpenFlags::RIGHT_READABLE
+                        | fio::OpenFlags::RIGHT_WRITABLE,
+                    fio::MODE_TYPE_FILE,
+                    FILE_NAME,
+                )
+                .await
+            };
+
+            node_id = file_proxy.get_attr().await.unwrap().1.id;
+
+            project_proxy
+                .set_for_node(node_id, PROJECT_ID)
+                .await
+                .unwrap()
+                .expect("Setting project on node");
+
+            project_proxy
+                .set_for_node(node_id, PROJECT_ID)
+                .await
+                .unwrap()
+                .expect_err("Should not be able to reset project for node.");
+
+            project_proxy
+                .set_limit(PROJECT_ID, BYTES_LIMIT_2, NODES_LIMIT_2)
+                .await
+                .unwrap()
+                .expect("To set limits");
+            {
+                // Should just be one open volume.
+                let (bytes, nodes) = get_project_limit(volume_and_root.volume(), PROJECT_ID)
+                    .await
+                    .expect("Fetching limits");
+                assert_eq!(bytes, BYTES_LIMIT_2);
+                assert_eq!(nodes, NODES_LIMIT_2);
+            }
+
+            assert_eq!(
+                project_proxy.get_for_node(node_id).await.unwrap().expect("Checking project"),
+                PROJECT_ID
+            );
+
+            std::mem::drop(volume_proxy);
+            volumes_directory.terminate().await;
+            std::mem::drop(volumes_directory);
+            filesystem.close().await.expect("close filesystem failed");
+            device = filesystem.take_device().await;
+        }
+        {
+            device.ensure_unique();
+            device.reopen(false);
+            let filesystem = FxFilesystem::open(device as DeviceHolder).await.unwrap();
+            fsck(filesystem.clone()).await.expect("Fsck");
+            fsck_volume(filesystem.as_ref(), volume_store_id, None).await.expect("Fsck volume");
+            let volumes_directory = VolumesDirectory::new(
+                root_volume(filesystem.clone()).await.unwrap(),
+                Weak::new(),
+                None,
+            )
+            .await
+            .unwrap();
+            let volume_and_root = volumes_directory
+                .mount_volume(VOLUME_NAME, None)
+                .await
+                .expect("mount unencrypted volume failed");
+            let (volume_proxy, volume_server_end) =
+                fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
+            volumes_directory.directory_node().clone().open(
+                ExecutionScope::new(),
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                0,
+                Path::validate_and_split(VOLUME_NAME).unwrap(),
+                volume_server_end.into_channel().into(),
+            );
+
+            {
+                let (bytes, nodes) = get_project_limit(volume_and_root.volume(), PROJECT_ID)
+                    .await
+                    .expect("Fetching limits");
+                assert_eq!(bytes, BYTES_LIMIT_2);
+                assert_eq!(nodes, NODES_LIMIT_2);
+            }
+
+            let project_proxy = {
+                let (volume_dir_proxy, dir_server_end) =
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                        .expect("Create dir proxy to succeed");
+                volumes_directory
+                    .serve_volume(&volume_and_root, dir_server_end)
+                    .await
+                    .expect("serve_volume failed");
+
+                connect_to_protocol_at_dir_svc::<ProjectIdMarker>(&volume_dir_proxy)
+                    .expect("Unable to connect to project id service")
+            };
+
+            // Should be unable to clear the project limit, due to being in use.
+            project_proxy.clear(PROJECT_ID).await.unwrap().expect_err("To clear limits");
+
+            assert_eq!(
+                project_proxy.get_for_node(node_id).await.unwrap().expect("Checking project"),
+                PROJECT_ID
+            );
+            project_proxy.clear_for_node(node_id).await.unwrap().expect("Clearing project");
+            project_proxy.get_for_node(node_id).await.unwrap().expect_err("Checking project");
+
+            project_proxy.clear(PROJECT_ID).await.unwrap().expect("To clear limits");
+            assert_eq!(
+                get_project_limit(volume_and_root.volume(), PROJECT_ID)
+                    .await
+                    .expect_err("Expect missing limits")
+                    .downcast::<FxfsError>()
+                    .unwrap(),
+                FxfsError::NotFound
+            );
+
+            std::mem::drop(volume_proxy);
+            volumes_directory.terminate().await;
+            std::mem::drop(volumes_directory);
+            filesystem.close().await.expect("close filesystem failed");
+            device = filesystem.take_device().await;
+        }
+        device.ensure_unique();
+        device.reopen(false);
+        let filesystem = FxFilesystem::open(device as DeviceHolder).await.unwrap();
+        fsck(filesystem.clone()).await.expect("Fsck");
+        fsck_volume(filesystem.as_ref(), volume_store_id, None).await.expect("Fsck volume");
+        let volumes_directory = VolumesDirectory::new(
+            root_volume(filesystem.clone()).await.unwrap(),
+            Weak::new(),
+            None,
+        )
+        .await
+        .unwrap();
+        let volume_and_root = volumes_directory
+            .mount_volume(VOLUME_NAME, None)
+            .await
+            .expect("mount unencrypted volume failed");
+        assert_eq!(
+            get_project_limit(volume_and_root.volume(), PROJECT_ID)
+                .await
+                .expect_err("Expect missing limits")
+                .downcast::<FxfsError>()
+                .unwrap(),
+            FxfsError::NotFound
+        );
+        volumes_directory.terminate().await;
+        std::mem::drop(volumes_directory);
+        filesystem.close().await.expect("close filesystem failed");
     }
 
     #[fuchsia::test(threads = 10)]

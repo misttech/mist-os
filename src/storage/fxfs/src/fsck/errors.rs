@@ -223,7 +223,12 @@ pub enum FsckError {
     MissingDataAttribute(u64, u64),
     MissingObjectInfo(u64, u64),
     MultipleLinksToDirectory(u64, u64),
+    NonRootProjectIdMetadata(u64, u64, u64),
     ObjectCountMismatch(u64, u64, u64),
+    ProjectOnGraveyard(u64, u64, u64),
+    ProjectUsedWithNoUsageTracking(u64, u64, u64),
+    ProjectWithLimitNoUsage(u64, Vec<u64>),
+    ProjectWithUsageNoLimit(u64, Vec<u64>),
     RefCountMismatch(u64, u64, u64),
     RootObjectHasParent(u64, u64, u64),
     SubDirCountMismatch(u64, u64, u64, u64),
@@ -324,8 +329,38 @@ impl FsckError {
             FsckError::MultipleLinksToDirectory(store_id, object_id) => {
                 format!("Directory {} in store {} has multiple links", store_id, object_id)
             }
+            FsckError::NonRootProjectIdMetadata(store_id, object_id, project_id) => {
+                format!(
+                    "Project Id {} metadata in store {} attached to object {}",
+                    project_id, store_id, object_id
+                )
+            }
             FsckError::ObjectCountMismatch(store_id, expected, actual) => {
                 format!("Store {} had {} objects, expected {}", store_id, actual, expected)
+            }
+            FsckError::ProjectOnGraveyard(store_id, project_id, object_id) => {
+                format!(
+                    "Store {} had graveyard object {} with project id {}",
+                    store_id, object_id, project_id
+                )
+            }
+            FsckError::ProjectUsedWithNoUsageTracking(store_id, project_id, node_id) => {
+                format!(
+                    "Store {} had node {} with project ids {} but no usage tracking metadata",
+                    store_id, node_id, project_id
+                )
+            }
+            FsckError::ProjectWithLimitNoUsage(store_id, missing) => {
+                format!(
+                    "Project metadata in store {} had limits but no tracked usage for {:?}",
+                    store_id, missing
+                )
+            }
+            FsckError::ProjectWithUsageNoLimit(store_id, missing) => {
+                format!(
+                    "Project metadata in store {} had tracked usaged but no limits for {:?}",
+                    store_id, missing
+                )
             }
             FsckError::RefCountMismatch(oid, expected, actual) => {
                 format!("Object {} had {} references, expected {}", oid, actual, expected)
@@ -440,8 +475,26 @@ impl FsckError {
             FsckError::MultipleLinksToDirectory(store_id, oid) => {
                 error!(store_id, oid, "Directory with multiple links");
             }
+            FsckError::NonRootProjectIdMetadata(store_id, object_id, project_id) => {
+                error!(
+                    store_id,
+                    object_id, project_id, "Non root object in volume with project id metadata"
+                );
+            }
             FsckError::ObjectCountMismatch(store_id, expected, actual) => {
                 error!(store_id, expected, actual, "Object count mismatch");
+            }
+            FsckError::ProjectOnGraveyard(store_id, project_id, object_id) => {
+                error!(store_id, project_id, object_id, "Project was set on graveyard object");
+            }
+            FsckError::ProjectUsedWithNoUsageTracking(store_id, project_id, node_id) => {
+                error!(store_id, project_id, node_id, "Project used without tracking metadata");
+            }
+            FsckError::ProjectWithLimitNoUsage(store_id, missing) => {
+                error!(store_id, ?missing, "Project id with metadata for limits but no usage");
+            }
+            FsckError::ProjectWithUsageNoLimit(store_id, missing) => {
+                error!(store_id, ?missing, "Project id with metadata for usage but no limits");
             }
             FsckError::RefCountMismatch(oid, expected, actual) => {
                 error!(oid, expected, actual, "Reference count mistmatch");

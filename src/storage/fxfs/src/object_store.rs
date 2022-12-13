@@ -80,10 +80,12 @@ use {
 // Exposed for serialized_types.
 pub use allocator::{AllocatorInfo, AllocatorKey, AllocatorValue};
 pub use extent_record::{ExtentKey, ExtentValue, DEFAULT_DATA_ATTRIBUTE_ID};
-pub use journal::{JournalRecord, SuperBlockHeader, SuperBlockRecord};
+pub use journal::{
+    JournalRecord, JournalRecordV20, SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV5,
+};
 pub use object_record::{
-    AttributeKey, EncryptionKeys, ObjectAttributes, ObjectKey, ObjectKeyData, ObjectKind,
-    ObjectValue,
+    AttributeKey, EncryptionKeys, ObjectAttributes, ObjectAttributesV5, ObjectKey, ObjectKeyData,
+    ObjectKeyDataV5, ObjectKeyV5, ObjectKind, ObjectValue, ObjectValueV5,
 };
 pub use transaction::Mutation;
 
@@ -854,7 +856,7 @@ impl ObjectStore {
             store.store_object_id(),
             Mutation::insert_object(
                 ObjectKey::object(object_id),
-                ObjectValue::file(1, 0, now.clone(), now),
+                ObjectValue::file(1, 0, now.clone(), now, 0),
             ),
         );
         let unwrapped_keys = if let Some(crypt) = crypt {

@@ -92,6 +92,7 @@ impl Graveyard {
                     attributes: ObjectAttributes {
                         creation_time: now.clone(),
                         modification_time: now,
+                        project_id: 0,
                     },
                 },
             ),

@@ -1244,7 +1244,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> GetProperties for StoreObjec
         match item.value {
             ObjectValue::Object {
                 kind: ObjectKind::File { refs, allocated_size, .. },
-                attributes: ObjectAttributes { creation_time, modification_time },
+                attributes: ObjectAttributes { creation_time, modification_time, .. },
             } => Ok(ObjectProperties {
                 refs,
                 allocated_size,

@@ -12,9 +12,9 @@ use {
         object_store::{
             allocator::{AllocatorItem, Reservation},
             object_manager::{reserved_space_from_journal_usage, ObjectManager},
-            object_record::{ObjectItem, ObjectKey, ObjectValue},
+            object_record::{ObjectItem, ObjectItemV5, ObjectKey, ObjectValue},
         },
-        serialized_types::Versioned,
+        serialized_types::{migrate_nodefault, Migrate, Versioned},
     },
     anyhow::Error,
     async_trait::async_trait,
@@ -153,6 +153,22 @@ pub enum Mutation {
     UpdateMutationsKey(UpdateMutationsKey),
 }
 
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+pub enum MutationV20 {
+    ObjectStore(ObjectStoreMutationV20),
+    EncryptedObjectStore(Box<[u8]>),
+    Allocator(AllocatorMutation),
+    // Indicates the beginning of a flush.  This would typically involve sealing a tree.
+    BeginFlush,
+    // Indicates the end of a flush.  This would typically involve replacing the immutable layers
+    // with compacted ones.
+    EndFlush,
+    // Volume has been deleted.  Requires we remove it from the set of managed ObjectStore.
+    DeleteVolume,
+    UpdateBorrowed(u64),
+    UpdateMutationsKey(UpdateMutationsKey),
+}
+
 impl Mutation {
     pub fn insert_object(key: ObjectKey, value: ObjectValue) -> Self {
         Mutation::ObjectStore(ObjectStoreMutation {
@@ -189,6 +205,13 @@ impl Mutation {
 pub struct ObjectStoreMutation {
     pub item: ObjectItem,
     pub op: Operation,
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize)]
+#[migrate_nodefault]
+pub struct ObjectStoreMutationV20 {
+    item: ObjectItemV5,
+    op: Operation,
 }
 
 // The different LSM tree operations that can be performed as part of a mutation.
@@ -328,10 +351,17 @@ impl PartialEq for UpdateMutationsKey {
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum LockKey {
     /// Used to lock changes to a particular object attribute (e.g. writes).
-    ObjectAttribute { store_object_id: u64, object_id: u64, attribute_id: u64 },
+    ObjectAttribute {
+        store_object_id: u64,
+        object_id: u64,
+        attribute_id: u64,
+    },
 
     /// Used to lock changes to a particular object (e.g. adding a child to a directory).
-    Object { store_object_id: u64, object_id: u64 },
+    Object {
+        store_object_id: u64,
+        object_id: u64,
+    },
 
     /// Used to lock changes to the root volume (e.g. adding or removing a volume).
     RootVolume,
@@ -340,13 +370,27 @@ pub enum LockKey {
     Filesystem,
 
     /// Used to lock cached writes to an object attribute.
-    CachedWrite { store_object_id: u64, object_id: u64, attribute_id: u64 },
+    CachedWrite {
+        store_object_id: u64,
+        object_id: u64,
+        attribute_id: u64,
+    },
+
+    ProjectId {
+        store_object_id: u64,
+        project_id: u64,
+    },
 
     /// Used to lock flushing an object.
-    Flush { object_id: u64 },
+    Flush {
+        object_id: u64,
+    },
 
     /// Used to lock any truncate operations for a file.
-    Truncate { store_object_id: u64, object_id: u64 },
+    Truncate {
+        store_object_id: u64,
+        object_id: u64,
+    },
 }
 
 impl LockKey {

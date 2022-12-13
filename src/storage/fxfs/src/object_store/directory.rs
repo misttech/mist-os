@@ -82,6 +82,7 @@ impl<S: HandleOwner> Directory<S> {
                     attributes: ObjectAttributes {
                         creation_time: now.clone(),
                         modification_time: now,
+                        project_id: 0,
                     },
                 },
             ),
@@ -297,7 +298,7 @@ impl<S: HandleOwner> Directory<S> {
         match item.value {
             ObjectValue::Object {
                 kind: ObjectKind::Directory { sub_dirs },
-                attributes: ObjectAttributes { creation_time, modification_time },
+                attributes: ObjectAttributes { creation_time, modification_time, .. },
             } => Ok(ObjectProperties {
                 refs: 1,
                 allocated_size: 0,

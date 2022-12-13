@@ -14,8 +14,9 @@ use {
         object_store::{
             allocator::{self, AllocatorKey, AllocatorValue},
             graveyard::Graveyard,
-            AttributeKey, EncryptionKeys, ExtentKey, ExtentValue, ObjectDescriptor, ObjectKey,
-            ObjectKeyData, ObjectKind, ObjectStore, ObjectValue, DEFAULT_DATA_ATTRIBUTE_ID,
+            AttributeKey, EncryptionKeys, ExtentKey, ExtentValue, ObjectAttributes,
+            ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind, ObjectStore, ObjectValue,
+            DEFAULT_DATA_ATTRIBUTE_ID,
         },
         range::RangeExt,
         round::round_up,
@@ -84,6 +85,11 @@ struct ScannedStore<'a> {
     is_root_store: bool,
     is_encrypted: bool,
     current_file: Option<CurrentFile>,
+    root_dir_id: u64,
+    seen_project_limits: HashSet<u64>,
+    seen_project_usages: HashSet<u64>,
+    /// Tracks project ids used and an example node to examine if it should not have been included.
+    used_project_ids: BTreeMap<u64, u64>,
 }
 
 struct CurrentFile {
@@ -98,6 +104,7 @@ impl<'a> ScannedStore<'a> {
         store_id: u64,
         is_root_store: bool,
         is_encrypted: bool,
+        root_dir_id: u64,
     ) -> Self {
         Self {
             fsck,
@@ -107,6 +114,10 @@ impl<'a> ScannedStore<'a> {
             is_root_store,
             is_encrypted,
             current_file: None,
+            root_dir_id,
+            seen_project_limits: HashSet::new(),
+            seen_project_usages: HashSet::new(),
+            used_project_ids: BTreeMap::new(),
         }
     }
 
@@ -131,8 +142,12 @@ impl<'a> ScannedStore<'a> {
                         ))?;
                     }
                     ObjectValue::Object {
-                        kind: ObjectKind::File { refs, allocated_size }, ..
+                        kind: ObjectKind::File { refs, allocated_size },
+                        attributes: ObjectAttributes { project_id, .. },
                     } => {
+                        if project_id > &0 {
+                            self.used_project_ids.insert(*project_id, key.object_id);
+                        }
                         self.current_file =
                             Some(CurrentFile { object_id: key.object_id, key_ids: HashSet::new() });
                         let kind =
@@ -179,7 +194,13 @@ impl<'a> ScannedStore<'a> {
                             }
                         }
                     }
-                    ObjectValue::Object { kind: ObjectKind::Directory { sub_dirs }, .. } => {
+                    ObjectValue::Object {
+                        kind: ObjectKind::Directory { sub_dirs },
+                        attributes: ObjectAttributes { project_id, .. },
+                    } => {
+                        if project_id > &0 {
+                            self.used_project_ids.insert(*project_id, key.object_id);
+                        }
                         let kind = ObjectKind::Directory { sub_dirs: *sub_dirs };
                         match self.objects.get_mut(&key.object_id) {
                             Some(ScannedObject::File(..)) => {
@@ -227,8 +248,15 @@ impl<'a> ScannedStore<'a> {
                             }
                         }
                     }
-                    ObjectValue::Object { kind: ObjectKind::Graveyard, .. } => {
+                    ObjectValue::Object { kind: ObjectKind::Graveyard, attributes } => {
                         self.objects.insert(key.object_id, ScannedObject::Etc(key.object_id));
+                        if attributes.project_id != 0 {
+                            self.fsck.error(FsckError::ProjectOnGraveyard(
+                                self.store_id,
+                                attributes.project_id,
+                                key.object_id,
+                            ))?;
+                        }
                     }
                     _ => {
                         self.fsck.error(FsckError::MalformedObjectRecord(
@@ -494,6 +522,56 @@ impl<'a> ScannedStore<'a> {
                     }
                 }
             }
+            ObjectKeyData::ProjectLimit { project_id } => {
+                // Should only be set on the root object store
+                if self.root_dir_id != key.object_id {
+                    self.fsck.error(FsckError::NonRootProjectIdMetadata(
+                        self.store_id,
+                        key.object_id,
+                        project_id,
+                    ))?;
+                }
+                match value {
+                    ObjectValue::None => {
+                        self.seen_project_limits.remove(&project_id);
+                    }
+                    ObjectValue::BytesAndNodes { .. } => {
+                        self.seen_project_limits.insert(project_id);
+                    }
+                    _ => {
+                        self.fsck.error(FsckError::MalformedObjectRecord(
+                            self.store_id,
+                            key.into(),
+                            value.into(),
+                        ))?;
+                    }
+                }
+            }
+            ObjectKeyData::ProjectUsage { project_id } => {
+                // Should only be set on the root object store
+                if self.root_dir_id != key.object_id {
+                    self.fsck.error(FsckError::NonRootProjectIdMetadata(
+                        self.store_id,
+                        key.object_id,
+                        project_id,
+                    ))?;
+                }
+                match value {
+                    ObjectValue::None => {
+                        self.seen_project_usages.remove(&project_id);
+                    }
+                    ObjectValue::BytesAndNodes { .. } => {
+                        self.seen_project_usages.insert(project_id);
+                    }
+                    _ => {
+                        self.fsck.error(FsckError::MalformedObjectRecord(
+                            self.store_id,
+                            key.into(),
+                            value.into(),
+                        ))?;
+                    }
+                }
+            }
             ObjectKeyData::GraveyardEntry { .. } => {}
         }
         Ok(())
@@ -702,8 +780,14 @@ pub(super) async fn scan_store(
 ) -> Result<(), Error> {
     let store_id = store.store_object_id();
 
-    let mut scanned =
-        ScannedStore::new(fsck, root_objects, store_id, store.is_root(), store.is_encrypted());
+    let mut scanned = ScannedStore::new(
+        fsck,
+        root_objects,
+        store_id,
+        store.is_root(),
+        store.is_encrypted(),
+        store.root_directory_object_id(),
+    );
 
     // Scan the store for objects, attributes, and parent/child relationships.
     let layer_set = store.tree().layer_set();
@@ -734,6 +818,26 @@ pub(super) async fn scan_store(
         fsck.assert(iter.advance().await, FsckFatal::MalformedStore(store_id))?;
     }
     scanned.finish_file()?;
+
+    {
+        let diff: Vec<u64> =
+            scanned.seen_project_limits.difference(&scanned.seen_project_usages).cloned().collect();
+        if !diff.is_empty() {
+            fsck.error(FsckError::ProjectWithLimitNoUsage(store_id, diff))?;
+        }
+    }
+    {
+        let diff: Vec<u64> =
+            scanned.seen_project_usages.difference(&scanned.seen_project_limits).cloned().collect();
+        if !diff.is_empty() {
+            fsck.error(FsckError::ProjectWithUsageNoLimit(store_id, diff))?;
+        }
+    }
+    for (project_id, node_id) in scanned.used_project_ids.iter() {
+        if !scanned.seen_project_usages.contains(project_id) {
+            fsck.error(FsckError::ProjectUsedWithNoUsageTracking(store_id, *project_id, *node_id))?;
+        }
+    }
 
     // Add a reference for files in the graveyard (which acts as the file's parent until it is
     // purged, leaving only the Object record in the original store and no links to the file).

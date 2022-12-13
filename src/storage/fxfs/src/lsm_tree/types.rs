@@ -7,6 +7,7 @@ use {
         drop_event::DropEvent,
         lsm_tree::merge,
         object_handle::ReadObjectHandle,
+        object_store::{ObjectKey, ObjectKeyV5, ObjectValue, ObjectValueV5},
         serialized_types::{Version, Versioned, VersionedLatest},
     },
     anyhow::Error,
@@ -94,6 +95,12 @@ pub struct Item<K, V> {
     /// committing the transaction containing the Item.  Note that two or more Items may share the
     /// same |sequence|.
     pub sequence: u64,
+}
+
+impl From<Item<ObjectKeyV5, ObjectValueV5>> for Item<ObjectKey, ObjectValue> {
+    fn from(item: Item<ObjectKeyV5, ObjectValueV5>) -> Self {
+        Self { key: item.key.into(), value: item.value.into(), sequence: item.sequence }
+    }
 }
 
 impl<K, V> Item<K, V> {

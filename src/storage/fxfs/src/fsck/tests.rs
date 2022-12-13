@@ -1331,6 +1331,7 @@ async fn test_file_length_mismatch() {
                     attributes: ObjectAttributes {
                         creation_time: Timestamp::now(),
                         modification_time: Timestamp::now(),
+                        project_id: 0,
                     },
                 },
             ),

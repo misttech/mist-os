@@ -42,15 +42,15 @@ use {
             object_manager::ObjectManager,
             object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue},
             transaction::{
-                AllocatorMutation, Mutation, ObjectStoreMutation, Options, Transaction,
-                TxnMutation, TRANSACTION_MAX_JOURNAL_USAGE,
+                AllocatorMutation, Mutation, MutationV20, ObjectStoreMutation, Options,
+                Transaction, TxnMutation, TRANSACTION_MAX_JOURNAL_USAGE,
             },
             HandleOptions, Item, ItemRef, LastObjectId, LockState, NewChildStoreOptions,
             ObjectStore, StoreObjectHandle, INVALID_OBJECT_ID,
         },
         range::RangeExt,
         round::{round_down, round_up},
-        serialized_types::{Version, Versioned, LATEST_VERSION},
+        serialized_types::{Migrate, Version, Versioned, LATEST_VERSION},
         trace_duration,
     },
     anyhow::{anyhow, bail, Context, Error},
@@ -76,7 +76,7 @@ use {
 };
 
 // Exposed for serialized_types.
-pub use super_block::{SuperBlockHeader, SuperBlockRecord};
+pub use super_block::{SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV5};
 
 // The journal file is written to in blocks of this size.
 pub const BLOCK_SIZE: u64 = 8192;
@@ -136,6 +136,15 @@ pub enum JournalRecord {
     // on the next mount will serve the same purpose and count as a flush, although it is necessary
     // to defensively flush the device before replaying the journal (if possible, i.e. not
     // read-only) in case the block device connection was reused.
+    DidFlushDevice(u64),
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
+pub enum JournalRecordV20 {
+    EndBlock,
+    Mutation { object_id: u64, mutation: MutationV20 },
+    Commit,
+    Discard(u64),
     DidFlushDevice(u64),
 }
 
