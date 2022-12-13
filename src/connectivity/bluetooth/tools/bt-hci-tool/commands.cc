@@ -23,9 +23,10 @@
 namespace hcitool {
 namespace {
 
-::bt::hci::CommandChannel::TransactionId SendCommand(
-    const CommandData* cmd_data, std::unique_ptr<::bt::hci::CommandPacket> packet,
-    ::bt::hci::CommandChannel::CommandCallback cb, fit::closure complete_cb) {
+template <typename T>
+::bt::hci::CommandChannel::TransactionId SendCommand(const CommandData* cmd_data, T packet,
+                                                     ::bt::hci::CommandChannel::CommandCallback cb,
+                                                     fit::closure complete_cb) {
   return cmd_data->cmd_channel()->SendCommand(
       std::move(packet),
       [complete_cb = std::move(complete_cb), cb = std::move(cb)](
@@ -48,9 +49,9 @@ void LogCommandResult(bt::hci_spec::StatusCode status, ::bt::hci::CommandChannel
                                  id);
 }
 
-::bt::hci::CommandChannel::TransactionId SendCompleteCommand(
-    const CommandData* cmd_data, std::unique_ptr<::bt::hci::CommandPacket> packet,
-    fit::closure complete_cb) {
+template <typename T>
+::bt::hci::CommandChannel::TransactionId SendCompleteCommand(const CommandData* cmd_data, T packet,
+                                                             fit::closure complete_cb) {
   auto cb = [complete_cb = complete_cb.share()](::bt::hci::CommandChannel::TransactionId id,
                                                 const ::bt::hci::EventPacket& event) {
     auto return_params = event.return_params<::bt::hci_spec::SimpleReturnParams>();
@@ -330,11 +331,11 @@ bool HandleSetEventMask(const CommandData* cmd_data, const fxl::CommandLine& cmd
     return false;
   }
 
-  constexpr size_t kPayloadSize = sizeof(::bt::hci_spec::SetEventMaskCommandParams);
-  auto packet = ::bt::hci::CommandPacket::New(::bt::hci_spec::kSetEventMask, kPayloadSize);
-  packet->mutable_payload<::bt::hci_spec::SetEventMaskCommandParams>()->event_mask = htole64(mask);
-
-  auto id = SendCompleteCommand(cmd_data, std::move(packet), std::move(complete_cb));
+  auto set_event = ::bt::hci::EmbossCommandPacket::New<::bt::hci_spec::SetEventMaskCommandWriter>(
+      ::bt::hci_spec::kSetEventMask);
+  auto set_event_params = set_event.view_t();
+  set_event_params.event_mask().Write(mask);
+  auto id = SendCompleteCommand(cmd_data, std::move(set_event), std::move(complete_cb));
 
   std::cout << "  Sent HCI_Set_Event_Mask(" << fxl::NumberToString(mask, fxl::Base::k16)
             << ") (id=" << id << ")" << std::endl;
