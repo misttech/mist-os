@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::platform::{GuestConsole, PlatformServices, Stdio},
-    anyhow::{anyhow, Error},
+    crate::attach::attach,
+    crate::platform::PlatformServices,
     fidl_fuchsia_virtualization::{GuestConfig, GuestManagerError, GuestMarker, GuestProxy},
-    fuchsia_async as fasync, guest_cli_args as arguments,
+    guest_cli_args as arguments,
     std::fmt,
 };
 
@@ -114,72 +114,5 @@ async fn launch<P: PlatformServices>(
             Ok(()) => Ok(guest),
             Err(error) => Err(LaunchResult::LaunchFailure(error.into_primitive())),
         },
-    }
-}
-
-// Attach to a running guest, using a combined stdout and serial for output, and stdin for input.
-async fn attach(guest: GuestProxy) -> Result<(), Error> {
-    // Tie serial output to stdout.
-    let guest_serial_response = guest.get_serial().await?;
-    let guest_serial = fasync::Socket::from_socket(guest_serial_response)?;
-    let serial_output = async {
-        futures::io::copy(guest_serial, &mut GuestConsole::get_unblocked_stdio(Stdio::Stdout))
-            .await
-            .map(|_| ())
-            .map_err(anyhow::Error::from)
-    };
-
-    // Host doesn't currently support duplicating Fuchsia handles, so just call get console twice
-    // and let the VMM duplicate the socket for reading and writing.
-    let console_input = guest.get_console().await?.map_err(|err| anyhow!(format!("{:?}", err)))?;
-    let console_output = guest.get_console().await?.map_err(|err| anyhow!(format!("{:?}", err)))?;
-    let guest_console = GuestConsole::new(console_input, console_output)?;
-
-    futures::future::try_join(serial_output, guest_console.run_with_stdio())
-        .await
-        .map(|_| ())
-        .map_err(anyhow::Error::from)
-}
-
-#[cfg(test)]
-mod test {
-    use {
-        super::*,
-        fidl::{endpoints::create_proxy_and_stream, Socket, SocketOpts},
-        fidl_fuchsia_virtualization::GuestError,
-        futures::future::join,
-        futures::StreamExt,
-    };
-
-    #[fuchsia_async::run_until_stalled(test)]
-    async fn launch_invalid_console_returns_error() {
-        let (guest_proxy, mut guest_stream) = create_proxy_and_stream::<GuestMarker>().unwrap();
-        let (serial_launch_sock, _serial_server_sock) = Socket::create(SocketOpts::STREAM).unwrap();
-
-        let server = async move {
-            let serial_responder = guest_stream
-                .next()
-                .await
-                .expect("Failed to read from stream")
-                .expect("Failed to parse request")
-                .into_get_serial()
-                .expect("Unexpected call to Guest Proxy");
-            serial_responder.send(serial_launch_sock).expect("Failed to send request to proxy");
-
-            let console_responder = guest_stream
-                .next()
-                .await
-                .expect("Failed to read from stream")
-                .expect("Failed to parse request")
-                .into_get_console()
-                .expect("Unexpected call to Guest Proxy");
-            console_responder
-                .send(&mut Err(GuestError::DeviceNotPresent))
-                .expect("Failed to send request to proxy");
-        };
-
-        let client = attach(guest_proxy);
-        let (_, client_res) = join(server, client).await;
-        assert!(client_res.is_err());
     }
 }

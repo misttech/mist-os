@@ -98,6 +98,7 @@ pub struct GuestOptions {
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum SubCommands {
+    Attach(crate::attach_args::AttachArgs),
     Launch(crate::launch_args::LaunchArgs),
     Stop(crate::stop_args::StopArgs),
     Balloon(BalloonArgs),
@@ -271,11 +272,24 @@ pub mod stop_args {
     #[argh(subcommand, name = "stop")]
     #[cfg_attr(not(target_os = "fuchsia"), ffx_command())]
     pub struct StopArgs {
-        /// guest type to launch e.g. 'zircon'
+        /// guest type to stop e.g. 'zircon'
         #[argh(positional)]
         pub guest_type: GuestType,
         /// force stop the guest
         #[argh(switch, short = 'f')]
         pub force: bool,
+    }
+}
+
+pub mod attach_args {
+    use super::*;
+    #[derive(FromArgs, PartialEq, Debug)]
+    /// Attach console and serial to a running guest. Usage: guest attach guest_type
+    #[argh(subcommand, name = "attach")]
+    #[cfg_attr(not(target_os = "fuchsia"), ffx_command())]
+    pub struct AttachArgs {
+        /// guest type to attach to e.g. 'debian'
+        #[argh(positional)]
+        pub guest_type: GuestType,
     }
 }

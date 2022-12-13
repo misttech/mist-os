@@ -9,7 +9,7 @@ use {
 
 #[ffx_plugin("guest_enabled")]
 pub async fn guest_launch(
-    #[ffx(machine = guest_cli::launch::GuestLaunch)] writer: Writer,
+    #[ffx(machine = guest_cli::launch::LaunchResult)] writer: Writer,
     args: LaunchArgs,
     remote_control: RemoteControlProxy,
 ) -> Result<()> {

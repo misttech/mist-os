@@ -46,6 +46,7 @@ rustc_library("guest_cli") {
   ]
 
   sources = [
+    "src/attach.rs",
     "src/launch.rs",
     "src/lib.rs",
     "src/list.rs",

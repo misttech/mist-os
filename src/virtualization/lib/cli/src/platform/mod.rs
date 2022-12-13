@@ -9,7 +9,10 @@ use {
     fidl_fuchsia_virtualization::{GuestManagerProxy, GuestMarker, GuestProxy, LinuxManagerProxy},
     fuchsia_async as fasync,
     guest_cli_args::GuestType,
-    std::os::fd::{AsRawFd, FromRawFd, RawFd},
+    std::{
+        io::{Read, Write},
+        os::fd::{AsRawFd, FromRawFd, IntoRawFd, RawFd},
+    },
 };
 
 #[cfg(target_os = "fuchsia")]
@@ -41,6 +44,43 @@ impl AsRawFd for Stdio {
     }
 }
 
+pub struct UnbufferedStdio(Option<std::fs::File>);
+
+impl UnbufferedStdio {
+    // Unbuffer stdio by creating a File from the raw FD, but without taking ownership of the FD.
+    // This allows for using interactive commands, and the custom Drop implementation prevents
+    // the file from closing the stdio FD upon destruction.
+    fn new(stdio: Stdio) -> Self {
+        // A note about safety: Using from_raw_fd requires that the fd remains valid. As this is
+        // only using the process stdio handles, validity can be assumed for the life of th
+        // process.
+        unsafe { Self { 0: Some(std::fs::File::from_raw_fd(stdio.as_raw_fd())) } }
+    }
+}
+
+impl Drop for UnbufferedStdio {
+    fn drop(&mut self) {
+        // Prevent the file from closing the fd (which it doesn't own).
+        _ = self.0.take().unwrap().into_raw_fd();
+    }
+}
+
+impl Write for UnbufferedStdio {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
+        self.0.as_mut().unwrap().write(buf)
+    }
+
+    fn flush(&mut self) -> Result<(), std::io::Error> {
+        self.0.as_mut().unwrap().flush()
+    }
+}
+
+impl Read for UnbufferedStdio {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
+        self.0.as_mut().unwrap().read(buf)
+    }
+}
+
 pub struct GuestConsole {
     input: Option<fasync::Socket>,
     output: Option<fasync::Socket>,
@@ -54,13 +94,8 @@ impl GuestConsole {
         })
     }
 
-    pub fn get_unblocked_stdio(stdio: Stdio) -> Unblock<std::fs::File> {
-        // Wrap the raw fd in a File to prevent line buffering (with the default line buffering a
-        // user can't see the characters as they type them).
-        //
-        // A note about safety: Using from_raw_fd requires that the fd remains valid. As this is
-        // passing the process stdio handles, validity can be assumed for the life of the process.
-        unsafe { Unblock::new(std::fs::File::from_raw_fd(stdio.as_raw_fd())) }
+    pub fn get_unblocked_stdio(stdio: Stdio) -> Unblock<UnbufferedStdio> {
+        Unblock::new(UnbufferedStdio::new(stdio))
     }
 
     pub async fn run<R: futures::io::AsyncRead + Unpin, W: futures::io::AsyncWrite + Unpin>(

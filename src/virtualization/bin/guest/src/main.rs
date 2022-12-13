@@ -20,6 +20,11 @@ async fn main() -> Result<(), Error> {
     let services = guest_cli::platform::FuchsiaPlatformServices::new();
 
     match options.nested {
+        SubCommands::Attach(attach_args) => {
+            let output = guest_cli::attach::handle_attach(&services, &attach_args).await?;
+            println!("{}", output);
+            Ok(())
+        }
         SubCommands::Launch(launch_args) => {
             let output = guest_cli::launch::handle_launch(&services, &launch_args).await;
             println!("{}", output);

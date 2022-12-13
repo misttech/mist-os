@@ -16,6 +16,7 @@ pub struct GuestOptions {
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum SubCommands {
+    Attach(attach_args::AttachArgs),
     Launch(launch_args::LaunchArgs),
     Stop(stop_args::StopArgs),
     Balloon(BalloonArgs),

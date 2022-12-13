@@ -9,6 +9,7 @@ ffx_plugin("ffx_guest") {
   edition = "2021"
 
   plugin_deps = [
+    "attach:ffx_guest_attach",
     "launch:ffx_guest_launch",
     "list:ffx_guest_list",
     "stop:ffx_guest_stop",
