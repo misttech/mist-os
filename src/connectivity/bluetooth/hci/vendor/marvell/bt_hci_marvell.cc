@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/hci/vendor/marvell/bt-hci-marvell.h"
+#include "src/connectivity/bluetooth/hci/vendor/marvell/bt_hci_marvell.h"
 
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/driver.h>
 
 #include <fbl/alloc_checker.h>
 
-#include "src/connectivity/bluetooth/hci/vendor/marvell/bt-hci-marvell-bind.h"
+#include "src/connectivity/bluetooth/hci/vendor/marvell/bt_hci_marvell_bind.h"
 
 namespace bt_hci_marvell {
 

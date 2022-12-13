@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/hci/vendor/marvell/device-oracle.h"
+#include "src/connectivity/bluetooth/hci/vendor/marvell/device_oracle.h"
 
 #include <lib/ddk/debug.h>
 #include <zircon/assert.h>

@@ -12,7 +12,7 @@
 
 #include <ddktl/device.h>
 
-#include "src/connectivity/bluetooth/hci/vendor/marvell/device-oracle.h"
+#include "src/connectivity/bluetooth/hci/vendor/marvell/device_oracle.h"
 
 namespace bt_hci_marvell {
 

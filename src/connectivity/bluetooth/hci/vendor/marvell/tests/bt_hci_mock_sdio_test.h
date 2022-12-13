@@ -9,8 +9,8 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/connectivity/bluetooth/hci/vendor/marvell/bt-hci-marvell.h"
-#include "src/connectivity/bluetooth/hci/vendor/marvell/tests/bt-hci-mock-sdio.h"
+#include "src/connectivity/bluetooth/hci/vendor/marvell/bt_hci_marvell.h"
+#include "src/connectivity/bluetooth/hci/vendor/marvell/tests/bt_hci_mock_sdio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace bt_hci_marvell {

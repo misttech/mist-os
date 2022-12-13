@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/hci/vendor/marvell/tests/bt-hci-mock-sdio-test.h"
+#include "src/connectivity/bluetooth/hci/vendor/marvell/tests/bt_hci_mock_sdio_test.h"
 
 namespace bt_hci_marvell {
 

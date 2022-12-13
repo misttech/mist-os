@@ -7,7 +7,7 @@
 
 #include <fuchsia/hardware/sdio/cpp/banjo-mock.h>
 
-#include "src/connectivity/bluetooth/hci/vendor/marvell/device-oracle.h"
+#include "src/connectivity/bluetooth/hci/vendor/marvell/device_oracle.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 // This function is used by the mock SDIO library to validate calls to DoRwTxn. This is currently

@@ -31,9 +31,9 @@ executable("lifecycle-tests") {
   testonly = true
   output_name = "bt-hci-marvell-lifecycle-tests"
   sources = [
-    "bt-hci-mock-sdio-test.h",
-    "bt-hci-mock-sdio.h",
-    "lifecycle.cc",
+    "bt_hci_mock_sdio.h",
+    "bt_hci_mock_sdio_test.h",
+    "lifecycle_unittest.cc",
   ]
   deps = [
     "//sdk/banjo/fuchsia.hardware.sdio:fuchsia.hardware.sdio_banjo_cpp_mock",
@@ -46,7 +46,7 @@ executable("lifecycle-tests") {
 executable("device-oracle-tests") {
   testonly = true
   output_name = "bt-hci-marvell-device-oracle-tests"
-  sources = [ "device-oracle.cc" ]
+  sources = [ "device_oracle_unittest.cc" ]
   deps = [
     "//src/connectivity/bluetooth/hci/vendor/marvell:common",
     "//zircon/system/ulib/zxtest",
