@@ -10,11 +10,13 @@ use {
         },
         light_sensor_handler::make_light_sensor_handler_and_spawn_led_watcher,
         text_settings_handler::TextSettingsHandler,
+        wayland_handler::WaylandHandler,
         CursorMessage,
     },
     anyhow::{Context, Error},
     fidl_fuchsia_factory::MiscFactoryStoreProviderMarker,
     fidl_fuchsia_input_injection::InputDeviceRegistryRequestStream,
+    fidl_fuchsia_input_wayland::KeymapRequestStream,
     fidl_fuchsia_lightsensor::SensorRequestStream as LightSensorRequestStream,
     fidl_fuchsia_recovery_policy::DeviceRequestStream,
     fidl_fuchsia_recovery_ui::FactoryResetCountdownRequestStream,
@@ -53,6 +55,8 @@ use {
     tracing::{error, info, warn},
 };
 
+type KeymapReceiver = futures::channel::mpsc::UnboundedReceiver<KeymapRequestStream>;
+
 /// Begins handling input events. The returned future will complete when
 /// input events are no longer being handled.
 ///
@@ -90,6 +94,7 @@ pub async fn handle_input(
     factory_reset_device_request_stream_receiver: futures::channel::mpsc::UnboundedReceiver<
         DeviceRequestStream,
     >,
+    keymap_request_stream_receiver: KeymapReceiver,
     icu_data_loader: icu_data::Loader,
     node: &inspect::Node,
     display_ownership_event: zx::Event,
@@ -99,6 +104,7 @@ pub async fn handle_input(
 ) -> Result<InputPipeline, Error> {
     let factory_reset_handler = FactoryResetHandler::new();
     let media_buttons_handler = MediaButtonsHandler::new();
+    let wayland_input_handler = WaylandHandler::new();
 
     let supported_input_devices =
         input_device::InputDeviceType::list_from_structured_config_list(&supported_input_devices);
@@ -154,6 +160,7 @@ pub async fn handle_input(
             light_sensor_handler.clone(),
             HashSet::from_iter(supported_input_devices.iter()),
             focus_chain_publisher,
+            wayland_input_handler.clone(),
         )
         .await,
     )
@@ -201,7 +208,24 @@ pub async fn handle_input(
     );
     fasync::Task::local(media_buttons_listener_registry_fut).detach();
 
+    // Start a task that receives the keymap changes for the wayland bridge.
+    fasync::Task::local(request_stream_receiver(
+        keymap_request_stream_receiver,
+        wayland_input_handler,
+    ))
+    .detach();
+
     Ok(input_pipeline)
+}
+
+async fn request_stream_receiver(mut stream: KeymapReceiver, handler: Rc<WaylandHandler>) {
+    while let Some(stream) = stream.next().await {
+        if let Err(e) = handler.handle_keymap_watch_stream_fn(stream).await {
+            // This error will break Wayland keymaps.
+            warn!("could not watch: fuchsia.input.wayland/Keymap: {:?}, exiting", &e);
+            break;
+        }
+    }
 }
 
 fn setup_pointer_injector_config_request_stream(
@@ -281,6 +305,7 @@ async fn build_input_pipeline_assembly(
     light_sensor_handler: Option<Rc<CalibratedLightSensorHandler>>,
     supported_input_devices: HashSet<&input_device::InputDeviceType>,
     focus_chain_publisher: FocusChainProviderPublisher,
+    wayland_input_handler: Rc<WaylandHandler>,
 ) -> InputPipelineAssembly {
     let mut assembly = InputPipelineAssembly::new();
     let (sender, mut receiver) = futures::channel::mpsc::channel(0);
@@ -304,6 +329,7 @@ async fn build_input_pipeline_assembly(
             assembly = add_text_settings_handler(assembly);
             assembly = add_keyboard_handler(assembly);
             assembly = add_keymap_handler(assembly);
+            assembly = add_wayland_handler(assembly, wayland_input_handler);
             assembly = add_key_meaning_modifier_handler(assembly);
             assembly = assembly.add_autorepeater();
             assembly = add_dead_keys_handler(assembly, icu_data_loader);
@@ -450,6 +476,16 @@ fn add_keyboard_handler(assembly: InputPipelineAssembly) -> InputPipelineAssembl
 /// the US QWERTY keymap.
 fn add_keymap_handler(assembly: InputPipelineAssembly) -> InputPipelineAssembly {
     assembly.add_handler(keymap_handler::KeymapHandler::new())
+}
+
+/// Hooks up the wayland input handler.  It relies on the keymap handler (above)
+/// to do its work; else it will always report US QWERTY keymap to the Wayland
+/// clients.
+fn add_wayland_handler(
+    assembly: InputPipelineAssembly,
+    handler: Rc<WaylandHandler>,
+) -> InputPipelineAssembly {
+    assembly.add_handler(handler)
 }
 
 /// Hooks up the dead keys handler. This allows us to input accented characters by composing a

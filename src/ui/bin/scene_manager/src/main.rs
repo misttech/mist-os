@@ -18,6 +18,7 @@ use {
     fidl_fuchsia_input_injection::InputDeviceRegistryRequestStream,
     fidl_fuchsia_input_interaction::NotifierRequestStream,
     fidl_fuchsia_input_interaction_observation::AggregatorRequestStream,
+    fidl_fuchsia_input_wayland::KeymapRequestStream,
     fidl_fuchsia_lightsensor::SensorRequestStream as LightSensorRequestStream,
     fidl_fuchsia_recovery_policy::DeviceRequestStream as FactoryResetDeviceRequestStream,
     fidl_fuchsia_recovery_ui::FactoryResetCountdownRequestStream,
@@ -73,6 +74,7 @@ enum ExposedServices {
     FocusChainProvider(FocusChainProviderRequestStream),
     InputConfigFeatures(InputConfigFeaturesRequestStream),
     InputDeviceRegistry(InputDeviceRegistryRequestStream),
+    Wayland(KeymapRequestStream),
     LightSensor(LightSensorRequestStream),
     SceneManager(SceneManagerRequestStream),
     UserInteractionObservation(AggregatorRequestStream),
@@ -119,6 +121,7 @@ async fn inner_main() -> Result<(), Error> {
     // provider (e.g. scene_manager) interacts with the trace manager.
     fuchsia_trace_provider::trace_provider_create_with_fdio();
 
+    // Do not reorder the services below.
     fs.dir("svc")
         .add_fidl_service(ExposedServices::AccessibilityViewRegistry)
         .add_fidl_service(ExposedServices::ColorAdjustmentHandler)
@@ -131,7 +134,8 @@ async fn inner_main() -> Result<(), Error> {
         .add_fidl_service(ExposedServices::InputDeviceRegistry)
         .add_fidl_service(ExposedServices::SceneManager)
         .add_fidl_service(ExposedServices::UserInteractionObservation)
-        .add_fidl_service(ExposedServices::UserInteraction);
+        .add_fidl_service(ExposedServices::UserInteraction)
+        .add_fidl_service(ExposedServices::Wayland);
 
     let light_sensor_configuration: Option<LightSensorConfiguration> =
         match File::open(LIGHT_SENSOR_CONFIGURATION) {
@@ -276,6 +280,10 @@ async fn inner_main() -> Result<(), Error> {
     let (focus_chain_publisher, focus_chain_stream_handler) =
         focus_chain_provider::make_publisher_and_stream_handler();
 
+    // Wayland keymap plumbing.
+    let (keymap_sender, keymap_receiver) =
+        futures::channel::mpsc::unbounded::<KeymapRequestStream>();
+
     // Create a node under root to hang all input pipeline inspect data off of.
     let inspect_node = Rc::new(inspector.root().create_child("input_pipeline"));
 
@@ -292,6 +300,7 @@ async fn inner_main() -> Result<(), Error> {
         media_buttons_listener_registry_request_stream_receiver,
         factory_reset_countdown_request_stream_receiver,
         factory_reset_device_request_stream_receiver,
+        keymap_receiver,
         icu_data_loader,
         &inspect_node.clone(),
         display_ownership,
@@ -338,6 +347,8 @@ async fn inner_main() -> Result<(), Error> {
 
     fs.take_and_serve_directory_handle()?;
 
+    // Concurrency note: spawn a local task in the match branch if the protocol must serve more
+    // than a single client at a time.
     while let Some(service_request) = fs.next().await {
         match service_request {
             ExposedServices::AccessibilityViewRegistry(request_stream) => {
@@ -469,6 +480,21 @@ async fn inner_main() -> Result<(), Error> {
                                 "failure while serving fuchsia.input.interaction.Notifier: {:?}",
                                 e
                             );
+                        }
+                    }
+                })
+                .detach();
+            }
+            ExposedServices::Wayland(stream) => {
+                let keymap_sender_clone = keymap_sender.clone();
+                // Spawning a local task allows us to handle multiple keymap clients concurrently.
+                fasync::Task::local(async move {
+                    let result =
+                        keymap_sender_clone.unbounded_send(stream).map_err(anyhow::Error::from);
+                    match result {
+                        Ok(_) => (),
+                        Err(e) => {
+                            warn!("failure while serving fuchsia.input.wayland.Keymap: {:?}", e);
                         }
                     }
                 })

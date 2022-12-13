@@ -36,7 +36,6 @@ impl UnhandledInputHandler for WaylandHandler {
         input_event: UnhandledInputEvent,
     ) -> Vec<InputEvent> {
         match input_event {
-            // Decorate a keyboard event with key meaning.
             UnhandledInputEvent {
                 device_event: InputDeviceEvent::Keyboard(event),
                 device_descriptor,
