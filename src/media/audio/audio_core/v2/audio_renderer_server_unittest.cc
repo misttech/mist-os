@@ -70,6 +70,8 @@ struct TestHarness {
   std::shared_ptr<AudioRendererServer> renderer_server;
   std::shared_ptr<fidl::WireSharedClient<fuchsia_media::AudioRenderer>> renderer_client;
   std::optional<zx_status_t> renderer_close_status;
+  bool renderer_fully_created = false;  // true when callback runs
+  bool renderer_shutdown = false;       // true when callback runs
 };
 
 TestHarness::TestHarness(Args args) {
@@ -100,6 +102,16 @@ TestHarness::TestHarness(Args args) {
                                                     .format = args.format,
                                                     .default_reference_clock = std::move(clock),
                                                     .ramp_on_play_pause = args.ramp_on_play_pause,
+                                                    .on_fully_created =
+                                                        [this](auto server) {
+                                                          EXPECT_EQ(server, renderer_server);
+                                                          renderer_fully_created = true;
+                                                        },
+                                                    .on_shutdown =
+                                                        [this](auto server) {
+                                                          EXPECT_EQ(server, renderer_server);
+                                                          renderer_shutdown = true;
+                                                        },
                                                 });
   renderer_client = std::make_shared<fidl::WireSharedClient<fuchsia_media::AudioRenderer>>(
       std::move(renderer_endpoints->client), loop.dispatcher(),
@@ -113,6 +125,7 @@ TestHarness::~TestHarness() {
   loop.RunUntilIdle();
   EXPECT_TRUE(renderer_server->WaitForShutdown(zx::nsec(0)));
   EXPECT_TRUE(graph_server->WaitForShutdown(zx::nsec(0)));
+  EXPECT_TRUE(renderer_shutdown);
 }
 
 TEST(AudioRendererServerTest, ErrorSendPacketBeforeConfigured) {
@@ -184,6 +197,8 @@ TEST(AudioRendererServerTest, ConfigureWithDefaults) {
 
   h.loop.RunUntilIdle();
   EXPECT_EQ(h.renderer_close_status, std::nullopt);
+  EXPECT_TRUE(h.renderer_server->IsFullyCreated());
+  EXPECT_TRUE(h.renderer_fully_created);
 
   const auto& calls = h.graph_server->calls();
   ASSERT_EQ(calls.size(), 4u);
@@ -306,6 +321,8 @@ TEST(AudioRendererServerTest, ConfigureWithExplicitCalls) {
 
   h.loop.RunUntilIdle();
   EXPECT_EQ(h.renderer_close_status, std::nullopt);
+  EXPECT_TRUE(h.renderer_server->IsFullyCreated());
+  EXPECT_TRUE(h.renderer_fully_created);
 
   const auto& calls = h.graph_server->calls();
   ASSERT_EQ(calls.size(), 3u);
@@ -400,6 +417,8 @@ TEST(AudioRendererServerTest, SendPacket) {
   // Wait for the AudioRendererServer to receive all requests.
   h.loop.RunUntilIdle();
   EXPECT_EQ(h.renderer_close_status, std::nullopt);
+  EXPECT_TRUE(h.renderer_server->IsFullyCreated());
+  EXPECT_TRUE(h.renderer_fully_created);
 
   // Check that a ProducerNode was created.
   auto& calls = h.graph_server->calls();
@@ -545,6 +564,8 @@ void TestPlayPause(const bool with_ramp) {
 
   h.loop.RunUntilIdle();
   EXPECT_EQ(h.renderer_close_status, std::nullopt);
+  EXPECT_TRUE(h.renderer_server->IsFullyCreated());
+  EXPECT_TRUE(h.renderer_fully_created);
 
   // Expected GraphServer calls: CreateProducer, CreateGainControl (stream gain), CreateGainControl
   // (ramp gain), BindProducerLeadTimeWatcher, Start, Stop.

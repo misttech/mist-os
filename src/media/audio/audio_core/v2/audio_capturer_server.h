@@ -44,14 +44,19 @@ class AudioCapturerServer
     // Required.
     zx::clock default_reference_clock;
 
-    // TODO(fxbug.dev/98652): callback to invoke when this is configured and ready to be routed
+    // Called when `IsFullyCreated`.
+    fit::callback<void(std::shared_ptr<AudioCapturerServer>)> on_fully_created;
+
+    // Called just before this server shuts down.
+    fit::callback<void(std::shared_ptr<AudioCapturerServer>)> on_shutdown;
   };
 
   static std::shared_ptr<AudioCapturerServer> Create(
       std::shared_ptr<const FidlThread> fidl_thread,
       fidl::ServerEnd<fuchsia_media::AudioCapturer> server_end, Args args);
 
-  // Reports if the capturer is configured.
+  // Reports if the capturer is configured and all graph objects have been created. When true, we
+  // are ready to start capturing packets.
   bool IsFullyCreated() const { return state_ == State::kFullyCreated; }
 
   // Reports current properties of the capturer.
@@ -150,6 +155,10 @@ class AudioCapturerServer
     kCapturingAsync,
   };
   State state_ = State::kWaitingForConfig;
+
+  // State callbacks.
+  fit::callback<void(std::shared_ptr<AudioCapturerServer>)> on_fully_created_;
+  fit::callback<void(std::shared_ptr<AudioCapturerServer>)> on_shutdown_;
 
   // Objects in the mixer graph.
   std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> graph_client_;

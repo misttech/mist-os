@@ -58,6 +58,8 @@ std::shared_ptr<AudioCapturerServer> AudioCapturerServer::Create(
 AudioCapturerServer::AudioCapturerServer(std::shared_ptr<const FidlThread> fidl_thread, Args args)
     : capturer_id_(++num_capturers),
       default_reference_clock_(std::move(args.default_reference_clock)),
+      on_fully_created_(std::move(args.on_fully_created)),
+      on_shutdown_(std::move(args.on_shutdown)),
       graph_client_(std::move(args.graph_client)),
       usage_(args.usage),
       format_(args.format),
@@ -126,8 +128,8 @@ void AudioCapturerServer::SetUsage(SetUsageRequestView request,
                                    SetUsageCompleter::Sync& completer) {
   TRACE_DURATION("audio", "AudioCapturerServer::SetUsage");
 
-  if (usage_ == CaptureUsage::ULTRASOUND) {
-    FX_LOGS(WARNING) << "Unsupported method SetUsage on ultrasound capturer";
+  if (usage_ == CaptureUsage::ULTRASOUND || usage_ == CaptureUsage::LOOPBACK) {
+    FX_LOGS(WARNING) << "Unsupported method SetUsage on ultrasound or loopback capturer";
     Shutdown(ZX_ERR_NOT_SUPPORTED);
     return;
   }
@@ -574,6 +576,11 @@ void AudioCapturerServer::OnShutdown(fidl::UnbindInfo info) {
     stream_sink_server_ = nullptr;
   }
 
+  // Notify that we are shutting down.
+  if (on_shutdown_) {
+    on_shutdown_(shared_from_this());
+  }
+
   BaseFidlServer::OnShutdown(info);
 }
 
@@ -712,6 +719,9 @@ void AudioCapturerServer::MaybeSetFullyCreated() {
   }
 
   state_ = State::kFullyCreated;
+  if (on_fully_created_) {
+    on_fully_created_(shared_from_this());
+  }
 
   // TODO(fxbug.dev/98652): after implementing RouteGraph, this is where we should add this capturer
   // to the RouteGroup.

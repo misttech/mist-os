@@ -75,6 +75,8 @@ struct TestHarness {
   std::shared_ptr<fidl::WireSharedClient<fuchsia_media::AudioCapturer>> capturer_client;
   std::shared_ptr<std::vector<fuchsia_media::wire::StreamPacket>> captured_packets;
   std::optional<zx_status_t> capturer_close_status;
+  bool capturer_fully_created = false;  // true when callback runs
+  bool capturer_shutdown = false;       // true when callback runs
 };
 
 TestHarness::TestHarness(Args args) {
@@ -105,6 +107,16 @@ TestHarness::TestHarness(Args args) {
                                                     .usage = args.usage,
                                                     .format = args.format,
                                                     .default_reference_clock = std::move(clock),
+                                                    .on_fully_created =
+                                                        [this](auto server) {
+                                                          EXPECT_EQ(server, capturer_server);
+                                                          capturer_fully_created = true;
+                                                        },
+                                                    .on_shutdown =
+                                                        [this](auto server) {
+                                                          EXPECT_EQ(server, capturer_server);
+                                                          capturer_shutdown = true;
+                                                        },
                                                 });
   capturer_client = std::make_shared<fidl::WireSharedClient<fuchsia_media::AudioCapturer>>(
       std::move(capturer_endpoints->client), loop.dispatcher(),
@@ -121,6 +133,7 @@ TestHarness::~TestHarness() {
   loop.RunUntilIdle();
   EXPECT_TRUE(capturer_server->WaitForShutdown(zx::nsec(0)));
   EXPECT_TRUE(graph_server->WaitForShutdown(zx::nsec(0)));
+  EXPECT_TRUE(capturer_shutdown);
 }
 
 void WriteSequentialFrames(const zx::vmo& vmo) {
@@ -201,6 +214,18 @@ TEST(AudioCapturerServerTest, ErrorUltrasoundForbidsSetPcmStreamType) {
   EXPECT_EQ(h.capturer_close_status, ZX_ERR_NOT_SUPPORTED);
 }
 
+TEST(AudioCapturerServerTest, ErrorLoopbackForbidsSetUsage) {
+  TestHarness h({
+      .usage = CaptureUsage::LOOPBACK,
+      .format = kFormat,
+  });
+  std::ignore =
+      (*h.capturer_client)
+          ->SetUsage(static_cast<fuchsia_media::AudioCaptureUsage>(CaptureUsage::FOREGROUND));
+  h.loop.RunUntilIdle();
+  EXPECT_EQ(h.capturer_close_status, ZX_ERR_NOT_SUPPORTED);
+}
+
 TEST(AudioCapturerServerTest, ConfigureWithDefaults) {
   TestHarness h({
       .usage = CaptureUsage::FOREGROUND,
@@ -213,6 +238,8 @@ TEST(AudioCapturerServerTest, ConfigureWithDefaults) {
 
   h.loop.RunUntilIdle();
   EXPECT_EQ(h.capturer_close_status, std::nullopt);
+  EXPECT_TRUE(h.capturer_server->IsFullyCreated());
+  EXPECT_TRUE(h.capturer_fully_created);
 
   const auto& calls = h.graph_server->calls();
   ASSERT_EQ(calls.size(), 2u);
@@ -304,6 +331,8 @@ TEST(AudioCapturerServerTest, ConfigureWithExplicitCalls) {
 
   h.loop.RunUntilIdle();
   EXPECT_EQ(h.capturer_close_status, std::nullopt);
+  EXPECT_TRUE(h.capturer_server->IsFullyCreated());
+  EXPECT_TRUE(h.capturer_fully_created);
 
   const auto& calls = h.graph_server->calls();
   ASSERT_EQ(calls.size(), 2u);
@@ -355,6 +384,8 @@ TEST(AudioCapturerServerTest, CaptureAt) {
 
   h.loop.RunUntilIdle();
   EXPECT_EQ(h.capturer_close_status, std::nullopt);
+  EXPECT_TRUE(h.capturer_server->IsFullyCreated());
+  EXPECT_TRUE(h.capturer_fully_created);
 
   // Check that a ConsumerNode was created.
   auto& calls = h.graph_server->calls();
@@ -460,6 +491,8 @@ TEST(AudioCapturerServerTest, SyncCapture) {
 
   h.loop.RunUntilIdle();
   EXPECT_EQ(h.capturer_close_status, std::nullopt);
+  EXPECT_TRUE(h.capturer_server->IsFullyCreated());
+  EXPECT_TRUE(h.capturer_fully_created);
 
   // Check that a ConsumerNode was created.
   auto& calls = h.graph_server->calls();

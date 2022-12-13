@@ -67,6 +67,8 @@ AudioRendererServer::AudioRendererServer(std::shared_ptr<const FidlThread> fidl_
     : renderer_id_(++num_renderers),
       default_reference_clock_(std::move(args.default_reference_clock)),
       ramp_on_play_pause_(args.ramp_on_play_pause),
+      on_fully_created_(std::move(args.on_fully_created)),
+      on_shutdown_(std::move(args.on_shutdown)),
       graph_client_(std::move(args.graph_client)),
       usage_(args.usage),
       format_(args.format),
@@ -722,6 +724,11 @@ void AudioRendererServer::OnShutdown(fidl::UnbindInfo info) {
   stream_gain_control_client_ = std::nullopt;
   play_pause_ramp_gain_control_client_ = std::nullopt;
 
+  // Notify that we are shutting down.
+  if (on_shutdown_) {
+    on_shutdown_(shared_from_this());
+  }
+
   BaseFidlServer::OnShutdown(info);
 }
 
@@ -892,6 +899,9 @@ void AudioRendererServer::MaybeSetFullyCreated() {
   }
 
   state_ = State::kFullyCreated;
+  if (on_fully_created_) {
+    on_fully_created_(shared_from_this());
+  }
 
   // TODO(fxbug.dev/98652): after implementing RouteGraph, this is where we should add this renderer
   // to the RouteGroup.

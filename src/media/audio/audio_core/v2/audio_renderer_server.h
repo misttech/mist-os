@@ -47,14 +47,19 @@ class AudioRendererServer
     // If true, ramp gain up on play and down on pause. Otherwise, no gain ramping on play/pause.
     bool ramp_on_play_pause;
 
-    // TODO(fxbug.dev/98652): callback to invoke when this is configured and ready to be routed
+    // Called when `IsFullyCreated`.
+    fit::callback<void(std::shared_ptr<AudioRendererServer>)> on_fully_created;
+
+    // Called just before this server shuts down.
+    fit::callback<void(std::shared_ptr<AudioRendererServer>)> on_shutdown;
   };
 
   static std::shared_ptr<AudioRendererServer> Create(
       std::shared_ptr<const FidlThread> fidl_thread,
       fidl::ServerEnd<fuchsia_media::AudioRenderer> server_end, Args args);
 
-  // Reports if the renderer is configured and all graph nodes have been created.
+  // Reports if the renderer is configured and all graph nodes have been created. When true, we are
+  // ready to start rendering packets.
   bool IsFullyCreated() const { return state_ == State::kFullyCreated; }
 
   // Reports current properties of the renderer.
@@ -155,6 +160,10 @@ class AudioRendererServer
     kFullyCreated,
   };
   State state_ = State::kWaitingForConfig;
+
+  // State callbacks.
+  fit::callback<void(std::shared_ptr<AudioRendererServer>)> on_fully_created_;
+  fit::callback<void(std::shared_ptr<AudioRendererServer>)> on_shutdown_;
 
   // Objects in the mixer graph.
   std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> graph_client_;
