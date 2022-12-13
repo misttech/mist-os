@@ -329,6 +329,7 @@ strncmp
 strncpy
 strndup
 strnlen
+strpbrk
 strrchr
 strsignal
 strspn
