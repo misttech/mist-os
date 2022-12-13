@@ -4,15 +4,14 @@
 use super::stats::LogStreamStats;
 use crate::logs::error::StreamError;
 use crate::logs::stored_message::StoredMessage;
-use diagnostics_message::MAX_DATAGRAM_LEN;
 use fuchsia_async as fasync;
-use futures::io::AsyncReadExt;
 use std::{marker::PhantomData, sync::Arc};
 
 /// An `Encoding` is able to parse a `Message` from raw bytes.
 pub trait Encoding {
     /// Attempt to parse a message from the given buffer
-    fn wrap_bytes(bytes: &[u8], stats: Arc<LogStreamStats>) -> Result<StoredMessage, StreamError>;
+    fn wrap_bytes(bytes: Vec<u8>, stats: Arc<LogStreamStats>)
+        -> Result<StoredMessage, StreamError>;
 }
 
 /// An encoding that can parse the legacy [logger/syslog wire format]
@@ -28,13 +27,13 @@ pub struct LegacyEncoding;
 pub struct StructuredEncoding;
 
 impl Encoding for LegacyEncoding {
-    fn wrap_bytes(buf: &[u8], stats: Arc<LogStreamStats>) -> Result<StoredMessage, StreamError> {
-        StoredMessage::legacy(buf, stats)
+    fn wrap_bytes(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> Result<StoredMessage, StreamError> {
+        StoredMessage::legacy(&buf, stats)
     }
 }
 
 impl Encoding for StructuredEncoding {
-    fn wrap_bytes(buf: &[u8], stats: Arc<LogStreamStats>) -> Result<StoredMessage, StreamError> {
+    fn wrap_bytes(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> Result<StoredMessage, StreamError> {
         StoredMessage::structured(buf, stats)
     }
 }
@@ -43,7 +42,6 @@ impl Encoding for StructuredEncoding {
 pub struct LogMessageSocket<E> {
     stats: Arc<LogStreamStats>,
     socket: fasync::Socket,
-    buffer: [u8; MAX_DATAGRAM_LEN],
     _encoder: PhantomData<E>,
 }
 
@@ -51,7 +49,7 @@ impl LogMessageSocket<LegacyEncoding> {
     /// Creates a new `LogMessageSocket` from the given `socket` that reads the legacy format.
     pub fn new(socket: fasync::Socket, stats: Arc<LogStreamStats>) -> Self {
         stats.open_socket();
-        Self { socket, buffer: [0; MAX_DATAGRAM_LEN], stats, _encoder: PhantomData }
+        Self { socket, stats, _encoder: PhantomData }
     }
 }
 
@@ -60,7 +58,7 @@ impl LogMessageSocket<StructuredEncoding> {
     /// format.
     pub fn new_structured(socket: fasync::Socket, stats: Arc<LogStreamStats>) -> Self {
         stats.open_socket();
-        Self { socket, buffer: [0; MAX_DATAGRAM_LEN], stats, _encoder: PhantomData }
+        Self { socket, stats, _encoder: PhantomData }
     }
 }
 
@@ -69,14 +67,12 @@ where
     E: Encoding + Unpin,
 {
     pub async fn next(&mut self) -> Result<StoredMessage, StreamError> {
-        let len = self.socket.read(&mut self.buffer).await?;
-
+        let mut buf = Vec::new();
+        let len = self.socket.read_datagram(&mut buf).await?;
         if len == 0 {
             return Err(StreamError::Closed);
         }
-
-        let msg_bytes = &self.buffer[..len];
-        E::wrap_bytes(msg_bytes, self.stats.clone())
+        E::wrap_bytes(buf, self.stats.clone())
     }
 }
 
