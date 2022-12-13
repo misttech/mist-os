@@ -32,6 +32,9 @@ import("//build/python/python_host_test.gni")
 #   host_script_args (optional)
 #     List of args to pass to host_script.
 #
+#   host_script_bin_name (optional)
+#     Host scripts binary name if different than the containing dir name.
+#
 #   environments (optional)
 #   deps (optional)
 #   visibility (optional)
@@ -48,6 +51,7 @@ import("//build/python/python_host_test.gni")
 #     test_url = "fuchsia-pkg://fuchsia.com/system_validation#meta/test.cm"
 #     test_package = "//src/testing/system-validation/ui:test_pkg(${target_toolchain})"
 #     host_script = "//src/performance/trace2json:bin"
+#     host_script_bin_name = "trace2json"
 #     host_script_args = [
 #       "--input-file=" + "{test_artifact_dir}/custom-0/trace.fxt",
 #       "--output-file=" + "{test_artifact_dir}/trace_from_host.json",
@@ -94,16 +98,21 @@ template("run_target_test_and_host_script") {
   }
 
   _script_bin_name =
-      get_path_info(get_label_info(invoker.host_script, "target_out_dir"),
-                    "file")
+      get_path_info(get_label_info(invoker.host_script, "dir"), "name")
+
+  # Use `host_script_bin_name` if the output_name is not the same as the containing dir.
+  if (defined(invoker.host_script_bin_name)) {
+    _script_bin_name = invoker.host_script_bin_name
+  }
+  _script_src = "${root_out_dir}/${_script_bin_name}"
   host_test_data("host_script_for_${target_name}") {
-    sources = [ "${root_out_dir}/${_script_bin_name}" ]
+    sources = [ _script_src ]
     deps = [ invoker.host_script ]
   }
   _data_deps += [ ":host_script_for_${target_name}" ]
   _args += [
     "--host-script-bin",
-    rebase_path("${root_out_dir}/${_script_bin_name}", root_build_dir),
+    rebase_path(_script_src, root_build_dir),
   ]
 
   if (defined(invoker.host_script_args)) {
