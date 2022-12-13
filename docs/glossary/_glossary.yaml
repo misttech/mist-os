@@ -62,6 +62,16 @@
   related_guides: [""]
   area: ["Developer"]
 
+- term: "Bind rules"
+  short_description: "Bind rules are a defined set of conditions provided by a driver that
+  must be satisfied in order for the driver to bind to a node. The conditions are evaluated against
+  node properties."
+  full_description: ""
+  see_also: ["<a href=\"/docs/glossary#driver-binding\">Driver binding</a>"]
+  related_guides: ["<a href=\"/docs/development/drivers/concepts/device_driver_model/driver-binding.md\">Driver binding</a>",
+                   "<a href=\"/docs/development/drivers/tutorials/bind-rules-tutorial.md\">Bind rules tutorial</a>"]
+  area: ["System", "Devices"]
+
 - term: "Binding"
   short_description: "In v2 components, a component instance binds to component instances that provided
   capabilities."
@@ -476,6 +486,15 @@
   see_also: ["<a href=\"/docs/development/drivers/developer_guide/driver-development.md\">Fuchsia driver development</a>",
              "<a href=\"/src/devices\">Driver source code</a>"]
   related_guides: [""]
+  area: ["System", "Devices"]
+
+- term: "Driver binding"
+  short_description: "The process in which drivers bind to nodes. A driver bound to a node can
+  access the node’s resources and create child nodes."
+  full_description: ""
+  see_also: [""]
+  related_guides: ["<a href=\"/docs/development/drivers/concepts/device_driver_model/driver-binding.md\">Driver binding</a>",
+                   "<a href=\"/docs/development/drivers/tutorials/bind-rules-tutorial.md\">Bind rules tutorial</a>"]
   area: ["System", "Devices"]
 
 - term: "Driver host"

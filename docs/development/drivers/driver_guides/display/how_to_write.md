@@ -51,8 +51,8 @@ for the new driver will live in `src/graphics/display/drivers/fancy-display/`.
 To begin, create:
 
  * A minimal implementation of [DisplayControllerImpl][dcimpl]
- * A [bind program][driver-binding]
- * A build recipe for the `DisplayControllerImpl` and the bind program
+ * A set of [bind rules][driver-binding]
+ * A build recipe for the `DisplayControllerImpl` and the bind rules
 
 ### Add the driver to the build {#adding-to-build}
 

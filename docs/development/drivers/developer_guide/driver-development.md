@@ -74,7 +74,7 @@ finds a matching driver for a device. A driver declares the devices it is
 compatible with through bind rules, which should be placed in a `.bind` file
 alongside the driver. The bind compiler compiles those rules and creates a
 driver declaration macro containing those rules in a C header file. The
-following bind program declares the
+following bind rules declares the
 [AHCI driver](/src/devices/block/drivers/ahci/):
 
 ```
@@ -176,7 +176,7 @@ There are generally four outcomes from `bind()`:
     [DDKTL](/docs/development/drivers/concepts/driver_development/using-ddktl.md)
     C++ wrapper library and returns `ZX_OK.
 
-2.  The driver determines that even though the bind program matched, the device
+2.  The driver determines that even though the bind rules matched, the device
     cannot be supported (maybe due to checking hw version bits or whatnot) and
     returns an error.
 
