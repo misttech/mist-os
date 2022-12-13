@@ -4,6 +4,7 @@
 
 use {
     crate::fxfs::log_and_map_err::LogThen,
+    anyhow::{anyhow, Error},
     fidl::endpoints::{ClientEnd, Proxy},
     fidl_fuchsia_component::{self as fcomponent, RealmMarker},
     fidl_fuchsia_component_decl as fdecl,
@@ -12,6 +13,8 @@ use {
     fuchsia_component::client::{
         connect_to_protocol, connect_to_protocol_at_dir_root, open_childs_exposed_directory,
     },
+    hkdf::Hkdf,
+    sha2::Sha256,
     tracing::warn,
     typed_builder::TypedBuilder,
 };
@@ -29,6 +32,8 @@ pub struct Args {
 }
 
 const CRYPT_CM_URL: &str = "#meta/fxfs-crypt.cm";
+const DATA_KEY_INDEX: u8 = 0;
+const METADATA_KEY_INDEX: u8 = 1;
 
 // Whether or not the Crypt component is currently running or being shut down.
 #[derive(Debug, PartialEq)]
@@ -37,12 +42,27 @@ enum State {
     ShuttingDown,
 }
 
+// Performs HKDF (HMAC key derivation) expansion from a single input |key|,
+// which is expected to already be cryptographically strong.
+//
+//   make_hkdf(IKM, info) -> OKM
+//      where
+//      - IKM    input key material; |key| in this function
+//      - info   additional context; different values of |info| will produce distinct keys.
+//      - OKM    output key material; the return value of this function.
+fn hkdf_expand(key: &[u8], info: &[u8]) -> Result<[u8; 32], Error> {
+    let hk = Hkdf::<Sha256>::from_prk(key).map_err(|_| anyhow!("Could not make HKDF from key."))?;
+    let mut output_key_material = [0u8; 32];
+    hk.expand(info, &mut output_key_material).map_err(|_| anyhow!("Key was wrong length."))?;
+    Ok(output_key_material)
+}
+
 /// A helper which provides access to the underlying Crypt service.
 /// Responsible for destroying the Crypt directory when asked.
 ///
 /// FYI: CryptKeeper expects to instantiate an FXFS Crypt component in the same
 /// package as the calling component. For now, see:
-/// - //src/identity/lib/storage_manager/meta/fxfs.shard.cml>
+/// - //src/identity/lib/storage_manager/meta/fxfs.shard.cml
 ///   - for the expected capabilities and collections this component needs, and
 /// - //src/identity/tests/storage_manager_integration/tests/fxfs.rs
 ///   - for an example (test) callsite for FxfsStorageManager and CryptKeeper.
@@ -112,27 +132,30 @@ impl CryptKeeper {
         )
         .log_error_then("Connect to CryptManagement protocol failed", faccount::Error::Resource)?;
 
-        // TODO(fxbug.dev/116244): Use different keys for metadata/data.
+        let data_wrapping_key = hkdf_expand(key, /*index=*/ &[DATA_KEY_INDEX])
+            .log_warn_then("compute wrapping_key failed", faccount::Error::Resource)?;
         crypt_management_service
-            .add_wrapping_key(0, key)
+            .add_wrapping_key(DATA_KEY_INDEX.into(), &data_wrapping_key)
+            .await
+            .log_warn_then("add_wrapping_key FIDL failed", faccount::Error::Resource)?
+            .log_warn_then("add_wrapping_key failed", faccount::Error::Resource)?;
+
+        let metadata_wrapping_key = hkdf_expand(key, /*index=*/ &[METADATA_KEY_INDEX])
+            .log_warn_then("compute wrapping_key failed", faccount::Error::Resource)?;
+        crypt_management_service
+            .add_wrapping_key(METADATA_KEY_INDEX.into(), &metadata_wrapping_key)
             .await
             .log_warn_then("add_wrapping_key FIDL failed", faccount::Error::Resource)?
             .log_warn_then("add_wrapping_key failed", faccount::Error::Resource)?;
 
         crypt_management_service
-            .add_wrapping_key(1, key)
-            .await
-            .log_warn_then("add_wrapping_key FIDL failed", faccount::Error::Resource)?
-            .log_warn_then("add_wrapping_key failed", faccount::Error::Resource)?;
-
-        crypt_management_service
-            .set_active_key(KeyPurpose::Data, 0)
+            .set_active_key(KeyPurpose::Data, DATA_KEY_INDEX.into())
             .await
             .log_warn_then("set_active_key FIDL failed", faccount::Error::Resource)?
             .log_warn_then("set_active_key failed", faccount::Error::Resource)?;
 
         crypt_management_service
-            .set_active_key(KeyPurpose::Metadata, 1)
+            .set_active_key(KeyPurpose::Metadata, METADATA_KEY_INDEX.into())
             .await
             .log_warn_then("set_active_key FIDL failed", faccount::Error::Resource)?
             .log_warn_then("set_active_key failed", faccount::Error::Resource)?;

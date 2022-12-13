@@ -110,7 +110,7 @@ impl Fxfs {
             use_unique_crypt_name_for_test: args.use_unique_crypt_name_for_test,
         }
     }
-    fn crypt_args(&self) -> CryptKeeperArgs {
+    fn make_cryptkeeper_args(&self) -> CryptKeeperArgs {
         if self.use_unique_crypt_name_for_test {
             // We need a unique name, so we pull in the process Koid here since it's
             // possible for the same binary in a component to be launched multiple times and we don't
@@ -143,7 +143,7 @@ impl StorageManagerTrait for Fxfs {
             return Err(AccountManagerError::new(AccountApiError::Internal));
         }
 
-        let cryptkeeper = CryptKeeper::new_from_key(self.crypt_args(), key).await?;
+        let cryptkeeper = CryptKeeper::new_from_key(self.make_cryptkeeper_args(), key).await?;
 
         let (outgoing_dir, server_end) = new_directory_proxy_pair()?;
 
@@ -173,7 +173,7 @@ impl StorageManagerTrait for Fxfs {
             return Err(AccountManagerError::new(AccountApiError::Internal));
         }
 
-        let cryptkeeper = CryptKeeper::new_from_key(self.crypt_args(), key).await?;
+        let cryptkeeper = CryptKeeper::new_from_key(self.make_cryptkeeper_args(), key).await?;
 
         let (exposed_dir, server_end) = new_directory_proxy_pair()?;
 
