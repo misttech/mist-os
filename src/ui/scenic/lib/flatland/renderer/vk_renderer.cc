@@ -66,7 +66,7 @@ const glm::vec4 kProtectedReplacementColorInRGBA = glm::vec4(0, 0, 0, 1);
 // Returns the corresponding Vulkan image format to use given the provided
 // Zircon image format.
 // TODO(fxbug.dev/71410): Remove all references to zx_pixel_format_t.
-static vk::Format ConvertToVkFormat(zx_pixel_format_t pixel_format) {
+vk::Format ConvertToVkFormat(const zx_pixel_format_t pixel_format) {
   switch (pixel_format) {
     // These two Zircon formats correspond to the Sysmem BGRA32 format.
     case ZX_PIXEL_FORMAT_RGB_x888:
@@ -85,8 +85,8 @@ static vk::Format ConvertToVkFormat(zx_pixel_format_t pixel_format) {
 
 // Create a default 1x1 texture for solid color renderables which are not associated
 // with an image.
-static escher::TexturePtr CreateWhiteTexture(escher::Escher* escher,
-                                             escher::BatchGpuUploader* gpu_uploader) {
+escher::TexturePtr CreateWhiteTexture(escher::Escher* escher,
+                                      escher::BatchGpuUploader* gpu_uploader) {
   FX_DCHECK(escher);
   uint8_t channels[4];
   channels[0] = channels[1] = channels[2] = channels[3] = 255;
@@ -94,8 +94,8 @@ static escher::TexturePtr CreateWhiteTexture(escher::Escher* escher,
   return escher->NewTexture(std::move(image), vk::Filter::eNearest);
 }
 
-static escher::TexturePtr CreateDepthTexture(escher::Escher* escher,
-                                             const escher::ImagePtr& output_image) {
+escher::TexturePtr CreateDepthTexture(escher::Escher* escher,
+                                      const escher::ImagePtr& output_image) {
   escher::TexturePtr depth_buffer;
   escher::RenderFuncs::ObtainDepthTexture(
       escher, output_image->use_protected_memory(), output_image->info(),
@@ -105,7 +105,34 @@ static escher::TexturePtr CreateDepthTexture(escher::Escher* escher,
 
 constexpr float clamp(float v, float lo, float hi) { return (v < lo) ? lo : (hi < v) ? hi : v; }
 
-static std::vector<escher::Rectangle2D> GetNormalizedUvRects(
+std::array<size_t, 4> GetFlippedIndices(const ImageFlip flip_type) {
+  switch (flip_type) {
+    case ImageFlip::NONE:
+      return {0, 1, 2, 3};
+    case ImageFlip::LEFT_RIGHT:
+      // The indices are sorted in a clockwise order starting at the top-left, and the left
+      // indices must be swapped with the right.
+      return {1, 0, 3, 2};
+    case ImageFlip::UP_DOWN:
+      // The indices are sorted in a clockwise order starting at the top-left, and the top indices
+      // must be swapped with the bottom.
+      return {3, 2, 1, 0};
+    default:
+      FX_NOTREACHED();
+      return {0, 0, 0, 0};
+  }
+}
+
+std::array<glm::ivec2, 4> FlipUVs(const std::array<glm::ivec2, 4>& uvs, const ImageFlip flip_type) {
+  const std::array<size_t, 4> flip_indices = GetFlippedIndices(flip_type);
+  std::array<glm::ivec2, 4> flipped_uvs;
+  for (size_t i = 0; i < 4; i++) {
+    flipped_uvs[i] = uvs[flip_indices[i]];
+  }
+  return flipped_uvs;
+}
+
+std::vector<escher::Rectangle2D> GetNormalizedUvRects(
     const std::vector<flatland::ImageRect>& rectangles,
     const std::vector<flatland::ImageMetadata>& images) {
   FX_DCHECK(rectangles.size() == images.size());
@@ -115,33 +142,13 @@ static std::vector<escher::Rectangle2D> GetNormalizedUvRects(
   for (unsigned int i = 0; i < rectangles.size(); i++) {
     const auto& rect = rectangles[i];
     const auto& image = images[i];
-    const auto& texel_uvs = rectangles[i].texel_uvs;
     const auto& orientation = rectangles[i].orientation;
     const float w = static_cast<float>(image.width);
     const float h = static_cast<float>(image.height);
     FX_DCHECK(w >= 0.f && h >= 0.f);
 
     // First, reorder the UVs based on whether the image was flipped.
-    std::array<size_t, 4> flip_indices;
-    switch (image.flip) {
-      case ImageFlip::NONE:
-        flip_indices = {0, 1, 2, 3};
-        break;
-      case ImageFlip::LEFT_RIGHT:
-        // The indices are sorted in a clockwise order starting at the top-left, and the left
-        // indices must be swapped with the right.
-        flip_indices = {1, 0, 3, 2};
-        break;
-      case ImageFlip::UP_DOWN:
-        // The indices are sorted in a clockwise order starting at the top-left, and the top indices
-        // must be swapped with the bottom.
-        flip_indices = {3, 2, 1, 0};
-        break;
-    }
-    std::array<glm::ivec2, 4> flipped_uvs;
-    for (size_t i = 0; i < texel_uvs.size(); i++) {
-      flipped_uvs[i] = texel_uvs[flip_indices[i]];
-    }
+    const auto texel_uvs = FlipUVs(rectangles[i].texel_uvs, image.flip);
 
     // Reorder based on rotation and normalize the texel UVs. Normalization is based on the width
     // and height of the image that is sampled from. Reordering is based on orientation. The texel
@@ -156,8 +163,8 @@ static std::vector<escher::Rectangle2D> GetNormalizedUvRects(
     for (int j = 0; j < 4; j++) {
       const int index = (starting_index + j) % 4;
       // Clamp values to ensure they are normalized to the range [0, 1].
-      normalized_uvs[j] = glm::vec2(clamp(static_cast<float>(flipped_uvs[index].x), 0, w) / w,
-                                    clamp(static_cast<float>(flipped_uvs[index].y), 0, h) / h);
+      normalized_uvs[j] = glm::vec2(clamp(static_cast<float>(texel_uvs[index].x), 0, w) / w,
+                                    clamp(static_cast<float>(texel_uvs[index].y), 0, h) / h);
     }
 
     normalized_rects.push_back({rect.origin, rect.extent, normalized_uvs});
@@ -194,7 +201,6 @@ vk::ImageUsageFlags GetImageUsageFlags(const BufferCollectionUsage usage) {
     case BufferCollectionUsage::kRenderTarget:
       return escher::RectangleCompositor::kRenderTargetUsageFlags |
              vk::ImageUsageFlagBits::eTransferSrc;
-      break;
     case BufferCollectionUsage::kReadback:
       return vk::ImageUsageFlagBits::eTransferDst;
     case BufferCollectionUsage::kClientImage:
@@ -353,10 +359,10 @@ std::optional<vk::BufferCollectionFUCHSIA> VkRenderer::GetAllocatedVulkanBufferC
   std::scoped_lock lock(lock_);
   // Make sure that the collection that will back this image's memory
   // is actually registered with the renderer.
-  std::unordered_map<GlobalBufferCollectionId, CollectionData>* collections =
-      UsageToCollection(usage);
-  const auto collection_itr = collections->find(collection_id);
-  if (collection_itr == collections->end()) {
+  const std::unordered_map<GlobalBufferCollectionId, CollectionData>& collections =
+      GetBufferCollectionsFor(usage);
+  const auto collection_itr = collections.find(collection_id);
+  if (collection_itr == collections.end()) {
     FX_LOGS(WARNING) << "Collection with id " << collection_id << " does not exist.";
     return std::nullopt;
   }
@@ -419,9 +425,9 @@ bool VkRenderer::ImportBufferCollection(
   // TODO(fxbug.dev/44335): Convert this to a lock-free structure.
   std::scoped_lock lock(lock_);
 
-  std::unordered_map<GlobalBufferCollectionId, CollectionData>* collections =
-      UsageToCollection(usage);
-  const auto [_, emplace_success] = collections->emplace(
+  std::unordered_map<GlobalBufferCollectionId, CollectionData>& collections =
+      GetBufferCollectionsFor(usage);
+  const auto [_, emplace_success] = collections.emplace(
       std::make_pair(collection_id, CollectionData{.collection = std::move(buffer_collection),
                                                    .vk_collection = std::move(vk_collection)}));
   if (!emplace_success) {
@@ -441,12 +447,12 @@ void VkRenderer::ReleaseBufferCollection(GlobalBufferCollectionId collection_id,
   // TODO(fxbug.dev/44335): Convert this to a lock-free structure.
   std::scoped_lock lock(lock_);
 
-  std::unordered_map<GlobalBufferCollectionId, CollectionData>* collections =
-      UsageToCollection(usage);
-  auto collection_itr = collections->find(collection_id);
+  std::unordered_map<GlobalBufferCollectionId, CollectionData>& collections =
+      GetBufferCollectionsFor(usage);
+  const auto collection_itr = collections.find(collection_id);
 
   // If the collection is not in the map, then there's nothing to do.
-  if (collection_itr == collections->end()) {
+  if (collection_itr == collections.end()) {
     FX_LOGS(WARNING) << "Attempting to release a non-existent buffer collection.";
     return;
   }
@@ -456,13 +462,13 @@ void VkRenderer::ReleaseBufferCollection(GlobalBufferCollectionId collection_id,
   vk_device.destroyBufferCollectionFUCHSIA(collection_itr->second.vk_collection, nullptr,
                                            vk_loader);
 
-  zx_status_t status = collection_itr->second.collection->Close();
+  const zx_status_t status = collection_itr->second.collection->Close();
   // AttachToken failure causes ZX_ERR_PEER_CLOSED.
   if (status != ZX_OK && status != ZX_ERR_PEER_CLOSED) {
     FX_LOGS(ERROR) << "Error when closing buffer collection: " << zx_status_get_string(status);
   }
 
-  collections->erase(collection_id);
+  collections.erase(collection_itr);
 }
 
 bool VkRenderer::ImageIsAlreadyRegisteredForUsage(const allocation::GlobalImageId image_id,
@@ -488,9 +494,10 @@ bool VkRenderer::ImportRenderTargetImage(const allocation::ImageMetadata& metada
 
   const vk::ImageUsageFlags kRenderTargetAsReadbackSourceUsageFlags =
       escher::RectangleCompositor::kRenderTargetUsageFlags | vk::ImageUsageFlagBits::eTransferSrc;
-  auto image = ExtractImage(metadata, BufferCollectionUsage::kRenderTarget, vk_collection,
-                            needs_readback ? kRenderTargetAsReadbackSourceUsageFlags
-                                           : escher::RectangleCompositor::kRenderTargetUsageFlags);
+  const auto image =
+      ExtractImage(metadata, BufferCollectionUsage::kRenderTarget, vk_collection,
+                   needs_readback ? kRenderTargetAsReadbackSourceUsageFlags
+                                  : escher::RectangleCompositor::kRenderTargetUsageFlags);
   if (!image) {
     FX_LOGS(ERROR) << "Could not extract render target.";
     return false;
@@ -508,13 +515,15 @@ bool VkRenderer::ImportReadbackImage(const allocation::ImageMetadata& metadata,
   std::scoped_lock lock(lock_);
   const auto readback_collection_itr = readback_collections_.find(metadata.collection_id);
   // Check to see if the buffers are allocated and return false if not.
-  zx_status_t allocation_status = ZX_OK;
-  const zx_status_t status =
-      readback_collection_itr->second.collection->CheckBuffersAllocated(&allocation_status);
-  if (status != ZX_OK || allocation_status != ZX_OK) {
-    FX_LOGS(ERROR) << "Readback collection was not allocated: " << zx_status_get_string(status)
-                   << " ;alloc: " << zx_status_get_string(allocation_status);
-    return false;
+  {
+    zx_status_t allocation_status = ZX_OK;
+    const zx_status_t status =
+        readback_collection_itr->second.collection->CheckBuffersAllocated(&allocation_status);
+    if (status != ZX_OK || allocation_status != ZX_OK) {
+      FX_LOGS(ERROR) << "Readback collection was not allocated: " << zx_status_get_string(status)
+                     << " ;alloc: " << zx_status_get_string(allocation_status);
+      return false;
+    }
   }
 
   const escher::ImagePtr readback_image = ExtractImage(
@@ -600,9 +609,10 @@ void VkRenderer::ReleaseBufferImage(allocation::GlobalImageId image_id) {
 }
 
 escher::ImagePtr VkRenderer::ExtractImage(const allocation::ImageMetadata& metadata,
-                                          BufferCollectionUsage bc_usage,
-                                          vk::BufferCollectionFUCHSIA collection,
-                                          vk::ImageUsageFlags usage, bool readback) {
+                                          const BufferCollectionUsage bc_usage,
+                                          const vk::BufferCollectionFUCHSIA collection,
+                                          const vk::ImageUsageFlags image_usage,
+                                          const bool readback) {
   // Called from main thread or Flatland threads.
   TRACE_DURATION("gfx", "VkRenderer::ExtractImage");
   auto vk_device = escher_->vk_device();
@@ -611,13 +621,16 @@ escher::ImagePtr VkRenderer::ExtractImage(const allocation::ImageMetadata& metad
   // Grab the collection Properties from Vulkan.
   // TODO(fxbug.dev/102299): Add unittests to cover the case where sysmem client
   // token gets invalidated when importing images.
-  auto properties_rv = vk_device.getBufferCollectionPropertiesFUCHSIA(collection, vk_loader);
-  if (properties_rv.result != vk::Result::eSuccess) {
-    FX_LOGS(WARNING) << "Cannot get buffer collection properties; the token may "
-                        "have been invalidated.";
+  vk::BufferCollectionPropertiesFUCHSIA properties;
+  if (const auto properties_results =
+          vk_device.getBufferCollectionPropertiesFUCHSIA(collection, vk_loader);
+      properties_results.result == vk::Result::eSuccess) {
+    properties = properties_results.value;
+  } else {
+    FX_LOGS(WARNING) << "Could not get buffer collection properties: "
+                     << vk::to_string(properties_results.result);
     return nullptr;
   }
-  auto properties = properties_rv.value;
 
   // Check the provided index against actually allocated number of buffers.
   if (properties.bufferCount <= metadata.vmo_index) {
@@ -644,9 +657,9 @@ escher::ImagePtr VkRenderer::ExtractImage(const allocation::ImageMetadata& metad
   // The same list of formats was provided when specifying constraints in ImportBufferCollection();
   // |createInfoIndex| is the index into the list, in the same order that it was provided.
   FX_DCHECK(properties.createInfoIndex < std::size(kSupportedImageFormats));
-  auto pixel_format = kSupportedImageFormats[properties.createInfoIndex];
+  const auto pixel_format = kSupportedImageFormats[properties.createInfoIndex];
   vk::ImageCreateInfo create_info =
-      escher::RectangleCompositor::GetDefaultImageConstraints(pixel_format, usage);
+      escher::RectangleCompositor::GetDefaultImageConstraints(pixel_format, image_usage);
   create_info.extent = vk::Extent3D{metadata.width, metadata.height, 1};
   create_info.setPNext(&collection_image_info);
   if (is_protected) {
@@ -654,31 +667,34 @@ escher::ImagePtr VkRenderer::ExtractImage(const allocation::ImageMetadata& metad
   }
 
   // Create the VK Image, return nullptr if this fails.
-  auto image_result = vk_device.createImage(create_info);
-  if (image_result.result != vk::Result::eSuccess) {
+  vk::Image image;
+  if (const auto image_result = vk_device.createImage(create_info);
+      image_result.result == vk::Result::eSuccess) {
+    image = image_result.value;
+  } else {
     FX_LOGS(ERROR) << "VkCreateImage failed: " << vk::to_string(image_result.result);
     return nullptr;
   }
 
   // Now we have to allocate VK memory for the image. This memory is going to come from
   // the imported buffer collection's vmo.
-  auto memory_requirements = vk_device.getImageMemoryRequirements(image_result.value);
-  uint32_t memory_type_index =
+  const auto memory_requirements = vk_device.getImageMemoryRequirements(image);
+  const uint32_t memory_type_index =
       escher::CountTrailingZeros(memory_requirements.memoryTypeBits & properties.memoryTypeBits);
-  vk::StructureChain<vk::MemoryAllocateInfo, vk::ImportMemoryBufferCollectionFUCHSIA,
-                     vk::MemoryDedicatedAllocateInfoKHR>
+  const vk::StructureChain<vk::MemoryAllocateInfo, vk::ImportMemoryBufferCollectionFUCHSIA,
+                           vk::MemoryDedicatedAllocateInfoKHR>
       alloc_info(vk::MemoryAllocateInfo()
                      .setAllocationSize(memory_requirements.size)
                      .setMemoryTypeIndex(memory_type_index),
                  vk::ImportMemoryBufferCollectionFUCHSIA()
                      .setCollection(collection)
                      .setIndex(metadata.vmo_index),
-                 vk::MemoryDedicatedAllocateInfoKHR().setImage(image_result.value));
+                 vk::MemoryDedicatedAllocateInfoKHR().setImage(image));
   vk::DeviceMemory memory = nullptr;
-  vk::Result err =
-      vk_device.allocateMemory(&alloc_info.get<vk::MemoryAllocateInfo>(), nullptr, &memory);
-  if (err != vk::Result::eSuccess) {
-    FX_LOGS(ERROR) << "Could not successfully allocate memory.";
+  if (const vk::Result err =
+          vk_device.allocateMemory(&alloc_info.get<vk::MemoryAllocateInfo>(), nullptr, &memory);
+      err != vk::Result::eSuccess) {
+    FX_LOGS(ERROR) << "Could not successfully allocate memory: " << vk::to_string(err);
     return nullptr;
   }
 
@@ -687,7 +703,7 @@ escher::ImagePtr VkRenderer::ExtractImage(const allocation::ImageMetadata& metad
   // for the image memory requirements. If it's not big enough, the client likely
   // requested an image size that is larger than the maximum image size allowed by
   // the sysmem collection constraints.
-  auto gpu_mem =
+  const auto gpu_mem =
       escher::GpuMem::AdoptVkMemory(vk_device, vk::DeviceMemory(memory), memory_requirements.size,
                                     /*needs_mapped_ptr*/ false);
   if (memory_requirements.size > gpu_mem->size()) {
@@ -711,15 +727,15 @@ escher::ImagePtr VkRenderer::ExtractImage(const allocation::ImageMetadata& metad
   escher_image_info.color_space = escher::FromSysmemColorSpace(
       static_cast<fuchsia::sysmem::ColorSpaceType>(properties.sysmemColorSpaceIndex.colorSpace));
   return escher::impl::NaiveImage::AdoptVkImage(escher_->resource_recycler(), escher_image_info,
-                                                image_result.value, std::move(gpu_mem),
+                                                image, std::move(gpu_mem),
                                                 create_info.initialLayout);
 }
 
 escher::TexturePtr VkRenderer::ExtractTexture(const allocation::ImageMetadata& metadata,
                                               vk::BufferCollectionFUCHSIA collection) {
   // Called from main thread or Flatland threads.
-  auto image = ExtractImage(metadata, BufferCollectionUsage::kClientImage, collection,
-                            escher::RectangleCompositor::kTextureUsageFlags);
+  const auto image = ExtractImage(metadata, BufferCollectionUsage::kClientImage, collection,
+                                  escher::RectangleCompositor::kTextureUsageFlags);
   if (!image) {
     FX_LOGS(ERROR) << "Image for texture was nullptr.";
     return nullptr;
@@ -731,8 +747,7 @@ escher::TexturePtr VkRenderer::ExtractTexture(const allocation::ImageMetadata& m
                                    : escher_->sampler_cache()->ObtainSampler(kDefaultFilter);
   FX_DCHECK(escher::image_utils::IsYuvFormat(image->format()) ? sampler->is_immutable()
                                                               : !sampler->is_immutable());
-  auto texture = fxl::MakeRefCounted<escher::Texture>(escher_->resource_recycler(), sampler, image);
-  return texture;
+  return fxl::MakeRefCounted<escher::Texture>(escher_->resource_recycler(), sampler, image);
 }
 
 void VkRenderer::Render(const ImageMetadata& render_target,
@@ -771,7 +786,7 @@ void VkRenderer::Render(const ImageMetadata& render_target,
 
   // Escher's frame class acts as a command buffer manager that we use to create a
   // command buffer and submit it to the device queue once we are done.
-  auto frame = escher_->NewFrame(
+  const auto frame = escher_->NewFrame(
       "flatland::VkRenderer", ++frame_number_, /*enable_gpu_logging=*/false,
       /*requested_type=*/escher::CommandBuffer::Type::kGraphics, render_in_protected_mode);
   auto command_buffer = frame->cmds();
@@ -813,8 +828,8 @@ void VkRenderer::Render(const ImageMetadata& render_target,
     // Pass the texture into the above vector to keep it alive outside of this loop.
     textures.emplace_back(texture_ptr);
 
-    glm::vec4 multiply(image.multiply_color[0], image.multiply_color[1], image.multiply_color[2],
-                       image.multiply_color[3]);
+    const glm::vec4 multiply(image.multiply_color[0], image.multiply_color[1],
+                             image.multiply_color[2], image.multiply_color[3]);
     color_data.emplace_back(escher::RectangleCompositor::ColorData(
         multiply, image.blend_mode == fuchsia::ui::composition::BlendMode::SRC));
   }
@@ -857,25 +872,30 @@ void VkRenderer::Render(const ImageMetadata& render_target,
     // duplicate them here so that the duped fences can be moved into
     // the create info struct of the semaphore.
     zx::event fence_copy;
-    auto status = fence_original.duplicate(ZX_RIGHT_SAME_RIGHTS, &fence_copy);
-    FX_DCHECK(status == ZX_OK);
+    {
+      const auto status = fence_original.duplicate(ZX_RIGHT_SAME_RIGHTS, &fence_copy);
+      FX_DCHECK(status == ZX_OK);
+    }
 
-    auto sema = escher::Semaphore::New(escher_->vk_device());
+    const auto sema = escher::Semaphore::New(escher_->vk_device());
     vk::ImportSemaphoreZirconHandleInfoFUCHSIA info;
     info.semaphore = sema->vk_semaphore();
     info.zirconHandle = fence_copy.release();
     info.handleType = vk::ExternalSemaphoreHandleTypeFlagBits::eZirconEventFUCHSIA;
 
-    auto result = escher_->vk_device().importSemaphoreZirconHandleFUCHSIA(
-        info, escher_->device()->dispatch_loader());
-    FX_DCHECK(result == vk::Result::eSuccess);
+    {
+      const auto result = escher_->vk_device().importSemaphoreZirconHandleFUCHSIA(
+          info, escher_->device()->dispatch_loader());
+      FX_DCHECK(result == vk::Result::eSuccess);
+    }
 
-    // Create a flow event that ends in the magma system driver.
-    zx::event semaphore_event = GetEventForSemaphore(escher_->device(), sema);
-    zx_info_handle_basic_t koid_info;
-    status = semaphore_event.get_info(ZX_INFO_HANDLE_BASIC, &koid_info, sizeof(koid_info), nullptr,
-                                      nullptr);
-    TRACE_FLOW_BEGIN("gfx", "semaphore", koid_info.koid);
+    {  // Create a flow event that ends in the magma system driver.
+      const zx::event semaphore_event = GetEventForSemaphore(escher_->device(), sema);
+      zx_info_handle_basic_t koid_info;
+      semaphore_event.get_info(ZX_INFO_HANDLE_BASIC, &koid_info, sizeof(koid_info), nullptr,
+                               nullptr);
+      TRACE_FLOW_BEGIN("gfx", "semaphore", koid_info.koid);
+    }
 
     semaphores.emplace_back(sema);
 
@@ -904,28 +924,18 @@ void VkRenderer::SetColorConversionValues(const std::array<float, 9>& coefficien
   // | c0 c1 c2 0 |
   // | c3 c4 c5 0 |
   // | c6 c7 c8 0 |
-  // | 0  0   0 1 |
+  // |  0  0  0 1 |
   //
   // Note: GLM uses column-major memory layout.
-  float values[16] = {coefficients[0],
-                      coefficients[3],
-                      coefficients[6],
-                      0,
-                      coefficients[1],
-                      coefficients[4],
-                      coefficients[7],
-                      0,
-                      coefficients[2],
-                      coefficients[5],
-                      coefficients[8],
-                      0,
-                      0,
-                      0,
-                      0,
-                      1};
-  glm::mat4 glm_matrix = glm::make_mat4(values);
-  glm::vec4 glm_preoffsets(preoffsets[0], preoffsets[1], preoffsets[2], 0.0);
-  glm::vec4 glm_postoffsets(postoffsets[0], postoffsets[1], postoffsets[2], 0.0);
+  // clang-format off
+  const float values[16] = {coefficients[0], coefficients[3], coefficients[6], 0,
+                            coefficients[1], coefficients[4], coefficients[7], 0,
+                            coefficients[2], coefficients[5], coefficients[8], 0,
+                                          0,               0,               0, 1};
+  // clang-format on
+  const glm::mat4 glm_matrix = glm::make_mat4(values);
+  const glm::vec4 glm_preoffsets(preoffsets[0], preoffsets[1], preoffsets[2], 0.0);
+  const glm::vec4 glm_postoffsets(postoffsets[0], postoffsets[1], postoffsets[2], 0.0);
   compositor_.SetColorConversionParams({glm_matrix, glm_preoffsets, glm_postoffsets});
 }
 
@@ -935,7 +945,7 @@ zx_pixel_format_t VkRenderer::ChoosePreferredPixelFormat(
 
   for (auto preferred_format : kSupportedRenderTargetImageFormats) {
     for (zx_pixel_format_t format : available_formats) {
-      vk::Format vk_format = ConvertToVkFormat(format);
+      const vk::Format vk_format = ConvertToVkFormat(format);
       if (vk_format == preferred_format) {
         return format;
       }
@@ -991,8 +1001,9 @@ void VkRenderer::WarmPipelineCache(zx_pixel_format_t pixel_format) {
 }
 
 void VkRenderer::BlitRenderTarget(escher::CommandBuffer* command_buffer,
-                                  escher::ImagePtr source_image,
-                                  vk::ImageLayout* source_image_layout, escher::ImagePtr dest_image,
+                                  const escher::ImagePtr source_image,
+                                  vk::ImageLayout* source_image_layout,
+                                  const escher::ImagePtr dest_image,
                                   const ImageMetadata& metadata) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
 
@@ -1006,19 +1017,19 @@ void VkRenderer::BlitRenderTarget(escher::CommandBuffer* command_buffer,
       vk::Offset2D(0, 0), vk::Extent2D(metadata.width, metadata.height), kDefaultFilter);
 }
 
-std::unordered_map<GlobalBufferCollectionId, VkRenderer::CollectionData>*
-VkRenderer::UsageToCollection(BufferCollectionUsage usage) {
+std::unordered_map<GlobalBufferCollectionId, VkRenderer::CollectionData>&
+VkRenderer::GetBufferCollectionsFor(const BufferCollectionUsage usage) {
   // Called from main thread or Flatland threads.
   switch (usage) {
     case BufferCollectionUsage::kRenderTarget:
-      return &render_target_collections_;
+      return render_target_collections_;
     case BufferCollectionUsage::kReadback:
-      return &readback_collections_;
+      return readback_collections_;
     case BufferCollectionUsage::kClientImage:
-      return &texture_collections_;
+      return texture_collections_;
     default:
       FX_NOTREACHED();
-      return nullptr;
+      return texture_collections_;
   }
 }
 

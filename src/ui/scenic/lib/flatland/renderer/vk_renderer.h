@@ -118,8 +118,8 @@ class VkRenderer final : public Renderer {
 
   // The function ExtractImage() creates an escher Image from a sysmem collection vmo.
   escher::ImagePtr ExtractImage(const ImageMetadata& metadata, BufferCollectionUsage bc_usage,
-                                vk::BufferCollectionFUCHSIA collection, vk::ImageUsageFlags usage,
-                                bool readback = false);
+                                vk::BufferCollectionFUCHSIA collection,
+                                vk::ImageUsageFlags image_usage, bool readback = false);
 
   // ExtractTexture() is a wrapper function to ExtractImage().
   escher::TexturePtr ExtractTexture(const ImageMetadata& metadata,
@@ -135,7 +135,7 @@ class VkRenderer final : public Renderer {
                                         BufferCollectionUsage usage);
 
   // Returns a reference to the appropriate map of buffer collections for |usage|.
-  std::unordered_map<GlobalBufferCollectionId, CollectionData>* UsageToCollection(
+  std::unordered_map<GlobalBufferCollectionId, CollectionData>& GetBufferCollectionsFor(
       BufferCollectionUsage usage) FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Escher is how we access Vulkan.
