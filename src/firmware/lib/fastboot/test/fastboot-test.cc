@@ -1216,6 +1216,17 @@ TEST_F(FastbootBuildInfoTest, GetVarHwRevision) {
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 }
 
+TEST_F(FastbootBuildInfoTest, GetVarProduct) {
+  Fastboot fastboot(0x40000, std::move(svc_chan()));
+  const char command[] = "getvar:product";
+  TestTransport transport;
+  transport.AddInPacket(command, strlen(command));
+  zx::result<> ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+  Packets expected_packets = {"OKAY" + std::string(kTestBoardConfig)};
+  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
+}
+
 }  // namespace
 
 }  // namespace fastboot

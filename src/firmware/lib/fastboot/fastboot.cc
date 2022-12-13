@@ -126,6 +126,7 @@ const Fastboot::VariableHashTable& Fastboot::GetVariableTable() {
       {"slot-count", &Fastboot::GetVarSlotCount},
       {"is-userspace", &Fastboot::GetVarIsUserspace},
       {"hw-revision", &Fastboot::GetVarHwRevision},
+      {"product", &Fastboot::GetVarHwRevision},
       {"version", &Fastboot::GetVarVersion},
   });
   return *kVariableTable;
