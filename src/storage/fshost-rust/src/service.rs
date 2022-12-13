@@ -89,7 +89,7 @@ async fn write_data_file(
     assert_eq!(config.ramdisk_prefix.is_empty(), false);
 
     let fvm_matcher = PartitionMatcher {
-        detected_disk_format: Some(DiskFormat::Fvm),
+        detected_disk_formats: Some(vec![DiskFormat::Fvm]),
         ignore_prefix: Some(config.ramdisk_prefix.clone()),
         ..Default::default()
     };
@@ -106,7 +106,7 @@ async fn write_data_file(
         vec![DATA_PARTITION_LABEL.to_string(), LEGACY_DATA_PARTITION_LABEL.to_string()];
 
     let data_matcher = PartitionMatcher {
-        type_guid: Some(constants::DATA_TYPE_GUID),
+        type_guids: Some(vec![constants::DATA_TYPE_GUID]),
         labels: Some(data_partition_names.clone()),
         parent_device: Some(fvm_path),
         ignore_if_path_contains: Some("zxcrypt/unsealed".to_string()),
@@ -122,7 +122,7 @@ async fn write_data_file(
         let mut zxcrypt_path = partition_path;
         zxcrypt_path.push_str("/zxcrypt/unsealed");
         let zxcrypt_matcher = PartitionMatcher {
-            type_guid: Some(constants::DATA_TYPE_GUID),
+            type_guids: Some(vec![constants::DATA_TYPE_GUID]),
             labels: Some(data_partition_names),
             parent_device: Some(zxcrypt_path),
             ..Default::default()

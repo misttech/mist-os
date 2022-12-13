@@ -15,19 +15,25 @@ use {
     futures::StreamExt,
 };
 
-/// A set of optional matchers for |open_partition| and friends.
-/// At least one must be specified.
+/// Set of parameters to use for identifying the correct partition to open via
+/// [`open_partition`]
+///
+/// If multiple matchers are specified, the first partition that satisfies any set
+/// of matchers will be used. At least one of [`type_guids`], [`instance_guids`], [`labels`],
+/// [`detected_formats`], or [`parent_device`] must be specified.
 #[derive(Default, Clone)]
 pub struct PartitionMatcher {
-    pub type_guid: Option<[u8; 16]>,
-    pub instance_guid: Option<[u8; 16]>,
+    /// Set of type GUIDs the partition must match. Ignored if empty.
+    pub type_guids: Option<Vec<[u8; 16]>>,
+    /// Set of instance GUIDs the partition must match. Ignored if empty.
+    pub instance_guids: Option<Vec<[u8; 16]>>,
     pub labels: Option<Vec<String>>,
-    pub detected_disk_format: Option<DiskFormat>,
-    // partition must be a child of this device.
+    pub detected_disk_formats: Option<Vec<DiskFormat>>,
+    /// partition must be a child of this device.
     pub parent_device: Option<String>,
-    // The topological path must not start with this prefix.
+    /// The topological path must not start with this prefix.
     pub ignore_prefix: Option<String>,
-    // The topological path must not contain this substring.
+    /// The topological path must not contain this substring.
     pub ignore_if_path_contains: Option<String>,
 }
 
@@ -83,29 +89,29 @@ async fn partition_matches_res(
     matcher: &PartitionMatcher,
 ) -> Result<bool, Error> {
     assert!(
-        matcher.type_guid.is_some()
-            || matcher.instance_guid.is_some()
-            || matcher.detected_disk_format.is_some()
+        matcher.type_guids.is_some()
+            || matcher.instance_guids.is_some()
+            || matcher.detected_disk_formats.is_some()
             || matcher.parent_device.is_some()
             || matcher.labels.is_some()
     );
 
-    if let Some(matcher_type_guid) = matcher.type_guid {
+    if let Some(matcher_type_guids) = &matcher.type_guids {
         let (status, guid_option) =
             proxy.get_type_guid().await.context("transport error on get_type_guid")?;
         zx::Status::ok(status).context("get_type_guid failed")?;
         let guid = guid_option.ok_or(anyhow!("Expected type guid"))?;
-        if guid.value != matcher_type_guid {
+        if !matcher_type_guids.into_iter().any(|x| x == &guid.value) {
             return Ok(false);
         }
     }
 
-    if let Some(matcher_instance_guid) = matcher.instance_guid {
+    if let Some(matcher_instance_guids) = &matcher.instance_guids {
         let (status, guid_option) =
             proxy.get_instance_guid().await.context("transport error on get_instance_guid")?;
         zx::Status::ok(status).context("get_instance_guid failed")?;
         let guid = guid_option.ok_or(anyhow!("Expected instance guid"))?;
-        if guid.value != matcher_instance_guid {
+        if !matcher_instance_guids.into_iter().any(|x| x == &guid.value) {
             return Ok(false);
         }
     }
@@ -153,10 +159,10 @@ async fn partition_matches_res(
         }
     }
 
-    if let Some(matcher_detected_disk_format) = matcher.detected_disk_format {
+    if let Some(matcher_detected_disk_formats) = &matcher.detected_disk_formats {
         let block_proxy = BlockProxy::new(proxy.into_channel().unwrap());
         let detected_format = detect_disk_format(&block_proxy).await;
-        if detected_format != matcher_detected_disk_format {
+        if !matcher_detected_disk_formats.into_iter().any(|x| x == &detected_format) {
             return Ok(false);
         }
     }
@@ -267,22 +273,27 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_type_guid_match() {
-        let matcher = PartitionMatcher { type_guid: Some(VALID_TYPE_GUID), ..Default::default() };
+        let matcher = PartitionMatcher {
+            type_guids: Some(vec![VALID_TYPE_GUID, INVALID_GUID_1]),
+            ..Default::default()
+        };
         assert_eq!(check_partition_matches(&matcher).await, true);
     }
 
     #[fuchsia::test]
     async fn test_instance_guid_match() {
-        let matcher =
-            PartitionMatcher { instance_guid: Some(VALID_INSTANCE_GUID), ..Default::default() };
+        let matcher = PartitionMatcher {
+            instance_guids: Some(vec![VALID_INSTANCE_GUID, INVALID_GUID_1]),
+            ..Default::default()
+        };
         assert_eq!(check_partition_matches(&matcher).await, true);
     }
 
     #[fuchsia::test]
     async fn test_type_and_instance_guid_match() {
         let matcher = PartitionMatcher {
-            type_guid: Some(VALID_TYPE_GUID),
-            instance_guid: Some(VALID_INSTANCE_GUID),
+            type_guids: Some(vec![VALID_TYPE_GUID, INVALID_GUID_1]),
+            instance_guids: Some(vec![VALID_INSTANCE_GUID, INVALID_GUID_2]),
             ..Default::default()
         };
         assert_eq!(check_partition_matches(&matcher).await, true);
@@ -322,7 +333,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_ignore_prefix_mismatch() {
         let matcher = PartitionMatcher {
-            type_guid: Some(VALID_TYPE_GUID),
+            type_guids: Some(vec![VALID_TYPE_GUID]),
             ignore_prefix: Some("/fake/block/device".to_string()),
             ..Default::default()
         };
@@ -332,7 +343,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_ignore_prefix_match() {
         let matcher = PartitionMatcher {
-            type_guid: Some(VALID_TYPE_GUID),
+            type_guids: Some(vec![VALID_TYPE_GUID]),
             ignore_prefix: Some("/real/block/device".to_string()),
             ..Default::default()
         };
@@ -342,7 +353,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_ignore_if_path_contains_mismatch() {
         let matcher = PartitionMatcher {
-            type_guid: Some(VALID_TYPE_GUID),
+            type_guids: Some(vec![VALID_TYPE_GUID]),
             ignore_if_path_contains: Some("/device/1".to_string()),
             ..Default::default()
         };
@@ -352,7 +363,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_ignore_if_path_contains_match() {
         let matcher = PartitionMatcher {
-            type_guid: Some(VALID_TYPE_GUID),
+            type_guids: Some(vec![VALID_TYPE_GUID]),
             ignore_if_path_contains: Some("/device/0".to_string()),
             ..Default::default()
         };
@@ -363,7 +374,7 @@ mod tests {
     async fn test_type_and_label_match() {
         let the_labels = vec![VALID_LABEL.to_string()];
         let matcher = PartitionMatcher {
-            type_guid: Some(VALID_TYPE_GUID),
+            type_guids: Some(vec![VALID_TYPE_GUID]),
             labels: Some(the_labels),
             ..Default::default()
         };
@@ -372,14 +383,19 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_type_guid_mismatch() {
-        let matcher = PartitionMatcher { type_guid: Some(INVALID_GUID_1), ..Default::default() };
+        let matcher = PartitionMatcher {
+            type_guids: Some(vec![INVALID_GUID_1, INVALID_GUID_2]),
+            ..Default::default()
+        };
         assert_eq!(check_partition_matches(&matcher).await, false);
     }
 
     #[fuchsia::test]
     async fn test_instance_guid_mismatch() {
-        let matcher =
-            PartitionMatcher { instance_guid: Some(INVALID_GUID_2), ..Default::default() };
+        let matcher = PartitionMatcher {
+            instance_guids: Some(vec![INVALID_GUID_1, INVALID_GUID_2]),
+            ..Default::default()
+        };
         assert_eq!(check_partition_matches(&matcher).await, false);
     }
 
@@ -393,15 +409,19 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_detected_disk_format_match() {
-        let matcher =
-            PartitionMatcher { detected_disk_format: Some(DiskFormat::Fvm), ..Default::default() };
+        let matcher = PartitionMatcher {
+            detected_disk_formats: Some(vec![DiskFormat::Fvm, DiskFormat::Minfs]),
+            ..Default::default()
+        };
         assert_eq!(check_partition_matches(&matcher).await, true);
     }
 
     #[fuchsia::test]
     async fn test_detected_disk_format_mismatch() {
-        let matcher =
-            PartitionMatcher { detected_disk_format: Some(DiskFormat::Fxfs), ..Default::default() };
+        let matcher = PartitionMatcher {
+            detected_disk_formats: Some(vec![DiskFormat::Fxfs, DiskFormat::Minfs]),
+            ..Default::default()
+        };
         assert_eq!(check_partition_matches(&matcher).await, false);
     }
 }
