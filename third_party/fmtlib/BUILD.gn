@@ -4,5 +4,8 @@ config("fmtlib_config") {
 
 source_set("fmtlib") {
   public_configs = [ ":fmtlib_config" ]
-  sources = [ "src/src/os.cc" ]
+  sources = [
+    "src/src/format.cc",
+    "src/src/os.cc",
+  ]
 }
