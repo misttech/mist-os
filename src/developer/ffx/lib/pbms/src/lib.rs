@@ -54,6 +54,8 @@ pub mod transfer_manifest;
 /// Select an Oauth2 authorization flow.
 #[derive(PartialEq, Debug, Clone)]
 pub enum AuthFlowChoice {
+    /// Fail rather than using authentication.
+    NoAuth,
     Default,
     Device,
     Exec(PathBuf),
@@ -77,6 +79,7 @@ impl FromStr for AuthFlowChoice {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_ref() {
+            "no-auth" => Ok(AuthFlowChoice::NoAuth),
             "default" => Ok(AuthFlowChoice::Default),
             "device-experimental" => Ok(AuthFlowChoice::Device),
             "oob" => Ok(AuthFlowChoice::Oob),
@@ -87,8 +90,9 @@ impl FromStr for AuthFlowChoice {
                     Ok(AuthFlowChoice::Exec(path.to_path_buf()))
                 } else {
                     Err("Unknown auth flow choice. Use one of oob, \
-                        device-experimental, pkce, default, or a path to an \
-                        executable which prints an access token to stdout."
+                        device-experimental, pkce, default, a path to an \
+                        executable which prints an access token to stdout, or \
+                        no-auth to enforce that no auth flow will be used."
                         .to_string())
                 }
             }
@@ -151,6 +155,7 @@ where
             // There's no need to fetch local files or unrecognized schemes.
             continue;
         }
+        tracing::debug!("update_metadata_all repo_url {:?}", repo_url);
         fetch_product_metadata(
             &repo_url,
             &output_dir.join(pb_dir_name(&repo_url)),

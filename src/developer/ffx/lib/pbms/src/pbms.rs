@@ -52,11 +52,11 @@ where
     let mut info = RepoInfo::default();
     info.metadata_url = repo.to_string();
     info.save(&output_dir.join("info"))?;
-    tracing::debug!("Wrote info to {:?}", output_dir);
+    tracing::debug!("Wrote 'info' file to {:?}", output_dir);
 
     fetch_bundle_uri(&repo, output_dir, auth_flow, progress, ui)
         .await
-        .context("fetch product bundle by URL")?;
+        .context("fetching product bundle by URL")?;
     Ok(())
 }
 
@@ -388,7 +388,7 @@ where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
     I: structured_ui::Interface + Sync,
 {
-    tracing::debug!("fetch_bundle_uri");
+    tracing::debug!("fetch_bundle_uri {:?}", product_url);
     if product_url.scheme() == GS_SCHEME {
         fetch_from_gcs(product_url.as_str(), local_dir, auth_flow, progress, ui)
             .await

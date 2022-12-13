@@ -81,6 +81,7 @@ pub(crate) fn get_gcs_client_with_auth(
             read_boto_refresh_token(path).context("read boto refresh")?
         }
         AuthFlowChoice::Exec(exec_path) => RefreshAccessType::Exec(exec_path.to_path_buf()),
+        AuthFlowChoice::NoAuth => RefreshAccessType::NoAuth,
     };
     let auth = TokenStore::new_with_auth(access_type, /*access_token=*/ None)?;
 
@@ -106,7 +107,7 @@ where
         Ok(exists) => Ok(exists),
         Err(_) => exists_in_gcs_with_auth(bucket, gcs_path, auth_flow, ui)
             .await
-            .context("fetch with auth"),
+            .context("checking existence with auth"),
     }
 }
 
@@ -176,7 +177,7 @@ where
         tracing::debug!("Failed without auth, trying auth {:?}", gcs_url);
         fetch_from_gcs_with_auth(bucket, gcs_path, local_dir, auth_flow, progress, ui)
             .await
-            .context("fetch with auth")?;
+            .context("fetching with auth")?;
     }
     Ok(())
 }
@@ -257,7 +258,7 @@ where
     tracing::debug!("Failed without auth, trying auth {:?}", gcs_url);
     string_from_gcs_with_auth(bucket, gcs_path, auth_flow, progress, ui)
         .await
-        .context("fetch with auth")
+        .context("fetching to string with auth")
 }
 
 /// Download a single file from `gcs_url` to an in-ram string.
@@ -345,6 +346,9 @@ where
         }
         AuthFlowChoice::Exec(_) => {
             bail!("There's no refresh token used with an executable for auth.");
+        }
+        AuthFlowChoice::NoAuth => {
+            bail!("The refresh token should not be updated when no-auth is used.");
         }
     };
     tracing::debug!("Writing boto file {:?}", boto_path);

@@ -9,6 +9,10 @@ use thiserror::Error;
 /// Errors specific to this lib, some may be addressed by the caller.
 #[derive(Error, Debug)]
 pub enum GcsError {
+    /// Check the RefreshAccessType and try the command again..
+    #[error("GCS auth is required, but the token store was instructed to use no auth.")]
+    AuthRequired,
+
     /// The refresh token is no longer valid (e.g. expired or revoked).
     /// Do something similar to `gsutil config` or new_refresh_token() to
     /// generate a new refresh token and try again.
@@ -37,6 +41,13 @@ pub enum GcsError {
         Report as a bug."
     )]
     MissingRefreshToken,
+
+    /// Likely an incorrect path to the tool.
+    #[error(
+        "The tool passed to --auth failed. Check the path to that tool or \
+        report bug to maker of that tool."
+    )]
+    ExecForAccessFailed,
 
     /// The user should check that the path passed in is a file that can be
     /// executed.

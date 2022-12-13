@@ -174,7 +174,7 @@ impl TokenStore {
                         exec,
                         output.status.code()
                     );
-                    return Err(GcsError::MissingRefreshToken);
+                    return Err(GcsError::ExecForAccessFailed);
                 }
                 let new_token = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 let mut access_token = self.access_token.lock().await;
@@ -187,7 +187,7 @@ impl TokenStore {
                 *access_token = new_token;
                 Ok(())
             }
-            RefreshAccessType::NoAuth => return Err(GcsError::MissingRefreshToken),
+            RefreshAccessType::NoAuth => return Err(GcsError::AuthRequired),
         }
     }
 
