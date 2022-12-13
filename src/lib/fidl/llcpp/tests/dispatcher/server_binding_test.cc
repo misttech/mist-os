@@ -148,6 +148,24 @@ TEST_F(ServerBindingTest, CloseBindingCallsTheCloseHandler) {
   EXPECT_EQ(1, close_handler_count);
 }
 
+TEST_F(ServerBindingTest, IgnoreCloseHandlerOnClientClose) {
+  Server server;
+  fidl::ServerBinding<test_basic_protocol::ValueEcho> binding{
+      loop().dispatcher(), std::move(endpoints().server), &server, fidl::kIgnoreBindingClosure};
+
+  endpoints().client.reset();
+  loop().RunUntilIdle();
+}
+
+TEST_F(ServerBindingTest, IgnoreCloseHandlerOnBindingClose) {
+  Server server;
+  fidl::ServerBinding<test_basic_protocol::ValueEcho> binding{
+      loop().dispatcher(), std::move(endpoints().server), &server, fidl::kIgnoreBindingClosure};
+
+  binding.Close(ZX_OK);
+  loop().RunUntilIdle();
+}
+
 TEST_F(ServerBindingTest, BindingDestructionPassivatesTheCloseHandler) {
   Server server;
   int close_handler_count = 0;

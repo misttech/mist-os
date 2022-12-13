@@ -357,6 +357,11 @@ ServerBindingRef<Protocol> BindServer(async_dispatcher_t* dispatcher,
       internal::UnboundThunk(std::move(impl), std::forward<OnUnbound>(on_unbound)));
 }
 
+// |kIgnoreBindingClosure| can be used in the place of |CloseHandler|s to explicitly acknowledge
+// that a binding implementer wants to ignore and drop all notifications of binding closure that
+// result in the teardown of a binding.
+constexpr auto kIgnoreBindingClosure = ::fidl::internal::IgnoreBindingClosureType::kValue;
+
 // |ServerBinding| binds the implementation of a FIDL protocol to a server
 // endpoint.
 //
@@ -409,12 +414,11 @@ class ServerBinding final : public internal::ServerBindingBase<FidlProtocol> {
   using Base = internal::ServerBindingBase<FidlProtocol>;
 
  public:
-  // |CloseHandler| is invoked when the endpoint managed by the |ServerBinding|
-  // is closed, due to a terminal error or because the user initiated binding
-  // teardown.
+  // |CloseHandler| is invoked when the endpoint managed by the |ServerBinding| is closed, due to a
+  // terminal error or because the user initiated binding teardown.
   //
-  // |CloseHandler| is silently discarded if |ServerBinding| is destroyed, to
-  // avoid calling into a destroyed server implementation.
+  // |CloseHandler| is silently discarded if |ServerBinding| is destroyed, to avoid calling into a
+  // destroyed server implementation.
   //
   // The handler may have one of these signatures:
   //
@@ -436,10 +440,16 @@ class ServerBinding final : public internal::ServerBindingBase<FidlProtocol> {
   //         dispatcher, std::move(server_end), impl,
   //         std::mem_fn(&Impl::OnFidlClosed));
   //
-  // The close handler will be invoked on a dispatcher thread, unless the user
-  // shuts down the async dispatcher while there are active server bindings
-  // associated with it. In that case, the handler will be synchronously
-  // invoked on the thread calling dispatcher shutdown.
+  // The close handler will be invoked on a dispatcher thread, unless the user shuts down the async
+  // dispatcher while there are active server bindings associated with it. In that case, the handler
+  // will be synchronously invoked on the thread calling dispatcher shutdown.
+  //
+  // In cases where the binding implementation never cares to handle any errors or be notified about
+  // binding closure, one can pass |fidl::kIgnoreBindingClosure| as the |CloseHandler|, as follows:
+  //
+  //     fidl::ServerBinding<Protocol> binding(
+  //         dispatcher, std::move(server_end), impl,
+  //         fidl::kIgnoreBindingClosure);
   template <typename Impl, typename CloseHandler>
   void CloseHandlerRequirement() {
     Base::template CloseHandlerRequirement<Impl, CloseHandler>();
@@ -783,6 +793,13 @@ class ServerBindingGroup final {
   //     binding_group.AddBinding(
   //         dispatcher, std::move(server_end), &impl,
   //         std::mem_fn(&Impl::OnFidlClosed));
+  //
+  // In cases where the binding implementation never cares to handle any errors or be notified about
+  // binding closure, one can pass |fidl::kIgnoreBindingClosure| as the |CloseHandler|, as follows:
+  //
+  //     fidl::ServerBinding<Protocol> binding(
+  //         dispatcher, std::move(server_end), impl,
+  //         fidl::kIgnoreBindingClosure);
   template <typename ServerImpl, typename CloseHandler>
   void AddBinding(async_dispatcher_t* dispatcher,
                   fidl::internal::ServerEndType<FidlProtocol> server_end, ServerImpl* impl,
@@ -984,7 +1001,12 @@ class ServerBindingGroup final {
     auto released_binding = this->ReleaseBinding(uid);
 
     // Execute the user-supplied |CloseHandler|.
-    if constexpr (std::is_convertible_v<CloseHandler, internal::SimpleCloseHandler>) {
+    if constexpr (std::is_convertible_v<CloseHandler, ::fidl::internal::IgnoreBindingClosureType>) {
+      // The implementer has explicitly chosen to drop errors, so do nothing.
+      //
+      // Suppress warnings of unused |CloseHandler|.
+      (void)actual_close_handler;
+    } else if constexpr (std::is_convertible_v<CloseHandler, fidl::internal::SimpleCloseHandler>) {
       actual_close_handler(info);
     } else {
       actual_close_handler(impl, info);

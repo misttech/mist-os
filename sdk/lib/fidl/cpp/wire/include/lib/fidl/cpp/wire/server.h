@@ -16,6 +16,8 @@ namespace fidl {
 
 namespace internal {
 
+enum class IgnoreBindingClosureType { kValue };
+
 class AsyncServerBinding;
 class ServerBindingRefBase;
 std::weak_ptr<AsyncServerBinding> BorrowBinding(const ServerBindingRefBase&);
@@ -82,9 +84,10 @@ template <typename FidlProtocol>
 class ServerBindingBase {
  public:
   template <typename Impl, typename CloseHandler>
-  static void CloseHandlerRequirement() {
+  static constexpr void CloseHandlerRequirement() {
     // TODO(fxbug.dev/112648): Cannot use |std::is_invocable_v| as that fails on the latest clang.
-    static_assert(std::is_convertible_v<CloseHandler, SimpleCloseHandler> ||
+    static_assert(std::is_convertible_v<CloseHandler, IgnoreBindingClosureType> ||
+                      std::is_convertible_v<CloseHandler, SimpleCloseHandler> ||
                       std::is_convertible_v<CloseHandler, InstanceCloseHandler<Impl>>,
                   "The close handler must have a signature of "
                   "void(fidl::UnbindInfo) or void(Impl*, fidl::UnbindInfo)");
@@ -111,7 +114,13 @@ class ServerBindingBase {
           // Close the endpoint before notifying the user of connection closure.
           endpoint.reset();
 
-          if constexpr (std::is_convertible_v<CloseHandler, SimpleErrorHandler>) {
+          if constexpr (std::is_convertible_v<CloseHandler,
+                                              ::fidl::internal::IgnoreBindingClosureType>) {
+            // The implementer has explicitly chosen to drop errors, so do nothing.
+            //
+            // Suppress warnings of unused |CloseHandler|.
+            (void)error_handler;
+          } else if constexpr (std::is_convertible_v<CloseHandler, SimpleErrorHandler>) {
             error_handler(info);
           } else {
             error_handler(impl, info);

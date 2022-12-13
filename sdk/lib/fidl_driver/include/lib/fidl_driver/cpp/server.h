@@ -165,6 +165,12 @@ class ServerBinding final : public ::fidl::internal::ServerBindingBase<FidlProto
   //         dispatcher, std::move(server_end), impl,
   //         std::mem_fn(&Impl::OnFidlClosed));
   //
+  // In cases where the binding implementation never cares to handle any errors or be notified about
+  // binding closure, one can pass |fidl::kIgnoreBindingClosure| as the |CloseHandler|, as follows:
+  //
+  //     fidl::ServerBinding<Protocol> binding(
+  //         dispatcher, std::move(server_end), impl,
+  //         fidl::kIgnoreBindingClosure);
   template <typename Impl, typename CloseHandler>
   static void CloseHandlerRequirement() {
     Base::template CloseHandlerRequirement<Impl, CloseHandler>();
