@@ -13,7 +13,7 @@ use std::sync::Arc;
 use super::shared::{
     as_exception_info, execute_syscall, process_completed_syscall, read_channel_sync, TaskInfo,
 };
-use crate::logging::{log_error, log_warn, set_zx_name};
+use crate::logging::{log_error, log_trace, log_warn, set_zx_name};
 use crate::mm::MemoryManager;
 use crate::signals::{deliver_signal, SignalActions, SignalInfo};
 use crate::syscalls::decls::SyscallDecl;
@@ -229,8 +229,37 @@ fn handle_exceptions(task: Arc<Task>, exception_channel: zx::Channel) {
                     let siginfo = SignalInfo::default(SIGSEGV);
                     deliver_signal(&task, siginfo, &mut registers);
 
-                    thread.write_state_general_regs(registers.into()).unwrap();
-                    exception.set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_HANDLED).unwrap();
+                    if task.read().exit_status.is_some() {
+                        log_trace!(
+                            task,
+                            "exiting with status {:?}",
+                            task.read().exit_status.as_ref()
+                        );
+                        // Subtle logic / terrible hack ahead!
+                        // At this point we want the task to exit. The restricted mode thread is blocked until
+                        // |exception| is handled with its PC pointed into a restricted mode address. We do not
+                        // currently have a way to tell Zircon to kick this thread out of restricted mode, so we do not
+                        // have a direct mechanism for executing the normal exit from restricted mode logic. Instead, we
+                        // let the Zircon exception propagate so that Zircon terminates the thread and thus the process.
+                        // Since we won't unwind the stack of the Starnix portion of the faulting thread, which would
+                        // usually involve invoking the Drop handler of CurrentTask, we have to destroy it manually
+                        // here.  Be aware that since we're destroying the process in a shared address space without
+                        // unwinding the stack and dropping objects as would usually happen the state in the shared
+                        // space may be surprising.
+                        // TODO(https://fxbug.dev/117302): Remove this mechanism once the execution model is evolved
+                        // such that we can handle exceptions in the thread that entered restricted mode.
+                        task.destroy_do_not_use_outside_of_drop_if_possible();
+                        let exception_state = match task.read().dump_on_exit {
+                            true => &zx::sys::ZX_EXCEPTION_STATE_TRY_NEXT, // Let crashsvc or the debugger handle the exception.
+                            false => &zx::sys::ZX_EXCEPTION_STATE_THREAD_EXIT,
+                        };
+                        exception.set_exception_state(exception_state).unwrap();
+                    } else {
+                        thread.write_state_general_regs(registers.into()).unwrap();
+                        exception
+                            .set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_HANDLED)
+                            .unwrap();
+                    }
                 }
                 _ => {
                     log_error!(task, "Unhandled exception {:?}", info);

@@ -51,11 +51,28 @@ test("syscalls_test_bin") {
   }
 }
 
+test("crash") {
+  exclude_toolchain_tags = [ "asan" ]
+  sources = [ "crash.cc" ]
+  deps = [
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gtest",
+  ]
+}
+
 starnix_linux_test_component("syscalls_test") {
   test_label = ":syscalls_test_bin"
   test_binary = "syscalls_test_bin"
 }
 
+starnix_linux_test_component("crash_test") {
+  test_label = ":crash"
+  test_binary = "crash"
+}
+
 starmium_test_package("test_chromiumos_syscalls") {
-  test_components = [ ":syscalls_test" ]
+  test_components = [
+    ":syscalls_test",
+    ":crash_test",
+  ]
 }

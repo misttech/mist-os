@@ -70,12 +70,12 @@ impl FutexTable {
     /// See FUTEX_WAKE.
     pub fn wake(
         &self,
-        current_task: &CurrentTask,
+        task: &Task,
         addr: UserAddress,
         count: usize,
         mask: u32,
     ) -> Result<(), Errno> {
-        let (_, key) = self.get_vmo_and_key(current_task, addr)?;
+        let (_, key) = self.get_vmo_and_key(task, addr)?;
         self.get_waiters(key).lock().notify_mask_count(mask, count);
         Ok(())
     }
@@ -104,10 +104,10 @@ impl FutexTable {
 
     fn get_vmo_and_key(
         &self,
-        current_task: &CurrentTask,
+        task: &Task,
         addr: UserAddress,
     ) -> Result<(Arc<zx::Vmo>, FutexKey), Errno> {
-        let (vmo, offset) = current_task.mm.get_mapping_vmo(addr, zx::VmarFlags::PERM_READ)?;
+        let (vmo, offset) = task.mm.get_mapping_vmo(addr, zx::VmarFlags::PERM_READ)?;
         let koid = vmo.info().map_err(impossible_error)?.koid;
         Ok((vmo, FutexKey { koid, offset }))
     }
