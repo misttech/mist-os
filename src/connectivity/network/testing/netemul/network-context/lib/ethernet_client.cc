@@ -450,7 +450,7 @@ EthernetClient::Ptr EthernetClientFactory::Create(const std::string& path,
   fidl::SynchronousInterfacePtr<ZController> controller;
   auto status = Connect(path, controller.NewRequest());
   if (status != ZX_OK) {
-    FX_PLOGS(WARNING, status) << "could not open " << path;
+    FX_PLOGS(ERROR, status) << "could not open " << path;
     return nullptr;
   }
 
