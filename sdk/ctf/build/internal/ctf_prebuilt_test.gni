@@ -103,9 +103,15 @@ template("ctf_prebuilt_tests_from_manifest") {
 
   tests = []
 
+  # The list of tests that are successfully disabled.
+  disabled_tests = []
+
   foreach(test, read_file("${invoker.ctf_path}/test_manifest.json", "json")) {
-    skip = filter_include(invoker.disabled_tests, [ test.archive_name ]) != []
-    if (!skip) {
+    is_disabled =
+        filter_include(invoker.disabled_tests, [ test.archive_name ]) != []
+    if (is_disabled) {
+      disabled_tests += [ test.archive_name ]
+    } else {
       # Support the legacy 'package=' instead of 'package_name='.
       # Delete after the F9 CTF release falls off CQ.
       if (!defined(test.package_name)) {
@@ -118,6 +124,12 @@ template("ctf_prebuilt_tests_from_manifest") {
       }
     }
   }
+
+  # Check for typos or stale disabled tests.
+  unknown_tests = invoker.disabled_tests - disabled_tests
+  assert(
+      unknown_tests == [],
+      "Could not find CTF test archives with these names in ${invoker.ctf_path}: ${unknown_tests}")
 
   group(target_name) {
     forward_variables_from(invoker, [ "visibility" ])
