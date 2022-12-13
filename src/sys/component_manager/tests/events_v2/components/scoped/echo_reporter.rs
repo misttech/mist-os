@@ -4,7 +4,7 @@
 
 use {
     component_events::{events::*, matcher::*},
-    fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_component as fcomponent,
 };
 
 #[fuchsia::main]
@@ -12,7 +12,7 @@ async fn main() {
     let mut event_stream = EventStream::open().await.unwrap();
     loop {
         let event = event_stream.next().await.unwrap();
-        if matches!(event.header.unwrap().event_type.unwrap(), fsys::EventType::Started) {
+        if matches!(event.header.unwrap().event_type.unwrap(), fcomponent::EventType::Started) {
             break;
         }
     }

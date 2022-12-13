@@ -385,7 +385,7 @@ impl TestEnvironmentBuilder {
         }));
         self.runtime_config
             .builtin_capabilities
-            .push(CapabilityDecl::EventStream(EventStreamDecl { name: "started_v2".into() }));
+            .push(CapabilityDecl::EventStream(EventStreamDecl { name: "started".into() }));
         self.runtime_config.component_id_index_path = self.component_id_index_path;
         self.runtime_config.enable_introspection = true;
 

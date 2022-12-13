@@ -23,8 +23,8 @@
         },
         {
             event_stream: [
-                "started_v2",
-                "stopped_v2",
+                "started",
+                "stopped",
             ],
             from: "parent",
             to: "#nested_realm",

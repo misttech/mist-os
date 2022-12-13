@@ -24,7 +24,6 @@ fidl("fuchsia.sys2") {
 
   sources = [
     "crash_introspect.fidl",
-    "events.fidl",
     "lifecycle_controller.fidl",
     "realm.fidl",
     "route_validator.fidl",

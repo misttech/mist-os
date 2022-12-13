@@ -19,14 +19,14 @@
     use: [
         {
             event_stream: [
-                "started_v2",
-                "stopped_v2",
+                "started",
+                "stopped",
             ],
             from: "parent",
             path: "/events/started_stopped",
         },
         {
-            event_stream: [ "stopped_v2" ],
+            event_stream: [ "stopped" ],
             from: "parent",
             path: "/events/stopped",
         },

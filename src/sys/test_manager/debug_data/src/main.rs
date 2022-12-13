@@ -11,7 +11,7 @@ mod message;
 use crate::message::PublisherRequestMessage;
 use anyhow::Error;
 use async_trait::async_trait;
-use fidl_fuchsia_sys2 as fsys;
+use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_test_debug as ftest_debug;
 use fidl_fuchsia_test_internal as ftest_internal;
 use fidl_fuchsia_test_manager as ftest_manager;
@@ -43,7 +43,7 @@ async fn main() -> Result<(), Error> {
         },
     );
     fs.take_and_serve_directory_handle()?;
-    let event_stream = connect_to_protocol_at_path::<fsys::EventStream2Marker>(
+    let event_stream = connect_to_protocol_at_path::<fcomponent::EventStreamMarker>(
         "/svc/fuchsia.component.EventStream",
     )
     .unwrap();

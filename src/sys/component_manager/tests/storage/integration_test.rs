@@ -4,7 +4,7 @@
 
 use {
     component_events::{events::*, matcher::*},
-    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
+    fidl_fuchsia_component as fcomponent, fuchsia_async as fasync,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
 };
 
@@ -17,8 +17,8 @@ async fn start_nested_cm(cm_url: &str, root_url: &str) -> RealmInstance {
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .capability(Capability::event_stream("destroyed_v2").with_scope(&root))
-                .capability(Capability::event_stream("stopped_v2").with_scope(&root))
+                .capability(Capability::event_stream("destroyed").with_scope(&root))
+                .capability(Capability::event_stream("stopped").with_scope(&root))
                 .from(Ref::parent())
                 .to(&root),
         )
@@ -30,7 +30,8 @@ async fn start_nested_cm(cm_url: &str, root_url: &str) -> RealmInstance {
 /// Connects to the EventSource protocol from the nested component manager, starts the component
 /// topology and waits for a clean stop of the specified component instance
 async fn wait_for_clean_stop(cm: RealmInstance, moniker_to_wait_on: &str) {
-    let proxy = cm.root.connect_to_protocol_at_exposed_dir::<fsys::EventStream2Marker>().unwrap();
+    let proxy =
+        cm.root.connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>().unwrap();
 
     let mut event_stream = EventStream::new_v2(proxy);
 

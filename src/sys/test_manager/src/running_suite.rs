@@ -758,12 +758,12 @@ async fn get_realm(
         .add_route(
             Route::new()
                 .capability(
-                    Capability::event_stream("capability_requested_v2")
+                    Capability::event_stream("capability_requested")
                         .with_scope(test_root.clone())
                         .with_scope(&enclosing_env),
                 )
                 .capability(
-                    Capability::event_stream("directory_ready_v2")
+                    Capability::event_stream("directory_ready")
                         .with_scope(test_root.clone())
                         .with_scope(&enclosing_env),
                 )

@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::events::types::{Event, EventValidationError, SourceIdentityValidationError};
+use crate::events::types::{Event, SourceIdentityValidationError};
 use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_sys2 as fsys;
 use futures::channel::mpsc;
 use thiserror::Error;
 
@@ -17,13 +16,10 @@ pub enum EventError {
     IncorrectName { received: String, expected: &'static str },
 
     #[error("received an invalid event type {0:?}")]
-    InvalidEventType(fsys::EventType),
+    InvalidEventType(fcomponent::EventType),
 
     #[error("missing diagnostics directory in DirectoryReady payload")]
     MissingDiagnosticsDir,
-
-    #[error(transparent)]
-    EventValidationFailed(#[from] EventValidationError),
 
     #[error(transparent)]
     SourceIdentityValidationFailed(#[from] SourceIdentityValidationError),
@@ -41,7 +37,7 @@ pub enum EventError {
     },
 
     #[error("received an unknown event result {0:?}")]
-    UnknownResult(fsys::EventResult),
+    UnknownResult(fcomponent::EventPayload),
 
     #[error("expected a result in the fuchsia.sys2 event, but none was found")]
     ExpectedResult,

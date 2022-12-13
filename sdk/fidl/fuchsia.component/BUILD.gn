@@ -11,6 +11,7 @@ fidl("fuchsia.component") {
     "binder.fidl",
     "constants.fidl",
     "error.fidl",
+    "events.fidl",
     "overview.fidl",
     "realm.fidl",
     "types.fidl",
@@ -19,6 +20,8 @@ fidl("fuchsia.component") {
     "//sdk/fidl/fuchsia.component.decl",
     "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.process",
+    "//sdk/fidl/fuchsia.url",
+    "//zircon/vdso/zx",
   ]
 
   # TODO(fxbug.dev/109747): Re-enable.

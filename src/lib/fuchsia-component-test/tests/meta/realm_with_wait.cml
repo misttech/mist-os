@@ -21,7 +21,7 @@
     ],
     use: [
         {
-            event_stream: [ "destroyed_v2" ],
+            event_stream: [ "destroyed" ],
             from: "parent",
         },
     ],

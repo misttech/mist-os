@@ -8,7 +8,7 @@ use {
         matcher::EventMatcher,
         sequence::{EventSequence, Ordering},
     },
-    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
+    fidl_fuchsia_component as fcomponent, fuchsia_async as fasync,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
 };
 
@@ -30,8 +30,10 @@ async fn destroy() {
         .unwrap();
     let instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
-    let proxy =
-        instance.root.connect_to_protocol_at_exposed_dir::<fsys::EventStream2Marker>().unwrap();
+    let proxy = instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
+        .unwrap();
     proxy.wait_for_ready().await.unwrap();
 
     let event_stream = EventStream::new_v2(proxy);
@@ -87,8 +89,10 @@ async fn destroy_and_recreate() {
         .unwrap();
     let instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
-    let proxy =
-        instance.root.connect_to_protocol_at_exposed_dir::<fsys::EventStream2Marker>().unwrap();
+    let proxy = instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
+        .unwrap();
     proxy.wait_for_ready().await.unwrap();
 
     let event_stream = EventStream::new_v2(proxy);

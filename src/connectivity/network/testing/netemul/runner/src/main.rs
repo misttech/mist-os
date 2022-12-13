@@ -117,7 +117,7 @@ async fn handle_runner_request(
                     // `destroyed` lifecycle event. The test root will only be destroyed once all
                     // its child components have stopped.
                     let connection =
-                        connect_to_protocol_at_dir_root::<fsys2::EventStream2Marker>(&svc_dir)
+                        connect_to_protocol_at_dir_root::<fcomponent::EventStreamMarker>(&svc_dir)
                             .context("connect to protocol")?;
                     connection
                         .wait_for_ready()

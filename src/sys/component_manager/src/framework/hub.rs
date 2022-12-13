@@ -799,7 +799,7 @@ mod tests {
                     .add_lazy_child("a")
                     .use_(UseDecl::EventStream(UseEventStreamDecl {
                         source: UseSource::Parent,
-                        source_name: "started_v2".into(),
+                        source_name: "started".into(),
                         target_path: CapabilityPath::try_from("/svc/fuchsia.component.EventStream")
                             .unwrap(),
                         filter: None,

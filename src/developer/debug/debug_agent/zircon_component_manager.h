@@ -34,7 +34,7 @@ class ZirconComponentManager : public ComponentManager {
                       std::string* process_name_override) override;
 
   // Handles an incoming component lifecycle event.
-  void OnComponentEvent(fuchsia::sys2::Event event);
+  void OnComponentEvent(fuchsia::component::Event event);
 
   // (For test only) Set the callback that will be invoked when the initialization is ready.
   // If the initialization is already done, callback will still be invoked in the message loop.
@@ -55,7 +55,7 @@ class ZirconComponentManager : public ComponentManager {
 
   // Information of all running components in the system, indexed by their job koids.
   std::map<zx_koid_t, debug_ipc::ComponentInfo> running_component_info_;
-  fuchsia::sys2::EventStream2Ptr event_stream_binding_;
+  fuchsia::component::EventStreamPtr event_stream_binding_;
 
   // Monikers of v2 components we're expecting.
   // There's no way to set stdio handle for v2 components yet.

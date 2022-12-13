@@ -8,9 +8,9 @@ use crate::{
 };
 use fidl::endpoints::ServerEnd;
 use fidl::prelude::*;
+use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_logger as flogger;
-use fidl_fuchsia_sys2 as fsys;
 use fidl_fuchsia_sys_internal::SourceIdentity;
 use fidl_table_validation::ValidFidlTable;
 use fuchsia_zircon as zx;
@@ -260,97 +260,93 @@ pub struct ValidatedSourceIdentity {
 }
 
 #[derive(Debug, ValidFidlTable)]
-#[fidl_table_src(fsys::EventHeader)]
+#[fidl_table_src(fcomponent::EventHeader)]
 pub struct ValidatedEventHeader {
-    pub event_type: fsys::EventType,
+    pub event_type: fcomponent::EventType,
     pub component_url: String,
     pub moniker: String,
     pub timestamp: i64,
 }
 
 #[derive(Debug, ValidFidlTable)]
-#[fidl_table_src(fsys::Event)]
+#[fidl_table_src(fcomponent::Event)]
 pub struct ValidatedEvent {
     /// Information about the component for which this event was generated.
     pub header: ValidatedEventHeader,
 
-    /// Optional payload for some event types
-    #[fidl_field_type(optional)]
-    pub event_result: Option<fsys::EventResult>,
+    pub payload: fcomponent::EventPayload,
 }
 
-impl TryFrom<fsys::Event> for Event {
+impl TryFrom<fcomponent::Event> for Event {
     type Error = EventError;
 
-    fn try_from(event: fsys::Event) -> Result<Event, Self::Error> {
-        let event: ValidatedEvent = ValidatedEvent::try_from(event)?;
+    fn try_from(event: fcomponent::Event) -> Result<Event, Self::Error> {
+        if let Ok(event) = ValidatedEvent::try_from(event) {
+            let identity = ComponentIdentity::from_identifier_and_url(
+                ComponentIdentifier::parse_from_moniker(&event.header.moniker)?,
+                &event.header.component_url,
+            );
 
-        let identity = ComponentIdentity::from_identifier_and_url(
-            ComponentIdentifier::parse_from_moniker(&event.header.moniker)?,
-            &event.header.component_url,
-        );
+            match event.header.event_type {
+                fcomponent::EventType::DirectoryReady => {
+                    let directory = match event.payload {
+                        fcomponent::EventPayload::DirectoryReady(directory_ready) => {
+                            let name =
+                                directory_ready.name.ok_or(EventError::MissingField("name"))?;
+                            if name != "diagnostics" {
+                                return Err(EventError::IncorrectName {
+                                    received: name,
+                                    expected: "diagnostics",
+                                });
+                            }
+                            match directory_ready.node {
+                                Some(node) => fuchsia_fs::node_to_directory(node.into_proxy()?)
+                                    .map_err(EventError::NodeToDirectory)?,
+                                None => return Err(EventError::MissingDiagnosticsDir),
+                            }
+                        }
+                        _ => return Err(EventError::UnknownResult(event.payload)),
+                    };
+                    Ok(Event {
+                        timestamp: zx::Time::from_nanos(event.header.timestamp),
+                        payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
+                            component: identity,
+                            directory: Some(directory),
+                        }),
+                    })
+                }
+                fcomponent::EventType::CapabilityRequested => {
+                    let request_stream = match event.payload {
+                        fcomponent::EventPayload::CapabilityRequested(capability_requested) => {
+                            let name = capability_requested
+                                .name
+                                .ok_or(EventError::MissingField("name"))?;
 
-        match event.header.event_type {
-            fsys::EventType::DirectoryReady => {
-                let directory = match event.event_result {
-                    Some(fsys::EventResult::Payload(fsys::EventPayload::DirectoryReady(
-                        directory_ready,
-                    ))) => {
-                        let name = directory_ready.name.ok_or(EventError::MissingField("name"))?;
-                        if name != "diagnostics" {
-                            return Err(EventError::IncorrectName {
-                                received: name,
-                                expected: "diagnostics",
-                            });
+                            if name != flogger::LogSinkMarker::PROTOCOL_NAME {
+                                return Err(EventError::IncorrectName {
+                                    received: name,
+                                    expected: flogger::LogSinkMarker::PROTOCOL_NAME,
+                                });
+                            }
+                            let capability = capability_requested
+                                .capability
+                                .ok_or(EventError::MissingField("capability"))?;
+                            ServerEnd::<flogger::LogSinkMarker>::new(capability).into_stream()?
                         }
-                        match directory_ready.node {
-                            Some(node) => fuchsia_fs::node_to_directory(node.into_proxy()?)
-                                .map_err(EventError::NodeToDirectory)?,
-                            None => return Err(EventError::MissingDiagnosticsDir),
-                        }
-                    }
-                    None => return Err(EventError::ExpectedResult),
-                    Some(result) => return Err(EventError::UnknownResult(result)),
-                };
-                Ok(Event {
-                    timestamp: zx::Time::from_nanos(event.header.timestamp),
-                    payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                        component: identity,
-                        directory: Some(directory),
-                    }),
-                })
+                        _ => return Err(EventError::UnknownResult(event.payload)),
+                    };
+                    Ok(Event {
+                        timestamp: zx::Time::from_nanos(event.header.timestamp),
+                        payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
+                            component: identity,
+                            request_stream: Some(request_stream),
+                        }),
+                    })
+                }
+                _ => Err(EventError::InvalidEventType(event.header.event_type)),
             }
-            fsys::EventType::CapabilityRequested => {
-                let request_stream = match event.event_result {
-                    Some(fsys::EventResult::Payload(fsys::EventPayload::CapabilityRequested(
-                        capability_requested,
-                    ))) => {
-                        let name =
-                            capability_requested.name.ok_or(EventError::MissingField("name"))?;
-
-                        if name != flogger::LogSinkMarker::PROTOCOL_NAME {
-                            return Err(EventError::IncorrectName {
-                                received: name,
-                                expected: flogger::LogSinkMarker::PROTOCOL_NAME,
-                            });
-                        }
-                        let capability = capability_requested
-                            .capability
-                            .ok_or(EventError::MissingField("capability"))?;
-                        ServerEnd::<flogger::LogSinkMarker>::new(capability).into_stream()?
-                    }
-                    None => return Err(EventError::ExpectedResult),
-                    Some(result) => return Err(EventError::UnknownResult(result)),
-                };
-                Ok(Event {
-                    timestamp: zx::Time::from_nanos(event.header.timestamp),
-                    payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
-                        component: identity,
-                        request_stream: Some(request_stream),
-                    }),
-                })
-            }
-            _ => Err(EventError::InvalidEventType(event.header.event_type)),
+        } else {
+            Err(EventError::MissingField("Payload or header is missing"))
         }
     }
 }

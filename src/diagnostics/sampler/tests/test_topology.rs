@@ -143,11 +143,9 @@ pub async fn create() -> Result<RealmInstance, Error> {
     builder
         .add_route(
             Route::new()
+                .capability(Capability::event_stream("directory_ready").with_scope(&wrapper_realm))
                 .capability(
-                    Capability::event_stream("directory_ready_v2").with_scope(&wrapper_realm),
-                )
-                .capability(
-                    Capability::event_stream("capability_requested_v2").with_scope(&wrapper_realm),
+                    Capability::event_stream("capability_requested").with_scope(&wrapper_realm),
                 )
                 .from(Ref::parent())
                 .to(&wrapper_realm),
@@ -173,8 +171,8 @@ pub async fn create() -> Result<RealmInstance, Error> {
     wrapper_realm
         .add_route(
             Route::new()
-                .capability(Capability::event_stream("directory_ready_v2"))
-                .capability(Capability::event_stream("capability_requested_v2"))
+                .capability(Capability::event_stream("directory_ready"))
+                .capability(Capability::event_stream("capability_requested"))
                 .from(Ref::parent())
                 .to(&test_case_archivist),
         )

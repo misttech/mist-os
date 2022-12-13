@@ -4,7 +4,7 @@
 
 use {
     component_events::{events::*, matcher::*},
-    fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_component as fcomponent,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
     test_case::test_case,
 };
@@ -20,7 +20,7 @@ async fn scoped_instances(root_component: &'static str) {
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .capability(Capability::event_stream("destroyed_v2").with_scope(&root))
+                .capability(Capability::event_stream("destroyed").with_scope(&root))
                 .from(Ref::parent())
                 .to(&root),
         )
@@ -28,8 +28,10 @@ async fn scoped_instances(root_component: &'static str) {
         .unwrap();
     let instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
-    let proxy =
-        instance.root.connect_to_protocol_at_exposed_dir::<fsys::EventStream2Marker>().unwrap();
+    let proxy = instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
+        .unwrap();
 
     let mut event_stream = EventStream::new_v2(proxy);
 

@@ -174,7 +174,7 @@ void SendLogs(DebugAgent* debug_agent, std::vector<fuchsia::diagnostics::Formatt
 }  // namespace
 
 void ZirconComponentManager::GetNextComponentEvent() {
-  event_stream_binding_->GetNext([this](std::vector<fuchsia::sys2::Event> events) {
+  event_stream_binding_->GetNext([this](std::vector<fuchsia::component::Event> events) {
     for (auto& event : events) {
       OnComponentEvent(std::move(event));
     }
@@ -186,7 +186,7 @@ ZirconComponentManager::ZirconComponentManager(SystemInterface* system_interface
                                                std::shared_ptr<sys::ServiceDirectory> services)
     : ComponentManager(system_interface), services_(std::move(services)), weak_factory_(this) {
   // 1. Subscribe to "debug_started" and "stopped" events.
-  fuchsia::sys2::EventStream2SyncPtr event_stream;
+  fuchsia::component::EventStreamSyncPtr event_stream;
   services_->Connect(event_stream.NewRequest(), "fuchsia.component.EventStream");
   zx_status_t subscribe_result = event_stream->WaitForReady();
   if (subscribe_result != ZX_OK) {
@@ -258,24 +258,21 @@ void ZirconComponentManager::SetReadyCallback(fit::callback<void()> callback) {
   }
 }
 
-void ZirconComponentManager::OnComponentEvent(fuchsia::sys2::Event event) {
-  if (!event.has_header() || !event.header().has_moniker() || event.header().moniker().empty() ||
-      !event.has_event_result() || !event.event_result().is_payload()) {
+void ZirconComponentManager::OnComponentEvent(fuchsia::component::Event event) {
+  if (!event.has_payload() || !event.has_header() || !event.header().has_moniker() ||
+      event.header().moniker().empty()) {
     return;
   }
   // Remove the "." at the beginning of the moniker. It's safe because moniker is not empty.
   std::string moniker = event.header().moniker().substr(1);
   switch (event.header().event_type()) {
-    case fuchsia::sys2::EventType::DEBUG_STARTED:
+    case fuchsia::component::EventType::DEBUG_STARTED:
       if (debug_agent_) {
         debug_agent_->OnComponentStarted(moniker, event.header().component_url());
       }
-      if (event.event_result().payload().is_debug_started() &&
-          event.event_result().payload().debug_started().has_runtime_dir()) {
+      if (event.payload().is_debug_started() && event.payload().debug_started().has_runtime_dir()) {
         ReadElfJobId(
-            std::move(
-                *event.mutable_event_result()->payload().debug_started().mutable_runtime_dir()),
-            moniker,
+            std::move(*event.mutable_payload()->debug_started().mutable_runtime_dir()), moniker,
             [weak_this = weak_factory_.GetWeakPtr(), moniker,
              url = event.header().component_url()](zx_koid_t job_id) {
               if (weak_this && job_id != ZX_KOID_INVALID) {
@@ -288,7 +285,7 @@ void ZirconComponentManager::OnComponentEvent(fuchsia::sys2::Event event) {
             });
       }
       break;
-    case fuchsia::sys2::EventType::STOPPED: {
+    case fuchsia::component::EventType::STOPPED: {
       if (debug_agent_) {
         debug_agent_->OnComponentExited(moniker, event.header().component_url());
       }

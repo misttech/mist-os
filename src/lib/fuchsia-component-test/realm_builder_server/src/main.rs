@@ -3250,7 +3250,7 @@ mod tests {
                         ..ftest::Service::EMPTY
                     }),
                     ftest::Capability::EventStream(ftest::EventStream {
-                        name: Some("started_v2".to_string()),
+                        name: Some("started".to_string()),
                         as_: Some("started_event".to_string()),
                         ..ftest::EventStream::EMPTY
                     }),
@@ -3347,7 +3347,7 @@ mod tests {
                     }),
                     cm_rust::OfferDecl::EventStream(cm_rust::OfferEventStreamDecl {
                         source: cm_rust::OfferSource::Parent,
-                        source_name: "started_v2".into(),
+                        source_name: "started".into(),
                         filter: None,
                         scope: None,
                         target: cm_rust::OfferTarget::static_child("a".to_string()),

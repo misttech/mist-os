@@ -4,7 +4,7 @@
 
 use {
     component_events::{events::*, matcher::*},
-    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
+    fidl_fuchsia_component as fcomponent, fuchsia_async as fasync,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
 };
 
@@ -22,8 +22,10 @@ async fn start_nested_cm_and_wait_for_clean_stop(root_url: &str, moniker_to_wait
         .unwrap();
     let instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
-    let proxy =
-        instance.root.connect_to_protocol_at_exposed_dir::<fsys::EventStream2Marker>().unwrap();
+    let proxy = instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
+        .unwrap();
 
     let mut event_stream = EventStream::new_v2(proxy);
 

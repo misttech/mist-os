@@ -5,10 +5,10 @@
 use crate::message::PublisherRequestMessage;
 use anyhow::{anyhow, Error};
 use async_trait::async_trait;
+use fcomponent::EventStreamProxy;
 use fidl::{endpoints::ServerEnd, prelude::*};
+use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_debugdata as fdebug;
-use fidl_fuchsia_sys2 as fsys;
-use fidl_fuchsia_sys2::EventStream2Proxy;
 use fidl_fuchsia_test_internal as ftest_internal;
 use fidl_fuchsia_test_manager as ftest_manager;
 use fuchsia_inspect::types::Node;
@@ -54,7 +54,7 @@ pub trait PublishRequestHandler {
 /// Stopped instead.
 pub async fn handle_debug_data_controller_and_events<CS, D>(
     controller_requests: CS,
-    event_source: EventStream2Proxy,
+    event_source: EventStreamProxy,
     publish_request_handler: D,
     timeout_after_finish: zx::Duration,
     inspect_node: &Node,
@@ -116,7 +116,7 @@ pub async fn handle_debug_data_controller_and_events<CS, D>(
 }
 
 async fn route_events(
-    event_stream: EventStream2Proxy,
+    event_stream: EventStreamProxy,
     sets: &Mutex<Vec<Weak<Mutex<inner::DebugDataSet>>>>,
 ) -> Result<(), Error> {
     while let Ok(events) = event_stream.get_next().await {
@@ -392,7 +392,7 @@ mod inner {
             }));
         }
 
-        pub async fn handle_event(&mut self, event: fsys::Event) -> Result<(), Error> {
+        pub async fn handle_event(&mut self, event: fcomponent::Event) -> Result<(), Error> {
             let header = event.header.as_ref().ok_or(anyhow!("Event contained no header"))?;
             let unparsed_moniker =
                 header.moniker.as_ref().ok_or(anyhow!("Event contained no moniker"))?;
@@ -406,7 +406,7 @@ mod inner {
                 .clone();
 
             match header.event_type.ok_or(anyhow!("Event contained no event type"))? {
-                fsys::EventType::CapabilityRequested => {
+                fcomponent::EventType::CapabilityRequested => {
                     let test_url = self.realms.get(&realm_id).unwrap().clone();
                     let request = publish_request_from_event(event);
                     if let Err(e) =
@@ -421,7 +421,7 @@ mod inner {
                     }
                     self.on_capability_event.lock().await.take().map(|callback| callback(true));
                 }
-                fsys::EventType::Started => {
+                fcomponent::EventType::Started => {
                     if self.destroyed_before_start.remove(&moniker) {
                         warn!("Got a destroy event before start event for {}", moniker);
                     } else {
@@ -432,7 +432,7 @@ mod inner {
                 // TODO(fxbug.dev/86503): Sometimes an instance may be destroyed before it is
                 // started or stopped. So we listen for destroyed instead of stopped, and record
                 // instances for which we destroyed but never got a start event for.
-                fsys::EventType::Destroyed => {
+                fcomponent::EventType::Destroyed => {
                     if !self.running_components.remove(&moniker) {
                         self.seen_realms.insert(realm_id);
                         self.destroyed_before_start.insert(moniker);
@@ -467,12 +467,12 @@ mod inner {
         }
     }
 
-    fn publish_request_from_event(event: fsys::Event) -> ServerEnd<fdebug::PublisherMarker> {
-        let result = event.event_result.unwrap();
+    fn publish_request_from_event(event: fcomponent::Event) -> ServerEnd<fdebug::PublisherMarker> {
+        let result = event.payload.unwrap();
         match result {
-            fsys::EventResult::Payload(fsys::EventPayload::CapabilityRequested(
-                fsys::CapabilityRequestedPayload { name: _, capability, .. },
-            )) => {
+            fcomponent::EventPayload::CapabilityRequested(
+                fcomponent::CapabilityRequestedPayload { name: _, capability, .. },
+            ) => {
                 // TODO: Check name and other stuff.
                 ServerEnd::new(capability.unwrap())
             }
@@ -535,7 +535,7 @@ mod inner {
             vec![("./test:child-1", "test-url-1"), ("./system-test:child-2", "test-url-2")]
         }
 
-        fn common_test_events() -> Vec<fsys::Event> {
+        fn common_test_events() -> Vec<fcomponent::Event> {
             vec![
                 start_event("./test:child-1"),
                 capability_event("./test:child-1"),
@@ -914,53 +914,49 @@ mod inner {
 mod testing {
     use super::*;
 
-    pub(super) fn start_event(moniker: &str) -> fsys::Event {
-        fsys::Event {
-            header: fsys::EventHeader {
-                event_type: fsys::EventType::Started.into(),
+    pub(super) fn start_event(moniker: &str) -> fcomponent::Event {
+        fcomponent::Event {
+            header: fcomponent::EventHeader {
+                event_type: fcomponent::EventType::Started.into(),
                 moniker: moniker.to_string().into(),
-                ..fsys::EventHeader::EMPTY
+                ..fcomponent::EventHeader::EMPTY
             }
             .into(),
-            event_result: Some(fsys::EventResult::Payload(fsys::EventPayload::Started(
-                fsys::StartedPayload::EMPTY,
-            ))),
-            ..fsys::Event::EMPTY
+            payload: Some(fcomponent::EventPayload::Started(fcomponent::StartedPayload::EMPTY)),
+            ..fcomponent::Event::EMPTY
         }
     }
 
-    pub(super) fn destroy_event(moniker: &str) -> fsys::Event {
-        fsys::Event {
-            header: fsys::EventHeader {
-                event_type: fsys::EventType::Destroyed.into(),
+    pub(super) fn destroy_event(moniker: &str) -> fcomponent::Event {
+        fcomponent::Event {
+            header: fcomponent::EventHeader {
+                event_type: fcomponent::EventType::Destroyed.into(),
                 moniker: moniker.to_string().into(),
-                ..fsys::EventHeader::EMPTY
+                ..fcomponent::EventHeader::EMPTY
             }
             .into(),
-            event_result: Some(fsys::EventResult::Payload(fsys::EventPayload::Destroyed(
-                fsys::DestroyedPayload::EMPTY,
-            ))),
-            ..fsys::Event::EMPTY
+            payload: Some(fcomponent::EventPayload::Destroyed(fcomponent::DestroyedPayload::EMPTY)),
+            ..fcomponent::Event::EMPTY
         }
     }
 
-    pub(super) fn capability_event(moniker: &str) -> fsys::Event {
+    pub(super) fn capability_event(moniker: &str) -> fcomponent::Event {
         let (_client, server) = zx::Channel::create().unwrap();
-        fsys::Event {
-            header: fsys::EventHeader {
-                event_type: fsys::EventType::CapabilityRequested.into(),
+        fcomponent::Event {
+            header: fcomponent::EventHeader {
+                event_type: fcomponent::EventType::CapabilityRequested.into(),
                 moniker: moniker.to_string().into(),
-                ..fsys::EventHeader::EMPTY
+                ..fcomponent::EventHeader::EMPTY
             }
             .into(),
-            event_result: Some(fsys::EventResult::Payload(
-                fsys::EventPayload::CapabilityRequested(fsys::CapabilityRequestedPayload {
+            payload: Some(fcomponent::EventPayload::CapabilityRequested(
+                fcomponent::CapabilityRequestedPayload {
                     name: fdebug::PublisherMarker::PROTOCOL_NAME.to_string().into(),
                     capability: Some(server),
-                    ..fsys::CapabilityRequestedPayload::EMPTY
-                }),
+                    ..fcomponent::CapabilityRequestedPayload::EMPTY
+                },
             )),
-            ..fsys::Event::EMPTY
+            ..fcomponent::Event::EMPTY
         }
     }
 }
@@ -970,9 +966,9 @@ mod test {
     use super::testing::*;
     use super::*;
     use assert_matches::assert_matches;
+    use fcomponent::EventStreamRequestStream;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
-    use fidl_fuchsia_sys2 as fsys;
-    use fsys::EventStream2RequestStream;
+    use fidl_fuchsia_component as fcomponent;
     use fuchsia_async as fasync;
     use futures::channel::mpsc;
     use futures::Future;
@@ -987,30 +983,31 @@ mod test {
     /// Simulates a V2 event stream
     struct EventStreamServer {
         _task: fasync::Task<()>,
-        sender: mpsc::UnboundedSender<fsys::Event>,
+        sender: mpsc::UnboundedSender<fcomponent::Event>,
     }
 
     impl EventStreamServer {
         fn on_event(
             &self,
-            event: fsys::Event,
-        ) -> Result<(), futures::channel::mpsc::TrySendError<fidl_fuchsia_sys2::Event>> {
+            event: fcomponent::Event,
+        ) -> Result<(), futures::channel::mpsc::TrySendError<fidl_fuchsia_component::Event>>
+        {
             self.sender.unbounded_send(event)
         }
 
-        fn new(mut stream: EventStream2RequestStream) -> Self {
-            let (sender, mut receiver) = mpsc::unbounded();
+        fn new(mut stream: EventStreamRequestStream) -> Self {
+            let (sender, mut receiver) = mpsc::unbounded::<fcomponent::Event>();
             let _task = fasync::Task::spawn(async move {
                 while let Some(event) = stream.next().await {
                     match event {
-                        Ok(fsys::EventStream2Request::GetNext { responder }) => {
+                        Ok(fcomponent::EventStreamRequest::GetNext { responder }) => {
                             if let Some(event) = receiver.next().await {
                                 responder.send(&mut vec![event].into_iter()).unwrap();
                             } else {
                                 break;
                             }
                         }
-                        Ok(fsys::EventStream2Request::WaitForReady { responder }) => {
+                        Ok(fcomponent::EventStreamRequest::WaitForReady { responder }) => {
                             responder.send().unwrap();
                         }
                         Err(e) => {
@@ -1072,7 +1069,7 @@ mod test {
         let (controller_request_proxy, controller_request_stream) =
             create_proxy_and_stream::<ftest_internal::DebugDataControllerMarker>().unwrap();
         let (event_proxy, event_request_stream) =
-            create_proxy_and_stream::<fsys::EventStream2Marker>().unwrap();
+            create_proxy_and_stream::<fcomponent::EventStreamMarker>().unwrap();
         let (request_handler, request_recv) = TestPublishRequestHandler::new();
         let ((), ()) = futures::future::join(
             handle_debug_data_controller_and_events(

@@ -51,28 +51,25 @@
             resolver: "boot_resolver",
         },
         {
-            event: "directory_ready",
+            event_stream: "directory_ready",
         },
         {
-            event_stream: "directory_ready_v2",
+            event_stream: "debug_started",
         },
         {
-            event_stream: "debug_started_v2",
+            event_stream: "started",
         },
         {
-            event_stream: "started_v2",
+            event_stream: "stopped",
         },
         {
-            event_stream: "stopped_v2",
+            event_stream: "capability_requested",
         },
         {
-            event_stream: "capability_requested_v2",
+            event_stream: "destroyed",
         },
         {
-            event_stream: "destroyed_v2",
-        },
-        {
-            event_stream: "discovered_v2",
+            event_stream: "discovered",
         },
     ],
     component_id_index_path: "/boot/config/component_id_index",

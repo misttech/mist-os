@@ -9,11 +9,11 @@ use {
     cm_types,
     fidl::endpoints::ServerEnd,
     fidl_fidl_examples_routing_echo::{self as fecho, EchoMarker as EchoClientStatsMarker},
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fcdecl,
-    fidl_fuchsia_component_test as ftest, fidl_fuchsia_data as fdata,
-    fidl_fuchsia_examples_services as fex_services, fidl_fuchsia_io as fio,
-    fidl_fuchsia_sys2::EventStream2Marker,
-    fuchsia_async as fasync,
+    fidl_fuchsia_component as fcomponent,
+    fidl_fuchsia_component::EventStreamMarker,
+    fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_test as ftest,
+    fidl_fuchsia_data as fdata, fidl_fuchsia_examples_services as fex_services,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_component::server as fserver,
     fuchsia_component_test::{
         error::Error as RealmBuilderError, Capability, ChildOptions, DirectoryContents,
@@ -1515,7 +1515,7 @@ async fn event_streams_test() -> Result<(), Error> {
                 let tx = tx.clone();
                 async move {
                     let (proxy, event_stream_server) =
-                        fidl::endpoints::create_proxy::<EventStream2Marker>().unwrap();
+                        fidl::endpoints::create_proxy::<EventStreamMarker>().unwrap();
                     let events_dir = handles.clone_from_namespace("events").unwrap();
                     events_dir.open(
                         fio::OpenFlags::RIGHT_READABLE,
@@ -1544,7 +1544,7 @@ async fn event_streams_test() -> Result<(), Error> {
     builder
         .add_route(
             Route::new()
-                .capability(Capability::event_stream("started_v2").path("/events/event_stream"))
+                .capability(Capability::event_stream("started").path("/events/event_stream"))
                 .from(Ref::parent())
                 .to(&listener),
         )

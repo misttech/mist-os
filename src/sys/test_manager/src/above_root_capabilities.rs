@@ -59,7 +59,7 @@ impl AboveRootCapabilitiesForTest {
             Some(c) if !c.required_event_streams.validate() => {
                 return Err(format_err!(
                     "The collection `{collection}` must be routed the events \
-                `capability_requested_v2` and `directory_ready_v2` from `parent` scoped \
+                `capability_requested` and `directory_ready` from `parent` scoped \
                 to it"
                 ));
             }
@@ -173,18 +173,17 @@ impl AboveRootCapabilitiesForTest {
                     // collection scoped to it.
                     let coll_ref =
                         fdecl::Ref::Collection(fdecl::CollectionRef { name: name.clone() });
-                    if (target_name == "capability_requested_v2"
-                        || target_name == "directory_ready_v2")
+                    if (target_name == "capability_requested" || target_name == "directory_ready")
                         && matches!(source, fdecl::Ref::Parent(_))
                         && scope.map(|s| s.contains(&coll_ref)).unwrap_or(false)
                     {
                         let mut entry = collection_data.get_mut(name.as_str()).unwrap();
                         entry.required_event_streams.directory_ready =
                             entry.required_event_streams.directory_ready
-                                || target_name == "directory_ready_v2";
+                                || target_name == "directory_ready";
                         entry.required_event_streams.capability_requested =
                             entry.required_event_streams.capability_requested
-                                || target_name == "capability_requested_v2";
+                                || target_name == "capability_requested";
                     }
                 }
                 fdecl::Offer::Service(fdecl::OfferService {

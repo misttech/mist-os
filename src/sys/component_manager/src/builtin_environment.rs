@@ -992,6 +992,7 @@ impl BuiltinEnvironment {
         // root and offer it via ServiceFs to the outside world.
         if self.debug {
             let event_source_v2 = self.event_source_factory.create_v2_for_above_root().await?;
+
             service_fs.dir("svc").add_fidl_service(move |stream| {
                 let mut event_source_v2 = event_source_v2.clone();
                 // Spawn a short-lived task that adds the EventSource serve to

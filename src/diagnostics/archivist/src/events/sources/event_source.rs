@@ -2,33 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::events::{
-    error::EventError,
-    router::{Dispatcher, EventProducer},
-};
+use crate::events::router::{Dispatcher, EventProducer};
 use anyhow::Error;
-use fidl_fuchsia_sys2 as fsys;
-use fsys::EventStream2Proxy;
+use fcomponent::EventStreamProxy;
+use fidl_fuchsia_component as fcomponent;
 use fuchsia_component::client::connect_to_protocol_at_path;
 use tracing::warn;
 
 pub struct EventSource {
     dispatcher: Dispatcher,
-    event_stream: EventStream2Proxy,
+    event_stream: EventStreamProxy,
 }
 
 impl EventSource {
     pub async fn new(event_stream_path: &str) -> Result<Self, Error> {
         let event_stream =
-            connect_to_protocol_at_path::<fsys::EventStream2Marker>(event_stream_path)?;
+            connect_to_protocol_at_path::<fcomponent::EventStreamMarker>(event_stream_path)?;
         let _ = event_stream.wait_for_ready().await;
         Ok(Self { event_stream, dispatcher: Dispatcher::default() })
     }
 
     #[cfg(test)]
-    async fn new_for_test(event_stream: EventStream2Proxy) -> Result<Self, EventError> {
+    async fn new_for_test(event_stream: EventStreamProxy) -> Self {
         // Connect to /events/event_stream which contains our newer FIDL protocol
-        Ok(Self { event_stream, dispatcher: Dispatcher::default() })
+        Self { event_stream, dispatcher: Dispatcher::default() }
     }
 
     pub async fn spawn(mut self) -> Result<(), Error> {
@@ -41,22 +38,6 @@ impl EventSource {
                                 break;
                             }
                         }
-                    }
-                    Err(EventError::UnknownResult(fsys::EventResult::Error(
-                        fsys::EventError {
-                            error_payload:
-                                Some(fsys::EventErrorPayload::DirectoryReady(
-                                    fsys::DirectoryReadyError { .. },
-                                )),
-                            ..
-                        },
-                    ))) => {
-                        // The error was intended for cases when a component
-                        // declared it exposes inspect but doesn't actually serve it. Turns out this
-                        // is not very common and leads to spam in tests that end up having to
-                        // include the inspect shard transitevely and correctly do not expose
-                        // Inspect. Instead of logging a spammy and confusing error, ignore it, with
-                        // RFC168 this error will be obsolete also.
                     }
                     Err(err) => {
                         warn!(?err, "Failed to interpret event");
@@ -89,50 +70,50 @@ pub mod tests {
         let events = BTreeSet::from([EventType::DiagnosticsReady, EventType::LogSinkRequested]);
         let (mut event_stream, dispatcher) = Dispatcher::new_for_test(events);
         let (stream_server, _server_task, sender) = spawn_fake_event_stream();
-        let mut source = EventSource::new_for_test(stream_server).await.unwrap();
+        let mut source = EventSource::new_for_test(stream_server).await;
         source.set_dispatcher(dispatcher);
         let _task = fasync::Task::spawn(async move { source.spawn().await });
 
         // Send a `DirectoryReady` event for diagnostics.
         let (node, _) = fidl::endpoints::create_request_stream::<fio::NodeMarker>().unwrap();
         sender
-            .unbounded_send(fsys::Event {
-                header: Some(fsys::EventHeader {
-                    event_type: Some(fsys::EventType::DirectoryReady),
+            .unbounded_send(fcomponent::Event {
+                header: Some(fcomponent::EventHeader {
+                    event_type: Some(fcomponent::EventType::DirectoryReady),
                     moniker: Some("./foo/bar".to_string()),
                     component_url: Some("fuchsia-pkg://fuchsia.com/foo#meta/bar.cmx".to_string()),
                     timestamp: Some(zx::Time::get_monotonic().into_nanos()),
-                    ..fsys::EventHeader::EMPTY
+                    ..fcomponent::EventHeader::EMPTY
                 }),
-                event_result: Some(fsys::EventResult::Payload(fsys::EventPayload::DirectoryReady(
-                    fsys::DirectoryReadyPayload {
+                payload: Some(fcomponent::EventPayload::DirectoryReady(
+                    fcomponent::DirectoryReadyPayload {
                         name: Some("diagnostics".to_string()),
                         node: Some(node),
-                        ..fsys::DirectoryReadyPayload::EMPTY
+                        ..fcomponent::DirectoryReadyPayload::EMPTY
                     },
-                ))),
-                ..fsys::Event::EMPTY
+                )),
+                ..fcomponent::Event::EMPTY
             })
             .expect("send diagnostics ready event ok");
 
         // Send a `LogSinkRequested` event.
         sender
-            .unbounded_send(fsys::Event {
-                header: Some(fsys::EventHeader {
-                    event_type: Some(fsys::EventType::CapabilityRequested),
+            .unbounded_send(fcomponent::Event {
+                header: Some(fcomponent::EventHeader {
+                    event_type: Some(fcomponent::EventType::CapabilityRequested),
                     moniker: Some("./foo/bar".to_string()),
                     component_url: Some("fuchsia-pkg://fuchsia.com/foo#meta/bar.cmx".to_string()),
                     timestamp: Some(zx::Time::get_monotonic().into_nanos()),
-                    ..fsys::EventHeader::EMPTY
+                    ..fcomponent::EventHeader::EMPTY
                 }),
-                event_result: Some(fsys::EventResult::Payload(
-                    fsys::EventPayload::CapabilityRequested(fsys::CapabilityRequestedPayload {
+                payload: Some(fcomponent::EventPayload::CapabilityRequested(
+                    fcomponent::CapabilityRequestedPayload {
                         name: Some("fuchsia.logger.LogSink".to_string()),
                         capability: Some(zx::Channel::create().unwrap().0),
-                        ..fsys::CapabilityRequestedPayload::EMPTY
-                    }),
+                        ..fcomponent::CapabilityRequestedPayload::EMPTY
+                    },
                 )),
-                ..fsys::Event::EMPTY
+                ..fcomponent::Event::EMPTY
             })
             .expect("send diagnostics ready event ok");
 
@@ -163,23 +144,23 @@ pub mod tests {
     }
 
     fn spawn_fake_event_stream(
-    ) -> (fsys::EventStream2Proxy, fasync::Task<()>, UnboundedSender<fsys::Event>) {
-        let (sender, mut receiver) = futures::channel::mpsc::unbounded();
+    ) -> (fcomponent::EventStreamProxy, fasync::Task<()>, UnboundedSender<fcomponent::Event>) {
+        let (sender, mut receiver) = futures::channel::mpsc::unbounded::<fcomponent::Event>();
         let (proxy, server_end) =
-            fidl::endpoints::create_proxy::<fsys::EventStream2Marker>().unwrap();
+            fidl::endpoints::create_proxy::<fcomponent::EventStreamMarker>().unwrap();
         let task = fasync::Task::spawn(async move {
             let mut request_stream = server_end.into_stream().unwrap();
             loop {
                 if let Some(Ok(request)) = request_stream.next().await {
                     match request {
-                        fsys::EventStream2Request::GetNext { responder } => {
+                        fcomponent::EventStreamRequest::GetNext { responder } => {
                             if let Some(event) = receiver.next().await {
                                 responder.send(&mut vec![event].into_iter()).unwrap();
                             } else {
                                 break;
                             }
                         }
-                        fsys::EventStream2Request::WaitForReady { responder } => {
+                        fcomponent::EventStreamRequest::WaitForReady { responder } => {
                             responder.send().unwrap();
                         }
                     }

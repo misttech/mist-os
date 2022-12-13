@@ -217,8 +217,9 @@
             source_availability: "unknown",
         },
         {
-            event_stream: "stopped_v2",
+            event_stream: "stopped",
             from: "parent",
+            as: "stopped_v2",
             to: "#sl4f",
             scope: "#sl4f",
         },

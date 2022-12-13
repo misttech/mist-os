@@ -81,7 +81,7 @@ protocol LifecycleController {
     /// TODO(http://fxbug.dev/97774): Move this function to [`fuchsia.sys2/RealmQuery`]
     GetStorageAdmin(resource struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
-        capability string:MAX_CAPABILITY_ID_LENGTH;
+        capability string:fuchsia.component.MAX_CAPABILITY_ID_LENGTH;
         admin_server server_end:StorageAdmin;
     }) -> () error fuchsia.component.Error;
 };

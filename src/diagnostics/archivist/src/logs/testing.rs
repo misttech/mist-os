@@ -11,11 +11,11 @@ use async_trait::async_trait;
 use diagnostics_log_encoding::{encode::Encoder, Record};
 use diagnostics_message::{fx_log_packet_t, MAX_DATAGRAM_LEN};
 use fidl::prelude::*;
+use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_logger::{
     LogFilterOptions, LogLevelFilter, LogMarker, LogMessage, LogProxy, LogSinkMarker, LogSinkProxy,
 };
-use fidl_fuchsia_sys2 as fsys;
 use fuchsia_async as fasync;
 use fuchsia_async::Task;
 use fuchsia_component::client::connect_to_protocol_at_dir_svc;
@@ -48,23 +48,23 @@ pub fn create_log_sink_requested_event(
     target_moniker: String,
     target_url: String,
     capability: zx::Channel,
-) -> fsys::Event {
-    fsys::Event {
-        header: Some(fsys::EventHeader {
-            event_type: Some(fsys::EventType::CapabilityRequested),
+) -> fcomponent::Event {
+    fcomponent::Event {
+        header: Some(fcomponent::EventHeader {
+            event_type: Some(fcomponent::EventType::CapabilityRequested),
             moniker: Some(target_moniker),
             component_url: Some(target_url),
             timestamp: Some(zx::Time::get_monotonic().into_nanos()),
-            ..fsys::EventHeader::EMPTY
+            ..fcomponent::EventHeader::EMPTY
         }),
-        event_result: Some(fsys::EventResult::Payload(fsys::EventPayload::CapabilityRequested(
-            fsys::CapabilityRequestedPayload {
+        payload: Some(fcomponent::EventPayload::CapabilityRequested(
+            fcomponent::CapabilityRequestedPayload {
                 name: Some(LogSinkMarker::PROTOCOL_NAME.into()),
                 capability: Some(capability),
-                ..fsys::CapabilityRequestedPayload::EMPTY
+                ..fcomponent::CapabilityRequestedPayload::EMPTY
             },
-        ))),
-        ..fsys::Event::EMPTY
+        )),
+        ..fcomponent::Event::EMPTY
     }
 }
 
@@ -308,7 +308,7 @@ impl EventStreamLogReader {
     }
 
     async fn handle_event_stream(
-        stream: fsys::EventStream2Proxy,
+        stream: fcomponent::EventStreamProxy,
         sender: mpsc::UnboundedSender<Task<()>>,
         log_manager: Arc<LogsRepository>,
     ) {
@@ -320,7 +320,7 @@ impl EventStreamLogReader {
     }
 
     async fn handle_event(
-        event: fsys::Event,
+        event: fcomponent::Event,
         sender: mpsc::UnboundedSender<Task<()>>,
         log_manager: Arc<LogsRepository>,
     ) {
@@ -338,7 +338,7 @@ impl EventStreamLogReader {
 impl LogReader for EventStreamLogReader {
     async fn handle_request(&self, log_sender: mpsc::UnboundedSender<Task<()>>) -> LogSinkProxy {
         let (event_stream_proxy, mut event_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fsys::EventStream2Marker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fcomponent::EventStreamMarker>().unwrap();
         let (log_sink_proxy, log_sink_server_end) =
             fidl::endpoints::create_proxy::<LogSinkMarker>().unwrap();
 
@@ -358,10 +358,10 @@ impl LogReader for EventStreamLogReader {
             let _tx_clone = tx;
             while let Some(Ok(request)) = event_stream.next().await {
                 match request {
-                    fsys::EventStream2Request::GetNext { responder } => {
+                    fcomponent::EventStreamRequest::GetNext { responder } => {
                         responder.send(&mut vec![rx.next().await.unwrap()].into_iter()).unwrap();
                     }
-                    fsys::EventStream2Request::WaitForReady { responder } => {
+                    fcomponent::EventStreamRequest::WaitForReady { responder } => {
                         responder.send().unwrap()
                     }
                 }

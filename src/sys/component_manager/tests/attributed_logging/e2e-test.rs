@@ -8,7 +8,7 @@ use {
         matcher::{EventMatcher, ExitStatusMatcher},
         sequence::{self, EventSequence},
     },
-    fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_component as fcomponent,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
 };
 
@@ -30,8 +30,8 @@ async fn verify_routing_failure_messages() {
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .capability(Capability::event_stream("capability_requested_v2").with_scope(&root))
-                .capability(Capability::event_stream("directory_ready_v2").with_scope(&root))
+                .capability(Capability::event_stream("capability_requested").with_scope(&root))
+                .capability(Capability::event_stream("directory_ready").with_scope(&root))
                 .from(Ref::parent())
                 .to(&root),
         )
@@ -40,8 +40,10 @@ async fn verify_routing_failure_messages() {
 
     let instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
-    let proxy =
-        instance.root.connect_to_protocol_at_exposed_dir::<fsys::EventStream2Marker>().unwrap();
+    let proxy = instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
+        .unwrap();
     proxy.wait_for_ready().await.unwrap();
     let event_stream = EventStream::new_v2(proxy);
 

@@ -22,8 +22,8 @@
         },
         {
             event_stream: [
-                "destroyed_v2",
-                "started_v2",
+                "destroyed",
+                "started",
             ],
             from: "parent",
             scope: "#coll",

@@ -23,13 +23,13 @@
     ],
     use: [
         {
-            event_stream: [ "capability_requested_v2" ],
+            event_stream: [ "capability_requested" ],
             from: "parent",
             path: "/events/log_sink_requested_event_stream",
             filter: { name: "fuchsia.logger.LogSink" },
         },
         {
-            event_stream: [ "directory_ready_v2" ],
+            event_stream: [ "directory_ready" ],
             from: "parent",
             path: "/events/diagnostics_ready_event_stream",
             filter: { name: "diagnostics" },

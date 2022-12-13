@@ -7,8 +7,8 @@ use component_events::{
     sequence::{EventSequence, Ordering},
 };
 use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_io as fio;
-use fidl_fuchsia_sys2 as fsys;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::*;
 use futures::{future::BoxFuture, FutureExt, StreamExt};
@@ -103,8 +103,10 @@ async fn builtin_time_service_and_clock_routed() {
 
     let instance = component_manager_realm.build().await.unwrap();
 
-    let proxy =
-        instance.root.connect_to_protocol_at_exposed_dir::<fsys::EventStream2Marker>().unwrap();
+    let proxy = instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
+        .unwrap();
 
     let event_stream = component_events::events::EventStream::new_v2(proxy);
 

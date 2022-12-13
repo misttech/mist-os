@@ -4,7 +4,7 @@
 
 use {
     component_events::events::{DirectoryReady, Event, EventStream},
-    fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_component as fcomponent,
 };
 
 #[fuchsia::main]
@@ -16,8 +16,11 @@ async fn main() {
         let event = event_stream.next().await.unwrap();
         if matches!(
             event,
-            fsys::Event {
-                header: Some(fsys::EventHeader { event_type: Some(DirectoryReady::TYPE), .. }),
+            fcomponent::Event {
+                header: Some(fcomponent::EventHeader {
+                    event_type: Some(DirectoryReady::TYPE),
+                    ..
+                }),
                 ..
             }
         ) {

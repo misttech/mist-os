@@ -27,9 +27,9 @@
         },
         {
             event_stream: [
-                "capability_requested_v2",
-                "destroyed_v2",
-                "started_v2",
+                "capability_requested",
+                "destroyed",
+                "started",
             ],
             from: "parent",
             filter: { name: "fuchsia.debugdata.Publisher" },

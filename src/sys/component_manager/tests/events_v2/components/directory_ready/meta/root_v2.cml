@@ -21,7 +21,7 @@
             from: "framework",
         },
         {
-            event_stream: "directory_ready_v2",
+            event_stream: "directory_ready",
             from: "parent",
             filter: {
                 name: [

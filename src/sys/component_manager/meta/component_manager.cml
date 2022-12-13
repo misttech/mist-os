@@ -17,7 +17,7 @@
     capabilities: [
         {
             protocol: [
-                "fuchsia.sys2.EventStream2",
+                "fuchsia.component.EventStream",
                 "fuchsia.sys2.LifecycleController",
                 "fuchsia.sys2.RealmQuery",
             ],
@@ -35,7 +35,7 @@
     expose: [
         {
             protocol: [
-                "fuchsia.sys2.EventStream2",
+                "fuchsia.component.EventStream",
                 "fuchsia.sys2.LifecycleController",
                 "fuchsia.sys2.RealmQuery",
             ],

@@ -38,8 +38,8 @@
         },
         {
             event_stream: [
-                "capability_requested_v2",
-                "directory_ready_v2",
+                "capability_requested",
+                "directory_ready",
             ],
             from: "parent",
             to: "#vfs-compliance-tests",

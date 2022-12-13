@@ -19,8 +19,8 @@
     use: [
         {
             event_stream: [
-                "debug_started_v2",
-                "stopped_v2",
+                "debug_started",
+                "stopped",
             ],
             from: "parent",
         },

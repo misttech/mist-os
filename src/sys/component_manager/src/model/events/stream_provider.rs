@@ -14,7 +14,6 @@ use {
     },
     async_trait::async_trait,
     cm_rust::{ComponentDecl, EventMode, UseDecl, UseEventStreamDeprecatedDecl},
-    fuchsia_async as fasync,
     futures::lock::Mutex,
     moniker::{AbsoluteMoniker, ExtendedMoniker},
     std::{
@@ -22,12 +21,6 @@ use {
         sync::{Arc, Weak},
     },
 };
-
-pub struct EventStreamAttachment {
-    /// The task serving the event stream and using the client_end
-    /// associated with the above server_end
-    _task: fasync::Task<()>,
-}
 
 /// V2 variant of EventStreamAttachment
 /// contains the event stream and its name.
@@ -51,10 +44,6 @@ struct AbsolutePath {
 /// Mutable event stream state, guarded by a mutex in the
 /// EventStreamProvider which allows for mutation.
 struct StreamState {
-    /// A mapping from a component instance's ExtendedMoniker, to the set of
-    /// event streams and their corresponding paths in the component instance's out directory.
-    streams: HashMap<ExtendedMoniker, Vec<EventStreamAttachment>>,
-
     /// A mapping from a component instance's InstancedAbsoluteMoniker, to the set of
     /// event streams and their corresponding paths in the component instance's out directory.
     streams_v2: HashMap<ExtendedMoniker, Vec<EventStreamAttachmentV2>>,
@@ -79,7 +68,6 @@ impl EventStreamProvider {
         Self {
             registry,
             state: Arc::new(Mutex::new(StreamState {
-                streams: HashMap::new(),
                 streams_v2: HashMap::new(),
                 subscription_component_lookup: HashMap::new(),
             })),
@@ -167,7 +155,6 @@ impl EventStreamProvider {
     ) -> Result<(), ModelError> {
         let mut state = self.state.lock().await;
         // Remove all event streams associated with the `target_moniker` component.
-        state.streams.remove(&ExtendedMoniker::ComponentInstance(target_moniker.clone()));
         state.streams_v2.remove(&ExtendedMoniker::ComponentInstance(target_moniker.clone()));
         state
             .subscription_component_lookup

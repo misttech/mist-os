@@ -5,7 +5,6 @@
 use {
     component_events::{events::*, matcher::*},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_tests as fctests,
-    fidl_fuchsia_sys2 as fsys,
     fuchsia_component::client,
     futures::stream::{FusedStream, StreamExt},
 };
@@ -27,7 +26,7 @@ async fn binder() {
 
     // First, assert that a connection to fuchsia.component.Binder triggers a start.
     EventMatcher::ok()
-        .r#type(fsys::EventType::Started)
+        .r#type(fcomponent::EventType::Started)
         .moniker(CHILD_MONIKER.to_owned())
         .wait::<Started>(&mut event_stream)
         .await
@@ -42,7 +41,7 @@ async fn binder() {
         .expect("failed to connect to fuchsia.component.tests.Shutdowner");
     let () = shutdowner.shutdown().expect("failed to call Shutdown()");
     EventMatcher::ok()
-        .r#type(fsys::EventType::Stopped)
+        .r#type(fcomponent::EventType::Stopped)
         .moniker(CHILD_MONIKER.to_owned())
         .wait::<Stopped>(&mut event_stream)
         .await

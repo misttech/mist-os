@@ -17,7 +17,7 @@
     },
     use: [
         {
-            event_stream: "stopped_v2",
+            event_stream: "stopped",
             from: "parent",
         },
     ],

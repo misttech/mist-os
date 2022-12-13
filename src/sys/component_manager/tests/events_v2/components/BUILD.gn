@@ -10,7 +10,7 @@ rustc_binary("echo_reporter_v2_bin") {
   source_root = "scoped/echo_reporter.rs"
   testonly = true
   deps = [
-    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//src/lib/fuchsia",
     "//src/sys/lib/component-events",
   ]
@@ -165,7 +165,7 @@ rustc_binary("synthesis_reporter_v2_bin") {
   source_root = "synthesis/reporter.rs"
   testonly = true
   deps = [
-    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//src/lib/fuchsia",
     "//src/sys/lib/component-events",
   ]

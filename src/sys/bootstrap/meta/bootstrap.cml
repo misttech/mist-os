@@ -902,17 +902,17 @@
 
         // Required events
         {
-            event_stream: "stopped_v2",
+            event_stream: "stopped",
             from: "parent",
             to: "#archivist",
         },
         {
-            event_stream: "capability_requested_v2",
+            event_stream: "capability_requested",
             from: "parent",
             to: "#archivist",
         },
         {
-            event_stream: "directory_ready_v2",
+            event_stream: "directory_ready",
             from: "parent",
             to: "#archivist",
         },

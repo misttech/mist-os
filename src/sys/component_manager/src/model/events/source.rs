@@ -22,7 +22,7 @@ use {
     cm_task_scope::TaskScope,
     cm_util::channel,
     fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{SinkExt, StreamExt},
     moniker::ExtendedMoniker,
     std::{path::PathBuf, sync::Weak},
@@ -186,7 +186,7 @@ impl CapabilityProvider for EventSourceV2 {
             ExtendedMoniker::ComponentManager => model.top_instance().task_scope(),
         };
         let server_end = channel::take_channel(server_end);
-        let stream = ServerEnd::<fsys::EventStream2Marker>::new(server_end);
+        let stream = ServerEnd::<fcomponent::EventStreamMarker>::new(server_end);
         task_scope
             .add_task(async move {
                 let moniker = self.v1.subscriber.clone();

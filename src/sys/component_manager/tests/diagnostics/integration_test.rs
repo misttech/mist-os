@@ -4,7 +4,7 @@
 
 use {
     component_events::{events::*, matcher::*},
-    fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_component as fcomponent,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
 };
 
@@ -16,10 +16,10 @@ async fn start_nested_cm_and_wait_for_clean_stop(root_url: &str, moniker_to_wait
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                 .capability(Capability::protocol_by_name("fuchsia.sys2.EventSource"))
-                .capability(Capability::event_stream("destroyed_v2"))
-                .capability(Capability::event_stream("started_v2"))
-                .capability(Capability::event_stream("capability_requested_v2"))
-                .capability(Capability::event_stream("directory_ready_v2"))
+                .capability(Capability::event_stream("destroyed"))
+                .capability(Capability::event_stream("started"))
+                .capability(Capability::event_stream("capability_requested"))
+                .capability(Capability::event_stream("directory_ready"))
                 .from(Ref::parent())
                 .to(&root),
         )
@@ -27,8 +27,10 @@ async fn start_nested_cm_and_wait_for_clean_stop(root_url: &str, moniker_to_wait
         .unwrap();
     let instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
-    let proxy =
-        instance.root.connect_to_protocol_at_exposed_dir::<fsys::EventStream2Marker>().unwrap();
+    let proxy = instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
+        .unwrap();
     proxy.wait_for_ready().await.unwrap();
     let mut event_stream = EventStream::new_v2(proxy);
 

@@ -42,8 +42,8 @@ use {
     fidl_fidl_examples_routing_echo::{self as echo},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_sys2 as fsys,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
     futures::{channel::oneshot, join, lock::Mutex, StreamExt, TryStreamExt},
     maplit::hashmap,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase},
@@ -274,11 +274,12 @@ async fn capability_requested_event_at_parent() {
         .await;
 
     let namespace_root = test.bind_and_get_namespace(AbsoluteMoniker::root()).await;
-    let event_stream = capability_util::connect_to_svc_in_namespace::<fsys::EventStream2Marker>(
-        &namespace_root,
-        &"/events/capability_requested".try_into().unwrap(),
-    )
-    .await;
+    let event_stream =
+        capability_util::connect_to_svc_in_namespace::<fcomponent::EventStreamMarker>(
+            &namespace_root,
+            &"/events/capability_requested".try_into().unwrap(),
+        )
+        .await;
 
     let namespace_b = test.bind_and_get_namespace(vec!["b"].into()).await;
     let _echo_proxy = capability_util::connect_to_svc_in_namespace::<echo::EchoMarker>(
@@ -292,23 +293,22 @@ async fn capability_requested_event_at_parent() {
     // 'b' is the target and 'a' is receiving the event so the relative moniker
     // is './b'.
     assert_matches!(&event,
-        fsys::Event {
-            header: Some(fsys::EventHeader {
+        fcomponent::Event {
+            header: Some(fcomponent::EventHeader {
             moniker: Some(moniker), .. }), ..
         } if *moniker == "./b".to_string() );
 
     assert_matches!(&event,
-        fsys::Event {
-            header: Some(fsys::EventHeader {
+        fcomponent::Event {
+            header: Some(fcomponent::EventHeader {
             component_url: Some(component_url), .. }), ..
         } if *component_url == "test:///b".to_string() );
 
     assert_matches!(&event,
-        fsys::Event {
-            event_result: Some(
-                fsys::EventResult::Payload(
-                        fsys::EventPayload::CapabilityRequested(
-                            fsys::CapabilityRequestedPayload { name: Some(name), .. }))), ..}
+        fcomponent::Event {
+            payload:
+                    Some(fcomponent::EventPayload::CapabilityRequested(
+                        fcomponent::CapabilityRequestedPayload { name: Some(name), .. })), ..}
 
     if *name == "foo_svc".to_string()
     );
@@ -1823,11 +1823,12 @@ async fn use_runner_from_environment_failed() {
         )])
         .await;
     let namespace_root = test.bind_and_get_namespace(AbsoluteMoniker::root()).await;
-    let event_stream = capability_util::connect_to_svc_in_namespace::<fsys::EventStream2Marker>(
-        &namespace_root,
-        &"/events/stopped".try_into().unwrap(),
-    )
-    .await;
+    let event_stream =
+        capability_util::connect_to_svc_in_namespace::<fcomponent::EventStreamMarker>(
+            &namespace_root,
+            &"/events/stopped".try_into().unwrap(),
+        )
+        .await;
 
     // Even though we expect the runner to fail, bind should succeed. This is because the failure
     // is propagated via the controller channel, separately from the Start action.
@@ -1836,21 +1837,19 @@ async fn use_runner_from_environment_failed() {
     // Since the controller should have closed, expect a Stopped event.
     let event = event_stream.get_next().await.unwrap().into_iter().next().unwrap();
     assert_matches!(&event,
-        fsys::Event {
-            header: Some(fsys::EventHeader {
+        fcomponent::Event {
+            header: Some(fcomponent::EventHeader {
                 moniker: Some(moniker),
                 ..
             }),
-            event_result: Some(
-                fsys::EventResult::Payload(
-                    fsys::EventPayload::Stopped(
-                        fsys::StoppedPayload {
+            payload:
+                    Some(fcomponent::EventPayload::Stopped(
+                        fcomponent::StoppedPayload {
                             status: Some(status),
                             ..
                         }
-                    )
-                )
-            ),
+                    ))
+            ,
             ..
         }
         if *moniker == "./b".to_string()

@@ -39,8 +39,8 @@
         },
         {
             event_stream: [
-                "destroyed_v2",
-                "stopped_v2",
+                "destroyed",
+                "stopped",
             ],
             from: "parent",
         },

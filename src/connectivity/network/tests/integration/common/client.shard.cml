@@ -14,7 +14,7 @@
         // Gives a test access to `stopped` events which are emitted when a component under test
         // exits.
         {
-            event_stream: "stopped_v2",
+            event_stream: "stopped",
             from: "parent",
             path: "/events/stopped",
         },

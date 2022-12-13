@@ -4,7 +4,7 @@
 
 use {
     component_events::{events::*, matcher::*},
-    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
+    fidl_fuchsia_component as fcomponent, fuchsia_async as fasync,
     fuchsia_component_test::*,
 };
 
@@ -64,8 +64,10 @@ async fn component_manager_namespace() {
 
     let instance = component_manager_realm.build().await.unwrap();
 
-    let proxy =
-        instance.root.connect_to_protocol_at_exposed_dir::<fsys::EventStream2Marker>().unwrap();
+    let proxy = instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
+        .unwrap();
 
     let mut event_stream = component_events::events::EventStream::new_v2(proxy);
 

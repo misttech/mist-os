@@ -18,21 +18,21 @@
     ],
     use: [
         {
-            event_stream: [ "discovered_v2" ],
+            event_stream: [ "discovered" ],
             from: "parent",
             path: "/events/discovered",
         },
         {
-            event_stream: [ "started_v2" ],
+            event_stream: [ "started" ],
             from: "parent",
             path: "/events/started",
         },
         {
-            event_stream: [ "started_v2" ],
+            event_stream: [ "started" ],
             from: "parent",
         },
         {
-            event_stream: [ "destroyed_v2" ],
+            event_stream: [ "destroyed" ],
             from: "parent",
             path: "/events/destroyed",
         },

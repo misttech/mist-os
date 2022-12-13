@@ -32,8 +32,10 @@ pub async fn start_policy_test(
         .await
         .unwrap();
     let instance = builder.build_in_nested_component_manager(component_manager_url).await.unwrap();
-    let proxy =
-        instance.root.connect_to_protocol_at_exposed_dir::<fsys::EventStream2Marker>().unwrap();
+    let proxy = instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
+        .unwrap();
     proxy.wait_for_ready().await.unwrap();
 
     let event_stream = EventStream::new_v2(proxy);

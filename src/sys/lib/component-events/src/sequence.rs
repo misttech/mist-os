@@ -211,10 +211,13 @@ mod tests {
     use super::*;
     use crate::events::{Event, Started};
     use anyhow::Context;
-    use fidl_fuchsia_sys2 as fsys;
+    use fidl_fuchsia_component as fcomponent;
     use futures::StreamExt;
 
-    async fn run_server(events: Vec<fsys::Event>, mut server: fsys::EventStream2RequestStream) {
+    async fn run_server(
+        events: Vec<fcomponent::Event>,
+        mut server: fcomponent::EventStreamRequestStream,
+    ) {
         let (tx, mut rx) = futures::channel::mpsc::unbounded();
         for event in events {
             tx.unbounded_send(event).unwrap();
@@ -225,22 +228,24 @@ mod tests {
         drop(tx);
         while let Some(Ok(request)) = server.next().await {
             match request {
-                fsys::EventStream2Request::GetNext { responder } => {
+                fcomponent::EventStreamRequest::GetNext { responder } => {
                     if let Some(event) = rx.next().await {
                         responder.send(&mut vec![event].into_iter()).unwrap();
                     } else {
                         return;
                     }
                 }
-                fsys::EventStream2Request::WaitForReady { responder } => responder.send().unwrap(),
+                fcomponent::EventStreamRequest::WaitForReady { responder } => {
+                    responder.send().unwrap()
+                }
             }
         }
     }
 
     async fn make_event_stream(
-        events: Vec<fsys::Event>,
+        events: Vec<fcomponent::Event>,
     ) -> Result<(EventStream, fuchsia_async::Task<()>), Error> {
-        let (proxy, server) = fidl::endpoints::create_proxy::<fsys::EventStream2Marker>()
+        let (proxy, server) = fidl::endpoints::create_proxy::<fcomponent::EventStreamMarker>()
             .context("failed to make EventStream proxy")?;
         Ok((
             EventStream::new_v2(proxy),
@@ -249,17 +254,15 @@ mod tests {
     }
 
     // Returns a successful Started event for the given moniker.
-    fn make_event<M: Into<String>>(moniker: M) -> fsys::Event {
-        fsys::Event {
-            header: Some(fsys::EventHeader {
-                event_type: Some(fsys::EventType::Started),
+    fn make_event<M: Into<String>>(moniker: M) -> fcomponent::Event {
+        fcomponent::Event {
+            header: Some(fcomponent::EventHeader {
+                event_type: Some(fcomponent::EventType::Started),
                 moniker: Some(moniker.into()),
-                ..fsys::EventHeader::EMPTY
+                ..fcomponent::EventHeader::EMPTY
             }),
-            event_result: Some(fsys::EventResult::Payload(fsys::EventPayload::Started(
-                fsys::StartedPayload::EMPTY,
-            ))),
-            ..fsys::Event::EMPTY
+            payload: Some(fcomponent::EventPayload::Started(fcomponent::StartedPayload::EMPTY)),
+            ..fcomponent::Event::EMPTY
         }
     }
 

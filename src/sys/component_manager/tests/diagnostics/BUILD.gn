@@ -60,7 +60,7 @@ rustc_test("bin") {
   edition = "2021"
   source_root = "integration_test.rs"
   deps = [
-    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component-test",
     "//src/sys/lib/component-events",

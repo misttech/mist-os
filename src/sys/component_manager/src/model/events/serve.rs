@@ -9,8 +9,7 @@ use {
     },
     cm_util::io::clone_dir,
     fidl::endpoints::{Proxy, ServerEnd},
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fsys::EventStream2RequestStream,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
     fuchsia_zircon::{
         self as zx, sys::ZX_CHANNEL_MAX_MSG_BYTES, sys::ZX_CHANNEL_MAX_MSG_HANDLES, HandleBased,
     },
@@ -163,8 +162,8 @@ pub fn validate_and_filter_event(
 
 async fn handle_get_next_request(
     event_stream: &mut EventStream,
-    pending_event: &mut Option<fsys::Event>,
-) -> Option<Vec<fsys::Event>> {
+    pending_event: &mut Option<fcomponent::Event>,
+) -> Option<Vec<fcomponent::Event>> {
     // Handle buffered state
     // TODO(https://fxbug.dev/98653): Replace this
     // with a function to measure a Vec<fsys::Event>
@@ -257,8 +256,8 @@ async fn handle_get_next_request(
 /// An error value indicates the caller should close the channel
 async fn try_handle_get_next_request(
     event_stream: &mut EventStream,
-    responder: fsys::EventStream2GetNextResponder,
-    buffer: &mut Option<fsys::Event>,
+    responder: fcomponent::EventStreamGetNextResponder,
+    buffer: &mut Option<fcomponent::Event>,
 ) -> bool {
     let events = handle_get_next_request(event_stream, buffer).await;
     if let Some(events) = events {
@@ -273,18 +272,18 @@ async fn try_handle_get_next_request(
 /// but as a ServerEnd from the hooks system.
 pub async fn serve_event_stream_v2_as_stream(
     mut event_stream: EventStream,
-    mut stream: EventStream2RequestStream,
+    mut stream: fcomponent::EventStreamRequestStream,
 ) {
     let mut buffer = None;
     while let Some(Ok(request)) = stream.next().await {
         match request {
-            fsys::EventStream2Request::GetNext { responder } => {
+            fcomponent::EventStreamRequest::GetNext { responder } => {
                 if !try_handle_get_next_request(&mut event_stream, responder, &mut buffer).await {
                     // Close the channel if an error occurs while handling the request.
                     return;
                 }
             }
-            fsys::EventStream2Request::WaitForReady { responder } => {
+            fcomponent::EventStreamRequest::WaitForReady { responder } => {
                 let _ = responder.send();
             }
         }
@@ -294,43 +293,60 @@ pub async fn serve_event_stream_v2_as_stream(
 /// Serves EventStream FIDL requests received over the provided stream.
 pub async fn serve_event_stream_v2(
     event_stream: EventStream,
-    server_end: ServerEnd<fsys::EventStream2Marker>,
+    server_end: ServerEnd<fcomponent::EventStreamMarker>,
 ) {
     let stream = server_end.into_stream().unwrap();
     serve_event_stream_v2_as_stream(event_stream, stream).await;
 }
 
-async fn maybe_create_event_result(
-    event_payload: &EventPayload,
-) -> Result<Option<fsys::EventResult>, fidl::Error> {
-    match event_payload {
+async fn create_event_result(
+    event_result: &EventPayload,
+) -> Result<fcomponent::EventPayload, fidl::Error> {
+    match event_result {
         EventPayload::DirectoryReady { name, node, .. } => {
-            Ok(Some(create_directory_ready_payload(name.to_string(), node)?))
+            Ok(create_directory_ready_payload(name.to_string(), node)?)
         }
-        EventPayload::CapabilityRequested { name, capability, .. } => Ok(Some(
-            create_capability_requested_payload(name.to_string(), capability.clone()).await,
-        )),
+        EventPayload::CapabilityRequested { name, capability, .. } => {
+            Ok(create_capability_requested_payload(name.to_string(), capability.clone()).await)
+        }
         EventPayload::CapabilityRouted { .. } => {
             // Capability routed events cannot be exposed externally. This should be unreachable.
-            Ok(None)
+            unreachable!("Capability routed can't be externally exposed");
         }
-        EventPayload::Stopped { status } => Ok(Some(fsys::EventResult::Payload(
-            fsys::EventPayload::Stopped(fsys::StoppedPayload {
+        EventPayload::Stopped { status } => {
+            Ok(fcomponent::EventPayload::Stopped(fcomponent::StoppedPayload {
                 status: Some(status.into_raw()),
-                ..fsys::StoppedPayload::EMPTY
-            }),
-        ))),
-        EventPayload::DebugStarted { runtime_dir, break_on_start } => {
-            Ok(Some(create_debug_started_payload(runtime_dir, break_on_start)))
+                ..fcomponent::StoppedPayload::EMPTY
+            }))
         }
-        payload => Ok(maybe_create_empty_payload(payload.event_type())),
+        EventPayload::DebugStarted { runtime_dir, break_on_start } => {
+            Ok(create_debug_started_payload(runtime_dir, break_on_start))
+        }
+        payload => Ok(match payload.event_type() {
+            EventType::Discovered => {
+                fcomponent::EventPayload::Discovered(fcomponent::DiscoveredPayload::EMPTY)
+            }
+            EventType::Destroyed => {
+                fcomponent::EventPayload::Destroyed(fcomponent::DestroyedPayload::EMPTY)
+            }
+            EventType::Resolved => {
+                fcomponent::EventPayload::Resolved(fcomponent::ResolvedPayload::EMPTY)
+            }
+            EventType::Unresolved => {
+                fcomponent::EventPayload::Unresolved(fcomponent::UnresolvedPayload::EMPTY)
+            }
+            EventType::Started => {
+                fcomponent::EventPayload::Started(fcomponent::StartedPayload::EMPTY)
+            }
+            _ => unreachable!("Unsupported event type"),
+        }),
     }
 }
 
 fn create_directory_ready_payload(
     name: String,
     node: &fio::NodeProxy,
-) -> Result<fsys::EventResult, fidl::Error> {
+) -> Result<fcomponent::EventPayload, fidl::Error> {
     let node = {
         let (node_clone, server_end) = fidl::endpoints::create_proxy()?;
         node.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end)?;
@@ -342,32 +358,32 @@ fn create_directory_ready_payload(
         Some(node_client_end)
     };
 
-    let payload = fsys::DirectoryReadyPayload {
+    let payload = fcomponent::DirectoryReadyPayload {
         name: Some(name),
         node,
-        ..fsys::DirectoryReadyPayload::EMPTY
+        ..fcomponent::DirectoryReadyPayload::EMPTY
     };
-    Ok(fsys::EventResult::Payload(fsys::EventPayload::DirectoryReady(payload)))
+    Ok(fcomponent::EventPayload::DirectoryReady(payload))
 }
 
 async fn create_capability_requested_payload(
     name: String,
     capability: Arc<Mutex<Option<zx::Channel>>>,
-) -> fsys::EventResult {
+) -> fcomponent::EventPayload {
     let capability = capability.lock().await.take();
-    let payload = fsys::CapabilityRequestedPayload {
+    let payload = fcomponent::CapabilityRequestedPayload {
         name: Some(name),
         capability,
-        ..fsys::CapabilityRequestedPayload::EMPTY
+        ..fcomponent::CapabilityRequestedPayload::EMPTY
     };
-    fsys::EventResult::Payload(fsys::EventPayload::CapabilityRequested(payload))
+    fcomponent::EventPayload::CapabilityRequested(payload)
 }
 
 fn create_debug_started_payload(
     runtime_dir: &Option<fio::DirectoryProxy>,
     break_on_start: &Arc<zx::EventPair>,
-) -> fsys::EventResult {
-    fsys::EventResult::Payload(fsys::EventPayload::DebugStarted(fsys::DebugStartedPayload {
+) -> fcomponent::EventPayload {
+    fcomponent::EventPayload::DebugStarted(fcomponent::DebugStartedPayload {
         runtime_dir: clone_dir(runtime_dir.as_ref()).map(|dir| {
             dir.into_channel()
                 .expect("could not convert directory to channel")
@@ -375,35 +391,12 @@ fn create_debug_started_payload(
                 .into()
         }),
         break_on_start: break_on_start.duplicate_handle(zx::Rights::SAME_RIGHTS).ok(),
-        ..fsys::DebugStartedPayload::EMPTY
-    }))
-}
-
-fn maybe_create_empty_payload(event_type: EventType) -> Option<fsys::EventResult> {
-    let result = match event_type {
-        EventType::Discovered => fsys::EventResult::Payload(fsys::EventPayload::Discovered(
-            fsys::DiscoveredPayload::EMPTY,
-        )),
-        EventType::Destroyed => {
-            fsys::EventResult::Payload(fsys::EventPayload::Destroyed(fsys::DestroyedPayload::EMPTY))
-        }
-        EventType::Resolved => {
-            fsys::EventResult::Payload(fsys::EventPayload::Resolved(fsys::ResolvedPayload::EMPTY))
-        }
-        EventType::Unresolved => fsys::EventResult::Payload(fsys::EventPayload::Unresolved(
-            fsys::UnresolvedPayload::EMPTY,
-        )),
-        EventType::Started => {
-            fsys::EventResult::Payload(fsys::EventPayload::Started(fsys::StartedPayload::EMPTY))
-        }
-        // TODO(fxbug.dev/116856): Don't use unknown_variant_for_testing() outside tests.
-        _ => fsys::EventResult::unknown_variant_for_testing(),
-    };
-    Some(result)
+        ..fcomponent::DebugStartedPayload::EMPTY
+    })
 }
 
 /// Creates the basic FIDL Event object
-async fn create_event_fidl_object(event: Event) -> Result<fsys::Event, anyhow::Error> {
+async fn create_event_fidl_object(event: Event) -> Result<fcomponent::Event, anyhow::Error> {
     let moniker_string = match (&event.event.target_moniker, &event.scope_moniker) {
         (moniker @ ExtendedMoniker::ComponentManager, _) => moniker.to_string(),
         (ExtendedMoniker::ComponentInstance(target), ExtendedMoniker::ComponentManager) => {
@@ -417,15 +410,19 @@ async fn create_event_fidl_object(event: Event) -> Result<fsys::Event, anyhow::E
                 .to_string()
         }
     };
-    let header = Some(fsys::EventHeader {
+    let header = fcomponent::EventHeader {
         event_type: Some(event.event.event_type().try_into()?),
         moniker: Some(moniker_string),
         component_url: Some(event.event.component_url.clone()),
         timestamp: Some(event.event.timestamp.into_nanos()),
-        ..fsys::EventHeader::EMPTY
-    });
-    let event_result = maybe_create_event_result(&event.event.payload).await?;
-    Ok(fsys::Event { header, event_result, ..fsys::Event::EMPTY })
+        ..fcomponent::EventHeader::EMPTY
+    };
+    let payload = create_event_result(&event.event.payload).await?;
+    Ok(fcomponent::Event {
+        header: Some(header),
+        payload: Some(payload),
+        ..fcomponent::Event::EMPTY
+    })
 }
 
 #[cfg(test)]

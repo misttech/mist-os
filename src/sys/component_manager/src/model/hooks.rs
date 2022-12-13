@@ -14,8 +14,8 @@ use {
     async_trait::async_trait,
     cm_rust::{CapabilityName, ComponentDecl},
     cm_util::io::clone_dir,
-    fidl_fuchsia_diagnostics_types as fdiagnostics, fidl_fuchsia_io as fio,
-    fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_diagnostics_types as fdiagnostics,
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{channel::oneshot, lock::Mutex},
     moniker::{AbsoluteMoniker, ExtendedMoniker},
     std::{
@@ -99,22 +99,22 @@ macro_rules! events {
 macro_rules! external_events {
     ($($name:ident),*) => {
 
-        impl From<fsys::EventType> for EventType {
-            fn from(fidl_event_type: fsys::EventType) -> Self {
+        impl From<fcomponent::EventType> for EventType {
+            fn from(fidl_event_type: fcomponent::EventType) -> Self {
                 match fidl_event_type {
                     $(
-                        fsys::EventType::$name => EventType::$name,
+                        fcomponent::EventType::$name => EventType::$name,
                     )*
                 }
             }
         }
 
-        impl TryInto<fsys::EventType> for EventType {
+        impl TryInto<fcomponent::EventType> for EventType {
             type Error = anyhow::Error;
-            fn try_into(self) -> Result<fsys::EventType, anyhow::Error> {
+            fn try_into(self) -> Result<fcomponent::EventType, anyhow::Error> {
                 match self {
                     $(
-                        EventType::$name => Ok(fsys::EventType::$name),
+                        EventType::$name => Ok(fcomponent::EventType::$name),
                     )*
                     EventType::CapabilityRouted =>
                         Err(format_err!("can't serve capability routed")),

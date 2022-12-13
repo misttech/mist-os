@@ -358,9 +358,9 @@ fuchsia_test_package("component-manager-tests") {
 
 measure_tape("measure_tape_for_events") {
   target_binding = "rust"
-  target_types = [ "fuchsia.sys2/Event" ]
+  target_types = [ "fuchsia.component/Event" ]
   fidls = [
-    "//sdk/fidl/fuchsia.sys2",
+    "//sdk/fidl/fuchsia.component",
     "//sdk/fidl/fuchsia.io",
   ]
 }

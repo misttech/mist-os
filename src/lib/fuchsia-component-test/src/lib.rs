@@ -886,7 +886,7 @@ impl RealmBuilder {
                     .capability(Capability::protocol_by_name("fuchsia.sys2.RealmQuery"))
                     .capability(Capability::protocol_by_name("fuchsia.sys2.LifecycleController"))
                     .capability(Capability::protocol_by_name("fuchsia.sys2.EventSource"))
-                    .capability(Capability::protocol_by_name("fuchsia.sys2.EventStream2"))
+                    .capability(Capability::protocol_by_name("fuchsia.component.EventStream"))
                     .from(Ref::child("component_manager"))
                     .to(Ref::parent()),
             )
@@ -2022,7 +2022,7 @@ impl ScopedInstance {
     /// If the instance has been started before this method is invoked, then
     /// this method will block forever waiting for the Started event.
     /// REQUIRED: The manifest of the component executing this code must use
-    /// the "started_v2" event_stream.
+    /// the "started" event_stream.
     pub async fn start_with_binder_sync(&self) -> Result<(), anyhow::Error> {
         let mut event_stream = component_events::events::EventStream::open()
             .await

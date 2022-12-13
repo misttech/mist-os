@@ -880,7 +880,7 @@ impl RoutingTestModel for RoutingTest {
             CheckUse::EventStream { path, .. } => {
                 // Fails if the component did not use the protocol EventStream or if the event is
                 // not allowed.
-                capability_util::connect_to_svc_in_namespace::<fsys::EventStream2Marker>(
+                capability_util::connect_to_svc_in_namespace::<fcomponent::EventStreamMarker>(
                     &namespace, &path,
                 )
                 .await;
@@ -1270,7 +1270,7 @@ pub mod capability_util {
         expected_res: ExpectedResult,
     ) {
         let event_source_proxy =
-            connect_to_svc_in_namespace::<fsys::EventStream2Marker>(namespace, &path).await;
+            connect_to_svc_in_namespace::<fcomponent::EventStreamMarker>(namespace, &path).await;
         let res = event_source_proxy.get_next().await;
         match expected_res {
             ExpectedResult::Ok => assert_matches!(res, Ok(_)),

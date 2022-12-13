@@ -8,7 +8,7 @@ use {
         events::{Event, EventStream, ExitStatus},
     },
     anyhow::Error,
-    fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_component as fcomponent,
     regex::RegexSet,
     std::{convert::TryFrom, fmt},
     thiserror::Error,
@@ -51,15 +51,15 @@ trait RawFieldMatcher<T>: Clone + std::fmt::Debug + ToString {
 
 #[derive(Clone, Debug)]
 pub struct EventTypeMatcher {
-    event_type: fsys::EventType,
+    event_type: fcomponent::EventType,
 }
 
 impl EventTypeMatcher {
-    fn new(event_type: fsys::EventType) -> Self {
+    fn new(event_type: fcomponent::EventType) -> Self {
         Self { event_type }
     }
 
-    pub fn value(&self) -> &fsys::EventType {
+    pub fn value(&self) -> &fcomponent::EventType {
         &self.event_type
     }
 }
@@ -70,10 +70,10 @@ impl fmt::Display for EventTypeMatcher {
     }
 }
 
-impl RawFieldMatcher<fsys::EventType> for EventTypeMatcher {
+impl RawFieldMatcher<fcomponent::EventType> for EventTypeMatcher {
     const NAME: &'static str = "event_type";
 
-    fn matches(&self, other: &fsys::EventType) -> bool {
+    fn matches(&self, other: &fcomponent::EventType) -> bool {
         self.event_type == *other
     }
 }
@@ -258,7 +258,7 @@ impl EventMatcher {
         matcher
     }
 
-    pub fn r#type(mut self, event_type: fsys::EventType) -> Self {
+    pub fn r#type(mut self, event_type: fcomponent::EventType) -> Self {
         self.event_type = Some(EventTypeMatcher::new(event_type));
         self
     }
@@ -304,7 +304,7 @@ impl EventMatcher {
 
     /// The expected exit status. Only applies to the Stop event.
     pub fn stop(mut self, exit_status: Option<ExitStatusMatcher>) -> Self {
-        self.event_type = Some(EventTypeMatcher::new(fsys::EventType::Stopped));
+        self.event_type = Some(EventTypeMatcher::new(fcomponent::EventType::Stopped));
         self.exit_status = exit_status;
         self
     }

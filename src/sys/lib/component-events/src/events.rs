@@ -5,7 +5,7 @@
 use {
     anyhow::{format_err, Error},
     fidl::endpoints::{ProtocolMarker, ServerEnd},
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
     fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_zircon as zx,
     lazy_static::lazy_static,
@@ -20,28 +20,28 @@ lazy_static! {
 }
 
 /// Returns the string name for the given `event_type`
-pub fn event_name(event_type: &fsys::EventType) -> String {
+pub fn event_name(event_type: &fcomponent::EventType) -> String {
     match event_type {
-        fsys::EventType::CapabilityRequested => "capability_requested",
-        fsys::EventType::DirectoryReady => "directory_ready",
-        fsys::EventType::Discovered => "discovered",
-        fsys::EventType::Destroyed => "destroyed",
-        fsys::EventType::Resolved => "resolved",
-        fsys::EventType::Unresolved => "unresolved",
-        fsys::EventType::Started => "started",
-        fsys::EventType::Stopped => "stopped",
-        fsys::EventType::DebugStarted => "debug_started",
+        fcomponent::EventType::CapabilityRequested => "capability_requested",
+        fcomponent::EventType::DirectoryReady => "directory_ready",
+        fcomponent::EventType::Discovered => "discovered",
+        fcomponent::EventType::Destroyed => "destroyed",
+        fcomponent::EventType::Resolved => "resolved",
+        fcomponent::EventType::Unresolved => "unresolved",
+        fcomponent::EventType::Started => "started",
+        fcomponent::EventType::Stopped => "stopped",
+        fcomponent::EventType::DebugStarted => "debug_started",
     }
     .to_string()
 }
 
 enum InternalStream {
-    New(fsys::EventStream2Proxy),
+    New(fcomponent::EventStreamProxy),
 }
 
 pub struct EventStream {
     stream: InternalStream,
-    buffer: VecDeque<fsys::Event>,
+    buffer: VecDeque<fcomponent::Event>,
 }
 
 #[derive(Debug, Error, Clone)]
@@ -51,22 +51,25 @@ pub enum EventStreamError {
 }
 
 impl EventStream {
-    pub fn new_v2(stream: fsys::EventStream2Proxy) -> Self {
+    pub fn new_v2(stream: fcomponent::EventStreamProxy) -> Self {
         Self { stream: InternalStream::New(stream), buffer: VecDeque::new() }
     }
 
     pub fn open_at_path_pipelined(path: impl Into<String>) -> Result<Self, Error> {
-        Ok(Self::new_v2(connect_to_protocol_at_path::<fsys::EventStream2Marker>(&path.into())?))
+        Ok(Self::new_v2(connect_to_protocol_at_path::<fcomponent::EventStreamMarker>(
+            &path.into(),
+        )?))
     }
 
     pub async fn open_at_path(path: impl Into<String>) -> Result<Self, Error> {
-        let event_stream = connect_to_protocol_at_path::<fsys::EventStream2Marker>(&path.into())?;
+        let event_stream =
+            connect_to_protocol_at_path::<fcomponent::EventStreamMarker>(&path.into())?;
         event_stream.wait_for_ready().await?;
         Ok(Self::new_v2(event_stream))
     }
 
     pub async fn open() -> Result<Self, Error> {
-        let event_stream = connect_to_protocol_at_path::<fsys::EventStream2Marker>(
+        let event_stream = connect_to_protocol_at_path::<fcomponent::EventStreamMarker>(
             "/svc/fuchsia.component.EventStream",
         )?;
         event_stream.wait_for_ready().await?;
@@ -74,12 +77,12 @@ impl EventStream {
     }
 
     pub fn open_pipelined() -> Result<Self, Error> {
-        Ok(Self::new_v2(connect_to_protocol_at_path::<fsys::EventStream2Marker>(
+        Ok(Self::new_v2(connect_to_protocol_at_path::<fcomponent::EventStreamMarker>(
             "/svc/fuchsia.component.EventStream",
         )?))
     }
 
-    pub async fn next(&mut self) -> Result<fsys::Event, EventStreamError> {
+    pub async fn next(&mut self) -> Result<fcomponent::Event, EventStreamError> {
         if let Some(event) = self.buffer.pop_front() {
             return Ok(event);
         }
@@ -108,8 +111,8 @@ impl EventStream {
 }
 
 /// Common features of any event - event type, target moniker, conversion function
-pub trait Event: TryFrom<fsys::Event, Error = anyhow::Error> {
-    const TYPE: fsys::EventType;
+pub trait Event: TryFrom<fcomponent::Event, Error = anyhow::Error> {
+    const TYPE: fcomponent::EventType;
     const NAME: &'static str;
 
     fn target_moniker(&self) -> &str;
@@ -138,16 +141,16 @@ impl From<i32> for ExitStatus {
 
 #[derive(Debug)]
 struct EventHeader {
-    event_type: fsys::EventType,
+    event_type: fcomponent::EventType,
     component_url: String,
     moniker: String,
     timestamp: zx::Time,
 }
 
-impl TryFrom<fsys::EventHeader> for EventHeader {
+impl TryFrom<fcomponent::EventHeader> for EventHeader {
     type Error = anyhow::Error;
 
-    fn try_from(header: fsys::EventHeader) -> Result<Self, Self::Error> {
+    fn try_from(header: fcomponent::EventHeader) -> Result<Self, Self::Error> {
         let event_type = header.event_type.ok_or(format_err!("No event type"))?;
         let component_url = header.component_url.ok_or(format_err!("No component url"))?;
         let moniker = header.moniker.ok_or(format_err!("No moniker"))?;
@@ -257,7 +260,7 @@ macro_rules! create_event {
             }
 
             impl Event for $event_type {
-                const TYPE: fsys::EventType = fsys::EventType::$event_type;
+                const TYPE: fcomponent::EventType = fcomponent::EventType::$event_type;
                 const NAME: &'static str = stringify!($event_name);
 
                 fn target_moniker(&self) -> &str {
@@ -281,18 +284,18 @@ macro_rules! create_event {
                 }
             }
 
-            impl TryFrom<fsys::Event> for $event_type {
+            impl TryFrom<fcomponent::Event> for $event_type {
                 type Error = anyhow::Error;
 
-                fn try_from(event: fsys::Event) -> Result<Self, Self::Error> {
+                fn try_from(event: fcomponent::Event) -> Result<Self, Self::Error> {
                     // Extract the payload from the Event object.
-                    let result = match event.event_result {
-                        Some(fsys::EventResult::Payload(payload)) => {
+                    let result = match event.payload {
+                        Some(payload) => {
                             // This payload will be unused for event types that have no additional
                             // fields.
                             #[allow(unused)]
                             let payload = match payload {
-                                fsys::EventPayload::$event_type(payload) => Ok(payload),
+                                fcomponent::EventPayload::$event_type(payload) => Ok(payload),
                                 _ => Err(format_err!("Incorrect payload type, {:?}", payload)),
                             }?;
 
@@ -327,37 +330,7 @@ macro_rules! create_event {
 
                             Ok(Ok(payload))
                         },
-                        Some(fsys::EventResult::Error(err)) => {
-                            let description = err.description.ok_or(
-                                format_err!("Missing error description")
-                                )?;
-
-                            let error_payload = err.error_payload.ok_or(
-                                format_err!("Missing error_payload from EventError object")
-                                )?;
-
-                            // This error payload will be unused for event types that have no
-                            // additional fields.
-                            #[allow(unused)]
-                            let err = match error_payload {
-                                fsys::EventErrorPayload::$event_type(err) => Ok(err),
-                                _ => Err(format_err!("Incorrect payload type")),
-                            }?;
-
-                            // Extract the additional data from the Payload object.
-                            $(
-                                let $error_data_name: $error_data_ty =
-                                    err.$error_data_name.ok_or(
-                                        format_err!("Missing $error_data_name from $error_payload_name object")
-                                    )?;
-                            )*
-
-                            let error_payload =
-                                [<$event_type Error>] { $($error_data_name,)* description };
-                            Ok(Err(error_payload))
-                        },
                         None => Err(format_err!("Missing event_result from Event object")),
-                        _ => Err(format_err!("Unexpected event result")),
                     }?;
 
                     let event = {
