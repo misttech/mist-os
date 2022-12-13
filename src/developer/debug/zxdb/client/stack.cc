@@ -202,7 +202,13 @@ void Stack::SyncFrames(fit::callback<void(const Err&)> callback) {
 
 void Stack::SetFrames(debug_ipc::ThreadRecord::StackAmount amount,
                       const std::vector<debug_ipc::StackFrame>& new_frames) {
-  // See if the new frames are an extension of the existing frames or are a replacement.
+  // See if the new frames are an extension of the existing frames or are a replacement. This
+  // avoids overwriting existing frames when possible because:
+  //  - There may be in-process operations with weak references to the frame that we don't want
+  //    to invalidate.
+  //  - Inline frame state, especially with the hide_ambiguous_inline_frame_count_, needs to
+  //    stay the same. Keeping this state across frame replacements and potential symbol changes
+  //    isn't possible.
   size_t appending_from = 0;  // First index in new_frames to append.
   for (size_t i = 0; i < frames_.size(); i++) {
     // The input will not contain any inline frames so skip over those when doing the checking.
@@ -245,6 +251,25 @@ bool Stack::ClearFrames() {
   return true;
 }
 
+Location Stack::SymbolizeFrameAddress(uint64_t address, bool is_top_physical_frame) const {
+  // Adjust locations for non-topmost frames because we should display the locations of function
+  // calls instead of return addresses. Inlined functions should also be expanded from the call
+  // sites rather than the return sites.
+  uint64_t address_to_symbolize = address;
+  if (!is_top_physical_frame)
+    address_to_symbolize -= 1;
+
+  // The symbols will provide the location for the innermost inlined function.
+  Location loc = delegate_->GetSymbolizedLocationForAddress(address_to_symbolize);
+
+  // Restore the actual address so that the register value and commands like "disassemble" are
+  // still correct.
+  if (!is_top_physical_frame)
+    loc.AddAddressOffset(1);
+
+  return loc;
+}
+
 void Stack::AppendFrame(const debug_ipc::StackFrame& record) {
   // This symbolizes all stack frames since the expansion of inline frames depends on the symbols.
   // Its possible some stack objects will never have their frames queried which makes this duplicate
@@ -254,20 +279,7 @@ void Stack::AppendFrame(const debug_ipc::StackFrame& record) {
   // Indicates we're adding the newest physical frame and its inlines to the frame list.
   bool is_top_physical_frame = frames_.empty();
 
-  // Adjust locations for non-topmost frames because we should display the locations of function
-  // calls instead of return addresses. Inlined functions should also be expanded from the call
-  // sites rather than the return sites.
-  uint64_t address_to_symbolize = record.ip;
-  if (!is_top_physical_frame)
-    address_to_symbolize -= 1;
-
-  // The symbols will provide the location for the innermost inlined function.
-  Location inner_loc = delegate_->GetSymbolizedLocationForAddress(address_to_symbolize);
-
-  // Restore the actual address so that the register value and commands like "disassemble" are
-  // still correct.
-  if (!is_top_physical_frame)
-    inner_loc.AddAddressOffset(1);
+  Location inner_loc = SymbolizeFrameAddress(record.ip, is_top_physical_frame);
 
   const Function* cur_func = inner_loc.symbol().Get()->As<Function>();
   if (!cur_func) {

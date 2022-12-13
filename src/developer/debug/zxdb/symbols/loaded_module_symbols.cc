@@ -6,6 +6,7 @@
 
 #include "src/developer/debug/zxdb/symbols/location.h"
 #include "src/developer/debug/zxdb/symbols/module_symbols.h"
+#include "src/developer/debug/zxdb/symbols/symbol.h"
 
 namespace zxdb {
 

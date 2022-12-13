@@ -101,13 +101,19 @@ TEST_F(RequestStackTraceTest, SyncFramesRequired) {
   std::vector<Location> location;
 
   for (size_t i = 0; i < kStackSize; i++) {
+    // For non-topmost stack frames, the address lookup will actually be the previous value
+    // to get the function call instruction rather than the return instruction.
+    uint64_t lookup_address = kAddress[i];
+    if (i > 0)
+      lookup_address--;
+
     function.push_back(fxl::MakeRefCounted<Function>(DwarfTag::kSubprogram));
     function[i]->set_assigned_name(std::string("test_func_") + std::to_string(i));
     function[i]->set_code_ranges(
         AddressRanges(AddressRange(kAddress[i] - 0x10, kAddress[i] + 0x10)));
-    location.push_back(Location(kAddress[i], FileLine(temp_file.name(), 23 + i), 10 + i,
+    location.push_back(Location(lookup_address, FileLine(temp_file.name(), 23 + i), 10 + i,
                                 SymbolContext::ForRelativeAddresses(), function[i]));
-    mock_module->AddSymbolLocations(kAddress[i], {location[i]});
+    mock_module->AddSymbolLocations(lookup_address, {location[i]});
   }
 
   // Notify of thread stop and push expected stack frames.

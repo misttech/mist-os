@@ -49,8 +49,8 @@ class Frame : public ClientObject {
   // Returns the location of the stack frame code. This will be symbolized.
   virtual const Location& GetLocation() const = 0;
 
-  // Returns the program counter of this frame. This may be faster than
-  // GetLocation().address() since it doesn't need to be symbolized.
+  // Returns the program counter of this frame. It should be the same as the address returned by
+  // GetLocation().address().
   virtual uint64_t GetAddress() const = 0;
 
   // Retrieves the registers of the given category that were saved with this stack frame. Only the

@@ -43,10 +43,7 @@ bool FrameImpl::IsInline() const { return false; }
 
 const Frame* FrameImpl::GetPhysicalFrame() const { return this; }
 
-const Location& FrameImpl::GetLocation() const {
-  EnsureSymbolized();
-  return location_;
-}
+const Location& FrameImpl::GetLocation() const { return location_; }
 
 uint64_t FrameImpl::GetAddress() const { return location_.address(); }
 
@@ -182,16 +179,6 @@ bool FrameImpl::IsInTopmostPhysicalFrame() const {
       break;
   }
   return false;
-}
-
-void FrameImpl::EnsureSymbolized() const {
-  if (location_.is_symbolized())
-    return;
-  auto vect =
-      thread_->GetProcess()->GetSymbols()->ResolveInputLocation(InputLocation(location_.address()));
-  // Should always return 1 result for symbolizing addresses.
-  FX_DCHECK(vect.size() == 1);
-  location_ = std::move(vect[0]);
 }
 
 fxl::RefPtr<SymbolDataProvider> FrameImpl::GetSymbolDataProvider() const {

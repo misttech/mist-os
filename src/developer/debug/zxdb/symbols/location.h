@@ -59,8 +59,6 @@ class Location {
   // Unlocated variable.
   Location(const SymbolContext& symbol_context, LazySymbol symbol);
 
-  ~Location();
-
   bool is_valid() const { return state_ != State::kInvalid; }
 
   // The different between "symbolized" and "has_symbols" is that the former means we tried to

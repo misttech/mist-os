@@ -62,7 +62,9 @@ std::vector<Location> MockModuleSymbols::ResolveInputLocation(const SymbolContex
         result = found->second;
       } else {
         // Return identity for all non-found addresses.
-        result.emplace_back(Location::State::kAddress, input_location.address);
+        result.emplace_back(
+            options.symbolize ? Location::State::kSymbolized : Location::State::kAddress,
+            input_location.address);
       }
       break;
     case InputLocation::Type::kName: {

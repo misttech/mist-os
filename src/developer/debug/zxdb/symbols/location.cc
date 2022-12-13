@@ -29,8 +29,6 @@ Location::Location(const SymbolContext& symbol_context, LazySymbol symbol)
       symbol_(std::move(symbol)),
       symbol_context_(symbol_context) {}
 
-Location::~Location() = default;
-
 void Location::AddAddressOffset(uint64_t offset) {
   if (!is_valid())
     return;
