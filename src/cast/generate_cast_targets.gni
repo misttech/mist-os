@@ -57,5 +57,9 @@ template("generate_cast_targets") {
     for_pkg = "appmgr"
     sources = [ "//src/cast/config/cast_scheme_map.config" ]
     outputs = [ "scheme_map/cast.config" ]
+
+    # The chromium_cast_runner_tests need to depend on the config.
+    # TODO(crbug.com/1065707): Remove once the deps has been removed.
+    visibility = [ "//src/chromium:*" ]
   }
 }
