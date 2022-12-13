@@ -165,10 +165,7 @@ config("fidl-llcpp-deprecated-wire-try-dispatch") {
   #   scripts/gn/trim_visibility.py --target="//build/cpp:fidl-llcpp-deprecated-wire-try-dispatch"
   #
   # and replace the contents of `visibility` with the script output.
-  visibility = [
-    "//src/devices/lib/fidl:devfs_fidl",
-    "//src/lib/storage/vfs/cpp",
-  ]
+  visibility = [ "//src/devices/lib/fidl:devfs_fidl" ]
 }
 
 # This allows code call FIDL wire table constructors and setters rather than using builders.

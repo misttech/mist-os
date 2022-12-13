@@ -196,11 +196,7 @@ bool Connection::OnMessage() {
 
   auto* header = msg.header();
   FidlTransaction txn(header->txid, binding);
-
-  ::fidl::DispatchResult dispatch_result = fidl_protocol_.TryDispatch(msg, &txn);
-  if (dispatch_result == ::fidl::DispatchResult::kNotFound) {
-    vnode_->HandleFsSpecificMessage(msg, &txn);
-  }
+  fidl_protocol_.Dispatch(std::move(msg), &txn);
 
   switch (txn.ToResult()) {
     case FidlTransaction::Result::kRepliedSynchronously:

@@ -201,13 +201,6 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // Subclasses may override this behavior to serve custom protocols over the channel.
   virtual zx_status_t ConnectService(zx::channel channel);
 
-  // Dispatches incoming FIDL messages which aren't recognized by |Connection::HandleMessage|.
-  //
-  // The default implementation just closes the connection through |txn|.
-  //
-  // This implementation may be overridden to support additional non-fuchsia.io FIDL protocols.
-  virtual void HandleFsSpecificMessage(fidl::IncomingHeaderAndMessage& msg, fidl::Transaction* txn);
-
   // Extract handle, type, and extra info from a vnode.
   //
   // The |protocol| argument specifies which protocol the connection is negotiated to speak. For

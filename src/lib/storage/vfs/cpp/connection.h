@@ -111,18 +111,19 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
     static FidlProtocol Create(typename fidl::WireServer<Protocol>* protocol_impl) {
       return FidlProtocol(
           static_cast<void*>(protocol_impl),
-          [](void* impl, fidl::IncomingHeaderAndMessage& msg, fidl::Transaction* txn) {
-            return fidl::WireTryDispatch<Protocol>(
-                static_cast<typename fidl::WireServer<Protocol>*>(impl), msg, txn);
+          [](void* impl, fidl::IncomingHeaderAndMessage&& msg, fidl::Transaction* txn) {
+            return fidl::WireDispatch<Protocol>(
+                static_cast<typename fidl::WireServer<Protocol>*>(impl),
+                std::forward<fidl::IncomingHeaderAndMessage>(msg), txn);
           });
     }
 
     // Dispatches |message| on |Protocol|. The function consumes the message and returns true if the
     // method was recognized by the protocol. Otherwise, it leaves the message intact and returns
     // false.
-    ::fidl::DispatchResult TryDispatch(fidl::IncomingHeaderAndMessage& message,
-                                       fidl::Transaction* transaction) {
-      return dispatch_fn_(protocol_impl_, message, transaction);
+    void Dispatch(fidl::IncomingHeaderAndMessage&& message, fidl::Transaction* transaction) {
+      return dispatch_fn_(protocol_impl_, std::forward<fidl::IncomingHeaderAndMessage>(message),
+                          transaction);
     }
 
     FidlProtocol(const FidlProtocol&) = default;
@@ -132,9 +133,8 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
     ~FidlProtocol() = default;
 
    private:
-    using TypeErasedDispatchFn = ::fidl::DispatchResult (*)(void* impl,
-                                                            fidl::IncomingHeaderAndMessage&,
-                                                            fidl::Transaction*);
+    using TypeErasedDispatchFn = void (*)(void* impl, fidl::IncomingHeaderAndMessage&&,
+                                          fidl::Transaction*);
 
     FidlProtocol() = delete;
     FidlProtocol(void* protocol_impl, TypeErasedDispatchFn dispatch_fn)
