@@ -169,7 +169,7 @@ def main():
     parser.add_argument("--platform-version-json", required=True)
     parser.add_argument("--goldens-manifest", required=True)
     parser.add_argument("--fidl-compatibility-doc-path", required=True)
-    parser.add_argument("--update-goldens", type=bool, default=False)
+    parser.add_argument("--update-goldens", type=bool, default=True)
     parser.add_argument("--root-build-dir", default="out/default")
     parser.add_argument("--root-source-dir")
     parser.add_argument("--stamp-file")
