@@ -51,8 +51,10 @@ async fn test_pixel_ratio() {
 
         let pointer_event = receiver.next().await.unwrap();
         assert!(matches!(pointer_event.phase, Phase::Add));
-        assert!(pointer_event.physical_x - 512.0 < std::f32::EPSILON);
-        assert!(pointer_event.physical_y - 300.0 < std::f32::EPSILON);
+        assert!((pointer_event.physical_x - 512.0).abs() < std::f32::EPSILON);
+        assert!((pointer_event.physical_y - 300.0).abs() < std::f32::EPSILON);
+        assert!((pointer_event.logical_x - 256.0).abs() < std::f32::EPSILON);
+        assert!((pointer_event.logical_y - 150.0).abs() < std::f32::EPSILON);
     }
     // Mouse.
     {
@@ -67,8 +69,10 @@ async fn test_pixel_ratio() {
 
         let pointer_event = receiver.next().await.unwrap();
         assert!(matches!(pointer_event.phase, Phase::Add));
-        assert!(pointer_event.physical_x - 1024.0 < std::f32::EPSILON);
-        assert!(pointer_event.physical_y - 600.0 < std::f32::EPSILON);
+        assert!((pointer_event.physical_x - 1024.0).abs() < std::f32::EPSILON);
+        assert!((pointer_event.physical_y - 600.0).abs() < std::f32::EPSILON);
+        assert!((pointer_event.logical_x - 512.0).abs() < std::f32::EPSILON);
+        assert!((pointer_event.logical_y - 300.0).abs() < std::f32::EPSILON);
     }
 }
 
@@ -124,7 +128,7 @@ async fn test_mouse_hover() {
 
     let pointer_event = receiver.next().await.unwrap();
     assert!(matches!(pointer_event.phase, Phase::Hover));
-    assert!(pointer_event.physical_x - 540.0 < std::f32::EPSILON);
+    assert!((pointer_event.physical_x - 540.0).abs() < std::f32::EPSILON);
 
     // Changing mouse y position should result in Hover event.
     let mouse_event = InputEvent::mouse().device_info(42).position(540.0, 320.0);
@@ -132,7 +136,7 @@ async fn test_mouse_hover() {
 
     let pointer_event = receiver.next().await.unwrap();
     assert!(matches!(pointer_event.phase, Phase::Hover));
-    assert!(pointer_event.physical_y - 320.0 < std::f32::EPSILON);
+    assert!((pointer_event.physical_y - 320.0).abs() < std::f32::EPSILON);
 }
 
 #[fuchsia::test]
@@ -143,7 +147,7 @@ async fn test_mouse_move() {
         .position(512.0, 300.0)
         .button_down();
 
-    let (sender, mut receiver) = pointer_fusion(1.0);
+    let (sender, mut receiver) = pointer_fusion(2.0);
     sender.unbounded_send(mouse_event).unwrap();
 
     let pointer_event = receiver.next().await.unwrap();
@@ -158,8 +162,10 @@ async fn test_mouse_move() {
 
     let pointer_event = receiver.next().await.unwrap();
     assert!(matches!(pointer_event.phase, Phase::Move));
-    assert!(pointer_event.physical_delta_x == 28.0);
-    assert!(pointer_event.physical_delta_y == 20.0);
+    assert!(pointer_event.physical_delta_x == 56.0);
+    assert!(pointer_event.physical_delta_y == 40.0);
+    assert!(pointer_event.logical_delta_x == 28.0);
+    assert!(pointer_event.logical_delta_y == 20.0);
 
     // Keeping the same position should not result in Move event.
     let mouse_event = InputEvent::mouse().device_info(42).position(540.0, 320.0).button_down();
@@ -196,7 +202,7 @@ async fn test_scroll_event() {
         .position(512.0, 300.0)
         .scroll(Some(10.0), None);
 
-    let (sender, mut receiver) = pointer_fusion(1.0);
+    let (sender, mut receiver) = pointer_fusion(2.0);
     sender.unbounded_send(mouse_event).unwrap();
 
     let pointer_event = receiver.next().await.unwrap();
@@ -204,8 +210,10 @@ async fn test_scroll_event() {
 
     let pointer_event = receiver.next().await.unwrap();
     assert!(matches!(pointer_event.phase, Phase::Hover));
-    assert!(pointer_event.scroll_delta_x == 10.0);
-    assert!(pointer_event.scroll_delta_y == 0.0);
+    assert!(pointer_event.physical_scroll_delta_x == 10.0);
+    assert!(pointer_event.physical_scroll_delta_y == 0.0);
+    assert!(pointer_event.logical_scroll_delta_x == 5.0);
+    assert!(pointer_event.logical_scroll_delta_y == 0.0);
 }
 
 #[fuchsia::test]
@@ -253,8 +261,8 @@ async fn test_touch_down_and_move() {
     let pointer_event = receiver.next().await.unwrap();
     assert!(matches!(pointer_event.phase, Phase::Down));
     assert!(pointer_event.synthesized);
-    assert!(pointer_event.physical_x - 512.0 < std::f32::EPSILON);
-    assert!(pointer_event.physical_y - 300.0 < std::f32::EPSILON);
+    assert!((pointer_event.physical_x - 512.0).abs() < std::f32::EPSILON);
+    assert!((pointer_event.physical_y - 300.0).abs() < std::f32::EPSILON);
 
     // Changing touch x position should result in Move event.
     let touch_event =
@@ -263,7 +271,7 @@ async fn test_touch_down_and_move() {
 
     let pointer_event = receiver.next().await.unwrap();
     assert!(matches!(pointer_event.phase, Phase::Move));
-    assert!(pointer_event.physical_x - 540.0 < std::f32::EPSILON);
+    assert!((pointer_event.physical_x - 540.0).abs() < std::f32::EPSILON);
 
     // Changing touch y position should result in Move event.
     let touch_event =
@@ -272,7 +280,7 @@ async fn test_touch_down_and_move() {
 
     let pointer_event = receiver.next().await.unwrap();
     assert!(matches!(pointer_event.phase, Phase::Move));
-    assert!(pointer_event.physical_y - 320.0 < std::f32::EPSILON);
+    assert!((pointer_event.physical_y - 320.0).abs() < std::f32::EPSILON);
 }
 
 #[fuchsia::test]

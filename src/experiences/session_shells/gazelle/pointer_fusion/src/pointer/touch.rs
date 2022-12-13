@@ -35,6 +35,8 @@ impl PointerFusionState {
                     position_in_viewport,
                     &self.view_parameters.unwrap(),
                 );
+                pointer_event.logical_x = logical_x;
+                pointer_event.logical_y = logical_y;
                 pointer_event.physical_x = logical_x * self.pixel_ratio;
                 pointer_event.physical_y = logical_y * self.pixel_ratio;
 

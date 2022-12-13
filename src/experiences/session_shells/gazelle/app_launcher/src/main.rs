@@ -52,7 +52,7 @@ impl AppLauncher {
                 Event::WindowEvent { event: WindowEvent::Pointer { event }, .. } => {
                     if event.phase == Phase::Down {
                         if let Some(component_url) =
-                            component_url_from_pos(event.physical_x, event.physical_y)
+                            component_url_from_pos(event.logical_x, event.logical_y)
                         {
                             launch_element(self.element_manager.clone(), component_url);
                         }

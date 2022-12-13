@@ -62,10 +62,15 @@ impl PointerFusionState {
                         event.id = state.id;
                         // Synthesize a move event if the location does not match.
                         if state.is_location_changed(&event) {
-                            let (physical_delta_x, physical_delta_y) = state.compute_delta(&event);
+                            let (physical_delta_x, physical_delta_y) =
+                                state.compute_physical_delta(&event);
+                            let (logical_delta_x, logical_delta_y) =
+                                state.compute_logical_delta(&event);
                             let move_event = PointerEvent {
                                 physical_delta_x,
                                 physical_delta_y,
+                                logical_delta_x,
+                                logical_delta_y,
                                 phase: Phase::Move,
                                 synthesized: true,
                                 ..event.clone()
@@ -73,6 +78,8 @@ impl PointerFusionState {
 
                             state.physical_x = move_event.physical_x;
                             state.physical_y = move_event.physical_y;
+                            state.logical_x = move_event.logical_x;
+                            state.logical_y = move_event.logical_y;
 
                             converted_pointers.push(move_event);
                         }
@@ -103,10 +110,15 @@ impl PointerFusionState {
 
                         // Synthesize a hover event if the location does not match.
                         if state.is_location_changed(&event) {
-                            let (physical_delta_x, physical_delta_y) = state.compute_delta(&event);
+                            let (physical_delta_x, physical_delta_y) =
+                                state.compute_physical_delta(&event);
+                            let (logical_delta_x, logical_delta_y) =
+                                state.compute_logical_delta(&event);
                             let hover_event = PointerEvent {
                                 physical_delta_x,
                                 physical_delta_y,
+                                logical_delta_x,
+                                logical_delta_y,
                                 phase: Phase::Hover,
                                 synthesized: true,
                                 ..event.clone()
@@ -114,6 +126,8 @@ impl PointerFusionState {
 
                             state.physical_x = hover_event.physical_x;
                             state.physical_y = hover_event.physical_y;
+                            state.logical_x = hover_event.logical_x;
+                            state.logical_y = hover_event.logical_y;
 
                             converted_pointers.push(hover_event);
                         }
@@ -139,12 +153,19 @@ impl PointerFusionState {
 
                     assert!(!state.is_down);
                     if state.is_location_changed(&event) {
-                        let (physical_delta_x, physical_delta_y) = state.compute_delta(&event);
+                        let (physical_delta_x, physical_delta_y) =
+                            state.compute_physical_delta(&event);
+                        let (logical_delta_x, logical_delta_y) =
+                            state.compute_logical_delta(&event);
                         event.physical_delta_x = physical_delta_x;
                         event.physical_delta_y = physical_delta_y;
+                        event.logical_delta_x = logical_delta_x;
+                        event.logical_delta_y = logical_delta_y;
 
                         state.physical_x = event.physical_x;
                         state.physical_y = event.physical_y;
+                        state.logical_x = event.logical_x;
+                        state.logical_y = event.logical_y;
                         converted_pointers.push(event);
                     }
                 }
@@ -167,10 +188,15 @@ impl PointerFusionState {
                     assert!(!state.is_down);
                     // Synthesize a hover event if the location does not match.
                     if state.is_location_changed(&event) {
-                        let (physical_delta_x, physical_delta_y) = state.compute_delta(&event);
+                        let (physical_delta_x, physical_delta_y) =
+                            state.compute_physical_delta(&event);
+                        let (logical_delta_x, logical_delta_y) =
+                            state.compute_logical_delta(&event);
                         let hover_event = PointerEvent {
                             physical_delta_x,
                             physical_delta_y,
+                            logical_delta_x,
+                            logical_delta_y,
                             phase: Phase::Hover,
                             synthesized: true,
                             ..event.clone()
@@ -178,6 +204,8 @@ impl PointerFusionState {
 
                         state.physical_x = hover_event.physical_x;
                         state.physical_y = hover_event.physical_y;
+                        state.logical_x = hover_event.logical_x;
+                        state.logical_y = hover_event.logical_y;
 
                         converted_pointers.push(hover_event);
                     }
@@ -197,12 +225,20 @@ impl PointerFusionState {
 
                     // Skip this event if location does not change.
                     if state.is_location_changed(&event) || state.is_button_state_changed(&event) {
-                        let (physical_delta_x, physical_delta_y) = state.compute_delta(&event);
+                        let (physical_delta_x, physical_delta_y) =
+                            state.compute_physical_delta(&event);
+                        let (logical_delta_x, logical_delta_y) =
+                            state.compute_logical_delta(&event);
                         event.physical_delta_x = physical_delta_x;
                         event.physical_delta_y = physical_delta_y;
+                        event.logical_delta_x = logical_delta_x;
+                        event.logical_delta_y = logical_delta_y;
 
                         state.physical_x = event.physical_x;
                         state.physical_y = event.physical_y;
+                        state.logical_x = event.logical_x;
+                        state.logical_y = event.logical_y;
+
                         state.buttons = event.buttons;
                         converted_pointers.push(event);
                     }
@@ -220,10 +256,15 @@ impl PointerFusionState {
 
                     // Synthesize a move event if the location does not match.
                     if state.is_location_changed(&event) {
-                        let (physical_delta_x, physical_delta_y) = state.compute_delta(&event);
+                        let (physical_delta_x, physical_delta_y) =
+                            state.compute_physical_delta(&event);
+                        let (logical_delta_x, logical_delta_y) =
+                            state.compute_logical_delta(&event);
                         let move_event = PointerEvent {
                             physical_delta_x,
                             physical_delta_y,
+                            logical_delta_x,
+                            logical_delta_y,
                             phase: Phase::Move,
                             synthesized: true,
                             ..event.clone()
@@ -231,6 +272,8 @@ impl PointerFusionState {
 
                         state.physical_x = move_event.physical_x;
                         state.physical_y = move_event.physical_y;
+                        state.logical_x = move_event.logical_x;
+                        state.logical_y = move_event.logical_y;
 
                         converted_pointers.push(move_event);
                     }
@@ -258,10 +301,13 @@ impl PointerFusionState {
                 // Synthesize a move / hover event if the location does not match.
                 if state.is_location_changed(&event) {
                     let phase = if state.is_down { Phase::Move } else { Phase::Hover };
-                    let (physical_delta_x, physical_delta_y) = state.compute_delta(&event);
+                    let (physical_delta_x, physical_delta_y) = state.compute_physical_delta(&event);
+                    let (logical_delta_x, logical_delta_y) = state.compute_logical_delta(&event);
                     let hover_event = PointerEvent {
                         physical_delta_x,
                         physical_delta_y,
+                        logical_delta_x,
+                        logical_delta_y,
                         phase,
                         synthesized: true,
                         ..event.clone()
@@ -269,13 +315,17 @@ impl PointerFusionState {
 
                     state.physical_x = hover_event.physical_x;
                     state.physical_y = hover_event.physical_y;
+                    state.logical_x = hover_event.logical_x;
+                    state.logical_y = hover_event.logical_y;
 
                     converted_pointers.push(hover_event);
                 }
 
                 if state.is_scroll_offset_changed(&event) {
-                    state.scroll_delta_x = event.scroll_delta_x;
-                    state.scroll_delta_y = event.scroll_delta_y;
+                    state.physical_scroll_delta_x = event.physical_scroll_delta_x;
+                    state.physical_scroll_delta_y = event.physical_scroll_delta_y;
+                    state.logical_scroll_delta_x = event.logical_scroll_delta_x;
+                    state.logical_scroll_delta_y = event.logical_scroll_delta_y;
 
                     converted_pointers.push(event);
                 }
@@ -293,8 +343,12 @@ struct PointerState {
     is_down: bool,
     physical_x: f32,
     physical_y: f32,
-    pub scroll_delta_y: f64,
-    pub scroll_delta_x: f64,
+    logical_x: f32,
+    logical_y: f32,
+    pub physical_scroll_delta_y: f64,
+    pub physical_scroll_delta_x: f64,
+    pub logical_scroll_delta_x: f64,
+    pub logical_scroll_delta_y: f64,
     buttons: i64,
 }
 
@@ -303,11 +357,16 @@ impl PointerState {
         let mut state = PointerState::default();
         state.physical_x = event.physical_x;
         state.physical_y = event.physical_y;
+        state.logical_x = event.logical_x;
+        state.logical_y = event.logical_y;
         state
     }
 
     pub(crate) fn is_location_changed(&self, event: &PointerEvent) -> bool {
-        self.physical_x != event.physical_x || self.physical_y != event.physical_y
+        self.physical_x != event.physical_x
+            || self.physical_y != event.physical_y
+            || self.logical_x != event.logical_x
+            || self.logical_y != event.logical_y
     }
 
     pub(crate) fn is_button_state_changed(&self, event: &PointerEvent) -> bool {
@@ -315,11 +374,18 @@ impl PointerState {
     }
 
     pub(crate) fn is_scroll_offset_changed(&self, event: &PointerEvent) -> bool {
-        self.scroll_delta_x != event.scroll_delta_x || self.scroll_delta_y != event.scroll_delta_y
+        self.physical_scroll_delta_x != event.physical_scroll_delta_x
+            || self.physical_scroll_delta_y != event.physical_scroll_delta_y
+            || self.logical_scroll_delta_x != event.logical_scroll_delta_x
+            || self.logical_scroll_delta_y != event.logical_scroll_delta_y
     }
 
-    pub(crate) fn compute_delta(&self, event: &PointerEvent) -> (f32, f32) {
+    pub(crate) fn compute_physical_delta(&self, event: &PointerEvent) -> (f32, f32) {
         (event.physical_x - self.physical_x, event.physical_y - self.physical_y)
+    }
+
+    pub(crate) fn compute_logical_delta(&self, event: &PointerEvent) -> (f32, f32) {
+        (event.logical_x - self.logical_x, event.logical_y - self.logical_y)
     }
 }
 

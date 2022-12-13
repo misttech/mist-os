@@ -137,13 +137,14 @@ pub trait SceneManager: Send {
     /// create one using default settings.
     ///
     /// # Parameters
-    /// - `position`: A [`Position`] struct representing the cursor position.
+    /// - `position_physical_px`: A [`Position`] struct representing the cursor position, in physical
+    ///   pixels.
     ///
     /// # Notes
     /// If a custom cursor has not been set using `set_cursor_image` or `set_cursor_shape` a default
     /// cursor will be created and added to the scene.  The implementation of the `SceneManager` trait
     /// is responsible for translating the raw input position into "pips".
-    fn set_cursor_position(&mut self, position: input_pipeline::Position);
+    fn set_cursor_position(&mut self, position_physical_px: input_pipeline::Position);
 
     /// Sets the visibility of the cursor in the current scene. The cursor is visible by default.
     ///

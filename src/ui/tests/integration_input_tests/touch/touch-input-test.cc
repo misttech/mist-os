@@ -154,19 +154,32 @@ struct UIStackConfig {
   bool use_scene_manager = false;
   bool use_flatland = false;
   int32_t display_rotation = 0;
+
+  // Use a DPR other than 1.0, so that physical and logical coordinate spaces
+  // are different.
+  float device_pixel_ratio = 2.f;
 };
 
 std::vector<UIStackConfig> UIStackConfigsToTest() {
   std::vector<UIStackConfig> configs;
 
   // GFX x RP
-  configs.push_back({.use_scene_manager = false, .use_flatland = false, .display_rotation = 90});
+  configs.push_back({.use_scene_manager = false,
+                     .use_flatland = false,
+                     .display_rotation = 90,
+                     .device_pixel_ratio = 2.f});
 
   // GFX x SM
-  configs.push_back({.use_scene_manager = true, .use_flatland = false, .display_rotation = 90});
+  configs.push_back({.use_scene_manager = true,
+                     .use_flatland = false,
+                     .display_rotation = 90,
+                     .device_pixel_ratio = 2.f});
 
   // Flatland X SM
-  configs.push_back({.use_scene_manager = true, .use_flatland = true, .display_rotation = 90});
+  configs.push_back({.use_scene_manager = true,
+                     .use_flatland = true,
+                     .display_rotation = 90,
+                     .device_pixel_ratio = 2.f});
 
   return configs;
 }

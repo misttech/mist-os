@@ -78,14 +78,28 @@ pub struct PointerEvent {
     pub physical_delta_x: f32,
     /// The relative change in y position of the device from previous event in sequence.
     pub physical_delta_y: f32,
+    /// The x position of the device, in the view's logical coordinate system.
+    pub logical_x: f32,
+    /// The y position of the device, in the view's logical coordinate system.
+    pub logical_y: f32,
+    /// The relative change in x position of the device from previous event in sequence, in the
+    /// view's logical coordinate system.
+    pub logical_delta_x: f32,
+    /// The relative change in y position of the device from previous event in sequence, in the
+    /// view's logical coordinate system.
+    pub logical_delta_y: f32,
     /// The buttons pressed on the device represented as bitflags.
     pub buttons: i64,
     /// The event [SignalKind] for scroll events.
     pub signal_kind: SignalKind,
     /// The amount of scroll in x direction, in physical pixels.
-    pub scroll_delta_y: f64,
+    pub physical_scroll_delta_y: f64,
     /// The amount of scroll in y direction, in physical pixels.
-    pub scroll_delta_x: f64,
+    pub physical_scroll_delta_x: f64,
+    /// The amount of scroll in x direction, in logical pixels.
+    pub logical_scroll_delta_y: f64,
+    /// The amount of scroll in y direction, in logical pixels.
+    pub logical_scroll_delta_x: f64,
     /// Set if this [PointerEvent] was synthesized for maintaining legal input sequence.
     pub synthesized: bool,
 }
