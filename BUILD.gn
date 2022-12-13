@@ -1326,10 +1326,7 @@ group("default") {
   }
 
   if (include_bazel_examples_and_tests) {
-    deps += [
-      "//build/bazel/examples",
-      "//build/bazel/tests",
-    ]
+    deps += [ "//build/bazel/tests" ]
   }
 }
 
@@ -1389,6 +1386,9 @@ group("developer_universe_packages") {
     "//build/images/*",
   ]
   public_deps = universe_package_labels
+  if (include_bazel_examples_and_tests) {
+    public_deps += [ "//build/bazel/examples" ]
+  }
 }
 
 ##

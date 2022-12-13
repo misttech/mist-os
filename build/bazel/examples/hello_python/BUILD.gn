@@ -6,10 +6,11 @@ import("//build/bazel/bazel_build_action.gni")
 
 bazel_build_action("hello_python_bin") {
   bazel_targets = [ "//build/bazel/examples/hello_python:bin" ]
-  bazel_outputs = [ "build/bazel/examples/hello_python/bin" ]
+  bazel_outputs = [ "bazel-bin/build/bazel/examples/hello_python/bin" ]
   ninja_outputs = [ "hello_python" ]
 }
 
 group("hello_python") {
+  testonly = true
   deps = [ ":hello_python_bin($host_toolchain)" ]
 }

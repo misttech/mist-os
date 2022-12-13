@@ -143,7 +143,7 @@ For more details, see the comments in //build/bazel/legacy_ninja_build_outputs.g
         return 1
 
     for bazel_out, ninja_out in zip(args.bazel_outputs, args.ninja_outputs):
-        src_path = os.path.join(args.workspace_dir, 'bazel-bin', bazel_out)
+        src_path = os.path.join(args.workspace_dir, bazel_out)
         dst_path = ninja_out
         copy_file_if_changed(src_path, dst_path)
 

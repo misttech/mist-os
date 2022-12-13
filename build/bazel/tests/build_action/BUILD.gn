@@ -58,7 +58,7 @@ bazel_input_resource("bazel_inputs") {
 bazel_build_action("run_build_action") {
   bazel_targets = [ "//build/bazel/tests/build_action" ]
   bazel_inputs = [ ":bazel_inputs" ]
-  bazel_outputs = [ "build/bazel/tests/build_action/example_out.txt" ]
+  bazel_outputs = [ "bazel-bin/build/bazel/tests/build_action/example_out.txt" ]
   ninja_outputs = [ "example_out.txt" ]
 }
 

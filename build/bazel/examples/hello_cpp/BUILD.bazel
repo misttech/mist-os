@@ -9,6 +9,7 @@ load(
     "fuchsia_component",
     "fuchsia_component_manifest",
     "fuchsia_package",
+    "fuchsia_test_component",
     "fuchsia_test_package",
     "if_fuchsia",
 )
@@ -51,7 +52,7 @@ fuchsia_component(
 
 fuchsia_package(
     name = "pkg",
-    package_name = "hello_world",
+    package_name = "hello_cpp",
     components = [
         ":component",
     ],
@@ -67,6 +68,25 @@ fuchsia_cc_test(
     ]),
 )
 
+fuchsia_component_manifest(
+    name = "hello_test_manifest",
+    src = "meta/hello_test.cml",
+    includes = [
+        "@fuchsia_sdk//pkg/sys/testing:elf_test_runner",
+        "@fuchsia_sdk//pkg/syslog:client",
+        # TODO(fxbug.dev/116670): make the below implicit
+        # as transitive includes of the above.
+        "@fuchsia_sdk//pkg/syslog:offer",
+        "@fuchsia_sdk//pkg/syslog:use",
+    ],
+)
+
+fuchsia_test_component(
+    name = "hello_test_component",
+    manifest = ":hello_test_manifest",
+    deps = [":hello_test"],
+)
+
 fuchsia_cc_test(
     name = "hello_gtest",
     size = "small",
@@ -77,12 +97,31 @@ fuchsia_cc_test(
     ]),
 )
 
+fuchsia_component_manifest(
+    name = "hello_gtest_manifest",
+    src = "meta/hello_gtest.cml",
+    includes = [
+        "@fuchsia_sdk//pkg/sys/testing:elf_test_runner",
+        "@fuchsia_sdk//pkg/syslog:client",
+        # TODO(fxbug.dev/116670): make the below implicit
+        # as transitive includes of the above.
+        "@fuchsia_sdk//pkg/syslog:offer",
+        "@fuchsia_sdk//pkg/syslog:use",
+    ],
+)
+
+fuchsia_test_component(
+    name = "hello_gtest_component",
+    manifest = ":hello_gtest_manifest",
+    deps = [":hello_test"],
+)
+
 fuchsia_test_package(
     name = "test_pkg",
-    package_name = "hello_test",
-    visibility = ["//visibility:public"],
-    deps = [
-        ":hello_gtest",
-        ":hello_test",
+    package_name = "hello_cpp_test",
+    components = [
+        ":hello_gtest_component",
+        ":hello_test_component",
     ],
+    visibility = ["//visibility:public"],
 )
