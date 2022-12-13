@@ -4392,13 +4392,13 @@ From //build/images/fvm.gni:64
 
 **Current value (from the default):** `false`
 
-From //third_party/mini_chromium/build/platform.gni:31
+From //third_party/mini_chromium/src/build/platform.gni:31
 
 ### mini_chromium_is_chromeos_lacros
 
 **Current value (from the default):** `false`
 
-From //third_party/mini_chromium/build/platform.gni:30
+From //third_party/mini_chromium/src/build/platform.gni:30
 
 ### monolithic_binaries
 Only for local development. When true the binaries (perfetto, traced, ...)

@@ -80,7 +80,7 @@ if (current_os == "linux") {
   config("linux-static-pie.config") {
     # Avoid libc references from assert() in libc++ header code.
     defines = [ "NDEBUG=1" ]
-    include_dirs = [ "//third_party/linux-syscall-support" ]
+    include_dirs = [ "//third_party/linux-syscall-support/src" ]
   }
 
   static_library("linux-static-pie") {

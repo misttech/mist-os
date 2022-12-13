@@ -109,7 +109,7 @@ source_set("crash_server") {
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
     "//third_party/crashpad/util:net",
-    "//third_party/mini_chromium/base",
+    "//third_party/mini_chromium/src/base",
   ]
 
   deps = [
@@ -273,7 +273,7 @@ source_set("sized_data_reader") {
   public_deps = [
     "//src/developer/forensics/utils:sized_data",
     "//third_party/crashpad/util",
-    "//third_party/mini_chromium/base",
+    "//third_party/mini_chromium/src/base",
   ]
 
   deps = [ "//sdk/lib/syslog/cpp" ]
