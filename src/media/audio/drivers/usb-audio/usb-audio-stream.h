@@ -273,6 +273,8 @@ class UsbAudioStream : public UsbAudioStreamBase,
 
   static void RequestCompleteCallback(void* ctx, usb_request_t* request);
 
+  bool is_async() const;
+
   UsbAudioDevice& parent_;
   const std::unique_ptr<UsbAudioStreamInterface> ifc_;
   char log_prefix_[LOG_PREFIX_STORAGE] = {0};
@@ -295,6 +297,7 @@ class UsbAudioStream : public UsbAudioStreamBase,
   uint32_t fifo_bytes_;
   bool delay_info_updated_ = false;
   int64_t internal_delay_nsec_ = 0;
+  zx::time allow_length_warnings_ = zx::time::infinite_past();
   uint32_t fractional_bpp_inc_;
   uint32_t fractional_bpp_acc_ __TA_GUARDED(req_lock_);
   uint32_t ring_buffer_offset_ __TA_GUARDED(req_lock_);

@@ -320,6 +320,10 @@ void UsbAudioStream::DdkRelease() {
   parent_.RemoveAudioStream(stream);
 }
 
+bool UsbAudioStream::is_async() const {
+  return ifc_ && ifc_->ep_sync_type() == EndpointSyncType::Async;
+}
+
 void UsbAudioStream::GetSupportedFormats(
     StreamChannel::GetSupportedFormatsCompleter::Sync& completer) {
   const fbl::Vector<UsbAudioStreamInterface::FormatMapEntry>& formats = ifc_->formats();
@@ -486,13 +490,25 @@ void UsbAudioStream::CreateRingBuffer(StreamChannel* channel, audio_fidl::wire::
     return;
   }
 
+  ZX_DEBUG_ASSERT(format_ndx < ifc_->formats().size());
+
   static constexpr uint32_t iso_packet_rate = 1000;
   uint32_t bytes_per_packet, fractional_bpp_inc, long_payload_len;
-  bytes_per_packet = (req.frame_rate / iso_packet_rate) * frame_size;
-  fractional_bpp_inc = (req.frame_rate % iso_packet_rate);
-  long_payload_len = bytes_per_packet + (fractional_bpp_inc ? frame_size : 0);
+  if (is_input() && is_async()) {
+    // For async inputs, give them as much room as we can, on every
+    // single packet.  Make sure it's a multiple of the frame size;
+    // it probably should already be a multiple, but if so, we're
+    // not losing anything by checking it.
+    bytes_per_packet = ifc_->formats()[format_ndx].max_req_size_;
+    bytes_per_packet -= bytes_per_packet % frame_size;
+    fractional_bpp_inc = 0;
+    long_payload_len = bytes_per_packet;
+  } else {
+    bytes_per_packet = (req.frame_rate / iso_packet_rate) * frame_size;
+    fractional_bpp_inc = (req.frame_rate % iso_packet_rate);
+    long_payload_len = bytes_per_packet + (fractional_bpp_inc ? frame_size : 0);
+  }
 
-  ZX_DEBUG_ASSERT(format_ndx < ifc_->formats().size());
   if (long_payload_len > ifc_->formats()[format_ndx].max_req_size_) {
     completer.Close(ZX_ERR_INVALID_ARGS);
     return;
@@ -1143,7 +1159,13 @@ void UsbAudioStream::CompleteRequestLocked(usb_request_t* req) {
 
   // If we are an input stream, copy the payload into the ring buffer.
   if (is_input()) {
-    uint32_t todo = static_cast<uint32_t>(req->header.length);
+    // TODO(31906): for async inputs, measure and report the device's
+    // observed sampling rate to the client.  If the device is falling
+    // behind the nominal sampling rate, it's probably a minor quality
+    // issue; but if they're running faster than the nominal sampling rate,
+    // the client will be seeing older and older data as time goes on, and
+    // the audio will fall further and further behind realtime.
+    uint32_t todo = static_cast<uint32_t>(req->response.actual);
 
     uint32_t avail = ring_buffer_size_ - ring_buffer_offset_;
     ZX_DEBUG_ASSERT(ring_buffer_offset_ < ring_buffer_size_);
@@ -1170,8 +1192,27 @@ void UsbAudioStream::CompleteRequestLocked(usb_request_t* req) {
     }
   }
 
+  // Check if the actual transfer length looks reasonable.
+  // It's reasonable if it's exactly what we requested, or if we're dealing
+  // with an async input, or if we got an error.  (If there's an error,
+  // reporting the length mismatch is probably superfluous.)
+  const bool actual_length_reasonable = (req->response.actual == req->header.length) ||
+                                        (is_async() && is_input()) ||
+                                        (req->response.status != ZX_OK);
+
+  // If not reasonable, log a warning.
+  if (!actual_length_reasonable) {
+    // Rate limit warnings to no more than one every 3 seconds.
+    if (zx::clock::get_monotonic() >= allow_length_warnings_) {
+      allow_length_warnings_ = zx::deadline_after(zx::sec(3));
+      zxlogf(WARNING, "%s: Audio transfer mismatch; asked for %u bytes, actual %u bytes",
+             parent_.log_prefix(), static_cast<uint32_t>(req->header.length),
+             static_cast<uint32_t>(req->response.actual));
+    }
+  }
+
   // Update the ring buffer position.
-  ring_buffer_pos_ += static_cast<uint32_t>(req->header.length);
+  ring_buffer_pos_ += static_cast<uint32_t>(req->response.actual);
   if (ring_buffer_pos_ >= ring_buffer_size_) {
     ring_buffer_pos_ -= ring_buffer_size_;
     ZX_DEBUG_ASSERT(ring_buffer_pos_ < ring_buffer_size_);
