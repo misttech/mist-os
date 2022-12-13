@@ -294,7 +294,7 @@ def main():
                     'dependencies': dependencies,
                     'dependency_overrides': overrides,
                     'environment': {
-                        'sdk': '>=2.0.0 <3.0.0'
+                        'sdk': '>=2.0.0 <4.0.0'
                     }
                 },
                 pubspec,
