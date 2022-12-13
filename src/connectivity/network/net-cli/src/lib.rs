@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
-use fidl_fuchsia_hardware_ethernet as fethernet;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_debug as fdebug;
 use fidl_fuchsia_net_dhcp as fdhcp;
@@ -44,14 +43,6 @@ fn add_row(t: &mut Table, row: Row) {
     let _: &mut Row = t.add_row(row);
 }
 
-/// A network device to be added to the stack.
-pub struct Device {
-    /// The path to the device in the driver tree.
-    pub topological_path: String,
-    /// A channel to the device's I/O protocol.
-    pub dev: fidl::endpoints::ClientEnd<fethernet::DeviceMarker>,
-}
-
 /// An interface for acquiring a proxy to a FIDL service.
 #[async_trait::async_trait]
 pub trait ServiceConnector<S: fidl::endpoints::ProtocolMarker> {
@@ -63,7 +54,6 @@ pub trait ServiceConnector<S: fidl::endpoints::ProtocolMarker> {
 ///
 /// FIDL dependencies are specified as supertraits. These supertraits are a complete enumeration of
 /// all FIDL dependencies required by net-cli.
-#[async_trait::async_trait]
 pub trait NetCliDepsConnector:
     ServiceConnector<fdebug::InterfacesMarker>
     + ServiceConnector<fdhcp::Server_Marker>
@@ -76,17 +66,20 @@ pub trait NetCliDepsConnector:
     + ServiceConnector<fstack::StackMarker>
     + ServiceConnector<fname::LookupMarker>
 {
-    /// Acquires a connection to the device at the provided path.
-    ///
-    /// This method exists because this library can make no assumptions about the namespace of its
-    /// clients. Implementers which do not have device nodes within their namespace must return an
-    /// error.
-    ///
-    /// The semantics of the path are not fully specified other than that it describes a path to a
-    /// device node within the client's namespace. The semantics of path and of this method are
-    /// likely to be unstable as Fuchsia system device discovery mechanisms are undergoing active
-    /// change.
-    async fn connect_device(&self, devfs_path: &str) -> Result<Device, Error>;
+}
+
+impl<O> NetCliDepsConnector for O where
+    O: ServiceConnector<fdebug::InterfacesMarker>
+        + ServiceConnector<fdhcp::Server_Marker>
+        + ServiceConnector<ffilter::FilterMarker>
+        + ServiceConnector<finterfaces::StateMarker>
+        + ServiceConnector<fneighbor::ControllerMarker>
+        + ServiceConnector<fneighbor::ViewMarker>
+        + ServiceConnector<fnetstack::NetstackMarker>
+        + ServiceConnector<fstack::LogMarker>
+        + ServiceConnector<fstack::StackMarker>
+        + ServiceConnector<fname::LookupMarker>
+{
 }
 
 pub async fn do_root<C: NetCliDepsConnector>(
@@ -290,28 +283,6 @@ async fn do_if<C: NetCliDepsConnector>(
                 write_tabulated_interfaces_info(out, response.into_iter())
                     .context("error tabulating interface info")?;
             }
-        }
-        opts::IfEnum::Add(opts::IfAdd { path }) => match connector.connect_device(&path).await {
-            Ok(Device { topological_path, dev }) => {
-                let stack = connect_with_context::<fstack::StackMarker, _>(connector).await?;
-                let id = fstack_ext::exec_fidl!(
-                    stack.add_ethernet_interface(&topological_path, dev),
-                    "error adding interface"
-                )?;
-                info!("Added interface {}", id);
-            }
-            Err(e) => {
-                out.line(e)?;
-            }
-        },
-        opts::IfEnum::Del(opts::IfDel { interface }) => {
-            let id = interface.find_nicid(connector).await?;
-            let stack = connect_with_context::<fstack::StackMarker, _>(connector).await?;
-            let () = fstack_ext::exec_fidl!(
-                stack.del_ethernet_interface(id),
-                "error removing interface"
-            )?;
-            info!("Deleted interface {}", id);
         }
         opts::IfEnum::Get(opts::IfGet { interface }) => {
             let id = interface.find_nicid(connector).await?;
@@ -1349,13 +1320,6 @@ mod tests {
                 .as_ref()
                 .cloned()
                 .ok_or(anyhow::anyhow!("connector has no name lookup instance"))
-        }
-    }
-
-    #[async_trait::async_trait]
-    impl NetCliDepsConnector for TestConnector {
-        async fn connect_device(&self, _path: &str) -> Result<Device, Error> {
-            Err(anyhow::anyhow!("connect interface unimplmented for test connector"))
         }
     }
 

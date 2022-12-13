@@ -125,10 +125,8 @@ pub struct If {
 #[derive(FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum IfEnum {
-    Add(IfAdd),
     Addr(IfAddr),
     Bridge(IfBridge),
-    Del(IfDel),
     Disable(IfDisable),
     Enable(IfEnable),
     Get(IfGet),
@@ -201,16 +199,6 @@ impl From<u64> for InterfaceIdentifier {
 }
 
 #[derive(FromArgs, Clone, Debug, PartialEq)]
-#[argh(subcommand, name = "add")]
-/// adds a network interface by path
-pub struct IfAdd {
-    // The path must yield a handle to a fuchsia.hardware.ethernet.Device interface.
-    // Currently this means paths under /dev/class/ethernet.
-    #[argh(positional)]
-    pub path: String,
-}
-
-#[derive(FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "addr")]
 /// commands for updating network interface addresses
 pub struct IfAddr {
@@ -258,14 +246,6 @@ pub struct IfAddrDel {
 pub struct IfBridge {
     #[argh(positional, arg_name = "nicid or name:ifname")]
     pub interfaces: Vec<InterfaceIdentifier>,
-}
-
-#[derive(FromArgs, Clone, Debug, PartialEq)]
-#[argh(subcommand, name = "del")]
-/// removes a network interface
-pub struct IfDel {
-    #[argh(positional, arg_name = "nicid or name:ifname")]
-    pub interface: InterfaceIdentifier,
 }
 
 #[derive(FromArgs, Clone, Debug, PartialEq)]

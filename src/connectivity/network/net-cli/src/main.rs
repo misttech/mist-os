@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{format_err, Context as _, Error};
+use anyhow::{format_err, Error};
 use fidl::endpoints::ProtocolMarker;
-use fidl_fuchsia_hardware_ethernet as fethernet;
 use fidl_fuchsia_net_debug as fdebug;
 use fidl_fuchsia_net_dhcp as fdhcp;
 use fidl_fuchsia_net_filter as ffilter;
@@ -145,23 +144,6 @@ impl net_cli::ServiceConnector<fnetstack::NetstackMarker> for Connector {
 impl net_cli::ServiceConnector<fname::LookupMarker> for Connector {
     async fn connect(&self) -> Result<<fname::LookupMarker as ProtocolMarker>::Proxy, Error> {
         self.connect_to_exposed_protocol::<fname::LookupMarker>(DNS_RESOLVER_MONIKER).await
-    }
-}
-
-#[async_trait::async_trait]
-impl net_cli::NetCliDepsConnector for Connector {
-    async fn connect_device(&self, path: &str) -> Result<net_cli::Device, Error> {
-        let dev = std::fs::File::open(path)
-            .with_context(|| format!("failed to open device at {}", path))?;
-        let topological_path =
-            fdio::device_get_topo_path(&dev).context("failed to get topological path")?;
-        let client = fdio::get_service_handle(dev)?;
-        let controller = fidl::endpoints::ClientEnd::<fethernet::ControllerMarker>::new(client);
-        let controller = controller.into_proxy().context("failed to create proxy")?;
-        let (dev, server_end) =
-            fidl::endpoints::create_endpoints().context("failed to create endpoints")?;
-        let () = controller.open_session(server_end).context("failed to open session")?;
-        Ok(net_cli::Device { topological_path, dev })
     }
 }
 

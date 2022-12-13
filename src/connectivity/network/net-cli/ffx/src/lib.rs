@@ -152,16 +152,6 @@ impl net_cli::ServiceConnector<fname::LookupMarker> for FfxConnector<'_> {
     }
 }
 
-#[async_trait::async_trait]
-impl net_cli::NetCliDepsConnector for FfxConnector<'_> {
-    async fn connect_device(&self, _devfs_path: &str) -> Result<net_cli::Device, anyhow::Error> {
-        // TODO(https://fxbug.dev/77130): Find a way to get device entries when running on the host.
-        Err(anyhow::anyhow!(
-            "Cannot connect to devfs on a remote target. See https://fxbug.dev/77130"
-        ))
-    }
-}
-
 const EXIT_FAILURE: i32 = 1;
 
 #[ffx_plugin()]
