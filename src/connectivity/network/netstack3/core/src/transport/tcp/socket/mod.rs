@@ -678,6 +678,8 @@ pub(crate) trait TcpSocketHandler<I: Ip, C: TcpNonSyncContext>:
         id: Id,
         f: F,
     ) -> R;
+
+    fn set_send_buffer_size<Id: Into<TcpSocketId<I>>>(&mut self, ctx: &mut C, id: Id, size: usize);
 }
 
 impl<I: IpExt, C: TcpNonSyncContext, SC: TcpSyncContext<I, C>> TcpSocketHandler<I, C> for SC {
@@ -1176,6 +1178,48 @@ impl<I: IpExt, C: TcpNonSyncContext, SC: TcpSyncContext<I, C>> TcpSocketHandler<
                 MaybeListener::Bound(bound) => f(&bound.keep_alive),
                 MaybeListener::Listener(listener) => f(&listener.keep_alive),
             }
+        })
+    }
+
+    fn set_send_buffer_size<Id: Into<TcpSocketId<I>>>(
+        &mut self,
+        _ctx: &mut C,
+        id: Id,
+        size: usize,
+    ) {
+        self.with_tcp_sockets_mut(|sockets| {
+            let TcpSockets { port_alloc: _, inactive, socketmap } = sockets;
+            let get_listener = match id.into() {
+                TcpSocketId::Unbound(id) => {
+                    let Unbound { bound_device: _, buffer_sizes, keep_alive: _ } =
+                        inactive.get_mut(id.into()).expect("invalid unbound ID");
+                    let BufferSizes { send } = buffer_sizes;
+                    return *send = size;
+                }
+                TcpSocketId::Connection(id) => {
+                    let (conn, _, _): (_, &(), &ConnAddr<_, _, _, _>) =
+                        socketmap.conns_mut().get_by_id_mut(&id.into()).expect("invalid ID");
+                    let Connection { acceptor: _, state, ip_sock: _, defunct: _, keep_alive: _ } =
+                        conn;
+                    return state.set_send_buffer_size(size);
+                }
+                TcpSocketId::Bound(id) => socketmap.listeners_mut().get_by_id_mut(&id.into()),
+                TcpSocketId::Listener(id) => socketmap.listeners_mut().get_by_id_mut(&id.into()),
+            };
+
+            let (state, _, _): (_, &(), &ListenerAddr<_, _, _>) =
+                get_listener.expect("invalid socket ID");
+            let BufferSizes { send } = match state {
+                MaybeListener::Bound(BoundState { buffer_sizes, keep_alive: _ }) => buffer_sizes,
+                MaybeListener::Listener(Listener {
+                    backlog: _,
+                    ready: _,
+                    pending: _,
+                    buffer_sizes,
+                    keep_alive: _,
+                }) => buffer_sizes,
+            };
+            *send = size;
         })
     }
 }
@@ -1790,6 +1834,24 @@ pub fn with_keep_alive<
     r
 }
 
+/// Set the size of the send buffer for this socket and future derived sockets.
+pub fn set_send_buffer_size<I: Ip, C: NonSyncContext, Id: Into<TcpSocketId<I>>>(
+    mut sync_ctx: &SyncCtx<C>,
+    ctx: &mut C,
+    id: Id,
+    size: usize,
+) {
+    I::map_ip(
+        (IpInvariant((&mut sync_ctx, ctx, size)), id.into()),
+        |(IpInvariant((sync_ctx, ctx, size)), id)| {
+            TcpSocketHandler::set_send_buffer_size(sync_ctx, ctx, id, size)
+        },
+        |(IpInvariant((sync_ctx, ctx, size)), id)| {
+            TcpSocketHandler::set_send_buffer_size(sync_ctx, ctx, id, size)
+        },
+    )
+}
+
 /// Call this function whenever a socket can push out more data. That means either:
 ///
 /// - A retransmission timer fires.
@@ -1986,6 +2048,10 @@ mod tests {
     }
 
     impl SendBuffer for TestSendBuffer {
+        fn request_capacity(&mut self, size: usize) {
+            self.1.request_capacity(size)
+        }
+
         fn mark_read(&mut self, count: usize) {
             self.1.mark_read(count)
         }
@@ -2957,5 +3023,115 @@ mod tests {
                 assert_matches!(conn.state, State::Established(_));
             });
         });
+    }
+
+    #[ip_test]
+    fn set_send_buffer_size<I: Ip + TcpTestIpExt>() {
+        set_logger_for_test();
+        let mut net = new_test_net::<I>();
+
+        // TODO(https://fxbug.dev/110625): Enhance this test to read back and
+        // verify the values once we support getting the send buffer size for
+        // TCP sockets.
+        let mut local_send_size: usize = 2048;
+        let mut remote_send_size: usize = 1024;
+
+        let local_listener = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            let unbound = TcpSocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let bound = TcpSocketHandler::bind(
+                sync_ctx,
+                non_sync_ctx,
+                unbound,
+                *I::FAKE_CONFIG.local_ip,
+                Some(PORT_1),
+            )
+            .expect("bind should succeed");
+            TcpSocketHandler::set_send_buffer_size(sync_ctx, non_sync_ctx, bound, local_send_size);
+            TcpSocketHandler::listen(sync_ctx, non_sync_ctx, bound, NonZeroUsize::new(5).unwrap())
+        });
+
+        let remote_connection = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            let unbound = TcpSocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            TcpSocketHandler::set_send_buffer_size(
+                sync_ctx,
+                non_sync_ctx,
+                unbound,
+                remote_send_size,
+            );
+            TcpSocketHandler::connect_unbound(
+                sync_ctx,
+                non_sync_ctx,
+                unbound,
+                SocketAddr { ip: I::FAKE_CONFIG.local_ip, port: PORT_1 },
+                Default::default(),
+            )
+            .expect("connect should succeed")
+        });
+        let mut step_and_increment_send_sizes_until_idle =
+            |net: &mut TcpTestNetwork<I>, local: TcpSocketId<_>, remote: TcpSocketId<_>| loop {
+                local_send_size += 1;
+                remote_send_size += 1;
+                net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+                    TcpSocketHandler::set_send_buffer_size(
+                        sync_ctx,
+                        non_sync_ctx,
+                        local,
+                        local_send_size,
+                    )
+                });
+                net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+                    TcpSocketHandler::set_send_buffer_size(
+                        sync_ctx,
+                        non_sync_ctx,
+                        remote,
+                        remote_send_size,
+                    )
+                });
+                if net.step(handle_frame, handle_timer).is_idle() {
+                    break;
+                }
+            };
+
+        // Set the send buffer size at each stage of sockets on both ends of the
+        // handshake process just to make sure it doesn't break.
+        step_and_increment_send_sizes_until_idle(
+            &mut net,
+            local_listener.into(),
+            remote_connection.into(),
+        );
+
+        let local_connection = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            let (conn, _, _) = TcpSocketHandler::accept(sync_ctx, non_sync_ctx, local_listener)
+                .expect("received connection");
+            conn
+        });
+
+        step_and_increment_send_sizes_until_idle(
+            &mut net,
+            local_connection.into(),
+            remote_connection.into(),
+        );
+
+        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            TcpSocketHandler::shutdown_conn(sync_ctx, non_sync_ctx, local_connection)
+                .expect("is connected");
+        });
+
+        step_and_increment_send_sizes_until_idle(
+            &mut net,
+            local_connection.into(),
+            remote_connection.into(),
+        );
+
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            TcpSocketHandler::shutdown_conn(sync_ctx, non_sync_ctx, remote_connection)
+                .expect("is connected");
+        });
+
+        step_and_increment_send_sizes_until_idle(
+            &mut net,
+            local_connection.into(),
+            remote_connection.into(),
+        );
     }
 }
