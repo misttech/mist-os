@@ -248,8 +248,8 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
                                         ftest_manager::SuiteStatus::DidNotFinish => {
                                             Outcome::Inconclusive
                                         }
-                                        ftest_manager::SuiteStatus::TimedOut => Outcome::Timedout,
-                                        ftest_manager::SuiteStatus::Stopped => Outcome::Failed,
+                                        ftest_manager::SuiteStatus::TimedOut
+                                        | ftest_manager::SuiteStatus::Stopped => Outcome::Timedout,
                                         ftest_manager::SuiteStatus::InternalError => {
                                             Outcome::error(
                                                 UnexpectedEventError::InternalErrorSuiteStatus,
