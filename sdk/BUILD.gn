@@ -53,7 +53,11 @@ generated_file("all_fidl_sdk_json") {
 # to copy from the build directory into the source tree.
 generated_file("compatibility_testing_goldens") {
   testonly = true
-  deps = [ "//sdk" ]
+  deps = [
+    # Pulls in SDKs containing the FIDLs to generate golden files for
+    ":fuchsia_dart",
+    "//sdk",
+  ]
   outputs = [ "$root_build_dir/compatibility_testing_goldens.json" ]
   output_conversion = "json"
   data_keys = [ "compatibility_testing_goldens" ]

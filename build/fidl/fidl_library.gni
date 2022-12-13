@@ -11,11 +11,6 @@ import("//build/sdk/sdk_atom.gni")
 import("//build/testing/fidl_api_compatibility_test.gni")
 import("//build/testing/golden_files.gni")
 
-declare_args() {
-  # Whether to run API compatibility tests.
-  api_compatibility_testing = true
-}
-
 # Declares a bindings agnostic FIDL library. See //build/fidl/fidl.gni for the
 # full FIDL template which produces bindings. This template does the following:
 #
@@ -235,7 +230,7 @@ template("fidl_library") {
     api_levels = [ "$current_level" ]
 
     # Set api level to the next level if generate golden files tag is set to true.
-    if (include_next_api_level) {
+    if (defined(include_next_api_level) && include_next_api_level) {
       next_level = 1 + platform_version.in_development_api_level
       api_levels += [ "$next_level" ]
     }
@@ -279,7 +274,8 @@ template("fidl_library") {
           "fuchsia." + string_replace(library_name, "fuchsia.", "", 1)
       not_needed([ "in_fuchsia_namespace" ])
 
-      if (api_compatibility_testing && in_fuchsia_namespace) {
+      if (defined(api_compatibility_testing) && api_compatibility_testing &&
+          in_fuchsia_namespace) {
         test_target = "${target_name}_${level}_compatibility_test"
         fidl_api_compatibility_test(test_target) {
           forward_variables_from(invoker, [ "testonly" ])

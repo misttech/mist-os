@@ -10,7 +10,13 @@ platform_version = read_file("platform_version.json", "json")
 platform_version.head_fuchsia_api_level = 4294967295
 
 declare_args() {
+  # If true, build for N+1 api level, where N is platform_version.in_development_api_level
+  bump_api_level = false
+}
+
+declare_args() {
   # If true, generate golden files for next api level. This is used by
   # platform-version-roller when the API level is incremented.
-  include_next_api_level = false
+  include_next_api_level = bump_api_level
+  api_compatibility_testing = !bump_api_level
 }

@@ -16,17 +16,13 @@ import sys
 
 from pathlib import Path
 
-PLATFORM_VERSION_PATH = "build/config/fuchsia/platform_version.json"
-VERSION_HISTORY_PATH = "sdk/version_history.json"
-FIDL_COMPATIBILITY_DOC_PATH = "docs/development/testing/ctf/fidl_api_compatibility_testing.md"
 
-
-def update_platform_version(fuchsia_api_level):
+def update_platform_version(fuchsia_api_level, platform_version_path):
     """Updates platform_version.json to set the in_development_api_level to the given
     Fuchsia API level.
     """
     try:
-        with open(PLATFORM_VERSION_PATH, "r+") as f:
+        with open(platform_version_path, "r+") as f:
             platform_version = json.load(f)
             platform_version["in_development_api_level"] = fuchsia_api_level
             f.seek(0)
@@ -37,15 +33,15 @@ def update_platform_version(fuchsia_api_level):
         print(
             """error: Unable to open '{path}'.
 Did you run this script from the root of the source tree?""".format(
-                path=PLATFORM_VERSION_PATH),
+                path=platform_version_path),
             file=sys.stderr)
         return False
 
 
-def update_fidl_compatibility_doc(fuchsia_api_level):
+def update_fidl_compatibility_doc(fuchsia_api_level, fidl_compatiblity_doc_path):
     """Updates fidl_api_compatibility_testing.md given the in-development API level."""
     try:
-        with open(FIDL_COMPATIBILITY_DOC_PATH, "r+") as f:
+        with open(fidl_compatiblity_doc_path, "r+") as f:
             old_content = f.read()
             new_content = re.sub(
                 r"\{% set in_development_api_level = \d+ %\}",
@@ -59,7 +55,7 @@ def update_fidl_compatibility_doc(fuchsia_api_level):
         print(
             """error: Unable to open '{path}'.
 Did you run this script from the root of the source tree?""".format(
-                path=FIDL_COMPATIBILITY_DOC_PATH),
+                path=fidl_compatiblity_doc_path),
             file=sys.stderr)
         return False
 
@@ -72,14 +68,14 @@ def generate_random_abi_revision():
     return '0x{abi_revision}'.format(abi_revision=secrets.token_hex(8).upper())
 
 
-def update_version_history(fuchsia_api_level):
+def update_version_history(fuchsia_api_level, version_history_path):
     """Updates version_history.json to include the given Fuchsia API level.
 
     The ABI revision for this API level is set to a new random value that has not
     been used before.
     """
     try:
-        with open(VERSION_HISTORY_PATH, "r+") as f:
+        with open(version_history_path, "r+") as f:
             version_history = json.load(f)
             versions = version_history['data']['versions']
             if [version for version in versions
@@ -106,19 +102,19 @@ def update_version_history(fuchsia_api_level):
         print(
             """error: Unable to open '{path}'.
 Did you run this script from the root of the source tree?""".format(
-                path=VERSION_HISTORY_PATH),
+                path=version_history_path),
             file=sys.stderr)
         return False
 
 
-def move_owners_file(root_build_dir, fuchsia_api_level):
+def move_owners_file(root_source_dir, root_build_dir, fuchsia_api_level):
     """Helper function for copying golden files. It accomplishes the following:
     1. Overrides //sdk/history/OWNERS in //sdk/history/N/ allowing a wider set of reviewers.
     2. Reverts //sdk/history/N-1/  back to using //sdk/history/OWNERS, now that N-1 is a 
        supported API level.
 
     """
-    root = join_path("sdk", "history")
+    root = join_path(root_source_dir, "sdk", "history")
     src = join_path(root, str(fuchsia_api_level - 1), "OWNERS")
     dst = join_path(root, str(fuchsia_api_level))
 
@@ -169,21 +165,29 @@ def join_path(root_dir, *paths):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fuchsia-api-level", type=int, required=True)
+    parser.add_argument("--sdk-version-history", required=True)
+    parser.add_argument("--platform-version-json", required=True)
+    parser.add_argument("--goldens-manifest", required=True)
+    parser.add_argument("--fidl-compatibility-doc-path", required=True)
     parser.add_argument("--update-goldens", type=bool, default=False)
-    parser.add_argument("--root-build-dir", type=str, default="out/default")
+    parser.add_argument("--root-build-dir", default="out/default")
+    parser.add_argument("--root-source-dir")
+    parser.add_argument("--stamp-file")
+    parser.add_argument("--revert-on-error", action="store_true", default=False)
+
     args = parser.parse_args()
 
-    if not update_version_history(args.fuchsia_api_level):
+    if not update_version_history(args.fuchsia_api_level, args.sdk_version_history):
         return 1
 
-    if not update_platform_version(args.fuchsia_api_level):
+    if not update_platform_version(args.fuchsia_api_level, args.platform_version_json):
         return 1
 
-    if not update_fidl_compatibility_doc(args.fuchsia_api_level):
+    if not update_fidl_compatibility_doc(args.fuchsia_api_level, args.fidl_compatibility_doc_path):
         return 1
 
     if args.update_goldens:
-        if not move_owners_file(args.root_build_dir, args.fuchsia_api_level):
+        if not move_owners_file(args.root_source_dir, args.root_build_dir, args.fuchsia_api_level):
             return 1
         if not copy_compatibility_test_goldens(args.root_build_dir,
                                                args.fuchsia_api_level):

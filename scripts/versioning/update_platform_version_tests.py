@@ -9,6 +9,7 @@ import os
 import shutil
 import tempfile
 import unittest
+
 import update_platform_version
 
 FAKE_VERSION_HISTORY_FILE_CONTENT = """{
@@ -110,11 +111,13 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
         self.assertFalse(
             self._version_history_contains_entry_for_api_level(NEW_API_LEVEL))
         self.assertTrue(
-            update_platform_version.update_version_history(NEW_API_LEVEL))
+            update_platform_version.update_version_history(
+                NEW_API_LEVEL, update_platform_version.VERSION_HISTORY_PATH ))
         self.assertTrue(
             self._version_history_contains_entry_for_api_level(NEW_API_LEVEL))
         self.assertFalse(
-            update_platform_version.update_version_history(NEW_API_LEVEL))
+            update_platform_version.update_version_history(
+                NEW_API_LEVEL, update_platform_version.VERSION_HISTORY_PATH))
 
     def _get_platform_version(self):
         with open(self.fake_milestone_version_file) as f:
@@ -125,7 +128,8 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
         self.assertNotEqual(NEW_API_LEVEL, pv['in_development_api_level'])
 
         self.assertTrue(
-            update_platform_version.update_platform_version(NEW_API_LEVEL))
+            update_platform_version.update_platform_version(
+                NEW_API_LEVEL, update_platform_version.PLATFORM_VERSION_PATH ))
 
         pv = self._get_platform_version()
         self.assertEqual(NEW_API_LEVEL, pv['in_development_api_level'])
@@ -142,7 +146,7 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
 
         self.assertTrue(
             update_platform_version.update_fidl_compatibility_doc(
-                NEW_API_LEVEL))
+                NEW_API_LEVEL, update_platform_version.FIDL_COMPATIBILITY_DOC_PATH))
 
         with open(self.fake_fidl_compability_doc_file) as f:
             lines = f.readlines()
