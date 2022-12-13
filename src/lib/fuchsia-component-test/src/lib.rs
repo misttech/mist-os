@@ -2078,7 +2078,7 @@ impl ScopedInstance {
     ) -> Result<(), anyhow::Error> {
         self.exposed_dir
             .open(
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::OpenFlags::RIGHT_READABLE,
                 fio::MODE_TYPE_SERVICE,
                 protocol_name,
                 ServerEnd::new(server_end),

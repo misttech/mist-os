@@ -69,13 +69,7 @@ impl MockHandles {
             .namespace
             .get(&"/svc".to_string())
             .ok_or(format_err!("the mock's namespace doesn't have a /svc directory"))?;
-        let node_proxy = fuchsia_fs::open_node(
-            svc_dir_proxy,
-            Path::new(P::PROTOCOL_NAME),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_SERVICE,
-        )?;
-        Ok(P::Proxy::from_channel(node_proxy.into_channel().unwrap()))
+        fuchsia_component::client::connect_to_protocol_at::<P>(svc_dir_proxy)
     }
 
     /// Clones a directory from the mock's namespace.

@@ -5,8 +5,8 @@
 use {
     anyhow::{format_err, Error},
     fidl::endpoints::{
-        create_request_stream, ClientEnd, DiscoverableProtocolMarker, MemberOpener, Proxy,
-        ServerEnd, ServiceMarker, ServiceProxy,
+        create_request_stream, ClientEnd, DiscoverableProtocolMarker, MemberOpener, ServerEnd,
+        ServiceMarker, ServiceProxy,
     },
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_test as ftest,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -26,8 +26,13 @@ struct DirectoryProtocolImpl(fio::DirectoryProxy);
 
 impl MemberOpener for DirectoryProtocolImpl {
     fn open_member(&self, member: &str, server_end: zx::Channel) -> Result<(), fidl::Error> {
-        let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-        self.0.open(flags, fio::MODE_TYPE_SERVICE, member, ServerEnd::new(server_end))?;
+        let Self(directory) = self;
+        directory.open(
+            fio::OpenFlags::RIGHT_READABLE,
+            fio::MODE_TYPE_SERVICE,
+            member,
+            ServerEnd::new(server_end),
+        )?;
         Ok(())
     }
 }
@@ -98,17 +103,7 @@ impl LocalComponentHandles {
             .namespace
             .get(&"/svc".to_string())
             .ok_or(format_err!("the component's namespace doesn't have a /svc directory"))?;
-        let node_proxy = fuchsia_fs::open_node(
-            svc_dir_proxy,
-            Path::new(name),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_SERVICE,
-        )?;
-        Ok(P::Proxy::from_channel(
-            node_proxy
-                .into_channel()
-                .map_err(|_| format_err!("failed to convert proxy to handle"))?,
-        ))
+        fuchsia_component::client::connect_to_named_protocol_at_dir_root::<P>(svc_dir_proxy, name)
     }
 
     /// Opens a FIDL service as a directory, which holds instances of the service.
@@ -126,7 +121,7 @@ impl LocalComponentHandles {
         fuchsia_fs::open_directory(
             &svc_dir_proxy,
             &Path::new(name),
-            fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+            fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
     }
 
@@ -158,7 +153,7 @@ impl LocalComponentHandles {
         let directory_proxy = fuchsia_fs::open_directory(
             &service_dir,
             &Path::new(instance_name),
-            fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+            fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )?;
         Ok(S::Proxy::from_member_opener(Box::new(DirectoryProtocolImpl(directory_proxy))))
     }
@@ -396,7 +391,7 @@ mod tests {
     use {
         super::*,
         assert_matches::assert_matches,
-        fidl::endpoints::create_proxy,
+        fidl::endpoints::{create_proxy, Proxy as _},
         fuchsia_fs::directory::{readdir, DirEntry, DirentKind},
         fuchsia_zircon::AsHandleRef,
         futures::{channel::oneshot, future::pending, lock::Mutex},
