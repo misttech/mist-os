@@ -26,63 +26,71 @@ RendererCapturerCreator::RendererCapturerCreator(
 
 void RendererCapturerCreator::CreateRenderer(
     fidl::ServerEnd<fuchsia_media::AudioRenderer> server_end, RenderUsage usage,
-    std::optional<Format> format) {
-  WithNewGraphControlledClock([this, self = shared_from_this(), server_end = std::move(server_end),
-                               usage, format](auto clock, auto release_fence) mutable {
-    AudioRendererServer::Create(
-        fidl_thread_, std::move(server_end),
-        {
-            .graph_client = graph_client_,
-            .usage = usage,
-            .format = std::move(format),
-            .default_reference_clock = std::move(clock),
-            .ramp_on_play_pause = usage != RenderUsage::ULTRASOUND,
+    std::optional<Format> format, fit::callback<void(const zx::clock&)> notify_clock) {
+  WithNewGraphControlledClock(
+      [this, self = shared_from_this(), server_end = std::move(server_end), usage, format,
+       notify_clock = std::move(notify_clock)](auto clock, auto release_fence) mutable {
+        if (notify_clock) {
+          notify_clock(clock);
+        }
+        AudioRendererServer::Create(
+            fidl_thread_, std::move(server_end),
+            {
+                .graph_client = graph_client_,
+                .usage = usage,
+                .format = std::move(format),
+                .default_reference_clock = std::move(clock),
+                .ramp_on_play_pause = usage != RenderUsage::ULTRASOUND,
 
-            // Once the renderer is fully created, it can be routed.
-            .on_fully_created =
-                [route_graph = route_graph_](auto server) { route_graph->AddRenderer(server); },
+                // Once the renderer is fully created, it can be routed.
+                .on_fully_created =
+                    [route_graph = route_graph_](auto server) { route_graph->AddRenderer(server); },
 
-            // Once the renderer has shutdown, it can be unrouted (if it was previously routed).
-            // We hold the release fence until shutdown so the mixer continues to adjust `clock`
-            // until this renderer shuts down.
-            .on_shutdown =
-                [route_graph = route_graph_, fence = std::move(release_fence)](auto server) {
-                  if (server->IsFullyCreated()) {
-                    route_graph->RemoveRenderer(server);
-                  }
-                },
-        });
-  });
+                // Once the renderer has shutdown, it can be unrouted (if it was previously routed).
+                // We hold the release fence until shutdown so the mixer continues to adjust `clock`
+                // until this renderer shuts down.
+                .on_shutdown =
+                    [route_graph = route_graph_, fence = std::move(release_fence)](auto server) {
+                      if (server->IsFullyCreated()) {
+                        route_graph->RemoveRenderer(server);
+                      }
+                    },
+            });
+      });
 }
 
 void RendererCapturerCreator::CreateCapturer(
     fidl::ServerEnd<fuchsia_media::AudioCapturer> server_end, CaptureUsage usage,
-    std::optional<Format> format) {
-  WithNewGraphControlledClock([this, self = shared_from_this(), server_end = std::move(server_end),
-                               usage, format](auto clock, auto release_fence) mutable {
-    AudioCapturerServer::Create(
-        fidl_thread_, std::move(server_end),
-        {
-            .graph_client = graph_client_,
-            .usage = usage,
-            .format = std::move(format),
-            .default_reference_clock = std::move(clock),
+    std::optional<Format> format, fit::callback<void(const zx::clock&)> notify_clock) {
+  WithNewGraphControlledClock(
+      [this, self = shared_from_this(), server_end = std::move(server_end), usage, format,
+       notify_clock = std::move(notify_clock)](auto clock, auto release_fence) mutable {
+        if (notify_clock) {
+          notify_clock(clock);
+        }
+        AudioCapturerServer::Create(
+            fidl_thread_, std::move(server_end),
+            {
+                .graph_client = graph_client_,
+                .usage = usage,
+                .format = std::move(format),
+                .default_reference_clock = std::move(clock),
 
-            // Once the capturer is fully created, it can be routed.
-            .on_fully_created =
-                [route_graph = route_graph_](auto server) { route_graph->AddCapturer(server); },
+                // Once the capturer is fully created, it can be routed.
+                .on_fully_created =
+                    [route_graph = route_graph_](auto server) { route_graph->AddCapturer(server); },
 
-            // Once the capturer has shutdown, it can be unrouted (if it was previously routed).
-            // We hold the release fence until shutdown so the mixer continues to adjust `clock`
-            // until this renderer shuts down.
-            .on_shutdown =
-                [route_graph = route_graph_, fence = std::move(release_fence)](auto server) {
-                  if (server->IsFullyCreated()) {
-                    route_graph->RemoveCapturer(server);
-                  }
-                },
-        });
-  });
+                // Once the capturer has shutdown, it can be unrouted (if it was previously routed).
+                // We hold the release fence until shutdown so the mixer continues to adjust `clock`
+                // until this renderer shuts down.
+                .on_shutdown =
+                    [route_graph = route_graph_, fence = std::move(release_fence)](auto server) {
+                      if (server->IsFullyCreated()) {
+                        route_graph->RemoveCapturer(server);
+                      }
+                    },
+            });
+      });
 }
 
 void RendererCapturerCreator::WithNewGraphControlledClock(

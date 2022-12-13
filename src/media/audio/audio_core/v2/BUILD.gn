@@ -27,6 +27,8 @@ source_set("audio_core_lib") {
     "stream_sink_server.cc",
     "stream_sink_server.h",
     "task_barrier.h",
+    "ultrasound_factory_server.cc",
+    "ultrasound_factory_server.h",
     "usage_volume.cc",
     "usage_volume.h",
   ]
@@ -37,6 +39,7 @@ source_set("audio_core_lib") {
     "//sdk/fidl/fuchsia.media:fuchsia.media_cpp_wire",
     "//sdk/fidl/fuchsia.media2:fuchsia.media2_cpp_wire",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
+    "//sdk/fidl/fuchsia.ultrasound:fuchsia.ultrasound_cpp_wire",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",

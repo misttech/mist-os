@@ -33,7 +33,7 @@ void AudioServer::CreateAudioRenderer(CreateAudioRendererRequestView request,
   }
 
   creator_->CreateRenderer(std::move(request->audio_renderer_request), RenderUsage::MEDIA,
-                           /*format=*/std::nullopt);
+                           /*format=*/std::nullopt, /*notify_clock=*/nullptr);
 }
 
 void AudioServer::CreateAudioCapturer(CreateAudioCapturerRequestView request,
@@ -48,7 +48,7 @@ void AudioServer::CreateAudioCapturer(CreateAudioCapturerRequestView request,
 
   creator_->CreateCapturer(std::move(request->audio_capturer_request),
                            request->loopback ? CaptureUsage::LOOPBACK : CaptureUsage::FOREGROUND,
-                           /*format=*/std::nullopt);
+                           /*format=*/std::nullopt, /*notify_clock=*/nullptr);
 }
 
 }  // namespace media_audio

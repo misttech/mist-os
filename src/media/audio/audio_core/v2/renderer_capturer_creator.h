@@ -9,7 +9,7 @@
 #include <fidl/fuchsia.media/cpp/wire.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/fit/function.h>
-#include <lib/zx/vmo.h>
+#include <lib/zx/clock.h>
 
 #include <map>
 #include <memory>
@@ -32,10 +32,18 @@ class RendererCapturerCreator : public std::enable_shared_from_this<RendererCapt
       std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> graph_client,
       std::shared_ptr<RouteGraph> route_graph);
 
+  // Both of these methods follow the same pattern: they call CreateGraphControlledClock, then
+  // construct an Audio{Renderer,Capturer}Server using the given parameters, where the server's
+  // `default_reference_clock` is the newly-created graph-controlled clock. If the caller needs
+  // immediate access to this clock, they can supply a `notify_clock` callback.
+
   void CreateRenderer(fidl::ServerEnd<fuchsia_media::AudioRenderer> server_end,
-                      media::audio::RenderUsage usage, std::optional<Format> format);
+                      media::audio::RenderUsage usage, std::optional<Format> format,
+                      fit::callback<void(const zx::clock&)> notify_clock);
+
   void CreateCapturer(fidl::ServerEnd<fuchsia_media::AudioCapturer> server_end,
-                      media::audio::CaptureUsage usage, std::optional<Format> format);
+                      media::audio::CaptureUsage usage, std::optional<Format> format,
+                      fit::callback<void(const zx::clock&)> notify_clock);
 
  private:
   void WithNewGraphControlledClock(fit::callback<void(zx::clock, zx::eventpair)> fn);
