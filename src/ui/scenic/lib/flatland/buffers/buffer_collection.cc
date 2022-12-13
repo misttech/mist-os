@@ -9,6 +9,29 @@
 
 namespace flatland {
 
+BufferCollectionInfo::~BufferCollectionInfo() {
+  if (buffer_collection_ptr_) {
+    buffer_collection_ptr_->Close();
+  }
+}
+
+BufferCollectionInfo& BufferCollectionInfo::operator=(BufferCollectionInfo&& other) noexcept {
+  if (buffer_collection_ptr_) {
+    buffer_collection_ptr_->Close();
+  }
+  buffer_collection_ptr_ = std::move(other.buffer_collection_ptr_);
+  buffer_collection_info_ = std::move(other.buffer_collection_info_);
+  return *this;
+}
+
+BufferCollectionInfo::BufferCollectionInfo(BufferCollectionInfo&& other) noexcept {
+  if (buffer_collection_ptr_) {
+    buffer_collection_ptr_->Close();
+  }
+  buffer_collection_ptr_ = std::move(other.buffer_collection_ptr_);
+  buffer_collection_info_ = std::move(other.buffer_collection_info_);
+}
+
 fit::result<fit::failed, BufferCollectionInfo> BufferCollectionInfo::New(
     fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
     BufferCollectionHandle buffer_collection_token) {

@@ -17,15 +17,14 @@ bool NullRenderer::ImportBufferCollection(
   FX_DCHECK(collection_id != allocation::kInvalidId);
   FX_DCHECK(token.is_valid());
 
-  auto& map = usage == BufferCollectionUsage::kReadback ? readback_map_ : render_target_map_;
-
+  std::scoped_lock lock(lock_);
+  auto& map = GetBufferCollectionInfosFor(usage);
   if (map.find(collection_id) != map.end()) {
     FX_LOGS(ERROR) << "Duplicate GlobalBufferCollectionID: " << collection_id;
     return false;
   }
 
   auto result = BufferCollectionInfo::New(sysmem_allocator, std::move(token));
-
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Unable to register collection.";
     return false;
@@ -34,19 +33,17 @@ bool NullRenderer::ImportBufferCollection(
   // Multiple threads may be attempting to read/write from |map| so we
   // lock this function here.
   // TODO(fxbug.dev/44335): Convert this to a lock-free structure.
-  std::unique_lock<std::mutex> lock(lock_);
   map[collection_id] = std::move(result.value());
   return true;
 }
 
 void NullRenderer::ReleaseBufferCollection(allocation::GlobalBufferCollectionId collection_id,
                                            BufferCollectionUsage usage) {
-  auto& map = usage == BufferCollectionUsage::kReadback ? readback_map_ : render_target_map_;
-
   // Multiple threads may be attempting to read/write from the various maps,
   // lock this function here.
   // TODO(fxbug.dev/44335): Convert this to a lock-free structure.
-  std::unique_lock<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
+  auto& map = GetBufferCollectionInfosFor(usage);
 
   auto collection_itr = map.find(collection_id);
 
@@ -61,8 +58,6 @@ void NullRenderer::ReleaseBufferCollection(allocation::GlobalBufferCollectionId 
 
 bool NullRenderer::ImportBufferImage(const allocation::ImageMetadata& metadata,
                                      BufferCollectionUsage usage) {
-  std::unique_lock<std::mutex> lock(lock_);
-
   // The metadata can't have an invalid collection id.
   if (metadata.collection_id == allocation::kInvalidId) {
     FX_LOGS(WARNING) << "Image has invalid collection id.";
@@ -75,8 +70,11 @@ bool NullRenderer::ImportBufferImage(const allocation::ImageMetadata& metadata,
     return false;
   }
 
-  const auto& collection_itr = render_target_map_.find(metadata.collection_id);
-  if (collection_itr == render_target_map_.end()) {
+  std::scoped_lock lock(lock_);
+  auto& map = GetBufferCollectionInfosFor(usage);
+
+  const auto& collection_itr = map.find(metadata.collection_id);
+  if (collection_itr == map.end()) {
     FX_LOGS(ERROR) << "Collection with id " << metadata.collection_id << " does not exist.";
     return false;
   }
@@ -93,14 +91,14 @@ bool NullRenderer::ImportBufferImage(const allocation::ImageMetadata& metadata,
   auto image_constraints = sysmem_info.settings.image_format_constraints;
 
   if (metadata.vmo_index >= vmo_count) {
-    FX_LOGS(ERROR) << "CreateImage failed, vmo_index " << metadata.vmo_index
+    FX_LOGS(ERROR) << "ImportBufferImage failed, vmo_index " << metadata.vmo_index
                    << " must be less than vmo_count " << vmo_count;
     return false;
   }
 
   if (metadata.width < image_constraints.min_coded_width ||
       metadata.width > image_constraints.max_coded_width) {
-    FX_LOGS(ERROR) << "CreateImage failed, width " << metadata.width
+    FX_LOGS(ERROR) << "ImportBufferImage failed, width " << metadata.width
                    << " is not within valid range [" << image_constraints.min_coded_width << ","
                    << image_constraints.max_coded_width << "]";
     return false;
@@ -108,32 +106,22 @@ bool NullRenderer::ImportBufferImage(const allocation::ImageMetadata& metadata,
 
   if (metadata.height < image_constraints.min_coded_height ||
       metadata.height > image_constraints.max_coded_height) {
-    FX_LOGS(ERROR) << "CreateImage failed, height " << metadata.height
+    FX_LOGS(ERROR) << "ImportBufferImage failed, height " << metadata.height
                    << " is not within valid range [" << image_constraints.min_coded_height << ","
                    << image_constraints.max_coded_height << "]";
     return false;
   }
 
-  image_map_[metadata.identifier] = image_constraints;
-
-  const auto& readback_itr = readback_map_.find(metadata.collection_id);
-  if (readback_itr != readback_map_.end()) {
-    auto& readback_collection = readback_itr->second;
-    if (!readback_collection.BuffersAreAllocated()) {
-      FX_LOGS(ERROR) << "Buffers for readback collection " << metadata.collection_id
-                     << " have not been allocated.";
-      return false;
-    }
-    if (vmo_count != readback_collection.GetSysmemInfo().buffer_count) {
-      FX_LOGS(ERROR) << "Number of buffers for readback collection " << metadata.collection_id
-                     << " is different than render targets.";
-      return false;
-    }
+  if (usage == BufferCollectionUsage::kClientImage) {
+    image_map_[metadata.identifier] = image_constraints;
   }
   return true;
 }
 
-void NullRenderer::ReleaseBufferImage(allocation::GlobalImageId image_id) {}
+void NullRenderer::ReleaseBufferImage(allocation::GlobalImageId image_id) {
+  std::scoped_lock lock(lock_);
+  image_map_.erase(image_id);
+}
 
 void NullRenderer::SetColorConversionValues(const std::array<float, 9>& coefficients,
                                             const std::array<float, 3>& preoffsets,
@@ -146,16 +134,13 @@ void NullRenderer::Render(const allocation::ImageMetadata& render_target,
                           const std::vector<allocation::ImageMetadata>& images,
                           const std::vector<zx::event>& release_fences,
                           bool apply_color_conversion) {
+  std::scoped_lock lock(lock_);
   for (const auto& image : images) {
     auto image_id = image.identifier;
     FX_DCHECK(image_id != allocation::kInvalidId);
 
-    // TODO(fxbug.dev/44335): Convert this to a lock-free structure.
-    std::unique_lock<std::mutex> lock(lock_);
-
     const auto& image_map_itr_ = image_map_.find(image_id);
     FX_DCHECK(image_map_itr_ != image_map_.end());
-
     auto image_constraints = image_map_itr_->second;
 
     // Make sure the image conforms to the constraints of the collection.
@@ -185,6 +170,21 @@ bool NullRenderer::SupportsRenderInProtected() const { return false; }
 bool NullRenderer::RequiresRenderInProtected(
     const std::vector<allocation::ImageMetadata>& images) const {
   return false;
+}
+
+std::unordered_map<allocation::GlobalBufferCollectionId, BufferCollectionInfo>&
+NullRenderer::GetBufferCollectionInfosFor(BufferCollectionUsage usage) {
+  switch (usage) {
+    case BufferCollectionUsage::kRenderTarget:
+      return render_target_map_;
+    case BufferCollectionUsage::kReadback:
+      return readback_map_;
+    case BufferCollectionUsage::kClientImage:
+      return client_image_map_;
+    default:
+      FX_NOTREACHED();
+      return render_target_map_;
+  }
 }
 
 }  // namespace flatland

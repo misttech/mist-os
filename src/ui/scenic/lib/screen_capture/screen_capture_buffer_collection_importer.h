@@ -23,8 +23,7 @@ using BufferCount = uint32_t;
 class ScreenCaptureBufferCollectionImporter : public allocation::BufferCollectionImporter {
  public:
   ScreenCaptureBufferCollectionImporter(fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
-                                        std::shared_ptr<flatland::Renderer> renderer,
-                                        bool enable_copy_fallback);
+                                        std::shared_ptr<flatland::Renderer> renderer);
   ~ScreenCaptureBufferCollectionImporter() override;
 
   // |BufferCollectionImporter|
@@ -78,11 +77,6 @@ class ScreenCaptureBufferCollectionImporter : public allocation::BufferCollectio
 
   // Store all registered buffer collections.
   std::unordered_set<allocation::GlobalBufferCollectionId> buffer_collections_;
-
-  // Whether we should try to allocate a buffer for render target copy. This may be necessary for
-  // cases where host-visible render targets are unsupported, i.e. emulator.
-  // TODO(fxbug.dev/103678): Remove this once we establish prunable token based allocations.
-  bool enable_copy_fallback_;
 };
 
 }  // namespace screen_capture

@@ -8,6 +8,7 @@
 #include <mutex>
 #include <unordered_map>
 
+#include "src/lib/fxl/synchronization/thread_annotations.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/flatland/buffers/buffer_collection.h"
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
@@ -65,11 +66,20 @@ class NullRenderer final : public Renderer {
       const std::vector<allocation::ImageMetadata>& images) const override;
 
  private:
-  // This mutex is used to protect access to |collection_map_| and |image_map|.
-  std::mutex lock_;
-  std::unordered_map<allocation::GlobalBufferCollectionId, BufferCollectionInfo> render_target_map_;
-  std::unordered_map<allocation::GlobalBufferCollectionId, BufferCollectionInfo> readback_map_;
-  std::unordered_map<allocation::GlobalImageId, fuchsia::sysmem::ImageFormatConstraints> image_map_;
+  std::unordered_map<allocation::GlobalBufferCollectionId, BufferCollectionInfo>&
+  GetBufferCollectionInfosFor(BufferCollectionUsage usage) FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+
+  // This mutex protects access to class members that are accessed on main thread and the Flatland
+  // threads.
+  mutable std::mutex lock_;
+  std::unordered_map<allocation::GlobalBufferCollectionId, BufferCollectionInfo> client_image_map_
+      FXL_GUARDED_BY(lock_);
+  std::unordered_map<allocation::GlobalBufferCollectionId, BufferCollectionInfo> render_target_map_
+      FXL_GUARDED_BY(lock_);
+  std::unordered_map<allocation::GlobalBufferCollectionId, BufferCollectionInfo> readback_map_
+      FXL_GUARDED_BY(lock_);
+  std::unordered_map<allocation::GlobalImageId, fuchsia::sysmem::ImageFormatConstraints> image_map_
+      FXL_GUARDED_BY(lock_);
 };
 
 }  // namespace flatland

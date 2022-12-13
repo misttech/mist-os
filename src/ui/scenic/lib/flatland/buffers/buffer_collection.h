@@ -31,6 +31,11 @@ class BufferCollectionInfo {
   // Creates a non-initialized instance of this class. Fully initialized instances must
   // be created via a call to |New|.
   BufferCollectionInfo() = default;
+  ~BufferCollectionInfo();
+  BufferCollectionInfo& operator=(BufferCollectionInfo&& other) noexcept;
+  BufferCollectionInfo(BufferCollectionInfo&& other) noexcept;
+  BufferCollectionInfo(const BufferCollectionInfo& other) = delete;
+  BufferCollectionInfo& operator=(const BufferCollectionInfo& other) = delete;
 
   // This BufferCollectionInfo may not be allocated due to the fact that it may not necessarily
   // have all constraints set from every client with a token. This function will return false if

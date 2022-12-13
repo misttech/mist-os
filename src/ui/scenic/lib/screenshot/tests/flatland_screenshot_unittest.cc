@@ -33,8 +33,7 @@ class FlatlandScreenshotTest : public gtest::RealLoopFixture,
   void SetUp() override {
     renderer_ = std::make_shared<flatland::NullRenderer>();
     importer_ = std::make_shared<ScreenCaptureBufferCollectionImporter>(
-        utils::CreateSysmemAllocatorSyncPtr("ScreenshotTest"), renderer_,
-        /*enable_copy_fallback=*/false);
+        utils::CreateSysmemAllocatorSyncPtr("ScreenshotTest"), renderer_);
 
     std::vector<std::shared_ptr<BufferCollectionImporter>> screenshot_importers;
     screenshot_importers.push_back(importer_);

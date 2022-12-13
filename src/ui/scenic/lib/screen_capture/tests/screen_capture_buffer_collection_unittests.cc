@@ -12,8 +12,6 @@
 
 #include "../screen_capture.h"
 #include "../screen_capture_buffer_collection_importer.h"
-#include "fuchsia/sysmem/cpp/fidl.h"
-#include "src/ui/lib/escher/test/common/gtest_escher.h"
 #include "src/ui/lib/escher/test/common/gtest_vulkan.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
@@ -34,8 +32,7 @@ class ScreenCaptureBufferCollectionTest : public scenic_impl::gfx::test::VkSessi
     VkSessionTest::SetUp();
     renderer_ = std::make_shared<flatland::VkRenderer>(escher()->GetWeakPtr());
     importer_ = std::make_unique<ScreenCaptureBufferCollectionImporter>(
-        utils::CreateSysmemAllocatorSyncPtr("SCBCTest::Setup"), renderer_,
-        /*enable_copy_fallback=*/escher::test::GlobalEscherUsesVirtualGpu());
+        utils::CreateSysmemAllocatorSyncPtr("SCBCTest::Setup"), renderer_);
   }
 
   fuchsia::sysmem::BufferCollectionInfo_2 CreateBufferCollectionInfo2WithConstraints(

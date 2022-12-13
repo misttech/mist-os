@@ -50,8 +50,7 @@ class ScreenCapture2ManagerTest : public gtest::TestLoopFixture {
 
     renderer_ = std::make_shared<flatland::NullRenderer>();
     importer_ = std::make_unique<ScreenCaptureBufferCollectionImporter>(
-        utils::CreateSysmemAllocatorSyncPtr("ScreenCapture2ManagerTest-importer"), renderer_,
-        /*enable_copy_fallback=*/false);
+        utils::CreateSysmemAllocatorSyncPtr("ScreenCapture2ManagerTest-importer"), renderer_);
 
     manager_ = std::make_unique<ScreenCapture2Manager>(
         renderer_, importer_, std::bind(&ScreenCapture2ManagerTest::GetRenderables, this));

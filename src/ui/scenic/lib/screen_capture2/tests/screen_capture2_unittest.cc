@@ -46,8 +46,7 @@ class ScreenCapture2Test : public gtest::TestLoopFixture {
 
     renderer_ = std::make_shared<flatland::NullRenderer>();
     importer_ = std::make_shared<ScreenCaptureBufferCollectionImporter>(
-        utils::CreateSysmemAllocatorSyncPtr("ScreenCapture2Test-importer"), renderer_,
-        /*enable_copy_fallback=*/false);
+        utils::CreateSysmemAllocatorSyncPtr("ScreenCapture2Test-importer"), renderer_);
 
     renderables_ =
         std::make_pair<std::vector<ImageRect>, std::vector<allocation::ImageMetadata>>({}, {});
@@ -56,29 +55,24 @@ class ScreenCapture2Test : public gtest::TestLoopFixture {
   void SetUpMockImporter() {
     mock_renderer_ = std::make_shared<flatland::MockRenderer>();
     importer_ = std::make_shared<ScreenCaptureBufferCollectionImporter>(
-        utils::CreateSysmemAllocatorSyncPtr("ScreenCapture2Test-mock-importer"), mock_renderer_,
-        /*enable_copy_fallback=*/false);
+        utils::CreateSysmemAllocatorSyncPtr("ScreenCapture2Test-mock-importer"), mock_renderer_);
   }
 
   // Configures ScreenCapture with given args successfully.
   void SetUpScreenCapture(screen_capture2::ScreenCapture& sc, BufferCount buffer_count,
                           uint32_t image_width, uint32_t image_height, bool is_mock) {
-    flatland::BufferCollectionInfo buffer_info;
     if (is_mock) {
       EXPECT_CALL(*mock_renderer_.get(), ImportBufferCollection(_, _, _, _, _))
-          .WillRepeatedly([&buffer_info](
-                              allocation::GlobalBufferCollectionId collection_id,
-                              fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-                              fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
-                              allocation::BufferCollectionUsage,
-                              std::optional<fuchsia::math::SizeU> size) {
+          .WillRepeatedly([](allocation::GlobalBufferCollectionId collection_id,
+                             fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
+                             fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
+                             allocation::BufferCollectionUsage,
+                             std::optional<fuchsia::math::SizeU> size) {
             auto result = flatland::BufferCollectionInfo::New(sysmem_allocator, std::move(token));
-
             if (result.is_error()) {
               FX_LOGS(WARNING) << "Unable to register collection.";
               return false;
             }
-            buffer_info = std::move(result.value());
             return true;
           });
 
@@ -230,23 +224,19 @@ TEST_F(ScreenCapture2Test, ConfigureWithMissingArguments) {
 // and ensure ReleaseBufferImage gets called the correct number of times.
 TEST_F(ScreenCapture2Test, Configure_BufferCollectionFailure) {
   SetUpMockImporter();
-  flatland::BufferCollectionInfo buffer_info;
   EXPECT_CALL(*mock_renderer_.get(), ImportBufferCollection(_, _, _, _, _))
-      .WillRepeatedly(
-          [&buffer_info](allocation::GlobalBufferCollectionId collection_id,
+      .WillRepeatedly([](allocation::GlobalBufferCollectionId collection_id,
                          fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
                          fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
                          allocation::BufferCollectionUsage,
                          std::optional<fuchsia::math::SizeU> size) {
-            auto result = flatland::BufferCollectionInfo::New(sysmem_allocator, std::move(token));
-
-            if (result.is_error()) {
-              FX_LOGS(WARNING) << "Unable to register collection.";
-              return false;
-            }
-            buffer_info = std::move(result.value());
-            return true;
-          });
+        auto result = flatland::BufferCollectionInfo::New(sysmem_allocator, std::move(token));
+        if (result.is_error()) {
+          FX_LOGS(WARNING) << "Unable to register collection.";
+          return false;
+        };
+        return true;
+      });
 
   screen_capture2::ScreenCapture sc(importer_, nullptr,
                                     [this]() { return this->GetRenderables(); });
