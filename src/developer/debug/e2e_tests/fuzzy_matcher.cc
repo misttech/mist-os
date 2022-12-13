@@ -6,16 +6,16 @@
 
 #include <iostream>
 #include <string>
+#include <string_view>
+
+#include "src/lib/fxl/strings/split_string.h"
 
 namespace zxdb {
 
-bool FuzzyMatcher::MatchesLine(std::initializer_list<std::string_view> substrs) {
-  std::string content_for_debug;
+bool FuzzyMatcher::MatchesLine(const std::vector<std::string_view>& substrs) {
   while (content_) {
     std::string line;
     std::getline(content_, line);
-    content_for_debug += line + "\n";
-
     size_t pos = 0;
     for (auto& substr : substrs) {
       pos = line.find(substr, pos);
@@ -25,11 +25,12 @@ bool FuzzyMatcher::MatchesLine(std::initializer_list<std::string_view> substrs) 
     if (pos != std::string::npos)
       return true;
   }
-  std::cerr << "Cannot find pattern { ";
-  for (auto& substr : substrs)
-    std::cerr << "\"" << substr << "\" ";
-  std::cerr << "} in the following content:\n" << content_for_debug;
   return false;
+}
+
+bool FuzzyMatcher::MatchesLine(std::string_view pattern) {
+  return MatchesLine(
+      fxl::SplitString(pattern, "??", fxl::kKeepWhitespace, fxl::kSplitWantNonEmpty));
 }
 
 }  // namespace zxdb

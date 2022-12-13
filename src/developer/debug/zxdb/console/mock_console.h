@@ -10,6 +10,7 @@
 #include "src/developer/debug/zxdb/client/session.h"
 #include "src/developer/debug/zxdb/console/console.h"
 #include "src/developer/debug/zxdb/console/output_buffer.h"
+#include "src/lib/fxl/observer_list.h"
 
 namespace zxdb {
 
@@ -26,11 +27,17 @@ class MockConsole : public Console {
     OutputBuffer output;
   };
 
-  MockConsole(Session* session) : Console(session), session_(session) {}
-  virtual ~MockConsole() = default;
+  class OutputObserver {
+   public:
+    virtual void OnOuput(const OutputBuffer& output) {}
+  };
+
+  explicit MockConsole(Session* session) : Console(session), session_(session) {}
+  ~MockConsole() override = default;
 
   const OutputBuffer& output_buffer() { return output_buffer_; }
   Session* session() { return session_; }
+  fxl::ObserverList<OutputObserver>& output_observers() { return output_observers_; }
 
   // Returns true if there are any output events waiting to be read.
   bool HasOutputEvent() const { return !output_queue_.empty(); }
@@ -83,6 +90,8 @@ class MockConsole : public Console {
   bool waiting_for_output_ = false;
 
   line_input::ModalLineInput::ModalCompletionCallback last_modal_cb_;
+
+  fxl::ObserverList<OutputObserver> output_observers_;
 };
 
 }  // namespace zxdb

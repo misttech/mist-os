@@ -5,13 +5,17 @@
 #include "src/developer/debug/zxdb/common/host_util.h"
 
 #include <limits.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #if defined(__APPLE__)
+#include <crt_externs.h>
+
 #include <mach-o/dyld.h>
 #endif
 
 namespace zxdb {
+
 std::string GetSelfPath() {
   std::string result;
 #if defined(__APPLE__)
@@ -31,6 +35,16 @@ std::string GetSelfPath() {
 
   char fullpath[PATH_MAX];
   return std::string(realpath(result.c_str(), fullpath));
+}
+
+char** GetEnviron() {
+#if defined(__APPLE__)
+  return *_NSGetEnviron();
+#elif defined(__linux__)
+  return environ;
+#else
+#error Write this for your platform.
+#endif
 }
 
 }  // namespace zxdb

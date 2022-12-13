@@ -5,6 +5,7 @@
 #include "src/developer/debug/e2e_tests/ffx_debug_agent_bridge.h"
 
 #include <fcntl.h>
+#include <lib/syslog/cpp/macros.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -14,9 +15,8 @@
 #include <filesystem>
 #include <memory>
 
-#include "lib/syslog/cpp/macros.h"
-#include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/zxdb/common/err.h"
+#include "src/developer/debug/zxdb/common/host_util.h"
 
 namespace zxdb {
 
@@ -24,6 +24,8 @@ namespace {
 
 constexpr std::string_view kFuchsiaDeviceAddr = "FUCHSIA_DEVICE_ADDR";
 constexpr std::string_view kFuchsiaSshKey = "FUCHSIA_SSH_KEY";
+
+FfxDebugAgentBridge* global_instance = nullptr;
 
 Err KillProcessWithSignal(pid_t pid, int signal) {
   if (kill(pid, signal) != 0) {
@@ -75,17 +77,18 @@ std::vector<char*> GetFfxArgV() {
 // the file, but in infra, it's set to a relative path. This function expands the environment
 // variable to the full path to the ssh key file, if it exists. Other environment variables are
 // copied. The returned strings must be freed properly.
-std::vector<char*> GetFfxEnv(char** unix_env) {
+std::vector<char*> GetFfxEnv() {
+  char** env = GetEnviron();
   std::vector<char*> new_env = {};
 
   // Duplicate the strings in the parent environment for us to manage in the child process. The
   // ownership of these strings is kept by the class and they are deallocated when this object goes
   // out of scope.
-  for (size_t i = 0; unix_env[i] != nullptr; i++) {
+  for (size_t i = 0; env[i] != nullptr; i++) {
     // Do not duplicate |kFuchsiaSshKey| because we're going to modify it before putting it
     // back into place later.
-    if (strstr(unix_env[i], kFuchsiaSshKey.data()) == nullptr) {
-      new_env.push_back(strdup(unix_env[i]));
+    if (strstr(env[i], kFuchsiaSshKey.data()) == nullptr) {
+      new_env.push_back(strdup(env[i]));
     }
   }
 
@@ -104,17 +107,17 @@ std::vector<char*> GetFfxEnv(char** unix_env) {
 }  // namespace
 
 Err FfxDebugAgentBridge::Init() {
-  Err e = SetupPipeAndFork(unix_env_);
+  Err e = SetupPipeAndFork();
   if (e.has_error()) {
     return e;
   }
 
-  e = ReadDebugAgentSocketPath();
-  if (e.has_error()) {
-    return e;
-  }
+  return ReadDebugAgentSocketPath();
+}
 
-  return e;
+FfxDebugAgentBridge::FfxDebugAgentBridge() {
+  FX_CHECK(!global_instance);
+  global_instance = this;
 }
 
 FfxDebugAgentBridge::~FfxDebugAgentBridge() {
@@ -130,9 +133,14 @@ FfxDebugAgentBridge::~FfxDebugAgentBridge() {
       FX_LOGS(ERROR) << "Error encountered while cleaning up child: " << e.msg();
     }
   }
+
+  FX_CHECK(global_instance == this);
+  global_instance = nullptr;
 }
 
-Err FfxDebugAgentBridge::SetupPipeAndFork(char** unix_env) {
+FfxDebugAgentBridge* FfxDebugAgentBridge::Get() { return global_instance; }
+
+Err FfxDebugAgentBridge::SetupPipeAndFork() {
   int p[2];
 
   if (pipe(p) < 0) {
@@ -157,7 +165,7 @@ Err FfxDebugAgentBridge::SetupPipeAndFork(char** unix_env) {
   if (child_pid == 0) {
     close(pipe_read_end_);
 
-    const std::filesystem::path me(program_name_);
+    const std::filesystem::path me(GetSelfPath());
 
     // In variant builds that put the test executable in a different directory (potentially
     // something like out/default/host_x64-asan/...), ffx could be in a different directory than the
@@ -177,7 +185,7 @@ Err FfxDebugAgentBridge::SetupPipeAndFork(char** unix_env) {
       exit(EXIT_FAILURE);
     }
 
-    std::vector<char*> env = GetFfxEnv(unix_env);
+    std::vector<char*> env = GetFfxEnv();
     execve(ffx_path.c_str(), GetFfxArgV().data(), env.data());
 
     FX_NOTREACHED();

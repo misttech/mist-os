@@ -20,6 +20,9 @@ void MockConsole::Output(const OutputBuffer& output) {
     waiting_for_output_ = false;
     debug::MessageLoop::Current()->QuitNow();
   }
+  for (auto& observer : output_observers_) {
+    observer.OnOuput(output);
+  }
 }
 
 void MockConsole::Clear() {

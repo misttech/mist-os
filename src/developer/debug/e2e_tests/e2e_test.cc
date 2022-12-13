@@ -6,7 +6,7 @@
 
 #include <filesystem>
 
-#include "src/developer/debug/e2e_tests/main_e2e_test.h"
+#include "src/developer/debug/e2e_tests/ffx_debug_agent_bridge.h"
 #include "src/developer/debug/zxdb/client/setting_schema_definition.h"
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/common/host_util.h"
@@ -33,6 +33,7 @@ E2eTest::E2eTest() {
   console_ = std::make_unique<MockConsole>(session_.get());
   console_->Init();
 
+  FfxDebugAgentBridge* bridge = FfxDebugAgentBridge::Get();
   FX_CHECK(bridge) << "debug_agent bridge failed to initialize.";
   socket_path_ = bridge->GetDebugAgentSocketPath();
 

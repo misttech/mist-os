@@ -27,8 +27,7 @@ namespace zxdb {
 //      the ffx command to clean up the DebugAgent socket and files.
 class FfxDebugAgentBridge {
  public:
-  FfxDebugAgentBridge(char* prog_name, char** unix_env)
-      : program_name_(prog_name), unix_env_(unix_env) {}
+  FfxDebugAgentBridge();
   ~FfxDebugAgentBridge();
 
   // It is expected that this method is called once per test executable, and that many test cases
@@ -41,13 +40,16 @@ class FfxDebugAgentBridge {
 
   std::string_view GetDebugAgentSocketPath() const { return socket_path_; }
 
+  // Get the global instance or nullptr.
+  static FfxDebugAgentBridge* Get();
+
  private:
   // Fork the child process with the pipe file descriptors configured to send
   // the STDOUT of child to the write end of the pipe and the parent to wait
   // for the read end of the pipe.
   //
   // Returns an Err containing the stringified errno value on failure.
-  Err SetupPipeAndFork(char** unix_env);
+  Err SetupPipeAndFork();
 
   // Reads the path to the UNIX socket created by the ffx sub-process from
   // |pipe_read_end_|.
@@ -65,10 +67,7 @@ class FfxDebugAgentBridge {
   int pipe_write_end_ = 0;
   int child_pid_ = 0;
 
-  std::string program_name_;
   std::string socket_path_;
-
-  char** unix_env_;
 
   FXL_DISALLOW_COPY_AND_ASSIGN(FfxDebugAgentBridge);
 };

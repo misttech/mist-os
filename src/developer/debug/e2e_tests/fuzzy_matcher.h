@@ -8,6 +8,7 @@
 #include <initializer_list>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace zxdb {
 
@@ -18,7 +19,10 @@ class FuzzyMatcher {
 
   // The content should contain a line that matches the given substrings.
   // Note that this method will consume the content, so a subsequent call may return differently.
-  bool MatchesLine(std::initializer_list<std::string_view> substrs);
+  bool MatchesLine(const std::vector<std::string_view>& substrs);
+
+  // This variant takes a pattern string, which contains "??" that can match everything.
+  bool MatchesLine(std::string_view pattern);
 
  private:
   std::stringstream content_;
