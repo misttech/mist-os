@@ -162,6 +162,12 @@ template("product_bundle") {
       "${files.outdir}/repository",
     ]
 
+    # The target below is generated as a part of the `ffx_tool` action at
+    # `//src/developer/ffx/plugins/product:ffx_product_tool`. See there
+    # for more information.
+    ffx_tool = "//src/developer/ffx/plugins/product:ffx_product_tool_versioned"
+    ffx_tool_output_name = "ffx-product"
+
     args = [
       "--config",
       "product.experimental=true",
