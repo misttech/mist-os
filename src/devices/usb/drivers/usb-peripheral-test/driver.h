@@ -22,7 +22,7 @@ static constexpr size_t INTR_COUNT = 8;
 static constexpr size_t BULK_MAX_PACKET = 512;  // FIXME(voydanoff) USB 3.0 support.
 // FIXME(voydanoff) Increase this when DCI drivers support
 // non-contiguous DMA buffers.
-static constexpr size_t BULK_REQ_SIZE = 4096;
+static constexpr size_t BULK_REQ_SIZE = 512;
 static constexpr size_t INTR_REQ_SIZE = 1024;
 static constexpr size_t INTR_MAX_PACKET = 64;
 
