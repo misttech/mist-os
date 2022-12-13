@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <fuchsia/hardware/bluetooth/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/ddk/driver.h>
@@ -19,8 +20,8 @@
 #include "lib/fit/defer.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/controllers/fidl_controller.h"
 #include "src/connectivity/bluetooth/core/bt-host/hci-spec/protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/device_wrapper.h"
 #include "src/connectivity/bluetooth/core/bt-host/transport/transport.h"
 #include "src/connectivity/bluetooth/tools/lib/command_dispatcher.h"
 #include "src/lib/fxl/command_line.h"
@@ -73,12 +74,14 @@ int main(int argc, char* argv[]) {
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  auto dev_wrapper = std::make_unique<::bt::hci::FidlDeviceWrapper>(std::move(local));
-  std::unique_ptr<::bt::hci::HciWrapper> hci_wrapper =
-      ::bt::hci::HciWrapper::Create(std::move(dev_wrapper), loop.dispatcher());
+  fuchsia::hardware::bluetooth::HciHandle hci_handle(std::move(local));
+  auto controller =
+      std::make_unique<bt::controllers::FidlController>(std::move(hci_handle), loop.dispatcher());
 
-  auto transport = ::bt::hci::Transport::Create(std::move(hci_wrapper));
-  if (!transport) {
+  auto transport = std::make_unique<bt::hci::Transport>(std::move(controller));
+  bool init_success = false;
+  transport->Initialize([&init_success](bool success) { init_success = success; });
+  if (!init_success) {
     return EXIT_FAILURE;
   }
 

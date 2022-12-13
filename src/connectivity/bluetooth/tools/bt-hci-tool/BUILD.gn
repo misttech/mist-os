@@ -15,8 +15,10 @@ executable("bin") {
 
   deps = [
     "../lib",
+    "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_hlcpp",
     "//sdk/lib/fdio",
     "//src/connectivity/bluetooth/core/bt-host/common",
+    "//src/connectivity/bluetooth/core/bt-host/controllers:fidl_controller",
     "//src/connectivity/bluetooth/core/bt-host/gap",
     "//src/connectivity/bluetooth/core/bt-host/hci",
     "//src/connectivity/bluetooth/core/bt-host/hci-spec",

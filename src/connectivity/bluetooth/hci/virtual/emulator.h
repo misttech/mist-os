@@ -6,6 +6,7 @@
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_VIRTUAL_EMULATOR_H_
 
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
+#include <fuchsia/hardware/bluetooth/c/fidl.h>
 #include <fuchsia/hardware/bt/hci/cpp/banjo.h>
 #include <fuchsia/hardware/test/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -87,8 +88,8 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator {
   void CloseCommandChannel();
   void CloseAclDataChannel();
 
-  void SendEvent(std::unique_ptr<bt::hci::EventPacket> event);
-  void SendAclPacket(std::unique_ptr<bt::hci::ACLDataPacket> packet);
+  void SendEvent(pw::span<const std::byte> buffer);
+  void SendAclPacket(pw::span<const std::byte> buffer);
 
   // Read and handle packets received over the channels.
   void HandleCommandPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,

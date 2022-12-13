@@ -143,10 +143,17 @@ zx_status_t EmulatorDevice::Bind(std::string_view name) {
     return status;
   }
 
-  fake_device_.set_error_callback([this](zx_status_t status) {
-    logf(WARNING, "FakeController error: %s", zx_status_get_string(status));
+  auto init_complete_cb = [](pw::Status status) {
+    if (!status.ok()) {
+    }
+  };
+  auto error_cb = [this](pw::Status status) {
+    logf(WARNING, "FakeController error: %s", pw_StatusString(status));
     UnpublishHci();
-  });
+  };
+
+  fake_device_.Initialize(init_complete_cb, error_cb);
+
   fake_device_.set_controller_parameters_callback(
       fit::bind_member<&EmulatorDevice::OnControllerParametersChanged>(this));
   fake_device_.set_advertising_state_callback(
@@ -252,10 +259,6 @@ zx_status_t EmulatorDevice::OpenChan(Channel chan_type, zx_handle_t in_h) {
   } else if (chan_type == Channel::ACL) {
     async::PostTask(loop_.dispatcher(),
                     [this, in = std::move(in)]() mutable { StartAclChannel(std::move(in)); });
-  } else if (chan_type == Channel::SNOOP) {
-    async::PostTask(loop_.dispatcher(), [this, in = std::move(in)]() mutable {
-      fake_device_.StartSnoopChannel(std::move(in));
-    });
   } else if (chan_type == Channel::EMULATOR) {
     async::PostTask(loop_.dispatcher(), [this, in = std::move(in)]() mutable {
       StartEmulatorInterface(std::move(in));
@@ -455,7 +458,7 @@ bool EmulatorDevice::StartCmdChannel(zx::channel chan) {
     return false;
   }
 
-  fake_device_.StartCmdChannel(fit::bind_member<&EmulatorDevice::SendEvent>(this));
+  fake_device_.SetEventFunction(fit::bind_member<&EmulatorDevice::SendEvent>(this));
 
   cmd_channel_ = std::move(chan);
   cmd_channel_wait_.set_object(cmd_channel_.get());
@@ -477,7 +480,7 @@ bool EmulatorDevice::StartAclChannel(zx::channel chan) {
   }
 
   // Enable FakeController to send packets to bt-host.
-  fake_device_.StartAclChannel(fit::bind_member<&EmulatorDevice::SendAclPacket>(this));
+  fake_device_.SetReceiveAclFunction(fit::bind_member<&EmulatorDevice::SendAclPacket>(this));
 
   // Enable bt-host to send packets to FakeController.
   acl_channel_ = std::move(chan);
@@ -508,19 +511,17 @@ void EmulatorDevice::CloseAclDataChannel() {
   fake_device_.Stop();
 }
 
-void EmulatorDevice::SendEvent(std::unique_ptr<bt::hci::EventPacket> event) {
-  zx_status_t status =
-      cmd_channel_.write(/*flags=*/0, event->view().data().data(), event->view().size(),
-                         /*handles=*/nullptr, /*num_handles=*/0);
+void EmulatorDevice::SendEvent(pw::span<const std::byte> buffer) {
+  zx_status_t status = cmd_channel_.write(/*flags=*/0, buffer.data(), buffer.size(),
+                                          /*handles=*/nullptr, /*num_handles=*/0);
   if (status != ZX_OK) {
     logf(WARNING, "failed to write event");
   }
 }
 
-void EmulatorDevice::SendAclPacket(std::unique_ptr<bt::hci::ACLDataPacket> packet) {
-  zx_status_t status =
-      acl_channel_.write(/*flags=*/0, packet->view().data().data(), packet->view().size(),
-                         /*handles=*/nullptr, /*num_handles=*/0);
+void EmulatorDevice::SendAclPacket(pw::span<const std::byte> buffer) {
+  zx_status_t status = acl_channel_.write(/*flags=*/0, buffer.data(), buffer.size(),
+                                          /*handles=*/nullptr, /*num_handles=*/0);
   if (status != ZX_OK) {
     logf(WARNING, "failed to write ACL packet");
   }
@@ -530,11 +531,14 @@ void EmulatorDevice::SendAclPacket(std::unique_ptr<bt::hci::ACLDataPacket> packe
 void EmulatorDevice::HandleCommandPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
                                          zx_status_t wait_status,
                                          const zx_packet_signal_t* signal) {
-  bt::StaticByteBuffer<bt::hci_spec::kMaxCommandPacketPayloadSize> buffer;
+  std::array<std::byte,
+             bt::hci_spec::kMaxCommandPacketPayloadSize + sizeof(bt::hci_spec::CommandHeader)>
+      buffer;
+
   uint32_t read_size;
-  zx_status_t status = cmd_channel_.read(0u, buffer.mutable_data(), /*handles=*/nullptr,
-                                         bt::hci_spec::kMaxCommandPacketPayloadSize, 0, &read_size,
-                                         /*actual_handles=*/nullptr);
+  zx_status_t status =
+      cmd_channel_.read(0u, buffer.data(), /*handles=*/nullptr, buffer.size(), 0, &read_size,
+                        /*actual_handles=*/nullptr);
   ZX_DEBUG_ASSERT(status == ZX_OK || status == ZX_ERR_PEER_CLOSED);
   if (status < 0) {
     if (status == ZX_ERR_PEER_CLOSED) {
@@ -546,22 +550,7 @@ void EmulatorDevice::HandleCommandPacket(async_dispatcher_t* dispatcher, async::
     return;
   }
 
-  if (read_size < sizeof(bt::hci_spec::CommandHeader)) {
-    logf(ERROR, "malformed command packet received");
-  } else {
-    bt::MutableBufferView view(buffer.mutable_data(), read_size);
-    bt::PacketView<bt::hci_spec::CommandHeader> packet_view(
-        &view, read_size - sizeof(bt::hci_spec::CommandHeader));
-
-    std::unique_ptr<bt::hci::CommandPacket> packet =
-        bt::hci::CommandPacket::New(packet_view.header().opcode, packet_view.payload_size());
-    bt::MutableBufferView dest = packet->mutable_view()->mutable_data();
-    view.Copy(&dest);
-
-    fake_device_.SendSnoopChannelPacket(packet_view.data(), BT_HCI_SNOOP_TYPE_CMD,
-                                        /*is_received=*/false);
-    fake_device_.HandleCommandPacket(std::move(packet));
-  }
+  fake_device_.SendCommand(buffer);
 
   status = wait->Begin(dispatcher);
   if (status != ZX_OK) {
@@ -572,11 +561,11 @@ void EmulatorDevice::HandleCommandPacket(async_dispatcher_t* dispatcher, async::
 
 void EmulatorDevice::HandleAclPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
                                      zx_status_t wait_status, const zx_packet_signal_t* signal) {
-  bt::StaticByteBuffer<bt::hci_spec::kMaxACLPayloadSize + sizeof(bt::hci_spec::ACLDataHeader)>
+  std::array<std::byte, bt::hci_spec::kMaxACLPayloadSize + sizeof(bt::hci_spec::ACLDataHeader)>
       buffer;
   uint32_t read_size;
-  zx_status_t status = acl_channel_.read(0u, buffer.mutable_data(), /*handles=*/nullptr,
-                                         buffer.size(), 0, &read_size, /*actual_handles=*/nullptr);
+  zx_status_t status = acl_channel_.read(0u, buffer.data(), /*handles=*/nullptr, buffer.size(), 0,
+                                         &read_size, /*actual_handles=*/nullptr);
   ZX_DEBUG_ASSERT(status == ZX_OK || status == ZX_ERR_PEER_CLOSED);
   if (status < 0) {
     if (status == ZX_ERR_PEER_CLOSED) {
@@ -592,17 +581,7 @@ void EmulatorDevice::HandleAclPacket(async_dispatcher_t* dispatcher, async::Wait
   if (read_size < sizeof(bt::hci_spec::ACLDataHeader)) {
     logf(ERROR, "malformed ACL packet received");
   } else {
-    bt::BufferView view(buffer.data(), read_size);
-
-    fake_device_.SendSnoopChannelPacket(view, BT_HCI_SNOOP_TYPE_ACL, /*is_received=*/false);
-
-    bt::hci::ACLDataPacketPtr packet = bt::hci::ACLDataPacket::New(
-        /*payload_size=*/read_size - sizeof(bt::hci_spec::ACLDataHeader));
-    bt::MutableBufferView dest = packet->mutable_view()->mutable_data();
-    view.Copy(&dest);
-    packet->InitializeFromBuffer();
-
-    fake_device_.HandleACLPacket(std::move(packet));
+    fake_device_.SendAclData(buffer);
   }
 
   status = wait->Begin(dispatcher);

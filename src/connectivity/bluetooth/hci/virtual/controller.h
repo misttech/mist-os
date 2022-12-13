@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
 #include <lib/ddk/driver.h>
+#include <zircon/types.h>
 
 #include <ddktl/device.h>
 #include <fbl/string_buffer.h>
@@ -35,7 +36,7 @@ class VirtualController : public VirtualControllerDeviceType {
  private:
   // FIDL Interface VirtualController.
   void CreateEmulator(CreateEmulatorCompleter::Sync& completer) override {
-    fbl::StringBuffer<zx_MAX_NAME_LEN> name;
+    fbl::StringBuffer<ZX_MAX_NAME_LEN> name;
     name.AppendPrintf("emulator-%u", num_devices_++);
     auto dev = std::make_unique<bt_hci_virtual::EmulatorDevice>(zxdev());
     zx_status_t status = dev->Bind(std::string_view(name));
@@ -52,7 +53,7 @@ class VirtualController : public VirtualControllerDeviceType {
   void CreateLoopbackDevice(CreateLoopbackDeviceRequestView request,
                             CreateLoopbackDeviceCompleter::Sync& completer) override {
     // chain new looback device off this device.
-    fbl::StringBuffer<zx_MAX_NAME_LEN> name;
+    fbl::StringBuffer<ZX_MAX_NAME_LEN> name;
     name.AppendPrintf("bt-transport-loopback-%u", num_devices_++);
     auto dev = std::make_unique<bt_hci_virtual::LoopbackDevice>(zxdev(), nullptr);
     auto channel = request->channel.release();

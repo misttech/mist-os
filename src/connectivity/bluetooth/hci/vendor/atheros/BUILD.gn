@@ -30,6 +30,7 @@ fuchsia_driver("fuchsia_driver") {
 
   deps = [
     ":bt_hci_atheros_bind",
+    "//sdk/banjo/fuchsia.hardware.bt.hci:fuchsia.hardware.bt.hci_banjo_c",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_c",
     "//sdk/lib/syslog/cpp:backend",
