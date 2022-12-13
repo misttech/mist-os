@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/intel-i915-tgl/gmbus-gpio.h"
+#include "src/graphics/display/drivers/intel-i915-tgl/i2c/gmbus-gpio.h"
 
 #include <gtest/gtest.h>
 

@@ -28,6 +28,7 @@
 #include "src/graphics/display/drivers/intel-i915-tgl/dpll.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/gtt.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/hdmi-display.h"
+#include "src/graphics/display/drivers/intel-i915-tgl/i2c/gmbus-i2c.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/igd.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/interrupts.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/pipe-manager.h"

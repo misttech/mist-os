@@ -13,7 +13,7 @@
 
 #include <hwreg/bitfields.h>
 
-#include "src/graphics/display/drivers/intel-i915-tgl/gmbus-gpio.h"
+#include "src/graphics/display/drivers/intel-i915-tgl/i2c/gmbus-gpio.h"
 
 namespace tgl_registers {
 
