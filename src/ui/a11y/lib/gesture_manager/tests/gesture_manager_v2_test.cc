@@ -39,11 +39,12 @@ using fuchsia::ui::pointer::augment::TouchEventWithLocalHit;
 using fuchsia::ui::pointer::augment::TouchSourceWithLocalHit;
 using fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr;
 
-TouchEventWithLocalHit fake_touch_event(EventPhase phase, uint32_t interaction_id = 0) {
+TouchEventWithLocalHit fake_touch_event(EventPhase phase, uint32_t interaction_id = 0,
+                                        std::array<float, 2> position_in_viewport = {0, 0}) {
   TouchPointerSample sample;
   sample.set_interaction({0, 0, interaction_id});
   sample.set_phase(phase);
-  sample.set_position_in_viewport({0, 0});
+  sample.set_position_in_viewport(position_in_viewport);
 
   TouchEvent inner;
   inner.set_timestamp(0);
@@ -137,9 +138,18 @@ class FakeGestureArena : public GestureArenaV2 {
   ConsumptionStatus OnEvent(
       const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) override {
     FX_CHECK(!future_statuses_.empty());
+
+    fuchsia::ui::pointer::augment::TouchEventWithLocalHit clone;
+    event.Clone(&clone);
+    events_received_.emplace_back(std::move(clone));
+
     auto status = future_statuses_.front();
     future_statuses_.pop_front();
     return status;
+  }
+
+  const std::vector<fuchsia::ui::pointer::augment::TouchEventWithLocalHit>& EventsReceived() {
+    return events_received_;
   }
 
   void InvokeCallback(fuchsia::ui::pointer::TouchInteractionId interaction, uint64_t trace_flow_id,
@@ -156,6 +166,8 @@ class FakeGestureArena : public GestureArenaV2 {
   a11y::InteractionTracker::HeldInteractionCallback callback_;
 
   std::deque<ConsumptionStatus> future_statuses_;
+
+  std::vector<fuchsia::ui::pointer::augment::TouchEventWithLocalHit> events_received_;
 };
 
 class GestureManagerV2Test : public gtest::TestLoopFixture {
@@ -346,6 +358,29 @@ TEST_F(GestureManagerV2Test, SimulateTwoFingerDoubleTap) {
   EXPECT_EQ(updated_responses[1].second.response_type(), TouchResponseType::YES_PRIORITIZE);
   EXPECT_TRUE(interaction_equals(updated_responses[2].first, fourth_interaction));
   EXPECT_EQ(updated_responses[2].second.response_type(), TouchResponseType::YES_PRIORITIZE);
+}
+
+// Check that events are converted to "NDC" coordinates before being sent to the
+// a11y gesture arena.
+TEST_F(GestureManagerV2Test, ConvertEventsToNdc) {
+  RunLoopUntilIdle();
+
+  std::vector<TouchEventWithLocalHit> view_parameters;
+  view_parameters.emplace_back(fake_view_parameters());
+  fake_touch_source_->SimulateEvents(std::move(view_parameters));
+  RunLoopUntilIdle();
+
+  std::vector<TouchEventWithLocalHit> sent;
+  sent.emplace_back(fake_touch_event(EventPhase::ADD, 0, {0.4f, 0.9f}));
+  fake_arena_ptr_->SetFutureStatuses({ConsumptionStatus::kUndecided});
+  fake_touch_source_->SimulateEvents(std::move(sent));
+  RunLoopUntilIdle();
+
+  const std::vector<TouchEventWithLocalHit>& received = fake_arena_ptr_->EventsReceived();
+  EXPECT_EQ(received.size(), 1u);
+  const auto p = received[0].touch_event.pointer_sample().position_in_viewport();
+  EXPECT_NEAR(p[0], -0.2, 0.001);
+  EXPECT_NEAR(p[1], 0.8, 0.001);
 }
 
 }  // namespace

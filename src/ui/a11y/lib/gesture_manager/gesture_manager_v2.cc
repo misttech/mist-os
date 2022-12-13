@@ -18,10 +18,58 @@ namespace a11y {
 namespace {
 
 using fuchsia::ui::pointer::EventPhase;
+using fuchsia::ui::pointer::Rectangle;
 using fuchsia::ui::pointer::TouchResponse;
 using fuchsia::ui::pointer::TouchResponseType;
 using fuchsia::ui::pointer::augment::TouchEventWithLocalHit;
 using fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr;
+
+// Helper for `normalizeToNdc`.
+//
+// Normalize `p` to be in the square [0, 1] * [0, 1].
+//
+// Returns std::nullopt if p is not contained in bounds.
+std::optional<std::array<float, 2>> normalizeToUnitSquare(std::array<float, 2> p,
+                                                          Rectangle bounds) {
+  const float x = p[0];
+  const float y = p[1];
+  const float x_min = bounds.min[0];
+  const float y_min = bounds.min[1];
+  const float x_max = bounds.max[0];
+  const float y_max = bounds.max[1];
+
+  const bool in_bounds = (x_min <= x && x <= x_max) && (y_min <= y && y <= y_max);
+  if (!in_bounds) {
+    return std::nullopt;
+  }
+
+  const float width = x_max - x_min;
+  const float height = y_max - y_min;
+  const float dx = x - x_min;
+  const float dy = y - y_min;
+
+  return {{
+      width > 0 ? dx / width : 0,
+      height > 0 ? dy / height : 0,
+  }};
+}
+
+// Normalize `p` to be in the square [-1, 1] * [-1, 1].
+//
+// Returns std::nullopt if p is not contained in bounds.
+std::optional<std::array<float, 2>> normalizeToNdc(std::array<float, 2> p, Rectangle bounds) {
+  auto normalized = normalizeToUnitSquare(p, bounds);
+  if (!normalized) {
+    return std::nullopt;
+  }
+
+  const float x = (*normalized)[0];
+  const float y = (*normalized)[1];
+  return {{
+      x * 2 - 1,
+      y * 2 - 1,
+  }};
+}
 
 // Based on the status of the current a11y gesture arena contest, how should we
 // respond in the system-level gesture disambiguation.
@@ -105,19 +153,16 @@ std::vector<fuchsia::ui::pointer::TouchResponse> GestureManagerV2::HandleEvents(
   std::vector<TouchResponse> responses;
 
   for (uint32_t i = 0; i < events.size(); ++i) {
-    const auto& event = events[i];
-
-    if (event.touch_event.has_device_info()) {
-      FX_DCHECK(event.touch_event.device_info().has_id());
-      FX_DCHECK(!touch_device_id_.has_value());
-      touch_device_id_ = event.touch_event.device_info().id();
-    }
+    auto& event = events[i];
 
     if (event.touch_event.has_view_parameters()) {
       viewport_bounds_ = event.touch_event.view_parameters().viewport;
     }
 
-    auto response = HandleEvent(events[i]);
+    // Warning: the field name `position_in_viewport` will no longer make sense.
+    ConvertToNdc(event);
+
+    auto response = HandleEvent(event);
     responses.push_back(std::move(response));
   }
 
@@ -143,6 +188,17 @@ fuchsia::ui::pointer::TouchResponse GestureManagerV2::HandleEvent(
   response.set_response_type(response_type);
 
   return response;
+}
+
+void GestureManagerV2::ConvertToNdc(fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) {
+  if (!event.touch_event.has_pointer_sample() ||
+      !event.touch_event.pointer_sample().has_position_in_viewport()) {
+    return;
+  }
+  FX_CHECK(viewport_bounds_) << "received touch sample event before viewport bounds";
+
+  auto point = event.touch_event.mutable_pointer_sample()->mutable_position_in_viewport();
+  *point = *normalizeToNdc(*point, *viewport_bounds_);
 }
 
 }  // namespace a11y

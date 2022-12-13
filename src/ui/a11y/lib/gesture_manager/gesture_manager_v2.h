@@ -47,6 +47,11 @@ class GestureManagerV2 {
   fuchsia::ui::pointer::TouchResponse HandleEvent(
       const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event);
 
+  // Convert a touch event to use NDC for the `position_in_viewport` field.
+  // This is done relative to the current `viewport_bounds_`, which must not be
+  // std::nullopt.
+  void ConvertToNdc(fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event);
+
   // API to get touch events, and participate in system-level gesture disambiguation.
   fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr touch_source_;
 
@@ -55,8 +60,6 @@ class GestureManagerV2 {
   // Whenever an a11y gesture is recognized, we notify the system-level gesture
   // disambiguation that those touch events are ours.
   std::unique_ptr<GestureArenaV2> arena_;
-
-  std::optional<int32_t> touch_device_id_;
 
   // A rectangle in the same coordinate space as touch event positions. The
   // edges of the rectangle correspond to the edges of the physical screen.
