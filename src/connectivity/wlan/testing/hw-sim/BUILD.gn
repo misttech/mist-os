@@ -22,7 +22,6 @@ rustc_library("wlan-hw-sim") {
     "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_rust",
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_rust",
     "//sdk/fidl/fuchsia.wlan.tap:fuchsia.wlan.tap_rust",
-    "//sdk/lib/device-watcher/rust",
     "//src/connectivity/lib/network-device/rust",
     "//src/connectivity/wlan/lib/common/rust:wlan-common",
     "//src/connectivity/wlan/lib/eapol",

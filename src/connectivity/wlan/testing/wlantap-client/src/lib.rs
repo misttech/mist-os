@@ -3,37 +3,36 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Error,
-    fidl::endpoints,
-    fidl_fuchsia_wlan_tap as wlantap, fuchsia_zircon as zx,
-    std::{
-        fs::{File, OpenOptions},
-        path::Path,
-    },
+    anyhow::Error, fidl::endpoints::Proxy, fidl_fuchsia_wlan_tap as wlantap, fuchsia_zircon as zx,
 };
 
 pub struct Wlantap {
-    file: File,
+    proxy: wlantap::WlantapCtlProxy,
 }
 
 impl Wlantap {
-    pub fn open() -> Result<Self, Error> {
-        const PATH_STR: &str = "/dev/sys/test/wlantapctl";
-        Ok(Self { file: OpenOptions::new().read(true).write(true).open(Path::new(PATH_STR))? })
+    pub async fn open() -> Result<Self, Error> {
+        let dir = fuchsia_fs::directory::open_in_namespace(
+            "/dev",
+            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+        )?;
+        let proxy =
+            device_watcher::recursive_wait_and_open_node(&dir, "sys/test/wlantapctl").await?;
+        let proxy = proxy.into_channel().expect("Proxy::into_channel");
+        let proxy = Proxy::from_channel(proxy);
+        Ok(Self { proxy })
     }
 
-    pub fn create_phy(
+    pub async fn create_phy(
         &self,
         mut config: wlantap::WlantapPhyConfig,
     ) -> Result<wlantap::WlantapPhyProxy, Error> {
-        let (ours, theirs) = endpoints::create_proxy()?;
+        let Self { proxy } = self;
+        let (ours, theirs) = fidl::endpoints::create_proxy()?;
 
-        let channel = fdio::clone_channel(&self.file)?;
-        let wlantap_ctl_proxy = wlantap::WlantapCtlSynchronousProxy::new(channel);
-
-        let status = wlantap_ctl_proxy.create_phy(&mut config, theirs, zx::Time::INFINITE)?;
-
+        let status = proxy.create_phy(&mut config, theirs).await?;
         let () = zx::ok(status)?;
+
         Ok(ours)
     }
 }

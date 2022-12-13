@@ -103,7 +103,6 @@ mod tests {
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_tap as fidl_wlantap,
         fuchsia_zircon::prelude::*,
         futures::{poll, task::Poll},
-        log::info,
         pin_utils::pin_mut,
         std::convert::TryInto,
         wlan_common::{ie::*, test_utils::ExpectWithin},
@@ -111,53 +110,30 @@ mod tests {
         zerocopy::AsBytes,
     };
 
-    #[test]
-    fn watch_phys() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+    #[fasync::run_singlethreaded(test)]
+    async fn watch_phys() {
         let phy_watcher = watch_phy_devices(PHY_PATH).expect("Failed to create phy_watcher");
         pin_mut!(phy_watcher);
 
-        // Wait for the wlantap to appear.
-        let raw_dir = File::open("/dev").expect("failed to open /dev");
-        let zircon_channel =
-            fdio::clone_channel(&raw_dir).expect("failed to clone directory channel");
-        let async_channel = fasync::Channel::from_channel(zircon_channel)
-            .expect("failed to create async channel from zircon channel");
-        let dir = fio::DirectoryProxy::from_channel(async_channel);
-        let monitor_fut = device_watcher::recursive_wait_and_open_node(&dir, "sys/test/wlantapctl");
-        pin_mut!(monitor_fut);
-
-        info!("Beginning wlantapctl monitor.");
-        exec.run_singlethreaded(async {
-            monitor_fut.await.expect("error while watching for wlantapctl")
-        });
-        info!("wlantapctl discovered.");
-
-        // Now that the wlantapctl device is present, connect to it.
-        let wlantap = wlantap_client::Wlantap::open().expect("Failed to connect to wlantapctl");
+        let wlantap =
+            wlantap_client::Wlantap::open().await.expect("Failed to connect to wlantapctl");
 
         // Create an intentionally unused variable instead of a plain
         // underscore. Otherwise, this end of the channel will be
         // dropped and cause the phy device to begin unbinding.
         let wlantap_phy =
-            wlantap.create_phy(create_wlantap_config()).expect("failed to create PHY");
-        exec.run_singlethreaded(async {
-            phy_watcher
-                .next()
-                .expect_within(5.seconds(), "phy_watcher did not respond")
-                .await
-                .expect("phy_watcher ended without yielding a phy")
-                .expect("phy_watcher returned an error");
-            if let Poll::Ready(..) = poll!(phy_watcher.next()) {
-                panic!("phy_watcher found more than one phy");
-            }
-        });
+            wlantap.create_phy(create_wlantap_config()).await.expect("failed to create PHY");
+        phy_watcher
+            .next()
+            .expect_within(5.seconds(), "phy_watcher did not respond")
+            .await
+            .expect("phy_watcher ended without yielding a phy")
+            .expect("phy_watcher returned an error");
+        if let Poll::Ready(..) = poll!(phy_watcher.next()) {
+            panic!("phy_watcher found more than one phy");
+        }
 
-        let shutdown_fut = wlantap_phy.shutdown();
-        pin_mut!(shutdown_fut);
-        exec.run_singlethreaded(async {
-            shutdown_fut.await.expect("shutdown operation failed");
-        });
+        let () = wlantap_phy.shutdown().await.expect("shutdown operation failed");
     }
 
     #[test]

@@ -4,15 +4,12 @@
 use {
     crate::wlancfg_helper::{start_ap_and_wait_for_confirmation, NetworkConfigBuilder},
     fidl::endpoints::create_proxy,
-    fidl::prelude::*,
-    fidl_fuchsia_io as fio, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_tap as wlantap,
+    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as wlantap,
     fuchsia_async::{DurationExt, Time, TimeoutExt, Timer},
     fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon::{self as zx, prelude::*},
     futures::{channel::oneshot, FutureExt, StreamExt},
     std::{
-        fs::File,
         future::Future,
         marker::Unpin,
         pin::Pin,
@@ -95,20 +92,9 @@ impl TestHelper {
         let _wlan_proxy =
             connect_to_protocol::<fidl_policy::ClientProviderMarker>().expect("starting wlancfg");
 
-        // The IsolatedDevMgr in CFv2 does not allow a configuration to block until a device is
-        // ready. Wait indefinitely here until the device becomes available.
-        let raw_dir = File::open("/dev").expect("failed to open /dev");
-        let zircon_channel =
-            fdio::clone_channel(&raw_dir).expect("failed to clone directory channel");
-        let async_channel = fuchsia_async::Channel::from_channel(zircon_channel)
-            .expect("failed to create async channel from zircon channel");
-        let dir = fio::DirectoryProxy::from_channel(async_channel);
-        info!("Waiting for /dev/sys/test/wlantapctl to appear.");
-        device_watcher::recursive_wait_and_open_node(&dir, "sys/test/wlantapctl").await.unwrap();
-
         // Trigger creation of wlantap serviced phy and iface for testing.
-        let wlantap = Wlantap::open().expect("Failed to open wlantapctl");
-        let proxy = wlantap.create_phy(config).expect("Failed to create wlantap PHY");
+        let wlantap = Wlantap::open().await.expect("Failed to open wlantapctl");
+        let proxy = wlantap.create_phy(config).await.expect("Failed to create wlantap PHY");
         let event_stream = Some(proxy.take_event_stream());
         TestHelper { _wlantap: wlantap, proxy: Arc::new(proxy), event_stream, is_stopped: false }
     }
