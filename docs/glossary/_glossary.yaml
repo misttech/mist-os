@@ -1161,6 +1161,14 @@
   related_guides: [""]
   area: ["Zircon"]
 
+- term: "Platform bus"
+  short_description: "The first driver loaded in Fuchsia. The platform bus is the root driver and
+  contains all the resources and privileges necessary to interact with hardware."
+  full_description: ""
+  see_also: [""]
+  related_guides: ["<a href=\"/docs/development/drivers/concepts/device_driver_model/platform-bus.md\">Platform Bus</a>"]
+  area: ["System", "Devices"]
+
 - term: "Platform source tree"
   short_description: "The open source code hosted on
   <a href=\"http://fuchsia.googlesource.com/\">fuchsia.googlesource.com</a>, which comprises the
