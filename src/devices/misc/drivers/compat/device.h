@@ -27,7 +27,6 @@
 #include <fbl/intrusive_double_list.h>
 
 #include "src/devices/lib/fidl/device_server.h"
-#include "src/devices/misc/drivers/compat/devfs_vnode.h"
 #include "src/lib/storage/vfs/cpp/vmo_file.h"
 
 namespace compat {
@@ -53,6 +52,7 @@ class Device : public std::enable_shared_from_this<Device>,
 
   // Binds a device to a DFv2 node.
   void Bind(fidl::WireSharedClient<fuchsia_driver_framework::Node> node);
+
   // Unbinds a device from a DFv2 node.
   void Unbind();
 
@@ -129,7 +129,7 @@ class Device : public std::enable_shared_from_this<Device>,
   driver::Logger& logger() { return *logger_; }
   async::Executor& executor() { return executor_; }
   DeviceServer& device_server() { return device_server_; }
-  fbl::RefPtr<DevfsVnode>& dev_vnode() { return dev_vnode_; }
+  devfs_fidl::DeviceServer& devfs_server() { return devfs_server_; }
 
   void set_logger(driver::Logger* logger) { logger_ = logger; }
 
@@ -140,7 +140,7 @@ class Device : public std::enable_shared_from_this<Device>,
   Device& operator=(Device&&) = delete;
 
   // device_fidl::DeviceInterface APIs.
-  zx::result<std::string> GetTopologicalPath() override;
+  void LogError(const char* error) override;
   bool IsUnbound() override;
   zx_status_t MessageOp(fidl_incoming_msg_t* msg, fidl_txn_t* txn) override;
   void ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
@@ -170,9 +170,9 @@ class Device : public std::enable_shared_from_this<Device>,
   fidl::Arena<512> arena_;
   std::vector<fuchsia_driver_framework::wire::NodeProperty> properties_;
 
-  fbl::RefPtr<DevfsVnode> dev_vnode_;
-  // This callback will remove `dev_vnode_` from devfs when it goes out of scope.
-  fit::deferred_callback dev_vnode_auto_free_;
+  devfs_fidl::DeviceServer devfs_server_;
+  // This callback will remove `devfs_server_` from devfs when it goes out of scope.
+  fit::deferred_callback devfs_server_auto_free_;
 
   DeviceServer device_server_;
 

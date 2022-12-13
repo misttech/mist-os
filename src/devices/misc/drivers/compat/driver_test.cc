@@ -564,9 +564,15 @@ TEST_F(DriverTest, ClientRemote) {
     auto res = echo_client->EchoString(fidl::StringView::FromExternal(kEchoString));
     ASSERT_EQ(res.status(), ZX_OK);
     ASSERT_EQ(res->response.get(), kEchoString);
+    // Drop the client here.
   }
 
+  // Let the dispatcher run so the driver sees the client has dropped.
+  RunUntilDispatchersIdle();
+
+  // Remove the driver.
   RunOnDispatcher([&] { driver.reset(); });
+
   ShutdownDriverDispatcher();
   ASSERT_TRUE(RunTestLoopUntilIdle());
 }
