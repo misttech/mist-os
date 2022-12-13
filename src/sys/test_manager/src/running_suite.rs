@@ -247,6 +247,13 @@ impl RunningSuite {
                 if chunk.is_empty() {
                     break;
                 }
+                if let Ok(Some(_)) = stop_recv.try_recv() {
+                    sender
+                        .send(Ok(SuiteEvents::suite_stopped(SuiteStatus::Stopped).into()))
+                        .await
+                        .unwrap();
+                    return self.report_custom_artifacts(&mut sender).await;
+                }
                 let res = match run_invocations(
                     &suite,
                     chunk,
@@ -271,13 +278,6 @@ impl RunningSuite {
                     return self.report_custom_artifacts(&mut sender).await;
                 }
                 suite_status = concat_suite_status(suite_status, res);
-                if let Ok(Some(_)) = stop_recv.try_recv() {
-                    sender
-                        .send(Ok(SuiteEvents::suite_stopped(SuiteStatus::Stopped).into()))
-                        .await
-                        .unwrap();
-                    return self.report_custom_artifacts(&mut sender).await;
-                }
             }
             sender.send(Ok(SuiteEvents::suite_stopped(suite_status).into())).await.unwrap();
             self.report_custom_artifacts(&mut sender).await
