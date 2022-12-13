@@ -39,7 +39,7 @@ namespace cobalt {
 // Main app, which manages all of Cobalt's functionality.
 //
 // To test run:
-//    fx set --with-base //bundles:tools,//src/cobalt/bin:cobalt_tests;
+//    fx set --with-base //bundles/tools,//src/cobalt/bin:cobalt_tests;
 //    fx test cobalt_testapp_no_network
 class CobaltApp {
  public:

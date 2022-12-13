@@ -11,7 +11,7 @@ traffic.
 To run fidlcat in-tree, you first build it, which you can do the following way:
 
 ```sh
-fx set <whatever> --with //bundles:tools
+fx set <whatever> --with //bundles/tools
 fx build
 ```
 
@@ -19,7 +19,7 @@ If you want to add it to your existing gn args, you can do so by adding this
 stanza to the bottom of your <build_dir>/args.gn.
 
 ```
-universe_package_labels += [ "//bundles:tools" ]
+universe_package_labels += [ "//bundles/tools" ]
 ```
 
 To run `fidlcat`, you must boot with networking enabled. If you're running an

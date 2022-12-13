@@ -14,7 +14,7 @@ config("magma_tests_include_config") {
   include_dirs = [ "tests" ]
 }
 
-# Included in //bundles:tools, this target should contain only tools.
+# Included in //bundles/tools, this target should contain only tools.
 group("magma-tools") {
   testonly = true
   deps = [ "src/tools:tools-only" ]

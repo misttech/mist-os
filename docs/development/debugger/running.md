@@ -38,16 +38,16 @@ service selector 'core/debug\_agent:expose:fuchsia.debugger.DebugAgent' did not 
 on the target", it means that debug\_agent is not built.  You can also check whether there's
 `debug_agent` and `host_x64/zxdb` in your build directory.
 
-If you don't have the debugger in your build, add `//bundles:tools` to your "universe", either with:
+If you don't have the debugger in your build, add `//bundles/tools` to your "universe", either with:
 
 ```posix-terminal
-fx <normal_stuff_you_use> --with //bundles:tools
+fx <normal_stuff_you_use> --with //bundles/tools
 ```
 
 Or you can edit your GN args directly by editing `<build_dir>/args.gn` and adding to the bottom:
 
 ```none
-universe_package_labels += [ "//bundles:tools" ]
+universe_package_labels += [ "//bundles/tools" ]
 ```
 
 ### ffx can talk with the device

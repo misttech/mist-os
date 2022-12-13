@@ -69,7 +69,7 @@ Bluetooth tests are built and installed when paving or OTA'ing with
 [`fx set`](/docs/development/build/fx.md#configure-a-build):
 
 ```
-  $ fx set workstation_eng.x64 --with //src/connectivity/bluetooth,//bundles:tools
+  $ fx set workstation_eng.x64 --with //src/connectivity/bluetooth,//bundles/tools
 ```
 
 #### Tests

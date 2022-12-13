@@ -14,7 +14,7 @@ namespace cobalt {
 // Implementations of the MetricEventLogger fidl interfaces.
 //
 // To test run:
-//    fx set --with-base //bundles:tools,//src/cobalt/bin:cobalt_tests;
+//    fx set --with-base //bundles/tools,//src/cobalt/bin:cobalt_tests;
 //    fx test cobalt_testapp_no_network
 class MetricEventLoggerImpl : public fuchsia::metrics::MetricEventLogger {
  public:

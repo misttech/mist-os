@@ -28,7 +28,7 @@ import (
 //     --with-base //tools/fuzz:tests \
 //     --with-base //tools/fuzz/testing:undercoat-test-fuzzers \
 //     --with-base //examples/fuzzers \
-//     --with-base //bundles:tools \
+//     --with-base //bundles/tools \
 //     --fuzz-with asan && fx build
 //
 // To run these tests:

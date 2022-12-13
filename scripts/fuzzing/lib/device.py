@@ -232,7 +232,7 @@ class Device(object):
         except subprocess.CalledProcessError as e:
             if e.returncode == 2:
                 self.host.error(
-                    "ls was not found. Make sure you build with //bundles:tools."
+                    "ls was not found. Make sure you build with //bundles/tools."
                 )
             elif e.returncode != 1:
                 # The returncode is 1 when the file or directory is not found (see

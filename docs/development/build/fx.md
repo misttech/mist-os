@@ -67,7 +67,7 @@ First let's configure the build. To do this you need to make a few choices:
   (unsure: try `workstation_eng`)
 * What board are you building for? (unsure: try `x64`)
 * What extra [test targets](#key-bundles) do you want? (unsure: try
-  `//bundles:tools`, and if you're working on features, you probably want
+  `//bundles/tools`, and if you're working on features, you probably want
   `//bundles:tests`)
 
 Armed with our above choices (if you didn't read above, do so now), you are
@@ -178,7 +178,7 @@ For convenience, a number of bundles are defined, which include a variety of
 commonly used build targets. It is important to be familiarized with the
 following bundles:
 
-* `//bundles:tools` contains a broad array of the most common developer tools.
+* `//bundles/tools` contains a broad array of the most common developer tools.
   This includes tools for spawning components from command-line shells, tools
   for reconfiguring and testing networks, making http requests, debugging
   programs, changing audio volume, and so on. The core product includes
