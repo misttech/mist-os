@@ -753,7 +753,7 @@ impl Peer {
                 "runner lost route to peer",
             );
         } else if let Err(e) = &result {
-            tracing::error!(
+            tracing::warn!(
                 node_id = %get_router_node_id(),
                 conn = ?conn_id,
                 ?endpoint,
