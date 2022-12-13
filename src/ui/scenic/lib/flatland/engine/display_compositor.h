@@ -271,7 +271,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   // Maps a buffer collection ID to a BufferCollectionSyncPtr in the same domain as the token with
   // display constraints set. This is used as a bridge between ImportBufferCollection() and
-  // ImportBufferImage() calls, so  that we can check if the existing allocation is
+  // ImportBufferImage() calls, so that we can check if the existing allocation is
   // display-compatible.
   std::unordered_map<allocation::GlobalBufferCollectionId, fuchsia::sysmem::BufferCollectionSyncPtr>
       display_buffer_collection_ptrs_ FXL_GUARDED_BY(lock_);

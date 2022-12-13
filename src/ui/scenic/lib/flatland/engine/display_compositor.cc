@@ -115,38 +115,50 @@ std::optional<std::string> DuplicateToken(
   return std::nullopt;
 }
 
-// Consumes |token| and returns a new AttachToken.
+// Returns a prunable subtree of |token| with |num_new_tokens| children.
 // Returns std::nullopt on failure.
-std::optional<fuchsia::sysmem::BufferCollectionTokenSyncPtr> ConvertToAttachToken(
+std::optional<std::vector<fuchsia::sysmem::BufferCollectionTokenSyncPtr>> CreatePrunableChildren(
     fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr token) {
-  fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection_sync_ptr;
-  sysmem_allocator->BindSharedCollection(std::move(token), buffer_collection_sync_ptr.NewRequest());
-  if (const auto status = buffer_collection_sync_ptr->Sync(); status != ZX_OK) {
-    FX_LOGS(ERROR) << "Could not sync token: " << zx_status_get_string(status);
-    return std::nullopt;
-  }
-
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr attach_token;
-  if (const auto status =
-          buffer_collection_sync_ptr->AttachToken(ZX_RIGHT_SAME_RIGHTS, attach_token.NewRequest());
+    fuchsia::sysmem::BufferCollectionTokenSyncPtr& token, const size_t num_new_tokens) {
+  fuchsia::sysmem::BufferCollectionTokenGroupSyncPtr token_group;
+  if (const auto status = token->CreateBufferCollectionTokenGroup(token_group.NewRequest());
       status != ZX_OK) {
-    FX_LOGS(ERROR) << "Could not create AttachToken: " << zx_status_get_string(status);
-    return std::nullopt;
-  }
-  if (const auto status = buffer_collection_sync_ptr->Close(); status != ZX_OK) {
-    FX_LOGS(ERROR) << "Could not close token: " << zx_status_get_string(status);
+    FX_LOGS(ERROR) << "Could not create buffer collection token group: "
+                   << zx_status_get_string(status);
     return std::nullopt;
   }
 
-  return attach_token;
+  // Create the requested children, then mark all children created and close out |token_group|.
+  std::vector<fuchsia::sysmem::BufferCollectionTokenHandle> new_tokens;
+  const std::vector<zx_rights_t> children_request_rights(num_new_tokens, ZX_RIGHT_SAME_RIGHTS);
+  if (const auto status = token_group->CreateChildrenSync(children_request_rights, &new_tokens);
+      status != ZX_OK) {
+    FX_LOGS(ERROR) << "Could not create buffer collection token group children: "
+                   << zx_status_get_string(status);
+    return std::nullopt;
+  }
+  if (const auto status = token_group->AllChildrenPresent(); status != ZX_OK) {
+    FX_LOGS(ERROR) << "Could not call AllChildrenPresent: " << zx_status_get_string(status);
+    return std::nullopt;
+  }
+  if (const auto status = token_group->Close(); status != ZX_OK) {
+    FX_LOGS(ERROR) << "Could not close token group: " << zx_status_get_string(status);
+    return std::nullopt;
+  }
+
+  std::vector<fuchsia::sysmem::BufferCollectionTokenSyncPtr> out_tokens;
+  for (auto& new_token : new_tokens) {
+    out_tokens.push_back(new_token.BindSync());
+  }
+  FX_DCHECK(out_tokens.size() == num_new_tokens);
+  return out_tokens;
 }
 
 // Returns a BufferCollectionSyncPtr duplicate of |token| with empty constraints set.
 // Since it has the same failure domain as |token|, it can be used to check the status of
 // allocations made from that collection.
 std::optional<fuchsia::sysmem::BufferCollectionSyncPtr>
-CreateBufferCollectionPtrWithEmptyConstraints(
+CreateDuplicateBufferCollectionPtrWithEmptyConstraints(
     fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
     fuchsia::sysmem::BufferCollectionTokenSyncPtr& token) {
   fuchsia::sysmem::BufferCollectionTokenSyncPtr token_dup;
@@ -215,28 +227,25 @@ bool IsYUV(const fuchsia::sysmem::PixelFormat& format) {
          format.type == fuchsia::sysmem::PixelFormatType::I420;
 }
 
-// Returns whether |token| is compatible with the display and, if it is, its pixel format.
-// It is possible for the image to be supported by the display, but for the pixel format fetch to
-// fail.
+// Consumes |token| and if its allocation is compatible with the display returns its pixel format.
+// Otherwise returns std::nullopt.
 // TODO(fxbug.dev/71344): Just return a bool after we don't need the pixel format anymore.
 std::optional<fuchsia::sysmem::PixelFormat> DetermineDisplaySupportFor(
     fuchsia::sysmem::BufferCollectionSyncPtr token) {
-  const bool image_supports_display = CheckBuffersAllocated(token);
-  if (!image_supports_display) {
-    return std::nullopt;
-  }
+  std::optional<fuchsia::sysmem::PixelFormat> result = std::nullopt;
 
-  const fuchsia::sysmem::PixelFormat pixel_format = GetPixelFormat(token);
+  const bool image_supports_display = CheckBuffersAllocated(token);
+  if (image_supports_display) {
+    result = GetPixelFormat(token);
+    // TODO(fxbug.dev/85601): Remove after YUV buffers can be imported to display. We filter YUV
+    // images out of display path.
+    if (IsYUV(result.value())) {
+      result = std::nullopt;
+    }
+  }
 
   token->Close();
-
-  // TODO(fxbug.dev/85601): Remove after YUV buffers can be imported to display. We filter YUV
-  // images out of display path.
-  if (IsYUV(pixel_format)) {
-    return std::nullopt;
-  }
-
-  return pixel_format;
+  return result;
 }
 
 }  // anonymous namespace
@@ -282,54 +291,59 @@ bool DisplayCompositor::ImportBufferCollection(
     const BufferCollectionUsage usage, const std::optional<fuchsia::math::SizeU> size) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::ImportBufferCollection");
-
-  // Expect the default Buffer Collection usage type.
-  FX_DCHECK(usage == BufferCollectionUsage::kClientImage);
+  FX_DCHECK(usage == BufferCollectionUsage::kClientImage)
+      << "Expected default buffer collection usage";
 
   auto renderer_token = token.BindSync();
 
-  // Create a token for the display controller to set constraints on.
+  // We want to achieve one of two outcomes:
+  // 1. Allocate buffer that is compatible with both the renderer and the display
+  // or, if that fails,
+  // 2. Allocate a buffer that is only compatible with the renderer.
+  // To do this we create two prunable children of the renderer token, one with display constraints
+  // and one with no constraints. Only one of these children will be chosen during sysmem
+  // negotiations.
+  // Resulting tokens:
+  // * renderer_token
+  // . * token_group
+  // . . * display_token (+ duplicate with no constraints to check allocation with, created below)
+  // . . * Empty token
   fuchsia::sysmem::BufferCollectionTokenSyncPtr display_token;
-  if (auto error = DuplicateToken(renderer_token, display_token)) {
-    FX_LOGS(ERROR) << *error;
+  if (auto prunable_tokens =
+          CreatePrunableChildren(sysmem_allocator, renderer_token, /*num_new_tokens*/ 2)) {
+    // Display+Renderer should have higher priority than Renderer only.
+    display_token = std::move(prunable_tokens->at(0));
+
+    // We close the second token with setting any constraints. If this gets chosen during sysmem
+    // negotiations then the allocated buffers are display-incompatible and we don't need to keep a
+    // reference to them here.
+    if (const auto status = prunable_tokens->at(1)->Close(); status != ZX_OK) {
+      FX_LOGS(ERROR) << "Could not close token: " << zx_status_get_string(status);
+    }
+  } else {
     return false;
   }
 
   // Set renderer constraints.
   if (!renderer_->ImportBufferCollection(collection_id, sysmem_allocator, std::move(renderer_token),
                                          usage, size)) {
-    FX_LOGS(INFO) << "Renderer could not import buffer collection.";
+    FX_LOGS(ERROR) << "Renderer could not import buffer collection.";
     return false;
   }
 
-  switch (import_mode_) {
-    case BufferCollectionImportMode::RendererOnly:
-      // Fall back to using the renderer. Don't attempt direct-to-display and don't keep any
-      // references.
-      if (const auto status = display_token->Close(); status != ZX_OK) {
-        FX_LOGS(ERROR) << "Could not close token: " << zx_status_get_string(status);
-      }
-      return true;
-    case BufferCollectionImportMode::EnforceDisplayConstraints:
-      // Continue to use |display_token| as is. Allocation will fail if the display constraints are
-      // incompatible.
-      break;
-    case BufferCollectionImportMode::AttemptDisplayConstraints:
-      // Replace |display_token| with an AttachToken. In this mode we get direct-to-display in case
-      // the display "just happens" to be happy with what the client and renderer agreed on.
-      // TODO(fxbug.dev/74423): Replace with prunable token when it is available.
-      if (auto attach_token = ConvertToAttachToken(sysmem_allocator, std::move(display_token))) {
-        display_token = std::move(*attach_token);
-      } else {
-        return false;
-      }
-      break;
+  if (import_mode_ == BufferCollectionImportMode::RendererOnly) {
+    // Forced fallback to using the renderer; don't attempt direct-to-display.
+    // Close |display_token| without importing it to the display controller.
+    if (const auto status = display_token->Close(); status != ZX_OK) {
+      FX_LOGS(ERROR) << "Could not close token: " << zx_status_get_string(status);
+    }
+    return true;
   }
 
   // Create a BufferCollectionPtr from a duplicate of |display_token| with which to later check if
   // buffers allocated from the BufferCollection are display-compatible.
   auto collection_ptr =
-      CreateBufferCollectionPtrWithEmptyConstraints(sysmem_allocator, display_token);
+      CreateDuplicateBufferCollectionPtrWithEmptyConstraints(sysmem_allocator, display_token);
   if (!collection_ptr.has_value()) {
     return false;
   }
