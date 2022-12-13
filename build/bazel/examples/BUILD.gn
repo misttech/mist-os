@@ -8,7 +8,9 @@ group("examples") {
     "hello_cpp($default_toolchain)",
     "hello_fuchsia($default_toolchain)",
     "hello_python",
-    "hello_rust($default_toolchain)",
+
+    # TODO(fxbug.dev/117336): fix, then uncomment hello_rust
+    #"hello_rust($default_toolchain)",
     "hello_world",
   ]
 }
