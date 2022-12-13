@@ -35,6 +35,7 @@ test("syscalls_test_bin") {
     "test_helper.h",
     "test_helper_test.cc",
     "trivial_test.cc",
+    "waitpid_test.cc",
   ]
   deps = [
     "//src/lib/fxl/test:gtest_main",

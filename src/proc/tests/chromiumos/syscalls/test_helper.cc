@@ -4,9 +4,12 @@
 
 #include "src/proc/tests/chromiumos/syscalls/test_helper.h"
 
+#include <sched.h>
+#include <sys/mman.h>
 #include <sys/prctl.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <time.h>
 
 #include <gtest/gtest.h>
 
@@ -59,3 +62,31 @@ pid_t ForkHelper::RunInForkedProcess(std::function<void()> action) {
   action();
   _exit(testing::Test::HasFailure());
 }
+
+CloneHelper::CloneHelper() {
+  // Stack setup
+  this->_childStack = (uint8_t *)mmap(NULL, CloneHelper::_childStackSize, PROT_WRITE | PROT_READ,
+                                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  assert(errno == 0);
+  assert(this->_childStack != (uint8_t *)(-1));
+  this->_childStackBegin = this->_childStack + CloneHelper::_childStackSize;
+}
+
+CloneHelper::~CloneHelper() { munmap(this->_childStack, CloneHelper::_childStackSize); }
+
+int CloneHelper::runInClonedChild(unsigned int cloneFlags, int (*childFunction)(void *)) {
+  int childPid = clone(childFunction, this->_childStackBegin, cloneFlags, NULL);
+  assert(errno == 0);
+  assert(childPid != -1);
+  return childPid;
+}
+
+int CloneHelper::sleep_1sec(void *) {
+  struct timespec res;
+  res.tv_sec = 1;
+  res.tv_nsec = 0;
+  clock_nanosleep(CLOCK_MONOTONIC, 0, &res, &res);
+  return 0;
+}
+
+int CloneHelper::doNothing(void *) { return 0; }

@@ -141,6 +141,7 @@ pub struct ZombieProcess {
     pub pgid: pid_t,
     pub uid: uid_t,
     pub exit_status: ExitStatus,
+    pub exit_signal: Option<Signal>,
 }
 
 impl ZombieProcess {
@@ -148,15 +149,18 @@ impl ZombieProcess {
         thread_group: ThreadGroupStateRef<'_>,
         credentials: &Credentials,
         exit_status: ExitStatus,
+        exit_signal: Option<Signal>,
     ) -> Self {
         ZombieProcess {
             pid: thread_group.base.leader,
             pgid: thread_group.process_group.leader,
             uid: credentials.uid,
             exit_status,
+            exit_signal,
         }
     }
 
+    // According to wait(2) man page, SignalInfo.signal needs to always be set to SIGCHLD
     pub fn as_signal_info(&self) -> SignalInfo {
         SignalInfo::new(
             SIGCHLD,
@@ -257,6 +261,7 @@ impl ThreadGroup {
                 pgid: state.process_group.leader,
                 uid: task.creds().uid,
                 exit_status,
+                exit_signal: task.exit_signal,
             });
         }
 
@@ -301,15 +306,17 @@ impl ThreadGroup {
                 let mut state = self.write();
                 let zombie = state.zombie_leader.take().expect("Failed to capture zombie leader.");
 
-                let signal_info = zombie.as_signal_info();
                 parent.children.remove(&state.leader());
-                parent.zombie_children.push(zombie);
 
                 // Send signals
-                // TODO: This should be the designated exit_signal of the leader
-                if let Some(signal_target) = parent.get_signal_target(&SIGCHLD.into()) {
-                    send_signal(&signal_target, signal_info);
+                if let Some(exit_signal) = zombie.exit_signal {
+                    if let Some(signal_target) = parent.get_signal_target(&exit_signal.into()) {
+                        let mut signal_info = zombie.as_signal_info();
+                        signal_info.signal = exit_signal;
+                        send_signal(&signal_target, signal_info);
+                    }
                 }
+                parent.zombie_children.push(zombie);
                 parent.child_status_waiters.notify_all();
             }
 
@@ -736,6 +743,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
                         child.as_ref(),
                         &child.get_task()?.creds(),
                         ExitStatus::Continue(siginfo),
+                        child.get_task()?.exit_signal,
                     )));
                 }
                 if child.stopped && options.wait_for_stopped {
@@ -748,6 +756,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
                         child.as_ref(),
                         &child.get_task()?.creds(),
                         ExitStatus::Stop(siginfo),
+                        child.get_task()?.exit_signal,
                     )));
                 }
             }

@@ -1340,6 +1340,7 @@ mod tests {
         let (_kernel, current_task) = create_kernel_and_task();
         let child = current_task.clone_task_for_test(0);
         let expected_zombie = ZombieProcess {
+            exit_signal: None,
             pid: child.id,
             pgid: child.thread_group.read().process_group.leader,
             uid: 0,
