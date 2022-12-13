@@ -13,7 +13,7 @@ namespace pwmctl {
 namespace {
 
 constexpr char kBinaryName[] = "pwmctl";
-constexpr char kDevPath[] = "/dev/class/pwm/000";
+constexpr char kDevPath[] = "some_path";
 
 }  // namespace
 

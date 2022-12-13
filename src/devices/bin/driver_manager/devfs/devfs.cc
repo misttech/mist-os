@@ -520,9 +520,6 @@ Devfs::Devfs(std::optional<Devnode>& root,
       // TODO(https://fxbug.dev/113842): Remove.
       "power-sensor",
 
-      // TODO(https://fxbug.dev/113836): Remove.
-      "pwm",
-
       // TODO(https://fxbug.dev/113838): Remove.
       "radar",
 
