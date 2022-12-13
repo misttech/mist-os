@@ -569,16 +569,8 @@ impl EssSa {
 
         // Safe: frame was just verified.
         let raw_frame = verified_frame.unsafe_get_raw();
-
-        // IEEE Std 802.11-2016, 12.7.2, d)
-        // Update key replay counter if MIC was set and is valid. Only applicable for Supplicant.
-        // TODO(fxbug.dev/68916): We should verify the MIC here and only increase the counter if the MIC
-        // is valid.
-        if raw_frame.key_frame_fields.key_info().key_mic() {
-            if let Role::Supplicant = self.role {
-                self.key_replay_counter = raw_frame.key_frame_fields.key_replay_counter.to_native();
-            }
-        }
+        let frame_has_mic = raw_frame.key_frame_fields.key_info().key_mic();
+        let frame_key_replay_counter = raw_frame.key_frame_fields.key_replay_counter.to_native();
 
         // Forward frame to correct security association.
         // PMKSA must be established before any other security association can be established. Because
@@ -590,7 +582,8 @@ impl EssSa {
 
         // Once PMKSA was established PTKSA and GTKSA can process frames.
         // IEEE Std 802.11-2016, 12.7.2 b.2)
-        if raw_frame.key_frame_fields.key_info().key_type() == eapol::KeyType::PAIRWISE {
+        let result = if raw_frame.key_frame_fields.key_info().key_type() == eapol::KeyType::PAIRWISE
+        {
             match self.ptksa.as_mut() {
                 Ptksa::Uninitialized { .. } => Ok(()),
                 Ptksa::Initialized { method } | Ptksa::Established { method, .. } => {
@@ -618,7 +611,23 @@ impl EssSa {
                 raw_frame.key_frame_fields.key_info().key_type()
             );
             Ok(())
+        };
+
+        // IEEE Std 802.11-2016, 12.7.2, d)
+        // Update key replay counter if MIC was set and is valid. Only applicable for Supplicant.
+        // Eapol key frame being TX'd implies that MIC is valid.
+        if frame_has_mic {
+            if let Role::Supplicant = self.role {
+                for update in update_sink {
+                    if let SecAssocUpdate::TxEapolKeyFrame { .. } = update {
+                        self.key_replay_counter = frame_key_replay_counter;
+                        break;
+                    }
+                }
+            }
         }
+
+        result
     }
 }
 
@@ -855,6 +864,40 @@ mod tests {
         });
         assert!(result.is_ok());
         expect_eapol_resp(&updates[..]);
+    }
+
+    #[test]
+    fn test_key_replay_counter_not_updated_for_invalid_mic_msg3() {
+        let mut supplicant = test_util::get_wpa2_supplicant();
+        supplicant.start().expect("Failed starting Supplicant");
+
+        let (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
+            msg1.key_frame_fields.key_replay_counter.set_from_native(1);
+        });
+        assert!(result.is_ok());
+        assert_eq!(0, supplicant.esssa.key_replay_counter);
+
+        let msg2 = expect_eapol_resp(&updates[..]);
+        let snonce = msg2.keyframe().key_frame_fields.key_nonce;
+        let ptk = test_util::get_ptk(&ANONCE[..], &snonce[..]);
+
+        let msg3 = test_util::get_wpa2_4whs_msg3_with_mic_modifier(
+            &ptk,
+            &ANONCE[..],
+            &GTK,
+            |msg3| {
+                msg3.key_frame_fields.key_replay_counter.set_from_native(5);
+            },
+            |mic| {
+                mic[0] = mic[0].wrapping_add(1);
+            },
+        );
+        let mut update_sink = UpdateSink::default();
+        let result =
+            supplicant.on_eapol_frame(&mut update_sink, eapol::Frame::Key(msg3.keyframe()));
+        assert!(result.is_ok());
+        // The key replay counter should not be updated
+        assert_eq!(0, supplicant.esssa.key_replay_counter);
     }
 
     #[test]

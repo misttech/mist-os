@@ -289,16 +289,18 @@ pub fn get_wpa3_4whs_msg1(anonce: &[u8]) -> eapol::KeyFrameBuf {
     get_4whs_msg1(FourwayConfig::Wpa3, anonce, |_| {})
 }
 
-fn get_4whs_msg3<'a, F>(
+fn get_4whs_msg3<'a, F1, F2>(
     config: FourwayConfig,
     ptk: &Ptk,
     anonce: &[u8],
     gtk: &[u8],
     igtk: Option<&[u8]>,
-    msg_modifier: F,
+    msg_modifier: F1,
+    mic_modifier: F2,
 ) -> eapol::KeyFrameBuf
 where
-    F: Fn(&mut KeyFrameTx),
+    F1: Fn(&mut KeyFrameTx),
+    F2: Fn(&mut [u8]),
 {
     let (protocol_version, key_info, a_rsne, s_rsne) = match config {
         FourwayConfig::Wpa2 => (
@@ -342,8 +344,9 @@ where
     );
     msg_modifier(&mut msg3);
     let msg3 = msg3.serialize();
-    let mic = compute_mic_from_buf(ptk.kck(), &protection, msg3.unfinalized_buf())
+    let mut mic = compute_mic_from_buf(ptk.kck(), &protection, msg3.unfinalized_buf())
         .expect("failed to compute msg3 mic");
+    mic_modifier(&mut mic);
     msg3.finalize_with_mic(&mic[..]).expect("failed to construct 4whs msg 3")
 }
 
@@ -356,7 +359,21 @@ pub fn get_wpa2_4whs_msg3<'a, F>(
 where
     F: Fn(&mut KeyFrameTx),
 {
-    get_4whs_msg3(FourwayConfig::Wpa2, ptk, anonce, gtk, None, msg_modifier)
+    get_4whs_msg3(FourwayConfig::Wpa2, ptk, anonce, gtk, None, msg_modifier, |_| {})
+}
+
+pub fn get_wpa2_4whs_msg3_with_mic_modifier<'a, F1, F2>(
+    ptk: &Ptk,
+    anonce: &[u8],
+    gtk: &[u8],
+    msg_modifier: F1,
+    mic_modifier: F2,
+) -> eapol::KeyFrameBuf
+where
+    F1: Fn(&mut KeyFrameTx),
+    F2: Fn(&mut [u8]),
+{
+    get_4whs_msg3(FourwayConfig::Wpa2, ptk, anonce, gtk, None, msg_modifier, mic_modifier)
 }
 
 pub fn get_wpa3_4whs_msg3(
@@ -365,7 +382,7 @@ pub fn get_wpa3_4whs_msg3(
     gtk: &[u8],
     igtk: Option<&[u8]>,
 ) -> eapol::KeyFrameBuf {
-    get_4whs_msg3(FourwayConfig::Wpa3, ptk, anonce, gtk, igtk, |_| {})
+    get_4whs_msg3(FourwayConfig::Wpa3, ptk, anonce, gtk, igtk, |_| {}, |_| {})
 }
 
 pub fn get_group_key_hs_msg1(
