@@ -63,7 +63,7 @@ pub async fn print_output(
             _ => filter_digest_by_process_koids(processed_digest, &cmd.process_koids),
         };
         if cmd.csv {
-            write_csv_output(writer, output)
+            write_csv_output(writer, output, cmd.buckets)
         } else {
             if writer.is_machine() {
                 writer.machine(&output)
