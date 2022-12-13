@@ -139,6 +139,18 @@ using RecordHeader = uint64_t;
 enum class BlobType { kData = 1, kLastBranch = 2 };
 enum class LargeBlobFormat { kMetadata = 0, kNoMetadata = 1 };
 
+// Wrapper struct to separate zx_koid_t from a uint64_t for both type safety and type deduction
+struct Koid {
+  constexpr explicit Koid(const zx_koid_t koid) : koid(koid) {}
+  zx_koid_t koid;
+};
+
+// Wrapper struct to separate uintptr_t from a uint64_t for both type safety and type deduction
+struct Pointer {
+  constexpr explicit Pointer(const uintptr_t ptr) : ptr(ptr) {}
+  uintptr_t ptr;
+};
+
 }  // namespace fxt
 
 #endif  // SRC_PERFORMANCE_LIB_FXT_INCLUDE_LIB_FXT_RECORD_TYPES_H_

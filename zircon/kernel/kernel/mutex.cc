@@ -98,10 +98,10 @@ class KTracer<Level, ktl::enable_if_t<(Level == KernelMutexTracingLevel::Contest
                                                                   : "user_mode"_stringref)
                                        ->GetId()};
 
-    fxt::Argument<fxt::ArgumentType::kPointer, fxt::RefType::kId> mutex_id_arg{
-        fxt::StringRef{"mutex_id"_stringref->GetId()}, reinterpret_cast<uintptr_t>(mutex)};
-    fxt::Argument<fxt::ArgumentType::kKoid, fxt::RefType::kId> tid_name_arg{
-        fxt::StringRef{"tid"_stringref->GetId()}, t == nullptr ? ZX_KOID_INVALID : t->tid()};
+    fxt::Argument mutex_id_arg{fxt::StringRef{"mutex_id"_stringref->GetId()},
+                               fxt::Pointer(reinterpret_cast<uintptr_t>(mutex))};
+    fxt::Argument tid_name_arg{fxt::StringRef{"tid"_stringref->GetId()},
+                               fxt::Koid(t == nullptr ? ZX_KOID_INVALID : t->tid())};
     fxt::Argument tid_type_arg{fxt::StringRef{"tid_type"_stringref->GetId()}, tid_type};
     fxt::Argument wait_count_arg{fxt::StringRef{"waiter_count"_stringref->GetId()}, waiter_count};
 

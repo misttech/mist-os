@@ -267,12 +267,11 @@ static void gic_handle_irq(iframe_t* frame) {
     CPU_STATS_INC(interrupts);
 
   if (unlikely(ktrace_tag_enabled(TAG_IRQ_ENTER))) {
-    fxt::Argument<fxt::ArgumentType::kUint64, fxt::RefType::kId> arg(
-        fxt::StringRef("irq #"_stringref->GetId()), vector);
-    fxt_duration_begin(TAG_IRQ_ENTER, current_ticks(),
-                       fxt::ThreadRef(kNoProcess, kKernelPseudoCpuBase + arch_curr_cpu_num()),
-                       fxt::StringRef("kernel:irq"_stringref->GetId()),
-                       fxt::StringRef("irq"_stringref->GetId()), arg);
+    fxt_duration_begin(
+        TAG_IRQ_ENTER, current_ticks(),
+        fxt::ThreadRef(kNoProcess, fxt::Koid(kKernelPseudoCpuBase + arch_curr_cpu_num())),
+        fxt::StringRef("kernel:irq"_stringref->GetId()), fxt::StringRef("irq"_stringref->GetId()),
+        fxt::Argument(fxt::StringRef("irq #"_stringref->GetId()), vector));
   }
 
   LTRACEF_LEVEL(2, "iar 0x%x cpu %u currthread %p vector %u pc %#" PRIxPTR "\n", iar,
@@ -285,12 +284,11 @@ static void gic_handle_irq(iframe_t* frame) {
   LTRACEF_LEVEL(2, "cpu %u exit\n", arch_curr_cpu_num());
 
   if (unlikely(ktrace_tag_enabled(TAG_IRQ_EXIT))) {
-    fxt::Argument<fxt::ArgumentType::kUint64, fxt::RefType::kId> arg(
-        fxt::StringRef("irq #"_stringref->GetId()), vector);
-    fxt_duration_end(TAG_IRQ_EXIT, current_ticks(),
-                     fxt::ThreadRef(kNoProcess, kKernelPseudoCpuBase + arch_curr_cpu_num()),
-                     fxt::StringRef("kernel:irq"_stringref->GetId()),
-                     fxt::StringRef("irq"_stringref->GetId()), arg);
+    fxt_duration_end(
+        TAG_IRQ_EXIT, current_ticks(),
+        fxt::ThreadRef(kNoProcess, fxt::Koid(kKernelPseudoCpuBase + arch_curr_cpu_num())),
+        fxt::StringRef("kernel:irq"_stringref->GetId()), fxt::StringRef("irq"_stringref->GetId()),
+        fxt::Argument(fxt::StringRef("irq #"_stringref->GetId()), vector));
   }
 }
 

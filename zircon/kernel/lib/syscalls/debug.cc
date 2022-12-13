@@ -196,7 +196,8 @@ zx_status_t sys_ktrace_write(zx_handle_t handle, uint32_t event_id, uint32_t arg
   }
 
   auto tag = TAG_PROBE_24(event_id);
-  const fxt::ThreadRef thread_ref{kNoProcess, kKernelPseudoCpuBase + arch_curr_cpu_num()};
+  const fxt::ThreadRef thread_ref{kNoProcess,
+                                  fxt::Koid(kKernelPseudoCpuBase + arch_curr_cpu_num())};
   ktrace_thunks::fxt_instant(tag, ktrace_timestamp(), thread_ref,
                              fxt::StringRef{GetCategoryForGroup(KTRACE_GROUP(tag))->GetId()},
                              fxt::StringRef{static_cast<uint16_t>(event_id | 0x4000)},

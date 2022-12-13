@@ -61,8 +61,7 @@ zx_status_t vmm_accessed_fault_handler(vaddr_t addr) {
                           fxt::ThreadRef{current_thread->pid(), current_thread->tid()},
                           fxt::StringRef{"kernel:vm"_stringref->GetId()},
                           fxt::StringRef{"access_fault"_stringref->GetId()}, current_ticks(),
-                          fxt::Argument<fxt::ArgumentType::kUint64, fxt::RefType::kId>{
-                              fxt::StringRef{"vaddr"_stringref->GetId()}, addr});
+                          fxt::Argument{fxt::StringRef{"vaddr"_stringref->GetId()}, addr});
   }
 
   return status;
@@ -109,8 +108,7 @@ zx_status_t vmm_page_fault_handler(vaddr_t addr, uint flags) {
                           fxt::ThreadRef{current_thread->pid(), current_thread->tid()},
                           fxt::StringRef{"kernel:vm"_stringref->GetId()},
                           fxt::StringRef{"page_fault"_stringref->GetId()}, current_ticks(),
-                          fxt::Argument<fxt::ArgumentType::kUint64, fxt::RefType::kId>{
-                              fxt::StringRef{"vaddr"_stringref->GetId()}, addr},
+                          fxt::Argument{fxt::StringRef{"vaddr"_stringref->GetId()}, addr},
                           fxt::Argument{fxt::StringRef{"flags"_stringref->GetId()}, flags});
   }
 

@@ -60,10 +60,10 @@ void ktrace_report_cpu_pseudo_threads() {
   char name[32];
   for (uint i = 0; i < max_cpus; i++) {
     snprintf(name, sizeof(name), "cpu-%u", i);
-    fxt_kernel_object(TAG_THREAD_NAME, /* always */ true, kKernelPseudoCpuBase + i,
-                      ZX_OBJ_TYPE_THREAD, fxt::StringRef(name),
-                      fxt::Argument<fxt::ArgumentType::kKoid, fxt::RefType::kId>(
-                          fxt::StringRef("process"_stringref->GetId()), kNoProcess));
+    fxt_kernel_object(
+        TAG_THREAD_NAME, /* always */ true, kKernelPseudoCpuBase + i, ZX_OBJ_TYPE_THREAD,
+        fxt::StringRef(name),
+        fxt::Argument(fxt::StringRef("process"_stringref->GetId()), fxt::Koid(kNoProcess)));
   }
   fxt_kernel_object(TAG_THREAD_NAME, /* always */ true, 0, ZX_OBJ_TYPE_THREAD,
                     fxt::StringRef("kernel"_stringref->GetId()));

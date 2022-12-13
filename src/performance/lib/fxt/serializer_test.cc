@@ -361,13 +361,10 @@ TEST(Serializer, Arguments) {
                 fxt::Argument(arg_name, true), fxt::Argument(arg_name, int32_t{0x12345678}),
                 fxt::Argument(arg_name, uint32_t{0x567890AB}),
                 fxt::Argument(arg_name, int64_t{0x1234'5678'90AB'CDEF}),
-                fxt::Argument<fxt::ArgumentType::kUint64, fxt::RefType::kId>(
-                    arg_name, uint64_t{0xFEDC'BA09'8765'4321}),
+                fxt::Argument(arg_name, uint64_t{0xFEDC'BA09'8765'4321}),
                 fxt::Argument(arg_name, double{1234.5678}),
-                fxt::Argument<fxt::ArgumentType::kPointer, fxt::RefType::kId>(
-                    arg_name, uintptr_t{0xDEADBEEF}),
-                fxt::Argument<fxt::ArgumentType::kKoid, fxt::RefType::kId>(arg_name,
-                                                                           zx_koid_t{0x12345678}),
+                fxt::Argument(arg_name, fxt::Pointer{0xDEADBEEF}),
+                fxt::Argument(arg_name, fxt::Koid{0x12345678}),
                 fxt::Argument(arg_name, fxt::StringRef(11)), fxt::Argument(arg_name, inline_string),
                 fxt::Argument(inline_string, inline_string)));
   uint64_t* bytes = reinterpret_cast<uint64_t*>(writer.bytes.data());
@@ -705,7 +702,7 @@ TEST(Serializer, KernelObjectRecord) {
   zx_obj_type_t obj_type = ZX_OBJ_TYPE_CHANNEL;
 
   FakeWriter writer;
-  EXPECT_EQ(ZX_OK, fxt::WriteKernelObjectRecord(&writer, koid, obj_type, name,
+  EXPECT_EQ(ZX_OK, fxt::WriteKernelObjectRecord(&writer, fxt::Koid(koid), obj_type, name,
                                                 fxt::Argument(arg_name, false)));
   // 1 word for the header, 1 for the pointer, 1 for the argument
   EXPECT_EQ(writer.bytes.size(), fxt::WordSize(3).SizeInBytes());
@@ -731,7 +728,7 @@ TEST(Serializer, KernelObjectRecordInlineNames) {
   zx_obj_type_t obj_type = ZX_OBJ_TYPE_CHANNEL;
 
   FakeWriter writer;
-  EXPECT_EQ(ZX_OK, fxt::WriteKernelObjectRecord(&writer, koid, obj_type, name,
+  EXPECT_EQ(ZX_OK, fxt::WriteKernelObjectRecord(&writer, fxt::Koid(koid), obj_type, name,
                                                 fxt::Argument(arg_name, false)));
   // 1 word for the header, 1 for the pointer, 1 for the argument
   EXPECT_EQ(writer.bytes.size(), fxt::WordSize(5).SizeInBytes());

@@ -506,24 +506,22 @@ void x86_exception_handler(iframe_t* frame) {
     // event. A context switch can occur if the page fault is fulfilled asynchronously by a pager.
     // Hence page fault events are emitted in the thread context, not the cpu context like other
     // irq's. See TAG_PAGE_FAULT in vmm_page_fault_handler().
-    fxt::Argument<fxt::ArgumentType::kUint64, fxt::RefType::kId> arg(
-        fxt::StringRef("irq #"_stringref->GetId()), entry_vector);
-    fxt_duration_begin(TAG_IRQ_ENTER, current_ticks(),
-                       fxt::ThreadRef(kNoProcess, kKernelPseudoCpuBase + arch_curr_cpu_num()),
-                       fxt::StringRef("kernel:irq"_stringref->GetId()),
-                       fxt::StringRef("irq"_stringref->GetId()), arg);
+    fxt_duration_begin(
+        TAG_IRQ_ENTER, current_ticks(),
+        fxt::ThreadRef(kNoProcess, fxt::Koid(kKernelPseudoCpuBase + arch_curr_cpu_num())),
+        fxt::StringRef("kernel:irq"_stringref->GetId()), fxt::StringRef("irq"_stringref->GetId()),
+        fxt::Argument(fxt::StringRef("irq #"_stringref->GetId()), entry_vector));
   }
 
   // deliver the interrupt
   handle_exception_types(frame);
 
   if (entry_vector != X86_INT_PAGE_FAULT && unlikely(ktrace_tag_enabled(TAG_IRQ_EXIT))) {
-    fxt::Argument<fxt::ArgumentType::kUint64, fxt::RefType::kId> arg(
-        fxt::StringRef("irq #"_stringref->GetId()), entry_vector);
-    fxt_duration_end(TAG_IRQ_EXIT, current_ticks(),
-                     fxt::ThreadRef(kNoProcess, kKernelPseudoCpuBase + arch_curr_cpu_num()),
-                     fxt::StringRef("kernel:irq"_stringref->GetId()),
-                     fxt::StringRef("irq"_stringref->GetId()), arg);
+    fxt_duration_end(
+        TAG_IRQ_EXIT, current_ticks(),
+        fxt::ThreadRef(kNoProcess, fxt::Koid(kKernelPseudoCpuBase + arch_curr_cpu_num())),
+        fxt::StringRef("kernel:irq"_stringref->GetId()), fxt::StringRef("irq"_stringref->GetId()),
+        fxt::Argument(fxt::StringRef("irq #"_stringref->GetId()), entry_vector));
   }
 
   bool do_preempt = int_handler_finish(&state);

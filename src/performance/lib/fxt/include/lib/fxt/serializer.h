@@ -103,23 +103,25 @@ class ThreadRef;
 template <>
 class ThreadRef<RefType::kInline> {
  public:
-  ThreadRef(zx_koid_t process, zx_koid_t thread) : process_(process), thread_(thread) {}
+  ThreadRef(zx_koid_t process, zx_koid_t thread) : process_(Koid(process)), thread_(Koid(thread)) {}
+  ThreadRef(Koid process, Koid thread) : process_(process), thread_(thread) {}
 
   static WordSize PayloadSize() { return WordSize(2); }
   static uint64_t HeaderEntry() { return 0; }
 
   template <typename Reservation>
   void Write(Reservation& res) const {
-    res.WriteWord(process_);
-    res.WriteWord(thread_);
+    res.WriteWord(process_.koid);
+    res.WriteWord(thread_.koid);
   }
 
  private:
-  zx_koid_t process_;
-  zx_koid_t thread_;
+  Koid process_;
+  Koid thread_;
 };
 #if __cplusplus >= 201703L
 ThreadRef(zx_koid_t, zx_koid_t)->ThreadRef<RefType::kInline>;
+ThreadRef(Koid, Koid)->ThreadRef<RefType::kInline>;
 #endif
 
 template <>
@@ -313,6 +315,10 @@ class Argument<ArgumentType::kUint64, name_type> {
   StringRef<name_type> name_;
   uint64_t val_;
 };
+#if __cplusplus >= 201703L
+template <RefType name_type>
+Argument(StringRef<name_type>, uint64_t) -> Argument<ArgumentType::kUint64, name_type>;
+#endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kDouble, name_type> {
@@ -346,7 +352,7 @@ Argument(StringRef<name_type>, double) -> Argument<ArgumentType::kDouble, name_t
 template <RefType name_type>
 class Argument<ArgumentType::kPointer, name_type> {
  public:
-  Argument(StringRef<name_type> name, uintptr_t val) : name_(name), val_(val) {}
+  Argument(StringRef<name_type> name, Pointer val) : name_(name), val_(val) {}
   WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize() + WordSize(1);
   }
@@ -360,18 +366,23 @@ class Argument<ArgumentType::kPointer, name_type> {
   void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
-    res.WriteWord(val_);
+    res.WriteWord(val_.ptr);
   }
 
  private:
   StringRef<name_type> name_;
-  uintptr_t val_;
+  Pointer val_;
 };
+
+#if __cplusplus >= 201703L
+template <RefType name_type>
+Argument(StringRef<name_type>, Pointer) -> Argument<ArgumentType::kPointer, name_type>;
+#endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kKoid, name_type> {
  public:
-  Argument(StringRef<name_type> name, zx_koid_t val) : name_(name), val_(val) {}
+  Argument(StringRef<name_type> name, Koid val) : name_(name), val_(val) {}
   WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize() + WordSize(1);
   }
@@ -385,13 +396,17 @@ class Argument<ArgumentType::kKoid, name_type> {
   void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
-    res.WriteWord(val_);
+    res.WriteWord(val_.koid);
   }
 
  private:
   StringRef<name_type> name_;
-  zx_koid_t val_;
+  Koid val_;
 };
+#if __cplusplus >= 201703L
+template <RefType name_type>
+Argument(StringRef<name_type>, Koid) -> Argument<ArgumentType::kKoid, name_type>;
+#endif
 
 template <RefType name_type, RefType val_type>
 class Argument<ArgumentType::kString, name_type, val_type> {
@@ -561,8 +576,7 @@ zx_status_t WriteStringRecord(Writer* writer, uint16_t index, const char* string
 //
 // See also: https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#thread-record
 template <typename Writer, internal::EnableIfWriter<Writer> = 0>
-zx_status_t WriteThreadRecord(Writer* writer, uint16_t index, zx_koid_t process_koid,
-                              zx_koid_t thread_koid) {
+zx_status_t WriteThreadRecord(Writer* writer, uint16_t index, Koid process_koid, Koid thread_koid) {
   const WordSize record_size(3);
   uint64_t header = MakeHeader(RecordType::kThread, record_size) |
                     fxt::ThreadRecordFields::ThreadIndex::Make(index);
@@ -950,7 +964,7 @@ zx_status_t WriteUserspaceObjectRecord(
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType name_type,
           ArgumentType... arg_types, RefType... arg_name_types, RefType... arg_val_types>
 zx_status_t WriteKernelObjectRecord(
-    Writer* writer, zx_koid_t koid, zx_obj_type_t obj_type, const StringRef<name_type>& name_arg,
+    Writer* writer, Koid koid, zx_obj_type_t obj_type, const StringRef<name_type>& name_arg,
     const Argument<arg_types, arg_name_types, arg_val_types>&... args) {
   WordSize record_size =
       WordSize(1) /*header*/ + WordSize(1) /*koid*/ + internal::TotalPayloadSize(name_arg, args...);
@@ -961,7 +975,7 @@ zx_status_t WriteKernelObjectRecord(
 
   zx::result<typename internal::WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
   if (res.is_ok()) {
-    res->WriteWord(koid);
+    res->WriteWord(koid.koid);
     name_arg.Write(*res);
     bool array[] = {(args.Write(*res), false)...};
     (void)array;

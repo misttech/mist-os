@@ -77,8 +77,7 @@ void ktrace_vcpu_exit(VcpuExit exit, uint64_t exit_address) {
     const Thread* current_thread = Thread::Current::Get();
     const fxt::ThreadRef thread{current_thread->pid(), current_thread->tid()};
     const fxt::StringRef category{"kernel:vcpu"_stringref->GetId()};
-    const fxt::Argument<fxt::ArgumentType::kUint64, fxt::RefType::kId> addr_arg{
-        fxt::StringRef{"exit_address"_stringref->GetId()}, exit_address};
+    const fxt::Argument addr_arg{fxt::StringRef{"exit_address"_stringref->GetId()}, exit_address};
     const fxt::StringRef name{"vcpu"_stringref->GetId()};
 
     if (exit < VCPU_EXIT_COUNT) {

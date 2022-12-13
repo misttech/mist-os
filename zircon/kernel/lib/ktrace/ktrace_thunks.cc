@@ -28,7 +28,7 @@ void fxt_kernel_object(uint32_t tag, bool always, zx_koid_t koid, zx_obj_type_t 
                        const fxt::StringRef<name_type>& name_arg,
                        const fxt::Argument<arg_types, arg_name_types, arg_val_types>&... args) {
   if (always || unlikely(KTRACE_STATE.tag_enabled(tag))) {
-    fxt::WriteKernelObjectRecord(&KTRACE_STATE, koid, obj_type, name_arg, args...);
+    fxt::WriteKernelObjectRecord(&KTRACE_STATE, fxt::Koid(koid), obj_type, name_arg, args...);
   }
 }
 
@@ -193,6 +193,11 @@ template void fxt_duration_begin(
     uint32_t tag, uint64_t timestamp, const fxt::ThreadRef<fxt::RefType::kInline>& thread_ref,
     const fxt::StringRef<fxt::RefType::kId>& category_ref,
     const fxt::StringRef<fxt::RefType::kId>& name_ref,
+    const fxt::Argument<fxt::ArgumentType::kInt32, fxt::RefType::kId, fxt::RefType::kId>& arg);
+template void fxt_duration_begin(
+    uint32_t tag, uint64_t timestamp, const fxt::ThreadRef<fxt::RefType::kInline>& thread_ref,
+    const fxt::StringRef<fxt::RefType::kId>& category_ref,
+    const fxt::StringRef<fxt::RefType::kId>& name_ref,
     const fxt::Argument<fxt::ArgumentType::kUint32, fxt::RefType::kId, fxt::RefType::kId>& arg);
 template void fxt_duration_begin(
     uint32_t tag, uint64_t timestamp, const fxt::ThreadRef<fxt::RefType::kInline>& thread_ref,
@@ -222,6 +227,11 @@ template void fxt_duration_end(uint32_t tag, uint64_t timestamp,
                                const fxt::ThreadRef<fxt::RefType::kInline>& thread_ref,
                                const fxt::StringRef<fxt::RefType::kId>& category_ref,
                                const fxt::StringRef<fxt::RefType::kId>& name_ref);
+template void fxt_duration_end(
+    uint32_t tag, uint64_t timestamp, const fxt::ThreadRef<fxt::RefType::kInline>& thread_ref,
+    const fxt::StringRef<fxt::RefType::kId>& category_ref,
+    const fxt::StringRef<fxt::RefType::kId>& name_ref,
+    const fxt::Argument<fxt::ArgumentType::kInt32, fxt::RefType::kId, fxt::RefType::kId>& arg);
 template void fxt_duration_end(
     uint32_t tag, uint64_t timestamp, const fxt::ThreadRef<fxt::RefType::kInline>& thread_ref,
     const fxt::StringRef<fxt::RefType::kId>& category_ref,
