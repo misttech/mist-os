@@ -6,10 +6,12 @@
 {
     include: [ "//src/testing/system-validation/web/tests/meta/web_system_validation_base.cml" ],
     program: {
-        // Args for ui_app_controller
+        // Args for ui_app_instrumentor
         args: [
             "--run-duration-sec",
             "10",
+            "--trace-config",
+            "benchmark,devtools.timeline,toplevel,v8,blink,netlog,gfx,system_metrics,app,view",
         ],
     },
     children: [

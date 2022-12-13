@@ -18,10 +18,10 @@ mod single_session_trace;
 /// Specify them through *_system_validation.cml
 #[derive(FromArgs, PartialEq, Debug)]
 struct RunTestCmd {
-    /// trace configurations
-    /// example: --trace-config "system_metrics" --trace-config "input"
+    /// trace configurations, input is a comma delimited string
+    /// example: --trace-config "system_metrics,input,gfx"
     #[argh(option)]
-    trace_config: Vec<String>,
+    trace_config: Option<String>,
 
     /// number of seconds to run example app
     #[argh(option)]
@@ -57,10 +57,12 @@ async fn main() {
 
     // Collect trace.
     let trace = SingleSessionTrace::new();
-    let collect_trace = args.trace_config.len() > 0;
+    let collect_trace = args.trace_config.is_some();
     if collect_trace {
-        info!("Collecting trace: {:?}", args.trace_config);
-        trace.initialize(args.trace_config).await.unwrap();
+        let trace_configs: Vec<String> =
+            args.trace_config.unwrap().split(',').map(|v| v.trim().to_string()).collect();
+        info!("Collecting trace: {:?}", trace_configs);
+        trace.initialize(trace_configs).await.unwrap();
         trace.start().await.unwrap();
     }
     // Let the UI App run for [run_duration_sec], then the test_runner will shutdown the sample_app

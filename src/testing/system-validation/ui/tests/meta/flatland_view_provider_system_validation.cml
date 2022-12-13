@@ -7,15 +7,7 @@
         // Args for ui_app_controller
         args: [
             "--trace-config",
-            "input",
-            "--trace-config",
-            "gfx",
-            "--trace-config",
-            "magma",
-            "--trace-config",
-            "system_metrics",
-            "--trace-config",
-            "system_metrics_logger",
+            "input,gfx,magma,system_metrics,system_metrics_logger",
         ],
     },
     children: [
