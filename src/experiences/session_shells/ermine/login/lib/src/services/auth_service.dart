@@ -180,6 +180,7 @@ class AuthService {
         account: _account!.ctrl.request(),
       ));
     } else {
+      _account = faccount.AccountProxy();
       await _accountManager.deprecatedProvisionNewAccount(
         password,
         metadata,
