@@ -20,7 +20,8 @@ namespace ramdevice_client {
 
 // A client library for creating, configuring and manipulating ramnands.
 // ```
-// ASSERT_EQ(ZX_OK, wait_for_device("/dev/sys/platform/00:00:2e/nand-ctl", ZX_SEC(60)));
+// ASSERT_EQ(ZX_OK, device_watcher::RecursiveWaitForFile("/dev/sys/platform/00:00:2e/nand-ctl",
+//   zx::sec(60)).status_value());
 // fuchsia_hardware_nand::wire::RamNandInfo ram_nand_config = {
 //   .nand_info = {
 //     .page_size = 4096,

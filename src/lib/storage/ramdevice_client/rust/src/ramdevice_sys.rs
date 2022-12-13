@@ -9,10 +9,8 @@
 pub type __uint8_t = ::std::os::raw::c_uchar;
 pub type __int32_t = ::std::os::raw::c_int;
 pub type __uint32_t = ::std::os::raw::c_uint;
-pub type __int64_t = ::std::os::raw::c_long;
 pub type __uint64_t = ::std::os::raw::c_ulong;
 pub type size_t = ::std::os::raw::c_ulong;
-pub type zx_duration_t = i64;
 pub type zx_handle_t = u32;
 pub type zx_status_t = i32;
 #[repr(C)]
@@ -21,19 +19,6 @@ pub struct ramdisk_client {
     _unused: [u8; 0],
 }
 pub type ramdisk_client_t = ramdisk_client;
-extern "C" {
-    pub fn wait_for_device(
-        path: *const ::std::os::raw::c_char,
-        timeout: zx_duration_t,
-    ) -> zx_status_t;
-}
-extern "C" {
-    pub fn wait_for_device_at(
-        dirfd: ::std::os::raw::c_int,
-        path: *const ::std::os::raw::c_char,
-        timeout: zx_duration_t,
-    ) -> zx_status_t;
-}
 extern "C" {
     pub fn ramdisk_create(
         blk_size: u64,

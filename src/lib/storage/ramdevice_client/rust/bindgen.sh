@@ -35,7 +35,7 @@ readonly OUTPUT="src/ramdevice_sys.rs"
     --disable-header-comment \
     --no-layout-tests \
     --raw-line "${RAW_LINES}" \
-    --allowlist-function '(ramdisk_|wait_for_device).*' \
+    --allowlist-function 'ramdisk_.*' \
     --output "${OUTPUT}" \
     -- \
     -I "${FUCHSIA_DIR}"/zircon/system/public

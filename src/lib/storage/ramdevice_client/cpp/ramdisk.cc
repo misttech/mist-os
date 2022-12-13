@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.hardware.ramdisk/cpp/wire.h>
 #include <inttypes.h>
 #include <lib/component/incoming/cpp/service_client.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
@@ -46,72 +47,6 @@ constexpr char kRamctlPath[] = "sys/platform/00:00:2d/ramctl";
 constexpr char kBlockExtension[] = "block";
 constexpr zx::duration kDeviceWaitTime = zx::sec(10);
 
-static zx_status_t driver_watcher_cb(int dirfd, int event, const char* fn, void* cookie) {
-  char* wanted = static_cast<char*>(cookie);
-  if (event == WATCH_EVENT_ADD_FILE && strcmp(fn, wanted) == 0) {
-    return ZX_ERR_STOP;
-  }
-  return ZX_OK;
-}
-
-static zx_status_t wait_for_device_impl(int dir_fd, char* path, const zx::time& deadline) {
-  // Peel off last path segment
-  char* sep = strrchr(path, '/');
-  if (path[0] == '\0' || (!sep)) {
-    fprintf(stderr, "invalid device path '%s'\n", path);
-    return ZX_ERR_BAD_PATH;
-  }
-  char* last = sep + 1;
-
-  *sep = '\0';
-  auto restore_path = fit::defer([sep] { *sep = '/'; });
-
-  // Recursively check the path up to this point
-  struct stat buf;
-  if (fstatat(dir_fd, path, &buf, 0) != 0) {
-    if (zx_status_t status = wait_for_device_impl(dir_fd, path, deadline); status != ZX_OK) {
-      fprintf(stderr, "failed to bind '%s': %s\n", path, zx_status_get_string(status));
-      return status;
-    }
-  }
-
-  // Early exit if this segment is empty
-  if (last[0] == '\0') {
-    return ZX_OK;
-  }
-
-  // Open the parent directory
-  fbl::unique_fd parent_dir(openat(dir_fd, path, O_RDONLY | O_DIRECTORY));
-  if (!parent_dir) {
-    fprintf(stderr, "unable to open '%s'\n", path);
-    return ZX_ERR_NOT_FOUND;
-  }
-
-  // Wait for the next path segment to show up
-  if (zx_status_t status =
-          fdio_watch_directory(parent_dir.get(), driver_watcher_cb, deadline.get(), last);
-      status != ZX_ERR_STOP) {
-    fprintf(stderr, "error when waiting for '%s': %s\n", last, zx_status_get_string(status));
-    return status;
-  }
-
-  return ZX_OK;
-}
-
-__EXPORT
-zx_status_t wait_for_device_at(int dirfd, const char* path, zx_duration_t timeout) {
-  if (!path || timeout == 0) {
-    fprintf(stderr, "invalid args: path='%s', timeout=%" PRIu64 "\n", path, timeout);
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  // Make a mutable copy
-  char tmp[PATH_MAX];
-  snprintf(tmp, sizeof(tmp), "%s", path);
-  zx::time deadline = zx::deadline_after(zx::duration(timeout));
-  return wait_for_device_impl(dirfd, tmp, deadline);
-}
-
 struct ramdisk_client {
  public:
   DISALLOW_COPY_ASSIGN_AND_MOVE(ramdisk_client);
@@ -146,20 +81,16 @@ struct ramdisk_client {
       ramdisk_client::DestroyByHandle(std::move(ramdisk_interface.value()));
     });
 
-    zx_status_t status = wait_for_device_at(dirfd.get(), block_path.c_str(), duration.get());
-    if (status != ZX_OK) {
-      return status;
-    }
-
-    zx::result block_interface =
-        component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), block_path);
-    if (block_interface.is_error()) {
-      return block_interface.status_value();
+    zx::result channel =
+        device_watcher::RecursiveWaitForFile(dirfd.get(), block_path.c_str(), duration);
+    if (channel.is_error()) {
+      return channel.error_value();
     }
     cleanup.cancel();
     *out = std::unique_ptr<ramdisk_client>(new ramdisk_client(
         std::move(dirfd), std::move(path), std::move(block_path),
-        std::move(ramdisk_interface.value()), std::move(block_interface.value())));
+        std::move(ramdisk_interface.value()),
+        fidl::ClientEnd<fuchsia_hardware_block::Block>{std::move(channel.value())}));
     return ZX_OK;
   }
 
@@ -177,37 +108,28 @@ struct ramdisk_client {
     // Ramdisk paths have the form: /dev/.../ramctl/ramdisk-xxx/block.
     // To rebind successfully, first, we rebind the "ramdisk-xxx" path,
     // and then we wait for "block" to rebind.
+    char ramdisk_path[PATH_MAX];
 
     // Wait for the "ramdisk-xxx" path to rebind.
-    const char* sep = strrchr(relative_path_.c_str(), '/');
-    char ramdisk_path[PATH_MAX];
-    strlcpy(ramdisk_path, relative_path_.c_str(), sep - relative_path_.c_str() + 1);
-    if (zx_status_t status = wait_for_device_impl(dev_root_fd_.get(), ramdisk_path,
-                                                  zx::deadline_after(kDeviceWaitTime));
-        status != ZX_OK) {
-      return status;
+    {
+      const char* sep = strrchr(relative_path_.c_str(), '/');
+      strlcpy(ramdisk_path, relative_path_.c_str(), sep - relative_path_.c_str() + 1);
+      zx::result channel =
+          device_watcher::RecursiveWaitForFile(dev_root_fd_.get(), ramdisk_path, kDeviceWaitTime);
+      if (channel.is_error()) {
+        return channel.error_value();
+      }
+      ramdisk_interface_.channel() = std::move(channel.value());
     }
-    fdio_cpp::UnownedFdioCaller caller(dev_root_fd_);
-    zx::result ramdisk_interface =
-        component::ConnectAt<fuchsia_hardware_ramdisk::Ramdisk>(caller.directory(), ramdisk_path);
-    if (ramdisk_interface.is_error()) {
-      return ramdisk_interface.status_value();
-    }
-    ramdisk_interface_ = std::move(ramdisk_interface.value());
 
     // Wait for the "block" path to rebind.
     strlcpy(ramdisk_path, relative_path_.c_str(), sizeof(ramdisk_path));
-    if (zx_status_t status = wait_for_device_impl(dev_root_fd_.get(), ramdisk_path,
-                                                  zx::deadline_after(kDeviceWaitTime));
-        status != ZX_OK) {
-      return status;
+    zx::result channel =
+        device_watcher::RecursiveWaitForFile(dev_root_fd_.get(), ramdisk_path, kDeviceWaitTime);
+    if (channel.is_error()) {
+      return channel.error_value();
     }
-    zx::result block_interface =
-        component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), relative_path_);
-    if (block_interface.is_error()) {
-      return block_interface.status_value();
-    }
-    block_interface_ = std::move(block_interface.value());
+    block_interface_.channel() = std::move(channel.value());
     return ZX_OK;
   }
 
@@ -274,13 +196,6 @@ struct ramdisk_client {
   fidl::ClientEnd<fuchsia_hardware_ramdisk::Ramdisk> ramdisk_interface_;
   fidl::ClientEnd<fuchsia_hardware_block::Block> block_interface_;
 };
-
-// TODO(aarongreen): This is more generic than just fs-management, or even block devices.  Move this
-// (and its tests) out of ramdisk and to somewhere else?
-__EXPORT
-zx_status_t wait_for_device(const char* path, zx_duration_t timeout) {
-  return wait_for_device_at(/*dirfd=*/-1, path, timeout);
-}
 
 static zx::result<fidl::ClientEnd<fuchsia_hardware_ramdisk::RamdiskController>> open_ramctl(
     int dev_root_fd) {

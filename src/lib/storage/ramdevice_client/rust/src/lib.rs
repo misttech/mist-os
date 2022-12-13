@@ -55,10 +55,8 @@ impl VmoRamdiskClientBuilder {
         self
     }
 
-    /// Create the ramdisk without waiting for its presence in devfs.
-    ///
-    /// TODO: remove this after soft transition in v/g.
-    pub fn build_sync(self) -> Result<RamdiskClient, zx::Status> {
+    // This method is not async because its body contains raw pointers, which are not Send.
+    fn build_sync(self) -> Result<RamdiskClient, zx::Status> {
         let Self { vmo, block_size, dev_root, guid } = self;
         let vmo_handle = vmo.into_raw();
         let mut ramdisk: *mut ramdevice_sys::ramdisk_client_t = ptr::null_mut();
@@ -146,10 +144,8 @@ impl RamdiskClientBuilder {
         self
     }
 
-    /// Create the ramdisk without waiting for its presence in devfs.
-    ///
-    /// TODO: remove this after soft transition in v/g.
-    pub fn build_sync(self) -> Result<RamdiskClient, zx::Status> {
+    // This method is not async because its body contains raw pointers, which are not Send.
+    fn build_sync(self) -> Result<RamdiskClient, zx::Status> {
         let Self { block_size, block_count, dev_root, guid } = self;
         let type_guid: *const u8 =
             if let Some(guid) = guid.as_ref() { guid.as_ptr() } else { std::ptr::null() };
@@ -291,26 +287,6 @@ impl Drop for RamdiskClient {
         let Self { ramdisk } = self;
         let _ = unsafe { ramdevice_sys::ramdisk_destroy(*ramdisk) };
     }
-}
-
-/// Wait for no longer than |duration| for the device at |path| to appear.
-pub fn wait_for_device(path: &str, duration: std::time::Duration) -> Result<(), Error> {
-    let c_path = ffi::CString::new(path)?;
-    let nanos = duration.as_nanos().try_into()?;
-    Ok(zx::Status::ok(unsafe { ramdevice_sys::wait_for_device(c_path.as_ptr(), nanos) })?)
-}
-
-/// Wait for no longer than |duration| for the device at |path| relative to |dirfd| to appear.
-pub fn wait_for_device_at(
-    dirfd: &fs::File,
-    path: &str,
-    duration: std::time::Duration,
-) -> Result<(), Error> {
-    let c_path = ffi::CString::new(path)?;
-    let nanos = duration.as_nanos().try_into()?;
-    Ok(zx::Status::ok(unsafe {
-        ramdevice_sys::wait_for_device_at(dirfd.as_raw_fd(), c_path.as_ptr(), nanos)
-    })?)
 }
 
 #[cfg(test)]
