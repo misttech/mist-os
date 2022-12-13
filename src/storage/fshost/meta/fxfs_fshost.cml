@@ -37,7 +37,10 @@
             ],
         },
         {
-            protocol: [ "fuchsia.memorypressure.Provider" ],
+            protocol: [
+                "fuchsia.memorypressure.Provider",
+                "fuchsia.tracing.provider.Registry",
+            ],
             from: "parent",
             to: "#fxfs",
             availability: "optional",

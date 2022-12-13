@@ -8,7 +8,6 @@
         "//sdk/lib/syslog/client.shard.cml",
         "//src/lib/storage/fs_management/client.shard.cml",
         "//src/storage/fs_test/meta/fxfs_crypt_test.shard.cml",
-        "//src/storage/fxfs/meta/test_fxfs.shard.cml",
     ],
     program: {
         binary: "bin/fuchsia_storage_benchmarks",
@@ -41,6 +40,14 @@
             protocol: [ "fuchsia.logger.LogSink" ],
             from: "parent",
             to: "#memfs",
+        },
+        {
+            protocol: [ "fuchsia.tracing.provider.Registry" ],
+            from: "parent",
+            to: [
+                "#fs-collection",
+                "#memfs",
+            ],
         },
     ],
     facets: {

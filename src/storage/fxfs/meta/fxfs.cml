@@ -34,7 +34,10 @@
     ],
     use: [
         {
-            protocol: "fuchsia.memorypressure.Provider",
+            protocol: [
+                "fuchsia.memorypressure.Provider",
+                "fuchsia.tracing.provider.Registry",
+            ],
             availability: "optional",
         },
     ],
