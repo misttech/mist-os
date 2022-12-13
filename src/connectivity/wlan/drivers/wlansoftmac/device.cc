@@ -391,12 +391,6 @@ zx_status_t Device::Bind(fdf::Channel channel) __TA_NO_THREAD_SAFETY_ANALYSIS {
 }
 
 zx_status_t Device::AddEthDevice() {
-  const zx_device_str_prop_t props[] = {
-      {
-          .key = "fuchsia.ethernet.NETDEVICE_MIGRATION",
-          .property_value = str_prop_bool_val(true),
-      },
-  };
   device_add_args_t args = {};
   args.version = DEVICE_ADD_ARGS_VERSION;
   args.name = "wlansoftmac-ethernet";
@@ -404,8 +398,6 @@ zx_status_t Device::AddEthDevice() {
   args.ops = &eth_device_ops;
   args.proto_id = ZX_PROTOCOL_ETHERNET_IMPL;
   args.proto_ops = &ethernet_impl_ops;
-  args.str_props = props;
-  args.str_prop_count = std::size(props);
   return device_add(parent_, &args, &ethdev_);
 }
 
