@@ -12,7 +12,7 @@ use {
     fidl_fuchsia_hardware_block::BlockProxy,
     fidl_fuchsia_hardware_block_partition::PartitionMarker,
     fidl_fuchsia_io as fio,
-    fs_management::{filesystem::Filesystem, Blobfs},
+    fs_management::Blobfs,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_zircon as zx,
     remote_block_device::{BlockClient, MutableBufferSlice, RemoteBlockClient},
@@ -116,19 +116,11 @@ async fn blobfs_formatted() {
         })
         .await
         .unwrap();
-        let blobfs = Filesystem::from_channel(
-            block.into_channel().unwrap().into(),
-            Blobfs {
-                verbose: false,
-                readonly: false,
-                blob_deprecated_padded_format: false, // default is false for integration tests
-                ..Default::default()
-            },
-        )
-        .unwrap()
-        .serve()
-        .await
-        .unwrap();
+        let blobfs = Blobfs::from_channel(block.into_channel().unwrap().into())
+            .unwrap()
+            .serve()
+            .await
+            .unwrap();
 
         let blobfs_root = blobfs.root();
         write_test_blob(blobfs_root).await;

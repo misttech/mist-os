@@ -18,6 +18,9 @@ use {
     anyhow::Error,
     cstr::cstr,
     fdio::{spawn_etc, SpawnAction, SpawnOptions},
+    fidl_fuchsia_fs_startup::{
+        CompressionAlgorithm, EvictionPolicyOverride, FormatOptions, StartOptions,
+    },
     fuchsia_zircon as zx,
     std::{ffi::CStr, sync::Arc},
 };
@@ -73,6 +76,12 @@ pub enum Mode<'a> {
         /// It should be possible to reuse components after serving them, but it's not universally
         /// supported.
         reuse_component_after_serving: bool,
+
+        /// Format options as defined by the startup protocol
+        format_options: FormatOptions,
+
+        /// Start options as defined by the startup protocol
+        start_options: StartOptions,
     },
 }
 
@@ -146,8 +155,6 @@ pub enum BlobLayout {
 /// Compression used for blobs in blobfs
 #[derive(Clone)]
 pub enum BlobCompression {
-    ZSTD,
-    ZSTDSeekable,
     ZSTDChunked,
     Uncompressed,
 }
@@ -163,11 +170,16 @@ pub enum BlobEvictionPolicy {
 /// If fields are None or false, they will not be set in arguments.
 #[derive(Clone, Default)]
 pub struct Blobfs {
+    // Format options
     pub verbose: bool,
+    pub deprecated_padded_blobfs_format: bool,
+    pub num_inodes: u64,
+    // Start Options
     pub readonly: bool,
-    pub blob_deprecated_padded_format: bool,
-    pub blob_compression: Option<BlobCompression>,
-    pub blob_eviction_policy: Option<BlobEvictionPolicy>,
+    pub sandbox_decompression: bool,
+    pub write_compression_algorithm: Option<BlobCompression>,
+    pub write_compression_level: Option<i32>,
+    pub cache_eviction_policy_override: Option<BlobEvictionPolicy>,
 }
 
 impl Blobfs {
@@ -186,7 +198,42 @@ impl Blobfs {
 
 impl FSConfig for Blobfs {
     fn mode(&self) -> Mode<'_> {
-        Mode::Component { name: "blobfs", reuse_component_after_serving: false }
+        Mode::Component {
+            name: "blobfs",
+            reuse_component_after_serving: false,
+            format_options: FormatOptions {
+                verbose: self.verbose,
+                deprecated_padded_blobfs_format: self.deprecated_padded_blobfs_format,
+                num_inodes: self.num_inodes,
+                fvm_data_slices: 0,
+            },
+            start_options: {
+                let mut start_options = StartOptions {
+                    read_only: self.readonly,
+                    verbose: self.verbose,
+                    sandbox_decompression: self.sandbox_decompression,
+                    fsck_after_every_transaction: false,
+                    write_compression_level: self.write_compression_level.unwrap_or(-1),
+                    write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
+                    cache_eviction_policy_override: EvictionPolicyOverride::None,
+                };
+                if let Some(compression) = &self.write_compression_algorithm {
+                    start_options.write_compression_algorithm = match compression {
+                        BlobCompression::ZSTDChunked => CompressionAlgorithm::ZstdChunked,
+                        BlobCompression::Uncompressed => CompressionAlgorithm::Uncompressed,
+                    }
+                }
+                if let Some(eviction) = &self.cache_eviction_policy_override {
+                    start_options.cache_eviction_policy_override = match eviction {
+                        BlobEvictionPolicy::NeverEvict => EvictionPolicyOverride::NeverEvict,
+                        BlobEvictionPolicy::EvictImmediately => {
+                            EvictionPolicyOverride::EvictImmediately
+                        }
+                    }
+                }
+                start_options
+            },
+        }
     }
 
     fn disk_format(&self) -> format::DiskFormat {
@@ -199,7 +246,10 @@ impl FSConfig for Blobfs {
 #[derive(Clone, Default)]
 pub struct Minfs {
     // TODO(xbhatnag): Add support for fvm_data_slices
+    // Format options
     pub verbose: bool,
+    pub fvm_data_slices: u32,
+    // Start Options
     pub readonly: bool,
     pub fsck_after_every_transaction: bool,
 }
@@ -220,7 +270,25 @@ impl Minfs {
 
 impl FSConfig for Minfs {
     fn mode(&self) -> Mode<'_> {
-        Mode::Component { name: "minfs", reuse_component_after_serving: false }
+        Mode::Component {
+            name: "minfs",
+            reuse_component_after_serving: false,
+            format_options: FormatOptions {
+                verbose: self.verbose,
+                deprecated_padded_blobfs_format: false,
+                num_inodes: 0,
+                fvm_data_slices: self.fvm_data_slices,
+            },
+            start_options: StartOptions {
+                read_only: self.readonly,
+                verbose: self.verbose,
+                sandbox_decompression: false,
+                fsck_after_every_transaction: self.fsck_after_every_transaction,
+                write_compression_level: -1,
+                write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
+                cache_eviction_policy_override: EvictionPolicyOverride::None,
+            },
+        }
     }
 
     fn disk_format(&self) -> format::DiskFormat {
@@ -290,16 +358,16 @@ pub type CryptClientFn = Arc<dyn Fn() -> zx::Channel + Send + Sync>;
 /// If fields are None or false, they will not be set in arguments.
 #[derive(Clone, Default)]
 pub struct Fxfs {
-    pub verbose: bool,
-    pub readonly: bool,
-
     // This is only used by fsck.
     pub crypt_client_fn: Option<CryptClientFn>,
+    // Start Options
+    pub readonly: bool,
+    pub fsck_after_every_transaction: bool,
 }
 
 impl Fxfs {
     pub fn with_crypt_client(crypt_client_fn: CryptClientFn) -> Self {
-        Fxfs { verbose: false, readonly: false, crypt_client_fn: Some(crypt_client_fn) }
+        Fxfs { crypt_client_fn: Some(crypt_client_fn), ..Default::default() }
     }
 
     /// Manages a block device at a given path using
@@ -317,7 +385,25 @@ impl Fxfs {
 
 impl FSConfig for Fxfs {
     fn mode(&self) -> Mode<'_> {
-        Mode::Component { name: "fxfs", reuse_component_after_serving: true }
+        Mode::Component {
+            name: "fxfs",
+            reuse_component_after_serving: true,
+            format_options: FormatOptions {
+                verbose: false,
+                deprecated_padded_blobfs_format: false,
+                num_inodes: 0,
+                fvm_data_slices: 0,
+            },
+            start_options: StartOptions {
+                read_only: self.readonly,
+                verbose: false,
+                sandbox_decompression: false,
+                fsck_after_every_transaction: self.fsck_after_every_transaction,
+                write_compression_level: -1,
+                write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
+                cache_eviction_policy_override: EvictionPolicyOverride::None,
+            },
+        }
     }
 
     fn crypt_client(&self) -> Option<zx::Channel> {
@@ -336,10 +422,7 @@ impl FSConfig for Fxfs {
 /// F2fs Filesystem Configuration
 /// If fields are None or false, they will not be set in arguments.
 #[derive(Clone, Default)]
-pub struct F2fs {
-    pub verbose: bool,
-    pub readonly: bool,
-}
+pub struct F2fs {}
 
 impl F2fs {
     /// Manages a block device at a given path using
@@ -357,7 +440,25 @@ impl F2fs {
 
 impl FSConfig for F2fs {
     fn mode(&self) -> Mode<'_> {
-        Mode::Component { name: "f2fs", reuse_component_after_serving: false }
+        Mode::Component {
+            name: "f2fs",
+            reuse_component_after_serving: false,
+            format_options: FormatOptions {
+                verbose: false,
+                deprecated_padded_blobfs_format: false,
+                num_inodes: 0,
+                fvm_data_slices: 0,
+            },
+            start_options: StartOptions {
+                read_only: false,
+                verbose: false,
+                sandbox_decompression: false,
+                fsck_after_every_transaction: false,
+                write_compression_level: -1,
+                write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
+                cache_eviction_policy_override: EvictionPolicyOverride::None,
+            },
+        }
     }
     fn is_multi_volume(&self) -> bool {
         false

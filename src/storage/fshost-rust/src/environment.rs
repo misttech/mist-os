@@ -143,10 +143,10 @@ impl<'a> Environment for FshostEnvironment<'a> {
 
         let mut blobfs = Blobfs::default();
         if let Some(compression) = self.boot_args.blobfs_write_compression_algorithm() {
-            blobfs.blob_compression = Some(compression);
+            blobfs.write_compression_algorithm = Some(compression);
         }
         if let Some(eviction) = self.boot_args.blobfs_eviction_policy() {
-            blobfs.blob_eviction_policy = Some(eviction);
+            blobfs.cache_eviction_policy_override = Some(eviction);
         }
         let fs = fs_management::filesystem::Filesystem::from_channel(
             device.proxy()?.into_channel().unwrap().into(),

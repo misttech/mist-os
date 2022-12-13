@@ -18,10 +18,7 @@ use {
     },
     fidl_fuchsia_component::{self as fcomponent, RealmMarker},
     fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_fs_startup::{
-        CheckOptions, CompressionAlgorithm, EvictionPolicyOverride, FormatOptions, StartOptions,
-        StartupMarker,
-    },
+    fidl_fuchsia_fs_startup::{CheckOptions, StartupMarker},
     fidl_fuchsia_fxfs::MountOptions,
     fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_io as fio,
     fuchsia_async::OnSignals,
@@ -165,11 +162,11 @@ impl<FSC: FSConfig> Filesystem<FSC> {
     /// Returns [`Err`] if the filesystem process failed to launch or returned a non-zero exit code.
     pub async fn format(&mut self) -> Result<(), Error> {
         match self.config.mode() {
-            Mode::Component { .. } => {
+            Mode::Component { mut format_options, .. } => {
                 let exposed_dir = self.get_component_exposed_dir().await?;
                 let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
                 proxy
-                    .format(self.get_block_handle()?.into(), &mut FormatOptions::new_empty())
+                    .format(self.get_block_handle()?.into(), &mut format_options)
                     .await?
                     .map_err(Status::from_raw)?;
             }
@@ -243,14 +240,13 @@ impl<FSC: FSConfig> Filesystem<FSC> {
         if self.config.is_multi_volume() {
             bail!("Can't serve a multivolume filesystem; use serve_multi_volume");
         }
-        if let Mode::Component { reuse_component_after_serving, .. } = self.config.mode() {
+        if let Mode::Component { mut start_options, reuse_component_after_serving, .. } =
+            self.config.mode()
+        {
             let exposed_dir = self.get_component_exposed_dir().await?;
             let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
-            let mut options = StartOptions::new_empty();
-            options.write_compression_algorithm = CompressionAlgorithm::ZstdChunked;
-            options.cache_eviction_policy_override = EvictionPolicyOverride::None;
             proxy
-                .start(self.get_block_handle()?.into(), &mut options)
+                .start(self.get_block_handle()?.into(), &mut start_options)
                 .await?
                 .map_err(Status::from_raw)?;
 
@@ -291,11 +287,11 @@ impl<FSC: FSConfig> Filesystem<FSC> {
         if !self.config.is_multi_volume() {
             bail!("Can't serve_multi_volume a single-volume filesystem; use serve");
         }
-        if let Mode::Component { .. } = self.config.mode() {
+        if let Mode::Component { mut start_options, .. } = self.config.mode() {
             let exposed_dir = self.get_component_exposed_dir().await?;
             let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
             proxy
-                .start(self.get_block_handle()?.into(), &mut StartOptions::new_empty())
+                .start(self.get_block_handle()?.into(), &mut start_options)
                 .await?
                 .map_err(Status::from_raw)?;
 
@@ -780,9 +776,9 @@ mod tests {
         let config = Blobfs {
             verbose: true,
             readonly: true,
-            blob_deprecated_padded_format: false,
-            blob_compression: Some(BlobCompression::Uncompressed),
-            blob_eviction_policy: Some(BlobEvictionPolicy::EvictImmediately),
+            write_compression_algorithm: Some(BlobCompression::Uncompressed),
+            cache_eviction_policy_override: Some(BlobEvictionPolicy::EvictImmediately),
+            ..Default::default()
         };
         let mut blobfs = new_fs(&ramdisk, config);
 
@@ -942,7 +938,12 @@ mod tests {
     async fn minfs_custom_config() {
         let block_size = 512;
         let ramdisk = ramdisk(block_size).await;
-        let config = Minfs { verbose: true, readonly: true, fsck_after_every_transaction: true };
+        let config = Minfs {
+            verbose: true,
+            readonly: true,
+            fsck_after_every_transaction: true,
+            ..Default::default()
+        };
         let mut minfs = new_fs(&ramdisk, config);
 
         minfs.format().await.expect("failed to format minfs");
@@ -1094,20 +1095,6 @@ mod tests {
         serving.shutdown().await.expect("failed to shutdown minfs");
 
         std::fs::File::open(test_path).expect_err("test file was not unbound");
-    }
-
-    #[fuchsia::test]
-    async fn f2fs_custom_config() {
-        let block_size = 4096;
-        let ramdisk = ramdisk(block_size).await;
-        let config = F2fs { verbose: true, readonly: true };
-        let mut f2fs = new_fs(&ramdisk, config);
-
-        f2fs.format().await.expect("failed to format f2fs");
-        f2fs.fsck().await.expect("failed to fsck f2fs");
-        let _ = f2fs.serve().await.expect("failed to serve f2fs");
-
-        ramdisk.destroy().expect("failed to destroy ramdisk");
     }
 
     #[fuchsia::test]
