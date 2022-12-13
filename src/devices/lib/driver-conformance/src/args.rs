@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    crate::{parser, results},
     anyhow::{anyhow, Result},
     argh::FromArgs,
     regex::Regex,
@@ -84,6 +85,22 @@ impl FromStr for OutputDirectory {
     }
 }
 
+/// Custom type to store a given list of device categories.
+#[derive(Default, Clone, PartialEq, Debug)]
+pub struct DeviceCategoryList(pub Vec<parser::DeviceCategory>);
+
+impl FromStr for DeviceCategoryList {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self> {
+        let mut ret: Vec<parser::DeviceCategory> = vec![];
+        for item in value.split(",") {
+            ret.push(parser::DeviceCategory::from_str(&item)?);
+        }
+        Ok(Self(ret))
+    }
+}
+
 /// Download or run driver conformance tests.
 #[derive(FromArgs, Debug, PartialEq)]
 #[argh(
@@ -136,9 +153,9 @@ pub struct TestCommand {
     #[argh(option)]
     pub types: Option<String>,
 
-    /// WIP. comma-separated list of test categories. e.g. imaging::camera,usb
+    /// comma-separated list of test categories. e.g. imaging::camera,usb
     #[argh(option)]
-    pub categories: Option<String>,
+    pub categories: Option<DeviceCategoryList>,
 
     /// comma-separated list of test components. e.g. fuchsia-pkg://fuchsia.dev/sometest#meta/sometest.cm,fuchsia-pkg://fuchsia.dev/test2#meta/othertest.cm
     #[argh(option)]
@@ -162,7 +179,7 @@ pub struct TestCommand {
 
     /// host type of the driver source. e.g. gerrit
     #[argh(option)]
-    pub source_host_type: Option<crate::results::SourceProvider>,
+    pub source_host_type: Option<results::SourceProvider>,
 
     /// name of the driver submission. Defaults to driver package URL.
     #[argh(option)]
@@ -325,5 +342,43 @@ mod test {
             Ok(_) => assert!(false, "This call should not pass."),
             Err(e) => assert_eq!(e.to_string(), "Version string cannot be empty."),
         }
+    }
+
+    #[test]
+    fn test_device_category_list_from_str_ok() {
+        let single_input = "a::b";
+        let single = DeviceCategoryList::from_str(single_input).unwrap();
+        let expected_single = DeviceCategoryList {
+            0: vec![parser::DeviceCategory {
+                category: "a".to_string(),
+                subcategory: "b".to_string(),
+            }],
+        };
+        assert_eq!(single, expected_single);
+
+        let multiple_input = vec!["a", "a::b", "c::d", "e"];
+        let expected_multiple = DeviceCategoryList {
+            0: vec![
+                parser::DeviceCategory { category: "a".to_string(), subcategory: "".to_string() },
+                parser::DeviceCategory { category: "a".to_string(), subcategory: "b".to_string() },
+                parser::DeviceCategory { category: "c".to_string(), subcategory: "d".to_string() },
+                parser::DeviceCategory { category: "e".to_string(), subcategory: "".to_string() },
+            ],
+        };
+        let multiple_csv = format!(
+            "{},{},{},{}",
+            multiple_input[0], multiple_input[1], multiple_input[2], multiple_input[3]
+        );
+        let multiple = DeviceCategoryList::from_str(multiple_csv.as_str()).unwrap();
+        assert_eq!(multiple, expected_multiple);
+    }
+
+    #[test]
+    fn test_device_category_list_from_str_err() {
+        let single = DeviceCategoryList::from_str(&"a::");
+        assert!(single.is_err());
+
+        let multiple = DeviceCategoryList::from_str(&"a::b,");
+        assert!(multiple.is_err());
     }
 }

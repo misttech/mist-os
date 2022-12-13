@@ -16,7 +16,7 @@ use {
         get_devices_by_driver, get_driver_by_device, get_driver_by_libname, Device,
     },
     futures::FutureExt,
-    parser::FilterTests,
+    parser::{FilterTests, ValidateAgainstMetadata},
     serde_json,
     signal_hook::{
         consts::signal::{SIGINT, SIGTERM},
@@ -150,7 +150,22 @@ fn validate_test_flags(cmd: &TestCommand) -> Result<()> {
         (true, _) | (_, Some(_)) => validate_license_dir(&cmd.licenses),
         _ => Ok(()),
     }?;
+
+    if cmd.tests.is_some() && (cmd.categories.is_some() || cmd.types.is_some()) {
+        ffx_bail!("--categories and --types are not allowed when --tests is provided.");
+    }
     Ok(())
+}
+
+fn validate_tests_are_subset(
+    all_available: &HashSet<parser::TestInfo>,
+    custom_set: &HashSet<parser::TestInfo>,
+) -> Result<()> {
+    if custom_set.is_subset(&all_available) {
+        Ok(())
+    } else {
+        Err(anyhow!("Custom set of tests contains at least one test that is incompatible with the given driver."))
+    }
 }
 
 /// Parse the FHCP metadata.
@@ -216,12 +231,18 @@ async fn get_driver_and_devices(
 /// Filter the test list down further, if necessary.
 fn filter_tests(
     cmd: &TestCommand,
+    metadata: &parser::TestMetadata,
     mut tests: HashSet<parser::TestInfo>,
 ) -> Result<HashSet<parser::TestInfo>> {
     if cmd.automated_only {
         tests.retain(|x| x.is_automated);
     } else if cmd.manual_only {
         tests.retain(|x| !x.is_automated);
+    }
+
+    if let Some(categories) = &cmd.categories {
+        let category_tests = metadata.tests_by_device_category(&categories.0[..])?;
+        tests.retain(|item| category_tests.contains(item));
     }
     Ok(tests)
 }
@@ -275,6 +296,9 @@ pub async fn conformance(
             validate_test_flags(&subcmd)?;
 
             let metadata = parse_metadata(&subcmd)?;
+            if let Some(categories) = &subcmd.categories {
+                metadata.validate_device_categories(&categories.0[..])?;
+            }
 
             let temp_dir_obj = tempfile::TempDir::new()?;
             let temp_output_path = temp_dir_obj.path();
@@ -296,32 +320,28 @@ pub async fn conformance(
             let (driver_info, _device_list) =
                 get_driver_and_devices(&subcmd, driver_connector).await?;
 
-            // TODO(fxb/113736): Enforce the custom list to be a strict subset of the available
-            // tests according to `get_tests_for_driver()`.
-            let filtered_tests: Option<HashSet<parser::TestInfo>>;
-            if let Some(custom_list) = &subcmd.tests {
-                filtered_tests = Some(metadata.tests_by_url(&custom_list.0[..])?);
-            } else {
-                filtered_tests = Some(metadata.tests_by_driver(&driver_info)?);
-            }
+            // The superset of possible tests to run against the given driver.
+            let tests_for_driver = metadata.tests_by_driver(&driver_info)?;
 
-            match filtered_tests {
-                Some(mut tests) => {
-                    tests = filter_tests(&subcmd, tests)?;
-                    if tests.is_empty() {
-                        println!("There were no tests to run for the given command.");
-                    }
-                    // We are ignoring the return value because we will read the results from
-                    // the report generated via `run_test_suite_lib::create_reporter()`.
-                    let _ = run_tests(
-                        tests,
-                        driver_connector.get_run_builder_proxy().await?,
-                        temp_output_path,
-                    )
-                    .await;
-                }
-                None => ffx_bail!("We were unable to create a list of tests to run."),
+            // If --tests was given, verify that it is a subset of possible tests and then skip
+            // any other filtering.
+            let tests = if let Some(custom_list) = &subcmd.tests {
+                let custom = metadata.tests_by_url(&custom_list.0[..]).unwrap();
+                validate_tests_are_subset(&tests_for_driver, &custom)?;
+                custom
+            } else {
+                filter_tests(&subcmd, &metadata, tests_for_driver)?
+            };
+
+            if tests.is_empty() {
+                println!("There were no tests to run for the given command.");
             }
+            // We are ignoring the return value because we will read the results from
+            // the report generated via `run_test_suite_lib::create_reporter()`.
+            let _ =
+                run_tests(tests, driver_connector.get_run_builder_proxy().await?, temp_output_path)
+                    .await;
+
             if let Some(output) = user_output_dir {
                 let file_path = generate_submission(
                     &subcmd,
@@ -535,6 +555,51 @@ mod test {
             ..Default::default()
         })
         .is_err());
+
+        assert!(validate_test_flags(&TestCommand {
+            driver: Some("val".to_string()),
+            tests: Some(args::TestList { 0: vec!["fuchsia-pkg://a.b/c#meta/d.cm".to_string()] }),
+            ..Default::default()
+        })
+        .is_ok());
+
+        assert!(validate_test_flags(&TestCommand {
+            driver: Some("val".to_string()),
+            tests: Some(args::TestList { 0: vec![] }),
+            categories: Some(args::DeviceCategoryList { 0: vec![] }),
+            ..Default::default()
+        })
+        .is_err());
+
+        assert!(validate_test_flags(&TestCommand {
+            driver: Some("val".to_string()),
+            tests: Some(args::TestList { 0: vec![] }),
+            categories: Some(args::DeviceCategoryList {
+                0: vec![parser::DeviceCategory {
+                    category: "a".to_string(),
+                    subcategory: "b".to_string()
+                }]
+            }),
+            ..Default::default()
+        })
+        .is_err());
+
+        assert!(validate_test_flags(&TestCommand {
+            driver: Some("val".to_string()),
+            tests: Some(args::TestList { 0: vec![] }),
+            types: Some("".to_string()),
+            ..Default::default()
+        })
+        .is_err());
+
+        assert!(validate_test_flags(&TestCommand {
+            driver: Some("val".to_string()),
+            tests: Some(args::TestList { 0: vec![] }),
+            categories: Some(args::DeviceCategoryList { 0: vec![] }),
+            types: Some("".to_string()),
+            ..Default::default()
+        })
+        .is_err());
     }
 
     #[test]
@@ -655,7 +720,7 @@ mod test {
     }
 
     #[test]
-    fn test_filter_tests() {
+    fn test_filter_tests_automated_vs_manual() {
         let tests = HashSet::from([
             parser::TestInfo {
                 url: "automated".to_string(),
@@ -668,13 +733,18 @@ mod test {
                 ..Default::default()
             },
         ]);
-        let test0 = filter_tests(&TestCommand { ..Default::default() }, tests.clone());
+        let test0 = filter_tests(
+            &TestCommand { ..Default::default() },
+            &parser::TestMetadata { ..Default::default() },
+            tests.clone(),
+        );
         assert!(test0.is_ok());
         let test0_val = test0.unwrap();
         assert_eq!(test0_val.len(), 2);
 
         let test1 = filter_tests(
             &TestCommand { automated_only: true, ..Default::default() },
+            &parser::TestMetadata { ..Default::default() },
             tests.clone(),
         );
         assert!(test1.is_ok());
@@ -689,8 +759,11 @@ mod test {
             }])
         );
 
-        let test2 =
-            filter_tests(&TestCommand { manual_only: true, ..Default::default() }, tests.clone());
+        let test2 = filter_tests(
+            &TestCommand { manual_only: true, ..Default::default() },
+            &parser::TestMetadata { ..Default::default() },
+            tests.clone(),
+        );
         assert!(test2.is_ok());
         let test2_val = test2.unwrap();
         assert_eq!(test2_val.len(), 1);
@@ -702,6 +775,137 @@ mod test {
                 ..Default::default()
             }])
         );
+    }
+
+    #[test]
+    fn test_filter_tests_by_categories() {
+        let metadata = parser::test::init_metadata();
+        // No category filter.
+        let tests0 = metadata
+            .tests_by_url(&vec![
+                "fuchsia-pkg://a/f#meta/g.cm".to_string(),
+                "fuchsia-pkg://a/d#meta/e.cm".to_string(),
+                "fuchsia-pkg://a/b#meta/c.cm".to_string(),
+            ])
+            .unwrap();
+        let test0 = filter_tests(&TestCommand { ..Default::default() }, &metadata, tests0.clone());
+        assert!(test0.is_ok());
+        let test0_val = test0.unwrap();
+        assert_eq!(test0_val.len(), 3);
+
+        // Match subset of original list. Also makes sure "fuchsia-pkg://a/f#meta/g.cm" does not
+        // end up matching as well.
+        let tests1 = tests0;
+        let test1 = filter_tests(
+            &TestCommand {
+                categories: Some(args::DeviceCategoryList(vec![parser::DeviceCategory {
+                    category: "imaging".to_string(),
+                    subcategory: "camera".to_string(),
+                }])),
+                ..Default::default()
+            },
+            &metadata,
+            tests1.clone(),
+        );
+        assert!(test1.is_ok());
+        let test1_val = test1.unwrap();
+        assert_eq!(
+            test1_val,
+            HashSet::from([parser::TestInfo {
+                url: "fuchsia-pkg://a/b#meta/c.cm".to_string(),
+                test_types: Box::new(["functional".to_string()]),
+                device_categories: Box::new([parser::DeviceCategory {
+                    category: "imaging".to_string(),
+                    subcategory: "camera".to_string(),
+                }]),
+                is_automated: true,
+                ..Default::default()
+            }])
+        );
+
+        // Empty original list.
+        let test2 = filter_tests(
+            &TestCommand {
+                categories: Some(args::DeviceCategoryList(vec![parser::DeviceCategory {
+                    category: "imaging".to_string(),
+                    subcategory: "camera".to_string(),
+                }])),
+                ..Default::default()
+            },
+            &metadata,
+            HashSet::from([]),
+        );
+        assert!(test2.is_ok());
+        let test2_val = test2.unwrap();
+        assert_eq!(test2_val.len(), 0);
+
+        // No overlap.
+        let tests3 = HashSet::from([
+            parser::TestInfo {
+                url: "thing".to_string(),
+                device_categories: Box::new([
+                    parser::DeviceCategory {
+                        category: "imaging".to_string(),
+                        subcategory: "camera".to_string(),
+                    },
+                    parser::DeviceCategory {
+                        category: "input".to_string(),
+                        subcategory: "touchpad".to_string(),
+                    },
+                ]),
+                ..Default::default()
+            },
+            parser::TestInfo {
+                url: "stuff".to_string(),
+                device_categories: Box::new([parser::DeviceCategory {
+                    category: "imaging".to_string(),
+                    subcategory: "camera".to_string(),
+                }]),
+                ..Default::default()
+            },
+        ]);
+        let test3 = filter_tests(
+            &TestCommand {
+                categories: Some(args::DeviceCategoryList(vec![parser::DeviceCategory {
+                    category: "imaging".to_string(),
+                    subcategory: "camera".to_string(),
+                }])),
+                ..Default::default()
+            },
+            &metadata,
+            tests3.clone(),
+        );
+        assert!(test3.is_ok());
+        let test3_val = test3.unwrap();
+        assert_eq!(test3_val.len(), 0);
+
+        // Full overlap.
+        let tests4 = metadata
+            .tests_by_url(&vec![
+                "fuchsia-pkg://a/d#meta/e.cm".to_string(),
+                "fuchsia-pkg://a/b#meta/c.cm".to_string(),
+            ])
+            .unwrap();
+        let test4 = filter_tests(
+            &TestCommand {
+                categories: Some(args::DeviceCategoryList(vec![
+                    parser::DeviceCategory {
+                        category: "imaging".to_string(),
+                        subcategory: "camera".to_string(),
+                    },
+                    parser::DeviceCategory {
+                        category: "misc".to_string(),
+                        subcategory: "".to_string(),
+                    },
+                ])),
+                ..Default::default()
+            },
+            &metadata,
+            tests4.clone(),
+        );
+        assert!(test4.is_ok());
+        let test4_val = test4.unwrap();
+        assert_eq!(test4_val.len(), 2);
     }
 
     fn create_dummy_ffx_test_results(output: &Path) -> Result<()> {

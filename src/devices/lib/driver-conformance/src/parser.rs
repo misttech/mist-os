@@ -7,6 +7,7 @@ use {
     fidl_fuchsia_driver_development as fdd,
     serde::Deserialize,
     std::collections::{HashMap, HashSet},
+    std::str::FromStr,
 };
 
 #[derive(Deserialize, Debug)]
@@ -16,6 +17,37 @@ pub struct PlaceholderEmptyDict {}
 pub struct DeviceCategory {
     pub category: String,
     pub subcategory: String,
+}
+
+impl FromStr for DeviceCategory {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self> {
+        let vec = value.split("::").collect::<Vec<&str>>();
+        match vec.len() {
+            1 => {
+                let val = vec[0].trim();
+                if val.is_empty() {
+                    Err(anyhow::anyhow!("Provided category is empty."))
+                } else {
+                    Ok(Self { category: val.to_string(), subcategory: "".to_string() })
+                }
+            }
+            2 => {
+                let val0 = vec[0].trim();
+                let val1 = vec[1].trim();
+                if val0.is_empty() || val1.is_empty() {
+                    Err(anyhow::anyhow!("Provided category is empty."))
+                } else {
+                    Ok(Self { category: val0.to_string(), subcategory: val1.to_string() })
+                }
+            }
+            _ => Err(anyhow::anyhow!(
+                "'{}' is an invalid category. Only expecting at most one '::'.",
+                value.to_string()
+            )),
+        }
+    }
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -29,7 +61,7 @@ pub struct TestInfo {
     pub is_automated: bool,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct TestMetadata {
     #[allow(unused)]
     pub certification_type: HashMap<String, PlaceholderEmptyDict>,
@@ -39,6 +71,35 @@ pub struct TestMetadata {
     pub driver_test_types: HashMap<String, PlaceholderEmptyDict>,
     pub device_category_types: HashMap<String, HashMap<String, PlaceholderEmptyDict>>,
     pub tests: Box<[TestInfo]>,
+}
+
+pub trait ValidateAgainstMetadata {
+    fn validate_device_categories(&self, list: &[DeviceCategory]) -> Result<()>;
+}
+
+impl ValidateAgainstMetadata for TestMetadata {
+    fn validate_device_categories(&self, list: &[DeviceCategory]) -> Result<()> {
+        for cat in list {
+            if self.device_category_types.contains_key(&cat.category) {
+                if !cat.subcategory.is_empty()
+                    && !self.device_category_types[&cat.category].contains_key(&cat.subcategory)
+                {
+                    return Err(anyhow!(
+                        "{}::{} is not a valid category.",
+                        &cat.category,
+                        &cat.subcategory
+                    ));
+                }
+            } else {
+                return Err(anyhow!(
+                    "{}::{} is not a valid category.",
+                    &cat.category,
+                    &cat.subcategory
+                ));
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Helper functions to filter the tests in the metadata by various criteria.
@@ -158,11 +219,12 @@ impl FilterTests for TestMetadata {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
+    use super::*;
     use crate::*;
     use fidl_fuchsia_driver_index as fdi;
 
-    fn init_metadata() -> parser::TestMetadata {
+    pub fn init_metadata() -> parser::TestMetadata {
         serde_json::from_str(
             r#"{
             "certification_type": {
@@ -394,5 +456,93 @@ mod test {
             ..fdd::DriverInfo::EMPTY
         });
         assert!(test5.is_err());
+    }
+
+    #[test]
+    fn test_test_device_category_from_str_ok() {
+        let test0 = "a::b";
+        let cat0 = parser::DeviceCategory::from_str(test0).unwrap();
+        assert_eq!(cat0.category, "a");
+        assert_eq!(cat0.subcategory, "b");
+
+        let test1 = "a";
+        let cat1 = parser::DeviceCategory::from_str(test1).unwrap();
+        assert_eq!(cat1.category, "a");
+        assert_eq!(cat1.subcategory, "");
+    }
+
+    #[test]
+    fn test_test_device_category_from_str_err() {
+        let empty = "";
+        let mut result = parser::DeviceCategory::from_str(empty);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), "Provided category is empty.");
+
+        let space = " ";
+        result = parser::DeviceCategory::from_str(space);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), "Provided category is empty.");
+
+        let empty_cat = "::b";
+        result = parser::DeviceCategory::from_str(empty_cat);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), "Provided category is empty.");
+
+        let empty_sub = "a::";
+        result = parser::DeviceCategory::from_str(empty_sub);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), "Provided category is empty.");
+
+        let trio = "a::b::c";
+        result = parser::DeviceCategory::from_str(trio);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), "'a::b::c' is an invalid category. Only expecting at most one '::'.");
+    }
+
+    #[test]
+    fn test_validate_device_categories_ok() {
+        let metadata = init_metadata();
+
+        let single = [parser::DeviceCategory {
+            category: "imaging".to_string(),
+            subcategory: "camera".to_string(),
+        }];
+        assert!(metadata.validate_device_categories(&single).is_ok());
+
+        let multiple = [
+            parser::DeviceCategory {
+                category: "imaging".to_string(),
+                subcategory: "camera".to_string(),
+            },
+            parser::DeviceCategory {
+                category: "input".to_string(),
+                subcategory: "mouse".to_string(),
+            },
+        ];
+        assert!(metadata.validate_device_categories(&multiple).is_ok());
+    }
+
+    #[test]
+    fn test_validate_device_categories_err() {
+        let metadata = init_metadata();
+
+        let single =
+            [parser::DeviceCategory { category: "a".to_string(), subcategory: "b".to_string() }];
+        match metadata.validate_device_categories(&single) {
+            Ok(_) => assert!(false, "This call should not pass."),
+            Err(e) => assert_eq!(e.to_string(), "a::b is not a valid category."),
+        }
+
+        let multiple = [
+            parser::DeviceCategory {
+                category: "imaging".to_string(),
+                subcategory: "camera".to_string(),
+            },
+            parser::DeviceCategory { category: "c".to_string(), subcategory: "d".to_string() },
+        ];
+        match metadata.validate_device_categories(&multiple) {
+            Ok(_) => assert!(false, "This call should not pass."),
+            Err(e) => assert_eq!(e.to_string(), "c::d is not a valid category."),
+        }
     }
 }
