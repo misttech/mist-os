@@ -21,6 +21,7 @@ def fast_copy_mock(
     that it's asked to perform in the passed-in list.
     """
     tracked_copies.append(FileEntry(source=src, destination=dst))
+    return src
 
 
 def create_fast_copy_mock_instance() -> Tuple[Callable, List[FileEntry]]:
@@ -36,4 +37,5 @@ def mock_fast_copy_in(context: Any) -> Tuple[Callable, List[FileEntry]]:
     """
     (mock_instance, copies) = create_fast_copy_mock_instance()
     context.fast_copy = mock_instance
+    context.fast_copy_makedirs = mock_instance
     return (mock_instance, copies)

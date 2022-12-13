@@ -58,6 +58,8 @@ impl ComponentBuilder {
             "compile".into(),
             "--includeroot".into(),
             include_path.as_ref().to_string(),
+            "--includepath".into(),
+            include_path.as_ref().to_string(),
             "-o".into(),
             cmfile.to_string(),
             cmlfile.to_string(),
@@ -119,6 +121,8 @@ mod tests {
                     "args": [
                         "compile",
                         "--includeroot",
+                        "include/path",
+                        "--includepath",
                         "include/path",
                         "-o",
                         outdir.join("test").join("test.cm").to_string(),

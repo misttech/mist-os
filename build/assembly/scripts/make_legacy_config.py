@@ -34,7 +34,8 @@ def copy_to_assembly_input_bundle(
     legacy: ImageAssemblyConfig, config_data_entries: FileEntryList,
     outdir: FilePath, base_driver_packages_list: List[str],
     base_driver_components_files_list: List[dict], shell_commands: Dict[str,
-                                                                        List]
+                                                                        List],
+    core_realm_shards: Set[FilePath], core_realm_includes: FileEntryList
 ) -> Tuple[AssemblyInputBundle, FilePath, DepSet]:
     """
     Copy all the artifacts from the ImageAssemblyConfig into an AssemblyInputBundle that is in
@@ -69,6 +70,12 @@ def copy_to_assembly_input_bundle(
     aib_creator.base_driver_component_files = base_driver_components_files_list
     aib_creator.config_data = config_data_entries
     aib_creator.shell_commands = shell_commands
+
+    # TODO(fxbug.dev/115630): allow other core package names
+    if (core_realm_shards):
+        aib_creator.component_shards = {"core": {"core": core_realm_shards}}
+        aib_creator.component_includes = {"core": core_realm_includes}
+
     return aib_creator.build()
 
 
@@ -91,6 +98,9 @@ def main():
         "--base-driver-components-files-list", type=argparse.FileType('r'))
     parser.add_argument(
         "--shell-commands-packages-list", type=argparse.FileType('r'))
+    parser.add_argument("--core-realm-shards-list", type=argparse.FileType('r'))
+    parser.add_argument(
+        "--core-realm-includes-list", type=argparse.FileType('r'))
     args = parser.parse_args()
 
     # Read in the legacy config and the others to subtract from it
@@ -134,6 +144,19 @@ def main():
                         if blob['path'].startswith("bin/")
                     })
 
+    core_realm_shards: Set[FilePath] = set()
+    core_realm_includes: List[FileEntry] = []
+    if args.core_realm_shards_list:
+        for shard in json.load(args.core_realm_shards_list):
+            core_realm_shards.add(shard)
+
+        # The source of a core realm include file is its location
+        # relative to the root_build_dir, while the destination
+        # is its location relative to the fuchsia root.
+        for include in json.load(args.core_realm_includes_list):
+            core_realm_includes.append(
+                FileEntry(include["source"], include["destination"]))
+
     # Create an Assembly Input Bundle from the remaining contents
     (assembly_input_bundle, assembly_config_manifest_path,
      deps) = copy_to_assembly_input_bundle(
@@ -141,7 +164,7 @@ def main():
          base_driver_components_files_list, {
              package: sorted(list(components))
              for (package, components) in shell_commands.items()
-         })
+         }, core_realm_shards, core_realm_includes)
 
     deps.update(shell_deps)
     # Write out a fini manifest of the files that have been copied, to create a

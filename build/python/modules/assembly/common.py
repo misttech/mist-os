@@ -75,7 +75,7 @@ class FileEntry:
             file.write("{}={}\n".format(dst, src))
 
 
-def fast_copy(src: FilePath, dst: FilePath, **kwargs) -> None:
+def fast_copy(src: FilePath, dst: FilePath, **kwargs) -> FilePath:
     """A wrapper around os and os.path fns to correctly copy a file using a
     hardlink.
     """
@@ -84,3 +84,15 @@ def fast_copy(src: FilePath, dst: FilePath, **kwargs) -> None:
         os.link(real_src_path, dst, **kwargs)
     except OSError:
         shutil.copy2(real_src_path, dst, **kwargs)
+
+    # Return src so it can be added to deps
+    return src
+
+
+def fast_copy_makedirs(src: FilePath, dst: FilePath, **kwargs) -> FilePath:
+    """Run `fast_copy`, making the destination directory if it doesn't exist"""
+    # Create parents if they don't exist
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+
+    # Hardlink the file from the source to the destination
+    return fast_copy(src, dst)

@@ -15,25 +15,26 @@ import os
 import pathlib
 import shutil
 import json
-from typing import Any, Dict, List, ItemsView, Optional, Set, TextIO, Tuple
+from typing import Any, Dict, List, ItemsView, Optional, Set, TextIO, Tuple, Union
 
 import serialization
 from serialization import json_dump, json_load, serialize_json
 
 from .image_assembly_config import ImageAssemblyConfig, KernelInfo
-from .common import FileEntry, FilePath, fast_copy
+from .common import FileEntry, FilePath, fast_copy, fast_copy_makedirs
 from .package_manifest import BlobEntry, PackageManifest, SubpackageEntry
 
 __all__ = [
     "AssemblyInputBundle", "AIBCreator", "ConfigDataEntries", "DriverDetails"
 ]
 
+PackageManifestList = List[FilePath]
+PackageName = str
+ComponentName = str
 DepSet = Set[FilePath]
 FileEntryList = List[FileEntry]
 FileEntrySet = Set[FileEntry]
-
-PackageManifestList = List[FilePath]
-PackageName = str
+ComponentShards = Dict[PackageName, Dict[ComponentName, Set[FilePath]]]
 Merkle = str
 BlobList = List[Tuple[Merkle, FilePath]]
 SubpackageManifests = Dict[Merkle, FilePath]
@@ -57,6 +58,31 @@ class DriverDetails:
     """Details for constructing a driver manifest fragment from a driver package"""
     package: FilePath = field()  # Path to the package manifest
     components: Set[FilePath] = field(default_factory=set)
+
+
+@dataclass
+@serialize_json
+class CompiledPackageMainDefinition:
+    """Primary definition of a compiled package which is created by Assembly"""
+    name: str = field()  # Name of the package
+    # Dictionary mapping components to cml files by name
+    components: Dict[str, FilePath] = field(default_factory=dict)
+    # Other files to include in the compiled package
+    contents: Set[FileEntry] = field(default_factory=set)
+    # CML files included by the component cml
+    includes: Set[FileEntry] = field(default_factory=set)
+
+
+@dataclass
+@serialize_json
+class CompiledPackageAdditionalShards:
+    """
+    Additional contents for a package defined by a CompiledPackageMainDefinition
+    """
+    # Name of the package
+    name: str = field()
+    # Additional component shards
+    component_shards: Dict[str, List[FilePath]] = field(default_factory=dict)
 
 
 @dataclass
@@ -90,6 +116,14 @@ class AssemblyInputBundle(ImageAssemblyConfig):
         config_data/
             <package name>/
                 <file name>
+        compiled_packages/
+            include/
+                path/to/shard/file/in/tree
+            <compiled package name>/
+                component_shards/
+                    path_to_input_file.cml
+                files/
+                    path/to/file/in/package
         kernel/
             kernel.zbi
             multiboot.bin
@@ -139,7 +173,31 @@ class AssemblyInputBundle(ImageAssemblyConfig):
             "shell_commands": {
                 "package1":
                     ["path/to/binary1", "path/to/binary2"]
-            }
+            },
+            "packages_to_compile": [
+               {
+                   "name": "package_name",
+                   "components": {
+                       "component1": "path/to/component1.cml",
+                       "component2": "path/to/component2.cml",
+                   },
+                   "contents:: [
+                       {
+                           "source": "path/to/source",
+                           "destination": "path/to/destination",
+                       }
+                   ]
+               },
+               {
+                  "name": "package_name",
+                  "component_shards": {
+                       "component1": [
+                           "path/to/shard1.cml",
+                           "path/to/shard2.cml"
+                       ]
+                  }
+               }
+             ]
         }
 
     All items are optional.  Files for `config_data` should be in the config_data section,
@@ -153,6 +211,9 @@ class AssemblyInputBundle(ImageAssemblyConfig):
     base_drivers: List[DriverDetails] = field(default_factory=list)
     shell_commands: Dict[str, List[str]] = field(
         default_factory=functools.partial(defaultdict, list))
+    packages_to_compile: List[Union[CompiledPackageMainDefinition,
+                                    CompiledPackageAdditionalShards]] = field(
+                                        default_factory=list)
 
     def __repr__(self) -> str:
         """Serialize to a JSON string"""
@@ -204,6 +265,20 @@ class AssemblyInputBundle(ImageAssemblyConfig):
             file_paths.extend([entry.source for entry in entries])
         if self.blobs is not None:
             file_paths.extend(self.blobs)
+
+        for package in self.packages_to_compile:
+            if isinstance(package, CompiledPackageMainDefinition):
+                file_paths.extend(package.includes)
+                file_paths.extend(package.components.values())
+            if isinstance(package, CompiledPackageAdditionalShards):
+                file_paths.extend(
+                    [
+                        # flatten
+                        component_path
+                        for shards in package.component_shards.values()
+                        for component_path in shards
+                    ])
+
         return file_paths
 
     def write_fini_manifest(
@@ -303,6 +378,17 @@ class AIBCreator:
         # A set containing the unique subpackage merkles, used to keep track of
         # which subpackages have already been copied.
         self.subpackages: Set[Merkle] = set()
+
+        # A dict mapping package name to dicts mapping component names to
+        # the component shards used to build them, which describes the
+        # components to build for each compiled package
+        self.component_shards: ComponentShards = dict()
+
+        # A set containing all the core realm shards included by the core
+        # package cml. These need to be placed in an include directory for
+        # the cml compiler in the AIB containing the core package definition.
+        # TODO(fxbug.dev/117397): Handle multiple packages properly
+        self.component_includes: Dict[PackageName, FileEntryList] = []
 
     def build(self) -> Tuple[AssemblyInputBundle, FilePath, DepSet]:
         """
@@ -407,9 +493,7 @@ class AIBCreator:
 
             # Copy the kernel itself into the out-of-tree layout
             local_kernel_dst_path = os.path.join(self.outdir, kernel_dst_path)
-            os.makedirs(os.path.dirname(local_kernel_dst_path), exist_ok=True)
-            fast_copy(kernel_src_path, local_kernel_dst_path)
-            deps.add(kernel_src_path)
+            deps.add(fast_copy_makedirs(kernel_src_path, local_kernel_dst_path))
 
         # Rebase the path to the qemu kernel into the out-of-tree layout
         if self.qemu_kernel:
@@ -420,9 +504,40 @@ class AIBCreator:
 
             # Copy the kernel itself into the out-of-tree layout
             local_kernel_dst_path = os.path.join(self.outdir, kernel_dst_path)
-            os.makedirs(os.path.dirname(local_kernel_dst_path), exist_ok=True)
-            fast_copy(kernel_src_path, local_kernel_dst_path)
-            deps.add(kernel_src_path)
+            deps.add(fast_copy_makedirs(kernel_src_path, local_kernel_dst_path))
+
+        if self.component_shards:
+            for package_name in self.component_shards.keys():
+                components = {}
+                for component_name in self.component_shards[package_name].keys(
+                ):
+                    component_files, component_deps = self._copy_component_shards(
+                        self.component_shards[package_name][component_name],
+                        package_name)
+
+                    deps.update(component_deps)
+
+                    components[component_name] = component_files
+
+                component_includes, component_includes_deps = self._copy_component_includes(
+                    self.component_includes[package_name])
+                deps.update(component_includes_deps)
+
+                result.packages_to_compile.append(
+                    CompiledPackageMainDefinition(
+                        name=package_name,
+                        components={
+                            component_name: components[component_name][0]
+                            for component_name in components.keys()
+                        },
+                        includes=component_includes))
+                result.packages_to_compile.append(
+                    CompiledPackageAdditionalShards(
+                        name=package_name,
+                        component_shards={
+                            component_name: components[component_name][1:]
+                            for component_name in components.keys()
+                        }))
 
         # Copy the config_data entries into the out-of-tree layout
         (config_data, config_data_deps) = self._copy_config_data_entries()
@@ -677,10 +792,46 @@ class AIBCreator:
             blob_path = _make_internal_blob_path(merkle)
             blob_destination = os.path.join(self.outdir, blob_path)
             blob_paths.append(blob_path)
-            fast_copy(source, blob_destination)
-            deps.add(source)
+            deps.add(fast_copy(source, blob_destination))
 
         return (blob_paths, deps)
+
+    def _copy_component_includes(
+            self,
+            component_includes: FileEntrySet) -> Tuple[Set[FilePath], DepSet]:
+        deps: DepSet = set()
+        shard_include_paths: Set[FilePath] = set()
+        for entry in component_includes:
+            # TODO(fxbug.dev/117397): Handle multiple packages properly
+            copy_destination = os.path.join(
+                self.outdir, "compiled_packages", "include", entry.destination)
+
+            # Hardlink the file from the source to the destination
+            deps.add(fast_copy_makedirs(entry.source, copy_destination))
+            shard_include_paths.add(copy_destination)
+
+        return shard_include_paths, deps
+
+    def _copy_component_shards(
+            self, component_shards: ComponentShards,
+            package_name: str) -> Tuple[List[FilePath], DepSet]:
+        shard_file_paths: List[FilePath] = list()
+        deps: DepSet = set()
+        for shard in component_shards:
+            # Copy the file to a destination based on its path in the source
+            # tree. Make sure any directory traversal characters are replaced
+            # and it's a valid filename.
+            copy_destination = os.path.join(
+                self.outdir, "compiled_packages", package_name,
+                "component_shards",
+                os.path.basename(
+                    shard.replace(os.path.sep, "_").replace(".", "_")))
+
+            # Hardlink the file from the source to the destination
+            deps.add(fast_copy_makedirs(shard, copy_destination))
+            shard_file_paths.append(copy_destination)
+
+        return shard_file_paths, deps
 
     def _copy_file_entries(self, entries: FileEntrySet,
                            set_name: str) -> Tuple[FileEntryList, DepSet]:
@@ -695,21 +846,15 @@ class AIBCreator:
             rebased_destination = os.path.join(set_name, entry.destination)
             copy_destination = os.path.join(self.outdir, rebased_destination)
 
-            # Create parents if they don't exist
-            os.makedirs(os.path.dirname(copy_destination), exist_ok=True)
-
             # Hardlink the file from source to the destination, relative to the
             # directory for all entries.
-            fast_copy(entry.source, copy_destination)
+            deps.add(fast_copy_makedirs(entry.source, copy_destination))
 
             # Make a new FileEntry, which has a source of the path within the
             # out-of-tree layout, and the same destination.
             results.append(
                 FileEntry(
                     source=rebased_destination, destination=entry.destination))
-
-            # Add the copied file's source/destination to the set of touched files.
-            deps.add(entry.source)
 
         return (results, deps)
 
@@ -746,18 +891,12 @@ class AIBCreator:
                 "config_data", package_name, file_path)
             copy_destination = os.path.join(self.outdir, rebased_source_path)
 
-            # Make any needed parents directories
-            os.makedirs(os.path.dirname(copy_destination), exist_ok=True)
-
             # Hardlink the file from source to the destination
-            fast_copy(entry.source, copy_destination)
+            deps.add(fast_copy_makedirs(entry.source, copy_destination))
 
             # Append the entry to the set of entries for the package
             results.setdefault(package_name, set()).add(
                 FileEntry(source=rebased_source_path, destination=file_path))
-
-            # Add the copy operation to the depfile
-            deps.add(entry.source)
 
         return (results, deps)
 

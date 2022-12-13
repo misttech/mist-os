@@ -35,8 +35,16 @@ import("//build/python/python_action.gni")
 #     [bool] optionally omit the handling of config_data entries (for those
 #     configurations that do not have a config_data package.
 #
-#   base_driver_packages (optional)
+#   base_driver_packages [optional]
 #     [list of labels] The driver packages to include in the base package set.
+#
+#   core_realm_definition [optional]
+#     [label] The GN label of a `core_realm_definition()` template
+#
+#   core_realm_includes [optional]
+#     [list of labels] List of labels to walk for the shard_includes metadata
+#     that specifies cml files included by the core component cml. These
+#     files will be included in the Assembly Input Bundle.
 #
 template("legacy_assembly_input_bundle") {
   # TODO:  Switch this over to using the `assembly_input_bundle()` template when
@@ -79,6 +87,15 @@ template("legacy_assembly_input_bundle") {
     _shell_command_packages = invoker.shell_command_packages
   }
 
+  _core_realm_definition = false
+  if (defined(invoker.core_realm_definition)) {
+    _core_realm_definition = invoker.core_realm_definition
+    _core_realm_includes = []
+    if (defined(invoker.core_realm_includes)) {
+      _core_realm_includes = invoker.core_realm_includes
+    }
+  }
+
   labels = {
     # Extract the assembly label's dir and name components:
     image_assembly_name = get_label_info(image_assembly_label, "name")
@@ -99,6 +116,10 @@ template("legacy_assembly_input_bundle") {
     driver_package_component_files =
         "${target_name}_driver_package_component_files"
     shell_commands_manifest_list = "${target_name}.shell_commands_manifest_list"
+    core_realm_shards_list = "${target_name}.core_realm_shards_list"
+    core_realm_includes = "${target_name}.core_realm_includes"
+    core_realm_default_includes = "${target_name}.core_realm_default_includes"
+    core_realm_main_cml = "${target_name}.core_realm_main_cml"
   }
 
   files = {
@@ -141,6 +162,9 @@ template("legacy_assembly_input_bundle") {
         "${target_gen_dir}/${target_name}.driver_package_component_files"
     shell_command_manifests_list =
         "${assembly_input_bundle_dir}.package_manifest_list.shell_commands"
+    core_realm_shards_list =
+        "${assembly_input_bundle_dir}.core_realm_shards_list"
+    core_realm_includes = "${assembly_input_bundle_dir}.core_realm_includes"
   }
 
   package_manifests_list(labels.base_driver_package_list) {
@@ -181,6 +205,70 @@ template("legacy_assembly_input_bundle") {
     }
   }
 
+  if (_core_realm_definition != false) {
+    # Include the default core cml in the legacy AIB
+    group(labels.core_realm_main_cml) {
+      forward_variables_from(invoker, [ "testonly" ])
+      deps = []
+      metadata = {
+        shard_files =
+            [ rebase_path("//src/sys/core/meta/core.cml", root_build_dir) ]
+      }
+    }
+
+    generated_file(labels.core_realm_shards_list) {
+      forward_variables_from(invoker, [ "testonly" ])
+      deps = [
+        ":${labels.core_realm_main_cml}",
+        "${_core_realm_definition}",
+      ]
+      data_keys = [ "shard_files" ]
+      outputs = [ "${files.core_realm_shards_list}" ]
+      output_conversion = "json"
+    }
+
+    # Include files needed by the default core cml in the legacy AIB
+    # The source of a core realm include file is its location
+    # relative to the root_build_dir, while the destination
+    # is its location relative to the fuchsia root.
+    # Assembly doesn't know about the fuchsia root but components reference
+    # absolute includes relative to the fuchsia root dir, so we lay them
+    # out in the AIB in the same way they are laid out in fuchsia.git.
+    group(labels.core_realm_default_includes) {
+      forward_variables_from(invoker, [ "testonly" ])
+      metadata = {
+        shard_includes = [
+          {
+            source =
+                rebase_path("//src/sys/core/meta/svc_for_sys.core_shard.cml",
+                            root_build_dir)
+            destination = "src/sys/core/meta/svc_for_sys.core_shard.cml"
+          },
+          {
+            source =
+                rebase_path("//src/sys/core/meta/core_proxy.core_shard.cml",
+                            root_build_dir)
+            destination = "src/sys/core/meta/core_proxy.core_shard.cml"
+          },
+
+          #TODO(115630): Add the sdk directory to the include paths
+          {
+            source = rebase_path("//sdk/lib/syslog/offer.shard.cml")
+            destination = "syslog/offer.shard.cml"
+          },
+        ]
+      }
+    }
+
+    generated_file(labels.core_realm_includes) {
+      forward_variables_from(invoker, [ "testonly" ])
+      deps = _core_realm_includes + [ ":${labels.core_realm_default_includes}" ]
+      data_keys = [ "shard_includes" ]
+      outputs = [ "${files.core_realm_includes}" ]
+      output_conversion = "json"
+    }
+  }
+
   create_package_archive =
       defined(invoker.create_package_archive) && invoker.create_package_archive
   create_package = create_package_archive ||
@@ -212,6 +300,7 @@ template("legacy_assembly_input_bundle") {
       "${files.assembly_input_bundle_dir}/config_data",
       "${files.assembly_input_bundle_dir}/bootfs",
       "${files.assembly_input_bundle_dir}/kernel",
+      "${files.assembly_input_bundle_dir}/compiled_packages",
     ]
 
     outputs = [ files.assembly_input_bundle_config ]
@@ -245,14 +334,6 @@ template("legacy_assembly_input_bundle") {
       files.image_assembly_config,
     ]
 
-    if (_shell_command_packages != []) {
-      args += [
-        "--shell-commands-packages-list",
-        rebase_path(files.shell_command_manifests_list, root_build_dir),
-      ]
-      inputs += [ files.shell_command_manifests_list ]
-    }
-
     deps = [
       ":${labels.base_driver_package_list}",
       ":${labels.driver_package_component_files}",
@@ -260,7 +341,29 @@ template("legacy_assembly_input_bundle") {
     ]
 
     if (_shell_command_packages != []) {
+      args += [
+        "--shell-commands-packages-list",
+        rebase_path(files.shell_command_manifests_list, root_build_dir),
+      ]
+      inputs += [ files.shell_command_manifests_list ]
       deps += [ ":${labels.shell_commands_manifest_list}" ]
+    }
+
+    if (_core_realm_definition != false) {
+      args += [
+        "--core-realm-shards-list",
+        rebase_path(files.core_realm_shards_list, root_build_dir),
+        "--core-realm-includes-list",
+        rebase_path(files.core_realm_includes, root_build_dir),
+      ]
+      inputs += [
+        files.core_realm_shards_list,
+        files.core_realm_includes,
+      ]
+      deps += [
+        ":${labels.core_realm_includes}",
+        ":${labels.core_realm_shards_list}",
+      ]
     }
 
     if (include_config_data) {

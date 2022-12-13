@@ -11,6 +11,7 @@ if (is_host) {
     testonly = true
     deps = [
       "assemble_image",
+      "compiled_package:compiled_package_test",
       "developer_packages",
       "product_drivers",
       "structured_config",

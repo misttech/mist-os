@@ -14,7 +14,7 @@ import unittest
 from unittest import mock
 
 from assembly import FileEntry, ImageAssemblyConfig, PackageManifest, BlobEntry, PackageMetaData
-from assembly.assembly_input_bundle import DriverDetails, DuplicatePackageException
+from assembly.assembly_input_bundle import CompiledPackageAdditionalShards, CompiledPackageMainDefinition, DriverDetails, DuplicatePackageException
 from fast_copy_mock import mock_fast_copy_in
 import make_legacy_config
 import assembly
@@ -158,7 +158,14 @@ class MakeLegacyConfig(unittest.TestCase):
             # AssemblyInputBundle.
             aib, _, deps = make_legacy_config.copy_to_assembly_input_bundle(
                 image_assembly, [], OUTDIR, [driver_manifest_path],
-                [driver_component_file], shell_commands_file)
+                [driver_component_file], shell_commands_file, [
+                    os.path.join(SOURCE_DIR, "core/realm.cml"),
+                    os.path.join(SOURCE_DIR, "core/realm/shard.cml")
+                ], [
+                    FileEntry(
+                        os.path.join(SOURCE_DIR, "src/include.cml"),
+                        "src/include.cml")
+                ])
             # Validate the contents of the AssemblyInputBundle itself
             self.assertEqual(
                 aib.base, set(["packages/base/base_a", "packages/base/base_b"]))
@@ -189,6 +196,28 @@ class MakeLegacyConfig(unittest.TestCase):
                         "packages/base_drivers/base_driver", ["meta/driver.cm"])
                 ])
             self.assertEqual(aib.shell_commands, shell_commands_file)
+            self.assertEqual(
+                aib.packages_to_compile, [
+                    CompiledPackageMainDefinition(
+                        name="core",
+                        components={
+                            "core":
+                                "outdir/compiled_packages/core/component_shards/source_core_realm_cml"
+                        },
+                        contents=set(),
+                        includes=set(
+                            [
+                                "outdir/compiled_packages/include/src/include.cml"
+                            ])),
+                    CompiledPackageAdditionalShards(
+                        name="core",
+                        component_shards={
+                            "core":
+                                [
+                                    "outdir/compiled_packages/core/component_shards/source_core_realm_shard_cml"
+                                ]
+                        })
+                ])
 
             # Make sure all the manifests were created in the correct location.
             for package_set in ["base", "cache", "system"]:
@@ -276,7 +305,8 @@ class MakeLegacyConfig(unittest.TestCase):
                         'source/system_b/internal/path/file_b_2',
                         'source/system_b/internal/path/file_b_3',
                         'source/kernel.bin', 'source/some/file',
-                        'source/another/file'
+                        'source/another/file', 'source/core/realm.cml',
+                        'source/core/realm/shard.cml', 'source/src/include.cml'
                     ]))
 
             # Validate that all the files were correctly copied to the
@@ -386,6 +416,20 @@ class MakeLegacyConfig(unittest.TestCase):
                             'outdir/blobs/0cdbf3e4f1246ce7522e78c21bcf1c3aef2d41ac2b4de3f0ee98fc6273f62eb9'
                         ),
                         FileEntry(
+                            source='source/src/include.cml',
+                            destination=
+                            'outdir/compiled_packages/include/src/include.cml'),
+                        FileEntry(
+                            source='source/core/realm.cml',
+                            destination=
+                            'outdir/compiled_packages/core/component_shards/source_core_realm_cml'
+                        ),
+                        FileEntry(
+                            source='source/core/realm/shard.cml',
+                            destination=
+                            'outdir/compiled_packages/core/component_shards/source_core_realm_shard_cml'
+                        ),
+                        FileEntry(
                             source='source/kernel.bin',
                             destination='outdir/kernel/kernel.bin'),
                         FileEntry(
@@ -422,7 +466,7 @@ class MakeLegacyConfig(unittest.TestCase):
 
             # Copies legacy config into AIB
             aib, _, _ = make_legacy_config.copy_to_assembly_input_bundle(
-                image_assembly, [], OUTDIR, [], [], dict())
+                image_assembly, [], OUTDIR, [], [], dict(), set(), [])
 
             # Asserts that the duplicate package is present in the base package set after
             # being copied to the AIB
@@ -462,7 +506,8 @@ class MakeLegacyConfig(unittest.TestCase):
                 patched_method.return_value = (
                     {make_package_path(duplicate_package)}, list())
                 aib, _, _ = make_legacy_config.copy_to_assembly_input_bundle(
-                    image_assembly, [], OUTDIR, [manifest_path], [], dict())
+                    image_assembly, [], OUTDIR, [manifest_path], [], dict(),
+                    set(), [])
 
             self.assertNotIn(make_package_path(duplicate_package), aib.base)
             self.assertIn(
@@ -510,4 +555,4 @@ class MakeLegacyConfig(unittest.TestCase):
                 DuplicatePackageException,
                 partial(
                     make_legacy_config.copy_to_assembly_input_bundle,
-                    image_assembly, [], OUTDIR, [], [], dict()))
+                    image_assembly, [], OUTDIR, [], [], dict(), set(), []))

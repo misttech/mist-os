@@ -29,10 +29,13 @@ import("//build/testing/host_test.gni")
 #     contents of the product assembly config product configuration.
 #     Passed through to the product_assembly_configuration() template
 #
-#   product (optional)
+#   base_driver_package (optional)
 #     [list, GN scopes] A list of GN scopes containing base driver packages.
 #     Passed through to the product_assembly_configuration() template.
 #     See the documentation for product_assembly_configuration().
+#
+#   core_realm_definition (optional)
+#     [list of labels] label of a core_realm_definition template
 #
 template("test_assembly_config") {
   base_packages_param = []
@@ -97,6 +100,7 @@ template("test_assembly_config") {
                  "product",
                  "platform",
                  "base_driver_packages",
+                 "core_realm_definition",
                ])
   }
 
@@ -138,6 +142,7 @@ template("test_assembly_config") {
       image_assembly_label = ":image"
       bundles_dir = outdir
       include_config_data = false
+      forward_variables_from(invoker, [ "core_realm_definition" ])
     }
 
     # This is an action rather than a host test because enumerating all the inputs to assembly
@@ -151,6 +156,7 @@ template("test_assembly_config") {
     platform_bundles_dir =
         get_label_info(platform_bundles_target, "target_out_dir")
     outdir = "$target_out_dir/outdir"
+    image_assembly_config = "$outdir/image_assembly.json"
     python_action("${target_name}") {
       testonly = true
 
@@ -177,7 +183,10 @@ template("test_assembly_config") {
                labels.ffx,
                platform_bundles_target,
              ] + additional_deps_param
-      outputs = [ stamp ]
+      outputs = [
+        stamp,
+        image_assembly_config,
+      ]
 
       not_needed(invoker, [ "test_runner_source" ])
     }
