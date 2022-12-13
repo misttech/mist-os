@@ -427,6 +427,16 @@ zx_status_t UsbCdcEcm::Bind(void* ctx, zx_device_t* parent) {
   }
 
   auto args = ddk::DeviceAddArgs("usb-cdc-ecm").set_proto_id(ZX_PROTOCOL_ETHERNET_IMPL);
+
+  // TODO(fxbug.dev/93333): Remove this conditional once GND is ready everywhere.
+  const zx_device_str_prop_t props[] = {
+      {
+          .key = "fuchsia.ethernet.NETDEVICE_MIGRATION",
+          .property_value = str_prop_bool_val(true),
+      },
+  };
+  args.set_str_props(props);
+
   status = device->DdkAdd(args);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: Error adding device: %s", __func__, zx_status_get_string(status));

@@ -70,16 +70,7 @@ zx_status_t TapCtl::OpenDeviceInternal(
   auto tap =
       std::unique_ptr<eth::TapDevice>(new eth::TapDevice(zxdev(), config, std::move(device)));
 
-  ddk::DeviceAddArgs args(name);
-  zx_device_str_prop_t str_props[] = {
-      zx_device_str_prop_t{
-          .key = "fuchsia.ethernet.LEGACY",
-          .property_value = str_prop_bool_val(true),
-      },
-  };
-  args.set_str_props(cpp20::span<const zx_device_str_prop_t>(str_props));
-
-  zx_status_t status = tap->DdkAdd(args);
+  auto status = tap->DdkAdd(name);
 
   if (status != ZX_OK) {
     zxlogf(ERROR, "tapctl: could not add tap device: %d", status);

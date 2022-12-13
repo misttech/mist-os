@@ -1083,6 +1083,15 @@ static zx_status_t e1000_bind(void* ctx, zx_device_t* dev) {
 
   adapter->online = e1000_status_online(adapter);
 
+  const zx_device_str_prop_t prop = {
+      .key = "fuchsia.ethernet.NETDEVICE_MIGRATION",
+      .property_value =
+          {
+              .data_type = ZX_DEVICE_PROPERTY_VALUE_BOOL,
+              .data = {.bool_val = true},
+          },
+  };
+
   device_add_args_t args = {
       .version = DEVICE_ADD_ARGS_VERSION,
       .name = "e1000",
@@ -1090,6 +1099,8 @@ static zx_status_t e1000_bind(void* ctx, zx_device_t* dev) {
       .ops = &e1000_device_ops,
       .proto_id = ZX_PROTOCOL_ETHERNET_IMPL,
       .proto_ops = &e1000_ethernet_impl_ops,
+      .str_props = &prop,
+      .str_prop_count = 1,
   };
 
   if ((status = device_add(dev, &args, &adapter->zxdev)) != ZX_OK) {
