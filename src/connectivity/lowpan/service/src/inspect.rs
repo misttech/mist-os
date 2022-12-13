@@ -643,6 +643,9 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                         if let Some(x) = telemetry_data.thread_router_id {
                             inspector.root().record_uint("thread_router_id", x.into());
                         }
+                        if let Some(x) = telemetry_data.thread_rloc {
+                            inspector.root().record_uint("thread_rloc", x.into());
+                        }
                         if let Some(x) = telemetry_data.partition_id {
                             inspector.root().record_uint("partition_id", x.into());
                         }
