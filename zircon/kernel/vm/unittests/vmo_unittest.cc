@@ -2083,7 +2083,7 @@ static bool vmo_attribution_ops_contiguous_test() {
       // present
       DEBUG_ASSERT(expected_page_count.uncompressed == 4);
     } else {
-      expected_gen_count += 2;
+      ++expected_gen_count;
       DEBUG_ASSERT(expected_page_count.uncompressed == 0);
       expected_page_count.uncompressed += 2;
       DEBUG_ASSERT(expected_page_count.uncompressed == 2);
@@ -2100,7 +2100,7 @@ static bool vmo_attribution_ops_contiguous_test() {
       // present
       DEBUG_ASSERT(expected_page_count.uncompressed == 4);
     } else {
-      expected_gen_count += 2;
+      ++expected_gen_count;
       expected_page_count.uncompressed += 2;
       DEBUG_ASSERT(expected_page_count.uncompressed == 4);
     }
@@ -2833,39 +2833,39 @@ static bool vmo_lookup_pages_test() {
 
   // Lookup the exact range we committed.
   EXPECT_OK(vmo_lookup_pages(vmo.get(), 0, 0, VmObject::DirtyTrackingAction::None,
-                             VmObject::LookupInfo::kMaxPages / 2, nullptr, &info));
+                             VmObject::LookupInfo::kMaxPages / 2, 1, nullptr, &info));
   EXPECT_EQ(info.num_pages, VmObject::LookupInfo::kMaxPages / 2);
   EXPECT_TRUE(info.writable);
 
   // Attempt to lookup more, should see the truncated actual committed range.
   EXPECT_OK(vmo_lookup_pages(vmo.get(), 0, 0, VmObject::DirtyTrackingAction::None,
-                             VmObject::LookupInfo::kMaxPages, nullptr, &info));
+                             VmObject::LookupInfo::kMaxPages, 1, nullptr, &info));
   EXPECT_EQ(info.num_pages, VmObject::LookupInfo::kMaxPages / 2);
   EXPECT_TRUE(info.writable);
 
   // Perform a lookup so that there's only a single committed page visible.
   EXPECT_OK(vmo_lookup_pages(vmo.get(), kSize / 4 - PAGE_SIZE, 0,
                              VmObject::DirtyTrackingAction::None, VmObject::LookupInfo::kMaxPages,
-                             nullptr, &info));
+                             1, nullptr, &info));
   EXPECT_EQ(info.num_pages, 1ul);
   EXPECT_TRUE(info.writable);
 
   // Writing shouldn't commit later pages once the first has been satisfied.
   EXPECT_OK(vmo_lookup_pages(
       vmo.get(), kSize / 4 - PAGE_SIZE, VMM_PF_FLAG_WRITE | VMM_PF_FLAG_SW_FAULT,
-      VmObject::DirtyTrackingAction::None, VmObject::LookupInfo::kMaxPages / 2, nullptr, &info));
+      VmObject::DirtyTrackingAction::None, VmObject::LookupInfo::kMaxPages / 2, 1, nullptr, &info));
   EXPECT_EQ(info.num_pages, 1ul);
   EXPECT_TRUE(info.writable);
 
   // If there is no page then writing without a fault should fail.
   EXPECT_EQ(ZX_ERR_NOT_FOUND, vmo_lookup_pages(vmo.get(), kSize / 4, VMM_PF_FLAG_WRITE,
                                                VmObject::DirtyTrackingAction::None,
-                                               VmObject::LookupInfo::kMaxPages, nullptr, &info));
+                                               VmObject::LookupInfo::kMaxPages, 1, nullptr, &info));
 
   // Then should be able to fault it in.
   EXPECT_OK(vmo_lookup_pages(vmo.get(), kSize / 4, VMM_PF_FLAG_WRITE | VMM_PF_FLAG_SW_FAULT,
                              VmObject::DirtyTrackingAction::None, VmObject::LookupInfo::kMaxPages,
-                             nullptr, &info));
+                             1, nullptr, &info));
   EXPECT_EQ(info.num_pages, 1ul);
   EXPECT_TRUE(info.writable);
 
@@ -2880,20 +2880,20 @@ static bool vmo_lookup_pages_test() {
 
   // Should be able to get runs of pages up to the intermediate page in child1.
   EXPECT_OK(vmo_lookup_pages(child2.get(), 0, 0, VmObject::DirtyTrackingAction::None,
-                             VmObject::LookupInfo::kMaxPages, nullptr, &info));
+                             VmObject::LookupInfo::kMaxPages, 1, nullptr, &info));
   EXPECT_EQ(info.num_pages, VmObject::LookupInfo::kMaxPages / 4);
   EXPECT_FALSE(info.writable);
 
   // The single page in child1
   EXPECT_OK(vmo_lookup_pages(child2.get(), kSize / 8, 0, VmObject::DirtyTrackingAction::None,
-                             VmObject::LookupInfo::kMaxPages, nullptr, &info));
+                             VmObject::LookupInfo::kMaxPages, 1, nullptr, &info));
   EXPECT_EQ(info.num_pages, 1ul);
   EXPECT_FALSE(info.writable);
 
   // Then the remainder of the run.
   EXPECT_OK(vmo_lookup_pages(child2.get(), kSize / 8 + PAGE_SIZE, 0,
                              VmObject::DirtyTrackingAction::None, VmObject::LookupInfo::kMaxPages,
-                             nullptr, &info));
+                             1, nullptr, &info));
   EXPECT_EQ(info.num_pages, VmObject::LookupInfo::kMaxPages / 4);
   EXPECT_FALSE(info.writable);
 

@@ -379,8 +379,9 @@ class VmCowPages final : public VmHierarchyBase,
   //  * Our VmObjectPaged backlink and our *slice* children are allowed to have writable mappings,
   //    and will be informed to either unmap or remove writability when needed.
   zx_status_t LookupPagesLocked(uint64_t offset, uint pf_flags, DirtyTrackingAction mark_dirty,
-                                uint64_t max_out_pages, list_node* alloc_list,
-                                LazyPageRequest* page_request, LookupInfo* out) TA_REQ(lock_);
+                                uint64_t max_out_pages, uint64_t max_waitable_pages,
+                                list_node* alloc_list, LazyPageRequest* page_request,
+                                LookupInfo* out) TA_REQ(lock_);
 
   // Controls the type of content that can be overwritten by the Add[New]Page[s]Locked functions.
   enum class CanOverwriteContent : uint8_t {

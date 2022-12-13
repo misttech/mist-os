@@ -478,8 +478,9 @@ TEST(PagerWriteback, NoDirtyRequestsForClones) {
   });
   ASSERT_TRUE(t1.Start());
 
-  // Writing the pages in the clone should trigger faults in the parent. Wait to see the first one.
-  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 1, ZX_TIME_INFINITE));
+  ASSERT_TRUE(t1.WaitForBlocked());
+  // Writing the pages in the clone should trigger faults in the parent.
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, kNumPages, ZX_TIME_INFINITE));
   ASSERT_TRUE(pager.SupplyPages(vmo, 0, kNumPages));
 
   // No dirty requests.
@@ -691,7 +692,7 @@ TEST(PagerWriteback, DirtyRequestsRandomOffsets) {
 
   uint64_t clean_start = 0;
   uint64_t clean_len = 0;
-  for (uint64_t i = 0; i < kNumPages; i++) {
+  for (int64_t i = 0; i < static_cast<int64_t>(kNumPages); i++) {
     if (page_state[i] == 0) {
       // Page is not present.
       // This might break an in-progress clean run, resolve that first.
@@ -699,13 +700,26 @@ TEST(PagerWriteback, DirtyRequestsRandomOffsets) {
         ASSERT_TRUE(pager.WaitForPageDirty(vmo, clean_start, clean_len, ZX_TIME_INFINITE));
         ASSERT_TRUE(pager.DirtyPages(vmo, clean_start, clean_len));
       }
-      // Should see a read request for this page now.
-      ASSERT_TRUE(pager.WaitForPageRead(vmo, i, 1, ZX_TIME_INFINITE));
-      ASSERT_TRUE(pager.SupplyPages(vmo, i, 1));
+
+      // Check how many pages after this are not present. The request will be batched.
+      uint64_t not_present_run_size = 1;
+      for (uint64_t j = i + 1; j < kNumPages; j++) {
+        if (page_state[j] != 0) {
+          break;
+        }
+        ++not_present_run_size;
+      }
+
+      // Should see a read request for this not-present page run.
+      ASSERT_TRUE(t.WaitForBlocked());
+      ASSERT_TRUE(pager.WaitForPageRead(vmo, i, not_present_run_size, ZX_TIME_INFINITE));
+      ASSERT_TRUE(pager.SupplyPages(vmo, i, not_present_run_size));
 
       // After the supply, visit this page again, as it might get combined into a subsequent clean
-      // run. Set the page's state to clean, and decrement i.
-      page_state[i] = 1;
+      // run. Set all the pages in the run to clean and decrement i.
+      for (uint64_t j = i; j < i + not_present_run_size; j++) {
+        page_state[j] = 1;
+      }
       i--;
 
       clean_start = i + 1;
@@ -2019,27 +2033,27 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(DirtyAfterMapProtect, 0) {
 // Tests that zero pages are supplied by the kernel for the newly extended range after a resize, and
 // are not overwritten by a pager supply.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeSupplyZero, ZX_VMO_RESIZABLE) {
+  static constexpr uint64_t kNumPages = 2;
+  static constexpr uint64_t kNumPagesAfterResize = 4;
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
   Vmo* vmo;
-  ASSERT_TRUE(pager.CreateVmoWithOptions(2, create_option, &vmo));
+  ASSERT_TRUE(pager.CreateVmoWithOptions(kNumPages, create_option, &vmo));
 
   // Resize the VMO up.
-  ASSERT_TRUE(vmo->Resize(4));
+  ASSERT_TRUE(vmo->Resize(kNumPagesAfterResize));
 
   // Now try to access all the pages. The first two should result in read requests, but the last
   // two should be supplied with zeros without any read requests.
   TestThread t([vmo]() -> bool {
-    uint8_t data[4 * zx_system_get_page_size()];
+    uint8_t data[kNumPagesAfterResize * zx_system_get_page_size()];
     return vmo->vmo().read(&data[0], 0, sizeof(data)) == ZX_OK;
   });
   ASSERT_TRUE(t.Start());
 
-  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 1, ZX_TIME_INFINITE));
-  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1));
-  ASSERT_TRUE(pager.WaitForPageRead(vmo, 1, 1, ZX_TIME_INFINITE));
-  ASSERT_TRUE(pager.SupplyPages(vmo, 1, 1));
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, kNumPages, ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, kNumPages));
 
   // No more read requests seen for the newly extended range.
   uint64_t offset, length;
@@ -2048,7 +2062,7 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeSupplyZero, ZX_VMO_RESIZABLE) {
   ASSERT_TRUE(t.Wait());
 
   // Verify that the last two pages are zeros.
-  std::vector<uint8_t> expected(4 * zx_system_get_page_size(), 0);
+  std::vector<uint8_t> expected(kNumPagesAfterResize * zx_system_get_page_size(), 0);
   vmo->GenerateBufferContents(expected.data(), 2, 0);
   ASSERT_TRUE(check_buffer_data(vmo, 0, 4, expected.data(), true));
 

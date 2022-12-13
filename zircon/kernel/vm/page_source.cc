@@ -182,8 +182,8 @@ void PageSource::OnPagesFailed(uint64_t offset, uint64_t len, zx_status_t error_
       // request), so a failure for a portion of the batch that does not include the first page
       // cannot be propagated to the external caller.
       if (cur->batch_state_ == PageRequest::BatchState::Internal) {
-        // We only use Internal batches for DIRTY requests.
-        DEBUG_ASSERT(type == page_request_type::DIRTY);
+        // We only use Internal batches for READ and DIRTY requests.
+        DEBUG_ASSERT(type == page_request_type::DIRTY || type == page_request_type::READ);
         // This failure does not apply to the first page. Since the caller only requested the first
         // page, we cannot treat failures for other pages we added to the request as fatal. Pretend
         // that this is not a failure and let the caller retry.
@@ -222,9 +222,13 @@ bool PageSource::IsValidInternalFailureCode(zx_status_t error_status) {
   }
 }
 
-zx_status_t PageSource::GetPage(uint64_t offset, PageRequest* request,
-                                VmoDebugInfo vmo_debug_info) {
+zx_status_t PageSource::GetPages(uint64_t offset, uint64_t prefetch_len, PageRequest* request,
+                                 VmoDebugInfo vmo_debug_info) {
   canary_.Assert();
+  DEBUG_ASSERT(prefetch_len > 0);
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(prefetch_len));
+
   if (!page_provider_->SupportsPageRequestType(page_request_type::READ)) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -232,21 +236,19 @@ zx_status_t PageSource::GetPage(uint64_t offset, PageRequest* request,
   ASSERT(request);
   offset = fbl::round_down(offset, static_cast<uint64_t>(PAGE_SIZE));
 
+  LTRACEF_LEVEL(2, "%p offset %" PRIx64 " prefetch_len %" PRIx64, this, offset, prefetch_len);
+
   Guard<Mutex> guard{&page_source_mtx_};
   if (detached_) {
     return ZX_ERR_BAD_STATE;
   }
 
-  // Check if request is initialized and initialize it if it isn't (it can be initialized
-  // for batch requests).
-  if (!request->IsInitialized()) {
-    request->Init(fbl::RefPtr<PageRequestInterface>(this), offset, page_request_type::READ,
-                  vmo_debug_info);
-    LTRACEF_LEVEL(2, "%p offset %lx\n", this, offset);
-  } else {
-    // The user should never have been trying to keep using a PageRequest that ended up in any state
-    // other than Accepting.
+  if (request->IsInitialized()) {
+    // Only `BatchState::Accepting` requests are allowed to be previously initialized.
+    DEBUG_ASSERT(request->creation_batch_state_ == PageRequest::BatchState::Accepting);
+    // If the request is already initialized, the batch state should never be overwritten.
     DEBUG_ASSERT(request->batch_state_ == PageRequest::BatchState::Accepting);
+
     if (request->src_.get() != static_cast<PageRequestInterface*>(this) ||
         request->type_ != page_request_type::READ) {
       // If the request has a different owning page source, or if the request is of a different
@@ -254,17 +256,26 @@ zx_status_t PageSource::GetPage(uint64_t offset, PageRequest* request,
       // request's page source to finalize the request.
       return request->FinalizeRequest();
     }
+  } else {
+    request->Init(
+        fbl::RefPtr<PageRequestInterface>(this), offset, page_request_type::READ, vmo_debug_info,
+        /*internal_batching=*/request->creation_batch_state_ != PageRequest::BatchState::Accepting);
   }
 
-  return PopulateRequestLocked(request, offset, page_request_type::READ);
+  DEBUG_ASSERT(request->batch_state_ == PageRequest::BatchState::Accepting ||
+               request->batch_state_ == PageRequest::BatchState::Internal);
+
+  return PopulateRequestLocked(request, offset, prefetch_len, page_request_type::READ);
 }
 
 void PageSource::FreePages(list_node* pages) { page_provider_->FreePages(pages); }
 
-zx_status_t PageSource::PopulateRequestLocked(PageRequest* request, uint64_t offset,
+zx_status_t PageSource::PopulateRequestLocked(PageRequest* request, uint64_t offset, uint64_t len,
                                               page_request_type type) {
   ASSERT(request);
-  DEBUG_ASSERT(IS_ALIGNED(offset, PAGE_SIZE));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
+  DEBUG_ASSERT(len > 0);
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
   DEBUG_ASSERT(type < page_request_type::COUNT);
   DEBUG_ASSERT(request->type_ == type);
   DEBUG_ASSERT(request->IsInitialized());
@@ -275,41 +286,47 @@ zx_status_t PageSource::PopulateRequestLocked(PageRequest* request, uint64_t off
 #endif  // DEBUG_ASSERT_IMPLEMENTED
 
   bool send_request = false;
-  zx_status_t res = ZX_ERR_SHOULD_WAIT;
   DEBUG_ASSERT(!request->provider_owned_);
   if (request->batch_state_ == PageRequest::BatchState::Accepting ||
       request->batch_state_ == PageRequest::BatchState::Internal) {
     // If possible, append the page directly to the current request. Else have the
     // caller try again with a new request.
     if (request->offset_ + request->len_ == offset) {
-      request->len_ += PAGE_SIZE;
-
       // Assert on overflow, since it means vmobject is trying to get out-of-bounds pages.
-      uint64_t unused;
+      [[maybe_unused]] bool overflowed = add_overflow(request->len_, len, &request->len_);
+      DEBUG_ASSERT(!overflowed);
       DEBUG_ASSERT(request->len_ >= PAGE_SIZE);
-      DEBUG_ASSERT(!add_overflow(request->offset_, request->len_, &unused));
+
+      uint64_t cur_end;
+      overflowed = add_overflow(request->offset_, request->len_, &cur_end);
+      DEBUG_ASSERT(!overflowed);
 
       bool end_batch = false;
       auto node = outstanding_requests_[request->type_].upper_bound(request->offset_);
       if (node.IsValid()) {
-        uint64_t cur_end = request->offset_ + request->len_;
-        if (node->offset_ <= request->offset_) {
-          // If offset is in [node->GetOffset(), node->GetEnd()), then we end
-          // the batch when we'd stop overlapping.
-          end_batch = node->GetEnd() == cur_end;
-        } else {
-          // If offset is less than node->GetOffset(), then we end the batch
-          // when we'd start overlapping.
-          end_batch = node->offset_ == cur_end;
+        if (request->offset_ >= node->offset_ && cur_end >= node->GetEnd()) {
+          // If the beginning part of this request is covered by an existing request, end the batch
+          // at the existing request's end and wait for that request to be resolved first.
+          end_batch = true;
+          request->len_ = node->GetEnd() - request->offset_;
+        } else if (request->offset_ < node->offset_ && cur_end >= node->offset_) {
+          // If offset is less than node->GetOffset(), then we end the batch when we'd start
+          // overlapping.
+          end_batch = true;
+          request->len_ = node->offset_ - request->offset_;
         }
       }
 
       if (end_batch) {
         send_request = true;
       } else if (request->batch_state_ == PageRequest::BatchState::Internal) {
-        // We only use Internal batches for DIRTY requests.
-        DEBUG_ASSERT(request->type_ == page_request_type::DIRTY);
-        res = ZX_ERR_NEXT;
+        // We only use `BatchState::Internal` for READ and DIRTY requests.
+        DEBUG_ASSERT(request->type_ == page_request_type::DIRTY ||
+                     request->type_ == page_request_type::READ);
+
+        // Always send the request for `BatchState::Internal`, since the caller is internal and will
+        // know how long the request should be.
+        send_request = true;
       }
     } else {
       send_request = true;
@@ -328,7 +345,7 @@ zx_status_t PageSource::PopulateRequestLocked(PageRequest* request, uint64_t off
     SendRequestToProviderLocked(request);
   }
 
-  return res;
+  return ZX_ERR_SHOULD_WAIT;
 }
 
 zx_status_t PageSource::FinalizeRequest(PageRequest* request) {
@@ -344,13 +361,6 @@ zx_status_t PageSource::FinalizeRequest(PageRequest* request) {
   }
   // Currently only read requests are batched externally.
   DEBUG_ASSERT(request->type_ == page_request_type::READ);
-  return FinalizeRequestLocked(request);
-}
-
-zx_status_t PageSource::FinalizeRequestLocked(PageRequest* request) {
-  DEBUG_ASSERT(!detached_);
-  DEBUG_ASSERT(request->IsInitialized());
-  DEBUG_ASSERT(request->type_ < page_request_type::COUNT);
 
   SendRequestToProviderLocked(request);
   return ZX_ERR_SHOULD_WAIT;
@@ -500,18 +510,7 @@ zx_status_t PageSource::RequestDirtyTransition(PageRequest* request, uint64_t of
   // accumulate multiple pages into the same request below.
   DEBUG_ASSERT(request->batch_state_ == PageRequest::BatchState::Internal);
 
-  zx_status_t status;
-  // Keep building up the current request as long as PopulateRequestLocked returns ZX_ERR_NEXT.
-  do {
-    status = PopulateRequestLocked(request, offset, page_request_type::DIRTY);
-    offset += PAGE_SIZE;
-  } while (offset < end && status == ZX_ERR_NEXT);
-
-  // PopulateRequestLocked did not complete the batch. Finalize it to complete.
-  if (status == ZX_ERR_NEXT) {
-    return FinalizeRequestLocked(request);
-  }
-  return status;
+  return PopulateRequestLocked(request, offset, end - offset, page_request_type::DIRTY);
 }
 
 void PageSource::Dump(uint depth) const {

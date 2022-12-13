@@ -1808,7 +1808,7 @@ VmPageOrMarkerRef VmCowPages::FindInitialPageContentLocked(uint64_t offset, VmCo
       // parent limit.
       *owner_length = ktl::min(*owner_length, cur->parent_limit_ - cur_offset);
       cur->page_list_.ForEveryPageInRange(
-          [owner_length, cur_offset](const VmPageOrMarker*, uint64_t off) {
+          [owner_length, cur_offset](const VmPageOrMarker* p, uint64_t off) {
             *owner_length = off - cur_offset;
             return ZX_ERR_STOP;
           },
@@ -2205,13 +2205,15 @@ void VmCowPages::UpdateOnAccessLocked(vm_page_t* page, uint pf_flags) {
 // and offset is in range.
 zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
                                           DirtyTrackingAction mark_dirty, uint64_t max_out_pages,
-                                          list_node* alloc_list, LazyPageRequest* page_request,
-                                          LookupInfo* out) {
+                                          uint64_t max_waitable_pages, list_node* alloc_list,
+                                          LazyPageRequest* page_request, LookupInfo* out) {
   VM_KTRACE_DURATION(2, "VmCowPages::LookupPagesLocked", page_attribution_user_id_, offset);
   canary_.Assert();
   DEBUG_ASSERT(!is_hidden_locked());
   DEBUG_ASSERT(out);
   DEBUG_ASSERT(max_out_pages > 0);
+  DEBUG_ASSERT(max_out_pages <= LookupInfo::kMaxPages);
+  DEBUG_ASSERT(max_waitable_pages > 0);
   DEBUG_ASSERT(page_request || !(pf_flags & VMM_PF_FLAG_FAULT_MASK));
   VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
 
@@ -2232,14 +2234,15 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
 
   // Trim the number of output pages to the size of this VMO. This ensures any range calculation
   // can never overflow.
-  max_out_pages = ktl::min(static_cast<uint64_t>(max_out_pages), ((size_ - offset) / PAGE_SIZE));
+  max_out_pages = ktl::min(max_out_pages, (size_ - offset) / PAGE_SIZE);
+  max_waitable_pages = ktl::min(max_waitable_pages, (size_ - offset) / PAGE_SIZE);
 
   if (is_slice_locked()) {
     uint64_t parent_offset = 0;
     VmCowPages* parent = PagedParentOfSliceLocked(&parent_offset);
     AssertHeld(parent->lock_);
     return parent->LookupPagesLocked(offset + parent_offset, pf_flags, mark_dirty, max_out_pages,
-                                     alloc_list, page_request, out);
+                                     max_waitable_pages, alloc_list, page_request, out);
   }
 
   // Ensure we're adding pages to an empty list so we don't risk overflowing it.
@@ -2423,7 +2426,7 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
     // supplied by the source.
     //
     // In the case of a (hypothetical) page source that's both always providing zeroes and not
-    // suppying specific physical pages, we intentionally ask the page source to supply the pages
+    // supplying specific physical pages, we intentionally ask the page source to supply the pages
     // here since otherwise there's no point in having such a page source.  We have no such page
     // sources currently.
     //
@@ -2460,11 +2463,49 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
           AssertHeld(page_owner->paged_ref_->lock_ref());
           user_id = page_owner->paged_ref_->user_id_locked();
         }
+
+        DEBUG_ASSERT(owner_offset < page_owner->supply_zero_offset_);
+
+        // Try and batch more pages up to |max_waitable_pages| but before the supply zero offset.
+        uint64_t max_request_len = ktl::min(max_waitable_pages * PAGE_SIZE,
+                                            page_owner->supply_zero_offset_ - owner_offset);
+
+        // Limit |max_request_len| to the number of pages missing in the VMO that are owned by
+        // |page_owner|.
+        if (max_request_len > PAGE_SIZE) {
+          VmCowPages* tmp_owner;
+          uint64_t tmp_owner_offset;
+
+          // This lookup may be different from previous calls to |FindInitialPageContentLocked|, as
+          // the |owner_length| parameter is computed from |max_waitable_pages| instead of
+          // |max_out_pages| (see the |max_request_len| calculation above for details).
+          VmPageOrMarkerRef tmp_page_or_mark =
+              FindInitialPageContentLocked(offset, &tmp_owner, &tmp_owner_offset, &max_request_len);
+
+          DEBUG_ASSERT(!tmp_page_or_mark || !tmp_page_or_mark->IsPage());
+          DEBUG_ASSERT(tmp_owner == page_owner);
+          DEBUG_ASSERT(tmp_owner_offset == owner_offset);
+        }
+
+        // Limit |max_request_len| to the first page visible in the page owner.
+        if (max_request_len > PAGE_SIZE) {
+          [[maybe_unused]] zx_status_t status = page_owner->page_list_.ForEveryPageInRange(
+              [&max_request_len, owner_offset](const VmPageOrMarker* p, uint64_t off) {
+                DEBUG_ASSERT(!p->IsEmpty());
+
+                max_request_len = off - owner_offset;
+                return ZX_ERR_STOP;
+              },
+              owner_offset, owner_offset + max_request_len);
+          DEBUG_ASSERT(status == ZX_OK);
+        }
+
         VmoDebugInfo vmo_debug_info = {
             .vmo_ptr = reinterpret_cast<uintptr_t>(page_owner->paged_ref_), .vmo_id = user_id};
-        zx_status_t status =
-            page_owner->page_source_->GetPage(owner_offset, page_request->get(), vmo_debug_info);
-        // Page sources will never synchronously return a page.
+
+        zx_status_t status = page_owner->page_source_->GetPages(
+            owner_offset, max_request_len, page_request->get(), vmo_debug_info);
+        // Pager page sources will never synchronously return a page.
         DEBUG_ASSERT(status != ZX_OK);
 
         return status;
@@ -2722,8 +2763,8 @@ zx_status_t VmCowPages::CommitRangeLocked(uint64_t offset, uint64_t len, uint64_
     if (!p || !p->IsPage()) {
       const uint flags = VMM_PF_FLAG_SW_FAULT | VMM_PF_FLAG_WRITE;
       // A commit does not imply that pages are being dirtied, they are just being populated.
-      zx_status_t res = LookupPagesLocked(offset, flags, DirtyTrackingAction::None, 1, &page_list,
-                                          page_request, &lookup_info);
+      zx_status_t res = LookupPagesLocked(offset, flags, DirtyTrackingAction::None, 1, 1,
+                                          &page_list, page_request, &lookup_info);
       if (unlikely(res == ZX_ERR_SHOULD_WAIT)) {
         if (page_request->get()->BatchAccepting()) {
           // In batch mode, will need to finalize the request later.
@@ -3246,7 +3287,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
       __UNINITIALIZED LookupInfo lookup_page;
       zx_status_t status = LookupPagesLocked(offset, VMM_PF_FLAG_SW_FAULT | VMM_PF_FLAG_WRITE,
                                              VmObject::DirtyTrackingAction::DirtyAllPagesOnWrite, 1,
-                                             nullptr, page_request, &lookup_page);
+                                             1, nullptr, page_request, &lookup_page);
       if (status != ZX_OK) {
         return status;
       }
@@ -3496,8 +3537,8 @@ void VmCowPages::PromoteRangeForReclamationLocked(uint64_t offset, uint64_t len)
     // to look up the page in the child, instead of just forwarding the entire range lookup to the
     // parent, because we do NOT want to hint pages in the parent that have already been forked in
     // the child. That is, we need to first lookup the page and then check for ownership.
-    zx_status_t status =
-        LookupPagesLocked(start_offset, 0, DirtyTrackingAction::None, 1, nullptr, nullptr, &lookup);
+    zx_status_t status = LookupPagesLocked(start_offset, 0, DirtyTrackingAction::None, 1, 1,
+                                           nullptr, nullptr, &lookup);
     // Successfully found an existing page.
     if (status == ZX_OK) {
       DEBUG_ASSERT(lookup.num_pages == 1);
@@ -3537,8 +3578,8 @@ void VmCowPages::ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len
     // NOT want to hint pages in the parent that have already been forked in the child. That is, we
     // need to first lookup the page and then check for ownership.
     zx_status_t status =
-        LookupPagesLocked(cur_offset, VMM_PF_FLAG_SW_FAULT, DirtyTrackingAction::None, 1, nullptr,
-                          &page_request, &lookup);
+        LookupPagesLocked(cur_offset, VMM_PF_FLAG_SW_FAULT, DirtyTrackingAction::None, 1, 1,
+                          nullptr, &page_request, &lookup);
 
     if (status == ZX_OK) {
       // If we reached here, we successfully found a page at the current offset.

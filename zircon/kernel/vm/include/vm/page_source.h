@@ -241,7 +241,10 @@ class PageSource final : public PageRequestInterface {
   PageSource() = delete;
   explicit PageSource(fbl::RefPtr<PageProvider>&& page_provider);
 
-  // Sends a request to the backing source to provide the requested page.
+  // Sends a request to the backing source to provide the requested page at |offset|.
+  //
+  // If |prefetch_len| > |PAGE_SIZE|, the kernel may eagerly request more pages from the page
+  // source.
   //
   // Returns ZX_ERR_NOT_FOUND if the request cannot be fulfilled.
   // Returns ZX_ERR_SHOULD_WAIT if the request will be asynchronously fulfilled. If
@@ -249,7 +252,8 @@ class PageSource final : public PageRequestInterface {
   // pages to the request, or if no more pages want to be added the request should be finalized by
   // |req->FinalizeRequest|. If |BatchAccepting| was false, or |req| was finalized, then the caller
   // should wait on |req|.
-  zx_status_t GetPage(uint64_t offset, PageRequest* req, VmoDebugInfo vmo_debug_info);
+  zx_status_t GetPages(uint64_t offset, uint64_t prefetch_len, PageRequest* req,
+                       VmoDebugInfo vmo_debug_info);
 
   void FreePages(list_node* pages);
 
@@ -357,26 +361,16 @@ class PageSource final : public PageRequestInterface {
   // PagerProxy for details).
   const fbl::RefPtr<PageProvider> page_provider_;
 
-  // Helper that adds page at |offset| to |request| and potentially forwards it to the provider.
-  // |request| must already be initialized, and its page_request_type must be set to |type|.
-  // |offset| must be page-aligned.
+  // Helper that adds the span of |len| pages at |offset| to |request| and potentially forwards it
+  // to the provider. |request| must already be initialized, and its page_request_type must be set
+  // to |type|. |offset| must be page-aligned.
   //
-  // Returns ZX_ERR_NEXT if the PageRequest::batch_state_ is BatchState::Internal and more pages can
-  // be added to it, in which case the caller of this function within PageSource *must* handle
-  // ZX_ERR_NEXT itself before returning from PageSource. This option is used for request types that
-  // the PageSource would like to operate in batch mode by default as an optimization (e.g. DIRTY
-  // requests), where pages are added to the batch internally in PageSource without involving the
-  // external caller. In other words, the ZX_ERR_NEXT must be consumed internally within the
-  // PageSource caller, as the external caller is not prepared to handle it.
+  // If the |PageRequest::batch_state_| passed in is |BatchState::Internal|, this will attempt to
+  // add |len| pages to the request and then finalize the request.
   //
-  // Otherwise this method always returns ZX_ERR_SHOULD_WAIT, and transitions the
-  // PageRequest::batch_state_ as required.
-  zx_status_t PopulateRequestLocked(PageRequest* request, uint64_t offset, page_request_type type)
-      TA_REQ(page_source_mtx_);
-
-  // Helper used to complete a batched page request if the last call to PopulateRequestLocked
-  // left the page request in the BatchRequest::Accepting state.
-  zx_status_t FinalizeRequestLocked(PageRequest* request) TA_REQ(page_source_mtx_);
+  // This function will always return |ZX_ERR_SHOULD_WAIT|.
+  zx_status_t PopulateRequestLocked(PageRequest* request, uint64_t offset, uint64_t len,
+                                    page_request_type type) TA_REQ(page_source_mtx_);
 
   // Sends a request to the backing source, or adds the request to the overlap_ list if
   // the needed region has already been requested from the source.
@@ -456,8 +450,8 @@ class PageRequest : public fbl::WAVLTreeContainable<PageRequest*>,
     // PageSource, so it is never transitioned to Finalized when the batch is ready to be waited on.
     // Since the "batch" in the case of Internal is not exposed to the external caller, there is
     // also a difference in the way page request failures are handled by the PageSource.
-    // Only used for page_request_type::DIRTY. See comment near PageSource::PopulateRequestLocked
-    // for more context.
+    // Only used for page_request_type::DIRTY and page_request_type::READ. See comment near
+    // PageSource::PopulateRequestLocked for more context.
     // TODO(rashaeqbal): Figure out if Internal can be unified with Accepting by making all batches
     // external.
     Internal

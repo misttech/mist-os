@@ -1220,11 +1220,13 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
     const size_t last_page_offset = ROUNDDOWN(src_offset + len - 1, PAGE_SIZE);
     const size_t max_pages = (last_page_offset - first_page_offset) / PAGE_SIZE + 1;
 
+    // Lookup and prefetch pages, since subsequent pages will very likely be needed.
+    const uint64_t max_waitable_pages = ktl::min(max_pages, LookupInfo::kMaxPages);
     // fault in the page(s)
-    zx_status_t status = LookupPagesLocked(
-        first_page_offset, VMM_PF_FLAG_SW_FAULT | (write ? VMM_PF_FLAG_WRITE : 0),
-        VmObject::DirtyTrackingAction::DirtyAllPagesOnWrite,
-        ktl::min(max_pages, LookupInfo::kMaxPages), nullptr, &page_request, &pages);
+    zx_status_t status =
+        LookupPagesLocked(first_page_offset, VMM_PF_FLAG_SW_FAULT | (write ? VMM_PF_FLAG_WRITE : 0),
+                          VmObject::DirtyTrackingAction::DirtyAllPagesOnWrite, max_waitable_pages,
+                          max_waitable_pages, nullptr, &page_request, &pages);
     if (status == ZX_ERR_SHOULD_WAIT) {
       // Must block on asynchronous page requests whilst not holding the lock.
       DEBUG_ASSERT(can_block_on_page_requests());

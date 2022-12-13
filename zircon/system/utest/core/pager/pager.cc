@@ -12,6 +12,7 @@
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/iommu.h>
 #include <zircon/syscalls/object.h>
+#include <zircon/time.h>
 
 #include <iterator>
 #include <memory>
@@ -25,6 +26,9 @@
 #include "userpager.h"
 
 namespace pager_tests {
+
+// This value corresponds to `VmObject::LookupInfo::kMaxPages`
+static constexpr uint64_t kMaxPagesBatch = 16;
 
 // Simple test that checks that a single thread can access a single page.
 VMO_VMAR_TEST(Pager, SinglePageTest) {
@@ -134,9 +138,19 @@ VMO_VMAR_TEST(Pager, SequentialMultipageTest) {
 
   ASSERT_TRUE(t.Start());
 
-  for (unsigned i = 0; i < kNumPages; i++) {
-    ASSERT_TRUE(pager.WaitForPageRead(vmo, i, 1, ZX_TIME_INFINITE));
-    ASSERT_TRUE(pager.SupplyPages(vmo, i, 1));
+  if (check_vmar) {
+    // When mapped, the hardware faults will fault in pages one by one.
+    for (uint64_t i = 0; i < kNumPages; i++) {
+      ASSERT_TRUE(pager.WaitForPageRead(vmo, i, 1, ZX_TIME_INFINITE));
+      ASSERT_TRUE(pager.SupplyPages(vmo, i, 1));
+    }
+  } else {
+    for (uint64_t i = 0; i < kNumPages; i += kMaxPagesBatch) {
+      // When doing direct reads, the software faults will be batched.
+      uint64_t page_count = std::min(kMaxPagesBatch, kNumPages - i);
+      ASSERT_TRUE(pager.WaitForPageRead(vmo, i, page_count, ZX_TIME_INFINITE));
+      ASSERT_TRUE(pager.SupplyPages(vmo, i, page_count));
+    }
   }
 
   ASSERT_TRUE(t.Wait());
@@ -588,6 +602,7 @@ VMO_VMAR_TEST(Pager, DecommitOnDetachTest) {
     return check_buffer(clone, 0, 1, check_vmar);
   });
   ASSERT_TRUE(t1.Start());
+
   ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 1, ZX_TIME_INFINITE));
 
   // Supply the page and wait for the thread to successfully exit.
@@ -686,10 +701,9 @@ TEST(Pager, DetachNonMappingAccess) {
 
   ASSERT_TRUE(t.Start());
 
-  // Supply the first page, then once the second is requested detach the VMO.
-  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 1, ZX_TIME_INFINITE));
+  // Expect the whole range to be batched into one request.
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 2, ZX_TIME_INFINITE));
   ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1));
-  ASSERT_TRUE(pager.WaitForPageRead(vmo, 1, 1, ZX_TIME_INFINITE));
   pager.DetachVmo(vmo);
   ASSERT_TRUE(t.WaitForTerm());
 
@@ -1012,7 +1026,7 @@ TEST(Pager, CloneDetachTest) {
   ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 1, ZX_TIME_INFINITE));
 
   // Threads t1 and t2 should have generated page requests. Fulfill them and wait for the threads to
-  // exit succesfully.
+  // exit successfully.
   ASSERT_TRUE(pager.SupplyPages(vmo, 0, 2));
   ASSERT_TRUE(t1.Wait());
   ASSERT_TRUE(t2.Wait());
@@ -3415,6 +3429,120 @@ TEST(Pager, RacyPortDequeue) {
     // Destroy the port.
     ASSERT_OK(zx_handle_close(port));
   }
+}
+
+TEST(Pager, PresentPageSplitsRange) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  constexpr uint64_t kNumPages = 5;
+  constexpr uint64_t kSuppliedPageIndex = 2;
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(kNumPages, &vmo));
+
+  // Supply page in the middle of the VMO.
+  ASSERT_TRUE(pager.SupplyPages(vmo, kSuppliedPageIndex, 1));
+
+  TestThread t([vmo]() -> bool { return vmo->Commit(0, kNumPages); });
+  ASSERT_TRUE(t.Start());
+
+  // Expect the first request to be the lower half of the VMO.
+  ASSERT_TRUE(t.WaitForBlocked());
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, kSuppliedPageIndex, ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, kSuppliedPageIndex));
+
+  // Expect the second request to be the upper half of the VMO.
+  ASSERT_TRUE(t.WaitForBlocked());
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, kSuppliedPageIndex + 1, kNumPages - kSuppliedPageIndex - 1,
+                                    ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.SupplyPages(vmo, kSuppliedPageIndex + 1, kNumPages - kSuppliedPageIndex - 1));
+
+  ASSERT_TRUE(t.Wait());
+}
+
+// Tests that page request batching checks for pages present in ancestor VMOs before including a
+// page in a batched request.
+TEST(Pager, PageRequestBatchingChecksAncestorPages) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  constexpr uint64_t kNumPages = 8;
+
+  Vmo* root_vmo;
+  ASSERT_TRUE(pager.CreateVmo(kNumPages, &root_vmo));
+
+  zx::vmo child_vmo;
+  ASSERT_OK(root_vmo->vmo().create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, 0,
+                                         kNumPages * zx_system_get_page_size(), &child_vmo));
+
+  // Write to pages 1-2 in `child_vmo`.
+  TestThread t1([&child_vmo] {
+    const std::vector<char> buffer(2 * zx_system_get_page_size(), 'b');
+    zx_status_t status =
+        child_vmo.write(buffer.data(), 1 * zx_system_get_page_size(), buffer.size());
+    return status == ZX_OK;
+  });
+
+  ASSERT_TRUE(t1.Start());
+  ASSERT_TRUE(pager.SupplyPages(root_vmo, 1, 2));
+  ASSERT_TRUE(t1.Wait());
+
+  zx::vmo grandchild_vmo;
+  ASSERT_OK(child_vmo.create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, 0,
+                                   kNumPages * zx_system_get_page_size(), &grandchild_vmo));
+
+  // Write to pages 5-7 in `grandchild_vmo`.
+  TestThread t2([&grandchild_vmo] {
+    const std::vector<char> buffer(3 * zx_system_get_page_size(), 'c');
+    zx_status_t status =
+        grandchild_vmo.write(buffer.data(), 5 * zx_system_get_page_size(), buffer.size());
+    return status == ZX_OK;
+  });
+
+  ASSERT_TRUE(t2.Start());
+  ASSERT_TRUE(pager.SupplyPages(root_vmo, 5, 3));
+  ASSERT_TRUE(t2.Wait());
+
+  zx::vmo great_grandchild_vmo;
+  ASSERT_OK(grandchild_vmo.create_child(
+      ZX_VMO_CHILD_SLICE, 0, kNumPages * zx_system_get_page_size(), &great_grandchild_vmo));
+
+  TestThread t3([&great_grandchild_vmo] {
+    std::unique_ptr<char[]> data = std::make_unique<char[]>(kNumPages * zx_system_get_page_size());
+
+    zx_status_t status =
+        great_grandchild_vmo.read(data.get(), 0, kNumPages * zx_system_get_page_size());
+    if (status != ZX_OK) {
+      printf("Read failed with %d\n", status);
+      return false;
+    }
+
+    // Ensure the contents of pages [1, 2] were from `child_vmo`.
+    const std::vector<char> expected_from_child(2 * zx_system_get_page_size(), 'b');
+    if (memcmp(&data[zx_system_get_page_size()], expected_from_child.data(),
+               expected_from_child.size()) != 0) {
+      return false;
+    }
+
+    // Ensure the contents of pages [5, 7] were from `grandchild_vmo`.
+    const std::vector<char> expected_from_grandchild(3 * zx_system_get_page_size(), 'c');
+    if (memcmp(&data[5 * zx_system_get_page_size()], expected_from_grandchild.data(),
+               expected_from_grandchild.size()) != 0) {
+      return false;
+    }
+
+    return true;
+  });
+
+  ASSERT_TRUE(t3.Start());
+
+  // Expect and supply page requests for page ranges [0, 1) and [3, 5).
+  ASSERT_TRUE(pager.WaitForPageRead(root_vmo, 0, 1, ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.SupplyPages(root_vmo, 0, 1));
+  ASSERT_TRUE(pager.WaitForPageRead(root_vmo, 3, 2, ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.SupplyPages(root_vmo, 3, 2));
+
+  ASSERT_TRUE(t3.Wait());
 }
 
 }  // namespace pager_tests

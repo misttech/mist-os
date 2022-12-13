@@ -581,7 +581,7 @@ class VmObject : public VmHierarchyBase,
                             LazyPageRequest* page_request, vm_page_t** page, paddr_t* pa)
       TA_REQ(lock_) {
     __UNINITIALIZED LookupInfo lookup;
-    zx_status_t status = LookupPagesLocked(offset, pf_flags, DirtyTrackingAction::None, 1,
+    zx_status_t status = LookupPagesLocked(offset, pf_flags, DirtyTrackingAction::None, 1, 1,
                                            alloc_list, page_request, &lookup);
     if (status == ZX_OK) {
       DEBUG_ASSERT(lookup.num_pages == 1);
@@ -623,28 +623,45 @@ class VmObject : public VmHierarchyBase,
     // the lookup.
     bool writable;
   };
+
   // See GetPage for a description of the core functionality.
+  //
   // Beyond GetPage this allows for retrieving information about multiple pages, storing them in a
-  // |LookupInfo| output struct. The |max_out_pages| is required to be strictly greater than 0, but
-  // not greater than LookupInfo::kMaxPages. |mark_dirty| specifies whether pages looked up for a
-  // write (VMM_PF_FLAG_WRITE) should be marked dirty, e.g. when called from a zx_vmo_write or a
-  // write fault. Note that |mark_dirty| only carries any meaning if VMM_PF_FLAG_WRITE is set, as it
-  // is specifying the dirty action on a write.
+  // |LookupInfo| output struct. |mark_dirty| specifies whether pages looked up for a write
+  // (VMM_PF_FLAG_WRITE) should be marked dirty, e.g. when called from a zx_vmo_write or a write
+  // fault. Note that |mark_dirty| only carries any meaning if |VMM_PF_FLAG_WRITE| is set, as it is
+  // specifying the dirty action on a write.
   //
-  // Collecting additional pages essentially treats the VMO's content as immutable, and will not
-  // perform page write forking or any page allocations, but may update page tracking metadata. For
-  // example, if a lookup is requested for a multi-page range with the write flag set, looked up
-  // pages in the range may be marked dirty in preparation for the write.
+  // |max_out_pages| represents an upper bound of pages for optimistic lookup.
+  // Optimistic lookup essentially treats the VMO's content as immutable, and will not perform page
+  // write forking or any page allocations, but may update page tracking metadata. For example, if a
+  // lookup is requested for a multi-page range with the write flag set, looked up pages in the
+  // range may be marked dirty in preparation for the write. Treating the VMO immutable makes this
+  // suitable for performing optimistic lookups without impacting memory usage. However, looking up
+  // additional pages is strictly optional and the caller may not infer anything based on the
+  // absence of these pages. |max_out_pages| will apply to the outputted |LookupInfo*|.
   //
-  // However returning additional pages is strictly optional and the caller may not infer anything
-  // based on absence of these pages. That is, for any additional pages that are returned, it is
-  // guaranteed that GetPage would have returned exactly the same page. The additional lookups
-  // treating the VMO immutable makes this suitable for performing optimistic lookups without
-  // impacting memory usage.
+  // |max_waitable_pages| represents an upper bound of pages for optimistic batching for
+  // |page_request|.
+  // Optimistic batching, in addition to optimistic lookup, may perform a request for additional
+  // pages from a page source if the page at |offset| needs to be provided by a page source.
+  // Optimistic batching is suitable for scenarios where an operation knows that sequentially
+  // adjacent pages are imminently required to complete the operation and can be used to amortize
+  // the cost of a page request. This will potentially have an impact on memory usage and may walk
+  // through more pages. However, fetching additional pages is strictly optional and the caller may
+  // not infer anything based on the absence of these pages.
+  //
+  //
+  // Notes:
+  //   * 1 <= max_out_pages <= LookupInfo::kMaxPages
+  //   * max_waitable_pages >= 1
+  //   * The first page, in the context of |max_out_pages| and |max_waitable_pages|, will always
+  //     be considered required.
   virtual zx_status_t LookupPagesLocked(uint64_t offset, uint pf_flags,
                                         DirtyTrackingAction mark_dirty, uint64_t max_out_pages,
-                                        list_node* alloc_list, LazyPageRequest* page_request,
-                                        LookupInfo* out) TA_REQ(lock_) {
+                                        uint64_t max_waitable_pages, list_node* alloc_list,
+                                        LazyPageRequest* page_request, LookupInfo* out)
+      TA_REQ(lock_) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 

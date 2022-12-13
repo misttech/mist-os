@@ -271,14 +271,15 @@ bool verify_mapping_page_attribution(VmMapping* mapping, uint64_t mapping_gen, u
 
 zx_status_t vmo_lookup_pages(VmObject* vmo, uint64_t offset, uint pf_flags,
                              VmObject::DirtyTrackingAction mark_dirty, uint64_t max_out_pages,
-                             list_node* alloc_list, VmObject::LookupInfo* out) {
+                             uint64_t max_waitable_pages, list_node* alloc_list,
+                             VmObject::LookupInfo* out) {
   zx_status_t status = ZX_OK;
   // TOOD(fxb/94078): Enforce no locks held here in case this gets waited on.
   __UNINITIALIZED LazyPageRequest page_request;
   Guard<CriticalMutex> guard{vmo->lock()};
   do {
-    status = vmo->LookupPagesLocked(offset, pf_flags, mark_dirty, max_out_pages, alloc_list,
-                                    &page_request, out);
+    status = vmo->LookupPagesLocked(offset, pf_flags, mark_dirty, max_out_pages, max_waitable_pages,
+                                    alloc_list, &page_request, out);
     if (status == ZX_ERR_SHOULD_WAIT) {
       zx_status_t st;
       guard.CallUnlocked([&page_request, &st] { st = page_request->Wait(); });

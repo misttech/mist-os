@@ -700,7 +700,7 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
           zx_status_t status;
           status = object_->LookupPagesLocked(
               vmo_offset, pf_flags, VmObject::DirtyTrackingAction::None,
-              ktl::min((len - offset) / PAGE_SIZE, VmObject::LookupInfo::kMaxPages), nullptr,
+              ktl::min((len - offset) / PAGE_SIZE, VmObject::LookupInfo::kMaxPages), 1, nullptr,
               &page_request, &pages);
           if (status != ZX_OK) {
             // As per the comment above page_request definition, there should never be SW_FAULT +
@@ -879,11 +879,11 @@ zx_status_t VmMapping::PageFault(vaddr_t va, const uint pf_flags, LazyPageReques
   // we can take a permission fault on a write to update their dirty tracking later. Instead, we can
   // keep things simple by just looking up 1 page.
   // TODO(rashaeqbal): Revisit this decision if there are performance issues.
-  const uint64_t max_pages =
+  const uint64_t max_out_pages =
       (pf_flags & VMM_PF_FLAG_WRITE && object_->is_dirty_tracked_locked())
           ? 1
           : ktl::min((max_map - va) / PAGE_SIZE, VmObject::LookupInfo::kMaxPages);
-  DEBUG_ASSERT(max_pages > 0);
+  DEBUG_ASSERT(max_out_pages > 0);
 
   // set the currently faulting flag for any recursive calls the vmo may make back into us
   // The specific path we're avoiding is if the VMO calls back into us during
@@ -899,8 +899,8 @@ zx_status_t VmMapping::PageFault(vaddr_t va, const uint pf_flags, LazyPageReques
   // fault in or grab existing pages.
   __UNINITIALIZED VmObject::LookupInfo lookup_info;
   zx_status_t status = object_->LookupPagesLocked(
-      vmo_offset, pf_flags, VmObject::DirtyTrackingAction::DirtyAllPagesOnWrite, max_pages, nullptr,
-      page_request, &lookup_info);
+      vmo_offset, pf_flags, VmObject::DirtyTrackingAction::DirtyAllPagesOnWrite, max_out_pages, 1,
+      nullptr, page_request, &lookup_info);
   if (status != ZX_OK) {
     // TODO(cpu): This trace was originally TRACEF() always on, but it fires if the
     // VMO was resized, rather than just when the system is running out of memory.
