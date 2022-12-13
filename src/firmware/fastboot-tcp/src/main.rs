@@ -73,11 +73,11 @@ async fn main() -> Result<(), anyhow::Error> {
     let listener = TcpListener::bind(&addrs[..]).context("Can't bind to address")?;
     loop {
         let (mut stream, _) = listener.accept().context("Accept failed")?;
-        // Set read time out to 1 seconds. Each fastboot host command initiates a new
+        // Set read time out to 5 seconds. Each fastboot host command initiates a new
         // TCP connection and sends one or more command/data packets. It closes itself
         // after finished. The timeout is used as a simple solution to close connection
         // when host finishes and becomes idle.
-        stream.set_read_timeout(Some(std::time::Duration::new(1, 0)))?;
+        stream.set_read_timeout(Some(std::time::Duration::new(5, 0)))?;
         match fastboot_session(&mut stream).await {
             Ok(()) => {}
             Err(err) => {
