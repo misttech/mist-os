@@ -9,6 +9,7 @@ use ffx_lib_sub_command::SubCommand;
 /// Fuchsia's developer tool
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "ffx", description = "Fuchsia Developer Multitool")]
 pub struct FfxBuiltIn {
     #[argh(subcommand)]
     pub subcommand: Option<SubCommand>,

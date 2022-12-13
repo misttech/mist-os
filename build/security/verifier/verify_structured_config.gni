@@ -45,6 +45,13 @@ template("extract_assembled_structured_config") {
     inputs = [ pb_manifest ]
     outputs = [ invoker.output ]
 
+    # The target below is generated as a part of the `ffx_tool` action at
+    # `//src/developer/ffx/plugins/scrutiny:ffx_scrutiny_tool`. See there
+    # for more information.
+    ffx_tool =
+        "//src/developer/ffx/plugins/scrutiny:ffx_scrutiny_tool_versioned"
+    ffx_tool_output_name = "ffx-scrutiny"
+
     args = [
       "scrutiny",
       "extract",
@@ -119,6 +126,13 @@ template("verify_assembled_structured_config") {
       invoker.policy,
     ]
     outputs = [ stamp_file ]
+
+    # The target below is generated as a part of the `ffx_tool` action at
+    # `//src/developer/ffx/plugins/scrutiny:ffx_scrutiny_tool`. See there
+    # for more information.
+    ffx_tool =
+        "//src/developer/ffx/plugins/scrutiny:ffx_scrutiny_tool_versioned"
+    ffx_tool_output_name = "ffx-scrutiny"
 
     args = [
       "scrutiny",

@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/build/ffx_tool.gni")
 
 ffx_plugin("ffx_scrutiny") {
   version = "0.1.0"
@@ -20,4 +21,21 @@ ffx_plugin("ffx_scrutiny") {
   non_rust_deps = [ "//src/lib/chunked-compression" ]
 
   args_sources = [ "src/args.rs" ]
+}
+
+# When used in the build, this separate subtool version must be used to avoid
+# its build steps depending on all of ffx. In order to use it with ffx_action,
+# you need to tell it to use the versioned executable target as follows:
+#
+#   ffx_tool =
+#       "//src/developer/ffx/plugins/scrutiny:ffx_scrutiny_tool_versioned"
+#   ffx_tool_output_name = "ffx-scrutiny"
+ffx_tool("ffx_scrutiny_tool") {
+  edition = "2021"
+  output_name = "ffx-scrutiny"
+  deps = [
+    ":ffx_scrutiny_suite",
+    "//src/lib/fuchsia-async",
+  ]
+  sources = [ "src/main.rs" ]
 }
