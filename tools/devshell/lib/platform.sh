@@ -25,7 +25,7 @@ case "$(uname -m)" in
   arm64)
     # TODO(fxbug.dev/97767): Stop redirecting mac-arm64 to mac-x64 binaries once prebuilt
     # arm64 binaries are available and included in mac-arm64 checkouts.
-    if [ "$HOST_OS" == "mac" ]; then
+    if [[ "$HOST_OS" == "mac" ]]; then
       readonly HOST_CPU="x64"
     else
       readonly HOST_CPU="arm64"
