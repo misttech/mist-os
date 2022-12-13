@@ -51,13 +51,6 @@ pub trait ReceiveBuffer: Buffer {
 
 /// A buffer supporting TCP sending operations.
 pub trait SendBuffer: Buffer {
-    /// Requests that the buffer be resized to hold the given number of bytes.
-    ///
-    /// Calling this method suggests to the buffer that it should alter its size.
-    /// Implementations are free to impose constraints or ignore requests
-    /// entirely.
-    fn request_capacity(&mut self, size: usize);
-
     /// Removes `count` bytes from the beginning of the buffer as already read.
     ///
     /// # Panics
@@ -415,10 +408,6 @@ impl ReceiveBuffer for RingBuffer {
 }
 
 impl SendBuffer for RingBuffer {
-    fn request_capacity(&mut self, size: usize) {
-        self.set_target_size(size)
-    }
-
     fn mark_read(&mut self, count: usize) {
         let Self { storage, head, len, shrink: _ } = self;
         assert!(count <= *len);

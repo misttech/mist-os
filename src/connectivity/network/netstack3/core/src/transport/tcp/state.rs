@@ -897,23 +897,6 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             ..*self
         }
     }
-
-    fn set_capacity(&mut self, size: usize) {
-        let Self {
-            nxt: _,
-            max: _,
-            una: _,
-            wnd: _,
-            wl1: _,
-            wl2: _,
-            buffer,
-            last_seq_ts: _,
-            rtt_estimator: _,
-            timer: _,
-            congestion_control: _,
-        } = self;
-        buffer.request_capacity(size)
-    }
 }
 
 impl<I: Instant, S: SendBuffer> Send<I, S, { FinQueued::NO }> {
@@ -1807,33 +1790,6 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
         *self = State::Closed(Closed { reason: UserError::ConnectionReset });
         reply
     }
-
-    pub(crate) fn set_send_buffer_size(&mut self, size: usize) {
-        match self {
-            State::FinWait2(_) | State::TimeWait(_) | State::Closed(_) => (),
-            State::Listen(Listen { iss: _, buffer_sizes })
-            | State::SynRcvd(SynRcvd {
-                iss: _,
-                irs: _,
-                timestamp: _,
-                retrans_timer: _,
-                simultaneous_open: _,
-                buffer_sizes,
-            })
-            | State::SynSent(SynSent {
-                iss: _,
-                timestamp: _,
-                retrans_timer: _,
-                active_open: _,
-                buffer_sizes,
-            }) => buffer_sizes.send = size,
-            State::Established(Established { snd, rcv: _ }) => snd.set_capacity(size),
-            State::FinWait1(FinWait1 { snd, rcv: _ }) => snd.set_capacity(size),
-            State::Closing(Closing { snd, last_ack: _, last_wnd: _ })
-            | State::LastAck(LastAck { snd, last_ack: _, last_wnd: _ }) => snd.set_capacity(size),
-            State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => snd.set_capacity(size),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -1932,8 +1888,6 @@ mod test {
     }
 
     impl SendBuffer for NullBuffer {
-        fn request_capacity(&mut self, _size: usize) {}
-
         fn mark_read(&mut self, count: usize) {
             assert_eq!(count, 0);
         }
