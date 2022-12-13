@@ -19,7 +19,11 @@ pub struct BootArgs {
 }
 
 impl BootArgs {
-    pub async fn new() -> Result<Self, Error> {
+    pub async fn new() -> Self {
+        Self::new_helper().await.unwrap_or(BootArgs { ..Default::default() })
+    }
+
+    pub async fn new_helper() -> Result<Self, Error> {
         let arguments_proxy = connect_to_protocol::<ArgumentsMarker>()
             .context("Failed to connect to Arguments protocol")?;
 
@@ -32,6 +36,7 @@ impl BootArgs {
             .get_bools(&mut defaults.iter_mut())
             .await
             .context("get_bools failed")?;
+
         let netsvc_netboot = ret[0];
         let zircon_system_filesystem_check = ret[1];
         let zircon_system_disable_automount = ret[2];

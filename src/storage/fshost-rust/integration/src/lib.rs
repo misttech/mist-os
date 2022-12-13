@@ -21,6 +21,7 @@ mod mocks;
 
 pub struct TestFixtureBuilder {
     netboot: bool,
+    no_fuchsia_boot: bool,
     disk: Option<disk_builder::Disk>,
     fshost: fshost_builder::FshostBuilder,
     zbi_ramdisk: Option<disk_builder::DiskBuilder>,
@@ -30,6 +31,7 @@ impl TestFixtureBuilder {
     pub fn new(fshost_component_name: &'static str) -> Self {
         Self {
             netboot: false,
+            no_fuchsia_boot: false,
             disk: None,
             fshost: fshost_builder::FshostBuilder::new(fshost_component_name),
             zbi_ramdisk: None,
@@ -60,6 +62,11 @@ impl TestFixtureBuilder {
         self
     }
 
+    pub fn no_fuchsia_boot(mut self) -> Self {
+        self.no_fuchsia_boot = true;
+        self
+    }
+
     pub async fn build(self) -> TestFixture {
         let builder = RealmBuilder::new().await.unwrap();
         let fshost = self.fshost.build(&builder).await;
@@ -78,14 +85,24 @@ impl TestFixtureBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol::<fboot::ArgumentsMarker>())
-                    .capability(Capability::protocol::<fboot::ItemsMarker>())
                     .capability(Capability::protocol::<ffeedback::CrashReporterMarker>())
                     .from(&mocks)
                     .to(&fshost),
             )
             .await
             .unwrap();
+        if !self.no_fuchsia_boot {
+            builder
+                .add_route(
+                    Route::new()
+                        .capability(Capability::protocol::<fboot::ArgumentsMarker>())
+                        .capability(Capability::protocol::<fboot::ItemsMarker>())
+                        .from(&mocks)
+                        .to(&fshost),
+                )
+                .await
+                .unwrap();
+        }
 
         let drivers = builder
             .add_child(

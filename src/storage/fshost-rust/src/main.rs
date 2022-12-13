@@ -6,7 +6,7 @@ use {
     crate::{
         boot_args::BootArgs, config::apply_boot_args_to_config, environment::FshostEnvironment,
     },
-    anyhow::{format_err, Context, Error},
+    anyhow::{format_err, Error},
     fidl::prelude::*,
     fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio,
     fuchsia_runtime::{take_startup_handle, HandleType},
@@ -33,7 +33,7 @@ mod watcher;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    let boot_args = BootArgs::new().await.context("Failed to create boot_args")?;
+    let boot_args = BootArgs::new().await;
     let mut config = fshost_config::Config::take_from_startup_handle();
     apply_boot_args_to_config(&mut config, &boot_args);
     let config = Arc::new(config);

@@ -333,7 +333,7 @@ pub fn fshost_block_watcher(pauser: watcher::Watcher) -> Arc<service::Service> {
                             Ok(()) => zx::Status::OK.into_raw(),
                             Err(e) => {
                                 tracing::error!("block watcher service: failed to pause: {:?}", e);
-                                zx::Status::UNAVAILABLE.into_raw()
+                                zx::Status::BAD_STATE.into_raw()
                             }
                         };
                         responder.send(res).unwrap_or_else(|e| {

@@ -103,6 +103,19 @@ async fn data_reformatted_when_corrupt() {
             &format!("fuchsia-{}-corruption", DATA_FILESYSTEM_FORMAT),
         )
         .await;
+
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+async fn data_formatted_no_fuchsia_boot() {
+    let mut builder = new_builder().no_fuchsia_boot();
+    builder.with_disk();
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
     fixture.tear_down().await;
 }
 
@@ -427,5 +440,19 @@ async fn pausing_block_watcher_ignores_devices() {
     // only the second one was processed.
     fixture.check_test_data_file().await;
 
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+async fn block_watcher_second_pause_fails() {
+    let fixture = new_builder().build().await;
+    let pauser = fixture
+        .realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<fshost::BlockWatcherMarker>()
+        .unwrap();
+    assert_eq!(pauser.pause().await.unwrap(), zx::Status::OK.into_raw());
+    // A paused block watcher should fail if paused a second time
+    assert_eq!(pauser.pause().await.unwrap(), zx::Status::BAD_STATE.into_raw());
     fixture.tear_down().await;
 }
