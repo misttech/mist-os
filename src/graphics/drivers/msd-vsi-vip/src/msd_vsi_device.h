@@ -53,19 +53,23 @@ class MsdVsiDevice : public msd_device_t,
 
   // Returns whether an AXI SRAM is expected.
   bool HasAxiSram() const {
-    return (!(((device_id() == 0x8000) && (customer_id() == MAGMA_VSI_VIP_NELSON_CUSTOMER_ID)) ||
-              ((device_id() == 0x8000) && (customer_id() == MAGMA_VSI_VIP_AS370_CUSTOMER_ID)) ||
-              ((device_id() == 0x9000) && (customer_id() == MAGMA_VSI_VIP_A5_CUSTOMER_ID))));
+    return (!(((device_id() == kMsdVsiVipDevice8000) &&
+               (customer_id() == MAGMA_VSI_VIP_NELSON_CUSTOMER_ID)) ||
+              ((device_id() == kMsdVsiVipDevice8000) &&
+               (customer_id() == MAGMA_VSI_VIP_AS370_CUSTOMER_ID)) ||
+              ((device_id() == kMsdVsiVipDevice9000) &&
+               (customer_id() == MAGMA_VSI_VIP_A5_CUSTOMER_ID))));
   }
 
   // Returns whether an 3d pipe is expected.
   bool Has3dPipe() const {
-    return (!((device_id() == 0x9000) && (customer_id() == MAGMA_VSI_VIP_A5_CUSTOMER_ID)));
+    return (!((device_id() == kMsdVsiVipDevice9000) &&
+              (customer_id() == MAGMA_VSI_VIP_A5_CUSTOMER_ID)));
   }
 
   // Check device id is supported
   bool IsValidDeviceId() {
-    return (device_id() == 0x8000 || device_id() == 0x9000);
+    return (device_id() == kMsdVsiVipDevice8000 || device_id() == kMsdVsiVipDevice9000);
   }
 
   bool Shutdown();

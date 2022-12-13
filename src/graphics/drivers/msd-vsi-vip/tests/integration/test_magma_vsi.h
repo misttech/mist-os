@@ -15,6 +15,8 @@
 #include <gtest/gtest.h>
 #include <magma/magma.h>
 
+#include "magma_vsi_vip_devices.h"
+
 class MagmaVsi {
  public:
   void DeviceFind() {
@@ -42,7 +44,7 @@ class MagmaVsi {
         ASSERT_EQ(magma_query(device_, MAGMA_QUERY_DEVICE_ID, nullptr, &device_id),
                   MAGMA_STATUS_OK);
 
-        if (device_id == kVersiliconChipID) {
+        if (device_id == kMsdVsiVipDevice8000 || device_id == kMsdVsiVipDevice9000) {
           break;
         }
         DeviceClose();
@@ -90,8 +92,6 @@ class MagmaVsi {
 
  protected:
   static constexpr const char* kDevicePath = "/dev/class/gpu";
-
-  static constexpr const uint32_t kVersiliconChipID = 0x8000;
 
   magma_device_t device_ = 0ul;
   magma_connection_t connection_ = {};

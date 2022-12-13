@@ -34,9 +34,7 @@ TEST_F(MsdVsiDeviceTest, Shutdown) {
   EXPECT_TRUE(device_->Shutdown());
 }
 
-TEST_F(MsdVsiDeviceTest, DeviceId) {
-  EXPECT_TRUE((device_->device_id() == 0x7000u) || (device_->device_id() == 0x8000u));
-}
+TEST_F(MsdVsiDeviceTest, DeviceId) { EXPECT_TRUE(device_->IsValidDeviceId()); }
 
 TEST_F(MsdVsiDeviceTest, ChipIdentity) {
   magma_vsi_vip_chip_identity identity;
