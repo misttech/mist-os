@@ -7,9 +7,6 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 
-#include "src/media/audio/audio_core/v2/audio_capturer_server.h"
-#include "src/media/audio/audio_core/v2/audio_renderer_server.h"
-
 namespace media_audio {
 
 using ::media::audio::CaptureUsage;
