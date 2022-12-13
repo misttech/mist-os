@@ -112,6 +112,10 @@ pub trait Ip6 {
     /// Functional equivalent of
     /// [`otsys::otIp6IsReceiveFilterEnabled`](crate::otsys::otIp6IsReceiveFilterEnabled).
     fn ip6_is_receive_filter_enabled(&self) -> bool;
+
+    /// Functional equivalent of
+    /// [`otsys::otIp6GetBorderRoutingCounters`](crate::otsys::otIp6GetBorderRoutingCounters).
+    fn ip6_get_border_routing_counters(&self) -> &BorderRoutingCounters;
 }
 
 impl<T: Ip6 + ot::Boxable> Ip6 for ot::Box<T> {
@@ -187,6 +191,10 @@ impl<T: Ip6 + ot::Boxable> Ip6 for ot::Box<T> {
 
     fn ip6_is_receive_filter_enabled(&self) -> bool {
         self.as_ref().ip6_is_receive_filter_enabled()
+    }
+
+    fn ip6_get_border_routing_counters(&self) -> &BorderRoutingCounters {
+        self.as_ref().ip6_get_border_routing_counters()
     }
 }
 
@@ -361,5 +369,12 @@ impl Ip6 for Instance {
 
     fn ip6_is_receive_filter_enabled(&self) -> bool {
         unsafe { otIp6IsReceiveFilterEnabled(self.as_ot_ptr()) }
+    }
+
+    fn ip6_get_border_routing_counters(&self) -> &BorderRoutingCounters {
+        unsafe {
+            BorderRoutingCounters::ref_from_ot_ptr(otIp6GetBorderRoutingCounters(self.as_ot_ptr()))
+                .unwrap()
+        }
     }
 }
