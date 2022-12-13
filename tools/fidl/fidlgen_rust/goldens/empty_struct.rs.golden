@@ -52,7 +52,6 @@ impl fidl::endpoints::ProtocolMarker for EmptyProtocolMarker {
 
 pub trait EmptyProtocolProxyInterface: Send + Sync {
     fn r#send_(&self, e: &mut Empty) -> Result<(), fidl::Error>;
-    type ReceiveResponseFut: std::future::Future<Output = Result<(Empty), fidl::Error>> + Send;
     type SendAndReceiveResponseFut: std::future::Future<Output = Result<(Empty), fidl::Error>>
         + Send;
     fn r#send_and_receive(&self, e: &mut Empty) -> Self::SendAndReceiveResponseFut;
@@ -154,7 +153,6 @@ impl EmptyProtocolProxyInterface for EmptyProtocolProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
-    type ReceiveResponseFut = fidl::client::QueryResponseFut<(Empty)>;
     type SendAndReceiveResponseFut = fidl::client::QueryResponseFut<(Empty)>;
     fn r#send_and_receive(&self, mut e: &mut Empty) -> Self::SendAndReceiveResponseFut {
         fn transform(result: Result<(Empty,), fidl::Error>) -> Result<(Empty), fidl::Error> {

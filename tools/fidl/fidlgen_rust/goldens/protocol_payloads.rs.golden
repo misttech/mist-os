@@ -136,13 +136,6 @@ pub trait MainProtocolProxyInterface: Send + Sync {
     fn r#two_way_composed(&self, a: i32) -> Self::TwoWayComposedResponseFut;
     type TwoWayComposedWithErrorResponseFut: std::future::Future<Output = Result<(fidl_test_protocolpayloads_imported::ComposedProtocolTwoWayComposedWithErrorResult), fidl::Error>> + Send;
     fn r#two_way_composed_with_error(&self, a: i32) -> Self::TwoWayComposedWithErrorResponseFut;
-    type OnComposedResponseFut: std::future::Future<Output = Result<(i32), fidl::Error>> + Send;
-    type OnComposedWithErrorResponseFut: std::future::Future<
-            Output = Result<
-                (fidl_test_protocolpayloads_imported::ComposedProtocolOnComposedWithErrorResult),
-                fidl::Error,
-            >,
-        > + Send;
     fn r#one_way_local(&self, a: u32, b: u32) -> Result<(), fidl::Error>;
     type TwoWayLocalResponseFut: std::future::Future<Output = Result<(u32, u32), fidl::Error>>
         + Send;
@@ -150,27 +143,18 @@ pub trait MainProtocolProxyInterface: Send + Sync {
     type TwoWayLocalWithErrorResponseFut: std::future::Future<Output = Result<(MainProtocolTwoWayLocalWithErrorResult), fidl::Error>>
         + Send;
     fn r#two_way_local_with_error(&self, a: u32, b: u32) -> Self::TwoWayLocalWithErrorResponseFut;
-    type OnLocalResponseFut: std::future::Future<Output = Result<(u32, u32), fidl::Error>> + Send;
-    type OnLocalWithErrorResponseFut: std::future::Future<Output = Result<(MainProtocolOnLocalWithErrorResult), fidl::Error>>
-        + Send;
     fn r#one_way_import(&self, a: i32) -> Result<(), fidl::Error>;
     type TwoWayImportResponseFut: std::future::Future<Output = Result<(i32), fidl::Error>> + Send;
     fn r#two_way_import(&self, a: i32) -> Self::TwoWayImportResponseFut;
     type TwoWayImportWithErrorResponseFut: std::future::Future<Output = Result<(MainProtocolTwoWayImportWithErrorResult), fidl::Error>>
         + Send;
     fn r#two_way_import_with_error(&self, a: i32) -> Self::TwoWayImportWithErrorResponseFut;
-    type OnImportResponseFut: std::future::Future<Output = Result<(i32), fidl::Error>> + Send;
-    type OnImportWithErrorResponseFut: std::future::Future<Output = Result<(MainProtocolOnImportWithErrorResult), fidl::Error>>
-        + Send;
     fn r#one_way_anon(&self, a: u32, b: u32) -> Result<(), fidl::Error>;
     type TwoWayAnonResponseFut: std::future::Future<Output = Result<(u32, u32), fidl::Error>> + Send;
     fn r#two_way_anon(&self, a: u32, b: u32) -> Self::TwoWayAnonResponseFut;
     type TwoWayAnonWithErrorResponseFut: std::future::Future<Output = Result<(MainProtocolTwoWayAnonWithErrorResult), fidl::Error>>
         + Send;
     fn r#two_way_anon_with_error(&self, a: u32, b: u32) -> Self::TwoWayAnonWithErrorResponseFut;
-    type OnAnonResponseFut: std::future::Future<Output = Result<(u32, u32), fidl::Error>> + Send;
-    type OnAnonWithErrorResponseFut: std::future::Future<Output = Result<(MainProtocolOnAnonWithErrorResult), fidl::Error>>
-        + Send;
 }
 
 #[derive(Debug)]
@@ -489,10 +473,6 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             Err(e) => MaybeDone::Done(Err(e)),
         })
     }
-    type OnComposedResponseFut = fidl::client::QueryResponseFut<(i32)>;
-    type OnComposedWithErrorResponseFut = fidl::client::QueryResponseFut<
-        (fidl_test_protocolpayloads_imported::ComposedProtocolOnComposedWithErrorResult),
-    >;
     fn r#one_way_local(&self, mut a: u32, mut b: u32) -> Result<(), fidl::Error> {
         self.client.send::<_, false>(
             &mut (a, b),
@@ -541,9 +521,6 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             Err(e) => MaybeDone::Done(Err(e)),
         })
     }
-    type OnLocalResponseFut = fidl::client::QueryResponseFut<(u32, u32)>;
-    type OnLocalWithErrorResponseFut =
-        fidl::client::QueryResponseFut<(MainProtocolOnLocalWithErrorResult)>;
     fn r#one_way_import(&self, mut a: i32) -> Result<(), fidl::Error> {
         self.client.send::<_, false>(
             &mut (a),
@@ -588,9 +565,6 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             Err(e) => MaybeDone::Done(Err(e)),
         })
     }
-    type OnImportResponseFut = fidl::client::QueryResponseFut<(i32)>;
-    type OnImportWithErrorResponseFut =
-        fidl::client::QueryResponseFut<(MainProtocolOnImportWithErrorResult)>;
     fn r#one_way_anon(&self, mut a: u32, mut b: u32) -> Result<(), fidl::Error> {
         self.client.send::<_, false>(
             &mut (a, b),
@@ -639,9 +613,6 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             Err(e) => MaybeDone::Done(Err(e)),
         })
     }
-    type OnAnonResponseFut = fidl::client::QueryResponseFut<(u32, u32)>;
-    type OnAnonWithErrorResponseFut =
-        fidl::client::QueryResponseFut<(MainProtocolOnAnonWithErrorResult)>;
 }
 
 pub struct MainProtocolEventStream {

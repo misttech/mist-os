@@ -508,7 +508,6 @@ impl fidl::endpoints::ProtocolMarker for ChannelProtocolMarker {
 
 pub trait ChannelProtocolProxyInterface: Send + Sync {
     fn r#method_a(&self, a: i64, b: i64) -> Result<(), fidl::Error>;
-    type EventAResponseFut: std::future::Future<Output = Result<(i64, i64), fidl::Error>> + Send;
     type MethodBResponseFut: std::future::Future<Output = Result<(i64), fidl::Error>> + Send;
     fn r#method_b(&self, a: i64, b: i64) -> Self::MethodBResponseFut;
     type TakeHandleResponseFut: std::future::Future<Output = Result<(), fidl::Error>> + Send;
@@ -651,7 +650,6 @@ impl ChannelProtocolProxyInterface for ChannelProtocolProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
-    type EventAResponseFut = fidl::client::QueryResponseFut<(i64, i64)>;
     type MethodBResponseFut = fidl::client::QueryResponseFut<(i64)>;
     fn r#method_b(&self, mut a: i64, mut b: i64) -> Self::MethodBResponseFut {
         fn transform(result: Result<(i64,), fidl::Error>) -> Result<(i64), fidl::Error> {
@@ -1571,8 +1569,6 @@ pub trait HandleRightsProtocolProxyInterface: Send + Sync {
     type ResponseMethodResponseFut: std::future::Future<Output = Result<(fidl::Socket), fidl::Error>>
         + Send;
     fn r#response_method(&self, h: fidl::Socket) -> Self::ResponseMethodResponseFut;
-    type AnEventResponseFut: std::future::Future<Output = Result<(fidl::Socket), fidl::Error>>
-        + Send;
 }
 
 #[derive(Debug)]
@@ -1699,7 +1695,6 @@ impl HandleRightsProtocolProxyInterface for HandleRightsProtocolProxy {
             Err(e) => MaybeDone::Done(Err(e)),
         })
     }
-    type AnEventResponseFut = fidl::client::QueryResponseFut<(fidl::Socket)>;
 }
 
 pub struct HandleRightsProtocolEventStream {
@@ -2699,7 +2694,6 @@ pub trait TransitionalProxyInterface: Send + Sync {
     fn r#one_way(&self, x: i64) -> Result<(), fidl::Error> {
         unimplemented!("transitional method one_way is unimplemented");
     }
-    type EventResponseFut: std::future::Future<Output = Result<(i64), fidl::Error>> + Send;
 }
 
 #[derive(Debug)]
@@ -2811,7 +2805,6 @@ impl TransitionalProxyInterface for TransitionalProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
-    type EventResponseFut = fidl::client::QueryResponseFut<(i64)>;
 }
 
 pub struct TransitionalEventStream {
@@ -3176,9 +3169,6 @@ pub trait WithAndWithoutRequestResponseProxyInterface: Send + Sync {
     type WithRequestWithResponseResponseFut: std::future::Future<Output = Result<(String), fidl::Error>>
         + Send;
     fn r#with_request_with_response(&self, arg: &str) -> Self::WithRequestWithResponseResponseFut;
-    type OnEmptyResponseResponseFut: std::future::Future<Output = Result<(), fidl::Error>> + Send;
-    type OnWithResponseResponseFut: std::future::Future<Output = Result<(String), fidl::Error>>
-        + Send;
 }
 
 #[derive(Debug)]
@@ -3424,8 +3414,6 @@ impl WithAndWithoutRequestResponseProxyInterface for WithAndWithoutRequestRespon
             Err(e) => MaybeDone::Done(Err(e)),
         })
     }
-    type OnEmptyResponseResponseFut = fidl::client::QueryResponseFut<()>;
-    type OnWithResponseResponseFut = fidl::client::QueryResponseFut<(String)>;
 }
 
 pub struct WithAndWithoutRequestResponseEventStream {

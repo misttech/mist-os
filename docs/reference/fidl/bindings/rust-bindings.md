@@ -445,9 +445,6 @@ Associated types:
 * `TicTacToeProxy::MakeMoveResponseFut`: The `Future` type for the response of a
   two way method. This type implements `std::future::Future<Output =
   Result<(bool, Option<Box<GameState>>), fidl::Error>> + Send`.
-* `TicTacToeProxy::OnOpponentMoveResponseFut`: The `Future` type for an incoming
-  event. This type implements `std::future::Future<Output = Result<GameState,
-  fidl::Error>> + Send`
 
 Methods:
 

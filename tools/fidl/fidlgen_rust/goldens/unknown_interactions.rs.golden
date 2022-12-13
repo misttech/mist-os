@@ -3058,72 +3058,6 @@ pub trait UnknownInteractionsAjarProtocolProxyInterface: Send + Sync {
             >,
         > + Send;
     fn r#strict_two_way_table_err(&self) -> Self::StrictTwoWayTableErrResponseFut;
-    type StrictEventResponseFut: std::future::Future<Output = Result<(), fidl::Error>> + Send;
-    type StrictEventFieldsResponseFut: std::future::Future<Output = Result<(i32), fidl::Error>>
-        + Send;
-    type StrictEventUnionResponseFut: std::future::Future<
-            Output = Result<(UnknownInteractionsAjarProtocolStrictEventUnionRequest), fidl::Error>,
-        > + Send;
-    type StrictEventTableResponseFut: std::future::Future<
-            Output = Result<(UnknownInteractionsAjarProtocolStrictEventTableRequest), fidl::Error>,
-        > + Send;
-    type StrictEventErrResponseFut: std::future::Future<
-            Output = Result<(UnknownInteractionsAjarProtocolStrictEventErrResult), fidl::Error>,
-        > + Send;
-    type StrictEventFieldsErrResponseFut: std::future::Future<
-            Output = Result<
-                (UnknownInteractionsAjarProtocolStrictEventFieldsErrResult),
-                fidl::Error,
-            >,
-        > + Send;
-    type StrictEventUnionErrResponseFut: std::future::Future<
-            Output = Result<
-                (UnknownInteractionsAjarProtocolStrictEventUnionErrResult),
-                fidl::Error,
-            >,
-        > + Send;
-    type StrictEventTableErrResponseFut: std::future::Future<
-            Output = Result<
-                (UnknownInteractionsAjarProtocolStrictEventTableErrResult),
-                fidl::Error,
-            >,
-        > + Send;
-    type FlexibleEventResponseFut: std::future::Future<Output = Result<(), fidl::Error>> + Send;
-    type FlexibleEventFieldsResponseFut: std::future::Future<Output = Result<(i32), fidl::Error>>
-        + Send;
-    type FlexibleEventUnionResponseFut: std::future::Future<
-            Output = Result<
-                (UnknownInteractionsAjarProtocolFlexibleEventUnionRequest),
-                fidl::Error,
-            >,
-        > + Send;
-    type FlexibleEventTableResponseFut: std::future::Future<
-            Output = Result<
-                (UnknownInteractionsAjarProtocolFlexibleEventTableRequest),
-                fidl::Error,
-            >,
-        > + Send;
-    type FlexibleEventErrResponseFut: std::future::Future<
-            Output = Result<(UnknownInteractionsAjarProtocolFlexibleEventErrResult), fidl::Error>,
-        > + Send;
-    type FlexibleEventFieldsErrResponseFut: std::future::Future<
-            Output = Result<
-                (UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult),
-                fidl::Error,
-            >,
-        > + Send;
-    type FlexibleEventUnionErrResponseFut: std::future::Future<
-            Output = Result<
-                (UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult),
-                fidl::Error,
-            >,
-        > + Send;
-    type FlexibleEventTableErrResponseFut: std::future::Future<
-            Output = Result<
-                (UnknownInteractionsAjarProtocolFlexibleEventTableErrResult),
-                fidl::Error,
-            >,
-        > + Send;
 }
 
 #[derive(Debug)]
@@ -3546,37 +3480,6 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
             Err(e) => MaybeDone::Done(Err(e)),
         })
     }
-    type StrictEventResponseFut = fidl::client::QueryResponseFut<()>;
-    type StrictEventFieldsResponseFut = fidl::client::QueryResponseFut<(i32)>;
-    type StrictEventUnionResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsAjarProtocolStrictEventUnionRequest)>;
-    type StrictEventTableResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsAjarProtocolStrictEventTableRequest)>;
-    type StrictEventErrResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsAjarProtocolStrictEventErrResult)>;
-    type StrictEventFieldsErrResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsAjarProtocolStrictEventFieldsErrResult)>;
-    type StrictEventUnionErrResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsAjarProtocolStrictEventUnionErrResult)>;
-    type StrictEventTableErrResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsAjarProtocolStrictEventTableErrResult)>;
-    type FlexibleEventResponseFut = fidl::client::QueryResponseFut<()>;
-    type FlexibleEventFieldsResponseFut = fidl::client::QueryResponseFut<(i32)>;
-    type FlexibleEventUnionResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsAjarProtocolFlexibleEventUnionRequest)>;
-    type FlexibleEventTableResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsAjarProtocolFlexibleEventTableRequest)>;
-    type FlexibleEventErrResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsAjarProtocolFlexibleEventErrResult)>;
-    type FlexibleEventFieldsErrResponseFut = fidl::client::QueryResponseFut<
-        (UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult),
-    >;
-    type FlexibleEventUnionErrResponseFut = fidl::client::QueryResponseFut<
-        (UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult),
-    >;
-    type FlexibleEventTableErrResponseFut = fidl::client::QueryResponseFut<
-        (UnknownInteractionsAjarProtocolFlexibleEventTableErrResult),
-    >;
 }
 
 pub struct UnknownInteractionsAjarProtocolEventStream {
@@ -5628,42 +5531,6 @@ pub trait UnknownInteractionsClosedProtocolProxyInterface: Send + Sync {
             >,
         > + Send;
     fn r#strict_two_way_table_err(&self) -> Self::StrictTwoWayTableErrResponseFut;
-    type StrictEventResponseFut: std::future::Future<Output = Result<(), fidl::Error>> + Send;
-    type StrictEventFieldsResponseFut: std::future::Future<Output = Result<(i32), fidl::Error>>
-        + Send;
-    type StrictEventUnionResponseFut: std::future::Future<
-            Output = Result<
-                (UnknownInteractionsClosedProtocolStrictEventUnionRequest),
-                fidl::Error,
-            >,
-        > + Send;
-    type StrictEventTableResponseFut: std::future::Future<
-            Output = Result<
-                (UnknownInteractionsClosedProtocolStrictEventTableRequest),
-                fidl::Error,
-            >,
-        > + Send;
-    type StrictEventErrResponseFut: std::future::Future<
-            Output = Result<(UnknownInteractionsClosedProtocolStrictEventErrResult), fidl::Error>,
-        > + Send;
-    type StrictEventFieldsErrResponseFut: std::future::Future<
-            Output = Result<
-                (UnknownInteractionsClosedProtocolStrictEventFieldsErrResult),
-                fidl::Error,
-            >,
-        > + Send;
-    type StrictEventUnionErrResponseFut: std::future::Future<
-            Output = Result<
-                (UnknownInteractionsClosedProtocolStrictEventUnionErrResult),
-                fidl::Error,
-            >,
-        > + Send;
-    type StrictEventTableErrResponseFut: std::future::Future<
-            Output = Result<
-                (UnknownInteractionsClosedProtocolStrictEventTableErrResult),
-                fidl::Error,
-            >,
-        > + Send;
 }
 
 #[derive(Debug)]
@@ -6072,23 +5939,6 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
             Err(e) => MaybeDone::Done(Err(e)),
         })
     }
-    type StrictEventResponseFut = fidl::client::QueryResponseFut<()>;
-    type StrictEventFieldsResponseFut = fidl::client::QueryResponseFut<(i32)>;
-    type StrictEventUnionResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsClosedProtocolStrictEventUnionRequest)>;
-    type StrictEventTableResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsClosedProtocolStrictEventTableRequest)>;
-    type StrictEventErrResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsClosedProtocolStrictEventErrResult)>;
-    type StrictEventFieldsErrResponseFut = fidl::client::QueryResponseFut<
-        (UnknownInteractionsClosedProtocolStrictEventFieldsErrResult),
-    >;
-    type StrictEventUnionErrResponseFut = fidl::client::QueryResponseFut<
-        (UnknownInteractionsClosedProtocolStrictEventUnionErrResult),
-    >;
-    type StrictEventTableErrResponseFut = fidl::client::QueryResponseFut<
-        (UnknownInteractionsClosedProtocolStrictEventTableErrResult),
-    >;
 }
 
 pub struct UnknownInteractionsClosedProtocolEventStream {
@@ -7699,48 +7549,6 @@ pub trait UnknownInteractionsProtocolProxyInterface: Send + Sync {
             Output = Result<(UnknownInteractionsProtocolFlexibleTwoWayTableErrResult), fidl::Error>,
         > + Send;
     fn r#flexible_two_way_table_err(&self) -> Self::FlexibleTwoWayTableErrResponseFut;
-    type StrictEventResponseFut: std::future::Future<Output = Result<(), fidl::Error>> + Send;
-    type StrictEventFieldsResponseFut: std::future::Future<Output = Result<(i32), fidl::Error>>
-        + Send;
-    type StrictEventUnionResponseFut: std::future::Future<
-            Output = Result<(UnknownInteractionsProtocolStrictEventUnionRequest), fidl::Error>,
-        > + Send;
-    type StrictEventTableResponseFut: std::future::Future<
-            Output = Result<(UnknownInteractionsProtocolStrictEventTableRequest), fidl::Error>,
-        > + Send;
-    type StrictEventErrResponseFut: std::future::Future<
-            Output = Result<(UnknownInteractionsProtocolStrictEventErrResult), fidl::Error>,
-        > + Send;
-    type StrictEventFieldsErrResponseFut: std::future::Future<
-            Output = Result<(UnknownInteractionsProtocolStrictEventFieldsErrResult), fidl::Error>,
-        > + Send;
-    type StrictEventUnionErrResponseFut: std::future::Future<
-            Output = Result<(UnknownInteractionsProtocolStrictEventUnionErrResult), fidl::Error>,
-        > + Send;
-    type StrictEventTableErrResponseFut: std::future::Future<
-            Output = Result<(UnknownInteractionsProtocolStrictEventTableErrResult), fidl::Error>,
-        > + Send;
-    type FlexibleEventResponseFut: std::future::Future<Output = Result<(), fidl::Error>> + Send;
-    type FlexibleEventFieldsResponseFut: std::future::Future<Output = Result<(i32), fidl::Error>>
-        + Send;
-    type FlexibleEventUnionResponseFut: std::future::Future<
-            Output = Result<(UnknownInteractionsProtocolFlexibleEventUnionRequest), fidl::Error>,
-        > + Send;
-    type FlexibleEventTableResponseFut: std::future::Future<
-            Output = Result<(UnknownInteractionsProtocolFlexibleEventTableRequest), fidl::Error>,
-        > + Send;
-    type FlexibleEventErrResponseFut: std::future::Future<
-            Output = Result<(UnknownInteractionsProtocolFlexibleEventErrResult), fidl::Error>,
-        > + Send;
-    type FlexibleEventFieldsErrResponseFut: std::future::Future<
-            Output = Result<(UnknownInteractionsProtocolFlexibleEventFieldsErrResult), fidl::Error>,
-        > + Send;
-    type FlexibleEventUnionErrResponseFut: std::future::Future<
-            Output = Result<(UnknownInteractionsProtocolFlexibleEventUnionErrResult), fidl::Error>,
-        > + Send;
-    type FlexibleEventTableErrResponseFut: std::future::Future<
-            Output = Result<(UnknownInteractionsProtocolFlexibleEventTableErrResult), fidl::Error>,
-        > + Send;
 }
 
 #[derive(Debug)]
@@ -8526,34 +8334,6 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
             Err(e) => MaybeDone::Done(Err(e)),
         })
     }
-    type StrictEventResponseFut = fidl::client::QueryResponseFut<()>;
-    type StrictEventFieldsResponseFut = fidl::client::QueryResponseFut<(i32)>;
-    type StrictEventUnionResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsProtocolStrictEventUnionRequest)>;
-    type StrictEventTableResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsProtocolStrictEventTableRequest)>;
-    type StrictEventErrResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsProtocolStrictEventErrResult)>;
-    type StrictEventFieldsErrResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsProtocolStrictEventFieldsErrResult)>;
-    type StrictEventUnionErrResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsProtocolStrictEventUnionErrResult)>;
-    type StrictEventTableErrResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsProtocolStrictEventTableErrResult)>;
-    type FlexibleEventResponseFut = fidl::client::QueryResponseFut<()>;
-    type FlexibleEventFieldsResponseFut = fidl::client::QueryResponseFut<(i32)>;
-    type FlexibleEventUnionResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsProtocolFlexibleEventUnionRequest)>;
-    type FlexibleEventTableResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsProtocolFlexibleEventTableRequest)>;
-    type FlexibleEventErrResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsProtocolFlexibleEventErrResult)>;
-    type FlexibleEventFieldsErrResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsProtocolFlexibleEventFieldsErrResult)>;
-    type FlexibleEventUnionErrResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsProtocolFlexibleEventUnionErrResult)>;
-    type FlexibleEventTableErrResponseFut =
-        fidl::client::QueryResponseFut<(UnknownInteractionsProtocolFlexibleEventTableErrResult)>;
 }
 
 pub struct UnknownInteractionsProtocolEventStream {

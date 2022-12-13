@@ -89,7 +89,7 @@ impl fidl::endpoints::DiscoverableProtocolMarker for {{ $protocol.Name }}Marker 
 
 pub trait {{ $protocol.Name }}ProxyInterface: Send + Sync {
     {{- range $method := $protocol.Methods }}
-    {{- if $method.HasResponse }}
+    {{- if and $method.HasRequest $method.HasResponse }}
     type {{ $method.CamelName }}ResponseFut: std::future::Future<Output = Result<(
         {{- range $index, $response := $method.Response -}}
         {{- if (eq $index 0) -}} {{ $response.Type }}
@@ -271,7 +271,7 @@ impl {{ $protocol.Name }}Proxy {
 
 impl {{ $protocol.Name}}ProxyInterface for {{ $protocol.Name}}Proxy {
     {{- range $method := $protocol.Methods }}
-    {{- if $method.HasResponse }}
+    {{- if and $method.HasRequest $method.HasResponse }}
     type {{ $method.CamelName }}ResponseFut = fidl::client::QueryResponseFut<(
         {{- range $index, $response := $method.Response -}}
         {{- if (eq $index 0) -}} {{ $response.Type }}

@@ -106,11 +106,4 @@ impl DeviceProxyInterface for MockDeviceProxy {
                 protocol_name: "mock",
             })
     }
-
-    type OnReadyForSendFramesResponseFut = futures::future::Pending<Result<u32, fidl::Error>>;
-
-    type OnReceiveFrameResponseFut = futures::future::Pending<Result<Vec<u8>, fidl::Error>>;
-
-    type OnErrorResponseFut =
-        futures::future::Pending<Result<(fidl_fuchsia_lowpan_spinel::Error, bool), fidl::Error>>;
 }

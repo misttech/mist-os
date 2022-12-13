@@ -427,7 +427,6 @@ impl fidl::endpoints::ProtocolMarker for InterfaceMarker {
 
 pub trait InterfaceProxyInterface: Send + Sync {
     fn r#method(&self) -> Result<(), fidl::Error>;
-    type OnEventResponseFut: std::future::Future<Output = Result<(), fidl::Error>> + Send;
 }
 
 #[derive(Debug)]
@@ -516,7 +515,6 @@ impl InterfaceProxyInterface for InterfaceProxy {
             fidl::encoding::DynamicFlags::empty(),
         )
     }
-    type OnEventResponseFut = fidl::client::QueryResponseFut<()>;
 }
 
 pub struct InterfaceEventStream {
