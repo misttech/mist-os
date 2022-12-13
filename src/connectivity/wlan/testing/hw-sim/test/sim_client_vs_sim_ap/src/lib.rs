@@ -9,8 +9,13 @@ use {
     futures::{channel::oneshot, join, TryFutureExt},
     pin_utils::pin_mut,
     tracing::{info, warn},
-    wlan_common::bss::Protection::Wpa2Personal,
-    wlan_hw_sim::*,
+    wlan_common::{bss::Protection::Wpa2Personal, buffer_reader::BufferReader, mac},
+    wlan_hw_sim::{
+        create_rx_info, default_wlantap_config_ap, default_wlantap_config_client, has_id_and_state,
+        init_syslog, loop_until_iface_is_found, netdevice_helper, send_scan_complete, test_utils,
+        wait_until_client_state, ApAdvertisement, Beacon, NetworkConfigBuilder, AP_MAC_ADDR,
+        AP_SSID, CLIENT_MAC_ADDR, ETH_DST_MAC, WLANCFG_DEFAULT_AP_CHANNEL,
+    },
 };
 
 const PASS_PHRASE: &str = "wpa2duel";
@@ -131,7 +136,8 @@ struct PeerInfo<'a> {
 }
 
 async fn send_then_receive(
-    eth: &mut ethernet::Client,
+    session: &netdevice_client::Session,
+    port: &netdevice_client::Port,
     me: &PeerInfo<'_>,
     peer: &PeerInfo<'_>,
     sender_to_peer: oneshot::Sender<()>,
@@ -152,7 +158,9 @@ async fn send_then_receive(
     while sender_to_peer_ptr.is_some() || receiver_from_peer_ptr.is_some() {
         if receiver_from_peer_ptr.is_some() {
             info!("{} sending payload to {}", me.name, peer.name);
-            send_fake_eth_frame(peer.addr, me.addr, me.payload, eth).await;
+            let mut buf = Vec::new();
+            netdevice_helper::write_fake_frame(peer.addr, me.addr, me.payload, &mut buf);
+            netdevice_helper::send(session, port, &buf).await;
         }
 
         match sender_to_peer_ptr.take() {
@@ -162,7 +170,7 @@ async fn send_then_receive(
             ),
             Some(sender_to_peer) => {
                 info!("{} awaiting payload from {}", me.name, peer.name);
-                let get_next_frame_fut = get_next_frame(eth);
+                let get_next_frame_fut = netdevice_helper::recv(session);
                 pin_mut!(get_next_frame_fut);
                 match test_utils::timeout_after(
                     WAIT_FOR_PAYLOAD_INTERVAL.millis(),
@@ -174,7 +182,13 @@ async fn send_then_receive(
                         warn!("{} timed out waiting for payload from {}.", me.name, peer.name);
                         sender_to_peer_ptr = Some(sender_to_peer);
                     }
-                    Ok((header, payload)) => {
+                    Ok(buffer) => {
+                        let mut buf_reader = BufferReader::new(&buffer[..]);
+                        let header = buf_reader
+                            .read::<mac::EthernetIIHdr>()
+                            .expect("bytes received too short for ethernet header");
+                        let payload = buf_reader.into_remaining().to_vec();
+
                         assert_eq!(header.da, me.addr);
                         assert_eq!(header.sa, peer.addr);
 
@@ -243,14 +257,22 @@ async fn verify_ethernet_in_both_directions(
     client_helper: &mut test_utils::TestHelper,
     ap_helper: &mut test_utils::TestHelper,
 ) {
-    let mut client_eth = create_eth_client(&CLIENT_MAC_ADDR)
+    let (client_netdevice, client_port) =
+        netdevice_helper::create_client(fidl_fuchsia_hardware_ethernet_ext::MacAddress {
+            octets: CLIENT_MAC_ADDR.clone(),
+        })
         .await
-        .expect("creating client side ethernet")
-        .expect("looking for client side ethernet");
-    let mut ap_eth = create_eth_client(&AP_MAC_ADDR.0)
+        .expect("failed to create netdevice client for client");
+    let (ap_netdevice, ap_port) =
+        netdevice_helper::create_client(fidl_fuchsia_hardware_ethernet_ext::MacAddress {
+            octets: AP_MAC_ADDR.0.clone(),
+        })
         .await
-        .expect("creating ap side ethernet")
-        .expect("looking for ap side ethernet");
+        .expect("failed to create netdevice client for AP");
+
+    let (client_session, _client_task) =
+        netdevice_helper::start_session(client_netdevice, client_port).await;
+    let (ap_session, _ap_task) = netdevice_helper::start_session(ap_netdevice, ap_port).await;
 
     let (sender_ap_to_client, receiver_client_from_ap) = oneshot::channel();
     let (sender_client_to_ap, receiver_ap_from_client) = oneshot::channel();
@@ -263,14 +285,16 @@ async fn verify_ethernet_in_both_directions(
         PeerInfo { addr: ETH_DST_MAC, payload: ETH_PEER_PAYLOAD, name: "peer_behind_ap" };
 
     let client_fut = send_then_receive(
-        &mut client_eth,
+        &client_session,
+        &client_port,
         &client_info,
         &peer_behind_ap_info,
         sender_client_to_ap,
         receiver_client_from_ap,
     );
     let peer_behind_ap_fut = send_then_receive(
-        &mut ap_eth,
+        &ap_session,
+        &ap_port,
         &peer_behind_ap_info,
         &client_info,
         sender_ap_to_client,

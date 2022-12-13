@@ -3,11 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::ensure,
     fidl_fuchsia_wlan_policy as fidl_policy,
     fuchsia_zircon::DurationNum,
-    futures::StreamExt,
     ieee80211::Bssid,
+    netdevice_client,
     pin_utils::pin_mut,
     wlan_common::{
         bss::Protection,
@@ -15,45 +14,41 @@ use {
         channel::{Cbw, Channel},
         mac,
     },
-    wlan_hw_sim::*,
+    wlan_hw_sim::{
+        connect_with_security_type, default_wlantap_config_client, init_syslog,
+        loop_until_iface_is_found, netdevice_helper, rx_wlan_data_frame, test_utils,
+        EventHandlerBuilder, TxHandlerBuilder, AP_SSID, CLIENT_MAC_ADDR, ETH_DST_MAC,
+    },
 };
 
 const BSS: Bssid = Bssid([0x65, 0x74, 0x68, 0x6e, 0x65, 0x74]);
 const PAYLOAD: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
 async fn send_and_receive<'a>(
-    client: &'a mut ethernet::Client,
-    buf: &'a Vec<u8>,
-) -> Result<(mac::EthernetIIHdr, Vec<u8>), anyhow::Error> {
-    let mut client_stream = client.get_stream();
-    client.send(&buf);
-    loop {
-        let event = client_stream.next().await.expect("receiving ethernet event")?;
-        match event {
-            ethernet::Event::StatusChanged => {
-                client.get_status().await.expect("getting status");
-            }
-            ethernet::Event::Receive(rx_buffer, flags) => {
-                ensure!(flags.intersects(ethernet::EthernetQueueFlags::RX_OK), "RX_OK not set");
-                let mut buf = vec![0; rx_buffer.len() as usize];
-                rx_buffer.read(&mut buf);
-                let mut buf_reader = BufferReader::new(&buf[..]);
-                let header = buf_reader
-                    .read::<mac::EthernetIIHdr>()
-                    .expect("bytes received too short for ethernet header");
-                let payload = buf_reader.into_remaining().to_vec();
-                return Ok((*header, payload));
-            }
-        }
-    }
+    session: &'a netdevice_client::Session,
+    port: &'a netdevice_client::Port,
+    buf: &'a [u8],
+) -> (mac::EthernetIIHdr, Vec<u8>) {
+    netdevice_helper::send(session, port, &buf).await;
+    let recv_buf = netdevice_helper::recv(session).await;
+    let mut buf_reader = BufferReader::new(&recv_buf[..]);
+    let header = buf_reader
+        .read::<mac::EthernetIIHdr>()
+        .expect("bytes received too short for ethernet header");
+    let payload = buf_reader.into_remaining().to_vec();
+    (*header, payload)
 }
 
-async fn verify_tx_and_rx(client: &mut ethernet::Client, helper: &mut test_utils::TestHelper) {
+async fn verify_tx_and_rx(
+    session: &netdevice_client::Session,
+    port: &netdevice_client::Port,
+    helper: &mut test_utils::TestHelper,
+) {
     let mut buf: Vec<u8> = Vec::new();
-    write_fake_eth_frame(ETH_DST_MAC, CLIENT_MAC_ADDR, PAYLOAD, &mut buf);
+    netdevice_helper::write_fake_frame(ETH_DST_MAC, CLIENT_MAC_ADDR, PAYLOAD, &mut buf);
 
-    let eth_tx_rx_fut = send_and_receive(client, &buf);
-    pin_mut!(eth_tx_rx_fut);
+    let tx_rx_fut = send_and_receive(session, port, &buf);
+    pin_mut!(tx_rx_fut);
 
     let phy = helper.proxy();
     let mut actual = Vec::new();
@@ -93,10 +88,9 @@ async fn verify_tx_and_rx(client: &mut ethernet::Client, helper: &mut test_utils
                         .build(),
                 )
                 .build(),
-            eth_tx_rx_fut,
+            tx_rx_fut,
         )
-        .await
-        .expect("send and receive eth");
+        .await;
     assert_eq!(&actual[..], PAYLOAD);
     assert_eq!(header.da, CLIENT_MAC_ADDR);
     assert_eq!(header.sa, ETH_DST_MAC);
@@ -104,8 +98,8 @@ async fn verify_tx_and_rx(client: &mut ethernet::Client, helper: &mut test_utils
     assert_eq!(&payload[..], PAYLOAD);
 }
 
-/// Test an ethernet device backed by WLAN device and send and receive data frames by verifying
-/// frames are delivered without any change in both directions.
+/// Test an ethernet device using netdevice backed by WLAN device and send and receive data
+/// frames by verifying frames are delivered without any change in both directions.
 #[fuchsia_async::run_singlethreaded(test)]
 async fn ethernet_tx_rx() {
     init_syslog();
@@ -123,11 +117,14 @@ async fn ethernet_tx_rx() {
     )
     .await;
 
-    let mut client = create_eth_client(&CLIENT_MAC_ADDR)
+    let (client, mut port) =
+        netdevice_helper::create_client(fidl_fuchsia_hardware_ethernet_ext::MacAddress {
+            octets: CLIENT_MAC_ADDR.clone(),
+        })
         .await
-        .expect("cannot create ethernet client")
-        .expect(&format!("ethernet client not found {:?}", &CLIENT_MAC_ADDR));
+        .expect("failed to create netdevice client");
+    let (mut session, _task) = netdevice_helper::start_session(client, port).await;
+    verify_tx_and_rx(&mut session, &mut port, &mut helper).await;
 
-    verify_tx_and_rx(&mut client, &mut helper).await;
     helper.stop().await;
 }

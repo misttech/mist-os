@@ -12,6 +12,7 @@ rustc_library("wlan-hw-sim") {
   edition = "2021"
 
   deps = [
+    "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_rust",
     "//sdk/fidl/fuchsia.wlan.device:fuchsia.wlan.device_rust",
@@ -22,6 +23,7 @@ rustc_library("wlan-hw-sim") {
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_rust",
     "//sdk/fidl/fuchsia.wlan.tap:fuchsia.wlan.tap_rust",
     "//sdk/lib/device-watcher/rust",
+    "//src/connectivity/lib/network-device/rust",
     "//src/connectivity/wlan/lib/common/rust:wlan-common",
     "//src/connectivity/wlan/lib/eapol",
     "//src/connectivity/wlan/lib/frame_writer:wlan-frame-writer",
@@ -34,7 +36,7 @@ rustc_library("wlan-hw-sim") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
-    "//src/lib/network/ethernet",
+    "//src/lib/network/fidl_fuchsia_hardware_ethernet_ext",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
@@ -49,9 +51,9 @@ rustc_library("wlan-hw-sim") {
   sources = [
     "src/config.rs",
     "src/device_helper.rs",
-    "src/eth_helper.rs",
     "src/event_handler_helper.rs",
     "src/lib.rs",
+    "src/netdevice_helper.rs",
     "src/test_utils.rs",
     "src/wlancfg_helper.rs",
   ]

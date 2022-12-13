@@ -37,15 +37,15 @@ use {
     wlan_rsn::{self, rsna::SecAssocUpdate},
 };
 
+pub mod netdevice_helper;
 pub mod test_utils;
+
 pub use device_helper::*;
-pub use eth_helper::*;
 pub use event_handler_helper::*;
 pub use wlancfg_helper::*;
 
 mod config;
 mod device_helper;
-mod eth_helper;
 mod event_handler_helper;
 mod wlancfg_helper;
 

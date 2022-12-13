@@ -9,11 +9,10 @@ use {
     fidl_fuchsia_wlan_tap::{WlantapPhyConfig, WlantapPhyEvent, WlantapPhyProxy},
     fuchsia_async::Interval,
     fuchsia_zircon::DurationNum,
-    futures::{channel::mpsc, poll, StreamExt},
+    futures::{channel::mpsc, StreamExt},
     ieee80211::Bssid,
     pin_utils::pin_mut,
     std::collections::HashMap,
-    std::task::Poll,
     tracing::info,
     wlan_common::{
         appendable::Appendable,
@@ -22,7 +21,11 @@ use {
         channel::{Cbw, Channel},
         mac,
     },
-    wlan_hw_sim::*,
+    wlan_hw_sim::{
+        connect_with_security_type, default_wlantap_config_client, init_syslog,
+        loop_until_iface_is_found, netdevice_helper, test_utils, ApAdvertisement, Beacon, AP_SSID,
+        CLIENT_MAC_ADDR, ETH_DST_MAC,
+    },
 };
 // Remedy for fxbug.dev/8165 (fxbug.dev/33151)
 // Refer to |KMinstrelUpdateIntervalForHwSim| in //src/connectivity/wlan/drivers/wlan/device.cpp
@@ -95,10 +98,13 @@ async fn eth_and_beacon_sender<'a>(
     receiver: &'a mut mpsc::Receiver<bool>,
     phy: &'a WlantapPhyProxy,
 ) -> Result<(), Error> {
-    let mut client = create_eth_client(&CLIENT_MAC_ADDR)
+    let (client, port) =
+        netdevice_helper::create_client(fidl_fuchsia_hardware_ethernet_ext::MacAddress {
+            octets: CLIENT_MAC_ADDR.clone(),
+        })
         .await
-        .expect("cannot create ethernet client")
-        .expect(&format!("ethernet client not found {:?}", &CLIENT_MAC_ADDR));
+        .expect("failed to create netdevice client");
+    let (session, _task) = netdevice_helper::start_session(client, port).await;
 
     let mut buf: Vec<u8> = vec![];
     buf.append_value(&mac::EthernetIIHdr {
@@ -110,7 +116,6 @@ async fn eth_and_beacon_sender<'a>(
 
     let mut timer_stream = Interval::new(DATA_FRAME_INTERVAL_NANOS.nanos());
     let mut intervals_since_last_beacon: i64 = i64::max_value() / DATA_FRAME_INTERVAL_NANOS;
-    let mut client_stream = client.get_stream();
     loop {
         timer_stream.next().await;
 
@@ -130,12 +135,7 @@ async fn eth_and_beacon_sender<'a>(
         }
         intervals_since_last_beacon += 1;
 
-        client.send(&buf);
-        if let Poll::Ready(Some(Ok(ethernet::Event::StatusChanged))) = poll!(client_stream.next()) {
-            info!("status changed to: {:?}", client.get_status().await?);
-            // There was an event waiting, ethernet frames have NOT been sent on the previous poll.
-            let _ = poll!(client_stream.next());
-        }
+        netdevice_helper::send(&session, &port, &buf).await;
         let converged = receiver.next().await.expect("error receiving channel message");
         if converged {
             break;
