@@ -2,41 +2,60 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(test)]
+use mockall::automock;
 use {
     anyhow::Error,
+    async_trait::async_trait,
     fidl_fuchsia_hardware_power_statecontrol as powercontrol, fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon::{Duration, Status as zx_status},
 };
 
-/// Request a reboot with optional delay in seconds. This is currently not cancellable and does not return an error result.
-/// The caller will be responsible for handling which thread to schedule this request on.
-pub async fn request_reboot(delay_seconds: Option<u64>) -> Result<(), Error> {
-    let proxy = connect_to_protocol::<powercontrol::AdminMarker>()?;
-    request_reboot_with_proxy(delay_seconds, proxy).await
+#[cfg_attr(test, automock)]
+#[async_trait(?Send)]
+pub trait RebootHandler {
+    /// Request a reboot with optional delay in seconds. This is currently not cancellable and does not return an error result.
+    /// The caller will be responsible for handling which thread to schedule this request on.
+    async fn reboot(&self, delay_seconds: Option<u64>) -> Result<(), Error>;
 }
 
-async fn request_reboot_with_proxy(
-    delay_seconds: Option<u64>,
-    proxy: powercontrol::AdminProxy,
-) -> Result<(), Error> {
-    println!("Rebooting after {:?} seconds...", delay_seconds.unwrap_or(0));
+#[derive(Default)]
+pub struct RebootImpl;
 
-    if let Some(delay) = delay_seconds {
-        fasync::Timer::new(fasync::Time::after(Duration::from_seconds(delay.try_into()?))).await;
+impl RebootImpl {
+    async fn request_reboot_with_proxy(
+        &self,
+        delay_seconds: Option<u64>,
+        proxy: powercontrol::AdminProxy,
+    ) -> Result<(), Error> {
+        println!("Rebooting after {:?} seconds...", delay_seconds.unwrap_or(0));
+
+        if let Some(delay) = delay_seconds {
+            fasync::Timer::new(fasync::Time::after(Duration::from_seconds(delay.try_into()?)))
+                .await;
+        }
+
+        // TODO(b/239569913): Update with a recovery-specific reboot reason.
+        proxy
+            .reboot(powercontrol::RebootReason::FactoryDataReset)
+            .await?
+            .map_err(|e| zx_status::from_raw(e))?;
+        Ok(())
     }
+}
 
-    // TODO(b/239569913): Update with a recovery-specific reboot reason.
-    proxy
-        .reboot(powercontrol::RebootReason::FactoryDataReset)
-        .await?
-        .map_err(|e| zx_status::from_raw(e))?;
-    Ok(())
+#[async_trait(?Send)]
+impl RebootHandler for RebootImpl {
+    async fn reboot(&self, delay_seconds: Option<u64>) -> Result<(), Error> {
+        let proxy = connect_to_protocol::<powercontrol::AdminMarker>()?;
+        self.request_reboot_with_proxy(delay_seconds, proxy).await
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::reboot::request_reboot_with_proxy;
+    use super::*;
     use anyhow::Error;
     use fidl_fuchsia_hardware_power_statecontrol as powercontrol;
     use fuchsia_async as fasync;
@@ -76,7 +95,8 @@ mod test {
     async fn test_reboot_reason_no_delay() {
         let (proxy, mut receiver) = create_mock_powercontrol_server().unwrap();
 
-        request_reboot_with_proxy(None, proxy).await.unwrap();
+        let reboot = RebootImpl::default();
+        reboot.request_reboot_with_proxy(None, proxy).await.unwrap();
 
         let reboot_reason =
             receiver.next().on_timeout(Duration::from_seconds(5), || None).await.unwrap();
@@ -90,7 +110,8 @@ mod test {
         let (proxy, mut receiver) = create_mock_powercontrol_server().unwrap();
 
         let start_time = fasync::Time::now();
-        request_reboot_with_proxy(Some(delay_seconds), proxy).await.unwrap();
+        let reboot = RebootImpl::default();
+        reboot.request_reboot_with_proxy(Some(delay_seconds), proxy).await.unwrap();
 
         let reboot_reason =
             receiver.next().on_timeout(Duration::from_seconds(5), || None).await.unwrap();

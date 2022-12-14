@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(test)]
+use mockall::automock;
 use {
     anyhow::{format_err, Context, Error},
     fidl_fuchsia_cobalt::{AggregateAndUploadMarker, AggregateAndUploadSynchronousProxy},
@@ -16,16 +18,35 @@ use {
     tracing::error,
 };
 
-pub fn aggregate_upload(timeout: i64) -> Result<(), Error> {
-    let (server_end, client_end) = zx::Channel::create()?;
-    connect_channel_to_protocol::<AggregateAndUploadMarker>(server_end)
-        .context("Failed to connect to the Cobalt AggregateAndUploadMarker")?;
+#[cfg_attr(test, automock)]
+pub trait Cobalt {
+    fn aggregate_and_upload(&self, timeout_seconds: i64) -> Result<(), Error>;
+}
 
-    let cobalt = AggregateAndUploadSynchronousProxy::new(client_end);
-    let deadline = zx::Time::after(zx::Duration::from_seconds(timeout));
-    cobalt
-        .aggregate_and_upload_metric_events(deadline)
-        .map_err(|e| format_err!("AggregateAndUploadMetric returned an error: {:?}", e))
+#[derive(Default)]
+pub struct CobaltImpl;
+
+impl CobaltImpl {
+    fn aggregate_and_upload_with_sync_proxy(
+        timeout_seconds: i64,
+        proxy: AggregateAndUploadSynchronousProxy,
+    ) -> Result<(), Error> {
+        let deadline = zx::Time::after(zx::Duration::from_seconds(timeout_seconds));
+        proxy
+            .aggregate_and_upload_metric_events(deadline)
+            .map_err(|e| format_err!("AggregateAndUploadMetric returned an error: {:?}", e))
+    }
+}
+
+impl Cobalt for CobaltImpl {
+    fn aggregate_and_upload(&self, timeout_seconds: i64) -> Result<(), Error> {
+        let (server_end, client_end) = zx::Channel::create()?;
+        connect_channel_to_protocol::<AggregateAndUploadMarker>(server_end)
+            .context("Failed to connect to the Cobalt AggregateAndUploadMarker")?;
+        let cobalt_proxy = AggregateAndUploadSynchronousProxy::new(client_end);
+
+        Self::aggregate_and_upload_with_sync_proxy(timeout_seconds, cobalt_proxy)
+    }
 }
 
 /// Creates a LoggerProxy connected to Cobalt.
@@ -37,7 +58,7 @@ pub fn aggregate_upload(timeout: i64) -> Result<(), Error> {
 ///
 /// # Returns
 /// `LoggerProxy` for log messages to be sent to.
-pub fn get_logger_from_factory(
+fn get_logger_from_factory(
     factory_proxy: MetricEventLoggerFactoryProxy,
 ) -> Result<MetricEventLoggerProxy, Error> {
     let (logger_proxy, server_end) =

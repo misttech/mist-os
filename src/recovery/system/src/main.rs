@@ -60,7 +60,11 @@ use {
         keyboard::{KeyboardMessages, KeyboardViewAssistant},
         proxy_view_assistant::ProxyMessages,
     },
-    recovery_util::{cobalt, cobalt::metrics, reboot::request_reboot, regulatory},
+    recovery_util::{
+        cobalt::{self, metrics, Cobalt, CobaltImpl},
+        reboot::{RebootHandler, RebootImpl},
+        regulatory,
+    },
     std::sync::Arc,
 };
 
@@ -992,7 +996,8 @@ impl RecoveryViewAssistant {
                                             metrics::RecoveryEventMetricDimensionResult::OtaSuccess
                                         );
 
-                                        if let Err(err) = cobalt::aggregate_upload(
+                                        let cobalt = CobaltImpl::default();
+                                        if let Err(err) = cobalt.aggregate_and_upload(
                                             REBOOT_DELAY_SECONDS.try_into().unwrap(),
                                         ) {
                                             eprintln!(
@@ -1003,7 +1008,8 @@ impl RecoveryViewAssistant {
                                             println!("aggregate_upload finished");
                                         }
 
-                                        if let Err(e) = request_reboot(None).await {
+                                        let reboot_handler = RebootImpl::default();
+                                        if let Err(e) = reboot_handler.reboot(None).await {
                                             eprintln!("Failed to reboot: {:?}", e);
                                         }
                                     })
