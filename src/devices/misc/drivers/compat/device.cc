@@ -178,7 +178,9 @@ Device::Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
 Device::~Device() {
   // Free the dev node first so that nothing will call into the device as it's being destructed
   // further.
-  devfs_server_auto_free_.call();
+  if (devfs_server_auto_free_) {
+    devfs_server_auto_free_.call();
+  }
 
   // We only shut down the devices that have a parent, since that means that *this* compat driver
   // owns the device. If the device does not have a parent, then ops_ belongs to another driver, and
@@ -234,6 +236,11 @@ fpromise::promise<void> Device::UnbindOp() {
 }
 
 void Device::CompleteUnbind() {
+  // Remove ourself from devfs.
+  if (devfs_server_auto_free_) {
+    devfs_server_auto_free_.call();
+  }
+
   // Our unbind is finished, so close all outstanding connections to devfs clients.
   devfs_server_.CloseAllConnections([this]() {
     // Now call our unbind completer.
