@@ -254,7 +254,7 @@ constexpr inline auto AssumeProtocolComposesNode =
 // in the FIDL schema. This could happen as a result of implicit or unsupported
 // multiplexing of FIDL protocols. There will not be any compile-time
 // validation that the cloning is supported, if the extra
-// |component::AssumeProtocolComposeseNode| argument is provided. Note that if
+// |component::AssumeProtocolComposesNode| argument is provided. Note that if
 // the channel does not implement |fuchsia.io/Node.Clone|, the remote endpoint
 // of the cloned node will be asynchronously closed.
 //
