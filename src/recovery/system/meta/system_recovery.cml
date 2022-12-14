@@ -18,6 +18,7 @@
         {
             protocol: [
                 "fuchsia.buildinfo.Provider",
+                "fuchsia.feedback.CrashReporter",
                 "fuchsia.hwinfo.Board",
                 "fuchsia.hwinfo.Device",
                 "fuchsia.hwinfo.Product",

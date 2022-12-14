@@ -208,6 +208,11 @@ if (is_fuchsia) {
         # SL4F for infra testing
         "//src/testing/sl4f",
         "//src/sys/bin/start_sl4f",
+
+        # Forensics and crash reporting
+        "//src/developer/forensics:pkg",
+        "//src/developer/forensics:user_configs",
+        "//src/developer/forensics:feedback_remote_device_id_provider",
       ]
 
   recovery_installer_packages =

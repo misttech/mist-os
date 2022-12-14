@@ -14,8 +14,10 @@ use futures::TryStreamExt;
 use ota_lib::OtaComponent;
 use recovery_ui::{font, proxy_view_assistant::ProxyViewAssistant};
 use recovery_ui_config::Config as UiConfig;
+use recovery_util::crash::{CrashReportBuilder, CrashReporter};
 use recovery_util::ota::controller::{Controller, ControllerImpl, SendEvent};
 use recovery_util::ota::state_machine::{Event, OtaStatus, State, StateMachine};
+use std::rc::Rc;
 use std::sync::Arc;
 
 #[cfg(feature = "debug_console")]
@@ -27,20 +29,28 @@ struct RecoveryAppAssistant {
     app_sender: AppSender,
     display_rotation: DisplayRotation,
     controller: Box<dyn Controller>,
+    crash_reporter: Option<Rc<CrashReporter>>,
 }
 
 impl RecoveryAppAssistant {
     pub fn new(app_sender: AppSender) -> Self {
         let display_rotation = Self::get_display_rotation();
-        Self::new_with_params(app_sender, display_rotation, Box::new(ControllerImpl::new()))
+        let crash_reporter = CrashReportBuilder::new().build().unwrap();
+        Self::new_with_params(
+            app_sender,
+            display_rotation,
+            Box::new(ControllerImpl::new()),
+            Some(crash_reporter),
+        )
     }
 
     pub fn new_with_params(
         app_sender: AppSender,
         display_rotation: DisplayRotation,
         controller: Box<dyn Controller>,
+        crash_reporter: Option<Rc<CrashReporter>>,
     ) -> Self {
-        Self { app_sender, display_rotation, controller }
+        Self { app_sender, display_rotation, controller, crash_reporter }
     }
 
     fn get_display_rotation() -> DisplayRotation {
@@ -89,7 +99,11 @@ impl AppAssistant for RecoveryAppAssistant {
         // TODO(b/244744635) Add a structured initialization flow for the recovery component
         let ota_manager =
             Arc::new(OtaComponent::new().expect("failed to create OTA component manager"));
-        let action = Action::new(self.controller.get_event_sender(), ota_manager);
+        let action = Action::new(
+            self.controller.get_event_sender(),
+            ota_manager,
+            self.crash_reporter.clone(),
+        );
         self.controller.add_state_handler(Box::new(action));
 
         let screens = Screens::new(self.app_sender.clone(), view_key);

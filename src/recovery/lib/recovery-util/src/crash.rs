@@ -14,27 +14,60 @@ use {
     fuchsia_component::client::connect_to_protocol,
 };
 
+#[macro_export]
+macro_rules! send_report {
+    // Send a crash report with the provided RecoveryError
+    // Option<Rc<CrashReporter>>, RecoveryError
+    ($rpt:expr,$error:expr) => {
+        match $rpt {
+            Some(reporter) => {
+                if let Err(error) = reporter.file_crash_report($error, None).await {
+                    println!("Failed to send crash report: {}", error);
+                }
+            }
+            None => {
+                println!("Crash reporter not available.");
+            }
+        }
+    };
+    // Send a crash report with the provided RecoveryError and additional error context
+    // Option<Rc<CrashReporter>>, RecoveryError, Error
+    ($rpt:expr,$error:expr,$ctx:expr) => {
+        match $rpt {
+            Some(reporter) => {
+                if let Err(error) = reporter.file_crash_report($error, Some($ctx.to_string())).await
+                {
+                    println!("Failed to send crash report: {}", error);
+                }
+            }
+            None => {
+                println!("Crash reporter not available.");
+            }
+        }
+    };
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum RecoveryError {
-    #[error("Error")]
+    #[error("generic-error")]
     GenericError(),
 
-    #[error("OTA finished with an error")]
+    #[error("ota-failure-error")]
     OtaFailureError(),
 
-    #[error("Factory reset policy failure, but proceeding with reset")]
+    #[error("factory-reset-policy-failure")]
     FdrPolicyError(),
 
-    #[error("Factory reset failure")]
+    #[error("factory-reset-failure")]
     FdrResetError(),
 
-    #[error("Failed to connect to WIFI")]
+    #[error("wifi-connection-error")]
     WifiConnectionError(),
 
-    #[error("Succesfully connected to WIFI")]
+    #[error("wifi-connection-success")]
     WifiConnectionSuccess(),
 
-    #[error("Pending crash reports exceeds limit")]
+    #[error("reports-exceed-limit")]
     OutOfSpace(),
 
     #[cfg(test)]
@@ -93,7 +126,7 @@ pub struct CrashReporter {
 
 pub struct ErrorReportMessage {
     error: RecoveryError,
-    context: Option<anyhow::Error>,
+    context: Option<String>,
 }
 
 impl CrashReporter {
@@ -103,7 +136,7 @@ impl CrashReporter {
     pub async fn file_crash_report(
         &self,
         error: RecoveryError,
-        context: Option<Error>,
+        context: Option<String>,
     ) -> Result<(), RecoveryError> {
         let message = ErrorReportMessage { error, context };
         match self.crash_report_sender.borrow_mut().try_send(message) {
@@ -160,7 +193,6 @@ impl CrashReporter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::anyhow;
     use assert_matches::assert_matches;
     use futures::TryStreamExt;
 
@@ -193,7 +225,7 @@ mod tests {
             .unwrap();
 
         crash_reporter
-            .file_crash_report(received_error, Some(anyhow!("test context")))
+            .file_crash_report(received_error, Some("test context".into()))
             .await
             .unwrap();
 
@@ -205,7 +237,7 @@ mod tests {
                 report,
                 fidl_feedback::CrashReport {
                     program_name: Some("fuchsia-recovery".to_string()),
-                    crash_signature: Some("Factory reset failure".to_string()),
+                    crash_signature: Some("factory-reset-failure".to_string()),
                     is_fatal: Some(false),
                     annotations: Some(vec![Annotation {
                         key: "context".into(),
@@ -236,7 +268,7 @@ mod tests {
             .build()
             .unwrap();
 
-        crash_reporter.file_crash_report(received_error, Some(anyhow!(context))).await.unwrap();
+        crash_reporter.file_crash_report(received_error, Some(context)).await.unwrap();
 
         // Verify the fake service receives the crash report with expected data
         if let Ok(Some(fidl_feedback::CrashReporterRequest::File { responder: _, report })) =

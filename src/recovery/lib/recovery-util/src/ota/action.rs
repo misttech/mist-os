@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::crash::CrashReporter;
 use crate::ota::actions::factory_reset::FactoryResetAction;
 use crate::ota::actions::finalize_reinstall::FinalizeReinstallAction;
 use crate::ota::actions::get_wifi_networks::GetWifiNetworksAction;
@@ -12,6 +13,7 @@ use crate::ota::controller::EventSender;
 use crate::ota::state_machine::{State, StateHandler};
 use fuchsia_async as fasync;
 use ota_lib::OtaManager;
+use std::rc::Rc;
 use std::sync::Arc;
 
 /// This file initiates all the non-ui, background actions that are required to satisfy
@@ -20,11 +22,16 @@ use std::sync::Arc;
 pub struct Action {
     event_sender: EventSender,
     ota_manager: Arc<dyn OtaManager>,
+    crash_reporter: Option<Rc<CrashReporter>>,
 }
 
 impl Action {
-    pub fn new(event_sender: EventSender, ota_manager: Arc<dyn OtaManager>) -> Self {
-        Self { event_sender, ota_manager }
+    pub fn new(
+        event_sender: EventSender,
+        ota_manager: Arc<dyn OtaManager>,
+        crash_reporter: Option<Rc<CrashReporter>>,
+    ) -> Self {
+        Self { event_sender, ota_manager, crash_reporter }
     }
 }
 
@@ -34,7 +41,7 @@ impl StateHandler for Action {
         match state {
             State::GetWiFiNetworks => GetWifiNetworksAction::run(event_sender),
             State::Connecting(network, password) => {
-                WifiConnectAction::run(event_sender, network, password)
+                WifiConnectAction::run(event_sender, network, password, self.crash_reporter.clone())
             }
             State::ReinstallConfirm { desired: user_data_sharing_consent, reported } => {
                 SetSharingConsentAction::run(event_sender, user_data_sharing_consent, reported)
@@ -108,7 +115,7 @@ mod test {
         // Verify that status propagates to complete_ota by trying a few different values.
         for status in [OtaStatus::Succeeded, OtaStatus::Failed, OtaStatus::Cancelled] {
             let (ota_manager, on_complete_ota) = FakeOtaManager::new();
-            let mut action = Action::new(event_sender.clone(), ota_manager);
+            let mut action = Action::new(event_sender.clone(), ota_manager, None);
 
             action.handle_state(State::ReinstallRunning {
                 status: Some(status.clone()),

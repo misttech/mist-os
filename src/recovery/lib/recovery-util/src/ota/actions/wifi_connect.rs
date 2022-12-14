@@ -5,23 +5,37 @@
 use crate::ota::controller::SendEvent;
 use crate::ota::state_machine::{Event, Network, Password};
 use crate::wlan::{create_network_info, WifiConnect, WifiConnectImpl};
+use crate::{
+    crash::{
+        CrashReporter,
+        RecoveryError::{WifiConnectionError, WifiConnectionSuccess},
+    },
+    send_report,
+};
 use anyhow::Error;
 use fuchsia_async::{DurationExt, Task};
 use fuchsia_zircon::Duration;
 use recovery_metrics_registry::cobalt_registry as metrics;
+use std::rc::Rc;
 
 /// Connects to a Wifi network.
 /// Asynchronously ends event Connected or Error as appropriate.
 pub struct WifiConnectAction {}
 
 impl WifiConnectAction {
-    pub fn run(event_sender: Box<dyn SendEvent>, network: Network, password: Password) {
+    pub fn run(
+        event_sender: Box<dyn SendEvent>,
+        network: Network,
+        password: Password,
+        crash_reporter: Option<Rc<CrashReporter>>,
+    ) {
         // This is split into two parts for testing. It allowing a fake wifi service to be injected.
         Self::run_with_wifi_service(
             event_sender,
             network,
             password,
             Box::new(WifiConnectImpl::new()),
+            crash_reporter,
         );
     }
 
@@ -30,6 +44,7 @@ impl WifiConnectAction {
         network: Network,
         password: Password,
         wifi_service: Box<dyn WifiConnect>,
+        crash_reporter: Option<Rc<CrashReporter>>,
     ) {
         let task = async move {
             match connect_to_wifi(&*wifi_service, &network, &password).await {
@@ -38,8 +53,10 @@ impl WifiConnectAction {
                     event_sender.send_recovery_stage_event(
                         metrics::RecoveryEventMetricDimensionResult::WiFiConnected,
                     );
+                    send_report!(crash_reporter, WifiConnectionSuccess());
                 }
                 Result::Err(error) => {
+                    send_report!(crash_reporter, WifiConnectionError(), error);
                     // Let the "Connecting" message stay there for a second so the
                     // user can see that something was tried.
                     // TODO(b/258576788): Confirm sleep details etc. with UX
@@ -126,6 +143,7 @@ mod tests {
             "network".to_string(),
             "password".to_string(),
             Box::new(FakeWifiConnectImpl::new(true)),
+            None,
         );
         // Make sure the task under test runs to its finish
         let _ = exec.run_until_stalled(&mut future::pending::<()>());
@@ -143,6 +161,7 @@ mod tests {
             "network".to_string(),
             "password".to_string(),
             Box::new(FakeWifiConnectImpl::new(false)),
+            None,
         );
         // Make sure the task under test runs to its delay
         let _ = exec.run_until_stalled(&mut future::pending::<()>());
