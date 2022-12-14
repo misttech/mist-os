@@ -483,5 +483,36 @@ TEST_F(PlainBackgroundTest, TranslatesCoordinatesFromNestedChildView) {
   }
 }
 
+TEST_F(PlainBackgroundTest, TestHighlightWithMagnification) {
+  // Magnify the view to 2x.
+  // Highlights should magnified along with the content, so this should cause the
+  // highlight to become twice as large.
+  a11y_view_->SetMagnificationTransform(/* scale = */ 2, /* translation_x = */ 0,
+                                        /* translation_y = */ 0, [this]() { QuitLoop(); });
+  RunLoop();
+
+  // Draw an a11y highlight around a rect in the middle of the screen.
+  const float left_f = static_cast<float>(display_width_) * 3 / 8;
+  const float top_f = static_cast<float>(display_height_) * 3 / 8;
+  const float right_f = static_cast<float>(display_width_) * 5 / 8;
+  const float bottom_f = static_cast<float>(display_height_) * 5 / 8;
+  a11y_view_->DrawHighlight({left_f, top_f}, {right_f, bottom_f},
+                            test_view_->GetViewRefKoid().value(), [this]() { QuitLoop(); });
+  RunLoop();
+
+  auto data = ui_test_manager_->TakeScreenshot();
+
+  // Check that the left rectangle is where we expect it to be.
+  // Example: If left=200, the pixels in the columns in the closed range [194, 205] should be
+  // drawn.
+  const int left = static_cast<int>(lround(display_width_ * 1 / 4));
+  const int middle = static_cast<int>(display_height_ / 2);
+  EXPECT_EQ(data.GetPixelAt(left - 7, middle), ui_testing::Screenshot::kGreen);
+  for (int i = -6; i < 6; i++) {
+    EXPECT_EQ(data.GetPixelAt(left + i, middle), kHighlightColor);
+  }
+  EXPECT_EQ(data.GetPixelAt(left + 6, middle), ui_testing::Screenshot::kGreen);
+}
+
 }  // namespace
 }  // namespace accessibility_test
