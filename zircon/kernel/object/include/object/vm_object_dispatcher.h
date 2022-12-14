@@ -55,7 +55,7 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
   // Dispatcher implementation.
   void on_zero_handles() final;
 
-  ContentSizeManager& content_size_manager() { return content_size_mgr_; }
+  ContentSizeManager* content_size_manager() const { return content_size_mgr_.get(); }
 
   // VmObjectDispatcher own methods.
   zx_status_t Read(VmAspace* current_aspace, user_out_ptr<char> user_data, size_t length,
@@ -93,14 +93,17 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
   zx_koid_t pager_koid() const { return pager_koid_; }
 
  private:
-  explicit VmObjectDispatcher(fbl::RefPtr<VmObject> vmo, uint64_t size, zx_koid_t pager_koid,
-                              InitialMutability initial_mutability);
+  explicit VmObjectDispatcher(fbl::RefPtr<VmObject> vmo,
+                              fbl::RefPtr<ContentSizeManager> content_size_manager,
+                              zx_koid_t pager_koid, InitialMutability initial_mutability);
   // The 'const' here is load bearing; we give a raw pointer to
   // ourselves to |vmo_| so we have to ensure we don't reset vmo_
   // except during destruction.
   fbl::RefPtr<VmObject> const vmo_;
 
-  ContentSizeManager content_size_mgr_;
+  // Manages the content size associated with this VMO. The content size is used by streams created
+  // against this VMO.
+  fbl::RefPtr<ContentSizeManager> const content_size_mgr_;
 
   // The koid of the related pager object, or ZX_KOID_INVALID if
   // there is no related pager.

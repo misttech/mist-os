@@ -55,10 +55,16 @@ zx_status_t VmObjectDispatcher::Create(fbl::RefPtr<VmObject> vmo, uint64_t conte
                                        KernelHandle<VmObjectDispatcher>* handle,
                                        zx_rights_t* rights) {
   fbl::AllocChecker ac;
-  KernelHandle new_handle(fbl::AdoptRef(
-      new (&ac) VmObjectDispatcher(ktl::move(vmo), content_size, pager_koid, initial_mutability)));
-  if (!ac.check())
+  fbl::RefPtr<ContentSizeManager> content_size_manager =
+      fbl::AdoptRef(new (&ac) ContentSizeManager(content_size));
+  if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
+  }
+  KernelHandle new_handle(fbl::AdoptRef(new (&ac) VmObjectDispatcher(
+      ktl::move(vmo), ktl::move(content_size_manager), pager_koid, initial_mutability)));
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
 
   new_handle.dispatcher()->vmo()->set_user_id(new_handle.dispatcher()->get_koid());
   *rights = default_rights();
@@ -66,11 +72,12 @@ zx_status_t VmObjectDispatcher::Create(fbl::RefPtr<VmObject> vmo, uint64_t conte
   return ZX_OK;
 }
 
-VmObjectDispatcher::VmObjectDispatcher(fbl::RefPtr<VmObject> vmo, uint64_t content_size,
+VmObjectDispatcher::VmObjectDispatcher(fbl::RefPtr<VmObject> vmo,
+                                       fbl::RefPtr<ContentSizeManager> content_size_manager,
                                        zx_koid_t pager_koid, InitialMutability initial_mutability)
     : SoloDispatcher(ZX_VMO_ZERO_CHILDREN),
       vmo_(ktl::move(vmo)),
-      content_size_mgr_(content_size),
+      content_size_mgr_(ktl::move(content_size_manager)),
       pager_koid_(pager_koid),
       initial_mutability_(initial_mutability) {
   kcounter_add(dispatcher_vmo_create_count, 1);
@@ -140,9 +147,9 @@ zx_status_t VmObjectDispatcher::SetSize(uint64_t size) {
   canary_.Assert();
 
   ContentSizeManager::Operation op;
-  Guard<Mutex> guard{content_size_mgr_.lock()};
+  Guard<Mutex> guard{content_size_mgr_->lock()};
 
-  content_size_mgr_.BeginSetContentSizeLocked(size, &op, &guard);
+  content_size_mgr_->BeginSetContentSizeLocked(size, &op, &guard);
 
   uint64_t size_aligned = ROUNDUP(size, PAGE_SIZE);
   // Check for overflow when rounding up.
@@ -228,8 +235,8 @@ zx_status_t VmObjectDispatcher::SetContentSize(uint64_t content_size) {
   canary_.Assert();
 
   ContentSizeManager::Operation op;
-  Guard<Mutex> guard{content_size_mgr_.lock()};
-  content_size_mgr_.BeginSetContentSizeLocked(content_size, &op, &guard);
+  Guard<Mutex> guard{content_size_mgr_->lock()};
+  content_size_mgr_->BeginSetContentSizeLocked(content_size, &op, &guard);
 
   uint64_t vmo_size = vmo_->size();
   if (content_size < vmo_size) {
@@ -249,7 +256,7 @@ zx_status_t VmObjectDispatcher::SetContentSize(uint64_t content_size) {
 uint64_t VmObjectDispatcher::GetContentSize() const {
   canary_.Assert();
 
-  return content_size_mgr_.GetContentSize();
+  return content_size_mgr_->GetContentSize();
 }
 
 zx_status_t VmObjectDispatcher::ExpandIfNecessary(uint64_t requested_vmo_size,

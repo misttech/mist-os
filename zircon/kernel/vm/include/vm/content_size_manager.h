@@ -11,6 +11,7 @@
 
 #include <fbl/intrusive_container_utils.h>
 #include <fbl/intrusive_double_list.h>
+#include <fbl/ref_counted.h>
 #include <kernel/event.h>
 #include <kernel/mutex.h>
 #include <ktl/algorithm.h>
@@ -40,7 +41,7 @@
 // target size (see above). When shrinking, set size ops are treated as shrink operations and will
 // block until it is the head if any read or write operations that operate beyond the target size
 // are queued in front of the set size.
-class ContentSizeManager {
+class ContentSizeManager : public fbl::RefCounted<ContentSizeManager> {
  private:
   // Forward declarations
   struct WriteQueueTag {};

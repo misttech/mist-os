@@ -75,10 +75,10 @@ zx_status_t StreamDispatcher::ReadVector(VmAspace* current_aspace, user_out_iove
 
   Guard<Mutex> seek_guard{&seek_lock_};
   {
-    Guard<Mutex> content_size_guard{vmo_->content_size_manager().lock()};
+    Guard<Mutex> content_size_guard{vmo_->content_size_manager()->lock()};
 
     uint64_t size_limit = 0u;
-    vmo_->content_size_manager().BeginReadLocked(seek_ + total_capacity, &size_limit, &op);
+    vmo_->content_size_manager()->BeginReadLocked(seek_ + total_capacity, &size_limit, &op);
     if (size_limit <= seek_) {
       // Return |ZX_OK| since there is nothing to be read.
       op.AssertParentLockHeld();
@@ -119,10 +119,10 @@ zx_status_t StreamDispatcher::ReadVectorAt(VmAspace* current_aspace, user_out_io
   ContentSizeManager::Operation op;
 
   {
-    Guard<Mutex> content_size_guard{vmo_->content_size_manager().lock()};
+    Guard<Mutex> content_size_guard{vmo_->content_size_manager()->lock()};
 
     uint64_t size_limit = 0u;
-    vmo_->content_size_manager().BeginReadLocked(offset + total_capacity, &size_limit, &op);
+    vmo_->content_size_manager()->BeginReadLocked(offset + total_capacity, &size_limit, &op);
     if (size_limit <= offset) {
       // Return |ZX_OK| since there is nothing to be read.
       op.AssertParentLockHeld();
@@ -290,10 +290,10 @@ zx_status_t StreamDispatcher::AppendVector(VmAspace* current_aspace, user_in_iov
 
   // This section expands the VMO if necessary and bumps the |seek_| pointer if successful.
   {
-    Guard<Mutex> content_size_guard{vmo_->content_size_manager().lock()};
+    Guard<Mutex> content_size_guard{vmo_->content_size_manager()->lock()};
 
     status =
-        vmo_->content_size_manager().BeginAppendLocked(total_capacity, &content_size_guard, &op);
+        vmo_->content_size_manager()->BeginAppendLocked(total_capacity, &content_size_guard, &op);
     if (status != ZX_OK) {
       return status;
     }
@@ -333,7 +333,7 @@ zx_status_t StreamDispatcher::AppendVector(VmAspace* current_aspace, user_in_iov
   seek_ = offset + *out_actual;
 
   // Reacquire the lock to potentially shrink and commit the operation.
-  Guard<Mutex> content_size_guard{vmo_->content_size_manager().lock()};
+  Guard<Mutex> content_size_guard{vmo_->content_size_manager()->lock()};
   op.AssertParentLockHeld();
 
   // Update the content size operation if operation was partially successful.
@@ -375,7 +375,7 @@ zx_status_t StreamDispatcher::Seek(zx_stream_seek_origin_t whence, int64_t offse
       break;
     }
     case ZX_STREAM_SEEK_ORIGIN_END: {
-      uint64_t content_size = vmo_->content_size_manager().GetContentSize();
+      uint64_t content_size = vmo_->content_size_manager()->GetContentSize();
       if (add_overflow(content_size, offset, &target)) {
         return ZX_ERR_INVALID_ARGS;
       }
@@ -410,7 +410,7 @@ void StreamDispatcher::GetInfo(zx_info_stream_t* info) const {
 
   info->options = options_;
   info->seek = seek_;
-  info->content_size = vmo_->content_size_manager().GetContentSize();
+  info->content_size = vmo_->content_size_manager()->GetContentSize();
 }
 
 zx_status_t StreamDispatcher::CreateWriteOpAndExpandVmo(
@@ -422,15 +422,15 @@ zx_status_t StreamDispatcher::CreateWriteOpAndExpandVmo(
   zx_status_t status = ZX_OK;
 
   {
-    Guard<Mutex> content_size_guard{vmo_->content_size_manager().lock()};
+    Guard<Mutex> content_size_guard{vmo_->content_size_manager()->lock()};
 
     size_t requested_content_size;
     if (add_overflow(offset, total_capacity, &requested_content_size)) {
       return ZX_ERR_FILE_BIG;
     }
 
-    vmo_->content_size_manager().BeginWriteLocked(requested_content_size, &content_size_guard,
-                                                  out_prev_content_size, out_op);
+    vmo_->content_size_manager()->BeginWriteLocked(requested_content_size, &content_size_guard,
+                                                   out_prev_content_size, out_op);
 
     uint64_t vmo_size = 0u;
     status = vmo_->ExpandIfNecessary(requested_content_size, &vmo_size);
