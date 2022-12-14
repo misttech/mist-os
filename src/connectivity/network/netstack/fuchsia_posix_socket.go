@@ -18,7 +18,6 @@ import (
 	"sync/atomic"
 	"syscall/zx"
 	"syscall/zx/fidl"
-	"syscall/zx/zxsocket"
 	"syscall/zx/zxwait"
 	"time"
 	"unsafe"
@@ -63,6 +62,14 @@ const (
 
 	// Maximum size of a UDP payload.
 	maxUDPPayloadSize = header.UDPMaximumPacketSize - header.UDPMinimumSize
+
+	signalStreamIncoming        = zx.Signals(socket.SignalStreamIncoming)
+	signalStreamConnected       = zx.Signals(socket.SignalStreamConnected)
+	signalDatagramIncoming      = zx.Signals(socket.SignalDatagramIncoming)
+	signalDatagramOutgoing      = zx.Signals(socket.SignalDatagramOutgoing)
+	signalDatagramError         = zx.Signals(socket.SignalDatagramError)
+	signalDatagramShutdownRead  = zx.Signals(socket.SignalDatagramShutdownRead)
+	signalDatagramShutdownWrite = zx.Signals(socket.SignalDatagramShutdownWrite)
 )
 
 func optionalUint8ToInt(v socket.OptionalUint8, unset int) (int, tcpip.Error) {
@@ -1121,11 +1128,11 @@ func (epe *endpointWithEvent) shutdown(how socket.ShutdownMode) (posix.Errno, er
 	var flags tcpip.ShutdownFlags
 
 	if how&socket.ShutdownModeRead != 0 {
-		signals |= zxsocket.SignalDatagramShutdownRead
+		signals |= signalDatagramShutdownRead
 		flags |= tcpip.ShutdownRead
 	}
 	if how&socket.ShutdownModeWrite != 0 {
-		signals |= zxsocket.SignalDatagramShutdownWrite
+		signals |= signalDatagramShutdownWrite
 		flags |= tcpip.ShutdownWrite
 	}
 	if flags == 0 {
@@ -1267,7 +1274,7 @@ func (eps *endpointWithSocket) startReadWriteLoops(loopRead, loopWrite func(chan
 	select {
 	case <-eps.closing:
 	default:
-		if err := eps.local.Handle().SignalPeer(0, zxsocket.SignalStreamConnected); err != nil {
+		if err := eps.local.Handle().SignalPeer(0, signalStreamConnected); err != nil {
 			panic(err)
 		}
 		for _, m := range []struct {
@@ -1921,9 +1928,9 @@ func (e *datagramSocketError) consume() tcpip.Error {
 func (e *datagramSocketError) setErrorSignalLocked(setErr bool) {
 	var set, clear = zx.SignalNone, zx.SignalNone
 	if setErr {
-		set |= zxsocket.SignalDatagramError
+		set |= signalDatagramError
 	} else {
-		clear |= zxsocket.SignalDatagramError
+		clear |= signalDatagramError
 	}
 	if err := e.mu.signalPeer(clear, set); err != nil {
 		panic(err)
@@ -3048,7 +3055,7 @@ func makeStreamSocketImpl(eps *endpointWithSocket) streamSocketImpl {
 				eventsToSignals: func(events waiter.EventMask) zx.Signals {
 					signals := zx.SignalNone
 					if events&waiter.EventIn != 0 {
-						signals |= zxsocket.SignalStreamIncoming
+						signals |= signalStreamIncoming
 						events ^= waiter.EventIn
 					}
 					if events != 0 {
@@ -3660,11 +3667,11 @@ func makeSynchronousDatagramSocket(ep tcpip.Endpoint, netProto tcpip.NetworkProt
 				eventsToSignals: func(events waiter.EventMask) zx.Signals {
 					signals := zx.SignalNone
 					if events&waiter.EventIn != 0 {
-						signals |= zxsocket.SignalDatagramIncoming
+						signals |= signalDatagramIncoming
 						events ^= waiter.EventIn
 					}
 					if events&waiter.EventErr != 0 {
-						signals |= zxsocket.SignalDatagramError
+						signals |= signalDatagramError
 						events ^= waiter.EventErr
 					}
 					if events != 0 {
@@ -3729,8 +3736,8 @@ func (sp *providerImpl) DatagramSocketDeprecated(ctx fidl.Context, domain socket
 	_ = syslog.DebugTf("NewSynchronousDatagram", "%p", s.endpointWithEvent)
 	sp.ns.onAddEndpoint(&s.endpoint)
 
-	if err := s.endpointWithEvent.local.SignalPeer(0, zxsocket.SignalDatagramOutgoing); err != nil {
-		panic(fmt.Sprintf("local.SignalPeer(0, zxsocket.SignalDatagramOutgoing) = %s", err))
+	if err := s.endpointWithEvent.local.SignalPeer(0, signalDatagramOutgoing); err != nil {
+		panic(fmt.Sprintf("local.SignalPeer(0, signalDatagramOutgoing) = %s", err))
 	}
 
 	return socket.ProviderDatagramSocketDeprecatedResultWithResponse(socket.ProviderDatagramSocketDeprecatedResponse{
@@ -3779,8 +3786,8 @@ func (sp *providerImpl) DatagramSocket(ctx fidl.Context, domain socket.Domain, p
 		_ = syslog.DebugTf("NewSynchronousDatagram", "%p", s.endpointWithEvent)
 		sp.ns.onAddEndpoint(&s.endpoint)
 
-		if err := s.endpointWithEvent.local.SignalPeer(0, zxsocket.SignalDatagramOutgoing); err != nil {
-			panic(fmt.Sprintf("local.SignalPeer(0, zxsocket.SignalDatagramOutgoing) = %s", err))
+		if err := s.endpointWithEvent.local.SignalPeer(0, signalDatagramOutgoing); err != nil {
+			panic(fmt.Sprintf("local.SignalPeer(0, signalDatagramOutgoing) = %s", err))
 		}
 
 		return socket.ProviderDatagramSocketResultWithResponse(socket.ProviderDatagramSocketResponseWithSynchronousDatagramSocket(socket.SynchronousDatagramSocketWithCtxInterface{Channel: peerC})), nil
@@ -3912,8 +3919,8 @@ func (sp *rawProviderImpl) Socket(ctx fidl.Context, domain socket.Domain, proto 
 	_ = syslog.DebugTf("NewRawSocket", "%p", s.endpointWithEvent)
 	sp.ns.onAddEndpoint(&s.endpoint)
 
-	if err := s.endpointWithEvent.local.SignalPeer(0, zxsocket.SignalDatagramOutgoing); err != nil {
-		panic(fmt.Sprintf("local.SignalPeer(0, zxsocket.SignalDatagramOutgoing) = %s", err))
+	if err := s.endpointWithEvent.local.SignalPeer(0, signalDatagramOutgoing); err != nil {
+		panic(fmt.Sprintf("local.SignalPeer(0, signalDatagramOutgoing) = %s", err))
 	}
 
 	return rawsocket.ProviderSocketResultWithResponse(rawsocket.ProviderSocketResponse{
@@ -4520,8 +4527,8 @@ func (sp *packetProviderImpl) Socket(ctx fidl.Context, kind packetsocket.Kind) (
 	_ = syslog.DebugTf("NewPacketSocket", "%p", s.endpointWithEvent)
 	sp.ns.onAddEndpoint(&s.endpoint)
 
-	if err := s.endpointWithEvent.local.SignalPeer(0, zxsocket.SignalDatagramOutgoing); err != nil {
-		panic(fmt.Sprintf("local.SignalPeer(0, zxsocket.SignalDatagramOutgoing) = %s", err))
+	if err := s.endpointWithEvent.local.SignalPeer(0, signalDatagramOutgoing); err != nil {
+		panic(fmt.Sprintf("local.SignalPeer(0, signalDatagramOutgoing) = %s", err))
 	}
 
 	return packetsocket.ProviderSocketResultWithResponse(packetsocket.ProviderSocketResponse{

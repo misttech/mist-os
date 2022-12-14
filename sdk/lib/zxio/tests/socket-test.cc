@@ -360,7 +360,7 @@ class DatagramSocketRouteCacheTest : public zxtest::Test {
   void GetFromCacheAssertSuccess(std::optional<SocketAddress>& addr) {
     zx_wait_item_t error_wait_item{
         .handle = error_peer_.get(),
-        .waitfor = kSignalError,
+        .waitfor = fsocket::wire::kSignalDatagramError,
     };
     RouteCache::Result result = cache_.Get(addr, std::nullopt, error_wait_item, client_);
 
@@ -369,7 +369,6 @@ class DatagramSocketRouteCacheTest : public zxtest::Test {
   }
 
  protected:
-  static constexpr zx_signals_t kSignalError = ZX_USER_SIGNAL_0;
   DatagramSocketServer server_;
   RouteCache cache_;
   fidl::WireSyncClient<fsocket::DatagramSocket> client_;
@@ -425,13 +424,13 @@ TEST_F(DatagramSocketRouteCacheTest, ErrorSignaledGetCallsGetError) {
   // When the designated error signal is signaled on the error wait item, the
   // client should call `GetError` and propagate the error it receives to the
   // caller.
-  ASSERT_OK(error_local_.signal_peer(0, kSignalError));
+  ASSERT_OK(error_local_.signal_peer(0, fsocket::wire::kSignalDatagramError));
 
   std::optional<SocketAddress> to;
   ASSERT_NO_FATAL_FAILURE(MakeSockAddrV6(kSomePort, to));
   zx_wait_item_t error_wait_item{
       .handle = error_peer_.get(),
-      .waitfor = kSignalError,
+      .waitfor = fsocket::wire::kSignalDatagramError,
   };
   RouteCache::Result result = cache_.Get(to, std::nullopt, error_wait_item, client_);
 
@@ -455,11 +454,11 @@ TEST_F(DatagramSocketRouteCacheTest, ErrorPropagatedEvenIfCacheAlsoInvalidated) 
   // item. The error should take precedence and be returned to the caller
   // without the client calling `SendMsgPreflight`.
   ASSERT_NO_FATAL_FAILURE(server_.InvalidateClientCache());
-  ASSERT_OK(error_local_.signal_peer(0, kSignalError));
+  ASSERT_OK(error_local_.signal_peer(0, fsocket::wire::kSignalDatagramError));
 
   zx_wait_item_t error_wait_item{
       .handle = error_peer_.get(),
-      .waitfor = kSignalError,
+      .waitfor = fsocket::wire::kSignalDatagramError,
   };
   RouteCache::Result result = cache_.Get(to, std::nullopt, error_wait_item, client_);
 

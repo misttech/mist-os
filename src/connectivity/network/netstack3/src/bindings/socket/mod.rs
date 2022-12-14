@@ -12,6 +12,7 @@ pub(crate) mod stream;
 use std::convert::Infallible as Never;
 use std::num::NonZeroU64;
 
+use const_unwrap::const_unwrap_option;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_posix::Errno;
 use fidl_fuchsia_posix_socket as psocket;
@@ -36,13 +37,12 @@ use crate::bindings::{
     LockableContext, StackTime,
 };
 
-// Socket constants defined in zxio in
-// https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/zxio/socket.cc
-// TODO(brunodalbo) Come back to this, see if we can have those definitions in a
-// public header from zxio somehow so we don't need to redefine.
-const ZXSIO_SIGNAL_INCOMING: zx::Signals = zx::Signals::USER_0;
-const ZXSIO_SIGNAL_OUTGOING: zx::Signals = zx::Signals::USER_1;
-const ZXSIO_SIGNAL_CONNECTED: zx::Signals = zx::Signals::USER_3;
+const ZXSIO_SIGNAL_INCOMING: zx::Signals =
+    const_unwrap_option(zx::Signals::from_bits(psocket::SIGNAL_DATAGRAM_INCOMING));
+const ZXSIO_SIGNAL_OUTGOING: zx::Signals =
+    const_unwrap_option(zx::Signals::from_bits(psocket::SIGNAL_DATAGRAM_OUTGOING));
+const ZXSIO_SIGNAL_CONNECTED: zx::Signals =
+    const_unwrap_option(zx::Signals::from_bits(psocket::SIGNAL_STREAM_CONNECTED));
 
 /// Common properties for socket workers.
 #[derive(Debug)]

@@ -149,8 +149,7 @@ class BaseTest : public zxtest::Test {
               if (!connected) {
                 connected = true;
                 // We need the FDIO to act like it's connected.
-                // fdio_internal::stream_socket::kSignalConnected is private, but we know the value.
-                EXPECT_OK(peer.signal(0, ZX_USER_SIGNAL_3));
+                EXPECT_OK(peer.signal(0, fuchsia_posix_socket::wire::kSignalStreamConnected));
                 completer.ReplyError(fuchsia_posix::wire::Errno::kEinprogress);
                 break;
               }
@@ -323,15 +322,16 @@ TEST_F(TcpSocketTest, WaitBeginEndConnecting) {
     zx_signals_t signals;
     fdio_unsafe_wait_begin(io, POLLIN, &handle, &signals);
     EXPECT_NE(handle, ZX_HANDLE_INVALID);
-    EXPECT_EQ(signals, ZX_USER_SIGNAL_0 | ZX_SOCKET_READABLE | ZX_SOCKET_PEER_CLOSED |
-                           ZX_SOCKET_PEER_WRITE_DISABLED);
+    EXPECT_EQ(signals, fuchsia_posix_socket::wire::kSignalStreamIncoming | ZX_SOCKET_READABLE |
+                           ZX_SOCKET_PEER_CLOSED | ZX_SOCKET_PEER_WRITE_DISABLED);
   }
 
   {
     zx_signals_t signals;
     fdio_unsafe_wait_begin(io, POLLOUT, &handle, &signals);
     EXPECT_NE(handle, ZX_HANDLE_INVALID);
-    EXPECT_EQ(signals, ZX_USER_SIGNAL_3 | ZX_SOCKET_PEER_CLOSED | ZX_SOCKET_WRITE_DISABLED);
+    EXPECT_EQ(signals, fuchsia_posix_socket::wire::kSignalStreamConnected | ZX_SOCKET_PEER_CLOSED |
+                           ZX_SOCKET_WRITE_DISABLED);
   }
 
   {

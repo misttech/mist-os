@@ -53,8 +53,6 @@ static_assert(static_cast<uint16_t>(fsocket::wire::InterfaceFlags::kDynamic) == 
 namespace fdio_internal {
 
 struct base_socket : public remote {
-  static constexpr zx_signals_t kSignalError = ZX_USER_SIGNAL_2;
-
   Errno posix_ioctl(int req, va_list va) final {
     switch (req) {
       case SIOCGIFNAME: {
