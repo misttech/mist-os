@@ -16,44 +16,13 @@
 
 #include <rapidjson/document.h>
 
-#include "src/lib/fxl/command_line.h"
-#include "src/lib/fxl/strings/string_number_conversions.h"
-
 namespace guest_config {
 
 namespace {
 
 using fuchsia::virtualization::GuestConfig;
 
-zx_status_t parse(const std::string& name, const std::string& value, bool* result) {
-  if (value.empty() || value == "true") {
-    *result = true;
-  } else if (value == "false") {
-    *result = false;
-  } else {
-    FX_LOGS(ERROR) << "Option '" << name << "' expects either 'true' or 'false'; received '"
-                   << value << "'";
-    return ZX_ERR_INVALID_ARGS;
-  }
-  return ZX_OK;
-}
-
-zx_status_t parse(const std::string& name, const std::string& value, std::string* result) {
-  *result = value;
-  return ZX_OK;
-}
-
-template <typename NumberType, fxl::Base base = fxl::Base::k10,
-          typename = std::enable_if<std::is_integral<NumberType>::value>>
-zx_status_t parse(const std::string& name, const std::string& value, NumberType* out) {
-  if (!fxl::StringToNumberWithError(value, out, base)) {
-    FX_LOGS(ERROR) << "Option '" << name << "': Unable to convert '" << value << "' into a number";
-    return ZX_ERR_INVALID_ARGS;
-  }
-  return ZX_OK;
-}
-
-zx_status_t parse(const OpenAt& open_at, const std::string& name, const std::string& value,
+zx_status_t parse(const OpenAt& open_at, const std::string& value,
                   fuchsia::virtualization::BlockSpec* out) {
   std::string path;
   std::istringstream token_stream(value);
@@ -116,12 +85,33 @@ zx_status_t parse(const OpenAt& open_at, const std::string& name, const std::str
   return ZX_OK;
 }
 
-zx_status_t parse(const std::string& name, const std::string& value, uint64_t* out) {
+template <typename T>
+zx_status_t parse(const rapidjson::Value& value, T* result) {
+  *result = value.Get<T>();
+  return ZX_OK;
+}
+template <>
+zx_status_t parse<uint8_t>(const rapidjson::Value& value, uint8_t* result) {
+  unsigned int v = value.GetUint();
+  if (v > std::numeric_limits<uint8_t>::max()) {
+    FX_LOGS(ERROR) << "Value too large: " << v;
+    return ZX_ERR_INVALID_ARGS;
+  }
+  *result = static_cast<uint8_t>(value.GetUint());
+  return ZX_OK;
+}
+
+zx_status_t parse_mem(const rapidjson::Value& value, uint64_t* result) {
   char modifier = 'b';
   uint64_t size;
-  int ret = sscanf(value.c_str(), "%lu%c", &size, &modifier);
+  if (!value.IsString()) {
+    FX_LOGS(ERROR) << "Value is not a string";
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  int ret = sscanf(value.GetString(), "%" SCNu64 "%c", &size, &modifier);
   if (ret < 1) {
-    FX_LOGS(ERROR) << "Value is not a size string: " << value;
+    FX_LOGS(ERROR) << "Value is not a size string: " << value.GetString();
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -142,7 +132,7 @@ zx_status_t parse(const std::string& name, const std::string& value, uint64_t* o
       return ZX_ERR_INVALID_ARGS;
   }
 
-  *out = size;
+  *result = size;
   return ZX_OK;
 }
 
@@ -150,7 +140,8 @@ class OptionHandler {
  public:
   OptionHandler() = default;
 
-  virtual zx_status_t Set(GuestConfig* cfg, const std::string& name, const std::string& value) = 0;
+  virtual zx_status_t Set(GuestConfig* cfg, const std::string& name,
+                          const rapidjson::Value& value) = 0;
 
   virtual ~OptionHandler() = default;
 };
@@ -164,9 +155,11 @@ class SimpleOptionHandler : public OptionHandler {
  protected:
   void FillMutableField(const T& value, GuestConfig* cfg) { *(mutable_field_(cfg)) = value; }
 
-  zx_status_t Set(GuestConfig* cfg, const std::string& name, const std::string& value) override {
+  zx_status_t Set(GuestConfig* cfg, const std::string& name,
+                  const rapidjson::Value& value) override {
     T result;
-    auto status = parse(name, value, &result);
+
+    zx_status_t status = parse(value, &result);
     if (status == ZX_OK) {
       FillMutableField(result, cfg);
     }
@@ -177,7 +170,22 @@ class SimpleOptionHandler : public OptionHandler {
   std::function<T*(GuestConfig*)> mutable_field_;
 };
 
-using GuestMemoryOptionHandler = SimpleOptionHandler<uint64_t>;
+class MemorySizeOptionHandler : public SimpleOptionHandler<uint64_t> {
+ public:
+  MemorySizeOptionHandler(std::function<uint64_t*(GuestConfig*)> mutable_field)
+      : SimpleOptionHandler<uint64_t>(std::move(mutable_field)) {}
+
+  zx_status_t Set(GuestConfig* cfg, const std::string& name,
+                  const rapidjson::Value& value) override {
+    uint64_t result;
+    auto status = parse_mem(value, &result);
+    if (status == ZX_OK) {
+      FillMutableField(result, cfg);
+    }
+    return status;
+  }
+};
+
 using NumCpusOptionHandler = SimpleOptionHandler<uint8_t>;
 using BoolOptionHandler = SimpleOptionHandler<bool>;
 using StringOptionHandler = SimpleOptionHandler<std::string>;
@@ -189,13 +197,14 @@ class FileOptionHandler : public OptionHandler {
       : OptionHandler(), open_at_{std::move(open_at)}, mutable_field_{std::move(mutable_field)} {}
 
  protected:
-  zx_status_t Set(GuestConfig* cfg, const std::string& name, const std::string& value) override {
-    if (value.empty()) {
+  zx_status_t Set(GuestConfig* cfg, const std::string& name,
+                  const rapidjson::Value& value) override {
+    if (value.GetStringLength() == 0) {
       FX_LOGS(ERROR) << "Option: '" << name << "' expects a value (--" << name << "=<value>)";
       return ZX_ERR_INVALID_ARGS;
     }
     fuchsia::io::FileHandle result;
-    zx_status_t status = open_at_(value, result.NewRequest());
+    zx_status_t status = open_at_(value.GetString(), result.NewRequest());
     if (status == ZX_OK) {
       *(mutable_field_(cfg)) = std::move(result);
     }
@@ -218,7 +227,8 @@ class KernelOptionHandler : public FileOptionHandler {
         type_{type} {}
 
  private:
-  zx_status_t Set(GuestConfig* cfg, const std::string& name, const std::string& value) override {
+  zx_status_t Set(GuestConfig* cfg, const std::string& name,
+                  const rapidjson::Value& value) override {
     auto status = FileOptionHandler::Set(cfg, name, value);
     if (status == ZX_OK) {
       *(mutable_type_fn_(cfg)) = type_;
@@ -237,13 +247,14 @@ class RepeatedOptionHandler : public OptionHandler {
       : mutable_field_{std::move(mutable_field)} {}
 
  protected:
-  zx_status_t Set(GuestConfig* cfg, const std::string& name, const std::string& value) override {
-    if (value.empty()) {
+  zx_status_t Set(GuestConfig* cfg, const std::string& name,
+                  const rapidjson::Value& value) override {
+    if (value.GetStringLength() == 0) {
       FX_LOGS(ERROR) << "Option: '" << name << "' expects a value (--" << name << "=<value>)";
       return ZX_ERR_INVALID_ARGS;
     }
     T result{};
-    auto status = parse(name, value, &result);
+    auto status = parse(value, &result);
     if (status == ZX_OK) {
       mutable_field_(cfg)->emplace_back(result);
     }
@@ -263,13 +274,14 @@ class RepeatedOptionHandler<fuchsia::virtualization::BlockSpec> : public OptionH
       : open_at_(std::move(open_at)), mutable_field_{std::move(mutable_field)} {}
 
  protected:
-  zx_status_t Set(GuestConfig* cfg, const std::string& name, const std::string& value) override {
-    if (value.empty()) {
+  zx_status_t Set(GuestConfig* cfg, const std::string& name,
+                  const rapidjson::Value& value) override {
+    if (value.GetStringLength() == 0) {
       FX_LOGS(ERROR) << "Option: '" << name << "' expects a value (--" << name << "=<value>)";
       return ZX_ERR_INVALID_ARGS;
     }
     fuchsia::virtualization::BlockSpec result;
-    auto status = parse(open_at_, name, value, &result);
+    auto status = parse(open_at_, value.GetString(), &result);
     if (status == ZX_OK) {
       mutable_field_(cfg)->emplace_back(std::move(result));
     }
@@ -303,7 +315,7 @@ std::unordered_map<std::string, std::unique_ptr<OptionHandler>> GetAllOptionHand
   handlers.emplace("cmdline-add", std::make_unique<RepeatedOptionHandler<std::string>>(
                                       &GuestConfig::mutable_cmdline_add));
   handlers.emplace("memory",
-                   std::make_unique<GuestMemoryOptionHandler>(&GuestConfig::mutable_guest_memory));
+                   std::make_unique<MemorySizeOptionHandler>(&GuestConfig::mutable_guest_memory));
   handlers.emplace("cpus", std::make_unique<NumCpusOptionHandler>(&GuestConfig::mutable_cpus));
   handlers.emplace("default-net",
                    std::make_unique<BoolOptionHandler>(&GuestConfig::mutable_default_net));
@@ -341,36 +353,20 @@ zx::result<GuestConfig> ParseConfig(const std::string& data, OpenAt open_at) {
       FX_LOGS(ERROR) << "Unknown field in configuration object: " << member.name.GetString();
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
-
-    // For string members, invoke the handler directly on the value.
-    if (member.value.IsString()) {
-      zx_status_t status =
-          entry->second->Set(&cfg, member.name.GetString(), member.value.GetString());
-      if (status != ZX_OK) {
-        return zx::error(ZX_ERR_INVALID_ARGS);
-      }
-      continue;
-    }
-
-    // For array members, invoke the handler on each value in the array.
+    zx_status_t status = ZX_OK;
     if (member.value.IsArray()) {
+      // for array members, invoke the handler on each value in the array.
       for (auto& array_member : member.value.GetArray()) {
-        if (!array_member.IsString()) {
-          FX_LOGS(ERROR) << "Array entry has incorect type, expected string: "
-                         << member.name.GetString();
-          return zx::error(ZX_ERR_INVALID_ARGS);
-        }
-        zx_status_t status =
-            entry->second->Set(&cfg, member.name.GetString(), array_member.GetString());
-        if (status != ZX_OK) {
-          return zx::error(ZX_ERR_INVALID_ARGS);
-        }
+        status = entry->second->Set(&cfg, member.name.GetString(), array_member);
       }
-      continue;
+    } else {
+      // For atomic members, invoke the handler directly on the value.
+      status = entry->second->Set(&cfg, member.name.GetString(), member.value);
     }
-    FX_LOGS(ERROR) << "Field has incorrect type, expected string or array: "
-                   << member.name.GetString();
-    return zx::error(ZX_ERR_INVALID_ARGS);
+
+    if (status != ZX_OK) {
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
   }
 
   return zx::ok(std::move(cfg));

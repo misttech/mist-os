@@ -33,17 +33,17 @@ TEST_F(GuestConfigTest, ParseConfig) {
                        R"JSON({
           "zircon": "zircon_path",
           "ramdisk": "ramdisk_path",
-          "cpus": "4",
+          "cpus": 4,
           "block": "/pkg/data/block_path",
           "cmdline": "kernel cmdline",
-          "default-net": "true",
-          "virtio-balloon": "true",
-          "virtio-console": "true",
-          "virtio-gpu": "true",
-          "virtio-rng": "true",
-          "virtio-sound": "true",
-          "virtio-sound-input": "true",
-          "virtio-vsock": "true"
+          "default-net": true,
+          "virtio-balloon": true,
+          "virtio-console": true,
+          "virtio-gpu": true,
+          "virtio-rng": true,
+          "virtio-sound": true,
+          "virtio-sound-input": true,
+          "virtio-vsock": true
         })JSON"));
   ASSERT_EQ(fuchsia::virtualization::KernelType::ZIRCON, config_.kernel_type());
   ASSERT_TRUE(config_.kernel());

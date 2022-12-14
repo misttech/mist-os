@@ -12,7 +12,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--block', action='append', help='Block device spec')
     parser.add_argument('--cmdline', help='Kernel command-line string')
-    parser.add_argument('--cpus', help='Number of VCPUs to create')
+    parser.add_argument('--cpus', help='Number of VCPUs to create', type=int)
     parser.add_argument(
         '--dtb-overlay', dest='dtb-overlay', help='Path to DTB overlay')
     parser.add_argument('--linux', help='Path to Linux kernel')
@@ -23,49 +23,49 @@ def main():
         '--default-net',
         dest='default-net',
         action='store_const',
-        const='true',
+        const=True,
         help='Enable the default net device')
     parser.add_argument(
         '--virtio-balloon',
         dest='virtio-balloon',
         action='store_const',
-        const='true',
+        const=True,
         help='Enable the default net device')
     parser.add_argument(
         '--virtio-console',
         dest='virtio-console',
         action='store_const',
-        const='true',
+        const=True,
         help='Enable the virtio console device')
     parser.add_argument(
         '--virtio-gpu',
         dest='virtio-gpu',
         action='store_const',
-        const='true',
+        const=True,
         help='Enable the virtio gpu & input devices')
     parser.add_argument(
         '--virtio-rng',
         dest='virtio-rng',
         action='store_const',
-        const='true',
+        const=True,
         help='Enable the virtio rng device')
     parser.add_argument(
         '--virtio-sound',
         dest='virtio-sound',
         action='store_const',
-        const='true',
+        const=True,
         help='Enable the virtio sound output device')
     parser.add_argument(
         '--virtio-sound-input',
         dest='virtio-sound-input',
         action='store_const',
-        const='true',
+        const=True,
         help='Enable the virtio sound input device')
     parser.add_argument(
         '--virtio-vsock',
         dest='virtio-vsock',
         action='store_const',
-        const='true',
+        const=True,
         help='Enable the virtio vsock device')
     parser.add_argument('filename', help='Path to output filename')
 
