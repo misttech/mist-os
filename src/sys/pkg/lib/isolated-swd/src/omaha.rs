@@ -13,7 +13,7 @@ use {
     crate::omaha::{
         http_request::FuchsiaHyperHttpRequest, installer::IsolatedInstaller, timer::FuchsiaTimer,
     },
-    anyhow::{anyhow, Error},
+    anyhow::{Context, Error},
     futures::lock::Mutex,
     futures::prelude::*,
     omaha_client::{
@@ -71,7 +71,21 @@ pub async fn install_update(
         VecAppSet::new(vec![App::builder().id(appid).version(version).cohort(cohort).build()]);
 
     let config = get_omaha_config(&current_version, &service_url).await;
-    install_update_with_http(updater, app_set, config, FuchsiaHyperHttpRequest::new()).await
+    install_update_with_http(updater, app_set, config, FuchsiaHyperHttpRequest::new())
+        .await
+        .context("installing update via http(s)")
+}
+
+#[derive(Debug, thiserror::Error)]
+enum InstallUpdateError {
+    #[error("expected exactly one UpdateCheckResult from Omaha, got {0}")]
+    TooManyUpdateCheckResults(usize),
+    #[error("expected exactly one app_response from Omaha, got {0}")]
+    TooManyAppResponses(usize),
+    #[error("update check failed: {0}")]
+    UpdateCheckFailed(UpdateCheckError),
+    #[error("update check did not produce an update, took action {0}")]
+    DidNotUpdate(update_check::Action),
 }
 
 async fn install_update_with_http<HR>(
@@ -79,7 +93,7 @@ async fn install_update_with_http<HR>(
     app_set: VecAppSet,
     config: Config,
     http_request: HR,
-) -> Result<(), Error>
+) -> Result<(), InstallUpdateError>
 where
     HR: HttpRequest,
 {
@@ -100,23 +114,40 @@ where
 
     let stream: Vec<StateMachineEvent> = state_machine.oneshot_check().await.collect().await;
 
-    let mut result: Vec<Result<update_check::Response, UpdateCheckError>> = stream
+    // TODO(fxbug.dev/117416): expose this data via the Monitor protocol, not just a single event.
+    // Filter the state machine events down to just update check results,
+    // which contain the final state of the check.
+    let filtered_events: Vec<Result<update_check::Response, UpdateCheckError>> = stream
         .into_iter()
         .filter_map(|p| match p {
             StateMachineEvent::UpdateCheckResult(val) => Some(val),
             _ => None,
         })
         .collect();
-    if result.len() != 1 {
-        return Err(anyhow!("Expected exactly one UpdateCheckResult from Omaha"));
-    }
 
-    let state = result.pop().unwrap();
-    if let Err(e) = state {
-        return Err(Error::new(e));
-    }
+    let filtered_events_len = filtered_events.len();
 
-    Ok(())
+    // Ensure we only got one update check result
+    let mut filtered_events = filtered_events.into_iter();
+    let response = match (filtered_events.next(), filtered_events.next()) {
+        (Some(Ok(r)), None) => r,
+        (Some(Err(e)), None) => return Err(InstallUpdateError::UpdateCheckFailed(e)),
+        _ => return Err(InstallUpdateError::TooManyUpdateCheckResults(filtered_events_len)),
+    };
+
+    // Ensure that update check only contained one app response
+    let app_responses_len = response.app_responses.len();
+    let mut app_responses = response.app_responses.into_iter();
+    let app_response = match (app_responses.next(), app_responses.next()) {
+        (Some(ar), None) => ar,
+        _ => return Err(InstallUpdateError::TooManyAppResponses(app_responses_len)),
+    };
+
+    // Return the result of that single update check
+    match app_response.result {
+        update_check::Action::Updated => Ok(()),
+        other_action => Err(InstallUpdateError::DidNotUpdate(other_action)),
+    }
 }
 
 #[cfg(test)]
@@ -195,6 +226,57 @@ mod tests {
         }
     }
 
+    fn get_test_response(package_path: &str) -> Vec<serde_json::Value> {
+        let update_response = json!({"response":{
+            "server": "prod",
+            "protocol": "3.0",
+            "app": [{
+                "appid": TEST_APP_ID,
+                "status": "ok",
+                "updatecheck": {
+                    "status": "ok",
+                    "urls": { "url": [{ "codebase": format!("{}/", TEST_REPO_URL) }] },
+                    "manifest": {
+                        "version": "20200101.1.0.0",
+                        "actions": {
+                            "action": [
+                                {
+                                    "run": package_path,
+                                    "event": "install"
+                                },
+                                {
+                                    "event": "postinstall"
+                                }
+                            ]
+                        },
+                        "packages": {
+                            "package": [
+                                {
+                                    "name": package_path,
+                                    "fp": "2.20200101.1.0.0",
+                                    "required": true,
+                                }
+                            ]
+                        }
+                    }
+                }
+            }],
+        }});
+
+        let event_response = json!({"response":{
+            "server": "prod",
+            "protocol": "3.0",
+            "app": [{
+                "appid": TEST_APP_ID,
+                "status": "ok",
+            }]
+        }});
+
+        let response =
+            vec![update_response, event_response.clone(), event_response.clone(), event_response];
+        response
+    }
+
     /// Construct an UpdaterForTest for use in the Omaha tests.
     async fn build_updater() -> Result<UpdaterForTest, Error> {
         let data = "hello world!".as_bytes();
@@ -229,55 +311,9 @@ mod tests {
     pub async fn test_omaha_update() -> Result<(), Error> {
         let updater = build_updater().await.context("Building updater")?;
         let package_path = format!("update?hash={}", updater.update_merkle_root);
-        let update_response = json!({"response":{
-            "server": "prod",
-            "protocol": "3.0",
-            "app": [{
-                "appid": TEST_APP_ID,
-                "status": "ok",
-                "updatecheck": {
-                    "status": "ok",
-                    "urls": { "url": [{ "codebase": format!("{}/", TEST_REPO_URL) }] },
-                    "manifest": {
-                        "version": "20200101.1.0.0",
-                        "actions": {
-                            "action": [
-                                {
-                                    "run": &package_path,
-                                    "event": "install"
-                                },
-                                {
-                                    "event": "postinstall"
-                                }
-                            ]
-                        },
-                        "packages": {
-                            "package": [
-                                {
-                                    "name": &package_path,
-                                    "fp": "2.20200101.1.0.0",
-                                    "required": true,
-                                }
-                            ]
-                        }
-                    }
-                }
-            }],
-        }});
-
-        let event_response = json!({"response":{
-            "server": "prod",
-            "protocol": "3.0",
-            "app": [{
-                "appid": TEST_APP_ID,
-                "status": "ok",
-            }]
-        }});
-
         let app_set = get_test_app_set();
         let config = get_test_config();
-        let response =
-            vec![update_response, event_response.clone(), event_response.clone(), event_response];
+        let response = get_test_response(&package_path);
         let result =
             run_omaha(updater, app_set, config, response).await.context("running omaha")?;
 
@@ -290,7 +326,37 @@ mod tests {
         let app_set = get_test_app_set();
         let config = get_test_config();
         let updater = build_updater().await.context("Building updater")?;
+
+        // No response, which means the update check should fail.
         let response = vec![];
+
+        let result = run_omaha(updater, app_set, config, response).await;
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    async fn build_updater_with_broken_paver() -> UpdaterForTest {
+        let data = "hello world!".as_bytes();
+
+        // Simulate the paver being completely broken, which means that installation should fail.
+        let hook = |_p: &PaverEvent| zx::Status::INTERNAL;
+
+        let updater = UpdaterBuilder::new()
+            .await
+            .paver(|p| p.insert_hook(mphooks::return_error(hook)))
+            .repo_url(TEST_REPO_URL)
+            .add_image("zbi.signed", data);
+
+        updater.build().await
+    }
+
+    #[fuchsia::test]
+    pub async fn test_installation_error_reports_failure() -> Result<(), Error> {
+        let app_set = get_test_app_set();
+        let config = get_test_config();
+        let updater = build_updater_with_broken_paver().await;
+        let package_path = format!("update?hash={}", updater.update_merkle_root);
+        let response = get_test_response(&package_path);
 
         let result = run_omaha(updater, app_set, config, response).await;
         assert!(result.is_err());
