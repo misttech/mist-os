@@ -10,6 +10,8 @@ Having it decode this (potentially very large) FIDL object, just so that it can
 immediately re-encode it as it forwards it to whatever protocol will do the
 actual storage, is very wasteful.
 
+### Reasoning
+
 A better solution is to use zircon's [virtual memory
 objects][docs-zx-concepts-vmos]. Instead of constantly copying bytes back and
 forth in a [bucket brigade][wiki-bucket-brigade], we can mint a VMO to hold the
@@ -44,6 +46,8 @@ component, can modify this data as it moves through the system.
 
 [fidl-persistence]: /docs/contribute/governance/rfcs/0120_standalone_use_of_fidl_wire_format.md#convention_for_data_persistence
 [wiki-polp]: https://en.wikipedia.org/wiki/Principle_of_least_privilege
+
+### Implementation
 
 Note: The source code for this example is located at
 [//examples/fidl/new/key_value_store/support_exports](/examples/fidl/new/key_value_store/support_exports).

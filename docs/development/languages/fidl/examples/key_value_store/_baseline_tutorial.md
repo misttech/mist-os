@@ -1,18 +1,17 @@
-This baseline case showcases an end-to-end implementation of a write-only
-key-value store implemented using FIDL. This allows each client to have its own
+This baseline case details an end-to-end implementation of a
+write-only key-value store implemented using FIDL. This case allows each client to have its own
 bespoke key-value store on the server, which it can connect to using the `Store`
 protocol, and write to using the `WriteItem` method.
 
 Note: The source code for this example is located at
 [//examples/fidl/new/key_value_store/baseline](/examples/fidl/new/key_value_store/baseline).
 This directory includes tests exercising the implementation in all supported
-languages, which may be run locally by executing the following from
+languages, which can be run locally by executing the following from
 the command line `fx set core.x64 --with=//examples/fidl/new:tests && fx test
 keyvaluestore_baseline`.
 
-First, we need to define our interface definitions and test harness. The FIDL,
-CML, and realm interface definitions set up a scaffold that arbitrary
-implementations can use:
+The following FIDL, CML, and realm interface definitions
+set up a scaffold that arbitrary implementations can use:
 
 <div>
   <devsite-selector>

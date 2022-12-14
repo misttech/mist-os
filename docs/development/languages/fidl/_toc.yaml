@@ -83,8 +83,12 @@ toc:
   # DO_NOT_REMOVE_COMMENT (Why? See: /tools/fidl/scripts/canonical_example/README.md)
   - title: "Canvas"
     path: /docs/development/languages/fidl/examples/canvas/README.md
-  - title: "Key value store"
+  - title: "Key value store: Baseline example"
     path: /docs/development/languages/fidl/examples/key_value_store/README.md
+    step_group: fidlkeyvaluestore
+  - title: "Key value store: Improving the design"
+    path: /docs/development/languages/fidl/examples/key_value_store/improving-key-value-store.md
+    step_group: fidlkeyvaluestore
   - title: "Calculator"
     path: /docs/development/languages/fidl/examples/calculator/README.md
   # /DO_NOT_REMOVE_COMMENT (Why? See: /tools/fidl/scripts/canonical_example/README.md)

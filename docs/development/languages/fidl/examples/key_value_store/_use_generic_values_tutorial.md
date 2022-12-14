@@ -1,3 +1,5 @@
+### Reasoning
+
 The [key-value store baseline
 example's](/docs/development/languages/fidl/examples/key_value_store#baseline)
 implementation was a good starting point, but one major drawback is that data is
@@ -5,6 +7,8 @@ stored as raw bytes. FIDL is a richly typed language. Forcing data that is for
 instance a UTF-8 string to be stored as an untyped byte array erases this
 valuable type information for readers of the *.fidl file, as well as for
 programmers using bindings generated from it.
+
+### Implementation
 
 The main goal of this change is to replace the baseline case's `vector<byte>`
 typed `value` member with a `union` that stores many possible types. In fact, as

@@ -1,5 +1,8 @@
-The originally write-only key-value store is now extended with the
+### Reasoning 
+The original write-only key-value store is now extended with the
 ability to read items back out of the store.
+
+### Implementation
 
 Note: The source code for this example is located at
 [//examples/fidl/new/key_value_store/add_read_item](/examples/fidl/new/key_value_store/add_read_item).
