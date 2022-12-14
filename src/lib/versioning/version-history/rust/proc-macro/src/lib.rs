@@ -35,3 +35,25 @@ pub fn latest_sdk_version(_tokens: TokenStream) -> TokenStream {
     .parse()
     .unwrap()
 }
+
+#[proc_macro]
+pub fn get_supported_versions(_tokens: TokenStream) -> TokenStream {
+    let versions = version_history().expect("version-history.json to be parsed");
+    if versions.is_empty() {
+        panic!("version-history.json did not contain any versions");
+    } else if versions.len() < 2 {
+        panic!("version-history.json did not contain at least two versions");
+    }
+    let supported_versions = versions.iter().rev().take(2);
+
+    let mut tokens = String::from("[");
+    for version in supported_versions {
+        tokens.push_str(&format!(
+            "Version {{ api_level: {}, abi_revision: AbiRevision({}) }}",
+            version.api_level, version.abi_revision.value
+        ));
+        tokens.push_str(",");
+    }
+    tokens.push_str("]");
+    tokens.parse().unwrap()
+}

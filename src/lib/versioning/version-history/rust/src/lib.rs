@@ -15,6 +15,9 @@ pub const VERSION_HISTORY: &[Version] = &version_history_macro::declare_version_
 /// LATEST_VERSION is the latest known SDK version.
 pub const LATEST_VERSION: &Version = &version_history_macro::latest_sdk_version!();
 
+/// SUPPORTED_API_LEVELS is the latest two API levels.
+pub const SUPPORTED_API_LEVELS: &[Version; 2] = &version_history_macro::get_supported_versions!();
+
 /// An `AbiRevision` represents the ABI revision of a Fuchsia Package.
 /// https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0135_package_abi_revision?#design
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Clone)]
@@ -100,6 +103,36 @@ pub fn is_valid_abi_revision(abi_revision: AbiRevision) -> bool {
     VERSION_HISTORY.iter().any(|v| v.abi_revision == abi_revision)
 }
 
+/// Returns true if the given abi_revision is listed in SUPPORTED_API_LEVELS.
+pub fn is_supported_abi_revision(abi_revision: AbiRevision) -> bool {
+    // TODO(fxbug.dev/117262): Store APIs and ABIs in a map instead of a list.
+    SUPPORTED_API_LEVELS.iter().any(|v| v.abi_revision == abi_revision)
+}
+
+/// Returns a vector of the API levels in SUPPORTED_API_LEVELS.
+pub fn get_supported_api_levels() -> Vec<u64> {
+    let mut api_levels: Vec<u64> = Vec::new();
+    for version in SUPPORTED_API_LEVELS {
+        api_levels.push(version.api_level);
+    }
+
+    return api_levels;
+}
+
+/// Returns a vector of the ABI revisions in SUPPORTED_API_LEVELS.
+pub fn get_supported_abi_revisions() -> Vec<u64> {
+    let mut abi_revisions: Vec<u64> = Vec::new();
+    for version in SUPPORTED_API_LEVELS {
+        abi_revisions.push(version.abi_revision.0);
+    }
+
+    return abi_revisions;
+}
+
+pub fn get_latest_abi_revision() -> u64 {
+    return LATEST_VERSION.abi_revision.0;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,6 +168,13 @@ mod tests {
     fn test_valid_abi_revision() {
         for version in VERSION_HISTORY {
             assert!(is_valid_abi_revision(version.abi_revision));
+        }
+    }
+
+    #[test]
+    fn test_is_supported_abi_revision() {
+        for version in SUPPORTED_API_LEVELS {
+            assert!(is_supported_abi_revision(version.abi_revision));
         }
     }
 
