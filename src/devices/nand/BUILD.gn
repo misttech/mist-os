@@ -6,6 +6,7 @@ group("drivers") {
   testonly = true
   deps = [
     "drivers/aml-rawnand",
+    "drivers/aml-spinand",
     "drivers/broker:nand-broker",
     "drivers/cadence-hpnfc",
     "drivers/intel-spi-flash:driver",

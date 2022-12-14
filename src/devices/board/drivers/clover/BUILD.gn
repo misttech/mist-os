@@ -49,6 +49,7 @@ fuchsia_driver("clover-driver") {
     "clover-ram.cc",
     "clover-registers.cc",
     "clover-spi.cc",
+    "clover-spinand.cc",
     "clover-sysmem.cc",
     "clover-tee.cc",
     "clover-thermal.cc",

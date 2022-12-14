@@ -79,6 +79,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   A1_CLK = 0x32,
   TDM_USE_DSP = 0x33,
   PDM_USE_DSP = 0x34,
+  SPI_NAND = 0x35,
 };
 
 extend uint fuchsia.BIND_REGISTER_ID {

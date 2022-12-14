@@ -47,6 +47,12 @@
 #define A1_SPICC0_BASE 0xfe003800
 #define A1_SPICC0_LENGTH 0x400
 
+// spifc
+#define A1_SPIFC_BASE 0xfd000400
+#define A1_SPIFC_LENGTH 0x400
+#define A1_SPIFC_CLOCK_BASE 0xfe0008d8
+#define A1_SPIFC_CLOCK_LENGTH 0x4
+
 // rtc
 
 // mailbox

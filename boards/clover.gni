@@ -9,10 +9,15 @@ board_description = "clover"
 
 _common_bootfs_deps = [
   "//boards/kernel_cmdline:clover",
+  "//src/devices/block/drivers/ftl",
   "//src/devices/board/drivers/clover",
   "//src/devices/clock/drivers/amlogic-clk",
   "//src/devices/gpio/drivers/aml-gpio",
   "//src/devices/i2c/drivers/aml-i2c",
+  "//src/devices/nand/drivers/aml-spinand",
+  "//src/devices/nand/drivers/nand",
+  "//src/devices/nand/drivers/nandpart",
+  "//src/devices/nand/drivers/skip-block",
   "//src/devices/pwm/drivers/aml-pwm",
   "//src/devices/ram/drivers/aml-ram",
   "//src/devices/registers/drivers/registers",
