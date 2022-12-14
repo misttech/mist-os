@@ -5,7 +5,7 @@
     capabilities: [
         // Device tree
         {
-            directory: "dev-topological",
+            directory: "dev",
 
             // TODO(https://fxbug.dev/110563): make this read-only when clients
             // have been updated.
@@ -13,17 +13,10 @@
             path: "/dev",
         },
         {
-            directory: "dev-class",
-
-            // TODO(https://fxbug.dev/110563): make this read-only when clients
-            // have been updated.
-            rights: [ "rw*" ],
-            path: "/dev/class",
-        },
-        {
             protocol: [
                 "fuchsia.device.composite.DeprecatedCompositeCreator",
                 "fuchsia.device.fs.Exporter",
+                "fuchsia.device.fs.lifecycle.Lifecycle",
                 "fuchsia.device.manager.Administrator",
                 "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.development.DriverDevelopment",
@@ -85,17 +78,14 @@
     ],
     expose: [
         {
-            directory: "dev-topological",
-            from: "self",
-        },
-        {
-            directory: "dev-class",
+            directory: "dev",
             from: "self",
         },
         {
             protocol: [
                 "fuchsia.device.composite.DeprecatedCompositeCreator",
                 "fuchsia.device.fs.Exporter",
+                "fuchsia.device.fs.lifecycle.Lifecycle",
                 "fuchsia.device.manager.Administrator",
                 "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.development.DriverDevelopment",

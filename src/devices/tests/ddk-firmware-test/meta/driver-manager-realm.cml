@@ -1,6 +1,8 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+// TODO(fxbug.dev/116950): Merge this into the driver-test-realm.cml
 {
     include: [ "syslog/offer.shard.cml" ],
     children: [
@@ -16,8 +18,22 @@
             name: "driver-index",
             url: "#meta/driver-index.cm",
         },
+        {
+            name: "devfs",
+            url: "#meta/devfs.cm",
+        },
     ],
     offer: [
+        {
+            protocol: [ "fuchsia.device.fs.lifecycle.Lifecycle" ],
+            from: "#driver-manager",
+            to: [ "#devfs" ],
+        },
+        {
+            directory: "dev",
+            from: "#driver-manager",
+            to: "#devfs",
+        },
         {
             protocol: [
                 "fuchsia.logger.LogSink",
@@ -80,7 +96,7 @@
     expose: [
         {
             directory: "dev-topological",
-            from: "#driver-manager",
+            from: "#devfs",
         },
         {
             protocol: [ "fuchsia.device.manager.Administrator" ],

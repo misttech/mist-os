@@ -5,7 +5,7 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
-test("devfs") {
+test("devfs-bin") {
   sources = [
     "fdio-tests.cc",
     "fidl-tests.cc",
@@ -21,7 +21,7 @@ test("devfs") {
 }
 
 fuchsia_unittest_package("devfs-test") {
-  deps = [ ":devfs" ]
+  deps = [ ":devfs-bin" ]
 }
 
 group("tests") {

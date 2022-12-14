@@ -48,6 +48,7 @@
             ],
             main_process_critical: [
                 "/bootstrap/archivist",
+                "/bootstrap/devfs",
                 "/bootstrap/driver_manager",
                 "/bootstrap/power_manager",
                 "/bootstrap/shutdown_shim",
@@ -705,14 +706,14 @@
                 // component hub.
                 // Users should try to use the dev-class directory capability instead.
                 // OWNERS: surajmalhotra@google.com, dgilhooley@google.com
-                source_moniker: "/bootstrap/driver_manager",
+                source_moniker: "/bootstrap/devfs",
                 source: "component",
                 source_name: "dev-topological",
                 capability: "directory",
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/console-launcher",
-                    "/bootstrap/driver_manager",
+                    "/bootstrap/devfs",
                     "/bootstrap/flashmap",
                     "/bootstrap/fshost",
                     "/bootstrap/fshost/blobfs",
@@ -743,6 +744,17 @@
                     "/core/test_manager/system-tests:**",
                     "/core/test_manager/system-validation-tests:**",
                     "/core/trace_manager/cpuperf_provider",
+                ],
+            },
+            {
+                // devfs access should be routed through the /bootstrap/devfs component
+                source_moniker: "/bootstrap/driver_manager",
+                source: "component",
+                source_name: "dev",
+                capability: "directory",
+                target_monikers: [
+                    "/bootstrap/devfs",
+                    "/bootstrap/driver_manager",
                 ],
             },
         ],

@@ -1,0 +1,61 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+
+    // Information about the program to run.
+    program: {
+        // Use the built-in ELF runner.
+        runner: "elf",
+
+        // The binary to run for this component.
+        binary: "bin/devfs",
+        lifecycle: { stop_event: "notify" },
+    },
+    capabilities: [
+        {
+            directory: "dev-topological",
+
+            // TODO(https://fxbug.dev/110563): make this read-only when clients
+            // have been updated.
+            rights: [ "rw*" ],
+            path: "/dev",
+        },
+        {
+            directory: "dev-class",
+
+            // TODO(https://fxbug.dev/110563): make this read-only when clients
+            // have been updated.
+            rights: [ "rw*" ],
+            path: "/dev/class",
+        },
+    ],
+    use: [
+        { protocol: "fuchsia.device.fs.lifecycle.Lifecycle" },
+        {
+            directory: "dev",
+            rights: [ "rw*" ],
+            path: "/dev",
+        },
+
+        // These services are not actually used but exist to increase the lifetime
+        // of components. The capabilities are named after their place in the topology.
+        // We cannot use a single service due to the lack of service merging.
+        { service: "bootstrap.boot-drivers" },
+        { service: "bootstrap.driver-hosts" },
+    ],
+    expose: [
+        {
+            directory: "dev-topological",
+            from: "self",
+        },
+        {
+            directory: "dev-class",
+            from: "self",
+        },
+    ],
+}

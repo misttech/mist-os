@@ -73,6 +73,7 @@ fuchsia_component("driver_test_realm_component") {
   deps = [
     ":driver_manager_support",
     ":driver_manager_test",
+    "//src/devices/bin/devfs:component",
     "//src/devices/bin/driver-index:component",
     "//src/devices/bin/driver_host2:component",
   ]

@@ -21,6 +21,10 @@
             name: "driver-index",
             url: "#meta/driver-index.cm",
         },
+        {
+            name: "devfs",
+            url: "#meta/devfs.cm",
+        },
     ],
     collections: [
         {
@@ -43,6 +47,16 @@
     ],
     offer: [
         {
+            protocol: [ "fuchsia.device.fs.lifecycle.Lifecycle" ],
+            from: "#driver_manager",
+            to: [ "#devfs" ],
+        },
+        {
+            directory: "dev",
+            from: "#driver_manager",
+            to: "#devfs",
+        },
+        {
             protocol: "fuchsia.component.Realm",
             from: "framework",
             to: "#driver_manager",
@@ -64,6 +78,7 @@
             from: "parent",
             to: [
                 "#boot-drivers",
+                "#devfs",
                 "#driver-hosts",
                 "#driver-index",
                 "#driver-manager-support",
@@ -72,7 +87,10 @@
             ],
         },
         {
-            protocol: [ "fuchsia.boot.RootResource" ],
+            protocol: [
+                "fuchsia.boot.RootResource",
+                "fuchsia.boot.WriteOnlyLog",
+            ],
             from: "parent",
             to: [ "#driver_manager" ],
         },
@@ -145,16 +163,16 @@
     expose: [
         {
             directory: "dev-topological",
-            from: "#driver_manager",
+            from: "#devfs",
         },
         {
             directory: "dev-topological",
-            from: "#driver_manager",
+            from: "#devfs",
             as: "dev",
         },
         {
             directory: "dev-class",
-            from: "#driver_manager",
+            from: "#devfs",
         },
         {
             protocol: [

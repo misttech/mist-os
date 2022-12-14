@@ -334,6 +334,21 @@ int RunDfv1(DriverManagerParams driver_manager_params,
          "continuing");
   }
 
+  // TODO(https://fxbug.dev/116638): Wire this up to do something useful.
+  class DevfsLifecycle : public fidl::WireServer<fuchsia_process_lifecycle::Lifecycle> {
+   public:
+    explicit DevfsLifecycle() = default;
+
+    void Stop(StopCompleter::Sync& completer) override { completer.Close(ZX_OK); }
+  };
+
+  DevfsLifecycle devfs_lifecycle;
+  {
+    zx::result result =
+        outgoing.AddProtocol(&devfs_lifecycle, "fuchsia.device.fs.lifecycle.Lifecycle");
+    ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
+  }
+
   coordinator.set_loader_service_connector(
       [loader_service = std::move(loader_service)](zx::channel* c) {
         auto conn = loader_service->Connect();

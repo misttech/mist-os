@@ -22,6 +22,10 @@
             on_terminate: "reboot",
         },
         {
+            name: "devfs",
+            url: "fuchsia-boot:///#meta/devfs.cm",
+        },
+        {
             name: "flashmap",
             url: "fuchsia-boot:///#meta/flashmap.cm",
         },
@@ -474,11 +478,19 @@
             protocol: [ "fuchsia.scheduler.ProfileProvider" ],
             from: "#svchost",
             to: [
-                "#boot-drivers",
                 "#fshost",
                 "#pkg-drivers",
                 "#universe-pkg-drivers",
             ],
+        },
+        {
+            protocol: [ "fuchsia.scheduler.ProfileProvider" ],
+            from: "#svchost",
+            to: "#boot-drivers",
+
+            // This must be weak because svchost needs sysmem from devfs, which creates
+            // a cycle. Sysmem can be pulled out of svchost to break this cycle.
+            dependency: "weak_for_migration",
         },
         {
             protocol: [ "fuchsia.virtualconsole.SessionManager" ],
@@ -525,6 +537,30 @@
             ],
         },
         {
+            protocol: [ "fuchsia.device.fs.lifecycle.Lifecycle" ],
+            from: "#driver_manager",
+            to: [ "#devfs" ],
+        },
+        {
+            directory: "dev",
+            from: "#driver_manager",
+            to: "#devfs",
+        },
+
+        // These protocols are not actually used but exist to increase the lifetime
+        // of components. The capabilities are named after their place in the topology.
+        // We cannot use a single service due to the lack of service merging.
+        {
+            service: [ "bootstrap.driver-hosts" ],
+            from: "#driver-hosts",
+            to: [ "#devfs" ],
+        },
+        {
+            service: [ "bootstrap.boot-drivers" ],
+            from: "#boot-drivers",
+            to: [ "#devfs" ],
+        },
+        {
             protocol: [ "fuchsia.scheduler.ProfileProvider" ],
             from: "#svchost",
             to: "#driver_manager",
@@ -549,10 +585,18 @@
             protocol: [ "fuchsia.sysmem.Allocator" ],
             from: "#svchost",
             to: [
-                "#boot-drivers",
                 "#pkg-drivers",
                 "#universe-pkg-drivers",
             ],
+        },
+        {
+            protocol: [ "fuchsia.sysmem.Allocator" ],
+            from: "#svchost",
+            to: "#boot-drivers",
+
+            // This must be weak because svchost needs sysmem from devfs, which creates
+            // a cycle. Sysmem can be pulled out of svchost to break this cycle.
+            dependency: "weak_for_migration",
         },
         {
             protocol: [ "fuchsia.sysmem.Allocator" ],
@@ -561,7 +605,7 @@
         },
         {
             directory: "dev-topological",
-            from: "#driver_manager",
+            from: "#devfs",
             to: [
                 "#console-launcher",
                 "#flashmap",
@@ -573,7 +617,7 @@
         },
         {
             directory: "dev-class",
-            from: "#driver_manager",
+            from: "#devfs",
             as: "dev-class-ethernet",
             to: [
                 "#device_name_provider",
@@ -583,7 +627,7 @@
         },
         {
             directory: "dev-class",
-            from: "#driver_manager",
+            from: "#devfs",
             as: "dev-class-network",
             to: [
                 "#device_name_provider",
@@ -593,35 +637,35 @@
         },
         {
             directory: "dev-class",
-            from: "#driver_manager",
+            from: "#devfs",
             as: "dev-class-block",
             to: "#live_usb",
             subdir: "block",
         },
         {
             directory: "dev-class",
-            from: "#driver_manager",
+            from: "#devfs",
             as: "dev-class-tpm",
             to: "#cr50_agent",
             subdir: "tpm",
         },
         {
             directory: "dev-class",
-            from: "#driver_manager",
+            from: "#devfs",
             as: "input-report",
             to: "#virtual_console",
             subdir: "input-report",
         },
         {
             directory: "dev-class",
-            from: "#driver_manager",
+            from: "#devfs",
             as: "sysmem",
             to: "#svchost",
             subdir: "sysmem",
         },
         {
             directory: "dev-class",
-            from: "#driver_manager",
+            from: "#devfs",
             as: "display-controller",
             to: "#virtual_console",
             subdir: "display-controller",
@@ -807,6 +851,7 @@
                 "#console",
                 "#console-launcher",
                 "#cr50_agent",
+                "#devfs",
                 "#device_name_provider",
                 "#driver-hosts",
                 "#driver_index",
@@ -868,7 +913,7 @@
         },
         {
             directory: "dev-class",
-            from: "#driver_manager",
+            from: "#devfs",
             as: "input",
             to: "#pwrbtn-monitor",
             subdir: "input",
@@ -1031,17 +1076,17 @@
         },
         {
             directory: "dev-topological",
-            from: "#driver_manager",
+            from: "#devfs",
         },
         {
             // TODO(fxbug.dev/107961): Stop routing this as "dev".
             directory: "dev-topological",
-            from: "#driver_manager",
+            from: "#devfs",
             as: "dev",
         },
         {
             directory: "dev-class",
-            from: "#driver_manager",
+            from: "#devfs",
         },
         {
             directory: [
