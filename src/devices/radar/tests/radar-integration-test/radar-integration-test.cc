@@ -46,7 +46,7 @@ class RadarIntegrationTest : public zxtest::Test {
 
   static void CheckBurst(const std::array<uint8_t, kBurstSize>& burst) {
     uint32_t config_id;
-    memcpy(&config_id, &burst[0], sizeof(config_id));
+    memcpy(&config_id, burst.data(), sizeof(config_id));
     EXPECT_EQ(config_id, 0);
 
     EXPECT_EQ(burst[4], 30);  // Burst rate in Hz.
@@ -73,7 +73,7 @@ class RadarIntegrationTest : public zxtest::Test {
                        fidl::WireSharedClient<BurstReader>* out_client,
                        std::future<void>* out_client_torn_down) {
     auto provider_client_end_or = component::Connect<BurstReaderProvider>();
-    ASSERT_TRUE(provider_client_end_or.is_ok());
+    ASSERT_OK(provider_client_end_or.status_value());
 
     fidl::WireSyncClient<BurstReaderProvider> provider_client(
         std::move(provider_client_end_or.value()));
@@ -83,8 +83,8 @@ class RadarIntegrationTest : public zxtest::Test {
     auto [client_end, server_end] = std::move(*endpoints);
 
     const auto result = provider_client->Connect(std::move(server_end));
-    ASSERT_TRUE(result.ok());
-    ASSERT_TRUE(result->is_ok());
+    ASSERT_OK(result.status());
+    ASSERT_TRUE(result->is_ok(), "%d", result->error_value());
 
     std::promise<void> client_torn_down_promise;
     *out_client_torn_down = client_torn_down_promise.get_future();
@@ -182,8 +182,8 @@ TEST_F(RadarIntegrationTest, BurstFormat) {
     vmo_id[0] = 1234;
 
     const auto result = client.sync()->RegisterVmos(vmo_id, vmo_dup);
-    ASSERT_OK(result.status());
-    ASSERT_TRUE(result->is_ok());
+    ASSERT_OK(result);
+    ASSERT_TRUE(result->is_ok(), "%d", result->error_value());
   }
 
   EXPECT_OK(client->StartBursts().status());
@@ -204,7 +204,7 @@ TEST_F(RadarIntegrationTest, BurstFormat) {
 
     const auto result = client.sync()->UnregisterVmos(vmo_id);
     ASSERT_OK(result.status());
-    ASSERT_TRUE(result->is_ok());
+    ASSERT_TRUE(result->is_ok(), "%d", result->error_value());
     ASSERT_EQ(result->value()->vmos.count(), 1);
     EXPECT_TRUE(result->value()->vmos[0].is_valid());
   }
@@ -239,7 +239,7 @@ TEST_F(RadarIntegrationTest, ReadManyBursts) {
     fidl::VectorView<zx::vmo> vmo_dups(allocator, kVmoCount);
     fidl::VectorView<uint32_t> vmo_ids(allocator, kVmoCount);
 
-    for (size_t i = 0; i < kVmoCount; i++) {
+    for (uint32_t i = 0; i < kVmoCount; i++) {
       ASSERT_OK(zx::vmo::create(kBurstSize, 0, &vmos[i]));
       ASSERT_OK(vmos[i].duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo_dups[i]));
       vmo_ids[i] = i;
@@ -247,7 +247,7 @@ TEST_F(RadarIntegrationTest, ReadManyBursts) {
 
     const auto result = client.sync()->RegisterVmos(vmo_ids, vmo_dups);
     ASSERT_OK(result.status());
-    ASSERT_TRUE(result->is_ok());
+    ASSERT_TRUE(result->is_ok(), "%d", result->error_value());
   }
 
   EXPECT_OK(client->StartBursts().status());
@@ -260,13 +260,13 @@ TEST_F(RadarIntegrationTest, ReadManyBursts) {
 
   {
     fidl::VectorView<uint32_t> vmo_ids(allocator, kVmoCount);
-    for (size_t i = 0; i < kVmoCount; i++) {
+    for (uint32_t i = 0; i < kVmoCount; i++) {
       vmo_ids[i] = i;
     }
 
     const auto result = client.sync()->UnregisterVmos(vmo_ids);
     ASSERT_OK(result.status());
-    ASSERT_TRUE(result->is_ok());
+    ASSERT_TRUE(result->is_ok(), "%d", result->error_value());
     ASSERT_EQ(result->value()->vmos.count(), kVmoCount);
     for (size_t i = 0; i < kVmoCount; i++) {
       EXPECT_TRUE(result->value()->vmos[i].is_valid());
@@ -305,7 +305,7 @@ TEST_F(RadarIntegrationTest, ReadManyBurstsMultipleClients) {
     fidl::VectorView<zx::vmo> vmo_dups(allocator, kVmoCount);
     fidl::VectorView<uint32_t> vmo_ids(allocator, kVmoCount);
 
-    for (size_t i = 0; i < kVmoCount; i++) {
+    for (uint32_t i = 0; i < kVmoCount; i++) {
       ASSERT_OK(zx::vmo::create(kBurstSize, 0, &vmos[i]));
       ASSERT_OK(vmos[i].duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo_dups[i]));
       vmo_ids[i] = i;
@@ -313,7 +313,7 @@ TEST_F(RadarIntegrationTest, ReadManyBurstsMultipleClients) {
 
     const auto result = client.client.sync()->RegisterVmos(vmo_ids, vmo_dups);
     ASSERT_OK(result.status());
-    ASSERT_TRUE(result->is_ok());
+    ASSERT_TRUE(result->is_ok(), "%d", result->error_value());
   }
 
   for (auto& client : clients) {
@@ -334,13 +334,13 @@ TEST_F(RadarIntegrationTest, ReadManyBurstsMultipleClients) {
 
   for (auto& client : clients) {
     fidl::VectorView<uint32_t> vmo_ids(allocator, kVmoCount);
-    for (size_t i = 0; i < kVmoCount; i++) {
+    for (uint32_t i = 0; i < kVmoCount; i++) {
       vmo_ids[i] = i;
     }
 
     const auto result = client.client.sync()->UnregisterVmos(vmo_ids);
     ASSERT_OK(result.status());
-    ASSERT_TRUE(result->is_ok());
+    ASSERT_TRUE(result->is_ok(), "%d", result->error_value());
     ASSERT_EQ(result->value()->vmos.count(), kVmoCount);
     for (size_t i = 0; i < kVmoCount; i++) {
       EXPECT_TRUE(result->value()->vmos[i].is_valid());

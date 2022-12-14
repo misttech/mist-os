@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <lib/async/default.h>
 #include <lib/async/time.h>
+#include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
@@ -56,22 +57,16 @@ void RadarProxy::DeviceAdded(int dir_fd, const std::string& filename) {
 
 RadarBurstReaderProviderPtr RadarProxy::DefaultRadarDeviceConnector::ConnectToRadarDevice(
     int dir_fd, const std::string& filename) {
-  fbl::unique_fd device_fd(openat(dir_fd, filename.c_str(), O_RDWR));
-  if (!device_fd) {
+  fdio_cpp::UnownedFdioCaller caller(dir_fd);
+  RadarBurstReaderProviderPtr radar_client;
+  if (zx_status_t status =
+          fdio_service_connect_at(caller.directory().channel()->get(), filename.c_str(),
+                                  radar_client.NewRequest().TakeChannel().release());
+      status != ZX_OK) {
     return {};
   }
 
-  zx::channel radar_channel;
-  zx_status_t status =
-      fdio_get_service_handle(device_fd.release(), radar_channel.reset_and_get_address());
-  if (status == ZX_OK) {
-    RadarBurstReaderProviderPtr radar_client;
-    if (radar_client.Bind(std::move(radar_channel)) == ZX_OK) {
-      return radar_client;
-    }
-  }
-
-  return {};
+  return radar_client;
 }
 
 RadarBurstReaderProviderPtr RadarProxy::DefaultRadarDeviceConnector::ConnectToFirstRadarDevice() {

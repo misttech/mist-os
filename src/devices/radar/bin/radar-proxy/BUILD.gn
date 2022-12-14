@@ -6,19 +6,18 @@ import("//build/components.gni")
 import("//build/test.gni")
 import("//src/sys/core/build/core_shard.gni")
 
-group("common") {
-  public_deps = [
-    "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar_hlcpp",
-    "//sdk/lib/fdio",
-    "//sdk/lib/sys/cpp",
-    "//sdk/lib/syslog/cpp",
-    "//src/lib/fsl",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-  ]
-}
+_common_deps = [
+  "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar_hlcpp",
+  "//sdk/lib/fdio",
+  "//sdk/lib/sys/cpp",
+  "//sdk/lib/syslog/cpp",
+  "//src/lib/fsl",
+  "//zircon/system/ulib/async-loop:async-loop-cpp",
+  "//zircon/system/ulib/async-loop:async-loop-default",
+  "//zircon/system/ulib/fbl",
+  "//zircon/system/ulib/fdio-caller",
+  "//zircon/system/ulib/zx",
+]
 
 executable("radar-proxy-bin") {
   output_name = "radar_proxy"
@@ -26,7 +25,7 @@ executable("radar-proxy-bin") {
     "main.cc",
     "radar-proxy.cc",
   ]
-  deps = [ ":common" ]
+  deps = _common_deps
 }
 
 fuchsia_component("radar-proxy-component") {
@@ -48,10 +47,7 @@ test("radar-proxy-test-bin") {
     "radar-proxy-test.cc",
     "radar-proxy.cc",
   ]
-  deps = [
-    ":common",
-    "//zircon/system/ulib/zxtest",
-  ]
+  deps = _common_deps + [ "//zircon/system/ulib/zxtest" ]
 }
 
 fuchsia_unittest_package("radar-proxy-test") {

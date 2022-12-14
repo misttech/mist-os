@@ -731,7 +731,6 @@ config("Wno-conversion") {
     "//src/devices/power/drivers/fusb302:*",
     "//src/devices/power/drivers/ti-ina231:*",
     "//src/devices/pwm/drivers/aml-pwm:*",
-    "//src/devices/radar/tests/radar-integration-test:*",
     "//src/devices/rtc/drivers/intel-rtc:*",
     "//src/devices/spi/drivers/aml-spi:*",
     "//src/devices/spi/drivers/intel-gspi:*",
