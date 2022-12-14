@@ -377,6 +377,10 @@ multiconst!(u32, [
     // Argument is the base address of the vDSO mapping (or zero), a uintptr_t.
     ZX_PROP_PROCESS_VDSO_BASE_ADDRESS = 6;
 
+    // Whether the dynamic loader should issue a debug trap when loading a shared
+    // library, either initially or when running (e.g. dlopen).
+    ZX_PROP_PROCESS_BREAK_ON_LOAD = 7;
+
     // Argument is a size_t.
     ZX_PROP_SOCKET_RX_THRESHOLD       = 12;
     ZX_PROP_SOCKET_TX_THRESHOLD       = 13;

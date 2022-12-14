@@ -47,6 +47,7 @@ impl_handle_based!(Process);
 unsafe_handle_properties!(object: Process,
     props: [
         {query_ty: PROCESS_DEBUG_ADDR, tag: ProcessDebugAddrTag, prop_ty: u64, get:get_debug_addr, set:set_debug_addr},
+        {query_ty: PROCESS_BREAK_ON_LOAD, tag: ProcessBreakOnLoadTag, prop_ty: u64, get:get_break_on_load, set:set_break_on_load},
     ]
 );
 
