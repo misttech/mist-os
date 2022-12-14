@@ -50,16 +50,12 @@ zx_status_t VmObjectDispatcher::parse_create_syscall_flags(uint32_t flags, uint3
   return ZX_OK;
 }
 
-zx_status_t VmObjectDispatcher::Create(fbl::RefPtr<VmObject> vmo, uint64_t content_size,
+zx_status_t VmObjectDispatcher::Create(fbl::RefPtr<VmObject> vmo,
+                                       fbl::RefPtr<ContentSizeManager> content_size_manager,
                                        zx_koid_t pager_koid, InitialMutability initial_mutability,
                                        KernelHandle<VmObjectDispatcher>* handle,
                                        zx_rights_t* rights) {
   fbl::AllocChecker ac;
-  fbl::RefPtr<ContentSizeManager> content_size_manager =
-      fbl::AdoptRef(new (&ac) ContentSizeManager(content_size));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
   KernelHandle new_handle(fbl::AdoptRef(new (&ac) VmObjectDispatcher(
       ktl::move(vmo), ktl::move(content_size_manager), pager_koid, initial_mutability)));
   if (!ac.check()) {

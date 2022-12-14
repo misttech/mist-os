@@ -26,8 +26,12 @@ EmbeddedVmo::EmbeddedVmo(const char* name, const void* image, size_t size,
   zx_status_t status = VmObjectPaged::CreateFromWiredPages(image, size, true, &vmo);
   ASSERT(status == ZX_OK);
 
+  fbl::RefPtr<ContentSizeManager> content_size_manager;
+  status = ContentSizeManager::Create(size, &content_size_manager);
+  ASSERT(status == ZX_OK);
+
   // build and point a dispatcher at it
-  status = VmObjectDispatcher::Create(ktl::move(vmo), size,
+  status = VmObjectDispatcher::Create(ktl::move(vmo), ktl::move(content_size_manager),
                                       VmObjectDispatcher::InitialMutability::kMutable,
                                       vmo_kernel_handle, &vmo_rights_);
   ASSERT(status == ZX_OK);

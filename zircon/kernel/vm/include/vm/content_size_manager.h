@@ -155,9 +155,10 @@ class ContentSizeManager : public fbl::RefCounted<ContentSizeManager> {
     Event ready_event_;
   };
 
-  ContentSizeManager() = default;
-
-  explicit ContentSizeManager(uint64_t content_size) : content_size_(content_size) {}
+  // Create a ContentSizeManager with its initial content size set to |content_size|. Returns a
+  // RefPtr to the newly created ContentSizeManager in |content_size_manager| on success.
+  static zx_status_t Create(uint64_t content_size,
+                            fbl::RefPtr<ContentSizeManager>* content_size_manager);
 
   Lock<Mutex>* lock() const TA_RET_CAP(lock_) { return &lock_; }
 
@@ -207,6 +208,10 @@ class ContentSizeManager : public fbl::RefCounted<ContentSizeManager> {
       TA_REQ(lock_);
 
  private:
+  // Private constructor. External callers should use ContentSizeManager::Create.
+  explicit ContentSizeManager(uint64_t content_size) : content_size_(content_size) {}
+  ContentSizeManager() = delete;
+
   // Updates the content size to a new value.
   //
   // Note that this function should only be called by internal functions, as content size should

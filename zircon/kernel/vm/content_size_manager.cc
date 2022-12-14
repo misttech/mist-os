@@ -7,6 +7,19 @@
 #include "vm/content_size_manager.h"
 
 #include <ktl/limits.h>
+#include <ktl/move.h>
+
+// static
+zx_status_t ContentSizeManager::Create(uint64_t content_size,
+                                       fbl::RefPtr<ContentSizeManager>* content_size_manager) {
+  fbl::AllocChecker ac;
+  fbl::RefPtr<ContentSizeManager> csm = fbl::AdoptRef(new (&ac) ContentSizeManager(content_size));
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+  *content_size_manager = ktl::move(csm);
+  return ZX_OK;
+}
 
 uint64_t ContentSizeManager::Operation::GetSizeLocked() const {
   DEBUG_ASSERT(IsValid());

@@ -31,15 +31,17 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
 
   static zx_status_t parse_create_syscall_flags(uint32_t flags, uint32_t* out_flags);
 
-  static zx_status_t Create(fbl::RefPtr<VmObject> vmo, uint64_t content_size,
+  static zx_status_t Create(fbl::RefPtr<VmObject> vmo,
+                            fbl::RefPtr<ContentSizeManager> content_size_manager,
                             InitialMutability initial_mutability,
                             KernelHandle<VmObjectDispatcher>* handle, zx_rights_t* rights) {
-    return Create(ktl::move(vmo), content_size, ZX_KOID_INVALID, initial_mutability, handle,
-                  rights);
+    return Create(ktl::move(vmo), ktl::move(content_size_manager), ZX_KOID_INVALID,
+                  initial_mutability, handle, rights);
   }
 
-  static zx_status_t Create(fbl::RefPtr<VmObject> vmo, uint64_t content_size, zx_koid_t pager_koid,
-                            InitialMutability initial_mutability,
+  static zx_status_t Create(fbl::RefPtr<VmObject> vmo,
+                            fbl::RefPtr<ContentSizeManager> content_size_manager,
+                            zx_koid_t pager_koid, InitialMutability initial_mutability,
                             KernelHandle<VmObjectDispatcher>* handle, zx_rights_t* rights);
   ~VmObjectDispatcher() final;
 
