@@ -12,8 +12,7 @@
 
 __BEGIN_CDECLS
 
-typedef void (*di_info_func_t)(zircon_driver_note_payload_t* note, const zx_bind_inst_t* binding,
-                               const uint8_t* bytecode, void* cookie);
+typedef void (*di_info_func_t)(zircon_driver_note_payload_t* note, void* cookie);
 
 zx_status_t di_read_driver_info(int fd, void* cookie, di_info_func_t func);
 

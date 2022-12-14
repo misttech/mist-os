@@ -202,15 +202,11 @@ typedef struct {
   uint32_t flags;
 
   // Driver Metadata
-  uint32_t bytecodeversion;
-  uint32_t bindcount;
-  uint32_t bytecount;
   uint32_t reserved0;
   char name[32];
   char vendor[16];
   char version[16];
 
-  // Driver Bind Program follows
 } zircon_driver_note_payload_t;
 
 // Flag bits in the driver note:
@@ -219,12 +215,10 @@ typedef struct {
 // devhost that supports the ASan runtime.
 #define ZIRCON_DRIVER_NOTE_FLAG_ASAN (1u << 0)
 
-#define ZIRCON_DRIVER_NOTE_PAYLOAD_INIT(Driver, VendorName, Version, BindCount, BytecodeVersion, \
-                                        ByteCount)                                               \
-  {                                                                                              \
-    /* .flags = */ ZIRCON_DRIVER_NOTE_FLAGS, /* .bytecodeversion = */ BytecodeVersion,           \
-        /* .bindcount = */ (BindCount), /* .bytecount = */ ByteCount, /* .reserved0 = */ 0,      \
-        /* .name = */ #Driver, /* .vendor = */ VendorName, /* .version = */ Version,             \
+#define ZIRCON_DRIVER_NOTE_PAYLOAD_INIT(Driver, VendorName, Version)                      \
+  {                                                                                       \
+    /* .flags = */ ZIRCON_DRIVER_NOTE_FLAGS, /* .reserved0 = */ 0, /* .name = */ #Driver, \
+        /* .vendor = */ VendorName, /* .version = */ Version,                             \
   }
 
 #define ZIRCON_DRIVER_NOTE_FLAGS \
@@ -269,44 +263,18 @@ static_assert(offsetof(zircon_driver_note_t, payload) == sizeof(zircon_driver_no
 // To support both formats simultaneously, |binding| is used for the old
 // bytecode instructions while |bytecode| is used for the new bytecode
 // instructions.
-#define ZIRCON_DRIVER_BEGIN_PRIV(Driver, Ops, VendorName, Version, BytecodeVersion, BindCount,     \
-                                 ByteCount)                                                        \
-  zx_driver_rec_t __zircon_driver_rec__ __EXPORT = {                                               \
-      /* .ops = */ &(Ops),                                                                         \
-      /* .driver = */ NULL,                                                                        \
-  };                                                                                               \
-  extern const struct zircon_driver_note __zircon_driver_note__ __EXPORT;                          \
-  alignas(4) __SECTION(".note.zircon.driver." #Driver)                                             \
-      ZIRCON_DRIVER_NOTE_ASAN const struct zircon_driver_note {                                    \
-    zircon_driver_note_t note;                                                                     \
-    zx_bind_inst_t binding[BindCount];                                                             \
-    uint8_t bytecode[ByteCount];                                                                   \
-  } __zircon_driver_note__ = {                                                                     \
-      /* .note = */ {                                                                              \
-          ZIRCON_DRIVER_NOTE_HEADER_INIT(__zircon_driver_note__),                                  \
-          ZIRCON_DRIVER_NOTE_PAYLOAD_INIT(Driver, VendorName, Version, BindCount, BytecodeVersion, \
-                                          ByteCount),                                              \
-      },
-
-// C macros for the old bytecode. |bindings| will be populated while
-// |bytecode| is left empty.
-// TODO(fxb/69360): Delete this once the the old bytecode is removed.
-#define ZIRCON_DRIVER_BEGIN_PRIV_V1(Driver, Ops, VendorName, Version, BindCount) \
-  ZIRCON_DRIVER_BEGIN_PRIV(Driver, Ops, VendorName, Version, 1, BindCount, 0) /* .binding = */ {
-#define ZIRCON_DRIVER_END_PRIV_V1(Driver) \
-  }                                       \
-  , /* .bytecode = */ {}                  \
-  }
-
-// C macros for the new bytecode. |bindings| is left empty while |bytecode| is
-// populated.
-#define ZIRCON_DRIVER_BEGIN_PRIV_V2(Driver, Ops, VendorName, Version, ByteCount) \
-  ZIRCON_DRIVER_BEGIN_PRIV(Driver, Ops, VendorName, Version, 2, 0, ByteCount)    \
-  /* .binding = */ {}, /* .bytecode = */ {
-#define ZIRCON_DRIVER_END_PRIV_V2(Driver) \
-  }                                       \
-  ,                                       \
-  }
+#define ZIRCON_DRIVER_PRIV(Driver, Ops, VendorName, Version)                 \
+  zx_driver_rec_t __zircon_driver_rec__ __EXPORT = {                         \
+      /* .ops = */ &(Ops),                                                   \
+      /* .driver = */ NULL,                                                  \
+  };                                                                         \
+  extern const struct zircon_driver_note __zircon_driver_note__ __EXPORT;    \
+  alignas(4) __SECTION(".note.zircon.driver." #Driver)                       \
+      ZIRCON_DRIVER_NOTE_ASAN const struct zircon_driver_note {              \
+    zircon_driver_note_t note;                                               \
+  } __zircon_driver_note__ = {                                               \
+      /* .note = */ {ZIRCON_DRIVER_NOTE_HEADER_INIT(__zircon_driver_note__), \
+                     ZIRCON_DRIVER_NOTE_PAYLOAD_INIT(Driver, VendorName, Version)}}
 
 // TODO: if we moved the Ops from the BEGIN() to END() macro we
 //      could add a zircon_driver_note_t* to the zx_driver_rec_t,

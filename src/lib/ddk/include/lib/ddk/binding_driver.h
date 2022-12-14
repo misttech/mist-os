@@ -7,8 +7,7 @@
 
 #include <lib/ddk/binding_priv.h>
 
-#define ZIRCON_DRIVER(Driver, Ops, VendorName, Version)            \
-  ZIRCON_DRIVER_BEGIN_PRIV_V2(Driver, Ops, VendorName, Version, 1) \
-  0x0, ZIRCON_DRIVER_END_PRIV_V2(Driver)
+#define ZIRCON_DRIVER(Driver, Ops, VendorName, Version) \
+  ZIRCON_DRIVER_PRIV(Driver, Ops, VendorName, Version)
 
 #endif  // SRC_LIB_DDK_INCLUDE_LIB_DDK_BINDING_DRIVER_H_

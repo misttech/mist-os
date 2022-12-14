@@ -10,7 +10,6 @@ mod rust_generator;
 
 use anyhow::{anyhow, Context, Error};
 use bind::bytecode_encoder::encode_v1::encode_to_string_v1;
-use bind::bytecode_encoder::encode_v2::encode_to_string_v2;
 use bind::compiler::{
     self, BindRules, CompiledBindRules, CompositeBindRules, CompositeNode, SymbolicInstruction,
     SymbolicInstructionInfo,
@@ -187,22 +186,15 @@ fn write_depfile(
 fn write_bind_template<'a>(bind_rules: BindRules<'a>) -> Result<String, Error> {
     let mut output = String::new();
     if bind_rules.use_new_bytecode {
-        let (binding, byte_count) = encode_to_string_v2(bind_rules)?;
         output
             .write_fmt(format_args!(
                 include_str!("templates/bind_v2.h.template"),
-                byte_count = byte_count,
-                binding = binding,
                 composite_fragment_definition = "",
             ))
             .context("Failed to format output")?;
     } else {
         output
-            .write_fmt(format_args!(
-                include_str!("templates/bind_v1.h.template"),
-                bind_count = bind_rules.instructions.len(),
-                binding = encode_to_string_v1(bind_rules.instructions)?,
-            ))
+            .write_fmt(format_args!(include_str!("templates/bind_v1.h.template"),))
             .context("Failed to format output")?;
     }
     Ok(output)
@@ -276,8 +268,6 @@ fn write_composite_bind_template<'a>(
     output
         .write_fmt(format_args!(
             include_str!("templates/bind_v2.h.template"),
-            byte_count = "0",
-            binding = "",
             composite_fragment_definition = fragment_definition,
         ))
         .context("Failed to format output")?;
@@ -556,9 +546,7 @@ mod tests {
             enable_debug: false,
         };
         let template = write_bind_template(bind_rules).unwrap();
-        assert!(
-            template.contains("ZIRCON_DRIVER_BEGIN_PRIV_V1(Driver, Ops, VendorName, Version, 0)")
-        );
+        assert!(template.contains("ZIRCON_DRIVER_PRIV(Driver, Ops, VendorName, Version)"));
     }
 
     #[test]
@@ -586,10 +574,7 @@ mod tests {
             enable_debug: false,
         };
         let template = write_bind_template(bind_rules).unwrap();
-        assert!(
-            template.contains("ZIRCON_DRIVER_BEGIN_PRIV_V1(Driver, Ops, VendorName, Version, 1)")
-        );
-        assert!(template.contains("{0x1000000,0x0,0x0}"));
+        assert!(template.contains("ZIRCON_DRIVER_PRIV(Driver, Ops, VendorName, Version)"));
     }
 
     #[test]
@@ -615,13 +600,7 @@ mod tests {
             enable_debug: false,
         };
         let template = write_bind_template(bind_rules).unwrap();
-        assert!(
-            template.contains("ZIRCON_DRIVER_BEGIN_PRIV_V2(Driver, Ops, VendorName, Version, 25)")
-        );
-        assert!(template.contains(
-            "0x42,0x49,0x4e,0x44,0x2,0x0,0x0,0x0,0x0,0x53,0x59,0x4e,0x42,0x0,\
-             0x0,0x0,0x0,0x49,0x4e,0x53,0x54,0x0,0x0,0x0,0x0"
-        ));
+        assert!(template.contains("ZIRCON_DRIVER_PRIV(Driver, Ops, VendorName, Version)"));
     }
 
     #[test]
@@ -653,13 +632,7 @@ mod tests {
             enable_debug: false,
         };
         let template = write_bind_template(bind_rules).unwrap();
-        assert!(
-            template.contains("ZIRCON_DRIVER_BEGIN_PRIV_V2(Driver, Ops, VendorName, Version, 26)")
-        );
-        assert!(template.contains(
-            "0x42,0x49,0x4e,0x44,0x2,0x0,0x0,0x0,0x0,0x53,0x59,0x4e,0x42,0x0,0x0,\
-             0x0,0x0,0x49,0x4e,0x53,0x54,0x1,0x0,0x0,0x0,0x30"
-        ));
+        assert!(template.contains("ZIRCON_DRIVER_PRIV(Driver, Ops, VendorName, Version)"));
     }
 
     #[test]
@@ -693,10 +666,7 @@ mod tests {
             enable_debug: false,
         };
         let template = write_bind_template(bind_rules).unwrap();
-        assert!(
-            template.contains("ZIRCON_DRIVER_BEGIN_PRIV_V1(Driver, Ops, VendorName, Version, 2)")
-        );
-        assert!(template.contains("{0x20000002,0x0,0x0}"));
+        assert!(template.contains("ZIRCON_DRIVER_PRIV(Driver, Ops, VendorName, Version)"));
     }
 
     #[test]

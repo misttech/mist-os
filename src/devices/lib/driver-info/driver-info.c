@@ -96,14 +96,7 @@ static zx_status_t callback(void* note, size_t sz, void* _ctx) {
   if (sz < sizeof(zircon_driver_note_t)) {
     return ZX_ERR_INTERNAL;
   }
-  size_t max = (sz - sizeof(zircon_driver_note_t)) / sizeof(zx_bind_inst_t);
-  if (dn->payload.bindcount > max) {
-    return ZX_ERR_INTERNAL;
-  }
-  const zx_bind_inst_t* binding = (const void*)(&dn->payload + 1);
-  const uint8_t* bytecode =
-      (const void*)(binding + (dn->payload.bindcount * sizeof(zx_bind_inst_t)));
-  ctx->func(&dn->payload, binding, bytecode, ctx->cookie);
+  ctx->func(&dn->payload, ctx->cookie);
   return ZX_OK;
 }
 

@@ -74,8 +74,7 @@ bool is_driver_eager_fallback(fidl::WireSyncClient<fuchsia_boot::Arguments>* boo
   return false;
 }
 
-void found_driver(zircon_driver_note_payload_t* note, const zx_bind_inst_t* bi,
-                  const uint8_t* bytecode, void* cookie) {
+void found_driver(zircon_driver_note_payload_t* note, void* cookie) {
   auto context = static_cast<AddContext*>(cookie);
 
   // ensure strings are terminated
@@ -114,10 +113,6 @@ void found_driver(zircon_driver_note_payload_t* note, const zx_bind_inst_t* bi,
   VLOGF(2, "      vendor: %s", note->vendor);
   VLOGF(2, "     version: %s", note->version);
   VLOGF(2, "       flags: %#x", note->flags);
-  VLOGF(2, "     binding:");
-  for (size_t n = 0; n < note->bindcount; n++) {
-    VLOGF(2, "         %03zd: %08x %08x", n, bi[n].op, bi[n].arg);
-  }
 
   context->func(drv.release(), note->version);
 }
