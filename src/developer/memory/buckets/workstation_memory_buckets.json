@@ -116,7 +116,7 @@
     {
         "event_code": 46,
         "name": "Feedback",
-        "process": "feedback\\.cm",
+        "process": "exceptions\\.cm|feedback\\.cm|system_log_recorder",
         "vmo": ""
     },
     {
