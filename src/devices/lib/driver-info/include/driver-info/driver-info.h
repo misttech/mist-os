@@ -26,10 +26,6 @@ zx_status_t di_read_driver_info_etc(void* obj, di_read_func_t rfunc, void* cooki
 // published parameters of a device, or dump the bind program of a driver.
 const char* di_bind_param_name(uint32_t param_num);
 
-// Disassemble a bind program instruction and dump it to the buffer provided by
-// the caller.  If the buffer is too small, the disassembly may be truncated.
-void di_dump_bind_inst(const zx_bind_inst_t* b, char* buf, size_t buf_len);
-
 __END_CDECLS
 
 #endif  // SRC_DEVICES_LIB_DRIVER_INFO_INCLUDE_DRIVER_INFO_DRIVER_INFO_H_
