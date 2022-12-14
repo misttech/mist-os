@@ -84,6 +84,11 @@ pub struct LogCommand {
     #[argh(option)]
     pub filter: Vec<String>,
 
+    /// filter for a component moniker.
+    /// May be repeated.
+    #[argh(option)]
+    pub moniker: Vec<String>,
+
     /// exclude a string in either the message, component or url.
     /// May be repeated.
     #[argh(option)]
@@ -184,6 +189,7 @@ impl Default for LogCommand {
     fn default() -> Self {
         LogCommand {
             filter: vec![],
+            moniker: vec![],
             exclude: vec![],
             tags: vec![],
             exclude_tags: vec![],

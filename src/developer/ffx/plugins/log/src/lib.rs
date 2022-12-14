@@ -97,6 +97,7 @@ fn format_ffx_event(msg: &str, timestamp: Option<Timestamp>) -> String {
 struct LogFilterCriteria {
     min_severity: Severity,
     filters: Vec<String>,
+    moniker_filters: Vec<String>,
     excludes: Vec<String>,
     tags: Vec<String>,
     exclude_tags: Vec<String>,
@@ -111,6 +112,7 @@ impl Default for LogFilterCriteria {
             filters: vec![],
             excludes: vec![],
             tags: vec![],
+            moniker_filters: vec![],
             exclude_tags: vec![],
             kernel: false,
             spam_filter: None,
@@ -122,6 +124,7 @@ impl LogFilterCriteria {
     fn new(
         min_severity: Severity,
         filters: Vec<String>,
+        moniker_filters: Vec<String>,
         excludes: Vec<String>,
         tags: Vec<String>,
         exclude_tags: Vec<String>,
@@ -131,6 +134,7 @@ impl LogFilterCriteria {
         Self {
             min_severity: min_severity,
             filters,
+            moniker_filters,
             excludes,
             tags,
             exclude_tags,
@@ -165,6 +169,7 @@ impl LogFilterCriteria {
         Ok(Self::new(
             cmd.severity,
             cmd.filter.clone(),
+            cmd.moniker.clone(),
             cmd.exclude.clone(),
             cmd.tags.clone(),
             cmd.exclude_tags.clone(),
@@ -186,12 +191,28 @@ impl LogFilterCriteria {
             || log.metadata.component_url.as_ref().map_or(false, |s| s.contains(filter_string));
     }
 
+    fn matches_filter_by_moniker_string(mut filter_string: &str, log: &LogsData) -> bool {
+        if filter_string.starts_with("/") {
+            filter_string = &filter_string[1..];
+        }
+        return log.moniker == filter_string;
+    }
+
     fn match_filters_to_log_data(&self, data: &LogsData, msg: &str) -> bool {
         if data.metadata.severity < self.min_severity {
             return false;
         }
 
         if self.kernel && data.moniker != "klog" {
+            return false;
+        }
+
+        if !self.moniker_filters.is_empty()
+            && !self
+                .moniker_filters
+                .iter()
+                .any(|f| Self::matches_filter_by_moniker_string(f, &data))
+        {
             return false;
         }
 
@@ -835,6 +856,7 @@ mod test {
             exclude: vec![],
             exclude_tags: vec![],
             filter: vec![],
+            moniker: vec![],
             hide_file: false,
             hide_tags: false,
             kernel: false,
@@ -1450,6 +1472,51 @@ mod test {
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included message")
+            .build()
+            .into()
+        )));
+    }
+
+    #[fuchsia::test]
+    async fn test_criteria_moniker_filter() {
+        let cmd = LogCommand {
+            moniker: vec!["/core/network/netstack".to_string()],
+            ..empty_dump_command()
+        };
+        let criteria = LogFilterCriteria::try_from_cmd(&cmd, None).unwrap();
+
+        assert!(!criteria.matches_filters_to_log_entry(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: "bootstrap/archivist".into(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("excluded")
+            .build()
+            .into()
+        )));
+
+        assert!(criteria.matches_filters_to_log_entry(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: "core/network/netstack".into(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("included")
+            .build()
+            .into()
+        )));
+
+        assert!(!criteria.matches_filters_to_log_entry(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: "core/network/dhcp".into(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("included")
             .build()
             .into()
         )));
