@@ -57,6 +57,7 @@ class ConditionalBreakpoint : public E2eTest {
 
 }  // namespace
 
-TEST_F(ConditionalBreakpoint, ConditionalBreakpoint) { Run(); }
+// TODO(fxbug.dev/117067): fix the flake and reenable the test.
+TEST_F(ConditionalBreakpoint, DISABLED_ConditionalBreakpoint) { Run(); }
 
 }  // namespace zxdb
