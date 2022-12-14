@@ -47,6 +47,7 @@
 //sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_sdk
 //sdk/fidl/fuchsia.hardware.audio.signalprocessing:fuchsia.hardware.audio.signalprocessing_sdk
 //sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_sdk
+//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_sdk
 //sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light_sdk
 //sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_sdk
 //sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_sdk

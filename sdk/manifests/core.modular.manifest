@@ -54,6 +54,7 @@ sdk://fidl/fuchsia.gpu.agis
 sdk://fidl/fuchsia.hardware.adc
 sdk://fidl/fuchsia.hardware.audio
 sdk://fidl/fuchsia.hardware.audio.signalprocessing
+sdk://fidl/fuchsia.hardware.i2c
 sdk://fidl/fuchsia.hardware.light
 sdk://fidl/fuchsia.hardware.network
 sdk://fidl/fuchsia.hardware.power.statecontrol
