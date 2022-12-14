@@ -87,6 +87,18 @@ Images must have meaningful `alt` text.
 ![Diagram of the state transitions](/docs/state-machine.png "State machine")
 ```
 
+### Including markdown fragment files
+
+Markdown file fragments are included in another markdown file by using
+
+```md
+<< relative-path-to/_file.md >>
+```
+
+The path must be relative to the current .md source file—absolute paths
+cannot be used. The `<< >>` directive is a block directive and so must appear
+on a line by itself.
+
 ## YAML data file checks
 
 ### _toc.yaml checks

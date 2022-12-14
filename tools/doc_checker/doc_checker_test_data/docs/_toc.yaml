@@ -11,3 +11,6 @@ toc:
   - section:
     name: cycle test
     include: /docs/cycle/_toc.yaml
+  - title: include test
+    path: /docs/include_here.md
+

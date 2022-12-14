@@ -66,7 +66,7 @@ impl<'a> Element<'a> {
     pub fn get_contents(&self) -> String {
         match self {
             Element::Block(_, elements, _) => {
-                elements.iter().map(|e| e.get_contents()).collect::<Vec<String>>().join(" ")
+                elements.iter().map(|e| e.get_contents()).collect::<Vec<String>>().join("")
             }
             Element::Code(code, _) => code.to_string(),
             Element::CodeBlock(code, elements, _) => {

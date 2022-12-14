@@ -731,6 +731,19 @@ The following are optional parameters for `includecode`:
     </tbody>
   </table>
 
+## Including markdown fragments
+
+You can include Markdown files into your current Markdown file for normal processing using
+the `<< >>` directive enclosing the required file path. The path must be relative to the
+current .md source file—absolute paths should not be used. The << >> directive is a block directive
+and so must appear on a line by itself.
+
+For example, if the current file en/time-travel/example.md wants to include file en/time-travel/_samples/_sample.md, it would specify:
+
+```md
+<<_samples/_sample.md>>
+```
+
 ## Inline code
 
 You can indicate code within a Markdown paragraph by wrapping text with backtick

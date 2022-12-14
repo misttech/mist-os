@@ -20,6 +20,7 @@ use {
 pub(crate) use crate::checker::{DocCheck, DocCheckError, DocLine, DocYamlCheck};
 pub(crate) use crate::md_element::DocContext;
 mod checker;
+mod include_checker;
 mod link_checker;
 mod md_element;
 mod parser;
@@ -175,7 +176,12 @@ async fn do_main(opt: DocCheckerArgs) -> Result<Option<Vec<DocCheckError>>> {
     let mut markdown_checks: Vec<Box<dyn DocCheck>> = vec![];
     let mut errors: Vec<DocCheckError> = vec![];
 
-    let checks = link_checker::register_markdown_checks(&opt)?;
+    let mut checks = link_checker::register_markdown_checks(&opt)?;
+    for c in checks {
+        markdown_checks.push(c);
+    }
+
+    checks = include_checker::register_markdown_checks(&opt)?;
     for c in checks {
         markdown_checks.push(c);
     }
@@ -296,6 +302,12 @@ mod test {
                 "Obsolete or invalid project garnet: https://fuchsia.googlesource.com/garnet/+/refs/heads/main/README.md"),
             DocCheckError::new(21,PathBuf::from("doc_checker_test_data/docs/README.md"),
                 "Cannot normalize /docs/../../README.md, references parent beyond root."),
+            DocCheckError::new(5, PathBuf::from("doc_checker_test_data/docs/_common/_included.md"),
+                "in-tree link to /docs/missing.md could not be found at \"doc_checker_test_data/docs/missing.md\""),
+            DocCheckError::new(7, PathBuf::from("doc_checker_test_data/docs/include_here.md"),
+                "Included markdown file \"doc_checker_test_data/docs/_common/missing.md\" not found."),
+            DocCheckError::new(11, PathBuf::from("doc_checker_test_data/docs/include_here.md"),
+               "Included markdown file \"/docs/_common/_included.md\" must be a relative path."),
             DocCheckError::new(2,  PathBuf::from("doc_checker_test_data/docs/no_readme/details.md"),
                 "in-tree link to /docs/no_readme could not be found at \"doc_checker_test_data/docs/no_readme\" or  \"doc_checker_test_data/docs/no_readme/README.md\""),
             DocCheckError::new(4,PathBuf::from("doc_checker_test_data/docs/path.md"),

@@ -4,10 +4,9 @@
 
 //! parser handles parsing markdown via pulldown_cmark into higher level elements.
 
-use pulldown_cmark::Event;
 use pulldown_cmark::{
     Event::{
-        Code, End, FootnoteReference, HardBreak, Html, SoftBreak, Start, TaskListMarker, Text,
+        self, Code, End, FootnoteReference, HardBreak, Html, SoftBreak, Start, TaskListMarker, Text,
     },
     Tag,
 };
@@ -49,7 +48,6 @@ pub(crate) fn element_from_event<'a>(
 fn parse_tag_element<'a>(event: Event<'a>, doc_context: &mut DocContext<'a>) -> Element<'a> {
     match event {
         Start(Tag::Paragraph) => {
-            //doc_context.line_num += 1;
             let block = read_block(Tag::Paragraph, doc_context);
             doc_context.line_num += 1;
             block
