@@ -221,11 +221,11 @@ zx_status_t CompositeDevice::BindFragment(size_t index, const fbl::RefPtr<Device
     return status;
   }
 
-  // If the device does not have an outgoing directory, then `CompositeDeviceFragment::Bind` will
-  // bind the fragment driver to the device, and `DeviceManager` will call `TryAssemble` once the
-  // fragment device is added. If the device does have an outgoing directory, then this will not
-  // happen, so we have to call `TryAssemble` explicitly here.
-  if (dev->has_outgoing_directory()) {
+  // If the device uses the fragment driver, then `CompositeDeviceFragment::Bind` will bind the
+  // fragment driver to the device, and `DeviceManager` will call `TryAssemble` once the fragment
+  // device is added. If the device does not use the fragment driver, then this will not happen, so
+  // we have to call `TryAssemble` explicitly here.
+  if (!fragment->uses_fragment_driver()) {
     status = TryAssemble();
     if (status != ZX_OK && status != ZX_ERR_SHOULD_WAIT) {
       LOGF(ERROR, "Failed to assemble composite device: %s", zx_status_get_string(status));
@@ -396,6 +396,7 @@ zx_status_t CompositeDeviceFragment::Bind(const fbl::RefPtr<Device>& dev) {
   ZX_ASSERT(bound_device_ == nullptr);
 
   if (!dev->has_outgoing_directory()) {
+    uses_fragment_driver_ = true;
     zx_status_t status = dev->coordinator->AttemptBind(
         MatchedDriverInfo{.driver = dev->coordinator->LoadFragmentDriver(), .colocate = true}, dev);
     if (status != ZX_OK) {
@@ -417,7 +418,7 @@ bool CompositeDeviceFragment::IsReady() {
     return false;
   }
 
-  return fragment_device() != nullptr || bound_device()->has_outgoing_directory();
+  return fragment_device() != nullptr || !uses_fragment_driver_;
 }
 
 zx_status_t CompositeDeviceFragment::CreateProxy(fbl::RefPtr<DriverHost> driver_host) {
@@ -440,13 +441,13 @@ zx_status_t CompositeDeviceFragment::CreateProxy(fbl::RefPtr<DriverHost> driver_
   // Check if we need to create a proxy. If not, share a reference to
   // the instance of the fragment device.
   // We always use a proxy when there is an outgoing directory involved.
-  if (parent->host() == driver_host && !parent->has_outgoing_directory()) {
+  if (parent->host() == driver_host && uses_fragment_driver()) {
     proxy_device_ = fragment_device_;
     return ZX_OK;
   }
 
   // Create a FIDL proxy.
-  if (parent->has_outgoing_directory()) {
+  if (!uses_fragment_driver()) {
     VLOGF(1, "Preparing FIDL proxy for %s", parent->name().data());
     fbl::RefPtr<Device> fidl_proxy;
     zx_status_t status = parent->coordinator->PrepareFidlProxy(parent, driver_host, &fidl_proxy);

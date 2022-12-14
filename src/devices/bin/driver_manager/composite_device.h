@@ -111,6 +111,8 @@ class CompositeDeviceFragment
 
   void set_proxy_device(fbl::RefPtr<Device> device) { proxy_device_ = std::move(device); }
 
+  bool uses_fragment_driver() const { return uses_fragment_driver_; }
+
  private:
   // The CompositeDevice that this is a part of.
   CompositeDevice* const composite_;
@@ -144,6 +146,8 @@ class CompositeDeviceFragment
   // It may be a Banjo proxied device, it may be a FIDL proxied device, or it may
   // be `bound_device_` if the composite is colocated.
   fbl::RefPtr<Device> proxy_device_ = nullptr;
+
+  bool uses_fragment_driver_ = false;
 };
 
 // A device composed of other devices.
