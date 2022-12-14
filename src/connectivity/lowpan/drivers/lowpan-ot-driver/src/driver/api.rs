@@ -852,6 +852,7 @@ where
             thread_leader_router_id: leader_data.as_ref().map(LeaderData::leader_router_id),
             thread_network_data: ot.net_data_as_vec(false).ok(),
             thread_stable_network_data: ot.net_data_as_vec(true).ok(),
+            thread_border_routing_counters: Some(ot.ip6_get_border_routing_counters().into_ext()),
             ..Telemetry::EMPTY
         })
     }

@@ -33,6 +33,49 @@ protocol TelemetryProvider {
     });
 };
 
+/// Counters associated with border routing.
+type BorderRoutingCounters = table {
+    /// The number of packets associated with inbound unicast messages.
+    ///
+    /// Required.
+    1: inbound_unicast_packets uint64;
+
+    /// The number of bytes associated with inbound unicast messages.
+    ///
+    /// Required.
+    2: inbound_unicast_bytes uint64;
+
+    /// The number of packets associated with inbound multicast messages.
+    ///
+    /// Required.
+    3: inbound_multicast_packets uint64;
+
+    /// The number of bytes associated with inbound multicast messages.
+    ///
+    /// Required.
+    4: inbound_multicast_bytes uint64;
+
+    /// The number of packets associated with outbound unicast messages.
+    ///
+    /// Required.
+    5: outbound_unicast_packets uint64;
+
+    /// The number of bytes associated with outbound unicast messages.
+    ///
+    /// Required.
+    6: outbound_unicast_bytes uint64;
+
+    /// The number of packets associated with outbound multicast messages.
+    ///
+    /// Required.
+    7: outbound_multicast_packets uint64;
+
+    /// The number of bytes associated with outbound multicast messages.
+    ///
+    /// Required.
+    8: outbound_multicast_bytes uint64;
+};
+
 /// LoWPAN Interface Telemetry Information.
 ///
 /// The fields in this table are used for providing low-level telemetry and information about the
@@ -106,4 +149,9 @@ type Telemetry = table {
     ///
     /// Only present on Thread networks.
    15: thread_stable_network_data vector<uint8>:255;
+
+    /// The counters associated with border routing messages.
+    ///
+    /// Only present on Thread networks.
+   16: thread_border_routing_counters BorderRoutingCounters;
 };

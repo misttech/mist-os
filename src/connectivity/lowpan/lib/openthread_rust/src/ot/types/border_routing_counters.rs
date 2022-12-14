@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::prelude_internal::*;
-use ot::types::packets_and_bytes::PacketsAndBytes;
 
 /// This structure represents border routing counters.
 ///

@@ -681,6 +681,57 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                         if let Some(x) = telemetry_data.rcp_version {
                             inspector.root().record_string("rcp_version", x);
                         }
+                        if let Some(x) = telemetry_data.thread_border_routing_counters {
+                            inspector.root().record_child(
+                                "border_routing_counters",
+                                |border_routing_counters_child| {
+                                    border_routing_counters_child.record_child(
+                                        "inbound_unicast",
+                                        |counter_node| {
+                                            if let Some(y) = x.inbound_unicast_packets {
+                                                counter_node.record_uint("packets", y);
+                                            }
+                                            if let Some(y) = x.inbound_unicast_bytes {
+                                                counter_node.record_uint("bytes", y);
+                                            }
+                                        },
+                                    );
+                                    border_routing_counters_child.record_child(
+                                        "inbound_multicast",
+                                        |counter_node| {
+                                            if let Some(y) = x.inbound_multicast_packets {
+                                                counter_node.record_uint("packets", y);
+                                            }
+                                            if let Some(y) = x.inbound_multicast_bytes {
+                                                counter_node.record_uint("bytes", y);
+                                            }
+                                        },
+                                    );
+                                    border_routing_counters_child.record_child(
+                                        "outbound_unicast",
+                                        |counter_node| {
+                                            if let Some(y) = x.outbound_unicast_packets {
+                                                counter_node.record_uint("packets", y);
+                                            }
+                                            if let Some(y) = x.outbound_unicast_bytes {
+                                                counter_node.record_uint("bytes", y);
+                                            }
+                                        },
+                                    );
+                                    border_routing_counters_child.record_child(
+                                        "outbound_multicast",
+                                        |counter_node| {
+                                            if let Some(y) = x.outbound_multicast_packets {
+                                                counter_node.record_uint("packets", y);
+                                            }
+                                            if let Some(y) = x.outbound_multicast_bytes {
+                                                counter_node.record_uint("bytes", y);
+                                            }
+                                        },
+                                    );
+                                },
+                            );
+                        }
                     }
                     Err(e) => {
                         fx_log_warn!("Error in logging telemetry. Error: {}", e);

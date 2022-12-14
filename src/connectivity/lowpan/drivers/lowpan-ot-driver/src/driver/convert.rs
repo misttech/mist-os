@@ -139,6 +139,24 @@ impl FromExt<ot::OperationalDataset> for Identity {
     }
 }
 
+impl FromExt<&ot::BorderRoutingCounters>
+    for fidl_fuchsia_lowpan_experimental::BorderRoutingCounters
+{
+    fn from_ext(x: &ot::BorderRoutingCounters) -> Self {
+        fidl_fuchsia_lowpan_experimental::BorderRoutingCounters {
+            inbound_unicast_packets: Some(x.inbound_unicast().packets()),
+            inbound_unicast_bytes: Some(x.inbound_unicast().bytes()),
+            inbound_multicast_packets: Some(x.inbound_multicast().packets()),
+            inbound_multicast_bytes: Some(x.inbound_multicast().bytes()),
+            outbound_unicast_packets: Some(x.outbound_unicast().packets()),
+            outbound_unicast_bytes: Some(x.outbound_unicast().bytes()),
+            outbound_multicast_packets: Some(x.outbound_multicast().packets()),
+            outbound_multicast_bytes: Some(x.outbound_multicast().bytes()),
+            ..fidl_fuchsia_lowpan_experimental::BorderRoutingCounters::EMPTY
+        }
+    }
+}
+
 pub trait UpdateOperationalDataset<T> {
     fn update_from(&mut self, data: &T) -> Result<(), anyhow::Error>;
 }

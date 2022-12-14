@@ -20,6 +20,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.lowpan.bootstrap:fuchsia.lowpan.bootstrap_rust",
     "//sdk/fidl/fuchsia.lowpan.device:fuchsia.lowpan.device_rust",
     "//sdk/fidl/fuchsia.lowpan.driver:fuchsia.lowpan.driver_rust",
+    "//sdk/fidl/fuchsia.lowpan.experimental:fuchsia.lowpan.experimental_rust",
     "//sdk/fidl/fuchsia.lowpan.spinel:fuchsia.lowpan.spinel_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
