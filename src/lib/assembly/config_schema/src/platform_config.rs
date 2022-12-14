@@ -43,6 +43,9 @@ pub struct PlatformConfig {
     /// Platform configuration options for the input area.
     #[serde(default)]
     pub input: input_config::PlatformInputConfig,
+
+    /// Platform configuration options for the SWD subsystem
+    pub software_delivery: Option<crate::swd_config::SwdConfig>,
 }
 
 /// The platform's base service level.

@@ -8,9 +8,11 @@ use assembly_config_schema::{AssemblyConfig, BoardInformation, BuildType, Featur
 use crate::common::{CompletedConfiguration, ConfigurationBuilderImpl};
 
 pub(crate) mod prelude {
+
+    #[allow(unused)]
     pub(crate) use crate::common::{
         BoardInformationExt, ComponentConfigBuilderExt, ConfigurationBuilder, ConfigurationContext,
-        DefineSubsystemConfiguration,
+        DefaultByBuildType, DefineSubsystemConfiguration, OptionDefaultByBuildTypeExt,
     };
 }
 
@@ -21,6 +23,7 @@ mod example;
 mod identity;
 mod input;
 mod session;
+mod swd;
 
 /// ffx config flag for enabling configuring the assembly+structured config example.
 const EXAMPLE_ENABLED_FLAG: &str = "assembly_example_enabled";

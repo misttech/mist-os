@@ -20,8 +20,8 @@ rustc_library("platform_configuration") {
     "src/subsystems/identity.rs",
     "src/subsystems/input.rs",
     "src/subsystems/session.rs",
+    "src/subsystems/swd.rs",
   ]
-
   deps = [
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//src/developer/ffx/config:lib",

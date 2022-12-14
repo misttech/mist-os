@@ -295,6 +295,58 @@ impl BoardInformationExt for Option<&BoardInformation> {
     }
 }
 
+/// DefaultByBuildType trait is implemented on each enum value to instantiate an
+/// unconfigured update checker. Specifically, an Eng build-type will result in an
+/// unconfigured system-update-checker and the User or UserDebug build-types will
+/// result in an unconfigured omaha-client
+///
+/// ```
+/// impl DefaultByBuildType for PolicyLabels {
+///    fn default_by_build_type(build_type: &BuildType) -> Self {
+///        match build_type {
+///            BuildType::Eng => PolicyLabels::Unrestricted,
+///            BuildType::UserDebug => PolicyLabels::LocalDynamicConfig,
+///            BuildType::User => PolicyLabels::BaseComponentsOnly,
+///        }
+///    }
+/// }
+///
+/// let policy = PolicyLabels::default_by_build_type(&BuildType::Eng);
+/// assert_eq!(policy, PolicyLabels::Unrestricted);
+/// ```
+pub(crate) trait DefaultByBuildType {
+    fn default_by_build_type(build_type: &BuildType) -> Self;
+}
+
+/// A trait which declares that a type T implements a fn which returns an instance of type T by
+/// default (with respect to the build_type) or because the T struct has already been instantiated
+pub(crate) trait OptionDefaultByBuildTypeExt<T: DefaultByBuildType> {
+    fn value_or_default_from_build_type(self, build_type: &BuildType) -> T;
+}
+
+/// Returns an unwrapped instance of T if T is provided, else defers to T::default_by_build_type
+/// Used in situations where the configuration value's default is dependent on the build_type,
+/// and may not be provided by the product owner. Therefore, None ends up being converted to
+/// a default which depends on the provided BuildType.
+///
+/// Usage:
+/// ```
+/// let config = SwdConfig {
+///    policy: None,
+///    ...
+/// };
+/// let policy = config.policy.value_or_default_from_build_type(&BuildType::Eng);
+/// assert_eq!(policy, PolicyLabels::Unrestricted);
+/// ```
+///
+///
+///
+impl<T: DefaultByBuildType> OptionDefaultByBuildTypeExt<T> for Option<T> {
+    fn value_or_default_from_build_type(self, build_type: &BuildType) -> T {
+        self.unwrap_or_else(|| T::default_by_build_type(build_type))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
