@@ -31,6 +31,7 @@ use {
     account_handler_structured_config::Config,
     anyhow::{Context as _, Error},
     fidl::endpoints::RequestStream,
+    fidl_fuchsia_identity_authentication::Mechanism,
     fidl_fuchsia_io as fio,
     fidl_fuchsia_process_lifecycle::LifecycleRequestStream,
     fuchsia_async as fasync,
@@ -45,7 +46,7 @@ use {
         minfs::{disk::DevDiskManager, StorageManager as MinfsStorageManager},
         StorageManager, StorageManagerEnum,
     },
-    tracing::{error, info},
+    tracing::{error, info, warn},
 };
 
 const DATA_DIR: &str = "/data";
@@ -77,7 +78,7 @@ fn get_dev_directory() -> fio::DirectoryProxy {
         .expect("open /dev root for disk manager")
 }
 
-fn get_storagemanager(config: &Config) -> StorageManagerEnum {
+fn get_storage_manager(config: &Config) -> StorageManagerEnum {
     match config.storage_manager.as_str() {
         FXFS => StorageManagerEnum::Fxfs(FxfsStorageManager::new(
             FxfsStorageManagerArgs::builder()
@@ -89,13 +90,33 @@ fn get_storagemanager(config: &Config) -> StorageManagerEnum {
         MINFS => StorageManagerEnum::Minfs(MinfsStorageManager::new(DevDiskManager::new(
             get_dev_directory(),
         ))),
-        other => panic!(
-            "AccountHandler was configured with invalid argument: \
-                             storage_manager={:?}. See the CML declaration for \
-                             valid values.",
-            other
-        ),
+        other => {
+            let error = format!(
+                "AccountHandler was configured with invalid argument: storage_manager={:?}. \
+                See the CML declaration for valid values.",
+                other
+            );
+            warn!("{}", error);
+            panic!("{}", error);
+        }
     }
+}
+
+fn get_available_mechanisms(config: &Config) -> Vec<Mechanism> {
+    config
+        .available_mechanisms
+        .iter()
+        .map(|mechanism| match mechanism.as_str() {
+            "TEST" => Mechanism::Test,
+            "PASSWORD" => Mechanism::Password,
+            other => {
+                let error =
+                    format!("AccountHandler was configured with invalid mechanism: {:?}.", other);
+                warn!("{}", error);
+                panic!("{}", error);
+            }
+        })
+        .collect()
 }
 
 fn main() -> Result<(), Error> {
@@ -116,8 +137,13 @@ fn main() -> Result<(), Error> {
     let mut fs = ServiceFs::new();
     inspect_runtime::serve(&inspector, &mut fs)?;
 
-    let account_handler =
-        Arc::new(AccountHandler::new(lifetime, &inspector, get_storagemanager(&config)));
+    let account_handler = Arc::new(AccountHandler::new(
+        lifetime,
+        &inspector,
+        config.is_interaction_enabled,
+        get_available_mechanisms(&config),
+        get_storage_manager(&config),
+    ));
 
     let _lifecycle_task: fuchsia_async::Task<()> =
         set_up_lifecycle_watcher(Arc::clone(&account_handler));

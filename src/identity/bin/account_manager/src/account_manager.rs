@@ -13,12 +13,14 @@ use {
     },
     account_common::{AccountId, AccountManagerError, FidlAccountId},
     anyhow::Error,
+    fidl::endpoints::ServerEnd,
     fidl_fuchsia_identity_account::{
         AccountManagerGetAccountRequest, AccountManagerProvisionNewAccountRequest,
         AccountManagerRegisterAccountListenerRequest, AccountManagerRequest,
         AccountManagerRequestStream, AccountMetadata as FidlAccountMetadata, Error as ApiError,
         Lifetime,
     },
+    fidl_fuchsia_identity_authentication::InteractionMarker,
     fidl_fuchsia_identity_internal::{
         AccountHandlerControlCreateAccountRequest, AccountHandlerControlUnlockAccountRequest,
     },
@@ -228,6 +230,7 @@ impl<AHC: AccountHandlerConnection> AccountManager<AHC> {
         &self,
         lifetime: Lifetime,
         auth_mechanism_id: Option<String>,
+        interaction: Option<ServerEnd<InteractionMarker>>,
     ) -> Result<(Arc<AHC>, Vec<u8>), ApiError> {
         let account_handler =
             self.account_map.lock().await.new_handler(lifetime).await.map_err(|err| {
@@ -240,6 +243,7 @@ impl<AHC: AccountHandlerConnection> AccountManager<AHC> {
             .create_account(AccountHandlerControlCreateAccountRequest {
                 id: account_id,
                 auth_mechanism_id,
+                interaction,
                 ..AccountHandlerControlCreateAccountRequest::EMPTY
             })
             .await
@@ -253,7 +257,11 @@ impl<AHC: AccountHandlerConnection> AccountManager<AHC> {
     async fn provision_new_account(
         &self,
         AccountManagerProvisionNewAccountRequest {
-            lifetime, auth_mechanism_id, mut metadata, ..
+            lifetime,
+            auth_mechanism_id,
+            mut metadata,
+            interaction,
+            ..
         }: AccountManagerProvisionNewAccountRequest,
     ) -> Result<FidlAccountId, ApiError> {
         let account_metadata = metadata
@@ -264,7 +272,11 @@ impl<AHC: AccountHandlerConnection> AccountManager<AHC> {
             })?
             .try_into()?;
         let (account_handler, pre_auth_state) = self
-            .create_account_internal(lifetime.ok_or(ApiError::InvalidRequest)?, auth_mechanism_id)
+            .create_account_internal(
+                lifetime.ok_or(ApiError::InvalidRequest)?,
+                auth_mechanism_id,
+                interaction,
+            )
             .await?;
         let account_id = account_handler.get_account_id();
 

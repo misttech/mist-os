@@ -16,10 +16,10 @@ use {
     },
     fuchsia_component::client,
     fuchsia_zircon as zx,
-    futures::{Future, TryStreamExt},
+    futures::{lock::Mutex, Future, TryStreamExt},
     identity_common::{EnrollmentData, PrekeyMaterial},
     lazy_static::lazy_static,
-    std::{cell::RefCell, collections::HashSet, rc::Rc},
+    std::{collections::HashSet, sync::Arc},
     tracing::warn,
 };
 
@@ -31,7 +31,8 @@ lazy_static! {
     ]);
 }
 
-type NotifyFn = Box<dyn Fn(&InteractionWatchStateResponse, InteractionWatchStateResponder) -> bool>;
+type NotifyFn =
+    Box<dyn Fn(&InteractionWatchStateResponse, InteractionWatchStateResponder) -> bool + Send>;
 
 type StateHangingGet =
     HangingGet<InteractionWatchStateResponse, InteractionWatchStateResponder, NotifyFn>;
@@ -51,13 +52,12 @@ fn create_interaction_watch_state(
     }
 }
 
-#[allow(dead_code)]
 /// Implements the fuchsia.identity.authentication.Interaction protocol. It
 /// handles all InteractionRequests from the client and connects it to the
 /// appropriate authenticator for enrollment and authentication.
 pub struct Interaction {
     /// Hanging get broker that requires mutability.
-    state_hanging_get: RefCell<StateHangingGet>,
+    state_hanging_get: Arc<Mutex<StateHangingGet>>,
 
     /// Mechanism to be used for authentication operations.
     mechanism: Mechanism,
@@ -76,10 +76,14 @@ impl Interaction {
         let initial_state = create_interaction_watch_state(mechanism, &mode);
         let hanging_get = Self::create_hanging_get_broker(initial_state);
         let state_publisher = hanging_get.new_publisher();
-        Self { state_hanging_get: RefCell::new(hanging_get), mechanism, mode, state_publisher }
+        Self {
+            state_hanging_get: Arc::new(Mutex::new(hanging_get)),
+            mechanism,
+            mode,
+            state_publisher,
+        }
     }
 
-    #[allow(dead_code)]
     /// Handles request stream over the provided `server_end` and connects to an
     /// authenticator supporting the provided `mechanism`. `enrollments` specify
     /// the list of enrollments to be accepted by the authenticator. Performs authenticate
@@ -91,18 +95,21 @@ impl Interaction {
     ) -> Result<AttemptedEvent, AccountManagerError> {
         let interaction = Self::new(mechanism, Mode::Authenticate);
         let stream = server_end.into_stream()?;
-        let enrollments = Rc::new(RefCell::new(enrollments));
+
+        // Enrollment needs to be mutable to be used for FIDL calls without
+        // cloning every time. Also needs the Send and Sync traits to be eligible
+        // for use in our asynchronous code.
+        let enrollments = Arc::new(Mutex::new(enrollments));
         interaction
             .handle_requests_from_stream(
                 stream,
                 Box::new(move |storage_unlock_proxy, ipse| {
-                    Self::start_authentication(Rc::clone(&enrollments), storage_unlock_proxy, ipse)
+                    Self::start_authentication(Arc::clone(&enrollments), storage_unlock_proxy, ipse)
                 }),
             )
             .await
     }
 
-    #[allow(dead_code)]
     /// Handles request stream over the provided `server_end` and connects to an
     /// authenticator supporting the provided `mechanism`. Performs enroll
     /// operation and returns the result. It will always run in `Enroll` mode.
@@ -147,7 +154,10 @@ impl Interaction {
         &self,
         mut stream: InteractionRequestStream,
         authenticator_fn: Box<
-            dyn Fn(StorageUnlockMechanismProxy, InteractionProtocolServerEnd) -> Fut + 'static,
+            dyn Fn(StorageUnlockMechanismProxy, InteractionProtocolServerEnd) -> Fut
+                + 'static
+                + Send
+                + Sync,
         >,
     ) -> Result<T, AccountManagerError>
     where
@@ -204,7 +214,7 @@ impl Interaction {
                     }
                 }
                 InteractionRequest::WatchState { responder } => {
-                    let subscriber = self.state_hanging_get.borrow_mut().new_subscriber();
+                    let subscriber = self.state_hanging_get.lock().await.new_subscriber();
                     subscriber.register(responder).map_err(|err| {
                         warn!("Failed to register new InteractionWatchState subscriber: {:?}", err);
                         ApiError::Internal
@@ -267,18 +277,16 @@ impl Interaction {
     }
 
     async fn start_authentication(
-        enrollments: Rc<RefCell<Vec<Enrollment>>>,
+        enrollments: Arc<Mutex<Vec<Enrollment>>>,
         storage_unlock_proxy: StorageUnlockMechanismProxy,
         mut ipse: InteractionProtocolServerEnd,
     ) -> Result<AttemptedEvent, AccountManagerError> {
-        let auth_attempt = storage_unlock_proxy
-            .authenticate(&mut ipse, &mut enrollments.borrow_mut().iter_mut())
-            .await
-            .map_err(|err| {
-                AccountManagerError::new(ApiError::Unknown)
-                    .with_cause(format_err!("Error connecting to authenticator: {:?}", err))
-            })?
-            .map_err(|authenticator_err| AccountManagerError::from(authenticator_err).api_error)?;
+        let mut enrollments_lock = enrollments.lock().await;
+        let fut = storage_unlock_proxy.authenticate(&mut ipse, &mut enrollments_lock.iter_mut());
+        let auth_attempt = fut.await.map_err(|err| {
+            AccountManagerError::new(ApiError::Unknown)
+                .with_cause(format_err!("Error connecting to authenticator: {:?}", err))
+        })??;
 
         Ok(auth_attempt)
     }
@@ -321,7 +329,10 @@ mod tests {
         mechanism: Mechanism,
         mode: Mode,
         storage_unlock: Box<
-            dyn Fn(StorageUnlockMechanismProxy, InteractionProtocolServerEnd) -> Fut + 'static,
+            dyn Fn(StorageUnlockMechanismProxy, InteractionProtocolServerEnd) -> Fut
+                + 'static
+                + Send
+                + Sync,
         >,
     ) -> (InteractionProxy, Task<Result<T, AccountManagerError>>)
     where

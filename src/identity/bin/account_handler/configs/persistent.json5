@@ -3,5 +3,6 @@
         "PASSWORD",
     ],
     is_ephemeral: false,
+    is_interaction_enabled: false,
     storage_manager: "MINFS",
 }

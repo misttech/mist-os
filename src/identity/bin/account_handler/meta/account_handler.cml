@@ -68,6 +68,10 @@
         // persistent.
         is_ephemeral: { type: "bool" },
 
+        // If true, interaction protocol will be used for passing authentication
+        // challenges.
+        is_interaction_enabled: { type: "bool" },
+
         // Which backing storage manager to use. Options are currently:
         // one of [ "MINFS", "FXFS" ].
         storage_manager: {

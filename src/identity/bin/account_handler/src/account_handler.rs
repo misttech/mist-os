@@ -6,8 +6,10 @@ use {
     crate::{
         account::{Account, AccountContext},
         common::AccountLifetime,
-        inspect, lock_request,
-        pre_auth::{self, produce_single_enrollment, State as PreAuthState},
+        inspect,
+        interaction::Interaction,
+        lock_request,
+        pre_auth::{self, produce_single_enrollment, EnrollmentState, State as PreAuthState},
     },
     account_common::{AccountId, AccountManagerError},
     anyhow::format_err,
@@ -15,8 +17,8 @@ use {
     fidl::prelude::*,
     fidl_fuchsia_identity_account::{AccountMarker, Error as ApiError},
     fidl_fuchsia_identity_authentication::{
-        Enrollment, InteractionMarker, InteractionProtocolServerEnd, StorageUnlockMechanismMarker,
-        StorageUnlockMechanismProxy,
+        Enrollment, InteractionMarker, InteractionProtocolServerEnd, Mechanism,
+        StorageUnlockMechanismMarker, StorageUnlockMechanismProxy,
     },
     fidl_fuchsia_identity_internal::{
         AccountHandlerControlCreateAccountRequest, AccountHandlerControlRequest,
@@ -27,7 +29,7 @@ use {
     fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_inspect::{Inspector, Property},
     futures::{channel::oneshot, lock::Mutex, prelude::*},
-    identity_common::TaskGroupError,
+    identity_common::{EnrollmentData, PrekeyMaterial, TaskGroupError},
     lazy_static::lazy_static,
     std::{collections::HashMap, convert::TryInto, fmt, sync::Arc},
     storage_manager::StorageManager,
@@ -124,6 +126,13 @@ where
     /// Helper for outputting account handler information via fuchsia_inspect.
     inspect: Arc<inspect::AccountHandler>,
 
+    // TODO(fxb/116213): Remove this once interaction is completely rolled out.
+    /// Feature flag to enable/disable interaction protocol.
+    is_interaction_enabled: bool,
+
+    /// The available mechanisms which can be used for Authentication.
+    mechanisms: Vec<Mechanism>,
+
     /// The storage manager for this account.
     storage_manager: Arc<Mutex<SM>>,
 }
@@ -136,6 +145,8 @@ where
     pub fn new(
         lifetime: AccountLifetime,
         inspector: &Inspector,
+        is_interaction_enabled: bool,
+        mechanisms: Vec<Mechanism>,
         storage_manager: SM,
     ) -> AccountHandler<SM> {
         let inspect = Arc::new(inspect::AccountHandler::new(inspector.root(), "uninitialized"));
@@ -143,6 +154,8 @@ where
             state: Arc::new(Mutex::new(Lifecycle::Uninitialized)),
             lifetime,
             inspect,
+            is_interaction_enabled,
+            mechanisms,
             storage_manager: Arc::new(Mutex::new(storage_manager)),
         }
     }
@@ -204,9 +217,6 @@ where
         &self,
         mut payload: AccountHandlerControlCreateAccountRequest,
     ) -> Result<Vec<u8>, ApiError> {
-        // TODO(fxb/104337): Implement the server end of the interaction protocol.
-        let (_, test_interaction_server_end) = create_endpoints().unwrap();
-        let mut test_ipse = InteractionProtocolServerEnd::Test(test_interaction_server_end);
         let maybe_auth_mechanism_id = payload.auth_mechanism_id;
         let account_id: AccountId = payload
             .id
@@ -221,42 +231,13 @@ where
         let mut state_lock = self.state.lock().await;
         match &*state_lock {
             Lifecycle::Uninitialized => {
-                let enrollment_state = match (&self.lifetime, maybe_auth_mechanism_id) {
-                    (AccountLifetime::Persistent { .. }, Some(auth_mechanism_id)) => {
-                        let auth_mechanism_proxy =
-                            get_auth_mechanism_connection(&auth_mechanism_id).await?;
-                        let (data, prekey_material) = auth_mechanism_proxy
-                            .enroll(&mut test_ipse)
-                            .await
-                            .map_err(|err| {
-                                warn!("Error connecting to authenticator: {:?}", err);
-                                ApiError::Unknown
-                            })?
-                            .map_err(|authenticator_err| {
-                                warn!(
-                                    "Error enrolling authentication mechanism: {:?}",
-                                    authenticator_err
-                                );
-                                AccountManagerError::from(authenticator_err).api_error
-                            })?;
-
-                        // TODO(fxbug.dev/45041): Use storage manager for key validation
-                        if prekey_material != *MAGIC_PREKEY {
-                            warn!("Received unexpected pre-key material from authenticator");
-                            return Err(ApiError::Internal);
-                        }
-
-                        produce_single_enrollment(auth_mechanism_id, data, prekey_material)?
-                    }
-                    (AccountLifetime::Ephemeral, Some(_)) => {
-                        warn!(
-                            "CreateAccount called with auth_mechanism_id set on an ephemeral \
-                              account"
-                        );
-                        return Err(ApiError::InvalidRequest);
-                    }
-                    (_, None) => pre_auth::EnrollmentState::NoEnrollments,
-                };
+                let enrollment_state = self
+                    .enroll_auth_mechanism(maybe_auth_mechanism_id, payload.interaction)
+                    .await
+                    .map_err(|err| {
+                        warn!("Enrollment error: {:?}", err);
+                        err.api_error
+                    })?;
                 let pre_auth_state = PreAuthState::new(account_id, enrollment_state);
 
                 let sender = self
@@ -336,13 +317,17 @@ where
                 Ok(None)
             }
             Lifecycle::Locked { pre_auth_state: pre_auth_state_ref } => {
-                let (maybe_prekey_material, maybe_updated_enrollment_state) =
-                    Self::authenticate(&pre_auth_state_ref.enrollment_state, interaction)
-                        .await
-                        .map_err(|err| {
-                            warn!("Authentication error: {:?}", err);
-                            err.api_error
-                        })?;
+                let (maybe_prekey_material, maybe_updated_enrollment_state) = Self::authenticate(
+                    self.is_interaction_enabled,
+                    &pre_auth_state_ref.enrollment_state,
+                    interaction,
+                    &self.mechanisms,
+                )
+                .await
+                .map_err(|err| {
+                    warn!("Authentication error: {:?}", err);
+                    err.api_error
+                })?;
                 // TODO(fxbug.dev/45041): Use storage manager for key validation
                 if let Some(prekey_material) = maybe_prekey_material {
                     if prekey_material != *MAGIC_PREKEY {
@@ -512,33 +497,149 @@ where
         }
     }
 
+    /// Enrolls a new authentication mechanism for the account, returning the
+    /// enrollment data and prekey material from the authenticator if successful.
+    async fn enroll_auth_mechanism(
+        &self,
+        maybe_auth_mechanism_id: Option<String>,
+        interaction: Option<ServerEnd<InteractionMarker>>,
+    ) -> Result<EnrollmentState, AccountManagerError> {
+        let (enrollment_state, maybe_prekey_material) = if !self.is_interaction_enabled {
+            self.enroll_auth_mechanism_without_interaction(maybe_auth_mechanism_id).await?
+        } else {
+            // If interaction mechanisms are enabled, use the interaction
+            // protocol for authenticator challenges.
+            self.enroll_auth_mechanism_with_interaction(interaction).await?
+        };
+
+        validate_prekey(maybe_prekey_material)?;
+
+        Ok(enrollment_state)
+    }
+
+    async fn enroll_auth_mechanism_without_interaction(
+        &self,
+        maybe_auth_mechanism_id: Option<String>,
+    ) -> Result<(EnrollmentState, Option<Vec<u8>>), AccountManagerError> {
+        Ok(match (&self.lifetime, maybe_auth_mechanism_id) {
+            (AccountLifetime::Persistent { .. }, Some(auth_mechanism_id)) => {
+                let (_, test_interaction_server_end) = create_endpoints().unwrap();
+                let mut test_ipse = InteractionProtocolServerEnd::Test(test_interaction_server_end);
+                let auth_mechanism_proxy =
+                    get_auth_mechanism_connection(&auth_mechanism_id).await?;
+                let (data, prekey_material) = auth_mechanism_proxy
+                    .enroll(&mut test_ipse)
+                    .await
+                    .map_err(|err| {
+                        AccountManagerError::new(ApiError::Unknown)
+                            .with_cause(format_err!("Error connecting to authenticator: {:?}", err))
+                    })?
+                    .map_err(|authenticator_err| {
+                        AccountManagerError::new(ApiError::Unknown).with_cause(format_err!(
+                            "Error while enrolling account: {:?}",
+                            authenticator_err
+                        ))
+                    })?;
+                // TODO(fxb/116213): Remove the clone once we don't need to
+                // return the prekey for checking outside of this block.
+                (
+                    produce_single_enrollment(auth_mechanism_id, data, prekey_material.clone())?,
+                    Some(prekey_material),
+                )
+            }
+            (AccountLifetime::Ephemeral, Some(_)) => {
+                return Err(AccountManagerError::new(ApiError::InvalidRequest).with_cause(
+                    format_err!(
+                        "CreateAccount called with \
+                            auth_mechanism_id set on an ephemeral account"
+                    ),
+                ));
+            }
+            (_, None) => (pre_auth::EnrollmentState::NoEnrollments, None),
+        })
+    }
+
+    async fn enroll_auth_mechanism_with_interaction(
+        &self,
+        mut interaction: Option<ServerEnd<InteractionMarker>>,
+    ) -> Result<(EnrollmentState, Option<Vec<u8>>), AccountManagerError> {
+        Ok(match (&self.lifetime, self.mechanisms.as_slice()) {
+            (AccountLifetime::Persistent { .. }, [mechanism]) => {
+                let server_end = interaction.take().ok_or_else(|| {
+                    AccountManagerError::new(ApiError::InvalidRequest)
+                        .with_cause(format_err!("Interaction ServerEnd missing."))
+                })?;
+                let (EnrollmentData(data), PrekeyMaterial(prekey_material)) =
+                    Interaction::enroll(server_end, *mechanism).await?;
+                // TODO(fxb/116213): Remove the clone once we don't need to
+                // return the prekey for checking outside of this block.
+                (
+                    produce_single_enrollment("".to_string(), data, prekey_material.clone())?,
+                    Some(prekey_material),
+                )
+            }
+            (AccountLifetime::Ephemeral, []) => (pre_auth::EnrollmentState::NoEnrollments, None),
+            (AccountLifetime::Persistent { .. }, _) => {
+                // We don't support zero or multiple authentication mechanisms.
+                // We already have a compile time check by providing the
+                // size limit in the structured config but we include this
+                // to cover zero or multiple mechanisms case.
+                return Err(AccountManagerError::new(ApiError::Internal).with_cause(format_err!(
+                    "CreateAccount called with unsupported number of \
+                            authentication mechanisms set on a persistent account"
+                )));
+            }
+            (AccountLifetime::Ephemeral, [_, ..]) => {
+                return Err(AccountManagerError::new(ApiError::Internal).with_cause(format_err!(
+                    "CreateAccount called with \
+                            authentication mechanism set on an ephemeral account"
+                )));
+            }
+        })
+    }
+
     /// Performs an authentication attempt if appropriate. Returns pre-key
     /// material from the attempt if the account is configured with a key, and
     /// optionally a new pre-authentication state, to be written if the
     /// attempt is successful.
     async fn authenticate(
+        is_interaction_enabled: bool,
         enrollment_state: &pre_auth::EnrollmentState,
-        _interaction: Option<ServerEnd<InteractionMarker>>,
+        mut interaction: Option<ServerEnd<InteractionMarker>>,
+        mechanisms: &[Mechanism],
     ) -> Result<(Option<Vec<u8>>, Option<pre_auth::EnrollmentState>), AccountManagerError> {
-        // TODO(fxb/104337): Implement the server end of the supplied interaction protocol to
-        // spawn new connections to authenticators.
-        let (_, test_interaction_server_end) = create_endpoints().unwrap();
-        let mut test_ipse = InteractionProtocolServerEnd::Test(test_interaction_server_end);
-
         if let pre_auth::EnrollmentState::SingleEnrollment {
             ref auth_mechanism_id,
             ref data,
             ref wrapped_key_material,
         } = enrollment_state
         {
-            let auth_mechanism_proxy = get_auth_mechanism_connection(auth_mechanism_id).await?;
             let mut enrollments = vec![Enrollment { id: ENROLLMENT_ID, data: data.clone() }];
-            let fut =
-                auth_mechanism_proxy.authenticate(&mut test_ipse, &mut enrollments.iter_mut());
-            let auth_attempt = fut.await.map_err(|err| {
-                AccountManagerError::new(ApiError::Unknown)
-                    .with_cause(format_err!("Error connecting to authenticator: {:?}", err))
-            })??;
+            let auth_attempt = if !is_interaction_enabled {
+                let (_, test_interaction_server_end) = create_endpoints().unwrap();
+                let mut test_ipse = InteractionProtocolServerEnd::Test(test_interaction_server_end);
+                let auth_mechanism_proxy = get_auth_mechanism_connection(auth_mechanism_id).await?;
+                let fut =
+                    auth_mechanism_proxy.authenticate(&mut test_ipse, &mut enrollments.iter_mut());
+                fut.await.map_err(|err| {
+                    AccountManagerError::new(ApiError::Unknown)
+                        .with_cause(format_err!("Error connecting to authenticator: {:?}", err))
+                })??
+            } else {
+                let mechanism = match mechanisms {
+                    [mechanism] => mechanism,
+                    _ => {
+                        return Err(AccountManagerError::new(ApiError::Internal).with_cause(
+                            format_err!("Invalid number of authentication mechanisms available."),
+                        ));
+                    }
+                };
+                let server_end = interaction.take().ok_or_else(|| {
+                    AccountManagerError::new(ApiError::InvalidRequest)
+                        .with_cause(format_err!("Interaction ServerEnd missing."))
+                })?;
+                Interaction::authenticate(server_end, *mechanism, enrollments).await?
+            };
             match auth_attempt.enrollment_id {
                 None => Err(AccountManagerError::new(ApiError::Internal).with_cause(format_err!(
                     "Authenticator returned an empty enrollment id during authentication."
@@ -678,6 +779,19 @@ where
     }
 }
 
+fn validate_prekey(maybe_prekey_material: Option<Vec<u8>>) -> Result<(), AccountManagerError> {
+    if let Some(prekey_material) = maybe_prekey_material {
+        // TODO(fxbug.dev/45041): Use storage manager for key validation
+        if prekey_material != *MAGIC_PREKEY {
+            return Err(AccountManagerError::new(ApiError::Internal).with_cause(format_err!(
+                "Received unexpected pre-key material from authenticator"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -741,10 +855,14 @@ mod tests {
     fn create_account_handler(
         lifetime: AccountLifetime,
         inspector: Arc<Inspector>,
+        is_interaction_enabled: bool,
+        mechanisms: Vec<Mechanism>,
     ) -> (AccountHandlerControlProxy, impl Future<Output = ()>) {
         let test_object = AccountHandler::new(
             lifetime,
             &inspector,
+            is_interaction_enabled,
+            mechanisms,
             /*storage_manager=*/
             make_storage_manager(
                 MockDiskManager::new().with_partition(make_formatted_account_partition_any_key()),
@@ -782,6 +900,8 @@ mod tests {
     {
         lifetime: AccountLifetime,
         inspector: Arc<Inspector>,
+        is_interaction_enabled: bool,
+        mechanisms: Vec<Mechanism>,
         test_fn: TestFn,
     }
 
@@ -791,7 +911,12 @@ mod tests {
         Fut: Future<Output = TestResult>,
     {
         let mut executor = fasync::LocalExecutor::new().expect("Failed to create executor");
-        let (proxy, server_fut) = create_account_handler(args.lifetime, args.inspector);
+        let (proxy, server_fut) = create_account_handler(
+            args.lifetime,
+            args.inspector,
+            args.is_interaction_enabled,
+            args.mechanisms,
+        );
 
         let (test_res, _server_result) =
             executor.run_singlethreaded(join((args.test_fn)(proxy), server_fut));
@@ -806,6 +931,8 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     let (_, account_server_end) = create_endpoints().unwrap();
                     assert_eq!(
@@ -825,6 +952,8 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     let (_, account_server_end) = create_endpoints().unwrap();
                     let pre_auth_state: Vec<u8> = (&*TEST_PRE_AUTH_EMPTY).try_into()?;
@@ -846,6 +975,8 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     proxy.create_account(create_account_request(TEST_ACCOUNT_ID_UINT)).await??;
 
@@ -867,6 +998,8 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::clone(&inspector))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|account_handler_proxy| {
                     async move {
                         account_handler_proxy
@@ -923,6 +1056,8 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::clone(&inspector))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     proxy.create_account(create_account_request(TEST_ACCOUNT_ID_UINT)).await??;
                     assert_data_tree!(inspector, root: {
@@ -941,6 +1076,8 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::clone(&inspector))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     let pre_auth_state: Vec<u8> = (&*TEST_PRE_AUTH_EMPTY).try_into()?;
                     proxy.preload(&pre_auth_state).await??;
@@ -972,6 +1109,8 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::clone(&inspector))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     proxy.create_account(create_account_request(TEST_ACCOUNT_ID_UINT)).await??;
                     proxy.lock_account().await??;
@@ -995,6 +1134,8 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     assert_eq!(
                         proxy
@@ -1016,6 +1157,8 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::clone(&inspector))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|proxy| {
                     async move {
                         assert_data_tree!(inspector, root: {
@@ -1078,6 +1221,8 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     proxy.create_account(create_account_request(TEST_ACCOUNT_ID_UINT)).await??;
 
@@ -1109,6 +1254,8 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     assert_eq!(proxy.remove_account().await?, Err(ApiError::FailedPrecondition));
                     Ok(())
@@ -1124,6 +1271,8 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|proxy| {
                     async move {
                         proxy
@@ -1158,6 +1307,8 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|proxy| {
                     async move {
                         proxy
@@ -1186,6 +1337,8 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     let pre_auth_state: Vec<u8> = (&*TEST_PRE_AUTH_EMPTY).try_into()?;
                     // Preloading a non-existing account will succeed, for now
@@ -1208,6 +1361,8 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(AccountLifetime::Ephemeral)
                 .inspector(Arc::new(Inspector::new()))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     assert_eq!(
                         proxy
@@ -1226,12 +1381,88 @@ mod tests {
     }
 
     #[test]
+    fn test_create_account_ephemeral_with_interaction_mechanism() {
+        request_stream_test(
+            RequestStreamTestArgs::builder()
+                .lifetime(AccountLifetime::Ephemeral)
+                .inspector(Arc::new(Inspector::new()))
+                .is_interaction_enabled(true)
+                .mechanisms(vec![Mechanism::Test])
+                .test_fn(|proxy| async move {
+                    assert_eq!(
+                        proxy
+                            .create_account(AccountHandlerControlCreateAccountRequest {
+                                id: Some(TEST_ACCOUNT_ID_UINT),
+                                ..AccountHandlerControlCreateAccountRequest::EMPTY
+                            })
+                            .await?,
+                        Err(ApiError::Internal)
+                    );
+                    Ok(())
+                })
+                .build(),
+        );
+    }
+
+    #[test]
+    fn test_create_account_persistent_with_multiple_interaction_mechanisms() {
+        let location = TempLocation::new();
+        request_stream_test(
+            RequestStreamTestArgs::builder()
+                .lifetime(location.to_persistent_lifetime())
+                .inspector(Arc::new(Inspector::new()))
+                .is_interaction_enabled(true)
+                .mechanisms(vec![Mechanism::Test, Mechanism::Password])
+                .test_fn(|proxy| async move {
+                    assert_eq!(
+                        proxy
+                            .create_account(AccountHandlerControlCreateAccountRequest {
+                                id: Some(TEST_ACCOUNT_ID_UINT),
+                                ..AccountHandlerControlCreateAccountRequest::EMPTY
+                            })
+                            .await?,
+                        Err(ApiError::Internal)
+                    );
+                    Ok(())
+                })
+                .build(),
+        );
+    }
+
+    #[test]
+    fn test_create_account_persistent_with_no_interaction_mechanisms() {
+        let location = TempLocation::new();
+        request_stream_test(
+            RequestStreamTestArgs::builder()
+                .lifetime(location.to_persistent_lifetime())
+                .inspector(Arc::new(Inspector::new()))
+                .is_interaction_enabled(true)
+                .mechanisms(vec![])
+                .test_fn(|proxy| async move {
+                    assert_eq!(
+                        proxy
+                            .create_account(AccountHandlerControlCreateAccountRequest {
+                                id: Some(TEST_ACCOUNT_ID_UINT),
+                                ..AccountHandlerControlCreateAccountRequest::EMPTY
+                            })
+                            .await?,
+                        Err(ApiError::Internal)
+                    );
+                    Ok(())
+                })
+                .build(),
+        );
+    }
+
+    #[test]
     fn test_lock_request_ephemeral_account_failure() {
         let inspector = Arc::new(Inspector::new());
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(AccountLifetime::Ephemeral)
                 .inspector(Arc::clone(&inspector))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|account_handler_proxy| async move {
                     account_handler_proxy
                         .create_account(create_account_request(TEST_ACCOUNT_ID_UINT))
@@ -1271,6 +1502,8 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::clone(&inspector))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|account_handler_proxy| async move {
                     account_handler_proxy
                         .create_account(create_account_request(TEST_ACCOUNT_ID_UINT))
@@ -1296,6 +1529,8 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(AccountLifetime::Ephemeral)
                 .inspector(Arc::clone(&inspector))
+                .is_interaction_enabled(false)
+                .mechanisms(vec![])
                 .test_fn(|account_handler_proxy| async move {
                     // Send the invalid request
                     assert_eq!(
