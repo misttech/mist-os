@@ -6,8 +6,48 @@ declare_args() {
   # Build any ffx plugins that can be built either as built-in or as separate
   # subtools as subtools.
   #
+  # Note that if you change this and don't `fx clean` you may wind up with stale
+  # copies of either the main `ffx` binary (with all the plugins built in) or
+  # the separately compiled ones, and that might produce confusing `ffx help`
+  # or `ffx commands` output.
+  #
   # When all subtools that will be migrated to the SDK have been migrated,
   # this config flag will be set to true by default, deprecated, and eventually
   # removed: fxb/117339
   ffx_build_dual_mode_plugins_as_subtools = false
+}
+
+# The list of plugins that can be built either as plugins or subtools,
+# used in the main ffx target if `ffx_build_dual_mode_plugns_as_subtools`
+# is false, and in tools/BUILD.gn if it's true (with the suffix of
+# `_tool_host_tool` appended)
+dual_mode_plugins = [
+  "//src/developer/ffx/plugins/assembly:ffx_assembly",
+  "//src/developer/ffx/plugins/audio:ffx_audio",
+  "//src/developer/ffx/plugins/component:ffx_component",
+  "//src/developer/ffx/plugins/debug:ffx_debug_plugin",
+  "//src/developer/ffx/plugins/efi:ffx_efi",
+  "//src/developer/ffx/plugins/emulator:ffx_emulator",
+  "//src/developer/ffx/plugins/flutter:ffx_flutter",
+  "//src/developer/ffx/plugins/inspect:ffx_inspect",
+  "//src/developer/ffx/plugins/package:ffx_package",
+  "//src/developer/ffx/plugins/platform:ffx_platform",
+  "//src/developer/ffx/plugins/power:ffx_power",
+  "//src/developer/ffx/plugins/product:ffx_product",
+  "//src/developer/ffx/plugins/profile:ffx_profile",
+  "//src/developer/ffx/plugins/repository:ffx_repository",
+  "//src/developer/ffx/plugins/scrutiny:ffx_scrutiny",
+  "//src/developer/ffx/plugins/session:ffx_session",
+  "//src/developer/ffx/plugins/setui:ffx_setui",
+  "//src/developer/ffx/plugins/sl4f:ffx_sl4f_plugin",
+  "//src/developer/ffx/plugins/starnix:ffx_starnix",
+  "//src/developer/ffx/plugins/wlan:ffx_wlan",
+]
+
+# The same list as `dual_mode_plugins`, but with the normal suffix for plugins converted to
+# subtools.
+dual_mode_subtools = []
+
+foreach(plugin, dual_mode_plugins) {
+  dual_mode_subtools += [ plugin + "_tool_host_tool" ]
 }

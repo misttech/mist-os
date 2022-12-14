@@ -5,6 +5,7 @@
 import("//build/sdk/sdk_atom.gni")
 import("//build/sdk/sdk_noop_atom.gni")
 import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/build/ffx_tool.gni")
 import("emu_companion.gni")
 
 if (is_host) {
@@ -57,4 +58,14 @@ if (is_host) {
     sdk_noop_atom("qemu_internal") {
     }
   }
+}
+
+ffx_tool("ffx_emulator_tool") {
+  edition = "2021"
+  output_name = "ffx-emulator"
+  deps = [
+    ":ffx_emulator_suite",
+    "//src/lib/fuchsia-async",
+  ]
+  sources = [ "src/main.rs" ]
 }

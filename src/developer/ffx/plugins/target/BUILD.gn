@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/build/ffx_tool.gni")
 
 ffx_plugin("ffx_target") {
   version = "0.1.0"
@@ -29,4 +30,14 @@ ffx_plugin("ffx_target") {
   ]
 
   args_sources = [ "src/args.rs" ]
+}
+
+ffx_tool("ffx_target_tool") {
+  edition = "2021"
+  output_name = "ffx-target"
+  deps = [
+    ":ffx_target_suite",
+    "//src/lib/fuchsia-async",
+  ]
+  sources = [ "src/main.rs" ]
 }

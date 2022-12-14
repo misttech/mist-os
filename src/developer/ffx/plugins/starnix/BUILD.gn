@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/build/ffx_tool.gni")
 
 ffx_plugin("ffx_starnix") {
   version = "0.0.1"
@@ -14,4 +15,14 @@ ffx_plugin("ffx_starnix") {
   ]
 
   args_sources = [ "src/args.rs" ]
+}
+
+ffx_tool("ffx_starnix_tool") {
+  edition = "2021"
+  output_name = "ffx-starnix"
+  deps = [
+    ":ffx_starnix_suite",
+    "//src/lib/fuchsia-async",
+  ]
+  sources = [ "src/main.rs" ]
 }

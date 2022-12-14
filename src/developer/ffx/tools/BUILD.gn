@@ -17,12 +17,7 @@ group("tools") {
   # Keep this set in sync with ../BUILD.gn's opposite listing.
   if (ffx_build_dual_mode_plugins_as_subtools) {
     # LINT.IfChange
-    public_deps += [
-      "//src/developer/ffx/plugins/assembly:ffx_assembly_tool_host_tool",
-      "//src/developer/ffx/plugins/efi:ffx_efi_tool_host_tool",
-      "//src/developer/ffx/plugins/product:ffx_product_tool_host_tool",
-      "//src/developer/ffx/plugins/scrutiny:ffx_scrutiny_tool_host_tool",
-    ]
+    public_deps += dual_mode_subtools  # from config.gni
     # LINT.ThenChange(../BUILD.gn)
   }
 }

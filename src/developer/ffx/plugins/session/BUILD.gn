@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/build/ffx_tool.gni")
 
 ffx_plugin("ffx_session") {
   version = "0.1.0"
@@ -27,4 +28,14 @@ group("tests") {
     "restart:ffx_session_restart_tests",
     "show:ffx_session_show_tests",
   ]
+}
+
+ffx_tool("ffx_session_tool") {
+  edition = "2021"
+  output_name = "ffx-session"
+  deps = [
+    ":ffx_session_suite",
+    "//src/lib/fuchsia-async",
+  ]
+  sources = [ "src/main.rs" ]
 }
