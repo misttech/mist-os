@@ -83,7 +83,7 @@ zx::result<> Mount(std::unique_ptr<minfs::Bcache> bcache, const MountOptions& op
 
 zx::result<> StartComponent(fidl::ServerEnd<fuchsia_io::Directory> root,
                             fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> lifecycle) {
-  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher());
 
   std::unique_ptr<ComponentRunner> runner(new ComponentRunner(loop.dispatcher()));

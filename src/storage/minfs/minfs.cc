@@ -526,10 +526,27 @@ BlockOffsets::BlockOffsets(const Bcache& bc, const SuperblockManager& sb) {
 #endif
 
 std::unique_ptr<Bcache> Minfs::Destroy(std::unique_ptr<Minfs> minfs) {
-#ifdef __Fuchsia__
-  minfs->StopWriteback();
-#endif
+  minfs->Terminate();
   return std::move(minfs->bc_);
+}
+
+void Minfs::Terminate() {
+#ifdef __Fuchsia__
+  // Try to cancel any scheduled syncs, if it can't then if the dispatcher is running on another
+  // thread, ensure that there isn't a sync running by pushing another task into it.
+  if (dispatcher_ && journal_sync_task_.Cancel() != ZX_OK &&
+      dispatcher_ != async_get_default_dispatcher()) {
+    sync_completion_t completion;
+    async::TaskClosure finish_periodic_sync(
+        [&completion]() { sync_completion_signal(&completion); });
+    finish_periodic_sync.Post(dispatcher_);
+    sync_completion_wait(&completion, ZX_TIME_INFINITE);
+  }
+  StopWriteback();
+  dispatcher_ = nullptr;
+  fbl::AutoLock lock(&hash_lock_);
+  vnode_hash_.clear();
+#endif
 }
 
 zx::result<std::unique_ptr<Transaction>> Minfs::BeginTransaction(size_t reserve_inodes,
@@ -740,21 +757,7 @@ Minfs::Minfs(std::unique_ptr<Bcache> bc, std::unique_ptr<SuperblockManager> sb,
       vfs_(vfs) {}
 #endif
 
-Minfs::~Minfs() {
-  vnode_hash_.clear();
-#ifdef __Fuchsia__
-  // Try to cancel any scheduled syncs, if it can't then if the dispatcher is running on another
-  // thread, ensure that there isn't a sync running by pushing another task into it.
-  if (dispatcher_ && journal_sync_task_.Cancel() != ZX_OK &&
-      dispatcher_ != async_get_default_dispatcher()) {
-    sync_completion_t completion;
-    async::TaskClosure finish_periodic_sync(
-        [&completion]() { sync_completion_signal(&completion); });
-    finish_periodic_sync.Post(dispatcher_);
-    sync_completion_wait(&completion, ZX_TIME_INFINITE);
-  }
-#endif
-}
+Minfs::~Minfs() { Terminate(); }
 
 zx::result<> Minfs::InoFree(Transaction* transaction, VnodeMinfs* vn) {
   TRACE_DURATION("minfs", "Minfs::InoFree", "ino", vn->GetIno());
@@ -1169,6 +1172,11 @@ zx::result<std::unique_ptr<Minfs>> Minfs::Create(FuchsiaDispatcher dispatcher,
   Superblock& info = info_or.value();
 
 #ifdef __Fuchsia__
+  // In Terminate we rely on the default dispatcher being set for the dispatcher thread, so
+  // assert that now.
+  async::PostTask(dispatcher,
+                  [dispatcher] { ZX_ASSERT(async_get_default_dispatcher() == dispatcher); });
+
   if ((info.flags & kMinfsFlagClean) == 0 && !options.quiet) {
     FX_LOGS(WARNING) << "filesystem not unmounted cleanly.";
   }

@@ -22,7 +22,7 @@ namespace {
 
 class MinfsComponentRunnerTest : public testing::Test {
  public:
-  MinfsComponentRunnerTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+  MinfsComponentRunnerTest() : loop_(&kAsyncLoopConfigAttachToCurrentThread) {}
 
   void SetUp() override {
     constexpr uint64_t kBlockCount = 1 << 17;
