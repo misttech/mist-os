@@ -104,7 +104,7 @@ class Devnode {
     bool IsService() const final;
     zx_status_t OpenNode(ValidatedOptions options, fbl::RefPtr<Vnode>* out_redirect) final;
 
-    bool IsSkipRightsEnforcementDevfsOnlyDoNotUse() const final { return true; }
+    bool IsSkipRightsEnforcementDevfsOnlyDoNotUse() const final { return false; }
 
     PseudoDir& children() const { return *children_; }
 
@@ -162,7 +162,7 @@ class PseudoDir : public fs::PseudoDir {
 
  private:
   PseudoDir() : fs::PseudoDir(false) {}
-  bool IsSkipRightsEnforcementDevfsOnlyDoNotUse() const final { return true; }
+  bool IsSkipRightsEnforcementDevfsOnlyDoNotUse() const final { return false; }
 
   friend fbl::internal::MakeRefCountedHelper<PseudoDir>;
 };
