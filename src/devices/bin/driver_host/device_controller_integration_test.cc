@@ -41,12 +41,18 @@ void CreateTestDevice(const IsolatedDevmgr& devmgr, const char* driver_name,
   zx::channel local, remote;
   ASSERT_OK(zx::channel::create(0, &local, &remote));
 
-  auto result =
-      test_root->CreateDevice(fidl::StringView::FromExternal(driver_name), std::move(remote));
+  auto result = test_root->CreateDevice(fidl::StringView::FromExternal(driver_name));
   ASSERT_OK(result.status());
   ASSERT_TRUE(result->is_ok(), "CreateDevice failed %s",
               zx_status_get_string(result->error_value()));
-  *dev_channel = std::move(local);
+
+  // Connect to the child that we created.
+  {
+    zx::result channel = device_watcher::RecursiveWaitForFile(
+        devmgr.devfs_root().get(), std::string(result->value()->path.get()).c_str());
+    ASSERT_OK(channel.status_value());
+    *dev_channel = std::move(channel.value());
+  }
 }
 
 class DeviceControllerIntegrationTest : public zxtest::Test {

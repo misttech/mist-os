@@ -66,17 +66,23 @@ zx_status_t RootMockDevice::CreateFromTestRoot(
     const IsolatedDevmgr& devmgr, async_dispatcher_t* dispatcher,
     fidl::SynchronousInterfacePtr<fuchsia::device::test::RootDevice> test_root,
     std::unique_ptr<MockDeviceHooks> hooks, std::unique_ptr<RootMockDevice>* mock_out) {
-  fidl::SynchronousInterfacePtr<fuchsia::device::test::Device> test_dev;
-
   fuchsia::device::test::RootDevice_CreateDevice_Result create_result;
-  zx_status_t status =
-      test_root->CreateDevice("mock", test_dev.NewRequest().TakeChannel(), &create_result);
+  zx_status_t status = test_root->CreateDevice("mock", &create_result);
   if (status != ZX_OK) {
     return status;
   }
   if (create_result.is_err()) {
     return create_result.err();
   }
+
+  // Connect to the created device.
+  zx::result channel = device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(),
+                                                            create_result.response().path.c_str());
+  if (channel.is_error()) {
+    return channel.error_value();
+  }
+  fidl::SynchronousInterfacePtr<fuchsia::device::test::Device> test_dev;
+  test_dev.Bind(std::move(channel.value()));
 
   auto destroy_device = fit::defer([&test_dev] { test_dev->Destroy(); });
 

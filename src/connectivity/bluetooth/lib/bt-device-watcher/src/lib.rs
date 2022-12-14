@@ -253,7 +253,7 @@ mod tests {
     /// Used to keep track of return values.
     struct IsolatedDevMgrTest {
         // The realm holding the IsolatedDevMgr
-        _realm: RealmInstance,
+        realm: RealmInstance,
 
         // The root test device.
         test_dev: RootDeviceSynchronousProxy,
@@ -289,22 +289,36 @@ mod tests {
             fio::OpenFlags::RIGHT_READABLE,
         )
         .await?;
-        Ok(IsolatedDevMgrTest { _realm: realm, test_dev, dev_test_dir })
+        Ok(IsolatedDevMgrTest { realm, test_dev, dev_test_dir })
     }
 
     // Creates a fuchsia.device.test.Device under the root test device.
-    fn create_test_dev_in_devmgr(
+    async fn create_test_dev_in_devmgr(
         name: &str,
         test_dev: &RootDeviceSynchronousProxy,
+        realm: &RealmInstance,
     ) -> Result<DeviceFile, Error> {
         // Create a test device under the `/dev/sys/test/test` root device.
-        let (local, remote) = zx::Channel::create()?;
         let path = test_dev
-            .create_device(name, Some(remote), zx::Time::after(TIMEOUT))?
+            .create_device(name, zx::Time::after(TIMEOUT))?
             .map_err(|e| zx::Status::from_raw(e))?;
+
         let relative_path = Path::new(&path).strip_prefix(CONTROL_DEVICE)?.to_owned();
-        let file = fdio::create_fd(zx::Handle::from(local))?;
+
+        let dev_dir = fuchsia_fs::directory::open_directory(
+            realm.root.get_exposed_dir(),
+            "dev",
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await?;
+
+        let created_dev = device_watcher::recursive_wait_and_open_node(&dev_dir, &path).await?;
+        let created_dev =
+            created_dev.into_channel().expect("failed to convert to channel").into_zx_channel();
+        let file = fdio::create_fd(zx::Handle::from(created_dev))?;
+
         let topo_path = PathBuf::from(fdio::device_get_topo_path(&file)?);
+
         Ok(DeviceFile { file, relative_path, topo_path })
     }
 
@@ -316,14 +330,15 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_watch_new() {
-        let IsolatedDevMgrTest { _realm, test_dev, dev_test_dir } =
+        let IsolatedDevMgrTest { realm, test_dev, dev_test_dir } =
             create_isolated_devmgr().await.expect("Failed to create IsolatedDevMgr");
-        let dev_test_dir_clone = Clone::clone(&dev_test_dir);
-        let mut watcher = DeviceWatcher::new(DEVICE_TEST_DIRECTORY, dev_test_dir, TIMEOUT)
-            .await
-            .expect("Failed to create watcher for test devices");
+        let mut watcher =
+            DeviceWatcher::new(DEVICE_TEST_DIRECTORY, Clone::clone(&dev_test_dir), TIMEOUT)
+                .await
+                .expect("Failed to create watcher for test devices");
 
-        let dev = create_test_dev_in_devmgr("test-watch-new", &test_dev)
+        let dev = create_test_dev_in_devmgr("test-watch-new", &test_dev, &realm)
+            .await
             .expect("Failed to create test device");
         let found = watcher
             .watch_new(dev.topo_path(), WatchFilter::AddedOnly)
@@ -332,7 +347,7 @@ mod tests {
         assert_eq!(dev.topo_path(), found.topo_path());
 
         // Calling with the `existing` flag should succeed.
-        let mut watcher = DeviceWatcher::new(DEVICE_TEST_DIRECTORY, dev_test_dir_clone, TIMEOUT)
+        let mut watcher = DeviceWatcher::new(DEVICE_TEST_DIRECTORY, dev_test_dir, TIMEOUT)
             .await
             .expect("Failed to create watcher for test devices");
         let found = watcher
@@ -347,9 +362,10 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_watch_existing() {
-        let IsolatedDevMgrTest { _realm, test_dev, dev_test_dir } =
+        let IsolatedDevMgrTest { realm, test_dev, dev_test_dir } =
             create_isolated_devmgr().await.expect("Failed to create IsolatedDevMgr");
-        let dev = create_test_dev_in_devmgr("test-watch-existing", &test_dev)
+        let dev = create_test_dev_in_devmgr("test-watch-existing", &test_dev, &realm)
+            .await
             .expect("Failed to create test device");
         let mut watcher = DeviceWatcher::new(DEVICE_TEST_DIRECTORY, dev_test_dir, TIMEOUT)
             .await
@@ -366,9 +382,10 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_watch_removed() {
-        let IsolatedDevMgrTest { _realm, test_dev, dev_test_dir } =
+        let IsolatedDevMgrTest { realm, test_dev, dev_test_dir } =
             create_isolated_devmgr().await.expect("Failed to create IsolatedDevMgr");
-        let dev = create_test_dev_in_devmgr("test-watch-removed", &test_dev)
+        let dev = create_test_dev_in_devmgr("test-watch-removed", &test_dev, &realm)
+            .await
             .expect("Failed to create test device");
         let mut watcher = DeviceWatcher::new(DEVICE_TEST_DIRECTORY, dev_test_dir, TIMEOUT)
             .await
@@ -389,7 +406,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_watch_timeout() {
-        let IsolatedDevMgrTest { _realm, test_dev: _, dev_test_dir } =
+        let IsolatedDevMgrTest { realm: _realm, test_dev: _, dev_test_dir } =
             create_isolated_devmgr().await.expect("Failed to create IsolatedDevMgr");
         let mut watcher =
             DeviceWatcher::new(DEVICE_TEST_DIRECTORY, dev_test_dir, zx::Duration::from_nanos(0))
@@ -409,7 +426,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_removed_helper_path_validation() {
-        let IsolatedDevMgrTest { _realm, test_dev: _, dev_test_dir } =
+        let IsolatedDevMgrTest { realm: _realm, test_dev: _, dev_test_dir } =
             create_isolated_devmgr().await.expect("Failed to create IsolatedDevMgr");
         let mut watcher = DeviceWatcher::new(DEVICE_TEST_DIRECTORY, dev_test_dir, TIMEOUT)
             .await

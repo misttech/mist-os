@@ -49,12 +49,8 @@ class BindCompilerV2Test : public gtest::TestLoopFixture {
     fidl::ClientEnd<fuchsia_device_test::RootDevice> client_end(std::move(channel.value()));
     fidl::WireSyncClient root_device{std::move(client_end)};
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
-    ASSERT_EQ(ZX_OK, endpoints.status_value());
-
     // Create the root test device in /dev/sys/test/test, and get its relative path from /dev.
-    auto result = root_device->CreateDevice(fidl::StringView::FromExternal(kDriverLibname),
-                                            endpoints->server.TakeChannel());
+    auto result = root_device->CreateDevice(fidl::StringView::FromExternal(kDriverLibname));
 
     ASSERT_EQ(result.status(), ZX_OK);
     ASSERT_TRUE(result->is_ok()) << "CreateDevice failed "
@@ -62,16 +58,24 @@ class BindCompilerV2Test : public gtest::TestLoopFixture {
 
     device_path_ = std::string(result->value()->path.get());
 
-    // Bind the test driver to the new device.
-    auto response =
-        fidl::WireCall(endpoints->client)->Bind(::fidl::StringView::FromExternal(kDriverLibname));
-    status = response.status();
-    if (status == ZX_OK) {
-      if (response->is_error()) {
-        status = response->error_value();
+    // Connect to the child device and bind a test driver to it.
+    {
+      zx::result channel =
+          device_watcher::RecursiveWaitForFile(root_fd.get(), device_path_.c_str());
+      ASSERT_EQ(channel.status_value(), ZX_OK);
+
+      fidl::ClientEnd<fuchsia_device::Controller> client_end(std::move(channel.value()));
+      fidl::WireSyncClient child{std::move(client_end)};
+
+      auto response = child->Bind(::fidl::StringView::FromExternal(kDriverLibname));
+      status = response.status();
+      if (status == ZX_OK) {
+        if (response->is_error()) {
+          status = response->error_value();
+        }
       }
+      ASSERT_EQ(status, ZX_OK);
     }
-    ASSERT_EQ(status, ZX_OK);
 
     // Connect to the DriverDevelopment service.
     status = realm_->Connect(driver_dev_.NewRequest());
@@ -138,7 +142,7 @@ TEST_F(BindCompilerV2Test, InvalidDevice) {
 
 // Get the properties of the test driver's child device and check that they are as expected.
 TEST_F(BindCompilerV2Test, ValidDevice) {
-  std::string child_device_path(device_path_ + "/" + kChildDeviceName);
+  std::string child_device_path("/dev/" + device_path_ + "/" + kChildDeviceName);
 
   fuchsia::driver::development::DeviceInfoIteratorSyncPtr iterator;
   ASSERT_EQ(driver_dev_->GetDeviceInfo({child_device_path}, iterator.NewRequest(),

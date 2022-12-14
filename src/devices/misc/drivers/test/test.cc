@@ -76,8 +76,8 @@ class TestRootDevice : public TestRootDeviceType {
 
  private:
   // Create a new child device with this |name|
-  zx_status_t CreateDeviceInternal(std::string_view name, zx::channel client_remote, char* path_out,
-                                   size_t path_size, size_t* path_actual);
+  zx_status_t CreateDeviceInternal(std::string_view name, char* path_out, size_t path_size,
+                                   size_t* path_actual);
 };
 
 void TestDevice::TestSetOutputSocket(zx::socket socket) { output_ = std::move(socket); }
@@ -133,9 +133,8 @@ void TestDevice::DdkUnbind(ddk::UnbindTxn txn) {
   txn.Reply();
 }
 
-zx_status_t TestRootDevice::CreateDeviceInternal(std::string_view name, zx::channel client_remote,
-                                                 char* path_out, size_t path_size,
-                                                 size_t* path_actual) {
+zx_status_t TestRootDevice::CreateDeviceInternal(std::string_view name, char* path_out,
+                                                 size_t path_size, size_t* path_actual) {
   static_assert(fuchsia_device_test::wire::kMaxDeviceNameLen == ZX_DEVICE_NAME_MAX);
 
   char devname[ZX_DEVICE_NAME_MAX + 1] = {};
@@ -155,8 +154,7 @@ zx_status_t TestRootDevice::CreateDeviceInternal(std::string_view name, zx::chan
   }
 
   auto device = std::make_unique<TestDevice>(zxdev());
-  zx_status_t status =
-      device->DdkAdd(ddk::DeviceAddArgs(devname).set_client_remote(std::move(client_remote)));
+  zx_status_t status = device->DdkAdd(ddk::DeviceAddArgs(devname));
   if (status != ZX_OK) {
     return status;
   }
@@ -172,8 +170,7 @@ void TestRootDevice::CreateDevice(CreateDeviceRequestView request,
                                   CreateDeviceCompleter::Sync& completer) {
   char path[fuchsia_device_test::wire::kMaxDevicePathLen];
   size_t path_size = 0;
-  zx_status_t status = CreateDeviceInternal(request->name.get(), std::move(request->device_request),
-                                            path, sizeof(path), &path_size);
+  zx_status_t status = CreateDeviceInternal(request->name.get(), path, sizeof(path), &path_size);
   if (status != ZX_OK) {
     completer.ReplyError(status);
     return;
