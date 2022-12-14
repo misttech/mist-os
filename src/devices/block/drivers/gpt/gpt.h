@@ -17,6 +17,7 @@
 
 #include <ddk/metadata/gpt.h>
 #include <ddktl/device.h>
+#include <fbl/macros.h>
 #include <gpt/c/gpt.h>
 #include <gpt/gpt.h>
 

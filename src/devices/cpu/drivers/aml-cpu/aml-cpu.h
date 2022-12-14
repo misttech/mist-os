@@ -15,6 +15,7 @@
 
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
+#include <fbl/macros.h>
 #include <soc/aml-common/aml-cpu-metadata.h>
 
 namespace amlogic_cpu {

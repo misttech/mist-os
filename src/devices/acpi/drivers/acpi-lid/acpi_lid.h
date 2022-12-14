@@ -8,6 +8,7 @@
 #include <fuchsia/hardware/hidbus/cpp/banjo.h>
 
 #include <ddktl/device.h>
+#include <fbl/macros.h>
 
 #include "src/devices/lib/acpi/client.h"
 

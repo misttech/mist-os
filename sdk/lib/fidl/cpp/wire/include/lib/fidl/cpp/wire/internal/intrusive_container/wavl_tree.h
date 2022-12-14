@@ -256,6 +256,10 @@ class __POINTER(KeyType_) WAVLTree {
     return *this;
   }
 
+  // move semantics only
+  WAVLTree(const WAVLTree&) = delete;
+  WAVLTree& operator=(const WAVLTree&) = delete;
+
   ~WAVLTree() {
     // It is considered an error to allow a tree of unmanaged pointers to
     // destruct of there are still elements in it.  Managed pointer trees
@@ -805,9 +809,6 @@ class __POINTER(KeyType_) WAVLTree {
 
   // The test framework's 'checker' class is our friend.
   friend CheckerType;
-
-  // move semantics only
-  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(WAVLTree);
 
   void internal_insert(PtrType& ptr, RawPtrType* collision = nullptr) {
     ZX_DEBUG_ASSERT(ptr != nullptr);

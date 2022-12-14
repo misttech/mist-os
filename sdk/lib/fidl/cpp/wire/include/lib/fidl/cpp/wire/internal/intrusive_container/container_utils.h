@@ -331,7 +331,7 @@ struct ContainableBaseClasses {
 };
 
 namespace internal {
-DECLARE_HAS_MEMBER_TYPE(has_tag_types, TagTypes);
+FIDL_INTERNAL_DECLARE_HAS_MEMBER_TYPE(has_tag_types, TagTypes);
 }
 
 // These are free function because making it a member function presents

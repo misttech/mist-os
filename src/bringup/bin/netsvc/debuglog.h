@@ -13,6 +13,8 @@
 
 #include <queue>
 
+#include <fbl/macros.h>
+
 #include "src/bringup/bin/netsvc/netsvc.h"
 
 zx_status_t debuglog_init(async_dispatcher_t* dispatcher);
