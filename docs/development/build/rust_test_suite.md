@@ -34,7 +34,7 @@ required for running the test suite.
 
    ```posix-terminal
    DEV_ROOT={{ '<var>' }}DEV_ROOT{{ '</var>' }}
-   TEST_TOOLCHAIN=$DEV_ROOT/infra/fuchsia/recipes/recipes/contrib/rust_toolchain.resources/test_toolchain.py
+   TEST_TOOLCHAIN={{ '<var>' }}RUST_SRC{{ '</var>' }}/src/ci/docker/scripts/fuchsia-test-runner.py
 
    python3 $TEST_TOOLCHAIN start \
      --rust $DEV_ROOT/rust/install/fuchsia-rust \
@@ -50,7 +50,7 @@ required for running the test suite.
 
    ```posix-terminal
    DEV_ROOT={{ '<var>' }}DEV_ROOT{{ '</var>' }}
-   TEST_TOOLCHAIN=$DEV_ROOT/infra/fuchsia/recipes/recipes/contrib/rust_toolchain.resources/test_toolchain.py
+   TEST_TOOLCHAIN={{ '<var>' }}RUST_SRC{{ '</var>' }}/src/ci/docker/scripts/fuchsia-test-runner.py
 
    ( \
      source $DEV_ROOT/rust/fuchsia-env.sh && \
@@ -80,7 +80,7 @@ required for running the test suite.
 
    ```posix-terminal
    DEV_ROOT={{ '<var>' }}DEV_ROOT{{ '</var>' }}
-   TEST_TOOLCHAIN=$DEV_ROOT/infra/fuchsia/recipes/recipes/contrib/rust_toolchain.resources/test_toolchain.py
+   TEST_TOOLCHAIN={{ '<var>' }}RUST_SRC{{ '</var>' }}src/ci/docker/scripts/fuchsia-test-runner.py
 
    python3 $TEST_TOOLCHAIN stop
    ```
@@ -89,7 +89,7 @@ required for running the test suite.
 
 Running the test suite produces many logs and other artifacts to aid in
 investigating failing test suite tests. These can be dumped to standard output
-during `test_toolchain.py stop` if the `--verbose` flag was used to start the
+during `fuchsia-test-runner.py stop` if the `--verbose` flag was used to start the
 testing environment.
 
 Note: These files are cleaned up by default when running the `stop` command. You
@@ -123,7 +123,7 @@ environments.
 
    ```posix-terminal
    DEV_ROOT={{ '<var>' }}DEV_ROOT{{ '</var>' }}
-   TEST_TOOLCHAIN=$DEV_ROOT/infra/fuchsia/recipes/recipes/contrib/rust_toolchain.resources/test_toolchain.py
+   TEST_TOOLCHAIN={{ '<var>' }}RUST_SRC{{ '</var>' }}/src/ci/docker/scripts/fuchsia-test-runner.py
 
    python3 $TEST_TOOLCHAIN debug \
      --rust-src {{ '<var>' }}RUST_SRC{{ '</var>' }} \
