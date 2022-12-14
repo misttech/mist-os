@@ -27,8 +27,8 @@ pub struct BasePackages {
 
 /// All of the base blobs.
 /// If the system is configured to have a system_image package, then:
-///   1. the meta.far and content blobs of the system_image package
-///   2. the meta.fars and content blobs of all the static_packages.
+///   1. the meta.far, content blobs, and transitive subpackage blobs of the system_image package
+///   2. the meta.fars, content blobs, and transitive subpackage blobs of all the static_packages.
 /// Otherwise, empty.
 #[derive(Debug)]
 struct BaseBlobs {
@@ -73,7 +73,7 @@ impl BasePackages {
             hashes_to_paths.entry(hash).or_default().push(path)
         }
 
-        match Self::load_base_blobs(blobfs, hashes_to_paths.iter().map(|p| *p.0)).await {
+        match Self::load_base_blobs(blobfs, hashes_to_paths.keys().copied()).await {
             Ok(blobs) => Ok(Self {
                 base_blobs: BaseBlobs::new(blobs, node.create_child("base-blobs")),
                 hashes_to_paths,
@@ -101,9 +101,11 @@ impl BasePackages {
         blobfs: &blobfs::Client,
         base_package_hashes: impl Iterator<Item = Hash>,
     ) -> Result<HashSet<Hash>, Error> {
-        let mut futures =
-            futures::stream::iter(base_package_hashes.map(|p| Self::package_blobs(blobfs, p)))
-                .buffer_unordered(1000);
+        let memoized_packages = async_lock::RwLock::new(HashMap::new());
+        let mut futures = futures::stream::iter(
+            base_package_hashes.map(|p| Self::package_blobs(blobfs, p, &memoized_packages)),
+        )
+        .buffer_unordered(1000);
 
         let mut ret = HashSet::new();
         while let Some(p) = futures.try_next().await? {
@@ -113,16 +115,23 @@ impl BasePackages {
         Ok(ret)
     }
 
-    // Return all blobs that make up `package`, including the meta.far.
+    // Returns all blobs of `package`: the meta.far, the content blobs, and the transitive
+    // closure of subpackage blobs.
     async fn package_blobs(
         blobfs: &blobfs::Client,
         package: Hash,
+        memoized_packages: &async_lock::RwLock<HashMap<Hash, HashSet<Hash>>>,
     ) -> Result<impl Iterator<Item = Hash>, Error> {
-        let package_dir = package_directory::RootDir::new(blobfs.clone(), package)
+        Ok(std::iter::once(package).chain(
+            crate::required_blobs::find_required_blobs_recursive(
+                blobfs,
+                &package,
+                memoized_packages,
+                crate::required_blobs::ErrorStrategy::PropagateFailure,
+            )
             .await
-            .with_context(|| format!("making RootDir for {}", package))?;
-        let external_hashes = package_dir.external_file_hashes().copied().collect::<Vec<_>>();
-        Ok(std::iter::once(package).chain(external_hashes))
+            .with_context(|| format!("determining required blobs for base package {package}"))?,
+        ))
     }
 
     /// Returns `true` iff `pkg` is the hash of a base package.
@@ -171,10 +180,13 @@ mod tests {
     }
 
     impl TestEnv {
-        async fn new(static_packages: &[&fuchsia_pkg_testing::Package]) -> (Self, BasePackages) {
+        async fn new_with_subpackages(
+            static_packages: &[&fuchsia_pkg_testing::Package],
+            subpackages: &[&fuchsia_pkg_testing::Package],
+        ) -> (Self, BasePackages) {
             let (blobfs_client, blobfs_fake) = blobfs::Client::new_temp_dir_fake();
             let blobfs_dir = blobfs_fake.backing_dir_as_openat_dir();
-            for p in static_packages.iter() {
+            for p in static_packages.iter().chain(subpackages) {
                 p.write_to_blobfs_dir(&blobfs_dir);
             }
 
@@ -203,31 +215,42 @@ mod tests {
 
             (Self { _blobfs_fake: blobfs_fake, system_image, inspector }, base_packages)
         }
+
+        async fn new(static_packages: &[&fuchsia_pkg_testing::Package]) -> (Self, BasePackages) {
+            Self::new_with_subpackages(static_packages, &[]).await
+        }
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn identifies_all_blobs() {
-        let a_base_package = PackageBuilder::new("a-base-package")
-            .add_resource_at("a-base-blob", &b"a-base-blob-contents"[..])
+        let base_subpackage = PackageBuilder::new("base-subpackage")
+            .add_resource_at("base-subpackage-blob", &b"base-subpackage-blob-contents"[..])
             .build()
             .await
             .unwrap();
-        let a_base_package_blobs = a_base_package.list_blobs().unwrap();
-        let (env, base_packages) = TestEnv::new(&[&a_base_package]).await;
+        let a_base_package = PackageBuilder::new("a-base-package")
+            .add_resource_at("a-base-blob", &b"a-base-blob-contents"[..])
+            .add_subpackage("my-subpackage", &base_subpackage)
+            .build()
+            .await
+            .unwrap();
+        let (env, base_packages) =
+            TestEnv::new_with_subpackages(&[&a_base_package], &[&base_subpackage]).await;
 
         let expected_blobs = env
             .system_image
             .list_blobs()
             .unwrap()
             .into_iter()
-            .chain(a_base_package_blobs.into_iter())
+            .chain(a_base_package.list_blobs().unwrap())
+            .chain(base_subpackage.list_blobs().unwrap())
             .collect();
         assert_eq!(base_packages.list_blobs(), &expected_blobs);
 
         assert_data_tree!(env.inspector, root: {
             "base-packages": {
                 "base-blobs": {
-                    "count": 4u64,
+                    "count": 6u64,
                 }
             }
         });

@@ -35,6 +35,7 @@ mod cache_service;
 mod compat;
 mod gc_service;
 mod index;
+mod required_blobs;
 mod retained_packages_service;
 
 #[cfg(test)]

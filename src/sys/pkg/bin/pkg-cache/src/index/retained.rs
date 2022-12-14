@@ -6,9 +6,7 @@ use {
     fuchsia_hash::Hash,
     fuchsia_inspect::{self as finspect, NumericProperty, Property},
     fuchsia_zircon as zx,
-    futures::future::FutureExt as _,
     std::collections::{HashMap, HashSet},
-    tracing::{error, info},
 };
 
 /// An index of packages considered to be part of a new system's base package set.
@@ -224,76 +222,22 @@ pub async fn populate_retained_index(
     meta_hashes: &[Hash],
 ) -> RetainedIndex {
     let mut packages = HashMap::with_capacity(meta_hashes.len());
-    let mut found_packages = HashMap::new();
+    let memoized_packages = async_lock::RwLock::new(HashMap::new());
     for meta_hash in meta_hashes {
-        let found = find_required_blobs_recursive(blobfs, meta_hash, &mut found_packages).await;
-        let retained_hashes = RetainedHashes { hashes: found.clone(), ..Default::default() };
-        found.map(|f| found_packages.insert(*meta_hash, f));
+        let found = crate::required_blobs::find_required_blobs_recursive(
+            blobfs,
+            meta_hash,
+            &memoized_packages,
+            crate::required_blobs::ErrorStrategy::BestEffort,
+        )
+        .await
+        .ok();
+        let retained_hashes = RetainedHashes { hashes: found, ..Default::default() };
         packages.insert(*meta_hash, retained_hashes);
     }
 
     let inspect = RetainedIndexInspect::default();
     RetainedIndex { packages, inspect }
-}
-
-/// Returns all known required blobs of package `meta_hash`, not guaranteed to be complete.
-/// Caches intermediate results in `found_packages` to de-duplicate work in case there are
-/// shared subpackages.
-/// `found_packages` is *not* updated with the (`meta_hash`, return value) entry, callers should
-/// do so.
-/// TODO(fxbug.dev/112773) Replace with an iterative implementation to avoid stack overflows.
-fn find_required_blobs_recursive<'a>(
-    blobfs: &'a blobfs::Client,
-    meta_hash: &'a Hash,
-    found_packages: &'a mut HashMap<Hash, HashSet<Hash>>,
-) -> futures::future::BoxFuture<'a, Option<HashSet<Hash>>> {
-    async move {
-        if let Some(found) = found_packages.get(meta_hash) {
-            return Some(found.clone());
-        }
-
-        let root_dir = match package_directory::RootDir::new(blobfs.clone(), *meta_hash).await {
-            Ok(root_dir) => root_dir,
-            Err(package_directory::Error::MissingMetaFar) => return None,
-            Err(e) => {
-                // The package isn't readable, it may be in the process of being cached. The
-                // required blobs will be added later by the caching process or when the retained
-                // index under construction is swapped into the package index.
-                info!(
-                    "failed to enumerate content blobs for package {}: {:#}",
-                    meta_hash,
-                    anyhow::anyhow!(e)
-                );
-                return None;
-            }
-        };
-
-        let mut found = root_dir.external_file_hashes().copied().collect::<HashSet<_>>();
-
-        let subpackages = match root_dir.subpackages().await {
-            Ok(subpackages) => subpackages.into_subpackages(),
-            Err(e) => {
-                error!(
-                    "error obtaining subpackages for package {}: {:#}",
-                    meta_hash,
-                    anyhow::anyhow!(e)
-                );
-                return Some(found);
-            }
-        };
-        for subpackage in subpackages.values() {
-            found.insert(*subpackage);
-            if let Some(subpackage_found) =
-                find_required_blobs_recursive(blobfs, subpackage, found_packages).await
-            {
-                found.extend(subpackage_found.iter().copied());
-                found_packages.insert(*subpackage, subpackage_found);
-            }
-        }
-
-        Some(found)
-    }
-    .boxed()
 }
 
 #[cfg(test)]

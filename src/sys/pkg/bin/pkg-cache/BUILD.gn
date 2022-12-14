@@ -79,6 +79,7 @@ rustc_library("lib") {
     "src/index/package.rs",
     "src/index/retained.rs",
     "src/main.rs",
+    "src/required_blobs.rs",
     "src/retained_packages_service.rs",
     "src/test_utils.rs",
   ]
