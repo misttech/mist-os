@@ -271,7 +271,7 @@ impl FromStr for AuthMode {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_ref() {
+        match s.as_ref() {
             "default" => Ok(AuthMode::Default),
             "oob" => Ok(AuthMode::Oob),
             "pkce" => Ok(AuthMode::Pkce),

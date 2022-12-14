@@ -78,7 +78,7 @@ impl FromStr for AuthFlowChoice {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_ref() {
+        match s.as_ref() {
             "no-auth" => Ok(AuthFlowChoice::NoAuth),
             "default" => Ok(AuthFlowChoice::Default),
             "device-experimental" => Ok(AuthFlowChoice::Device),
