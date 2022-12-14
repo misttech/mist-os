@@ -51,12 +51,29 @@ struct bench_vk
   VkQueue                          q;
   VkCommandPool                    cp;
   VkQueryPool                      qp;
+  bool                             is_calibrated;  // Is VK_EXT_calibrated_timestamps present?
+  bool                             is_calibrated_disabled;
+  struct
+  {
+    bool is_clock_monotonic;
+    bool is_clock_monotonic_raw;
+    bool is_query_performance_counter;
+  } time_domains;
 };
 
 //
 // Will be NULL if VK_EXT_calibrated_timestamps isn't supported
 //
-PFN_vkGetCalibratedTimestampsEXT pfn_vkGetCalibratedTimestampsEXT;
+#define BENCH_PFN_NAME(name_) pfn_##name_
+#define BENCH_PFN_TYPE(name_) PFN_##name_
+#define BENCH_PFN_DECL(name_) BENCH_PFN_TYPE(name_) BENCH_PFN_NAME(name_) = NULL
+#define BENCH_PFN_INSTANCE_INIT(instance_, name_)                                                  \
+  BENCH_PFN_NAME(name_) = (BENCH_PFN_TYPE(name_))vkGetInstanceProcAddr(instance_, #name_)
+#define BENCH_PFN_DEVICE_INIT(device_, name_)                                                      \
+  BENCH_PFN_NAME(name_) = (BENCH_PFN_TYPE(name_))vkGetDeviceProcAddr(device_, #name_)
+
+BENCH_PFN_DECL(vkGetPhysicalDeviceCalibrateableTimeDomainsEXT);
+BENCH_PFN_DECL(vkGetCalibratedTimestampsEXT);
 
 //
 //
@@ -69,8 +86,6 @@ struct bench_config
   bool            is_quiet;
   bool            is_validate;
   bool            is_summary;
-  bool            is_calibrated;  // Is VK_EXT_calibrated_timestamps present?
-  bool            is_calibrated_disabled;
 };
 
 //
@@ -215,15 +230,21 @@ bench_wait_to_string(bench_wait_e const wait)
 // Capture a host timestamp
 //
 static void
-bench_timestamp(uint64_t * const timestamp)
+bench_timestamp(struct bench_config const * const config, uint64_t * const timestamp)
 {
 #ifndef _WIN32
   //
   // POSIX
   //
+  assert(config->vk.time_domains.is_clock_monotonic ||
+         config->vk.time_domains.is_clock_monotonic_raw);
+
   struct timespec ts;
 
-  clock_gettime(CLOCK_MONOTONIC_RAW, &ts);  // ignore return
+  clock_gettime(config->vk.time_domains.is_clock_monotonic_raw  // Ignore return
+                  ? CLOCK_MONOTONIC_RAW                         // Bias to _RAW
+                  : CLOCK_MONOTONIC,                            //
+                &ts);                                           //
 
   *timestamp = 1000000000 * ts.tv_sec + ts.tv_nsec;
 #else
@@ -241,11 +262,33 @@ bench_timestamp(uint64_t * const timestamp)
 //
 // Capture calibrated timestamps (once)
 //
+// We acquire both a device timestamp and the value of the device timestamp in
+// the specified domain.
+//
 static void
 bench_calibration(struct bench_config const *         config,
                   union bench_timestamp_calibration * calibration)
 {
-  assert(config->is_calibrated);
+  assert(config->vk.is_calibrated);
+
+  //
+  // Which domain?
+  //
+#ifndef _WIN32
+  //
+  // POSIX
+  //
+  // Bias to VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXY
+  //
+  enum VkTimeDomainEXT const time_domain = config->vk.time_domains.is_clock_monotonic_raw
+                                             ? VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXT
+                                             : VK_TIME_DOMAIN_CLOCK_MONOTONIC_EXT;
+#else
+  //
+  // WIN32
+  //
+  enum VkTimeDomainEXT const time_domain = VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT;
+#endif
 
   //
   // FIXME(allanmac): On Win32 use QueryPerformanceCounter() and
@@ -255,28 +298,16 @@ bench_calibration(struct bench_config const *         config,
     { .sType      = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_EXT,
       .pNext      = NULL,
       .timeDomain = VK_TIME_DOMAIN_DEVICE_EXT },
-#ifndef _WIN32
-    //
-    // POSIX clock_gettime(CLOCK_MONOTONIC_RAW)
-    //
     { .sType      = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_EXT,
       .pNext      = NULL,
-      .timeDomain = VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXT }
-#else
-    //
-    // WIN32 QueryPerformanceCounter()
-    //
-    { .sType      = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_EXT,
-      .pNext      = NULL,
-      .timeDomain = VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT }
-#endif
+      .timeDomain = time_domain }
   };
 
-  vk_ok(pfn_vkGetCalibratedTimestampsEXT(config->vk.d,
-                                         ARRAY_LENGTH_MACRO(infos),
-                                         infos,
-                                         calibration->array.timestamps,
-                                         calibration->array.max_deviations));
+  vk_ok(BENCH_PFN_NAME(vkGetCalibratedTimestampsEXT)(config->vk.d,
+                                                     ARRAY_LENGTH_MACRO(infos),
+                                                     infos,
+                                                     calibration->array.timestamps,
+                                                     calibration->array.max_deviations));
 }
 
 //
@@ -331,7 +362,7 @@ bench_statistics(struct bench_config const * const      config,
   //
   if (!config->is_summary)
     {
-      if (config->is_calibrated)
+      if (config->vk.is_calibrated)
         {
           union bench_timestamp_calibration calibration;
 
@@ -376,7 +407,7 @@ bench_statistics(struct bench_config const * const      config,
                           VK_API_VERSION_PATCH(config->vk.pdp.driverVersion),
                           name,
                           bench_wait_to_string(wait),
-                          config->is_calibrated ? "TRUE " : "FALSE",
+                          config->vk.is_calibrated ? "TRUE " : "FALSE",
                           iter->repetitions,
                           iter->warmup,
                           bytes);
@@ -442,7 +473,7 @@ bench_statistics(struct bench_config const * const      config,
                     VK_VERSION_PATCH(config->vk.pdp.driverVersion),
                     name,
                     bench_wait_to_string(wait),
-                    config->is_calibrated ? "TRUE " : "FALSE",
+                    config->vk.is_calibrated ? "TRUE " : "FALSE",
                     iter->repetitions,
                     iter->warmup,
                     bytes);
@@ -562,7 +593,7 @@ bench_execute_fence(VkCommandBuffer                        cb,
 
       if (is_not_warmup)
         {
-          bench_timestamp(&splits[ii].host.start);
+          bench_timestamp(config, &splits[ii].host.start);
         }
 
       vk(QueueSubmit(config->vk.q, 1, &si, fence));
@@ -571,7 +602,7 @@ bench_execute_fence(VkCommandBuffer                        cb,
 
       if (is_not_warmup)
         {
-          bench_timestamp(&splits[ii].host.stop);
+          bench_timestamp(config, &splits[ii].host.stop);
 
           vk(GetQueryPoolResults(config->vk.d,
                                  config->vk.qp,
@@ -620,7 +651,7 @@ bench_execute_queue(VkCommandBuffer                        cb,
 
       if (is_not_warmup)
         {
-          bench_timestamp(&splits[ii].host.start);
+          bench_timestamp(config, &splits[ii].host.start);
         }
 
       vk(QueueSubmit(config->vk.q, 1, &si, VK_NULL_HANDLE));
@@ -629,7 +660,7 @@ bench_execute_queue(VkCommandBuffer                        cb,
 
       if (is_not_warmup)
         {
-          bench_timestamp(&splits[ii].host.stop);
+          bench_timestamp(config, &splits[ii].host.stop);
 
           vk(GetQueryPoolResults(config->vk.d,
                                  config->vk.qp,
@@ -715,7 +746,7 @@ bench_execute_timeline(VkCommandBuffer                        cb,
 
       if (is_not_warmup)
         {
-          bench_timestamp(&splits[ii].host.start);
+          bench_timestamp(config, &splits[ii].host.start);
         }
 
       ssv[0] += 1UL;  // increment timeline signal
@@ -726,7 +757,7 @@ bench_execute_timeline(VkCommandBuffer                        cb,
 
       if (is_not_warmup)
         {
-          bench_timestamp(&splits[ii].host.stop);
+          bench_timestamp(config, &splits[ii].host.stop);
 
           vk(GetQueryPoolResults(config->vk.d,
                                  config->vk.qp,
@@ -1297,7 +1328,7 @@ bench_config_no_calibrated(uint32_t const              argc,
                                    argv,
                                    next_token,
                                    "no_calibrated",
-                                   &config->is_calibrated_disabled);
+                                   &config->vk.is_calibrated_disabled);
   ;
 }
 
@@ -1819,7 +1850,7 @@ bench_vk(uint32_t argc, char const * argv[])
       if (strcmp(device_ext_props[ii].extensionName,  //
                  VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME) == 0)
         {
-          config.is_calibrated = true && !config.is_calibrated_disabled;
+          config.vk.is_calibrated = true && !config.vk.is_calibrated_disabled;
           break;
         }
     }
@@ -1845,7 +1876,7 @@ bench_vk(uint32_t argc, char const * argv[])
     .pQueueCreateInfos       = &qci,
     .enabledLayerCount       = 0,
     .ppEnabledLayerNames     = NULL,
-    .enabledExtensionCount   = config.is_calibrated ? ext_name_count : ext_name_count - 1,
+    .enabledExtensionCount   = config.vk.is_calibrated ? ext_name_count : ext_name_count - 1,
     .ppEnabledExtensionNames = ext_names,
     .pEnabledFeatures        = NULL
   };
@@ -1855,9 +1886,84 @@ bench_vk(uint32_t argc, char const * argv[])
   //
   // get calibrated timestamps pfn -- will be NULL if extension isn't enabled/present
   //
-  pfn_vkGetCalibratedTimestampsEXT =
-    (PFN_vkGetCalibratedTimestampsEXT)vkGetDeviceProcAddr(config.vk.d,
-                                                          "vkGetCalibratedTimestampsEXT");
+  BENCH_PFN_INSTANCE_INIT(config.vk.i, vkGetPhysicalDeviceCalibrateableTimeDomainsEXT);
+  BENCH_PFN_DEVICE_INIT(config.vk.d, vkGetCalibratedTimestampsEXT);
+
+  //
+  // what domains are supported?
+  //
+  if (BENCH_PFN_NAME(vkGetPhysicalDeviceCalibrateableTimeDomainsEXT) != NULL)
+    {
+      uint32_t time_domain_count = 0;
+
+      BENCH_PFN_NAME(vkGetPhysicalDeviceCalibrateableTimeDomainsEXT)
+      (config.vk.pd, &time_domain_count, NULL);
+
+      VkTimeDomainEXT * time_domains = malloc(sizeof(*time_domains) * time_domain_count);
+
+      BENCH_PFN_NAME(vkGetPhysicalDeviceCalibrateableTimeDomainsEXT)
+      (config.vk.pd, &time_domain_count, time_domains);
+
+      //
+      // Note that there are only 4 time domain enums
+      //
+      for (uint32_t ii = 0; ii < time_domain_count; ii++)
+        {
+          switch (time_domains[ii])
+            {
+              case VK_TIME_DOMAIN_CLOCK_MONOTONIC_EXT:
+                config.vk.time_domains.is_clock_monotonic = true;
+                break;
+
+              case VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXT:
+                config.vk.time_domains.is_clock_monotonic_raw = true;
+                break;
+
+              case VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT:
+                config.vk.time_domains.is_query_performance_counter = true;
+                break;
+
+              default:
+                break;
+            }
+        }
+
+#ifndef NDEBUG
+      //
+      // List the time domains
+      //
+      if (time_domain_count > 0)
+        {
+          fprintf(stderr, "Supported VK_EXT_calibrated_timestamps time domains:\n");
+          for (uint32_t ii = 0; ii < time_domain_count; ii++)
+            {
+              switch (time_domains[ii])
+                {
+                  case VK_TIME_DOMAIN_DEVICE_EXT:
+                    fprintf(stderr, "\tVK_TIME_DOMAIN_DEVICE_EXT\n");
+                    break;
+                  case VK_TIME_DOMAIN_CLOCK_MONOTONIC_EXT:
+                    fprintf(stderr, "\tVK_TIME_DOMAIN_CLOCK_MONOTONIC_EXT\n");
+                    break;
+
+                  case VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXT:
+                    fprintf(stderr, "\tVK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXT\n");
+                    break;
+
+                  case VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT:
+                    fprintf(stderr, "\tVK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT\n");
+                    break;
+
+                  default:
+                    break;
+                }
+            }
+        }
+#endif
+
+      free(time_domains);
+    }
+
   //
   // get a queue
   //
