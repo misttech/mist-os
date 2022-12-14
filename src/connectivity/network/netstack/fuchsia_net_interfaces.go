@@ -246,6 +246,22 @@ var _ interfaceEvent = (*defaultRouteChanged)(nil)
 
 func (defaultRouteChanged) isInterfaceEvent() {}
 
+func (c defaultRouteChanged) String() string {
+	nullableBoolToString := func(b *bool) string {
+		if b == nil {
+			return "(nil)"
+		}
+		return fmt.Sprintf("%t", *b)
+	}
+
+	return fmt.Sprintf(
+		"nicid: %d, hasDefaultIPv4Route: %s, hasDefaultIpv6Route: %s",
+		c.nicid,
+		nullableBoolToString(c.hasDefaultIPv4Route),
+		nullableBoolToString(c.hasDefaultIPv6Route),
+	)
+}
+
 type addressProperties struct {
 	lifetimes stack.AddressLifetimes
 	state     stack.AddressAssignmentState
@@ -395,6 +411,7 @@ func interfaceWatcherEventLoop(
 				}
 			case interfaceRemoved:
 				removed := tcpip.NICID(event)
+				syslog.InfoTf(watcherProtocolName, "interface removed event: %d", removed)
 				if _, ok := propertiesMap[removed]; !ok {
 					panic(fmt.Sprintf("unknown interface NIC=%d removed", removed))
 					continue
@@ -404,6 +421,8 @@ func interfaceWatcherEventLoop(
 					w.onEvent(interfaces.EventWithRemoved(uint64(removed)))
 				}
 			case defaultRouteChanged:
+				syslog.InfoTf(watcherProtocolName, "default route changed event: %s", event)
+
 				properties, ok := propertiesMap[event.nicid]
 				// TODO(https://fxbug.dev/95468): Change to panic once interface properties
 				// are guaranteed to not change after an interface is removed.
@@ -426,11 +445,14 @@ func interfaceWatcherEventLoop(
 				if changes.HasHasDefaultIpv4Route() || changes.HasHasDefaultIpv6Route() {
 					propertiesMap[event.nicid] = properties
 					changes.SetId(uint64(event.nicid))
+
 					for w := range watchers {
 						w.onEvent(interfaces.EventWithChanged(changes))
 					}
 				}
 			case onlineChanged:
+				syslog.InfoTf(watcherProtocolName, "online changed event: %#v", event)
+
 				properties, ok := propertiesMap[event.nicid]
 				// TODO(https://fxbug.dev/95468): Change to panic once interface properties
 				// are guaranteed to not change after an interface is removed.
@@ -466,6 +488,12 @@ func interfaceWatcherEventLoop(
 				properties.SetAddresses(addresses)
 				propertiesMap[event.nicid] = properties
 
+				// Due to the frequency of lifetime changes in certain environments, don't
+				// log when the only difference is in address lifetimes in assigned state.
+				if !found || nextProperties.state != prevProperties.state || nextProperties.state != stack.AddressAssigned {
+					syslog.InfoTf(watcherProtocolName, "address changed event: %#v", event)
+				}
+
 				propertyChangedBitflag, addedOrRemoved := func() (interfaces.AddressPropertiesInterest, bool) {
 					nextVisible := isAddressVisible(event.state)
 					if found {
@@ -488,6 +516,8 @@ func interfaceWatcherEventLoop(
 					w.onAddressesChanged(event.nicid, addresses, addedOrRemoved, propertyChangedBitflag)
 				}
 			case addressRemoved:
+				syslog.InfoTf(watcherProtocolName, "address removed event: %#v", event)
+
 				properties, ok := propertiesMap[event.nicid]
 				if !ok {
 					panic(fmt.Sprintf("address removed event for unknown interface: %#v", event))
