@@ -56,85 +56,17 @@ source_set("lib") {
   ]
 }
 
-executable("bin") {
-  testonly = true
-  output_name = "run-test-component"
-
-  sources = [ "main.cc" ]
-
-  deps = [
-    ":lib",
-    "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_hlcpp",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
-    "//sdk/fidl/fuchsia.process:fuchsia.process_hlcpp",
-    "//sdk/fidl/fuchsia.sys:fuchsia.sys_hlcpp",
-    "//sdk/lib/sys/cpp",
-    "//sdk/lib/sys/cpp/testing:cpp",
-    "//sdk/lib/syslog/cpp",
-    "//src/diagnostics/archivist/fidl:controller_hlcpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-  ]
-}
-
 group("run-test-component") {
   testonly = true
-  deps = [
-    ":run-test-component-pkg",
-    "//src/diagnostics/archivist:archivist-for-embedding",
-  ]
-}
-
-# Deprecated binary name
-renamed_binary("bin-deprecated") {
-  testonly = true
-  dest = "bin/run_test_component"
-  source = "$root_out_dir/run-test-component"
-  source_deps = [ ":bin" ]
-  keep_original = true
-}
-
-fuchsia_shell_package("run-test-component-pkg") {
-  testonly = true
-  package_name = "run_test_component"
-  deps = [
-    ":bin",
-    ":bin-deprecated",
-  ]
-}
-
-executable("test_bin") {
-  testonly = true
-  output_name = "run_test_component_unittests"
-
-  sources = [
-    "log_collector_unittests.cc",
-    "output_collector_unittests.cc",
-    "run_test_component_unittest.cc",
-    "sys_tests_unittests.cc",
-    "test_metadata_unittest.cc",
-  ]
-
-  deps = [
-    ":lib",
-    "//src/lib/fxl/test:gtest_main",
-    "//third_party/googletest:gmock",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-  ]
-}
-
-fuchsia_unittest_package("run_test_component_unittests") {
-  manifest = "meta/run_test_component_unittests.cml"
-  deps = [ ":test_bin" ]
+  deps = []
 }
 
 group("run_test_component") {
   testonly = true
-  public_deps = [ ":run-test-component" ]
+  public_deps = []
 }
 
 group("tests") {
   testonly = true
-  public_deps = [ ":run_test_component_unittests" ]
+  public_deps = []
 }
