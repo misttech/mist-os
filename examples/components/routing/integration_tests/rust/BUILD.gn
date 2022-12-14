@@ -52,3 +52,11 @@ fuchsia_test_package_with_default_component(
   deps = [ ":bin" ]
   subpackages = [ "//examples/components/routing/rust/echo_server" ]
 }
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":echo_integration_test_rust",
+    ":subpackaged_echo_integration_test_rust",
+  ]
+}

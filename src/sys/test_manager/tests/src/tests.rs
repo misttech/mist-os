@@ -210,6 +210,41 @@ async fn calling_stop_should_stop_test() {
 }
 
 #[fuchsia::test]
+async fn launch_and_test_subpackaged_test() {
+    let test_url =
+        "fuchsia-pkg://fuchsia.com/subpackaged_echo_integration_test_cpp#meta/default.cm";
+    let (events, logs) = run_single_test(test_url, default_run_option()).await.unwrap();
+
+    let expected_events = vec![
+        RunEvent::suite_started(),
+        RunEvent::case_found("EchoIntegrationTest.TestEcho"),
+        RunEvent::case_started("EchoIntegrationTest.TestEcho"),
+        RunEvent::case_stopped("EchoIntegrationTest.TestEcho", CaseStatus::Passed),
+        RunEvent::case_finished("EchoIntegrationTest.TestEcho"),
+        RunEvent::suite_stopped(SuiteStatus::Passed),
+    ];
+
+    assert_eq!(logs, Vec::<String>::new());
+    assert_eq!(&expected_events, &events);
+
+    let test_url =
+        "fuchsia-pkg://fuchsia.com/subpackaged_echo_integration_test_rust#meta/default.cm";
+    let (events, logs) = run_single_test(test_url, default_run_option()).await.unwrap();
+
+    let expected_events = vec![
+        RunEvent::suite_started(),
+        RunEvent::case_found("echo_integration_test"),
+        RunEvent::case_started("echo_integration_test"),
+        RunEvent::case_stopped("echo_integration_test", CaseStatus::Passed),
+        RunEvent::case_finished("echo_integration_test"),
+        RunEvent::suite_stopped(SuiteStatus::Passed),
+    ];
+
+    assert_eq!(logs, Vec::<String>::new());
+    assert_eq!(&expected_events, &events);
+}
+
+#[fuchsia::test]
 async fn launch_and_test_echo_test() {
     let test_url = "fuchsia-pkg://fuchsia.com/example-tests#meta/echo_test_realm.cm";
     let (events, logs) = run_single_test(test_url, default_run_option()).await.unwrap();
