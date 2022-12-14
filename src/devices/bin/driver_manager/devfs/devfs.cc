@@ -504,10 +504,6 @@ Devfs::Devfs(std::optional<Devnode>& root,
       "goldfish-control",
       "goldfish-pipe",
 
-      // TODO(https://fxbug.dev/113832): Remove.
-      "input",
-      "input-report",
-
       // TODO(https://fxbug.dev/113833): Remove.
       "isp",
 

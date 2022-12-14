@@ -9,17 +9,20 @@
 #include <fuchsia/driver/test/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/incoming/cpp/service_client.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/driver_test_realm/realm_builder/cpp/lib.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/fd.h>
+#include <lib/fdio/watcher.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <zircon/syscalls.h>
 
+#include <fbl/unique_fd.h>
 #include <hid/boot.h>
 #include <zxtest/zxtest.h>
 
@@ -59,6 +62,34 @@ class HidDriverTest : public zxtest::Test {
 
     fidl::ClientEnd<fuchsia_hardware_hidctl::Device> client_end(std::move(hidctl_channel.value()));
     hidctl_client_.Bind(std::move(client_end));
+  }
+
+  template <typename Protocol>
+  zx::result<fidl::ClientEnd<Protocol>> WaitForFirstDevice(const std::string& path) {
+    fbl::unique_fd fd(openat(dev_fd_.get(), path.c_str(), O_RDONLY));
+    if (!fd) {
+      return zx::error(ZX_ERR_BAD_STATE);
+    }
+
+    auto watch_func = [](int dirfd, int event, const char* fn, void* cookie) {
+      if (event != WATCH_EVENT_ADD_FILE) {
+        return ZX_OK;
+      }
+      if (std::string_view{fn} == ".") {
+        return ZX_OK;
+      }
+      fdio_cpp::UnownedFdioCaller caller(dirfd);
+      *static_cast<zx::result<fidl::ClientEnd<Protocol>>*>(cookie) =
+          component::ConnectAt<Protocol>(caller.directory(), fn);
+      return ZX_ERR_STOP;
+    };
+    zx::result<fidl::ClientEnd<Protocol>> result;
+    if (zx_status_t status =
+            fdio_watch_directory(fd.get(), watch_func, zx::time::infinite().get(), &result);
+        status != ZX_ERR_STOP) {
+      return zx::error(status);
+    }
+    return std::move(result);
   }
 
   async::Loop loop_ = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
@@ -114,22 +145,16 @@ TEST_F(HidDriverTest, BootMouseTest) {
 
   fbl::unique_fd fd_device;
 
-  // Open the input-report device. We need to wait for this to exist so the test does not
-  // shutdown while InputReport is still binding.
-  ASSERT_OK(
-      device_watcher::RecursiveWaitForFile(dev_fd_.get(), "class/input-report/000").status_value());
-
-  // Open the corresponding /dev/class/input/ device
-  zx::result input_channel = device_watcher::RecursiveWaitForFile(dev_fd_.get(), "class/input/000");
-  ASSERT_OK(input_channel.status_value());
+  // Open the /dev/class/input/ device created by MakeHidDevice.
+  zx::result input_client = WaitForFirstDevice<fuchsia_hardware_input::Controller>("class/input");
+  ASSERT_OK(input_client.status_value());
 
   // Open a FIDL channel to the HID device
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::Device>();
   ASSERT_OK(endpoints);
   auto& [device, server] = endpoints.value();
 
-  fidl::ClientEnd<fuchsia_hardware_input::Controller> client_end(std::move(input_channel.value()));
-  ASSERT_OK(fidl::WireCall(client_end)->OpenSession(std::move(server)));
+  ASSERT_OK(fidl::WireCall(input_client.value())->OpenSession(std::move(server)));
 
   fidl::WireSyncClient client(std::move(device));
   // Make a synchronous FIDL call to ensure the session connection is alive.
@@ -194,12 +219,11 @@ TEST_F(HidDriverTest, BootMouseTestInputReport) {
   ASSERT_OK(result.status());
   zx::socket hidctl_socket = std::move(result.value().report_socket);
 
-  // Open the corresponding /dev/class/input/ device
-  zx::result input_channel =
-      device_watcher::RecursiveWaitForFile(dev_fd_.get(), "class/input-report/000");
-  ASSERT_OK(input_channel.status_value());
-  fidl::ClientEnd<fuchsia_input_report::InputDevice> client_end(std::move(input_channel.value()));
-  fidl::WireSyncClient client(std::move(client_end));
+  // Open the /dev/class/input/ device created by MakeHidDevice.
+  zx::result input_client =
+      WaitForFirstDevice<fuchsia_input_report::InputDevice>("class/input-report");
+  ASSERT_OK(input_client.status_value());
+  fidl::WireSyncClient client(std::move(input_client.value()));
 
   auto reader_endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
   ASSERT_OK(reader_endpoints.status_value());

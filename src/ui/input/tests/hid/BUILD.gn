@@ -13,6 +13,7 @@ driver_compat_test("hid-driver-test") {
     "//sdk/fidl/fuchsia.hardware.hidctl:fuchsia.hardware.hidctl_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_cpp_wire",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp_wire",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/driver_test_realm/realm_builder/cpp",
     "//sdk/lib/fdio",
