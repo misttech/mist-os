@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use fidl_fuchsia_input as finput;
 use fidl_fuchsia_settings as fsettings;
 use fuchsia_async as fasync;
-use fuchsia_syslog::{fx_log_debug, fx_log_err};
+use fuchsia_syslog::{fx_log_debug, fx_log_err, fx_log_info};
 use futures::{TryFutureExt, TryStreamExt};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -96,7 +96,7 @@ impl TextSettingsHandler {
                 Some(fsettings::KeyboardSettings { keymap, autorepeat, .. }) => {
                     self.set_keymap_id(keymap);
                     self.set_autorepeat_settings(autorepeat.map(|e| e.into()));
-                    fx_log_debug!("keymap ID set to: {:?}", self.get_keymap_id());
+                    fx_log_info!("keymap ID set to: {:?}", self.get_keymap_id());
                 }
                 e => {
                     fx_log_err!("exiting - unexpected response: {:?}", &e);
