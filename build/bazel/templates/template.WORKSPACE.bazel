@@ -174,13 +174,13 @@ rules_fuchsia_deps()
 
 fuchsia_sdk_repository(
     name = "fuchsia_sdk",
-    local_path = "../../../../sdk/exported/core",
+    local_paths = ["../../../../sdk/exported/core"],
 )
 
 fuchsia_sdk_repository(
     name = "internal_sdk",
     parent_sdk = "@fuchsia_sdk",
-    local_path = "../../../../sdk/exported/platform",
+    local_paths = ["../../../../sdk/exported/platform"],
 )
 
 register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
