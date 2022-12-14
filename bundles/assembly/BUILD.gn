@@ -18,6 +18,9 @@ group("assembly") {
     # The testonly assembly bundles
     ":common_minimal_eng",
     ":common_minimal_userdebug",
+
+    # Feature-support and configuration bundles
+    ":swd_bundles",
   ]
 }
 
@@ -37,6 +40,14 @@ group("prod_only") {
 group("eng_and_userdebug") {
   testonly = false
   deps = [ ":common_minimal_userdebug" ]
+}
+
+group("swd_bundles") {
+  testonly = false
+  deps = [
+    ":omaha-client",
+    ":system-update-checker",
+  ]
 }
 
 # The most-common, most-basic, Assembly Input Bundle that is included by all
@@ -144,6 +155,18 @@ assembly_input_bundle("emulator_support") {
   qemu_kernel = _qemu_kernel_file
   deps = [ _qemu_kernel_target ]
 
+  # Create package and archive for use OOT.
+  create_aib_package = true
+  create_aib_archive = true
+}
+
+assembly_input_bundle("system-update-checker") {
+  # Create package and archive for use OOT.
+  create_aib_package = true
+  create_aib_archive = true
+}
+
+assembly_input_bundle("omaha-client") {
   # Create package and archive for use OOT.
   create_aib_package = true
   create_aib_archive = true

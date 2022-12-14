@@ -159,6 +159,22 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #     as an override, that in conjunction with 'kernel_zbi' allows selecting a custom zbi
 #     image as the kernel zbi.
 #
+#   must_exist_deps (optional; default: {})
+#     [scope of type:labels] A list of deps that we would like to validate are
+#     included (with their transitive deps) in the Image Assembly Config created
+#     by assembly
+#
+#     must_exist = {
+#       base_packages = [...]
+#       cache_packages = [...]
+#       bootfs_labels = [...]
+#       bootfs_package_labels = [...]
+#       extra_base_deps = [...]
+#       boot_args = [...]
+#       cmdline = [...]
+#       cmdline_deps = [...]
+#     }
+#
 # Board parameters:
 #
 #   assembly_blob_layout_format (default: "compact")
@@ -262,6 +278,29 @@ template("assembled_system") {
     }
   }
 
+  if (defined(invoker.must_exist_deps)) {
+    _must_exist = invoker.must_exist_deps
+    assert(invoker.must_exist_deps != {
+               },
+           "must_exist should provide a scope of deps")
+    assert(defined(_must_exist.base_packages),
+           "must_exist scope has required field base_packages")
+    assert(defined(_must_exist.cache_packages),
+           "must_exist scope has required field cache_packages")
+    assert(defined(_must_exist.bootfs_labels),
+           "must_exist scope has required field bootfs_labels")
+    assert(defined(_must_exist.bootfs_package_labels),
+           "must_exist scope has required field bootfs_package_labels")
+    assert(defined(_must_exist.extra_base_deps),
+           "must_exist scope has required field extra_base_deps")
+    assert(defined(_must_exist.boot_args),
+           "must_exist scope has required field boot_args")
+    assert(defined(_must_exist.cmdline),
+           "must_exist scope has required field cmdline")
+    assert(defined(_must_exist.cmdline_deps),
+           "must_exist scope has required field cmdline_deps")
+  }
+
   kernel_zbi = "//zircon/kernel"
   if (defined(invoker.kernel_zbi)) {
     kernel_zbi = invoker.kernel_zbi
@@ -331,6 +370,8 @@ template("assembled_system") {
       "common_minimal",
       "emulator_support",
       "common_minimal_userdebug",
+      "system-update-checker",
+      "omaha-client",
     ]
     if (defined(invoker.allow_eng_platform_bundle_use) &&
         invoker.allow_eng_platform_bundle_use) {
@@ -346,6 +387,8 @@ template("assembled_system") {
 
     bazel_images_config_inputs = "${namespace}.bazel_images_config_inputs"
     bazel_legacy_aib = "${namespace}.bazel_legacy_aib"
+    partial_image_assembly_config_for_validations =
+        "${namespace}.validation_image_assembly_config"
   }
 
   # Intermediate files produced for Image Assembly.
@@ -427,6 +470,8 @@ template("assembled_system") {
       platform_common_aibs +=
           [ "${_target_out_dir}/${_name}/assembly_config.json" ]
     }
+    partial_image_assembly_config_for_validations =
+        "${target_gen_dir}/testing/validation_image_assembly_config.json"
   }
 
   _base_packages = invoker.base_packages
@@ -733,6 +778,26 @@ template("assembled_system") {
           }
         }
       }
+    }
+  }
+
+  if (defined(_must_exist)) {
+    generated_image_assembly_config(
+        labels.partial_image_assembly_config_for_validations) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                               "include_component_id_index",
+                               "include_config_data",
+                             ])
+
+      forward_variables_from(_must_exist, [ "base_packages" ])
+      output_path = files.partial_image_assembly_config_for_validations
+      kernel_image = kernel_zbi
+      kernel_image_name = kernel_name
+      config_data_packages = _must_exist.base_packages + _universe_packages +
+                             _must_exist.cache_packages
     }
   }
 
@@ -1297,6 +1362,10 @@ template("assembled_system") {
     }
     if (defined(invoker.assembly_images_config_label)) {
       public_deps += [ ":${labels.images_config_matches}" ]
+    }
+    if (defined(_must_exist)) {
+      public_deps +=
+          [ ":${labels.partial_image_assembly_config_for_validations}" ]
     }
 
     metadata = {
