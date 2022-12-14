@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/assembly/package_manifests_list.gni")
+import("//build/component/component_id_index.gni")
+import("//build/config.gni")
 import("//build/dist/distribution_manifest.gni")
 import("//build/dist/resource.gni")
 import("//build/images/args.gni")
@@ -49,6 +51,13 @@ import("//build/zbi/kernel_cmdline.gni")
 #     [list of labels] Dependencies with metadata including additional kernel
 #     command arguments to add to the ZBI.
 #
+#   include_component_id_index (default: false)
+#     [bool] Collect and merges a component id index from the base
+#     package set.
+#
+#   include_config_data (default: true)
+#     [bool] Whether to create a config_data package for the assembly or not.
+
 template("generated_image_assembly_config") {
   assert(
       current_toolchain == default_toolchain,
@@ -87,6 +96,16 @@ template("generated_image_assembly_config") {
     boot_args += invoker.boot_args
   }
 
+  config_data_packages = []
+  if (defined(invoker.config_data_packages)) {
+    config_data_packages += invoker.config_data_packages
+  }
+
+  _meta_packages = []
+  if (defined(invoker.meta_packages)) {
+    _meta_packages = invoker.meta_packages
+  }
+
   kernel_image_name = invoker.kernel_image_name
 
   # Labels used in this file.
@@ -101,6 +120,7 @@ template("generated_image_assembly_config") {
     kernel_cmdline_args = "${target_name}_kernel_cmdline_args"
     bootfs_entries_metadata = "${target_name}_bootfs_entries_metadata"
     boot_args = "${target_name}_boot_args"
+    config_data = "${target_name}.config-data"
   }
 
   # Files produced by targets in this file.
@@ -119,6 +139,53 @@ template("generated_image_assembly_config") {
         "$target_out_dir/${target_name}_bootfs_entries.gn_meta.json"
     boot_args = "$target_out_dir/${target_name}_boot_args"
   }
+
+  component_id_index_dep = []
+  component_id_index_config_data_dep = []
+  include_component_index = defined(invoker.include_component_id_index) &&
+                            invoker.include_component_id_index
+
+  if (include_component_index) {
+    # For details, see //docs/development/components/component_id_index.md#system-assembly
+    component_id_index_config("${target_name}.component_id_index_config") {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+
+      # collect and merge component ID indices from the base set.
+      deps = base_packages
+
+      metadata = {
+        package_barrier = []
+      }
+    }
+
+    component_id_index_dep = [ ":${target_name}.component_id_index_config" ]
+    component_id_index_config_data_dep =
+        [ ":${target_name}.component_id_index_config-config-data" ]
+    _meta_packages += component_id_index_dep
+  }
+
+  include_config_data = true
+  if (defined(invoker.include_config_data)) {
+    include_config_data = invoker.include_config_data
+  }
+  if (include_config_data) {
+    config_package(labels.config_data) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      package_name = "config-data"
+      deps = config_data_packages + component_id_index_config_data_dep
+    }
+    _meta_packages += [ ":${labels.config_data}" ]
+  }
+
+  bootfs_labels += component_id_index_dep
 
   # Construct a list of Base packages to add to the image assembly config.
   package_manifests_list(labels.base_package_list) {

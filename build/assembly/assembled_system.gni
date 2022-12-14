@@ -10,8 +10,7 @@ import("//build/assembly/hermetic_inputs_for_image_assembly.gni")
 import("//build/assembly/legacy_assembly_input_bundle.gni")
 import("//build/bazel/assembly/bazel_assembly_images_config_inputs.gni")
 import("//build/bazel/bazel_inputs.gni")
-import("//build/component/component_id_index.gni")
-import("//build/config.gni")
+
 import("//build/drivers/driver_manifest.gni")
 import("//build/images/filesystem_limits.gni")
 import("//build/images/fvm.gni")
@@ -320,7 +319,6 @@ template("assembled_system") {
     copy_zbi_signed = "${namespace}.copy_zbi_signed"
     copy_zbi_manifest = "${namespace}.copy_zbi_manifest"
     copy_images = "${namespace}.copy_images"
-    config_data = "${namespace}.config-data"
     shell_commands = "${namespace}.shell_commands"
     assembly_generated_packages = "${namespace}.assembly_generated_packages"
     fshost = "${namespace}.fs_host"
@@ -378,7 +376,6 @@ template("assembled_system") {
     # path that it's expected to be found at, not the path that it's to be
     # written to.
     regenerated_image_assembly_config = "${outdir}/image_assembly.json"
-    config_data_manifest = "${outdir}/config_data/package_manifest.json"
 
     bootfs_files = "${gendir}/bootfs_files.list"
     devmgr_config = "${gendir}/devmgr_config.txt"
@@ -408,7 +405,7 @@ template("assembled_system") {
     base_pkg_abi_revision =
         "${gendir}/${base_package_name}/meta/fuchsia.abi/abi-revision"
     assembly_manifest = "${outdir}/images.json"
-
+    config_data_manifest = "${outdir}/config_data/package_manifest.json"
     image_command_log = "${gendir}/command_log.json"
 
     # Determine which ZBI we are shipping.
@@ -494,51 +491,6 @@ template("assembled_system") {
     not_needed([ "_universe_packages" ])
   }
 
-  component_id_index_dep = []
-  component_id_index_config_data_dep = []
-  include_component_index = defined(invoker.include_component_id_index) &&
-                            invoker.include_component_id_index
-  if (include_component_index) {
-    # For details, see //docs/development/components/component_id_index.md#system-assembly
-    component_id_index_config("${namespace}.component_id_index_config") {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
-
-      # collect and merge component ID indices from the base set.
-      deps = _base_packages
-
-      metadata = {
-        package_barrier = []
-      }
-    }
-
-    component_id_index_dep = [ ":${namespace}.component_id_index_config" ]
-    component_id_index_config_data_dep =
-        [ ":${namespace}.component_id_index_config-config-data" ]
-    _meta_packages += component_id_index_dep
-  }
-
-  include_config_data = true
-  if (defined(invoker.include_config_data)) {
-    include_config_data = invoker.include_config_data
-  }
-  if (include_config_data) {
-    config_package(labels.config_data) {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
-      package_name = "config-data"
-      deps = _base_packages + _universe_packages + _cache_packages +
-             component_id_index_config_data_dep
-    }
-    _meta_packages += [ ":${labels.config_data}" ]
-  }
-
   # Compile the fshost component and configuration needed for this assembly
   fshost_component_and_config(labels.fshost) {
     # THIS CANNOT BE MARKED TESTONLY, EVEN IF THE ASSEMBLY IS.  This template
@@ -598,6 +550,8 @@ template("assembled_system") {
                            [
                              "testonly",
                              "visibility",
+                             "include_component_id_index",
+                             "include_config_data",
                            ])
 
     output_path = files.generated_config_for_legacy_bundle
@@ -611,6 +565,8 @@ template("assembled_system") {
       cache_packages = _cache_packages
     }
 
+    config_data_packages = _base_packages + _universe_packages + _cache_packages
+
     boot_args = devmgr_config
 
     # Search for BootFS packages in these targets.
@@ -621,7 +577,7 @@ template("assembled_system") {
 
     # Search for BootFS files in these targets.
     bootfs_labels = invoker.bootfs_labels
-    bootfs_labels += component_id_index_dep
+
     bootfs_labels += [ kernel_image ]
     bootfs_labels += [ ":${labels.fshost}" ]
 
