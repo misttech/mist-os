@@ -197,6 +197,10 @@ pub struct TestCommand {
     #[argh(switch)]
     pub manual_only: bool,
 
+    /// only list the tests that would have been run, but do not run the tests.
+    #[argh(switch)]
+    pub preview: bool,
+
     /// path to the license directory.
     #[argh(option)]
     pub licenses: Option<PathBuf>,

@@ -46,6 +46,15 @@ fn process_test_list(
     Ok(ret)
 }
 
+fn print_test_list(tests: HashSet<parser::TestInfo>) {
+    let mut tests: Vec<parser::TestInfo> = tests.into_iter().collect();
+    // Sort so the order is deterministic.
+    tests.sort_by(|a, b| a.url.cmp(&b.url));
+    for test in tests {
+        println!("{}", test.url);
+    }
+}
+
 fn get_name(cmd: &TestCommand) -> String {
     if let Some(name) = &cmd.submission_name {
         name.to_string()
@@ -212,7 +221,7 @@ async fn get_driver_and_devices(
     match (driver_info, device_list) {
         (Some(driver), Some(devices)) => {
             println!(
-                "Testing driver {} using {} device(s).",
+                "Identified driver {} associated with {} device(s).",
                 driver.libname.as_ref().unwrap_or(&"".to_string()),
                 devices.len()
             );
@@ -334,23 +343,30 @@ pub async fn conformance(
             };
 
             if tests.is_empty() {
-                println!("There were no tests to run for the given command.");
-            }
-            // We are ignoring the return value because we will read the results from
-            // the report generated via `run_test_suite_lib::create_reporter()`.
-            let _ =
-                run_tests(tests, driver_connector.get_run_builder_proxy().await?, temp_output_path)
-                    .await;
+                println!("\nThere were no tests to run for the given command.");
+            } else if subcmd.preview {
+                println!("\nThis command would run the following tests:");
+                print_test_list(tests);
+            } else {
+                // We are ignoring the return value because we will read the results from
+                // the report generated via `run_test_suite_lib::create_reporter()`.
+                let _ = run_tests(
+                    tests,
+                    driver_connector.get_run_builder_proxy().await?,
+                    temp_output_path,
+                )
+                .await;
 
-            if let Some(output) = user_output_dir {
-                let file_path = generate_submission(
-                    &subcmd,
-                    &temp_output_path,
-                    &output,
-                    &get_name(&subcmd),
-                    &version,
-                )?;
-                println!("Submission package has been generated at: {}", file_path.display());
+                if let Some(output) = user_output_dir {
+                    let file_path = generate_submission(
+                        &subcmd,
+                        &temp_output_path,
+                        &output,
+                        &get_name(&subcmd),
+                        &version,
+                    )?;
+                    println!("\nSubmission package has been generated at: {}", file_path.display());
+                }
             }
         }
     }
