@@ -7,6 +7,7 @@ import("//build/sdk/sdk_host_tool.gni")
 import("//build/testing/host_test.gni")
 import("//build/testing/host_test_data.gni")
 import("./build/ffx.gni")
+import("config.gni")
 
 # A note for developers interested in generating a Cargo.toml file for this tool:
 # FFX generates a `ffx_bin_unversioned` rule, which is what should be used as the target for
@@ -43,11 +44,14 @@ if (is_host) {
     # Plugins that can be disabled without breaking ffx as a whole. You
     # can do so in local development to reduce compile times while iterating on
     # a specific plugin.
+    #
+    # Moving any of these plugins to be built externally will allow them to be
+    # used with the `ffx_build_dual_mode_plugins_as_subtools`. See the next
+    # section for this.
     plugin_deps += [
       "//src/connectivity/network/net-cli/ffx:ffx_net",
       "//src/connectivity/network/testing/network-test-realm/ffx:ffx_net_test_realm",
       "//src/developer/ffx/plugins/agis:ffx_agis",
-      "//src/developer/ffx/plugins/assembly:ffx_assembly",
       "//src/developer/ffx/plugins/audio:ffx_audio",
       "//src/developer/ffx/plugins/component:ffx_component",
       "//src/developer/ffx/plugins/coverage:ffx_coverage",
@@ -55,7 +59,6 @@ if (is_host) {
       "//src/developer/ffx/plugins/debug:ffx_debug_plugin",
       "//src/developer/ffx/plugins/doctor:ffx_doctor",
       "//src/developer/ffx/plugins/driver:ffx_driver",
-      "//src/developer/ffx/plugins/efi:ffx_efi",
       "//src/developer/ffx/plugins/emulator:ffx_emulator",
       "//src/developer/ffx/plugins/flutter:ffx_flutter",
       "//src/developer/ffx/plugins/fuzz:ffx_fuzz",
@@ -67,11 +70,9 @@ if (is_host) {
       "//src/developer/ffx/plugins/platform:ffx_platform",
       "//src/developer/ffx/plugins/power:ffx_power",
       "//src/developer/ffx/plugins/process_explorer:ffx_process_explorer",
-      "//src/developer/ffx/plugins/product:ffx_product",
       "//src/developer/ffx/plugins/product_bundle:ffx_product_bundle",
       "//src/developer/ffx/plugins/profile:ffx_profile",
       "//src/developer/ffx/plugins/repository:ffx_repository",
-      "//src/developer/ffx/plugins/scrutiny:ffx_scrutiny",
       "//src/developer/ffx/plugins/sdk:ffx_sdk",
       "//src/developer/ffx/plugins/self-test:ffx_selftest",
       "//src/developer/ffx/plugins/session:ffx_session",
@@ -85,6 +86,22 @@ if (is_host) {
       "//src/storage/ffx:ffx_storage",
       "//src/virtualization/ffx:ffx_guest",
     ]
+
+    # Any plugins that can be built in dual mode should be listed here, and that
+    # will cause them to be not included in the main ffx build if the
+    # `ffx_build_dual_mode_plugins_as_subtools` config is set.
+    #
+    # Keep this set in sync with tools/BUILD.gn's opposite listing.
+    if (!ffx_build_dual_mode_plugins_as_subtools) {
+      # LINT.IfChange
+      plugin_deps += [
+        "//src/developer/ffx/plugins/assembly:ffx_assembly",
+        "//src/developer/ffx/plugins/efi:ffx_efi",
+        "//src/developer/ffx/plugins/product:ffx_product",
+        "//src/developer/ffx/plugins/scrutiny:ffx_scrutiny",
+      ]
+      # LINT.ThenChange(tools/BUILD.gn)
+    }
 
     deps = [ "//third_party/rust_crates:anyhow" ]
 

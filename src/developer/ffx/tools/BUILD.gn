@@ -2,12 +2,29 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//src/developer/ffx/config.gni")
+
 assert(is_host)
 
 group("tools") {
   testonly = true
 
   public_deps = [ "echo" ]
+
+  # Any plugins that can be built in dual mode should be listed here, and that
+  # will cause them to be built as host tools that ffx can invoke.
+  #
+  # Keep this set in sync with ../BUILD.gn's opposite listing.
+  if (ffx_build_dual_mode_plugins_as_subtools) {
+    # LINT.IfChange
+    public_deps += [
+      "//src/developer/ffx/plugins/assembly:ffx_assembly_tool_host_tool",
+      "//src/developer/ffx/plugins/efi:ffx_efi_tool_host_tool",
+      "//src/developer/ffx/plugins/product:ffx_product_tool_host_tool",
+      "//src/developer/ffx/plugins/scrutiny:ffx_scrutiny_tool_host_tool",
+    ]
+    # LINT.ThenChange(../BUILD.gn)
+  }
 }
 
 group("tests") {

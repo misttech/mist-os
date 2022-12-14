@@ -1,0 +1,13 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+declare_args() {
+  # Build any ffx plugins that can be built either as built-in or as separate
+  # subtools as subtools.
+  #
+  # When all subtools that will be migrated to the SDK have been migrated,
+  # this config flag will be set to true by default, deprecated, and eventually
+  # removed: fxb/117339
+  ffx_build_dual_mode_plugins_as_subtools = false
+}
