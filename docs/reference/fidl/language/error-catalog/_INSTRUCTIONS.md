@@ -39,7 +39,7 @@ END BIG NOTICE
 
 To manually add a new error:
 
-1. Create a new markdown file `_fi-{ERROR_NUMBER}md` in
+1. Create a new markdown file `_fi-{ERROR_NUMBER}.md` in
   `//docs/reference/fidl/language/error-catalog/`. Replace `{ERROR_NUMBER}` with
   the error code. Pad the number with leading 0's. Copy the contents of an
   existing error so the content is consistent.
