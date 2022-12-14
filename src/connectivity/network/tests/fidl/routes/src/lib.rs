@@ -12,6 +12,7 @@ use netstack_testing_common::{
     interfaces,
     realms::{Netstack2, TestSandboxExt as _},
 };
+use netstack_testing_macros::variants_test;
 
 async fn resolve(
     routes: &fidl_fuchsia_net_routes::StateProxy,
@@ -25,12 +26,11 @@ async fn resolve(
         .context("routes/State.Resolve error")
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn test_resolve_loopback_route() {
+#[variants_test]
+async fn resolve_loopback_route(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = sandbox
-        .create_netstack_realm::<Netstack2, _>("resolve_loopback_route")
-        .expect("failed to create realm");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack2, _>(name).expect("failed to create realm");
     let routes = realm
         .connect_to_protocol::<fidl_fuchsia_net_routes::StateMarker>()
         .expect("failed to connect to routes/State");
@@ -58,8 +58,8 @@ async fn test_resolve_loopback_route() {
         .expect("error testing resolution for IPv6 loopback");
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn test_resolve_route() {
+#[variants_test]
+async fn resolve_route(name: &str) {
     const GATEWAY_IP_V4: fidl_fuchsia_net::Subnet = fidl_subnet!("192.168.0.1/24");
     const GATEWAY_IP_V6: fidl_fuchsia_net::Subnet = fidl_subnet!("3080::1/64");
     const GATEWAY_MAC: fidl_fuchsia_net::MacAddress = fidl_mac!("02:01:02:03:04:05");
@@ -71,7 +71,7 @@ async fn test_resolve_route() {
 
     // Configure a host.
     let host = sandbox
-        .create_netstack_realm::<Netstack2, _>("resolve_route_host")
+        .create_netstack_realm::<Netstack2, _>(format!("{}_host", name))
         .expect("failed to create client realm");
 
     let host_stack = host
@@ -93,7 +93,7 @@ async fn test_resolve_route() {
 
     // Configure a gateway.
     let gateway = sandbox
-        .create_netstack_realm::<Netstack2, _>("resolve_route_gateway")
+        .create_netstack_realm::<Netstack2, _>(format!("{}_gateway", name))
         .expect("failed to create server realm");
 
     let gateway_ep = gateway
@@ -200,15 +200,14 @@ async fn test_resolve_route() {
     .expect("IPv6 route lookup failed");
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn test_resolve_default_route_while_dhcp_is_running() {
+#[variants_test]
+async fn resolve_default_route_while_dhcp_is_running(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
 
     // Configure a host.
-    let realm = sandbox
-        .create_netstack_realm::<Netstack2, _>("resolve_route_host")
-        .expect("failed to create client realm");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack2, _>(name).expect("failed to create client realm");
 
     let stack = realm
         .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()

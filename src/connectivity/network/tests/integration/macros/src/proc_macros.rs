@@ -116,8 +116,8 @@ fn permutations_over_type_generics(
 fn variants_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStream {
     let item = input.clone();
     let mut item = syn::parse_macro_input!(item as syn::ItemFn);
-    let syn::ItemFn { attrs, vis: _, ref sig, block: _ } = &mut item;
-    let impl_attrs = std::mem::replace(attrs, Vec::new());
+    let impl_attrs = std::mem::replace(&mut item.attrs, Vec::new());
+    let syn::ItemFn { attrs: _, vis: _, ref sig, block: _ } = &item;
     let syn::Signature {
         constness: _,
         asyncness: _,
@@ -217,66 +217,88 @@ fn variants_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
         type_generics.push(generic_type)
     }
 
+    // Pass the test name as the first argument, and keep other arguments
+    // in the generated function which will be passed to the original function.
+    let impl_inputs = inputs.iter().skip(1).cloned().collect::<Vec<_>>();
+
+    let mut args = Vec::new();
+    for arg in impl_inputs.iter() {
+        let arg = match arg {
+            syn::FnArg::Typed(syn::PatType { attrs: _, pat, colon_token: _, ty: _ }) => pat,
+            other => {
+                return syn::Error::new_spanned(
+                    proc_macro2::TokenStream::from(input),
+                    format!("expected typed fn arg; got = {:#?}", other),
+                )
+                .to_compile_error()
+                .into()
+            }
+        };
+
+        let arg = match arg.as_ref() {
+            syn::Pat::Ident(syn::PatIdent {
+                attrs: _,
+                by_ref: _,
+                mutability: _,
+                ident,
+                subpat: _,
+            }) => ident,
+            other => {
+                return syn::Error::new_spanned(
+                    proc_macro2::TokenStream::from(input),
+                    format!("expected ident fn arg; got = {:#?}", other),
+                )
+                .to_compile_error()
+                .into()
+            }
+        };
+
+        args.push(syn::Expr::Path(syn::ExprPath {
+            attrs: Vec::new(),
+            qself: None,
+            path: arg.clone().into(),
+        }));
+    }
+
+    let make_args = |name: String| {
+        std::iter::once(syn::Expr::Lit(syn::ExprLit {
+            attrs: vec![],
+            lit: syn::Lit::Str(syn::LitStr::new(&name, Span::call_site())),
+        }))
+        .chain(args.iter().cloned())
+    };
+
+    let permutations = permutations_over_type_generics(variants, &type_generics);
+
+    // If we're not emitting any variants we're aware of, just re-emit the
+    // function with its name passed in as the first argument.
+    if permutations.len() == 1 {
+        let TestVariation { params: _, generics, suffix } = &permutations[0];
+        // Suffix should be empty for single permutation.
+        assert_eq!(suffix, "");
+        let args = make_args(name.to_string());
+        let result = quote! {
+            #(#impl_attrs)*
+            #[fuchsia_async::run_singlethreaded(test)]
+            async fn #name < #(#generics),* > ( #(#impl_inputs),* ) #output #where_clause {
+                #item
+                #name ( #(#args),* ).await
+            }
+        }
+        .into();
+        return result;
+    }
+
     let mut impls = Vec::new();
     // Generate the list of test variations we will generate.
     //
     // The initial variation has no replacements or suffix.
-    for TestVariation { params, generics, suffix } in
-        permutations_over_type_generics(variants, &type_generics)
-    {
+    for TestVariation { params, generics, suffix } in permutations {
         // We don't need to add an "_" between the name and the suffix here as the suffix
         // will start with one.
         let test_name_str = format!("{}{}", name.to_string(), suffix);
         let test_name = syn::Ident::new(&test_name_str, Span::call_site());
-
-        // Pass the test name as the first argument, and keep other arguments
-        // in the generated function which will be passed to the original function.
-        let impl_inputs = inputs
-            .iter()
-            .enumerate()
-            .filter_map(|(i, item)| if i == 0 { None } else { Some(item.clone()) })
-            .collect::<Vec<_>>();
-        let mut args = vec![syn::Expr::Lit(syn::ExprLit {
-            attrs: vec![],
-            lit: syn::Lit::Str(syn::LitStr::new(&test_name_str, Span::call_site())),
-        })];
-        for arg in impl_inputs.iter() {
-            let arg = match arg {
-                syn::FnArg::Typed(syn::PatType { attrs: _, pat, colon_token: _, ty: _ }) => pat,
-                other => {
-                    return syn::Error::new_spanned(
-                        proc_macro2::TokenStream::from(input),
-                        format!("expected typed fn arg; got = {:#?}", other),
-                    )
-                    .to_compile_error()
-                    .into()
-                }
-            };
-
-            let arg = match arg.as_ref() {
-                syn::Pat::Ident(syn::PatIdent {
-                    attrs: _,
-                    by_ref: _,
-                    mutability: _,
-                    ident,
-                    subpat: _,
-                }) => ident,
-                other => {
-                    return syn::Error::new_spanned(
-                        proc_macro2::TokenStream::from(input),
-                        format!("expected ident fn arg; got = {:#?}", other),
-                    )
-                    .to_compile_error()
-                    .into()
-                }
-            };
-
-            args.push(syn::Expr::Path(syn::ExprPath {
-                attrs: Vec::new(),
-                qself: None,
-                path: arg.clone().into(),
-            }));
-        }
+        let args = make_args(test_name_str);
 
         impls.push(quote! {
             #(#impl_attrs)*
@@ -295,12 +317,12 @@ fn variants_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
     result.into()
 }
 
-/// Runs a test `fn` over different variations of Netstacks, device endpoints and/or
-/// network managers based on the test `fn`'s type parameters.
+/// Runs a test `fn` over different variations of Netstacks and/or network
+/// managers based on the test `fn`'s type parameters.
 ///
-/// The test `fn` may only be generic over any combination of `Endpoint`, `Netstack`
-/// and `Manager`. It may only have a single `&str` argument, used to identify the
-/// test variation.
+/// The test `fn` may only be generic over any combination of `Endpoint`,
+/// `Netstack` and `Manager`. It may only have a single `&str` argument, used to
+/// identify the test variation.
 ///
 /// Example:
 ///
@@ -460,6 +482,22 @@ fn variants_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
 ///         netemul::NetworkDevice,
 ///     >("test_foo_ns3_ns3_netdevice")
 ///     .await
+/// }
+/// ```
+///
+/// A test with no type parameters is expanded to receive the function name as
+/// the first argument.
+/// ```
+/// #[variants_test]
+/// async fn test_foo(name: &str) {/*...*/}
+/// ```
+///
+/// Expands to
+/// ```
+/// #[fuchsia_async::run_singlethreaded(test)]
+/// async fn test_foo() {
+///    async fn test_foo(name: &str){/*...*/}
+///    test_foo("test_foo").await
 /// }
 /// ```
 #[proc_macro_attribute]

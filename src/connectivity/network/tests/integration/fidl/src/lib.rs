@@ -37,9 +37,8 @@ use packet_formats::{
 };
 use test_case::test_case;
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn add_ethernet_device() {
-    let name = "add_ethernet_device";
+#[variants_test]
+async fn add_ethernet_device(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
     let netstack = realm
@@ -96,12 +95,10 @@ async fn add_ethernet_device() {
     assert!(!online);
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn test_no_duplicate_interface_names() {
+#[variants_test]
+async fn no_duplicate_interface_names(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm = sandbox
-        .create_netstack_realm::<Netstack2, _>("no_duplicate_interface_names")
-        .expect("create realm");
+    let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
     let netstack = realm
         .connect_to_protocol::<fidl_fuchsia_netstack::NetstackMarker>()
         .expect("connect to protocol");
@@ -152,9 +149,8 @@ async fn test_no_duplicate_interface_names() {
     assert_eq!(result, Err(zx::Status::ALREADY_EXISTS));
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn test_log_packets() {
-    let name = "test_log_packets";
+#[variants_test]
+async fn log_packets(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     // Modify debug netstack args so that it does not log packets.
     let (realm, stack_log) = {

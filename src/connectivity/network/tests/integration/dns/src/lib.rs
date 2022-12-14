@@ -54,12 +54,12 @@ use packet_formats::{
 };
 use packet_formats_dhcp::v6;
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn no_ip_literal() {
+#[variants_test]
+async fn no_ip_literal(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
         .create_netstack_realm_with::<Netstack2, _, _>(
-            "realm",
+            name,
             &[KnownServiceProvider::DnsResolver, KnownServiceProvider::FakeClock],
         )
         .expect("create realm");
@@ -532,8 +532,8 @@ const EXAMPLE_HOSTNAME: &str = "www.example.com.";
 const EXAMPLE_IPV4_ADDR: fnet::IpAddress = fidl_ip!("93.184.216.34");
 const EXAMPLE_IPV6_ADDR: fnet::IpAddress = fidl_ip!("2606:2800:220:1:248:1893:25c8:1946");
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout() {
+#[variants_test]
+async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout(name: &str) {
     use trust_dns_proto::{
         op::{Message, ResponseCode},
         rr::RecordType,
@@ -542,7 +542,7 @@ async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout() {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox
         .create_netstack_realm_with::<Netstack2, _, _>(
-            "realm",
+            name,
             &[KnownServiceProvider::DnsResolver, KnownServiceProvider::FakeClock],
         )
         .expect("failed to create realm");
@@ -686,8 +686,8 @@ async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout() {
         .await;
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn fallback_on_error_response_code() {
+#[variants_test]
+async fn fallback_on_error_response_code(name: &str) {
     use itertools::Itertools as _;
     use trust_dns_proto::{
         op::{Message, ResponseCode},
@@ -727,7 +727,7 @@ async fn fallback_on_error_response_code() {
         let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
         let realm = sandbox
             .create_netstack_realm_with::<Netstack2, _, _>(
-                "realm",
+                name,
                 &[KnownServiceProvider::DnsResolver, KnownServiceProvider::FakeClock],
             )
             .expect("failed to create realm");
@@ -896,14 +896,14 @@ async fn setup_dns_server(
     (udp_socket, tcp_listener)
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn no_fallback_to_tcp_on_failed_udp() {
+#[variants_test]
+async fn no_fallback_to_tcp_on_failed_udp(name: &str) {
     use trust_dns_proto::op::{Message, ResponseCode};
 
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
         .create_netstack_realm_with::<Netstack2, _, _>(
-            "realm",
+            name,
             &[KnownServiceProvider::DnsResolver, KnownServiceProvider::FakeClock],
         )
         .expect("create realm");
@@ -957,14 +957,14 @@ async fn no_fallback_to_tcp_on_failed_udp() {
     };
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn fallback_to_tcp_on_truncated_response() {
+#[variants_test]
+async fn fallback_to_tcp_on_truncated_response(name: &str) {
     use trust_dns_proto::op::{Message, MessageType, OpCode, ResponseCode};
 
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
         .create_netstack_realm_with::<Netstack2, _, _>(
-            "realm",
+            name,
             &[KnownServiceProvider::DnsResolver, KnownServiceProvider::FakeClock],
         )
         .expect("create realm");
@@ -1063,14 +1063,14 @@ async fn fallback_to_tcp_on_truncated_response() {
     };
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn query_preferred_name_servers_first() {
+#[variants_test]
+async fn query_preferred_name_servers_first(name: &str) {
     use trust_dns_proto::op::{Message, MessageType, OpCode, ResponseCode};
 
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
         .create_netstack_realm_with::<Netstack2, _, _>(
-            "realm",
+            name,
             &[KnownServiceProvider::DnsResolver, KnownServiceProvider::FakeClock],
         )
         .expect("create realm");

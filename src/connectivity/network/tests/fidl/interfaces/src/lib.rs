@@ -930,11 +930,10 @@ async fn test_watcher_race<N: Netstack>(name: &str) {
 // TODO(https://fxbug.dev/107338): Run this against netstack3 when it
 // hides IPv6 addresses on offline interfaces from clients of
 // fuchsia.net.interfaces/Watcher.
+#[variants_test]
 #[test_case(fidl_subnet!("abcd::1/64"))]
 #[test_case(fidl_subnet!("1.2.3.4/24"))]
-#[fuchsia_async::run_singlethreaded(test)]
-async fn test_addresses_while_offline(addr_with_prefix: fidl_fuchsia_net::Subnet) {
-    let name = "test_addresses_while_offline";
+async fn addresses_while_offline(name: &str, addr_with_prefix: fidl_fuchsia_net::Subnet) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
     let device =
@@ -1031,9 +1030,8 @@ async fn test_addresses_while_offline(addr_with_prefix: fidl_fuchsia_net::Subnet
 
 // TODO(https://fxbug.dev/112627): Split this test up and run against NS3.
 /// Test interface changes are reported through the interface watcher.
-#[fuchsia_async::run_singlethreaded(test)]
-async fn test_watcher() {
-    let name = "test_watcher";
+#[variants_test]
+async fn watcher(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
     let stack =

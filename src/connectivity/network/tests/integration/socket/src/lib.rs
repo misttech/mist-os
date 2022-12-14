@@ -316,6 +316,7 @@ async fn execute_and_validate_preflights(
         .await
 }
 
+#[variants_test]
 #[test_case("connect_called", UdpCacheInvalidationReason::ConnectCalled)]
 #[test_case("ipv6_only_called", UdpCacheInvalidationReason::IPv6OnlyCalled)]
 #[test_case("broadcast_called", UdpCacheInvalidationReason::BroadcastCalled)]
@@ -326,8 +327,8 @@ async fn execute_and_validate_preflights(
     "Stack.SetInterfaceIpForwardingDeprecated",
     UdpCacheInvalidationReason::SetInterfaceIpForwardingDeprecatedCalled
 )]
-#[fuchsia_async::run_singlethreaded(test)]
-async fn test_udp_send_msg_preflight_fidl(
+async fn udp_send_msg_preflight_fidl(
+    root_name: &str,
     test_name: &str,
     invalidation_reason: UdpCacheInvalidationReason,
 ) {
@@ -351,8 +352,9 @@ async fn test_udp_send_msg_preflight_fidl(
         });
 
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm_name = format!("{}_{}", root_name, test_name);
     let (_net, _netstack, iface, socket) =
-        setup_fastudp_network(test_name, &sandbox, fposix_socket::Domain::Ipv4).await;
+        setup_fastudp_network(&realm_name, &sandbox, fposix_socket::Domain::Ipv4).await;
 
     let mut installed_subnet =
         fnet::Subnet { addr: fnet::IpAddress::Ipv4(INSTALLED_ADDR.address), prefix_len: 8 };
@@ -560,12 +562,11 @@ async fn assert_preflight_response_invalidated(
     );
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn test_udp_send_msg_preflight_autogen_addr_invalidation() {
+#[variants_test]
+async fn udp_send_msg_preflight_autogen_addr_invalidation(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let (net, netstack, iface, socket) =
-        setup_fastudp_network("autogen_addr_invalidated", &sandbox, fposix_socket::Domain::Ipv6)
-            .await;
+        setup_fastudp_network(name, &sandbox, fposix_socket::Domain::Ipv6).await;
 
     let interfaces_state = netstack
         .connect_to_protocol::<fnet_interfaces::StateMarker>()
@@ -661,11 +662,11 @@ async fn test_udp_send_msg_preflight_autogen_addr_invalidation() {
     assert_eq!(result, Err(fposix::Errno::Ehostunreach));
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn test_udp_send_msg_preflight_dad_failure() {
+#[variants_test]
+async fn udp_send_msg_preflight_dad_failure(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let (net, _netstack, iface, socket) =
-        setup_fastudp_network("dad_failure", &sandbox, fposix_socket::Domain::Ipv6).await;
+        setup_fastudp_network(name, &sandbox, fposix_socket::Domain::Ipv6).await;
 
     let preflight = connect_socket_and_validate_preflight(
         &socket,
@@ -840,6 +841,7 @@ async fn toggle_cmsg(
     }
 }
 
+#[variants_test]
 #[test_case("ip_tos", CmsgType::IpTos)]
 #[test_case("ip_ttl", CmsgType::IpTtl)]
 #[test_case("ipv6_tclass", CmsgType::Ipv6Tclass)]
@@ -847,11 +849,10 @@ async fn toggle_cmsg(
 #[test_case("ipv6_pktinfo", CmsgType::Ipv6PktInfo)]
 #[test_case("so_timestamp_ns", CmsgType::SoTimestampNs)]
 #[test_case("so_timestamp", CmsgType::SoTimestamp)]
-#[fuchsia_async::run_singlethreaded(test)]
-async fn test_udp_recv_msg_postflight_fidl(test_name: &str, cmsg_type: CmsgType) {
+async fn udp_recv_msg_postflight_fidl(root_name: &str, test_name: &str, cmsg_type: CmsgType) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let netstack = sandbox
-        .create_netstack_realm::<Netstack2WithFastUdp, _>(format!("{}_netstack", test_name))
+        .create_netstack_realm::<Netstack2WithFastUdp, _>(format!("{}_{}", root_name, test_name))
         .expect("failed to create netstack realm");
 
     let socket_provider = netstack
@@ -1376,14 +1377,14 @@ fn base_ip_device_port_config() -> fnet_tun::BasePortConfig {
     }
 }
 
-#[fasync::run_singlethreaded(test)]
-async fn test_ip_endpoints_socket() {
+#[variants_test]
+async fn ip_endpoints_socket(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let client = sandbox
-        .create_netstack_realm::<Netstack2, _>("test_ip_endpoints_socket_client")
+        .create_netstack_realm::<Netstack2, _>(format!("{}_client", name))
         .expect("failed to create client realm");
     let server = sandbox
-        .create_netstack_realm::<Netstack2, _>("test_ip_endpoints_socket_server")
+        .create_netstack_realm::<Netstack2, _>(format!("{}_server", name))
         .expect("failed to create server realm");
 
     let tun = fuchsia_component::client::connect_to_protocol::<fnet_tun::ControlMarker>()
@@ -1440,12 +1441,11 @@ async fn test_ip_endpoints_socket() {
     let () = run_udp_socket_test(&server, SERVER_ADDR_V6.addr, &client, CLIENT_ADDR_V6.addr).await;
 }
 
-#[fasync::run_singlethreaded(test)]
-async fn test_ip_endpoint_packets() {
+#[variants_test]
+async fn ip_endpoint_packets(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = sandbox
-        .create_netstack_realm::<Netstack2, _>("test_ip_endpoint_packets")
-        .expect("failed to create client realm");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack2, _>(name).expect("failed to create client realm");
 
     let tun = fuchsia_component::client::connect_to_protocol::<fnet_tun::ControlMarker>()
         .expect("failed to connect to tun protocol");

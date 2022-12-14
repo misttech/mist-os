@@ -8,7 +8,6 @@ use std::collections::HashMap;
 use std::convert::From as _;
 
 use anyhow::Context as _;
-use fuchsia_async as fasync;
 use futures::{stream, FutureExt as _, StreamExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip, fidl_mac};
 use net_types::SpecifiedAddress;
@@ -17,6 +16,7 @@ use netemul::{
 };
 use netstack_testing_common::realms::{Netstack2, TestRealmExt as _, TestSandboxExt as _};
 use netstack_testing_common::Result;
+use netstack_testing_macros::variants_test;
 
 const ALICE_MAC: fidl_fuchsia_net::MacAddress = fidl_mac!("02:00:01:02:03:04");
 const ALICE_IP: fidl_fuchsia_net::IpAddress = fidl_ip!("192.168.0.100");
@@ -40,7 +40,7 @@ struct NeighborRealm<'a> {
 async fn create_realm<'a>(
     sandbox: &'a TestSandbox,
     network: &'a TestNetwork<'a>,
-    test_name: &'static str,
+    test_name: &'a str,
     variant_name: &'static str,
     static_addr: fidl_fuchsia_net::Subnet,
     mac: fidl_fuchsia_net::MacAddress,
@@ -100,7 +100,7 @@ async fn create_realm<'a>(
 async fn create_neighbor_realms<'a>(
     sandbox: &'a TestSandbox,
     network: &'a TestNetwork<'a>,
-    test_name: &'static str,
+    test_name: &'a str,
 ) -> (NeighborRealm<'a>, NeighborRealm<'a>) {
     let alice = create_realm(
         sandbox,
@@ -329,12 +329,12 @@ async fn assert_entries<
     }
 }
 
-#[fasync::run_singlethreaded(test)]
-async fn neigh_list_entries() {
+#[variants_test]
+async fn neigh_list_entries(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
 
-    let (alice, bob) = create_neighbor_realms(&sandbox, &network, "neigh_list_entries").await;
+    let (alice, bob) = create_neighbor_realms(&sandbox, &network, name).await;
 
     let mut alice_iter =
         get_entry_iterator(&alice.realm, fidl_fuchsia_net_neighbor::EntryIteratorOptions::EMPTY);
@@ -618,15 +618,15 @@ async fn next_solicitation_resolution(
     }
 }
 
-#[fasync::run_singlethreaded(test)]
-async fn neigh_clear_entries_errors() {
+#[variants_test]
+async fn neigh_clear_entries_errors(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
 
     let alice = create_realm(
         &sandbox,
         &network,
-        "neigh_clear_entries_errors",
+        name,
         "alice",
         fidl_fuchsia_net::Subnet { addr: ALICE_IP, prefix_len: SUBNET_PREFIX },
         ALICE_MAC,
@@ -658,8 +658,8 @@ async fn neigh_clear_entries_errors() {
     );
 }
 
-#[fasync::run_singlethreaded(test)]
-async fn neigh_clear_entries() {
+#[variants_test]
+async fn neigh_clear_entries(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
 
@@ -668,7 +668,7 @@ async fn neigh_clear_entries() {
     let fake_ep = network.create_fake_endpoint().expect("failed to create fake endpoint");
     let mut solicit_stream = create_metadata_stream(&fake_ep);
 
-    let (alice, bob) = create_neighbor_realms(&sandbox, &network, "neigh_clear_entries").await;
+    let (alice, bob) = create_neighbor_realms(&sandbox, &network, name).await;
 
     let controller = alice
         .realm
@@ -747,8 +747,8 @@ async fn neigh_clear_entries() {
     assert_eq!(next_solicitation_resolution(&mut solicit_stream).await, bob.ipv6);
 }
 
-#[fasync::run_singlethreaded(test)]
-async fn neigh_add_remove_entry() {
+#[variants_test]
+async fn neigh_add_remove_entry(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
 
@@ -762,7 +762,7 @@ async fn neigh_add_remove_entry() {
         })
     });
 
-    let (alice, bob) = create_neighbor_realms(&sandbox, &network, "neigh_add_remove_entry").await;
+    let (alice, bob) = create_neighbor_realms(&sandbox, &network, name).await;
 
     let controller = alice
         .realm
@@ -893,15 +893,15 @@ async fn neigh_add_remove_entry() {
     assert_eq!(next_solicitation_resolution(&mut meta_stream).await, bob.ipv6);
 }
 
-#[fasync::run_singlethreaded(test)]
-async fn neigh_unreachability_config_errors() {
+#[variants_test]
+async fn neigh_unreachability_config_errors(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
 
     let alice = create_realm(
         &sandbox,
         &network,
-        "neigh_update_unreachability_config_errors",
+        name,
         "alice",
         fidl_fuchsia_net::Subnet { addr: ALICE_IP, prefix_len: SUBNET_PREFIX },
         ALICE_MAC,
@@ -964,15 +964,15 @@ async fn neigh_unreachability_config_errors() {
     );
 }
 
-#[fasync::run_singlethreaded(test)]
-async fn neigh_unreachability_config() {
+#[variants_test]
+async fn neigh_unreachability_config(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
 
     let alice = create_realm(
         &sandbox,
         &network,
-        "neigh_update_unreachability_config",
+        name,
         "alice",
         fidl_fuchsia_net::Subnet { addr: ALICE_IP, prefix_len: SUBNET_PREFIX },
         ALICE_MAC,
@@ -1069,15 +1069,15 @@ async fn neigh_unreachability_config() {
     }
 }
 
-#[fasync::run_singlethreaded(test)]
-async fn neigh_unreachable_entries() {
+#[variants_test]
+async fn neigh_unreachable_entries(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
 
     let alice = create_realm(
         &sandbox,
         &network,
-        "neigh_unreachable_entries",
+        name,
         "alice",
         fidl_fuchsia_net::Subnet { addr: ALICE_IP, prefix_len: SUBNET_PREFIX },
         ALICE_MAC,
@@ -1129,13 +1129,12 @@ async fn neigh_unreachable_entries() {
     .await;
 }
 
-#[fasync::run_singlethreaded(test)]
-async fn cant_hang_twice() {
+#[variants_test]
+async fn cant_hang_twice(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
 
-    let realm = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("cant_hang_twice"))
-        .expect("failed to create realm");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack2, _>(name).expect("failed to create realm");
 
     let view = realm
         .connect_to_protocol::<fidl_fuchsia_net_neighbor::ViewMarker>()
@@ -1162,15 +1161,15 @@ async fn cant_hang_twice() {
     assert_matches::assert_matches!(r2, Err(e) if e.is_closed());
 }
 
-#[fasync::run_singlethreaded(test)]
-async fn channel_is_closed_if_not_polled() {
+#[variants_test]
+async fn channel_is_closed_if_not_polled(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
 
     let alice = create_realm(
         &sandbox,
         &network,
-        "channel_is_closed_if_not_polled",
+        name,
         "alice",
         fidl_fuchsia_net::Subnet { addr: ALICE_IP, prefix_len: SUBNET_PREFIX },
         ALICE_MAC,
@@ -1218,15 +1217,15 @@ async fn channel_is_closed_if_not_polled() {
     }
 }
 
-#[fasync::run_singlethreaded(test)]
-async fn remove_device_clears_neighbors() {
+#[variants_test]
+async fn remove_device_clears_neighbors(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
 
     let NeighborRealm { realm, ep, ipv6: _, loopback_id: _ } = create_realm(
         &sandbox,
         &network,
-        "remove_device_clears_neighbors",
+        name,
         "alice",
         fidl_fuchsia_net::Subnet { addr: ALICE_IP, prefix_len: SUBNET_PREFIX },
         ALICE_MAC,

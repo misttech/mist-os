@@ -964,9 +964,8 @@ async fn sends_mld_reports<E: netemul::Endpoint>(name: &str) {
         .expect("error getting our expected MLD report");
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn sending_ra_with_autoconf_flag_triggers_slaac() {
-    let name = "sending_ra_with_onlink_triggers_autoconf";
+#[variants_test]
+async fn sending_ra_with_autoconf_flag_triggers_slaac(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("error creating sandbox");
     let (_network, realm, _netstack, iface, _fake_ep) =
         setup_network::<netemul::NetworkDevice>(&sandbox, name, None)
