@@ -658,6 +658,7 @@ type StructWithArrayMembers = struct {
 					Type: TypeDescriptor{
 						Type: "int64",
 						Kind: TypeKindInteger,
+						Size: 8,
 					},
 					Offset: 0,
 				},
@@ -666,6 +667,7 @@ type StructWithArrayMembers = struct {
 					Type: TypeDescriptor{
 						Type: "uint64",
 						Kind: TypeKindInteger,
+						Size: 8,
 					},
 					Offset: 8,
 				},
@@ -674,6 +676,7 @@ type StructWithArrayMembers = struct {
 					Type: TypeDescriptor{
 						Type: "int32",
 						Kind: TypeKindInteger,
+						Size: 4,
 					},
 					Offset: 16,
 				},
@@ -682,6 +685,7 @@ type StructWithArrayMembers = struct {
 					Type: TypeDescriptor{
 						Type: "uint32",
 						Kind: TypeKindInteger,
+						Size: 4,
 					},
 					Offset: 20,
 				},
@@ -690,6 +694,7 @@ type StructWithArrayMembers = struct {
 					Type: TypeDescriptor{
 						Type: "int16",
 						Kind: TypeKindInteger,
+						Size: 2,
 					},
 					Offset: 24,
 				},
@@ -698,6 +703,7 @@ type StructWithArrayMembers = struct {
 					Type: TypeDescriptor{
 						Type: "uint16",
 						Kind: TypeKindInteger,
+						Size: 2,
 					},
 					Offset: 26,
 				},
@@ -706,6 +712,7 @@ type StructWithArrayMembers = struct {
 					Type: TypeDescriptor{
 						Type: "int8",
 						Kind: TypeKindInteger,
+						Size: 1,
 					},
 					Offset: 28,
 				},
@@ -714,6 +721,7 @@ type StructWithArrayMembers = struct {
 					Type: TypeDescriptor{
 						Type: "uint8",
 						Kind: TypeKindInteger,
+						Size: 1,
 					},
 					Offset: 29,
 				},
@@ -722,6 +730,7 @@ type StructWithArrayMembers = struct {
 					Type: TypeDescriptor{
 						Type: "bool",
 						Kind: TypeKindBool,
+						Size: 1,
 					},
 					Offset: 30,
 				},
@@ -731,6 +740,7 @@ type StructWithArrayMembers = struct {
 						Type: "example/Enum",
 						Kind: TypeKindEnum,
 						Decl: &enum,
+						Size: 2,
 					},
 					Offset: 32,
 				},
@@ -740,6 +750,7 @@ type StructWithArrayMembers = struct {
 						Type: "example/Bits",
 						Kind: TypeKindBits,
 						Decl: &bits,
+						Size: 2,
 					},
 					Offset: 34,
 				},
@@ -749,6 +760,7 @@ type StructWithArrayMembers = struct {
 						Type: "example/EmptyStruct",
 						Kind: TypeKindStruct,
 						Decl: &emptyStruct,
+						Size: 1,
 					},
 					Offset: 36,
 				},
@@ -765,8 +777,10 @@ type StructWithArrayMembers = struct {
 						ElementType: &TypeDescriptor{
 							Type: "uint8",
 							Kind: TypeKindInteger,
+							Size: 1,
 						},
 						ElementCount: &ten,
+						Size:         10,
 					},
 					Offset: 0,
 				},
@@ -778,8 +792,10 @@ type StructWithArrayMembers = struct {
 							Type: "example/EmptyStruct",
 							Kind: TypeKindStruct,
 							Decl: &emptyStruct,
+							Size: 1,
 						},
 						ElementCount: &six,
+						Size:         6,
 					},
 					Offset: 10,
 				},
@@ -792,10 +808,13 @@ type StructWithArrayMembers = struct {
 							ElementType: &TypeDescriptor{
 								Type: "bool",
 								Kind: TypeKindBool,
+								Size: 1,
 							},
 							ElementCount: &two,
+							Size:         2,
 						},
 						ElementCount: &four,
+						Size:         8,
 					},
 					Offset: 16,
 				},
@@ -886,6 +905,7 @@ alias NestedArrayAlias = array<array<Struct, 8>, 4>;
 				Type: TypeDescriptor{
 					Type: "uint64",
 					Kind: TypeKindInteger,
+					Size: 8,
 				},
 			},
 		},
@@ -901,6 +921,7 @@ alias NestedArrayAlias = array<array<Struct, 8>, 4>;
 			Value: TypeDescriptor{
 				Type: "uint8",
 				Kind: TypeKindInteger,
+				Size: 1,
 			},
 		},
 		{
@@ -909,6 +930,7 @@ alias NestedArrayAlias = array<array<Struct, 8>, 4>;
 				Type: "example/Enum",
 				Kind: TypeKindEnum,
 				Decl: &enum,
+				Size: 2,
 			},
 		},
 		{
@@ -917,6 +939,7 @@ alias NestedArrayAlias = array<array<Struct, 8>, 4>;
 				Type: "example/Bits",
 				Kind: TypeKindBits,
 				Decl: &bits,
+				Size: 2,
 			},
 		},
 		{
@@ -925,6 +948,7 @@ alias NestedArrayAlias = array<array<Struct, 8>, 4>;
 				Type: "example/Struct",
 				Kind: TypeKindStruct,
 				Decl: &strct,
+				Size: 8,
 			},
 		},
 		{
@@ -934,8 +958,10 @@ alias NestedArrayAlias = array<array<Struct, 8>, 4>;
 				ElementType: &TypeDescriptor{
 					Type: "uint32",
 					Kind: TypeKindInteger,
+					Size: 4,
 				},
 				ElementCount: &four,
+				Size:         16,
 			},
 		},
 		{
@@ -948,10 +974,13 @@ alias NestedArrayAlias = array<array<Struct, 8>, 4>;
 						Type: "example/Struct",
 						Kind: TypeKindStruct,
 						Decl: &strct,
+						Size: 8,
 					},
 					ElementCount: &eight,
+					Size:         64,
 				},
 				ElementCount: &four,
+				Size:         256,
 			},
 		},
 	}
@@ -1183,6 +1212,7 @@ protocol SyscallWithParameters {
 							Type: TypeDescriptor{
 								Type: "bool",
 								Kind: TypeKindBool,
+								Size: 1,
 							},
 							Orientation: ParameterOrientationIn,
 						},
@@ -1191,6 +1221,7 @@ protocol SyscallWithParameters {
 							Type: TypeDescriptor{
 								Type: "bool",
 								Kind: TypeKindBool,
+								Size: 1,
 							},
 							Orientation: ParameterOrientationOut,
 						},
@@ -1199,6 +1230,7 @@ protocol SyscallWithParameters {
 						Type: "example/StatusEnum",
 						Kind: TypeKindEnum,
 						Decl: &statusEnum,
+						Size: 4,
 					},
 				},
 				{
@@ -1209,6 +1241,7 @@ protocol SyscallWithParameters {
 							Type: TypeDescriptor{
 								Type: "uint64",
 								Kind: TypeKindInteger,
+								Size: 8,
 							},
 							Orientation: ParameterOrientationIn,
 						},
@@ -1217,6 +1250,7 @@ protocol SyscallWithParameters {
 							Type: TypeDescriptor{
 								Type: "bool",
 								Kind: TypeKindBool,
+								Size: 1,
 							},
 							Orientation: ParameterOrientationIn,
 						},
@@ -1230,6 +1264,7 @@ protocol SyscallWithParameters {
 							Type: TypeDescriptor{
 								Type: "uint64",
 								Kind: TypeKindInteger,
+								Size: 8,
 							},
 							Orientation: ParameterOrientationIn,
 						},
@@ -1238,6 +1273,7 @@ protocol SyscallWithParameters {
 							Type: TypeDescriptor{
 								Type: "uint32",
 								Kind: TypeKindInteger,
+								Size: 4,
 							},
 							Orientation: ParameterOrientationInOut,
 						},
@@ -1246,6 +1282,7 @@ protocol SyscallWithParameters {
 							Type: TypeDescriptor{
 								Type: "uint32",
 								Kind: TypeKindInteger,
+								Size: 4,
 							},
 							Orientation: ParameterOrientationOut,
 						},
@@ -1254,6 +1291,7 @@ protocol SyscallWithParameters {
 							Type: TypeDescriptor{
 								Type: "int8",
 								Kind: TypeKindInteger,
+								Size: 1,
 							},
 							Orientation: ParameterOrientationOut,
 						},
@@ -1267,6 +1305,7 @@ protocol SyscallWithParameters {
 							Type: TypeDescriptor{
 								Type: "int32",
 								Kind: TypeKindInteger,
+								Size: 4,
 							},
 							Orientation: ParameterOrientationOut,
 						},
@@ -1275,6 +1314,7 @@ protocol SyscallWithParameters {
 							Type: TypeDescriptor{
 								Type: "uint16",
 								Kind: TypeKindInteger,
+								Size: 2,
 							},
 							Orientation: ParameterOrientationOut,
 						},
@@ -1293,11 +1333,13 @@ protocol SyscallWithParameters {
 									Type: TypeDescriptor{
 										Type: "uint64",
 										Kind: TypeKindInteger,
+										Size: 8,
 									},
 								},
 							},
 							Size: 8,
 						},
+						Size: 8,
 					},
 				},
 				{
@@ -1305,6 +1347,7 @@ protocol SyscallWithParameters {
 					ReturnType: &TypeDescriptor{
 						Type: "uint32",
 						Kind: TypeKindInteger,
+						Size: 4,
 					},
 				},
 			},
@@ -1359,6 +1402,7 @@ protocol Foo {
 							Type: TypeDescriptor{
 								Type: "bool",
 								Kind: TypeKindBool,
+								Size: 1,
 							},
 							Orientation: ParameterOrientationIn,
 						},
@@ -1367,6 +1411,7 @@ protocol Foo {
 							Type: TypeDescriptor{
 								Type: "bool",
 								Kind: TypeKindBool,
+								Size: 1,
 							},
 							Orientation: ParameterOrientationOut,
 						},
@@ -1375,9 +1420,14 @@ protocol Foo {
 						Type: "zx/status",
 						Kind: TypeKindAlias,
 						Decl: &Alias{
-							decl:  decl{Name: fidlgen.MustReadName("zx/status")},
-							Value: TypeDescriptor{Type: "int32", Kind: TypeKindInteger},
+							decl: decl{Name: fidlgen.MustReadName("zx/status")},
+							Value: TypeDescriptor{
+								Type: "int32",
+								Kind: TypeKindInteger,
+								Size: 4,
+							},
 						},
+						Size: 4,
 					},
 				},
 			},
@@ -1455,7 +1505,9 @@ protocol Syscall {
 									Kind: TypeKindStruct,
 									Type: "example/EmptyStruct",
 									Decl: &emptyStruct,
+									Size: 1,
 								},
+								Size: 8,
 							},
 							Orientation: ParameterOrientationIn,
 							Tags: map[ParameterTag]struct{}{
@@ -1467,6 +1519,7 @@ protocol Syscall {
 							Type: TypeDescriptor{
 								Kind: TypeKindSize,
 								Type: "usize",
+								Size: 8,
 							},
 							Orientation: ParameterOrientationIn,
 							Tags: map[ParameterTag]struct{}{
@@ -1480,7 +1533,9 @@ protocol Syscall {
 								ElementType: &TypeDescriptor{
 									Kind: TypeKindInteger,
 									Type: "uint16",
+									Size: 2,
 								},
+								Size: 8,
 							},
 							Orientation: ParameterOrientationIn,
 							Tags: map[ParameterTag]struct{}{
@@ -1492,6 +1547,7 @@ protocol Syscall {
 							Type: TypeDescriptor{
 								Kind: TypeKindInteger,
 								Type: "uint32",
+								Size: 4,
 							},
 							Orientation: ParameterOrientationIn,
 							Tags: map[ParameterTag]struct{}{
@@ -1505,7 +1561,9 @@ protocol Syscall {
 								ElementType: &TypeDescriptor{
 									Kind: TypeKindInteger,
 									Type: "uint8",
+									Size: 1,
 								},
+								Size: 8,
 							},
 							Orientation: ParameterOrientationIn,
 							Tags: map[ParameterTag]struct{}{
@@ -1517,6 +1575,7 @@ protocol Syscall {
 							Type: TypeDescriptor{
 								Kind: TypeKindSize,
 								Type: "usize",
+								Size: 8,
 							},
 							Orientation: ParameterOrientationIn,
 							Tags: map[ParameterTag]struct{}{
@@ -1530,7 +1589,9 @@ protocol Syscall {
 								ElementType: &TypeDescriptor{
 									Kind: TypeKindInteger,
 									Type: "uint8",
+									Size: 1,
 								},
+								Size: 8,
 							},
 							Orientation: ParameterOrientationIn,
 							Tags: map[ParameterTag]struct{}{
@@ -1542,6 +1603,7 @@ protocol Syscall {
 							Type: TypeDescriptor{
 								Kind: TypeKindInteger,
 								Type: "uint32",
+								Size: 4,
 							},
 							Orientation: ParameterOrientationIn,
 							Tags: map[ParameterTag]struct{}{
@@ -1555,8 +1617,10 @@ protocol Syscall {
 								ElementType: &TypeDescriptor{
 									Kind:    TypeKindInteger,
 									Type:    "int8",
+									Size:    1,
 									Mutable: true,
 								},
+								Size: 8,
 							},
 							Orientation: ParameterOrientationInOut,
 							Tags: map[ParameterTag]struct{}{
@@ -1568,6 +1632,7 @@ protocol Syscall {
 							Type: TypeDescriptor{
 								Kind: TypeKindSize,
 								Type: "usize",
+								Size: 8,
 							},
 							Orientation: ParameterOrientationIn,
 							Tags: map[ParameterTag]struct{}{
@@ -1581,8 +1646,10 @@ protocol Syscall {
 								ElementType: &TypeDescriptor{
 									Kind:    TypeKindInteger,
 									Type:    "int8",
+									Size:    1,
 									Mutable: true,
 								},
+								Size: 8,
 							},
 							Orientation: ParameterOrientationInOut,
 							Tags: map[ParameterTag]struct{}{
@@ -1594,6 +1661,7 @@ protocol Syscall {
 							Type: TypeDescriptor{
 								Kind: TypeKindInteger,
 								Type: "uint32",
+								Size: 4,
 							},
 							Orientation: ParameterOrientationIn,
 							Tags: map[ParameterTag]struct{}{
@@ -1607,8 +1675,10 @@ protocol Syscall {
 								ElementType: &TypeDescriptor{
 									Kind:    TypeKindBool,
 									Type:    "bool",
+									Size:    1,
 									Mutable: true,
 								},
+								Size: 8,
 							},
 							Orientation: ParameterOrientationOut,
 							Tags: map[ParameterTag]struct{}{
@@ -1620,6 +1690,7 @@ protocol Syscall {
 							Type: TypeDescriptor{
 								Kind: TypeKindSize,
 								Type: "usize",
+								Size: 8,
 							},
 							Orientation: ParameterOrientationIn,
 							Tags: map[ParameterTag]struct{}{

@@ -674,6 +674,9 @@ type TypeDescriptor struct {
 	// ElementCount gives the size of the associated array.
 	ElementCount *int
 
+	// The wire size of the type.
+	Size int
+
 	// Mutable gives whether this type is mutable.
 	Mutable bool
 }
@@ -682,6 +685,12 @@ type TypeDescriptor struct {
 // fidlgen.Type and fidlgen.PartialTypeConstructor.
 type recursiveType interface {
 	GetKind() fidlgen.TypeKind
+	// TODO(fxbug.dev/105758): The presence of the declMap in the signature is
+	// to account for yet another type alias IR deficiency: the IR loses
+	// type information (e.g., size) about the value of the right-hand side, so
+	// we use the map to look up previously processed declarations to make a
+	// size determination.
+	GetSize(decls declMap) int
 	GetPrimitiveSubtype() fidlgen.PrimitiveSubtype
 	GetIdentifierType() fidlgen.EncodedCompoundIdentifier
 	GetElementType() recursiveType
@@ -692,7 +701,7 @@ type recursiveType interface {
 // requires a map of previously processed declarations for consulting, as well
 // as map of type kinds to record those seen during the resolution.
 func resolveType(typ recursiveType, attrs fidlgen.Attributes, decls declMap, typeKinds map[TypeKind]struct{}) (*TypeDescriptor, error) {
-	desc := TypeDescriptor{}
+	desc := TypeDescriptor{Size: typ.GetSize(decls)}
 	switch typ.GetKind() {
 	case fidlgen.PrimitiveType:
 		if typ.GetPrimitiveSubtype().IsFloat() {
@@ -799,6 +808,8 @@ func resolveType(typ recursiveType, attrs fidlgen.Attributes, decls declMap, typ
 type fidlgenType fidlgen.Type
 
 func (typ fidlgenType) GetKind() fidlgen.TypeKind { return typ.Kind }
+
+func (typ fidlgenType) GetSize(_ declMap) int { return typ.TypeShapeV2.InlineSize }
 
 func (typ fidlgenType) GetPrimitiveSubtype() fidlgen.PrimitiveSubtype {
 	return typ.PrimitiveSubtype
@@ -960,10 +971,37 @@ func (ctor fidlgenTypeCtor) GetKind() fidlgen.TypeKind {
 		string(fidlgen.Float32),
 		string(fidlgen.Float64):
 		return fidlgen.PrimitiveType
-	case "string":
-		return fidlgen.StringType
 	case "array":
 		return fidlgen.ArrayType
+	default:
+		panic(fmt.Sprintf("unsupported type: %s", ctor.Name))
+	}
+}
+
+func (ctor fidlgenTypeCtor) GetSize(decls declMap) int {
+	switch ctor.GetKind() {
+	case fidlgen.IdentifierType:
+		d := decls[string(ctor.Name)]
+		switch d.(type) {
+		case *Enum:
+			return primitiveWireSize(d.(*Enum).Subtype)
+		case *Bits:
+			return primitiveWireSize(d.(*Bits).Subtype)
+		case *Struct:
+			return d.(*Struct).Size
+		case *Alias:
+			return d.(*Alias).Value.Size
+		case *Handle:
+			return 4
+		default:
+			// The above declarations are the only ones that should appear as
+			// an alias value.
+			panic(fmt.Sprintf("unknown alias value kind %s: %#v", ctor.GetKind(), ctor))
+		}
+	case fidlgen.PrimitiveType:
+		return primitiveWireSize(ctor.GetPrimitiveSubtype())
+	case fidlgen.ArrayType:
+		return *ctor.GetElementCount() * ctor.GetElementType().GetSize(decls)
 	default:
 		panic(fmt.Sprintf("unsupported type: %s", ctor.Name))
 	}
@@ -995,6 +1033,23 @@ func (ctor fidlgenTypeCtor) GetElementCount() *int {
 		panic(fmt.Sprintf("could not interpret %s as an int", ctor.MaybeSize.Value))
 	}
 	return &count
+}
+
+func primitiveWireSize(typ fidlgen.PrimitiveSubtype) int {
+	switch typ {
+	case fidlgen.Bool, fidlgen.Int8, fidlgen.Uint8,
+		fidlgen.ZxExperimentalUchar:
+		return 1
+	case fidlgen.Int16, fidlgen.Uint16:
+		return 2
+	case fidlgen.Int32, fidlgen.Uint32:
+		return 4
+	case fidlgen.Int64, fidlgen.Uint64,
+		fidlgen.ZxExperimentalUintptr, fidlgen.ZxExperimentalUsize:
+		return 8
+	default:
+		panic(fmt.Sprintf("unknown primitive type: %s", typ))
+	}
 }
 
 // Handle represents a Zircon handle, as represented by a FIDL resource declaration.
@@ -1255,12 +1310,17 @@ func newSyscallFamily(protocol fidlgen.Protocol, decls declMap) (*SyscallFamily,
 			// Once one of these bugs is fixed, this workaround can be removed.
 			if syscall.ReturnType.Kind == TypeKindInteger && syscall.ReturnType.Type == string(fidlgen.Int32) {
 				if status, ok := decls["zx/status"]; ok { // TODO(fxbug.dev/109734): Should be "zx/Status".
-					int32Type := TypeDescriptor{Type: string(fidlgen.Int32), Kind: TypeKindInteger}
+					int32Type := TypeDescriptor{
+						Type: string(fidlgen.Int32),
+						Kind: TypeKindInteger,
+						Size: 4,
+					}
 					if alias, ok := status.(*Alias); ok && alias.Value == int32Type {
 						syscall.ReturnType = &TypeDescriptor{
 							Type: "zx/status",
 							Kind: TypeKindAlias,
 							Decl: status,
+							Size: 4,
 						}
 					}
 				}
@@ -1311,6 +1371,7 @@ func newSyscallFamily(protocol fidlgen.Protocol, decls declMap) (*SyscallFamily,
 					Type: string(typ.Identifier),
 					Kind: TypeKindStruct,
 					Decl: ident,
+					Size: s.Size,
 				}
 				return
 			}
@@ -1347,6 +1408,7 @@ func newSyscallFamily(protocol fidlgen.Protocol, decls declMap) (*SyscallFamily,
 				// parameters.
 				if kind.IsVectorLike() {
 					pointer := param
+					pointer.Type.Size = 8
 					pointer.SetTag(ParameterTagDecayedFromVector)
 					if kind.IsVoidVectorLike() {
 						pointer.Type.Kind = TypeKindVoidPointer
@@ -1375,11 +1437,13 @@ func newSyscallFamily(protocol fidlgen.Protocol, decls declMap) (*SyscallFamily,
 						length.Type = TypeDescriptor{
 							Kind: TypeKindInteger,
 							Type: string(fidlgen.Uint32),
+							Size: 4,
 						}
 					} else {
 						length.Type = TypeDescriptor{
 							Kind: TypeKindSize,
 							Type: string(fidlgen.ZxExperimentalUsize),
+							Size: 8,
 						}
 					}
 					syscall.Parameters = append(syscall.Parameters, pointer, length)
