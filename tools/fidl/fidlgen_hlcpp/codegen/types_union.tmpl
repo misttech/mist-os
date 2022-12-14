@@ -1,3 +1,5 @@
+#include <utility>
+#include <variant>
 {{/*
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
@@ -143,8 +145,7 @@ class {{ .Name }} final {
   friend ::fidl::Equality<{{ . }}>;
 
   {{- if .Result }}
-  {{- if .Result.HasError }}
-  {{ .Name }}(fpromise::result<{{ .Result.ValueDecl }}, {{ .Result.ErrorDecl }}>&& result) {
+  {{ .Name }}({{ .Result.FpromiseResult }}&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
       {{- if eq 0 .Result.ValueArity }}
@@ -153,17 +154,47 @@ class {{ .Name }} final {
       set_response({{ .Result.ValueTypeDecl }}{result.take_value()});
       {{- end }}
     } else {
+      {{- if and .Result.HasError .Result.HasFrameworkError }}
+      {{ .Result.FpromiseErrDecl }} errvariant = result.take_error();
+      switch (errvariant.index()) {
+        case 0:
+          set_err(std::get<0>(errvariant));
+          break;
+        case 1:
+          set_transport_err(std::get<1>(errvariant));
+          break;
+        default:
+          ZX_PANIC("Unknown variant index %zu", errvariant.index());
+          break;
+      }
+      {{- else if .Result.HasError }}
       set_err(result.take_error());
+      {{- else }}
+      set_transport_err(result.take_error());
+      {{- end }}
     }
   }
   {{ .Name }}(fpromise::ok_result<{{ .Result.ValueDecl }}>&& result)
-    : {{ .Name }}(fpromise::result<{{ .Result.ValueDecl }}, {{ .Result.ErrorDecl }}>(std::move(result))) { }
-  {{ .Name }}(fpromise::error_result<{{ .Result.ErrorDecl }}>&& result)
-    : {{ .Name }}(fpromise::result<{{ .Result.ValueDecl }}, {{ .Result.ErrorDecl }}>(std::move(result))) { }
-  operator fpromise::result<{{ .Result.ValueDecl }}, {{ .Result.ErrorDecl }}>() && {
+    : {{ .Name }}({{ .Result.FpromiseResult }}(std::move(result))) { }
+  {{ .Name }}(fpromise::error_result<{{ .Result.FpromiseErrDecl }}>&& result)
+    : {{ .Name }}({{ .Result.FpromiseResult }}(std::move(result))) { }
+  operator {{ .Result.FpromiseResult }}() && {
+    {{- if and .Result.HasError .Result.HasFrameworkError }}
+    if (is_err()) {
+      return fpromise::error({{ .Result.FpromiseErrDecl }}(std::in_place_index<0>, err()));
+    }
+    if (is_transport_err()) {
+      return fpromise::error({{ .Result.FpromiseErrDecl }}(std::in_place_index<1>, transport_err()));
+    }
+    {{- else if .Result.HasError }}
     if (is_err()) {
       return fpromise::error(err());
     }
+    {{- else }}
+    if (is_transport_err()) {
+      return fpromise::error(transport_err());
+    }
+    {{- end }}
     {{- if eq 0 .Result.ValueArity }}
     return fpromise::ok();
     {{- else if eq 1 .Result.ValueArity }}
@@ -173,7 +204,6 @@ class {{ .Name }} final {
     return fpromise::ok(std::move(response()));
     {{- end }}
   }
-  {{- end }}
   {{- end }}
 
  private:

@@ -329,6 +329,12 @@ func (r *Root) Namespace() namespace {
 	panic("not reached")
 }
 
+var transportErr nameVariants = nameVariants{
+	HLCPP:   makeName("fidl::TransportErr"),
+	Unified: makeName("fidl::internal::TransportErr"),
+	Wire:    makeName("fidl::internal::TransportErr"),
+}
+
 // Result holds information about error results on methods.
 type Result struct {
 	ResultDecl        nameVariants
@@ -375,6 +381,27 @@ func (r Result) BuildPayload(varName string) string {
 	}
 	out += "};\n"
 	return out
+}
+
+// FpromiseResult returns a string representing this result as an
+// fpromise::result for use in HLCPP.
+func (r Result) FpromiseResult() string {
+	return fmt.Sprintf("fpromise::result<%s, %s>", r.ValueDecl, r.FpromiseErrDecl())
+}
+
+// FpromiseErrDecl returns a string representing the error type arg to the
+// fpromise::result used for this Result in HLCPP.
+func (r Result) FpromiseErrDecl() string {
+	if r.HasError && r.HasFrameworkError {
+		return fmt.Sprintf("std::variant<%s, %s>", r.ErrorDecl, transportErr)
+	}
+	if r.HasError {
+		return r.ErrorDecl.String()
+	}
+	if r.HasFrameworkError {
+		return transportErr.String()
+	}
+	panic("Result had neither application error nor transport error")
 }
 
 var primitiveTypes = map[fidlgen.PrimitiveSubtype]string{
@@ -607,13 +634,7 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 	case fidlgen.InternalType:
 		switch val.InternalSubtype {
 		case fidlgen.TransportErr:
-			hlcppVariant := makeName("fidl::TransportErr")
-			newcppVariant := makeName("fidl::internal::TransportErr")
-			r.nameVariants = nameVariants{
-				HLCPP:   hlcppVariant,
-				Unified: newcppVariant,
-				Wire:    newcppVariant,
-			}
+			r.nameVariants = transportErr
 			r.Kind = TypeKinds.Enum
 			r.WireFamily = FamilyKinds.TrivialCopy
 			r.NaturalFieldConstraint = "fidl::internal::NaturalCodingConstraintEmpty"

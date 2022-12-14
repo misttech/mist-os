@@ -1762,6 +1762,24 @@ class UnknownInteractionsProtocol_FlexibleTwoWay_Result final {
   }
 
   friend ::fidl::Equality<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWay_Result>;
+  UnknownInteractionsProtocol_FlexibleTwoWay_Result(fpromise::result<void, ::fidl::TransportErr>&& result) {
+    ZX_ASSERT(!result.is_pending());
+    if (result.is_ok()) {
+      set_response(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWay_Response{});
+    } else {
+      set_transport_err(result.take_error());
+    }
+  }
+  UnknownInteractionsProtocol_FlexibleTwoWay_Result(fpromise::ok_result<void>&& result)
+    : UnknownInteractionsProtocol_FlexibleTwoWay_Result(fpromise::result<void, ::fidl::TransportErr>(std::move(result))) { }
+  UnknownInteractionsProtocol_FlexibleTwoWay_Result(fpromise::error_result<::fidl::TransportErr>&& result)
+    : UnknownInteractionsProtocol_FlexibleTwoWay_Result(fpromise::result<void, ::fidl::TransportErr>(std::move(result))) { }
+  operator fpromise::result<void, ::fidl::TransportErr>() && {
+    if (is_transport_err()) {
+      return fpromise::error(transport_err());
+    }
+    return fpromise::ok();
+  }
 
  private:
   void Destroy();
@@ -1910,6 +1928,25 @@ class UnknownInteractionsProtocol_FlexibleTwoWayFields_Result final {
   }
 
   friend ::fidl::Equality<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFields_Result>;
+  UnknownInteractionsProtocol_FlexibleTwoWayFields_Result(fpromise::result<int32_t, ::fidl::TransportErr>&& result) {
+    ZX_ASSERT(!result.is_pending());
+    if (result.is_ok()) {
+      set_response(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFields_Response{result.take_value()});
+    } else {
+      set_transport_err(result.take_error());
+    }
+  }
+  UnknownInteractionsProtocol_FlexibleTwoWayFields_Result(fpromise::ok_result<int32_t>&& result)
+    : UnknownInteractionsProtocol_FlexibleTwoWayFields_Result(fpromise::result<int32_t, ::fidl::TransportErr>(std::move(result))) { }
+  UnknownInteractionsProtocol_FlexibleTwoWayFields_Result(fpromise::error_result<::fidl::TransportErr>&& result)
+    : UnknownInteractionsProtocol_FlexibleTwoWayFields_Result(fpromise::result<int32_t, ::fidl::TransportErr>(std::move(result))) { }
+  operator fpromise::result<int32_t, ::fidl::TransportErr>() && {
+    if (is_transport_err()) {
+      return fpromise::error(transport_err());
+    }
+    ::std::tuple<int32_t> value_tuple = std::move(response());
+    return fpromise::ok(std::move(std::get<0>(value_tuple)));
+  }
 
  private:
   void Destroy();
@@ -2116,6 +2153,25 @@ class UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result final {
   }
 
   friend ::fidl::Equality<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result>;
+  UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response, ::fidl::TransportErr>&& result) {
+    ZX_ASSERT(!result.is_pending());
+    if (result.is_ok()) {
+      set_response(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response{result.take_value()});
+    } else {
+      set_transport_err(result.take_error());
+    }
+  }
+  UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result(fpromise::ok_result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response>&& result)
+    : UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response, ::fidl::TransportErr>(std::move(result))) { }
+  UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result(fpromise::error_result<::fidl::TransportErr>&& result)
+    : UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response, ::fidl::TransportErr>(std::move(result))) { }
+  operator fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response, ::fidl::TransportErr>() && {
+    if (is_transport_err()) {
+      return fpromise::error(transport_err());
+    }
+    ::std::tuple<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response> value_tuple = std::move(response());
+    return fpromise::ok(std::move(std::get<0>(value_tuple)));
+  }
 
  private:
   void Destroy();
@@ -2318,6 +2374,25 @@ class UnknownInteractionsProtocol_FlexibleTwoWayTable_Result final {
   }
 
   friend ::fidl::Equality<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Result>;
+  UnknownInteractionsProtocol_FlexibleTwoWayTable_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Response, ::fidl::TransportErr>&& result) {
+    ZX_ASSERT(!result.is_pending());
+    if (result.is_ok()) {
+      set_response(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Response{result.take_value()});
+    } else {
+      set_transport_err(result.take_error());
+    }
+  }
+  UnknownInteractionsProtocol_FlexibleTwoWayTable_Result(fpromise::ok_result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Response>&& result)
+    : UnknownInteractionsProtocol_FlexibleTwoWayTable_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Response, ::fidl::TransportErr>(std::move(result))) { }
+  UnknownInteractionsProtocol_FlexibleTwoWayTable_Result(fpromise::error_result<::fidl::TransportErr>&& result)
+    : UnknownInteractionsProtocol_FlexibleTwoWayTable_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Response, ::fidl::TransportErr>(std::move(result))) { }
+  operator fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Response, ::fidl::TransportErr>() && {
+    if (is_transport_err()) {
+      return fpromise::error(transport_err());
+    }
+    ::std::tuple<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Response> value_tuple = std::move(response());
+    return fpromise::ok(std::move(std::get<0>(value_tuple)));
+  }
 
  private:
   void Destroy();
@@ -2480,21 +2555,35 @@ class UnknownInteractionsProtocol_FlexibleTwoWayErr_Result final {
   }
 
   friend ::fidl::Equality<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayErr_Result>;
-  UnknownInteractionsProtocol_FlexibleTwoWayErr_Result(fpromise::result<void, int32_t>&& result) {
+  UnknownInteractionsProtocol_FlexibleTwoWayErr_Result(fpromise::result<void, std::variant<int32_t, ::fidl::TransportErr>>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
       set_response(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayErr_Response{});
     } else {
-      set_err(result.take_error());
+      std::variant<int32_t, ::fidl::TransportErr> errvariant = result.take_error();
+      switch (errvariant.index()) {
+        case 0:
+          set_err(std::get<0>(errvariant));
+          break;
+        case 1:
+          set_transport_err(std::get<1>(errvariant));
+          break;
+        default:
+          ZX_PANIC("Unknown variant index %zu", errvariant.index());
+          break;
+      }
     }
   }
   UnknownInteractionsProtocol_FlexibleTwoWayErr_Result(fpromise::ok_result<void>&& result)
-    : UnknownInteractionsProtocol_FlexibleTwoWayErr_Result(fpromise::result<void, int32_t>(std::move(result))) { }
-  UnknownInteractionsProtocol_FlexibleTwoWayErr_Result(fpromise::error_result<int32_t>&& result)
-    : UnknownInteractionsProtocol_FlexibleTwoWayErr_Result(fpromise::result<void, int32_t>(std::move(result))) { }
-  operator fpromise::result<void, int32_t>() && {
+    : UnknownInteractionsProtocol_FlexibleTwoWayErr_Result(fpromise::result<void, std::variant<int32_t, ::fidl::TransportErr>>(std::move(result))) { }
+  UnknownInteractionsProtocol_FlexibleTwoWayErr_Result(fpromise::error_result<std::variant<int32_t, ::fidl::TransportErr>>&& result)
+    : UnknownInteractionsProtocol_FlexibleTwoWayErr_Result(fpromise::result<void, std::variant<int32_t, ::fidl::TransportErr>>(std::move(result))) { }
+  operator fpromise::result<void, std::variant<int32_t, ::fidl::TransportErr>>() && {
     if (is_err()) {
-      return fpromise::error(err());
+      return fpromise::error(std::variant<int32_t, ::fidl::TransportErr>(std::in_place_index<0>, err()));
+    }
+    if (is_transport_err()) {
+      return fpromise::error(std::variant<int32_t, ::fidl::TransportErr>(std::in_place_index<1>, transport_err()));
     }
     return fpromise::ok();
   }
@@ -2662,21 +2751,35 @@ class UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result final {
   }
 
   friend ::fidl::Equality<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result>;
-  UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::result<int32_t, int32_t>&& result) {
+  UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::result<int32_t, std::variant<int32_t, ::fidl::TransportErr>>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
       set_response(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response{result.take_value()});
     } else {
-      set_err(result.take_error());
+      std::variant<int32_t, ::fidl::TransportErr> errvariant = result.take_error();
+      switch (errvariant.index()) {
+        case 0:
+          set_err(std::get<0>(errvariant));
+          break;
+        case 1:
+          set_transport_err(std::get<1>(errvariant));
+          break;
+        default:
+          ZX_PANIC("Unknown variant index %zu", errvariant.index());
+          break;
+      }
     }
   }
   UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::ok_result<int32_t>&& result)
-    : UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::result<int32_t, int32_t>(std::move(result))) { }
-  UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::error_result<int32_t>&& result)
-    : UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::result<int32_t, int32_t>(std::move(result))) { }
-  operator fpromise::result<int32_t, int32_t>() && {
+    : UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::result<int32_t, std::variant<int32_t, ::fidl::TransportErr>>(std::move(result))) { }
+  UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::error_result<std::variant<int32_t, ::fidl::TransportErr>>&& result)
+    : UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::result<int32_t, std::variant<int32_t, ::fidl::TransportErr>>(std::move(result))) { }
+  operator fpromise::result<int32_t, std::variant<int32_t, ::fidl::TransportErr>>() && {
     if (is_err()) {
-      return fpromise::error(err());
+      return fpromise::error(std::variant<int32_t, ::fidl::TransportErr>(std::in_place_index<0>, err()));
+    }
+    if (is_transport_err()) {
+      return fpromise::error(std::variant<int32_t, ::fidl::TransportErr>(std::in_place_index<1>, transport_err()));
     }
     ::std::tuple<int32_t> value_tuple = std::move(response());
     return fpromise::ok(std::move(std::get<0>(value_tuple)));
@@ -2903,21 +3006,35 @@ class UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result final {
   }
 
   friend ::fidl::Equality<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result>;
-  UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response, int32_t>&& result) {
+  UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response, std::variant<int32_t, ::fidl::TransportErr>>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
       set_response(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response{result.take_value()});
     } else {
-      set_err(result.take_error());
+      std::variant<int32_t, ::fidl::TransportErr> errvariant = result.take_error();
+      switch (errvariant.index()) {
+        case 0:
+          set_err(std::get<0>(errvariant));
+          break;
+        case 1:
+          set_transport_err(std::get<1>(errvariant));
+          break;
+        default:
+          ZX_PANIC("Unknown variant index %zu", errvariant.index());
+          break;
+      }
     }
   }
   UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result(fpromise::ok_result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response>&& result)
-    : UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response, int32_t>(std::move(result))) { }
-  UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result(fpromise::error_result<int32_t>&& result)
-    : UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response, int32_t>(std::move(result))) { }
-  operator fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response, int32_t>() && {
+    : UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response, std::variant<int32_t, ::fidl::TransportErr>>(std::move(result))) { }
+  UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result(fpromise::error_result<std::variant<int32_t, ::fidl::TransportErr>>&& result)
+    : UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response, std::variant<int32_t, ::fidl::TransportErr>>(std::move(result))) { }
+  operator fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response, std::variant<int32_t, ::fidl::TransportErr>>() && {
     if (is_err()) {
-      return fpromise::error(err());
+      return fpromise::error(std::variant<int32_t, ::fidl::TransportErr>(std::in_place_index<0>, err()));
+    }
+    if (is_transport_err()) {
+      return fpromise::error(std::variant<int32_t, ::fidl::TransportErr>(std::in_place_index<1>, transport_err()));
     }
     ::std::tuple<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response> value_tuple = std::move(response());
     return fpromise::ok(std::move(std::get<0>(value_tuple)));
@@ -3140,21 +3257,35 @@ class UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result final {
   }
 
   friend ::fidl::Equality<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result>;
-  UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response, int32_t>&& result) {
+  UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response, std::variant<int32_t, ::fidl::TransportErr>>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
       set_response(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response{result.take_value()});
     } else {
-      set_err(result.take_error());
+      std::variant<int32_t, ::fidl::TransportErr> errvariant = result.take_error();
+      switch (errvariant.index()) {
+        case 0:
+          set_err(std::get<0>(errvariant));
+          break;
+        case 1:
+          set_transport_err(std::get<1>(errvariant));
+          break;
+        default:
+          ZX_PANIC("Unknown variant index %zu", errvariant.index());
+          break;
+      }
     }
   }
   UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result(fpromise::ok_result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response>&& result)
-    : UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response, int32_t>(std::move(result))) { }
-  UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result(fpromise::error_result<int32_t>&& result)
-    : UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response, int32_t>(std::move(result))) { }
-  operator fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response, int32_t>() && {
+    : UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response, std::variant<int32_t, ::fidl::TransportErr>>(std::move(result))) { }
+  UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result(fpromise::error_result<std::variant<int32_t, ::fidl::TransportErr>>&& result)
+    : UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response, std::variant<int32_t, ::fidl::TransportErr>>(std::move(result))) { }
+  operator fpromise::result<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response, std::variant<int32_t, ::fidl::TransportErr>>() && {
     if (is_err()) {
-      return fpromise::error(err());
+      return fpromise::error(std::variant<int32_t, ::fidl::TransportErr>(std::in_place_index<0>, err()));
+    }
+    if (is_transport_err()) {
+      return fpromise::error(std::variant<int32_t, ::fidl::TransportErr>(std::in_place_index<1>, transport_err()));
     }
     ::std::tuple<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response> value_tuple = std::move(response());
     return fpromise::ok(std::move(std::get<0>(value_tuple)));
@@ -12298,6 +12429,24 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result final {
   }
 
   friend ::fidl::Equality<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result>;
+  UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result(fpromise::result<void, ::fidl::TransportErr>&& result) {
+    ZX_ASSERT(!result.is_pending());
+    if (result.is_ok()) {
+      set_response(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response{});
+    } else {
+      set_transport_err(result.take_error());
+    }
+  }
+  UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result(fpromise::ok_result<void>&& result)
+    : UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result(fpromise::result<void, ::fidl::TransportErr>(std::move(result))) { }
+  UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result(fpromise::error_result<::fidl::TransportErr>&& result)
+    : UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result(fpromise::result<void, ::fidl::TransportErr>(std::move(result))) { }
+  operator fpromise::result<void, ::fidl::TransportErr>() && {
+    if (is_transport_err()) {
+      return fpromise::error(transport_err());
+    }
+    return fpromise::ok();
+  }
 
  private:
   void Destroy();
@@ -12446,6 +12595,25 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result final {
   }
 
   friend ::fidl::Equality<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result>;
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result(fpromise::result<int32_t, ::fidl::TransportErr>&& result) {
+    ZX_ASSERT(!result.is_pending());
+    if (result.is_ok()) {
+      set_response(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response{result.take_value()});
+    } else {
+      set_transport_err(result.take_error());
+    }
+  }
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result(fpromise::ok_result<int32_t>&& result)
+    : UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result(fpromise::result<int32_t, ::fidl::TransportErr>(std::move(result))) { }
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result(fpromise::error_result<::fidl::TransportErr>&& result)
+    : UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result(fpromise::result<int32_t, ::fidl::TransportErr>(std::move(result))) { }
+  operator fpromise::result<int32_t, ::fidl::TransportErr>() && {
+    if (is_transport_err()) {
+      return fpromise::error(transport_err());
+    }
+    ::std::tuple<int32_t> value_tuple = std::move(response());
+    return fpromise::ok(std::move(std::get<0>(value_tuple)));
+  }
 
  private:
   void Destroy();
@@ -12652,6 +12820,25 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result final {
   }
 
   friend ::fidl::Equality<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result>;
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response, ::fidl::TransportErr>&& result) {
+    ZX_ASSERT(!result.is_pending());
+    if (result.is_ok()) {
+      set_response(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response{result.take_value()});
+    } else {
+      set_transport_err(result.take_error());
+    }
+  }
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result(fpromise::ok_result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response>&& result)
+    : UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response, ::fidl::TransportErr>(std::move(result))) { }
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result(fpromise::error_result<::fidl::TransportErr>&& result)
+    : UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response, ::fidl::TransportErr>(std::move(result))) { }
+  operator fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response, ::fidl::TransportErr>() && {
+    if (is_transport_err()) {
+      return fpromise::error(transport_err());
+    }
+    ::std::tuple<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response> value_tuple = std::move(response());
+    return fpromise::ok(std::move(std::get<0>(value_tuple)));
+  }
 
  private:
   void Destroy();
@@ -12854,6 +13041,25 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result final {
   }
 
   friend ::fidl::Equality<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result>;
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response, ::fidl::TransportErr>&& result) {
+    ZX_ASSERT(!result.is_pending());
+    if (result.is_ok()) {
+      set_response(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response{result.take_value()});
+    } else {
+      set_transport_err(result.take_error());
+    }
+  }
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result(fpromise::ok_result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response>&& result)
+    : UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response, ::fidl::TransportErr>(std::move(result))) { }
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result(fpromise::error_result<::fidl::TransportErr>&& result)
+    : UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response, ::fidl::TransportErr>(std::move(result))) { }
+  operator fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response, ::fidl::TransportErr>() && {
+    if (is_transport_err()) {
+      return fpromise::error(transport_err());
+    }
+    ::std::tuple<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response> value_tuple = std::move(response());
+    return fpromise::ok(std::move(std::get<0>(value_tuple)));
+  }
 
  private:
   void Destroy();
@@ -13016,21 +13222,35 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result final {
   }
 
   friend ::fidl::Equality<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result>;
-  UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result(fpromise::result<void, int32_t>&& result) {
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result(fpromise::result<void, std::variant<int32_t, ::fidl::TransportErr>>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
       set_response(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response{});
     } else {
-      set_err(result.take_error());
+      std::variant<int32_t, ::fidl::TransportErr> errvariant = result.take_error();
+      switch (errvariant.index()) {
+        case 0:
+          set_err(std::get<0>(errvariant));
+          break;
+        case 1:
+          set_transport_err(std::get<1>(errvariant));
+          break;
+        default:
+          ZX_PANIC("Unknown variant index %zu", errvariant.index());
+          break;
+      }
     }
   }
   UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result(fpromise::ok_result<void>&& result)
-    : UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result(fpromise::result<void, int32_t>(std::move(result))) { }
-  UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result(fpromise::error_result<int32_t>&& result)
-    : UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result(fpromise::result<void, int32_t>(std::move(result))) { }
-  operator fpromise::result<void, int32_t>() && {
+    : UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result(fpromise::result<void, std::variant<int32_t, ::fidl::TransportErr>>(std::move(result))) { }
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result(fpromise::error_result<std::variant<int32_t, ::fidl::TransportErr>>&& result)
+    : UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result(fpromise::result<void, std::variant<int32_t, ::fidl::TransportErr>>(std::move(result))) { }
+  operator fpromise::result<void, std::variant<int32_t, ::fidl::TransportErr>>() && {
     if (is_err()) {
-      return fpromise::error(err());
+      return fpromise::error(std::variant<int32_t, ::fidl::TransportErr>(std::in_place_index<0>, err()));
+    }
+    if (is_transport_err()) {
+      return fpromise::error(std::variant<int32_t, ::fidl::TransportErr>(std::in_place_index<1>, transport_err()));
     }
     return fpromise::ok();
   }
@@ -13198,21 +13418,35 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result final {
   }
 
   friend ::fidl::Equality<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result>;
-  UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::result<int32_t, int32_t>&& result) {
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::result<int32_t, std::variant<int32_t, ::fidl::TransportErr>>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
       set_response(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response{result.take_value()});
     } else {
-      set_err(result.take_error());
+      std::variant<int32_t, ::fidl::TransportErr> errvariant = result.take_error();
+      switch (errvariant.index()) {
+        case 0:
+          set_err(std::get<0>(errvariant));
+          break;
+        case 1:
+          set_transport_err(std::get<1>(errvariant));
+          break;
+        default:
+          ZX_PANIC("Unknown variant index %zu", errvariant.index());
+          break;
+      }
     }
   }
   UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::ok_result<int32_t>&& result)
-    : UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::result<int32_t, int32_t>(std::move(result))) { }
-  UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::error_result<int32_t>&& result)
-    : UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::result<int32_t, int32_t>(std::move(result))) { }
-  operator fpromise::result<int32_t, int32_t>() && {
+    : UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::result<int32_t, std::variant<int32_t, ::fidl::TransportErr>>(std::move(result))) { }
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::error_result<std::variant<int32_t, ::fidl::TransportErr>>&& result)
+    : UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result(fpromise::result<int32_t, std::variant<int32_t, ::fidl::TransportErr>>(std::move(result))) { }
+  operator fpromise::result<int32_t, std::variant<int32_t, ::fidl::TransportErr>>() && {
     if (is_err()) {
-      return fpromise::error(err());
+      return fpromise::error(std::variant<int32_t, ::fidl::TransportErr>(std::in_place_index<0>, err()));
+    }
+    if (is_transport_err()) {
+      return fpromise::error(std::variant<int32_t, ::fidl::TransportErr>(std::in_place_index<1>, transport_err()));
     }
     ::std::tuple<int32_t> value_tuple = std::move(response());
     return fpromise::ok(std::move(std::get<0>(value_tuple)));
@@ -13439,21 +13673,35 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result final {
   }
 
   friend ::fidl::Equality<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result>;
-  UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response, int32_t>&& result) {
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response, std::variant<int32_t, ::fidl::TransportErr>>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
       set_response(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response{result.take_value()});
     } else {
-      set_err(result.take_error());
+      std::variant<int32_t, ::fidl::TransportErr> errvariant = result.take_error();
+      switch (errvariant.index()) {
+        case 0:
+          set_err(std::get<0>(errvariant));
+          break;
+        case 1:
+          set_transport_err(std::get<1>(errvariant));
+          break;
+        default:
+          ZX_PANIC("Unknown variant index %zu", errvariant.index());
+          break;
+      }
     }
   }
   UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result(fpromise::ok_result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response>&& result)
-    : UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response, int32_t>(std::move(result))) { }
-  UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result(fpromise::error_result<int32_t>&& result)
-    : UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response, int32_t>(std::move(result))) { }
-  operator fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response, int32_t>() && {
+    : UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response, std::variant<int32_t, ::fidl::TransportErr>>(std::move(result))) { }
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result(fpromise::error_result<std::variant<int32_t, ::fidl::TransportErr>>&& result)
+    : UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response, std::variant<int32_t, ::fidl::TransportErr>>(std::move(result))) { }
+  operator fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response, std::variant<int32_t, ::fidl::TransportErr>>() && {
     if (is_err()) {
-      return fpromise::error(err());
+      return fpromise::error(std::variant<int32_t, ::fidl::TransportErr>(std::in_place_index<0>, err()));
+    }
+    if (is_transport_err()) {
+      return fpromise::error(std::variant<int32_t, ::fidl::TransportErr>(std::in_place_index<1>, transport_err()));
     }
     ::std::tuple<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response> value_tuple = std::move(response());
     return fpromise::ok(std::move(std::get<0>(value_tuple)));
@@ -13676,21 +13924,35 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result final {
   }
 
   friend ::fidl::Equality<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result>;
-  UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response, int32_t>&& result) {
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response, std::variant<int32_t, ::fidl::TransportErr>>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
       set_response(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response{result.take_value()});
     } else {
-      set_err(result.take_error());
+      std::variant<int32_t, ::fidl::TransportErr> errvariant = result.take_error();
+      switch (errvariant.index()) {
+        case 0:
+          set_err(std::get<0>(errvariant));
+          break;
+        case 1:
+          set_transport_err(std::get<1>(errvariant));
+          break;
+        default:
+          ZX_PANIC("Unknown variant index %zu", errvariant.index());
+          break;
+      }
     }
   }
   UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result(fpromise::ok_result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response>&& result)
-    : UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response, int32_t>(std::move(result))) { }
-  UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result(fpromise::error_result<int32_t>&& result)
-    : UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response, int32_t>(std::move(result))) { }
-  operator fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response, int32_t>() && {
+    : UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response, std::variant<int32_t, ::fidl::TransportErr>>(std::move(result))) { }
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result(fpromise::error_result<std::variant<int32_t, ::fidl::TransportErr>>&& result)
+    : UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result(fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response, std::variant<int32_t, ::fidl::TransportErr>>(std::move(result))) { }
+  operator fpromise::result<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response, std::variant<int32_t, ::fidl::TransportErr>>() && {
     if (is_err()) {
-      return fpromise::error(err());
+      return fpromise::error(std::variant<int32_t, ::fidl::TransportErr>(std::in_place_index<0>, err()));
+    }
+    if (is_transport_err()) {
+      return fpromise::error(std::variant<int32_t, ::fidl::TransportErr>(std::in_place_index<1>, transport_err()));
     }
     ::std::tuple<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response> value_tuple = std::move(response());
     return fpromise::ok(std::move(std::get<0>(value_tuple)));

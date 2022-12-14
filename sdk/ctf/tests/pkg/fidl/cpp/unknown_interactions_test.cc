@@ -18,6 +18,9 @@
 #include <test/unknown/interactions/cpp/fidl_test_base.h>
 #include <zxtest/zxtest.h>
 
+#include "lib/fidl/cpp/unknown_interactions_hlcpp.h"
+#include "lib/fpromise/result.h"
+
 namespace {
 namespace test = ::test::unknown::interactions;
 
@@ -336,6 +339,29 @@ TEST_F(UnknownInteractions, TwoWayFlexibleAsyncSend) {
   loop().RunUntilIdle();
 }
 
+TEST_F(UnknownInteractions, TwoWayFlexibleAsyncSendResultConversion) {
+  auto client = AsyncClient();
+  auto server = TakeServerChannel();
+
+  client->FlexibleTwoWay(
+      [](fpromise::result<void, fidl::TransportErr> response) { EXPECT_TRUE(response.is_ok()); });
+
+  auto received = TwoWayServerRequest<16>::ReadFromChannel(server);
+  EXPECT_EQ(ZX_OK, received.status);
+  auto expected =
+      ExcludeTxid(MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWay_Ordinal,
+                              fidl::MessageDynamicFlags::kFlexibleMethod));
+  EXPECT_EQ(expected, received.buf_excluding_txid());
+  EXPECT_NE(0u, received.txid());
+
+  auto server_reply =
+      MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWay_Ordinal,
+                  fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kSuccess, 0);
+  received.reply(server, server_reply);
+
+  loop().RunUntilIdle();
+}
+
 TEST_F(UnknownInteractions, TwoWayFlexibleAsyncSendUnknownResponse) {
   auto client = AsyncClient();
   auto server = TakeServerChannel();
@@ -343,6 +369,32 @@ TEST_F(UnknownInteractions, TwoWayFlexibleAsyncSendUnknownResponse) {
   client->FlexibleTwoWay([](auto response) {
     ASSERT_TRUE(response.is_transport_err());
     EXPECT_EQ(::fidl::TransportErr::kUnknownMethod, response.transport_err());
+  });
+
+  auto received = TwoWayServerRequest<16>::ReadFromChannel(server);
+  EXPECT_EQ(ZX_OK, received.status);
+  auto expected =
+      ExcludeTxid(MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWay_Ordinal,
+                              fidl::MessageDynamicFlags::kFlexibleMethod));
+  EXPECT_EQ(expected, received.buf_excluding_txid());
+  EXPECT_NE(0u, received.txid());
+
+  auto server_reply =
+      MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWay_Ordinal,
+                  fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kTransportError,
+                  ZX_ERR_NOT_SUPPORTED);
+  received.reply(server, server_reply);
+
+  loop().RunUntilIdle();
+}
+
+TEST_F(UnknownInteractions, TwoWayFlexibleAsyncSendUnknownResponseResultConversion) {
+  auto client = AsyncClient();
+  auto server = TakeServerChannel();
+
+  client->FlexibleTwoWay([](fpromise::result<void, fidl::TransportErr> response) {
+    ASSERT_TRUE(response.is_error());
+    EXPECT_EQ(::fidl::TransportErr::kUnknownMethod, response.error());
   });
 
   auto received = TwoWayServerRequest<16>::ReadFromChannel(server);
@@ -466,6 +518,31 @@ TEST_F(UnknownInteractions, TwoWayFlexibleFieldsAsyncSend) {
   loop().RunUntilIdle();
 }
 
+TEST_F(UnknownInteractions, TwoWayFlexibleFieldsAsyncSendResultConversion) {
+  auto client = AsyncClient();
+  auto server = TakeServerChannel();
+
+  client->FlexibleTwoWayFields([](fpromise::result<int32_t, fidl::TransportErr> response) {
+    ASSERT_TRUE(response.is_ok());
+    EXPECT_EQ(32, response.value());
+  });
+
+  auto received = TwoWayServerRequest<16>::ReadFromChannel(server);
+  EXPECT_EQ(ZX_OK, received.status);
+  auto expected = ExcludeTxid(
+      MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWayFields_Ordinal,
+                  fidl::MessageDynamicFlags::kFlexibleMethod));
+  EXPECT_EQ(expected, received.buf_excluding_txid());
+  EXPECT_NE(0u, received.txid());
+
+  auto server_reply =
+      MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWayFields_Ordinal,
+                  fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kSuccess, 32);
+  received.reply(server, server_reply);
+
+  loop().RunUntilIdle();
+}
+
 TEST_F(UnknownInteractions, TwoWayFlexibleFieldsAsyncSendUnknownResponse) {
   auto client = AsyncClient();
   auto server = TakeServerChannel();
@@ -473,6 +550,32 @@ TEST_F(UnknownInteractions, TwoWayFlexibleFieldsAsyncSendUnknownResponse) {
   client->FlexibleTwoWayFields([](auto response) {
     ASSERT_TRUE(response.is_transport_err());
     EXPECT_EQ(::fidl::TransportErr::kUnknownMethod, response.transport_err());
+  });
+
+  auto received = TwoWayServerRequest<16>::ReadFromChannel(server);
+  EXPECT_EQ(ZX_OK, received.status);
+  auto expected = ExcludeTxid(
+      MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWayFields_Ordinal,
+                  fidl::MessageDynamicFlags::kFlexibleMethod));
+  EXPECT_EQ(expected, received.buf_excluding_txid());
+  EXPECT_NE(0u, received.txid());
+
+  auto server_reply =
+      MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWayFields_Ordinal,
+                  fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kTransportError,
+                  ZX_ERR_NOT_SUPPORTED);
+  received.reply(server, server_reply);
+
+  loop().RunUntilIdle();
+}
+
+TEST_F(UnknownInteractions, TwoWayFlexibleFieldsAsyncSendUnknownResponseResultConversion) {
+  auto client = AsyncClient();
+  auto server = TakeServerChannel();
+
+  client->FlexibleTwoWayFields([](fpromise::result<int32_t, fidl::TransportErr> response) {
+    ASSERT_TRUE(response.is_error());
+    EXPECT_EQ(::fidl::TransportErr::kUnknownMethod, response.error());
   });
 
   auto received = TwoWayServerRequest<16>::ReadFromChannel(server);
@@ -514,6 +617,31 @@ TEST_F(UnknownInteractions, TwoWayFlexibleErrAsyncSend) {
   loop().RunUntilIdle();
 }
 
+TEST_F(UnknownInteractions, TwoWayFlexibleErrAsyncSendResultConversion) {
+  auto client = AsyncClient();
+  auto server = TakeServerChannel();
+
+  client->FlexibleTwoWayErr(
+      [](fpromise::result<void, std::variant<int32_t, fidl::TransportErr>> response) {
+        EXPECT_TRUE(response.is_ok());
+      });
+
+  auto received = TwoWayServerRequest<16>::ReadFromChannel(server);
+  EXPECT_EQ(ZX_OK, received.status);
+  auto expected = ExcludeTxid(
+      MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWayErr_Ordinal,
+                  fidl::MessageDynamicFlags::kFlexibleMethod));
+  EXPECT_EQ(expected, received.buf_excluding_txid());
+  EXPECT_NE(0u, received.txid());
+
+  auto server_reply =
+      MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWayErr_Ordinal,
+                  fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kSuccess, 0);
+  received.reply(server, server_reply);
+
+  loop().RunUntilIdle();
+}
+
 TEST_F(UnknownInteractions, TwoWayFlexibleErrAsyncSendUnknownResponse) {
   auto client = AsyncClient();
   auto server = TakeServerChannel();
@@ -522,6 +650,34 @@ TEST_F(UnknownInteractions, TwoWayFlexibleErrAsyncSendUnknownResponse) {
     ASSERT_TRUE(response.is_transport_err());
     EXPECT_EQ(::fidl::TransportErr::kUnknownMethod, response.transport_err());
   });
+
+  auto received = TwoWayServerRequest<16>::ReadFromChannel(server);
+  EXPECT_EQ(ZX_OK, received.status);
+  auto expected = ExcludeTxid(
+      MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWayErr_Ordinal,
+                  fidl::MessageDynamicFlags::kFlexibleMethod));
+  EXPECT_EQ(expected, received.buf_excluding_txid());
+  EXPECT_NE(0u, received.txid());
+
+  auto server_reply =
+      MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWayErr_Ordinal,
+                  fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kTransportError,
+                  ZX_ERR_NOT_SUPPORTED);
+  received.reply(server, server_reply);
+
+  loop().RunUntilIdle();
+}
+
+TEST_F(UnknownInteractions, TwoWayFlexibleErrAsyncSendUnknownResponseResultConversion) {
+  auto client = AsyncClient();
+  auto server = TakeServerChannel();
+
+  client->FlexibleTwoWayErr(
+      [](fpromise::result<void, std::variant<int32_t, fidl::TransportErr>> response) {
+        ASSERT_TRUE(response.is_error());
+        ASSERT_EQ(1, response.error().index());
+        EXPECT_EQ(::fidl::TransportErr::kUnknownMethod, std::get<1>(response.error()));
+      });
 
   auto received = TwoWayServerRequest<16>::ReadFromChannel(server);
   EXPECT_EQ(ZX_OK, received.status);
@@ -592,6 +748,33 @@ TEST_F(UnknownInteractions, TwoWayFlexibleErrAsyncSendErrorVariant) {
   loop().RunUntilIdle();
 }
 
+TEST_F(UnknownInteractions, TwoWayFlexibleErrAsyncSendErrorVariantResultConversion) {
+  auto client = AsyncClient();
+  auto server = TakeServerChannel();
+
+  client->FlexibleTwoWayErr(
+      [](fpromise::result<void, std::variant<int32_t, fidl::TransportErr>> response) {
+        ASSERT_TRUE(response.is_error());
+        ASSERT_EQ(0, response.error().index());
+        EXPECT_EQ(0x100, std::get<0>(response.error()));
+      });
+
+  auto received = TwoWayServerRequest<16>::ReadFromChannel(server);
+  EXPECT_EQ(ZX_OK, received.status);
+  auto expected = ExcludeTxid(
+      MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWayErr_Ordinal,
+                  fidl::MessageDynamicFlags::kFlexibleMethod));
+  EXPECT_EQ(expected, received.buf_excluding_txid());
+  EXPECT_NE(0u, received.txid());
+
+  auto server_reply = MakeMessage(
+      test::internal::kUnknownInteractionsProtocol_FlexibleTwoWayErr_Ordinal,
+      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kApplicationError, 0x100);
+  received.reply(server, server_reply);
+
+  loop().RunUntilIdle();
+}
+
 TEST_F(UnknownInteractions, TwoWayFlexibleFieldsErrAsyncSend) {
   auto client = AsyncClient();
   auto server = TakeServerChannel();
@@ -600,6 +783,32 @@ TEST_F(UnknownInteractions, TwoWayFlexibleFieldsErrAsyncSend) {
     ASSERT_TRUE(response.is_response());
     EXPECT_EQ(32, response.response().some_field);
   });
+
+  auto received = TwoWayServerRequest<16>::ReadFromChannel(server);
+  EXPECT_EQ(ZX_OK, received.status);
+  auto expected = ExcludeTxid(
+      MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Ordinal,
+                  fidl::MessageDynamicFlags::kFlexibleMethod));
+  EXPECT_EQ(expected, received.buf_excluding_txid());
+  EXPECT_NE(0u, received.txid());
+
+  auto server_reply =
+      MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Ordinal,
+                  fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kSuccess, 32);
+  received.reply(server, server_reply);
+
+  loop().RunUntilIdle();
+}
+
+TEST_F(UnknownInteractions, TwoWayFlexibleFieldsErrAsyncSendResultConversion) {
+  auto client = AsyncClient();
+  auto server = TakeServerChannel();
+
+  client->FlexibleTwoWayFieldsErr(
+      [](fpromise::result<int32_t, std::variant<int32_t, fidl::TransportErr>> response) {
+        ASSERT_TRUE(response.is_ok());
+        EXPECT_EQ(32, response.value());
+      });
 
   auto received = TwoWayServerRequest<16>::ReadFromChannel(server);
   EXPECT_EQ(ZX_OK, received.status);
@@ -643,6 +852,34 @@ TEST_F(UnknownInteractions, TwoWayFlexibleFieldsErrAsyncSendUnknownResponse) {
   loop().RunUntilIdle();
 }
 
+TEST_F(UnknownInteractions, TwoWayFlexibleFieldsErrAsyncSendUnknownResponseResultConversion) {
+  auto client = AsyncClient();
+  auto server = TakeServerChannel();
+
+  client->FlexibleTwoWayFieldsErr(
+      [](fpromise::result<int32_t, std::variant<int32_t, fidl::TransportErr>> response) {
+        ASSERT_TRUE(response.is_error());
+        ASSERT_EQ(1, response.error().index());
+        EXPECT_EQ(::fidl::TransportErr::kUnknownMethod, std::get<1>(response.error()));
+      });
+
+  auto received = TwoWayServerRequest<16>::ReadFromChannel(server);
+  EXPECT_EQ(ZX_OK, received.status);
+  auto expected = ExcludeTxid(
+      MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Ordinal,
+                  fidl::MessageDynamicFlags::kFlexibleMethod));
+  EXPECT_EQ(expected, received.buf_excluding_txid());
+  EXPECT_NE(0u, received.txid());
+
+  auto server_reply =
+      MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Ordinal,
+                  fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kTransportError,
+                  ZX_ERR_NOT_SUPPORTED);
+  received.reply(server, server_reply);
+
+  loop().RunUntilIdle();
+}
+
 TEST_F(UnknownInteractions, TwoWayFlexibleFieldsErrAsyncSendErrorVariant) {
   auto client = AsyncClient();
   auto server = TakeServerChannel();
@@ -651,6 +888,33 @@ TEST_F(UnknownInteractions, TwoWayFlexibleFieldsErrAsyncSendErrorVariant) {
     ASSERT_TRUE(response.is_err());
     EXPECT_EQ(0x100, response.err());
   });
+
+  auto received = TwoWayServerRequest<16>::ReadFromChannel(server);
+  EXPECT_EQ(ZX_OK, received.status);
+  auto expected = ExcludeTxid(
+      MakeMessage(test::internal::kUnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Ordinal,
+                  fidl::MessageDynamicFlags::kFlexibleMethod));
+  EXPECT_EQ(expected, received.buf_excluding_txid());
+  EXPECT_NE(0u, received.txid());
+
+  auto server_reply = MakeMessage(
+      test::internal::kUnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Ordinal,
+      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kApplicationError, 0x100);
+  received.reply(server, server_reply);
+
+  loop().RunUntilIdle();
+}
+
+TEST_F(UnknownInteractions, TwoWayFlexibleFieldsErrAsyncSendErrorVariantResultConversion) {
+  auto client = AsyncClient();
+  auto server = TakeServerChannel();
+
+  client->FlexibleTwoWayFieldsErr(
+      [](fpromise::result<int32_t, std::variant<int32_t, fidl::TransportErr>> response) {
+        ASSERT_TRUE(response.is_error());
+        ASSERT_EQ(0, response.error().index());
+        EXPECT_EQ(0x100, std::get<0>(response.error()));
+      });
 
   auto received = TwoWayServerRequest<16>::ReadFromChannel(server);
   EXPECT_EQ(ZX_OK, received.status);
