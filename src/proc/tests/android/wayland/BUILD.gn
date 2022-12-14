@@ -15,7 +15,6 @@ template("wayland_test_component") {
   # went out of scope.`
   not_needed([ "invoker" ])
 
-  test_dir = "wayland"
   meta_dir = "//src/proc/tests/android/wayland/meta"
   starnix_test_component(target_name) {
   }

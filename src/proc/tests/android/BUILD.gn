@@ -24,7 +24,7 @@ group("tests") {
 
 resource("binder_smoke_test_bin") {
   sources = [
-    "//prebuilt/starnix/tests/syscalls/linux-amd64/android/binder_smoke_test",
+    "//prebuilt/starnix/tests/syscalls/linux-amd64/stripped/binder_smoke_test",
   ]
   outputs = [ "data/tests/binder_smoke_test" ]
 }

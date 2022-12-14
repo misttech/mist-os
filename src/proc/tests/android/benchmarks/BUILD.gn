@@ -12,7 +12,8 @@ group("benchmarks") {
 }
 
 resource("bin") {
-  sources = [ "//prebuilt/starnix/tests/syscalls/linux-amd64/benchmarks" ]
+  sources =
+      [ "//prebuilt/starnix/tests/syscalls/linux-amd64/stripped/benchmarks" ]
   outputs = [ "data/tests/benchmarks" ]
 }
 

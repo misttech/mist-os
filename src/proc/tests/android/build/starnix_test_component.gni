@@ -10,8 +10,7 @@ template("starnix_test_component") {
   test_name = target_name
 
   resource("${test_name}_bin") {
-    sources =
-        [ "${gvisor_prebuilt_test_root}/${invoker.test_dir}/${test_name}" ]
+    sources = [ "${gvisor_prebuilt_test_root}/stripped/${test_name}" ]
     outputs = [ "data/tests/${test_name}" ]
   }
 

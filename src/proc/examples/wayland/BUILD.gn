@@ -15,9 +15,8 @@ group("tests") {
 }
 
 resource("demo_bin") {
-  sources = [
-    "//prebuilt/starnix/tests/syscalls/linux-amd64/wayland_demo/wayland_demo",
-  ]
+  sources =
+      [ "//prebuilt/starnix/tests/syscalls/linux-amd64/stripped/wayland_demo" ]
   outputs = [ "data/bin/wayland_demo" ]
 }
 
@@ -36,9 +35,8 @@ fuchsia_component("component") {
 }
 
 resource("test_bin") {
-  sources = [
-    "//prebuilt/starnix/tests/syscalls/linux-amd64/wayland_demo/wayland_test",
-  ]
+  sources =
+      [ "//prebuilt/starnix/tests/syscalls/linux-amd64/stripped/wayland_test" ]
   outputs = [ "data/tests/wayland_test" ]
 }
 

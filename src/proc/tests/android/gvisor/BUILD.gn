@@ -28,7 +28,6 @@ template("gvisor_test_component") {
   # went out of scope.`
   not_needed([ "invoker" ])
 
-  test_dir = "linux"
   meta_dir = "//src/proc/tests/android/gvisor/meta"
   starnix_test_component(target_name) {
     deps = [ ":gvisor_test" ]
