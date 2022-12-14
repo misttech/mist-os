@@ -943,6 +943,16 @@ TEST_F(GfxObserverRegistryIntegrationTest, ChildRequestsFocusAfterConnectingForG
   auto [child_control_ref, child_view_ref] = scenic::ViewRefPair::New();
 
   const auto child_view_ref_koid = ExtractKoid(child_view_ref);
+
+  // Register view tree watcher before proceeding.
+  // We can't register earlier, because we need to know `child_view_ref_koid` to register an
+  // observer scoped to the child view.
+  std::optional<bool> result;
+  scoped_observer_registry_ptr_->RegisterScopedViewTreeWatcher(
+      child_view_ref_koid, view_tree_watcher.NewRequest(), [&result] { result = true; });
+  RunLoopUntil([&result] { return result.has_value(); });
+  EXPECT_TRUE(result.value());
+
   fuv_ViewRef child_view_ref_copy;
   fidl::Clone(child_view_ref, &child_view_ref_copy);
   scenic::View child_view(&child_session, std::move(child_view_token), std::move(child_control_ref),
@@ -962,15 +972,6 @@ TEST_F(GfxObserverRegistryIntegrationTest, ChildRequestsFocusAfterConnectingForG
 
   child_session.Present2(0, 0, [](auto) {});
   root_session_->session.Present2(0, 0, [](auto) {});
-
-  // Register view tree watcher before proceeding.
-  // We can't register earlier, because we need to know `child_view_ref_koid` to register an
-  // observer scoped to the child view.
-  std::optional<bool> result;
-  scoped_observer_registry_ptr_->RegisterScopedViewTreeWatcher(
-      child_view_ref_koid, view_tree_watcher.NewRequest(), [&result] { result = true; });
-  RunLoopUntil([&result] { return result.has_value(); });
-  EXPECT_TRUE(result.value());
 
   // The view is not included in the response because it has not rendered any content.
   EXPECT_FALSE(HasViewConnected(view_tree_watcher, child_view_ref_koid));
