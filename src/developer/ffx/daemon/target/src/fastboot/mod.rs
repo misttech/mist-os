@@ -51,6 +51,12 @@ lazy_static! {
 const FLASH_TIMEOUT_RATE: &str = "fastboot.flash.timeout_rate";
 const MIN_FLASH_TIMEOUT: &str = "fastboot.flash.min_timeout_secs";
 
+// USB fastboot interface IDs
+const FASTBOOT_AND_CDC_ETH_USB_DEV_PRODUCT: u16 = 0xa027;
+const FASTBOOT_USB_INTERFACE_CLASS: u8 = 0xff;
+const FASTBOOT_USB_INTERFACE_SUBCLASS: u8 = 0x42;
+const FASTBOOT_USB_INTERFACE_PROTOCOL: u8 = 0x03;
+
 /// Fastboot Service that handles communicating with a target over the Fastboot protocol.
 ///
 /// Since this service can handle establishing communication with a target in any state (Product,
@@ -179,7 +185,13 @@ impl fastboot::UploadProgressListener for UploadProgressListener {
 }
 
 fn is_fastboot_match(info: &InterfaceInfo) -> bool {
-    (info.dev_vendor == 0x18d1) && ((info.dev_product == 0x4ee0) || (info.dev_product == 0x0d02))
+    (info.dev_vendor == 0x18d1)
+        && ((info.dev_product == 0x4ee0)
+            || (info.dev_product == 0x0d02)
+            || (info.dev_product == FASTBOOT_AND_CDC_ETH_USB_DEV_PRODUCT))
+        && (info.ifc_class == FASTBOOT_USB_INTERFACE_CLASS)
+        && (info.ifc_subclass == FASTBOOT_USB_INTERFACE_SUBCLASS)
+        && (info.ifc_protocol == FASTBOOT_USB_INTERFACE_PROTOCOL)
 }
 
 fn extract_serial_number(info: &InterfaceInfo) -> String {
