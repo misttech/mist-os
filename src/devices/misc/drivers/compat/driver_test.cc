@@ -538,7 +538,7 @@ TEST_F(DriverTest, Start) {
   }
 }
 
-TEST_F(DriverTest, ClientRemote) {
+TEST_F(DriverTest, DISABLED_ClientRemote) {
   const char* kEchoString = "test";
 
   zx_protocol_device_t ops{
