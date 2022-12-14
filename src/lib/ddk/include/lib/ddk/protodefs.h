@@ -33,6 +33,7 @@ DDK_PROTOCOL_DEF(DISPLAY_CONTROLLER_IMPL, 12,   "display-controller-impl", PF_NO
 DDK_PROTOCOL_DEF(DOTMATRIX_DISPLAY,       13,   "dotmatrix-display", 0)
 DDK_PROTOCOL_DEF(ETHERNET,                14,   "ethernet", 0)
 DDK_PROTOCOL_DEF(ETHERNET_IMPL,           15,   "ethernet-impl", 0)
+// FASTBOOT defined as 167 below.
 DDK_PROTOCOL_DEF(FRAMEBUFFER,             16,   "framebuffer", 0)
 DDK_PROTOCOL_DEF(GOLDFISH_ADDRESS_SPACE,  17,   "goldfish-address-space", 0)
 DDK_PROTOCOL_DEF(GOLDFISH_CONTROL,        18,   "goldfish-control", 0)
@@ -181,5 +182,6 @@ DDK_PROTOCOL_DEF(AML_DSP,                 164, "aml-dsp", 0)
 DDK_PROTOCOL_DEF(ADB,                     165, "adb", 0)
 // Out-of-order (or added later).
 DDK_PROTOCOL_DEF(USB_INTERFACE_ASSOCIATION, 166, "usb-interface-association", PF_NOPUB)
+DDK_PROTOCOL_DEF(FASTBOOT, 167, "fastboot", 0)
 #undef DDK_PROTOCOL_DEF
 #endif
