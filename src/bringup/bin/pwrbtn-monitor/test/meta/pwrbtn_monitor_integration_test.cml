@@ -21,7 +21,7 @@
     capabilities: [
         {
             directory: "input",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/input",
         },
         {

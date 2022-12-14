@@ -276,7 +276,7 @@ TEST(Flash, DeletePartition) {
   ASSERT_TRUE(fvm_path.is_ok());
 
   // Access FVM.
-  fbl::unique_fd fvm_fd(open(fvm_path.value().c_str(), O_RDWR));
+  fbl::unique_fd fvm_fd(open(fvm_path.value().c_str(), O_RDONLY));
   ASSERT_TRUE(fvm_fd);
 
   alloc_req_t request{.slice_count = 1, .name = "test-fs"};

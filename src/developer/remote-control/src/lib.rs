@@ -531,9 +531,9 @@ async fn connect_to_protocol_in_exposed_dir(
     // Connect to the capability
     exposed_dir
         .open(
-            io::OpenFlags::RIGHT_READABLE | io::OpenFlags::RIGHT_WRITABLE,
+            io::OpenFlags::RIGHT_READABLE | io::OpenFlags::POSIX_WRITABLE,
             0,
-            &protocol_name,
+            protocol_name,
             ServerEnd::new(server_end),
         )
         .map_err(|err| {

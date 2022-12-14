@@ -284,7 +284,7 @@ std::string TemporaryFvmPartition::GetPartitionPath() { return partition_path_; 
 // Start a stress test.
 bool StressFlash(StatusLine* logger, const CommandLineArgs& args, zx::duration duration) {
   // Access the FVM.
-  fbl::unique_fd fvm_fd(open(args.fvm_path.c_str(), O_RDWR));
+  fbl::unique_fd fvm_fd(open(args.fvm_path.c_str(), O_RDONLY));
   if (!fvm_fd) {
     logger->Log("Error: Could not open FVM\n");
     return false;

@@ -13,12 +13,7 @@ pub async fn lspci(cmd: LspciCommand, dev: fio::DirectoryProxy) -> Result<()> {
     // Creates the proxy and server
     let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>()?;
 
-    dev.open(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        0,
-        &cmd.service,
-        server,
-    )?;
+    dev.open(fio::OpenFlags::RIGHT_READABLE, 0, &cmd.service, server)?;
 
     let bus = fhpci::BusProxy::new(proxy.into_channel().unwrap());
     let pci_ids = include_bytes!("../../../../../../../third_party/pciids/pci.ids.zst");

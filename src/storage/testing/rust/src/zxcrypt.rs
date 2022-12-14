@@ -33,7 +33,7 @@ pub async fn wait_for_zxcrypt_driver(block_device: &Path) -> Result<PathBuf> {
     const ZXCRYPT_DEVICE_NAME: &str = "zxcrypt";
     let device = fuchsia_fs::directory::open_in_namespace(
         block_device.to_str().unwrap(),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        fio::OpenFlags::RIGHT_READABLE,
     )
     .context("block device directory open")?;
     recursive_wait_and_open_node(&device, ZXCRYPT_DEVICE_NAME)
@@ -63,7 +63,7 @@ pub async fn set_up_insecure_zxcrypt(block_device: &Path) -> Result<PathBuf> {
 
     let zxcrypt_dir = fuchsia_fs::directory::open_in_namespace(
         zxcrypt_path.to_str().unwrap(),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        fio::OpenFlags::RIGHT_READABLE,
     )
     .context("zxcrypt directory open")?;
     recursive_wait_and_open_node(&zxcrypt_dir, UNSEALED_BLOCK_PATH)
@@ -91,7 +91,7 @@ pub async fn unseal_insecure_zxcrypt(block_device: &Path) -> Result<PathBuf> {
 
     let zxcrypt_dir = fuchsia_fs::directory::open_in_namespace(
         zxcrypt_path.to_str().unwrap(),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        fio::OpenFlags::RIGHT_READABLE,
     )
     .context("zxcrypt directory open")?;
     recursive_wait_and_open_node(&zxcrypt_dir, UNSEALED_BLOCK_PATH)

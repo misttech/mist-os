@@ -131,7 +131,7 @@ class MinfsFvmTest : public BaseFilesystemTest {
   zx::result<fuchsia_hardware_block_partition::wire::Guid> GetMinfsPartitionGuid() {
     zx::result<std::string> device_path_or = fs().DevicePath();
     EXPECT_TRUE(device_path_or.is_ok());
-    fbl::unique_fd fd(open(device_path_or->c_str(), O_RDWR));
+    fbl::unique_fd fd(open(device_path_or->c_str(), O_RDONLY));
     EXPECT_TRUE(fd);
 
     fdio_cpp::UnownedFdioCaller caller(fd);

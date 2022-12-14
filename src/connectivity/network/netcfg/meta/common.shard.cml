@@ -28,12 +28,12 @@
         },
         {
             directory: "dev-class-ethernet",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/ethernet",
         },
         {
             directory: "dev-class-network",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/network",
         },
         {

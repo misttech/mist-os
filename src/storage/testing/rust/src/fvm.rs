@@ -51,7 +51,7 @@ pub async fn wait_for_fvm_driver(block_device: &Path) -> Result<PathBuf> {
     const FVM_DEVICE_NAME: &str = "fvm";
     let device = fuchsia_fs::directory::open_in_namespace(
         block_device.to_str().unwrap(),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        fio::OpenFlags::RIGHT_READABLE,
     )
     .context("wait_for_fvm_driver open failed")?;
     recursive_wait_and_open_node(&device, FVM_DEVICE_NAME)

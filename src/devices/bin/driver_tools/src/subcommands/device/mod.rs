@@ -53,12 +53,7 @@ pub async fn device(cmd: DeviceCommand, dev: fio::DirectoryProxy) -> Result<()> 
 fn connect_to_device(dev: fio::DirectoryProxy, device_path: &str) -> Result<fdev::ControllerProxy> {
     let (client, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>()?;
 
-    dev.open(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        0,
-        device_path,
-        server,
-    )?;
+    dev.open(fio::OpenFlags::RIGHT_READABLE, 0, device_path, server)?;
 
     Ok(fdev::ControllerProxy::new(client.into_channel().unwrap()))
 }

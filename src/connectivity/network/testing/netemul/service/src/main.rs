@@ -299,9 +299,7 @@ async fn create_realm_instance(
                                     })?;
                                 }
                                 let mut capability = Capability::directory(DEVFS)
-                                    // TODO(https://fxbug.dev/77059): remove write permissions once
-                                    // they are no longer required to connect to services.
-                                    .rights(fio::RW_STAR_DIR)
+                                    .rights(fio::R_STAR_DIR)
                                     .path(DEVFS_PATH)
                                     .as_(capability_name.clone());
                                 if let Some(subdir) = subdir {
@@ -806,7 +804,7 @@ fn make_devfs() -> Result<(fio::DirectoryProxy, Arc<SimpleMutableDir>)> {
     let dir = vfs::directory::mutable::simple::simple();
     let () = dir.clone().open(
         vfs::execution_scope::ExecutionScope::new(),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        fio::OpenFlags::RIGHT_READABLE,
         fio::MODE_TYPE_DIRECTORY,
         vfs::path::Path::dot(),
         server.into_channel().into(),
@@ -2119,7 +2117,7 @@ mod tests {
                         uses: Some(fnetemul::ChildUses::Capabilities(vec![
                             fnetemul::Capability::LogSink(fnetemul::Empty {}),
                             fnetemul::Capability::NetemulDevfs(fnetemul::DevfsDep {
-                                name: Some("dev".to_string()),
+                                name: Some(DEVFS.to_string()),
                                 subdir: None,
                                 ..fnetemul::DevfsDep::EMPTY
                             }),
@@ -2167,9 +2165,7 @@ mod tests {
             let () = counter
                 .open_in_namespace(
                     &format!("{}/{}", DEVFS_PATH, name),
-                    // TODO(https://fxbug.dev/77059): remove write permissions once they are no
-                    // longer required to connect to protocols.
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                    fio::OpenFlags::RIGHT_READABLE,
                     server_end.into_channel(),
                 )
                 .expect("failed to connect to device through counter");

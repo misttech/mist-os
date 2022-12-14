@@ -317,7 +317,7 @@ mod tests {
         let scope_for_watcher = ExecutionScope::new();
         dir.open(
             scope_for_watcher,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
             0,
             Path::dot(),
             server_end_for_watcher,
@@ -332,7 +332,7 @@ mod tests {
         let scope_for_agent = ExecutionScope::new();
         pseudo_dir_clone.open(
             scope_for_agent,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
             0,
             Path::dot(),
             server_end_for_agent,

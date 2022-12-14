@@ -150,7 +150,7 @@ pub async fn find_directory_proxy(
 ) -> Result<fio::DirectoryProxy, fuchsia_fs::node::OpenError> {
     fuchsia_fs::directory::open_in_namespace(
         &path.to_string_lossy(),
-        fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+        fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )
 }
 

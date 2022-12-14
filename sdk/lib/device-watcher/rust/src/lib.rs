@@ -35,7 +35,7 @@ pub async fn wait_for_device_with<T>(
                 fidl::endpoints::create_proxy::<ControllerMarker>()?;
             let () = dev_dir
                 .open(
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                    fio::OpenFlags::RIGHT_READABLE,
                     fio::MODE_TYPE_SERVICE,
                     filename,
                     server_end.into_channel().into(),
@@ -189,7 +189,7 @@ mod tests {
         let scope = ExecutionScope::new();
         dir.open(
             scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
             fio::MODE_TYPE_DIRECTORY,
             vfs::path::Path::dot(),
             fidl::endpoints::ServerEnd::new(remote.into_channel()),
@@ -214,7 +214,7 @@ mod tests {
         let scope = ExecutionScope::new();
         dir.open(
             scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
             fio::MODE_TYPE_DIRECTORY,
             vfs::path::Path::dot(),
             fidl::endpoints::ServerEnd::new(remote.into_channel()),
@@ -249,7 +249,7 @@ mod tests {
         let scope = ExecutionScope::new();
         dir.open(
             scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
             fio::MODE_TYPE_DIRECTORY,
             vfs::path::Path::dot(),
             fidl::endpoints::ServerEnd::new(remote.into_channel()),

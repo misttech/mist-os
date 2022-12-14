@@ -158,7 +158,7 @@ pub fn generate_content(seed: u64) -> Vec<u8> {
 pub async fn find_dev(dev: &str) -> Result<String> {
     let dev_class_block = fuchsia_fs::directory::open_in_namespace(
         "/dev/class/block",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+        fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
     for entry in readdir(&dev_class_block).await? {
         let path = format!("/dev/class/block/{}", entry.name);
@@ -174,17 +174,14 @@ pub async fn find_dev(dev: &str) -> Result<String> {
 
 /// Returns a directory proxy connected to /dev.
 pub fn dev() -> fio::DirectoryProxy {
-    fuchsia_fs::directory::open_in_namespace(
-        "/dev",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
-    )
-    .expect("failed to open /dev")
+    fuchsia_fs::directory::open_in_namespace("/dev", fuchsia_fs::OpenFlags::RIGHT_READABLE)
+        .expect("failed to open /dev")
 }
 
 fn dev_class_block() -> fio::DirectoryProxy {
     fuchsia_fs::directory::open_in_namespace(
         "/dev/class/block",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+        fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )
     .expect("failed to open /dev/class/block")
 }
