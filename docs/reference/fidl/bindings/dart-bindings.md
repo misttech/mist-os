@@ -374,14 +374,19 @@ Examples on how to set up and bind a proxy class to a channel are covered in the
 ### Server {#server}
 
 Implementing a server for a FIDL protocol involves providing a concrete
-implementation of `TicTacToe` abstract class.
+implementation of the appropriate interface. For a `closed` protocol, the
+`TicTacToe` abstract class is used directly as the interface implemented on the
+server. For an `open` or `ajar` protocol, an additional interface called
+`TicTacToeServer` is generated, which must be implemented on the server.
 
-The bindings provide a `TicTacToeBinding` class that can bind to a `TicTacToe`
-instance and a channel, and listens to incoming messages on the channel,
+
+The bindings provide a `TicTacToeBinding` class that can bind to either a
+`TicTacToe` instance (if `closed`) or `TicTacToeServer` instance (if `open` or
+`ajar`), and a channel, and listens to incoming messages on the channel,
 dispatches them to the server implementation, and sends messages back through
 the channel. This class implements
 <!-- TODO(fxbug.dev/58672) add link to API docs when those are available -->
-`fidl.AsyncBinding<TicTacToe>`.
+`fidl.AsyncBinding<TicTacToe[Server]>`.
 
 Examples on how to set up and bind a server implementation are covered in the
 [Dart tutorial][dart-tutorial].
@@ -456,6 +461,74 @@ An example of using this on the client side would be:
 myproxy.makeMove(1, 2).then((gameState) { ... })
                       .catchError((moveError) { ... });
 
+```
+
+### Unknown interaction handling {#unknown-interaction-handling}
+
+#### Server-side
+
+When a protocol is declared as `open` or `ajar`, the backend will generate a
+`TicTacToeServer` class which inherits from the `TicTacToe` class. The server
+interface will add a single method to the base interface, called
+`$unknownMethod`, with this signature:
+
+```dart
+Future<void> $unknownMethod(fidl.UnknownMethodMetadata metadata);
+```
+
+This method will be called whenever the server receives a flexible unknown
+interaction which it can handle, that is a `flexible` one-way method in the case
+of an `ajar` protocol, or any `flexible` method in the case of an `open`
+protocol. The argument is a class that holds basic information about the unknown
+method that was received:
+
+```dart
+/// Metadata about an unknown flexible method that was received.
+class UnknownMethodMetadata {
+  UnknownMethodMetadata(this.ordinal, this.unknownMethodType);
+
+  /// Ordinal of the method.
+  final int ordinal;
+
+  /// Type of the unknown method.
+  ///
+  /// For an ajar protocol, this will always be oneWay.
+  final UnknownMethodType unknownMethodType;
+}
+```
+
+`UnknownMethodType` is an enum with two variants, `oneWay` and `twoWay`. If the
+protocol is `ajar`, the `unknownMethodType` will always be `oneWay`, since
+two-way unknown methods cannot be handled.
+
+#### Client-side
+
+There is no way for the client to tell if a `flexible` one-way method was known
+to the server or not. For `flexible` two-way methods, if the method is not known
+to the server, `fidl.UnknownMethodException` will be thrown, which is a subclass
+of `FidlError` which has the error code `FidlErrorCode.fidlUnknownMethod`.
+
+Aside from the possibility of getting an `UnknownMethodException`, there are no
+API difference between `strict` and `flexible` methods on the client.
+
+For `open` and `ajar` protocols the generated `TicTacToeProxy` class will have an additional field, called `$unknownEvents`:
+
+```dart
+Stream<UnknownEvent> get $unknownEvents;
+```
+
+This stream will emit an `UnknownEvent` whenever the client receives an unknown
+`flexible` event from the server. `UnknownEvent` is a class that holds
+information about the event that was received:
+
+```dart
+/// Event used when an unknown, flexible event is received.
+class UnknownEvent {
+  UnknownEvent(this.ordinal);
+
+  /// Ordinal of the event.
+  final int ordinal;
+}
 ```
 
 ### Protocol composition {#protocol-composition}
