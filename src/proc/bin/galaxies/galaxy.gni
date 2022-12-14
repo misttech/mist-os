@@ -17,6 +17,8 @@ import("//tools/cmc/build/cmc.gni")
 #                                the default one.
 #
 # `deps` (optional, list of targets): additional dependencies.
+#
+# `subpackages` (optional, list of targets): subpackages of the galaxy
 template("starnix_galaxy_package") {
   assert(defined(invoker.config),
          "must define `config` as a path to JSON file with startup config")
@@ -114,6 +116,7 @@ template("starnix_galaxy_package") {
   }
 
   fuchsia_package(target_name) {
+    forward_variables_from(invoker, [ "subpackages" ])
     deps = [ ":${group_target}" ]
   }
 }
