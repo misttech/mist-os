@@ -201,10 +201,22 @@ register_clang_toolchains()
 # buildifier: disable=load-on-top
 load(
     "//:build/bazel/toolchains/clang/repository_rules.bzl",
-    "generate_prebuilt_toolchain_repository",
+    "generate_prebuilt_clang_toolchain_repository",
+    "generate_prebuilt_llvm_repository",
 )
 
-generate_prebuilt_toolchain_repository(
+generate_prebuilt_llvm_repository(
+    name = "prebuilt_llvm",
+    # NOTE: We don't have Fuchsia variant of LLVM libraries yet, so always use
+    # host_platform's prebuilts for now. Currently, this repository is only used
+    # to expose headers from prebuilt LLVM, so it should make no difference as
+    # headers are the same across different platforms.
+    #
+    # See https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/llvm/BUILD.gn;l=51;drc=468d94479b10f5613ca928d782990e5340e943a4
+    llvm_install_dir = "prebuilt/third_party/llvm/{host_tag}",
+)
+
+generate_prebuilt_clang_toolchain_repository(
     name = "prebuilt_clang",
     clang_install_dir = "prebuilt/third_party/clang/{host_tag}",
 )

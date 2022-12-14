@@ -13,7 +13,7 @@ load(
     "workspace_root_path",
 )
 
-# generate_prebuilt_toolchain_repository() is used to generate
+# generate_prebuilt_clang_toolchain_repository() is used to generate
 # an external repository that contains a copy of the prebuilt
 # Clang toolchain that is already available in the Fuchsia source
 # tree, then adding Bazel specific files there.
@@ -22,7 +22,7 @@ load(
 # not directories, we have to invoke a special script to perform
 # the copy, possibly using hard links.
 #
-def _generate_prebuilt_toolchain_impl(repo_ctx):
+def _generate_prebuilt_clang_toolchain_impl(repo_ctx):
     workspace_dir = str(workspace_root_path(repo_ctx))
 
     # Symlink the content of the clang installation directory into
@@ -86,9 +86,46 @@ constants = struct(
         "BUILD.bazel",
     )
 
-generate_prebuilt_toolchain_repository = repository_rule(
-    implementation = _generate_prebuilt_toolchain_impl,
+generate_prebuilt_clang_toolchain_repository = repository_rule(
+    implementation = _generate_prebuilt_clang_toolchain_impl,
     attrs = {
         "clang_install_dir": attr.string(mandatory = True),
+    },
+)
+
+def _generate_prebuilt_llvm_repository_impl(repo_ctx):
+    repo_ctx.file("WORKSPACE.bazel", content = "")
+
+    workspace_dir = str(workspace_root_path(repo_ctx))
+
+    # Symlink the content of the LLVM installation directory into the repository.
+    # This allows us to add Bazel-specific files in this location.
+
+    # Resolve full path of script before executing it, this ensures that the repository
+    # rule will be re-run everytime the invoked script is modified.
+    script_path = str(repo_ctx.path(Label("@//:build/bazel/scripts/symlink-directory.py")))
+
+    repo_ctx.execute(
+        [
+            script_path,
+            repo_ctx.attr.llvm_install_dir,
+            ".",
+        ],
+        quiet = False,  # False for debugging!
+    )
+
+    # Symlink the BUILD.bazel file.
+    repo_ctx.symlink(
+        workspace_dir + "/build/bazel/toolchains/clang/prebuilt_llvm.BUILD.bazel",
+        "BUILD.bazel",
+    )
+
+generate_prebuilt_llvm_repository = repository_rule(
+    implementation = _generate_prebuilt_llvm_repository_impl,
+    attrs = {
+        "llvm_install_dir": attr.string(
+            mandatory = True,
+            doc = "Location of prebuilt LLVM toolchain installation",
+        ),
     },
 )
