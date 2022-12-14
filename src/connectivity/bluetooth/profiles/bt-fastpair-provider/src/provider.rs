@@ -189,8 +189,7 @@ impl Provider {
         request: Vec<u8>,
     ) -> Result<(SharedSecret, KeyBasedPairingRequest), Error> {
         // There must be an active local Host to facilitate pairing.
-        let discoverable =
-            self.host_watcher.pairing_mode().ok_or(Error::internal("No active host"))?;
+        let discoverable = self.host_watcher.pairing_mode().ok_or(Error::NoActiveHost)?;
 
         let (encrypted_request, remote_public_key) = parse_key_based_pairing_request(request)?;
         let keys_to_try = if let Some(key) = remote_public_key {
@@ -251,13 +250,13 @@ impl Provider {
         // There must be an active local Host and PairingManager to facilitate pairing.
         let Some(local_public_address) = self.host_watcher.public_address() else {
             response(Err(gatt::Error::UnlikelyError));
-            return Err(Error::internal("No active host"));
+            return Err(Error::NoActiveHost);
         };
         let discoverable = self.host_watcher.pairing_mode().expect("just checked active host");
 
         let Some(pairing) =  self.pairing.inner_mut() else {
             response(Err(gatt::Error::UnlikelyError));
-            return Err(Error::internal("No pairing manager"));
+            return Err(Error::NoPairingManager);
         };
 
         // Some key-based pairing requests require additional steps.
@@ -318,8 +317,7 @@ impl Provider {
         // Attempts to decrypt and parse the `encrypted_request`. Returns an encrypted response
         // on success, Error otherwise.
         let verify_fn = || -> Result<Vec<u8>, Error> {
-            let pairing_manager =
-                self.pairing.inner_mut().ok_or(Error::internal("No pairing manager"))?;
+            let pairing_manager = self.pairing.inner_mut().ok_or(Error::NoPairingManager)?;
             let key = pairing_manager
                 .key_for_procedure(&peer_id)
                 .map(Clone::clone)
@@ -364,8 +362,7 @@ impl Provider {
         // Attempts to decrypt and parse the the `encrypted_request`. Returns an Account Key on
         // success, Error otherwise.
         let verify_fn = || -> Result<AccountKey, Error> {
-            let pairing_manager =
-                self.pairing.inner_mut().ok_or(Error::internal("No pairing manager"))?;
+            let pairing_manager = self.pairing.inner_mut().ok_or(Error::NoPairingManager)?;
             let key = pairing_manager
                 .key_for_procedure(&peer_id)
                 .ok_or(Error::internal("No active pairing procedure"))?;
@@ -402,8 +399,7 @@ impl Provider {
     ) {
         // The request can only be decrypted if there is a procedure in progress.
         let parse_fn = || -> Result<String, Error> {
-            let pairing_manager =
-                self.pairing.inner_mut().ok_or(Error::internal("No pairing manager"))?;
+            let pairing_manager = self.pairing.inner_mut().ok_or(Error::NoPairingManager)?;
             let key = pairing_manager
                 .key_for_procedure(&peer_id)
                 .map(Clone::clone)
@@ -678,7 +674,7 @@ mod tests {
         drop(host_watcher_stream);
 
         let result = provider_fut.await;
-        assert_matches!(result, Err(Error::InternalError(_)));
+        assert_matches!(result, Err(Error::Internal(_)));
     }
 
     #[fuchsia::test]
@@ -693,7 +689,7 @@ mod tests {
         drop(gatt);
 
         let result = provider_fut.await;
-        assert_matches!(result, Err(Error::InternalError(_)));
+        assert_matches!(result, Err(Error::Internal(_)));
     }
 
     #[fuchsia::test]
@@ -706,7 +702,7 @@ mod tests {
 
         drop(sender);
         let result = provider_fut.await;
-        assert_matches!(result, Err(Error::InternalError(_)));
+        assert_matches!(result, Err(Error::Internal(_)));
     }
 
     #[fuchsia::test]

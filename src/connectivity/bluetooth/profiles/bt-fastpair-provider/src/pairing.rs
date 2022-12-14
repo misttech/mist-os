@@ -1191,7 +1191,7 @@ pub(crate) mod tests {
         // discarded.
         assert_matches!(manager.key_for_procedure(&id), None);
         // Can't complete the procedure since pairing failed.
-        assert_matches!(manager.complete_pairing_procedure(id), Err(Error::InternalError(_)));
+        assert_matches!(manager.complete_pairing_procedure(id), Err(Error::Internal(_)));
     }
 
     #[fuchsia::test]
@@ -1240,7 +1240,7 @@ pub(crate) mod tests {
         // Trying to start a new pairing procedure for the same peer is an Error.
         assert_matches!(
             manager.new_pairing_procedure(id, keys::tests::example_aes_key(), PairingType::Initial),
-            Err(Error::InternalError(_))
+            Err(Error::Internal(_))
         );
         // Don't expect a new delegate to be claimed.
         assert_matches!(mock.downstream_pairing_server.next().now_or_never(), None);
@@ -1252,9 +1252,9 @@ pub(crate) mod tests {
 
         let id = PeerId(123);
         // Can't compare passkey for a procedure that doesn't exist.
-        assert_matches!(manager.compare_passkey(id, 555666), Err(Error::InternalError(_)));
+        assert_matches!(manager.compare_passkey(id, 555666), Err(Error::Internal(_)));
         // Can't complete a procedure that doesn't exist.
-        assert_matches!(manager.complete_pairing_procedure(id), Err(Error::InternalError(_)));
+        assert_matches!(manager.complete_pairing_procedure(id), Err(Error::Internal(_)));
 
         // Start a new procedure.
         assert_matches!(
@@ -1264,7 +1264,7 @@ pub(crate) mod tests {
         mock.expect_set_pairing_delegate().await;
 
         // Comparing passkeys before pairing begins is an error.
-        assert_matches!(manager.compare_passkey(id, 555666), Err(Error::InternalError(_)));
+        assert_matches!(manager.compare_passkey(id, 555666), Err(Error::Internal(_)));
         // Put the procedure in the `Pairing` state.
         let request_fut = mock.make_pairing_request(id, 555666);
         assert_matches!(manager.select_next_some().now_or_never(), None);
@@ -1272,9 +1272,9 @@ pub(crate) mod tests {
         let result = request_fut.await.expect("fidl response");
         assert_eq!(result, (true, 555666));
         // Trying to compare passkeys again is an error.
-        assert_matches!(manager.compare_passkey(id, 555666), Err(Error::InternalError(_)));
+        assert_matches!(manager.compare_passkey(id, 555666), Err(Error::Internal(_)));
         // Can't complete the procedure when pairing is in progress.
-        assert_matches!(manager.complete_pairing_procedure(id), Err(Error::InternalError(_)));
+        assert_matches!(manager.complete_pairing_procedure(id), Err(Error::Internal(_)));
 
         // Put the procedure in the `PairingComplete` state.
         let _ = mock
@@ -1285,13 +1285,13 @@ pub(crate) mod tests {
         assert_eq!(result, id);
 
         // Trying to compare passkeys or complete the procedure is an error.
-        assert_matches!(manager.compare_passkey(id, 555666), Err(Error::InternalError(_)));
-        assert_matches!(manager.complete_pairing_procedure(id), Err(Error::InternalError(_)));
+        assert_matches!(manager.compare_passkey(id, 555666), Err(Error::Internal(_)));
+        assert_matches!(manager.complete_pairing_procedure(id), Err(Error::Internal(_)));
 
         // Put the procedure in the terminal `AccountKeyWritten` state. Procedure can be completed.
         assert_matches!(manager.account_key_write(id), Ok(_));
         // Trying to compare passkey or signal an account key write again is an Error.
-        assert_matches!(manager.compare_passkey(id, 555666), Err(Error::InternalError(_)));
+        assert_matches!(manager.compare_passkey(id, 555666), Err(Error::Internal(_)));
         assert_matches!(manager.account_key_write(id), Err(_));
         assert_matches!(manager.complete_pairing_procedure(id), Ok(_));
     }

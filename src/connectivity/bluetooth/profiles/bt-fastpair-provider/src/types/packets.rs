@@ -466,7 +466,7 @@ pub(crate) mod tests {
         // The public key point is valid in size but is not a point on the secp256r1 curve.
         let buf = vec![1u8; 80];
         let result = parse_key_based_pairing_request(buf.clone());
-        assert_matches!(result, Err(Error::InternalError(_)));
+        assert_matches!(result, Err(Error::Internal(_)));
     }
 
     #[test]
@@ -502,7 +502,7 @@ pub(crate) mod tests {
         let encrypted_request = key.encrypt(&device_action);
 
         let request = decrypt_key_based_pairing_request(&encrypted_request, &key);
-        assert_matches!(request, Err(Error::InternalError(_)));
+        assert_matches!(request, Err(Error::Internal(_)));
     }
 
     /// Example device action request with a fixed address of 0x123456.
@@ -634,7 +634,7 @@ pub(crate) mod tests {
         buf[0] = u8::from(&PasskeyType::Provider);
         let encrypted_buf = encrypt_message(&buf);
         let result = decrypt_passkey_request(encrypted_buf.to_vec(), &example_aes_key());
-        assert_matches!(result, Err(Error::InternalError(_)));
+        assert_matches!(result, Err(Error::Internal(_)));
     }
 
     #[test]

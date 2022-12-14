@@ -359,7 +359,7 @@ pub(crate) mod tests {
         let oversized = AccountKeyList::with_capacity_and_keys(15, keys);
 
         let result = oversized.service_data();
-        assert_matches!(result, Err(Error::InternalError(_)));
+        assert_matches!(result, Err(Error::Internal(_)));
     }
 
     #[test]

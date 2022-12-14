@@ -161,38 +161,38 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn invalid_private_key() {
         let result = private_key_from_bytes(vec![]);
-        assert_matches!(result, Err(Error::InternalError(_)));
+        assert_matches!(result, Err(Error::Internal(_)));
 
         let result = private_key_from_bytes(vec![1; 40]);
-        assert_matches!(result, Err(Error::InternalError(_)));
+        assert_matches!(result, Err(Error::Internal(_)));
 
         // Correct size, but the key must be a natural number.
         let result = private_key_from_bytes(vec![0; 32]);
-        assert_matches!(result, Err(Error::InternalError(_)));
+        assert_matches!(result, Err(Error::Internal(_)));
 
         // Correct size, but the value is too large. The private key value is bounded by the order
         // of the elliptic curve (number of all its points).
         let result = private_key_from_bytes(vec![0xff; 32]);
-        assert_matches!(result, Err(Error::InternalError(_)));
+        assert_matches!(result, Err(Error::Internal(_)));
     }
 
     #[fuchsia::test]
     fn invalid_public_key() {
         let result = public_key_from_bytes(vec![]);
-        assert_matches!(result, Err(Error::InternalError(_)));
+        assert_matches!(result, Err(Error::Internal(_)));
 
         let result = public_key_from_bytes([1; 65].to_vec());
-        assert_matches!(result, Err(Error::InternalError(_)));
+        assert_matches!(result, Err(Error::Internal(_)));
 
         // Correct size, but the point must be nonzero.
         let result = public_key_from_bytes([0; 64].to_vec());
-        assert_matches!(result, Err(Error::InternalError(_)));
+        assert_matches!(result, Err(Error::Internal(_)));
 
         // Correct size, but this random point is not on the secp256r1 curve.
         let mut test_x = vec![7; 32];
         let mut test_y = vec![4; 32];
         test_x.append(&mut test_y);
         let result = public_key_from_bytes(test_x);
-        assert_matches!(result, Err(Error::InternalError(_)));
+        assert_matches!(result, Err(Error::Internal(_)));
     }
 }

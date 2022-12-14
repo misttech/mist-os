@@ -17,15 +17,15 @@ pub enum Error {
 
     /// `fuchsia.bluetooth.gatt2` API errors.
     #[error("Error in gatt2 FIDL: {0:?}")]
-    GattError(gatt::Error),
+    Gatt(gatt::Error),
 
     /// Error encountered specifically in the `gatt2.Server.PublishService` method.
     #[error("Error publishing GATT service: {0:?}")]
-    PublishError(gatt::PublishServiceError),
+    Publish(gatt::PublishServiceError),
 
     /// Error encountered when trying to advertise via `le.Peripheral`.
     #[error("Error trying to advertise over LE: {:?}", .0)]
-    AdvertiseError(le::PeripheralError),
+    Advertise(le::PeripheralError),
 
     /// Error encountered when using the `ProfileClient` library.
     #[error("Profile Error: {:?}", .0)]
@@ -49,13 +49,21 @@ pub enum Error {
     #[error("Account Key storage error: {:?}. Message: {}", err, msg)]
     AccountKeyStorage { err: std::io::Error, msg: String },
 
+    /// There is no active Host to facilitate Fast Pair operations.
+    #[error("No active host")]
+    NoActiveHost,
+
+    /// There is no PairingManager to facilitate Fast Pair pairing.
+    #[error("No active PairingManager")]
+    NoPairingManager,
+
     /// Encountered when trying to serialize or deserialize data using the `serde_json` crate.
     #[error("Serde error: {0:?}")]
     Serde(serde_json::Error),
 
-    /// Internal component Error.
+    /// Internal component error.
     #[error("Internal component Error: {0}")]
-    InternalError(#[from] anyhow::Error),
+    Internal(#[from] anyhow::Error),
 
     #[error("Fidl Error: {0}")]
     Fidl(#[from] fidl::Error),
@@ -63,7 +71,7 @@ pub enum Error {
 
 impl Error {
     pub fn internal(msg: &str) -> Self {
-        Self::InternalError(format_err!("{}", msg))
+        Self::Internal(format_err!("{}", msg))
     }
 
     pub fn key_storage(err: std::io::Error, msg: &str) -> Self {
@@ -73,19 +81,19 @@ impl Error {
 
 impl From<gatt::Error> for Error {
     fn from(src: gatt::Error) -> Error {
-        Self::GattError(src)
+        Self::Gatt(src)
     }
 }
 
 impl From<gatt::PublishServiceError> for Error {
     fn from(src: gatt::PublishServiceError) -> Error {
-        Self::PublishError(src)
+        Self::Publish(src)
     }
 }
 
 impl From<le::PeripheralError> for Error {
     fn from(src: le::PeripheralError) -> Error {
-        Self::AdvertiseError(src)
+        Self::Advertise(src)
     }
 }
 
