@@ -269,8 +269,9 @@ rustc_library("lib") {
     "src/trace.rs",
   ]
 
-  # TODO(fxbug.dev/85921): Split this library up to be less monolithic.
-  # If building this massive crate runs into OOM issues on RBE, `disable_rbe = true`
+  # -Copt-level=1 makes building the _test OOM on RBE with core.arm64-asan
+  # TODO(fxbug.dev/86896, fxbug.dev/85921): split this crate up to prevent OOM on RBE
+  disable_rbe = true
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
