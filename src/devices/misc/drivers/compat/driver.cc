@@ -632,11 +632,6 @@ void Driver::LoadFirmwareAsync(Device* device, const char* filename,
 
 zx_status_t Driver::AddDevice(Device* parent, device_add_args_t* args, zx_device_t** out) {
   return RunOnDispatcher([&] {
-    zx::channel client_remote(args->client_remote);
-    if (client_remote.is_valid() && args->flags & DEVICE_ADD_MUST_ISOLATE) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-
     zx_device_t* child;
     zx_status_t status = parent->Add(args, &child);
     if (status != ZX_OK) {
@@ -646,11 +641,6 @@ zx_status_t Driver::AddDevice(Device* parent, device_add_args_t* args, zx_device
     if (out) {
       *out = child;
     }
-
-    if (client_remote.is_valid()) {
-      child->devfs_server().ServeMultiplexed(std::move(client_remote));
-    }
-
     executor_.schedule_task(child->Export());
     return ZX_OK;
   });

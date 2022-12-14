@@ -221,8 +221,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   // Convenience version which takes string:
   void SetFirmware(std::string firmware, std::string_view path = {});
 
-  zx::channel&& TakeClientRemote() { return std::move(client_remote_); }
-
  private:
   constexpr static zx_protocol_device_t kDefaultOps = {};
   // |ctx| must outlive |*out_dev|.  This is managed in the full binary by creating
@@ -321,7 +319,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   std::vector<zx_device_prop_t> props_;
   std::vector<zx_device_str_prop_t> str_props_;
   zx::vmo inspect_;
-  zx::channel client_remote_;
 };
 
 namespace mock_ddk {

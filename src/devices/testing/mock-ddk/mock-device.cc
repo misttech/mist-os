@@ -28,9 +28,6 @@ MockDevice::MockDevice(device_add_args_t* args, MockDevice* parent)
     }
   }
 
-  if (args->client_remote) {
-    client_remote_ = zx::channel(args->client_remote);
-  }
   inspect_ = zx::vmo(args->inspect_vmo);
 }
 

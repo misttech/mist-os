@@ -97,12 +97,9 @@ class FidlMessenger : public fidl::WireServer<FidlProtocol> {
 
   // Set handlers to be called when FIDL message is received
   // - Message operation context |op_ctx| and |op| must outlive FidlMessenger
-  // - If `remote` is empty, FidlHandler will create a new channel, storing the local endpoint in
+  // - FidlHandler will create a new channel, storing the local endpoint in
   //   `local` for the client to retrieve later and binding the remote endpoint to the server.
-  //   Otherwise, the endpoint in `remote` will be bound to the server, and FidlHandler will
-  //   assume the client has retained the local endpoint.
-  zx_status_t SetMessageOp(void* op_ctx, MessageOp* op,
-                           std::optional<zx::channel> remote = std::nullopt);
+  zx_status_t SetMessageOp(void* op_ctx, MessageOp* op);
 
  private:
   MessageOp* message_op_ = nullptr;

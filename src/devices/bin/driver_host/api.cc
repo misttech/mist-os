@@ -104,14 +104,6 @@ __EXPORT zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* paren
     return ZX_ERR_INVALID_ARGS;
   }
 
-  // If the device will be added in the same driver_host and visible,
-  // we can connect the client immediately after adding the device.
-  // Otherwise we will pass this channel to the devcoordinator via internal::device_add.
-  zx::channel client_remote(args->client_remote);
-  if (args->flags & DEVICE_ADD_MUST_ISOLATE && client_remote.is_valid()) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
   zx::vmo inspect(args->inspect_vmo);
 
   auto api_ctx = internal::ContextForApi();
@@ -224,16 +216,6 @@ __EXPORT zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* paren
       *out = nullptr;
     }
     dev.reset();
-  } else {
-    async::PostTask(internal::ContextForApi()->loop().dispatcher(),
-                    [dev, client_remote = std::move(client_remote)]() mutable {
-                      // This needs to be called async because it would otherwise re-entrantly call
-                      // back into the driver.
-                      if (std::optional<devfs_fidl::DeviceServer>& vnode = dev->vnode;
-                          vnode.has_value() && client_remote.is_valid()) {
-                        vnode.value().ServeMultiplexed(std::move(client_remote));
-                      }
-                    });
   }
 
   // Leak the reference that was written to |out|, it will be recovered in device_remove().

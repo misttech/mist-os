@@ -188,16 +188,14 @@ class SkipBlockTest : public zxtest::Test {
 
   void InitializeFidlClient() {
     if (!client_) {
-      auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_skipblock::SkipBlock>();
-      ASSERT_OK(endpoints.status_value());
       ASSERT_EQ(fake_parent().child_count(), 1);
       fidl_messenger_.SetMessageOp(
           fake_parent().GetLatestChild(),
           [](void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn) -> zx_status_t {
             return static_cast<MockDevice*>(ctx)->MessageOp(msg, txn);
-          },
-          endpoints->server.TakeChannel());
-      client_ = fidl::WireSyncClient(std::move(endpoints->client));
+          });
+      client_.Bind(fidl::ClientEnd<fuchsia_hardware_skipblock::SkipBlock>(
+          std::move(fidl_messenger_.local())));
     }
   }
 

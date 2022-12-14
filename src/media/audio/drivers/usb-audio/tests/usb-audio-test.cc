@@ -257,14 +257,12 @@ class Binder : public fake_ddk::Bind {
 
     if (args && args->ops) {
       if (args->ops->message) {
-        std::optional<zx::channel> remote_channel = std::nullopt;
-        if (args->client_remote) {
-          remote_channel.emplace(args->client_remote);
+        if (zx_status_t status = fidl_.SetMessageOp(args->ctx, args->ops->message);
+            status != ZX_OK) {
+          return status;
         }
-
-        [[maybe_unused]] auto unused =
-            fidl_.SetMessageOp(args->ctx, args->ops->message, std::move(remote_channel));
       }
+
       if (args->ops->unbind || args->ops->release) {
         devs_.push_back({args->ops->unbind, args->ops->release, args->ctx});
         unbind_op_ = args->ops->unbind;  // Starts the unbind/release of devices.

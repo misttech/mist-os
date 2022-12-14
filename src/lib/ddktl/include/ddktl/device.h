@@ -392,10 +392,6 @@ class DeviceAddArgs {
     args_.proxy_args = proxy_args;
     return *this;
   }
-  DeviceAddArgs& set_client_remote(zx::channel client_remote) {
-    args_.client_remote = client_remote.release();
-    return *this;
-  }
   DeviceAddArgs& set_inspect_vmo(zx::vmo inspect_vmo) {
     args_.inspect_vmo = inspect_vmo.release();
     return *this;

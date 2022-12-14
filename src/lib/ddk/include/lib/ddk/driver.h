@@ -203,10 +203,6 @@ typedef struct device_add_args {
   // Zero or more of DEVICE_ADD_*
   uint32_t flags;
 
-  // Optional channel passed to the |dev| that serves as an open connection for the client.
-  // This will not work if DEVICE_ADD_MUST_ISOLATE is set.
-  zx_handle_t client_remote;
-
   // Optional VMO representing that will get used in devfs inspect tree.
   zx_handle_t inspect_vmo;
 
