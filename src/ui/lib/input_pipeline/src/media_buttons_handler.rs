@@ -11,6 +11,7 @@ use {
     fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
     fidl_fuchsia_ui_policy as fidl_ui_policy,
     fuchsia_syslog::fx_log_err,
+    fuchsia_syslog::fx_log_info,
     fuchsia_zircon as zx,
     futures::lock::Mutex,
     futures::TryStreamExt,
@@ -186,12 +187,21 @@ impl MediaButtonsHandler {
     /// # Parameters
     /// - `event`: The event to send to the listeners.
     async fn send_event_to_listeners(self: &Rc<Self>, event: &fidl_ui_input::MediaButtonsEvent) {
-        let inner = self.inner.lock().await;
-        for listener in inner.listeners.iter() {
-            if let Err(e) = listener.on_event(event.clone()).await {
-                fx_log_err!("Error sending MediaButtonsEvent to listener: {:?}", e);
+        let mut inner = self.inner.lock().await;
+        let mut listeners_to_keep = Vec::new();
+
+        for listener in inner.listeners.drain(..) {
+            match listener.on_event(event.clone()).await {
+                Ok(()) => listeners_to_keep.push(listener),
+                Err(e) => {
+                    fx_log_info!(
+                        "Unregistering listener; unable to send MediaButtonsEvent: {:?}",
+                        e
+                    )
+                }
             }
         }
+        inner.listeners.append(&mut listeners_to_keep);
     }
 
     /// Reports the given event_time to the activity service, if available.
@@ -206,6 +216,8 @@ impl MediaButtonsHandler {
 
 #[cfg(test)]
 mod tests {
+    use crate::input_handler::InputHandler;
+
     use {
         super::*, crate::testing_utilities, assert_matches::assert_matches,
         fidl::endpoints::create_proxy_and_stream, fidl_fuchsia_input_report as fidl_input_report,
@@ -400,5 +412,65 @@ mod tests {
             media_buttons_listener_request_stream:
                 vec![first_listener_stream, second_listener_stream],
         );
+    }
+
+    /// Tests that listener is unregistered if channel is closed and we try to send input event to listener
+    #[fasync::run_singlethreaded(test)]
+    async fn unregister_listener_if_channel_closed() {
+        let event_time = zx::Time::get_monotonic();
+        let aggregator_proxy = spawn_aggregator_request_server(event_time.into_nanos());
+        let media_buttons_handler = MediaButtonsHandler::new_internal(aggregator_proxy);
+        let device_listener_proxy =
+            spawn_device_listener_registry_server(media_buttons_handler.clone());
+
+        // Register two listeners.
+        let (first_listener, first_listener_stream) =
+            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
+                .unwrap();
+        let (second_listener, mut second_listener_stream) =
+            fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
+                .unwrap();
+        let _ = device_listener_proxy.register_listener(first_listener).await;
+        let _ = device_listener_proxy.register_listener(second_listener).await;
+        let inner = media_buttons_handler.inner.lock().await;
+        assert_eq!(inner.listeners.len(), 2);
+        drop(inner);
+
+        // Generate input event to be handled by MediaButtonsHandler.
+        let descriptor = testing_utilities::consumer_controls_device_descriptor();
+        let input_event = testing_utilities::create_consumer_controls_event(
+            vec![fidl_input_report::ConsumerControlButton::VolumeUp],
+            event_time,
+            &descriptor,
+        );
+
+        // Drop first registered listener.
+        std::mem::drop(first_listener_stream);
+
+        // Send input event to MediaButtonsHandler to be processed.
+        // Since one of the listeners was dropped, meaning its channel is closed, we ensure
+        // that listener has also been unregistered.
+        fasync::Task::local(async move {
+            let _ = media_buttons_handler.clone().handle_input_event(input_event).await;
+
+            // Should only be one listener left in 'inner' after we unregister the listener with closed channel.
+            assert_eq!(media_buttons_handler.inner.lock().await.listeners.len(), 1);
+        })
+        .detach();
+
+        // Send response from responder on second listener stream
+        if let Some(request) = second_listener_stream.next().await {
+            match request {
+                Ok(fidl_ui_policy::MediaButtonsListenerRequest::OnEvent {
+                    event: _,
+                    responder,
+                }) => {
+                    let _ = responder.send();
+                }
+                _ => assert!(false),
+            }
+        } else {
+            assert!(false);
+        }
     }
 }

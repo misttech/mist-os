@@ -146,19 +146,34 @@ INSTANTIATE_TEST_SUITE_P(MediaButtonsListenerTestWithParams, MediaButtonsListene
                                            ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER));
 TEST_P(MediaButtonsListenerTest, MediaButtonsWithCallback) {
   RegisterInjectionDevice();
-
-  // Callback to save the observed media button event.
-  std::optional<fuchsia::ui::input::MediaButtonsEvent> observed_event;
-  fit::function<void(const fuchsia::ui::input::MediaButtonsEvent&)> on_event =
-      [&observed_event](const fuchsia::ui::input::MediaButtonsEvent& observed) {
-        observed_event = fidl::Clone(observed);
+  // Callbacks to save the observed media button event.
+  std::optional<fuchsia::ui::input::MediaButtonsEvent> observed_event_first_listener;
+  fit::function<void(const fuchsia::ui::input::MediaButtonsEvent&)> on_event_first =
+      [&observed_event_first_listener](const fuchsia::ui::input::MediaButtonsEvent& observed) {
+        observed_event_first_listener = fidl::Clone(observed);
+      };
+  std::optional<fuchsia::ui::input::MediaButtonsEvent> observed_event_second_listener;
+  fit::function<void(const fuchsia::ui::input::MediaButtonsEvent&)> on_event_second =
+      [&observed_event_second_listener](const fuchsia::ui::input::MediaButtonsEvent& observed) {
+        observed_event_second_listener = fidl::Clone(observed);
+      };
+  std::optional<fuchsia::ui::input::MediaButtonsEvent> observed_event_third_listener;
+  fit::function<void(const fuchsia::ui::input::MediaButtonsEvent&)> on_event_third =
+      [&observed_event_third_listener](const fuchsia::ui::input::MediaButtonsEvent& observed) {
+        observed_event_third_listener = fidl::Clone(observed);
       };
 
-  // Register the MediaButtons listener against Input Pipeline and inject an event with pressed
+  // Register the MediaButtons listeners against Input Pipeline and inject an event with pressed
   // buttons.
-  fidl::InterfaceHandle<fuchsia::ui::policy::MediaButtonsListener> listener_handle;
-  auto button_listener_impl =
-      std::make_unique<ButtonsListenerImpl>(listener_handle.NewRequest(), std::move(on_event));
+  fidl::InterfaceHandle<fuchsia::ui::policy::MediaButtonsListener> first_listener_handle;
+  auto first_button_listener_impl = std::make_unique<ButtonsListenerImpl>(
+      first_listener_handle.NewRequest(), std::move(on_event_first));
+  fidl::InterfaceHandle<fuchsia::ui::policy::MediaButtonsListener> second_listener_handle;
+  auto second_button_listener_impl = std::make_unique<ButtonsListenerImpl>(
+      second_listener_handle.NewRequest(), std::move(on_event_second));
+  fidl::InterfaceHandle<fuchsia::ui::policy::MediaButtonsListener> third_listener_handle;
+  auto third_button_listener_impl = std::make_unique<ButtonsListenerImpl>(
+      third_listener_handle.NewRequest(), std::move(on_event_third));
 
   auto listener_registry =
       realm_exposed_services()->Connect<fuchsia::ui::policy::DeviceListenerRegistry>();
@@ -172,35 +187,105 @@ TEST_P(MediaButtonsListenerTest, MediaButtonsWithCallback) {
       fuchsia::input::report::ConsumerControlButton::PAUSE,
       fuchsia::input::report::ConsumerControlButton::VOLUME_UP,
   });
-  listener_registry->RegisterListener(
-      std::move(listener_handle), [this, &first_report] { InjectInput(std::move(first_report)); });
+  listener_registry->RegisterListener(std::move(first_listener_handle), [] {});
+  listener_registry->RegisterListener(std::move(second_listener_handle), [] {});
+  listener_registry->RegisterListener(std::move(third_listener_handle), [] {});
+  InjectInput(std::move(first_report));
+  RunLoopUntil([&observed_event_first_listener, &observed_event_second_listener,
+                &observed_event_third_listener] {
+    return observed_event_first_listener.has_value() &&
+           (observed_event_second_listener.has_value() &&
+            observed_event_third_listener.has_value());
+  });
 
-  RunLoopUntil([&observed_event] { return observed_event.has_value(); });
+  ASSERT_TRUE(observed_event_first_listener->has_volume());
+  EXPECT_EQ(observed_event_first_listener->volume(), 1);
+  ASSERT_TRUE(observed_event_first_listener->has_mic_mute());
+  EXPECT_TRUE(observed_event_first_listener->mic_mute());
+  ASSERT_TRUE(observed_event_first_listener->has_pause());
+  EXPECT_TRUE(observed_event_first_listener->pause());
+  ASSERT_TRUE(observed_event_first_listener->has_camera_disable());
+  EXPECT_TRUE(observed_event_first_listener->camera_disable());
 
-  ASSERT_TRUE(observed_event->has_volume());
-  EXPECT_EQ(observed_event->volume(), 1);
-  ASSERT_TRUE(observed_event->has_mic_mute());
-  EXPECT_TRUE(observed_event->mic_mute());
-  ASSERT_TRUE(observed_event->has_pause());
-  EXPECT_TRUE(observed_event->pause());
-  ASSERT_TRUE(observed_event->has_camera_disable());
-  EXPECT_TRUE(observed_event->camera_disable());
+  ASSERT_TRUE(observed_event_second_listener->has_volume());
+  EXPECT_EQ(observed_event_second_listener->volume(), 1);
+  ASSERT_TRUE(observed_event_second_listener->has_mic_mute());
+  EXPECT_TRUE(observed_event_second_listener->mic_mute());
+  ASSERT_TRUE(observed_event_second_listener->has_pause());
+  EXPECT_TRUE(observed_event_second_listener->pause());
+  ASSERT_TRUE(observed_event_second_listener->has_camera_disable());
+  EXPECT_TRUE(observed_event_second_listener->camera_disable());
+
+  ASSERT_TRUE(observed_event_third_listener->has_volume());
+  EXPECT_EQ(observed_event_third_listener->volume(), 1);
+  ASSERT_TRUE(observed_event_third_listener->has_mic_mute());
+  EXPECT_TRUE(observed_event_third_listener->mic_mute());
+  ASSERT_TRUE(observed_event_third_listener->has_pause());
+  EXPECT_TRUE(observed_event_third_listener->pause());
+  ASSERT_TRUE(observed_event_third_listener->has_camera_disable());
+  EXPECT_TRUE(observed_event_third_listener->camera_disable());
 
   // Inject a second event that represents releasing the pressed buttons.
-  observed_event.reset();
+  observed_event_first_listener.reset();
+  observed_event_second_listener.reset();
+  observed_event_third_listener.reset();
   fuchsia::input::report::ConsumerControlInputReport second_report;
   second_report.set_pressed_buttons({});
   InjectInput(std::move(second_report));
-  RunLoopUntil([&observed_event] { return observed_event.has_value(); });
+  RunLoopUntil([&observed_event_first_listener, &observed_event_second_listener,
+                &observed_event_third_listener] {
+    return observed_event_first_listener.has_value() &&
+           (observed_event_second_listener.has_value() &&
+            observed_event_third_listener.has_value());
+  });
 
-  ASSERT_TRUE(observed_event->has_volume());
-  EXPECT_EQ(observed_event->volume(), 0);
-  ASSERT_TRUE(observed_event->has_mic_mute());
-  EXPECT_FALSE(observed_event->mic_mute());
-  ASSERT_TRUE(observed_event->has_pause());
-  EXPECT_FALSE(observed_event->pause());
-  ASSERT_TRUE(observed_event->has_camera_disable());
-  EXPECT_FALSE(observed_event->camera_disable());
+  ASSERT_TRUE(observed_event_first_listener->has_volume());
+  EXPECT_EQ(observed_event_first_listener->volume(), 0);
+  ASSERT_TRUE(observed_event_first_listener->has_mic_mute());
+  EXPECT_FALSE(observed_event_first_listener->mic_mute());
+  ASSERT_TRUE(observed_event_first_listener->has_pause());
+  EXPECT_FALSE(observed_event_first_listener->pause());
+  ASSERT_TRUE(observed_event_first_listener->has_camera_disable());
+  EXPECT_FALSE(observed_event_first_listener->camera_disable());
+
+  ASSERT_TRUE(observed_event_second_listener->has_volume());
+  EXPECT_EQ(observed_event_second_listener->volume(), 0);
+  ASSERT_TRUE(observed_event_second_listener->has_mic_mute());
+  EXPECT_FALSE(observed_event_second_listener->mic_mute());
+  ASSERT_TRUE(observed_event_second_listener->has_pause());
+  EXPECT_FALSE(observed_event_second_listener->pause());
+  ASSERT_TRUE(observed_event_second_listener->has_camera_disable());
+  EXPECT_FALSE(observed_event_second_listener->camera_disable());
+
+  ASSERT_TRUE(observed_event_third_listener->has_volume());
+  EXPECT_EQ(observed_event_third_listener->volume(), 0);
+  ASSERT_TRUE(observed_event_third_listener->has_mic_mute());
+  EXPECT_FALSE(observed_event_third_listener->mic_mute());
+  ASSERT_TRUE(observed_event_third_listener->has_pause());
+  EXPECT_FALSE(observed_event_third_listener->pause());
+  ASSERT_TRUE(observed_event_third_listener->has_camera_disable());
+  EXPECT_FALSE(observed_event_third_listener->camera_disable());
+
+  // Drop endpoint of second listener to close channel.
+  second_button_listener_impl = {};
+
+  // Inject a third event that should result in second listener being unregistered since it's
+  // channel is now closed.
+  observed_event_first_listener.reset();
+  observed_event_second_listener.reset();
+  observed_event_third_listener.reset();
+  fuchsia::input::report::ConsumerControlInputReport third_report;
+  third_report.set_pressed_buttons({fuchsia::input::report::ConsumerControlButton::VOLUME_UP});
+  InjectInput(std::move(third_report));
+  RunLoopUntil([&observed_event_first_listener, &observed_event_third_listener] {
+    return observed_event_first_listener.has_value() && observed_event_third_listener.has_value();
+  });
+
+  ASSERT_TRUE(observed_event_first_listener->has_volume());
+  EXPECT_EQ(observed_event_first_listener->volume(), 1);
+  ASSERT_TRUE(observed_event_third_listener->has_volume());
+  EXPECT_EQ(observed_event_third_listener->volume(), 1);
+  ASSERT_FALSE(observed_event_second_listener.has_value());
 }
 
 }  // namespace
