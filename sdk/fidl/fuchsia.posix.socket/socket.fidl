@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.posix.socket;
 
-using fuchsia.io;
 using fuchsia.net;
 using fuchsia.net.interfaces;
 using fuchsia.posix;
@@ -659,7 +658,11 @@ protocol DatagramSocket {
         3: rx_meta_buf_size uint64;
         /// Identifies the version of the protocol used to encode and decode
         /// metadata sent alongside payloads over the socket.
-        4: metadata_encoding_protocol_version fuchsia.io.UdpMetadataEncodingProtocolVersion;
+        4: metadata_encoding_protocol_version
+                @generated_name("UdpMetadataEncodingProtocolVersion")
+                flexible enum : uint16 {
+            ZERO = 0;
+        };
     });
 
     /// Validates that data can be sent.

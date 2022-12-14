@@ -146,29 +146,6 @@
         "value": "fuchsia.io/Directory"
     },
     {
-        "kind": "struct/member",
-        "name": "fuchsia.io/DatagramSocket.rx_meta_buf_size",
-        "ordinal": "3",
-        "type": "uint64"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/DatagramSocket.socket",
-        "ordinal": "1",
-        "type": "zx/handle:<SOCKET,zx.TRANSFER,zx.READ,zx.WRITE,zx.WAIT,zx.INSPECT>"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/DatagramSocket.tx_meta_buf_size",
-        "ordinal": "2",
-        "type": "uint64"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.io/DatagramSocket",
-        "resourceness": "resource"
-    },
-    {
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory.AddInotifyFilter",
         "ordinal": "2291733984692638506",
@@ -1783,12 +1760,6 @@
     },
     {
         "kind": "union/member",
-        "name": "fuchsia.io/NodeInfoDeprecated.datagram_socket",
-        "ordinal": "13",
-        "type": "fuchsia.io/DatagramSocket"
-    },
-    {
-        "kind": "union/member",
         "name": "fuchsia.io/NodeInfoDeprecated.directory",
         "ordinal": "3",
         "type": "fuchsia.io/DirectoryObject"
@@ -1801,39 +1772,9 @@
     },
     {
         "kind": "union/member",
-        "name": "fuchsia.io/NodeInfoDeprecated.packet_socket",
-        "ordinal": "12",
-        "type": "fuchsia.io/PacketSocket"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.io/NodeInfoDeprecated.raw_socket",
-        "ordinal": "11",
-        "type": "fuchsia.io/RawSocket"
-    },
-    {
-        "kind": "union/member",
         "name": "fuchsia.io/NodeInfoDeprecated.service",
         "ordinal": "1",
         "type": "fuchsia.io/Service"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.io/NodeInfoDeprecated.stream_socket",
-        "ordinal": "10",
-        "type": "fuchsia.io/StreamSocket"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.io/NodeInfoDeprecated.synchronous_datagram_socket",
-        "ordinal": "9",
-        "type": "fuchsia.io/SynchronousDatagramSocket"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.io/NodeInfoDeprecated.tty",
-        "ordinal": "7",
-        "type": "fuchsia.io/Tty"
     },
     {
         "kind": "union",
@@ -2082,17 +2023,6 @@
         "type": "uint64"
     },
     {
-        "kind": "struct/member",
-        "name": "fuchsia.io/PacketSocket.event",
-        "ordinal": "1",
-        "type": "zx/handle:<EVENTPAIR,zx.TRANSFER,zx.WAIT>"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.io/PacketSocket",
-        "resourceness": "resource"
-    },
-    {
         "kind": "const",
         "name": "fuchsia.io/RW_STAR_DIR",
         "type": "fuchsia.io/Operations",
@@ -2109,17 +2039,6 @@
         "name": "fuchsia.io/R_STAR_DIR",
         "type": "fuchsia.io/Operations",
         "value": "211"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/RawSocket.event",
-        "ordinal": "1",
-        "type": "zx/handle:<EVENTPAIR,zx.TRANSFER,zx.WAIT>"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.io/RawSocket",
-        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
@@ -2244,39 +2163,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.io/Service"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/StreamSocket.socket",
-        "ordinal": "1",
-        "type": "zx/handle:<SOCKET,zx.TRANSFER,zx.READ,zx.WRITE,zx.WAIT,zx.INSPECT>"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.io/StreamSocket",
-        "resourceness": "resource"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/SynchronousDatagramSocket.event",
-        "ordinal": "1",
-        "type": "zx/handle:<EVENTPAIR,zx.TRANSFER,zx.WAIT>"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.io/SynchronousDatagramSocket",
-        "resourceness": "resource"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/Tty.event",
-        "ordinal": "1",
-        "type": "zx/handle:<EVENTPAIR,optional>"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.io/Tty",
-        "resourceness": "resource"
     },
     {
         "kind": "bits/member",

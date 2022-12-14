@@ -10,8 +10,8 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/zx/eventpair.h>
-#include <lib/zx/socket.h>
 #include <lib/zx/result.h>
+#include <lib/zx/socket.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
 #include <lib/zxio/cpp/inception.h>
@@ -24,6 +24,8 @@
 #include "sdk/lib/zxio/tests/test_directory_server_base.h"
 #include "sdk/lib/zxio/tests/test_file_server_base.h"
 #include "sdk/lib/zxio/tests/test_socket_server.h"
+
+namespace {
 
 TEST(CreateWithAllocator, ErrorAllocator) {
   auto allocator = [](zxio_object_type_t type, zxio_storage_t** out_storage, void** out_context) {
@@ -248,6 +250,9 @@ TEST(CreateWithAllocator, Service) {
 
 class TestTtyServer : public fidl::testing::WireTestBase<fuchsia_hardware_pty::Device> {
  public:
+  explicit TestTtyServer(zx::eventpair event) : event_(std::move(event)) {}
+
+ private:
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) final {
     ADD_FAILURE() << "unexpected message received: " << name;
     completer.Close(ZX_ERR_NOT_SUPPORTED);
@@ -258,6 +263,22 @@ class TestTtyServer : public fidl::testing::WireTestBase<fuchsia_hardware_pty::D
     // After the reply, we should close the connection.
     completer.Close(ZX_OK);
   }
+
+  void Query(QueryCompleter::Sync& completer) final {
+    const std::string_view kProtocol = fuchsia_hardware_pty::wire::kDeviceProtocolName;
+    // TODO(https://fxbug.dev/101890): avoid the const cast.
+    uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
+    completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
+  }
+
+  void Describe(DescribeCompleter::Sync& completer) final {
+    fidl::Arena alloc;
+    completer.Reply(fuchsia_hardware_pty::wire::DeviceDescribeResponse::Builder(alloc)
+                        .event(std::move(event_))
+                        .Build());
+  }
+
+  zx::eventpair event_;
 };
 
 TEST(CreateWithAllocator, Tty) {
@@ -267,10 +288,6 @@ TEST(CreateWithAllocator, Tty) {
 
   zx::eventpair event0, event1;
   ASSERT_OK(zx::eventpair::create(0, &event0, &event1));
-
-  auto node_info = fuchsia_io::wire::NodeInfoDeprecated::WithTty({
-      .event = std::move(event1),
-  });
 
   auto allocator = [](zxio_object_type_t type, zxio_storage_t** out_storage, void** out_context) {
     if (type != ZXIO_OBJECT_TYPE_TTY) {
@@ -282,17 +299,14 @@ TEST(CreateWithAllocator, Tty) {
   };
 
   async::Loop tty_control_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  TestTtyServer server;
+  TestTtyServer server(std::move(event1));
   fidl::ServerEnd<fuchsia_hardware_pty::Device> tty_server(node_server.TakeChannel());
   fidl::BindServer(tty_control_loop.dispatcher(), std::move(tty_server), &server);
   tty_control_loop.StartThread("tty_control_thread");
 
   void* context = nullptr;
-  ASSERT_OK(zxio_create_with_allocator(std::move(node_client), node_info, allocator, &context));
+  ASSERT_OK(zxio_create_with_allocator(node_client.TakeChannel(), allocator, &context));
   ASSERT_NE(context, nullptr);
-
-  // The event in node_info should be consumed by zxio.
-  EXPECT_FALSE(node_info.tty().event.is_valid());
 
   std::unique_ptr<zxio_storage_t> storage(static_cast<zxio_storage_t*>(context));
   zxio_t* zxio = &(storage->io);
@@ -320,10 +334,6 @@ TEST(CreateWithAllocator, PacketSocket) {
   zx::eventpair event0, event1;
   ASSERT_OK(zx::eventpair::create(0, &event0, &event1));
 
-  auto node_info = fuchsia_io::wire::NodeInfoDeprecated::WithPacketSocket({
-      .event = std::move(event1),
-  });
-
   auto allocator = [](zxio_object_type_t type, zxio_storage_t** out_storage, void** out_context) {
     if (type != ZXIO_OBJECT_TYPE_PACKET_SOCKET) {
       return ZX_ERR_NOT_SUPPORTED;
@@ -334,18 +344,13 @@ TEST(CreateWithAllocator, PacketSocket) {
   };
 
   async::Loop control_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  zxio_tests::PacketSocketServer server;
+  zxio_tests::PacketSocketServer server(std::move(event1));
   fidl::BindServer(control_loop.dispatcher(), std::move(socket_server), &server);
   control_loop.StartThread("packet_socket_control_thread");
 
   void* context = nullptr;
-  ASSERT_OK(
-      zxio_create_with_allocator(fidl::ClientEnd<fuchsia_io::Node>(socket_client.TakeChannel()),
-                                 node_info, allocator, &context));
+  ASSERT_OK(zxio_create_with_allocator(socket_client.TakeChannel(), allocator, &context));
   ASSERT_NE(context, nullptr);
-
-  // The event in node_info should be consumed by zxio.
-  EXPECT_FALSE(node_info.packet_socket().event.is_valid());
 
   std::unique_ptr<zxio_storage_t> storage(static_cast<zxio_storage_t*>(context));
   zxio_t* zxio = &(storage->io);
@@ -373,10 +378,6 @@ TEST(CreateWithAllocator, RawSocket) {
   zx::eventpair event0, event1;
   ASSERT_OK(zx::eventpair::create(0, &event0, &event1));
 
-  auto node_info = fuchsia_io::wire::NodeInfoDeprecated::WithRawSocket({
-      .event = std::move(event1),
-  });
-
   auto allocator = [](zxio_object_type_t type, zxio_storage_t** out_storage, void** out_context) {
     if (type != ZXIO_OBJECT_TYPE_RAW_SOCKET) {
       return ZX_ERR_NOT_SUPPORTED;
@@ -387,18 +388,13 @@ TEST(CreateWithAllocator, RawSocket) {
   };
 
   async::Loop control_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  zxio_tests::RawSocketServer server;
+  zxio_tests::RawSocketServer server(std::move(event1));
   fidl::BindServer(control_loop.dispatcher(), std::move(socket_server), &server);
   control_loop.StartThread("raw_socket_control_thread");
 
   void* context = nullptr;
-  ASSERT_OK(
-      zxio_create_with_allocator(fidl::ClientEnd<fuchsia_io::Node>(socket_client.TakeChannel()),
-                                 node_info, allocator, &context));
+  ASSERT_OK(zxio_create_with_allocator(socket_client.TakeChannel(), allocator, &context));
   ASSERT_NE(context, nullptr);
-
-  // The event in node_info should be consumed by zxio.
-  EXPECT_FALSE(node_info.raw_socket().event.is_valid());
 
   std::unique_ptr<zxio_storage_t> storage(static_cast<zxio_storage_t*>(context));
   zxio_t* zxio = &(storage->io);
@@ -426,10 +422,6 @@ TEST(CreateWithAllocator, SynchronousDatagramSocket) {
   zx::eventpair event0, event1;
   ASSERT_OK(zx::eventpair::create(0, &event0, &event1));
 
-  auto node_info = fuchsia_io::wire::NodeInfoDeprecated::WithSynchronousDatagramSocket({
-      .event = std::move(event1),
-  });
-
   auto allocator = [](zxio_object_type_t type, zxio_storage_t** out_storage, void** out_context) {
     if (type != ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET) {
       return ZX_ERR_NOT_SUPPORTED;
@@ -440,18 +432,13 @@ TEST(CreateWithAllocator, SynchronousDatagramSocket) {
   };
 
   async::Loop control_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  zxio_tests::SynchronousDatagramSocketServer server;
+  zxio_tests::SynchronousDatagramSocketServer server(std::move(event1));
   fidl::BindServer(control_loop.dispatcher(), std::move(socket_server), &server);
   control_loop.StartThread("synchronous_datagram_socket_control_thread");
 
   void* context = nullptr;
-  ASSERT_OK(
-      zxio_create_with_allocator(fidl::ClientEnd<fuchsia_io::Node>(socket_client.TakeChannel()),
-                                 node_info, allocator, &context));
+  ASSERT_OK(zxio_create_with_allocator(socket_client.TakeChannel(), allocator, &context));
   ASSERT_NE(context, nullptr);
-
-  // The event in node_info should be consumed by zxio.
-  EXPECT_FALSE(node_info.synchronous_datagram_socket().event.is_valid());
 
   std::unique_ptr<zxio_storage_t> storage(static_cast<zxio_storage_t*>(context));
   zxio_t* zxio = &(storage->io);
@@ -478,13 +465,6 @@ TEST(CreateWithAllocator, DatagramSocket) {
 
   zx::socket socket, peer;
   ASSERT_OK(zx::socket::create(ZX_SOCKET_DATAGRAM, &socket, &peer));
-  zx_info_socket_t info;
-  ASSERT_OK(socket.get_info(ZX_INFO_SOCKET, &info, sizeof(info), nullptr, nullptr));
-
-  fuchsia_io::wire::DatagramSocket datagram_info{.socket = std::move(socket)};
-  fuchsia_io::wire::NodeInfoDeprecated node_info =
-      fuchsia_io::wire::NodeInfoDeprecated::WithDatagramSocket(
-          fidl::ObjectView<fuchsia_io::wire::DatagramSocket>::FromExternal(&datagram_info));
 
   auto allocator = [](zxio_object_type_t type, zxio_storage_t** out_storage, void** out_context) {
     if (type != ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET) {
@@ -496,18 +476,13 @@ TEST(CreateWithAllocator, DatagramSocket) {
   };
 
   async::Loop control_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  zxio_tests::DatagramSocketServer server;
+  zxio_tests::DatagramSocketServer server(std::move(socket));
   fidl::BindServer(control_loop.dispatcher(), std::move(socket_server), &server);
   control_loop.StartThread("datagram_socket_control_thread");
 
   void* context = nullptr;
-  ASSERT_OK(
-      zxio_create_with_allocator(fidl::ClientEnd<fuchsia_io::Node>(socket_client.TakeChannel()),
-                                 node_info, allocator, &context));
+  ASSERT_OK(zxio_create_with_allocator(socket_client.TakeChannel(), allocator, &context));
   ASSERT_NE(context, nullptr);
-
-  // The socket in node_info should be consumed by zxio.
-  EXPECT_FALSE(node_info.datagram_socket().socket.is_valid());
 
   std::unique_ptr<zxio_storage_t> storage(static_cast<zxio_storage_t*>(context));
   zxio_t* zxio = &(storage->io);
@@ -523,12 +498,6 @@ TEST(CreateWithAllocator, StreamSocket) {
 
   zx::socket socket, peer;
   ASSERT_OK(zx::socket::create(ZX_SOCKET_STREAM, &socket, &peer));
-  zx_info_socket_t info;
-  ASSERT_OK(socket.get_info(ZX_INFO_SOCKET, &info, sizeof(info), nullptr, nullptr));
-
-  fuchsia_io::wire::StreamSocket stream_info{.socket = std::move(socket)};
-  fuchsia_io::wire::NodeInfoDeprecated node_info =
-      fuchsia_io::wire::NodeInfoDeprecated::WithStreamSocket(std::move(stream_info));
 
   auto allocator = [](zxio_object_type_t type, zxio_storage_t** out_storage, void** out_context) {
     if (type != ZXIO_OBJECT_TYPE_STREAM_SOCKET) {
@@ -540,18 +509,13 @@ TEST(CreateWithAllocator, StreamSocket) {
   };
 
   async::Loop control_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  zxio_tests::StreamSocketServer server;
+  zxio_tests::StreamSocketServer server(std::move(socket));
   fidl::BindServer(control_loop.dispatcher(), std::move(socket_server), &server);
   control_loop.StartThread("stream_socket_control_thread");
 
   void* context = nullptr;
-  ASSERT_OK(
-      zxio_create_with_allocator(fidl::ClientEnd<fuchsia_io::Node>(socket_client.TakeChannel()),
-                                 node_info, allocator, &context));
+  ASSERT_OK(zxio_create_with_allocator(socket_client.TakeChannel(), allocator, &context));
   ASSERT_NE(context, nullptr);
-
-  // The socket in node_info should be consumed by zxio.
-  EXPECT_FALSE(node_info.stream_socket().socket.is_valid());
 
   std::unique_ptr<zxio_storage_t> storage(static_cast<zxio_storage_t*>(context));
   zxio_t* zxio = &(storage->io);
@@ -559,3 +523,5 @@ TEST(CreateWithAllocator, StreamSocket) {
   ASSERT_OK(zxio_close(zxio));
   control_loop.Shutdown();
 }
+
+}  // namespace

@@ -69,7 +69,7 @@ class SynchronousDatagramSocketTest : public zxtest::Test {
   zxio_t* zxio_{nullptr};
   zx::eventpair event0_, event1_;
   fidl::ClientEnd<fsocket::SynchronousDatagramSocket> client_end_;
-  zxio_tests::SynchronousDatagramSocketServer server_;
+  zxio_tests::SynchronousDatagramSocketServer server_{{}};
   async::Loop control_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 };
 
@@ -137,7 +137,7 @@ class StreamSocketTest : public zxtest::Test {
   zx_info_socket_t info_;
   zx::socket socket_, peer_;
   fidl::ClientEnd<fsocket::StreamSocket> client_end_;
-  zxio_tests::StreamSocketServer server_;
+  zxio_tests::StreamSocketServer server_{{}};
   async::Loop control_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 };
 
@@ -208,7 +208,7 @@ class DatagramSocketTest : public zxtest::Test {
   const zxio_datagram_prelude_size_t prelude_size_{};
   zx::socket socket_, peer_;
   fidl::ClientEnd<fsocket::DatagramSocket> client_end_;
-  zxio_tests::DatagramSocketServer server_;
+  zxio_tests::DatagramSocketServer server_{{}};
   async::Loop control_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 };
 
@@ -569,7 +569,7 @@ class RawSocketTest : public zxtest::Test {
   zxio_t* zxio_{nullptr};
   zx::eventpair event_client_, event_server_;
   fidl::ClientEnd<fsocket_raw::Socket> client_end_;
-  zxio_tests::RawSocketServer server_;
+  zxio_tests::RawSocketServer server_{{}};
   async::Loop control_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 };
 
@@ -632,7 +632,7 @@ class PacketSocketTest : public zxtest::Test {
   zxio_t* zxio_{nullptr};
   zx::eventpair event_client_, event_server_;
   fidl::ClientEnd<fsocket_packet::Socket> client_end_;
-  zxio_tests::PacketSocketServer server_;
+  zxio_tests::PacketSocketServer server_{{}};
   async::Loop control_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 };
 

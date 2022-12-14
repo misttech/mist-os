@@ -6,89 +6,6 @@ library fuchsia.io;
 
 using zx;
 
-@available(added=10)
-type UdpMetadataEncodingProtocolVersion = flexible enum : uint16 {
-    ZERO = 0;
-};
-
-/// Connection information.
-///
-/// Refer to [`Node.Describe`] and [`Node.OnOpen`] for usage.
-@deprecated("replaced by fuchsia.unknown/Queryable.Query")
-type NodeInfoDeprecated = strict resource union {
-    /// No protocol information was supplied by the connection.
-    1: service struct {};
-
-    /// The connection composes [`File`].
-    2: file @generated_name("FileObject") resource struct {
-        /// An optional event which transmits information about an object's readability
-        /// or writability. This event relays information about the underlying object, not
-        /// the capability granted to client: this event may be signalled "readable" on a
-        /// connection that does not have the capability to read.
-        ///
-        /// The "`FILE_SIGNAL_`" values may be observed on this event.
-        event zx.handle:<EVENT, optional>;
-
-        /// A placeholder for future stream support.
-        ///
-        /// Currently, servers are required not to send a handle in this field.
-        stream zx.handle:<STREAM, optional>;
-    };
-
-    /// The connection composes [`Directory`].
-    3: directory @generated_name("DirectoryObject") struct {};
-
-    4: reserved;
-
-    5: reserved;
-
-    6: reserved;
-
-    /// The connection composes [`fuchsia.hardware.pty/Device`].
-    7: tty resource struct {
-        event zx.handle:<EVENTPAIR, optional>;
-    };
-
-    8: reserved;
-
-    /// The connection composes [`fuchsia.posix.socket/SynchronousDatagramSocket`].
-    9: synchronous_datagram_socket resource struct {
-        /// See [`fuchsia.posix.socket.SynchronousDatagramSocket`] for details.
-        event zx.handle:<EVENTPAIR, zx.rights.TRANSFER | zx.rights.WAIT>;
-    };
-
-    /// The connection composes [`fuchsia.posix.socket/StreamSocket`].
-   10: stream_socket resource struct {
-        socket zx.handle:<SOCKET, zx.rights.TRANSFER | zx.RIGHTS_IO | zx.rights.WAIT | zx.rights.INSPECT>;
-    };
-
-    /// The connection composes [`fuchsia.posix.socket.raw/Socket`].
-   11: raw_socket resource struct {
-        /// See [`fuchsia.posix.socket.raw.Socket`] for details.
-        event zx.handle:<EVENTPAIR, zx.rights.TRANSFER | zx.rights.WAIT>;
-    };
-
-    /// The connection composes [`fuchsia.posix.socket.packet/Socket`].
-   12: packet_socket resource struct {
-        /// See [`fuchsia.posix.socket.packet.Socket`] for details.
-        event zx.handle:<EVENTPAIR, zx.rights.TRANSFER | zx.rights.WAIT>;
-    };
-
-    /// The connection composes  [`fuchsia.posix.socket/DatagramSocket`].
-   13: datagram_socket resource struct {
-        /// See [`fuchsia.posix.socket.DatagramSocket`] for details.
-        socket zx.handle:<SOCKET, zx.rights.TRANSFER | zx.RIGHTS_IO | zx.rights.WAIT | zx.rights.INSPECT>;
-        /// Size of the buffer used to receive Tx metadata.
-        tx_meta_buf_size uint64;
-        /// Size of the buffer used to receive Rx metadata.
-        rx_meta_buf_size uint64;
-        /// Identifies the version of the protocol used to encode and decode
-        /// metadata sent alongside payloads over the socket.
-        @available(added=10)
-        metadata_encoding_protocol_version UdpMetadataEncodingProtocolVersion;
-    };
-};
-
 /// The fields of 'attributes' which are used to update the Node are indicated
 /// by the 'flags' argument.
 type NodeAttributeFlags = strict bits : uint32 {
@@ -155,7 +72,29 @@ protocol Node1 {
     @selector("fuchsia.io1/Node.OnOpen")
     -> OnOpen(resource struct {
         s zx.status;
-        info NodeInfoDeprecated:optional;
+        info @generated_name("NodeInfoDeprecated") strict resource union {
+            /// No protocol information was supplied by the connection.
+            1: service struct {};
+
+            /// The connection composes [`File`].
+            2: file @generated_name("FileObject") resource struct {
+                /// An optional event which transmits information about an object's readability
+                /// or writability. This event relays information about the underlying object, not
+                /// the capability granted to client: this event may be signalled "readable" on a
+                /// connection that does not have the capability to read.
+                ///
+                /// The "`FILE_SIGNAL_`" values may be observed on this event.
+                event zx.handle:<EVENT, optional>;
+
+                /// A placeholder for future stream support.
+                ///
+                /// Currently, servers are required not to send a handle in this field.
+                stream zx.handle:<STREAM, optional>;
+            };
+
+            /// The connection composes [`Directory`].
+            3: directory @generated_name("DirectoryObject") struct {};
+        } :optional;
     });
 
     /// Acquires information about the node.

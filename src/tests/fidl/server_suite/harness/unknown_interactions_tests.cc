@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "fidl/fidl.serversuite/cpp/natural_types.h"
-#include "lib/fidl/cpp/unified_messaging.h"
+#include <fidl/fidl.serversuite/cpp/natural_types.h>
+#include <lib/zx/eventpair.h>
+
 #include "src/tests/fidl/server_suite/harness/harness.h"
 #include "src/tests/fidl/server_suite/harness/ordinals.h"
 

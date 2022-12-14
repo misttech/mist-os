@@ -90,12 +90,6 @@ pub enum Kind {
     Service,
     File,
     Directory,
-    Tty,
-    SynchronousDatagramSocket,
-    StreamSocket,
-    RawSocket,
-    PacketSocket,
-    DatagramSocket,
     Unknown,
 }
 
@@ -105,14 +99,6 @@ impl Kind {
             fio::NodeInfoDeprecated::Service(_) => Kind::Service,
             fio::NodeInfoDeprecated::File(_) => Kind::File,
             fio::NodeInfoDeprecated::Directory(_) => Kind::Directory,
-            fio::NodeInfoDeprecated::Tty(_) => Kind::Tty,
-            fio::NodeInfoDeprecated::SynchronousDatagramSocket(_) => {
-                Kind::SynchronousDatagramSocket
-            }
-            fio::NodeInfoDeprecated::StreamSocket(_) => Kind::StreamSocket,
-            fio::NodeInfoDeprecated::RawSocket(_) => Kind::RawSocket,
-            fio::NodeInfoDeprecated::PacketSocket(_) => Kind::PacketSocket,
-            fio::NodeInfoDeprecated::DatagramSocket(_) => Kind::DatagramSocket,
         }
     }
 

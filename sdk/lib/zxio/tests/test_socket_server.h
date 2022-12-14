@@ -16,8 +16,9 @@ namespace zxio_tests {
 class DatagramSocketServer final
     : public fidl::testing::WireTestBase<fuchsia_posix_socket::DatagramSocket> {
  public:
-  DatagramSocketServer() = default;
+  explicit DatagramSocketServer(zx::socket socket) : socket_(std::move(socket)) {}
 
+ private:
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) final {
     ADD_FAILURE() << "unexpected message received: " << name;
     completer.Close(ZX_ERR_NOT_SUPPORTED);
@@ -27,13 +28,33 @@ class DatagramSocketServer final
     completer.ReplySuccess();
     completer.Close(ZX_OK);
   }
+
+  void Query(QueryCompleter::Sync& completer) final {
+    const std::string_view kProtocol = fuchsia_posix_socket::wire::kDatagramSocketProtocolName;
+    // TODO(https://fxbug.dev/101890): avoid the const cast.
+    uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
+    completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
+  }
+
+  void Describe(DescribeCompleter::Sync& completer) final {
+    fidl::Arena alloc;
+    completer.Reply(fuchsia_posix_socket::wire::DatagramSocketDescribeResponse::Builder(alloc)
+                        .socket(std::move(socket_))
+                        .tx_meta_buf_size({})
+                        .rx_meta_buf_size({})
+                        .metadata_encoding_protocol_version({})
+                        .Build());
+  }
+
+  zx::socket socket_;
 };
 
 class PacketSocketServer final
     : public fidl::testing::WireTestBase<fuchsia_posix_socket_packet::Socket> {
  public:
-  PacketSocketServer() = default;
+  explicit PacketSocketServer(zx::eventpair event) : event_(std::move(event)) {}
 
+ private:
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) final {
     ADD_FAILURE() << "unexpected message received: " << name;
     completer.Close(ZX_ERR_NOT_SUPPORTED);
@@ -47,12 +68,29 @@ class PacketSocketServer final
     completer.ReplySuccess();
     completer.Close(ZX_OK);
   }
+
+  void Query(QueryCompleter::Sync& completer) final {
+    const std::string_view kProtocol = fuchsia_posix_socket_packet::wire::kSocketProtocolName;
+    // TODO(https://fxbug.dev/101890): avoid the const cast.
+    uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
+    completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
+  }
+
+  void Describe(DescribeCompleter::Sync& completer) final {
+    fidl::Arena alloc;
+    completer.Reply(fuchsia_posix_socket_packet::wire::SocketDescribeResponse::Builder(alloc)
+                        .event(std::move(event_))
+                        .Build());
+  }
+
+  zx::eventpair event_;
 };
 
 class RawSocketServer final : public fidl::testing::WireTestBase<fuchsia_posix_socket_raw::Socket> {
  public:
-  RawSocketServer() = default;
+  explicit RawSocketServer(zx::eventpair event) : event_(std::move(event)) {}
 
+ private:
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) final {
     ADD_FAILURE() << "unexpected message received: " << name;
     completer.Close(ZX_ERR_NOT_SUPPORTED);
@@ -66,13 +104,30 @@ class RawSocketServer final : public fidl::testing::WireTestBase<fuchsia_posix_s
     completer.ReplySuccess();
     completer.Close(ZX_OK);
   }
+
+  void Query(QueryCompleter::Sync& completer) final {
+    const std::string_view kProtocol = fuchsia_posix_socket_raw::wire::kSocketProtocolName;
+    // TODO(https://fxbug.dev/101890): avoid the const cast.
+    uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
+    completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
+  }
+
+  void Describe(DescribeCompleter::Sync& completer) final {
+    fidl::Arena alloc;
+    completer.Reply(fuchsia_posix_socket_raw::wire::SocketDescribeResponse::Builder(alloc)
+                        .event(std::move(event_))
+                        .Build());
+  }
+
+  zx::eventpair event_;
 };
 
 class StreamSocketServer final
     : public fidl::testing::WireTestBase<fuchsia_posix_socket::StreamSocket> {
  public:
-  StreamSocketServer() = default;
+  explicit StreamSocketServer(zx::socket socket) : socket_(std::move(socket)) {}
 
+ private:
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) final {
     ADD_FAILURE() << "unexpected message received: " << name;
     completer.Close(ZX_ERR_NOT_SUPPORTED);
@@ -82,13 +137,30 @@ class StreamSocketServer final
     completer.ReplySuccess();
     completer.Close(ZX_OK);
   }
+
+  void Query(QueryCompleter::Sync& completer) final {
+    const std::string_view kProtocol = fuchsia_posix_socket::wire::kStreamSocketProtocolName;
+    // TODO(https://fxbug.dev/101890): avoid the const cast.
+    uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
+    completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
+  }
+
+  void Describe(DescribeCompleter::Sync& completer) final {
+    fidl::Arena alloc;
+    completer.Reply(fuchsia_posix_socket::wire::StreamSocketDescribeResponse::Builder(alloc)
+                        .socket(std::move(socket_))
+                        .Build());
+  }
+
+  zx::socket socket_;
 };
 
 class SynchronousDatagramSocketServer final
     : public fidl::testing::WireTestBase<fuchsia_posix_socket::SynchronousDatagramSocket> {
  public:
-  SynchronousDatagramSocketServer() = default;
+  explicit SynchronousDatagramSocketServer(zx::eventpair event) : event_(std::move(event)) {}
 
+ private:
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) final {
     ADD_FAILURE() << "unexpected message received: " << name;
     completer.Close(ZX_ERR_NOT_SUPPORTED);
@@ -102,6 +174,24 @@ class SynchronousDatagramSocketServer final
     completer.ReplySuccess();
     completer.Close(ZX_OK);
   }
+
+  void Query(QueryCompleter::Sync& completer) final {
+    const std::string_view kProtocol =
+        fuchsia_posix_socket::wire::kSynchronousDatagramSocketProtocolName;
+    // TODO(https://fxbug.dev/101890): avoid the const cast.
+    uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
+    completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
+  }
+
+  void Describe(DescribeCompleter::Sync& completer) final {
+    fidl::Arena alloc;
+    completer.Reply(
+        fuchsia_posix_socket::wire::SynchronousDatagramSocketDescribeResponse::Builder(alloc)
+            .event(std::move(event_))
+            .Build());
+  }
+
+  zx::eventpair event_;
 };
 
 }  // namespace zxio_tests

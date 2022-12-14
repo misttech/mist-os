@@ -30,7 +30,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/lib/component"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
-	fidlio "fidl/fuchsia/io"
 	fidlnet "fidl/fuchsia/net"
 	"fidl/fuchsia/posix"
 	"fidl/fuchsia/posix/socket"
@@ -2537,7 +2536,7 @@ func (s *datagramSocketImpl) Describe(fidl.Context) (socket.DatagramSocketDescri
 	response.SetSocket(zx.Socket(handle))
 	response.SetTxMetaBufSize(uint64(udpTxPreludeSize))
 	response.SetRxMetaBufSize(uint64(udpRxPreludeSize))
-	response.SetMetadataEncodingProtocolVersion(fidlio.UdpMetadataEncodingProtocolVersionZero)
+	response.SetMetadataEncodingProtocolVersion(socket.UdpMetadataEncodingProtocolVersionZero)
 	return response, nil
 }
 

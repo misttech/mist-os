@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.posix.socket.packet/cpp/wire.h>
 #include <fidl/fuchsia.posix.socket.raw/cpp/wire.h>
 #include <fidl/fuchsia.posix.socket/cpp/wire.h>
+#include <fidl/fuchsia.unknown/cpp/wire.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/debuglog.h>
 #include <lib/zx/event.h>
@@ -246,7 +247,7 @@ zx_status_t zxio_create_with_nodeinfo(fidl::ClientEnd<fuchsia_io::Node> node,
                                       fuchsia_io::wire::NodeInfoDeprecated& node_info,
                                       zxio_storage_t* storage);
 
-zx::result<fuchsia_io::wire::NodeInfoDeprecated> zxio_get_nodeinfo(
-    fidl::AnyArena& alloc, const fidl::ClientEnd<fuchsia_io::Node>& node);
+zx::result<zxio_object_type_t> zxio_get_object_type(
+    const fidl::ClientEnd<fuchsia_unknown::Queryable>& queryable);
 
 #endif  // LIB_ZXIO_PRIVATE_H_

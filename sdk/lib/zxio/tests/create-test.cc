@@ -17,6 +17,8 @@
 #include "sdk/lib/zxio/tests/test_file_server_base.h"
 #include "sdk/lib/zxio/tests/test_node_server.h"
 
+namespace {
+
 TEST(Create, InvalidArgs) {
   ASSERT_STATUS(zxio_create(ZX_HANDLE_INVALID, nullptr), ZX_ERR_INVALID_ARGS);
 
@@ -651,31 +653,6 @@ TEST_F(CreateTtyTest, Tty) {
       << "pending is " << std::showbase << std::hex << pending;
 }
 
-TEST_F(CreateWithOnOpenTest, Tty) {
-  zx::eventpair event0, event1;
-
-  ASSERT_OK(zx::eventpair::create(0, &event0, &event1));
-  SendOnOpenEvent(fuchsia_io::wire::NodeInfoDeprecated::WithTty({
-      .event = std::move(event1),
-  }));
-
-  ASSERT_OK(zxio_create_with_on_open(TakeClientChannel().release(), storage()));
-
-  // Closing the zxio object should close our eventpair's peer event.
-  zx_signals_t pending = 0;
-  ASSERT_STATUS(event0.wait_one(0u, zx::time::infinite_past(), &pending), ZX_ERR_TIMED_OUT);
-  EXPECT_NE(pending & ZX_EVENTPAIR_PEER_CLOSED, ZX_EVENTPAIR_PEER_CLOSED)
-      << "pending is " << std::showbase << std::hex << pending;
-
-  StartServerThread();
-
-  ASSERT_OK(zxio_close(zxio()));
-
-  ASSERT_STATUS(event0.wait_one(0u, zx::time::infinite_past(), &pending), ZX_ERR_TIMED_OUT);
-  EXPECT_EQ(pending & ZX_EVENTPAIR_PEER_CLOSED, ZX_EVENTPAIR_PEER_CLOSED)
-      << "pending is " << std::showbase << std::hex << pending;
-}
-
 TEST(CreateVmofileWithTypeTest, File) {
   const uint64_t vmo_size = 5678;
   const uint64_t file_start_offset = 1234;
@@ -729,3 +706,5 @@ TEST(CreateVmoWithTypeWrapperTest, File) {
 
   ASSERT_OK(zxio_close(zxio));
 }
+
+}  // namespace

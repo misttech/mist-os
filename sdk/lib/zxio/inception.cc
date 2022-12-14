@@ -12,6 +12,7 @@
 #include "private.h"
 
 namespace fio = fuchsia_io;
+namespace funknown = fuchsia_unknown;
 
 zx_status_t zxio_create_with_allocator(zx::handle handle, zxio_storage_alloc allocator,
                                        void** out_context) {
@@ -25,13 +26,16 @@ zx_status_t zxio_create_with_allocator(zx::handle handle, zxio_storage_alloc all
   zxio_object_type_t type = ZXIO_OBJECT_TYPE_NONE;
   switch (handle_info.type) {
     case ZX_OBJ_TYPE_CHANNEL: {
-      fidl::Arena alloc;
-      fidl::ClientEnd<fio::Node> node(zx::channel(std::move(handle)));
-      zx::result node_info = zxio_get_nodeinfo(alloc, node);
-      if (node_info.is_error()) {
-        return node_info.status_value();
+      fidl::ClientEnd<funknown::Queryable> queryable(zx::channel(std::move(handle)));
+      zx::result type = zxio_get_object_type(queryable);
+      if (type.is_error()) {
+        return type.error_value();
       }
-      return zxio_create_with_allocator(std::move(node), node_info.value(), allocator, out_context);
+      zx_status_t status = allocator(type.value(), &storage, out_context);
+      if (status != ZX_OK || storage == nullptr) {
+        return ZX_ERR_NO_MEMORY;
+      }
+      return zxio_create_with_info(queryable.TakeChannel().release(), &handle_info, storage);
     }
     case ZX_OBJ_TYPE_LOG: {
       type = ZXIO_OBJECT_TYPE_DEBUGLOG;
@@ -59,32 +63,14 @@ zx_status_t zxio_create_with_allocator(fidl::ClientEnd<fuchsia_io::Node> node,
   zxio_storage_t* storage = nullptr;
   zxio_object_type_t type = ZXIO_OBJECT_TYPE_NONE;
   switch (info.Which()) {
-    case fio::wire::NodeInfoDeprecated::Tag::kDatagramSocket:
-      type = ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET;
-      break;
     case fio::wire::NodeInfoDeprecated::Tag::kDirectory:
       type = ZXIO_OBJECT_TYPE_DIR;
       break;
     case fio::wire::NodeInfoDeprecated::Tag::kFile:
       type = ZXIO_OBJECT_TYPE_FILE;
       break;
-    case fio::wire::NodeInfoDeprecated::Tag::kPacketSocket:
-      type = ZXIO_OBJECT_TYPE_PACKET_SOCKET;
-      break;
-    case fio::wire::NodeInfoDeprecated::Tag::kRawSocket:
-      type = ZXIO_OBJECT_TYPE_RAW_SOCKET;
-      break;
     case fio::wire::NodeInfoDeprecated::Tag::kService:
       type = ZXIO_OBJECT_TYPE_SERVICE;
-      break;
-    case fio::wire::NodeInfoDeprecated::Tag::kStreamSocket:
-      type = ZXIO_OBJECT_TYPE_STREAM_SOCKET;
-      break;
-    case fio::wire::NodeInfoDeprecated::Tag::kSynchronousDatagramSocket:
-      type = ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET;
-      break;
-    case fio::wire::NodeInfoDeprecated::Tag::kTty:
-      type = ZXIO_OBJECT_TYPE_TTY;
       break;
   }
   zx_status_t status = allocator(type, &storage, out_context);

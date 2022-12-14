@@ -24,7 +24,6 @@
 
 #include "private.h"
 
-namespace fio = fuchsia_io;
 namespace fsocket = fuchsia_posix_socket;
 namespace frawsocket = fuchsia_posix_socket_raw;
 namespace fpacketsocket = fuchsia_posix_socket_packet;
@@ -774,7 +773,7 @@ zx_status_t zxio_socket(zxio_service_connector service_connector, int domain, in
           }
           if (!(response.has_metadata_encoding_protocol_version() &&
                 response.metadata_encoding_protocol_version() ==
-                    fuchsia_io::UdpMetadataEncodingProtocolVersion::kZero)) {
+                    fsocket::UdpMetadataEncodingProtocolVersion::kZero)) {
             return ZX_ERR_NOT_SUPPORTED;
           }
           zx::socket& socket = response.socket();
