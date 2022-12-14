@@ -102,7 +102,7 @@ mod tests {
                     .capability(
                         Capability::directory("dev-dai")
                             .path(DAI_DEVICE_DIR)
-                            .rights(fio::RW_STAR_DIR),
+                            .rights(fio::R_STAR_DIR),
                     )
                     .from(&mock_dev)
                     .to(&mock_client),

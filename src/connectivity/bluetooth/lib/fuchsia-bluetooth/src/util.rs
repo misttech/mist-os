@@ -2,12 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
-use std::{
-    fs::{File, OpenOptions},
-    path::Path,
-};
-
 /// Macro to help build bluetooth fidl statuses.
 /// No Args is a success
 /// One Arg is the error type
@@ -37,9 +31,4 @@ macro_rules! bt_fidl_status {
             })),
         }
     };
-}
-
-/// Open a file with read and write permissions.
-pub fn open_rdwr<P: AsRef<Path>>(path: P) -> Result<File, Error> {
-    OpenOptions::new().read(true).write(true).open(path).map_err(Into::into)
 }

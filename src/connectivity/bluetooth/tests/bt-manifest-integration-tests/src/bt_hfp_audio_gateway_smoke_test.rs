@@ -202,9 +202,7 @@ async fn hfp_audio_gateway_v2_capability_routing() {
         .add_route(
             Route::new()
                 .capability(
-                    Capability::directory("dev-dai")
-                        .path("/dev/class/dai")
-                        .rights(fio::RW_STAR_DIR),
+                    Capability::directory("dev-dai").path("/dev/class/dai").rights(fio::R_STAR_DIR),
                 )
                 .from(&mock_dev)
                 .to(&hfp),

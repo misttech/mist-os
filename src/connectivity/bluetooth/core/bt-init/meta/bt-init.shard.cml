@@ -55,7 +55,7 @@
             directory: "dev-bt-host",
             from: "parent",
             to: [ "#bt-gap" ],
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
         {
             protocol: [

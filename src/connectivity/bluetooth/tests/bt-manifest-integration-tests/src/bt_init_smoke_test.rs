@@ -262,7 +262,7 @@ async fn bt_init_component_topology() {
                 .capability(
                     Capability::directory("dev-bt-host")
                         .path("/dev/class/bt-host")
-                        .rights(fio::RW_STAR_DIR),
+                        .rights(fio::R_STAR_DIR),
                 )
                 .from(&mock_dev)
                 .to(&bt_init),

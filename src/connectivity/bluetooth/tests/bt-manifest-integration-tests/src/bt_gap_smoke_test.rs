@@ -259,7 +259,7 @@ async fn bt_gap_component_topology() {
                 .capability(
                     Capability::directory("dev-bt-host")
                         .path("/dev/class/bt-host")
-                        .rights(fio::RW_STAR_DIR),
+                        .rights(fio::R_STAR_DIR),
                 )
                 .from(&mock_dev_child)
                 .to(&bt_gap),

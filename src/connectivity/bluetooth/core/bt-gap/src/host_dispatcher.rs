@@ -787,8 +787,8 @@ impl HostDispatcher {
     /// Adds a bt-host device to the host dispatcher. Called by the watch_hosts device watcher
     pub async fn add_host_by_path(&self, host_path: &Path) -> Result<(), Error> {
         let node = self.state.read().inspect.hosts().create_child(unique_name("device_"));
-        let host_dev = bt::util::open_rdwr(host_path)
-            .context(format!("failed to open {:?} device file", host_path))?;
+        let host_dev =
+            File::open(host_path).context(format!("failed to open {:?} device file", host_path))?;
         let device_topo = fdio::device_get_topo_path(&host_dev)?;
         info!("Adding Adapter: {:?} (topology: {:?})", host_path, device_topo);
         let host_device = init_host(host_path, node).await?;

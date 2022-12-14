@@ -21,7 +21,7 @@
     use: [
         {
             directory: "dev-dai",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/dai",
         },
         {

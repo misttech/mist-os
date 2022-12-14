@@ -29,7 +29,7 @@
     use: [
         {
             directory: "dev-bt-host",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/bt-host",
         },
         {

@@ -244,9 +244,7 @@ async fn add_mock_dai_devices(builder: &RealmBuilder) {
         .add_route(
             Route::new()
                 .capability(
-                    Capability::directory("dev-dai")
-                        .path("/dev/class/dai")
-                        .rights(fio::RW_STAR_DIR),
+                    Capability::directory("dev-dai").path("/dev/class/dai").rights(fio::R_STAR_DIR),
                 )
                 .from(&mock_dai_devices)
                 .to(Ref::child(HFP_AG_MONIKER)),

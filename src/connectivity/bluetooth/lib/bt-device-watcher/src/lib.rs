@@ -219,7 +219,7 @@ impl DeviceWatcher {
         let file = fuchsia_fs::open_file(
             &self.watched_dir,
             relative_path.as_path(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
         )?;
         let file = fdio::create_fd(
             file.into_channel()
@@ -273,7 +273,7 @@ mod tests {
         let dev_dir = fuchsia_fs::directory::open_directory(
             realm.root.get_exposed_dir(),
             "dev",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
         )
         .await?;
         // Block until the test control device is ready.
