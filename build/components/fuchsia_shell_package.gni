@@ -50,10 +50,12 @@ template("fuchsia_shell_package") {
     fuchsia_package(target_name) {
       forward_variables_from(invoker,
                              [
-                               "shell_commands",
                                "data_deps",
                                "deps",
                                "disable_elf_binaries_checks",
+                               "renameable_subpackages",
+                               "shell_commands",
+                               "subpackages",
                                "testonly",
                                "visibility",
                              ])

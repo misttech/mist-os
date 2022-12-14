@@ -9,10 +9,5 @@
             "-c",
             "ls && ls",
         ],
-        mounts: [
-            "/:ext4:data/system.img",
-            "/dev:devtmpfs",
-            "/tmp:tmpfs",
-        ],
     },
 }

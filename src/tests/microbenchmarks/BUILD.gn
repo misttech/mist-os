@@ -209,12 +209,14 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
     testonly = true
 
     galaxy = "//src/proc/bin/galaxies/starmium_test"
-    name = get_label_info(galaxy, "name")
-    dir = get_label_info(galaxy, "dir")
-    deps = [
-      ":starnix_microbenchmarks_component",
-      "${dir}:${name}_deps",
+    renameable_subpackages = [
+      {
+        name = "galaxy"
+        package = galaxy
+      },
     ]
+
+    deps = [ ":starnix_microbenchmarks_component" ]
 
     # This package intentionally contains many non-Fuchia ELF binaries that
     # are not under /data/, and some of them are even unstripped, so disable

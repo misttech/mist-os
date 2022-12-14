@@ -15,7 +15,6 @@ use {
     rand::Rng,
     runner::component::ComponentNamespace,
     std::convert::TryInto,
-    url::Url,
 };
 
 /// The name of the collection in which the starnix runner is instantiated.
@@ -68,7 +67,7 @@ pub async fn handle_suite_requests(
                 let mut program = program.clone();
                 let runner_name = format!("starnix-runner-{}", rand::thread_rng().gen::<u64>());
                 let (starnix_runner, realm) =
-                    instantiate_runner_in_realm(&namespace, &runner_name, test_url).await?;
+                    instantiate_runner_in_realm(&namespace, &runner_name).await?;
 
                 if let Some(test_args) = options.arguments {
                     if let Some(program) = &mut program {
@@ -149,10 +148,8 @@ async fn open_exposed_directory(
 async fn instantiate_runner_in_realm(
     namespace: &ComponentNamespace,
     runner_name: &str,
-    runner_url: &str,
 ) -> Result<(frunner::ComponentRunnerProxy, fcomponent::RealmProxy), Error> {
-    let mut runner_url = Url::parse(runner_url)?;
-    runner_url.set_fragment(Some("meta/starnix_runner.cm"));
+    let runner_url = "galaxy#meta/starnix_runner.cm";
 
     let realm = get_realm(namespace)?;
     realm

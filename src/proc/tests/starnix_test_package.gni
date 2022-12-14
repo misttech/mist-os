@@ -17,13 +17,13 @@ template("starnix_test_package") {
     galaxy = invoker.galaxy
     forward_variables_from(invoker, "*")
 
-    if (!defined(invoker.deps)) {
-      deps = []
-    }
     if (target_cpu == "x64") {
-      name = get_label_info(galaxy, "name")
-      dir = get_label_info(galaxy, "dir")
-      deps += [ "${dir}:${name}_deps" ]
+      renameable_subpackages = [
+        {
+          name = "galaxy"
+          package = galaxy
+        },
+      ]
     }
 
     # This package intentionally contains many non-Fuchia ELF binaries that
