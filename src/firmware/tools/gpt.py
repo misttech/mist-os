@@ -19,7 +19,7 @@ from typing import Iterator, List, Optional
 
 # A regexp to capture GUIDs as reported by `sgdisk`.
 # Example: 4B7A23A5-E9D1-456A-BACB-78B23D855324.
-_GUID_RE = r'[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}'
+_GUID_RE = r"[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"
 
 
 @dataclasses.dataclass
@@ -39,20 +39,20 @@ class Partition():
 @contextlib.contextmanager
 def gen_disk_image(source_gpt: str, image_size_mib: int) -> Iterator[str]:
     """ Generates empty disk image using the given source GPT."""
-    print('Generating disk image')
+    print("Generating disk image")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         image_path = os.path.join(temp_dir, "disk_image")
 
-        with open(image_path, 'wb') as file:
+        with open(image_path, "wb") as file:
             file.truncate(image_size_mib * 1024 * 1024)
 
         subprocess.run(
-            ['sgdisk', f'--load-backup={source_gpt}', image_path],
+            ["sgdisk", f"--load-backup={source_gpt}", image_path],
             capture_output=True,
             check=True)
         yield image_path
-        print('Deleting disk image')
+        print("Deleting disk image")
 
 
 # This function is a bit brittle as it depends heavily on `sgdisk` output format
@@ -80,11 +80,11 @@ def get_partitions(disk_file: str) -> List[Partition]:
     # Here we just care about the index, which will be the first entry on lines
     # that start with a number.
     output = subprocess.run(
-        ['sgdisk', disk_file, '--print'],
+        ["sgdisk", disk_file, "--print"],
         text=True,
         capture_output=True,
         check=True).stdout
-    indices = re.findall(r'^\s*(\d+)\s+', output, re.MULTILINE)
+    indices = re.findall(r"^\s*(\d+)\s+", output, re.MULTILINE)
 
     partitions = []
     for index in indices:
@@ -101,13 +101,13 @@ def get_partitions(disk_file: str) -> List[Partition]:
         # We could potentially query all partitions in a single command, but
         # the extra delay is negligible and this is simpler.
         output = subprocess.run(
-            ['sgdisk', disk_file, '--info', index],
+            ["sgdisk", disk_file, "--info", index],
             text=True,
             capture_output=True,
             check=True).stdout
 
         def get_param(pattern):
-            return re.search(f'^{pattern}.*?$', output, re.MULTILINE).group(1)
+            return re.search(f"^{pattern}.*?$", output, re.MULTILINE).group(1)
 
         partitions.append(
             Partition(
@@ -172,45 +172,45 @@ def save_gpt(
     if flashing_gpt_file:
         subprocess.run(
             [
-                'dd', f'if={disk_file}', f'of={flashing_gpt_file}',
-                f'bs={blk_size}', 'count=34'
+                "dd", f"if={disk_file}", f"of={flashing_gpt_file}",
+                f"bs={blk_size}", "count=34"
             ],
             capture_output=True,
             check=True)
     if primary_gpt_file:
         subprocess.run(
             [
-                'dd', f'if={disk_file}', f'of={primary_gpt_file}',
-                f'bs={blk_size}', 'skip=1', 'count=33'
+                "dd", f"if={disk_file}", f"of={primary_gpt_file}",
+                f"bs={blk_size}", "skip=1", "count=33"
             ],
             capture_output=True,
             check=True)
     if secondary_gpt_file:
         subprocess.run(
             [
-                'dd', f'if={disk_file}', f'of={secondary_gpt_file}',
-                f'bs={blk_size}', f'skip={image_size_lba-33}', 'count=33'
+                "dd", f"if={disk_file}", f"of={secondary_gpt_file}",
+                f"bs={blk_size}", f"skip={image_size_lba-33}", "count=33"
             ],
             capture_output=True,
             check=True)
     if combined_gpt_file:
         subprocess.run(
             [
-                'dd', f'if={disk_file}', f'of={combined_gpt_file}',
-                f'bs={blk_size}', 'skip=1', 'count=33'
+                "dd", f"if={disk_file}", f"of={combined_gpt_file}",
+                f"bs={blk_size}", "skip=1", "count=33"
             ],
             capture_output=True,
             check=True)
         subprocess.run(
             [
-                'dd',
-                f'if={disk_file}',
-                f'of={combined_gpt_file}',
-                f'bs={blk_size}',
-                f'skip={image_size_lba-33}',
-                'count=33',
-                'oflag=append',
-                'conv=notrunc',
+                "dd",
+                f"if={disk_file}",
+                f"of={combined_gpt_file}",
+                f"bs={blk_size}",
+                f"skip={image_size_lba-33}",
+                "count=33",
+                "oflag=append",
+                "conv=notrunc",
             ],
             capture_output=True,
             check=True)
@@ -219,7 +219,7 @@ def save_gpt(
 def delete_part(disk_file: str, part_num: int):
     """Delete a partition from the GPT"""
     subprocess.run(
-        ['sgdisk', '--delete', f'{part_num}', disk_file],
+        ["sgdisk", "--delete", f"{part_num}", disk_file],
         capture_output=True,
         check=True)
 
@@ -236,25 +236,25 @@ def new_part(disk_file: str, part_num: int, part: Partition):
     # don't depend on it.
     subprocess.run(
         [
-            'sgdisk', '-a', '1', '--new',
-            f'{part_num}:{part.first_lba}:{part.last_lba}', disk_file
+            "sgdisk", "-a", "1", "--new",
+            f"{part_num}:{part.first_lba}:{part.last_lba}", disk_file
         ],
         capture_output=True,
         check=True)
 
     subprocess.run(
-        ['sgdisk', '--change-name', f'{part_num}:{part.name}', disk_file],
+        ["sgdisk", "--change-name", f"{part_num}:{part.name}", disk_file],
         capture_output=True,
         check=True)
     subprocess.run(
-        ['sgdisk', '--typecode', f'{part_num}:{part.type_guid}', disk_file],
+        ["sgdisk", "--typecode", f"{part_num}:{part.type_guid}", disk_file],
         capture_output=True,
         check=True)
 
     # If we don't have a specific UUID to use, "R" creates a random one.
     guid = part.unique_guid or "R"
     subprocess.run(
-        ['sgdisk', '--partition-guid', f'{part_num}:{guid}', disk_file],
+        ["sgdisk", "--partition-guid", f"{part_num}:{guid}", disk_file],
         capture_output=True,
         check=True)
 
@@ -273,7 +273,7 @@ def gpt_rename_part(
         last_lba=orig_part.last_lba,
         size=orig_part.size,
         type_guid=new_part_type_guid or orig_part.type_guid,
-        unique_guid='',  #generate new
+        unique_guid="",  #generate new
         attr_flags=orig_part.attr_flags,
     )
 
