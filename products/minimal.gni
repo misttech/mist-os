@@ -126,6 +126,11 @@ product_bootfs_labels += [
   "//src/sys/base-resolver:bootfs",
 ]
 
+product_bootfs_labels -= [
+  # Remove diagnostics tooling (iquery).
+  "//bundles:diagnostics-eng",
+]
+
 # Set the SWD policy for core.gni, details can be found in
 # //build/security/policies_swd.gni.
 policy_labels.swd = "unrestricted"

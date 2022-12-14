@@ -153,6 +153,12 @@ with Inspect included, see the following [example test driver][example_test_driv
   - The device inspect file is hosted in `class/<protocol>/xxx.inspect`
   - Check the inspect data using `iquery`
 
+    Important: if you are working in a product other than `bringup` please
+    read [this section](#include-iquery-bootfs) to learn how to include
+    `iquery` in bootfs. If you are working on a product in which networking and
+    `ffx` are available, you can use `ffx inspect` instead of `iquery` without
+    the need of including `iquery` in `bootfs`.
+
     ```
     fx iquery show bootstrap/driver_manager --file class/ethernet/000.inspect
 
@@ -162,13 +168,25 @@ with Inspect included, see the following [example test driver][example_test_driv
 
 1. Run `fx snapshot` and check if your inspect data is present in `inspect.json`. Note that the
 feedback component is not part of bringup, so taking snapshots is not very useful when working
-only with a bringup build. For these situations, prefer using `iquery` which is available in bootfs.
+only with a bringup build. For these situations, prefer using `iquery` which is available in bootfs
+(in bringup, if you are working in other product see [below](#include-iquery-bootfs).
 
   Note: Don’t forget to write tests for the inspect code. You can look at the inspect
   [codelab][inspect_codelab] or [the driver host inspect test][driver_host_inspect_test] for some
   examples.
 
 
+## Include `iquery` in bootfs {#include-iquery-bootfs}
+
+The `bringup` product already includes `iquery` in bootfs, so if you are working
+with that product, you can skip this section.
+
+If you are working on some other product and need to have `iquery` available in
+bootfs, then add the following to your `fx set`:
+
+```
+fx set core.x64 --args='product_bootfs_labels+=["//bundles:diagnostics-eng"]'
+```
 
 [selectors]: https://docs.google.com/document/d/1gI3FizKlTlth9DL8l7Ja9f7xuY_GKDffa5x1uZesLMY/edit
 [inspect_overview]: /docs/development/diagnostics/inspect/README.md
