@@ -10,6 +10,7 @@
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/zx/channel.h>
+#include <lib/zx/clock.h>
 #include <lib/zx/fifo.h>
 #include <lib/zx/vmo.h>
 #include <stdio.h>
@@ -21,9 +22,9 @@
 #include <zircon/time.h>
 #include <zircon/types.h>
 
-#include <ramdevice-client/ramdisk.h>
-
 #include "src/lib/storage/block_client/cpp/client.h"
+#include "src/lib/storage/block_client/cpp/remote_block_device.h"
+#include "src/storage/testing/ram_disk.h"
 
 static uint64_t number(const char* str) {
   char* end;
@@ -47,146 +48,129 @@ static uint64_t number(const char* str) {
   return m * n;
 }
 
-static void bytes_per_second(uint64_t bytes, uint64_t nanos) {
-  double s = (static_cast<double>(nanos)) / (static_cast<double>(1000000000));
-  double rate = (static_cast<double>(bytes)) / s;
-
-  const char* unit = "B";
-  if (rate > 1024 * 1024) {
-    unit = "MB";
-    rate /= 1024 * 1024;
-  } else if (rate > 1024) {
-    unit = "KB";
-    rate /= 1024;
-  }
-  fprintf(stderr, "%g %s/s\n", rate, unit);
-}
-
-static zx_duration_t iotime_posix(int is_read, int fd, size_t total, size_t bufsz) {
-  void* buffer = malloc(bufsz);
-  if (buffer == nullptr) {
+static zx::duration iotime_posix(int is_read, int fd, size_t total_io_size, size_t buffer_size) {
+  std::unique_ptr<unsigned char[]> buffer(new unsigned char[buffer_size]);
+  if (buffer.get() == nullptr) {
     fprintf(stderr, "error: out of memory\n");
-    return ZX_TIME_INFINITE;
+    return zx::duration::infinite();
   }
 
-  zx_time_t t0 = zx_clock_get_monotonic();
-  size_t n = total;
+  const zx::time t0 = zx::clock::get_monotonic();
+  size_t bytes_remaining = total_io_size;
   const char* fn_name = is_read ? "read" : "write";
-  while (n > 0) {
-    size_t xfer = (n > bufsz) ? bufsz : n;
-    ssize_t r = is_read ? read(fd, buffer, xfer) : write(fd, buffer, xfer);
+  while (bytes_remaining > 0) {
+    size_t transfer_size = std::min(buffer_size, bytes_remaining);
+    ssize_t r =
+        is_read ? read(fd, buffer.get(), transfer_size) : write(fd, buffer.get(), transfer_size);
     if (r < 0) {
       fprintf(stderr, "error: %s() error %d\n", fn_name, errno);
-      return ZX_TIME_INFINITE;
+      return zx::duration::infinite();
     }
-    if (static_cast<size_t>(r) != xfer) {
-      fprintf(stderr, "error: %s() %zu of %zu bytes processed\n", fn_name, r, xfer);
-      return ZX_TIME_INFINITE;
+    if (static_cast<size_t>(r) != transfer_size) {
+      fprintf(stderr, "error: %s() %zu of %zu bytes processed\n", fn_name, r, transfer_size);
+      return zx::duration::infinite();
     }
-    n -= xfer;
+    bytes_remaining -= transfer_size;
   }
-  zx_time_t t1 = zx_clock_get_monotonic();
+  const zx::time t1 = zx::clock::get_monotonic();
 
-  return zx_time_sub_time(t1, t0);
+  return t1 - t0;
 }
 
-static zx_duration_t iotime_block(int is_read, int fd, size_t total, size_t bufsz) {
-  if ((total % 4096) || (bufsz % 4096)) {
-    fprintf(stderr, "error: total and buffer size must be multiples of 4K\n");
-    return ZX_TIME_INFINITE;
+static zx::duration iotime_block(int is_read, int fd, size_t total_io_size, size_t buffer_size) {
+  if ((total_io_size % 4096) || (buffer_size % 4096)) {
+    fprintf(stderr, "error: total_io_size and buffer_size must be multiples of 4K\n");
+    return zx::duration::infinite();
   }
 
-  return iotime_posix(is_read, fd, total, bufsz);
-}
-
-static zx_duration_t iotime_fifo(char* dev, int is_read, int fd, size_t total, size_t bufsz) {
-  zx::vmo vmo;
-  if (zx_status_t status = zx::vmo::create(bufsz, 0, &vmo); status != ZX_OK) {
-    fprintf(stderr, "error: out of memory: %s\n", zx_status_get_string(status));
-    return ZX_TIME_INFINITE;
+  std::unique_ptr<unsigned char[]> buffer(new unsigned char[buffer_size]);
+  if (buffer.get() == nullptr) {
+    fprintf(stderr, "error: out of memory\n");
+    return zx::duration::infinite();
   }
 
   fdio_cpp::UnownedFdioCaller disk_connection(fd);
   fidl::UnownedClientEnd channel = disk_connection.borrow_as<fuchsia_hardware_block::Block>();
 
+  size_t bytes_remaining = total_io_size;
+  const zx::time t0 = zx::clock::get_monotonic();
+  while (bytes_remaining > 0) {
+    size_t transfer_size = std::min(buffer_size, bytes_remaining);
+
+    if (is_read) {
+      zx_status_t status = block_client::SingleReadBytes(channel, buffer.get(), transfer_size,
+                                                         total_io_size - bytes_remaining);
+      if (status != ZX_OK) {
+        fprintf(stderr, "error: failed SingleReadBytes() call: %s\n", zx_status_get_string(status));
+        return zx::duration::infinite();
+      }
+    } else {
+      zx_status_t status = block_client::SingleWriteBytes(channel, buffer.get(), transfer_size,
+                                                          total_io_size - bytes_remaining);
+      if (status != ZX_OK) {
+        fprintf(stderr, "error: failed SingleWriteBytes() call: %s\n",
+                zx_status_get_string(status));
+        return zx::duration::infinite();
+      }
+    }
+
+    bytes_remaining -= transfer_size;
+  }
+  const zx::time t1 = zx::clock::get_monotonic();
+
+  return t1 - t0;
+}
+
+static zx::duration iotime_fifo(const char* dev, int is_read, int fd, size_t total_io_size,
+                                size_t buffer_size) {
+  zx::result block_device = block_client::RemoteBlockDevice::Create(fd);
+  if (block_device.is_error()) {
+    fprintf(stderr, "error: cannot create remote block device for '%s': %s\n", dev,
+            block_device.status_string());
+    return zx::duration::infinite();
+  }
+
   fuchsia_hardware_block::wire::BlockInfo info;
-  {
-    const fidl::WireResult result = fidl::WireCall(channel)->GetInfo();
-    if (!result.ok()) {
-      fprintf(stderr, "error: cannot get info for '%s':%s\n", dev,
-              result.FormatDescription().c_str());
-      return ZX_TIME_INFINITE;
-    }
-    const fit::result response = result.value();
-    if (response.is_error()) {
-      fprintf(stderr, "error: cannot get info for '%s':%s\n", dev,
-              zx_status_get_string(response.error_value()));
-      return ZX_TIME_INFINITE;
-    }
-    info = response.value()->info;
+  if (zx_status_t status = block_device->BlockGetInfo(&info); status != ZX_OK) {
+    fprintf(stderr, "error: failed BlockGetInfo() call for '%s':%s\n", dev,
+            zx_status_get_string(status));
+    return zx::duration::infinite();
   }
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Session>();
-  if (endpoints.is_error()) {
-    fprintf(stderr, "error: cannot create endpoints for '%s': %s\n", dev,
-            endpoints.status_string());
-    return ZX_TIME_INFINITE;
-  }
-  auto& [session, server] = endpoints.value();
-  if (fidl::Status result = fidl::WireCall(channel)->OpenSession(std::move(server)); !result.ok()) {
-    fprintf(stderr, "error: cannot open session for '%s': %s\n", dev,
-            result.FormatDescription().c_str());
-    return ZX_TIME_INFINITE;
+  zx::vmo vmo;
+  if (zx_status_t status = zx::vmo::create(buffer_size, 0, &vmo); status != ZX_OK) {
+    fprintf(stderr, "error: out of memory: %s\n", zx_status_get_string(status));
+    return zx::duration::infinite();
   }
 
-  zx::fifo fifo;
-  {
-    fidl::WireResult result = fidl::WireCall(session)->GetFifo();
-    if (!result.ok()) {
-      fprintf(stderr, "error: cannot get fifo for '%s':%s\n", dev,
-              result.FormatDescription().c_str());
-      return ZX_TIME_INFINITE;
-    }
-    const fit::result response = result.value();
-    if (response.is_error()) {
-      fprintf(stderr, "error: cannot get fifo for '%s':%s\n", dev,
-              zx_status_get_string(response.error_value()));
-      return ZX_TIME_INFINITE;
-    }
-    fifo = std::move(response.value()->fifo);
+  storage::Vmoid vmoid;
+  if (zx_status_t status = block_device->BlockAttachVmo(vmo, &vmoid); status != ZX_OK) {
+    fprintf(stderr, "error: cannot attach vmo for '%s':%s\n", dev, zx_status_get_string(status));
+    return zx::duration::infinite();
   }
 
-  block_client::Client client(std::move(session), std::move(fifo));
+  block_fifo_request_t request = {
+      .opcode = static_cast<uint32_t>(is_read ? BLOCKIO_READ : BLOCKIO_WRITE),
+      .reqid = 0,
+      .group = 0,
+      .vmoid = vmoid.get(),
+      .vmo_offset = 0,
+  };
 
-  zx::result vmoid = client.RegisterVmo(vmo);
-  if (vmoid.is_error()) {
-    fprintf(stderr, "error: cannot register vmo for '%s':%s\n", dev, vmoid.status_string());
-    return ZX_TIME_INFINITE;
-  }
-
-  groupid_t group = 0;
-
-  zx_time_t t0 = zx_clock_get_monotonic();
-  size_t n = total;
-  while (n > 0) {
-    size_t xfer = (n > bufsz) ? bufsz : n;
-    block_fifo_request_t request = {
-        .opcode = static_cast<uint32_t>(is_read ? BLOCKIO_READ : BLOCKIO_WRITE),
-        .reqid = 0,
-        .group = group,
-        .vmoid = vmoid.value().TakeId(),
-        .length = static_cast<uint32_t>(xfer / info.block_size),
-        .vmo_offset = 0,
-        .dev_offset = (total - n) / info.block_size,
-    };
-    if (zx_status_t status = client.Transaction(&request, 1); status != ZX_OK) {
+  size_t bytes_remaining = total_io_size;
+  const zx::time t0 = zx::clock::get_monotonic();
+  while (bytes_remaining > 0) {
+    size_t transfer_size = std::min(buffer_size, bytes_remaining);
+    request.length = static_cast<uint32_t>(transfer_size / info.block_size);
+    request.dev_offset = (total_io_size - bytes_remaining) / info.block_size;
+    if (zx_status_t status = block_device->FifoTransaction(&request, 1); status != ZX_OK) {
       fprintf(stderr, "error: block_fifo_txn error %s\n", zx_status_get_string(status));
-      return ZX_TIME_INFINITE;
+      return zx::duration::infinite();
     }
-    n -= xfer;
+    bytes_remaining -= transfer_size;
   }
-  zx_time_t t1 = zx_clock_get_monotonic();
-  return zx_time_sub_time(t1, t0);
+  const zx::time t1 = zx::clock::get_monotonic();
+  return t1 - t0;
 }
 
 static int usage() {
@@ -202,69 +186,81 @@ int main(int argc, char** argv) {
     return usage();
   }
 
-  int is_read = !strcmp(argv[1], "read");
-  size_t total = number(argv[4]);
-  size_t bufsz = number(argv[5]);
+  const std::string io_type(argv[1]);
+  const std::string mode(argv[2]);
+  const std::string device(argv[3]);
+  const size_t total_io_size = number(argv[4]);
+  const size_t buffer_size = number(argv[5]);
 
-  int r = -1;
-  ramdisk_client_t* ramdisk = nullptr;
-  int fd;
-  if (!strcmp(argv[3], "--ramdisk")) {
-    if (strcmp(argv[2], "block") != 0) {
+  const bool is_read = io_type == "read";
+  if (!is_read && io_type != "write") {
+    fprintf(stderr, "io type can only be 'read' or 'write'. got: %s\n", io_type.c_str());
+    return usage();
+  }
+
+  storage::RamDisk ramdisk;
+  fbl::unique_fd fd;
+  if (device == "--ramdisk") {
+    if (mode != "block") {
       fprintf(stderr, "ramdisk only supported for block\n");
-      goto done;
+      return EXIT_FAILURE;
     }
-    zx_status_t status = ramdisk_create(512, total / 512, &ramdisk);
-    if (status != ZX_OK) {
-      fprintf(stderr, "error: cannot create %zu-byte ramdisk: %s\n", total,
-              zx_status_get_string(status));
-      goto done;
+    constexpr size_t kBlockSizeBytes = 512;
+    zx::result result = storage::RamDisk::Create(kBlockSizeBytes, total_io_size / kBlockSizeBytes);
+    if (result.is_error()) {
+      fprintf(stderr, "error: cannot create %zu-byte ramdisk: %s\n", total_io_size,
+              result.status_string());
+      return EXIT_FAILURE;
     }
-    zx_handle_t handle = ramdisk_get_block_interface(ramdisk);
+    ramdisk = std::move(result.value());
+    zx_handle_t handle = ramdisk_get_block_interface(ramdisk.client());
     fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block(handle);
     // TODO(https://fxbug.dev/112484): this relies on multiplexing.
     zx::result cloned = component::Clone(block, component::AssumeProtocolComposesNode);
     if (cloned.is_error()) {
       fprintf(stderr, "error: cannot create ramdisk fd: %s\n", cloned.status_string());
-      goto done;
+      return EXIT_FAILURE;
     }
-    if (zx_status_t status = fdio_fd_create(cloned.value().TakeChannel().release(), &fd);
+    if (zx_status_t status =
+            fdio_fd_create(cloned.value().TakeChannel().release(), fd.reset_and_get_address());
         status != ZX_OK) {
       fprintf(stderr, "error: cannot create ramdisk fd: %s\n", zx_status_get_string(status));
-      goto done;
+      return EXIT_FAILURE;
     }
   } else {
-    fd = open(argv[3], is_read ? O_RDONLY : O_WRONLY);
-    if (fd < 0) {
-      fprintf(stderr, "error: cannot open '%s': %s\n", argv[3], strerror(errno));
-      goto done;
+    fd.reset(open(device.c_str(), is_read ? O_RDONLY : O_WRONLY));
+    if (fd.get() < 0) {
+      fprintf(stderr, "error: cannot open '%s': %s\n", device.c_str(), strerror(errno));
+      return EXIT_FAILURE;
     }
   }
 
-  zx_duration_t res;
-  if (!strcmp(argv[2], "posix")) {
-    res = iotime_posix(is_read, fd, total, bufsz);
-  } else if (!strcmp(argv[2], "block")) {
-    res = iotime_block(is_read, fd, total, bufsz);
-  } else if (!strcmp(argv[2], "fifo")) {
-    res = iotime_fifo(argv[3], is_read, fd, total, bufsz);
+  zx::duration io_duration;
+  if (mode == "posix") {
+    io_duration = iotime_posix(is_read, fd.get(), total_io_size, buffer_size);
+  } else if (mode == "block") {
+    io_duration = iotime_block(is_read, fd.get(), total_io_size, buffer_size);
+  } else if (mode == "fifo") {
+    io_duration = iotime_fifo(device.c_str(), is_read, fd.get(), total_io_size, buffer_size);
   } else {
-    fprintf(stderr, "error: unknown mode '%s'\n", argv[2]);
-    goto done;
+    fprintf(stderr, "error: unsupported mode '%s'\n", mode.c_str());
+    return EXIT_FAILURE;
   }
 
-  if (res != ZX_TIME_INFINITE) {
-    fprintf(stderr, "%s %zu bytes in %zu ns: ", is_read ? "read" : "write", total, res);
-    bytes_per_second(total, res);
-    r = 0;
-    goto done;
-  } else {
-    goto done;
+  if (io_duration == zx::duration::infinite()) {
+    return EXIT_FAILURE;
   }
-
-done:
-  if (ramdisk != nullptr) {
-    ramdisk_destroy(ramdisk);
+  double s = (static_cast<double>(io_duration.to_nsecs())) / (static_cast<double>(1000000000));
+  double rate = (static_cast<double>(total_io_size)) / s;
+  const char* unit = "B";
+  if (rate > 1024 * 1024) {
+    unit = "MB";
+    rate /= 1024 * 1024;
+  } else if (rate > 1024) {
+    unit = "KB";
+    rate /= 1024;
   }
-  return r;
+  fprintf(stderr, "%s %zu bytes (%zu chunks) in %zu ns: %g %s/s\n", io_type.c_str(), total_io_size,
+          buffer_size, io_duration.to_nsecs(), rate, unit);
+  return EXIT_SUCCESS;
 }

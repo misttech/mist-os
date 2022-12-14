@@ -3,13 +3,14 @@
 # found in the LICENSE file.
 
 executable("iotime") {
+  testonly = true
   sources = [ "iotime.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//src/lib/storage/block_client/cpp",
-    "//src/lib/storage/ramdevice_client/cpp",
+    "//src/storage/testing:storage_driver_test_support",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/sync",
