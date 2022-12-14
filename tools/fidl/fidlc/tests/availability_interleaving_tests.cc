@@ -393,6 +393,16 @@ void substitute(std::string& str, std::string_view placeholder, std::string_view
   str.replace(str.find(placeholder), placeholder.size(), replacement);
 }
 
+TEST(AvailabilityInterleavingTests, OtherLibrary) {
+  SharedAmongstLibraries shared;
+  TestLibrary dependency(&shared);
+  dependency.AddFile("bad/fi-0056-a.test.fidl");
+  ASSERT_COMPILED(dependency);
+  TestLibrary library(&shared);
+  library.AddFile("bad/fi-0056-b.test.fidl");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidReferenceToDeprecatedOtherPlatform);
+}
+
 TEST(AvailabilityInterleavingTests, SameLibrary) {
   for (auto& test_case : kTestCases) {
     auto attributes = test_case.Format();

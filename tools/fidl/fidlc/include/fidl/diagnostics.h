@@ -122,8 +122,8 @@ constexpr ErrorDef<55, const flat::Element *, VersionRange, Platform, const flat
     ErrInvalidReferenceToDeprecated(
         "invalid reference to {}, which is deprecated {} of platform '{}' while {} "
         "is not; either remove this reference or mark {} as deprecated");
-constexpr UndocumentedErrorDef<56, const flat::Element *, VersionRange, Platform,
-                               const flat::Element *, VersionRange, Platform, const flat::Element *>
+constexpr ErrorDef<56, const flat::Element *, VersionRange, Platform, const flat::Element *,
+                   VersionRange, Platform, const flat::Element *>
     ErrInvalidReferenceToDeprecatedOtherPlatform(
         "invalid reference to {}, which is deprecated {} of platform '{}' while {} "
         "is not deprecated {} of platform '{}'; either remove this reference or mark {} as "
