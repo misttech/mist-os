@@ -279,6 +279,12 @@ class FeatureUnit : public AudioUnit {
   bool SetMute(const usb_protocol_t& proto, bool mute);
   bool SetAgc(const usb_protocol_t& proto, bool enabled);
 
+  // Get a reasonable default volume for the unit.  It can be tricky
+  // to pick a reasonable default, and this is an attempt to keep
+  // the trickiness centralized.  The return value will be acceptable
+  // for passing to SetVol().
+  float GetDefaultVolume() const;
+
  private:
   friend class AudioUnit;
 
@@ -301,6 +307,10 @@ class FeatureUnit : public AudioUnit {
   };
 
   static fbl::RefPtr<FeatureUnit> Create(const DescriptorListMemory::Iterator& iter, uint8_t iid);
+
+  // Convert a float dB number to its corresponding integer volume.
+  // Take care of clamping and honoring the unit's resolution.
+  int16_t NormalizedVolumeFromDb(float db) const;
 
   // Map a feature ordinal to its corresponding bit in the bmaControls
   // bitmask.  Thankfully, as of the USB Audio 1.0 spec, this is just a simple

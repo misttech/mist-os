@@ -169,11 +169,10 @@ zx_status_t AudioPath::Setup(const usb_protocol_t& proto) {
     units_[i]->set_in_use();
   }
 
-  // If this path has a feature unit, then default the volume controls to 0dB
-  // gain and unmuted.
+  // If this path has a feature unit, then set a default volume, unmuted.
   if (feature_unit_ != nullptr) {
     feature_unit_->SetMute(proto, false);
-    feature_unit_->SetVol(proto, 0.0f);
+    feature_unit_->SetVol(proto, feature_unit_->GetDefaultVolume());
     feature_unit_->SetAgc(proto, false);
   }
 

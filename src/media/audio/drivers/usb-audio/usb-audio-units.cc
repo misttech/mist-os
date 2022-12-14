@@ -476,12 +476,9 @@ zx_status_t FeatureUnit::Probe(const usb_protocol_t& proto) {
   return ZX_OK;
 }
 
-float FeatureUnit::SetVol(const usb_protocol_t& proto, float db) {
-  // If we have no volume control, then our gain is fixed at 0.0 dB no matter
-  // what the user asks for.
-  if (!has_vol()) {
-    return 0.0;
-  }
+int16_t FeatureUnit::NormalizedVolumeFromDb(float db) const {
+  if (!has_vol())
+    return 0;
 
   // Convert to our target value.  Start by converting to ticks.
   float ticks_float = db / kDbPerTick;
@@ -490,7 +487,35 @@ float FeatureUnit::SetVol(const usb_protocol_t& proto, float db) {
   ticks_float = roundf(ticks_float / vol_res_) * vol_res_;
 
   // Now clamp to the acceptable min/max range and convert to integer ticks.
-  vol_cur_ = static_cast<int16_t>(std::clamp<float>(ticks_float, vol_min_, vol_max_));
+  return static_cast<int16_t>(std::clamp<float>(ticks_float, vol_min_, vol_max_));
+}
+
+float FeatureUnit::GetDefaultVolume() const {
+  float default_db = 0.0f;
+
+  // Try the default of 0.0 dB, unless this unit has a volume control
+  // and does not support negative volumes.  In such a case, 0.0 is
+  // a pretty poor choice for a default, since it will end up being
+  // the lowest possible unmuted volume.  Instead, use the unit's
+  // midpoint as the default;
+
+  if (has_vol() && vol_min_ >= 0) {
+    default_db = (vol_min_ * 0.5f + vol_max_ * 0.5f) * kDbPerTick;
+  }
+
+  // Snap and clamp the default to an actual achievable value.
+  return NormalizedVolumeFromDb(default_db) * kDbPerTick;
+}
+
+float FeatureUnit::SetVol(const usb_protocol_t& proto, float db) {
+  // If we have no volume control, then our gain is fixed at 0.0 dB no matter
+  // what the user asks for.
+  if (!has_vol()) {
+    return 0.0;
+  }
+
+  // Snap and clamp the request to the actual value the unit wants to see.
+  vol_cur_ = NormalizedVolumeFromDb(db);
 
   // Finally apply the setting.  If we have no explicit mute control, and we
   // are currently supposed to be muted, skip this step.  We are using the
