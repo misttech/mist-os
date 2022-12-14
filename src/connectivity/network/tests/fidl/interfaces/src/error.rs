@@ -12,9 +12,9 @@ use fidl::endpoints::Proxy as _;
 use fuchsia_zircon as zx;
 use net_declare::fidl_subnet;
 use netstack_testing_common::realms::{Netstack, NetstackVersion, TestSandboxExt as _};
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 
-#[variants_test]
+#[netstack_test]
 async fn interfaces_watcher_after_invalid_state_request<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create netstack");

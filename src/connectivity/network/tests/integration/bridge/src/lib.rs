@@ -17,7 +17,7 @@ use netstack_testing_common::{
     realms::{Netstack2, TestSandboxExt as _},
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
 };
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use test_case::test_case;
 
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
@@ -62,7 +62,7 @@ enum Step {
 // The other test steps include disabling-and-reenabling, and flapping the
 // link of an interface attached to a bridge and ensuring that the bridge
 // functions correctly afterwards.
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "none",
     &[Step::Bridge(vec![])];
@@ -349,7 +349,7 @@ async fn test<E: netemul::Endpoint>(name: &str, sub_name: &str, steps: &[Step]) 
 
 // Tests that an admin-disabled interface attached to a bridge is still
 // disabled when the bridge is removed.
-#[variants_test]
+#[netstack_test]
 async fn test_remove_bridge_interface_disabled<E: netemul::Endpoint>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let gateway_realm = sandbox

@@ -12,7 +12,7 @@ use netstack_testing_common::{
     interfaces,
     realms::{Netstack2, TestSandboxExt as _},
 };
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 
 async fn resolve(
     routes: &fidl_fuchsia_net_routes::StateProxy,
@@ -26,7 +26,7 @@ async fn resolve(
         .context("routes/State.Resolve error")
 }
 
-#[variants_test]
+#[netstack_test]
 async fn resolve_loopback_route(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm =
@@ -58,7 +58,7 @@ async fn resolve_loopback_route(name: &str) {
         .expect("error testing resolution for IPv6 loopback");
 }
 
-#[variants_test]
+#[netstack_test]
 async fn resolve_route(name: &str) {
     const GATEWAY_IP_V4: fidl_fuchsia_net::Subnet = fidl_subnet!("192.168.0.1/24");
     const GATEWAY_IP_V6: fidl_fuchsia_net::Subnet = fidl_subnet!("3080::1/64");
@@ -200,7 +200,7 @@ async fn resolve_route(name: &str) {
     .expect("IPv6 route lookup failed");
 }
 
-#[variants_test]
+#[netstack_test]
 async fn resolve_default_route_while_dhcp_is_running(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");

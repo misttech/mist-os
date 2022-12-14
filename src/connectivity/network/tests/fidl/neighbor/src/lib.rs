@@ -16,7 +16,7 @@ use netemul::{
 };
 use netstack_testing_common::realms::{Netstack2, TestRealmExt as _, TestSandboxExt as _};
 use netstack_testing_common::Result;
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 
 const ALICE_MAC: fidl_fuchsia_net::MacAddress = fidl_mac!("02:00:01:02:03:04");
 const ALICE_IP: fidl_fuchsia_net::IpAddress = fidl_ip!("192.168.0.100");
@@ -329,7 +329,7 @@ async fn assert_entries<
     }
 }
 
-#[variants_test]
+#[netstack_test]
 async fn neigh_list_entries(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -618,7 +618,7 @@ async fn next_solicitation_resolution(
     }
 }
 
-#[variants_test]
+#[netstack_test]
 async fn neigh_clear_entries_errors(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -658,7 +658,7 @@ async fn neigh_clear_entries_errors(name: &str) {
     );
 }
 
-#[variants_test]
+#[netstack_test]
 async fn neigh_clear_entries(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -747,7 +747,7 @@ async fn neigh_clear_entries(name: &str) {
     assert_eq!(next_solicitation_resolution(&mut solicit_stream).await, bob.ipv6);
 }
 
-#[variants_test]
+#[netstack_test]
 async fn neigh_add_remove_entry(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -893,7 +893,7 @@ async fn neigh_add_remove_entry(name: &str) {
     assert_eq!(next_solicitation_resolution(&mut meta_stream).await, bob.ipv6);
 }
 
-#[variants_test]
+#[netstack_test]
 async fn neigh_unreachability_config_errors(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -964,7 +964,7 @@ async fn neigh_unreachability_config_errors(name: &str) {
     );
 }
 
-#[variants_test]
+#[netstack_test]
 async fn neigh_unreachability_config(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -1069,7 +1069,7 @@ async fn neigh_unreachability_config(name: &str) {
     }
 }
 
-#[variants_test]
+#[netstack_test]
 async fn neigh_unreachable_entries(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -1129,7 +1129,7 @@ async fn neigh_unreachable_entries(name: &str) {
     .await;
 }
 
-#[variants_test]
+#[netstack_test]
 async fn cant_hang_twice(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
 
@@ -1161,7 +1161,7 @@ async fn cant_hang_twice(name: &str) {
     assert_matches::assert_matches!(r2, Err(e) if e.is_closed());
 }
 
-#[variants_test]
+#[netstack_test]
 async fn channel_is_closed_if_not_polled(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -1217,7 +1217,7 @@ async fn channel_is_closed_if_not_polled(name: &str) {
     }
 }
 
-#[variants_test]
+#[netstack_test]
 async fn remove_device_clears_neighbors(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");

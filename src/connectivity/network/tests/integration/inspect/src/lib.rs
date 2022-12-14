@@ -20,7 +20,7 @@ use netstack_testing_common::{
     realms::{Netstack2, TestSandboxExt as _},
     Result,
 };
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use nonzero_ext::nonzero;
 use packet::{ParsablePacket as _, Serializer as _};
 use packet_formats::{
@@ -94,7 +94,7 @@ impl fuchsia_inspect::testing::PropertyAssertion for AddressMatcher {
     }
 }
 
-#[variants_test]
+#[netstack_test]
 async fn inspect_nic(name: &str) {
     // The number of IPv6 addresses that the stack will assign to an interface.
     const EXPECTED_NUM_IPV6_ADDRESSES: usize = 1;
@@ -403,7 +403,7 @@ async fn inspect_nic(name: &str) {
     let () = netdev_addrs.check().expect("netdev addresses match failed");
 }
 
-#[variants_test]
+#[netstack_test]
 async fn inspect_routing_table(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm =
@@ -459,7 +459,7 @@ struct PacketAttributes {
 const INVALID_PORT: NonZeroU16 = nonzero!(1234u16);
 const DHCP_CLIENT_PORT: NonZeroU16 = nonzero!(dhcpv4::protocol::CLIENT_PORT);
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "invalid_trans_proto",
     vec![
@@ -501,7 +501,7 @@ const DHCP_CLIENT_PORT: NonZeroU16 = nonzero!(dhcpv4::protocol::CLIENT_PORT);
         }
     ]; "multiple_invalid_port_and_single_invalid_trans_proto")]
 async fn inspect_dhcp<E: netemul::Endpoint>(
-    variants_test_name: &str,
+    netstack_test_name: &str,
     test_case_name: &str,
     inbound_packets: Vec<PacketAttributes>,
 ) {
@@ -510,7 +510,7 @@ async fn inspect_dhcp<E: netemul::Endpoint>(
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
     let realm = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}-{}", variants_test_name, test_case_name))
+        .create_netstack_realm::<Netstack2, _>(format!("{}-{}", netstack_test_name, test_case_name))
         .expect("failed to create realm");
     // Create the fake endpoint before installing an endpoint in the netstack to ensure
     // that we receive all DHCP messages sent by the client.
@@ -685,7 +685,7 @@ async fn inspect_dhcp<E: netemul::Endpoint>(
 // automatically exported from netstack via reflection. This test
 // serves as a change detector to acknowledge any possible additions
 // or deletions when importing code from upstream.
-#[variants_test]
+#[netstack_test]
 async fn inspect_stat_counters(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm =
@@ -930,7 +930,7 @@ async fn inspect_stat_counters(name: &str) {
     });
 }
 
-#[variants_test]
+#[netstack_test]
 async fn inspect_for_sampler(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm =

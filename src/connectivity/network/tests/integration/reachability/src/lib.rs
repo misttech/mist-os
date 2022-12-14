@@ -21,7 +21,7 @@ use netstack_testing_common::{
     realms::{constants, KnownServiceProvider, Netstack2, TestSandboxExt as _},
     wait_for_component_stopped,
 };
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
 use packet_formats::{
     ethernet::{EtherType, EthernetFrameBuilder},
@@ -374,7 +374,7 @@ fn handle_frame_stream<'a>(
     )
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "gateway",
     &[(InterfaceConfig::new_primary(LOWER_METRIC), State::Gateway)];

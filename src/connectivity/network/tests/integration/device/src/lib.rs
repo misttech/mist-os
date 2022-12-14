@@ -8,7 +8,7 @@ use fidl_fuchsia_net as fnet;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryStreamExt as _};
 use net_declare::{fidl_mac, fidl_subnet, std_socket_addr_v4};
 use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use packet::ParsablePacket as _;
 use packet_formats::icmp::MessageBody as _;
 use packet_formats::ipv4::Ipv4Header as _;
@@ -179,7 +179,7 @@ fn icmp_event_stream<'a>(
     )
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "fragmented",
     netemul::DEFAULT_MTU.into(),

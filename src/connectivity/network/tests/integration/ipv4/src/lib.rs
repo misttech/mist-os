@@ -15,7 +15,7 @@ use net_types::{
 };
 use netemul::RealmUdpSocket as _;
 use netstack_testing_common::{interfaces, setup_network, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT};
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use packet::ParsablePacket as _;
 use packet_formats::{
     ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck},
@@ -24,7 +24,7 @@ use packet_formats::{
     testutil::parse_ip_packet,
 };
 
-#[variants_test]
+#[netstack_test]
 async fn sends_igmp_reports<E: netemul::Endpoint>(name: &str) {
     const INTERFACE_ADDR: std::net::Ipv4Addr = std_ip_v4!("192.168.0.1");
     const MULTICAST_ADDR: std::net::Ipv4Addr = std_ip_v4!("224.1.2.3");

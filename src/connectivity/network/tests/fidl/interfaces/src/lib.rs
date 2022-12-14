@@ -19,12 +19,12 @@ use netstack_testing_common::{
     interfaces,
     realms::{Netstack, Netstack2, NetstackVersion, TestSandboxExt as _},
 };
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto as _;
 use test_case::test_case;
 
-#[variants_test]
+#[netstack_test]
 async fn watcher_existing<N: Netstack>(name: &str) {
     // This test is limited to mostly IPv4 because IPv6 LL addresses are
     // subject to DAD and hard to test with Existing events.
@@ -248,7 +248,7 @@ async fn watcher_existing<N: Netstack>(name: &str) {
     assert_eq!(interfaces, HashMap::new());
 }
 
-#[variants_test]
+#[netstack_test]
 async fn watcher_after_state_closed<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -299,7 +299,7 @@ async fn watcher_after_state_closed<N: Netstack>(name: &str) {
 }
 
 /// Tests that adding an interface causes an interface changed event.
-#[variants_test]
+#[netstack_test]
 async fn test_add_remove_interface<N: Netstack, E: netemul::Endpoint>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -338,7 +338,7 @@ async fn test_add_remove_interface<N: Netstack, E: netemul::Endpoint>(name: &str
 /// Tests that if a device closes (is removed from the system), the
 /// corresponding Netstack interface is deleted.
 /// if `enabled` is `true`, enables the interface before closing the device.
-#[variants_test]
+#[netstack_test]
 #[test_case("disabled", false; "disabled")]
 #[test_case("enabled", true ; "enabled")]
 async fn test_close_interface<N: Netstack, E: netemul::Endpoint>(
@@ -398,7 +398,7 @@ async fn test_close_interface<N: Netstack, E: netemul::Endpoint>(
 }
 
 /// Tests races between device link down and close.
-#[variants_test]
+#[netstack_test]
 async fn test_down_close_race<N: Netstack, E: netemul::Endpoint>(name: &str) {
     // TODO(https://fxbug.dev/102064): Remove this once Ethernet devices are
     // no longer supported.
@@ -464,7 +464,7 @@ async fn test_down_close_race<N: Netstack, E: netemul::Endpoint>(name: &str) {
 }
 
 /// Tests races between data traffic and closing a device.
-#[variants_test]
+#[netstack_test]
 async fn test_close_data_race<N: Netstack, E: netemul::Endpoint>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let net = sandbox.create_network("net").await.expect("create network");
@@ -577,7 +577,7 @@ async fn test_close_data_race<N: Netstack, E: netemul::Endpoint>(name: &str) {
 
 /// Tests that toggling interface enabled repeatedly results in every change
 /// in the boolean value being observable.
-#[variants_test]
+#[netstack_test]
 async fn test_watcher_online_edges<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
@@ -729,7 +729,7 @@ async fn test_watcher_online_edges<N: Netstack>(name: &str) {
 
 /// Tests that competing interface change events are reported by
 /// fuchsia.net.interfaces/Watcher in the correct order.
-#[variants_test]
+#[netstack_test]
 async fn test_watcher_race<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
@@ -930,7 +930,7 @@ async fn test_watcher_race<N: Netstack>(name: &str) {
 // TODO(https://fxbug.dev/107338): Run this against netstack3 when it
 // hides IPv6 addresses on offline interfaces from clients of
 // fuchsia.net.interfaces/Watcher.
-#[variants_test]
+#[netstack_test]
 #[test_case(fidl_subnet!("abcd::1/64"))]
 #[test_case(fidl_subnet!("1.2.3.4/24"))]
 async fn addresses_while_offline(name: &str, addr_with_prefix: fidl_fuchsia_net::Subnet) {
@@ -1030,7 +1030,7 @@ async fn addresses_while_offline(name: &str, addr_with_prefix: fidl_fuchsia_net:
 
 // TODO(https://fxbug.dev/112627): Split this test up and run against NS3.
 /// Test interface changes are reported through the interface watcher.
-#[variants_test]
+#[netstack_test]
 async fn watcher(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
@@ -1384,7 +1384,7 @@ async fn watcher(name: &str) {
     assert_eq!(next(&mut stream).await, want);
 }
 
-#[variants_test]
+#[netstack_test]
 async fn test_readded_address_present<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network(name).await.expect("create network");

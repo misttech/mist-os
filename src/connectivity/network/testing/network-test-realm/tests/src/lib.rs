@@ -26,7 +26,7 @@ use netstack_testing_common::{
     packets,
     realms::{KnownServiceProvider, Netstack2, TestSandboxExt as _},
 };
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use packet::ParsablePacket as _;
 use std::convert::TryInto as _;
 use test_case::test_case;
@@ -369,7 +369,7 @@ async fn start_hermetic_network_realm() {
     assert!(has_hermetic_network_realm(&realm).await);
 }
 
-#[variants_test]
+#[netstack_test]
 async fn start_hermetic_network_realm_replaces_existing_realm<E: netemul::Endpoint>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = create_netstack_realm(name, &sandbox).expect("failed to create netstack realm");
@@ -431,7 +431,7 @@ async fn start_hermetic_network_realm_replaces_existing_realm<E: netemul::Endpoi
     assert!(has_hermetic_network_realm(&realm).await);
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case("no_wait_any_ip_address", false)]
 #[test_case("wait_any_ip_address", true)]
 async fn add_interface<E: netemul::Endpoint>(
@@ -527,7 +527,7 @@ async fn add_interface<E: netemul::Endpoint>(
     .await;
 }
 
-#[variants_test]
+#[netstack_test]
 async fn add_interface_already_exists<E: netemul::Endpoint>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = create_netstack_realm(name, &sandbox).expect("failed to create netstack realm");
@@ -583,7 +583,7 @@ async fn add_interface_already_exists<E: netemul::Endpoint>(name: &str) {
 
 // Tests the case where the MAC address provided to `Controller.AddInterface`
 // does not match any of the interfaces on the system.
-#[variants_test]
+#[netstack_test]
 async fn add_interface_with_no_matching_interface<E: netemul::Endpoint>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = create_netstack_realm(name, &sandbox).expect("failed to create netstack realm");
@@ -669,7 +669,7 @@ async fn add_interface_with_no_matching_interface_in_devfs() {
 
 // Tests the case where the MAC address provided to `Controller.AddInterface`
 // matches an interface in devfs, but not in the system Netstack.
-#[variants_test]
+#[netstack_test]
 async fn add_interface_with_no_matching_interface_in_netstack<E: netemul::Endpoint>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = create_netstack_realm(name, &sandbox).expect("failed to create netstack realm");
@@ -709,7 +709,7 @@ async fn add_interface_with_no_matching_interface_in_netstack<E: netemul::Endpoi
     );
 }
 
-#[variants_test]
+#[netstack_test]
 async fn stop_hermetic_network_realm<E: netemul::Endpoint>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = create_netstack_realm(name, &sandbox).expect("failed to create netstack realm");
@@ -1137,7 +1137,7 @@ const IPV6_LINK_LOCAL_ADDRESS_CONFIG: PingAddressConfig = PingAddressConfig {
     target_subnet: DEFAULT_IPV6_LINK_LOCAL_TARGET_SUBNET,
 };
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "ipv4",
     IPV4_ADDRESS_CONFIG,
@@ -1518,7 +1518,7 @@ async fn expect_multicast_event(
     stream.next().await.expect("failed to find expected multicast event");
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "ipv4",
     fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
@@ -1576,7 +1576,7 @@ async fn join_multicast_group<E: netemul::Endpoint>(
 
 // Tests that the persisted multicast socket is cleared when the hermetic
 // network realm is stopped.
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "ipv4",
     fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
@@ -1666,7 +1666,7 @@ async fn join_multicast_group_after_stop<E: netemul::Endpoint>(
     expect_multicast_event(&fake_ep, MulticastEvent::Joined(second_multicast_address)).await;
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "ipv4",
     fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
@@ -1780,7 +1780,7 @@ async fn join_multicast_group_with_non_existent_interface() {
     );
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "ipv4",
     DEFAULT_IPV4_SOURCE_SUBNET;
@@ -1834,7 +1834,7 @@ async fn join_multicast_group_with_non_multicast_address<E: netemul::Endpoint>(
     );
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "ipv4",
     fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
@@ -1918,7 +1918,7 @@ async fn leave_multicast_group_with_no_hermetic_network_realm() {
     );
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "ipv4",
     DEFAULT_IPV4_SOURCE_SUBNET;
@@ -1972,7 +1972,7 @@ async fn leave_multicast_group_with_non_multicast_address<E: netemul::Endpoint>(
     );
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "ipv4",
     fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),

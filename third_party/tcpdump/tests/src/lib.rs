@@ -29,7 +29,7 @@ use netstack_testing_common::{
     interfaces,
     realms::{Netstack2, TestSandboxExt as _},
 };
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use packet::{Buf, Serializer};
 use packet_formats::{
     ethernet::{EtherType, EthernetFrameBuilder},
@@ -287,7 +287,7 @@ async fn packet_test() {
     .await
 }
 
-#[variants_test]
+#[netstack_test]
 // TODO(https://fxbug.dev/88133): Fix memory leak and run this with Lsan.
 #[cfg_attr(feature = "variant_asan", ignore)]
 async fn bridged_packet_test<E: netemul::Endpoint>(name: &str) {

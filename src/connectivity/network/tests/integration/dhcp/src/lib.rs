@@ -20,7 +20,7 @@ use netstack_testing_common::{
     realms::{constants, KnownServiceProvider, Netstack2, TestSandboxExt as _},
     Result,
 };
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 
 // Encapsulates a minimal configuration needed to test a DHCP client/server combination.
 struct DhcpTestConfig {
@@ -308,7 +308,7 @@ struct Settings<'a> {
     options: &'a mut [fidl_fuchsia_net_dhcp::Option_],
 }
 
-#[variants_test]
+#[netstack_test]
 async fn acquire_with_dhcpd_bound_device<E: netemul::Endpoint>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
@@ -348,7 +348,7 @@ async fn acquire_with_dhcpd_bound_device<E: netemul::Endpoint>(name: &str) {
     .await
 }
 
-#[variants_test]
+#[netstack_test]
 async fn acquire_then_renew_with_dhcpd_bound_device<E: netemul::Endpoint>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
@@ -402,7 +402,7 @@ async fn acquire_then_renew_with_dhcpd_bound_device<E: netemul::Endpoint>(name: 
     .await
 }
 
-#[variants_test]
+#[netstack_test]
 async fn acquire_with_dhcpd_bound_device_dup_addr<E: netemul::Endpoint>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
@@ -749,7 +749,7 @@ fn param_name(param: &fidl_fuchsia_net_dhcp::Parameter) -> fidl_fuchsia_net_dhcp
 // state on the next restart.  Finally, the server is restarted one more time, and then its
 // clear_leases() function is triggered, which will cause a panic if the server is in an
 // inconsistent state.
-#[variants_test]
+#[netstack_test]
 async fn acquire_persistent_dhcp_server_after_restart<E: netemul::Endpoint>(name: &str) {
     let mode = PersistenceMode::Persistent;
     acquire_dhcp_server_after_restart::<E>(&format!("{}_{}", name, mode), mode).await
@@ -759,7 +759,7 @@ async fn acquire_persistent_dhcp_server_after_restart<E: netemul::Endpoint>(name
 // none.  However, without persistent state, an ephemeral dhcp server cannot run without explicit
 // configuration.  This test verifies that an ephemeral dhcp server will return an error if run
 // after restarting.
-#[variants_test]
+#[netstack_test]
 async fn acquire_ephemeral_dhcp_server_after_restart<E: netemul::Endpoint>(name: &str) {
     let mode = PersistenceMode::Ephemeral;
     acquire_dhcp_server_after_restart::<E>(&format!("{}_{}", name, mode), mode).await
@@ -926,13 +926,13 @@ async fn acquire_dhcp_server_after_restart<E: netemul::Endpoint>(
     }
 }
 
-#[variants_test]
+#[netstack_test]
 async fn dhcp_server_persistence_mode_persistent<E: netemul::Endpoint>(name: &str) {
     let mode = PersistenceMode::Persistent;
     test_dhcp_server_persistence_mode::<E>(&format!("{}_{}", name, mode), mode).await
 }
 
-#[variants_test]
+#[netstack_test]
 async fn dhcp_server_persistence_mode_ephemeral<E: netemul::Endpoint>(name: &str) {
     let mode = PersistenceMode::Ephemeral;
     test_dhcp_server_persistence_mode::<E>(&format!("{}_{}", name, mode), mode).await

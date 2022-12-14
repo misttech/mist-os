@@ -22,7 +22,7 @@ use netstack_testing_common::{
         TestSandboxExt as _,
     },
 };
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use packet::ParseBuffer as _;
 use test_case::test_case;
 use tracing::info;
@@ -207,7 +207,7 @@ fn create_bridged_network(
 // network stacks in real usage. After each test step, ensure that all
 // `guest`s and the `gateway` can communicate with each other if there is a
 // candidate for upstream present.
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "basic",
     &[
@@ -510,7 +510,7 @@ async fn virtualization<E: netemul::Endpoint>(name: &str, sub_name: &str, steps:
     }
 }
 
-#[variants_test]
+#[netstack_test]
 async fn dhcpv4_client_started<E: netemul::Endpoint>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let host_realm = sandbox

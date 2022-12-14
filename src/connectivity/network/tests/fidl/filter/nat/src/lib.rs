@@ -20,7 +20,7 @@ use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _};
 use netfilter::FidlReturn as _;
 use netstack_testing_common::ping as ping_helper;
 use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use test_case::test_case;
 
 pub enum NatNic {
@@ -385,7 +385,7 @@ pub const IPV4_SUBNET2: fnet::Subnet = fidl_subnet!("192.168.0.0/24");
 pub const IPV6_SUBNET1: fnet::Subnet = fidl_subnet!("a::/24");
 pub const IPV6_SUBNET2: fnet::Subnet = fidl_subnet!("b::/24");
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "perform_nat44",
     NatTestCase {
@@ -594,7 +594,7 @@ async fn masquerade_nat_udp<E: netemul::Endpoint>(
     }
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "perform_nat44",
     NatTestCase {
@@ -773,7 +773,7 @@ async fn masquerade_nat_tcp<E: netemul::Endpoint>(
     assert_eq!(client_addr, expected_client_addr);
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "perform_nat44",
     NatTestCase {

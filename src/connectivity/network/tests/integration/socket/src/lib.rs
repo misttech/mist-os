@@ -46,7 +46,7 @@ use netstack_testing_common::{
     },
     Result,
 };
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use packet::Serializer as _;
 use packet_formats::{
     self,
@@ -107,7 +107,7 @@ enum UdpProtocol {
     Fast,
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     UdpProtocol::Synchronous; "synchronous_protocol")]
 #[test_case(
@@ -316,7 +316,7 @@ async fn execute_and_validate_preflights(
         .await
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case("connect_called", UdpCacheInvalidationReason::ConnectCalled)]
 #[test_case("ipv6_only_called", UdpCacheInvalidationReason::IPv6OnlyCalled)]
 #[test_case("broadcast_called", UdpCacheInvalidationReason::BroadcastCalled)]
@@ -562,7 +562,7 @@ async fn assert_preflight_response_invalidated(
     );
 }
 
-#[variants_test]
+#[netstack_test]
 async fn udp_send_msg_preflight_autogen_addr_invalidation(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let (net, netstack, iface, socket) =
@@ -662,7 +662,7 @@ async fn udp_send_msg_preflight_autogen_addr_invalidation(name: &str) {
     assert_eq!(result, Err(fposix::Errno::Ehostunreach));
 }
 
-#[variants_test]
+#[netstack_test]
 async fn udp_send_msg_preflight_dad_failure(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let (net, _netstack, iface, socket) =
@@ -841,7 +841,7 @@ async fn toggle_cmsg(
     }
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case("ip_tos", CmsgType::IpTos)]
 #[test_case("ip_ttl", CmsgType::IpTtl)]
 #[test_case("ipv6_tclass", CmsgType::Ipv6Tclass)]
@@ -1059,7 +1059,7 @@ async fn tcp_socket_accept_cross_ns<
     f(client, accepted).await
 }
 
-#[variants_test]
+#[netstack_test]
 async fn tcp_socket_accept<
     I: net_types::ip::Ip + TestIpExt,
     E: netemul::Endpoint,
@@ -1072,7 +1072,7 @@ async fn tcp_socket_accept<
         .await
 }
 
-#[variants_test]
+#[netstack_test]
 async fn tcp_socket_send_recv<
     I: net_types::ip::Ip + TestIpExt,
     E: netemul::Endpoint,
@@ -1105,7 +1105,7 @@ async fn tcp_socket_send_recv<
     tcp_socket_accept_cross_ns::<I, Client, Server, E, _, _>(name, send_recv).await
 }
 
-#[variants_test]
+#[netstack_test]
 async fn tcp_socket_shutdown_connection<
     I: net_types::ip::Ip + TestIpExt,
     E: netemul::Endpoint,
@@ -1135,7 +1135,7 @@ async fn tcp_socket_shutdown_connection<
 }
 
 // TODO(https://fxbug.dev/112135): Parametrize netstack.
-#[variants_test]
+#[netstack_test]
 async fn tcp_socket_shutdown_listener<I: net_types::ip::Ip + TestIpExt, E: netemul::Endpoint>(
     name: &str,
 ) {
@@ -1202,7 +1202,7 @@ async fn tcp_socket_shutdown_listener<I: net_types::ip::Ip + TestIpExt, E: netem
     assert_eq!(from.ip(), client_ip);
 }
 
-#[variants_test]
+#[netstack_test]
 async fn tcpv4_tcpv6_listeners_coexist<E: netemul::Endpoint>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
@@ -1234,7 +1234,7 @@ async fn tcpv4_tcpv6_listeners_coexist<E: netemul::Endpoint>(name: &str) {
         .expect("failed to create v6 socket");
 }
 
-#[variants_test]
+#[netstack_test]
 async fn test_tcp_socket<N: Netstack, E: netemul::Endpoint>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
@@ -1377,7 +1377,7 @@ fn base_ip_device_port_config() -> fnet_tun::BasePortConfig {
     }
 }
 
-#[variants_test]
+#[netstack_test]
 async fn ip_endpoints_socket(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let client = sandbox
@@ -1441,7 +1441,7 @@ async fn ip_endpoints_socket(name: &str) {
     let () = run_udp_socket_test(&server, SERVER_ADDR_V6.addr, &client, CLIENT_ADDR_V6.addr).await;
 }
 
-#[variants_test]
+#[netstack_test]
 async fn ip_endpoint_packets(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm =
@@ -1753,7 +1753,7 @@ async fn ip_endpoint_packets(name: &str) {
     );
 }
 
-#[variants_test]
+#[netstack_test]
 async fn ping<E: netemul::Endpoint>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
@@ -1795,7 +1795,7 @@ enum SocketType {
     Tcp,
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(SocketType::Udp, true; "UDP specified")]
 #[test_case(SocketType::Udp, false; "UDP unspecified")]
 #[test_case(SocketType::Tcp, true; "TCP specified")]
@@ -1821,7 +1821,7 @@ async fn socket_loopback_test<N: Netstack, I: net_types::ip::Ip>(
     }
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(SocketType::Udp)]
 #[test_case(SocketType::Tcp)]
 async fn socket_clone_bind<N: Netstack>(name: &str, socket_type: SocketType) {
@@ -1870,7 +1870,7 @@ async fn socket_clone_bind<N: Netstack>(name: &str, socket_type: SocketType) {
     assert_eq!(bind_addr, local_addr.as_socket().unwrap());
 }
 
-#[variants_test]
+#[netstack_test]
 async fn udp_sendto_unroutable_leaves_socket_bound<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -2095,7 +2095,7 @@ async fn with_multinic_and_peers<
     call_with_sockets(config).await
 }
 
-#[variants_test]
+#[netstack_test]
 async fn udp_receive_on_bound_to_devices<N: Netstack>(name: &str) {
     const NUM_PEERS: u8 = 3;
     const PORT: u16 = 80;
@@ -2153,7 +2153,7 @@ async fn udp_receive_on_bound_to_devices<N: Netstack>(name: &str) {
     .await
 }
 
-#[variants_test]
+#[netstack_test]
 async fn udp_send_from_bound_to_device<N: Netstack>(name: &str) {
     const NUM_PEERS: u8 = 3;
     const PORT: u16 = 80;
@@ -2205,7 +2205,7 @@ async fn udp_send_from_bound_to_device<N: Netstack>(name: &str) {
     .await
 }
 
-#[variants_test]
+#[netstack_test]
 async fn tcp_connect_bound_to_device<E: netemul::Endpoint>(name: &str) {
     // TODO(https://github.com/google/gvisor/issues/8276): Run this against
     // Netstack2 variants once gVisor uses the bound device when connecting TCP
@@ -2280,7 +2280,7 @@ async fn tcp_connect_bound_to_device<E: netemul::Endpoint>(name: &str) {
     .await
 }
 
-#[variants_test]
+#[netstack_test]
 async fn get_bound_device_errors_after_device_deleted<N: Netstack, E: netemul::Endpoint>(
     name: &str,
 ) {
@@ -2339,7 +2339,7 @@ async fn get_bound_device_errors_after_device_deleted<N: Netstack, E: netemul::E
     assert_eq!(bound_device, Err(Some(fposix::Errno::Enodev)));
 }
 
-#[variants_test]
+#[netstack_test]
 async fn send_to_remote_with_zone<N: Netstack, E: netemul::Endpoint>(name: &str) {
     const PORT: u16 = 80;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");

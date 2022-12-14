@@ -35,12 +35,12 @@ use netstack_testing_common::{
     try_all, try_any, wait_for_component_stopped, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
     ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use test_case::test_case;
 
 /// Test that NetCfg discovers a newly added device and it adds the device
 /// to the Netstack.
-#[variants_test]
+#[netstack_test]
 async fn test_oir<E: netemul::Endpoint, M: Manager>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
@@ -93,7 +93,7 @@ async fn test_oir<E: netemul::Endpoint, M: Manager>(name: &str) {
 }
 
 /// Tests that stable interface name conflicts are handled gracefully.
-#[variants_test]
+#[netstack_test]
 async fn test_oir_interface_name_conflict<E: netemul::Endpoint, M: Manager>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
@@ -246,7 +246,7 @@ async fn test_oir_interface_name_conflict<E: netemul::Endpoint, M: Manager>(name
 ///
 /// Also make sure that a new WLAN AP interface may be added after a previous interface has been
 /// removed from the netstack.
-#[variants_test]
+#[netstack_test]
 async fn test_wlan_ap_dhcp_server<E: netemul::Endpoint, M: Manager>(name: &str) {
     // Use a large timeout to check for resolution.
     //
@@ -532,7 +532,7 @@ async fn test_wlan_ap_dhcp_server<E: netemul::Endpoint, M: Manager>(name: &str) 
 }
 
 /// Tests that netcfg observes component stop events and exits cleanly.
-#[variants_test]
+#[netstack_test]
 async fn observes_stop_events<M: Manager>(name: &str) {
     use component_events::events::{self};
 
@@ -583,7 +583,7 @@ async fn observes_stop_events<M: Manager>(name: &str) {
 
 /// Test that NetCfg enables forwarding on interfaces when the device class is configured to have
 /// that enabled.
-#[variants_test]
+#[netstack_test]
 async fn test_forwarding<E: netemul::Endpoint, M: Manager>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
@@ -661,7 +661,7 @@ async fn test_forwarding<E: netemul::Endpoint, M: Manager>(name: &str) {
 
 // TODO(https://fxbug.dev/114132): Remove this test when multiple clients
 // requesting prefixes is supported.
-#[variants_test]
+#[netstack_test]
 async fn test_prefix_provider_already_acquiring<M: Manager>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
@@ -743,7 +743,7 @@ async fn test_prefix_provider_already_acquiring<M: Manager>(name: &str) {
     }
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     fnet_dhcpv6::AcquirePrefixConfig {
         interface_id: Some(42),
@@ -797,7 +797,7 @@ async fn test_prefix_provider_config_error<M: Manager>(
     assert_eq!(reason, want_reason);
 }
 
-#[variants_test]
+#[netstack_test]
 async fn test_prefix_provider_double_watch<M: Manager>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox

@@ -13,7 +13,7 @@ use futures_util::{AsyncReadExt as _, AsyncWriteExt as _};
 use net_declare::{fidl_ip, fidl_subnet, std_ip};
 use netemul::{RealmTcpListener as _, RealmTcpStream as _};
 use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use test_case::test_case;
 
 struct Setup {
@@ -32,7 +32,7 @@ const PORT: u16 = 8080;
 const REQUEST: &str = "hello from client";
 const RESPONSE: &str = "hello from server";
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     Setup {
         client_ip: std_ip!("192.168.1.2"),

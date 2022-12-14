@@ -113,7 +113,7 @@ fn permutations_over_type_generics(
     test_variations
 }
 
-fn variants_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStream {
+fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStream {
     let item = input.clone();
     let mut item = syn::parse_macro_input!(item as syn::ItemFn);
     let impl_attrs = std::mem::replace(&mut item.attrs, Vec::new());
@@ -327,7 +327,7 @@ fn variants_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
 /// Example:
 ///
 /// ```
-/// #[variants_test]
+/// #[netstack_test]
 /// async fn test_foo<N: Netstack>(name: &str) {}
 /// ```
 ///
@@ -346,14 +346,14 @@ fn variants_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
 ///
 /// Similarly,
 /// ```
-/// #[variants_test]
+/// #[netstack_test]
 /// async fn test_foo<E: netemul::Endpoint>(name: &str) {/*...*/}
 /// ```
 ///
 /// and
 ///
 /// ```
-/// #[variants_test]
+/// #[netstack_test]
 /// async fn test_foo<M: Manager>(name: &str) {/*...*/}
 /// ```
 ///
@@ -364,7 +364,7 @@ fn variants_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
 /// Example:
 ///
 /// ```
-/// #[variants_test]
+/// #[netstack_test]
 /// async fn test_foo<N: Netstack, E: netemul::Endpoint>(name: &str) {/*...*/}
 /// ```
 ///
@@ -404,7 +404,7 @@ fn variants_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
 /// Similarly, this macro also handles expanding multiple occurrences of the
 /// same trait bound.
 /// ```
-/// #[variants_test]
+/// #[netstack_test]
 /// async fn test_foo<N1: Netstack, N2: Netstack, E: netemul::Endpoint>(name: &str) {/*...*/}
 /// ```
 ///
@@ -488,7 +488,7 @@ fn variants_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
 /// A test with no type parameters is expanded to receive the function name as
 /// the first argument.
 /// ```
-/// #[variants_test]
+/// #[netstack_test]
 /// async fn test_foo(name: &str) {/*...*/}
 /// ```
 ///
@@ -501,7 +501,7 @@ fn variants_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn variants_test(attrs: TokenStream, input: TokenStream) -> TokenStream {
+pub fn netstack_test(attrs: TokenStream, input: TokenStream) -> TokenStream {
     if !attrs.is_empty() {
         return syn::Error::new_spanned(
             proc_macro2::TokenStream::from(attrs),
@@ -511,7 +511,7 @@ pub fn variants_test(attrs: TokenStream, input: TokenStream) -> TokenStream {
         .into();
     }
 
-    variants_test_inner(
+    netstack_test_inner(
         input,
         &[
             Variant {

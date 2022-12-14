@@ -9,7 +9,7 @@ use itertools::Itertools as _;
 use net_types::Witness as _;
 use netemul::{Endpoint, RealmUdpSocket as _};
 use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use netsvc_proto::{debuglog, netboot, tftp};
 use packet::{FragmentedBuffer as _, InnerPacketBuilder as _, ParseBuffer as _, Serializer};
 use std::borrow::Cow;
@@ -658,7 +658,7 @@ async fn can_discover_inner(sock: fuchsia_async::net::UdpSocket, scope_id: u32) 
     let _: std::net::Ipv6Addr = discover(&sock, scope_id).await;
 }
 
-#[variants_test]
+#[netstack_test]
 async fn can_discover<E: netemul::Endpoint>(name: &str) {
     with_netsvc_and_netstack::<E, _, _>(name, can_discover_inner).await;
 }
@@ -741,7 +741,7 @@ async fn debuglog_inner(sock: fuchsia_async::net::UdpSocket, _scope_id: u32) {
             .await;
 }
 
-#[variants_test]
+#[netstack_test]
 async fn debuglog<E: netemul::Endpoint>(name: &str) {
     with_netsvc_and_netstack_bind_port::<E, _, _, _, _, _>(
         debuglog::MULTICAST_PORT.get(),
@@ -854,7 +854,7 @@ async fn get_board_info_inner(sock: fuchsia_async::net::UdpSocket, scope_id: u32
     }
 }
 
-#[variants_test]
+#[netstack_test]
 async fn get_board_info<E: netemul::Endpoint>(name: &str) {
     with_netsvc_and_netstack::<E, _, _>(name, get_board_info_inner).await;
 }
@@ -1051,7 +1051,7 @@ async fn pave(image_name: &str, sock: fuchsia_async::net::UdpSocket, scope_id: u
     }
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case("zirconr.img"; "recovery")]
 #[test_case("sparse.fvm"; "fvm")]
 async fn pave_image<E: netemul::Endpoint>(name: &str, image: &str) {
@@ -1064,7 +1064,7 @@ async fn pave_image<E: netemul::Endpoint>(name: &str, image: &str) {
     .await;
 }
 
-#[variants_test]
+#[netstack_test]
 async fn advertises<E: netemul::Endpoint>(name: &str) {
     let () = with_netsvc_and_netstack_bind_port::<E, _, _, _, _, _>(
         netsvc_proto::netboot::ADVERT_PORT.get(),
@@ -1118,7 +1118,7 @@ async fn advertises<E: netemul::Endpoint>(name: &str) {
     .await;
 }
 
-#[variants_test]
+#[netstack_test]
 async fn survives_device_removal<E: netemul::Endpoint>(name: &str) {
     use packet_formats::ethernet::{EthernetFrame, EthernetFrameLengthCheck};
 
@@ -1209,7 +1209,7 @@ async fn survives_device_removal<E: netemul::Endpoint>(name: &str) {
 /// Tests that netsvc retransmits ACKs following the timeout option. Guards
 /// against a regression where netsvc was not sending ACKs when it was receiving
 /// retransmitted blocks from the host.
-#[variants_test]
+#[netstack_test]
 async fn retransmits_acks<E: netemul::Endpoint>(name: &str) {
     with_netsvc_and_netstack::<E, _, _>(name, |sock, scope_id| async move {
         let device = discover(&sock, scope_id).await;

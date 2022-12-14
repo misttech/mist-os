@@ -11,7 +11,7 @@ use futures_util::{AsyncReadExt as _, AsyncWriteExt as _, FutureExt as _};
 use net_declare::{fidl_subnet, std_ip};
 use netemul::{RealmTcpListener as _, RealmTcpStream as _};
 use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use tcp_stream_ext::TcpStreamExt as _;
 
 async fn measure(fut: impl std::future::Future<Output = ()>) -> std::time::Duration {
@@ -56,7 +56,7 @@ const CLIENT_IP: fnet::Subnet = fidl_subnet!("192.168.0.2/24");
 const REMOTE_IP: std::net::IpAddr = std_ip!("192.168.0.1");
 const PORT: u16 = 80;
 
-#[variants_test]
+#[netstack_test]
 async fn timeouts<E: netemul::Endpoint>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");

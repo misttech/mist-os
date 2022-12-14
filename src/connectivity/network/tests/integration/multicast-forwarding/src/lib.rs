@@ -23,7 +23,7 @@ use netstack_testing_common::{
     interfaces,
     realms::{Netstack2, TestSandboxExt as _},
 };
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use std::collections::HashMap;
 use test_case::test_case;
 use test_util::assert_gt;
@@ -961,7 +961,7 @@ struct MulticastForwardingTestOptions {
     controller_action: ControllerAction,
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "ttl_same_as_route_min_ttl",
     hashmap! {
@@ -1279,7 +1279,7 @@ struct AddMulticastRouteTestOptions {
     destination_address: IpAddrType,
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "success",
     ClientConfig {
@@ -1548,7 +1548,7 @@ async fn add_multicast_route<E: netemul::Endpoint, I: net_types::ip::Ip>(
         .await;
 }
 
-#[variants_test]
+#[netstack_test]
 async fn multiple_multicast_controllers<E: netemul::Endpoint, I: net_types::ip::Ip>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm(name, &sandbox);
@@ -1581,7 +1581,7 @@ async fn multiple_multicast_controllers<E: netemul::Endpoint, I: net_types::ip::
         .await;
 }
 
-#[variants_test]
+#[netstack_test]
 async fn watch_routing_events_hanging<E: netemul::Endpoint, I: net_types::ip::Ip>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm(name, &sandbox);
@@ -1623,7 +1623,7 @@ async fn watch_routing_events_hanging<E: netemul::Endpoint, I: net_types::ip::Ip
     let ((), ()) = futures::future::join(watch_routing_events_fut, send_packet_fut).await;
 }
 
-#[variants_test]
+#[netstack_test]
 async fn watch_routing_events_already_hanging<E: netemul::Endpoint, I: net_types::ip::Ip>(
     name: &str,
 ) {
@@ -1667,7 +1667,7 @@ async fn watch_routing_events_already_hanging<E: netemul::Endpoint, I: net_types
     test_network.wait_for_packet_to_become_unrouteable().await;
 }
 
-#[variants_test]
+#[netstack_test]
 async fn watch_routing_events_dropped_events<E: netemul::Endpoint, I: net_types::ip::Ip>(
     name: &str,
 ) {
@@ -1738,7 +1738,7 @@ async fn watch_routing_events_dropped_events<E: netemul::Endpoint, I: net_types:
     expect_num_dropped_events(&controller, 0).await;
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "success",
     DeviceAddress::Server(Server::A),
@@ -1852,7 +1852,7 @@ async fn del_multicast_route<E: netemul::Endpoint, I: net_types::ip::Ip>(
         .await;
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "no_matching_route_for_source_address",
     DeviceAddress::Server(Server::B),
@@ -1942,7 +1942,7 @@ async fn get_route_stats_errors<E: netemul::Endpoint, I: net_types::ip::Ip>(
     assert_eq!(controller.get_route_stats(get_route_stats_addresses).await, Err(expected_error));
 }
 
-#[variants_test]
+#[netstack_test]
 async fn get_route_stats<E: netemul::Endpoint, I: net_types::ip::Ip>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm(name, &sandbox);

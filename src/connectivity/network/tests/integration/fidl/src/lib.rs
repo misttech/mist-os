@@ -24,7 +24,7 @@ use netstack_testing_common::{
     },
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use packet::{serialize::Serializer as _, ParsablePacket as _};
 use packet_formats::{
     error::ParseError,
@@ -37,7 +37,7 @@ use packet_formats::{
 };
 use test_case::test_case;
 
-#[variants_test]
+#[netstack_test]
 async fn add_ethernet_device(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
@@ -95,7 +95,7 @@ async fn add_ethernet_device(name: &str) {
     assert!(!online);
 }
 
-#[variants_test]
+#[netstack_test]
 async fn no_duplicate_interface_names(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
@@ -149,7 +149,7 @@ async fn no_duplicate_interface_names(name: &str) {
     assert_eq!(result, Err(zx::Status::ALREADY_EXISTS));
 }
 
-#[variants_test]
+#[netstack_test]
 async fn log_packets(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     // Modify debug netstack args so that it does not log packets.
@@ -211,7 +211,7 @@ async fn log_packets(name: &str) {
 const IPV4_LOOPBACK: fidl_fuchsia_net::Subnet = fidl_subnet!("127.0.0.1/8");
 const IPV6_LOOPBACK: fidl_fuchsia_net::Subnet = fidl_subnet!("::1/128");
 
-#[variants_test]
+#[netstack_test]
 async fn add_remove_address_on_loopback<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -271,7 +271,7 @@ async fn add_remove_address_on_loopback<N: Netstack>(name: &str) {
         .await;
 }
 
-#[variants_test]
+#[netstack_test]
 async fn disable_interface_loopback<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -338,7 +338,7 @@ async fn disable_interface_loopback<N: Netstack>(name: &str) {
     .expect("interface watcher stream ended unexpectedly")
 }
 
-#[variants_test]
+#[netstack_test]
 async fn reject_multicast_mac_address<N: Netstack, E: netemul::Endpoint>(name: &str) {
     const BAD_MAC_ADDRESS: net_types::ethernet::Mac = net_mac!("CF:AA:BB:CC:DD:EE");
     assert_eq!(net_types::UnicastAddr::new(BAD_MAC_ADDRESS), None);
@@ -409,7 +409,7 @@ fn test_forwarding_v6(
     }
 }
 
-#[variants_test]
+#[netstack_test]
 #[test_case(
     "v4_none_forward_icmp_v4",
     test_forwarding_v4(

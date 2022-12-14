@@ -37,7 +37,7 @@ use netstack_testing_common::{
     realms::{KnownServiceProvider, Manager, ManagerConfig, Netstack2, TestSandboxExt as _},
     wait_for_component_stopped, Result, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
-use netstack_testing_macros::variants_test;
+use netstack_testing_macros::netstack_test;
 use packet::{
     serialize::{InnerPacketBuilder as _, Serializer as _},
     ParsablePacket as _,
@@ -54,7 +54,7 @@ use packet_formats::{
 };
 use packet_formats_dhcp::v6;
 
-#[variants_test]
+#[netstack_test]
 async fn no_ip_literal(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
@@ -149,7 +149,7 @@ async fn poll_lookup_admin<
 
 /// Tests that Netstack exposes DNS servers discovered dynamically and NetworkManager
 /// configures the Lookup service.
-#[variants_test]
+#[netstack_test]
 async fn discovered_dns<E: netemul::Endpoint, M: Manager>(name: &str) {
     const SERVER_ADDR: fnet::Subnet = fidl_subnet!("192.168.0.1/24");
     /// DNS server served by DHCP.
@@ -299,7 +299,7 @@ async fn discovered_dns<E: netemul::Endpoint, M: Manager>(name: &str) {
 
 /// Tests that DHCPv6 exposes DNS servers discovered dynamically and the network manager
 /// configures the Lookup service.
-#[variants_test]
+#[netstack_test]
 async fn discovered_dhcpv6_dns<E: netemul::Endpoint, M: Manager>(name: &str) {
     /// DHCPv6 server IP.
     const DHCPV6_SERVER: net_types_ip::Ipv6Addr =
@@ -532,7 +532,7 @@ const EXAMPLE_HOSTNAME: &str = "www.example.com.";
 const EXAMPLE_IPV4_ADDR: fnet::IpAddress = fidl_ip!("93.184.216.34");
 const EXAMPLE_IPV6_ADDR: fnet::IpAddress = fidl_ip!("2606:2800:220:1:248:1893:25c8:1946");
 
-#[variants_test]
+#[netstack_test]
 async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout(name: &str) {
     use trust_dns_proto::{
         op::{Message, ResponseCode},
@@ -686,7 +686,7 @@ async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout(name: &str) {
         .await;
 }
 
-#[variants_test]
+#[netstack_test]
 async fn fallback_on_error_response_code(name: &str) {
     use itertools::Itertools as _;
     use trust_dns_proto::{
@@ -896,7 +896,7 @@ async fn setup_dns_server(
     (udp_socket, tcp_listener)
 }
 
-#[variants_test]
+#[netstack_test]
 async fn no_fallback_to_tcp_on_failed_udp(name: &str) {
     use trust_dns_proto::op::{Message, ResponseCode};
 
@@ -957,7 +957,7 @@ async fn no_fallback_to_tcp_on_failed_udp(name: &str) {
     };
 }
 
-#[variants_test]
+#[netstack_test]
 async fn fallback_to_tcp_on_truncated_response(name: &str) {
     use trust_dns_proto::op::{Message, MessageType, OpCode, ResponseCode};
 
@@ -1063,7 +1063,7 @@ async fn fallback_to_tcp_on_truncated_response(name: &str) {
     };
 }
 
-#[variants_test]
+#[netstack_test]
 async fn query_preferred_name_servers_first(name: &str) {
     use trust_dns_proto::op::{Message, MessageType, OpCode, ResponseCode};
 
