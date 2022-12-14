@@ -39,7 +39,7 @@ class AmlClockTest : public AmlClock {
  public:
   AmlClockTest(mmio_buffer_t mmio_buffer, mmio_buffer_t dosbus_buffer, uint32_t did)
       : AmlClock(nullptr, fdf::MmioBuffer(mmio_buffer), fdf::MmioBuffer(dosbus_buffer),
-                 std::nullopt, did) {}
+                 std::nullopt, std::nullopt, did) {}
   ~AmlClockTest() = default;
 
   zx_status_t ClkDebugForceDisable(uint32_t clk) { return AmlClock::ClkDebugForceDisable(clk); }

@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_CLOCK_DRIVERS_AMLOGIC_CLK_AML_A1_BLOCKS_H_
 #define SRC_DEVICES_CLOCK_DRIVERS_AMLOGIC_CLK_AML_A1_BLOCKS_H_
 
+#include <soc/aml-a1/a1-hiu.h>
 #include <soc/aml-meson/a1-clk.h>
 
 #include "aml-clk-blocks.h"
@@ -41,7 +42,8 @@ constexpr uint32_t kA1ClkctrlCecbClkCtrl1 = (0x3c << 2);
 constexpr uint32_t kA1ClkctrlPsramClkCtrl0 = (0x3d << 2);
 constexpr uint32_t kA1ClkctrlDmcClkCtrl1 = (0x3e << 2);
 
-// ANA_CTRL
+// CPUCTRL_CTRL
+constexpr uint32_t kCpuctrlClkCtrl0 = 0x0;
 
 // clang-format off
 static constexpr meson_clk_gate_t a1_clk_gates[] = {
@@ -216,6 +218,14 @@ static_assert(a1_clk::CLK_A1_MUX_COUNT == std::size(a1_muxes),
 static constexpr meson_clk_msr_t a1_clk_msr = {
     .reg0_offset = (0x0 << 2),
     .reg2_offset = (0x2 << 2),
+};
+
+static constexpr meson_cpu_clk_t a1_cpu_clks[] = {
+    {
+        .reg = kCpuctrlClkCtrl0,
+        .pll = static_cast<hhi_plls_t>(amlogic_clock::a1::SYS_PLL),
+        .initial_hz = 1'200'000'000
+    },
 };
 
 // Here the index id is the clock measurement id,

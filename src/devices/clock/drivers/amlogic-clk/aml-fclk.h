@@ -20,6 +20,12 @@ const aml_fclk_rate_table_t* s905d2_fclk_get_rate_table(void);
 // Return the rate table count.
 size_t s905d2_fclk_get_rate_table_count(void);
 
+// Return the Fixed clk rate table.
+const aml_fclk_rate_table_t* a1_fclk_get_rate_table(void);
+
+// Return the rate table count.
+size_t a1_fclk_get_rate_table_count(void);
+
 __END_CDECLS
 
 #endif  // SRC_DEVICES_CLOCK_DRIVERS_AMLOGIC_CLK_AML_FCLK_H_

@@ -87,6 +87,7 @@ using a1_pll_type = amlogic_clock::a1::meson_plls_t;
 constexpr uint32_t CLK_HIFI_PLL = AmlClkId(a1_pll_type::HIFI_PLL, clk_type::kMesonPll);
 
 // Cpu Clocks
+constexpr uint32_t CLK_SYS_CPU_CLK = AmlClkId(0, clk_type::kMesonCpuClk);
 
 }  // namespace a1_clk
 

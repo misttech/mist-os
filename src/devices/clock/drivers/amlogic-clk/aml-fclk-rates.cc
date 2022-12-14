@@ -22,3 +22,15 @@ static const aml_fclk_rate_table_t fclk_pll_rate_table[] = {
 const aml_fclk_rate_table_t* s905d2_fclk_get_rate_table() { return fclk_pll_rate_table; }
 
 size_t s905d2_fclk_get_rate_table_count() { return std::size(fclk_pll_rate_table); }
+
+// Fixed PLL: DCO = 1536M, FCLK_DIV2 = 768M, FCLK_DIV3 = 512M
+static const aml_fclk_rate_table_t a1_fclk_pll_rate_table[] = {
+    FCLK_PLL_RATE(128'000'000, 2, 1, 3),  // FCLK_DIV3 source
+    FCLK_PLL_RATE(256'000'000, 2, 1, 1),  // FCLK_DIV3 source
+    FCLK_PLL_RATE(512'000'000, 2, 0, 0),  // FCLK_DIV3 source
+    FCLK_PLL_RATE(768'000'000, 1, 0, 0),  // FCLK_DIV2 source
+};
+
+const aml_fclk_rate_table_t* a1_fclk_get_rate_table() { return a1_fclk_pll_rate_table; }
+
+size_t a1_fclk_get_rate_table_count() { return std::size(a1_fclk_pll_rate_table); }

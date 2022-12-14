@@ -33,6 +33,7 @@ namespace amlogic_clock {
 static constexpr uint32_t kHiuMmio = 0;
 static constexpr uint32_t kDosbusMmio = 1;
 static constexpr uint32_t kMsrMmio = 2;
+static constexpr uint32_t kCpuCtrlMmio = 3;
 
 #define MSR_WAIT_BUSY_RETRIES 5
 #define MSR_WAIT_BUSY_TIMEOUT_US 10000
@@ -184,6 +185,13 @@ class MesonCpuClock : public MesonRateClock {
                          const uint32_t initial_rate)
       : hiu_(hiu), offset_(offset), sys_pll_(sys_pll), current_rate_hz_(initial_rate) {}
   explicit MesonCpuClock(const fdf::MmioBuffer* hiu, const uint32_t offset, MesonPllClock* sys_pll,
+                         const uint32_t initial_rate, const uint32_t chip_id)
+      : hiu_(hiu),
+        offset_(offset),
+        sys_pll_(sys_pll),
+        current_rate_hz_(initial_rate),
+        chip_id_(chip_id) {}
+  explicit MesonCpuClock(const fdf::MmioBuffer* hiu, const uint32_t offset, MesonPllClock* sys_pll,
                          const uint32_t initial_rate, const uint32_t chip_id,
                          zx::resource smc_resource)
       : hiu_(hiu),
@@ -216,6 +224,7 @@ class MesonCpuClock : public MesonRateClock {
   zx_status_t SecSetCpuClkMux(uint64_t clock_source);
   zx_status_t SecSetSys0DcoPll(const pll_params_table& pll_params);
   zx_status_t SecSetCpuClkDyn(const cpu_dyn_table& dyn_params);
+  zx_status_t SetRateA1(const uint32_t hz);
 
   static constexpr uint32_t kFrequencyThresholdHz = 1'000'000'000;
   // Final Mux for selecting clock source.
@@ -355,11 +364,29 @@ zx_status_t MesonCpuClock::SetRateA5(const uint32_t hz) {
   return status;
 }
 
+zx_status_t MesonCpuClock::SetRateA1(const uint32_t hz) {
+  zx_status_t status;
+
+  if (hz > kFrequencyThresholdHz) {
+    // switch to low freq source
+    auto sys_cpu_ctrl0 = SysCpuClkControl::Get(offset_).ReadFrom(&*hiu_);
+    sys_cpu_ctrl0.set_final_mux_sel(kFixedPll).WriteTo(&*hiu_);
+
+    status = ConfigureSysPLL(hz);
+  } else {
+    status = ConfigCpuFixedPll(hz);
+  }
+
+  return status;
+}
+
 zx_status_t MesonCpuClock::SetRate(const uint32_t hz) {
   zx_status_t status;
 
   if (chip_id_ == PDEV_PID_AMLOGIC_A5) {
     status = SetRateA5(hz);
+  } else if (chip_id_ == PDEV_PID_AMLOGIC_A1) {
+    status = SetRateA1(hz);
   } else {
     if (hz > kFrequencyThresholdHz && current_rate_hz_ > kFrequencyThresholdHz) {
       // Switching between two frequencies both higher than 1GHz.
@@ -501,10 +528,17 @@ zx_status_t MesonCpuClock::GetRate(uint64_t* result) {
 // dividers to get the new_rate in the sys_pll_div block. Refer fig. 6.6 Multi
 // Phase PLLS for A53 & A73 in the datasheet.
 zx_status_t MesonCpuClock::ConfigCpuFixedPll(const uint32_t new_rate) {
-  const aml_fclk_rate_table_t* fclk_rate_table = s905d2_fclk_get_rate_table();
-  size_t rate_count = s905d2_fclk_get_rate_table_count();
+  const aml_fclk_rate_table_t* fclk_rate_table;
+  size_t rate_count;
   size_t i;
 
+  if (chip_id_ == PDEV_PID_AMLOGIC_A1) {
+    fclk_rate_table = a1_fclk_get_rate_table();
+    rate_count = a1_fclk_get_rate_table_count();
+  } else {
+    fclk_rate_table = s905d2_fclk_get_rate_table();
+    rate_count = s905d2_fclk_get_rate_table_count();
+  }
   // Validate if the new_rate is available
   for (i = 0; i < rate_count; i++) {
     if (new_rate == fclk_rate_table[i].rate) {
@@ -564,11 +598,13 @@ zx_status_t MesonCpuClock::WaitForBusyCpu() {
 AmlClock::~AmlClock() = default;
 
 AmlClock::AmlClock(zx_device_t* device, fdf::MmioBuffer hiu_mmio, fdf::MmioBuffer dosbus_mmio,
-                   std::optional<fdf::MmioBuffer> msr_mmio, uint32_t device_id)
+                   std::optional<fdf::MmioBuffer> msr_mmio,
+                   std::optional<fdf::MmioBuffer> cpuctrl_mmio, uint32_t device_id)
     : DeviceType(device),
       hiu_mmio_(std::move(hiu_mmio)),
       dosbus_mmio_(std::move(dosbus_mmio)),
-      msr_mmio_(std::move(msr_mmio)) {
+      msr_mmio_(std::move(msr_mmio)),
+      cpuctrl_mmio_(std::move(cpuctrl_mmio)) {
   // Populate the correct register blocks.
   switch (device_id) {
     case PDEV_DID_AMLOGIC_AXG_CLK: {
@@ -682,6 +718,7 @@ AmlClock::AmlClock(zx_device_t* device, fdf::MmioBuffer hiu_mmio, fdf::MmioBuffe
     }
     case PDEV_DID_AMLOGIC_A1_CLK: {
       // clover
+      uint32_t chip_id = PDEV_PID_AMLOGIC_A1;
       clk_msr_offsets_ = a1_clk_msr;
 
       clk_table_ = static_cast<const char* const*>(a1_clk_table);
@@ -696,6 +733,12 @@ AmlClock::AmlClock(zx_device_t* device, fdf::MmioBuffer hiu_mmio, fdf::MmioBuffe
 
       pll_count_ = a1::PLL_COUNT;
       InitHiuA1();
+
+      constexpr size_t cpu_clk_count = std::size(a1_cpu_clks);
+      cpu_clks_.reserve(cpu_clk_count);
+      // For A1, there is only 1 CPU clock
+      cpu_clks_.emplace_back(&cpuctrl_mmio_.value(), a1_cpu_clks[0].reg,
+                             &pllclk_[a1_cpu_clks[0].pll], a1_cpu_clks[0].initial_hz, chip_id);
 
       break;
     }
@@ -717,6 +760,7 @@ zx_status_t AmlClock::Create(zx_device_t* parent) {
   std::optional<fdf::MmioBuffer> hiu_mmio = std::nullopt;
   std::optional<fdf::MmioBuffer> dosbus_mmio = std::nullopt;
   std::optional<fdf::MmioBuffer> msr_mmio = std::nullopt;
+  std::optional<fdf::MmioBuffer> cpuctrl_mmio = std::nullopt;
 
   // All AML clocks have HIU and dosbus regs but only some support MSR regs.
   // Figure out which of the varieties we're dealing with.
@@ -749,6 +793,15 @@ zx_status_t AmlClock::Create(zx_device_t* parent) {
     }
   }
 
+  // For A1, this register is within cpuctrl mmio
+  if (info.pid == PDEV_PID_AMLOGIC_A1 && info.mmio_count > kCpuCtrlMmio) {
+    status = pdev.MapMmio(kCpuCtrlMmio, &cpuctrl_mmio);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "aml-clk: failed to map cpuctrl regs, status = %d", status);
+      return status;
+    }
+  }
+
   auto endpoints = fdf::CreateEndpoints<fuchsia_hardware_platform_bus::PlatformBus>();
   if (endpoints.is_error()) {
     zxlogf(ERROR, "Create endpoints failed: %s", endpoints.status_string());
@@ -767,7 +820,8 @@ zx_status_t AmlClock::Create(zx_device_t* parent) {
   }
 
   auto clock_device = std::make_unique<amlogic_clock::AmlClock>(
-      parent, std::move(*hiu_mmio), *std::move(dosbus_mmio), *std::move(msr_mmio), info.did);
+      parent, std::move(*hiu_mmio), *std::move(dosbus_mmio), *std::move(msr_mmio),
+      *std::move(cpuctrl_mmio), info.did);
 
   status = clock_device->DdkAdd(
       ddk::DeviceAddArgs("clocks").forward_metadata(parent, DEVICE_METADATA_CLOCK_IDS));

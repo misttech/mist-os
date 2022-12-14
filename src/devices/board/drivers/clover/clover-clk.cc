@@ -33,6 +33,10 @@ static const std::vector<fpbus::Mmio> clk_mmios{
         .base = A1_MSR_CLK_BASE,
         .length = A1_MSR_CLK_LENGTH,
     }},
+    {{
+        .base = A1_CPUCTRL_CLK_CTRL0_BASE,
+        .length = A1_CPUCTRL_CLK_CTRL0_LENGTH,
+    }},
 };
 
 constexpr clock_id_t clock_ids[] = {
