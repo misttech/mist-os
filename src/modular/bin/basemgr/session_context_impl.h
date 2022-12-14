@@ -18,7 +18,7 @@
 
 #include "src/lib/fxl/macros.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
-#include "src/modular/lib/common/viewparams.h"
+#include "src/modular/lib/common/viewmode.h"
 #include "src/modular/lib/fidl/app_client.h"
 #include "src/modular/lib/modular_config/modular_config_accessor.h"
 
@@ -46,7 +46,7 @@ class SessionContextImpl : fuchsia::modular::internal::SessionContext {
   SessionContextImpl(fuchsia::sys::Launcher* launcher,
                      fuchsia::modular::session::AppConfig sessionmgr_app_config,
                      const modular::ModularConfigAccessor* config_accessor,
-                     std::optional<ViewParams> view_params,
+                     fuchsia::modular::internal::ViewParamsPtr view_params,
                      fuchsia::sys::ServiceList v2_services_for_sessionmgr,
                      fidl::InterfaceRequest<fuchsia::io::Directory> svc_from_v1_sessionmgr,
                      OnSessionShutdownCallback on_session_shutdown);

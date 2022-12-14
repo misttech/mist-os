@@ -49,6 +49,10 @@
                     "type": "boolean",
                     "default": false
                 },
+                "headless": {
+                    "type": "boolean",
+                    "default": false
+                },
                 "session_shells": {
                     "type": "array",
                     "items": {

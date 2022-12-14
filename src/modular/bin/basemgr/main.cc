@@ -75,7 +75,8 @@ std::unique_ptr<modular::BasemgrImpl> CreateBasemgrImpl(
   // If sessionmgr is not configured to launch a session shell, basemgr should get the session
   // shell view via ViewProvider exposed by a v2 component.
   std::optional<fuchsia::ui::app::ViewProviderPtr> view_provider;
-  if (!config_accessor.session_shell_app_config().has_value()) {
+  if (!config_accessor.basemgr_config().headless() &&
+      !config_accessor.session_shell_app_config().has_value()) {
     view_provider = std::make_optional<fuchsia::ui::app::ViewProviderPtr>();
     view_provider->set_error_handler([](zx_status_t error) {
       FX_PLOGS(ERROR, error) << "Error on fuchsia.ui.app.ViewProvider.";
@@ -211,25 +212,31 @@ int main(int argc, const char** argv) {
     return EXIT_FAILURE;
   }
 
-  // Query scenic for the composition API to use.
-  // The scenic service may not always be routed to us in all product configurations, so allow the
-  // query to fail with ZX_ERR_PEER_CLOSED.
-  fuchsia::ui::scenic::ScenicSyncPtr scenic;
+  auto config_accessor = modular::ModularConfigAccessor(config_reader.GetConfig());
+
   bool use_flatland = false;
-  zx_status_t connect_status =
-      component_context->svc()->Connect<fuchsia::ui::scenic::Scenic>(scenic.NewRequest());
-  FX_CHECK(connect_status == ZX_OK) << "Error connection to fuchsia::ui::scenic::Scenic: "
-                                    << zx_status_get_string(connect_status);
-  zx_status_t use_flatland_status = scenic->UsesFlatland(&use_flatland);
-  FX_CHECK(use_flatland_status == ZX_OK || use_flatland_status == ZX_ERR_PEER_CLOSED)
-      << "Error querying Scenic for flatland status: " << zx_status_get_string(use_flatland_status);
-  if (use_flatland_status == ZX_ERR_PEER_CLOSED) {
-    FX_LOGS(WARNING) << "fuchsia::ui::scenic::Scenic not present when querying for flatland status";
+  if (!config_accessor.basemgr_config().headless()) {
+    // Query scenic for the composition API to use.
+    // The scenic service may not always be routed to us in all product configurations, so allow the
+    // query to fail with ZX_ERR_PEER_CLOSED.
+    fuchsia::ui::scenic::ScenicSyncPtr scenic;
+    zx_status_t connect_status =
+        component_context->svc()->Connect<fuchsia::ui::scenic::Scenic>(scenic.NewRequest());
+    FX_CHECK(connect_status == ZX_OK) << "Error connection to fuchsia::ui::scenic::Scenic: "
+                                      << zx_status_get_string(connect_status);
+    zx_status_t use_flatland_status = scenic->UsesFlatland(&use_flatland);
+    FX_CHECK(use_flatland_status == ZX_OK || use_flatland_status == ZX_ERR_PEER_CLOSED)
+        << "Error querying Scenic for flatland status: "
+        << zx_status_get_string(use_flatland_status);
+    if (use_flatland_status == ZX_ERR_PEER_CLOSED) {
+      FX_LOGS(WARNING)
+          << "fuchsia::ui::scenic::Scenic not present when querying for flatland status";
+    }
   }
 
-  auto basemgr_impl = CreateBasemgrImpl(modular::ModularConfigAccessor(config_reader.GetConfig()),
-                                        children, backoff_base, use_flatland,
-                                        component_context.get(), inspector.get(), &loop);
+  auto basemgr_impl =
+      CreateBasemgrImpl(std::move(config_accessor), children, backoff_base, use_flatland,
+                        component_context.get(), inspector.get(), &loop);
 
   basemgr_impl->Start();
   loop.Run();

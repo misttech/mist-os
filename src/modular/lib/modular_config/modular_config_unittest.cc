@@ -357,7 +357,8 @@ TEST_F(ModularConfigReaderTest, ConfigToJsonString) {
       "basemgr": {
         "enable_cobalt": true,
         "use_session_shell_for_story_shell_factory": false,
-        "session_shells": []
+        "session_shells": [],
+        "headless": false
       },
       "sessionmgr": {
         "enable_cobalt": true,

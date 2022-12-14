@@ -27,20 +27,22 @@ ModuleControllerImpl::ModuleControllerImpl(fuchsia::sys::Launcher* const launche
       module_data_(module_data) {
   app_client_.SetAppErrorHandler([this] { OnAppConnectionError(); });
 
-  fuchsia::ui::app::ViewProviderPtr view_provider;
-  app_client_.services().Connect(view_provider.NewRequest());
+  if (view_params) {
+    fuchsia::ui::app::ViewProviderPtr view_provider;
+    app_client_.services().Connect(view_provider.NewRequest());
 
-  if (std::holds_alternative<fuchsia::ui::views::ViewCreationToken>(view_params)) {
-    fuchsia::ui::app::CreateView2Args args;
-    args.set_view_creation_token(
-        std::move(std::get<fuchsia::ui::views::ViewCreationToken>(view_params)));
-    view_provider->CreateView2(std::move(args));
-  } else {
-    auto& view_pair =
-        std::get<std::pair<fuchsia::ui::views::ViewToken, scenic::ViewRefPair>>(view_params);
-    view_provider->CreateViewWithViewRef(std::move(view_pair.first.value),
-                                         std::move(view_pair.second.control_ref),
-                                         std::move(view_pair.second.view_ref));
+    if (std::holds_alternative<fuchsia::ui::views::ViewCreationToken>(*view_params)) {
+      fuchsia::ui::app::CreateView2Args args;
+      args.set_view_creation_token(
+          std::move(std::get<fuchsia::ui::views::ViewCreationToken>(*view_params)));
+      view_provider->CreateView2(std::move(args));
+    } else {
+      auto& view_pair =
+          std::get<std::pair<fuchsia::ui::views::ViewToken, scenic::ViewRefPair>>(*view_params);
+      view_provider->CreateViewWithViewRef(std::move(view_pair.first.value),
+                                           std::move(view_pair.second.control_ref),
+                                           std::move(view_pair.second.view_ref));
+    }
   }
 }
 

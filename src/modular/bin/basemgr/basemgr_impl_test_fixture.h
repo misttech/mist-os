@@ -79,28 +79,7 @@ class FakeSessionmgr : public fuchsia::modular::internal::testing::Sessionmgr_Te
                   fidl::InterfaceHandle<fuchsia::modular::internal::SessionContext> session_context,
                   fuchsia::sys::ServiceList v2_services_for_sessionmgr,
                   fidl::InterfaceRequest<fuchsia::io::Directory> svc_from_v1_sessionmgr,
-                  fuchsia::ui::views::ViewCreationToken view_creation_token) override {
-    v2_services_for_sessionmgr_ = std::move(v2_services_for_sessionmgr);
-    initialized_ = true;
-  }
-
-  void InitializeLegacy(
-      std::string session_id,
-      fidl::InterfaceHandle<fuchsia::modular::internal::SessionContext> session_context,
-      fuchsia::sys::ServiceList v2_services_for_sessionmgr,
-      fidl::InterfaceRequest<fuchsia::io::Directory> svc_from_v1_sessionmgr,
-      fuchsia::ui::views::ViewToken view_token, fuchsia::ui::views::ViewRefControl control_ref,
-      fuchsia::ui::views::ViewRef view_ref) override {
-    v2_services_for_sessionmgr_ = std::move(v2_services_for_sessionmgr);
-    initialized_ = true;
-  }
-
-  void InitializeWithoutView(
-      std::string session_id,
-      fidl::InterfaceHandle<fuchsia::modular::internal::SessionContext> session_context,
-      fuchsia::sys::ServiceList v2_services_for_sessionmgr,
-      fidl::InterfaceRequest<fuchsia::io::Directory> svc_from_v1_sessionmgr,
-      bool use_flatland) override {
+                  fuchsia::modular::internal::ViewParamsPtr view_params) override {
     v2_services_for_sessionmgr_ = std::move(v2_services_for_sessionmgr);
     initialized_ = true;
   }

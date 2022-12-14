@@ -102,6 +102,9 @@ void XdrBasemgrConfig_v1(XdrContext* const xdr,
                         data->mutable_use_session_shell_for_story_shell_factory(),
                         has_use_session_shell_for_story_shell_factory, false);
 
+  bool has_headless = data->has_headless();
+  xdr->FieldWithDefault(modular_config::kHeadless, data->mutable_headless(), has_headless, false);
+
   std::vector<fuchsia::modular::session::SessionShellMapEntry> default_session_shell_map;
   bool has_session_shell_map = data->has_session_shell_map();
   xdr->FieldWithDefault(modular_config::kSessionShells, data->mutable_session_shell_map(),

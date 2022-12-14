@@ -305,32 +305,46 @@ class StoryControllerImpl::LaunchModuleCall : public Operation<> {
     running_mod_info->module_data =
         std::make_unique<fuchsia::modular::ModuleData>(CloneModuleData(module_data_));
 
-    if (story_controller_impl_->story_provider_impl_->use_flatland()) {
-      auto [view_creation_token, viewport_creation_token] = scenic::ViewCreationTokenPair::New();
+    switch (story_controller_impl_->story_provider_impl_->view_mode()) {
+      case ViewMode::HEADLESS:
+        // ModuleControllerImpl's constructor launches the child application.
+        running_mod_info->module_controller_impl = std::make_unique<ModuleControllerImpl>(
+            story_controller_impl_->story_provider_impl_->session_environment()->GetLauncher(),
+            std::move(module_config), running_mod_info->module_data.get(), std::move(service_list),
+            /*view_params=*/std::nullopt);
+        break;
+      case ViewMode::FLATLAND: {
+        auto [view_creation_token, viewport_creation_token] = scenic::ViewCreationTokenPair::New();
 
-      // ModuleControllerImpl's constructor launches the child application.
-      running_mod_info->module_controller_impl = std::make_unique<ModuleControllerImpl>(
-          story_controller_impl_->story_provider_impl_->session_environment()->GetLauncher(),
-          std::move(module_config), running_mod_info->module_data.get(), std::move(service_list),
-          std::move(view_creation_token));
+        // ModuleControllerImpl's constructor launches the child application.
+        running_mod_info->module_controller_impl = std::make_unique<ModuleControllerImpl>(
+            story_controller_impl_->story_provider_impl_->session_environment()->GetLauncher(),
+            std::move(module_config), running_mod_info->module_data.get(), std::move(service_list),
+            std::move(view_creation_token));
 
-      running_mod_info->pending_viewport_creation_token = std::move(viewport_creation_token);
-      running_mod_info->pending_view_holder_token = std::nullopt;
-      running_mod_info->view_ref = std::nullopt;
-    } else {
-      auto [view_token, view_holder_token] = scenic::ViewTokenPair::New();
-      scenic::ViewRefPair view_ref_pair = scenic::ViewRefPair::New();
-      auto view_ref_clone = fidl::Clone(view_ref_pair.view_ref);
+        running_mod_info->pending_viewport_creation_token = std::move(viewport_creation_token);
+        break;
+      }
+      case ViewMode::GFX: {
+        auto [view_token, view_holder_token] = scenic::ViewTokenPair::New();
+        scenic::ViewRefPair view_ref_pair = scenic::ViewRefPair::New();
+        auto view_ref_clone = fidl::Clone(view_ref_pair.view_ref);
 
-      // ModuleControllerImpl's constructor launches the child application.
-      running_mod_info->module_controller_impl = std::make_unique<ModuleControllerImpl>(
-          story_controller_impl_->story_provider_impl_->session_environment()->GetLauncher(),
-          std::move(module_config), running_mod_info->module_data.get(), std::move(service_list),
-          std::make_pair(std::move(view_token), std::move(view_ref_pair)));
+        // ModuleControllerImpl's constructor launches the child application.
+        running_mod_info->module_controller_impl = std::make_unique<ModuleControllerImpl>(
+            story_controller_impl_->story_provider_impl_->session_environment()->GetLauncher(),
+            std::move(module_config), running_mod_info->module_data.get(), std::move(service_list),
+            std::make_pair(std::move(view_token), std::move(view_ref_pair)));
 
-      running_mod_info->pending_view_holder_token = std::move(view_holder_token);
-      running_mod_info->view_ref = std::move(view_ref_clone);
-      running_mod_info->pending_viewport_creation_token = std::nullopt;
+        running_mod_info->pending_view_holder_token = std::move(view_holder_token);
+        running_mod_info->view_ref = std::move(view_ref_clone);
+        break;
+      }
+      default: {
+        FX_LOGS(FATAL) << "Unknown ViewMode: "
+                       << static_cast<int>(
+                              story_controller_impl_->story_provider_impl_->view_mode());
+      }
     }
 
     ModuleContextInfo module_context_info = {
@@ -387,6 +401,11 @@ class StoryControllerImpl::LaunchModuleInShellCall : public Operation<> {
     if (!story_controller_impl_->present_mods_as_stories_ &&
         !story_controller_impl_->story_shell_) {
       FX_LOGS(WARNING) << "StoryShell disconnected, not presenting module view.";
+      return;
+    }
+
+    // In headless mode, there is no story shell or module module view.
+    if (story_controller_impl_->story_provider_impl_->view_mode() == ViewMode::HEADLESS) {
       return;
     }
 
@@ -948,6 +967,11 @@ void StoryControllerImpl::Watch(fidl::InterfaceHandle<fuchsia::modular::StoryWat
 }
 
 void StoryControllerImpl::MaybeStartStoryShell() {
+  if (story_provider_impl_->view_mode() == ViewMode::HEADLESS) {
+    FX_LOGS(INFO) << "Running in headless mode. Story shell will not be started or "
+                     "requested from StoryShellFactory.";
+    return;
+  }
   if (present_mods_as_stories_) {
     FX_LOGS(INFO) << "Mods will be presented as stories. Story shell will not be started or "
                      "requested from StoryShellFactory.";

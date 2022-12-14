@@ -193,7 +193,7 @@ StoryProviderImpl::StoryProviderImpl(
     Environment* const session_environment, SessionStorage* const session_storage,
     std::optional<fuchsia::modular::session::AppConfig> story_shell_config,
     fuchsia::modular::StoryShellFactoryPtr story_shell_factory,
-    PresentationProtocolPtr presentation_protocol, bool present_mods_as_stories, bool use_flatland,
+    PresentationProtocolPtr presentation_protocol, bool present_mods_as_stories, ViewMode view_mode,
     ComponentContextInfo component_context_info, AgentServicesFactory* const agent_services_factory,
     inspect::Node* root_node)
     : session_environment_(session_environment),
@@ -202,7 +202,7 @@ StoryProviderImpl::StoryProviderImpl(
       story_shell_factory_(std::move(story_shell_factory)),
       presentation_protocol_(std::move(presentation_protocol)),
       present_mods_as_stories_(present_mods_as_stories),
-      use_flatland_(use_flatland),
+      view_mode_(view_mode),
       component_context_info_(std::move(component_context_info)),
       agent_services_factory_(agent_services_factory),
       session_inspect_node_(root_node),
@@ -362,28 +362,38 @@ void StoryProviderImpl::AttachOrPresentStoryShellView(std::string story_id) {
   AttachOrPresentViewParams present_view_params;
   present_view_params.story_id = std::move(story_id);
 
-  // Create the flatland or gfx view.
-  if (use_flatland_) {
-    auto [view_creation_token, viewport_creation_token] = scenic::ViewCreationTokenPair::New();
-    present_view_params.viewport_creation_token =
-        std::make_optional(std::move(viewport_creation_token));
-    fuchsia::ui::app::ViewProviderPtr view_provider;
-    preloaded_story_shell_app_->services().Connect(view_provider.NewRequest());
-    fuchsia::ui::app::CreateView2Args args;
-    args.set_view_creation_token(std::move(view_creation_token));
-    view_provider->CreateView2(std::move(args));
-  } else {
-    auto [view_token, view_holder_token] = scenic::ViewTokenPair::New();
-    scenic::ViewRefPair view_ref_pair = scenic::ViewRefPair::New();
+  switch (view_mode_) {
+    case ViewMode::HEADLESS:
+      FX_LOGS(FATAL) << "Cannot present story shell view in headless mode";
+      return;
+    case ViewMode::FLATLAND: {
+      auto [view_creation_token, viewport_creation_token] = scenic::ViewCreationTokenPair::New();
+      present_view_params.viewport_creation_token =
+          std::make_optional(std::move(viewport_creation_token));
+      fuchsia::ui::app::ViewProviderPtr view_provider;
+      preloaded_story_shell_app_->services().Connect(view_provider.NewRequest());
+      fuchsia::ui::app::CreateView2Args args;
+      args.set_view_creation_token(std::move(view_creation_token));
+      view_provider->CreateView2(std::move(args));
+      break;
+    }
+    case ViewMode::GFX: {
+      auto [view_token, view_holder_token] = scenic::ViewTokenPair::New();
+      scenic::ViewRefPair view_ref_pair = scenic::ViewRefPair::New();
 
-    present_view_params.view_holder_token = std::move(view_holder_token),
-    present_view_params.view_ref = fidl::Clone(view_ref_pair.view_ref);
+      present_view_params.view_holder_token = std::move(view_holder_token),
+      present_view_params.view_ref = fidl::Clone(view_ref_pair.view_ref);
 
-    fuchsia::ui::app::ViewProviderPtr view_provider;
-    preloaded_story_shell_app_->services().Connect(view_provider.NewRequest());
-    view_provider->CreateViewWithViewRef(std::move(view_token.value),
-                                         std::move(view_ref_pair.control_ref),
-                                         std::move(view_ref_pair.view_ref));
+      fuchsia::ui::app::ViewProviderPtr view_provider;
+      preloaded_story_shell_app_->services().Connect(view_provider.NewRequest());
+      view_provider->CreateViewWithViewRef(std::move(view_token.value),
+                                           std::move(view_ref_pair.control_ref),
+                                           std::move(view_ref_pair.view_ref));
+      break;
+    }
+    default: {
+      FX_LOGS(FATAL) << "Unknown ViewMode: " << static_cast<int>(view_mode_);
+    }
   }
 
   AttachOrPresentView(std::move(present_view_params));

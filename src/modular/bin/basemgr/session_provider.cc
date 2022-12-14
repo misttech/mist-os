@@ -43,7 +43,7 @@ SessionProvider::SessionProvider(fuchsia::sys::Launcher* const launcher,
 }
 
 SessionProvider::StartSessionResult SessionProvider::StartSession(
-    std::optional<ViewParams> view_params) {
+    fuchsia::modular::internal::ViewParamsPtr view_params) {
   if (is_session_running()) {
     FX_LOGS(WARNING) << "StartSession() called when session context already "
                         "exists. Try calling SessionProvider::Teardown()";

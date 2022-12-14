@@ -226,28 +226,29 @@ BasemgrImpl::StartSessionResult BasemgrImpl::StartSession() {
     return fpromise::error(ZX_ERR_BAD_STATE);
   }
 
-  if (use_flatland_) {
+  if (config_accessor_.basemgr_config().headless()) {
+    auto start_session_result = session_provider_->StartSession(/*view_params=*/nullptr);
+    FX_CHECK(start_session_result.is_ok());
+  } else if (use_flatland_) {
     fuchsia::session::scene::ManagerPtr* scene_manager =
         std::get_if<fuchsia::session::scene::ManagerPtr>(&scene_owner_);
     FX_CHECK(scene_manager != nullptr);
 
     auto [view_creation_token, viewport_creation_token] = scenic::ViewCreationTokenPair::New();
 
-    std::optional<ViewParams> view_params = std::nullopt;
+    fuchsia::modular::internal::ViewParamsPtr view_params =
+        std::make_unique<fuchsia::modular::internal::ViewParams>();
     // Get the view from the v2 session shell if available.
     if (view_provider_.has_value()) {
       FX_LOGS(INFO) << "Creating Flatland view for v2 session shell.";
       fuchsia::ui::app::CreateView2Args create_view_args;
       create_view_args.set_view_creation_token(std::move(view_creation_token));
       (*view_provider_)->CreateView2(std::move(create_view_args));
+      view_params->set_use_flatland(true);
     } else {
       FX_LOGS(INFO)
           << "No ViewProvider, sessionmgr will create Flatland view for v1 session shell.";
-      view_params = std::make_optional(std::move(view_creation_token));
-    }
-
-    if (!view_params) {
-      view_params = std::make_optional(/*use_flatland=*/true);
+      view_params->set_view_creation_token(std::move(view_creation_token));
     }
 
     auto start_session_result = session_provider_->StartSession(std::move(view_params));
@@ -263,21 +264,22 @@ BasemgrImpl::StartSessionResult BasemgrImpl::StartSession() {
     scenic::ViewRefPair view_ref_pair = scenic::ViewRefPair::New();
     auto view_ref_clone = fidl::Clone(view_ref_pair.view_ref);
 
-    std::optional<ViewParams> view_params = std::nullopt;
+    fuchsia::modular::internal::ViewParamsPtr view_params =
+        std::make_unique<fuchsia::modular::internal::ViewParams>();
     // Get the view from the v2 session shell if available.
     if (view_provider_.has_value()) {
       FX_LOGS(INFO) << "Creating Gfx view for v2 session shell.";
       (*view_provider_)
           ->CreateViewWithViewRef(std::move(view_token.value), std::move(view_ref_pair.control_ref),
                                   std::move(view_ref_pair.view_ref));
+      view_params->set_use_flatland(false);
     } else {
       FX_LOGS(INFO) << "No ViewProvider, sessionmgr will create Gfx view for v1 session shell.";
-      view_params = std::make_optional(GfxViewParams{.view_token = std::move(view_token),
-                                                     .view_ref_pair = std::move(view_ref_pair)});
-    }
-
-    if (!view_params) {
-      view_params = std::make_optional(/*use_flatland=*/false);
+      view_params->set_gfx_view_params(fuchsia::modular::internal::GfxViewParams{
+          .view_token = std::move(view_token),
+          .control_ref = std::move(view_ref_pair.control_ref),
+          .view_ref = std::move(view_ref_pair.view_ref),
+      });
     }
 
     auto start_session_result = session_provider_->StartSession(std::move(view_params));

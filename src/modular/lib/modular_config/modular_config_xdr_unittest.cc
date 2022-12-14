@@ -24,7 +24,8 @@ TEST(ModularConfigXdr, BasemgrWriteDefaultValues) {
   static constexpr auto kExpectedJson = R"({
       "enable_cobalt": true,
       "use_session_shell_for_story_shell_factory": false,
-      "session_shells": null
+      "session_shells": null,
+      "headless": false
     })";
   rapidjson::Document expected_json_doc;
   expected_json_doc.Parse(kExpectedJson);
@@ -80,6 +81,7 @@ TEST(ModularConfigXdr, BasemgrReadValues) {
 
   EXPECT_FALSE(read_config.enable_cobalt());
   EXPECT_TRUE(read_config.use_session_shell_for_story_shell_factory());
+  EXPECT_FALSE(read_config.headless());
 
   ASSERT_EQ(1u, read_config.session_shell_map().size());
   const auto& session_shell = read_config.session_shell_map().at(0);
@@ -257,7 +259,8 @@ TEST(ModularConfigXdr, ModularWriteDefaultValues) {
       "basemgr": {
         "enable_cobalt": true,
         "use_session_shell_for_story_shell_factory": false,
-        "session_shells": []
+        "session_shells": [],
+        "headless": false
       },
       "sessionmgr": {
         "enable_cobalt": true,
@@ -291,7 +294,8 @@ TEST(ModularConfigXdr, ModularReadWriteValues) {
       "basemgr": {
         "enable_cobalt": false,
         "use_session_shell_for_story_shell_factory": false,
-        "session_shells": null
+        "session_shells": null,
+        "headless": false
       },
       "sessionmgr": {
         "enable_cobalt": false,

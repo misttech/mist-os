@@ -29,7 +29,7 @@
 #include "src/modular/bin/sessionmgr/storage/story_storage.h"
 #include "src/modular/bin/sessionmgr/story_runner/story_provider_impl.h"
 #include "src/modular/lib/common/async_holder.h"
-#include "src/modular/lib/common/viewparams.h"
+#include "src/modular/lib/common/viewmode.h"
 #include "src/modular/lib/deprecated_service_provider/service_provider_impl.h"
 #include "src/modular/lib/fidl/environment.h"
 #include "src/modular/lib/modular_config/modular_config_accessor.h"
@@ -49,39 +49,16 @@ class SessionmgrImpl : fuchsia::modular::internal::Sessionmgr,
 
  private:
   // |Sessionmgr|
-  void Initialize(std::string session_id,
-                  fidl::InterfaceHandle<fuchsia::modular::internal::SessionContext> session_context,
-                  fuchsia::sys::ServiceList v2_services_for_sessionmgr,
-                  fidl::InterfaceRequest<fuchsia::io::Directory> svc_from_v1_sessionmgr,
-                  fuchsia::ui::views::ViewCreationToken view_creation_token) override;
-
-  // |Sessionmgr|
-  void InitializeLegacy(
-      std::string session_id,
-      fidl::InterfaceHandle<fuchsia::modular::internal::SessionContext> session_context,
-      fuchsia::sys::ServiceList v2_services_for_sessionmgr,
-      fidl::InterfaceRequest<fuchsia::io::Directory> svc_from_v1_sessionmgr,
-      fuchsia::ui::views::ViewToken view_token, fuchsia::ui::views::ViewRefControl control_ref,
-      fuchsia::ui::views::ViewRef view_ref) override;
-
-  // |Sessionmgr|
-  void InitializeWithoutView(
-      std::string session_id,
-      fidl::InterfaceHandle<fuchsia::modular::internal::SessionContext> session_context,
-      fuchsia::sys::ServiceList v2_services_for_sessionmgr,
-      fidl::InterfaceRequest<fuchsia::io::Directory> svc_from_v1_sessionmgr,
-      bool use_flatland) override;
-
+  //
   // InitializeInternal is called for each new session, denoted by a unique session_id. In other
   // words, it initializes a session, not a SessionmgrImpl (despite the class-scoped name).
   // (Ironically, the |finitish_initialization_| lambda does initialize some Sessionmgr-scoped
   // resources only once, upon demand.)
-  void InitializeInternal(
-      std::string session_id,
-      fidl::InterfaceHandle<fuchsia::modular::internal::SessionContext> session_context,
-      fuchsia::sys::ServiceList v2_services_for_sessionmgr,
-      fidl::InterfaceRequest<fuchsia::io::Directory> svc_from_v1_sessionmgr,
-      std::optional<ViewParams> view_params);
+  void Initialize(std::string session_id,
+                  fidl::InterfaceHandle<fuchsia::modular::internal::SessionContext> session_context,
+                  fuchsia::sys::ServiceList v2_services_for_sessionmgr,
+                  fidl::InterfaceRequest<fuchsia::io::Directory> svc_from_v1_sessionmgr,
+                  fuchsia::modular::internal::ViewParamsPtr view_params) override;
 
   // Sequence of Initialize() broken up into steps for clarity.
   void InitializeSessionEnvironment(std::string session_id,
@@ -93,13 +70,14 @@ class SessionmgrImpl : fuchsia::modular::internal::Sessionmgr,
   void InitializeStoryProvider(
       std::optional<fuchsia::modular::session::AppConfig> story_shell_config,
       PresentationProtocolPtr presentation_protocol, bool use_session_shell_for_story_shell_factory,
-      bool present_mods_as_stories, bool use_flatland);
+      bool present_mods_as_stories, ViewMode view_mode);
   void InitializeSessionShell(
       std::optional<fuchsia::modular::session::AppConfig> session_shell_config,
-      std::optional<ViewParams> view_params);
+      fuchsia::modular::internal::ViewParamsPtr view_params);
   fuchsia::sys::ServiceList CreateSessionShellServiceList();
   void LaunchSessionShell(fuchsia::modular::session::AppConfig session_shell_config,
-                          fuchsia::sys::ServiceList service_list, ViewParams view_params);
+                          fuchsia::sys::ServiceList service_list,
+                          fuchsia::modular::internal::ViewParams view_params);
   void InitializePuppetMaster();
   void InitializeElementManager();
   void ServeSvcFromV1SessionmgrDir(

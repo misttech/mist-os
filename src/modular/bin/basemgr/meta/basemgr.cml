@@ -26,13 +26,19 @@
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.session.Restarter",
-                "fuchsia.session.scene.Manager",
                 "fuchsia.sys.Launcher",
                 "fuchsia.tracing.provider.Registry",
+            ],
+            from: "parent",
+        },
+        {
+            protocol: [
+                "fuchsia.session.scene.Manager",
                 "fuchsia.ui.policy.Presenter",
                 "fuchsia.ui.scenic.Scenic",
             ],
             from: "parent",
+            availability: "optional",
         },
         {
             storage: "data",

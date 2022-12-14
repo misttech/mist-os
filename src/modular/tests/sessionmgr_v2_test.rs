@@ -241,7 +241,7 @@ async fn test_launch_sessionmgr() -> Result<(), Error> {
         create_endpoints::<fmodular_internal::SessionContextMarker>()?;
     let (_services_from_sessionmgr, services_from_sessionmgr_server_end) =
         create_proxy::<fio::DirectoryMarker>()?;
-    let mut link_token_pair = scenic::flatland::ViewCreationTokenPair::new()?;
+    let link_token_pair = scenic::flatland::ViewCreationTokenPair::new()?;
     let mut services_for_agents_fs = ServiceFs::<ServiceObj<'_, ()>>::new();
 
     let sessionmgr_proxy = instance
@@ -252,7 +252,9 @@ async fn test_launch_sessionmgr() -> Result<(), Error> {
         session_context_client_end,
         &mut services_for_agents_fs.host_services_list()?,
         services_from_sessionmgr_server_end,
-        &mut link_token_pair.view_creation_token,
+        Some(&mut fmodular_internal::ViewParams::ViewCreationToken(
+            link_token_pair.view_creation_token,
+        )),
     )?;
 
     fasync::Task::local(services_for_agents_fs.collect()).detach();
@@ -347,7 +349,7 @@ async fn test_v2_modular_agents() -> Result<(), Error> {
         create_endpoints::<fmodular_internal::SessionContextMarker>()?;
     let (_services_from_sessionmgr, services_from_sessionmgr_server_end) =
         create_proxy::<fio::DirectoryMarker>()?;
-    let mut link_token_pair = scenic::flatland::ViewCreationTokenPair::new()?;
+    let link_token_pair = scenic::flatland::ViewCreationTokenPair::new()?;
 
     // `fuchsia.modular.Agent.test_agent` represents a v2 component whose Agent protocol
     // is routed to sessionmgr through /svc_for_v1_sessionmgr.
@@ -367,7 +369,9 @@ async fn test_v2_modular_agents() -> Result<(), Error> {
         session_context_client_end,
         &mut services_for_agents_fs.host_services_list()?,
         services_from_sessionmgr_server_end,
-        &mut link_token_pair.view_creation_token,
+        Some(&mut fmodular_internal::ViewParams::ViewCreationToken(
+            link_token_pair.view_creation_token,
+        )),
     )?;
 
     fasync::Task::local(services_for_agents_fs.collect()).detach();
@@ -519,7 +523,7 @@ async fn test_v2_modular_agent_reconnect() -> Result<(), Error> {
         create_endpoints::<fmodular_internal::SessionContextMarker>()?;
     let (_services_from_sessionmgr, services_from_sessionmgr_server_end) =
         create_proxy::<fio::DirectoryMarker>()?;
-    let mut link_token_pair = scenic::flatland::ViewCreationTokenPair::new()?;
+    let link_token_pair = scenic::flatland::ViewCreationTokenPair::new()?;
 
     // `fuchsia.modular.Agent.test_agent` represents a v2 component whose Agent protocol
     // is routed to sessionmgr through /svc_for_v1_sessionmgr.
@@ -550,7 +554,9 @@ async fn test_v2_modular_agent_reconnect() -> Result<(), Error> {
         session_context_client_end,
         &mut services_for_agents_fs.host_services_list()?,
         services_from_sessionmgr_server_end,
-        &mut link_token_pair.view_creation_token,
+        Some(&mut fmodular_internal::ViewParams::ViewCreationToken(
+            link_token_pair.view_creation_token,
+        )),
     )?;
 
     fasync::Task::local(services_for_agents_fs.collect()).detach();
@@ -648,7 +654,7 @@ async fn test_v2_session_shell() -> Result<(), Error> {
         create_endpoints::<fmodular_internal::SessionContextMarker>()?;
     let (services_from_sessionmgr, services_from_sessionmgr_server_end) =
         create_proxy::<fio::DirectoryMarker>()?;
-    let mut link_token_pair = scenic::flatland::ViewCreationTokenPair::new()?;
+    let link_token_pair = scenic::flatland::ViewCreationTokenPair::new()?;
 
     let (view_spec_sender, view_spec_receiver) = mpsc::channel(1);
 
@@ -673,7 +679,9 @@ async fn test_v2_session_shell() -> Result<(), Error> {
         session_context_client_end,
         &mut services_for_agents_fs.host_services_list()?,
         services_from_sessionmgr_server_end,
-        &mut link_token_pair.view_creation_token,
+        Some(&mut fmodular_internal::ViewParams::ViewCreationToken(
+            link_token_pair.view_creation_token,
+        )),
     )?;
 
     fasync::Task::local(services_for_agents_fs.collect()).detach();

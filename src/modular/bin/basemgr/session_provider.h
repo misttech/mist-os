@@ -46,7 +46,7 @@ class SessionProvider {
   // start a new session.
   //
   // Returns fpromise::ok if a new session was started successfully.
-  StartSessionResult StartSession(std::optional<ViewParams> view_params);
+  StartSessionResult StartSession(fuchsia::modular::internal::ViewParamsPtr view_params);
 
   // |AsyncHolder|
   // Asynchronously tears down the sessionmgr process. |callback| is invoked

@@ -26,10 +26,6 @@ source_set("teardown") {
   sources = [ "teardown.h" ]
 }
 
-source_set("viewparams") {
-  sources = [ "viewparams.h" ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
-    "//sdk/lib/ui/scenic/cpp",
-  ]
+source_set("viewmode") {
+  sources = [ "viewmode.h" ]
 }

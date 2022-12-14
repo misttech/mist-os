@@ -28,52 +28,35 @@ protocol Sessionmgr {
     /// CFv1 components (such as agent services and modular APIs like
     /// PuppetMaster) so they can also be used by CFv2 components hosted by
     /// basemgr.
-    ///
-    /// `view_creation_token` is a token for the Flatland view that is created
-    /// by the session shell launched by sessionmgr, and presented by basemgr
-    /// as the root view.
-    ///
-    /// This should be called when basemgr uses Flatland to present the
-    /// root view.
     Initialize(resource struct {
-        session_id string;
+        session_id string:MAX;
         session_context client_end:SessionContext;
         additional_services_for_agents fuchsia.sys.ServiceList;
         services_from_sessionmgr server_end:fuchsia.io.Directory;
-        view_creation_token fuchsia.ui.views.ViewCreationToken;
-    });
-    /// Launches sessionmgr. See `Initialize`.
-    ///
-    /// `view_token`, `control_ref`, and `view_ref` are used to create the Gfx
-    /// session shell view, passed to the session shell component launched
-    /// by sessionmgr, and presented by basemgr as the root view.
-    ///
-    /// This should be called when basemgr uses Gfx to present the root view.
-    InitializeLegacy(resource struct {
-        session_id string;
-        session_context client_end:SessionContext;
-        additional_services_for_agents fuchsia.sys.ServiceList;
-        services_from_sessionmgr server_end:fuchsia.io.Directory;
-        view_token fuchsia.ui.views.ViewToken;
-        control_ref fuchsia.ui.views.ViewRefControl;
-        view_ref fuchsia.ui.views.ViewRef;
-    });
-    /// Launches sessionmgr. See `Initialize`.
-    ///
-    /// sessionmgr does not receive a view through this method. `use_flatland`
-    /// indicates if Flatland protocol should be used instead of Gfx.
-    ///
-    /// This should be called when using a v2 session shell component,
-    /// launched by basemgr, instead of a v1 shell launched by sessionmgr.
-    /// In this case, basemgr presents the shell's view directly.
-    InitializeWithoutView(resource struct {
-        session_id string;
-        session_context client_end:SessionContext;
-        additional_services_for_agents fuchsia.sys.ServiceList;
-        services_from_sessionmgr server_end:fuchsia.io.Directory;
-        use_flatland bool;
+
+        /// If unset, sessionmgr will run in "headless" mode, i.e. without
+        /// graphics, and will not request or present mod views.
+        view_params strict resource union {
+            /// A token for the Flatland view that is created by the session shell
+            /// launched by sessionmgr, and presented by basemgr as the root view.
+            1: view_creation_token fuchsia.ui.views.ViewCreationToken;
+
+            /// Used to create the Gfx session shell view, passed to the session
+            /// shell component launched by sessionmgr, and presented by basemgr
+            /// as the root view.
+            2: gfx_view_params resource struct {
+                view_token fuchsia.ui.views.ViewToken;
+                control_ref fuchsia.ui.views.ViewRefControl;
+                view_ref fuchsia.ui.views.ViewRef;
+            };
+
+            /// If true, sessionmgr will request Flatland views from mods,
+            /// or Gfx views otherwise.
+            3: use_flatland bool;
+        } :optional;
     });
 };
+
 
 /// This interface is provided by basemgr to `Sessionmgr`.
 protocol SessionContext {

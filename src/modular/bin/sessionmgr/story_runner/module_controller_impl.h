@@ -24,8 +24,8 @@
 namespace modular {
 
 using ModuleControllerImplViewParams =
-    std::variant<fuchsia::ui::views::ViewCreationToken,
-                 std::pair<fuchsia::ui::views::ViewToken, scenic::ViewRefPair>>;
+    std::optional<std::variant<fuchsia::ui::views::ViewCreationToken,
+                               std::pair<fuchsia::ui::views::ViewToken, scenic::ViewRefPair>>>;
 
 class StoryControllerImpl;
 

@@ -7,6 +7,7 @@
 #include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/ui/policy/cpp/fidl.h>
 #include <lib/sys/cpp/testing/fake_launcher.h>
+#include <lib/ui/scenic/cpp/view_ref_pair.h>
 #include <lib/ui/scenic/cpp/view_token_pair.h>
 
 #include <optional>
@@ -41,10 +42,14 @@ TEST_F(SessionContextImplTest, StartSessionmgr) {
   scenic::ViewRefPair view_ref_pair = scenic::ViewRefPair::New();
   auto modular_config_accessor = modular::ModularConfigAccessor(modular::DefaultConfig());
 
+  auto view_params = fuchsia::modular::internal::ViewParams::New();
+  view_params->set_gfx_view_params(
+      fuchsia::modular::internal::GfxViewParams{.view_token = std::move(view_token),
+                                                .control_ref = std::move(view_ref_pair.control_ref),
+                                                .view_ref = std::move(view_ref_pair.view_ref)});
+
   modular::SessionContextImpl impl(
-      &launcher, std::move(sessionmgr_app_config), &modular_config_accessor,
-      std::make_optional(modular::GfxViewParams{.view_token = std::move(view_token),
-                                                .view_ref_pair = std::move(view_ref_pair)}),
+      &launcher, std::move(sessionmgr_app_config), &modular_config_accessor, std::move(view_params),
       /*v2_services_for_sessionmgr=*/fuchsia::sys::ServiceList(),
       /*svc_from_v1_sessionmgr=*/nullptr,
       /*on_session_shutdown=*/[](modular::SessionContextImpl::ShutDownReason /* unused */) {});
@@ -70,11 +75,15 @@ TEST_F(SessionContextImplTest, SessionmgrCrashInvokesOnSessionShutdown) {
   auto [view_token, view_holder_token] = scenic::ViewTokenPair::New();
   scenic::ViewRefPair view_ref_pair = scenic::ViewRefPair::New();
 
+  auto view_params = fuchsia::modular::internal::ViewParams::New();
+  view_params->set_gfx_view_params(
+      fuchsia::modular::internal::GfxViewParams{.view_token = std::move(view_token),
+                                                .control_ref = std::move(view_ref_pair.control_ref),
+                                                .view_ref = std::move(view_ref_pair.view_ref)});
+
   bool on_session_shutdown_called = false;
   modular::SessionContextImpl impl(
-      &launcher, std::move(sessionmgr_app_config), &modular_config_accessor,
-      std::make_optional(modular::GfxViewParams{.view_token = std::move(view_token),
-                                                .view_ref_pair = std::move(view_ref_pair)}),
+      &launcher, std::move(sessionmgr_app_config), &modular_config_accessor, std::move(view_params),
       /*v2_services_for_sessionmgr=*/fuchsia::sys::ServiceList(),
       /*svc_from_v1_sessionmgr=*/nullptr,
       /*on_session_shutdown=*/

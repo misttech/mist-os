@@ -31,6 +31,7 @@
 #include "src/modular/bin/sessionmgr/storage/story_storage.h"
 #include "src/modular/bin/sessionmgr/story_runner/annotation_controller_impl.h"
 #include "src/modular/lib/async/cpp/operation.h"
+#include "src/modular/lib/common/viewmode.h"
 #include "src/modular/lib/deprecated_service_provider/service_provider_impl.h"
 #include "src/modular/lib/fidl/app_client.h"
 #include "src/modular/lib/fidl/environment.h"
@@ -56,7 +57,7 @@ class StoryProviderImpl : fuchsia::modular::StoryProvider {
                     std::optional<fuchsia::modular::session::AppConfig> story_shell_config,
                     fuchsia::modular::StoryShellFactoryPtr story_shell_factory,
                     PresentationProtocolPtr presentation_protocol, bool present_mods_as_stories,
-                    bool use_flatland, ComponentContextInfo component_context_info,
+                    ViewMode view_mode, ComponentContextInfo component_context_info,
                     AgentServicesFactory* agent_services_factory, inspect::Node* root_node);
 
   ~StoryProviderImpl() override;
@@ -122,7 +123,7 @@ class StoryProviderImpl : fuchsia::modular::StoryProvider {
     return std::holds_alternative<fuchsia::element::GraphicalPresenterPtr>(presentation_protocol_);
   }
 
-  bool use_flatland() const { return use_flatland_; }
+  ViewMode view_mode() const { return view_mode_; }
 
  private:
   // |fuchsia::modular::StoryProvider|
@@ -192,8 +193,8 @@ class StoryProviderImpl : fuchsia::modular::StoryProvider {
   // When set, mod views are presented as story views.
   bool present_mods_as_stories_;
 
-  // When set, views use flatland.
-  bool use_flatland_;
+  // The view API to use for story views, if any.
+  ViewMode view_mode_;
 
   // The story controllers of the currently active stories, indexed by their
   // story IDs.

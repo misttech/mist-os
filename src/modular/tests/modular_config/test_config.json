@@ -2,6 +2,7 @@
     "basemgr": {
         "enable_cobalt": true,
         "use_session_shell_for_story_shell_factory": true,
+        "headless": false,
         "session_shells": [
             {
                 "url": "fuchsia-pkg://fuchsia.com/test_session_shell#meta/test_session_shell.cmx"
