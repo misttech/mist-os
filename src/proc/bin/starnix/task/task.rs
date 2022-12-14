@@ -18,7 +18,6 @@ use crate::loader::*;
 use crate::lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use crate::logging::{not_implemented, set_zx_name};
 use crate::mm::{MemoryAccessorExt, MemoryManager};
-use crate::signals::signal_handling::dequeue_signal;
 use crate::signals::types::*;
 use crate::syscalls::SyscallResult;
 use crate::task::*;
@@ -631,7 +630,8 @@ impl CurrentTask {
 
     /// Sets the task's signal mask to `signal_mask` and runs `wait_function`.
     ///
-    /// Signals are dequeued prior to the original signal mask being restored.
+    /// Signals are dequeued prior to the original signal mask being restored. This is done by the
+    /// signal machinery in the syscall dispatch loop.
     ///
     /// The returned result is the result returned from the wait function.
     pub fn wait_with_temporary_mask<F, T>(
@@ -642,11 +642,8 @@ impl CurrentTask {
     where
         F: FnOnce(&CurrentTask) -> Result<T, Errno>,
     {
-        let old_mask = self.write().signals.set_mask(signal_mask);
-        let wait_result = wait_function(self);
-        dequeue_signal(self);
-        self.write().signals.set_mask(old_mask);
-        wait_result
+        self.write().signals.set_temporary_mask(signal_mask);
+        wait_function(self)
     }
 
     /// Determine namespace node indicated by the dir_fd.

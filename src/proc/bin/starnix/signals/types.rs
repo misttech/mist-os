@@ -68,6 +68,15 @@ pub struct SignalState {
     // See https://man7.org/linux/man-pages/man2/rt_sigprocmask.2.html
     mask: sigset_t,
 
+    /// The signal mask that should be restored by the signal handling machinery, after dequeuing
+    /// a signal.
+    ///
+    /// Some syscalls apply a temporary signal mask by setting `SignalState.mask` during the wait.
+    /// This means that the mask must be set to the temporary mask when the signal is dequeued,
+    /// which is done by the syscall dispatch loop before returning to userspace. After the signal
+    /// is dequeued `mask` can be reset to `saved_mask`.
+    saved_mask: Option<sigset_t>,
+
     /// The queue of signals for a given task.
     ///
     /// There may be more than one instance of a real-time signal in the queue, but for standard
@@ -81,6 +90,25 @@ impl SignalState {
         let old_mask = self.mask;
         self.mask = signal_mask & !UNBLOCKABLE_SIGNALS;
         old_mask
+    }
+
+    /// Sets the signal mask of the state temporarily, until the signal machinery has completed its
+    /// next dequeue operation. This can be used by syscalls that want to change the signal mask
+    /// during a wait, but want the signal mask to be reset before returning back to userspace after
+    /// the wait.
+    pub fn set_temporary_mask(&mut self, signal_mask: u64) {
+        assert!(self.saved_mask.is_none());
+        self.saved_mask = Some(self.mask);
+        self.mask = signal_mask & !UNBLOCKABLE_SIGNALS;
+    }
+
+    /// Restores the signal mask to what it was before the previous call to `set_temporary_mask`.
+    /// If there is no saved mask, the mask is left alone.
+    pub fn restore_mask(&mut self) {
+        if let Some(mask) = self.saved_mask {
+            self.mask = mask;
+            self.saved_mask = None;
+        }
     }
 
     pub fn mask(&self) -> u64 {

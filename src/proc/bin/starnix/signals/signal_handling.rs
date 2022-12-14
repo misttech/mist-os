@@ -332,6 +332,10 @@ pub fn dequeue_signal(current_task: &mut CurrentTask) {
         siginfo.as_ref().map(|siginfo| task.thread_group.signal_actions.get(siginfo.signal)),
     );
 
+    // A syscall may have been waiting with a temporary mask which should be used to dequeue the
+    // signal, but after the signal has been dequeued the old mask should be restored.
+    task_state.signals.restore_mask();
+
     // Drop the task state before actually setting up any signal handler.
     std::mem::drop(task_state);
 
