@@ -60,17 +60,27 @@ component metrics and inspect data, use `fx iquery show core/bluetooth-core/bt-f
 root:
   provider:
     account_key_count = 0
-    active_host = true
+    active_host = (true, false)
     advertisement = (ModelId, AccountKeys, None)
-    fast_pair_enabled = true
+    fast_pair_enabled = (true, false)
     personalized_name = ""
-    PairingManager:
-      owner = Upstream
+    personalized_name_set = (true, false)
+    pairing_manager:
+      owner = (Upstream, FastPair)
       procedure_1:
         le_id = ""
         bredr_id = ""
         state = (Started, Pairing, PasskeyChecked, PairingComplete, AccountKeyWritten)
+        type = (Initial, Subsequent, Retroactive, PersonalizedName)
       procedure_2:
+      finished_procedures:
+        0:
+          procedure_3:
+            ...
+            pairing_time_seconds = 0
+        1:
+          procedure_4:
+            ...
 ```
 
 ## Testing

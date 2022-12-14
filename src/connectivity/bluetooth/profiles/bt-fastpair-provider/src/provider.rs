@@ -8,7 +8,7 @@ use fidl_fuchsia_bluetooth_fastpair::{ProviderEnableResponder, ProviderWatcherPr
 use fidl_fuchsia_bluetooth_gatt2 as gatt;
 use fidl_fuchsia_bluetooth_sys::{HostWatcherMarker, PairingMarker, PairingProxy};
 use fuchsia_bluetooth::types::PeerId;
-use fuchsia_inspect::{self as inspect, Property};
+use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::stream::{FusedStream, StreamExt};
 use futures::{channel::mpsc, select, FutureExt};
@@ -20,7 +20,7 @@ use crate::fidl_client::FastPairConnectionManager;
 use crate::gatt_service::{GattRequest, GattService, GattServiceResponder};
 use crate::host_watcher::{HostEvent, HostWatcher};
 use crate::message_stream::MessageStream;
-use crate::pairing::{PairingArgs, PairingManager};
+use crate::pairing::{PairingArgs, PairingManager, PairingType};
 use crate::types::keys::aes_from_anti_spoofing_and_public;
 use crate::types::packets::{
     decrypt_account_key_request, decrypt_key_based_pairing_request, decrypt_passkey_request,
@@ -51,12 +51,19 @@ struct ProviderInspect {
     fast_pair_enabled: inspect::BoolProperty,
     active_host: inspect::BoolProperty,
     personalized_name: inspect::StringProperty,
+    personalized_name_set: inspect::BoolProperty,
+    pairing_request_count: inspect::UintProperty,
     inspect_node: inspect::Node,
 }
 
 impl ProviderInspect {
     fn node(&self) -> &inspect::Node {
         &self.inspect_node
+    }
+
+    fn set_personalized_name(&self, name: &str) {
+        self.personalized_name.set(name);
+        self.personalized_name_set.set(true);
     }
 }
 
@@ -130,7 +137,7 @@ impl Provider {
     }
 
     fn set_personalized_name(&mut self, name: String) {
-        self.inspect_node.personalized_name.set(&name);
+        self.inspect_node.set_personalized_name(&name);
         self.state.personalized_name = Some(name);
     }
 
@@ -246,6 +253,7 @@ impl Provider {
             response(Err(gatt::Error::UnlikelyError));
             return Err(Error::internal("No active host"));
         };
+        let discoverable = self.host_watcher.pairing_mode().expect("just checked active host");
 
         let Some(pairing) =  self.pairing.inner_mut() else {
             response(Err(gatt::Error::UnlikelyError));
@@ -254,7 +262,8 @@ impl Provider {
 
         // Some key-based pairing requests require additional steps.
         // TODO(fxbug.dev/96217): Track the salt in `request` to prevent replay attacks.
-        let mut retroactive = false;
+        debug!(%peer_id, "Received key based pairing request: {:?}", request);
+        let pairing_type = PairingType::from_action(&request.action, discoverable);
         match request.action {
             KeyBasedPairingAction::SeekerInitiatesPairing { received_provider_address }
             | KeyBasedPairingAction::PersonalizedNameWrite { received_provider_address } => {
@@ -265,6 +274,10 @@ impl Provider {
                     response(Err(gatt::Error::WriteRequestRejected));
                     return Err(Error::internal(&error));
                 }
+
+                if matches!(request.action, KeyBasedPairingAction::SeekerInitiatesPairing { .. }) {
+                    self.inspect_node.pairing_request_count.add(1);
+                }
             }
             KeyBasedPairingAction::ProviderInitiatesPairing { .. } => {
                 // TODO(fxbug.dev96222): Use `sys.Access/Pair` to pair to peer.
@@ -273,7 +286,6 @@ impl Provider {
                 // TODO(fxbug.dev/115567): This can be improved by using a timeout after an
                 // OnPairingComplete signal is received. A retroactive write can only occur within
                 // some finite period of time.
-                retroactive = true;
             }
         }
 
@@ -294,11 +306,7 @@ impl Provider {
             }
         }
 
-        if retroactive {
-            pairing.new_retroactive_pairing_procedure(peer_id, key)
-        } else {
-            pairing.new_pairing_procedure(peer_id, key)
-        }
+        pairing.new_pairing_procedure(peer_id, key, pairing_type)
     }
 
     fn handle_verify_passkey_request(
@@ -591,7 +599,7 @@ mod tests {
     };
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::types::{Address, HostId};
-    use fuchsia_inspect::assert_data_tree;
+    use fuchsia_inspect::{assert_data_tree, NumericProperty};
     use fuchsia_inspect_derive::WithInspect;
     use futures::{pin_mut, FutureExt, SinkExt};
     use std::convert::{TryFrom, TryInto};
@@ -1608,18 +1616,23 @@ mod tests {
                 fast_pair_enabled: false,
                 active_host: false,
                 personalized_name: "",
+                personalized_name_set: false,
+                pairing_request_count: 0u64,
             }
         });
 
         provider_inspect.fast_pair_enabled.set(true);
         provider_inspect.active_host.set(true);
-        provider_inspect.personalized_name.set("foobar");
+        provider_inspect.set_personalized_name("foobar");
+        provider_inspect.pairing_request_count.add(1);
 
         assert_data_tree!(inspect, root: {
             provider: {
                 fast_pair_enabled: true,
                 active_host: true,
                 personalized_name: "foobar",
+                personalized_name_set: true,
+                pairing_request_count: 1u64,
             }
         });
     }

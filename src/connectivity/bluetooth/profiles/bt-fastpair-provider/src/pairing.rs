@@ -17,19 +17,45 @@ use fidl_fuchsia_bluetooth_sys::{
 use fuchsia_async::{self as fasync, DurationExt};
 use fuchsia_bluetooth::types::{Peer, PeerId};
 use fuchsia_inspect::{self as inspect, Property};
+use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use fuchsia_zircon as zx;
 use futures::stream::{FusedStream, FuturesUnordered, Stream, StreamExt};
 use futures::{future::BoxFuture, Future, FutureExt};
+use std::collections::HashMap;
 use std::convert::TryFrom;
 use tracing::{debug, info, trace, warn};
 
+use crate::types::packets::KeyBasedPairingAction;
 use crate::types::{Error, SharedSecret};
 
 pub struct PairingArgs {
     pub input: InputCapability,
     pub output: OutputCapability,
     pub delegate: PairingDelegateProxy,
+}
+
+/// The supported Fast Pair pairing methods.
+/// See `KeyBasedPairingAction` for more details on each pairing type.
+#[derive(Debug)]
+pub enum PairingType {
+    Initial,
+    Subsequent,
+    Retroactive,
+    PersonalizedNameWrite,
+}
+
+impl PairingType {
+    pub fn from_action(action: &KeyBasedPairingAction, discoverable: bool) -> Self {
+        use KeyBasedPairingAction::*;
+        match action {
+            SeekerInitiatesPairing { .. } | ProviderInitiatesPairing { .. } => {
+                discoverable.then_some(Self::Initial).unwrap_or(Self::Subsequent)
+            }
+            PersonalizedNameWrite { .. } => Self::PersonalizedNameWrite,
+            RetroactiveWrite { .. } => Self::Retroactive,
+        }
+    }
 }
 
 /// The current owner of the Pairing Delegate.
@@ -77,11 +103,29 @@ impl std::fmt::Debug for ProcedureState {
     }
 }
 
-#[derive(Default, Debug, Inspect)]
+#[derive(Default, Debug)]
 struct ProcedureInspect {
     bredr_id: inspect::StringProperty,
     state: inspect::StringProperty,
+    /// Expected to be a weak node.
     inspect_node: inspect::Node,
+}
+
+impl ProcedureInspect {
+    fn new(le_id: &PeerId, inspect_node: inspect::Node) -> Self {
+        inspect_node.record_string("le_id", format!("{le_id}"));
+        let bredr_id = inspect_node.create_string("bredr_id", "");
+        let state = inspect_node.create_string("state", "");
+        Self { bredr_id, state, inspect_node }
+    }
+}
+
+impl Drop for ProcedureInspect {
+    fn drop(&mut self) {
+        // Saves the "self" managed properties to be "automatically" managed.
+        self.inspect_node.record(std::mem::take(&mut self.bredr_id));
+        self.inspect_node.record(std::mem::take(&mut self.state));
+    }
 }
 
 /// An active Fast Pair Pairing procedure.
@@ -102,18 +146,6 @@ struct Procedure {
     inspect_node: ProcedureInspect,
 }
 
-impl Inspect for &mut Procedure {
-    fn iattach(self, parent: &inspect::Node, name: impl AsRef<str>) -> Result<(), AttachError> {
-        self.inspect_node.iattach(parent, name.as_ref())?;
-        self.inspect_node.inspect_node.record_string("le_id", format!("{:?}", self.le_id));
-        self.inspect_node
-            .bredr_id
-            .set(&self.bredr_id.map_or("".to_string(), |id| format!("{:?}", id)));
-        self.inspect_node.state.set(&format!("{:?}", self.state));
-        Ok(())
-    }
-}
-
 impl Procedure {
     /// Default timeout duration for a pairing procedure. Per the GFPS specification, if progress
     /// is not made within this amount of time, the procedure should be terminated.
@@ -132,6 +164,16 @@ impl Procedure {
         }
     }
 
+    fn set_inspect(&mut self, node: ProcedureInspect) {
+        self.inspect_node = node;
+        self.inspect_node.bredr_id.set(&self.bredr_id.map_or("".to_string(), |id| format!("{id}")));
+        self.inspect_node.state.set(&format!("{:?}", self.state));
+    }
+
+    fn inspect_node(&self) -> &inspect::Node {
+        &self.inspect_node.inspect_node
+    }
+
     /// Moves the procedure to the new pairing `state` and resets the deadline for the procedure.
     fn transition(&mut self, state: ProcedureState) -> ProcedureState {
         let old_state = std::mem::replace(&mut self.state, state);
@@ -142,7 +184,7 @@ impl Procedure {
 
     fn set_bredr_id(&mut self, id: PeerId) {
         self.bredr_id = Some(id);
-        self.inspect_node.bredr_id.set(&format!("{:?}", id));
+        self.inspect_node.bredr_id.set(&format!("{id}"));
     }
 
     fn is_started(&self) -> bool {
@@ -204,10 +246,34 @@ impl std::fmt::Debug for Procedure {
     }
 }
 
-#[derive(Default, Debug, Inspect)]
+/// The maximum number of recently completed procedures that are tracked in Inspect.
+pub const MAX_SAVED_PROCEDURES: usize = 5;
+
+/// An inspect node tracking a Fast Pair procedure that is in progress.
+struct ActiveProcedureInspect {
+    /// The time the procedure was started at.
+    start_time: fasync::Time,
+    inspect_node: inspect::Node,
+}
+
+#[derive(Default)]
 struct PairingManagerInspect {
     owner: inspect::StringProperty,
+    finished_procedures: Option<BoundedListNode>,
+    active_procedures: HashMap<PeerId, ActiveProcedureInspect>,
     inspect_node: inspect::Node,
+}
+
+impl Inspect for &mut PairingManagerInspect {
+    fn iattach(self, parent: &inspect::Node, name: impl AsRef<str>) -> Result<(), AttachError> {
+        self.inspect_node = parent.create_child(name.as_ref());
+        self.owner = self.inspect_node.create_string("owner", "");
+        self.finished_procedures = Some(BoundedListNode::new(
+            self.inspect_node.create_child("finished_procedures"),
+            MAX_SAVED_PROCEDURES,
+        ));
+        Ok(())
+    }
 }
 
 impl PairingManagerInspect {
@@ -216,6 +282,31 @@ impl PairingManagerInspect {
             PairingDelegateOwner::FastPair => self.owner.set("FastPair"),
             PairingDelegateOwner::Upstream => self.owner.set("Upstream"),
         }
+    }
+
+    /// Creates an inspect node for the Fast Pair pairing procedure. Returns the Inspect node which
+    /// can be used to record information about the active procedure.
+    pub fn record_new_procedure(&mut self, id: PeerId, name: &str) -> ProcedureInspect {
+        let node = self.inspect_node.create_child(name);
+        // The inspect node for procedure is owned by `PairingManagerInspect`. However, the
+        // procedure can make modifications via a weak clone of the node.
+        let procedure_node = ProcedureInspect::new(&id, node.clone_weak());
+        let _ = self.active_procedures.insert(
+            id,
+            ActiveProcedureInspect { start_time: fasync::Time::now(), inspect_node: node },
+        );
+        procedure_node
+    }
+
+    /// Saves the active pairing procedure to the inspect hierarchy.
+    pub fn record_finished_procedure(&mut self, id: PeerId, at: fasync::Time) {
+        let Some(bounded_list_node) = self.finished_procedures.as_mut() else { return };
+        let Some(ActiveProcedureInspect { start_time, inspect_node }) = self.active_procedures.remove(&id) else { return };
+        let pairing_time_seconds = (at - start_time).into_seconds().try_into().unwrap_or(0);
+        inspect_node.record_uint("pairing_time_seconds", pairing_time_seconds);
+        let node_writer = bounded_list_node.create_entry();
+        let _ = node_writer.adopt(&inspect_node);
+        let _ = node_writer.record(inspect_node);
     }
 }
 
@@ -234,8 +325,9 @@ impl PairingManagerInspect {
 ///
 /// The `PairingManager` supports the handling of Fast Pair pairing procedures with multiple peers.
 /// However, there can only be one active procedure per remote peer. When the pairing procedure
-/// completes, (e.g ProcedureState::PasskeyChecked), it will remain in the set of active
-/// `procedures` until explicitly removed via `PairingManager::complete_pairing_procedure`.
+/// completes, (e.g `Procedure::is_complete`), it will remain in the set of active
+/// `procedures` until either explicitly removed via `PairingManager::complete_pairing_procedure` or
+/// evicted after meeting the time deadline.
 ///
 /// Note: Due to a limitation of the `sys.Pairing` API, any non-Fast Pair pairing request made while
 /// Fast Pair owns the Pairing Delegate will incorrectly use Fast Pair I/O capabilities. Ideally,
@@ -332,6 +424,7 @@ impl PairingManager {
         let (c, s) = fidl::endpoints::create_request_stream::<PairingDelegateMarker>()?;
         self.pairing.set_pairing_delegate(input, output, c)?;
         self.pairing_requests.set(s);
+        self.inspect_node.set_owner(&owner);
         self.owner = owner;
         Ok(())
     }
@@ -374,35 +467,51 @@ impl PairingManager {
         self.procedures.inner().get(le_id).map(|procedure| &procedure.key)
     }
 
-    /// Attempts to initiate a new Fast Pair pairing procedure with the provided peer.
-    pub fn new_pairing_procedure(&mut self, le_id: PeerId, key: SharedSecret) -> Result<(), Error> {
-        if self.procedures.contains_key(&le_id) {
-            return Err(Error::internal(&format!("Pairing with {le_id:?} already in progress")));
-        }
-
-        self.claim_delegate()?;
+    fn new_procedure(&mut self, le_id: PeerId, key: SharedSecret) {
         let mut procedure = Procedure::new(le_id, key);
-        let _ =
-            procedure.iattach(&self.inspect_node.inspect_node, inspect::unique_name("procedure_"));
+        procedure.set_inspect(
+            self.inspect_node.record_new_procedure(le_id, &inspect::unique_name("procedure_")),
+        );
         let _ = self.procedures.insert(le_id, procedure);
-        Ok(())
     }
 
-    /// Attempts to initiate a new retroactive Fast Pair pairing procedure with the provided peer.
-    pub fn new_retroactive_pairing_procedure(
+    /// Attempts to initiate a new Fast Pair pairing procedure with the provided peer.
+    pub fn new_pairing_procedure(
         &mut self,
         le_id: PeerId,
         key: SharedSecret,
+        pairing_type: PairingType,
     ) -> Result<(), Error> {
+        debug!(%le_id, "Starting a new pairing procedure ({pairing_type:?})");
         if self.procedures.contains_key(&le_id) {
-            return Err(Error::internal(&format!("Pairing with {le_id:?} already in progress")));
+            return Err(Error::internal(&format!("Pairing with {le_id} already in progress")));
         }
 
-        // Classic/LE pairing has already completed so there is no need to claim the Pairing
-        // Delegate nor go through the regular pairing stages of the Procedure.
-        let mut procedure = Procedure::new(le_id, key);
-        let _ = procedure.transition(ProcedureState::PairingComplete);
-        let _ = self.procedures.insert(le_id, procedure);
+        self.new_procedure(le_id, key);
+        match pairing_type {
+            PairingType::Initial | PairingType::Subsequent => {
+                self.claim_delegate()?;
+            }
+            PairingType::Retroactive => {
+                // Classic/LE pairing has already completed so there is no need to claim the Pairing
+                // Delegate nor go through the regular pairing stages of the Procedure.
+                let _ = self
+                    .procedures
+                    .inner()
+                    .get_mut(&le_id)
+                    .expect("just added")
+                    .transition(ProcedureState::PairingComplete);
+            }
+            PairingType::PersonalizedNameWrite => {
+                // Pairing is not needed during a personalized name write.
+            }
+        }
+        self.procedures
+            .inner()
+            .get_mut(&le_id)
+            .expect("just added")
+            .inspect_node()
+            .record_string("type", &format!("{pairing_type:?}"));
         Ok(())
     }
 
@@ -425,7 +534,7 @@ impl PairingManager {
             .inner()
             .get_mut(&le_id)
             .filter(|p| matches!(p.state, ProcedureState::Pairing { .. }))
-            .ok_or(Error::internal(&format!("Unexpected passkey response for {le_id:?}")))?;
+            .ok_or(Error::internal(&format!("Unexpected passkey response for {le_id}")))?;
 
         match procedure.transition(ProcedureState::PasskeyChecked) {
             ProcedureState::Pairing { passkey, responder } => {
@@ -451,7 +560,7 @@ impl PairingManager {
             .get_mut(&le_id)
             .filter(|p| matches!(p.state, ProcedureState::PairingComplete))
             .ok_or(Error::internal(&format!(
-                "Procedure with {le_id:?} is not in the correct state"
+                "Procedure with {le_id} is not in the correct state"
             )))?;
         let _ = procedure.transition(ProcedureState::AccountKeyWritten);
         Ok(())
@@ -463,12 +572,13 @@ impl PairingManager {
     pub fn complete_pairing_procedure(&mut self, le_id: PeerId) -> Result<(), Error> {
         if !self.procedures.inner().get(&le_id).map_or(false, |p| p.is_complete()) {
             return Err(Error::internal(&format!(
-                "Procedure with {le_id:?} is not in the correct state"
+                "Procedure with {le_id} is not in the correct state"
             )));
-        }
+        };
 
         // Procedure is in the correct (finished) state and we can clean up and try to give the
-        // delegate back to the upstream client.
+        // delegate back to the upstream client. The inspect data is saved.
+        self.inspect_node.record_finished_procedure(le_id, fasync::Time::now());
         self.cancel_pairing_procedure(&le_id)
     }
 
@@ -646,7 +756,9 @@ impl PairingManager {
         if let Poll::Ready(Some(id)) = self.procedures.poll_next_unpin(cx) {
             info!(%id, "Deadline reached for Fast Pair procedure. Canceling");
             // Deadline was reached (e.g no updates within the expected time). Procedure is no
-            // longer valid.
+            // longer active. In most cases, this signifies an end to the "mandatory" part of the
+            // Fast Pair flow. As such, the inspect data is saved.
+            self.inspect_node.record_finished_procedure(id, fasync::Time::now());
             let _ = self.cancel_pairing_procedure(&id);
         }
     }
@@ -952,7 +1064,10 @@ pub(crate) mod tests {
         // A new pairing procedure is started between us and the peer. Expect the delegate to be
         // claimed.
         let id = PeerId(123);
-        assert_matches!(manager.new_pairing_procedure(id, keys::tests::example_aes_key()), Ok(_));
+        assert_matches!(
+            manager.new_pairing_procedure(id, keys::tests::example_aes_key(), PairingType::Initial),
+            Ok(_)
+        );
         mock.expect_set_pairing_delegate().await;
         assert_matches!(manager.key_for_procedure(&id), Some(_));
 
@@ -1005,7 +1120,11 @@ pub(crate) mod tests {
             // A new pairing procedure is started between us and the peer.
             let id = PeerId(123);
             assert_matches!(
-                manager.new_pairing_procedure(id, keys::tests::example_aes_key()),
+                manager.new_pairing_procedure(
+                    id,
+                    keys::tests::example_aes_key(),
+                    PairingType::Initial
+                ),
                 Ok(_)
             );
             mock.expect_set_pairing_delegate().await;
@@ -1036,7 +1155,10 @@ pub(crate) mod tests {
 
         // A new pairing procedure is started between us and the peer.
         let id = PeerId(123);
-        assert_matches!(manager.new_pairing_procedure(id, keys::tests::example_aes_key()), Ok(_));
+        assert_matches!(
+            manager.new_pairing_procedure(id, keys::tests::example_aes_key(), PairingType::Initial),
+            Ok(_)
+        );
         mock.expect_set_pairing_delegate().await;
         assert_matches!(manager.key_for_procedure(&id), Some(_));
 
@@ -1078,7 +1200,10 @@ pub(crate) mod tests {
 
         // A new pairing procedure is started between us and the peer.
         let id = PeerId(123);
-        assert_matches!(manager.new_pairing_procedure(id, keys::tests::example_aes_key()), Ok(_));
+        assert_matches!(
+            manager.new_pairing_procedure(id, keys::tests::example_aes_key(), PairingType::Initial),
+            Ok(_)
+        );
         mock.expect_set_pairing_delegate().await;
         assert_matches!(manager.key_for_procedure(&id), Some(_));
 
@@ -1106,12 +1231,15 @@ pub(crate) mod tests {
         let (mut manager, mut mock) = MockPairing::new_with_manager().await;
 
         let id = PeerId(123);
-        assert_matches!(manager.new_pairing_procedure(id, keys::tests::example_aes_key()), Ok(_));
+        assert_matches!(
+            manager.new_pairing_procedure(id, keys::tests::example_aes_key(), PairingType::Initial),
+            Ok(_)
+        );
         mock.expect_set_pairing_delegate().await;
 
         // Trying to start a new pairing procedure for the same peer is an Error.
         assert_matches!(
-            manager.new_pairing_procedure(id, keys::tests::example_aes_key()),
+            manager.new_pairing_procedure(id, keys::tests::example_aes_key(), PairingType::Initial),
             Err(Error::InternalError(_))
         );
         // Don't expect a new delegate to be claimed.
@@ -1129,7 +1257,10 @@ pub(crate) mod tests {
         assert_matches!(manager.complete_pairing_procedure(id), Err(Error::InternalError(_)));
 
         // Start a new procedure.
-        assert_matches!(manager.new_pairing_procedure(id, keys::tests::example_aes_key()), Ok(_));
+        assert_matches!(
+            manager.new_pairing_procedure(id, keys::tests::example_aes_key(), PairingType::Initial),
+            Ok(_)
+        );
         mock.expect_set_pairing_delegate().await;
 
         // Comparing passkeys before pairing begins is an error.
@@ -1172,7 +1303,10 @@ pub(crate) mod tests {
         let (mut manager, mut mock) = MockPairing::new_with_manager().await;
 
         let id = PeerId(123);
-        assert_matches!(manager.new_pairing_procedure(id, keys::tests::example_aes_key()), Ok(_));
+        assert_matches!(
+            manager.new_pairing_procedure(id, keys::tests::example_aes_key(), PairingType::Initial),
+            Ok(_)
+        );
         mock.expect_set_pairing_delegate().await;
 
         // Peer tries to pair - no stream item since pairing isn't complete.
@@ -1200,9 +1334,23 @@ pub(crate) mod tests {
 
         // We can start two pairing procedures - we only expect one SetPairingDelegate since Fast
         // Pair will request it after the first call.
-        assert_matches!(manager.new_pairing_procedure(id1, keys::tests::example_aes_key()), Ok(_));
+        assert_matches!(
+            manager.new_pairing_procedure(
+                id1,
+                keys::tests::example_aes_key(),
+                PairingType::Initial
+            ),
+            Ok(_)
+        );
         mock.expect_set_pairing_delegate().await;
-        assert_matches!(manager.new_pairing_procedure(id2, keys::tests::example_aes_key()), Ok(_));
+        assert_matches!(
+            manager.new_pairing_procedure(
+                id2,
+                keys::tests::example_aes_key(),
+                PairingType::Initial
+            ),
+            Ok(_)
+        );
         assert_matches!(mock.downstream_pairing_server.next().now_or_never(), None);
 
         // First peer tries to pair - no stream item since pairing isn't complete.
@@ -1316,7 +1464,10 @@ pub(crate) mod tests {
 
         // New procedure is started - the shared secret should be available.
         let id = PeerId(123);
-        assert_matches!(manager.new_pairing_procedure(id, keys::tests::example_aes_key()), Ok(_));
+        assert_matches!(
+            manager.new_pairing_procedure(id, keys::tests::example_aes_key(), PairingType::Initial),
+            Ok(_)
+        );
         let _ = exec.run_until_stalled(&mut manager.next()).expect_pending("no stream item");
         {
             let expect_fut = mock.expect_set_pairing_delegate();
@@ -1367,7 +1518,11 @@ pub(crate) mod tests {
 
         // Pairing procedure is always initiated by the LE peer.
         assert_matches!(
-            manager.new_pairing_procedure(le_id, keys::tests::example_aes_key()),
+            manager.new_pairing_procedure(
+                le_id,
+                keys::tests::example_aes_key(),
+                PairingType::Initial
+            ),
             Ok(_)
         );
         mock.expect_set_pairing_delegate().await;
@@ -1423,7 +1578,10 @@ pub(crate) mod tests {
 
         // New procedure is started.
         let id = PeerId(123);
-        assert_matches!(manager.new_pairing_procedure(id, keys::tests::example_aes_key()), Ok(_));
+        assert_matches!(
+            manager.new_pairing_procedure(id, keys::tests::example_aes_key(), PairingType::Initial),
+            Ok(_)
+        );
         let _ = exec.run_until_stalled(&mut manager.next()).expect_pending("no stream item");
         {
             let expect_fut = mock.expect_set_pairing_delegate();
@@ -1481,7 +1639,9 @@ pub(crate) mod tests {
 
         // Initialize a new procedure.
         let id = PeerId(123);
-        manager.new_pairing_procedure(id, keys::tests::example_aes_key()).expect("can initialize");
+        manager
+            .new_pairing_procedure(id, keys::tests::example_aes_key(), PairingType::Initial)
+            .expect("can initialize");
         mock.expect_set_pairing_delegate().await;
         assert_matches!(manager.key_for_procedure(&id), Some(_));
 
@@ -1492,12 +1652,39 @@ pub(crate) mod tests {
     }
 
     #[fuchsia::test]
+    async fn personalized_name_write_doesnt_claim_delegate() {
+        let (mut manager, mut mock) = MockPairing::new_with_manager().await;
+
+        let le_id = PeerId(123);
+        assert_matches!(
+            manager.new_pairing_procedure(
+                le_id,
+                keys::tests::example_aes_key(),
+                PairingType::PersonalizedNameWrite
+            ),
+            Ok(_)
+        );
+        // We don't expect the pairing delegate to be claimed since pairing is not needed.
+        assert_matches!(mock.expect_set_pairing_delegate().now_or_never(), None);
+        // Shared secret should be accessible.
+        assert_matches!(manager.key_for_procedure(&le_id), Some(_));
+
+        // No pairing steps so the procedure can be completed whenever.
+        assert_matches!(manager.complete_pairing_procedure(le_id), Ok(_));
+        assert_matches!(manager.key_for_procedure(&le_id), None);
+    }
+
+    #[fuchsia::test]
     async fn retroactive_pairing_procedure() {
         let (mut manager, mut mock) = MockPairing::new_with_manager().await;
 
         let le_id = PeerId(123);
         assert_matches!(
-            manager.new_retroactive_pairing_procedure(le_id, keys::tests::example_aes_key()),
+            manager.new_pairing_procedure(
+                le_id,
+                keys::tests::example_aes_key(),
+                PairingType::Retroactive
+            ),
             Ok(_)
         );
         // We don't expect the pairing delegate to be claimed since pairing is already complete.
@@ -1515,21 +1702,53 @@ pub(crate) mod tests {
 
     #[test]
     fn pairing_manager_inspect_tree() {
+        let exec = fasync::TestExecutor::new_with_fake_time().expect("executor creation");
+        exec.set_fake_time(fasync::Time::from_nanos(5_000_000_000));
         let inspect = inspect::Inspector::new();
-        let pairing_inspect =
+        let mut pairing_inspect =
             PairingManagerInspect::default().with_inspect(inspect.root(), "pairing").unwrap();
 
         // Default tree
         assert_data_tree!(inspect, root: {
             pairing: {
                 owner: "",
+                finished_procedures: {}
             }
         });
 
         pairing_inspect.set_owner(&PairingDelegateOwner::Upstream);
+        let id = PeerId(123);
+        let example_procedure_node = pairing_inspect.record_new_procedure(id, "procedure_1");
+        example_procedure_node.bredr_id.set("123");
+        example_procedure_node.state.set("AccountKeyWritten");
         assert_data_tree!(inspect, root: {
             pairing: {
                 owner: "Upstream",
+                finished_procedures: {},
+                procedure_1: {
+                    le_id: "000000000000007b",
+                    bredr_id: "123",
+                    state: "AccountKeyWritten",
+                }
+            }
+        });
+
+        // Procedure finishes some time later.
+        exec.set_fake_time(fasync::Time::from_nanos(10_000_000_000));
+        pairing_inspect.record_finished_procedure(id, fasync::Time::now());
+        assert_data_tree!(inspect, root: {
+            pairing: {
+                owner: "Upstream",
+                finished_procedures: {
+                    "0": {
+                        procedure_1: {
+                            le_id: "000000000000007b",
+                            bredr_id: "123",
+                            state: "AccountKeyWritten",
+                            pairing_time_seconds: 5u64,
+                        }
+                    }
+                }
             }
         });
 
@@ -1537,6 +1756,16 @@ pub(crate) mod tests {
         assert_data_tree!(inspect, root: {
             pairing: {
                 owner: "FastPair",
+                finished_procedures: {
+                    "0": {
+                        procedure_1: {
+                            le_id: "000000000000007b",
+                            bredr_id: "123",
+                            state: "AccountKeyWritten",
+                            pairing_time_seconds: 5u64,
+                        }
+                    }
+                }
             }
         });
     }
