@@ -23,8 +23,6 @@ void FidlMessenger::Dispatch(fidl::IncomingHeaderAndMessage&& msg, ::fidl::Trans
 
 zx_status_t FidlMessenger::SetMessageOp(void* op_ctx, MessageOp* op,
                                         std::optional<zx::channel> optional_remote) {
-  zx_status_t status;
-
   if (message_op_) {
     // Message op was already set
     return ZX_ERR_BAD_STATE;
@@ -34,21 +32,22 @@ zx_status_t FidlMessenger::SetMessageOp(void* op_ctx, MessageOp* op,
 
   // If the caller provided a remote endpoint, we use it below and assume they kept the local
   // endpoint. Otherwise, create a new channel and store the local endpoint.
-  zx::channel remote;
+  fidl::ServerEnd<FidlProtocol> remote;
   if (optional_remote) {
-    remote = std::move(optional_remote.value());
+    remote.channel() = std::move(optional_remote.value());
   } else {
-    if ((status = zx::channel::create(0, &local_, &remote)) < 0) {
-      return status;
+    zx::result server = fidl::CreateEndpoints(&local_);
+    if (server.is_error()) {
+      return server.error_value();
     }
+    remote = std::move(server.value());
   }
 
-  if ((status = loop_.StartThread("fake_ddk_fidl")) < 0) {
+  if (zx_status_t status = loop_.StartThread("fake_ddk_fidl"); status != ZX_OK) {
     return status;
   }
 
-  auto binding = fidl::BindServer<FidlProtocol>(loop_.dispatcher(), std::move(remote), this);
-  binding_ = std::make_unique<fidl::ServerBindingRef<FidlProtocol>>(std::move(binding));
+  binding_.emplace(fidl::BindServer(loop_.dispatcher(), std::move(remote), this));
   return ZX_OK;
 }
 

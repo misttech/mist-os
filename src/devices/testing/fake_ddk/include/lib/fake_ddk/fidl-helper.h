@@ -44,7 +44,7 @@ class fidl::internal::WireWeakEventSender<fake_ddk::FidlProtocol> {
 
 namespace fake_ddk {
 
-typedef zx_status_t(MessageOp)(void* ctx, fidl_incoming_msg_t* msg, fidl_txn_t* txn);
+using MessageOp = zx_status_t(void*, fidl_incoming_msg_t*, fidl_txn_t*);
 
 // Helper class to call fidl handlers in unit tests
 // Use in conjunction with fake ddk
@@ -76,14 +76,15 @@ class FidlMessenger : public fidl::WireServer<FidlProtocol> {
 
   explicit FidlMessenger() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
   explicit FidlMessenger(const async_loop_config_t* config) : loop_(config) {}
-  virtual ~FidlMessenger() {
-    if (binding_)
-      binding_->Unbind();
+  ~FidlMessenger() override {
+    if (binding_.has_value()) {
+      binding_.value().Unbind();
+    }
   }
   void Shutdown() { loop_.Shutdown(); }
 
   // Local channel to send FIDL client messages
-  zx::channel& local() { return local_; }
+  zx::channel& local() { return local_.channel(); }
 
   void Dispatch(fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn);
 
@@ -107,9 +108,9 @@ class FidlMessenger : public fidl::WireServer<FidlProtocol> {
   MessageOp* message_op_ = nullptr;
   void* op_ctx_ = nullptr;
   // Channel to mimic RPC
-  zx::channel local_;
+  fidl::ClientEnd<FidlProtocol> local_;
   // Server binding
-  std::unique_ptr<fidl::ServerBindingRef<FidlProtocol>> binding_;
+  std::optional<fidl::ServerBindingRef<FidlProtocol>> binding_;
   // Dispatcher for fidl messages
   async::Loop loop_;
 };
