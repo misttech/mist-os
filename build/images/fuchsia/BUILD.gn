@@ -547,6 +547,8 @@ if (is_fuchsia) {
   # storage.  The system decompresses the fvm.blk image into memory and then
   # sees that RAM disk just as if it were a real disk on the device.
   assembled_system("netboot") {
+    image_name = "fuchsia"
+    namespace = "netboot"
     forward_variables_from(fuchsia_base, "*")
     ramdisk_fvm_in_zbi = true
 
