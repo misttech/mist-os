@@ -2616,16 +2616,3 @@
   reviewers: ['curtisgalloway@google.com', 'rdzhuang@google.com', 'gkalsi@google.com',  'prashanthsw@google.com', 'jeremymanson@google.com', 'surajmalhotra@google.com']
   submitted: '2022-08-24'
   reviewed: '2022-11-17'
-
-- name: 'RFC-0202'
-  title: 'Test manager as a Service'
-  short_description: 'Design for test manager as a service.'
-  authors: ['anmittal@google.com']
-  file: '0202_test_manager_as_a_service.md'
-  area: ['Testing']
-  issue: ['117504']
-  gerrit_change_id: ['703682']
-  status: 'Accepted'
-  reviewers: ['geb@google.com', 'shayba@google.com', 'richkadel@google.com', 'kjharland@google.com', 'crjohns@google.com', 'cgonyeo@google.com', 'aaronwood@google.com', 'satsukiu@google.com', 'xbhatnag@google.com', 'yaneury@google.com', 'hjfreyer@google.com', 'akbiggs@google.com']
-  submitted: '2022-22-07'
-  reviewed: '2022-12-14'
