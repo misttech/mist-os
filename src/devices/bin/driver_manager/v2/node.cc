@@ -534,9 +534,10 @@ void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
   // Removing kPkg, and state is Running
   if ((node_state_ != NodeState::kPrestop && node_state_ != NodeState::kRunning) ||
       (node_state_ == NodeState::kPrestop && removal_set == RemovalSet::kPackage)) {
-    LOGF(WARNING, "Node::Remove() called late, already in state %s", State2String(node_state_));
+    LOGF(WARNING, "Node::Remove() %s called late, already in state %s", TopoName().c_str(),
+         State2String(node_state_));
     if (should_register)
-      removal_tracker_->RegisterNode(this, collection_, name_, node_state_);
+      removal_tracker_->RegisterNode(this, collection_, TopoName(), node_state_);
     return;
   }
 
@@ -548,12 +549,15 @@ void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
   } else {
     // Either removing kAll, or is package driver and removing kPackage.
     node_state_ = NodeState::kWaitingOnChildren;
+    if (!should_register && removal_tracker_) {
+      removal_tracker_->NotifyWaitingOnChildren(this);
+    }
     // All children should be removed regardless as they block removal of this node.
     removal_set = RemovalSet::kAll;
   }
   // Either way, propagate removal message to children
   if (should_register) {
-    removal_tracker_->RegisterNode(this, collection_, name_, node_state_);
+    removal_tracker_->RegisterNode(this, collection_, TopoName(), node_state_);
   }
 
   // Ask each of our children to remove themselves.

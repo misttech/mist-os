@@ -16,6 +16,7 @@ namespace dfv2 {
 class NodeRemovalTracker {
  public:
   void RegisterNode(void* node_ptr, Collection node_collection, std::string name, NodeState state);
+  void NotifyWaitingOnChildren(void* node_ptr);
   void NotifyNoChildren(void* node_ptr);
   void NotifyRemovalComplete(void* node_ptr);
   void FinishEnumeration();

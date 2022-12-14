@@ -19,6 +19,15 @@ void NodeRemovalTracker::RegisterNode(void* node_ptr, Collection node_collection
   nodes_[node_ptr] = {name, node_collection, state};
 }
 
+void NodeRemovalTracker::NotifyWaitingOnChildren(void* node_ptr) {
+  if (auto itr = nodes_.find(node_ptr); itr != nodes_.end()) {
+    auto [name, node_collection, state] = itr->second;
+    nodes_[itr->first] = {name, node_collection, NodeState::kWaitingOnChildren};
+  } else {
+    LOGF(ERROR, "Tried to NotifyWaitingOnChildren without registering!");
+  }
+}
+
 void NodeRemovalTracker::NotifyNoChildren(void* node_ptr) {
   if (auto itr = nodes_.find(node_ptr); itr != nodes_.end()) {
     auto [name, node_collection, state] = itr->second;
@@ -47,11 +56,21 @@ void NodeRemovalTracker::CheckRemovalDone() {
     auto [name, node_collection, state] = value;
     if (state != NodeState::kStopping) {
       all_count++;
+      LOGF(DEBUG, "NRT: %s node %s waiting on %s",
+           node_collection == Collection::kPackage ? "package"
+           : node_collection == Collection::kBoot  ? "boot"
+                                                   : "other",
+           name.c_str(),
+           state == NodeState::kWaitingOnDriver     ? "driver"
+           : state == NodeState::kWaitingOnChildren ? "children"
+                                                    : "nothing");
+
       if (node_collection == Collection::kPackage) {
         pkg_count++;
       }
     }
   }
+  LOGF(DEBUG, "NodeRemovalTracker: %d pkg %d all remaining", pkg_count, all_count);
   if (pkg_callback_ && pkg_count == 0) {
     pkg_callback_();
     pkg_callback_ = nullptr;
@@ -61,7 +80,6 @@ void NodeRemovalTracker::CheckRemovalDone() {
     all_callback_ = nullptr;
     nodes_.clear();
   }
-  LOGF(DEBUG, "NodeRemovalTracker: %d pkg %d all remaining", pkg_count, all_count);
 }
 
 void NodeRemovalTracker::set_pkg_callback(fit::callback<void()> callback) {
