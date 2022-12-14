@@ -98,9 +98,6 @@ template("fuchsia_component_manifest") {
       if (defined(invoker.deps)) {
         deps += invoker.deps
       }
-      if (fuchsia_code_coverage) {
-        deps += [ ":${merged_manifest}" ]
-      }
     }
 
     copy(target_name) {
