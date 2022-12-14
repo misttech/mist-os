@@ -50,6 +50,8 @@ This document lists all errors emitted by the [FIDL compiler][docs-fidlc],
 
 <<error-catalog/_fi-0020.md>>
 
+<<error-catalog/_fi-0021.md>>
+
 <<error-catalog/_fi-0022.md>>
 
 <<error-catalog/_fi-0023.md>>

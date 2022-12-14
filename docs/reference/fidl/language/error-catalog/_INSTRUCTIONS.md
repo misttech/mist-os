@@ -101,9 +101,9 @@ To retire an error:
   to the following:
 
         ```
-        ## fi-{ERROR_NUMBER} {#fi-0134}
+        ## fi-ERROR_NUMBER {:#fi-ERROR_NUMBER .hide-from-toc}
 
-        This error has been retired.
+        Deprecated: This error code has been retired.
         ```
 
 1. Update necessary C++ code
