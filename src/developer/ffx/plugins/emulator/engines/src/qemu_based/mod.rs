@@ -53,20 +53,50 @@ use mockall::automock;
 mod modules {
     use super::*;
 
-    pub(super) async fn get_host_tool(name: &str) -> Result<PathBuf> {
+    pub(crate) async fn get_host_tool(name: &str) -> Result<PathBuf> {
         let sdk = ffx_config::global_env_context()
             .context("loading global environment context")?
             .get_sdk()
             .await?;
-        sdk.get_host_tool(name)
+
+        // Attempts to get a host tool from the SDK manifest. If it fails, falls
+        // back to attempting to derive the path to the host tool binary by simply checking
+        // for its existence in `ffx`'s directory.
+        // TODO(fxb/99321): When issues around including aemu in the sdk are resolved, this
+        // hack can be removed.
+        match sdk.get_host_tool(name) {
+            Ok(path) => Ok(path),
+            Err(error) => {
+                tracing::warn!(
+                    "failed to get host tool {} from manifest. Trying local SDK dir: {}",
+                    name,
+                    error
+                );
+                let mut ffx_path = std::env::current_exe()
+                    .context(format!("getting current ffx exe path for host tool {}", name))?;
+                ffx_path = std::fs::canonicalize(ffx_path.clone())
+                    .context(format!("canonicalizing ffx path {:?}", ffx_path))?;
+
+                let tool_path = ffx_path
+                    .parent()
+                    .context(format!("ffx path missing parent {:?}", ffx_path))?
+                    .join(name);
+
+                if tool_path.exists() {
+                    Ok(tool_path)
+                } else {
+                    bail!("Host tool '{}' not found after checking in `ffx` directory.", name);
+                }
+            }
+        }
     }
 }
 
 cfg_if! {
     if #[cfg(test)] {
-        use self::mock_modules::get_host_tool;
+        pub(crate) use self::mock_modules::get_host_tool;
     } else {
-        use self::modules::get_host_tool;
+        pub(crate) use self::modules::get_host_tool;
     }
 }
 

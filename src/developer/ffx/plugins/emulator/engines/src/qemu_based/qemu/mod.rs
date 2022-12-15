@@ -22,6 +22,8 @@ use std::{
     process::Command,
 };
 
+use super::get_host_tool;
+
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct QemuEngine {
     #[serde(default)]
@@ -158,11 +160,7 @@ impl EmulatorEngine for QemuEngine {
             CpuArchitecture::Unsupported => None,
         };
 
-        let sdk = ffx_config::global_env_context()
-            .context("loading global environment context")?
-            .get_sdk()
-            .await?;
-        let qemu_x64_path = match sdk.get_host_tool(QEMU_TOOL) {
+        let qemu_x64_path = match get_host_tool(QEMU_TOOL).await {
             Ok(qemu_path) => qemu_path.canonicalize().context(format!(
                 "Failed to canonicalize the path to the emulator binary: {:?}",
                 qemu_path

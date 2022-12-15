@@ -16,6 +16,8 @@ use fidl_fuchsia_developer_ffx as ffx;
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, process::Command};
 
+use super::get_host_tool;
+
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct FemuEngine {
     #[serde(default)]
@@ -154,11 +156,7 @@ impl EmulatorEngine for FemuEngine {
 
     /// Get the AEMU binary path from the SDK manifest and verify it exists.
     async fn load_emulator_binary(&mut self) -> Result<()> {
-        let sdk = ffx_config::global_env_context()
-            .context("loading global environment context")?
-            .get_sdk()
-            .await?;
-        self.emulator_binary = match sdk.get_host_tool(config::FEMU_TOOL) {
+        self.emulator_binary = match get_host_tool(config::FEMU_TOOL).await {
             Ok(aemu_path) => aemu_path.canonicalize().context(format!(
                 "Failed to canonicalize the path to the emulator binary: {:?}",
                 aemu_path
