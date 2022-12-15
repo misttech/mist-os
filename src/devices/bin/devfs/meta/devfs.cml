@@ -23,6 +23,10 @@
             // TODO(https://fxbug.dev/110563): make this read-only when clients
             // have been updated.
             rights: [ "rw*" ],
+
+            // TODO(https://fxbug.dev/85030): make this /dev/sys; this is a
+            // prerequisite for changing the rights above to read-only for
+            // clients that use /dev/null or /dev/zero.
             path: "/dev",
         },
         {
@@ -32,6 +36,16 @@
             // have been updated.
             rights: [ "rw*" ],
             path: "/dev/class",
+        },
+        {
+            protocol: "dev-null",
+            rights: [ "rw*" ],
+            path: "/dev/null",
+        },
+        {
+            protocol: "dev-zero",
+            rights: [ "rw*" ],
+            path: "/dev/zero",
         },
     ],
     use: [
@@ -50,11 +64,17 @@
     ],
     expose: [
         {
-            directory: "dev-topological",
+            directory: [
+                "dev-class",
+                "dev-topological",
+            ],
             from: "self",
         },
         {
-            directory: "dev-class",
+            protocol: [
+                "dev-null",
+                "dev-zero",
+            ],
             from: "self",
         },
     ],

@@ -3,12 +3,11 @@
 // found in the LICENSE file.
 {
     capabilities: [
-        // Device tree
         {
             directory: "dev",
 
-            // TODO(https://fxbug.dev/110563): make this read-only when clients
-            // have been updated.
+            // TODO(https://fxbug.dev/85030): make this read-only when /dev/null
+            // and /dev/zero are no longer implemented by this component.
             rights: [ "rw*" ],
             path: "/dev",
         },

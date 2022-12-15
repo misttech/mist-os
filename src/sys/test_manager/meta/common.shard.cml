@@ -209,6 +209,10 @@
     offer: [
         {
             protocol: [
+                // Tests are permitted to use /dev/null and /dev/zero.
+                "dev-null",
+                "dev-zero",
+
                 // Tests can write to debug logs
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.process.Launcher",

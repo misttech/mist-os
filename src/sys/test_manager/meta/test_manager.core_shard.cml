@@ -25,6 +25,8 @@
         // Needed by test_manager and/or some test runners
         {
             protocol: [
+                "dev-null",
+                "dev-zero",
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.SvcStashProvider",
                 "fuchsia.boot.WriteOnlyLog",
