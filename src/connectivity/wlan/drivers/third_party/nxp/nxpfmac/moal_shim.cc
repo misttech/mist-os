@@ -13,6 +13,7 @@
 
 #include "moal_shim.h"
 
+#include <lib/async/cpp/task.h>
 #include <string.h>
 #include <zircon/syscalls.h>
 
@@ -280,7 +281,19 @@ mlan_status moal_recv_amsdu_packet(t_void *pmoal, pmlan_buffer pmbuf) {
 }
 
 mlan_status moal_recv_event(t_void *pmoal, pmlan_event pmevent) {
-  static_cast<wlan::nxpfmac::DeviceContext *>(pmoal)->event_handler_->OnEvent(pmevent);
+  auto context = static_cast<wlan::nxpfmac::DeviceContext *>(pmoal);
+  // Make a copy of the event here and process it asynchronously. Otherwise event handler callbacks
+  // cannot really interact with mlan since this is called from the mlan main process. Most
+  // interactions with mlan (such as ioctls) on this thread would deadlock otherwise.
+  std::vector<uint8_t> event_buf(sizeof(*pmevent) + pmevent->event_len);
+  memcpy(event_buf.data(), pmevent, sizeof(*pmevent));
+  memcpy(reinterpret_cast<pmlan_event>(event_buf.data())->event_buf, pmevent->event_buf,
+         pmevent->event_len);
+  async::PostTask(context->device_->GetDispatcher(),
+                  [context, event_buf = std::move(event_buf)]() mutable {
+                    auto event = reinterpret_cast<pmlan_event>(event_buf.data());
+                    context->event_handler_->OnEvent(event);
+                  });
   return MLAN_STATUS_SUCCESS;
 }
 
