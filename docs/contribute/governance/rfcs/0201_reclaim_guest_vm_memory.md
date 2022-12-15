@@ -419,4 +419,4 @@ pressure without affecting host/guest performance too much.
 [Uningine]: https://benchmark.unigine.com/
 [Free page reporting benchmarks]: https://lwn.net/Articles/808807/
 [DAX mapping]: https://lwn.net/Articles/828371/
-[memorypressure provider]: https://fuchsia.dev/reference/fidl/fuchsia.memorypressure?hl=en
+[memorypressure provider]: https://fuchsia.dev/reference/fidl/fuchsia.memorypressure
