@@ -5,6 +5,7 @@
 use anyhow::{anyhow, bail, Result};
 use fuchsia_archive::{Error, Utf8Entry, Utf8Reader};
 use fuchsia_hash::Hash;
+use fuchsia_merkle::{from_read, MerkleTree};
 use fuchsia_pkg::MetaContents;
 use mockall::automock;
 use serde::Serialize;
@@ -97,6 +98,10 @@ impl FarListReader for FarArchiveReader {
         };
         Ok(contents)
     }
+}
+
+pub fn get_merkleroot(far_file: &mut File) -> Result<MerkleTree> {
+    return Ok(from_read(far_file)?);
 }
 
 pub fn read_file_entries(reader: &mut Box<dyn FarListReader>) -> Result<Vec<ArchiveEntry>> {

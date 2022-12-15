@@ -13,6 +13,7 @@ ffx_plugin("ffx_package_archive") {
     "cat:ffx_package_archive_cat",
     "create:ffx_package_archive_create",
     "extract:ffx_package_archive_extract",
+    "hash:ffx_package_archive_hash",
     "list:ffx_package_archive_list",
   ]
 
@@ -30,11 +31,12 @@ rustc_library("lib") {
   deps = [
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",
     "//src/sys/pkg/lib/fuchsia-hash",
+    "//src/sys/pkg/lib/fuchsia-merkle",
     "//src/sys/pkg/lib/fuchsia-pkg",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:mockall",
     "//third_party/rust_crates:serde",
   ]
 
-  test_deps = [ "//third_party/rust_crates:tempfile" ]
+  test_deps = []
 }
