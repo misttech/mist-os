@@ -101,6 +101,7 @@ class Device : public DeviceType,
   zx_status_t LoadFirmwareData(const char* path, std::vector<uint8_t>* data_out);
   zx_status_t LoadPowerFile(char country_code[3], std::vector<uint8_t>* pwr_data_out);
   zx_status_t SetCountryCodeInFw(char country_code[3]);
+  zx_status_t RetrieveMacAddress();
 
   mlan_device mlan_device_ = {};
   void* mlan_adapter_ = nullptr;

@@ -13,8 +13,10 @@
 
 #include "device.h"
 
+#include <lib/ddk/metadata.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/zx/timer.h>
+#include <sys/random.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
@@ -129,15 +131,12 @@ void Device::DdkInit(ddk::InitTxn txn) {
       NXPF_ERR("Failed to initialize firmware: %s", zx_status_get_string(status));
       return status;
     }
-    IoctlRequest<mlan_ds_bss> request(MLAN_IOCTL_BSS, MLAN_ACT_GET, 0,
-                                      {.sub_command = MLAN_OID_BSS_MAC_ADDR});
 
-    IoctlStatus io_status = context_->ioctl_adapter_->IssueIoctlSync(&request);
-    if (io_status != IoctlStatus::Success) {
-      NXPF_ERR("Failed to perform get MAC ioctl: %d", io_status);
-      return ZX_ERR_INTERNAL;
+    status = RetrieveMacAddress();
+    if (status != ZX_OK) {
+      NXPF_ERR("Failed to retrieve MAC address: %s", zx_status_get_string(status));
+      return status;
     }
-    memcpy(mac_address_, request.UserReq().param.mac_addr, ETH_ALEN);
 
     return ZX_OK;
   }();
@@ -659,6 +658,38 @@ zx_status_t Device::LoadFirmwareData(const char *path, std::vector<uint8_t> *dat
   *data_out = std::move(data);
 
   return ZX_OK;
+}
+
+zx_status_t Device::RetrieveMacAddress() {
+  // MAC address is only 6 bytes, but it is rounded up to 8 in the ZBI
+  uint8_t bootloader_macaddr[8] = {};
+  size_t actual_len = 0;
+  zx_status_t status = DdkGetMetadata(DEVICE_METADATA_MAC_ADDRESS, bootloader_macaddr,
+                                      sizeof(bootloader_macaddr), &actual_len);
+  if (status == ZX_OK) {
+    memcpy(mac_address_, bootloader_macaddr, ETH_ALEN);
+    return ZX_OK;
+  }
+  NXPF_ERR("Failed to get MAC address metadata: %s", zx_status_get_string(status));
+
+  // Fall back on random MAC address
+  if (getentropy(mac_address_, ETH_ALEN) == 0) {
+    mac_address_[0] &= 0xfe;  // bit 0: 0 = unicast
+    mac_address_[0] |= 0x02;  // bit 1: 1 = locally-administered
+    return ZX_OK;
+  }
+  NXPF_ERR("Failed to randomly generate MAC address");
+
+  // Then fall back on the firmware address
+  IoctlRequest<mlan_ds_bss> request(MLAN_IOCTL_BSS, MLAN_ACT_GET, 0,
+                                    {.sub_command = MLAN_OID_BSS_MAC_ADDR});
+  IoctlStatus io_status = context_->ioctl_adapter_->IssueIoctlSync(&request);
+  if (io_status == IoctlStatus::Success) {
+    memcpy(mac_address_, request.UserReq().param.mac_addr, ETH_ALEN);
+    return ZX_OK;
+  }
+  NXPF_ERR("Failed to retrieve MAC address from firmware: %d", io_status);
+  return ZX_ERR_IO;
 }
 
 }  // namespace wlan::nxpfmac
