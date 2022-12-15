@@ -88,6 +88,17 @@ class Session : private fuchsia::ui::scenic::SessionListener {
   explicit Session(SessionPtrAndListenerRequest session_and_listener,
                    async_dispatcher_t* dispatcher = nullptr);
 
+  // Creates a new session using the provided Scenic and binds the listener to
+  // this object. The Scenic itself is not retained after construction.
+  // |endpoints| must not have either the session or session_listener fields set; they will be
+  // set by the constructor.
+  //
+  // Callbacks will be run on the async dispatcher specified by |dispatcher|, or
+  // the default dispatcher for the current thread if unspecified.
+  explicit Session(fuchsia::ui::scenic::Scenic* scenic,
+                   fuchsia::ui::scenic::SessionEndpoints endpoints,
+                   async_dispatcher_t* dispatcher = nullptr);
+
   Session(const Session&) = delete;
   Session& operator=(const Session&) = delete;
 

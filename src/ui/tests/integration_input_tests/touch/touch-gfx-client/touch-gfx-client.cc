@@ -29,6 +29,41 @@
 
 namespace touch_gfx_client {
 
+namespace {
+
+std::array<float, 2> ViewportToViewCoordinates(
+    std::array<float, 2> viewport_coordinates,
+    const std::array<float, 9>& viewport_to_view_transform) {
+  // The transform matrix is a FIDL array with matrix data in column-major
+  // order. For a matrix with data [a b c d e f g h i], and with the viewport
+  // coordinates expressed as homogeneous coordinates, the logical view
+  // coordinates are obtained with the following formula:
+  //   |a d g|   |x|   |x'|
+  //   |b e h| * |y| = |y'|
+  //   |c f i|   |1|   |w'|
+  // which we then normalize based on the w component:
+  //   if w' not zero: (x'/w', y'/w')
+  //   else (x', y')
+  const auto& M = viewport_to_view_transform;
+  const float x = viewport_coordinates[0];
+  const float y = viewport_coordinates[1];
+  const float xp = M[0] * x + M[3] * y + M[6];
+  const float yp = M[1] * x + M[4] * y + M[7];
+  const float wp = M[2] * x + M[5] * y + M[8];
+  if (wp != 0) {
+    return {xp / wp, yp / wp};
+  } else {
+    return {xp, yp};
+  }
+}
+
+}  // namespace
+
+using fuchsia::ui::pointer::EventPhase;
+using fuchsia::ui::pointer::TouchEvent;
+using fuchsia::ui::pointer::TouchResponse;
+using fuchsia::ui::pointer::TouchResponseType;
+
 // Implementation of a very simple Scenic client.
 class TouchGfxClient : public fuchsia::ui::app::ViewProvider {
  public:
@@ -55,7 +90,11 @@ class TouchGfxClient : public fuchsia::ui::app::ViewProvider {
       loop_->Quit();
     });
 
-    session_ = std::make_unique<scenic::Session>(scenic.get());
+    {
+      fuchsia::ui::scenic::SessionEndpoints endpoints;
+      endpoints.set_touch_source(touch_source_.NewRequest());
+      session_ = std::make_unique<scenic::Session>(scenic.get(), std::move(endpoints));
+    }
     session_->set_error_handler([this](zx_status_t status) {
       FX_LOGS(ERROR) << "Quitting. Scenic session disconnected, status: "
                      << zx_status_get_string(status);
@@ -68,6 +107,7 @@ class TouchGfxClient : public fuchsia::ui::app::ViewProvider {
     root_node_->SetEventMask(fuchsia::ui::gfx::kMetricsEventMask);
 
     session_->Present2(/*when*/ zx_clock_get_monotonic(), /*span*/ 0, [](auto) {});
+    touch_source_->Watch({}, [this](auto events) { OnTouchEvents(std::move(events)); });
   }
 
  private:
@@ -123,37 +163,6 @@ class TouchGfxClient : public fuchsia::ui::app::ViewProvider {
           default:
             break;  // nop
         }
-      } else if (event.is_input()) {
-        switch (event.input().Which()) {
-          case fuchsia::ui::input::InputEvent::Tag::kPointer: {
-            const auto& phase = event.input().pointer().phase;
-            if (phase == fuchsia::ui::input::PointerEventPhase::DOWN && material_) {
-              color_index_ = (color_index_ + 1) % kColorsRgba.size();
-              std::array<uint8_t, 4> color = kColorsRgba[color_index_];
-              material_->SetColor(color[0], color[1], color[2], color[3]);
-              session_->Present2(/*when*/ zx_clock_get_monotonic(), /*span*/ 0, [](auto) {});
-            }
-            if (touch_input_listener_) {
-              fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest request;
-              // Only report DOWN and MOVE events, for consistency with the
-              // flutter client.
-              if (phase == fuchsia::ui::input::PointerEventPhase::DOWN ||
-                  phase == fuchsia::ui::input::PointerEventPhase::MOVE) {
-                // The raw pointer event's coordinates are in pips (logical pixels). The test
-                // expects coordinates in physical pixels. The former is transformed into the latter
-                // with the scale factor provided in the metrics event.
-                request.set_local_x(event.input().pointer().x * metrics_.scale_x)
-                    .set_local_y(event.input().pointer().y * metrics_.scale_y)
-                    .set_time_received(zx_clock_get_monotonic())
-                    .set_component_name("touch-gfx-client");
-                touch_input_listener_->ReportTouchInput(std::move(request));
-              }
-            }
-            break;
-          }
-          default:
-            break;  // nop
-        }
       }
     }
 
@@ -161,6 +170,59 @@ class TouchGfxClient : public fuchsia::ui::app::ViewProvider {
       CreateScene();
       scene_created_ = true;
     }
+  }
+
+  // Listens for touch events and responds to them. Should be initially called in the callback to
+  // TouchSource::Watch().
+  void OnTouchEvents(std::vector<TouchEvent> events) {
+    for (auto& event : events) {
+      if (event.has_view_parameters()) {
+        view_params_ = std::move(event.view_parameters());
+      }
+      if (event.has_pointer_sample()) {
+        const auto& pointer = event.pointer_sample();
+        const auto& phase = pointer.phase();
+        if (phase == EventPhase::ADD && material_) {
+          color_index_ = (color_index_ + 1) % kColorsRgba.size();
+          std::array<uint8_t, 4> color = kColorsRgba[color_index_];
+          material_->SetColor(color[0], color[1], color[2], color[3]);
+          session_->Present2(/*when*/ zx_clock_get_monotonic(), /*span*/ 0, [](auto) {});
+        }
+
+        if (touch_input_listener_) {
+          // Only report ADD and CHANGE events, for consistency with the flutter client.
+          if (phase == EventPhase::ADD || phase == EventPhase::CHANGE) {
+            // The raw pointer event's coordinates are in pips (logical pixels). The test
+            // expects coordinates in physical pixels. The former is transformed into the latter
+            // with the scale factor provided in the metrics event.
+            const auto logical = ViewportToViewCoordinates(
+                pointer.position_in_viewport(), view_params_->viewport_to_view_transform);
+            fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest request;
+            request.set_local_x(logical[0] * metrics_.scale_x)
+                .set_local_y(logical[1] * metrics_.scale_y)
+                .set_time_received(zx_clock_get_monotonic())
+                .set_component_name("touch-gfx-client");
+            touch_input_listener_->ReportTouchInput(std::move(request));
+          }
+        }
+      }
+    }
+
+    // Create responses.
+    std::vector<TouchResponse> responses;
+    for (auto& event : events) {
+      if (event.has_pointer_sample()) {
+        TouchResponse response;
+        response.set_response_type(TouchResponseType::YES);
+        responses.emplace_back(std::move(response));
+      } else {
+        // Add empty response for non-pointer event.
+        responses.emplace_back();
+      }
+    }
+
+    touch_source_->Watch(std::move(responses),
+                         [this](auto events) { OnTouchEvents(std::move(events)); });
   }
 
   // Calculates view size based on view properties and metrics event.
@@ -195,6 +257,8 @@ class TouchGfxClient : public fuchsia::ui::app::ViewProvider {
     session_->Present2(/*when*/ zx_clock_get_monotonic(), /*span*/ 0, [](auto) {});
   }
 
+  std::optional<fuchsia::ui::pointer::ViewParameters> view_params_;
+
   // The main thread's message loop.
   async::Loop* loop_ = nullptr;
 
@@ -203,6 +267,8 @@ class TouchGfxClient : public fuchsia::ui::app::ViewProvider {
 
   // Protocols used by this component.
   fuchsia::ui::test::input::TouchInputListenerPtr touch_input_listener_;
+
+  fuchsia::ui::pointer::TouchSourcePtr touch_source_;
 
   // Protocols vended by this component.
   fidl::Binding<fuchsia::ui::app::ViewProvider> view_provider_binding_;
