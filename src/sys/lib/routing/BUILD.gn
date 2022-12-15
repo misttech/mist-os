@@ -32,6 +32,7 @@ rustc_library("routing") {
     "//src/lib/error/clonable_error",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/from-enum",
+    "//src/lib/versioning/version-history/rust:version-history",
     "//src/lib/zircon/rust:fuchsia-zircon-status",
     "//src/sys/lib/cm_fidl_validator",
     "//src/sys/lib/cm_moniker",

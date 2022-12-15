@@ -5,7 +5,9 @@
 use {
     crate::model::error::ModelError,
     ::routing::{
-        component_id_index::ComponentIdIndex, config::RuntimeConfig, policy::GlobalPolicyChecker,
+        component_id_index::ComponentIdIndex,
+        config::{AbiRevisionPolicy, RuntimeConfig},
+        policy::GlobalPolicyChecker,
     },
     std::sync::{Arc, Weak},
 };
@@ -17,6 +19,7 @@ pub struct ModelContext {
     policy_checker: GlobalPolicyChecker,
     component_id_index: Arc<ComponentIdIndex>,
     runtime_config: Arc<RuntimeConfig>,
+    abi_revision_policy: AbiRevisionPolicy,
 }
 
 impl ModelContext {
@@ -27,6 +30,7 @@ impl ModelContext {
                 Some(path) => Arc::new(ComponentIdIndex::new(&path).await?),
                 None => Arc::new(ComponentIdIndex::default()),
             },
+            abi_revision_policy: runtime_config.abi_revision_policy.clone(),
             runtime_config: runtime_config.clone(),
             policy_checker: GlobalPolicyChecker::new(runtime_config),
         })
@@ -43,6 +47,10 @@ impl ModelContext {
 
     pub fn component_id_index(&self) -> Arc<ComponentIdIndex> {
         self.component_id_index.clone()
+    }
+
+    pub fn abi_revision_policy(&self) -> &AbiRevisionPolicy {
+        &self.abi_revision_policy
     }
 }
 

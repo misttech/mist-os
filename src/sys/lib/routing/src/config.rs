@@ -6,7 +6,7 @@ use {
     crate::policy::allowlist_entry_matches,
     anyhow::{format_err, Context, Error},
     cm_rust::{CapabilityName, CapabilityTypeName, FidlIntoNative},
-    cm_types::{Name, Url},
+    cm_types::{symmetrical_enums, Name, Url},
     fidl::encoding::unpersist,
     fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_internal::{
@@ -22,6 +22,8 @@ use {
         str::FromStr,
     },
     thiserror::Error,
+    tracing::log,
+    version_history::AbiRevision,
 };
 
 /// Runtime configuration options.
@@ -99,6 +101,9 @@ pub struct RuntimeConfig {
 
     /// If and how the realm builder resolver and runner are enabled.
     pub realm_builder_resolver_and_runner: RealmBuilderResolverAndRunner,
+
+    /// The enforcement and validation policy to apply to component target ABI revisions.
+    pub abi_revision_policy: AbiRevisionPolicy,
 }
 
 /// A single security policy allowlist entry.
@@ -217,6 +222,77 @@ pub enum CapabilityAllowlistSource {
     Capability,
 }
 
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
+pub enum AbiRevisionError {
+    #[error("Missing a component target ABI revision.")]
+    Absent,
+    #[error("Unsupported component target ABI revision: {0}.")]
+    Unsupported(AbiRevision),
+}
+
+/// The enforcement and validation policy to apply to component target ABI revisions.
+/// Defaults to `AllowAll`
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum AbiRevisionPolicy {
+    AllowAll,
+    EnforcePresenceOnly,
+    EnforcePresenceAndCompatibility,
+}
+
+symmetrical_enums!(
+    AbiRevisionPolicy,
+    component_internal::AbiRevisionPolicy,
+    AllowAll,
+    EnforcePresenceOnly,
+    EnforcePresenceAndCompatibility
+);
+
+impl Default for AbiRevisionPolicy {
+    fn default() -> Self {
+        AbiRevisionPolicy::AllowAll
+    }
+}
+
+impl AbiRevisionPolicy {
+    fn is_supported(moniker: &AbsoluteMoniker, abi_revision: Option<AbiRevision>) -> bool {
+        match abi_revision {
+            Some(abi) => {
+                let is_supported = version_history::is_supported_abi_revision(abi);
+                if !is_supported {
+                    log::debug!("Component {} targets an invalid ABI revision {}.", moniker, abi)
+                }
+                is_supported
+            }
+            None => {
+                log::debug!("Component {} does not have a target ABI revision.", moniker);
+                false
+            }
+        }
+    }
+    /// Check if the abi_revision, if present, is supported by the platform and compatible with the
+    /// `AbiRevisionPolicy`. Regardless of the enforcement policy, log a warning if the
+    /// ABI revision is missing or not supported by the platform.
+    pub fn check_compatibility(
+        &self,
+        moniker: &AbsoluteMoniker,
+        abi_revision: Option<AbiRevision>,
+    ) -> Result<(), AbiRevisionError> {
+        let is_supported_abi = Self::is_supported(moniker, abi_revision);
+        match (self, abi_revision) {
+            (AbiRevisionPolicy::AllowAll, _) => Ok(()),
+            (AbiRevisionPolicy::EnforcePresenceOnly, Some(_)) => Ok(()),
+            (AbiRevisionPolicy::EnforcePresenceAndCompatibility, Some(abi)) => {
+                if is_supported_abi {
+                    Ok(())
+                } else {
+                    Err(AbiRevisionError::Unsupported(abi))
+                }
+            }
+            _ => Err(AbiRevisionError::Absent),
+        }
+    }
+}
+
 /// Allowlist key for capability routing policy. Part of the runtime
 /// security policy. This defines all the required keying information to lookup
 /// whether a capability exists in the policy map or not.
@@ -249,6 +325,7 @@ impl Default for RuntimeConfig {
             builtin_boot_resolver: BuiltinBootResolver::None,
             reboot_on_terminate_enabled: false,
             realm_builder_resolver_and_runner: RealmBuilderResolverAndRunner::None,
+            abi_revision_policy: Default::default(),
         }
     }
 }
@@ -395,6 +472,9 @@ impl TryFrom<component_internal::Config> for RuntimeConfig {
         let log_all_events =
             if let Some(log_all_events) = config.log_all_events { log_all_events } else { false };
 
+        let abi_revision_policy =
+            config.abi_revision_policy.map(AbiRevisionPolicy::from).unwrap_or_default();
+
         Ok(RuntimeConfig {
             list_children_batch_size,
             security_policy,
@@ -426,6 +506,7 @@ impl TryFrom<component_internal::Config> for RuntimeConfig {
             realm_builder_resolver_and_runner: config
                 .realm_builder_resolver_and_runner
                 .unwrap_or(default.realm_builder_resolver_and_runner),
+            abi_revision_policy,
         })
     }
 }
@@ -804,6 +885,7 @@ mod tests {
                 ..component_internal::Config::EMPTY
             },
             RuntimeConfig {
+                abi_revision_policy: AbiRevisionPolicy::AllowAll,
                 debug: true,
                 enable_introspection: true,
                 list_children_batch_size: 42,
@@ -1126,6 +1208,41 @@ mod tests {
         std::fs::write(&path, &vec![0xfa, 0xde])?;
 
         assert_matches!(RuntimeConfig::load_from_file(&path), Err(_));
+        Ok(())
+    }
+
+    #[test]
+    fn abi_revision_policy_check_compatibility() -> Result<(), Error> {
+        // This test assumes the platform does not support a u64::MAX ABI value.
+        let invalid_abi = AbiRevision(u64::MAX);
+        let valid_abi = version_history::LATEST_VERSION.abi_revision;
+        let test_scenarios = vec![
+            (AbiRevisionPolicy::AllowAll, None, Ok(())),
+            (AbiRevisionPolicy::AllowAll, Some(invalid_abi), Ok(())),
+            (AbiRevisionPolicy::AllowAll, Some(valid_abi), Ok(())),
+            (AbiRevisionPolicy::EnforcePresenceOnly, None, Err(AbiRevisionError::Absent)),
+            (AbiRevisionPolicy::EnforcePresenceOnly, Some(invalid_abi), Ok(())),
+            (AbiRevisionPolicy::EnforcePresenceOnly, Some(valid_abi), Ok(())),
+            (
+                AbiRevisionPolicy::EnforcePresenceAndCompatibility,
+                None,
+                Err(AbiRevisionError::Absent),
+            ),
+            (
+                AbiRevisionPolicy::EnforcePresenceAndCompatibility,
+                Some(invalid_abi),
+                Err(AbiRevisionError::Unsupported(invalid_abi)),
+            ),
+            (AbiRevisionPolicy::EnforcePresenceAndCompatibility, Some(valid_abi), Ok(())),
+        ];
+        for (policy, abi, expected_res) in test_scenarios {
+            println!(
+                "Test {:?} policy against the ABI revision {:?} produces {:?} result",
+                policy, abi, expected_res
+            );
+            let res = policy.check_compatibility(&"/foo".try_into().unwrap(), abi);
+            assert_eq!(res, expected_res);
+        }
         Ok(())
     }
 

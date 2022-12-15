@@ -90,6 +90,24 @@ type Config = table {
     /// Enables Component Manager's introspection APIs (RealmQuery, RealmExplorer,
     /// RouteValidator, LifecycleController, etc.) for use by components.
    18: enable_introspection bool;
+
+    /// The enforcement and validation policy to apply to component target ABI revisions.
+    /// If not present, defaults to `AbiRevisionPolicy::ALLOW_ALL`.
+   19: abi_revision_policy AbiRevisionPolicy;
+};
+
+/// The enforcement and validation policy to apply to component target ABI revisions.
+type AbiRevisionPolicy = strict enum : uint8 {
+    /// There is no enforcement or validation of component target ABI revisions: permit components to
+    /// not set, or set target ABI revisions not supported by the current Fuchsia platform.
+    /// This is useful for backwards-compatibility as component-level ABI revisions are introduced.
+    ALLOW_ALL = 1;
+    /// Enforce that a target ABI revision must exist for every component.  Does not require the ABI
+    /// to be supported by the current Fuchsia platform.
+    ENFORCE_PRESENCE_ONLY = 2;
+    // Enforce that a target ABI revision must exist for every component and be compatible with the
+    // current Fuchsia platform.
+    ENFORCE_PRESENCE_AND_COMPATIBILITY = 3;
 };
 
 /// The builtin resolver to use for the fuchsia-boot scheme, if any.
