@@ -95,6 +95,7 @@ if (is_fuchsia) {
     "//src/developer/build_info:build_info_core_shard",
     "//src/developer/forensics:core_shard",
     "//src/firmware/fastboot-tcp:fastboot-tcp-core-shard",
+    "//src/firmware/fastboot-usb:fastboot-usb-core-shard",
     "//src/recovery/factory_reset:factory_reset_core_shard",
     "//src/ui/bin/brightness_manager:auto-brightness_core_shard",
   ]
@@ -270,6 +271,7 @@ if (is_fuchsia) {
       "//src/firmware/fastboot-tcp:fastboot_tcp_mdns_config",
       "//src/sys/pkg:recovery-core",
       "//src/developer/build_info:build-info-service",
+      "//src/firmware/fastboot-usb",
     ]
 
     bootfs_labels = []
