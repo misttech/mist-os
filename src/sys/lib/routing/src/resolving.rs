@@ -17,6 +17,7 @@ use {
     std::sync::Arc,
     thiserror::Error,
     url::Url,
+    version_history::AbiRevision,
 };
 
 lazy_static! {
@@ -41,6 +42,7 @@ pub struct ResolvedComponent {
     pub decl: cm_rust::ComponentDecl,
     pub package: Option<ResolvedPackage>,
     pub config_values: Option<cm_rust::ValuesData>,
+    pub abi_revision: Option<AbiRevision>,
 }
 
 /// The response returned from a Resolver. This struct is derived from the FIDL

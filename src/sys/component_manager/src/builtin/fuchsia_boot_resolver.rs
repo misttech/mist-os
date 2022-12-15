@@ -320,7 +320,7 @@ impl Resolver for FuchsiaBootResolver {
         if component_address.is_relative_path() {
             return Err(ResolverError::UnexpectedRelativePath(component_address.url().to_string()));
         }
-        let fresolution::Component { url, decl, package, config_values, .. } =
+        let fresolution::Component { url, decl, package, config_values, abi_revision, .. } =
             self.resolve_async(component_address.url()).await?;
         let resolved_url = url.unwrap();
         let decl = decl.ok_or_else(|| {
@@ -341,6 +341,7 @@ impl Resolver for FuchsiaBootResolver {
             decl,
             package: package.map(|p| p.try_into()).transpose()?,
             config_values,
+            abi_revision: abi_revision.map(Into::into),
         })
     }
 }

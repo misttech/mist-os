@@ -72,6 +72,7 @@ use {
         time::Duration,
     },
     tracing::warn,
+    version_history::AbiRevision,
     vfs::{execution_scope::ExecutionScope, path::Path},
 };
 
@@ -132,8 +133,10 @@ pub struct Component {
     pub decl: ComponentDecl,
     /// The package info, if the component came from a package.
     pub package: Option<Package>,
-    /// The components validated configuration. If None, no configuration was provided.
+    /// The component's validated configuration. If None, no configuration was provided.
     pub config: Option<ConfigFields>,
+    /// The component's target ABI revision, if available.
+    pub abi_revision: Option<AbiRevision>,
 }
 
 /// Package information possibly returned by the resolver.
@@ -156,6 +159,7 @@ impl TryFrom<ResolvedComponent> for Component {
             decl,
             package,
             config_values,
+            abi_revision,
         }: ResolvedComponent,
     ) -> Result<Self, Self::Error> {
         // Verify the component configuration, if it exists
@@ -169,7 +173,7 @@ impl TryFrom<ResolvedComponent> for Component {
         };
 
         let package = package.map(|p| p.try_into()).transpose()?;
-        Ok(Self { resolved_url, context_to_resolve_children, decl, package, config })
+        Ok(Self { resolved_url, context_to_resolve_children, decl, package, config, abi_revision })
     }
 }
 

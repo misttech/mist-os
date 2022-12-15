@@ -50,6 +50,7 @@ use {
         sync::{Arc, Mutex as SyncMutex, Weak},
     },
     tracing::warn,
+    version_history,
     vfs::{
         directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
         file::vmo::asynchronous::read_only_static, path::Path, pseudo_directory, remote::RoutingFn,
@@ -224,6 +225,7 @@ impl MockResolver {
             decl: decl.clone(),
             package: Some(ResolvedPackage { url: "pkg".to_string(), directory: client }),
             config_values,
+            abi_revision: Some(version_history::LATEST_VERSION.abi_revision.clone()),
         })
     }
 

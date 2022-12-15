@@ -6,6 +6,7 @@ use {
     crate::model::{events::error::EventsError, routing::OpenResourceError, storage::StorageError},
     ::routing::{
         component_id_index::ComponentIdIndexError,
+        config::AbiRevisionError,
         error::{ComponentInstanceError, RoutingError},
         policy::PolicyError,
         resolving::ResolverError,
@@ -155,6 +156,11 @@ pub enum ModelError {
     ComponentIdIndexError {
         #[from]
         err: ComponentIdIndexError,
+    },
+    #[error("component ABI error: {}", err)]
+    AbiRevisionError {
+        #[from]
+        err: AbiRevisionError,
     },
     #[error("component has a config schema but resolver did not provide values")]
     ConfigValuesMissing,

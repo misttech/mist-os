@@ -153,6 +153,7 @@ impl Resolver for RemoteResolver {
         );
         let resolved_url = component.url.ok_or(ResolverError::RemoteInvalidData)?;
         let context_to_resolve_children = component.resolution_context.map(Into::into);
+        let abi_revision = component.abi_revision.map(Into::into);
         Ok(ResolvedComponent {
             resolved_by,
             resolved_url,
@@ -160,6 +161,7 @@ impl Resolver for RemoteResolver {
             decl,
             package: component.package.map(TryInto::try_into).transpose()?,
             config_values,
+            abi_revision,
         })
     }
 }
@@ -247,6 +249,7 @@ mod tests {
                 decl: cm_rust::ComponentDecl::default(),
                 package: None,
                 config_values: None,
+                abi_revision: Some(version_history::LATEST_VERSION.abi_revision.clone()),
             })
         }
     }
@@ -335,6 +338,7 @@ mod tests {
                 decl: cm_rust::ComponentDecl::default(),
                 package: None,
                 config_values: None,
+                abi_revision: Some(version_history::LATEST_VERSION.abi_revision.clone()),
             })
         }
     }
