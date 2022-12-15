@@ -264,7 +264,7 @@ pub fn sys_futex(
     utime: UserRef<timespec>,
     addr2: UserAddress,
     value3: u32,
-) -> Result<usize, Errno> {
+) -> Result<(), Errno> {
     let futexes = if op & FUTEX_PRIVATE_FLAG != 0 {
         &current_task.mm.futex
     } else {
@@ -285,9 +285,10 @@ pub fn sys_futex(
                 zx::Time::after(duration_from_timespec(duration)?)
             };
             futexes.wait(current_task, addr, value, FUTEX_BITSET_MATCH_ANY, deadline)?;
-            Ok(0)
         }
-        FUTEX_WAKE => futexes.wake(current_task, addr, value as usize, FUTEX_BITSET_MATCH_ANY),
+        FUTEX_WAKE => {
+            futexes.wake(current_task, addr, value as usize, FUTEX_BITSET_MATCH_ANY)?;
+        }
         FUTEX_WAIT_BITSET => {
             if value3 == 0 {
                 return error!(EINVAL);
@@ -303,20 +304,23 @@ pub fn sys_futex(
                 time_from_timespec(deadline)?
             };
             futexes.wait(current_task, addr, value, value3, deadline)?;
-            Ok(0)
         }
         FUTEX_WAKE_BITSET => {
             if value3 == 0 {
                 return error!(EINVAL);
             }
-            futexes.wake(current_task, addr, value as usize, value3)
+            futexes.wake(current_task, addr, value as usize, value3)?;
         }
-        FUTEX_REQUEUE => futexes.requeue(current_task, addr, value as usize, addr2),
+        FUTEX_REQUEUE => {
+            futexes.requeue(current_task, addr, value as usize, addr2)?;
+        }
         _ => {
             not_implemented!(current_task, "futex: command 0x{:x} not implemented.", cmd);
-            error!(ENOSYS)
+            return error!(ENOSYS);
         }
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
