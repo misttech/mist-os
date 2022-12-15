@@ -8,7 +8,10 @@ use {
     fidl_fuchsia_hardware_block_partition::Guid,
     fidl_fuchsia_hardware_block_volume::{VolumeAndNodeMarker, VolumeManagerMarker},
     fidl_fuchsia_io as fio,
-    fshost_test_fixture::{disk_builder::FVM_SLICE_SIZE, TestFixtureBuilder},
+    fshost_test_fixture::{
+        disk_builder::{DataSpec, FVM_SLICE_SIZE},
+        TestFixtureBuilder,
+    },
     fuchsia_async as fasync,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_zircon as zx,
@@ -51,16 +54,33 @@ const DATA_MAX_BYTES: u64 = 109876543;
 fn data_fs_type() -> u32 {
     match DATA_FILESYSTEM_FORMAT {
         "f2fs" => VFS_TYPE_F2FS,
-        "fxfs" => VFS_TYPE_FXFS,
+        "fxfs" | "fxfs-legacy-crypto" => VFS_TYPE_FXFS,
         "minfs" => VFS_TYPE_MINFS,
         _ => panic!("invalid data filesystem format"),
+    }
+}
+
+fn data_fs_name() -> &'static str {
+    match DATA_FILESYSTEM_FORMAT {
+        "f2fs" => "f2fs",
+        "fxfs" | "fxfs-legacy-crypto" => "fxfs",
+        "minfs" => "minfs",
+        _ => panic!("invalid data filesystem format"),
+    }
+}
+
+fn data_fs_spec() -> DataSpec {
+    DataSpec {
+        format: Some(data_fs_name()),
+        zxcrypt: true,
+        legacy_crypto_format: DATA_FILESYSTEM_FORMAT == "fxfs-legacy-crypto",
     }
 }
 
 #[fuchsia::test]
 async fn blobfs_and_data_mounted() {
     let mut builder = new_builder();
-    builder.with_disk().format_data(true, DATA_FILESYSTEM_FORMAT);
+    builder.with_disk().format_data(data_fs_spec());
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
@@ -85,7 +105,7 @@ async fn data_formatted() {
 #[fuchsia::test]
 async fn data_reformatted_when_corrupt() {
     let mut builder = new_builder();
-    builder.with_disk().format_data(true, DATA_FILESYSTEM_FORMAT).corrupt_data();
+    builder.with_disk().format_data(data_fs_spec()).corrupt_data();
     let mut fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -99,8 +119,8 @@ async fn data_reformatted_when_corrupt() {
     fixture
         .wait_for_crash_reports(
             1,
-            DATA_FILESYSTEM_FORMAT,
-            &format!("fuchsia-{}-corruption", DATA_FILESYSTEM_FORMAT),
+            data_fs_name(),
+            &format!("fuchsia-{}-corruption", data_fs_name()),
         )
         .await;
 
@@ -149,7 +169,7 @@ async fn data_formatted_with_small_initial_volume_big_target() {
 #[fuchsia::test]
 async fn data_mounted_legacy_crypto_format() {
     let mut builder = new_builder();
-    builder.with_disk().format_data(true, DATA_FILESYSTEM_FORMAT).legacy_crypto_format();
+    builder.with_disk().format_data(DataSpec { legacy_crypto_format: true, ..data_fs_spec() });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -162,7 +182,7 @@ async fn data_mounted_legacy_crypto_format() {
 async fn data_mounted_no_zxcrypt() {
     let mut builder = new_builder();
     builder.fshost().set_no_zxcrypt();
-    builder.with_disk().format_data(false, DATA_FILESYSTEM_FORMAT);
+    builder.with_disk().format_data(DataSpec { zxcrypt: false, ..data_fs_spec() });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -209,7 +229,7 @@ async fn wipe_storage_not_supported() {
 async fn ramdisk_blob_and_data_mounted() {
     let mut builder = new_builder();
     builder.fshost().set_fvm_ramdisk();
-    builder.with_disk().format_data(false, DATA_FILESYSTEM_FORMAT);
+    builder.with_disk().format_data(DataSpec { zxcrypt: false, ..data_fs_spec() });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
@@ -224,7 +244,7 @@ async fn ramdisk_data_ignores_non_ramdisk() {
     let mut builder = new_builder();
     // Fake out the ramdisk checking by providing a nonsense ramdisk prefix.
     builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/not/the/prefix");
-    builder.with_disk().format_data(false, DATA_FILESYSTEM_FORMAT);
+    builder.with_disk().format_data(DataSpec { zxcrypt: false, ..data_fs_spec() });
     let fixture = builder.build().await;
 
     let dev = fixture.dir("dev-topological/class/block");
@@ -236,7 +256,7 @@ async fn ramdisk_data_ignores_non_ramdisk() {
     .await
     .unwrap();
 
-    if DATA_FILESYSTEM_FORMAT != "fxfs" {
+    if data_fs_name() != "fxfs" {
         device_watcher::wait_for_device_with(&dev, |info| {
             info.topological_path
                 .ends_with("fvm/data-p-2/block/zxcrypt/unsealed/block")
@@ -372,7 +392,7 @@ async fn fvm_ramdisk_serves_zbi_ramdisk_contents_with_unformatted_data() {
 #[fuchsia::test]
 async fn fvm_within_gpt() {
     let mut builder = new_builder();
-    builder.with_disk().with_gpt().format_data(true, DATA_FILESYSTEM_FORMAT);
+    builder.with_disk().with_gpt().format_data(data_fs_spec());
     let fixture = builder.build().await;
     let dev = fixture.dir("dev-topological/class/block");
 
@@ -410,7 +430,7 @@ async fn pausing_block_watcher_ignores_devices() {
 
     // The second disk has a formatted data filesystem with a test file inside it.
     let mut disk_builder2 = fshost_test_fixture::disk_builder::DiskBuilder::new();
-    disk_builder2.format_data(true, DATA_FILESYSTEM_FORMAT);
+    disk_builder2.format_data(data_fs_spec());
     let disk_vmo2 = disk_builder2.build().await;
 
     let mut fixture = new_builder().build().await;

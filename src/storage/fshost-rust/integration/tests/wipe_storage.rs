@@ -6,7 +6,7 @@
 //! among other things, sets the fvm_ramdisk flag to prevent binding of the on-disk filesystems.)
 
 use {
-    crate::{new_builder, DATA_FILESYSTEM_FORMAT},
+    crate::{data_fs_name, data_fs_spec, new_builder},
     fidl::endpoints::{create_proxy, Proxy as _},
     fidl_fuchsia_fshost as fshost,
     fidl_fuchsia_hardware_block::BlockProxy,
@@ -41,7 +41,7 @@ async fn write_test_blob(directory: &fio::DirectoryProxy) {
 #[fuchsia::test]
 async fn no_fvm_device() {
     // TODO(fxbug.dev/113970): this test doesn't work on f2fs
-    if DATA_FILESYSTEM_FORMAT == "f2fs" {
+    if data_fs_name() == "f2fs" {
         return;
     }
 
@@ -64,7 +64,7 @@ async fn no_fvm_device() {
 #[fuchsia::test]
 async fn write_blob() {
     // TODO(fxbug.dev/113970): this test doesn't work on f2fs
-    if DATA_FILESYSTEM_FORMAT == "f2fs" {
+    if data_fs_name() == "f2fs" {
         return;
     }
 
@@ -93,7 +93,7 @@ async fn write_blob() {
 #[fuchsia::test]
 async fn blobfs_formatted() {
     // TODO(fxbug.dev/113970): this test doesn't work on f2fs
-    if DATA_FILESYSTEM_FORMAT == "f2fs" {
+    if data_fs_name() == "f2fs" {
         return;
     }
 
@@ -143,14 +143,14 @@ async fn blobfs_formatted() {
 #[fuchsia::test]
 async fn data_unformatted() {
     // TODO(fxbug.dev/113970): this test doesn't work on f2fs
-    if DATA_FILESYSTEM_FORMAT == "f2fs" {
+    if data_fs_name() == "f2fs" {
         return;
     }
 
     const BUFF_LEN: usize = 512;
     let mut builder = new_builder();
     builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/nada/zip/zilch");
-    builder.with_disk().with_gpt().format_data(true, DATA_FILESYSTEM_FORMAT);
+    builder.with_disk().format_data(data_fs_spec()).with_gpt();
     let fixture = builder.build().await;
     let dev = fixture.dir("dev-topological/class/block");
 
@@ -181,7 +181,7 @@ async fn data_unformatted() {
 
     // TODO(fxbug.dev/112142): Due to a race between the block watcher and WipeStorage, we have to
     // wait for zxcrypt to be unsealed to ensure all child drivers of the FVM device are bound.
-    if DATA_FILESYSTEM_FORMAT != "fxfs" {
+    if data_fs_name() != "fxfs" {
         device_watcher::wait_for_device_with(&dev, |info| {
             info.topological_path
                 .ends_with("/fvm/data-p-2/block/zxcrypt/unsealed/block")
@@ -225,7 +225,7 @@ async fn data_unformatted() {
 #[fuchsia::test]
 async fn handles_corrupt_fvm() {
     // TODO(fxbug.dev/113970): this test doesn't work on f2fs
-    if DATA_FILESYSTEM_FORMAT == "f2fs" {
+    if data_fs_name() == "f2fs" {
         return;
     }
 

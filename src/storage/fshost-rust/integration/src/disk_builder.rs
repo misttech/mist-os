@@ -213,14 +213,19 @@ impl Disk {
     }
 }
 
+#[derive(Default)]
+pub struct DataSpec {
+    pub format: Option<&'static str>,
+    pub zxcrypt: bool,
+    pub legacy_crypto_format: bool,
+}
+
 pub struct DiskBuilder {
     size: u64,
     data_volume_size: u64,
-    format_zxcrypt: bool,
-    format: Option<&'static str>,
+    data_spec: DataSpec,
     // Only used if `format` is Some.
     corrupt_contents: bool,
-    legacy_crypto_format: bool,
     gpt: bool,
     format_fvm: bool,
 }
@@ -230,10 +235,8 @@ impl DiskBuilder {
         DiskBuilder {
             size: DEFAULT_DISK_SIZE,
             data_volume_size: DEFAULT_DATA_VOLUME_SIZE,
-            format_zxcrypt: false,
-            format: None,
+            data_spec: DataSpec { format: None, zxcrypt: false, legacy_crypto_format: false },
             corrupt_contents: false,
-            legacy_crypto_format: false,
             gpt: false,
             format_fvm: true,
         }
@@ -249,28 +252,14 @@ impl DiskBuilder {
         self
     }
 
-    /// Format the data partition with zxcrypt, unless the data format is set to something that
-    /// doesn't need it, like Fxfs. This will format the data partition with just zxcrypt if no
-    /// data format is set.
-    pub fn format_zxcrypt_if_needed(&mut self) -> &mut Self {
-        self.format_zxcrypt = true;
-        self
-    }
-
-    pub fn format_data(&mut self, with_zxcrypt_if_needed: bool, format: &'static str) -> &mut Self {
+    pub fn format_data(&mut self, data_spec: DataSpec) -> &mut Self {
         assert!(self.format_fvm);
-        self.format = Some(format);
-        self.format_zxcrypt = with_zxcrypt_if_needed;
+        self.data_spec = data_spec;
         self
     }
 
     pub fn corrupt_data(&mut self) -> &mut Self {
         self.corrupt_contents = true;
-        self
-    }
-
-    pub fn legacy_crypto_format(&mut self) -> &mut Self {
-        self.legacy_crypto_format = true;
         self
     }
 
@@ -280,7 +269,7 @@ impl DiskBuilder {
     }
 
     pub fn with_unformatted_fvm(&mut self) -> &mut Self {
-        assert!(self.format.is_none());
+        assert!(self.data_spec.format.is_none());
         self.format_fvm = false;
         self
     }
@@ -366,7 +355,7 @@ impl DiskBuilder {
                 .expect("recursive_wait_and_open_node failed");
 
         // Potentially set up zxcrypt, if we are configured to and aren't using Fxfs.
-        if self.format != Some("fxfs") && self.format_zxcrypt {
+        if self.data_spec.format != Some("fxfs") && self.data_spec.zxcrypt {
             let zxcrypt_path = zxcrypt::set_up_insecure_zxcrypt(Path::new(&data_path))
                 .await
                 .expect("failed to set up zxcrypt");
@@ -377,7 +366,7 @@ impl DiskBuilder {
                     .expect("recursive_wait_and_open_node failed");
         }
 
-        if let Some(format) = self.format {
+        if let Some(format) = self.data_spec.format {
             match format {
                 "fxfs" => self.init_data_fxfs(data_device).await,
                 "minfs" => self.init_data_minfs(data_device).await,
@@ -475,7 +464,7 @@ impl DiskBuilder {
             return;
         }
 
-        let (data_key, metadata_key) = if self.legacy_crypto_format {
+        let (data_key, metadata_key) = if self.data_spec.legacy_crypto_format {
             (LEGACY_DATA_KEY, LEGACY_METADATA_KEY)
         } else {
             (DATA_KEY, METADATA_KEY)
@@ -485,7 +474,7 @@ impl DiskBuilder {
             .expect("from_channel failed");
         fxfs.format().await.expect("format failed");
         let mut fs = fxfs.serve_multi_volume().await.expect("serve_multi_volume failed");
-        let vol = if self.legacy_crypto_format {
+        let vol = if self.data_spec.legacy_crypto_format {
             let crypt_service = Some(
                 crypt_realm
                     .root

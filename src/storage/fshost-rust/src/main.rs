@@ -48,10 +48,11 @@ async fn main() -> Result<(), Error> {
     let (shutdown_tx, shutdown_rx) = mpsc::channel::<service::FshostShutdownResponder>(1);
     let (watcher, device_stream) = watcher::Watcher::new().await?;
 
-    let mut env = FshostEnvironment::new(&config, &boot_args);
+    let mut env = FshostEnvironment::new(config.clone(), boot_args);
     let export = vfs::pseudo_directory! {
         "svc" => vfs::pseudo_directory! {
-            fshost::AdminMarker::PROTOCOL_NAME => service::fshost_admin(&config),
+            fshost::AdminMarker::PROTOCOL_NAME =>
+                service::fshost_admin(config.clone(), env.launcher()),
             fshost::BlockWatcherMarker::PROTOCOL_NAME =>
                 service::fshost_block_watcher(watcher),
         },

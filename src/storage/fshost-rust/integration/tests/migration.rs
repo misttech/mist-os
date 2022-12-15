@@ -37,7 +37,10 @@
 //! that tests just configured_format with no zxcrypt. fxfs doesn't use zxcrypt, but it should
 //! disregard the no_zxcrypt config flag, so it should be handled the same in both tests.
 
-use crate::{data_fs_type, new_builder, DATA_FILESYSTEM_FORMAT};
+use {
+    crate::{data_fs_name, data_fs_type, new_builder},
+    fshost_test_fixture::disk_builder::DataSpec,
+};
 
 // Original state - unknown/blank
 
@@ -69,12 +72,12 @@ async fn none_to_format_no_zxcrypt() {
 #[fuchsia::test]
 async fn fxfs_to_format() {
     let mut builder = new_builder();
-    builder.with_disk().format_data(true, "fxfs");
+    builder.with_disk().format_data(DataSpec { format: Some("fxfs"), ..Default::default() });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    if DATA_FILESYSTEM_FORMAT == "fxfs" {
+    if data_fs_name() == "fxfs" {
         // Original state matches goal state
         fixture.check_test_data_file().await;
     }
@@ -86,12 +89,12 @@ async fn fxfs_to_format() {
 async fn fxfs_to_format_no_zxcrypt() {
     let mut builder = new_builder();
     builder.fshost().set_no_zxcrypt();
-    builder.with_disk().format_data(true, "fxfs");
+    builder.with_disk().format_data(DataSpec { format: Some("fxfs"), ..Default::default() });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    if DATA_FILESYSTEM_FORMAT == "fxfs" {
+    if data_fs_name() == "fxfs" {
         // Original state matches goal state
         fixture.check_test_data_file().await;
     }
@@ -104,7 +107,7 @@ async fn fxfs_to_format_no_zxcrypt() {
 #[fuchsia::test]
 async fn minfs_no_zxcrypt_to_format() {
     let mut builder = new_builder();
-    builder.with_disk().format_data(false, "minfs");
+    builder.with_disk().format_data(DataSpec { format: Some("minfs"), ..Default::default() });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -112,7 +115,7 @@ async fn minfs_no_zxcrypt_to_format() {
     // This covers the minfs->fxfs migration outlined above.
     // TODO(fxbug.dev/109293): support migrating data in the rust fshost
     #[cfg(not(feature = "fshost_rust"))]
-    if DATA_FILESYSTEM_FORMAT == "fxfs" {
+    if data_fs_name() == "fxfs" {
         fixture.check_test_data_file().await;
     }
 
@@ -123,7 +126,7 @@ async fn minfs_no_zxcrypt_to_format() {
 async fn minfs_no_zxcrypt_to_format_no_zxcrypt() {
     let mut builder = new_builder();
     builder.fshost().set_no_zxcrypt();
-    builder.with_disk().format_data(false, "minfs");
+    builder.with_disk().format_data(DataSpec { format: Some("minfs"), ..Default::default() });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -131,11 +134,11 @@ async fn minfs_no_zxcrypt_to_format_no_zxcrypt() {
     // This covers the minfs->fxfs and minfs->f2fs migrations outlined above.
     // TODO(fxbug.dev/109293): support migrating data in the rust fshost
     #[cfg(not(feature = "fshost_rust"))]
-    if DATA_FILESYSTEM_FORMAT == "fxfs" || DATA_FILESYSTEM_FORMAT == "f2fs" {
+    if data_fs_name() == "fxfs" || data_fs_name() == "f2fs" {
         fixture.check_test_data_file().await;
     }
 
-    if DATA_FILESYSTEM_FORMAT == "minfs" {
+    if data_fs_name() == "minfs" {
         // Original state matches goal state
         fixture.check_test_data_file().await;
     }
@@ -148,7 +151,7 @@ async fn minfs_no_zxcrypt_to_format_no_zxcrypt() {
 #[fuchsia::test]
 async fn f2fs_no_zxcrypt_to_format() {
     let mut builder = new_builder();
-    builder.with_disk().format_data(false, "f2fs");
+    builder.with_disk().format_data(DataSpec { format: Some("f2fs"), ..Default::default() });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -160,12 +163,12 @@ async fn f2fs_no_zxcrypt_to_format() {
 async fn f2fs_no_zxcrypt_to_format_no_zxcrypt() {
     let mut builder = new_builder();
     builder.fshost().set_no_zxcrypt();
-    builder.with_disk().format_data(false, "f2fs");
+    builder.with_disk().format_data(DataSpec { format: Some("f2fs"), ..Default::default() });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    if DATA_FILESYSTEM_FORMAT == "f2fs" {
+    if data_fs_name() == "f2fs" {
         // Original state matches goal state
         fixture.check_test_data_file().await;
     }
@@ -178,7 +181,7 @@ async fn f2fs_no_zxcrypt_to_format_no_zxcrypt() {
 #[fuchsia::test]
 async fn zxcrypt_to_format() {
     let mut builder = new_builder();
-    builder.with_disk().format_zxcrypt_if_needed();
+    builder.with_disk().format_data(DataSpec { format: None, zxcrypt: true, ..Default::default() });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -190,7 +193,7 @@ async fn zxcrypt_to_format() {
 async fn zxcrypt_to_format_no_zxcrypt() {
     let mut builder = new_builder();
     builder.fshost().set_no_zxcrypt();
-    builder.with_disk().format_zxcrypt_if_needed();
+    builder.with_disk().format_data(DataSpec { format: None, zxcrypt: true, ..Default::default() });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -203,7 +206,11 @@ async fn zxcrypt_to_format_no_zxcrypt() {
 #[fuchsia::test]
 async fn minfs_zxcrypt_to_format() {
     let mut builder = new_builder();
-    builder.with_disk().format_data(true, "minfs");
+    builder.with_disk().format_data(DataSpec {
+        format: Some("minfs"),
+        zxcrypt: true,
+        ..Default::default()
+    });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -211,11 +218,11 @@ async fn minfs_zxcrypt_to_format() {
     // This covers the zxcrypt+minfs->fxfs and zxcrypt+minfs->f2fs migrations outlined above.
     // TODO(fxbug.dev/109293): support migrating data in the rust fshost
     #[cfg(not(feature = "fshost_rust"))]
-    if DATA_FILESYSTEM_FORMAT == "fxfs" || DATA_FILESYSTEM_FORMAT == "f2fs" {
+    if data_fs_name() == "fxfs" || data_fs_name() == "f2fs" {
         fixture.check_test_data_file().await;
     }
 
-    if DATA_FILESYSTEM_FORMAT == "minfs" {
+    if data_fs_name() == "minfs" {
         // Original state matches goal state
         fixture.check_test_data_file().await;
     }
@@ -227,7 +234,11 @@ async fn minfs_zxcrypt_to_format() {
 async fn minfs_zxcrypt_to_format_no_zxcrypt() {
     let mut builder = new_builder();
     builder.fshost().set_no_zxcrypt();
-    builder.with_disk().format_data(true, "minfs");
+    builder.with_disk().format_data(DataSpec {
+        format: Some("minfs"),
+        zxcrypt: true,
+        ..Default::default()
+    });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -240,12 +251,16 @@ async fn minfs_zxcrypt_to_format_no_zxcrypt() {
 #[fuchsia::test]
 async fn f2fs_zxcrypt_to_format() {
     let mut builder = new_builder();
-    builder.with_disk().format_data(true, "f2fs");
+    builder.with_disk().format_data(DataSpec {
+        format: Some("f2fs"),
+        zxcrypt: true,
+        ..Default::default()
+    });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    if DATA_FILESYSTEM_FORMAT == "f2fs" {
+    if data_fs_name() == "f2fs" {
         // Original state matches goal state
         fixture.check_test_data_file().await;
     }
@@ -257,7 +272,11 @@ async fn f2fs_zxcrypt_to_format() {
 async fn f2fs_zxcrypt_to_format_no_zxcrypt() {
     let mut builder = new_builder();
     builder.fshost().set_no_zxcrypt();
-    builder.with_disk().format_data(true, "f2fs");
+    builder.with_disk().format_data(DataSpec {
+        format: Some("f2fs"),
+        zxcrypt: true,
+        ..Default::default()
+    });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;

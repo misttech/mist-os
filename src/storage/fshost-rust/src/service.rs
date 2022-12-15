@@ -3,22 +3,22 @@
 // found in the LICENSE file.
 
 use {
-    crate::{crypt::fxfs, device::constants, volume::resize_volume, watcher},
+    crate::{
+        device::{constants, BlockDevice},
+        environment::FilesystemLauncher,
+        watcher,
+    },
     anyhow::{anyhow, Context, Error},
-    fidl::endpoints::{Proxy, RequestStream},
+    fidl::endpoints::RequestStream,
     fidl_fuchsia_fshost as fshost,
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fidl_fuchsia_hardware_block_volume::VolumeMarker,
     fidl_fuchsia_io::OpenFlags,
     fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream},
     fs_management::{
-        filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem},
-        format::{detect_disk_format, round_up, DiskFormat},
+        format::DiskFormat,
         partition::{open_partition, PartitionMatcher},
         F2fs, Fxfs, Minfs,
     },
     fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_fs::{
         directory::{create_directory_recursive, open_file},
         file::write,
@@ -26,7 +26,7 @@ use {
     fuchsia_runtime::HandleType,
     fuchsia_zircon::{self as zx, Duration},
     futures::{channel::mpsc, StreamExt, TryStreamExt},
-    std::{cmp, sync::Arc},
+    std::sync::Arc,
     vfs::service,
 };
 
@@ -47,24 +47,9 @@ const OPEN_PARTITION_DURATION: Duration = Duration::from_seconds(10);
 const DATA_PARTITION_LABEL: &str = "data";
 const LEGACY_DATA_PARTITION_LABEL: &str = "minfs";
 
-enum Filesystem {
-    Serving(ServingSingleVolumeFilesystem),
-    ServingMultiVolume(ServingMultiVolumeFilesystem),
-}
-
-impl Filesystem {
-    fn root(&mut self) -> Result<&fidl_fuchsia_io::DirectoryProxy, Error> {
-        match self {
-            Filesystem::Serving(fs) => Ok(fs.root()),
-            Filesystem::ServingMultiVolume(fs) => {
-                Ok(fs.volume("data").ok_or(anyhow!("no data volume"))?.root())
-            }
-        }
-    }
-}
-
 async fn write_data_file(
-    config: &Arc<fshost_config::Config>,
+    config: &fshost_config::Config,
+    launcher: &FilesystemLauncher,
     filename: &str,
     payload: zx::Vmo,
 ) -> Result<(), Error> {
@@ -132,107 +117,32 @@ async fn write_data_file(
             .context("Failed to open zxcrypt partition")?;
         inside_zxcrypt = true;
     }
-    let partition_proxy = connect_to_protocol_at_path::<BlockMarker>(&partition_path)?;
-    let detected_format = detect_disk_format(&partition_proxy).await;
-    tracing::info!(
-        "Using data partition at {:?}, has format {:?}",
-        partition_path,
-        detected_format
-    );
-    let volume_proxy = connect_to_protocol_at_path::<VolumeMarker>(&partition_path)?;
-    let mut serving_fs = match format {
+
+    let mut device = BlockDevice::new(partition_path).await.context("failed to make new device")?;
+    let mut filesystem = match format {
         DiskFormat::Fxfs => {
-            let mut different_format = false;
-            if detected_format != format {
-                tracing::info!("Data partition is not in expected format; reformatting");
-                let target_size = config.data_max_bytes;
-                tracing::info!("Resizing data volume, target = {:?} bytes", target_size);
-                let actual_size = resize_volume(&volume_proxy, target_size, inside_zxcrypt).await?;
-                if actual_size < target_size {
-                    tracing::info!("Only allocated {:?} bytes", actual_size);
-                }
-                different_format = true;
-            }
-            let mut fxfs = Fxfs::from_channel(volume_proxy.into_channel().unwrap().into())?;
-            if different_format {
-                fxfs.format().await.context("Failed to format Fxfs")?;
-            }
-            let mut serving_fxfs =
-                fxfs.serve_multi_volume().await.context("Failed to serve_multi_volume")?;
-            if different_format {
-                fxfs::init_data_volume(&mut serving_fxfs, config)
-                    .await
-                    .map_err(Error::from)
-                    .context("Failed to initialize the data volume")?
-            } else {
-                fxfs::unlock_data_volume(&mut serving_fxfs, config)
-                    .await
-                    .map_err(Error::from)
-                    .context("Failed to unlock the data volume")?
-            };
-            Filesystem::ServingMultiVolume(serving_fxfs)
+            launcher.serve_data(&mut device, Fxfs::dynamic_child(), inside_zxcrypt).await?
         }
         DiskFormat::F2fs => {
-            let mut different_format = false;
-            if detected_format != format {
-                tracing::info!("Data partition is not in expected format; reformatting");
-                let mut target_size = config.data_max_bytes;
-                let (status, volume_manager_info, _volume_info) = volume_proxy
-                    .get_volume_info()
-                    .await
-                    .context("Transport error on get_volum_info")?;
-                zx::Status::ok(status).context("get_volume_info failed")?;
-                let manager = volume_manager_info.ok_or(anyhow!("Expected volume manager info"))?;
-                let slice_size = manager.slice_size;
-                let mut required_size = round_up(constants::DEFAULT_F2FS_MIN_BYTES, slice_size);
-                // f2fs always requires at least a certain size.
-                if inside_zxcrypt {
-                    // Allocate an additional slice for zxcrypt metadata.
-                    required_size += slice_size;
-                }
-                target_size = cmp::max(target_size, required_size);
-                tracing::info!("Resizing data volume, target = {:?} bytes", target_size);
-                let actual_size = resize_volume(&volume_proxy, target_size, inside_zxcrypt).await?;
-                if actual_size < constants::DEFAULT_F2FS_MIN_BYTES {
-                    return Err(anyhow!(
-                        "Only allocated {:?} bytes but needed {:?}",
-                        actual_size,
-                        constants::DEFAULT_F2FS_MIN_BYTES
-                    ));
-                } else if actual_size < target_size {
-                    tracing::info!("Only allocated {:?} bytes", actual_size);
-                }
-                different_format = true;
-            }
-            let mut f2fs = F2fs::from_channel(volume_proxy.into_channel().unwrap().into())
-                .context("Failed to create f2fs")?;
-            if different_format {
-                f2fs.format().await.context("Failed to format f2fs")?;
-            }
-            let serving_f2fs = f2fs.serve().await.context("Failed to serve f2fs")?;
-            Filesystem::Serving(serving_f2fs)
+            launcher.serve_data(&mut device, F2fs::dynamic_child(), inside_zxcrypt).await?
         }
         DiskFormat::Minfs => {
-            let mut minfs = Minfs::from_channel(volume_proxy.into_channel().unwrap().into())
-                .context("Failed to create minfs")?;
-            if detected_format != format {
-                minfs.format().await.context("Failed to format minfs")?;
-            }
-            let serving_minfs = minfs.serve().await.context("Failed to serve minfs")?;
-            Filesystem::Serving(serving_minfs)
+            launcher.serve_data(&mut device, Minfs::dynamic_child(), inside_zxcrypt).await?
         }
         _ => unreachable!(),
     };
-    let data_root = serving_fs.root().context("Failed to get data root")?;
+
+    let data_root = filesystem.root().context("Failed to get data root")?;
     let (directory_path, relative_file_path) =
         filename.rsplit_once("/").ok_or(anyhow!("There is no backslash in the file path"))?;
     let directory_proxy = create_directory_recursive(
-        data_root,
+        &data_root,
         directory_path,
         OpenFlags::CREATE | OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
     )
     .await
     .context("Failed to create directory")?;
+
     let file_proxy = open_file(
         &directory_proxy,
         relative_file_path,
@@ -240,20 +150,23 @@ async fn write_data_file(
     )
     .await
     .context("Failed to open file")?;
+
     let mut data = vec![0; content_size];
     payload.read(&mut data, 0)?;
     write(&file_proxy, &data).await?;
-    if let Filesystem::Serving(filesystem) = serving_fs {
-        filesystem.shutdown().await.context("Failed to shutdown minfs")?;
-    }
+
+    filesystem.shutdown().await?;
     return Ok(());
 }
 
 /// Make a new vfs service node that implements fuchsia.fshost.Admin
-pub fn fshost_admin(config: &Arc<fshost_config::Config>) -> Arc<service::Service> {
-    let config = config.clone();
+pub fn fshost_admin(
+    config: Arc<fshost_config::Config>,
+    launcher: Arc<FilesystemLauncher>,
+) -> Arc<service::Service> {
     service::host(move |mut stream: fshost::AdminRequestStream| {
         let config = config.clone();
+        let launcher = launcher.clone();
         async move {
             while let Some(request) = stream.next().await {
                 match request {
@@ -286,7 +199,9 @@ pub fn fshost_admin(config: &Arc<fshost_config::Config>) -> Arc<service::Service
                     }
                     Ok(fshost::AdminRequest::WriteDataFile { responder, payload, filename }) => {
                         tracing::info!(?filename, "admin write data file called");
-                        let mut res = match write_data_file(&config, &filename, payload).await {
+                        let mut res = match write_data_file(&config, &launcher, &filename, payload)
+                            .await
+                        {
                             Ok(()) => Ok(()),
                             Err(e) => {
                                 tracing::error!("admin service: write_data_file failed: {:?}", e);

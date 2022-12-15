@@ -73,8 +73,7 @@ template("fshost_integration_test") {
   _fshost_target = "test-fshost-${target_name}"
   fshost_component_and_config(_fshost_target) {
     testonly = true
-    options = default_integration_test_options
-    options.data_filesystem_format = invoker.data_filesystem_format
+    options = invoker.options
     options.use_rust_port = invoker.use_rust_port
   }
 
@@ -175,9 +174,22 @@ template("fshost_integration_test_suite") {
     fshost_integration_test(fshost_integration_test_label) {
       data_filesystem_format = filesystem_format
       use_rust_port = invoker.use_rust_port
+      options = default_integration_test_options
+      options.data_filesystem_format = filesystem_format
     }
     fshost_integration_tests += [ ":${fshost_integration_test_label}" ]
   }
+
+  # In addition to the basic filesystem formats, there are some modifying options we want to test.
+  fshost_integration_fxfs_legacy_label = "${target_name}_fxfs_legacy_crypto"
+  fshost_integration_test(fshost_integration_fxfs_legacy_label) {
+    data_filesystem_format = "fxfs-legacy-crypto"
+    use_rust_port = invoker.use_rust_port
+    options = default_integration_test_options
+    options.use_native_fxfs_crypto = false
+    options.data_filesystem_format = "fxfs"
+  }
+  fshost_integration_tests += [ ":$fshost_integration_fxfs_legacy_label" ]
 
   fuchsia_test_package(target_name) {
     # Currently required because the data_formatted test causes Fxfs to log:

@@ -6,7 +6,7 @@
 //! among other things, sets the fvm_ramdisk flag to prevent binding of the on-disk filesystems.)
 
 use {
-    super::{data_fs_type, new_builder, DATA_FILESYSTEM_FORMAT},
+    super::{data_fs_name, data_fs_spec, data_fs_type, new_builder},
     fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio,
     fshost::{AdminProxy, AdminWriteDataFileResult},
     fuchsia_zircon::{self as zx, HandleBased as _},
@@ -61,7 +61,7 @@ async fn unformatted_small_disk() {
 
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
-    if DATA_FILESYSTEM_FORMAT == "f2fs" {
+    if data_fs_name() == "f2fs" {
         call_write_data_file(&admin).await.expect_err("write_data_file succeeded");
         return;
     }
@@ -87,7 +87,7 @@ async fn unformatted_small_disk() {
 async fn formatted() {
     let mut builder = new_builder();
     builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/nada/zip/zilch");
-    builder.with_disk().format_data(true, DATA_FILESYSTEM_FORMAT);
+    builder.with_disk().format_data(data_fs_spec());
     let fixture = builder.build().await;
 
     let admin =

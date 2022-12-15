@@ -22,7 +22,7 @@ use {
     fs_management::{
         filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem},
         format::DiskFormat,
-        Blobfs, F2fs, FSConfig, Fxfs, Minfs,
+        Blobfs, ComponentType, F2fs, FSConfig, Fxfs, Minfs,
     },
     fuchsia_async as fasync,
     fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path},
@@ -51,14 +51,14 @@ pub trait Environment: Send + Sync {
 }
 
 // Before a filesystem is mounted, we queue requests.
-enum Filesystem {
+pub enum Filesystem {
     Queue(Vec<ServerEnd<fio::DirectoryMarker>>),
     Serving(ServingSingleVolumeFilesystem),
     ServingMultiVolume(ServingMultiVolumeFilesystem, String),
 }
 
 impl Filesystem {
-    fn root(&mut self) -> Result<fio::DirectoryProxy, Error> {
+    pub fn root(&mut self) -> Result<fio::DirectoryProxy, Error> {
         let (proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
         match self {
             Filesystem::Queue(queue) => queue.push(server),
@@ -80,23 +80,31 @@ impl Filesystem {
             _ => None,
         }
     }
+
+    pub async fn shutdown(self) -> Result<(), Error> {
+        match self {
+            Filesystem::Queue(_) => Ok(()),
+            Filesystem::Serving(fs) => fs.shutdown().await.context("shutdown failed"),
+            Filesystem::ServingMultiVolume(fs, _) => fs.shutdown().await.context("shutdown failed"),
+        }
+    }
 }
 
 /// Implements the Environment trait and keeps track of mounted filesystems.
-pub struct FshostEnvironment<'a> {
+pub struct FshostEnvironment {
     config: Arc<fshost_config::Config>,
     blobfs: Filesystem,
-    boot_args: &'a BootArgs,
     data: Filesystem,
+    launcher: Arc<FilesystemLauncher>,
 }
 
-impl<'a> FshostEnvironment<'a> {
-    pub fn new(config: &Arc<fshost_config::Config>, boot_args: &'a BootArgs) -> Self {
+impl FshostEnvironment {
+    pub fn new(config: Arc<fshost_config::Config>, boot_args: BootArgs) -> Self {
         Self {
             config: config.clone(),
             blobfs: Filesystem::Queue(Vec::new()),
-            boot_args,
             data: Filesystem::Queue(Vec::new()),
+            launcher: Arc::new(FilesystemLauncher { config, boot_args }),
         }
     }
 
@@ -111,111 +119,55 @@ impl<'a> FshostEnvironment<'a> {
     pub fn data_root(&mut self) -> Result<fio::DirectoryProxy, Error> {
         self.data.root()
     }
+
+    pub fn launcher(&self) -> Arc<FilesystemLauncher> {
+        self.launcher.clone()
+    }
 }
 
 #[async_trait]
-impl<'a> Environment for FshostEnvironment<'a> {
+impl Environment for FshostEnvironment {
     async fn attach_driver(
         &mut self,
         device: &mut dyn Device,
         driver_path: &str,
     ) -> Result<(), Error> {
-        tracing::info!(path = %device.path(), %driver_path, "Binding driver to device");
-        let controller = ControllerProxy::new(device.proxy()?.into_channel().unwrap());
-        controller.bind(driver_path).await?.map_err(zx::Status::from_raw)?;
-        Ok(())
+        self.launcher.attach_driver(device, driver_path).await
     }
 
     async fn bind_zxcrypt(&mut self, device: &mut dyn Device) -> Result<(), Error> {
-        self.attach_driver(device, "zxcrypt.so").await?;
-        zxcrypt::unseal_or_format(device).await
+        self.launcher.bind_zxcrypt(device).await
     }
 
     async fn mount_blobfs(&mut self, device: &mut dyn Device) -> Result<(), Error> {
         let queue = self.blobfs.queue().ok_or(anyhow!("blobfs already mounted"))?;
 
-        tracing::info!(path = %device.path(), "Mounting /blob");
+        let mut fs = self.launcher.serve_blobfs(device).await?;
 
-        // Setting max partition size for blobfs
-        if let Err(e) = set_partition_max_size(device, self.config.blobfs_max_bytes).await {
-            tracing::warn!("Failed to set max partition size for blobfs: {:?}", e);
-        };
-
-        let config = Blobfs {
-            write_compression_algorithm: self.boot_args.blobfs_write_compression_algorithm(),
-            cache_eviction_policy_override: self.boot_args.blobfs_eviction_policy(),
-            component_type: fs_management::ComponentType::StaticChild,
-            ..Default::default()
-        };
-        let fs = fs_management::filesystem::Filesystem::from_channel(
-            device.proxy()?.into_channel().unwrap().into(),
-            config,
-        )?
-        .serve()
-        .await?;
-        let root_dir = fs.root();
+        let root_dir = fs.root()?;
         for server in queue.drain(..) {
             root_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
         }
-        self.blobfs = Filesystem::Serving(fs);
+        self.blobfs = fs;
         Ok(())
     }
 
     async fn mount_data(&mut self, device: &mut dyn Device) -> Result<(), Error> {
         let _ = self.data.queue().ok_or_else(|| anyhow!("data partition already mounted"))?;
 
-        let mut filesystem = match self.config.data_filesystem_format.as_ref() {
-            "fxfs" => {
-                let config = Fxfs {
-                    component_type: fs_management::ComponentType::StaticChild,
-                    ..Default::default()
-                };
-                self.serve_data(device, config).await?
-            }
-            "f2fs" => {
-                let config = F2fs {
-                    component_type: fs_management::ComponentType::StaticChild,
-                    ..Default::default()
-                };
-                self.serve_data(device, config).await?
-            }
-            _ => {
-                let config = Minfs {
-                    component_type: fs_management::ComponentType::StaticChild,
-                    ..Default::default()
-                };
-                self.serve_data(device, config).await?
-            }
+        let format = match self.config.data_filesystem_format.as_ref() {
+            "fxfs" => DiskFormat::Fxfs,
+            "f2fs" => DiskFormat::F2fs,
+            // Default to minfs if no format type was provided.
+            _ => DiskFormat::Minfs,
         };
-
-        let queue = self.data.queue().unwrap();
-        let root_dir = filesystem.root()?;
-        for server in queue.drain(..) {
-            root_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
-        }
-        self.data = filesystem;
-        Ok(())
-    }
-}
-
-impl<'a> FshostEnvironment<'a> {
-    async fn serve_data<FSC: FSConfig>(
-        &mut self,
-        device: &mut dyn Device,
-        config: FSC,
-    ) -> Result<Filesystem, Error> {
-        let format = config.disk_format();
-        tracing::info!(
-            path = %device.path(),
-            expected_format = ?format,
-            "Mounting /data"
-        );
 
         // Set the max partition size for data
         if let Err(e) = set_partition_max_size(device, self.config.data_max_bytes).await {
             tracing::warn!(?e, "Failed to set max partition size for data");
         };
 
+        // Potentially bind zxcrypt before serving data.
         let mut new_dev;
         let mut inside_zxcrypt = false;
         let device = match format {
@@ -238,6 +190,90 @@ impl<'a> FshostEnvironment<'a> {
                 new_dev.as_mut()
             }
         };
+
+        let mut filesystem = match format {
+            DiskFormat::Fxfs => {
+                let config =
+                    Fxfs { component_type: ComponentType::StaticChild, ..Default::default() };
+                self.launcher.serve_data(device, config, inside_zxcrypt).await?
+            }
+            DiskFormat::F2fs => {
+                let config =
+                    F2fs { component_type: ComponentType::StaticChild, ..Default::default() };
+                self.launcher.serve_data(device, config, inside_zxcrypt).await?
+            }
+            DiskFormat::Minfs => {
+                let config =
+                    Minfs { component_type: ComponentType::StaticChild, ..Default::default() };
+                self.launcher.serve_data(device, config, inside_zxcrypt).await?
+            }
+            _ => unreachable!(),
+        };
+
+        let queue = self.data.queue().unwrap();
+        let root_dir = filesystem.root()?;
+        for server in queue.drain(..) {
+            root_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+        }
+        self.data = filesystem;
+        Ok(())
+    }
+}
+
+pub struct FilesystemLauncher {
+    config: Arc<fshost_config::Config>,
+    boot_args: BootArgs,
+}
+
+impl FilesystemLauncher {
+    async fn attach_driver(&self, device: &mut dyn Device, driver_path: &str) -> Result<(), Error> {
+        tracing::info!(path = %device.path(), %driver_path, "Binding driver to device");
+        let controller = ControllerProxy::new(device.proxy()?.into_channel().unwrap());
+        controller.bind(driver_path).await?.map_err(zx::Status::from_raw)?;
+        Ok(())
+    }
+
+    async fn bind_zxcrypt(&self, device: &mut dyn Device) -> Result<(), Error> {
+        self.attach_driver(device, "zxcrypt.so").await?;
+        zxcrypt::unseal_or_format(device).await
+    }
+
+    async fn serve_blobfs(&self, device: &mut dyn Device) -> Result<Filesystem, Error> {
+        tracing::info!(path = %device.path(), "Mounting /blob");
+
+        // Setting max partition size for blobfs
+        if let Err(e) = set_partition_max_size(device, self.config.blobfs_max_bytes).await {
+            tracing::warn!("Failed to set max partition size for blobfs: {:?}", e);
+        };
+
+        let config = Blobfs {
+            write_compression_algorithm: self.boot_args.blobfs_write_compression_algorithm(),
+            cache_eviction_policy_override: self.boot_args.blobfs_eviction_policy(),
+            component_type: fs_management::ComponentType::StaticChild,
+            ..Default::default()
+        };
+        let fs = fs_management::filesystem::Filesystem::from_channel(
+            device.proxy()?.into_channel().unwrap().into(),
+            config,
+        )?
+        .serve()
+        .await?;
+
+        Ok(Filesystem::Serving(fs))
+    }
+
+    pub async fn serve_data<FSC: FSConfig>(
+        &self,
+        device: &mut dyn Device,
+        config: FSC,
+        inside_zxcrypt: bool,
+    ) -> Result<Filesystem, Error> {
+        let format = config.disk_format();
+        tracing::info!(
+            path = %device.path(),
+            expected_format = ?format,
+            "Mounting /data"
+        );
 
         let detected_format = device.content_format().await?;
         let volume_proxy = fidl_fuchsia_hardware_block_volume::VolumeProxy::from_channel(
@@ -301,7 +337,7 @@ impl<'a> FshostEnvironment<'a> {
     }
 
     async fn format_data<FSC: FSConfig>(
-        &mut self,
+        &self,
         fs: &mut fs_management::filesystem::Filesystem<FSC>,
         volume_proxy: fidl_fuchsia_hardware_block_volume::VolumeProxy,
         inside_zxcrypt: bool,
