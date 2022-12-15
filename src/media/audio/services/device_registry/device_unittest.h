@@ -56,21 +56,37 @@ class DeviceTestBase : public gtest::TestLoopFixture {
         fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(std::move(stream_config_client_end)));
 
     RunLoopUntilIdle();
-    EXPECT_FALSE(device->state_ == Device::State::Initializing);
+    EXPECT_FALSE(device->state_ == Device::State::DeviceInitializing);
 
     return device;
   }
 
-  void RemoveDevice() { fake_driver_->DropStreamConfig(); }
+  void FakeDriverDropStreamConfig() { fake_driver_->DropStreamConfig(); }
 
   fuchsia_audio_device::Info GetDeviceInfo() const { return *device_->info(); }
 
   static bool HasError(std::shared_ptr<Device> device) {
     return device->state_ == Device::State::Error;
   }
-  static bool InReadyState(std::shared_ptr<Device> device) {
-    return device->state_ == Device::State::Ready;
+  static bool InInitializedState(std::shared_ptr<Device> device) {
+    return device->state_ == Device::State::DeviceInitialized;
   }
+  static bool IsControlled(std::shared_ptr<Device> device) { return device->is_controlled_; }
+
+  bool DevicePluggedState(std::shared_ptr<Device> device) {
+    return *device->plug_state_->plugged();
+  }
+  fuchsia_hardware_audio::GainState DeviceGainState(std::shared_ptr<Device> device) {
+    return *device->gain_state_;
+  }
+
+  bool SetDeviceGain(fuchsia_hardware_audio::GainState new_state) {
+    return device_->SetGain(new_state);
+  }
+  // bool SetDevicePlugState(bool plugged, zx::time plug_time){return device_->}
+
+  bool SetControl(std::shared_ptr<Device> device) { return device->SetControl(); }
+  bool DropControl(std::shared_ptr<Device> device) { return device->DropControl(); }
 
   std::shared_ptr<Device> device_;
   std::shared_ptr<Clock> device_clock() { return device_->device_clock_; }

@@ -14,31 +14,7 @@ namespace media_audio {
 namespace {
 
 // These tests rely upon a single, already-created Provider.
-class ProviderServerWarningTest : public AudioDeviceRegistryServerTestBase {
-  //  protected:
-  // void SetUp() override {
-  //   AudioDeviceRegistryServerTestBase::SetUp();
-
-  // auto provider_wrapper = std::make_unique<TestServerAndNaturalAsyncClient<ProviderServer>>(
-  //     test_loop(), server_thread_, adr_service_);
-  // EXPECT_EQ(ProviderServer::count(), 1u);
-  //   auto endpoints = CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Provider>();
-  //   provider_server_ = adr_service_->CreateProviderServer(std::move(endpoints.second));
-  //   provider_client_ = fidl::Client(std::move(endpoints.first), dispatcher());
-
-  //   EXPECT_EQ(ProviderServer::count(), 1u);
-  // }
-
-  // // If we explicitly shutdown the client first, we avoid dispatcher_shutdown errors.
-  // void TearDown() override {
-  //   provider_client_ = fidl::Client<fuchsia_audio_device::Provider>();
-  //   RunLoopUntilIdle();
-  //   EXPECT_TRUE(provider_server_->WaitForShutdown(zx::sec(1)));
-  // }
-
-  // std::shared_ptr<ProviderServer> provider_server_;
-  // fidl::Client<fuchsia_audio_device::Provider> provider_client_;
-};
+class ProviderServerWarningTest : public AudioDeviceRegistryServerTestBase {};
 
 TEST_F(ProviderServerWarningTest, MissingDeviceName) {
   auto provider_wrapper = std::make_unique<TestServerAndNaturalAsyncClient<ProviderServer>>(

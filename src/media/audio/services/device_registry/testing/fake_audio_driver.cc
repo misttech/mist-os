@@ -50,6 +50,27 @@ void FakeAudioDriver::DropStreamConfig() {
   stream_config_binding_->Close(ZX_ERR_PEER_CLOSED);
 }
 
+void FakeAudioDriver::InjectGainChange(fuchsia_hardware_audio::GainState gain_state) {
+  fuchsia::hardware::audio::GainState new_state;
+  gain_state.gain_db() ? new_state.set_gain_db(*gain_state.gain_db()) : new_state;
+  gain_state.muted() ? new_state.set_muted(*gain_state.muted()) : new_state;
+  gain_state.agc_enabled() ? new_state.set_agc_enabled(*gain_state.agc_enabled()) : new_state;
+
+  SetGain(std::move(new_state));
+}
+
+void FakeAudioDriver::InjectPlugChange(bool plugged, zx::time plug_time) {
+  if (!plugged_ || (*plugged_ != plugged && plug_time > plug_state_time_)) {
+    plugged_ = plugged;
+    plug_state_time_ = plug_time;
+    plug_has_changed_ = true;
+
+    if (pending_plug_callback_) {
+      WatchPlugState(std::move(pending_plug_callback_));
+    }
+  }
+}
+
 void FakeAudioDriver::GetHealthState(
     fuchsia::hardware::audio::StreamConfig::GetHealthStateCallback callback) {
   fuchsia::hardware::audio::HealthState health_state;
@@ -182,36 +203,65 @@ void FakeAudioDriver::WatchGainState(
     fuchsia::hardware::audio::StreamConfig::WatchGainStateCallback callback) {
   ADR_LOG_OBJECT(kLogFakeAudioDriver);
 
-  fuchsia::hardware::audio::GainState gain_state = {};
-  if (current_mute_) {
-    gain_state.set_muted(*current_mute_);
+  if (gain_has_changed_) {
+    fuchsia::hardware::audio::GainState gain_state = {};
+    if (current_mute_) {
+      gain_state.set_muted(*current_mute_);
+    }
+    if (current_agc_) {
+      gain_state.set_agc_enabled(*current_agc_);
+    }
+    if (current_gain_db_) {
+      gain_state.set_gain_db(*current_gain_db_);
+    }
+    gain_has_changed_ = false;
+    callback(std::move(gain_state));
+  } else {
+    pending_gain_callback_ = std::move(callback);
   }
-  if (current_agc_) {
-    gain_state.set_agc_enabled(*current_agc_);
-  }
-  if (current_gain_db_) {
-    gain_state.set_gain_db(*current_gain_db_);
-  }
-  callback(std::move(gain_state));
 }
 
 void FakeAudioDriver::WatchPlugState(
     fuchsia::hardware::audio::StreamConfig::WatchPlugStateCallback callback) {
   ADR_LOG_OBJECT(kLogFakeAudioDriver);
 
-  fuchsia::hardware::audio::PlugState plug_state = {};
-  if (plugged_) {
-    plug_state.set_plugged(*plugged_);
+  if (plug_has_changed_) {
+    fuchsia::hardware::audio::PlugState plug_state = {};
+    if (plugged_) {
+      plug_state.set_plugged(*plugged_);
+    }
+    plug_state.set_plug_state_time(plug_state_time_.get());
+    plug_has_changed_ = false;
+    callback(std::move(plug_state));
+  } else {
+    pending_plug_callback_ = std::move(callback);
   }
-  if (plug_state_time_) {
-    plug_state.set_plug_state_time(plug_state_time_->get());
-  }
-  callback(std::move(plug_state));
 }
 
-// For now, don't do anything with this. No response is needed so this should be OK even if called.
+// Only generate a WatchGainState notification if this SetGain call represents an actual change.
 void FakeAudioDriver::SetGain(fuchsia::hardware::audio::GainState target_state) {
   ADR_LOG_OBJECT(kLogFakeAudioDriver);
+  bool gain_notification_needed = false;
+  if (target_state.has_gain_db() &&
+      (!current_gain_db_ || *current_gain_db_ != target_state.gain_db())) {
+    current_gain_db_ = target_state.gain_db();
+    gain_notification_needed = true;
+  }
+  if (target_state.has_muted() && target_state.muted() != current_mute_.value_or(false)) {
+    current_mute_ = target_state.muted();
+    gain_notification_needed = true;
+  }
+  if (target_state.has_agc_enabled() &&
+      target_state.agc_enabled() != current_agc_.value_or(false)) {
+    current_agc_ = target_state.agc_enabled();
+    gain_notification_needed = true;
+  }
+  if (gain_notification_needed) {
+    gain_has_changed_ = true;
+    if (pending_gain_callback_) {
+      WatchGainState(std::move(pending_gain_callback_));
+    }
+  }
 }
 
 // For now, don't do anything with this. No response is needed so this should be OK even if called.

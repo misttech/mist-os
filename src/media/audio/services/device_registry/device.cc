@@ -35,9 +35,10 @@ uint64_t NextTokenId() {
 }
 
 // statics
-uint32_t Device::count_ = 0;
-uint32_t Device::initialized_count_ = 0;
-uint32_t Device::unhealthy_count_ = 0;
+uint64_t Device::count_ = 0;
+uint64_t Device::initialized_count_ = 0;
+uint64_t Device::unhealthy_count_ = 0;
+uint64_t Device::control_count_ = 0;
 
 std::shared_ptr<Device> Device::Create(
     std::weak_ptr<DevicePresenceWatcher> presence_watcher, async_dispatcher_t* dispatcher,
@@ -60,9 +61,9 @@ std::shared_ptr<Device> Device::Create(
                                           std::move(stream_config));
 }
 
-// Device notifies presence_watcher when it is available (Ready), unhealthy (Error) or removed.
-// The dispatcher member is needed for Device to create client connections to protocols such as
-// fuchsia.hardware.audio.signalprocessing.Reader or fuchsia.hardware.audio.RingBuffer.
+// Device notifies presence_watcher when it is available (DeviceInitialized), unhealthy (Error) or
+// removed. The dispatcher member is needed for Device to create client connections to protocols
+// such as fuchsia.hardware.audio.signalprocessing.Reader or fuchsia.hardware.audio.RingBuffer.
 Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
                async_dispatcher_t* dispatcher, std::string_view name,
                fuchsia_audio_device::DeviceType device_type,
@@ -91,7 +92,7 @@ Device::~Device() {
 // Invoked when the underlying driver disconnects its StreamConfig.
 void Device::on_fidl_error(fidl::UnbindInfo error) {
   if (!error.is_dispatcher_shutdown() && !error.is_peer_closed() && !error.is_user_initiated()) {
-    FX_LOGS(WARNING) << __func__ << ":" << error;
+    ADR_WARN_OBJECT() << error;
     OnError(error.status());
   }
 
@@ -104,12 +105,13 @@ void Device::on_fidl_error(fidl::UnbindInfo error) {
 void Device::OnRemoval() {
   ADR_LOG_OBJECT(kLogDeviceState);
   if (state_ == State::Error) {
-    FX_LOGS(WARNING) << __func__ << ": device already has an error; no device state to unwind";
+    ADR_WARN_OBJECT() << "device already has an error; no device state to unwind";
     --Device::unhealthy_count_;
-  } else if (state_ != State::Initializing) {
+  } else if (state_ != State::DeviceInitializing) {
     --Device::initialized_count_;
 
-    // We completed initialization before this error, so notify clients so they can unwind.
+    // Notify clients so they can unwind.
+    // DeviceWasRemoved should be a part of the coming ObserverNotify and ControlNotify as well.
   }
   LogObjectCounts();
 
@@ -123,17 +125,17 @@ void Device::OnRemoval() {
 void Device::OnError(zx_status_t error) {
   ADR_LOG_OBJECT(kLogDeviceState);
   if (state_ == State::Error) {
-    FX_LOGS(WARNING) << __func__ << ": device already has an error; ignoring subsequent error ("
-                     << error << ")";
+    ADR_WARN_OBJECT() << "device already has an error; ignoring subsequent error (" << error << ")";
     return;
   }
 
   FX_PLOGS(WARNING, error) << __func__;
 
-  if (state_ != State::Initializing) {
+  if (state_ != State::DeviceInitializing) {
     --Device::initialized_count_;
 
-    // We completed initialization before this error, so notify clients so they can unwind.
+    // Notify clients so they can unwind.
+    // DeviceHasError should be a part of the coming ObserverNotify and ControlNotify as well.
   }
   ++Device::unhealthy_count_;
   SetStateError(error);
@@ -150,8 +152,8 @@ void Device::OnHealthResponse() {
   ADR_LOG_OBJECT(kLogDeviceState || kLogStreamConfigFidlResponses);
   FX_CHECK(health_state_) << "Received " << __func__ << " but health_state_ was not set";
 
-  // If device state is Initializing, this might be the final response we are waiting for.
-  if (state_ == State::Initializing) {
+  // If device state is DeviceInitializing, this might be the final response we are waiting for.
+  if (state_ == State::DeviceInitializing) {
     OnInitializationResponse();
     return;
   }
@@ -163,7 +165,7 @@ void Device::OnHealthResponse() {
 // An initialization command returned a successful response. Is initialization complete?
 void Device::OnInitializationResponse() {
   if (state_ == State::Error) {
-    FX_LOGS(WARNING) << __func__ << ": device has already encountered a problem; ignoring this";
+    ADR_WARN_OBJECT() << "device has already encountered a problem; ignoring this";
     return;
   }
 
@@ -175,20 +177,59 @@ void Device::OnInitializationResponse() {
       << (plug_state_ ? "PLUG" : "plug") << "     "                 //
       << (health_state_ ? "HEALTH" : "health");
 
-  if (state_ != State::Initializing) {
-    FX_LOGS(WARNING) << "Unexpected device initialization response when not Initializing";
+  if (state_ != State::DeviceInitializing) {
+    ADR_WARN_OBJECT() << "unexpected device initialization response when not Initializing";
   }
 
   if (stream_config_properties_ && formats_ && gain_state_ && plug_state_ && health_state_) {
     ++Device::initialized_count_;
     SetDeviceInfo();
-    SetStateReady();
+    SetStateInitialized();
     LogObjectCounts();
 
     if (std::shared_ptr<DevicePresenceWatcher> pw = presence_watcher_.lock()) {
       pw->DeviceIsReady(shared_from_this());
     }
+    WatchForOngoingUpdates();
   }
+}
+
+bool Device::SetControl() {
+  ADR_LOG_OBJECT(kLogDeviceState);
+  FX_CHECK(state_ != State::DeviceInitializing);
+
+  if (state_ == State::Error) {
+    ADR_WARN_OBJECT() << "device has an error; cannot set control";
+    return false;
+  }
+  if (state_ != State::DeviceInitialized) {
+    ADR_WARN_OBJECT() << "wrong state for this call (" << state_ << ")";
+    return false;
+  }
+
+  if (is_controlled_) {
+    ADR_WARN_OBJECT() << "already controlled";
+    return false;
+  }
+
+  is_controlled_ = true;
+  ++Device::control_count_;
+  LogObjectCounts();
+  return true;
+}
+
+bool Device::DropControl() {
+  ADR_LOG_OBJECT(kLogDeviceMethods);
+  FX_CHECK(state_ != State::DeviceInitializing);
+
+  if (!is_controlled_) {
+    ADR_WARN_OBJECT() << "already not controlled";
+    return false;
+  }
+
+  --Device::control_count_;
+  LogObjectCounts();
+  return true;
 }
 
 void Device::SetStateError(zx_status_t error) {
@@ -196,14 +237,14 @@ void Device::SetStateError(zx_status_t error) {
   state_ = State::Error;
 }
 
-void Device::SetStateReady() {
+void Device::SetStateInitialized() {
   if (state_ == State::Error) {
-    FX_LOGS(WARNING) << __func__ << ": device already has an error; ignoring this";
+    ADR_WARN_OBJECT() << "device already has an error; ignoring this";
     return;
   }
 
   ADR_LOG_OBJECT(kLogDeviceState);
-  state_ = State::Ready;
+  state_ = State::DeviceInitialized;
 }
 
 void Device::Initialize() {
@@ -220,7 +261,7 @@ void Device::Initialize() {
 template <typename ResultT>
 bool Device::LogResultError(const ResultT& result, const char* debug_context) {
   if (state_ == State::Error) {
-    FX_LOGS(WARNING) << debug_context << ": device already has an error; ignoring this";
+    ADR_WARN_OBJECT() << "device already has an error; ignoring this";
     return true;
   }
   if (!result.is_ok()) {
@@ -297,6 +338,8 @@ void Device::QuerySupportedFormats() {
             formats_->emplace_back(supported_formats);
           }
           OnInitializationResponse();
+        } else {
+          permitted_formats_ = TranslateFormatSets(result->supported_formats());
         }
         // otherwise, this is a GetCurrentlyPermittedFormats request (subsequent CL).
       });
@@ -308,7 +351,7 @@ void Device::QueryGainState() {
   if (state_ == State::Error) {
     return;
   }
-  if (state_ == State::Initializing) {
+  if (!gain_state_) {
     // TODO(fxbug.dev/113429): handle command timeouts (but not on subsequent watches)
   }
 
@@ -332,9 +375,27 @@ void Device::QueryGainState() {
           gain_state_->muted() = gain_state_->muted().value_or(false);
           gain_state_->agc_enabled() = gain_state_->agc_enabled().value_or(false);
           OnInitializationResponse();
+        } else {
+          ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchGainState received update";
+
+          OnGainUpdate(result->gain_state());
         }
-        // Otherwise, we watched for, and received, a change in the gain state (subsequent CL).
+        // Kick off the next watch.
+        QueryGainState();
       });
+}
+
+void Device::OnGainUpdate(fuchsia_hardware_audio::GainState& gain_state) {
+  ADR_LOG_OBJECT(kLogDeviceMethods);
+
+  gain_state.muted() = gain_state.muted().value_or(false);
+  gain_state.agc_enabled() = gain_state.agc_enabled().value_or(false);
+
+  if (gain_state != gain_state_) {
+    gain_state_ = gain_state;
+
+    // Notify any observers.
+  }
 }
 
 void Device::QueryPlugState() {
@@ -343,7 +404,7 @@ void Device::QueryPlugState() {
   if (state_ == State::Error) {
     return;
   }
-  if (state_ == State::Initializing) {
+  if (!plug_state_) {
     // TODO(fxbug.dev/113429): handle command timeouts (but not on subsequent watches)
   }
 
@@ -362,12 +423,29 @@ void Device::QueryPlugState() {
 
         if (!plug_state_) {
           ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchPlugState received initial value";
-
           plug_state_ = result->plug_state();
           OnInitializationResponse();
+        } else {
+          ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchPlugState received update";
+          OnPlugUpdate(result->plug_state());
         }
-        // Otherwise, we watched for, and received, a change in the plug state (subsequent CL).
+        // Kick off the next watch.
+        QueryPlugState();
       });
+}
+
+void Device::OnPlugUpdate(fuchsia_hardware_audio::PlugState& plug_state) {
+  ADR_LOG_OBJECT(kLogDeviceMethods);
+
+  if (plug_state.plug_state_time() < plug_state_->plug_state_time()) {
+    ADR_WARN_OBJECT() << "plug_state_time (" << *plug_state_->plug_state_time()
+                      << ") cannot go backwards (previous time " << *plug_state_->plug_state_time()
+                      << ")";
+  } else if (plug_state.plugged() != plug_state_->plugged()) {
+    plug_state_ = plug_state;
+
+    // Notify any observers.
+  }
 }
 
 // TODO(fxbug.dev/117199): Decide when we proactively call GetHealthState, if at all.
@@ -453,7 +531,7 @@ void Device::CreateDeviceClock() {
 
 // Create a duplicate handle to our clock with limited rights. We can transfer it to a client who
 // can only read and duplicate. Specifically, they cannot change this clock's rate or offset.
-zx::result<zx::clock> Device::GetReadOnlyClock() {
+zx::result<zx::clock> Device::GetReadOnlyClock() const {
   ADR_LOG_OBJECT(kLogDeviceMethods);
 
   auto dupe_clock = device_clock_->DuplicateZxClockReadOnly();
@@ -462,6 +540,75 @@ zx::result<zx::clock> Device::GetReadOnlyClock() {
   }
 
   return zx::ok(std::move(*dupe_clock));
+}
+
+// After initialization, set hanging-gets to detect any changes in gain or plug states.
+void Device::WatchForOngoingUpdates() {
+  WatchForGainUpdates();
+  WatchForPlugUpdates();
+}
+
+// Only kick off a continuous chain of hanging-gets if the GainState can actually change.
+void Device::WatchForGainUpdates() {
+  FX_CHECK(state_ == State::DeviceInitialized);
+  if (stream_config_properties_->max_gain_db() > stream_config_properties_->min_gain_db() ||
+      stream_config_properties_->can_mute().value_or(false) ||
+      stream_config_properties_->can_agc().value_or(false)) {
+    ADR_LOG_OBJECT(kLogDeviceMethods);
+    QueryGainState();
+  } else {
+    ADR_LOG_OBJECT(kLogDeviceMethods)
+        << "Will not monitor gain status - device has no gain controls";
+  }
+}
+
+// Only kick off a continuous chain of hanging-gets if the PlugState can actually change.
+void Device::WatchForPlugUpdates() {
+  FX_CHECK(state_ == State::DeviceInitialized);
+  if (stream_config_properties_->plug_detect_capabilities() ==
+      fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify) {
+    ADR_LOG_OBJECT(kLogDeviceMethods);
+    QueryPlugState();
+  } else {
+    ADR_LOG_OBJECT(kLogDeviceMethods) << "Will not monitor plug status - device is hardwired";
+  }
+}
+
+bool Device::SetGain(fuchsia_hardware_audio::GainState& gain_state) {
+  ADR_LOG_OBJECT(kLogStreamConfigFidlCalls);
+  FX_CHECK(state_ != State::DeviceInitializing);
+
+  if (state_ == State::Error) {
+    ADR_WARN_OBJECT() << "Device has previous error; cannot set gain";
+    return false;
+  }
+  // if (state_ == State::DeviceInitialized) {
+  if (!is_controlled_) {
+    ADR_WARN_OBJECT() << "Device must be allocated before this method can be called";
+    return false;
+  }
+
+  auto status = stream_config_->SetGain(std::move(gain_state));
+  if (status.is_error()) {
+    if (status.error_value().is_canceled() || status.error_value().is_dispatcher_shutdown() ||
+        status.error_value().is_peer_closed()) {
+      // These indicate that we are already shutting down, so they aren't error conditions.
+      ADR_LOG_OBJECT(kLogStreamConfigFidlResponses)
+          << "SetGain response will take no action on error "
+          << status.error_value().FormatDescription();
+
+      return false;
+    }
+
+    FX_PLOGS(ERROR, status.error_value().status()) << __func__ << " returned error:";
+    OnError(status.error_value().status());
+    return false;
+  }
+
+  ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << " is_ok";
+
+  // We don't notify anyone - we wait for the driver to notify us via WatchGainState.
+  return true;
 }
 
 }  // namespace media_audio

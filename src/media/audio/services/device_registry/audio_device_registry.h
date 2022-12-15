@@ -18,10 +18,12 @@
 
 #include "src/media/audio/services/common/fidl_thread.h"
 #include "src/media/audio/services/common/vector_of_weak_ptr.h"
+#include "src/media/audio/services/device_registry/basic_types.h"
 #include "src/media/audio/services/device_registry/device_presence_watcher.h"
 
 namespace media_audio {
 
+class ControlCreatorServer;
 class ProviderServer;
 class RegistryServer;
 
@@ -46,7 +48,12 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
     return unhealthy_devices_;
   }
   // Add a newly-constructed Device object to our "initializing" list.
-  void AddDevice(std::shared_ptr<Device> initializing_device);
+  void AddDevice(const std::shared_ptr<Device>& initializing_device);
+
+  enum class DevicePresence { Unknown, Active, Error, Removed };
+  std::pair<DevicePresence, std::shared_ptr<Device>> FindDeviceByTokenId(TokenId token_id);
+
+  bool ClaimDeviceForControl(std::shared_ptr<Device> device);
 
   // DevicePresenceWatcher interface
   // Add a successfully-initialized Device to our active list.
@@ -62,24 +69,27 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
   std::shared_ptr<RegistryServer> CreateRegistryServer(
       fidl::ServerEnd<fuchsia_audio_device::Registry> server_end);
 
+  // ControlCreator support
+  std::shared_ptr<ControlCreatorServer> CreateControlCreatorServer(
+      fidl::ServerEnd<fuchsia_audio_device::ControlCreator> server_end);
+
  private:
   static inline const std::string_view kClassName = "AudioDeviceRegistry";
 
   void NotifyRegistriesOfDeviceRemoval(uint64_t removed_device_id);
-  void GarbageCollectRegistries();
 
   std::shared_ptr<DeviceDetector> device_detector_;
 
   // These devices are in the process of being initialized.
   std::unordered_set<std::shared_ptr<Device>> pending_devices_;
-
   // The list of operational devices, provided to clients (via Registry/WatchDevicesAdded).
   std::unordered_set<std::shared_ptr<Device>> devices_;
-
   // These devices have encountered an error or have self-reported as unhealthy. They have been
   // reported (via Registry/WatchDeviceRemoved) as being removed, and are no longer in the device
   // list provided to clients (via Registry/WatchDevicesAdded).
   std::unordered_set<std::shared_ptr<Device>> unhealthy_devices_;
+  // The list of IDs of devices that have been removed; they may previously have been in any state.
+  std::unordered_set<TokenId> removed_devices_;
 
   std::shared_ptr<FidlThread> thread_;
   component::OutgoingDirectory outgoing_;

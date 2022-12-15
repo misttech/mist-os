@@ -47,6 +47,7 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig {
     }
   }
   void set_is_input(std::optional<bool> is_input) { is_input_ = is_input; }
+  std::optional<bool> is_input() const { return is_input_; }
   void set_device_manufacturer(std::optional<std::string> mfgr) { manufacturer_ = std::move(mfgr); }
   void set_device_product(std::optional<std::string> product) { product_ = std::move(product); }
   void set_min_gain_db(std::optional<float> min_gain_db) { min_gain_db_ = min_gain_db; }
@@ -114,6 +115,7 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig {
     }
     frame_rates_[pcm_format_set_idx] = rates;
   }
+
   // By default, we support 2-channel, int16 (all bits valid), 48kHz.
   void SetDefaultFormats() {
     clear_formats();
@@ -131,16 +133,9 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig {
 
   void set_health_state(std::optional<bool> healthy) { healthy_ = healthy; }
 
-  void set_current_gain_db(std::optional<float> gain_db) { current_gain_db_ = gain_db; }
-  void set_current_agc(std::optional<bool> current_agc) { current_agc_ = current_agc; }
-  void set_current_mute(std::optional<bool> current_mute) { current_mute_ = current_mute; }
-
-  void set_plugged(std::optional<bool> plugged) { plugged_ = plugged; }
-  void set_plug_state_time(std::optional<zx::time> plug_state_time) {
-    plug_state_time_ = plug_state_time;
-  }
-
-  std::optional<bool> is_input() const { return is_input_; }
+  // Explicitly trigger a gain or plug change, including notification.
+  void InjectGainChange(fuchsia_hardware_audio::GainState new_state);
+  void InjectPlugChange(bool plugged, zx::time plug_time);
 
  private:
   static inline const std::string_view kClassName = "FakeAudioDriver";
@@ -177,11 +172,13 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig {
   std::optional<ClockDomain> clock_domain_ = fuchsia::hardware::audio::CLOCK_DOMAIN_MONOTONIC;
 
   std::optional<bool> healthy_ = true;
+
   std::optional<float> current_gain_db_ = 0.0f;
   std::optional<bool> current_agc_ = false;
   std::optional<bool> current_mute_ = false;
+
   std::optional<bool> plugged_ = true;
-  std::optional<zx::time> plug_state_time_ = zx::time(0);
+  zx::time plug_state_time_ = zx::time(0);
 
   // The default values for these five vectors are set by SetDefaultFormats(), in the ctor.
   std::vector<std::optional<
@@ -203,6 +200,12 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig {
   std::optional<fidl::Binding<fuchsia::hardware::audio::StreamConfig>> stream_config_binding_;
   zx::channel stream_config_server_end_;
   zx::channel stream_config_client_end_;
+
+  // Always respond to the first hanging-get request.
+  bool gain_has_changed_ = true;
+  bool plug_has_changed_ = true;
+  fuchsia::hardware::audio::StreamConfig::WatchGainStateCallback pending_gain_callback_ = nullptr;
+  fuchsia::hardware::audio::StreamConfig::WatchPlugStateCallback pending_plug_callback_ = nullptr;
 };
 
 }  // namespace media_audio

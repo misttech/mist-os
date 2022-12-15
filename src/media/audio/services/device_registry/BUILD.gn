@@ -46,6 +46,7 @@ executable("device_registry_unittests_bin") {
 
   sources = [
     "audio_device_registry_unittest.cc",
+    "control_creator_server_unittest.cc",
     "device_detector_unittest.cc",
     "device_unittest.cc",
     "provider_server_unittest.cc",
@@ -64,6 +65,7 @@ executable("device_registry_warning_unittests_bin") {
 
   sources = [
     "audio_device_registry_warning_unittest.cc",
+    "control_creator_server_warning_unittest.cc",
     "device_warning_unittest.cc",
     "provider_server_warning_unittest.cc",
     "registry_server_warning_unittest.cc",
@@ -78,6 +80,8 @@ source_set("device_registry_lib") {
     "audio_device_registry.cc",
     "audio_device_registry.h",
     "basic_types.h",
+    "control_creator_server.cc",
+    "control_creator_server.h",
     "device.cc",
     "device.h",
     "device_detector.cc",
@@ -114,7 +118,6 @@ source_set("unittest_base") {
   testonly = true
 
   sources = [
-    # "adr_server_unittest_base.cc",
     "adr_server_unittest_base.h",
     "device_unittest.h",
   ]

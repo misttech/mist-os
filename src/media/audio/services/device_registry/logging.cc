@@ -13,6 +13,7 @@
 #include <sstream>
 
 #include "src/media/audio/services/device_registry/basic_types.h"
+#include "src/media/audio/services/device_registry/control_creator_server.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/provider_server.h"
 #include "src/media/audio/services/device_registry/registry_server.h"
@@ -361,7 +362,7 @@ void LogObjectCounts() {
   ADR_LOG(kLogObjectCounts) << Device::count() << " Devices (" << Device::initialized_count()
                             << " active/" << Device::unhealthy_count() << " unhealthy); "
                             << ProviderServer::count() << " Providers, " << RegistryServer::count()
-                            << " Registries";
+                            << " Registries, " << ControlCreatorServer::count() << " CtlCreators";
 }
 
 }  // namespace media_audio

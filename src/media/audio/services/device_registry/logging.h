@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.mediastreams/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/time.h>
 
 #include <optional>
 #include <ostream>
@@ -20,6 +21,8 @@ namespace media_audio {
 #define ADR_LOG_OBJECT(CONDITION)                         \
   FX_LAZY_STREAM(FX_LOG_STREAM(INFO, nullptr), CONDITION) \
       << kClassName << "(" << this << ")::" << __func__ << ": "
+
+#define ADR_WARN_OBJECT() FX_LOGS(WARNING) << kClassName << "(" << this << ")::" << __func__ << ": "
 
 #define ADR_LOG_CLASS(CONDITION) \
   FX_LAZY_STREAM(FX_LOG_STREAM(INFO, nullptr), CONDITION) << kClassName << "::" << __func__ << ": "
@@ -37,9 +40,12 @@ inline constexpr bool kLogStreamConfigFidlCalls = false;
 inline constexpr bool kLogStreamConfigFidlResponses = false;
 inline constexpr bool kLogStreamConfigFidlResponseValues = false;
 
-inline constexpr bool kLogObjectLifetimes = true;
+inline constexpr bool kLogObjectLifetimes = false;
 inline constexpr bool kLogDeviceState = false;
-inline constexpr bool kLogObjectCounts = true;
+inline constexpr bool kLogObjectCounts = false;
+
+inline constexpr bool kLogControlCreatorServerMethods = false;
+inline constexpr bool kLogControlCreatorServerResponses = false;
 
 inline constexpr bool kLogProviderServerMethods = false;
 inline constexpr bool kLogProviderServerResponses = false;

@@ -12,6 +12,7 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/system/public/zircon/errors.h>
 
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -57,7 +58,7 @@ void RegistryServer::WatchDevicesAdded(WatchDevicesAddedCompleter::Sync& complet
   ReplyWithAddedDevices();
 }
 
-void RegistryServer::DeviceWasAdded(std::shared_ptr<Device> new_device) {
+void RegistryServer::DeviceWasAdded(std::shared_ptr<const Device> new_device) {
   ADR_LOG_OBJECT(kLogRegistryServerMethods);
 
   auto id = *new_device->info()->token_id();
@@ -163,40 +164,39 @@ void RegistryServer::CreateObserver(CreateObserverRequest& request,
   ADR_LOG_OBJECT(kLogRegistryServerMethods);
 
   if (!request.token_id()) {
-    FX_LOGS(WARNING) << kClassName << "::" << __func__ << ": required field 'id' is missing";
+    ADR_WARN_OBJECT() << "required field 'id' is missing";
     completer.Reply(fit::error(fuchsia_audio_device::RegistryCreateObserverError::kInvalidTokenId));
     return;
   }
   if (!request.observer_server()) {
-    FX_LOGS(WARNING) << kClassName << "::" << __func__
-                     << ": required field 'observer_server' is missing";
+    ADR_WARN_OBJECT() << "required field 'observer_server' is missing";
     completer.Reply(
         fit::error(fuchsia_audio_device::RegistryCreateObserverError::kInvalidObserver));
     return;
   }
-  auto id = *request.token_id();
-  auto token_match = [id](std::shared_ptr<Device> device) { return device->token_id() == id; };
-  auto matching_device =
-      std::find_if(parent_->devices().begin(), parent_->devices().end(), token_match);
-  if (matching_device == parent_->devices().end()) {
-    // TODO: unittest this case
-    auto unhealthy_match = std::find_if(parent_->unhealthy_devices().begin(),
-                                        parent_->unhealthy_devices().end(), token_match);
-    if (unhealthy_match != parent_->unhealthy_devices().end()) {
-      FX_LOGS(WARNING) << kClassName << "::" << __func__ << ": device with 'id' " << id
-                       << " has an error";
+  auto token_id = *request.token_id();
+  auto matching_device = parent_->FindDeviceByTokenId(token_id);
+  switch (matching_device.first) {
+    // We could break these out into separate error codes if needed.
+    case AudioDeviceRegistry::DevicePresence::Unknown:
+    case AudioDeviceRegistry::DevicePresence::Removed:
+      ADR_WARN_OBJECT() << "no device found with 'id' " << token_id;
+      completer.Reply(
+          fit::error(fuchsia_audio_device::RegistryCreateObserverError::kDeviceNotFound));
+      return;
+
+    case AudioDeviceRegistry::DevicePresence::Error:
+      ADR_WARN_OBJECT() << "device with 'id' " << token_id << " has an error";
       completer.Reply(fit::error(fuchsia_audio_device::RegistryCreateObserverError::kDeviceError));
       return;
-    }
 
-    FX_LOGS(WARNING) << kClassName << "::" << __func__ << ": no device found with 'id' " << id;
-    completer.Reply(fit::error(fuchsia_audio_device::RegistryCreateObserverError::kDeviceNotFound));
-    return;
+    case AudioDeviceRegistry::DevicePresence::Active:
+      break;
   }
 
   // TODO(fxbug.dev/117199): Decide when we proactively call GetHealthState, if at all.
 
-  // With the observer_server and matching_device, we will create an Observer protocol server.
+  // With observer_server and matching_device.second, we will create an Observer protocol server.
 
   completer.Reply(fit::success(fuchsia_audio_device::RegistryCreateObserverResponse{}));
 }

@@ -44,19 +44,19 @@ void ProviderServer::AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sy
   ADR_LOG_OBJECT(kLogProviderServerMethods);
 
   if (!request.device_name() || request.device_name()->empty()) {
-    FX_LOGS(WARNING) << __func__ << ": device_name was absent/empty";
+    ADR_WARN_OBJECT() << "device_name was absent/empty";
     completer.Reply(fit::error(fuchsia_audio_device::ProviderAddDeviceError::kInvalidName));
     return;
   }
 
   if (!request.device_type()) {
-    FX_LOGS(WARNING) << __func__ << ": device_type was absent";
+    ADR_WARN_OBJECT() << "device_type was absent";
     completer.Reply(fit::error(fuchsia_audio_device::ProviderAddDeviceError::kInvalidType));
     return;
   }
 
   if (!request.stream_config_client()) {
-    FX_LOGS(WARNING) << __func__ << ": stream_config_client was absent";
+    ADR_WARN_OBJECT() << "stream_config_client was absent";
 
     completer.Reply(fit::error(fuchsia_audio_device::ProviderAddDeviceError::kInvalidStreamConfig));
     return;

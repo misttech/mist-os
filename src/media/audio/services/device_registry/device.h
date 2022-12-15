@@ -38,32 +38,38 @@ class Device : public std::enable_shared_from_this<Device>,
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> stream_config);
   ~Device() override;
 
-  void Initialize();
+  // This is the const subset available to device observers).
+  //
+  // `info` is only populated once the device is DeviceInitialized.
+  const std::optional<fuchsia_audio_device::Info>& info() const { return device_info_; }
+  zx::result<zx::clock> GetReadOnlyClock() const;
 
+  void Initialize();
   // Assigned by this service, guaranteed unique for this boot session, but not across reboots.
   TokenId token_id() const { return token_id_; }
-  // This can only be called once the device is Ready.
-  const std::optional<fuchsia_audio_device::Info>& info() { return device_info_; }
 
-  void QueryHealthState();
-  zx::result<zx::clock> GetReadOnlyClock();
+  bool SetControl();
+  bool DropControl();
+
+  bool SetGain(fuchsia_hardware_audio::GainState& gain_state);
 
   // Static object counts, for debugging purposes.
-  static uint32_t count() { return count_; }
-  static uint32_t initialized_count() { return initialized_count_; }
-  static uint32_t unhealthy_count() { return unhealthy_count_; }
+  static uint64_t count() { return count_; }
+  static uint64_t initialized_count() { return initialized_count_; }
+  static uint64_t unhealthy_count() { return unhealthy_count_; }
+  static uint64_t control_count() { return control_count_; }
 
   //
   // # Device state and state machine
   //
   // ## "Forward" transitions
   //
-  // - On construction, state is Initializing.  Initialize() kicks off various commands.
+  // - On construction, state is DeviceInitializing.  Initialize() kicks off various commands.
   //   Each command then calls either OnInitializationResponse (when completing successfully) or
   //   OnError (if an error occurs at any time).
   //
-  // - OnInitializationResponse() checks whether all commands are complete, and if so changes state
-  //   to Ready. If not, the state remains Initializing until subsequent OnInitializationResponse().
+  // - OnInitializationResponse() changes state to DeviceInitialized if all commands are complete;
+  // else state remains DeviceInitializing until later OnInitializationResponse().
   //
   // ## "Backward" transitions
   //
@@ -71,28 +77,29 @@ class Device : public std::enable_shared_from_this<Device>,
   //   ANY other state to the terminal Error state. Devices in that state ignore all subsequent
   //   OnInitializationResponse / OnHealthResponse / OnError calls or state changes.
   //
-  // - Device health can be queried proactively by the client and is automatically checked at
-  //   certain times (including during initialization). These result in either OnError
-  //   (detailed above) or OnHealthResponse. Note that a successful health check is one of the
-  //   "graduation requirements" for transitioning to the Ready state: thus Initializing devices
-  //   treat OnHealthResponse identically to OnInitializationResponse. OnHealthResponse has no
-  //   effect on the state of devices that are not Initializing (Error remains Error, Ready remains
-  //   Ready, etc).
+  // - Device health is automatically checked at initialization. This may result in OnError
+  //   (detailed above). Note that a successful health check is one of the  "graduation
+  //   requirements" for transitioning to the DeviceInitialized state. fxbug.dev/117199 tracks the
+  //   work to proactively call GetHealthState at some point. This will always be surfaced to the
+  //   client by an error notification, rather than their calling GetHealthState directly.
+  //
   enum class State {
-    Initializing,
     Error,
-    Ready,
+    DeviceInitializing,
+    DeviceInitialized,
   };
 
  private:
   friend class DeviceTestBase;
   friend class DeviceTest;
   friend class DeviceWarningTest;
+  friend class AudioDeviceRegistryServerTestBase;
 
   static inline const std::string_view kClassName = "Device";
-  static uint32_t count_;
-  static uint32_t initialized_count_;
-  static uint32_t unhealthy_count_;
+  static uint64_t count_;
+  static uint64_t initialized_count_;
+  static uint64_t unhealthy_count_;
+  static uint64_t control_count_;
 
   Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher, async_dispatcher_t* dispatcher,
          std::string_view name, fuchsia_audio_device::DeviceType device_type,
@@ -109,6 +116,7 @@ class Device : public std::enable_shared_from_this<Device>,
   void QuerySupportedFormats();
   void QueryGainState();
   void QueryPlugState();
+  void QueryHealthState();
 
   void OnInitializationResponse();
   void OnHealthResponse();
@@ -125,7 +133,14 @@ class Device : public std::enable_shared_from_this<Device>,
   void CreateDeviceClock();
 
   void SetStateError(zx_status_t error);
-  void SetStateReady();
+  void SetStateInitialized();
+
+  void WatchForOngoingUpdates();
+  void WatchForGainUpdates();
+  void WatchForPlugUpdates();
+
+  void OnGainUpdate(fuchsia_hardware_audio::GainState& gain_state);
+  void OnPlugUpdate(fuchsia_hardware_audio::PlugState& plug_state);
 
   // Device notifies watcher when it completes initialization, encounters an error, or is removed.
   std::weak_ptr<DevicePresenceWatcher> presence_watcher_;
@@ -146,21 +161,26 @@ class Device : public std::enable_shared_from_this<Device>,
   std::optional<fuchsia_hardware_audio::PlugState> plug_state_;
   std::optional<fuchsia_hardware_audio::HealthState> health_state_;
 
-  State state_{State::Initializing};
+  State state_{State::DeviceInitializing};
 
   std::optional<fuchsia_audio_device::Info> device_info_;
 
   std::shared_ptr<Clock> device_clock_;
+  std::vector<fuchsia_audio_device::PcmFormatSet> permitted_formats_;
+
+  // Members related to being controlled.
+  // This will be replaced by a std::weak_ptr<ControlNotify> subsequent CL.
+  bool is_controlled_ = false;
 };
 
 inline std::ostream& operator<<(std::ostream& out, Device::State device_state) {
   switch (device_state) {
-    case Device::State::Initializing:
-      return (out << "Initializing");
     case Device::State::Error:
       return (out << "Error");
-    case Device::State::Ready:
-      return (out << "Ready");
+    case Device::State::DeviceInitializing:
+      return (out << "DeviceInitializing");
+    case Device::State::DeviceInitialized:
+      return (out << "DeviceInitialized");
   }
 }
 

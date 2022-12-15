@@ -17,7 +17,6 @@
 namespace media_audio {
 
 class AudioDeviceRegistry;
-class Device;
 
 class ProviderServer
     : public std::enable_shared_from_this<ProviderServer>,
