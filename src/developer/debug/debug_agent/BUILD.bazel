@@ -10,11 +10,4 @@ load(
 fuchsia_component_manifest(
     name = "manifest",
     src = "meta/debug_agent.cml",
-    includes = [
-        "@fuchsia_sdk//pkg/syslog:client",
-        # TODO(fxbug.dev/116670): make the below implicit
-        # as transitive includes of the above.
-        "@fuchsia_sdk//pkg/syslog:offer",
-        "@fuchsia_sdk//pkg/syslog:use",
-    ],
 )

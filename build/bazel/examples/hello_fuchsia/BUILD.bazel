@@ -24,13 +24,6 @@ fuchsia_cc_binary(
 fuchsia_component_manifest(
     name = "hello_fuchsia_manifest",
     src = "meta/hello_fuchsia.cml",
-    includes = [
-        "@fuchsia_sdk//pkg/syslog:client",
-        # TODO(fxbug.dev/116670): make the below implicit
-        # as transitive includes of the above.
-        "@fuchsia_sdk//pkg/syslog:offer",
-        "@fuchsia_sdk//pkg/syslog:use",
-    ],
 )
 
 fuchsia_component(

@@ -35,13 +35,6 @@ fuchsia_cc_binary(
 fuchsia_component_manifest(
     name = "manifest",
     src = "meta/hello_world.cml",
-    includes = [
-        "@fuchsia_sdk//pkg/syslog:client",
-        # TODO(fxbug.dev/116670): make the below implicit
-        # as transitive includes of the above.
-        "@fuchsia_sdk//pkg/syslog:offer",
-        "@fuchsia_sdk//pkg/syslog:use",
-    ],
 )
 
 fuchsia_component(
@@ -71,14 +64,6 @@ fuchsia_cc_test(
 fuchsia_component_manifest(
     name = "hello_test_manifest",
     src = "meta/hello_test.cml",
-    includes = [
-        "@fuchsia_sdk//pkg/sys/testing:elf_test_runner",
-        "@fuchsia_sdk//pkg/syslog:client",
-        # TODO(fxbug.dev/116670): make the below implicit
-        # as transitive includes of the above.
-        "@fuchsia_sdk//pkg/syslog:offer",
-        "@fuchsia_sdk//pkg/syslog:use",
-    ],
 )
 
 fuchsia_test_component(
@@ -100,14 +85,6 @@ fuchsia_cc_test(
 fuchsia_component_manifest(
     name = "hello_gtest_manifest",
     src = "meta/hello_gtest.cml",
-    includes = [
-        "@fuchsia_sdk//pkg/sys/testing:elf_test_runner",
-        "@fuchsia_sdk//pkg/syslog:client",
-        # TODO(fxbug.dev/116670): make the below implicit
-        # as transitive includes of the above.
-        "@fuchsia_sdk//pkg/syslog:offer",
-        "@fuchsia_sdk//pkg/syslog:use",
-    ],
 )
 
 fuchsia_test_component(
