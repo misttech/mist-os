@@ -4,16 +4,17 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import os
 import argparse
-import hashlib
-import shutil
-import re
-import sys
-import json
-import datetime
-import functools
 import collections
+import datetime
+import enum
+import functools
+import hashlib
+import json
+import os
+import re
+import shutil
+import sys
 
 ROOT_PATH = os.path.abspath(__file__ + "/../..")
 sys.path += [os.path.join(ROOT_PATH, "third_party", "pytoml")]
@@ -26,6 +27,8 @@ CARGO_PACKAGE_CONTENTS = """\
 
 # source GN: %(target)s"
 
+cargo-features = ["per-package-target"]
+
 [package]
 name = "%(package_name)s"
 version = "%(version)s"
@@ -34,6 +37,7 @@ authors = ["rust-fuchsia@fuchsia.com"]
 description = "Rust crate for Fuchsia OS"
 repository = "https://fuchsia.googlesource.com"
 edition = "%(edition)s"
+%(default_target)s
 
 %(bin_or_lib)s
 %(is_proc_macro)s
@@ -52,6 +56,11 @@ version = "%(version)s"
 path = "%(crate_path)s"
 
 """
+
+
+class ToolchainType(enum.Enum):
+    TARGET = 1
+    HOST = 2
 
 
 def strip_toolchain(target):
@@ -74,6 +83,14 @@ def version_from_toolchain(toolchain):
     if toolchain != None and toolchain.startswith("//build/toolchain:host_"):
         version = "0.0.2"
     return version
+
+
+def classify_toolchain(toolchain):
+    if toolchain != None and toolchain.startswith("//build/toolchain:host_"):
+        return ToolchainType.HOST
+    else:
+        return ToolchainType.TARGET
+
 
 def lookup_gn_pkg_name(project, target, *, for_workspace):
     if for_workspace:
@@ -213,6 +230,10 @@ def write_toml_file(
     crate_type = "rlib"
     package_name = lookup_gn_pkg_name(project, target, for_workspace=for_workspace)
 
+    default_target = ""
+    if classify_toolchain(extract_toolchain(target)) == ToolchainType.TARGET:
+        default_target = 'default-target = "x86_64-fuchsia"'
+
     fout.write(
         CARGO_PACKAGE_CONTENTS % {
             "target": target,
@@ -227,6 +248,7 @@ def write_toml_file(
             "source_root": rebase_gn_path(root_path, metadata["crate_root"]),
             "crate_name": metadata["crate_name"],
             "rust_crates_path": rust_crates_path,
+            "default_target": default_target,
         })
 
     extra_test_deps = set()
