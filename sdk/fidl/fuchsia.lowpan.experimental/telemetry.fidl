@@ -74,6 +74,36 @@ type BorderRoutingCounters = table {
     ///
     /// Required.
     8: outbound_multicast_bytes uint64;
+
+    /// The number of received RA packets.
+    ///
+    /// Required.
+    9: ra_rx uint32;
+
+    /// The number of RA packets successfully transmitted.
+    ///
+    /// Required.
+   10: ra_tx_success uint32;
+
+    /// The number of RA packets failed to transmit.
+    ///
+    /// Required.
+   11: ra_tx_failure uint32;
+
+    /// The number of received RS packets.
+    ///
+    /// Required.
+   12: rs_rx uint32;
+
+    /// The number of RS packets successfully transmitted.
+    ///
+    /// Required.
+   13: rs_tx_success uint32;
+
+    /// The number of RS packets failed to transmit.
+    ///
+    /// Required.
+   14: rs_tx_failure uint32;
 };
 
 /// LoWPAN Interface Telemetry Information.

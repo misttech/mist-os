@@ -152,6 +152,12 @@ impl FromExt<&ot::BorderRoutingCounters>
             outbound_unicast_bytes: Some(x.outbound_unicast().bytes()),
             outbound_multicast_packets: Some(x.outbound_multicast().packets()),
             outbound_multicast_bytes: Some(x.outbound_multicast().bytes()),
+            ra_rx: Some(x.ra_rx()),
+            ra_tx_success: Some(x.ra_tx_success()),
+            ra_tx_failure: Some(x.ra_tx_failure()),
+            rs_rx: Some(x.rs_rx()),
+            rs_tx_success: Some(x.rs_tx_success()),
+            rs_tx_failure: Some(x.rs_tx_failure()),
             ..fidl_fuchsia_lowpan_experimental::BorderRoutingCounters::EMPTY
         }
     }

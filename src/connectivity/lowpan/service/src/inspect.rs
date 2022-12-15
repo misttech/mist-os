@@ -729,6 +729,30 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                                             }
                                         },
                                     );
+                                    if let Some(y) = x.ra_rx {
+                                        border_routing_counters_child
+                                            .record_uint("ra_rx", y.into());
+                                    }
+                                    if let Some(y) = x.ra_tx_success {
+                                        border_routing_counters_child
+                                            .record_uint("ra_tx_success", y.into());
+                                    }
+                                    if let Some(y) = x.ra_tx_failure {
+                                        border_routing_counters_child
+                                            .record_uint("ra_tx_failure", y.into());
+                                    }
+                                    if let Some(y) = x.rs_rx {
+                                        border_routing_counters_child
+                                            .record_uint("rs_rx", y.into());
+                                    }
+                                    if let Some(y) = x.rs_tx_success {
+                                        border_routing_counters_child
+                                            .record_uint("rs_tx_success", y.into());
+                                    }
+                                    if let Some(y) = x.rs_tx_failure {
+                                        border_routing_counters_child
+                                            .record_uint("rs_tx_failure", y.into());
+                                    }
                                 },
                             );
                         }
