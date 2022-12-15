@@ -4,6 +4,7 @@
 
 pub mod context;
 mod heap;
+pub mod return_code;
 pub mod tcti;
 
 pub use context::*;

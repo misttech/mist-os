@@ -388,6 +388,7 @@ static_library("tss2-esys") {
   ]
   deps = [
     ":tss2-mu",
+    ":tss2-rc",
     ":tss2-sys",
     "//third_party/boringssl",
   ]

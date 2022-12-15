@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::error::TpmError;
+use crate::{error::TpmError, ffi_return_if_error};
 use std::ptr::null_mut;
 use tpm2_tss_sys as tss_sys;
 
@@ -17,11 +17,7 @@ impl TctiContext {
     /// allocated Fuchsia TCTI from the underlying C Library.
     pub fn try_new() -> Result<Self, TpmError> {
         let mut tcti_context = null_mut();
-        let return_code =
-            unsafe { tss_sys::Tss2_Tcti_Fuchsia_Init_Ex(&mut tcti_context, null_mut()) };
-        if return_code != 0 {
-            return Err(TpmError::TssReturnCode(return_code));
-        }
+        ffi_return_if_error!(tss_sys::Tss2_Tcti_Fuchsia_Init_Ex(&mut tcti_context, null_mut()));
         Ok(Self { tcti_context })
     }
 

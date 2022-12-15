@@ -5,5 +5,7 @@
 pub mod capability;
 pub mod error;
 pub mod hierarchy;
+pub mod session;
 pub mod tpm;
 mod tss;
+pub mod util;

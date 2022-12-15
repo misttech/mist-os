@@ -20,10 +20,14 @@ common_source = [
   "src/capability.rs",
   "src/hierarchy.rs",
   "src/error.rs",
+  "src/util.rs",
+  "src/session.rs",
   "src/tss/mod.rs",
+  "src/tss/return_code.rs",
 ]
 
 common_deps = [
+  "//third_party/rust_crates:hex",
   "//third_party/rust_crates:thiserror",
   "//third_party/tpm2-tss/rust/tpm2-tss-sys",
 ]
@@ -57,7 +61,11 @@ rustc_library("tpm-device") {
   sources = common_source
 }
 
+fuchsia_unittest_package("tpm-tests") {
+  deps = [ ":tpm-device_test" ]
+}
+
 group("tests") {
   testonly = true
-  public_deps = [ ":tpm-device_test" ]
+  deps = [ ":tpm-tests" ]
 }

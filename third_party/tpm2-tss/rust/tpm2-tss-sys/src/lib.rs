@@ -3282,6 +3282,18 @@ extern "C" {
         out: *mut TPMS_EMPTY,
     ) -> TSS2_RC;
 }
+pub type TSS2_RC_HANDLER =
+    ::std::option::Option<unsafe extern "C" fn(rc: TSS2_RC) -> *const ::std::os::raw::c_char>;
+extern "C" {
+    pub fn Tss2_RC_Decode(rc: TSS2_RC) -> *const ::std::os::raw::c_char;
+}
+extern "C" {
+    pub fn Tss2_RC_SetHandler(
+        layer: u8,
+        name: *const ::std::os::raw::c_char,
+        handler: TSS2_RC_HANDLER,
+    ) -> TSS2_RC_HANDLER;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct pollfd {

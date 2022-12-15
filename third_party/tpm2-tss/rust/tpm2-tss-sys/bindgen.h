@@ -11,6 +11,8 @@
 #include "tss2_tpm2_types.h"
 // TPM Command Marshalling Support.
 #include "tss2_mu.h"
+/// TPM Return Code Marshalling.
+#include "tss2_rc.h"
 // Fuchsia TCTI Interface.
 #include "tss2_tcti_fuchsia.h"
 // TSS Enhanced System Interface.
