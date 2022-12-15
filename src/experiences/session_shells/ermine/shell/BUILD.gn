@@ -229,6 +229,7 @@ config_data("images") {
                           "images/Settings-icon-2x.png",
                           "images/SimpleBrowser-icon-2x.png",
                           "images/SpinningSquare-icon-2x.png",
+                          "images/Starnix-icon-2x.png",
                           "images/Terminal-icon-2x.png",
                         ])
 
