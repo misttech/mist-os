@@ -853,6 +853,14 @@ where
             thread_network_data: ot.net_data_as_vec(false).ok(),
             thread_stable_network_data: ot.net_data_as_vec(true).ok(),
             thread_border_routing_counters: Some(ot.ip6_get_border_routing_counters().into_ext()),
+            srp_server_info: Some(SrpServerInfo {
+                state: Some(ot.srp_server_get_state().into_ext()),
+                port: match ot.srp_server_get_state().into_ext() {
+                    SrpServerState::Disabled => None,
+                    _ => Some(ot.srp_server_get_port()),
+                },
+                ..SrpServerInfo::EMPTY
+            }),
             ..Telemetry::EMPTY
         })
     }

@@ -756,6 +756,16 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                                 },
                             );
                         }
+                        if let Some(x) = telemetry_data.srp_server_info {
+                            inspector.root().record_child("srp_server", |srp_server_info_child| {
+                                if let Some(y) = x.state {
+                                    srp_server_info_child.record_string("state", format!("{:?}", y))
+                                }
+                                if let Some(y) = x.port {
+                                    srp_server_info_child.record_uint("port", y.into())
+                                }
+                            });
+                        }
                     }
                     Err(e) => {
                         fx_log_warn!("Error in logging telemetry. Error: {}", e);

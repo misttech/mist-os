@@ -106,6 +106,29 @@ type BorderRoutingCounters = table {
    14: rs_tx_failure uint32;
 };
 
+/// SRP server operational states.
+type SrpServerState = strict enum {
+    /// The server is disabled.
+    DISABLED = 1;
+    /// The server is enabled and running.
+    RUNNING = 2;
+    /// The server is enabled, but stopped.
+    STOPPED = 3;
+};
+
+/// State information about the SRP server.
+type SrpServerInfo = table {
+    /// The operational state of the SRP server.
+    ///
+    /// Required.
+    1: state SrpServerState;
+
+    /// The port the SRP server is listening to.
+    ///
+    /// Optional. The port may be omitted when `state` is `DISABLED`.
+    2: port uint16;
+};
+
 /// LoWPAN Interface Telemetry Information.
 ///
 /// The fields in this table are used for providing low-level telemetry and information about the
@@ -184,4 +207,9 @@ type Telemetry = table {
     ///
     /// Only present on Thread networks.
    16: thread_border_routing_counters BorderRoutingCounters;
+
+    /// The SRP server information.
+    ///
+    /// Only present on Thread networks.
+   17: srp_server_info SrpServerInfo;
 };

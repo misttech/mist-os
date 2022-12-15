@@ -33,6 +33,25 @@ pub struct SrpServerServiceFlags : u8 {
 }
 }
 
+/// Represents the SRP server state.
+///
+/// Functional equivalent of [`otsys::otSrpServerState`](crate::otsys::otSrpServerState).
+#[derive(Debug, Copy, Clone, Eq, Ord, PartialOrd, PartialEq, num_derive::FromPrimitive)]
+#[allow(missing_docs)]
+pub enum SrpServerState {
+    /// Functional equivalent of
+    /// [`otsys::otSrpServerState_OT_SRP_SERVER_STATE_DISABLED`](crate::otsys::otSrpServerState_OT_SRP_SERVER_STATE_DISABLED).
+    Disabled = OT_SRP_SERVER_STATE_DISABLED as isize,
+
+    /// Functional equivalent of
+    /// [`otsys::otSrpServerState_OT_SRP_SERVER_STATE_RUNNING`](crate::otsys::otSrpServerState_OT_SRP_SERVER_STATE_RUNNING).
+    Running = OT_SRP_SERVER_STATE_RUNNING as isize,
+
+    /// Functional equivalent of
+    /// [`otsys::otSrpServerState_OT_SRP_SERVER_STATE_STOPPED`](crate::otsys::otSrpServerState_OT_SRP_SERVER_STATE_STOPPED).
+    Stopped = OT_SRP_SERVER_STATE_STOPPED as isize,
+}
+
 /// Iterates over the available SRP server hosts. See [`SrpServer::srp_server_get_hosts`].
 pub struct SrpServerHostIterator<'a, T: SrpServer> {
     prev: Option<&'a SrpServerHost>,
@@ -353,6 +372,14 @@ impl Drop for SrpServerServiceUpdateId {
 /// [1]: https://openthread.io/reference/group/api-srp
 pub trait SrpServer {
     /// Functional equivalent of
+    /// [`otsys::otSrpServerGetState`](crate::otsys::otSrpServerGetState).
+    fn srp_server_get_state(&self) -> SrpServerState;
+
+    /// Functional equivalent of
+    /// [`otsys::otSrpServerGetPort`](crate::otsys::otSrpServerGetPort).
+    fn srp_server_get_port(&self) -> u16;
+
+    /// Functional equivalent of
     /// [`otsys::otSrpServerSetEnabled`](crate::otsys::otSrpServerSetEnabled).
     fn srp_server_set_enabled(&self, enabled: bool);
 
@@ -397,6 +424,14 @@ pub trait SrpServer {
 }
 
 impl<T: SrpServer + Boxable> SrpServer for ot::Box<T> {
+    fn srp_server_get_state(&self) -> SrpServerState {
+        self.as_ref().srp_server_get_state()
+    }
+
+    fn srp_server_get_port(&self) -> u16 {
+        self.as_ref().srp_server_get_port()
+    }
+
     fn srp_server_set_enabled(&self, enabled: bool) {
         self.as_ref().srp_server_set_enabled(enabled)
     }
@@ -441,6 +476,14 @@ impl<T: SrpServer + Boxable> SrpServer for ot::Box<T> {
 }
 
 impl SrpServer for Instance {
+    fn srp_server_get_state(&self) -> SrpServerState {
+        unsafe { SrpServerState::from_u32(otSrpServerGetState(self.as_ot_ptr())).unwrap() }
+    }
+
+    fn srp_server_get_port(&self) -> u16 {
+        unsafe { otSrpServerGetPort(self.as_ot_ptr()) }
+    }
+
     fn srp_server_set_enabled(&self, enabled: bool) {
         unsafe { otSrpServerSetEnabled(self.as_ot_ptr(), enabled) }
     }

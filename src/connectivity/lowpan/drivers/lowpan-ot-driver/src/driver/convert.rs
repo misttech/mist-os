@@ -38,6 +38,16 @@ impl FromExt<ot::Error> for ProvisionError {
     }
 }
 
+impl FromExt<ot::SrpServerState> for SrpServerState {
+    fn from_ext(x: ot::SrpServerState) -> Self {
+        match x {
+            ot::SrpServerState::Disabled => SrpServerState::Disabled,
+            ot::SrpServerState::Running => SrpServerState::Running,
+            ot::SrpServerState::Stopped => SrpServerState::Stopped,
+        }
+    }
+}
+
 impl FromExt<ot::BorderRouterConfig> for OnMeshPrefix {
     fn from_ext(x: ot::BorderRouterConfig) -> Self {
         OnMeshPrefix {
