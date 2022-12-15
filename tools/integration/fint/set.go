@@ -193,6 +193,31 @@ func runGen(
 	return stdoutBuf.String(), nil
 }
 
+// findGNIFile returns the relative path to a board or product file in a
+// checkout, given a basename. It checks the root of the checkout as well as
+// each vendor/* directory for a file matching "<dirname>/<basename>.gni", e.g.
+// "boards/core.gni".
+func findGNIFile(checkoutDir, dirname, basename string) (string, error) {
+	dirs, err := filepath.Glob(filepath.Join(checkoutDir, "vendor", "*", dirname))
+	if err != nil {
+		return "", err
+	}
+	dirs = append(dirs, filepath.Join(checkoutDir, dirname))
+
+	for _, dir := range dirs {
+		path := filepath.Join(dir, fmt.Sprintf("%s.gni", basename))
+		exists, err := osmisc.FileExists(path)
+		if err != nil {
+			return "", err
+		}
+		if exists {
+			return filepath.Rel(checkoutDir, path)
+		}
+	}
+
+	return "", nil
+}
+
 func genArgs(staticSpec *fintpb.Static, contextSpec *fintpb.Context) ([]string, error) {
 	// GN variables to set via args (mapping from variable name to value).
 	vars := make(map[string]interface{})
@@ -247,6 +272,22 @@ func genArgs(staticSpec *fintpb.Static, contextSpec *fintpb.Context) ([]string, 
 		basename := filepath.Base(staticSpec.Board)
 		vars["build_info_board"] = strings.Split(basename, ".")[0]
 		imports = append(imports, staticSpec.Board)
+	}
+
+	// We may want to run scrutiny verifiers on specific product+board
+	// combinations. If a file exists at //scrutiny_configs/product_board.gni
+	// then we include it, and the build will run the verifiers.
+	if staticSpec.Product != "" && staticSpec.Board != "" {
+		product := strings.Split(filepath.Base(staticSpec.Product), ".")[0]
+		board := strings.Split(filepath.Base(staticSpec.Board), ".")[0]
+		productUnderscoreBoard := product + "_" + board
+		scrutinyConfigPath, err := findGNIFile(contextSpec.CheckoutDir, "scrutiny_configs", productUnderscoreBoard)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if scrutiny config exists: %w", err)
+		}
+		if scrutinyConfigPath != "" {
+			imports = append(imports, scrutinyConfigPath)
+		}
 	}
 
 	if contextSpec.SdkId != "" {
