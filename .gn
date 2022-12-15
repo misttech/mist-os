@@ -24,7 +24,7 @@ ninja_required_version = "1.10.0"
 no_check_targets = [ "//third_party/*" ]
 
 # Use of `exec_script()` is discouraged for performance reasons.
-# https://fuchsia.dev/fuchsia-src/concepts/build_system/best_practices#exec-script
+# See: https://fuchsia.dev/fuchsia-src/concepts/build_system/best_practices#exec-script
 exec_script_whitelist = [
   "//build/config/clang/clang.gni",
   "//build/config/mac/mac_sdk.gni",
