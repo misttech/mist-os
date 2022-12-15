@@ -741,7 +741,9 @@ and so must appear on a line by itself.
 For example, if the current file en/time-travel/example.md wants to include file en/time-travel/_samples/_sample.md, it would specify:
 
 ```md
+{% verbatim %}
 <<_samples/_sample.md>>
+{% endverbatim %}
 ```
 
 ## Inline code
