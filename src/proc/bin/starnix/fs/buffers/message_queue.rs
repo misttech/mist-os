@@ -258,7 +258,7 @@ impl MessageQueue {
         ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
         let actual = std::cmp::min(self.available_capacity(), user_buffers.remaining());
-        if actual == 0 {
+        if actual == 0 && user_buffers.remaining() > 0 {
             return error!(EAGAIN);
         }
         let data = MessageData::copy_from_user(task, user_buffers, actual)?;
