@@ -356,6 +356,10 @@ bool ImagePipeSurfaceAsync::CreateImage(VkDevice device, VkLayerDispatchTable* p
                                                       i, std::move(image_properties));
         flatland_connection_->flatland()->SetImageDestinationSize({info.image_id},
                                                                   {extent.width, extent.height});
+        // SRC_OVER determines if this image should be blennded with what is behind and does not
+        // ignore alpha channel. It is different than VkCompositeAlphaFlagBitsKHR modes.
+        flatland_connection_->flatland()->SetImageBlendingFunction(
+            {info.image_id}, fuchsia::ui::composition::BlendMode::SRC_OVER);
       }
     });
   }
