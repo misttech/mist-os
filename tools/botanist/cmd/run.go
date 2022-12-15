@@ -93,6 +93,9 @@ type RunCommand struct {
 	// Any image overrides for boot.
 	imageOverrides imageOverridesFlagValue
 
+	// When true skips setting up the targets.
+	skipSetup bool
+
 	// Args passed to testrunner
 	testrunnerFlags testrunner.TestrunnerFlags
 }
@@ -162,6 +165,7 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&r.ffxPath, "ffx", "", "Path to the ffx tool.")
 	f.StringVar(&r.downloadManifest, "download-manifest", "", "Path to a manifest containing all package server downloads")
 	f.IntVar(&r.ffxExperimentLevel, "ffx-experiment-level", 0, "The level of experimental features to enable. If -ffx is not set, this will have no effect.")
+	f.BoolVar(&r.skipSetup, "skip-setup", false, "if set, botanist will not set up a target.")
 	f.Var(&r.imageOverrides, "image-overrides", "A json struct following the ImageOverrides schema at //tools/build/tests.go with the names of the images to use from images.json.")
 
 	// Parsing of testrunner flags.
@@ -177,6 +181,8 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 
 func (r *RunCommand) execute(ctx context.Context, args []string) error {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	testsPath := args[0]
+
 	go func() {
 		<-ctx.Done()
 		// Log the timeout for tefmocheck to detect it.
@@ -185,6 +191,13 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 		}
 	}()
 	defer cancel()
+
+	if r.skipSetup {
+		if err := testrunner.SetupAndExecute(ctx, r.testrunnerFlags, testsPath); err != nil {
+			return fmt.Errorf("testrunner with flags: %v, with timeout: %s, failed: %w", r.testrunnerFlags, r.timeout, err)
+		}
+		return nil
+	}
 
 	// Parse targets out from the target configuration file.
 	targetSlice, err := r.deriveTargetsFromFile(ctx)
@@ -381,7 +394,7 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 				}
 			}
 		}
-		err = r.runAgainstTarget(ctx, t0, args, testbedConfig)
+		err = r.runAgainstTarget(ctx, t0, testsPath, testbedConfig)
 		// Cancel ctx to notify other goroutines that this routine has completed.
 		// If another goroutine gets an error and the context is canceled, it
 		// should return nil so that we always prioritize the result from this
@@ -502,7 +515,7 @@ func (r *RunCommand) dumpSyslogOverSerial(ctx context.Context, socketPath string
 	return nil
 }
 
-func (r *RunCommand) runAgainstTarget(ctx context.Context, t targets.Target, args []string, testbedConfig string) error {
+func (r *RunCommand) runAgainstTarget(ctx context.Context, t targets.Target, testsPath string, testbedConfig string) error {
 	testrunnerEnv := map[string]string{
 		constants.NodenameEnvKey:      t.Nodename(),
 		constants.SerialSocketEnvKey:  t.SerialSocketPath(),
@@ -574,10 +587,8 @@ func (r *RunCommand) runAgainstTarget(ctx context.Context, t targets.Target, arg
 		setEnviron(t.FFXEnv())
 	}
 
-	logger.Debugf(ctx, "botanist positional args (passed to testrunner) %v", args)
-
-	if err := testrunner.SetupAndExecute(ctx, r.testrunnerFlags, args[0]); err != nil {
-		return fmt.Errorf("testrunner with args: %v, with timeout: %s, failed: %w", r.testrunnerFlags, r.timeout, err)
+	if err := testrunner.SetupAndExecute(ctx, r.testrunnerFlags, testsPath); err != nil {
+		return fmt.Errorf("testrunner with flags: %v, with timeout: %s, failed: %w", r.testrunnerFlags, r.timeout, err)
 	}
 	return nil
 }
