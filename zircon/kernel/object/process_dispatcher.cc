@@ -182,6 +182,14 @@ ProcessDispatcher::ProcessDispatcher(fbl::RefPtr<ShareableProcessState> shared_s
       name_(name.data(), name.length()) {
   LTRACE_ENTRY_OBJ;
 
+  if constexpr (KERNEL_BASED_MEMORY_ATTRIBUTION) {
+    fbl::AllocChecker ac;
+    attribution_obj_ = fbl::MakeRefCountedChecked<AttributionObject>(&ac, get_koid());
+
+    DEBUG_ASSERT(ac.check());
+    AttributionObject::AddAttributionToGlobalList(attribution_obj_.get());
+  }
+
   kcounter_add(dispatcher_process_create_count, 1);
 }
 

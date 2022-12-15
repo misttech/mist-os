@@ -114,6 +114,10 @@ declare_args() {
   jtrace_last_entry_storage = 0
   jtrace_target_buffer_size = "auto"
   jtrace_use_large_entries = "auto"
+
+  # Controls the instantiation of AttributionObjects
+  # on ProcessDispatcher creation.
+  kernel_based_memory_attribution_enabled = false
 }
 
 declare_args() {

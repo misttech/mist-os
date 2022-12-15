@@ -16,6 +16,7 @@
 #include <fbl/name.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
+#include <kernel/attribution.h>
 #include <kernel/brwlock.h>
 #include <kernel/event.h>
 #include <kernel/mutex.h>
@@ -168,6 +169,8 @@ class ProcessDispatcher final
   }
 
   State state() const;
+
+  fbl::RefPtr<AttributionObject> attribution_obj() { return attribution_obj_; }
 
   fbl::RefPtr<JobDispatcher> job();
 
@@ -337,6 +340,10 @@ class ProcessDispatcher final
 
   // the enclosing job
   const fbl::RefPtr<JobDispatcher> job_;
+
+  // Attribution object tracking the process that this dispatcher
+  // instance represents.
+  fbl::RefPtr<AttributionObject> attribution_obj_;
 
   // Job that this process is critical to.
   //

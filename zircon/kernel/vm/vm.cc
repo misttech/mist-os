@@ -23,6 +23,7 @@
 #include <zircon/types.h>
 
 #include <fbl/algorithm.h>
+#include <kernel/attribution.h>
 #include <kernel/thread.h>
 #include <ktl/array.h>
 #include <vm/anonymous_page_requester.h>
@@ -220,6 +221,10 @@ void vm_init_preheap() {
   VmAspace::KernelAspaceInitPreHeap();
 
   vm_init_preheap_vmars();
+
+  if constexpr (KERNEL_BASED_MEMORY_ATTRIBUTION) {
+    AttributionObject::KernelAttributionInit();
+  }
 
   // mark the physical pages used by the boot time allocator
   if (boot_alloc_end != boot_alloc_start) {
