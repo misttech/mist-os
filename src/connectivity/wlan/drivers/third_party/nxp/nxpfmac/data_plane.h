@@ -45,6 +45,9 @@ class DataPlane : public wlan::drivers::components::NetworkDevice::Callbacks {
 
   network_device_ifc_protocol_t NetDevIfcProto();
   void DeferRxWork();
+  // Synchronously wait until all scheduled RX work completes. Any RX work scheduled after or during
+  // this will not be waited upon.
+  void FlushRxWork();
 
   void CompleteTx(wlan::drivers::components::Frame&& frame, zx_status_t status);
   void CompleteRx(wlan::drivers::components::Frame&& frame);

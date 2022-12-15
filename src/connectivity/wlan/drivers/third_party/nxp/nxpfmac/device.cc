@@ -47,6 +47,12 @@ Device::Device(zx_device_t *parent) : DeviceType(parent) {
           data_plane_->DeferRxWork();
         }
       });
+  flush_rx_work_event_ =
+      event_handler_.RegisterForEvent(MLAN_EVENT_ID_DRV_FLUSH_RX_WORK, [this](pmlan_event event) {
+        if (data_plane_) {
+          data_plane_->FlushRxWork();
+        }
+      });
   defer_handling_event_ =
       event_handler_.RegisterForEvent(MLAN_EVENT_ID_DRV_DEFER_HANDLING, [this](pmlan_event event) {
         if (bus_) {

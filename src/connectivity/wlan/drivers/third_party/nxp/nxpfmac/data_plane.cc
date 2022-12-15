@@ -94,6 +94,23 @@ void DataPlane::DeferRxWork() {
   }
 }
 
+void DataPlane::FlushRxWork() {
+  // Post a task on the RX work dispatcher and wait for it to run. Once the task has finished
+  // running that means that all previously scheduled RX work has completed.
+  sync_completion_t completion;
+  zx_status_t status = async::PostTask(rx_work_loop_.dispatcher(),
+                                       [&completion] { sync_completion_signal(&completion); });
+  if (status != ZX_OK) {
+    NXPF_THROTTLE_ERR("Failed to post flush RX work task: %s", zx_status_get_string(status));
+    return;
+  }
+  status = sync_completion_wait(&completion, ZX_TIME_INFINITE);
+  if (status != ZX_OK) {
+    NXPF_THROTTLE_ERR("Failed to wait for RX work to flush: %s", zx_status_get_string(status));
+    return;
+  }
+}
+
 void DataPlane::CompleteTx(wlan::drivers::components::Frame &&frame, zx_status_t status) {
   if (likely(frame.Size() >= sizeof(ethhdr))) {
     auto eth = reinterpret_cast<ethhdr *>(frame.Data());

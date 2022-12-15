@@ -112,6 +112,51 @@ TEST_F(DataPlaneTest, DeferRxWork) {
   ASSERT_OK(sync_completion_wait(&mlan_rx_process_called, ZX_TIME_INFINITE));
 }
 
+TEST_F(DataPlaneTest, FlushRxWork) {
+  // Test that the data plane correctly defers RX work and calls mlan_rx_process.
+
+  enum class Event { RxWork, FlushWorkStart, FlushWorkDone };
+
+  std::mutex mutex;
+  std::vector<Event> events;
+
+  sync_completion_t complete_rx_work;
+  mlan_mocks_.SetOnMlanRxProcess([&](t_void*, t_u8*) {
+    EXPECT_OK(sync_completion_wait(&complete_rx_work, ZX_TIME_INFINITE));
+    std::lock_guard lock(mutex);
+    events.push_back(Event::RxWork);
+    return MLAN_STATUS_SUCCESS;
+  });
+
+  data_plane_->DeferRxWork();
+
+  sync_completion_t flush_thread_started;
+  std::thread flushing_thread([&]() {
+    {
+      std::lock_guard lock(mutex);
+      events.push_back(Event::FlushWorkStart);
+    }
+    sync_completion_signal(&flush_thread_started);
+    data_plane_->FlushRxWork();
+    {
+      std::lock_guard lock(mutex);
+      events.push_back(Event::FlushWorkDone);
+    }
+  });
+  // Wait for the flush RX work thread to get started and push its event on the event vector.
+  ASSERT_OK(sync_completion_wait(&flush_thread_started, ZX_TIME_INFINITE));
+  // Now allow the deferred RX work to complete.
+  sync_completion_signal(&complete_rx_work);
+  // Now the flush work should be allowed to proceed, wait for that thread to exit.
+  flushing_thread.join();
+  // Then ensure the proper sequence of events.
+  std::lock_guard lock(mutex);
+  ASSERT_EQ(3u, events.size());
+  EXPECT_EQ(Event::FlushWorkStart, events[0]);
+  EXPECT_EQ(Event::RxWork, events[1]);
+  EXPECT_EQ(Event::FlushWorkDone, events[2]);
+}
+
 TEST_F(DataPlaneTest, HasNetDeviceProto) {
   // Test that the data plane present a working network device ifc protocol.
 
