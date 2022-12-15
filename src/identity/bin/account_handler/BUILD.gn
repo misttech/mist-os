@@ -62,6 +62,7 @@ rustc_binary("bin") {
     "src/pre_auth.rs",
     "src/stored_account.rs",
     "src/test_util.rs",
+    "src/wrapped_key.rs",
   ]
 }
 

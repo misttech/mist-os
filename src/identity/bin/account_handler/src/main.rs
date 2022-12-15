@@ -22,6 +22,7 @@ mod lock_request;
 mod persona;
 mod pre_auth;
 mod stored_account;
+mod wrapped_key;
 
 #[cfg(test)]
 mod test_util;
