@@ -70,14 +70,19 @@
             to: "#chromium-tests",
         },
         {
+            protocol: [ "fuchsia.media.drm.Widevine" ],
+            from: "parent",
+            to: "#chromium-tests",
+            availability: "optional",
+        },
+        {
             protocol: [
-                "fuchsia.media.drm.Widevine",
                 "fuchsia.tracing.perfetto.ProducerConnector",
                 "fuchsia.tracing.provider.Registry",
             ],
             from: "parent",
             to: "#chromium-tests",
-            availability: "optional",
+            availability: "same_as_target",
         },
 
         // Test realms may offer subdirectories of config-data to test
