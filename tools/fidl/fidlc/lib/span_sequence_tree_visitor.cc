@@ -110,6 +110,19 @@ size_t CountNewlinesBetweenAdjacentTokens(const std::string_view source, const T
   const char* source_start_char = source.data();
   const char* from_char = start.span().data().data() + start.span().data().size();
   const char* until_char = end.span().data().data();
+
+  // In the event that at least one of the tokens supplied is not inside of the |source|'s
+  // |string_view| (that is, it has been inserted after parsing by something like
+  // |fix::Transformer|), we should not count adjacent newlines.
+  if (start.is_synthetic() || end.is_synthetic()) {
+    // TODO(fxbug.dev/114357): This is not a very good solution to this problem. We're basically
+    // saying that during a transform operation, the formatter will ignore any newlines that may
+    // have abutted a replaced/inserted token before. This is unideal (we may lose newlines during
+    // transforms), but also not catastrophic (they're just newlines, and we're transforming the
+    // source anyway).
+    return 0;
+  }
+
   ZX_ASSERT(until_char >= from_char);
   const std::string_view whitespace =
       source.substr(from_char - source_start_char, until_char - from_char);

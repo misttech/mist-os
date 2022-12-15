@@ -13,6 +13,8 @@
 
 namespace fidl {
 
+class SyntheticToken;
+
 // A Token represents a typed view into a source buffer. That is, it
 // has a TokenKind, and it has a buffer representing the data
 // corresponding to the token. No processing is done on the data:
@@ -79,17 +81,21 @@ class Token {
 
   std::string_view data() const { return span_.data(); }
   const SourceSpan& span() const { return span_; }
-  void set_previous_end(SourceSpan span) { previous_end_ = span; }
   SourceSpan previous_end() const { return previous_end_; }
   Kind kind() const { return kind_and_subkind_.kind(); }
   Subkind subkind() const { return kind_and_subkind_.subkind(); }
   KindAndSubkind kind_and_subkind() const { return kind_and_subkind_; }
   uint32_t ordinal() const { return ordinal_; }
+
+  void set_previous_end(SourceSpan span) { previous_end_ = span; }
   void set_ordinal(uint32_t ordinal) { ordinal_ = ordinal; }
+  uint32_t sub_ordinal() const { return sub_ordinal_; }
 
   bool same_file_as(const Token& rhs) const {
     return span_.source_file().filename() == rhs.span().source_file().filename();
   }
+
+  bool is_synthetic() const { return sub_ordinal_ != 0; }
 
   constexpr bool operator==(const Token& rhs) const { return this->span() == rhs.span(); }
   constexpr bool operator!=(const Token& rhs) const { return !(*this == rhs); }
@@ -100,6 +106,9 @@ class Token {
   // is the case.
   constexpr bool operator<(const Token& rhs) const {
     if (this->same_file_as(rhs)) {
+      if (ordinal_ == rhs.ordinal_) {
+        return sub_ordinal_ < rhs.sub_ordinal_;
+      }
       return ordinal_ < rhs.ordinal_;
     }
     return span_.source_file().filename() < rhs.span_.source_file().filename();
@@ -116,6 +125,41 @@ class Token {
   SourceSpan span_;
   KindAndSubkind kind_and_subkind_;
   uint32_t ordinal_;
+
+ protected:
+  // The zero |sub_ordinal_| is used to indicate that |Token| is sourced - that is, it came from a
+  // static buffer of FIDL content, and was not created and inserted into the raw AST later by a
+  // |Transformer|.
+  //
+  // When ordering |Token|s, we first compare |ordinal_|s. If |ordinal_|s are equal, at least one of
+  // the |Token|s in question is a |SyntheticToken|, denoted by having a |sub_ordinal_| greater than
+  // 0. Ordering between such |Token|s is determined by comparing this |sub_ordinal_| value.
+  //
+  // Because every file must start with a non-synthetic |Token::Kind::kStartOfFile| and end with
+  // with a |Token::Kind::kEndOfFile| and those |Token|s must not be altered or replaced, we can be
+  // sure that every |SyntheticToken| is a "child" of some original, sourced |Token|. To maintain
+  // this invariant, care should be taken when removing an existing |Token| from a token list, since
+  // all of its attached |SyntheticToken|s must be assigned to its predecessor instead.
+  uint32_t sub_ordinal_ = 0;
+};
+
+// A |Token| that has been generated post-parsing, and injected into a raw AST tree and/or
+// |TokenPointerList|. Unlike it's surrounding |Token|s, this |Token| does NOT come from the
+// original FIDL buffer used during the first lexing and parsing pass. This means that it cannot be
+// positioned relative to other |Token|s via pointer arithmetic alone, and must instead rely on
+// having its |ordinal_| and |sub_ordinal_| correctly assigned. Every |SyntheticToken| is thus a
+// "child" of some original |Token|, in that it shares an |ordinal_| with it, and appears directly
+// after it in the token list.
+class SyntheticToken : public Token {
+ public:
+  SyntheticToken(SourceSpan previous_end, SourceSpan span, Token::Kind kind, Token::Subkind subkind,
+                 uint32_t ordinal, uint32_t sub_ordinal)
+      : Token(previous_end, span, kind, subkind, ordinal) {
+    ZX_ASSERT(sub_ordinal > 0);
+    sub_ordinal_ = sub_ordinal;
+  }
+
+  void set_sub_ordinal(uint32_t sub_ordinal) { sub_ordinal_ = sub_ordinal; }
 };
 
 }  // namespace fidl

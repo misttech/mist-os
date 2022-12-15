@@ -100,6 +100,7 @@ class Reporter {
   const std::vector<std::unique_ptr<Diagnostic>>& errors() const { return errors_; }
   const std::vector<std::unique_ptr<Diagnostic>>& warnings() const { return warnings_; }
   void set_warnings_as_errors(bool value) { warnings_as_errors_ = value; }
+  bool silence_fixables() const { return silence_fixables_; }
   void set_silence_fixables(bool value) { silence_fixables_ = value; }
 
   // Formats a diagnostic message for the command line, displaying the filename,

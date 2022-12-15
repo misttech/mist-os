@@ -89,9 +89,13 @@ class TokenChain {
 
   void set_start(Token token) { start_ = token; }
 
+  Token& start() { return start_; }
+
   const Token& start() const { return start_; }
 
   void set_end(Token token) { end_ = token; }
+
+  Token& end() { return end_; }
 
   const Token& end() const { return end_; }
 

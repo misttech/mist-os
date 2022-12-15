@@ -48,6 +48,7 @@ source_set("fidl") {
     "lib/linting_tree_callbacks.cc",
     "lib/names.cc",
     "lib/ordinals.cc",
+    "lib/parsed_transformer.cc",
     "lib/parser.cc",
     "lib/raw_ast.cc",
     "lib/reporter.cc",

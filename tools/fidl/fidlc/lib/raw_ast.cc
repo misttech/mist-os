@@ -303,6 +303,7 @@ void NamedLayoutReference::Accept(TreeVisitor* visitor) const {
 }
 
 void TypeConstraints::Accept(TreeVisitor* visitor) const {
+  SourceElementMark sem(visitor, *this);
   for (auto& item : items) {
     visitor->OnConstant(item);
   }
@@ -320,6 +321,7 @@ void TypeConstructor::Accept(TreeVisitor* visitor) const {
 }
 
 void TypeDeclaration::Accept(TreeVisitor* visitor) const {
+  SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
     visitor->OnAttributeList(attributes);
   }

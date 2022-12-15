@@ -8,6 +8,7 @@
 #include "tools/fidl/fidlc/include/fidl/parser.h"
 #include "tools/fidl/fidlc/include/fidl/span_sequence.h"
 #include "tools/fidl/fidlc/include/fidl/span_sequence_tree_visitor.h"
+#include "tools/fidl/fidlc/include/fidl/token_list.h"
 
 namespace fidl::fmt {
 
@@ -17,15 +18,24 @@ std::optional<std::string> NewFormatter::Format(
   fidl::Parser parser(&lexer, reporter_, experimental_flags);
   std::unique_ptr<raw::File> ast = parser.Parse();
   if (parser.Success()) {
-    return Print(std::move(ast), source_file.data().size());
+    raw::TokenPointerList token_pointer_list = raw::TokenPointerListBuilder(ast).Build();
+    return Print(std::move(ast), std::move(token_pointer_list), source_file.data().size());
   }
   return std::nullopt;
 }
 
-std::string NewFormatter::Print(std::unique_ptr<raw::File> ast, size_t original_file_size) const {
+std::optional<std::string> NewFormatter::Format(std::unique_ptr<raw::File> ast,
+                                                fidl::raw::TokenPointerList token_pointer_list,
+                                                size_t original_file_size) const {
+  return Print(std::move(ast), std::move(token_pointer_list), original_file_size);
+}
+
+std::string NewFormatter::Print(std::unique_ptr<raw::File> ast,
+                                fidl::raw::TokenPointerList token_pointer_list,
+                                size_t original_file_size) const {
   std::string out;
-  auto visitor = SpanSequenceTreeVisitor(ast->span().source_file().data(),
-                                         raw::TokenPointerListBuilder(ast).Build());
+  auto visitor =
+      SpanSequenceTreeVisitor(ast->span().source_file().data(), std::move(token_pointer_list));
   visitor.OnFile(ast);
   MultilineSpanSequence result = visitor.Result();
 

@@ -378,6 +378,15 @@ class TestLibrary final : public SharedInterface {
     return *all_sources_.at(0);
   }
 
+  std::vector<const fidl::SourceFile*> source_files() const {
+    std::vector<const fidl::SourceFile*> out;
+    out.reserve(all_sources_.size());
+    for (const auto& source : all_sources_) {
+      out.push_back(source);
+    }
+    return out;
+  }
+
   fidl::SourceSpan source_span(size_t start, size_t size) const {
     ZX_ASSERT_MSG(all_sources_.size() == 1, "convenience method only possible with single source");
     std::string_view data = all_sources_.at(0)->data();
