@@ -68,6 +68,7 @@ rustc_binary("bin") {
     "src/watcher.rs",
   ]
   with_unit_tests = true
+  configs += [ "//build/config/rust:bootfs" ]
 }
 
 renamed_binary("fshost-rust") {
