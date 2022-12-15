@@ -188,6 +188,62 @@ impl<S: HandleOwner> Directory<S> {
         Ok(handle)
     }
 
+    /// Returns the link of a symlink object.
+    pub async fn read_symlink(&self, object_id: u64) -> Result<Option<String>, Error> {
+        trace_duration!("Directory::lookup");
+        if self.is_deleted() {
+            return Ok(None);
+        }
+        match self.store().tree().find(&ObjectKey::symlink(object_id)).await? {
+            None | Some(ObjectItem { value: ObjectValue::None, .. }) => Ok(None),
+            Some(ObjectItem { value: ObjectValue::Symlink { link }, .. }) => Ok(Some(link)),
+            Some(item) => Err(anyhow!(FxfsError::Inconsistent)
+                .context(format!("Unexpected item in lookup: {:?}", item))),
+        }
+    }
+
+    pub async fn add_symlink<'a>(
+        &self,
+        transaction: &mut Transaction<'a>,
+        link: &str,
+        name: &str,
+        symlink_id: u64,
+    ) -> Result<(), Error> {
+        ensure!(!self.is_deleted(), FxfsError::Deleted);
+        transaction.add(
+            self.store().store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::symlink(symlink_id),
+                ObjectValue::symlink(link),
+            ),
+        );
+        transaction.add(
+            self.store().store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::child(self.object_id, name),
+                ObjectValue::child(symlink_id, ObjectDescriptor::Symlink),
+            ),
+        );
+        self.update_attributes(transaction, None, Some(Timestamp::now()), |_| {}).await?;
+        Ok(())
+    }
+
+    pub async fn create_symlink<'a>(
+        &self,
+        transaction: &mut Transaction<'a>,
+        link: &str,
+        name: &str,
+    ) -> Result<u64, Error> {
+        ensure!(!self.is_deleted(), FxfsError::Deleted);
+        // Limit the length of link that might be too big to put in the tree.
+        // https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/limits.h.html.
+        // See _POSIX_SYMLINK_MAX.
+        ensure!(link.len() <= 256, FxfsError::BadPath);
+        let symlink_id = self.store().get_next_object_id().await?;
+        self.add_symlink(transaction, link, name, symlink_id).await?;
+        Ok(symlink_id)
+    }
+
     pub async fn add_child_volume<'a>(
         &self,
         transaction: &mut Transaction<'a>,
@@ -450,6 +506,13 @@ pub async fn replace_child<'a, S: HandleOwner>(
                 // Neither src nor dst exist
                 bail!(FxfsError::NotFound);
             }
+            ReplacedChild::None
+        }
+        Some((old_id, ObjectDescriptor::Symlink)) => {
+            transaction.add(
+                dst.0.store().store_object_id(),
+                Mutation::replace_or_insert_object(ObjectKey::symlink(old_id), ObjectValue::None),
+            );
             ReplacedChild::None
         }
     };
@@ -1182,5 +1245,106 @@ mod tests {
         let layer_set = dir.store().tree().layer_set();
         let mut merger = layer_set.merger();
         assert_access_denied(dir.iter(&mut merger).await.map(|_| {}));
+    }
+
+    #[fuchsia::test]
+    async fn test_create_symlink() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let symlink_id = {
+            let mut transaction = fs
+                .clone()
+                .new_transaction(&[], Options::default())
+                .await
+                .expect("new_transaction failed");
+            let dir =
+                Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+
+            let symlink_id = dir
+                .create_symlink(&mut transaction, "link", "foo")
+                .await
+                .expect("create_symlink failed");
+            transaction.commit().await.expect("commit failed");
+
+            fs.sync(SyncOptions::default()).await.expect("sync failed");
+            symlink_id
+        };
+        fs.close().await.expect("Close failed");
+        let device = fs.take_device().await;
+        device.reopen(false);
+        let fs = FxFilesystem::open(device).await.expect("open failed");
+        {
+            let mut transaction = fs
+                .clone()
+                .new_transaction(&[], Options::default())
+                .await
+                .expect("new_transaction failed");
+            let dir =
+                Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+            let (object_id, object_descriptor) =
+                dir.lookup("foo").await.expect("lookup failed").expect("not found");
+            assert_eq!(object_id, symlink_id);
+            assert_eq!(object_descriptor, ObjectDescriptor::Symlink);
+        }
+        fs.close().await.expect("Close failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_read_symlink() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(&[], Options::default())
+            .await
+            .expect("new_transaction failed");
+        let dir =
+            Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+
+        let symlink_id = dir
+            .create_symlink(&mut transaction, "link", "foo")
+            .await
+            .expect("create_symlink failed");
+        transaction.commit().await.expect("commit failed");
+
+        let link =
+            dir.read_symlink(symlink_id).await.expect("read_symlink failed").expect("not found");
+        assert_eq!(link, "link".to_owned());
+        fs.close().await.expect("Close failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_unlink_symlink() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(&[], Options::default())
+            .await
+            .expect("new_transaction failed");
+        let dir =
+            Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+
+        let symlink_id = dir
+            .create_symlink(&mut transaction, "link", "foo")
+            .await
+            .expect("create_symlink failed");
+        transaction.commit().await.expect("commit failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(&[], Options::default())
+            .await
+            .expect("new_transaction failed");
+        assert_matches!(
+            replace_child(&mut transaction, None, (&dir, "foo"))
+                .await
+                .expect("replace_child failed"),
+            ReplacedChild::None
+        );
+        transaction.commit().await.expect("commit failed");
+
+        assert_eq!(dir.lookup("foo").await.expect("lookup failed"), None);
+        assert_eq!(dir.read_symlink(symlink_id).await.expect("read_symlink failed"), None);
+        fs.close().await.expect("Close failed");
     }
 }

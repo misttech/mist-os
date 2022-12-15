@@ -404,6 +404,7 @@ impl<'a> ScannedStore<'a> {
                                         ))?;
                                     }
                                     ObjectDescriptor::Volume => unreachable!(),
+                                    ObjectDescriptor::Symlink => unimplemented!(),
                                 }
                                 parents.push(key.object_id);
                             }
@@ -419,6 +420,7 @@ impl<'a> ScannedStore<'a> {
                                     }
                                     ObjectDescriptor::Directory => {}
                                     ObjectDescriptor::Volume => unreachable!(),
+                                    ObjectDescriptor::Symlink => unimplemented!(),
                                 }
                                 if parent.is_some() {
                                     // TODO(fxbug.dev/87381): Accumulating and reporting all parents
@@ -467,6 +469,7 @@ impl<'a> ScannedStore<'a> {
                                         }
                                         ScannedObject::Etc(*child_id)
                                     }
+                                    ObjectDescriptor::Symlink => unimplemented!(),
                                 };
                                 self.objects.insert(*child_id, node);
                             }
@@ -572,6 +575,7 @@ impl<'a> ScannedStore<'a> {
                     }
                 }
             }
+            ObjectKeyData::Symlink { .. } => unimplemented!(),
             ObjectKeyData::GraveyardEntry { .. } => {}
         }
         Ok(())

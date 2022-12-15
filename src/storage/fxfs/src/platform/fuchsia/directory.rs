@@ -139,6 +139,7 @@ impl FxDirectory {
                     child_object_id = object_id;
                 }
                 ObjectDescriptor::Volume => bail!(FxfsError::Inconsistent),
+                ObjectDescriptor::Symlink => bail!(FxfsError::Inconsistent),
             }
         }
     }
@@ -194,6 +195,7 @@ impl FxDirectory {
                                 }
                             }
                             ObjectDescriptor::Volume => bail!(FxfsError::Inconsistent),
+                            ObjectDescriptor::Symlink => bail!(FxfsError::Inconsistent),
                         }
                     }
                     current_node = self
@@ -660,6 +662,7 @@ impl Directory for FxDirectory {
                 ObjectDescriptor::File => fio::DirentType::File,
                 ObjectDescriptor::Directory => fio::DirentType::Directory,
                 ObjectDescriptor::Volume => return Err(Status::IO_DATA_INTEGRITY),
+                ObjectDescriptor::Symlink => return Err(Status::IO_DATA_INTEGRITY),
             };
             let info = EntryInfo::new(object_id, entry_type);
             match sink.append(&info, name) {

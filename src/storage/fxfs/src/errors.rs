@@ -42,6 +42,8 @@ pub enum FxfsError {
     OutOfRange,
     #[error("Already bound")]
     AlreadyBound,
+    #[error("Bad path")]
+    BadPath,
 }
 
 impl FxfsError {

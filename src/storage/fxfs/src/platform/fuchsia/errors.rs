@@ -28,6 +28,7 @@ impl From<FxfsError> for Status {
             FxfsError::AccessDenied => Status::ACCESS_DENIED,
             FxfsError::OutOfRange => Status::OUT_OF_RANGE,
             FxfsError::AlreadyBound => Status::ALREADY_BOUND,
+            FxfsError::BadPath => Status::BAD_PATH,
         }
     }
 }

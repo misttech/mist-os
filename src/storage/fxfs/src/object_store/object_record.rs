@@ -26,6 +26,8 @@ pub enum ObjectDescriptor {
     Directory,
     /// A volume, which is the root of a distinct object store containing Files and Directories.
     Volume,
+    /// A symbolic link, which is only used for FUSE.
+    Symlink,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize, TypeHash)]
@@ -49,6 +51,8 @@ pub enum ObjectKeyData {
     /// Project ID usage info, where the is the associated id number. This should only be attached
     /// to the volume's root node.
     ProjectUsage { project_id: u64 },
+    /// A symlink of an object.
+    Symlink,
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize)]
@@ -124,6 +128,11 @@ impl ObjectKey {
     /// Creates an ObjectKey for a child.
     pub fn child(object_id: u64, name: &str) -> Self {
         Self { object_id, data: ObjectKeyData::Child { name: name.to_owned() } }
+    }
+
+    /// Creates an ObjectKey for a symlink.
+    pub fn symlink(object_id: u64) -> Self {
+        Self { object_id, data: ObjectKeyData::Symlink }
     }
 
     /// Creates a graveyard entry.
@@ -353,6 +362,9 @@ pub enum ObjectValue {
     Trim,
     /// Tracking a bytes and nodes pair. Added to support tracking Project ID usage and limits.
     BytesAndNodes { bytes: u64, nodes: u64 },
+    /// A symlink of an object. |object_id| is the ID of the target, |object_descriptor| describes
+    /// the target and |link| is the link path.
+    Symlink { link: String },
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
@@ -404,6 +416,11 @@ impl ObjectValue {
     /// Creates an ObjectValue for an object child.
     pub fn child(object_id: u64, object_descriptor: ObjectDescriptor) -> ObjectValue {
         ObjectValue::Child { object_id, object_descriptor }
+    }
+
+    /// Creates an ObjectValue for an object symlink.
+    pub fn symlink(link: impl Into<String>) -> ObjectValue {
+        ObjectValue::Symlink { link: link.into() }
     }
 }
 
