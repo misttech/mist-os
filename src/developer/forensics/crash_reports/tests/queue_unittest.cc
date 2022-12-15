@@ -773,8 +773,9 @@ TEST_F(QueueTest, PreventStrandedSnapshot) {
   GetSnapshotStore()->AddSnapshot(kSnapshotUuidValue, std::move(snapshot));
 
   ASSERT_TRUE(GetSnapshotStore()->SnapshotExists(kSnapshotUuidValue));
-  EXPECT_TRUE(
-      GetSnapshotStore()->MoveToPersistence(kSnapshotUuidValue, /*only_consider_tmp=*/false));
+
+  ASSERT_EQ(GetSnapshotStore()->MoveToPersistence(kSnapshotUuidValue, /*only_consider_tmp=*/false),
+            ItemLocation::kCache);
   ASSERT_EQ(GetSnapshotStore()->SnapshotLocation(kSnapshotUuidValue), ItemLocation::kCache);
 
   // Initial upload attempts + 15 minute retry.
@@ -819,8 +820,9 @@ TEST_F(QueueTest, PreventStrandedSnapshot_FailedMove) {
   GetSnapshotStore()->AddSnapshot(kSnapshotUuidValue, std::move(snapshot));
 
   ASSERT_TRUE(GetSnapshotStore()->SnapshotExists(kSnapshotUuidValue));
-  EXPECT_TRUE(
-      GetSnapshotStore()->MoveToPersistence(kSnapshotUuidValue, /*only_consider_tmp=*/false));
+
+  ASSERT_EQ(GetSnapshotStore()->MoveToPersistence(kSnapshotUuidValue, /*only_consider_tmp=*/false),
+            ItemLocation::kCache);
   ASSERT_EQ(GetSnapshotStore()->SnapshotLocation(kSnapshotUuidValue), ItemLocation::kCache);
 
   // Initial upload attempts + 15 minute retry.
@@ -869,8 +871,8 @@ TEST_F(QueueTest, Check_SnapshotClientsReloaded) {
   GetSnapshotStore()->AddSnapshot(kSnapshotUuidValue, std::move(snapshot));
   ASSERT_EQ(GetSnapshotStore()->SnapshotLocation(kSnapshotUuidValue), ItemLocation::kMemory);
 
-  EXPECT_TRUE(
-      GetSnapshotStore()->MoveToPersistence(kSnapshotUuidValue, /*only_consider_tmp=*/false));
+  ASSERT_EQ(GetSnapshotStore()->MoveToPersistence(kSnapshotUuidValue, /*only_consider_tmp=*/false),
+            ItemLocation::kCache);
   ASSERT_EQ(GetSnapshotStore()->SnapshotLocation(kSnapshotUuidValue), ItemLocation::kCache);
 
   // Verify report clients are reloaded by checking if the snapshot gets deleted prematurely.
@@ -913,8 +915,8 @@ TEST_F(QueueTest, Check_CleansUpStrandedSnapshotsInCache) {
 
   const SnapshotUuid kTestUuid = "test uuid";
   GetSnapshotStore()->AddSnapshot(kTestUuid, std::move(snapshot));
-  GetSnapshotStore()->MoveToPersistence(kTestUuid, /*only_consider_tmp=*/false);
-
+  ASSERT_EQ(GetSnapshotStore()->MoveToPersistence(kTestUuid, /*only_consider_tmp=*/false),
+            ItemLocation::kCache);
   ASSERT_EQ(GetSnapshotStore()->SnapshotLocation(kTestUuid), ItemLocation::kCache);
 
   // Queue should clean up stranded snapshots on construction.
@@ -939,8 +941,8 @@ TEST_F(QueueTest, Check_CleansUpStrandedSnapshotsInTmp) {
 
   const SnapshotUuid kTestUuid = "test uuid";
   GetSnapshotStore()->AddSnapshot(kTestUuid, std::move(snapshot));
-  GetSnapshotStore()->MoveToPersistence(kTestUuid, /*only_consider_tmp=*/true);
-
+  ASSERT_EQ(GetSnapshotStore()->MoveToPersistence(kTestUuid, /*only_consider_tmp=*/true),
+            ItemLocation::kTmp);
   ASSERT_EQ(GetSnapshotStore()->SnapshotLocation(kTestUuid), ItemLocation::kTmp);
 
   // Queue should clean up stranded snapshots on construction.

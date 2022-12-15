@@ -29,9 +29,10 @@ class SnapshotPersistence {
                       const std::optional<Root>& persistent_root);
 
   // Adds a snapshot to persistence. If |only_consider_tmp| is true, only /tmp will be
-  // considered as a possible storage location. Returns true if successful.
-  bool Add(const SnapshotUuid& uuid, const ManagedSnapshot::Archive& archive,
-           StorageSize archive_size, bool only_consider_tmp);
+  // considered as a possible storage location. Returns the location of the stored snapshot, if it
+  // was stored.
+  std::optional<ItemLocation> Add(const SnapshotUuid& uuid, const ManagedSnapshot::Archive& archive,
+                                  StorageSize archive_size, bool only_consider_tmp);
 
   // Returns true if a snapshot for |uuid| exists on disk.
   bool Contains(const SnapshotUuid& uuid);
@@ -57,9 +58,11 @@ class SnapshotPersistence {
   void DeleteAll();
 
  private:
-  // Adds a snapshot to persistence. Returns true if successful.
-  bool AddToRoot(const SnapshotUuid& uuid, const ManagedSnapshot::Archive& archive,
-                 StorageSize archive_size, SnapshotPersistenceMetadata& root);
+  // Adds a snapshot to persistence. Returns the location of the stored snapshot, if it was stored.
+  std::optional<ItemLocation> AddToRoot(const SnapshotUuid& uuid,
+                                        const ManagedSnapshot::Archive& archive,
+                                        StorageSize archive_size,
+                                        SnapshotPersistenceMetadata& root);
 
   // The root that the snapshot for |uuid| is stored under.
   SnapshotPersistenceMetadata& RootFor(const SnapshotUuid& uuid);

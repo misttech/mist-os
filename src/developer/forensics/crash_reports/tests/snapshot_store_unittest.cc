@@ -128,8 +128,8 @@ TEST_F(SnapshotStoreTest, Check_GetSnapshotFromPersistence) {
                      /*max_cache_size=*/StorageSize::Megabytes(1));
 
   snapshot_store_->AddSnapshot(kTestUuid, GetDefaultAttachment());
-  snapshot_store_->MoveToPersistence(kTestUuid, /*only_consider_tmp=*/false);
-
+  ASSERT_EQ(snapshot_store_->MoveToPersistence(kTestUuid, /*only_consider_tmp=*/false),
+            ItemLocation::kCache);
   ASSERT_EQ(snapshot_store_->SnapshotLocation(kTestUuid), ItemLocation::kCache);
 
   auto snapshot = AsManaged(snapshot_store_->GetSnapshot(kTestUuid));
@@ -194,7 +194,8 @@ TEST_F(SnapshotStoreTest, Check_DeleteAll) {
                      /*max_cache_size=*/StorageSize::Megabytes(1));
 
   AddDefaultSnapshot();
-  snapshot_store_->MoveToPersistence(kTestUuid, /*only_consider_tmp=*/false);
+  ASSERT_EQ(snapshot_store_->MoveToPersistence(kTestUuid, /*only_consider_tmp=*/false),
+            ItemLocation::kCache);
 
   const SnapshotUuid kTestUuid2 = kTestUuid + "2";
   AddDefaultSnapshot(kTestUuid2);
@@ -338,7 +339,8 @@ TEST_F(SnapshotStoreTest, Check_MoveToPersistence) {
 
   EXPECT_EQ(snapshot_store_->SnapshotLocation(kTestUuid), ItemLocation::kMemory);
 
-  snapshot_store_->MoveToPersistence(kTestUuid, /*only_consider_tmp=*/false);
+  ASSERT_EQ(snapshot_store_->MoveToPersistence(kTestUuid, /*only_consider_tmp=*/false),
+            ItemLocation::kCache);
 
   ASSERT_EQ(snapshot_store_->SnapshotLocation(kTestUuid), ItemLocation::kCache);
 

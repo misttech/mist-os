@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "src/developer/forensics/crash_reports/constants.h"
+#include "src/developer/forensics/crash_reports/item_location.h"
 #include "src/developer/forensics/crash_reports/snapshot.h"
 #include "src/developer/forensics/feedback/annotations/constants.h"
 
@@ -185,12 +186,16 @@ void SnapshotStore::EnforceSizeLimits(const SnapshotUuid& uuid) {
   }
 }
 
-bool SnapshotStore::MoveToPersistence(const SnapshotUuid& uuid, const bool only_consider_tmp) {
+ItemLocation SnapshotStore::MoveToPersistence(const SnapshotUuid& uuid,
+                                              const bool only_consider_tmp) {
   auto* data = FindSnapshotData(uuid);
   FX_CHECK(data);
 
-  if (!persistence_.Add(uuid, *data->archive, data->archive_size, only_consider_tmp)) {
-    return false;
+  const auto location =
+      persistence_.Add(uuid, *data->archive, data->archive_size, only_consider_tmp);
+
+  if (!location.has_value()) {
+    return ItemLocation::kMemory;
   }
 
   // Snapshot successfully moved to disk; no longer needed in memory.
@@ -198,7 +203,7 @@ bool SnapshotStore::MoveToPersistence(const SnapshotUuid& uuid, const bool only_
                          insertion_order_.end());
   DropArchive(data);
   data_.erase(uuid);
-  return true;
+  return *location;
 }
 
 void SnapshotStore::MoveToTmp(const SnapshotUuid& uuid) { return persistence_.MoveToTmp(uuid); }

@@ -201,13 +201,25 @@ bool ReportStore::Add(Report report, std::vector<ReportId>* garbage_collected_re
   const auto report_location = AddToRoot(report.Id(), report.ProgramShortname(), report_size,
                                          attachments, root_metadata, garbage_collected_reports);
 
-  const auto snapshot_location = snapshot_store_.SnapshotLocation(report.SnapshotUuid());
+  auto snapshot_location = snapshot_store_.SnapshotLocation(report.SnapshotUuid());
   if (report_location.has_value() && snapshot_location == ItemLocation::kMemory) {
     // Moving the associated snapshot to persistence for the first time - do not put the snapshot in
     // /cache if the report was put in /tmp. Doing so could cause a stranded snapshot if the
     // device were to reboot.
     const bool only_consider_tmp = report_location == ItemLocation::kTmp;
-    snapshot_store_.MoveToPersistence(report.SnapshotUuid(), only_consider_tmp);
+    snapshot_location = snapshot_store_.MoveToPersistence(report.SnapshotUuid(), only_consider_tmp);
+  }
+
+  if (report_location.has_value()) {
+    FX_LOGST(INFO, tags_->Get(report.Id()))
+        << "Successfully moved report to " << ToString(*report_location);
+  }
+
+  if (snapshot_location.has_value()) {
+    FX_LOGST(INFO, tags_->Get(report.Id()))
+        << "Associated snapshot is in " << ToString(*snapshot_location);
+  } else {
+    FX_LOGST(INFO, tags_->Get(report.Id())) << "Associated snapshot is not available";
   }
 
   return report_location.has_value();

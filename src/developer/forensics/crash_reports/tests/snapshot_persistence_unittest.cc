@@ -96,7 +96,7 @@ class SnapshotPersistenceTest : public UnitTestFixture {
     auto archive_size = StorageSize::Bytes(archive.key.size());
     archive_size += StorageSize::Bytes(archive.value.size());
 
-    return persistence_->Add(uuid, archive, archive_size, /*only_consider_tmp=*/false);
+    return persistence_->Add(uuid, archive, archive_size, /*only_consider_tmp=*/false).has_value();
   }
 
   std::unique_ptr<SnapshotPersistence> persistence_;

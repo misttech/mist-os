@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include "src/developer/forensics/crash_reports/item_location.h"
 #include "src/developer/forensics/crash_reports/snapshot.h"
 #include "src/developer/forensics/crash_reports/snapshot_persistence_metadata.h"
 #include "src/developer/forensics/utils/sized_data.h"
@@ -94,10 +95,12 @@ SnapshotPersistence::SnapshotPersistence(const std::optional<Root>& temp_root,
   }
 }
 
-bool SnapshotPersistence::Add(const SnapshotUuid& uuid, const ManagedSnapshot::Archive& archive,
-                              StorageSize archive_size, const bool only_consider_tmp) {
+std::optional<ItemLocation> SnapshotPersistence::Add(const SnapshotUuid& uuid,
+                                                     const ManagedSnapshot::Archive& archive,
+                                                     StorageSize archive_size,
+                                                     const bool only_consider_tmp) {
   if (!SnapshotPersistenceEnabled()) {
-    return false;
+    return std::nullopt;
   }
 
   FX_CHECK(!Contains(uuid)) << "Duplicate snapshot uuid '" << uuid << "' added to persistence";
@@ -106,24 +109,26 @@ bool SnapshotPersistence::Add(const SnapshotUuid& uuid, const ManagedSnapshot::A
 
   if (root_metadata == nullptr) {
     FX_LOGS(ERROR) << "Failed to add snapshot to persistence; snapshot storage limits reached";
-    return false;
+    return std::nullopt;
   }
 
   return AddToRoot(uuid, archive, archive_size, *root_metadata);
 }
 
-bool SnapshotPersistence::AddToRoot(const SnapshotUuid& uuid,
-                                    const ManagedSnapshot::Archive& archive,
-                                    StorageSize archive_size, SnapshotPersistenceMetadata& root) {
+std::optional<ItemLocation> SnapshotPersistence::AddToRoot(const SnapshotUuid& uuid,
+                                                           const ManagedSnapshot::Archive& archive,
+                                                           StorageSize archive_size,
+                                                           SnapshotPersistenceMetadata& root) {
   // Delete the persisted files and attempt to store the report under a new directory.
-  auto on_error = [this, &uuid, &archive, archive_size,
-                   &root](const std::optional<std::string>& snapshot_dir) {
+  auto on_error =
+      [this, &uuid, &archive, archive_size,
+       &root](const std::optional<std::string>& snapshot_dir) -> std::optional<ItemLocation> {
     if (snapshot_dir.has_value()) {
       DeletePath(*snapshot_dir);
     }
 
     if (!HasFallbackRoot(root)) {
-      return false;
+      return std::nullopt;
     }
 
     auto& fallback_root = FallbackRoot(root);
@@ -153,7 +158,8 @@ bool SnapshotPersistence::AddToRoot(const SnapshotUuid& uuid,
 
   root.Add(uuid, archive_size, archive.key);
 
-  return true;
+  return cache_metadata_.has_value() && &cache_metadata_.value() == &root ? ItemLocation::kCache
+                                                                          : ItemLocation::kTmp;
 }
 
 void SnapshotPersistence::MoveToTmp(const SnapshotUuid& uuid) {

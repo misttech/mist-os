@@ -128,6 +128,13 @@ source_set("errors") {
   ]
 }
 
+source_set("item_location") {
+  sources = [
+    "item_location.cc",
+    "item_location.h",
+  ]
+}
+
 source_set("log_tags") {
   sources = [
     "log_tags.cc",
@@ -341,6 +348,7 @@ source_set("store") {
 
   public_deps = [
     ":annotation_map",
+    ":item_location",
     ":log_tags",
     ":report",
     ":report_id",
