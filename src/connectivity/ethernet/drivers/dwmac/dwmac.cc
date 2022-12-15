@@ -100,7 +100,18 @@ int DWMacDevice::WorkerThread() {
     DdkAsyncRemove();
     return ZX_ERR_NO_MEMORY;
   }
-  auto status = phy_function->DdkAdd("Designware-MAC");
+
+  auto args = ddk::DeviceAddArgs("Designware-MAC");
+  static constexpr zx_device_str_prop_t str_props[] = {
+      zx_device_str_prop_t{
+          .key = "fuchsia.ethernet.NETDEVICE_MIGRATION",
+          .property_value = str_prop_bool_val(true),
+      },
+  };
+
+  args.set_str_props(cpp20::span<const zx_device_str_prop_t>(str_props));
+
+  auto status = phy_function->DdkAdd(args);
   if (status != ZX_OK) {
     zxlogf(ERROR, "dwmac: Could not create eth device: %d", status);
     DdkAsyncRemove();
@@ -548,7 +559,7 @@ void DWMacDevice::ProcRxBuffer(uint32_t int_status) {
         ethernet_client_.Recv(temptr, fr_len, 0);
 
       } else {
-        zxlogf(ERROR, "Dropping bad packet");
+        zxlogf(TRACE, "System not ready to receive");
       }
     };
 

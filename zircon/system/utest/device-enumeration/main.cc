@@ -276,7 +276,9 @@ TEST_F(DeviceEnumerationTest, Av400Test) {
       "sys/platform/05:00:19/spi-1/aml-spi-1/spi/spi-1-0",
       "sys/platform/05:07:1d/aml-pwm-device/pwm-6/pwm-init",
       "sys/platform/05:07:9/ethernet_mac/aml-ethernet/dwmac/dwmac/eth_phy/phy_null_device",
-      "sys/platform/05:07:9/ethernet_mac/aml-ethernet/dwmac/dwmac/Designware-MAC/ethernet",
+      // TODO(https://fxbug.dev/117539): Update topopath when dwmac is off
+      // netdevice migration.
+      "sys/platform/05:07:9/ethernet_mac/aml-ethernet/dwmac/dwmac/Designware-MAC/netdevice-migration/network-device",
       "sys/platform/05:07:9/ethernet_mac/aml-ethernet",
       "sys/platform/05:07:2e/aml-rtc",
       "sys/platform/05:07:12:1/av400-i2s-audio-out",
@@ -345,7 +347,9 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:00:2/aml-i2c",
       "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-81/rtc",
       "sys/platform/05:06:9/ethernet_mac/aml-ethernet/dwmac/dwmac/eth_phy/phy_null_device",
-      "sys/platform/05:06:9/ethernet_mac/aml-ethernet/dwmac/dwmac/Designware-MAC/ethernet",
+      // TODO(https://fxbug.dev/117539): Update topopath when dwmac is off
+      // netdevice migration.
+      "sys/platform/05:06:9/ethernet_mac/aml-ethernet/dwmac/dwmac/Designware-MAC/netdevice-migration/network-device",
       "sys/platform/05:06:9/ethernet_mac/aml-ethernet",
       "sys/platform/05:00:7/aml_sd/aml-sd-emmc",
       "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
