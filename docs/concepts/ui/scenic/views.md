@@ -27,7 +27,7 @@ called a Viewport; this Viewport is intrinsically linked to a given View which i
 
 The hosted View can be, and often is, owned by another UI client in a different component.
 
-## View Tree
+## View Tree {#view-tree}
 
 Using Views and Viewports UI clients can collaborate to build a global, distributed tree of
 content for Scenic to dispatch for rendering and query for hit testing.

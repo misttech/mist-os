@@ -16,6 +16,9 @@ toc:
     path: /docs/concepts/ui/scenic/index.md
   - title: "Flatland"
     path: /docs/concepts/ui/scenic/flatland/index.md
+    section:
+    - title: "Flatland timeline"
+      path: /docs/concepts/ui/scenic/flatland/timeline.md
   - title: "Gfx"
     section:
     - include: /docs/concepts/ui/scenic/gfx/_toc.yaml
