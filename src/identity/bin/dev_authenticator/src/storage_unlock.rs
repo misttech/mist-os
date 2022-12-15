@@ -69,9 +69,9 @@ impl StorageUnlockMechanism {
     }
 
     /// Returns the time in the clock object, or None if time has not yet started.
-    fn read_clock(&self) -> Option<i64> {
+    fn read_clock(&self) -> Option<zx::Time> {
         match (self.clock.read(), self.clock.get_details()) {
-            (Ok(time), Ok(details)) if time > details.backstop => Some(time.into_nanos()),
+            (Ok(time), Ok(details)) if time > details.backstop => Some(time),
             _ => None,
         }
     }
@@ -139,7 +139,7 @@ impl StorageUnlockMechanism {
         let Enrollment { id, .. } = enrollment;
 
         Ok(AttemptedEvent {
-            timestamp: self.read_clock(),
+            timestamp: self.read_clock().map(|time| time.into_nanos()),
             enrollment_id: Some(id),
             updated_enrollment_data: None,
             prekey_material: Some(prekey_material),
