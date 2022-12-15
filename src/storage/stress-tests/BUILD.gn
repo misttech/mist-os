@@ -3,19 +3,23 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/rust/rustc_binary.gni")
-import("//build/rust/rustc_library.gni")
 
 fuchsia_component("minfs-crash") {
   testonly = true
   manifest = "minfs/meta/crash.cml"
-  deps = [ "genericfs:stressor-bin" ]
+  deps = [
+    "genericfs:stressor-bin",
+    "//src/storage/bin/minfs:minfs-component",
+  ]
 }
 
 fuchsia_component("minfs-no-crash") {
   testonly = true
   manifest = "minfs/meta/no-crash.cml"
-  deps = [ "genericfs:stressor-bin" ]
+  deps = [
+    "genericfs:stressor-bin",
+    "//src/storage/bin/minfs:minfs-component",
+  ]
 }
 
 fuchsia_component("fxfs-crash") {
@@ -59,13 +63,19 @@ fuchsia_component("f2fs-no-crash") {
 fuchsia_component("blobfs-crash") {
   testonly = true
   manifest = "blobfs/meta/crash.cml"
-  deps = [ "blobfs:stressor-bin" ]
+  deps = [
+    "blobfs:stressor-bin",
+    "//src/storage/bin/blobfs:blobfs-component",
+  ]
 }
 
 fuchsia_component("blobfs-no-crash") {
   testonly = true
   manifest = "blobfs/meta/no-crash.cml"
-  deps = [ "blobfs:stressor-bin" ]
+  deps = [
+    "blobfs:stressor-bin",
+    "//src/storage/bin/blobfs:blobfs-component",
+  ]
 }
 
 fuchsia_component("fvm-no-crash") {
@@ -83,7 +93,10 @@ fuchsia_component("fvm-crash") {
 fuchsia_component("blobfs-short") {
   testonly = true
   manifest = "blobfs/meta/short.cml"
-  deps = [ "blobfs:stressor-bin" ]
+  deps = [
+    "blobfs:stressor-bin",
+    "//src/storage/bin/blobfs:blobfs-component",
+  ]
 }
 
 fuchsia_component("fvm-short") {
@@ -95,7 +108,10 @@ fuchsia_component("fvm-short") {
 fuchsia_component("minfs-short") {
   testonly = true
   manifest = "minfs/meta/short.cml"
-  deps = [ "genericfs:stressor-bin" ]
+  deps = [
+    "genericfs:stressor-bin",
+    "//src/storage/bin/minfs:minfs-component",
+  ]
 }
 
 fuchsia_component("fxfs-short") {
@@ -133,11 +149,7 @@ fuchsia_test_package("storage-stress-tests") {
     ":f2fs-crash",
     ":f2fs-no-crash",
   ]
-  deps = [
-    "//src/storage/bin/f2fs",
-    "//src/storage/bin/minfs:minfs-component",
-    "//src/storage/testing:storage_driver_test_realm",
-  ]
+  deps = [ "//src/storage/testing:storage_driver_test_realm" ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
@@ -163,11 +175,7 @@ fuchsia_test_package("storage-stress-tests-short") {
     ":fxfs-short",
     ":f2fs-short",
   ]
-  deps = [
-    "//src/storage/bin/f2fs",
-    "//src/storage/bin/minfs:minfs-component",
-    "//src/storage/testing:storage_driver_test_realm",
-  ]
+  deps = [ "//src/storage/testing:storage_driver_test_realm" ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"

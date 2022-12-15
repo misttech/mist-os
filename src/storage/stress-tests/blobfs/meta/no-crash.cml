@@ -16,8 +16,4 @@
             "21600",
         ],
     },
-    use: [
-        // Used to start filesystem processes
-        { protocol: "fuchsia.process.Launcher" },
-    ],
 }
