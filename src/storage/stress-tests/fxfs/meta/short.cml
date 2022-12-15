@@ -4,6 +4,7 @@
 {
     include: [
         "//src/storage/stress-tests/fxfs/meta/fxfs.shard.cml",
+        "//src/storage/testing/driver_test_realm/meta/client.shard.cml",
         "//src/sys/test_runners/rust/default.shard.cml",
         "syslog/client.shard.cml",
     ],
@@ -25,29 +26,4 @@
             "fxfs",
         ],
     },
-    children: [
-        {
-            name: "driver-test-realm",
-            url: "#meta/storage_driver_test_realm.cm",
-            startup: "eager",
-        },
-    ],
-    use: [
-        {
-            directory: "dev",
-            from: "#driver-test-realm",
-            rights: [ "rw*" ],
-            path: "/dev",
-        },
-    ],
-    offer: [
-        {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.process.Launcher",
-            ],
-            from: "parent",
-            to: [ "#driver-test-realm" ],
-        },
-    ],
 }
