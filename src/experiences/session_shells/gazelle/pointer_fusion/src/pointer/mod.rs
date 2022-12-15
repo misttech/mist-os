@@ -88,14 +88,12 @@ impl PointerFusionState {
                     }
                 }
                 Phase::Add => {
-                    assert!(!self.pointer_states.contains_key(&event.device_id));
                     let state = PointerState::from_event(&event);
                     self.pointer_states.insert(event.device_id, state);
 
                     converted_pointers.push(event);
                 }
                 Phase::Remove => {
-                    assert!(self.pointer_states.contains_key(&event.device_id));
                     if let Some(state) = self.pointer_states.get_mut(&event.device_id) {
                         // Synthesize a Cancel event if pointer is down.
                         if state.is_down {
