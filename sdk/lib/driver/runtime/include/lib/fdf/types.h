@@ -44,6 +44,8 @@ typedef struct fdf_channel_call_args {
 // Cannot be set in conjunction with `FDF_DISPATCHER_OPTION_UNSYNCHRONIZED`.
 #define FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS ((uint32_t)1u << 1)
 
+#define FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK ((uint32_t)1u << 0)
+
 __END_CDECLS
 
 #endif  // LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_TYPES_H_

@@ -11,6 +11,7 @@
 #include <lib/fit/function.h>
 #include <lib/stdcompat/string_view.h>
 #include <lib/zx/result.h>
+#include <zircon/assert.h>
 
 #include <string>
 
@@ -74,8 +75,8 @@ class Dispatcher {
   // zircon threads with the dispatcher.
   //
   // |shutdown_handler| will be called after |ShutdownAsync| has been called, and the dispatcher
-  // has completed its asynchronous shutdown. The client is responsible for retaining this
-  // structure in memory (and unmodified) until the handler runs.
+  // has completed its asynchronous shutdown. The client must keep any pointers that are
+  // referenced in |shutdown_handler| alive until the handler runs.
   //
   // # Thread requirements
   //
@@ -189,7 +190,7 @@ class Dispatcher {
 
   Unowned<Dispatcher> borrow() const { return Unowned<Dispatcher>(dispatcher_); }
 
- private:
+ protected:
   // Friend declaration is needed because the |DispatcherShutdownContext| is private.
   friend class fdf_env::DispatcherBuilder;
 
@@ -217,7 +218,139 @@ class Dispatcher {
   fdf_dispatcher_t* dispatcher_;
 };
 
+// Dispatcher that disallows parallel calls into callbacks.
+class SynchronizedDispatcher : public Dispatcher {
+ public:
+  // Creates a dispatcher for performing asynchronous operations.
+  //
+  // |options| provides the dispatcher configuration. The following options are supported:
+  //   * `FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS` - blocking calls may be made on this dispatcher.
+  //
+  // |name| is reported via diagnostics. It is similar to setting the name of a thread. Names longer
+  // than `ZX_MAX_NAME_LEN` may be truncated.
+  //
+  // |scheduler_role| is a hint. It may or not impact the priority the work scheduler against the
+  // dispatcher is handled at. It may or may not impact the ability for other drivers to share
+  // zircon threads with the dispatcher.
+  //
+  // |shutdown_handler| will be called after |ShutdownAsync| has been called, and the dispatcher
+  // has completed its asynchronous shutdown. The client must keep any pointers that are
+  // referenced in |shutdown_handler| alive until the handler runs.
+  //
+  // # Thread requirements
+  //
+  // This must be called from a thread managed by the driver runtime.
+  //
+  // # Errors
+  //
+  // ZX_ERR_INVALID_ARGS: This was not called from a thread managed by the driver runtime.
+  //
+  // ZX_ERR_BAD_STATE: Dispatchers are currently not allowed to be created, such as when a driver
+  // is being shutdown by its driver host.
+  static zx::result<SynchronizedDispatcher> Create(uint32_t options, cpp17::string_view name,
+                                                   ShutdownHandler shutdown_handler,
+                                                   cpp17::string_view scheduler_role = {}) {
+    options &= (~FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK);
+    // We need to create an additional shutdown context in addition to the fdf::Dispatcher
+    // object, as the fdf::SynchronizedDispatcher may be destructed before the shutdown handler
+    // is called. This can happen if the raw pointer is released from the
+    // fdf::SynchronizedDispatcher.
+    auto dispatcher_shutdown_context =
+        std::make_unique<DispatcherShutdownContext>(std::move(shutdown_handler));
+    fdf_dispatcher_t* dispatcher;
+    zx_status_t status =
+        fdf_dispatcher_create(FDF_DISPATCHER_OPTION_SYNCHRONIZED | options, name.data(),
+                              name.size(), scheduler_role.data(), scheduler_role.size(),
+                              dispatcher_shutdown_context->observer(), &dispatcher);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    dispatcher_shutdown_context.release();
+    return zx::ok(SynchronizedDispatcher(dispatcher));
+  }
+
+  explicit SynchronizedDispatcher(fdf_dispatcher_t* dispatcher = nullptr) : Dispatcher(dispatcher) {
+    if (dispatcher) {
+      ZX_ASSERT((fdf_dispatcher_get_options(dispatcher) &
+                 FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK) == FDF_DISPATCHER_OPTION_SYNCHRONIZED);
+    }
+  }
+
+  Unowned<SynchronizedDispatcher> borrow() const {
+    return Unowned<SynchronizedDispatcher>(dispatcher_);
+  }
+};
+
+// Dispatcher that allows parallel calls into callbacks.
+class UnsynchronizedDispatcher : public Dispatcher {
+ public:
+  // Creates a dispatcher for performing asynchronous operations.
+  //
+  // |options| provides the dispatcher configuration. Currently no options are supported.
+  //
+  // |name| is reported via diagnostics. It is similar to setting the name of a thread. Names longer
+  // than `ZX_MAX_NAME_LEN` may be truncated.
+  //
+  // |scheduler_role| is a hint. It may or not impact the priority the work scheduler against the
+  // dispatcher is handled at. It may or may not impact the ability for other drivers to share
+  // zircon threads with the dispatcher.
+  //
+  // |shutdown_handler| will be called after |ShutdownAsync| has been called, and the dispatcher
+  // has completed its asynchronous shutdown. The client must keep any pointers that are
+  // referenced in |shutdown_handler| alive until the handler runs.
+  //
+  // # Thread requirements
+  //
+  // This must be called from a thread managed by the driver runtime.
+  //
+  // # Errors
+  //
+  // ZX_ERR_NOT_SUPPORTED: |options| is not a supported configuration, which is any of:
+  //   * `FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS`.
+  //
+  // ZX_ERR_INVALID_ARGS: This was not called from a thread managed by the driver runtime.
+  //
+  // ZX_ERR_BAD_STATE: Dispatchers are currently not allowed to be created, such as when a driver
+  // is being shutdown by its driver host.
+  static zx::result<UnsynchronizedDispatcher> Create(uint32_t options, cpp17::string_view name,
+                                                     ShutdownHandler shutdown_handler,
+                                                     cpp17::string_view scheduler_role = {}) {
+    options &= (~FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK);
+    // We need to create an additional shutdown context in addition to the fdf::Dispatcher
+    // object, as the fdf::UnsynchronizedDispatcher may be destructed before the shutdown handler
+    // is called. This can happen if the raw pointer is released from the
+    // fdf::UnsynchronizedDispatcher.
+    auto dispatcher_shutdown_context =
+        std::make_unique<DispatcherShutdownContext>(std::move(shutdown_handler));
+    fdf_dispatcher_t* dispatcher;
+    zx_status_t status =
+        fdf_dispatcher_create(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED | options, name.data(),
+                              name.size(), scheduler_role.data(), scheduler_role.size(),
+                              dispatcher_shutdown_context->observer(), &dispatcher);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    dispatcher_shutdown_context.release();
+    return zx::ok(UnsynchronizedDispatcher(dispatcher));
+  }
+
+  explicit UnsynchronizedDispatcher(fdf_dispatcher_t* dispatcher = nullptr)
+      : Dispatcher(dispatcher) {
+    if (dispatcher) {
+      ZX_ASSERT(
+          (fdf_dispatcher_get_options(dispatcher) & FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK) ==
+          FDF_DISPATCHER_OPTION_UNSYNCHRONIZED);
+    }
+  }
+
+  Unowned<UnsynchronizedDispatcher> borrow() const {
+    return Unowned<UnsynchronizedDispatcher>(dispatcher_);
+  }
+};
+
 using UnownedDispatcher = Unowned<Dispatcher>;
+using UnownedSynchronizedDispatcher = Unowned<SynchronizedDispatcher>;
+using UnownedUnsynchronizedDispatcher = Unowned<UnsynchronizedDispatcher>;
 
 }  // namespace fdf
 

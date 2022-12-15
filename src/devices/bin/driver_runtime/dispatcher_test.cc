@@ -3127,3 +3127,58 @@ TEST_F(DispatcherTest, OutgoingDirectoryDestructionOnShutdown) {
 
   ASSERT_OK(shutdown.Wait());
 }
+
+TEST_F(DispatcherTest, SynchronizedDispatcherWrapper) {
+  auto fake_driver = CreateFakeDriver();
+  driver_context::PushDriver(fake_driver);
+  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+
+  {
+    libsync::Completion completion;
+    auto destructed_handler = [&](fdf_dispatcher_t* dispatcher) { completion.Signal(); };
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(0, "", destructed_handler);
+    ASSERT_FALSE(dispatcher.is_error());
+    auto options = dispatcher->options();
+    ASSERT_TRUE(options.has_value());
+    ASSERT_EQ(*options, FDF_DISPATCHER_OPTION_SYNCHRONIZED);
+
+    fdf::SynchronizedDispatcher dispatcher2 = *std::move(dispatcher);
+    dispatcher2.ShutdownAsync();
+    ASSERT_OK(completion.Wait());
+  }
+  {
+    libsync::Completion completion;
+    auto destructed_handler = [&](fdf_dispatcher_t* dispatcher) { completion.Signal(); };
+    auto blocking_dispatcher = fdf::SynchronizedDispatcher::Create(
+        FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, "", destructed_handler);
+    ASSERT_FALSE(blocking_dispatcher.is_error());
+    auto options = blocking_dispatcher->options();
+    ASSERT_TRUE(options.has_value());
+    ASSERT_EQ(*options,
+              FDF_DISPATCHER_OPTION_SYNCHRONIZED | FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS);
+    blocking_dispatcher->ShutdownAsync();
+    ASSERT_OK(completion.Wait());
+  }
+  // Reset the number of threads to 1.
+  driver_runtime::GetDispatcherCoordinator().Reset();
+}
+
+TEST_F(DispatcherTest, UnsynchronizedDispatcherWrapper) {
+  auto fake_driver = CreateFakeDriver();
+  driver_context::PushDriver(fake_driver);
+  auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+
+  {
+    libsync::Completion completion;
+    auto destructed_handler = [&](fdf_dispatcher_t* dispatcher) { completion.Signal(); };
+    auto dispatcher = fdf::UnsynchronizedDispatcher::Create(0, "", destructed_handler);
+    ASSERT_FALSE(dispatcher.is_error());
+    auto options = dispatcher->options();
+    ASSERT_TRUE(options.has_value());
+    ASSERT_EQ(*options, FDF_DISPATCHER_OPTION_UNSYNCHRONIZED);
+
+    fdf::UnsynchronizedDispatcher dispatcher2 = *std::move(dispatcher);
+    dispatcher2.ShutdownAsync();
+    ASSERT_OK(completion.Wait());
+  }
+}
