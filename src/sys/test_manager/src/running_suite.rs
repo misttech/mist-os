@@ -367,7 +367,7 @@ impl RunningSuite {
 
     /// Mark the resources associated with the suite for destruction, then wait for destruction to
     /// complete. Returns an error only if destruction fails.
-    pub(crate) async fn destroy(mut self) -> Result<(), Error> {
+    pub(crate) async fn destroy(self) -> Result<(), Error> {
         // TODO(fxbug.dev/92769) Remove timeout once component manager hangs are removed.
         // This value is set to be slightly longer than the shutdown timeout for tests (30 sec).
         const TEARDOWN_TIMEOUT: zx::Duration = zx::Duration::from_seconds(32);
@@ -410,8 +410,6 @@ impl RunningSuite {
             .await?
             .map_err(|e| format_err!("call to destroy test failed: {:?}", e))?;
 
-        let destroy_waiter = self.instance.root.take_destroy_waiter();
-        drop(self.instance);
         #[derive(Debug, Error)]
         enum TeardownError {
             #[error("timeout")]
@@ -434,7 +432,7 @@ impl RunningSuite {
                     Err(TeardownError::Timeout)
                 },
             ),
-            destroy_waiter.map_err(|e| TeardownError::Other(e)).on_timeout(
+            self.instance.destroy().map_err(|e| TeardownError::Other(e.into())).on_timeout(
                 TEARDOWN_TIMEOUT,
                 || {
                     // This log is detected in triage. Update the config in
