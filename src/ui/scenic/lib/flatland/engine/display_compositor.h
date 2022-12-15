@@ -12,7 +12,6 @@
 #include <memory>
 #include <unordered_map>
 
-#include "src/lib/fxl/memory/weak_ptr.h"
 #include "src/lib/fxl/synchronization/thread_annotations.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/display/display.h"
@@ -20,6 +19,7 @@
 #include "src/ui/scenic/lib/flatland/engine/color_conversion_state_machine.h"
 #include "src/ui/scenic/lib/flatland/engine/engine_types.h"
 #include "src/ui/scenic/lib/flatland/engine/release_fence_manager.h"
+#include "src/ui/scenic/lib/flatland/renderer/renderer.h"
 
 namespace flatland {
 
@@ -47,14 +47,6 @@ using allocation::BufferCollectionUsage;
 class DisplayCompositor final : public allocation::BufferCollectionImporter,
                                 public std::enable_shared_from_this<DisplayCompositor> {
  public:
-#ifdef FLATLAND_DISABLE_DISPLAY_COMPOSITION
-  // Uses the GPU/Vulkan compositor by default, instead of attempting to composite using the display
-  // controller.
-  constexpr static bool kDisableDisplayComposition = true;
-#else
-  constexpr static bool kDisableDisplayComposition = false;
-#endif
-
   // TODO(fxbug.dev/66807): The DisplayCompositor has multiple parts of its code where usage of the
   // display controller is protected by locks, because of the multithreaded environment of flatland.
   // Ideally, we'd want the DisplayCompositor to have sole ownership of the display controller -
@@ -67,7 +59,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
       async_dispatcher_t* main_dispatcher,
       std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr> display_controller,
       const std::shared_ptr<Renderer>& renderer, fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
-      BufferCollectionImportMode import_mode);
+      bool disable_display_composition);
 
   ~DisplayCompositor() override;
 
@@ -322,9 +314,9 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
 
-  // See BufferCollectionImportMode definition for what each mode means. by default, we add display
-  // constraints as AttachTokens.
-  BufferCollectionImportMode import_mode_ = BufferCollectionImportMode::AttemptDisplayConstraints;
+  // Whether to bypass any attempts at display composition.
+  // Constant except for in tests.
+  bool disable_display_composition_ = false;
 
   ColorConversionStateMachine cc_state_machine_;
 

@@ -8,12 +8,8 @@
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <zircon/pixelformat.h>
 
-#include <functional>
-
+#include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
-#include "src/ui/scenic/lib/flatland/link_system.h"
-#include "src/ui/scenic/lib/flatland/renderer/renderer.h"
-#include "src/ui/scenic/lib/flatland/uber_struct_system.h"
 
 namespace flatland {
 
@@ -57,25 +53,6 @@ struct DisplaySrcDstFrames {
   // source and destination information.
   static DisplaySrcDstFrames New(ImageRect rectangle, allocation::ImageMetadata image);
 };
-
-// Options for BufferCollectionImporter usage modes for DisplayCompositor.
-enum class BufferCollectionImportMode {
-  // Display constraints are treated as must-have. We fail allocating sysmem backed buffers
-  // if display and renderer constraints result in unsuccessful allocation.
-  // Note that renderer constraints are still applied. There are some formats which aren't widely
-  // supported by displays, i.e. YUV formats, that might not be allocated.
-  EnforceDisplayConstraints,
-  // Display constraints are treated as optional. They are added as AttachTokens and we check if
-  // they happened to work. Note that renderer constraints are still applied.
-  AttemptDisplayConstraints,
-  // Display constraints are skipped and assumed as failed. Note that renderer constraints are still
-  // applied.
-  RendererOnly
-};
-
-BufferCollectionImportMode StringToBufferCollectionImportMode(const std::string& str);
-
-const char* StringFromBufferCollectionImportMode(BufferCollectionImportMode mode);
 
 // Converts a flatland |Orientation| and |ImageFlip| value to the appropriate hardware display
 // transform enum.

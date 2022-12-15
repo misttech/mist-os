@@ -77,8 +77,7 @@ scenic_impl::ConfigValues GetConfig(sys::ComponentContext* app_context) {
           "flatland_buffer_collection_import_mode",
           [&values](auto& key, auto& value) {
             FX_CHECK(value.is_stringval()) << key << " must be a string";
-            values.flatland_buffer_collection_import_mode =
-                flatland::StringToBufferCollectionImportMode(value.stringval());
+            values.flatland_disable_display_composition = (value.stringval() == "renderer_only");
           },
       },
       {
@@ -175,20 +174,13 @@ scenic_impl::ConfigValues GetConfig(sys::ComponentContext* app_context) {
     stash_loop.Run(zx::time::infinite(), /*once*/ true);
   }
 
-  // If we are disabling display composition, then disable display import constraints.
-  if (flatland::DisplayCompositor::kDisableDisplayComposition) {
-    values.flatland_buffer_collection_import_mode =
-        flatland::BufferCollectionImportMode::RendererOnly;
-  }
-
   FX_LOGS(INFO) << "Scenic min_predicted_frame_duration(us): "
                 << values.min_predicted_frame_duration.to_usecs();
   FX_LOGS(INFO) << "i_can_haz_flatland: " << values.i_can_haz_flatland;
   FX_LOGS(INFO) << "enable_allocator_for_flatland: " << values.enable_allocator_for_flatland;
   FX_LOGS(INFO) << "Scenic pointer auto focus: " << values.pointer_auto_focus_on;
-  FX_LOGS(INFO) << "flatland_buffer_collection_import_mode: "
-                << StringFromBufferCollectionImportMode(
-                       values.flatland_buffer_collection_import_mode);
+  FX_LOGS(INFO) << "flatland_disable_display_composition: "
+                << values.flatland_disable_display_composition;
   FX_LOGS(INFO) << "Scenic i_can_haz_display_id: " << values.i_can_haz_display_id.value_or(0);
   FX_LOGS(INFO) << "Scenic i_can_haz_display_mode: " << values.i_can_haz_display_mode.value_or(0);
 
@@ -474,7 +466,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     flatland_compositor_ = std::make_shared<flatland::DisplayCompositor>(
         async_get_default_dispatcher(), display_manager_->default_display_controller(),
         flatland_renderer, utils::CreateSysmemAllocatorSyncPtr("flatland::DisplayCompositor"),
-        config_values_.flatland_buffer_collection_import_mode);
+        config_values_.flatland_disable_display_composition);
   }
 
   // Flatland manager depends on compositor, and is required by engine.

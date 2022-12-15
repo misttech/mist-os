@@ -420,15 +420,15 @@ Vulkan Renderer, try creating a DisplayCompositor with the NullRenderer
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      BufferCollectionImportMode::AttemptDisplayConstraints);
+      false);
 
 Lastly, if you are specifically testing the Vulkan Renderer and do not need Display Compositing, try
-creating a DisplayCompositor BufferCollectionImportMode::RendererOnly:
+creating a DisplayCompositor with disable_display_composition=true:
 
    auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      BufferCollectionImportMode::RendererOnly);
+      true);
 
 When uploading a CL that makes changes to these tests, also make sure that they run on NUC
 environments with basic envs. This should happen automatically because this is specified in
@@ -449,7 +449,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      BufferCollectionImportMode::AttemptDisplayConstraints);
+      /*disable_display_composition*/ false);
 
   auto display = display_manager_->default_display();
   auto display_controller = display_manager_->default_display_controller();
@@ -562,7 +562,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      BufferCollectionImportMode::AttemptDisplayConstraints);
+      /*disable_display_composition=*/false);
 
   auto display = display_manager_->default_display();
   auto display_controller = display_manager_->default_display_controller();
@@ -681,7 +681,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      BufferCollectionImportMode::AttemptDisplayConstraints);
+      /*disable_display_composition*/ false);
 
   auto display = display_manager_->default_display();
   auto display_controller = display_manager_->default_display_controller();
@@ -789,7 +789,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      BufferCollectionImportMode::AttemptDisplayConstraints);
+      /*disable_display_composition*/ false);
 
   auto display = display_manager_->default_display();
   auto display_controller = display_manager_->default_display_controller();
@@ -950,7 +950,7 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      BufferCollectionImportMode::AttemptDisplayConstraints);
+      /*disable_display_composition*/ false);
 
   auto texture_collection = SetupClientTextures(display_compositor.get(), kTextureCollectionId,
                                                 GetParam(), kTextureWidth, kTextureHeight,
@@ -1124,7 +1124,7 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      BufferCollectionImportMode::AttemptDisplayConstraints);
+      /*disable_display_composition*/ false);
 
   auto texture_collection =
       SetupClientTextures(display_compositor.get(), kTextureCollectionId,
@@ -1254,7 +1254,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      BufferCollectionImportMode::RendererOnly);
+      /*disable_display_composition*/ true);
 
   const uint64_t kTextureCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
@@ -1444,7 +1444,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
       dispatcher(), display_manager_->default_display_controller(), renderer,
       utils::CreateSysmemAllocatorSyncPtr("display_compositor_pixeltest"),
-      BufferCollectionImportMode::RendererOnly);
+      /*disable_display_composition=*/true);
 
   const uint64_t kTextureCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const uint64_t kCaptureCollectionId = allocation::GenerateUniqueBufferCollectionId();
