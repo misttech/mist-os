@@ -15,6 +15,8 @@
   })
 
 #define IWL_ALIGN(a, b) IWL_ROUNDUP(a, b)
-#define ALIGN(a, b) IWL_ROUNDUP(a, b)
+
+// This is the same to above, but used to initialize an array size.
+#define ALIGN(a, b) (((a) + (b) - 1) / (b) * (b))
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PLATFORM_ALIGN_H_
