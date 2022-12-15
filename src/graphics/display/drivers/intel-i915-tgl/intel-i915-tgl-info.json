@@ -1,7 +1,9 @@
 {
-    "short_description": "PCI Intel display and GPU core driver (temporary fork for Tiger Lake enablement",
+    "short_description": "PCI Intel display and GPU core driver",
     "manufacturer": "Intel",
     "families": [
+        "Sky Lake",
+        "Kaby Lake",
         "Tiger Lake"
     ],
     "models": [],
