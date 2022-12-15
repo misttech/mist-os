@@ -45,10 +45,10 @@ void BasicTest::RequestStreamProperties() {
         }
 
         if (stream_props_.has_can_mute()) {
-          *stream_props_.mutable_can_mute() = false;
+          *stream_props_.mutable_can_mute() = stream_props_.can_mute();
         }
         if (stream_props_.has_can_agc()) {
-          *stream_props_.mutable_can_agc() = false;
+          *stream_props_.mutable_can_agc() = stream_props_.can_agc();
         }
 
         ASSERT_TRUE(stream_props_.has_min_gain_db());
