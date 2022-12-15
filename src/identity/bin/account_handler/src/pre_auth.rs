@@ -166,6 +166,25 @@ impl WrappedKey {
         let ciphertext = cipher.encrypt(&nonce, &**plaintext).ok()?;
         Some(WrappedKey { ciphertext_and_tag: ciphertext.to_vec(), nonce: nonce.into() })
     }
+    fn unwrap_key(&self, cipher: &mut Aes256Gcm) -> Result<[u8; 32], ApiError> {
+        cipher
+            .decrypt((&self.nonce).into(), self.ciphertext_and_tag.as_ref())
+            .map_err(|_e| {
+                warn!(
+                    "Failed to unwrap AES-256-GCM ciphertext. Was the wrong prekey material \
+                    provided?"
+                );
+                ApiError::FailedAuthentication
+            })?
+            .try_into()
+            .map_err(|_| {
+                warn!(
+                    "Unwrapped AES-256-GCM ciphertext given prekey material, but the resultant \
+                    plaintext was of the wrong length -- expected [u8; 32]."
+                );
+                ApiError::Internal
+            })
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
@@ -184,6 +203,44 @@ impl WrappedKey {
 pub struct WrappedKeySet {
     wrapped_real_key: WrappedKey,
     wrapped_null_key: WrappedKey,
+}
+
+impl WrappedKeySet {
+    // First unwraps the null key and ensures that it unwraps to the expected
+    // NULL_KEY value. Then unwraps the real key and returns it.
+    //
+    // If the call to self.wrapped_null_key.unwrap_key() does not produce
+    // NULL_KEY, it means that the wrong prekey_material was supplied, and we
+    // return ApiError::FailedPrecondition.
+    //
+    // If the internal unwrap_key calls fail, we return ApiError::Internal.
+    pub fn unwrap_real_key(&self, prekey_material: &[u8]) -> Result<[u8; 32], ApiError> {
+        let mut cipher = Aes256Gcm::new(GenericArray::from_slice(prekey_material));
+
+        match self.wrapped_null_key.unwrap_key(&mut cipher) {
+            Err(ApiError::FailedAuthentication) => {
+                warn!(
+                    "Failed to unwrap the encrypted null key using AES-256-GCM. This probably \
+                    means that the prekey material did not match that supplied during creation."
+                );
+                Err(ApiError::FailedAuthentication)
+            }
+            Err(e) => Err(e),
+            Ok(decrypted_null_key) if decrypted_null_key == NULL_KEY.as_slice() => {
+                // If the unwrapped encrypted null key is equal to the NULL_KEY,
+                // then the provided prekey material is correct -- proceed to unwrap the real key.
+                self.wrapped_real_key.unwrap_key(&mut cipher)
+            }
+            Ok(_) => {
+                warn!(
+                    "Unwrapped the encrypted null key using AES-256-GCM, but the resultant value \
+                    was not actually the null key. This probably means that the prekey material \
+                    did not match that supplied during creation."
+                );
+                Err(ApiError::FailedAuthentication)
+            }
+        }
+    }
 }
 
 // Given prekey material, this function:
@@ -343,6 +400,34 @@ mod tests {
                 wk.wrapped_real_key.ciphertext_and_tag.as_ref(),
             ),
             Ok(_)
+        );
+    }
+
+    #[test]
+    fn test_wrapped_keys_unwrap_helper_fn() {
+        let prekey_material = make_random_256_bit_array().to_vec();
+
+        let wk = assert_matches!(produce_wrapped_keys(prekey_material.clone()), Ok(m) => m);
+
+        // That this returns proves that:
+        //  - the codepath to decrypt_wrapped_key(.., wrapped_null_key) succeeds,
+        //  - the decrypted null key is null, and
+        //  - the codepath to decrypt_wrapped_key(.., wrapped_real_key) succeeds.
+        let _actual_real_key: [u8; 32] = assert_matches!(
+            wk.unwrap_real_key(&prekey_material),
+            Ok(plaintext) => plaintext
+        );
+    }
+
+    #[test]
+    fn test_wrapped_keys_wrong_prekey() {
+        let prekey_material = make_random_256_bit_array().to_vec();
+        let wk = assert_matches!(produce_wrapped_keys(prekey_material), Ok(m) => m);
+
+        let other_prekey_material = make_random_256_bit_array().to_vec();
+        assert_matches!(
+            wk.unwrap_real_key(&other_prekey_material),
+            Err(ApiError::FailedAuthentication)
         );
     }
 }
