@@ -236,6 +236,7 @@ mod tests {
             AppSender::new_for_testing_purposes_only(),
             DisplayRotation::Deg0,
             Box::new(controller),
+            None,
         );
 
         recovery_app_assistant.create_view_assistant(ViewKey::default()).unwrap();
@@ -250,6 +251,7 @@ mod tests {
             AppSender::new_for_testing_purposes_only(),
             DisplayRotation::Deg0,
             Box::new(controller),
+            None,
         );
 
         assert_eq!(
@@ -301,6 +303,7 @@ mod tests {
             AppSender::new_for_testing_purposes_only(),
             DisplayRotation::Deg0,
             Box::new(controller),
+            None,
         );
 
         assert_eq!(
