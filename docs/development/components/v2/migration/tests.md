@@ -424,7 +424,7 @@ _before_ it is created. Once a realm is created its contents are immutable.
 To add a CML component with Realm Builder, use `AddChild()`:
 
 ```cpp
-realm_builder->AddChild("example_component", "#meta/example_component.cm");
+realm_builder->AddChild("example_component", "example_component#meta/default.cm");
 ```
 
 To include a legacy component in the same realm, use `AddLegacyChild()`:
@@ -443,7 +443,7 @@ its parent:
 ```cpp
 realm_builder->AddChild(
     "example_eager_component",
-    "#meta/example_eager.cm",
+    "example_eager#meta/default.cm",
     ChildOptions{.startup_mode = StartupMode::EAGER});
 ```
 

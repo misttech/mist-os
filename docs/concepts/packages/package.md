@@ -8,8 +8,9 @@ parts and is not a single binary `BLOB`.
 Note: For more information on components, see
 [Introduction to the Fuchsia component framework](/docs/concepts/components/v2/introduction.md).
 
-Packages are downloaded from the Fuchsia package server in `BLOB`s. The Fuchsia
-package server is a HTTP(s) server. These `BLOB`s are uniquely defined by a Merkle
+Some packages are present on a Fuchsia system at startup, and
+additional packages can be downloaded from a Fuchsia package server in `BLOB`s.
+The Fuchsia package server is an HTTP(S) server. These `BLOB`s are uniquely defined by a Merkle
 root. A `BLOB` is named after its content, using the
 [Fuchsia Merkle Root](merkleroot.md) algorithm. If two `BLOB`s have the same content,
 they have the same name. As a result, each `BLOB` has a unique identifier and is
@@ -20,6 +21,26 @@ multiple packages is only stored once on the device.
 
 The package server serves as a root of trust as it validates the authenticity of
 each package.
+
+Packages can also declare dependencies on named
+[subpackage][glossary.subpackage]s, creating a hierarchy of nested packages.
+Build rules link a package with the build target of each subpackage. At build
+time, the package build tool records the subpackages in the parent package's
+metadata, mapping each subpackage name to its package hash (the `BLOB` id that
+identifies the subpackage). This ensures the list of subpackages and the
+internals of each subpackage cannot change without also changing the Merkle
+(package hash) of the parent.
+
+_Subpackages enable:_
+
+* Encapsulated dependencies (packages are inherently "package trees")
+* Isolated `/pkg` directories (grouped components don't need to merge their
+  files, libraries, and metadata into a single shared namespace)
+* Assured dependency resolution (system and build tools ensure subpackages
+  always "travel with" their packages)
+
+For more information on packaging components with their dependencies using
+Subpackages, see [Subpackaging components].
 
 Note: To understand how components and packages work together in Fuchsia,
 see [Fuchsia's software model](/docs/concepts/software_model.md).
@@ -109,6 +130,20 @@ The `meta/` directory of a package contains at minimum two files:
    with the `pm build` tool. This file maps the user-facing file names of a
    package to the Merkle root of those files.
 
+If the package declares subpackages, the `meta/` directory also contains:
+
+* `meta/fuchsia.pkg/subpackages`
+
+   The subpackages file. This is a JSON file that contains the name and version
+   of each declared subpackage. From the perspective of the parent package, the
+   subpackage name is used as a relative package URL when resolving the
+   subpackage.
+
+   Package build tools traverse subpackage references (declared through build
+   dependency declarations and package manifest files that reference other
+   package manifest files for each subpackage) to compute the version (package
+   hash) of each subpackage and generate the `subpackages` file.
+
 Additionally, the `meta/` directory can contain files such as a component manifest.
 For more information on component manifests, see
 [Component manifests](/docs/concepts/components/v2/component_manifests.md).
@@ -129,7 +164,10 @@ Every package in Fuchsia is identified by a `package-url`.
 
 Note: For more information about [Fuchsia package URLs](/docs/concepts/packages/package_url.md).
 
-A Fuchsia package URL looks like the following:
+### Absolute package URLs
+
+An absolute Fuchsia package URL identifies a system-addressable package, without
+requiring any additional context, and looks like the following:
 
 ```
 fuchsia-pkg://{{ '<var>' }}repository{{ '</var>' }}/{{ '<var>' }}package-name{{ '</var>' }}?hash={{ '<var>' }}package-hash{{ '</var>' }}#{{ '<var>' }}resource-path{{ '</var>' }}
@@ -150,3 +188,20 @@ package name must be present, optionally followed by the package hash.
 
 If the package hash is missing, the package resolver fetches the resources
 from the newest revision of the package variant available to the client.
+
+### Relative package URLs
+
+A relative Fuchsia package URL identifies a subpackage given previously loaded
+package (or subpackage) as "context". The repository and parent package are
+implicit, and the subpackage name is used to look up the package hash in the
+parent package's `"meta/fuchsia.pkg/subpackages"` file. (The package hash
+cannot be overridden). A relative package URL looks like the following:
+
+```
+{{ '<var>' }}package-name{{ '</var>' }}#{{ '<var>' }}resource-path{{ '</var>' }}
+```
+
+As with absolute package URLs, the resource path may or may not be included.
+
+[Subpackaging components]: /docs/concepts/components/v2/subpackaging.md
+[glossary.subpackage]: /docs/glossary/README.md#subpackage

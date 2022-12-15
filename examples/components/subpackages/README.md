@@ -3,7 +3,7 @@
 The following directory hosts examples resolving components from
 [Subpackages (RFC-0154)](/docs/contribute/governance/rfcs/0154_subpackages.md).
 Subpackages are explained in the
-[developer guide](/docs/concepts/packages/subpackages.md).
+[developer guide](/docs/concepts/components/v2/subpackaging.md).
 
 The tests are meant to demonstrate compilable code. This means that
 it will always contain the latest API surface of each of the client libraries.

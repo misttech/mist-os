@@ -4,7 +4,7 @@ This directory contains additional examples of
 [capability routing](/docs/concepts/components/component_manifests#capability-routing)
 in [Component Framework](/docs/concepts/components/introduction.md), with
 slightly modified packaging, using
-[Subpackages (RFC-0154)](/docs/contribute/governance/rfcs/0154_subpackages.md), instead of bundling
+[Subpackages](/docs/concepts/components/v2/subpackaging.md), instead of bundling
 all components into a single package.
 
 ## Building

@@ -14,6 +14,8 @@ toc:
   path: /docs/concepts/components/v2/component_manager.md
 - title: "Component manifests"
   path: /docs/concepts/components/v2/component_manifests.md
+- title: "Subpackaging"
+  path: /docs/concepts/components/v2/subpackaging.md
 - title: "Lifecycle"
   path: /docs/concepts/components/v2/lifecycle.md
 - title: "Topology"

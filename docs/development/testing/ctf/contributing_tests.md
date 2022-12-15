@@ -229,4 +229,4 @@ The FAQ sections about [retiring tests] and [disabling tests].
 [disabling tests]: /docs/development/testing/ctf/faq.md#disable-a-test
 [retiring tests]: /docs/development/testing/ctf/faq.md#retire-a-test
 [allow list]: /sdk/ctf/build/internal/allowed_ctf_deps.gni
-[Subpackages]: /docs/concepts/packages/subpackages.md
+[Subpackages]: /docs/concepts/components/v2/subpackaging.md

@@ -1117,7 +1117,8 @@
   files, such as manifests, metadata, zero or more executables
   (e.g. <a href=\"/docs/glossary#component\">components</a>), and assets. Individual Fuchsia
   packages can be identified using
-  <a href=\"/docs/glossary#fuchsia-pkg-url\">fuchsia-pkg URL</a>."
+  <a href=\"/docs/glossary#fuchsia-pkg-url\">fuchsia-pkg URL</a>. Packages can
+  contain other packages (known as <a href=\"/docs/glossary#subpackage\">Subpackages</a>)."
   see_also: [""]
   related_guides: [""]
   area: ["System", "Component Framework"]
@@ -1445,6 +1446,33 @@
   see_also: ["<a href=\"/docs/concepts/components/v2/realms.md\">Realms</a>"]
   related_guides: [""]
   area: ["Component Framework"]
+
+- term: "Subpackage"
+  short_description: "A Fuchsia package contained (by reference) in another package."
+  full_description: "A Fuchsia package can declare dependencies on one or more
+  packages, by containment. The containing package is sometimes referred to as
+  the superpackage and the
+  contained packages are its subpackages. Subpackages are declared by reference,
+  but the existence of the superpackage implies the existence of its
+  subpackages, regardless of the medium (including a Fuchsia runtime, in a
+  package repository, or in a package archive format, for example). Packages
+  and Components can reference contained packages and subpackaged components,
+  respectively, by relative subpackage URLs."
+  see_also: ["<a href=\"/docs/glossary#package\">Package</a>"]
+  related_guides: ["<a href=\"/docs/concepts/components/v2/subpackaging.md\">Fuchsia Subpackages</a>"]
+  area: ["System", "Software Assembly", "Component Framework"]
+
+- term: "Subpackage URL (Relative)"
+  short_description: "A partial Fuchsia Package URL, starting from the URI path."
+  full_description: "A relative subpackage URL requires a
+  \"resolution context\", which simply means a known starting package
+  (or \"superpackage\"). The path (a single path segment with no slashes: `/`)
+  refers to a subpackage, declared and named by its superpackage; for example:
+  <code>my-package#meta/comp.cm</code>, representing a component within a
+  subpackage, with the locally-scoped name \"my-package\"."
+  see_also: ["<a href=\"/docs/glossary#subpackage\">Subpackage</a>"]
+  related_guides: [""]
+  area: ["Software Assembly", "Developer"]
 
 - term: "Thread"
   short_description: "A <a href=\"/docs/glossary#kernel-object\">kernel object</a> that

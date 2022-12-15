@@ -1379,7 +1379,7 @@ In the previous example error, an `offer` should be added in the parent componen
         // ...
         {
             name: "echo",
-            url: "#meta/echo.cm",
+            url: "echo#meta/default.cm",
         },
     ],
     offer: [

@@ -35,9 +35,10 @@ of a component instance, as part of a [child declaration][doc-manifests-children
 The above example declares the `logger` component as an absolute resource
 in a [Fuchsia package][doc-package] hosted in a package repository.
 
-Component Framework also supports relative URLs to identify components built
-into the same package as the parent component. This allows component reuse
-between packages without creating additional manifests:
+Component Framework also supports relative URLs.
+
+To identify a component built into the same package as the parent component,
+specify only the URL fragment:
 
 ```json5 {:.devsite-disable-click-to-copy}
 {
@@ -50,8 +51,23 @@ between packages without creating additional manifests:
 }
 ```
 
-This pattern is often used in tests, where the best practice is to re-package
-production components in a test-specific package to promote
+To identify a component in a [subpackage][doc-subpackaging] of the parent
+component's package, include the subpackage name followed by the component
+manifest path (via URL fragment):
+
+```json5 {:.devsite-disable-click-to-copy}
+{
+    children: [
+        {
+            name: "child",
+            url: "child#meta/default.cm",
+        }
+    ],
+}
+```
+
+Relative component URLs are often used in tests, where the best practice is to
+re-package production components in a test-specific package to promote
 [hermeticity][test-hermeticity].
 
 For more details on component URL syntax, see the
@@ -135,6 +151,7 @@ For more details on component moniker syntax, see the
 [doc-manifests-children]: https://fuchsia.dev/reference/cml#children
 [doc-manifests-declaration]: /docs/concepts/components/v2/component_manifests.md#component-declaration
 [doc-package]: /docs/concepts/packages/package.md
+[doc-subpackaging]: /docs/concepts/components/v2/subpackaging.md
 [doc-resolvers]: /docs/concepts/components/v2/capabilities/resolvers.md
 [moniker-reference]: /docs/reference/components/moniker.md
 [url-reference]: /docs/reference/components/url.md
