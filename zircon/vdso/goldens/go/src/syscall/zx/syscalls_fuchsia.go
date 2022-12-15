@@ -530,6 +530,30 @@ func Sys_syscall_next_1(arg int32) Status
 
 //go:noescape
 //go:nosplit
+func Sys_syscall_test_handle_create(return_value Status, out *Handle) Status
+
+//go:noescape
+//go:nosplit
+func Sys_syscall_test_widening_signed_narrow(a int64, b int32, c int16, d int8) int64
+
+//go:noescape
+//go:nosplit
+func Sys_syscall_test_widening_signed_wide(a int64, b int32, c int16, d int8) int64
+
+//go:noescape
+//go:nosplit
+func Sys_syscall_test_widening_unsigned_narrow(a uint64, b uint32, c uint16, d uint8) uint64
+
+//go:noescape
+//go:nosplit
+func Sys_syscall_test_widening_unsigned_wide(a uint64, b uint32, c uint16, d uint8) uint64
+
+//go:noescape
+//go:nosplit
+func Sys_syscall_test_wrapper(a int32, b int32, c int32) Status
+
+//go:noescape
+//go:nosplit
 func Sys_syscall_test_0() Status
 
 //go:noescape
@@ -563,30 +587,6 @@ func Sys_syscall_test_7(a int32, b int32, c int32, d int32, e int32, f int32, g_
 //go:noescape
 //go:nosplit
 func Sys_syscall_test_8(a int32, b int32, c int32, d int32, e int32, f int32, g_ int32, h int32) Status
-
-//go:noescape
-//go:nosplit
-func Sys_syscall_test_handle_create(return_value Status, out *Handle) Status
-
-//go:noescape
-//go:nosplit
-func Sys_syscall_test_widening_signed_narrow(a int64, b int32, c int16, d int8) int64
-
-//go:noescape
-//go:nosplit
-func Sys_syscall_test_widening_signed_wide(a int64, b int32, c int16, d int8) int64
-
-//go:noescape
-//go:nosplit
-func Sys_syscall_test_widening_unsigned_narrow(a uint64, b uint32, c uint16, d uint8) uint64
-
-//go:noescape
-//go:nosplit
-func Sys_syscall_test_widening_unsigned_wide(a uint64, b uint32, c uint16, d uint8) uint64
-
-//go:noescape
-//go:nosplit
-func Sys_syscall_test_wrapper(a int32, b int32, c int32) Status
 
 //go:noescape
 //go:nosplit

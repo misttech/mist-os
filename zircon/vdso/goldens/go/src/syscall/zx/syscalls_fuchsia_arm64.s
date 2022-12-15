@@ -526,6 +526,30 @@ TEXT ·Sys_stream_writev_at(SB),NOSPLIT,$0
 TEXT ·Sys_syscall_next_1(SB),NOSPLIT,$0
 	JMP runtime·vdsoCall_zx_syscall_next_1(SB)
 
+// func Sys_syscall_test_handle_create(return_value Status, out *Handle) Status
+TEXT ·Sys_syscall_test_handle_create(SB),NOSPLIT,$0
+	JMP runtime·vdsoCall_zx_syscall_test_handle_create(SB)
+
+// func Sys_syscall_test_widening_signed_narrow(a int64, b int32, c int16, d int8) int64
+TEXT ·Sys_syscall_test_widening_signed_narrow(SB),NOSPLIT,$0
+	JMP runtime·vdsoCall_zx_syscall_test_widening_signed_narrow(SB)
+
+// func Sys_syscall_test_widening_signed_wide(a int64, b int32, c int16, d int8) int64
+TEXT ·Sys_syscall_test_widening_signed_wide(SB),NOSPLIT,$0
+	JMP runtime·vdsoCall_zx_syscall_test_widening_signed_wide(SB)
+
+// func Sys_syscall_test_widening_unsigned_narrow(a uint64, b uint32, c uint16, d uint8) uint64
+TEXT ·Sys_syscall_test_widening_unsigned_narrow(SB),NOSPLIT,$0
+	JMP runtime·vdsoCall_zx_syscall_test_widening_unsigned_narrow(SB)
+
+// func Sys_syscall_test_widening_unsigned_wide(a uint64, b uint32, c uint16, d uint8) uint64
+TEXT ·Sys_syscall_test_widening_unsigned_wide(SB),NOSPLIT,$0
+	JMP runtime·vdsoCall_zx_syscall_test_widening_unsigned_wide(SB)
+
+// func Sys_syscall_test_wrapper(a int32, b int32, c int32) Status
+TEXT ·Sys_syscall_test_wrapper(SB),NOSPLIT,$0
+	JMP runtime·vdsoCall_zx_syscall_test_wrapper(SB)
+
 // func Sys_syscall_test_0() Status
 TEXT ·Sys_syscall_test_0(SB),NOSPLIT,$0
 	JMP runtime·vdsoCall_zx_syscall_test_0(SB)
@@ -561,30 +585,6 @@ TEXT ·Sys_syscall_test_7(SB),NOSPLIT,$0
 // func Sys_syscall_test_8(a int32, b int32, c int32, d int32, e int32, f int32, g_ int32, h int32) Status
 TEXT ·Sys_syscall_test_8(SB),NOSPLIT,$0
 	JMP runtime·vdsoCall_zx_syscall_test_8(SB)
-
-// func Sys_syscall_test_handle_create(return_value Status, out *Handle) Status
-TEXT ·Sys_syscall_test_handle_create(SB),NOSPLIT,$0
-	JMP runtime·vdsoCall_zx_syscall_test_handle_create(SB)
-
-// func Sys_syscall_test_widening_signed_narrow(a int64, b int32, c int16, d int8) int64
-TEXT ·Sys_syscall_test_widening_signed_narrow(SB),NOSPLIT,$0
-	JMP runtime·vdsoCall_zx_syscall_test_widening_signed_narrow(SB)
-
-// func Sys_syscall_test_widening_signed_wide(a int64, b int32, c int16, d int8) int64
-TEXT ·Sys_syscall_test_widening_signed_wide(SB),NOSPLIT,$0
-	JMP runtime·vdsoCall_zx_syscall_test_widening_signed_wide(SB)
-
-// func Sys_syscall_test_widening_unsigned_narrow(a uint64, b uint32, c uint16, d uint8) uint64
-TEXT ·Sys_syscall_test_widening_unsigned_narrow(SB),NOSPLIT,$0
-	JMP runtime·vdsoCall_zx_syscall_test_widening_unsigned_narrow(SB)
-
-// func Sys_syscall_test_widening_unsigned_wide(a uint64, b uint32, c uint16, d uint8) uint64
-TEXT ·Sys_syscall_test_widening_unsigned_wide(SB),NOSPLIT,$0
-	JMP runtime·vdsoCall_zx_syscall_test_widening_unsigned_wide(SB)
-
-// func Sys_syscall_test_wrapper(a int32, b int32, c int32) Status
-TEXT ·Sys_syscall_test_wrapper(SB),NOSPLIT,$0
-	JMP runtime·vdsoCall_zx_syscall_test_wrapper(SB)
 
 // func Sys_system_get_dcache_line_size() uint32
 TEXT ·Sys_system_get_dcache_line_size(SB),NOSPLIT,$0

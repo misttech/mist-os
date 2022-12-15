@@ -3032,6 +3032,141 @@ TEXT runtime·vdsoCall_zx_syscall_next_1(SB),NOSPLIT,$8-12
 	MOVQ $0, m_vdsoSP(R14)
 	RET
 
+// func vdsoCall_zx_syscall_test_handle_create(return_value int32, out unsafe.Pointer) int32
+TEXT runtime·vdsoCall_zx_syscall_test_handle_create(SB),NOSPLIT,$8-20
+	GO_ARGS
+	NO_LOCAL_POINTERS
+	get_tls(CX)
+	MOVQ g(CX), AX
+	MOVQ g_m(AX), R14
+	PUSHQ R14
+	LEAQ ret+0(FP), DX
+	MOVQ -8(DX), CX
+	MOVQ CX, m_vdsoPC(R14)
+	MOVQ DX, m_vdsoSP(R14)
+	MOVL return_value+0(FP), DI
+	MOVQ out+8(FP), SI
+	MOVQ vdso_zx_syscall_test_handle_create(SB), AX
+	CALL AX
+	MOVL AX, ret+16(FP)
+	POPQ R14
+	MOVQ $0, m_vdsoSP(R14)
+	RET
+
+// func vdsoCall_zx_syscall_test_widening_signed_narrow(a int64, b int32, c int16, d int8) int64
+TEXT runtime·vdsoCall_zx_syscall_test_widening_signed_narrow(SB),NOSPLIT,$8-23
+	GO_ARGS
+	NO_LOCAL_POINTERS
+	get_tls(CX)
+	MOVQ g(CX), AX
+	MOVQ g_m(AX), R14
+	PUSHQ R14
+	LEAQ ret+0(FP), DX
+	MOVQ -8(DX), CX
+	MOVQ CX, m_vdsoPC(R14)
+	MOVQ DX, m_vdsoSP(R14)
+	MOVQ a+0(FP), DI
+	MOVL b+8(FP), SI
+	MOVQ c+12(FP), DX
+	MOVQ d+14(FP), CX
+	MOVQ vdso_zx_syscall_test_widening_signed_narrow(SB), AX
+	CALL AX
+	MOVQ AX, ret+15(FP)
+	POPQ R14
+	MOVQ $0, m_vdsoSP(R14)
+	RET
+
+// func vdsoCall_zx_syscall_test_widening_signed_wide(a int64, b int32, c int16, d int8) int64
+TEXT runtime·vdsoCall_zx_syscall_test_widening_signed_wide(SB),NOSPLIT,$8-23
+	GO_ARGS
+	NO_LOCAL_POINTERS
+	get_tls(CX)
+	MOVQ g(CX), AX
+	MOVQ g_m(AX), R14
+	PUSHQ R14
+	LEAQ ret+0(FP), DX
+	MOVQ -8(DX), CX
+	MOVQ CX, m_vdsoPC(R14)
+	MOVQ DX, m_vdsoSP(R14)
+	MOVQ a+0(FP), DI
+	MOVL b+8(FP), SI
+	MOVQ c+12(FP), DX
+	MOVQ d+14(FP), CX
+	MOVQ vdso_zx_syscall_test_widening_signed_wide(SB), AX
+	CALL AX
+	MOVQ AX, ret+15(FP)
+	POPQ R14
+	MOVQ $0, m_vdsoSP(R14)
+	RET
+
+// func vdsoCall_zx_syscall_test_widening_unsigned_narrow(a uint64, b uint32, c uint16, d uint8) uint64
+TEXT runtime·vdsoCall_zx_syscall_test_widening_unsigned_narrow(SB),NOSPLIT,$8-23
+	GO_ARGS
+	NO_LOCAL_POINTERS
+	get_tls(CX)
+	MOVQ g(CX), AX
+	MOVQ g_m(AX), R14
+	PUSHQ R14
+	LEAQ ret+0(FP), DX
+	MOVQ -8(DX), CX
+	MOVQ CX, m_vdsoPC(R14)
+	MOVQ DX, m_vdsoSP(R14)
+	MOVQ a+0(FP), DI
+	MOVL b+8(FP), SI
+	MOVQ c+12(FP), DX
+	MOVQ d+14(FP), CX
+	MOVQ vdso_zx_syscall_test_widening_unsigned_narrow(SB), AX
+	CALL AX
+	MOVQ AX, ret+15(FP)
+	POPQ R14
+	MOVQ $0, m_vdsoSP(R14)
+	RET
+
+// func vdsoCall_zx_syscall_test_widening_unsigned_wide(a uint64, b uint32, c uint16, d uint8) uint64
+TEXT runtime·vdsoCall_zx_syscall_test_widening_unsigned_wide(SB),NOSPLIT,$8-23
+	GO_ARGS
+	NO_LOCAL_POINTERS
+	get_tls(CX)
+	MOVQ g(CX), AX
+	MOVQ g_m(AX), R14
+	PUSHQ R14
+	LEAQ ret+0(FP), DX
+	MOVQ -8(DX), CX
+	MOVQ CX, m_vdsoPC(R14)
+	MOVQ DX, m_vdsoSP(R14)
+	MOVQ a+0(FP), DI
+	MOVL b+8(FP), SI
+	MOVQ c+12(FP), DX
+	MOVQ d+14(FP), CX
+	MOVQ vdso_zx_syscall_test_widening_unsigned_wide(SB), AX
+	CALL AX
+	MOVQ AX, ret+15(FP)
+	POPQ R14
+	MOVQ $0, m_vdsoSP(R14)
+	RET
+
+// func vdsoCall_zx_syscall_test_wrapper(a int32, b int32, c int32) int32
+TEXT runtime·vdsoCall_zx_syscall_test_wrapper(SB),NOSPLIT,$8-20
+	GO_ARGS
+	NO_LOCAL_POINTERS
+	get_tls(CX)
+	MOVQ g(CX), AX
+	MOVQ g_m(AX), R14
+	PUSHQ R14
+	LEAQ ret+0(FP), DX
+	MOVQ -8(DX), CX
+	MOVQ CX, m_vdsoPC(R14)
+	MOVQ DX, m_vdsoSP(R14)
+	MOVL a+0(FP), DI
+	MOVL b+4(FP), SI
+	MOVL c+8(FP), DX
+	MOVQ vdso_zx_syscall_test_wrapper(SB), AX
+	CALL AX
+	MOVL AX, ret+16(FP)
+	POPQ R14
+	MOVQ $0, m_vdsoSP(R14)
+	RET
+
 // func vdsoCall_zx_syscall_test_0() int32
 TEXT runtime·vdsoCall_zx_syscall_test_0(SB),NOSPLIT,$8-4
 	GO_ARGS
@@ -3247,141 +3382,6 @@ TEXT runtime·vdsoCall_zx_syscall_test_8(SB),NOSPLIT,$40-36
 	POPQ R13
 	MOVQ BP, SP
 	MOVL AX, ret+32(FP)
-	POPQ R14
-	MOVQ $0, m_vdsoSP(R14)
-	RET
-
-// func vdsoCall_zx_syscall_test_handle_create(return_value int32, out unsafe.Pointer) int32
-TEXT runtime·vdsoCall_zx_syscall_test_handle_create(SB),NOSPLIT,$8-20
-	GO_ARGS
-	NO_LOCAL_POINTERS
-	get_tls(CX)
-	MOVQ g(CX), AX
-	MOVQ g_m(AX), R14
-	PUSHQ R14
-	LEAQ ret+0(FP), DX
-	MOVQ -8(DX), CX
-	MOVQ CX, m_vdsoPC(R14)
-	MOVQ DX, m_vdsoSP(R14)
-	MOVL return_value+0(FP), DI
-	MOVQ out+8(FP), SI
-	MOVQ vdso_zx_syscall_test_handle_create(SB), AX
-	CALL AX
-	MOVL AX, ret+16(FP)
-	POPQ R14
-	MOVQ $0, m_vdsoSP(R14)
-	RET
-
-// func vdsoCall_zx_syscall_test_widening_signed_narrow(a int64, b int32, c int16, d int8) int64
-TEXT runtime·vdsoCall_zx_syscall_test_widening_signed_narrow(SB),NOSPLIT,$8-23
-	GO_ARGS
-	NO_LOCAL_POINTERS
-	get_tls(CX)
-	MOVQ g(CX), AX
-	MOVQ g_m(AX), R14
-	PUSHQ R14
-	LEAQ ret+0(FP), DX
-	MOVQ -8(DX), CX
-	MOVQ CX, m_vdsoPC(R14)
-	MOVQ DX, m_vdsoSP(R14)
-	MOVQ a+0(FP), DI
-	MOVL b+8(FP), SI
-	MOVQ c+12(FP), DX
-	MOVQ d+14(FP), CX
-	MOVQ vdso_zx_syscall_test_widening_signed_narrow(SB), AX
-	CALL AX
-	MOVQ AX, ret+15(FP)
-	POPQ R14
-	MOVQ $0, m_vdsoSP(R14)
-	RET
-
-// func vdsoCall_zx_syscall_test_widening_signed_wide(a int64, b int32, c int16, d int8) int64
-TEXT runtime·vdsoCall_zx_syscall_test_widening_signed_wide(SB),NOSPLIT,$8-23
-	GO_ARGS
-	NO_LOCAL_POINTERS
-	get_tls(CX)
-	MOVQ g(CX), AX
-	MOVQ g_m(AX), R14
-	PUSHQ R14
-	LEAQ ret+0(FP), DX
-	MOVQ -8(DX), CX
-	MOVQ CX, m_vdsoPC(R14)
-	MOVQ DX, m_vdsoSP(R14)
-	MOVQ a+0(FP), DI
-	MOVL b+8(FP), SI
-	MOVQ c+12(FP), DX
-	MOVQ d+14(FP), CX
-	MOVQ vdso_zx_syscall_test_widening_signed_wide(SB), AX
-	CALL AX
-	MOVQ AX, ret+15(FP)
-	POPQ R14
-	MOVQ $0, m_vdsoSP(R14)
-	RET
-
-// func vdsoCall_zx_syscall_test_widening_unsigned_narrow(a uint64, b uint32, c uint16, d uint8) uint64
-TEXT runtime·vdsoCall_zx_syscall_test_widening_unsigned_narrow(SB),NOSPLIT,$8-23
-	GO_ARGS
-	NO_LOCAL_POINTERS
-	get_tls(CX)
-	MOVQ g(CX), AX
-	MOVQ g_m(AX), R14
-	PUSHQ R14
-	LEAQ ret+0(FP), DX
-	MOVQ -8(DX), CX
-	MOVQ CX, m_vdsoPC(R14)
-	MOVQ DX, m_vdsoSP(R14)
-	MOVQ a+0(FP), DI
-	MOVL b+8(FP), SI
-	MOVQ c+12(FP), DX
-	MOVQ d+14(FP), CX
-	MOVQ vdso_zx_syscall_test_widening_unsigned_narrow(SB), AX
-	CALL AX
-	MOVQ AX, ret+15(FP)
-	POPQ R14
-	MOVQ $0, m_vdsoSP(R14)
-	RET
-
-// func vdsoCall_zx_syscall_test_widening_unsigned_wide(a uint64, b uint32, c uint16, d uint8) uint64
-TEXT runtime·vdsoCall_zx_syscall_test_widening_unsigned_wide(SB),NOSPLIT,$8-23
-	GO_ARGS
-	NO_LOCAL_POINTERS
-	get_tls(CX)
-	MOVQ g(CX), AX
-	MOVQ g_m(AX), R14
-	PUSHQ R14
-	LEAQ ret+0(FP), DX
-	MOVQ -8(DX), CX
-	MOVQ CX, m_vdsoPC(R14)
-	MOVQ DX, m_vdsoSP(R14)
-	MOVQ a+0(FP), DI
-	MOVL b+8(FP), SI
-	MOVQ c+12(FP), DX
-	MOVQ d+14(FP), CX
-	MOVQ vdso_zx_syscall_test_widening_unsigned_wide(SB), AX
-	CALL AX
-	MOVQ AX, ret+15(FP)
-	POPQ R14
-	MOVQ $0, m_vdsoSP(R14)
-	RET
-
-// func vdsoCall_zx_syscall_test_wrapper(a int32, b int32, c int32) int32
-TEXT runtime·vdsoCall_zx_syscall_test_wrapper(SB),NOSPLIT,$8-20
-	GO_ARGS
-	NO_LOCAL_POINTERS
-	get_tls(CX)
-	MOVQ g(CX), AX
-	MOVQ g_m(AX), R14
-	PUSHQ R14
-	LEAQ ret+0(FP), DX
-	MOVQ -8(DX), CX
-	MOVQ CX, m_vdsoPC(R14)
-	MOVQ DX, m_vdsoSP(R14)
-	MOVL a+0(FP), DI
-	MOVL b+4(FP), SI
-	MOVL c+8(FP), DX
-	MOVQ vdso_zx_syscall_test_wrapper(SB), AX
-	CALL AX
-	MOVL AX, ret+16(FP)
 	POPQ R14
 	MOVQ $0, m_vdsoSP(R14)
 	RET

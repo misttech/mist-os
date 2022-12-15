@@ -851,6 +851,45 @@ extern {
         arg: i32
         ) -> zx_status_t;
 
+    pub fn zx_syscall_test_handle_create(
+        return_value: zx_status_t,
+        out: *mut zx_handle_t
+        ) -> zx_status_t;
+
+    pub fn zx_syscall_test_widening_signed_narrow(
+        a: i64,
+        b: i32,
+        c: i16,
+        d: i8
+        ) -> i64;
+
+    pub fn zx_syscall_test_widening_signed_wide(
+        a: i64,
+        b: i32,
+        c: i16,
+        d: i8
+        ) -> i64;
+
+    pub fn zx_syscall_test_widening_unsigned_narrow(
+        a: u64,
+        b: u32,
+        c: u16,
+        d: u8
+        ) -> u64;
+
+    pub fn zx_syscall_test_widening_unsigned_wide(
+        a: u64,
+        b: u32,
+        c: u16,
+        d: u8
+        ) -> u64;
+
+    pub fn zx_syscall_test_wrapper(
+        a: i32,
+        b: i32,
+        c: i32
+        ) -> zx_status_t;
+
     pub fn zx_syscall_test_0(
         ) -> zx_status_t;
 
@@ -912,45 +951,6 @@ extern {
         f: i32,
         g: i32,
         h: i32
-        ) -> zx_status_t;
-
-    pub fn zx_syscall_test_handle_create(
-        return_value: zx_status_t,
-        out: *mut zx_handle_t
-        ) -> zx_status_t;
-
-    pub fn zx_syscall_test_widening_signed_narrow(
-        a: i64,
-        b: i32,
-        c: i16,
-        d: i8
-        ) -> i64;
-
-    pub fn zx_syscall_test_widening_signed_wide(
-        a: i64,
-        b: i32,
-        c: i16,
-        d: i8
-        ) -> i64;
-
-    pub fn zx_syscall_test_widening_unsigned_narrow(
-        a: u64,
-        b: u32,
-        c: u16,
-        d: u8
-        ) -> u64;
-
-    pub fn zx_syscall_test_widening_unsigned_wide(
-        a: u64,
-        b: u32,
-        c: u16,
-        d: u8
-        ) -> u64;
-
-    pub fn zx_syscall_test_wrapper(
-        a: i32,
-        b: i32,
-        c: i32
         ) -> zx_status_t;
 
     pub fn zx_system_get_dcache_line_size(

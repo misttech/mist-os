@@ -145,6 +145,12 @@ var vdsoSymbolKeys = []vdsoSymbolKey{
 	{"_zx_stream_writev", 0x89120a21, &vdso_zx_stream_writev},
 	{"_zx_stream_writev_at", 0xcd618395, &vdso_zx_stream_writev_at},
 	{"_zx_syscall_next_1", 0xa83386fe, &vdso_zx_syscall_next_1},
+	{"_zx_syscall_test_handle_create", 0xb996e56d, &vdso_zx_syscall_test_handle_create},
+	{"_zx_syscall_test_widening_signed_narrow", 0x215c6254, &vdso_zx_syscall_test_widening_signed_narrow},
+	{"_zx_syscall_test_widening_signed_wide", 0x6b7b27a4, &vdso_zx_syscall_test_widening_signed_wide},
+	{"_zx_syscall_test_widening_unsigned_narrow", 0x2b822f37, &vdso_zx_syscall_test_widening_unsigned_narrow},
+	{"_zx_syscall_test_widening_unsigned_wide", 0xbaf25fc7, &vdso_zx_syscall_test_widening_unsigned_wide},
+	{"_zx_syscall_test_wrapper", 0x4d7af9cf, &vdso_zx_syscall_test_wrapper},
 	{"_zx_syscall_test_0", 0xb62fbcde, &vdso_zx_syscall_test_0},
 	{"_zx_syscall_test_1", 0xb62fbcdf, &vdso_zx_syscall_test_1},
 	{"_zx_syscall_test_2", 0xb62fbce0, &vdso_zx_syscall_test_2},
@@ -154,12 +160,6 @@ var vdsoSymbolKeys = []vdsoSymbolKey{
 	{"_zx_syscall_test_6", 0xb62fbce4, &vdso_zx_syscall_test_6},
 	{"_zx_syscall_test_7", 0xb62fbce5, &vdso_zx_syscall_test_7},
 	{"_zx_syscall_test_8", 0xb62fbce6, &vdso_zx_syscall_test_8},
-	{"_zx_syscall_test_handle_create", 0xb996e56d, &vdso_zx_syscall_test_handle_create},
-	{"_zx_syscall_test_widening_signed_narrow", 0x215c6254, &vdso_zx_syscall_test_widening_signed_narrow},
-	{"_zx_syscall_test_widening_signed_wide", 0x6b7b27a4, &vdso_zx_syscall_test_widening_signed_wide},
-	{"_zx_syscall_test_widening_unsigned_narrow", 0x2b822f37, &vdso_zx_syscall_test_widening_unsigned_narrow},
-	{"_zx_syscall_test_widening_unsigned_wide", 0xbaf25fc7, &vdso_zx_syscall_test_widening_unsigned_wide},
-	{"_zx_syscall_test_wrapper", 0x4d7af9cf, &vdso_zx_syscall_test_wrapper},
 	{"_zx_system_get_dcache_line_size", 0x2d6d6511, &vdso_zx_system_get_dcache_line_size},
 	{"_zx_system_get_event", 0x7a0b68da, &vdso_zx_system_get_event},
 	{"_zx_system_get_features", 0x42682df7, &vdso_zx_system_get_features},
@@ -344,6 +344,12 @@ var vdsoSymbolKeys = []vdsoSymbolKey{
 //go:cgo_import_dynamic vdso_zx_stream_writev zx_stream_writev
 //go:cgo_import_dynamic vdso_zx_stream_writev_at zx_stream_writev_at
 //go:cgo_import_dynamic vdso_zx_syscall_next_1 zx_syscall_next_1
+//go:cgo_import_dynamic vdso_zx_syscall_test_handle_create zx_syscall_test_handle_create
+//go:cgo_import_dynamic vdso_zx_syscall_test_widening_signed_narrow zx_syscall_test_widening_signed_narrow
+//go:cgo_import_dynamic vdso_zx_syscall_test_widening_signed_wide zx_syscall_test_widening_signed_wide
+//go:cgo_import_dynamic vdso_zx_syscall_test_widening_unsigned_narrow zx_syscall_test_widening_unsigned_narrow
+//go:cgo_import_dynamic vdso_zx_syscall_test_widening_unsigned_wide zx_syscall_test_widening_unsigned_wide
+//go:cgo_import_dynamic vdso_zx_syscall_test_wrapper zx_syscall_test_wrapper
 //go:cgo_import_dynamic vdso_zx_syscall_test_0 zx_syscall_test_0
 //go:cgo_import_dynamic vdso_zx_syscall_test_1 zx_syscall_test_1
 //go:cgo_import_dynamic vdso_zx_syscall_test_2 zx_syscall_test_2
@@ -353,12 +359,6 @@ var vdsoSymbolKeys = []vdsoSymbolKey{
 //go:cgo_import_dynamic vdso_zx_syscall_test_6 zx_syscall_test_6
 //go:cgo_import_dynamic vdso_zx_syscall_test_7 zx_syscall_test_7
 //go:cgo_import_dynamic vdso_zx_syscall_test_8 zx_syscall_test_8
-//go:cgo_import_dynamic vdso_zx_syscall_test_handle_create zx_syscall_test_handle_create
-//go:cgo_import_dynamic vdso_zx_syscall_test_widening_signed_narrow zx_syscall_test_widening_signed_narrow
-//go:cgo_import_dynamic vdso_zx_syscall_test_widening_signed_wide zx_syscall_test_widening_signed_wide
-//go:cgo_import_dynamic vdso_zx_syscall_test_widening_unsigned_narrow zx_syscall_test_widening_unsigned_narrow
-//go:cgo_import_dynamic vdso_zx_syscall_test_widening_unsigned_wide zx_syscall_test_widening_unsigned_wide
-//go:cgo_import_dynamic vdso_zx_syscall_test_wrapper zx_syscall_test_wrapper
 //go:cgo_import_dynamic vdso_zx_system_get_dcache_line_size zx_system_get_dcache_line_size
 //go:cgo_import_dynamic vdso_zx_system_get_event zx_system_get_event
 //go:cgo_import_dynamic vdso_zx_system_get_features zx_system_get_features
@@ -542,6 +542,12 @@ var vdsoSymbolKeys = []vdsoSymbolKey{
 //go:linkname vdso_zx_stream_writev vdso_zx_stream_writev
 //go:linkname vdso_zx_stream_writev_at vdso_zx_stream_writev_at
 //go:linkname vdso_zx_syscall_next_1 vdso_zx_syscall_next_1
+//go:linkname vdso_zx_syscall_test_handle_create vdso_zx_syscall_test_handle_create
+//go:linkname vdso_zx_syscall_test_widening_signed_narrow vdso_zx_syscall_test_widening_signed_narrow
+//go:linkname vdso_zx_syscall_test_widening_signed_wide vdso_zx_syscall_test_widening_signed_wide
+//go:linkname vdso_zx_syscall_test_widening_unsigned_narrow vdso_zx_syscall_test_widening_unsigned_narrow
+//go:linkname vdso_zx_syscall_test_widening_unsigned_wide vdso_zx_syscall_test_widening_unsigned_wide
+//go:linkname vdso_zx_syscall_test_wrapper vdso_zx_syscall_test_wrapper
 //go:linkname vdso_zx_syscall_test_0 vdso_zx_syscall_test_0
 //go:linkname vdso_zx_syscall_test_1 vdso_zx_syscall_test_1
 //go:linkname vdso_zx_syscall_test_2 vdso_zx_syscall_test_2
@@ -551,12 +557,6 @@ var vdsoSymbolKeys = []vdsoSymbolKey{
 //go:linkname vdso_zx_syscall_test_6 vdso_zx_syscall_test_6
 //go:linkname vdso_zx_syscall_test_7 vdso_zx_syscall_test_7
 //go:linkname vdso_zx_syscall_test_8 vdso_zx_syscall_test_8
-//go:linkname vdso_zx_syscall_test_handle_create vdso_zx_syscall_test_handle_create
-//go:linkname vdso_zx_syscall_test_widening_signed_narrow vdso_zx_syscall_test_widening_signed_narrow
-//go:linkname vdso_zx_syscall_test_widening_signed_wide vdso_zx_syscall_test_widening_signed_wide
-//go:linkname vdso_zx_syscall_test_widening_unsigned_narrow vdso_zx_syscall_test_widening_unsigned_narrow
-//go:linkname vdso_zx_syscall_test_widening_unsigned_wide vdso_zx_syscall_test_widening_unsigned_wide
-//go:linkname vdso_zx_syscall_test_wrapper vdso_zx_syscall_test_wrapper
 //go:linkname vdso_zx_system_get_dcache_line_size vdso_zx_system_get_dcache_line_size
 //go:linkname vdso_zx_system_get_event vdso_zx_system_get_event
 //go:linkname vdso_zx_system_get_features vdso_zx_system_get_features
@@ -1132,6 +1132,30 @@ func vdsoCall_zx_syscall_next_1(arg int32) int32
 
 //go:noescape
 //go:nosplit
+func vdsoCall_zx_syscall_test_handle_create(return_value int32, out unsafe.Pointer) int32
+
+//go:noescape
+//go:nosplit
+func vdsoCall_zx_syscall_test_widening_signed_narrow(a int64, b int32, c int16, d int8) int64
+
+//go:noescape
+//go:nosplit
+func vdsoCall_zx_syscall_test_widening_signed_wide(a int64, b int32, c int16, d int8) int64
+
+//go:noescape
+//go:nosplit
+func vdsoCall_zx_syscall_test_widening_unsigned_narrow(a uint64, b uint32, c uint16, d uint8) uint64
+
+//go:noescape
+//go:nosplit
+func vdsoCall_zx_syscall_test_widening_unsigned_wide(a uint64, b uint32, c uint16, d uint8) uint64
+
+//go:noescape
+//go:nosplit
+func vdsoCall_zx_syscall_test_wrapper(a int32, b int32, c int32) int32
+
+//go:noescape
+//go:nosplit
 func vdsoCall_zx_syscall_test_0() int32
 
 //go:noescape
@@ -1165,30 +1189,6 @@ func vdsoCall_zx_syscall_test_7(a int32, b int32, c int32, d int32, e int32, f i
 //go:noescape
 //go:nosplit
 func vdsoCall_zx_syscall_test_8(a int32, b int32, c int32, d int32, e int32, f int32, g_ int32, h int32) int32
-
-//go:noescape
-//go:nosplit
-func vdsoCall_zx_syscall_test_handle_create(return_value int32, out unsafe.Pointer) int32
-
-//go:noescape
-//go:nosplit
-func vdsoCall_zx_syscall_test_widening_signed_narrow(a int64, b int32, c int16, d int8) int64
-
-//go:noescape
-//go:nosplit
-func vdsoCall_zx_syscall_test_widening_signed_wide(a int64, b int32, c int16, d int8) int64
-
-//go:noescape
-//go:nosplit
-func vdsoCall_zx_syscall_test_widening_unsigned_narrow(a uint64, b uint32, c uint16, d uint8) uint64
-
-//go:noescape
-//go:nosplit
-func vdsoCall_zx_syscall_test_widening_unsigned_wide(a uint64, b uint32, c uint16, d uint8) uint64
-
-//go:noescape
-//go:nosplit
-func vdsoCall_zx_syscall_test_wrapper(a int32, b int32, c int32) int32
 
 //go:noescape
 //go:nosplit
@@ -1529,6 +1529,12 @@ var (
 	vdso_zx_stream_writev uintptr
 	vdso_zx_stream_writev_at uintptr
 	vdso_zx_syscall_next_1 uintptr
+	vdso_zx_syscall_test_handle_create uintptr
+	vdso_zx_syscall_test_widening_signed_narrow uintptr
+	vdso_zx_syscall_test_widening_signed_wide uintptr
+	vdso_zx_syscall_test_widening_unsigned_narrow uintptr
+	vdso_zx_syscall_test_widening_unsigned_wide uintptr
+	vdso_zx_syscall_test_wrapper uintptr
 	vdso_zx_syscall_test_0 uintptr
 	vdso_zx_syscall_test_1 uintptr
 	vdso_zx_syscall_test_2 uintptr
@@ -1538,12 +1544,6 @@ var (
 	vdso_zx_syscall_test_6 uintptr
 	vdso_zx_syscall_test_7 uintptr
 	vdso_zx_syscall_test_8 uintptr
-	vdso_zx_syscall_test_handle_create uintptr
-	vdso_zx_syscall_test_widening_signed_narrow uintptr
-	vdso_zx_syscall_test_widening_signed_wide uintptr
-	vdso_zx_syscall_test_widening_unsigned_narrow uintptr
-	vdso_zx_syscall_test_widening_unsigned_wide uintptr
-	vdso_zx_syscall_test_wrapper uintptr
 	vdso_zx_system_get_dcache_line_size uintptr
 	vdso_zx_system_get_event uintptr
 	vdso_zx_system_get_features uintptr

@@ -9,6 +9,7 @@
 #include <zircon/compiler.h>
 
 #include <algorithm>
+#include <cctype>
 
 #include "tools/kazoo/output_util.h"
 #include "tools/kazoo/string_util.h"
@@ -457,7 +458,22 @@ void SyscallLibrary::FilterSyscalls(const std::set<std::string>& attributes_to_e
 
   std::sort(filtered.begin(), filtered.end(),
             [](const std::unique_ptr<Syscall>& a, const std::unique_ptr<Syscall>& b) -> bool {
-              return a->snake_name() < b->snake_name();
+              // TODO(fxbug.dev/110295): The default lexicographic order
+              // between digits and letters is different in C++ than in Go.
+              // Compare the Go way here for easier diffs when comparing
+              // kazoo's outputs with zither's.
+              auto comp = [](char c1, char c2) -> bool {
+                bool isdigit1 = std::isdigit(c1);
+                bool isdigit2 = std::isdigit(c2);
+                if (isdigit1 != isdigit2) {
+                  return !isdigit1;
+                }
+                return c1 < c2;
+              };
+              const std::string& name_a = a->snake_name();
+              const std::string& name_b = b->snake_name();
+              return std::lexicographical_compare(name_a.begin(), name_a.end(), name_b.begin(),
+                                                  name_b.end(), comp);
             });
   syscalls_ = std::move(filtered);
 }

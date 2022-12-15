@@ -2467,6 +2467,117 @@ TEXT runtime·vdsoCall_zx_syscall_next_1(SB),NOSPLIT,$0-12
 	MOVD $0, m_vdsoSP(R21)
 	RET
 
+// func vdsoCall_zx_syscall_test_handle_create(return_value int32, out unsafe.Pointer) int32
+TEXT runtime·vdsoCall_zx_syscall_test_handle_create(SB),NOSPLIT,$0-20
+	GO_ARGS
+	NO_LOCAL_POINTERS
+	MOVD g_m(g), R21
+	MOVD LR, m_vdsoPC(R21)
+	DMB $0xe
+	MOVD $ret-8(FP), R20 // caller's SP
+	MOVD R20, m_vdsoSP(R21)
+	MOVW return_value+0(FP), R0
+	MOVD out+8(FP), R1
+	BL vdso_zx_syscall_test_handle_create(SB)
+	MOVW R0, ret+16(FP)
+	MOVD g_m(g), R21
+	MOVD $0, m_vdsoSP(R21)
+	RET
+
+// func vdsoCall_zx_syscall_test_widening_signed_narrow(a int64, b int32, c int16, d int8) int64
+TEXT runtime·vdsoCall_zx_syscall_test_widening_signed_narrow(SB),NOSPLIT,$0-32
+	GO_ARGS
+	NO_LOCAL_POINTERS
+	MOVD g_m(g), R21
+	MOVD LR, m_vdsoPC(R21)
+	DMB $0xe
+	MOVD $ret-8(FP), R20 // caller's SP
+	MOVD R20, m_vdsoSP(R21)
+	MOVD a+0(FP), R0
+	MOVW b+8(FP), R1
+	MOVD c+12(FP), R2
+	MOVD d+16(FP), R3
+	BL vdso_zx_syscall_test_widening_signed_narrow(SB)
+	MOVD R0, ret+24(FP)
+	MOVD g_m(g), R21
+	MOVD $0, m_vdsoSP(R21)
+	RET
+
+// func vdsoCall_zx_syscall_test_widening_signed_wide(a int64, b int32, c int16, d int8) int64
+TEXT runtime·vdsoCall_zx_syscall_test_widening_signed_wide(SB),NOSPLIT,$0-32
+	GO_ARGS
+	NO_LOCAL_POINTERS
+	MOVD g_m(g), R21
+	MOVD LR, m_vdsoPC(R21)
+	DMB $0xe
+	MOVD $ret-8(FP), R20 // caller's SP
+	MOVD R20, m_vdsoSP(R21)
+	MOVD a+0(FP), R0
+	MOVW b+8(FP), R1
+	MOVD c+12(FP), R2
+	MOVD d+16(FP), R3
+	BL vdso_zx_syscall_test_widening_signed_wide(SB)
+	MOVD R0, ret+24(FP)
+	MOVD g_m(g), R21
+	MOVD $0, m_vdsoSP(R21)
+	RET
+
+// func vdsoCall_zx_syscall_test_widening_unsigned_narrow(a uint64, b uint32, c uint16, d uint8) uint64
+TEXT runtime·vdsoCall_zx_syscall_test_widening_unsigned_narrow(SB),NOSPLIT,$0-32
+	GO_ARGS
+	NO_LOCAL_POINTERS
+	MOVD g_m(g), R21
+	MOVD LR, m_vdsoPC(R21)
+	DMB $0xe
+	MOVD $ret-8(FP), R20 // caller's SP
+	MOVD R20, m_vdsoSP(R21)
+	MOVD a+0(FP), R0
+	MOVW b+8(FP), R1
+	MOVD c+12(FP), R2
+	MOVD d+16(FP), R3
+	BL vdso_zx_syscall_test_widening_unsigned_narrow(SB)
+	MOVD R0, ret+24(FP)
+	MOVD g_m(g), R21
+	MOVD $0, m_vdsoSP(R21)
+	RET
+
+// func vdsoCall_zx_syscall_test_widening_unsigned_wide(a uint64, b uint32, c uint16, d uint8) uint64
+TEXT runtime·vdsoCall_zx_syscall_test_widening_unsigned_wide(SB),NOSPLIT,$0-32
+	GO_ARGS
+	NO_LOCAL_POINTERS
+	MOVD g_m(g), R21
+	MOVD LR, m_vdsoPC(R21)
+	DMB $0xe
+	MOVD $ret-8(FP), R20 // caller's SP
+	MOVD R20, m_vdsoSP(R21)
+	MOVD a+0(FP), R0
+	MOVW b+8(FP), R1
+	MOVD c+12(FP), R2
+	MOVD d+16(FP), R3
+	BL vdso_zx_syscall_test_widening_unsigned_wide(SB)
+	MOVD R0, ret+24(FP)
+	MOVD g_m(g), R21
+	MOVD $0, m_vdsoSP(R21)
+	RET
+
+// func vdsoCall_zx_syscall_test_wrapper(a int32, b int32, c int32) int32
+TEXT runtime·vdsoCall_zx_syscall_test_wrapper(SB),NOSPLIT,$0-20
+	GO_ARGS
+	NO_LOCAL_POINTERS
+	MOVD g_m(g), R21
+	MOVD LR, m_vdsoPC(R21)
+	DMB $0xe
+	MOVD $ret-8(FP), R20 // caller's SP
+	MOVD R20, m_vdsoSP(R21)
+	MOVW a+0(FP), R0
+	MOVW b+4(FP), R1
+	MOVW c+8(FP), R2
+	BL vdso_zx_syscall_test_wrapper(SB)
+	MOVW R0, ret+16(FP)
+	MOVD g_m(g), R21
+	MOVD $0, m_vdsoSP(R21)
+	RET
+
 // func vdsoCall_zx_syscall_test_0() int32
 TEXT runtime·vdsoCall_zx_syscall_test_0(SB),NOSPLIT,$0-4
 	GO_ARGS
@@ -2634,117 +2745,6 @@ TEXT runtime·vdsoCall_zx_syscall_test_8(SB),NOSPLIT,$0-36
 	MOVW h+28(FP), R7
 	BL vdso_zx_syscall_test_8(SB)
 	MOVW R0, ret+32(FP)
-	MOVD g_m(g), R21
-	MOVD $0, m_vdsoSP(R21)
-	RET
-
-// func vdsoCall_zx_syscall_test_handle_create(return_value int32, out unsafe.Pointer) int32
-TEXT runtime·vdsoCall_zx_syscall_test_handle_create(SB),NOSPLIT,$0-20
-	GO_ARGS
-	NO_LOCAL_POINTERS
-	MOVD g_m(g), R21
-	MOVD LR, m_vdsoPC(R21)
-	DMB $0xe
-	MOVD $ret-8(FP), R20 // caller's SP
-	MOVD R20, m_vdsoSP(R21)
-	MOVW return_value+0(FP), R0
-	MOVD out+8(FP), R1
-	BL vdso_zx_syscall_test_handle_create(SB)
-	MOVW R0, ret+16(FP)
-	MOVD g_m(g), R21
-	MOVD $0, m_vdsoSP(R21)
-	RET
-
-// func vdsoCall_zx_syscall_test_widening_signed_narrow(a int64, b int32, c int16, d int8) int64
-TEXT runtime·vdsoCall_zx_syscall_test_widening_signed_narrow(SB),NOSPLIT,$0-32
-	GO_ARGS
-	NO_LOCAL_POINTERS
-	MOVD g_m(g), R21
-	MOVD LR, m_vdsoPC(R21)
-	DMB $0xe
-	MOVD $ret-8(FP), R20 // caller's SP
-	MOVD R20, m_vdsoSP(R21)
-	MOVD a+0(FP), R0
-	MOVW b+8(FP), R1
-	MOVD c+12(FP), R2
-	MOVD d+16(FP), R3
-	BL vdso_zx_syscall_test_widening_signed_narrow(SB)
-	MOVD R0, ret+24(FP)
-	MOVD g_m(g), R21
-	MOVD $0, m_vdsoSP(R21)
-	RET
-
-// func vdsoCall_zx_syscall_test_widening_signed_wide(a int64, b int32, c int16, d int8) int64
-TEXT runtime·vdsoCall_zx_syscall_test_widening_signed_wide(SB),NOSPLIT,$0-32
-	GO_ARGS
-	NO_LOCAL_POINTERS
-	MOVD g_m(g), R21
-	MOVD LR, m_vdsoPC(R21)
-	DMB $0xe
-	MOVD $ret-8(FP), R20 // caller's SP
-	MOVD R20, m_vdsoSP(R21)
-	MOVD a+0(FP), R0
-	MOVW b+8(FP), R1
-	MOVD c+12(FP), R2
-	MOVD d+16(FP), R3
-	BL vdso_zx_syscall_test_widening_signed_wide(SB)
-	MOVD R0, ret+24(FP)
-	MOVD g_m(g), R21
-	MOVD $0, m_vdsoSP(R21)
-	RET
-
-// func vdsoCall_zx_syscall_test_widening_unsigned_narrow(a uint64, b uint32, c uint16, d uint8) uint64
-TEXT runtime·vdsoCall_zx_syscall_test_widening_unsigned_narrow(SB),NOSPLIT,$0-32
-	GO_ARGS
-	NO_LOCAL_POINTERS
-	MOVD g_m(g), R21
-	MOVD LR, m_vdsoPC(R21)
-	DMB $0xe
-	MOVD $ret-8(FP), R20 // caller's SP
-	MOVD R20, m_vdsoSP(R21)
-	MOVD a+0(FP), R0
-	MOVW b+8(FP), R1
-	MOVD c+12(FP), R2
-	MOVD d+16(FP), R3
-	BL vdso_zx_syscall_test_widening_unsigned_narrow(SB)
-	MOVD R0, ret+24(FP)
-	MOVD g_m(g), R21
-	MOVD $0, m_vdsoSP(R21)
-	RET
-
-// func vdsoCall_zx_syscall_test_widening_unsigned_wide(a uint64, b uint32, c uint16, d uint8) uint64
-TEXT runtime·vdsoCall_zx_syscall_test_widening_unsigned_wide(SB),NOSPLIT,$0-32
-	GO_ARGS
-	NO_LOCAL_POINTERS
-	MOVD g_m(g), R21
-	MOVD LR, m_vdsoPC(R21)
-	DMB $0xe
-	MOVD $ret-8(FP), R20 // caller's SP
-	MOVD R20, m_vdsoSP(R21)
-	MOVD a+0(FP), R0
-	MOVW b+8(FP), R1
-	MOVD c+12(FP), R2
-	MOVD d+16(FP), R3
-	BL vdso_zx_syscall_test_widening_unsigned_wide(SB)
-	MOVD R0, ret+24(FP)
-	MOVD g_m(g), R21
-	MOVD $0, m_vdsoSP(R21)
-	RET
-
-// func vdsoCall_zx_syscall_test_wrapper(a int32, b int32, c int32) int32
-TEXT runtime·vdsoCall_zx_syscall_test_wrapper(SB),NOSPLIT,$0-20
-	GO_ARGS
-	NO_LOCAL_POINTERS
-	MOVD g_m(g), R21
-	MOVD LR, m_vdsoPC(R21)
-	DMB $0xe
-	MOVD $ret-8(FP), R20 // caller's SP
-	MOVD R20, m_vdsoSP(R21)
-	MOVW a+0(FP), R0
-	MOVW b+4(FP), R1
-	MOVW c+8(FP), R2
-	BL vdso_zx_syscall_test_wrapper(SB)
-	MOVW R0, ret+16(FP)
 	MOVD g_m(g), R21
 	MOVD $0, m_vdsoSP(R21)
 	RET

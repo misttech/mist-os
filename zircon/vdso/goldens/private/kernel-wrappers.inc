@@ -1243,6 +1243,61 @@ syscall_result wrapper_syscall_next_1(SafeSyscallArgument<int32_t>::RawType arg,
     });
 }
 
+syscall_result wrapper_syscall_test_handle_create(SafeSyscallArgument<zx_status_t>::RawType return_value, SafeSyscallArgument<zx_handle_t*>::RawType out, uint64_t pc);
+syscall_result wrapper_syscall_test_handle_create(SafeSyscallArgument<zx_status_t>::RawType return_value, SafeSyscallArgument<zx_handle_t*>::RawType out, uint64_t pc) {
+    return do_syscall(ZX_SYS_syscall_test_handle_create, pc, &VDso::ValidSyscallPC::syscall_test_handle_create, [&](ProcessDispatcher* current_process) -> uint64_t {
+        user_out_handle out_handle_out;
+        auto result = sys_syscall_test_handle_create(SafeSyscallArgument<zx_status_t>::Sanitize(return_value), &out_handle_out);
+        if (result != ZX_OK)
+            return result;
+        result = out_handle_out.begin_copyout(current_process, make_user_out_ptr(SafeSyscallArgument<zx_handle_t*>::Sanitize(out)));
+        if (result != ZX_OK)
+            return result;
+        out_handle_out.finish_copyout(current_process);
+        return result;
+    });
+}
+
+syscall_result wrapper_syscall_test_widening_signed_narrow(SafeSyscallArgument<int64_t>::RawType a, SafeSyscallArgument<int32_t>::RawType b, SafeSyscallArgument<int16_t>::RawType c, SafeSyscallArgument<int8_t>::RawType d, uint64_t pc);
+syscall_result wrapper_syscall_test_widening_signed_narrow(SafeSyscallArgument<int64_t>::RawType a, SafeSyscallArgument<int32_t>::RawType b, SafeSyscallArgument<int16_t>::RawType c, SafeSyscallArgument<int8_t>::RawType d, uint64_t pc) {
+    return do_syscall(ZX_SYS_syscall_test_widening_signed_narrow, pc, &VDso::ValidSyscallPC::syscall_test_widening_signed_narrow, [&](ProcessDispatcher* current_process) -> uint64_t {
+        auto result = sys_syscall_test_widening_signed_narrow(SafeSyscallArgument<int64_t>::Sanitize(a), SafeSyscallArgument<int32_t>::Sanitize(b), SafeSyscallArgument<int16_t>::Sanitize(c), SafeSyscallArgument<int8_t>::Sanitize(d));
+        return result;
+    });
+}
+
+syscall_result wrapper_syscall_test_widening_signed_wide(SafeSyscallArgument<int64_t>::RawType a, SafeSyscallArgument<int32_t>::RawType b, SafeSyscallArgument<int16_t>::RawType c, SafeSyscallArgument<int8_t>::RawType d, uint64_t pc);
+syscall_result wrapper_syscall_test_widening_signed_wide(SafeSyscallArgument<int64_t>::RawType a, SafeSyscallArgument<int32_t>::RawType b, SafeSyscallArgument<int16_t>::RawType c, SafeSyscallArgument<int8_t>::RawType d, uint64_t pc) {
+    return do_syscall(ZX_SYS_syscall_test_widening_signed_wide, pc, &VDso::ValidSyscallPC::syscall_test_widening_signed_wide, [&](ProcessDispatcher* current_process) -> uint64_t {
+        auto result = sys_syscall_test_widening_signed_wide(SafeSyscallArgument<int64_t>::Sanitize(a), SafeSyscallArgument<int32_t>::Sanitize(b), SafeSyscallArgument<int16_t>::Sanitize(c), SafeSyscallArgument<int8_t>::Sanitize(d));
+        return result;
+    });
+}
+
+syscall_result wrapper_syscall_test_widening_unsigned_narrow(SafeSyscallArgument<uint64_t>::RawType a, SafeSyscallArgument<uint32_t>::RawType b, SafeSyscallArgument<uint16_t>::RawType c, SafeSyscallArgument<uint8_t>::RawType d, uint64_t pc);
+syscall_result wrapper_syscall_test_widening_unsigned_narrow(SafeSyscallArgument<uint64_t>::RawType a, SafeSyscallArgument<uint32_t>::RawType b, SafeSyscallArgument<uint16_t>::RawType c, SafeSyscallArgument<uint8_t>::RawType d, uint64_t pc) {
+    return do_syscall(ZX_SYS_syscall_test_widening_unsigned_narrow, pc, &VDso::ValidSyscallPC::syscall_test_widening_unsigned_narrow, [&](ProcessDispatcher* current_process) -> uint64_t {
+        auto result = sys_syscall_test_widening_unsigned_narrow(SafeSyscallArgument<uint64_t>::Sanitize(a), SafeSyscallArgument<uint32_t>::Sanitize(b), SafeSyscallArgument<uint16_t>::Sanitize(c), SafeSyscallArgument<uint8_t>::Sanitize(d));
+        return result;
+    });
+}
+
+syscall_result wrapper_syscall_test_widening_unsigned_wide(SafeSyscallArgument<uint64_t>::RawType a, SafeSyscallArgument<uint32_t>::RawType b, SafeSyscallArgument<uint16_t>::RawType c, SafeSyscallArgument<uint8_t>::RawType d, uint64_t pc);
+syscall_result wrapper_syscall_test_widening_unsigned_wide(SafeSyscallArgument<uint64_t>::RawType a, SafeSyscallArgument<uint32_t>::RawType b, SafeSyscallArgument<uint16_t>::RawType c, SafeSyscallArgument<uint8_t>::RawType d, uint64_t pc) {
+    return do_syscall(ZX_SYS_syscall_test_widening_unsigned_wide, pc, &VDso::ValidSyscallPC::syscall_test_widening_unsigned_wide, [&](ProcessDispatcher* current_process) -> uint64_t {
+        auto result = sys_syscall_test_widening_unsigned_wide(SafeSyscallArgument<uint64_t>::Sanitize(a), SafeSyscallArgument<uint32_t>::Sanitize(b), SafeSyscallArgument<uint16_t>::Sanitize(c), SafeSyscallArgument<uint8_t>::Sanitize(d));
+        return result;
+    });
+}
+
+syscall_result wrapper_syscall_test_wrapper(SafeSyscallArgument<int32_t>::RawType a, SafeSyscallArgument<int32_t>::RawType b, SafeSyscallArgument<int32_t>::RawType c, uint64_t pc);
+syscall_result wrapper_syscall_test_wrapper(SafeSyscallArgument<int32_t>::RawType a, SafeSyscallArgument<int32_t>::RawType b, SafeSyscallArgument<int32_t>::RawType c, uint64_t pc) {
+    return do_syscall(ZX_SYS_syscall_test_wrapper, pc, &VDso::ValidSyscallPC::syscall_test_wrapper, [&](ProcessDispatcher* current_process) -> uint64_t {
+        auto result = sys_syscall_test_wrapper(SafeSyscallArgument<int32_t>::Sanitize(a), SafeSyscallArgument<int32_t>::Sanitize(b), SafeSyscallArgument<int32_t>::Sanitize(c));
+        return result;
+    });
+}
+
 syscall_result wrapper_syscall_test_0(uint64_t pc);
 syscall_result wrapper_syscall_test_0(uint64_t pc) {
     return do_syscall(ZX_SYS_syscall_test_0, pc, &VDso::ValidSyscallPC::syscall_test_0, [&](ProcessDispatcher* current_process) -> uint64_t {
@@ -1311,61 +1366,6 @@ syscall_result wrapper_syscall_test_8(SafeSyscallArgument<int32_t>::RawType a, S
 syscall_result wrapper_syscall_test_8(SafeSyscallArgument<int32_t>::RawType a, SafeSyscallArgument<int32_t>::RawType b, SafeSyscallArgument<int32_t>::RawType c, SafeSyscallArgument<int32_t>::RawType d, SafeSyscallArgument<int32_t>::RawType e, SafeSyscallArgument<int32_t>::RawType f, SafeSyscallArgument<int32_t>::RawType g, SafeSyscallArgument<int32_t>::RawType h, uint64_t pc) {
     return do_syscall(ZX_SYS_syscall_test_8, pc, &VDso::ValidSyscallPC::syscall_test_8, [&](ProcessDispatcher* current_process) -> uint64_t {
         auto result = sys_syscall_test_8(SafeSyscallArgument<int32_t>::Sanitize(a), SafeSyscallArgument<int32_t>::Sanitize(b), SafeSyscallArgument<int32_t>::Sanitize(c), SafeSyscallArgument<int32_t>::Sanitize(d), SafeSyscallArgument<int32_t>::Sanitize(e), SafeSyscallArgument<int32_t>::Sanitize(f), SafeSyscallArgument<int32_t>::Sanitize(g), SafeSyscallArgument<int32_t>::Sanitize(h));
-        return result;
-    });
-}
-
-syscall_result wrapper_syscall_test_handle_create(SafeSyscallArgument<zx_status_t>::RawType return_value, SafeSyscallArgument<zx_handle_t*>::RawType out, uint64_t pc);
-syscall_result wrapper_syscall_test_handle_create(SafeSyscallArgument<zx_status_t>::RawType return_value, SafeSyscallArgument<zx_handle_t*>::RawType out, uint64_t pc) {
-    return do_syscall(ZX_SYS_syscall_test_handle_create, pc, &VDso::ValidSyscallPC::syscall_test_handle_create, [&](ProcessDispatcher* current_process) -> uint64_t {
-        user_out_handle out_handle_out;
-        auto result = sys_syscall_test_handle_create(SafeSyscallArgument<zx_status_t>::Sanitize(return_value), &out_handle_out);
-        if (result != ZX_OK)
-            return result;
-        result = out_handle_out.begin_copyout(current_process, make_user_out_ptr(SafeSyscallArgument<zx_handle_t*>::Sanitize(out)));
-        if (result != ZX_OK)
-            return result;
-        out_handle_out.finish_copyout(current_process);
-        return result;
-    });
-}
-
-syscall_result wrapper_syscall_test_widening_signed_narrow(SafeSyscallArgument<int64_t>::RawType a, SafeSyscallArgument<int32_t>::RawType b, SafeSyscallArgument<int16_t>::RawType c, SafeSyscallArgument<int8_t>::RawType d, uint64_t pc);
-syscall_result wrapper_syscall_test_widening_signed_narrow(SafeSyscallArgument<int64_t>::RawType a, SafeSyscallArgument<int32_t>::RawType b, SafeSyscallArgument<int16_t>::RawType c, SafeSyscallArgument<int8_t>::RawType d, uint64_t pc) {
-    return do_syscall(ZX_SYS_syscall_test_widening_signed_narrow, pc, &VDso::ValidSyscallPC::syscall_test_widening_signed_narrow, [&](ProcessDispatcher* current_process) -> uint64_t {
-        auto result = sys_syscall_test_widening_signed_narrow(SafeSyscallArgument<int64_t>::Sanitize(a), SafeSyscallArgument<int32_t>::Sanitize(b), SafeSyscallArgument<int16_t>::Sanitize(c), SafeSyscallArgument<int8_t>::Sanitize(d));
-        return result;
-    });
-}
-
-syscall_result wrapper_syscall_test_widening_signed_wide(SafeSyscallArgument<int64_t>::RawType a, SafeSyscallArgument<int32_t>::RawType b, SafeSyscallArgument<int16_t>::RawType c, SafeSyscallArgument<int8_t>::RawType d, uint64_t pc);
-syscall_result wrapper_syscall_test_widening_signed_wide(SafeSyscallArgument<int64_t>::RawType a, SafeSyscallArgument<int32_t>::RawType b, SafeSyscallArgument<int16_t>::RawType c, SafeSyscallArgument<int8_t>::RawType d, uint64_t pc) {
-    return do_syscall(ZX_SYS_syscall_test_widening_signed_wide, pc, &VDso::ValidSyscallPC::syscall_test_widening_signed_wide, [&](ProcessDispatcher* current_process) -> uint64_t {
-        auto result = sys_syscall_test_widening_signed_wide(SafeSyscallArgument<int64_t>::Sanitize(a), SafeSyscallArgument<int32_t>::Sanitize(b), SafeSyscallArgument<int16_t>::Sanitize(c), SafeSyscallArgument<int8_t>::Sanitize(d));
-        return result;
-    });
-}
-
-syscall_result wrapper_syscall_test_widening_unsigned_narrow(SafeSyscallArgument<uint64_t>::RawType a, SafeSyscallArgument<uint32_t>::RawType b, SafeSyscallArgument<uint16_t>::RawType c, SafeSyscallArgument<uint8_t>::RawType d, uint64_t pc);
-syscall_result wrapper_syscall_test_widening_unsigned_narrow(SafeSyscallArgument<uint64_t>::RawType a, SafeSyscallArgument<uint32_t>::RawType b, SafeSyscallArgument<uint16_t>::RawType c, SafeSyscallArgument<uint8_t>::RawType d, uint64_t pc) {
-    return do_syscall(ZX_SYS_syscall_test_widening_unsigned_narrow, pc, &VDso::ValidSyscallPC::syscall_test_widening_unsigned_narrow, [&](ProcessDispatcher* current_process) -> uint64_t {
-        auto result = sys_syscall_test_widening_unsigned_narrow(SafeSyscallArgument<uint64_t>::Sanitize(a), SafeSyscallArgument<uint32_t>::Sanitize(b), SafeSyscallArgument<uint16_t>::Sanitize(c), SafeSyscallArgument<uint8_t>::Sanitize(d));
-        return result;
-    });
-}
-
-syscall_result wrapper_syscall_test_widening_unsigned_wide(SafeSyscallArgument<uint64_t>::RawType a, SafeSyscallArgument<uint32_t>::RawType b, SafeSyscallArgument<uint16_t>::RawType c, SafeSyscallArgument<uint8_t>::RawType d, uint64_t pc);
-syscall_result wrapper_syscall_test_widening_unsigned_wide(SafeSyscallArgument<uint64_t>::RawType a, SafeSyscallArgument<uint32_t>::RawType b, SafeSyscallArgument<uint16_t>::RawType c, SafeSyscallArgument<uint8_t>::RawType d, uint64_t pc) {
-    return do_syscall(ZX_SYS_syscall_test_widening_unsigned_wide, pc, &VDso::ValidSyscallPC::syscall_test_widening_unsigned_wide, [&](ProcessDispatcher* current_process) -> uint64_t {
-        auto result = sys_syscall_test_widening_unsigned_wide(SafeSyscallArgument<uint64_t>::Sanitize(a), SafeSyscallArgument<uint32_t>::Sanitize(b), SafeSyscallArgument<uint16_t>::Sanitize(c), SafeSyscallArgument<uint8_t>::Sanitize(d));
-        return result;
-    });
-}
-
-syscall_result wrapper_syscall_test_wrapper(SafeSyscallArgument<int32_t>::RawType a, SafeSyscallArgument<int32_t>::RawType b, SafeSyscallArgument<int32_t>::RawType c, uint64_t pc);
-syscall_result wrapper_syscall_test_wrapper(SafeSyscallArgument<int32_t>::RawType a, SafeSyscallArgument<int32_t>::RawType b, SafeSyscallArgument<int32_t>::RawType c, uint64_t pc) {
-    return do_syscall(ZX_SYS_syscall_test_wrapper, pc, &VDso::ValidSyscallPC::syscall_test_wrapper, [&](ProcessDispatcher* current_process) -> uint64_t {
-        auto result = sys_syscall_test_wrapper(SafeSyscallArgument<int32_t>::Sanitize(a), SafeSyscallArgument<int32_t>::Sanitize(b), SafeSyscallArgument<int32_t>::Sanitize(c));
         return result;
     });
 }
