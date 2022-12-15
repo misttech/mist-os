@@ -1,0 +1,36 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "fastboot-usb",
+            url: "fuchsia-pkg://fuchsia.com/fastboot-usb#meta/fastboot-usb.cm",
+            startup: "eager",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.fshost.Admin",
+                "fuchsia.hardware.power.statecontrol.Admin",
+                "fuchsia.logger.LogSink",
+                "fuchsia.paver.Paver",
+            ],
+            from: "parent",
+            to: [ "#fastboot-usb" ],
+        },
+        {
+            protocol: "fuchsia.buildinfo.Provider",
+            from: "#build-info",
+            to: "#fastboot-usb",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-class-fastboot",
+            to: "#fastboot-usb",
+            subdir: "fastboot",
+        },
+    ],
+}
