@@ -543,7 +543,12 @@ where
                 // TODO(fxb/116213): Remove the clone once we don't need to
                 // return the prekey for checking outside of this block.
                 (
-                    produce_single_enrollment(auth_mechanism_id, data, prekey_material.clone())?,
+                    produce_single_enrollment(
+                        auth_mechanism_id,
+                        Mechanism::Test,
+                        data,
+                        prekey_material.clone(),
+                    )?,
                     Some(prekey_material),
                 )
             }
@@ -574,7 +579,12 @@ where
                 // TODO(fxb/116213): Remove the clone once we don't need to
                 // return the prekey for checking outside of this block.
                 (
-                    produce_single_enrollment("".to_string(), data, prekey_material.clone())?,
+                    produce_single_enrollment(
+                        "".to_string(),
+                        *mechanism,
+                        data,
+                        prekey_material.clone(),
+                    )?,
                     Some(prekey_material),
                 )
             }
@@ -610,6 +620,7 @@ where
     ) -> Result<(Option<Vec<u8>>, Option<pre_auth::EnrollmentState>), AccountManagerError> {
         if let pre_auth::EnrollmentState::SingleEnrollment {
             ref auth_mechanism_id,
+            ref mechanism,
             ref data,
             ref wrapped_key_material,
         } = enrollment_state
@@ -626,14 +637,15 @@ where
                         .with_cause(format_err!("Error connecting to authenticator: {:?}", err))
                 })??
             } else {
-                let mechanism = match mechanisms {
-                    [mechanism] => mechanism,
-                    _ => {
-                        return Err(AccountManagerError::new(ApiError::Internal).with_cause(
-                            format_err!("Invalid number of authentication mechanisms available."),
-                        ));
-                    }
-                };
+                if !mechanisms.contains(mechanism) {
+                    return Err(AccountManagerError::new(ApiError::Internal).with_cause(
+                        format_err!(
+                            "Enrollment mechanism {:?} is not available for \
+                            authentication.",
+                            mechanism
+                        ),
+                    ));
+                }
                 let server_end = interaction.take().ok_or_else(|| {
                     AccountManagerError::new(ApiError::InvalidRequest)
                         .with_cause(format_err!("Interaction ServerEnd missing."))
@@ -657,6 +669,7 @@ where
             let updated_pre_auth_state = auth_attempt.updated_enrollment_data.map(|data| {
                 pre_auth::EnrollmentState::SingleEnrollment {
                     auth_mechanism_id: auth_mechanism_id.to_string(),
+                    mechanism: *mechanism,
                     data,
                     wrapped_key_material: wrapped_key_material.clone(),
                 }

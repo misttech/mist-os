@@ -18,9 +18,10 @@ use {
         Aes256Gcm, Nonce,
     },
     fidl_fuchsia_identity_account::Error as ApiError,
+    fidl_fuchsia_identity_authentication::Mechanism,
     lazy_static::lazy_static,
     rand::{thread_rng, Rng},
-    serde::{Deserialize, Serialize},
+    serde::{Deserialize, Deserializer, Serialize, Serializer},
     tracing::{error, warn},
 };
 
@@ -92,12 +93,33 @@ pub enum EnrollmentState {
     SingleEnrollment {
         /// the ID of the authentication mechanism,
         auth_mechanism_id: String,
+        #[serde(
+            deserialize_with = "deserialize_mechanism",
+            serialize_with = "serialize_mechanism"
+        )]
+        /// the mechanism used for authentication challenges.
+        mechanism: Mechanism,
         /// the enrollment data for that authentication mechanism,
         data: Vec<u8>,
         /// both the volume encryption key and the null key (a key of all
         /// zeroes), wrapped with the authenticator prekey material.
         wrapped_key_material: WrappedKeySet,
     },
+}
+
+fn deserialize_mechanism<'de, D>(deserializer: D) -> Result<Mechanism, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let primitive = u32::deserialize(deserializer)?;
+    Ok(Mechanism::from_primitive_allow_unknown(primitive))
+}
+
+fn serialize_mechanism<S>(mechanism: &Mechanism, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_u32(mechanism.into_primitive())
 }
 
 // Generates a random 256-bit array and returns it as a generic array of 32 u8s.
@@ -192,11 +214,13 @@ fn produce_wrapped_keys(prekey_material: Vec<u8>) -> Result<WrappedKeySet, ApiEr
 
 pub fn produce_single_enrollment(
     auth_mechanism_id: String,
+    mechanism: Mechanism,
     data: Vec<u8>,
     prekey_material: Vec<u8>,
 ) -> Result<EnrollmentState, ApiError> {
     Ok(EnrollmentState::SingleEnrollment {
         auth_mechanism_id,
+        mechanism,
         data,
         wrapped_key_material: produce_wrapped_keys(prekey_material)?,
     })
@@ -212,6 +236,7 @@ mod tests {
     lazy_static! {
         static ref TEST_ENROLLMENT_STATE: EnrollmentState = EnrollmentState::SingleEnrollment {
             auth_mechanism_id: String::from("test_id"),
+            mechanism: Mechanism::Test,
             data: vec![1, 2, 3],
             wrapped_key_material: WrappedKeySet {
                 wrapped_real_key: WrappedKey {
@@ -229,9 +254,9 @@ mod tests {
             State::new(*TEST_ACCOUNT_ID_1, TEST_ENROLLMENT_STATE.clone(),);
         static ref TEST_STATE_BYTES: Vec<u8> = vec![
             1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 116, 101, 115,
-            116, 95, 105, 100, 3, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 3, 0, 0, 0, 0, 0, 0, 0, 4, 5, 6, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 7, 8, 9, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0
+            116, 95, 105, 100, 2, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 3, 0, 0, 0, 0, 0, 0, 0,
+            4, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 7, 8, 9, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0
         ];
     }
 
