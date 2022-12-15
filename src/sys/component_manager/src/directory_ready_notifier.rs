@@ -16,7 +16,7 @@ use {
         CapabilityName, CapabilityPath, ComponentDecl, ExposeDecl, ExposeDirectoryDecl,
         ExposeSource, ExposeTarget,
     },
-    fidl::endpoints::{Proxy, ServerEnd},
+    fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_fs, fuchsia_zircon as zx,
     futures::stream::StreamExt,
     moniker::AbsoluteMoniker,
@@ -74,13 +74,10 @@ impl DirectoryReadyNotifier {
         outgoing_dir: &fio::DirectoryProxy,
         decl: ComponentDecl,
     ) -> Result<(), ModelError> {
-        // Forward along errors into the new task so that dispatch can forward the
-        // error as an event.
-        let outgoing_node_result = clone_outgoing_root(&outgoing_dir, target_moniker).await;
-
         // Don't block the handling on the event on the exposed capabilities being ready
         let this = self.clone();
         let target_moniker = target_moniker.clone();
+        let outgoing_dir = Clone::clone(outgoing_dir);
         fasync::Task::spawn(async move {
             // If we can't find the component then we can't dispatch any DirectoryReady event,
             // error or otherwise. This isn't necessarily an error as the model or component might've been
@@ -97,46 +94,23 @@ impl DirectoryReadyNotifier {
             };
 
             let matching_exposes = filter_matching_exposes(&decl, None);
-            this.dispatch_capabilities_ready(
-                outgoing_node_result,
-                &decl,
-                matching_exposes,
-                &target,
-            )
-            .await;
+            this.dispatch_capabilities_ready(outgoing_dir, &decl, matching_exposes, &target).await;
         })
         .detach();
         Ok(())
-    }
-
-    /// Waits for the OnOpen event on the directory. This will hang until the component starts
-    /// serving that directory. The directory should have been cloned/opened with DESCRIBE.
-    async fn wait_for_on_open(
-        &self,
-        node: &fio::NodeProxy,
-        moniker: &AbsoluteMoniker,
-        path: String,
-    ) -> Result<(), ModelError> {
-        let mut events = node.take_event_stream();
-        match events.next().await {
-            Some(Ok(fio::NodeEvent::OnOpen_ { s: status, info: _ })) => zx::Status::ok(status)
-                .map_err(|_| ModelError::open_directory_error(moniker.clone(), path)),
-            Some(Ok(fio::NodeEvent::OnRepresentation { .. })) => Ok(()),
-            _ => Err(ModelError::open_directory_error(moniker.clone(), path)),
-        }
     }
 
     /// Waits for the outgoing directory to be ready and then notifies hooks of all the capabilities
     /// inside it that were exposed to the framework by the component.
     async fn dispatch_capabilities_ready(
         &self,
-        outgoing_node_result: Result<fio::NodeProxy, ModelError>,
+        outgoing_dir: fio::DirectoryProxy,
         decl: &ComponentDecl,
         matching_exposes: Vec<&ExposeDecl>,
         target: &Arc<ComponentInstance>,
     ) {
         let directory_ready_events =
-            self.create_events(outgoing_node_result, decl, matching_exposes, target).await;
+            self.create_events(Some(outgoing_dir), decl, matching_exposes, target).await;
         for directory_ready_event in directory_ready_events {
             target.hooks.dispatch(&directory_ready_event).await.unwrap_or_else(|error| {
                 warn!(for_component=%target.abs_moniker, %error, "Couldn't notify directory ready");
@@ -146,7 +120,7 @@ impl DirectoryReadyNotifier {
 
     async fn create_events(
         &self,
-        outgoing_node_result: Result<fio::NodeProxy, ModelError>,
+        outgoing_dir: Option<fio::DirectoryProxy>,
         decl: &ComponentDecl,
         matching_exposes: Vec<&ExposeDecl>,
         target: &Arc<ComponentInstance>,
@@ -154,12 +128,24 @@ impl DirectoryReadyNotifier {
         // Forward along the result for opening the outgoing directory into the DirectoryReady
         // dispatch in order to propagate any potential errors as an event.
         let outgoing_dir_result = async move {
-            let outgoing_node = outgoing_node_result?;
-            self.wait_for_on_open(&outgoing_node, &target.abs_moniker, "/".to_string()).await?;
-            fuchsia_fs::node_to_directory(outgoing_node)
-                .map_err(|_| ModelError::open_directory_error(target.abs_moniker.clone(), "/"))
+            let outgoing_dir = outgoing_dir?;
+            let outgoing_dir = fuchsia_fs::directory::clone_no_describe(
+                &outgoing_dir,
+                Some(fio::OpenFlags::CLONE_SAME_RIGHTS | fio::OpenFlags::DESCRIBE),
+            )
+            .ok()?;
+            let mut events = outgoing_dir.take_event_stream();
+            let () = match events.next().await {
+                Some(Ok(fio::DirectoryEvent::OnOpen_ { s: status, info: _ })) => {
+                    zx::Status::ok(status).ok()
+                }
+                Some(Ok(fio::DirectoryEvent::OnRepresentation { .. })) => Some(()),
+                _ => None,
+            }?;
+            Some(outgoing_dir)
         }
-        .await;
+        .await
+        .ok_or_else(|| ModelError::open_directory_error(target.abs_moniker.clone(), "/"));
 
         let mut events = Vec::new();
         for expose_decl in matching_exposes {
@@ -347,21 +333,6 @@ fn filter_matching_exposes<'a>(
         .collect()
 }
 
-async fn clone_outgoing_root(
-    outgoing_dir: &fio::DirectoryProxy,
-    target_moniker: &AbsoluteMoniker,
-) -> Result<fio::NodeProxy, ModelError> {
-    let outgoing_dir = fuchsia_fs::clone_directory(
-        &outgoing_dir,
-        fio::OpenFlags::CLONE_SAME_RIGHTS | fio::OpenFlags::DESCRIBE,
-    )
-    .map_err(|_| ModelError::open_directory_error(target_moniker.clone(), "/"))?;
-    let outgoing_dir_channel = outgoing_dir
-        .into_channel()
-        .map_err(|_| ModelError::open_directory_error(target_moniker.clone(), "/"))?;
-    Ok(fio::NodeProxy::from_channel(outgoing_dir_channel))
-}
-
 #[async_trait]
 impl EventSynthesisProvider for DirectoryReadyNotifier {
     async fn provide(&self, component: ExtendedComponent, filter: &EventFilter) -> Vec<Event> {
@@ -384,27 +355,14 @@ impl EventSynthesisProvider for DirectoryReadyNotifier {
             return vec![];
         }
 
-        let maybe_outgoing_node_result = async {
+        let outgoing_dir = {
             let execution = component.lock_execution().await;
-            if execution.runtime.is_none() {
-                return None;
+            match execution.runtime.as_ref() {
+                Some(runtime) => runtime.outgoing_dir.clone(),
+                None => return vec![],
             }
-            let runtime = execution.runtime.as_ref().unwrap();
-            let out_dir = match runtime.outgoing_dir.as_ref().ok_or(
-                ModelError::open_directory_error(component.abs_moniker.clone(), "/".to_string()),
-            ) {
-                Ok(out_dir) => out_dir,
-                Err(e) => return Some(Err(e)),
-            };
-            Some(clone_outgoing_root(&out_dir, &component.abs_moniker).await)
-        }
-        .await;
-        let outgoing_node_result = match maybe_outgoing_node_result {
-            None => return vec![],
-            Some(result) => result,
         };
-
-        self.create_events(outgoing_node_result, &decl, matching_exposes, &component).await
+        self.create_events(outgoing_dir, &decl, matching_exposes, &component).await
     }
 }
 

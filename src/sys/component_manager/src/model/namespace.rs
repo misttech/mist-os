@@ -210,9 +210,8 @@ fn add_pkg_directory(
     ns: &mut Vec<fcrunner::ComponentNamespaceEntry>,
     package_dir: &fio::DirectoryProxy,
 ) -> Result<(), ModelError> {
-    let clone_dir_proxy =
-        fuchsia_fs::clone_directory(package_dir, fio::OpenFlags::CLONE_SAME_RIGHTS)
-            .map_err(|e| ModelError::namespace_creation_failed(e))?;
+    let clone_dir_proxy = fuchsia_fs::directory::clone_no_describe(package_dir, None)
+        .map_err(|e| ModelError::namespace_creation_failed(e))?;
     let cloned_dir = ClientEnd::new(
         clone_dir_proxy
             .into_channel()

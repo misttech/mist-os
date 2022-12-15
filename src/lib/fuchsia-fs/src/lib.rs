@@ -136,16 +136,6 @@ pub fn node_to_file(node: fio::NodeProxy) -> Result<fio::FileProxy, Error> {
     Ok(fio::FileProxy::from_channel(node_chan))
 }
 
-/// clone_directory will create a clone of the given DirectoryProxy by calling its clone function.
-/// This function will not block.
-pub fn clone_directory(
-    dir: &fio::DirectoryProxy,
-    flags: fio::OpenFlags,
-) -> Result<fio::DirectoryProxy, Error> {
-    let node = directory::clone_no_describe(dir, Some(flags))?;
-    Ok(node)
-}
-
 /// canonicalize_path will remove a leading `/` if it exists, since it's always unnecessary and in
 /// some cases disallowed (fxbug.dev/28436).
 pub fn canonicalize_path(path: &str) -> &str {

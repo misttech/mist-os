@@ -904,11 +904,11 @@ mod tests {
         );
 
         let configurator = Arc::new(Mutex::new(DefaultConfigurator::new(config)?));
-        if let Err(e) = find_codecs(codec_proxy, 2, configurator.clone()).await {
+        if let Err(e) = find_codecs(&codec_proxy, 2, configurator.clone()).await {
             // One of the test drivers reports bad formats.
             assert_eq!(e.to_string(), "Codec processing error: Codec with bad format reported");
         }
-        assert_matches!(find_dais(dai_proxy, 1, configurator).await, Ok(()));
+        assert_matches!(find_dais(&dai_proxy, 1, configurator).await, Ok(()));
 
         Ok(())
     }
@@ -949,14 +949,14 @@ mod tests {
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
         let configurator = Arc::new(Mutex::new(DefaultConfigurator::new(config)?));
-        if let Err(e) = find_codecs(codec_proxy, 2, configurator.clone()).await {
+        if let Err(e) = find_codecs(&codec_proxy, 2, configurator.clone()).await {
             assert_eq!(
                 e.to_string(),
                 "Codec processing error: Codec (Device { manufacturer: \"456\", product: \"789\", \
                  is_codec: true, hardwired: true, dai_channel: 0 }) not in config"
             );
         }
-        if let Err(e) = find_dais(dai_proxy, 1, configurator).await {
+        if let Err(e) = find_dais(&dai_proxy, 1, configurator).await {
             // One of the test drivers reports bad formats.
             assert_eq!(
                 e.to_string(),
@@ -984,7 +984,7 @@ mod tests {
         );
 
         let configurator = Arc::new(Mutex::new(DefaultConfigurator::new(config)?));
-        assert_matches!(find_dais(dai_proxy, 1, configurator.clone()).await, Ok(()));
+        assert_matches!(find_dais(&dai_proxy, 1, configurator.clone()).await, Ok(()));
 
         let configurator = configurator.clone();
         let configurator = configurator.lock();
@@ -1039,11 +1039,11 @@ mod tests {
         );
 
         let configurator = Arc::new(Mutex::new(DefaultConfigurator::new(config)?));
-        if let Err(e) = find_codecs(codec_proxy, 2, configurator.clone()).await {
+        if let Err(e) = find_codecs(&codec_proxy, 2, configurator.clone()).await {
             // One of the test drivers reports bad formats.
             assert_eq!(e.to_string(), "Codec processing error: Codec with bad format reported");
         }
-        assert_matches!(find_dais(dai_proxy, 1, configurator.clone()).await, Ok(()));
+        assert_matches!(find_dais(&dai_proxy, 1, configurator.clone()).await, Ok(()));
 
         let configurator = configurator.clone();
         let configurator = configurator.lock();

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    anyhow::{Context as _, Error},
     async_trait::async_trait,
     fidl::endpoints::Proxy,
     fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc,
@@ -146,7 +147,7 @@ struct TestOutput {
 const DYNAMIC_SKIP_RESULT: &str = "SKIPPED";
 
 /// Opens and reads file defined by `path` in `dir`.
-async fn read_file(dir: &fio::DirectoryProxy, path: &Path) -> Result<String, anyhow::Error> {
+async fn read_file(dir: &fio::DirectoryProxy, path: &Path) -> Result<String, Error> {
     // Open the file in read-only mode.
     let result_file_proxy = fuchsia_fs::open_file(dir, path, fio::OpenFlags::RIGHT_READABLE)?;
     return fuchsia_fs::read_file(&result_file_proxy).await;
@@ -357,7 +358,8 @@ impl TestServer {
 
     fn test_data_namespace(&self) -> Result<fproc::NameInfo, IoError> {
         let client_channnel =
-            fuchsia_fs::clone_directory(&self.output_dir_proxy, fio::OpenFlags::CLONE_SAME_RIGHTS)
+            fuchsia_fs::directory::clone_no_describe(&self.output_dir_proxy, None)
+                .context("clone")
                 .map_err(IoError::CloneProxy)?
                 .into_channel()
                 .map_err(|_| FidlError::ProxyToChannel)
@@ -732,7 +734,6 @@ where
 mod tests {
     use {
         super::*,
-        anyhow::{Context as _, Error},
         assert_matches::assert_matches,
         fidl_fuchsia_test::{RunListenerMarker, RunOptions, SuiteMarker},
         pretty_assertions::assert_eq,
@@ -961,7 +962,7 @@ mod tests {
         invocations: Vec<Invocation>,
         run_options: RunOptions,
         component: Option<Arc<Component>>,
-    ) -> Result<Vec<ListenerEvent>, anyhow::Error> {
+    ) -> Result<Vec<ListenerEvent>, Error> {
         let test_data = TestDataDir::new().context("Cannot create test data")?;
         let component = component
             .unwrap_or(sample_test_component().await.context("Cannot create test component")?);

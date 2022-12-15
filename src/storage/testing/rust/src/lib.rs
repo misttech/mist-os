@@ -77,7 +77,7 @@ pub async fn wait_for_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Resul
     assert!(!matchers.is_empty());
     let block_dev_dir =
         fuchsia_fs::directory::open_in_namespace(DEV_CLASS_BLOCK, fio::OpenFlags::RIGHT_READABLE)?;
-    let mut watcher = Watcher::new(Clone::clone(&block_dev_dir)).await?;
+    let mut watcher = Watcher::new(&block_dev_dir).await?;
     while let Some(msg) = watcher.try_next().await? {
         if msg.event != WatchEvent::ADD_FILE && msg.event != WatchEvent::EXISTING {
             continue;

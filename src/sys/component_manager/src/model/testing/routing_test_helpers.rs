@@ -844,11 +844,8 @@ impl RoutingTestModel for RoutingTest {
                         )
                         .expect("failed to open /tmp")
                     } else {
-                        fuchsia_fs::clone_directory(
-                            &self.test_dir_proxy,
-                            fio::OpenFlags::CLONE_SAME_RIGHTS,
-                        )
-                        .expect("failed to clone test_dir_proxy")
+                        fuchsia_fs::directory::clone_no_describe(&self.test_dir_proxy, None)
+                            .expect("failed to clone test_dir_proxy")
                     };
                     capability_util::check_file_in_storage(
                         storage_subdir.clone(),

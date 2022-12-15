@@ -43,7 +43,7 @@ async fn get_all_input_device_paths(
         fio::OpenFlags::RIGHT_READABLE,
     )
     .with_context(|| format!("Failed to open {}", INPUT_DEVICE_DIR))?;
-    let input_device_paths = device_watcher::watch_for_files(input_device_dir)
+    let input_device_paths = device_watcher::watch_for_files(&input_device_dir)
         .await
         .context("Failed to watch for input device /dev files")?;
     Ok(input_device_paths

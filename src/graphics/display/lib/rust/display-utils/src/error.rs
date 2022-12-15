@@ -58,6 +58,10 @@ pub enum Error {
     #[error("zircon error: {0}")]
     ZxError(#[from] zx::Status),
 
+    /// Wrapper for errors from fuchsia-fs.
+    #[error("filesystem error: {0}")]
+    FsError(#[from] fuchsia_fs::node::OpenError),
+
     /// Error that occurred while notifying vsync event listeners over an in-process async channel.
     #[error("failed to notify vsync: {0}")]
     CouldNotSendVsyncEvent(#[from] mpsc::TrySendError<VsyncEvent>),

@@ -1327,72 +1327,72 @@ impl<'a> NetCfg<'a> {
     ) -> Result<impl futures::Stream<Item = Result<D::DeviceInstance, anyhow::Error>>, anyhow::Error>
     {
         let installer = self.installer.clone();
-        let stream_of_streams = fvfs_watcher::Watcher::new(
+        let directory =
             fuchsia_fs::directory::open_in_namespace(D::PATH, OpenFlags::RIGHT_READABLE)
-                .with_context(|| format!("error opening {} directory", D::NAME))?,
-        )
-        .await
-        .with_context(|| format!("creating watcher for {}", D::PATH))?
-        .err_into()
-        .try_filter_map(move |fvfs_watcher::WatchMessage { event, filename }| {
-            let installer = installer.clone();
-            async move {
-                trace!("got {:?} {} event for {}", event, D::NAME, filename.display());
+                .with_context(|| format!("error opening {} directory", D::NAME))?;
+        let stream_of_streams = fvfs_watcher::Watcher::new(&directory)
+            .await
+            .with_context(|| format!("creating watcher for {}", D::PATH))?
+            .err_into()
+            .try_filter_map(move |fvfs_watcher::WatchMessage { event, filename }| {
+                let installer = installer.clone();
+                async move {
+                    trace!("got {:?} {} event for {}", event, D::NAME, filename.display());
 
-                if filename == path::PathBuf::from(THIS_DIRECTORY) {
-                    debug!("skipping {} w/ filename = {}", D::NAME, filename.display());
-                    return Ok(None);
-                }
+                    if filename == path::PathBuf::from(THIS_DIRECTORY) {
+                        debug!("skipping {} w/ filename = {}", D::NAME, filename.display());
+                        return Ok(None);
+                    }
 
-                match event {
-                    fvfs_watcher::WatchEvent::ADD_FILE | fvfs_watcher::WatchEvent::EXISTING => {
-                        let filepath = path::Path::new(D::PATH).join(filename);
-                        info!("found new {} at {:?}", D::NAME, filepath);
-                        match D::get_instance_stream(&installer, &filepath)
-                            .await
-                            .context("create instance stream")
-                        {
-                            Ok(stream) => Ok(Some(stream.filter_map(move |r| {
-                                futures::future::ready(match r {
-                                    Ok(instance) => Some(Ok(instance)),
-                                    Err(errors::Error::NonFatal(nonfatal)) => {
-                                        error!(
+                    match event {
+                        fvfs_watcher::WatchEvent::ADD_FILE | fvfs_watcher::WatchEvent::EXISTING => {
+                            let filepath = path::Path::new(D::PATH).join(filename);
+                            info!("found new {} at {:?}", D::NAME, filepath);
+                            match D::get_instance_stream(&installer, &filepath)
+                                .await
+                                .context("create instance stream")
+                            {
+                                Ok(stream) => Ok(Some(stream.filter_map(move |r| {
+                                    futures::future::ready(match r {
+                                        Ok(instance) => Some(Ok(instance)),
+                                        Err(errors::Error::NonFatal(nonfatal)) => {
+                                            error!(
                                         "non-fatal error operating device stream {} for {:?}: {:?}",
                                         D::NAME,
                                         filepath,
                                         nonfatal
                                     );
-                                        None
-                                    }
-                                    Err(errors::Error::Fatal(fatal)) => Some(Err(fatal)),
-                                })
-                            }))),
-                            Err(errors::Error::NonFatal(nonfatal)) => {
-                                error!(
-                                    "non-fatal error fetching device stream {} for {:?}: {:?}",
-                                    D::NAME,
-                                    filepath,
-                                    nonfatal
-                                );
-                                Ok(None)
+                                            None
+                                        }
+                                        Err(errors::Error::Fatal(fatal)) => Some(Err(fatal)),
+                                    })
+                                }))),
+                                Err(errors::Error::NonFatal(nonfatal)) => {
+                                    error!(
+                                        "non-fatal error fetching device stream {} for {:?}: {:?}",
+                                        D::NAME,
+                                        filepath,
+                                        nonfatal
+                                    );
+                                    Ok(None)
+                                }
+                                Err(errors::Error::Fatal(fatal)) => Err(fatal),
                             }
-                            Err(errors::Error::Fatal(fatal)) => Err(fatal),
                         }
+                        fvfs_watcher::WatchEvent::IDLE | fvfs_watcher::WatchEvent::REMOVE_FILE => {
+                            Ok(None)
+                        }
+                        event => Err(anyhow::anyhow!(
+                            "unrecognized event {:?} for {} filename {}",
+                            event,
+                            D::NAME,
+                            filename.display()
+                        )),
                     }
-                    fvfs_watcher::WatchEvent::IDLE | fvfs_watcher::WatchEvent::REMOVE_FILE => {
-                        Ok(None)
-                    }
-                    event => Err(anyhow::anyhow!(
-                        "unrecognized event {:?} for {} filename {}",
-                        event,
-                        D::NAME,
-                        filename.display()
-                    )),
                 }
-            }
-        })
-        .fuse()
-        .try_flatten_unordered();
+            })
+            .fuse()
+            .try_flatten_unordered();
         Ok(stream_of_streams)
     }
 
@@ -1567,20 +1567,20 @@ impl<'a> NetCfg<'a> {
                     id
                 )));
             }
-            let InterfaceState { control, config: _, device_class: _ } =
-                match self.interface_states.entry(interface_id) {
-                    Entry::Occupied(entry) => {
-                        return Err(errors::Error::Fatal(anyhow::anyhow!(
-                            "multiple interfaces with the same ID = {}; \
+            let InterfaceState { control, config: _, device_class: _ } = match self
+                .interface_states
+                .entry(interface_id)
+            {
+                Entry::Occupied(entry) => {
+                    return Err(errors::Error::Fatal(anyhow::anyhow!(
+                        "multiple interfaces with the same ID = {}; \
                                 attempting to add state for a WLAN AP, existing state = {:?}",
-                            entry.key(),
-                            entry.get()
-                        )));
-                    }
-                    Entry::Vacant(entry) => {
-                        entry.insert(InterfaceState::new_wlan_ap(control, class))
-                    }
-                };
+                        entry.key(),
+                        entry.get()
+                    )));
+                }
+                Entry::Vacant(entry) => entry.insert(InterfaceState::new_wlan_ap(control, class)),
+            };
 
             info!("discovered WLAN AP (interface ID={})", interface_id);
 
@@ -1613,9 +1613,7 @@ impl<'a> NetCfg<'a> {
                             entry.get()
                         )));
                     }
-                    Entry::Vacant(entry) => {
-                        entry.insert(InterfaceState::new_host(control, class))
-                    }
+                    Entry::Vacant(entry) => entry.insert(InterfaceState::new_host(control, class)),
                 };
 
             info!("discovered host interface with id={}, configuring interface", interface_id);

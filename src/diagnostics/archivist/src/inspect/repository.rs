@@ -235,16 +235,13 @@ impl InspectRepositoryInner {
                 }
 
                 // This artifact contains inspect and matches a passed selector.
-                fuchsia_fs::clone_directory(
-                    container.diagnostics_directory(),
-                    fio::OpenFlags::CLONE_SAME_RIGHTS,
-                )
-                .ok()
-                .map(|directory| UnpopulatedInspectDataContainer {
-                    identity: identity.clone(),
-                    component_diagnostics_proxy: directory,
-                    inspect_matcher: optional_hierarchy_matcher.cloned(),
-                })
+                fuchsia_fs::directory::clone_no_describe(container.diagnostics_directory(), None)
+                    .ok()
+                    .map(|directory| UnpopulatedInspectDataContainer {
+                        identity: identity.clone(),
+                        component_diagnostics_proxy: directory,
+                        inspect_matcher: optional_hierarchy_matcher.cloned(),
+                    })
             })
             .collect()
     }

@@ -48,7 +48,7 @@ async fn watch_directory_async(
         dir.to_str().expect("to_str"),
         OpenFlags::RIGHT_READABLE,
     )?;
-    let mut watcher = vfs_watcher::Watcher::new(dir_proxy).await?;
+    let mut watcher = vfs_watcher::Watcher::new(&dir_proxy).await?;
     fasync::Task::local(async move {
         while let Some(msg) = (watcher.try_next()).await.expect("msg") {
             match msg.event {

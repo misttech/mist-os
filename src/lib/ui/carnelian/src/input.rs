@@ -491,7 +491,7 @@ pub(crate) async fn listen_for_user_input(internal_sender: InternalSender) -> Re
         input_devices_directory,
         OpenFlags::RIGHT_READABLE,
     )?;
-    let mut watcher = vfs_watcher::Watcher::new(dir_proxy).await?;
+    let mut watcher = vfs_watcher::Watcher::new(&dir_proxy).await?;
     fasync::Task::local(async move {
         let input_devices_directory_path = PathBuf::from("/dev/class/input-report");
         while let Some(msg) = (watcher.try_next()).await.expect("msg") {

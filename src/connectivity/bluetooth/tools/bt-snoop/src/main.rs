@@ -22,7 +22,6 @@ use {
     },
     std::{
         fmt,
-        fs::File,
         path::{Path, PathBuf},
         time::Duration,
     },
@@ -338,14 +337,13 @@ async fn run(
     inspect: inspect::Node,
 ) -> Result<(), Error> {
     let mut id_gen = IdGenerator::new();
-    let hci_dir = File::open(HCI_DEVICE_CLASS_PATH).expect("Failed to open hci dev directory");
-    let channel = fdio::clone_channel(&hci_dir)?;
-    let async_channel = fasync::Channel::from_channel(channel)?;
-    let directory = fio::DirectoryProxy::from_channel(async_channel);
+    let directory = fuchsia_fs::directory::open_in_namespace(
+        HCI_DEVICE_CLASS_PATH,
+        fio::OpenFlags::RIGHT_READABLE,
+    )
+    .expect("Failed to open hci dev directory");
     let mut hci_device_events =
-        Watcher::new(fuchsia_fs::clone_directory(&directory, fio::OpenFlags::CLONE_SAME_RIGHTS)?)
-            .await
-            .context("Cannot create device watcher")?;
+        Watcher::new(&directory).await.context("Cannot create device watcher")?;
     let mut client_requests = ConcurrentClientRequestFutures::new();
     let mut subscribers = SubscriptionManager::new();
     let mut snoopers = ConcurrentSnooperPacketFutures::new();
@@ -379,11 +377,7 @@ async fn run(
                     Err(e) => {
                         // Attempt to recreate watcher in the event of an error.
                         warn!("VFS Watcher has died with error: {:?}", e);
-                        hci_device_events = Watcher::new(fuchsia_fs::clone_directory(
-                            &directory,
-                            fio::OpenFlags::CLONE_SAME_RIGHTS,
-                        )?)
-                            .await
+                        hci_device_events = Watcher::new(&directory).await
                             .context("Cannot create device watcher")?;
                     }
                 }

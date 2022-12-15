@@ -369,7 +369,7 @@ impl InputPipeline {
             input_device::INPUT_REPORT_PATH,
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )?;
-        Watcher::new(input_report_dir_proxy).await
+        Watcher::new(&input_report_dir_proxy).await
     }
 
     /// Watches the input report directory for new input devices. Creates InputDeviceBindings
@@ -870,12 +870,12 @@ mod tests {
         let scope_for_watcher = ExecutionScope::new();
         dir.open(
             scope_for_watcher,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
             0,
             Path::dot(),
             server_end_for_watcher,
         );
-        let device_watcher = Watcher::new(dir_proxy_for_watcher).await.unwrap();
+        let device_watcher = Watcher::new(&dir_proxy_for_watcher).await.unwrap();
 
         // Get a proxy to the pseudo directory for the input pipeline. The input pipeline uses this
         // proxy to get connections to input devices.
@@ -885,7 +885,7 @@ mod tests {
         let scope_for_pipeline = ExecutionScope::new();
         pseudo_dir_clone.open(
             scope_for_pipeline,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
             0,
             Path::dot(),
             server_end_for_pipeline,
@@ -959,12 +959,12 @@ mod tests {
         let scope_for_watcher = ExecutionScope::new();
         dir.open(
             scope_for_watcher,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
             0,
             Path::dot(),
             server_end_for_watcher,
         );
-        let device_watcher = Watcher::new(dir_proxy_for_watcher).await.unwrap();
+        let device_watcher = Watcher::new(&dir_proxy_for_watcher).await.unwrap();
 
         // Get a proxy to the pseudo directory for the input pipeline. The input pipeline uses this
         // proxy to get connections to input devices.
@@ -974,7 +974,7 @@ mod tests {
         let scope_for_pipeline = ExecutionScope::new();
         pseudo_dir_clone.open(
             scope_for_pipeline,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
             0,
             Path::dot(),
             server_end_for_pipeline,

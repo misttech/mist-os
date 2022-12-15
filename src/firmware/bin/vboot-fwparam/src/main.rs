@@ -106,7 +106,7 @@ async fn find_chromeos_acpi_device() -> Result<chrome_acpi::DeviceProxy, anyhow:
     )
     .with_context(|| format!("Opening {}", ACPI_PATH))?;
 
-    let path = device_watcher::watch_for_files(Clone::clone(&proxy))
+    let path = device_watcher::watch_for_files(&proxy)
         .await
         .with_context(|| format!("Watching for files in {}", ACPI_PATH))?
         .try_next()

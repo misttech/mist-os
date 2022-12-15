@@ -146,7 +146,7 @@ mod tests {
         let (_realm_instance, dev_proxy) = get_dev_proxy("class/codec").await?;
         let config = Config::new()?;
         let configurator = Arc::new(Mutex::new(TestConfigurator::new(config)?));
-        find_codecs(dev_proxy, 2, configurator).await?;
+        find_codecs(&dev_proxy, 2, configurator).await?;
         Ok(())
     }
 }

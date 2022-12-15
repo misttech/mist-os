@@ -339,7 +339,7 @@ impl StorageManagerTrait for Fxfs {
     async fn get_root_dir(&self) -> Result<fio::DirectoryProxy, AccountManagerError> {
         let state_lock = self.state.lock().await;
         if let Some(FxfsInner { root_dir, .. }) = state_lock.get_internals() {
-            Ok(fuchsia_fs::clone_directory(root_dir, fio::OpenFlags::CLONE_SAME_RIGHTS)
+            Ok(fuchsia_fs::directory::clone_no_describe(root_dir, None)
                 .log_warn_then("failed to clone root directory", faccount::Error::Resource)?)
         } else {
             Err(AccountManagerError::new(AccountApiError::Internal))

@@ -193,7 +193,7 @@ async fn process_watch_event(
 pub async fn watch_power_device(battery_manager: Arc<BatteryManager>) -> Result<(), Error> {
     let dir_proxy =
         fuchsia_fs::directory::open_in_namespace(POWER_DEVICE, OpenFlags::RIGHT_READABLE)?;
-    let mut watcher = vfs_watcher::Watcher::new(dir_proxy).await?;
+    let mut watcher = vfs_watcher::Watcher::new(&dir_proxy).await?;
     let mut adapter_device_found = false;
     let mut battery_device_found = false;
     while let Some(msg) = (watcher.try_next()).await? {

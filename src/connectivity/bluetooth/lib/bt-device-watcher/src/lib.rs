@@ -73,13 +73,12 @@ impl DeviceWatcher {
     /// met, or in an error if the condition is not met within `timeout`.
     pub async fn new(
         debug_dir_name: &str,
-        open_dir: fio::DirectoryProxy,
+        watched_dir: fio::DirectoryProxy,
         timeout: zx::Duration,
     ) -> Result<DeviceWatcher, Error> {
-        let watched_dir = Clone::clone(&open_dir);
         Ok(DeviceWatcher {
             debug_dir_name: PathBuf::from(debug_dir_name),
-            watcher: VfsWatcher::new(open_dir).await?,
+            watcher: VfsWatcher::new(&watched_dir).await?,
             timeout,
             watched_dir,
         })
@@ -347,9 +346,10 @@ mod tests {
         assert_eq!(dev.topo_path(), found.topo_path());
 
         // Calling with the `existing` flag should succeed.
-        let mut watcher = DeviceWatcher::new(DEVICE_TEST_DIRECTORY, dev_test_dir, TIMEOUT)
-            .await
-            .expect("Failed to create watcher for test devices");
+        let mut watcher =
+            DeviceWatcher::new(DEVICE_TEST_DIRECTORY, Clone::clone(&dev_test_dir), TIMEOUT)
+                .await
+                .expect("Failed to create watcher for test devices");
         let found = watcher
             .watch_new(dev.topo_path(), WatchFilter::AddedOrExisting)
             .await

@@ -145,8 +145,7 @@ async fn wait_for_node(
     filename: &str,
 ) -> Result<(), DiskError> {
     let needle = Path::new(filename);
-    let mut watcher =
-        Watcher::new(Clone::clone(directory_proxy)).await.map_err(DiskError::WatcherError)?;
+    let mut watcher = Watcher::new(directory_proxy).await.map_err(DiskError::WatcherError)?;
     while let Some(WatchMessage { event, filename }) =
         watcher.try_next().await.map_err(DiskError::WatcherStreamError)?
     {

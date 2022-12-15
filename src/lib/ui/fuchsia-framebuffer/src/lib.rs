@@ -756,7 +756,7 @@ impl FrameBuffer {
             )?;
 
             let timeout = 10.seconds().after_now();
-            let watcher = fuchsia_vfs_watcher::Watcher::new(dir).await?;
+            let watcher = fuchsia_vfs_watcher::Watcher::new(&dir).await?;
             let filename = watcher
                 .try_filter_map(|fuchsia_vfs_watcher::WatchMessage { event, filename }| {
                     futures::future::ok(match event {

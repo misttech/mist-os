@@ -114,7 +114,7 @@ async fn inner_watch(path: PathBuf) -> Result<BoxStream<'static, PathEvent>, Err
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
     let (mut tx, rx) = channel(1);
-    let mut watcher = Watcher::new(dir_proxy).await?;
+    let mut watcher = Watcher::new(&dir_proxy).await?;
 
     let path_future = async move {
         while let Ok(message) = watcher.try_next().await {

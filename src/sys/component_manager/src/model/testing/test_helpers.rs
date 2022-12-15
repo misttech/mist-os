@@ -226,9 +226,7 @@ pub async fn list_sub_directory(parent: &fio::DirectoryProxy, path: &str) -> Vec
 }
 
 pub async fn list_directory_recursive<'a>(root_proxy: &'a fio::DirectoryProxy) -> Vec<String> {
-    let dir = fuchsia_fs::clone_directory(&root_proxy, fio::OpenFlags::CLONE_SAME_RIGHTS)
-        .expect("Failed to clone DirectoryProxy");
-    let entries = fuchsia_fs::directory::readdir_recursive(&dir, /*timeout=*/ None);
+    let entries = fuchsia_fs::directory::readdir_recursive(&root_proxy, /*timeout=*/ None);
     let mut items = entries
         .map(|result| result.map(|entry| entry.name.clone()))
         .try_collect::<Vec<_>>()

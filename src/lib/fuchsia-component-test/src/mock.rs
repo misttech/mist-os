@@ -89,7 +89,7 @@ impl MockHandles {
             "the mock's namespace doesn't have a /{} directory",
             directory_name
         ))?;
-        fuchsia_fs::clone_directory(dir_proxy, fio::OpenFlags::CLONE_SAME_RIGHTS)
+        fuchsia_fs::directory::clone_no_describe(dir_proxy, None)
     }
 }
 

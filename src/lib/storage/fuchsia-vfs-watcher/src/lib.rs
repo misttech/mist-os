@@ -65,7 +65,7 @@ impl Unpin for Watcher {}
 
 impl Watcher {
     /// Creates a new `Watcher` for the directory given by `dir`.
-    pub async fn new(dir: fio::DirectoryProxy) -> Result<Watcher, anyhow::Error> {
+    pub async fn new(dir: &fio::DirectoryProxy) -> Result<Watcher, anyhow::Error> {
         let (client_end, server_end) = fidl::endpoints::create_endpoints()?;
         let options = 0u32;
         let status = dir.watch(fio::WatchMask::all(), options, server_end).await?;
@@ -221,7 +221,7 @@ mod tests {
             OpenFlags::RIGHT_READABLE,
         )
         .unwrap();
-        let mut w = Watcher::new(dir).await.unwrap();
+        let mut w = Watcher::new(&dir).await.unwrap();
 
         // TODO(tkilbourn): this assumes "." always comes before "file1". If this test ever starts
         // flaking, handle the case of unordered EXISTING files.
@@ -246,7 +246,7 @@ mod tests {
             OpenFlags::RIGHT_READABLE,
         )
         .unwrap();
-        let mut w = Watcher::new(dir).await.unwrap();
+        let mut w = Watcher::new(&dir).await.unwrap();
 
         loop {
             let msg = one_step(&mut w).await;
@@ -276,7 +276,7 @@ mod tests {
             OpenFlags::RIGHT_READABLE,
         )
         .unwrap();
-        let mut w = Watcher::new(dir).await.unwrap();
+        let mut w = Watcher::new(&dir).await.unwrap();
 
         loop {
             let msg = one_step(&mut w).await;
@@ -303,7 +303,7 @@ mod tests {
             OpenFlags::RIGHT_READABLE,
         )
         .unwrap();
-        let mut w = Watcher::new(dir).await.unwrap();
+        let mut w = Watcher::new(&dir).await.unwrap();
 
         loop {
             let msg = one_step(&mut w).await;

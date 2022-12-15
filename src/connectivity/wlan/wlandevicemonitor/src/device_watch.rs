@@ -4,13 +4,12 @@
 
 use {
     anyhow::format_err,
-    fidl::endpoints::Proxy,
     fidl_fuchsia_io as fio, fidl_fuchsia_wlan_device as fidl_wlan_dev, fuchsia_async as fasync,
     fuchsia_vfs_watcher::{WatchEvent, Watcher},
     fuchsia_zircon as zx,
     futures::prelude::*,
     log::{error, warn},
-    std::{fs::File, str::FromStr},
+    std::str::FromStr as _,
 };
 
 pub struct NewPhyDevice {
@@ -53,12 +52,10 @@ fn handle_open_error<T>(
 fn watch_new_devices(
     device_directory: &str,
 ) -> Result<impl Stream<Item = Result<String, anyhow::Error>>, anyhow::Error> {
-    let raw_dir = File::open(&device_directory)?;
-    let zircon_channel = fdio::clone_channel(&raw_dir)?;
-    let async_channel = fasync::Channel::from_channel(zircon_channel)?;
-    let directory = fio::DirectoryProxy::from_channel(async_channel);
+    let directory =
+        fuchsia_fs::directory::open_in_namespace(device_directory, fio::OpenFlags::RIGHT_READABLE)?;
     Ok(async move {
-        let watcher = Watcher::new(directory).await?;
+        let watcher = Watcher::new(&directory).await?;
         Ok(watcher
             .try_filter_map(move |msg| {
                 future::ready(Ok(match msg.event {

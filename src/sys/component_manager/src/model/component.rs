@@ -2098,8 +2098,7 @@ fn try_clone_dir_endpoint(
     dir: Option<&fio::DirectoryProxy>,
 ) -> Option<ClientEnd<fio::DirectoryMarker>> {
     if let Some(dir) = dir {
-        if let Ok(cloned_dir) = fuchsia_fs::clone_directory(&dir, fio::OpenFlags::CLONE_SAME_RIGHTS)
-        {
+        if let Ok(cloned_dir) = fuchsia_fs::directory::clone_no_describe(&dir, None) {
             let cloned_dir_channel = cloned_dir.into_channel().unwrap().into_zx_channel();
             Some(ClientEnd::new(cloned_dir_channel))
         } else {

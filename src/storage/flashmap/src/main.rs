@@ -29,13 +29,10 @@ enum IncomingRequest {
 async fn find_chromeos_acpi_device(
 ) -> Result<fidl_fuchsia_acpi_chromeos::DeviceProxy, anyhow::Error> {
     const ACPI_PATH: &str = "/dev/class/chromeos-acpi";
-    let proxy = fuchsia_fs::directory::open_in_namespace(
-        ACPI_PATH,
-        OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-    )
-    .with_context(|| format!("Opening {}", ACPI_PATH))?;
+    let proxy = fuchsia_fs::directory::open_in_namespace(ACPI_PATH, OpenFlags::RIGHT_READABLE)
+        .with_context(|| format!("Opening {}", ACPI_PATH))?;
 
-    let path = device_watcher::watch_for_files(Clone::clone(&proxy))
+    let path = device_watcher::watch_for_files(&proxy)
         .await
         .with_context(|| format!("Watching for files in {}", ACPI_PATH))?
         .try_next()

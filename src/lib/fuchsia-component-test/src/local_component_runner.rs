@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{format_err, Error},
+    anyhow::{format_err, Context as _, Error},
     fidl::endpoints::{
         create_request_stream, ClientEnd, DiscoverableProtocolMarker, MemberOpener, ServerEnd,
         ServiceMarker, ServiceProxy,
@@ -175,7 +175,7 @@ impl LocalComponentHandles {
             "the local component's namespace doesn't have a /{} directory",
             directory_name
         ))?;
-        fuchsia_fs::clone_directory(dir_proxy, fio::OpenFlags::CLONE_SAME_RIGHTS)
+        fuchsia_fs::directory::clone_no_describe(&dir_proxy, None).context("clone")
     }
 }
 

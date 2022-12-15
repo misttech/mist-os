@@ -24,7 +24,7 @@ impl DaiInterface {
     /// A new interface that will connect to the device at the `path` within the `dev_proxy`
     /// directory. The interface is unconnected when created.
     pub fn new(dev_proxy: fio::DirectoryProxy, path: &Path) -> Self {
-        Self { dev_proxy: dev_proxy, path: path.to_path_buf(), proxy: None }
+        Self { dev_proxy, path: path.to_path_buf(), proxy: None }
     }
 
     /// Get the DAI proxy.
@@ -154,7 +154,7 @@ mod tests {
         let (_realm_instance, dev_proxy) = get_dev_proxy("class/dai").await?;
         let config = Config::new()?;
         let configurator = Arc::new(Mutex::new(TestConfigurator::new(config)?));
-        find_dais(dev_proxy, 1, configurator).await?;
+        find_dais(&dev_proxy, 1, configurator).await?;
         Ok(())
     }
 }

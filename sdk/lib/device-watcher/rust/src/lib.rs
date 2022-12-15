@@ -25,7 +25,7 @@ pub async fn wait_for_device_with<T>(
     dev_dir: &fio::DirectoryProxy,
     predicate: impl Fn(DeviceInfo<'_>) -> Option<T>,
 ) -> Result<T, anyhow::Error> {
-    let stream = watch_for_files(Clone::clone(dev_dir)).await?;
+    let stream = watch_for_files(dev_dir).await?;
     let stream = stream.try_filter_map(|filename| {
         let predicate = &predicate;
         async move {
@@ -72,7 +72,7 @@ pub async fn wait_for_device_with<T>(
 /// directories in `dir` and any new files or directories created after this
 /// function was invoked. These paths are relative to `dir`.
 pub async fn watch_for_files(
-    dir: fio::DirectoryProxy,
+    dir: &fio::DirectoryProxy,
 ) -> Result<impl Stream<Item = Result<PathBuf>>> {
     let watcher = Watcher::new(dir).await.context("failed to create watcher")?;
     Ok(watcher.map(|result| result.context("failed to get watcher event")).try_filter_map(|msg| {
@@ -89,7 +89,7 @@ pub async fn watch_for_files(
     }))
 }
 
-async fn wait_for_file(dir: fio::DirectoryProxy, name: &str) -> Result<()> {
+async fn wait_for_file(dir: &fio::DirectoryProxy, name: &str) -> Result<()> {
     let mut watcher = fuchsia_vfs_watcher::Watcher::new(dir).await?;
     while let Some(msg) = watcher.try_next().await? {
         if msg.event != fuchsia_vfs_watcher::WatchEvent::EXISTING
@@ -123,7 +123,7 @@ async fn recursive_wait_and_open_node_with_flags(
                 return Err(format_err!("path contains non-normal component {:?}", component))
             }
         };
-        let () = wait_for_file(Clone::clone(&dir), file.to_str().unwrap()).await?;
+        let () = wait_for_file(&dir, file.to_str().unwrap()).await?;
         let file = std::path::Path::new(file);
         if components.peek().is_some() {
             dir = fuchsia_fs::open_directory(&dir, file, flags)?;
@@ -220,7 +220,7 @@ mod tests {
             fidl::endpoints::ServerEnd::new(remote.into_channel()),
         );
 
-        let stream = watch_for_files(dir_proxy).await.unwrap();
+        let stream = watch_for_files(&dir_proxy).await.unwrap();
         futures::pin_mut!(stream);
         let actual: HashSet<PathBuf> =
             vec![stream.next().await.unwrap().unwrap(), stream.next().await.unwrap().unwrap()]

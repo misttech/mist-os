@@ -50,7 +50,7 @@ pub mod tests {
             fuchsia_fs::directory::open_directory(&dev, dev_dir, fio::OpenFlags::RIGHT_READABLE)
                 .await?;
         // Wait for the first node.
-        let stream = device_watcher::watch_for_files(Clone::clone(&dir)).await?;
+        let stream = device_watcher::watch_for_files(&dir).await?;
         let path: Option<_> = stream
             .try_filter(|path| futures::future::ready(path != std::path::Path::new(".")))
             .try_next()

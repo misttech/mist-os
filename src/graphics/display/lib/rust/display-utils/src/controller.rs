@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    fidl::endpoints::{ClientEnd, Proxy, ServerEnd},
+    fidl::endpoints::{ClientEnd, ServerEnd},
     fidl_fuchsia_hardware_display::{self as display, ControllerEvent},
     fidl_fuchsia_io as fio,
     fuchsia_async::{self as fasync, DurationExt, TimeoutExt},
@@ -12,7 +12,6 @@ use {
     futures::{channel::mpsc, future, TryStreamExt},
     parking_lot::RwLock,
     std::{
-        ffi::OsStr,
         fmt,
         fs::File,
         path::{Path, PathBuf},
@@ -347,23 +346,17 @@ impl ControllerInner {
 // Asynchronously returns the path to the first file found under the given directory path. The
 // returned future does not resolve until either an entry is found or there is an error while
 // watching the directory.
-async fn watch_first_file<P: AsRef<Path> + AsRef<OsStr>>(dir: P) -> Result<PathBuf> {
-    let path = Path::new(&dir);
-    let dir: fio::DirectoryProxy = {
-        let raw_dir = File::open(&path)?;
-        let zx_channel = fdio::clone_channel(&raw_dir)?;
-        let fasync_channel = fasync::Channel::from_channel(zx_channel)?;
-        fio::DirectoryProxy::from_channel(fasync_channel)
-    };
+async fn watch_first_file(path: &str) -> Result<PathBuf> {
+    let dir = fuchsia_fs::directory::open_in_namespace(path, fio::OpenFlags::RIGHT_READABLE)?;
 
-    let mut watcher = Watcher::new(dir).await.map_err(|_| Error::VfsWatcherError)?;
+    let mut watcher = Watcher::new(&dir).await.map_err(|_| Error::VfsWatcherError)?;
     while let Some(msg) = watcher.try_next().await? {
         match msg.event {
             WatchEvent::EXISTING | WatchEvent::ADD_FILE => {
                 if msg.filename == Path::new(".") {
                     continue;
                 }
-                return Ok(path.join(msg.filename));
+                return Ok(Path::new(path).join(msg.filename));
             }
             _ => continue,
         }

@@ -61,8 +61,7 @@ fn new_storage_manager(fs: &mut ServingMultiVolumeFilesystem) -> Fxfs {
         FxfsArgs::builder()
             .volume_label(ACCOUNT_LABEL.to_string())
             .filesystem_dir(
-                fuchsia_fs::clone_directory(fs.exposed_dir(), fio::OpenFlags::CLONE_SAME_RIGHTS)
-                    .unwrap(),
+                fuchsia_fs::directory::clone_no_describe(fs.exposed_dir(), None).unwrap(),
             )
             .use_unique_crypt_name_for_test(true)
             .build(),

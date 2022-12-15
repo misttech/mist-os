@@ -294,7 +294,7 @@ async fn find_lid_sensor() -> Result<LidProxy, Error> {
         OpenFlags::RIGHT_READABLE,
     )?;
 
-    let mut watcher = vfs::Watcher::new(dir_proxy).await?;
+    let mut watcher = vfs::Watcher::new(&dir_proxy).await?;
 
     while let Some(msg) = watcher.try_next().await? {
         match msg.event {

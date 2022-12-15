@@ -34,8 +34,8 @@ async fn main() -> Result<(), anyhow::Error> {
     let mut config = Config::new()?;
     config.load()?;
     let configurator = Arc::new(Mutex::new(DefaultConfigurator::new(config)?));
-    let codec_future = discover::find_codecs(codec_proxy, 0, configurator.clone());
-    let dai_future = discover::find_dais(dai_proxy, 0, configurator);
+    let codec_future = discover::find_codecs(&codec_proxy, 0, configurator.clone());
+    let dai_future = discover::find_dais(&dai_proxy, 0, configurator);
     match futures::try_join!(codec_future, dai_future) {
         Ok(value) => {
             tracing::error!("Find devices returned: {:?}", value);

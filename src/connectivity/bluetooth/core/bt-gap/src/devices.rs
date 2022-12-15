@@ -26,7 +26,7 @@ pub fn watch_hosts() -> impl Stream<Item = Result<HostEvent, io::Error>> {
         let directory =
             fuchsia_fs::directory::open_in_namespace(HOST_DEVICE_DIR, OpenFlags::RIGHT_READABLE)
                 .unwrap();
-        let watcher = vfs_watcher::Watcher::new(directory)
+        let watcher = vfs_watcher::Watcher::new(&directory)
             .await
             .expect("Cannot open vfs watcher for bt-host device path");
         watcher.try_filter_map(|msg| future::ok(as_host_event(msg)))

@@ -252,12 +252,8 @@ where
 
     async fn get_root_dir(&self) -> Result<fio::DirectoryProxy, AccountManagerError> {
         match self.state.lock().await.get_internals() {
-            Some((_, minfs)) => {
-                fuchsia_fs::clone_directory(minfs.root_dir(), fio::OpenFlags::CLONE_SAME_RIGHTS)
-                    .map_err(|err| {
-                        AccountManagerError::new(AccountApiError::Internal).with_cause(err)
-                    })
-            }
+            Some((_, minfs)) => fuchsia_fs::directory::clone_no_describe(minfs.root_dir(), None)
+                .map_err(|err| AccountManagerError::new(AccountApiError::Internal).with_cause(err)),
             None => Err(AccountManagerError::new(AccountApiError::Internal)),
         }
     }

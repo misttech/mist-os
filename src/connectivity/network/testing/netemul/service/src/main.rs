@@ -1929,7 +1929,7 @@ mod tests {
         let (devfs, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
         let () = realm.get_devfs(server).expect("calling get devfs");
-        fvfs_watcher::Watcher::new(devfs).await.expect("watcher creation")
+        fvfs_watcher::Watcher::new(&devfs).await.expect("watcher creation")
     }
 
     async fn wait_for_event_on_path(
@@ -2336,8 +2336,7 @@ mod tests {
         let (devfs, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
         let () = realm.get_devfs(server_end).expect("calling get devfs");
-        let mut dev_watcher =
-            fvfs_watcher::Watcher::new(Clone::clone(&devfs)).await.expect("watcher creation");
+        let mut dev_watcher = fvfs_watcher::Watcher::new(&devfs).await.expect("watcher creation");
         let () = realm
             .add_device(&test_device_path, get_device_proxy(&endpoint))
             .await
@@ -2362,7 +2361,7 @@ mod tests {
             )
             .expect("calling open");
         let mut ethernet_watcher =
-            fvfs_watcher::Watcher::new(ethernet).await.expect("watcher creation");
+            fvfs_watcher::Watcher::new(&ethernet).await.expect("watcher creation");
         let () = wait_for_event_on_path(
             &mut ethernet_watcher,
             fvfs_watcher::WatchEvent::EXISTING,

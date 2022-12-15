@@ -58,11 +58,7 @@ trait New {
 async fn get_devices<DeviceType: New + New<Output = DeviceType>>(
     dir: &fio::DirectoryProxy,
 ) -> Result<Vec<DeviceType>> {
-    let mut watcher = fuchsia_vfs_watcher::Watcher::new(fuchsia_fs::clone_directory(
-        dir,
-        fio::OpenFlags::RIGHT_READABLE,
-    )?)
-    .await?;
+    let mut watcher = fuchsia_vfs_watcher::Watcher::new(dir).await?;
     let mut devices = Vec::new();
     while let Some(msg) = watcher.try_next().await? {
         if msg.event == fuchsia_vfs_watcher::WatchEvent::IDLE {

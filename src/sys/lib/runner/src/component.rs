@@ -246,9 +246,7 @@ impl Clone for ComponentNamespace {
             // here, we opt to omit the path we failed to clone from the namespace, as that's
             // simpler than generating some handle to put in the namespace that we'd need to then
             // later close.
-            if let Ok(client_proxy) =
-                fuchsia_fs::clone_directory(proxy, fio::OpenFlags::CLONE_SAME_RIGHTS)
-            {
+            if let Ok(client_proxy) = fuchsia_fs::directory::clone_no_describe(proxy, None) {
                 ns.items.push((path.clone(), client_proxy));
             }
         }
