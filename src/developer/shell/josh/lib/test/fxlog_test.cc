@@ -165,8 +165,18 @@ TEST_F(FxLogTest, TestEvalLog) {
     fxlog.info("Message1");
     fxlog.warn("Message2", "TestTag");
     my_func();
+
+    // Mark the test complete
+    let file = std.open('/test_tmp/test_eval_log.done', 'a+');
+    file.puts("OK");
+    file.close();
   )"));
   loop_->RunUntilIdle();
+
+  // Make sure the test is complete
+  std::ifstream in("/test_tmp/test_eval_log.done");
+  std::string actual((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  ASSERT_STREQ(actual.c_str(), "OK");
 
   auto reader = CollectLog(4);
   ASSERT_EQ(reader->messages.size(), 4u);
@@ -202,6 +212,11 @@ TEST_F(FxLogTest, TestScriptLog) {
     fxlog.info("Message1");
     fxlog.warn("Message2", "TestTag");
     my_func();
+
+    // Mark the test complete
+    let file = std.open('/test_tmp/test_eval_script_log.done', 'a+');
+    file.puts("OK");
+    file.close();
   )";
   test_script.close();
 
@@ -210,6 +225,11 @@ TEST_F(FxLogTest, TestScriptLog) {
       std.loadScript("/test_tmp/test_log.js")
     )"));
   loop_->RunUntilIdle();
+
+  // Make sure the test is complete
+  std::ifstream in("/test_tmp/test_eval_script_log.done");
+  std::string actual((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  ASSERT_STREQ(actual.c_str(), "OK");
 
   auto reader = CollectLog(4);
   ASSERT_EQ(reader->messages.size(), 4u);
