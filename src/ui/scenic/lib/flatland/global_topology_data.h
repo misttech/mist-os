@@ -55,8 +55,7 @@ struct GlobalTopologyData {
   std::unordered_map<TransformHandle, TransformHandle> root_transforms;
 
   // HitRegions for each TransformHandle.
-  using HitRegions =
-      std::unordered_map<TransformHandle, std::vector<fuchsia::ui::composition::HitRegion>>;
+  using HitRegions = std::unordered_map<TransformHandle, std::vector<flatland::HitRegion>>;
   HitRegions hit_regions;
 
   // Debug name for each transform handle, if present.

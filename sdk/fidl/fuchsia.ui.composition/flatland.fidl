@@ -722,7 +722,8 @@ protocol Flatland {
     /// that transitively connect to the root Transform have their hit regions interact with a hit
     /// test.
     ///
-    /// To reset a Transform to "no hit testing": send an empty vector.
+    /// Calling this function replaces any previous values set on this Transform. To reset a
+    /// Transform to "no hit testing": send an empty vector with [`SetHitRegions`].
     ///
     /// Note that root transforms get a default hit region installed by Flatland. For more details,
     /// see the [`SetRootTransform`] documentation.
@@ -747,7 +748,25 @@ protocol Flatland {
     ///   the parent View, the user expects to interact with the child's Content.
     SetHitRegions(struct {
         transform_id TransformId;
+        /// Each region's [`HitRegion.region.width`] and [`HitRegion.region.height`] field must be a
+        /// non-negative value.
         regions vector<HitRegion>:MAX_HIT_REGION_COUNT;
+    });
+
+    /// Identical to [`SetHitRegions`], except the hit region associated with [`transform_id`]
+    /// covers an infinite region. The hit region is invariant against translation, scaling, and
+    /// orientation of the Transform.
+    ///
+    /// An infinite hit region is still limited in extent by the View's clip boundary, just like a
+    /// finite hit region.
+    ///
+    /// Calling this function replaces any previous values set on this Transform. To reset a
+    /// Transform to "no hit testing": send an empty vector with [`SetHitRegions`].
+    @available(added=10)
+    @transitional
+    SetInfiniteHitRegion(struct {
+        transform_id TransformId;
+        hit_test HitTestInteraction;
     });
 
     // ***** Content *****

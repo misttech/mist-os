@@ -14,6 +14,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <optional>
 
 #include <gtest/gtest.h>
 
@@ -25,6 +26,7 @@
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/allocation/mock_buffer_collection_importer.h"
 #include "src/ui/scenic/lib/flatland/flatland_display.h"
+#include "src/ui/scenic/lib/flatland/flatland_types.h"
 #include "src/ui/scenic/lib/flatland/global_matrix_data.h"
 #include "src/ui/scenic/lib/flatland/global_topology_data.h"
 #include "src/ui/scenic/lib/flatland/tests/mock_flatland_presenter.h"
@@ -2220,6 +2222,27 @@ TEST_F(FlatlandTest, ViewportClippingPersistsAcrossInstances) {
   EXPECT_EQ(child_root_clip.height, kViewportHeight);
 }
 
+TEST_F(FlatlandTest, DefaultHitRegion_IsInfinite) {
+  std::shared_ptr<Flatland> flatland = CreateFlatland();
+  const auto session_id = flatland->GetSessionId();
+
+  const TransformId kId1 = {1};
+  const TransformHandle handle1 = TransformHandle(session_id, 1);
+
+  flatland->CreateTransform(kId1);
+  flatland->SetRootTransform(kId1);
+
+  PRESENT(flatland, true);
+  {
+    auto uber_struct = GetUberStruct(flatland.get());
+    auto& hit_regions = uber_struct->local_hit_regions_map;
+
+    ASSERT_EQ(hit_regions.size(), 1u);
+    ASSERT_EQ(hit_regions[handle1].size(), 1u);
+    EXPECT_FALSE(hit_regions[handle1][0].is_finite());
+  }
+}
+
 TEST_F(FlatlandTest, DefaultHitRegionsExist_OnlyForCurrentRoot) {
   std::shared_ptr<Flatland> flatland = CreateFlatland();
   const auto session_id = flatland->GetSessionId();
@@ -2271,7 +2294,6 @@ TEST_F(FlatlandTest, SetHitRegionsOverwritesPreviousOnes) {
 
   PRESENT(flatland, true);
 
-  constexpr float expected_initial_bounds = 1'000'000.F;
   // Check that the default hit region is as expected.
   {
     auto uber_struct = GetUberStruct(flatland.get());
@@ -2282,11 +2304,8 @@ TEST_F(FlatlandTest, SetHitRegionsOverwritesPreviousOnes) {
 
     auto hit_region = hit_regions[handle1][0];
 
-    auto rect = hit_region.region;
-    fuchsia::math::RectF expected_rect = {-expected_initial_bounds, -expected_initial_bounds,
-                                          2 * expected_initial_bounds, 2 * expected_initial_bounds};
-    ExpectRectFEquals(rect, expected_rect);
-    EXPECT_EQ(hit_region.hit_test, fuchsia::ui::composition::HitTestInteraction::DEFAULT);
+    EXPECT_FALSE(hit_region.is_finite());
+    EXPECT_EQ(hit_region.interaction(), fuchsia::ui::composition::HitTestInteraction::DEFAULT);
   }
 
   // Add a hit region to a different transform - this should not overwrite the default one.
@@ -2310,21 +2329,18 @@ TEST_F(FlatlandTest, SetHitRegionsOverwritesPreviousOnes) {
     {
       auto hit_region = hit_regions[handle1][0];
 
-      auto rect = hit_region.region;
-      fuchsia::math::RectF expected_rect = {-expected_initial_bounds, -expected_initial_bounds,
-                                            2 * expected_initial_bounds,
-                                            2 * expected_initial_bounds};
-      ExpectRectFEquals(rect, expected_rect);
-      EXPECT_EQ(hit_region.hit_test, fuchsia::ui::composition::HitTestInteraction::DEFAULT);
+      EXPECT_FALSE(hit_region.is_finite());
+      EXPECT_EQ(hit_region.interaction(), fuchsia::ui::composition::HitTestInteraction::DEFAULT);
     }
 
     {
       auto hit_region = hit_regions[handle2][0];
 
-      auto rect = hit_region.region;
+      ASSERT_TRUE(hit_region.is_finite());
+      auto rect = hit_region.region();
       fuchsia::math::RectF expected_rect = {0, 1, 2, 3};
       ExpectRectFEquals(rect, expected_rect);
-      EXPECT_EQ(hit_region.hit_test, fuchsia::ui::composition::HitTestInteraction::DEFAULT);
+      EXPECT_EQ(hit_region.interaction(), fuchsia::ui::composition::HitTestInteraction::DEFAULT);
     }
   }
 
@@ -2343,10 +2359,11 @@ TEST_F(FlatlandTest, SetHitRegionsOverwritesPreviousOnes) {
 
     auto hit_region = hit_regions[handle1][0];
 
-    auto rect = hit_region.region;
+    ASSERT_TRUE(hit_region.is_finite());
+    auto rect = hit_region.region();
     fuchsia::math::RectF expected_rect = {1, 2, 3, 4};
     ExpectRectFEquals(rect, expected_rect);
-    EXPECT_EQ(hit_region.hit_test,
+    EXPECT_EQ(hit_region.interaction(),
               fuchsia::ui::composition::HitTestInteraction::SEMANTICALLY_INVISIBLE);
   }
 }
@@ -2373,10 +2390,11 @@ TEST_F(FlatlandTest, SetRootTransformAfterSetHitRegions_DoesNotChangeHitRegion) 
 
   auto hit_region = hit_regions[handle1][0];
 
-  auto rect = hit_region.region;
+  ASSERT_TRUE(hit_region.is_finite());
+  auto rect = hit_region.region();
   fuchsia::math::RectF expected_rect = {0, 1, 2, 3};
   ExpectRectFEquals(rect, expected_rect);
-  EXPECT_EQ(hit_region.hit_test,
+  EXPECT_EQ(hit_region.interaction(),
             fuchsia::ui::composition::HitTestInteraction::SEMANTICALLY_INVISIBLE);
 }
 
@@ -2411,15 +2429,17 @@ TEST_F(FlatlandTest, MultipleTransformsWithHitRegions) {
     auto hit_region1 = hit_regions[handle1][0];
     auto hit_region2 = hit_regions[handle2][0];
 
-    auto rect1 = hit_region1.region;
-    auto rect2 = hit_region2.region;
+    ASSERT_TRUE(hit_region1.is_finite());
+    auto rect1 = hit_region1.region();
+    ASSERT_TRUE(hit_region2.is_finite());
+    auto rect2 = hit_region2.region();
     fuchsia::math::RectF expected_rect1 = {0, 1, 2, 3};
     fuchsia::math::RectF expected_rect2 = {1, 2, 3, 4};
     ExpectRectFEquals(rect1, expected_rect1);
     ExpectRectFEquals(rect2, expected_rect2);
 
-    EXPECT_EQ(hit_region1.hit_test, fuchsia::ui::composition::HitTestInteraction::DEFAULT);
-    EXPECT_EQ(hit_region2.hit_test,
+    EXPECT_EQ(hit_region1.interaction(), fuchsia::ui::composition::HitTestInteraction::DEFAULT);
+    EXPECT_EQ(hit_region2.interaction(),
               fuchsia::ui::composition::HitTestInteraction::SEMANTICALLY_INVISIBLE);
   }
 }
@@ -2449,7 +2469,8 @@ TEST_F(FlatlandTest, ManuallyAddedMaximalHitRegionPersists) {
   EXPECT_EQ(hit_regions[handle1].size(), 1u);
   auto hit_region1 = hit_regions[handle1][0];
 
-  auto rect = hit_region1.region;
+  ASSERT_TRUE(hit_region1.is_finite());
+  auto rect = hit_region1.region();
   fuchsia::math::RectF expected_rect = {FLT_MIN, FLT_MIN, FLT_MAX, FLT_MAX};
   ExpectRectFEquals(rect, expected_rect);
 }

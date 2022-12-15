@@ -5,9 +5,11 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_FLATLAND_TYPES_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_FLATLAND_TYPES_H_
 
+#include <fuchsia/math/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 
 #include <array>
+#include <optional>
 
 #include <glm/glm.hpp>
 
@@ -46,6 +48,39 @@ struct ImageRect {
 };
 
 std::ostream& operator<<(std::ostream& str, const flatland::ImageRect& r);
+
+// A flexible representation of a flatland hit region.
+class HitRegion {
+ public:
+  // Finite hit region with default interaction.
+  explicit HitRegion(fuchsia::math::RectF region,
+                     fuchsia::ui::composition::HitTestInteraction interaction =
+                         fuchsia::ui::composition::HitTestInteraction::DEFAULT);
+
+  // Infinite hit region with default interaction.
+  static HitRegion Infinite(fuchsia::ui::composition::HitTestInteraction interaction =
+                                fuchsia::ui::composition::HitTestInteraction::DEFAULT);
+
+  // Return true if region has finite extent.
+  bool is_finite() const;
+
+  // Finite region accessor. Caller ensures is_finite() is true.
+  const fuchsia::math::RectF& region() const;
+
+  // Hit test interaction accessor.
+  fuchsia::ui::composition::HitTestInteraction interaction() const;
+
+ private:
+  // Helper for Infinite().
+  explicit HitRegion(fuchsia::ui::composition::HitTestInteraction interaction);
+
+  // Presence indicates a finite hit region.
+  // Absence indicates an infinite hit region.
+  std::optional<fuchsia::math::RectF> region_;
+
+  fuchsia::ui::composition::HitTestInteraction interaction_ =
+      fuchsia::ui::composition::HitTestInteraction::DEFAULT;
+};
 
 }  // namespace flatland
 

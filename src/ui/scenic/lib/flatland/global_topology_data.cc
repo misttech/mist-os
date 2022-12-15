@@ -4,9 +4,13 @@
 
 #include "src/ui/scenic/lib/flatland/global_topology_data.h"
 
+#include <fuchsia/math/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <optional>
+
 #include "src/ui/scenic/lib/flatland/flatland.h"
+#include "src/ui/scenic/lib/flatland/flatland_types.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/lib/utils/logging.h"
 
@@ -91,6 +95,7 @@ size_t GetSubtreeEndIndex(size_t start, const std::vector<flatland::TransformHan
 
   return end;
 }
+
 // Converts a 3x3 (2D) matrix to its 4x4 (3D) analog.
 // xx, xy, yx, yy represent scale/rotation, T for translation.
 //
@@ -117,6 +122,15 @@ glm::mat4 Convert2DTransformTo3D(glm::mat3 in_matrix) {
   out_matrix[3][1] = in_matrix[2][1];
 
   return out_matrix;
+}
+
+// Wrapper function to check against implementation's sentinel value for infinite regions.
+bool HitRegionContainsPoint(flatland::HitRegion region, float x, float y) {
+  if (!region.is_finite()) {
+    return true;
+  }
+
+  return utils::RectFContainsPoint(region.region(), x, y);
 }
 
 // Easier-to-read input data to HitTest() below.
@@ -167,9 +181,8 @@ view_tree::SubtreeHitTestResult HitTest(const HitTestingData& data, zx_koid_t st
       if (const auto hit_region_vec = hit_regions.find(transform);
           hit_region_vec != hit_regions.end()) {
         for (const auto& region : hit_region_vec->second) {
-          const auto rect = region.region;
           const bool semantically_invisible =
-              region.hit_test ==
+              region.interaction() ==
               fuchsia::ui::composition::HitTestInteraction::SEMANTICALLY_INVISIBLE;
 
           // Deliver a hit in all cases except for when it is a semantic hit test and the region
@@ -180,7 +193,7 @@ view_tree::SubtreeHitTestResult HitTest(const HitTestingData& data, zx_koid_t st
 
           // Instead of clipping the hit region with the clip region, simply check if the hit
           // point is in both.
-          if (utils::RectFContainsPoint(rect, x, y) &&
+          if (HitRegionContainsPoint(region, x, y) &&
               utils::RectFContainsPoint(clip_region, x, y)) {
             hits.push_back(utils::ExtractKoid(view_ref));
             break;

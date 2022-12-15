@@ -10,6 +10,7 @@
 #include <iterator>
 
 #include "src/ui/lib/escher/geometry/types.h"
+#include "src/ui/scenic/lib/flatland/flatland_types.h"
 
 #include <glm/gtc/epsilon.hpp>
 #include <glm/gtc/matrix_access.hpp>
@@ -422,12 +423,15 @@ GlobalHitRegionsMap ComputeGlobalHitRegions(
 
     if (regions_vec_kv != uber_struct_kv->second->local_hit_regions_map.end()) {
       for (auto& local_hit_region : regions_vec_kv->second) {
-        auto local_rect = local_hit_region.region;
-
-        // Calculate the global position of the current hit region.
-        auto global_rect = MatrixMultiplyRectF(matrix_vector[i], local_rect);
-
-        global_hit_regions[handle].push_back({global_rect, local_hit_region.hit_test});
+        if (local_hit_region.is_finite()) {
+          // Usually: calculate the global position of the current hit region.
+          auto global_rect = MatrixMultiplyRectF(matrix_vector[i], local_hit_region.region());
+          global_hit_regions[handle].push_back(
+              flatland::HitRegion(global_rect, local_hit_region.interaction()));
+        } else {
+          // Special case: preserve sentinel value for infinite hit region.
+          global_hit_regions[handle].push_back(local_hit_region);
+        }
       }
     }
   }

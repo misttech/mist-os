@@ -9,6 +9,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "src/ui/scenic/lib/flatland/flatland_types.h"
 #include "src/ui/scenic/lib/flatland/global_image_data.h"
 #include "src/ui/scenic/lib/flatland/global_matrix_data.h"
 #include "src/ui/scenic/lib/flatland/global_topology_data.h"
@@ -844,7 +845,7 @@ TEST(ImageRectTest, MultipleParentTest) {
   // Set up the uber struct with the above topology. Set the doubly-parented child (1,4) up
   // with an image, hit region and clip region to make sure those get duplicated properly.
   const TransformClipRegion kClipRegion = {5, 10, 30, 40};
-  const fuchsia::ui::composition::HitRegion kHitRegion = {.region = {1, 2, 10, 20}};
+  const flatland::HitRegion kHitRegion({1, 2, 10, 20});
   const float kScale = 2.0f;
 
   const uint32_t kImageId = 7;
@@ -919,16 +920,16 @@ TEST(ImageRectTest, MultipleParentTest) {
     const auto second = vec[1];
 
     // The first clip region should match exactly the hit region above.
-    EXPECT_EQ(first.region.x, kHitRegion.region.x);
-    EXPECT_EQ(first.region.y, kHitRegion.region.y);
-    EXPECT_EQ(first.region.width, kHitRegion.region.width);
-    EXPECT_EQ(first.region.height, kHitRegion.region.height);
+    EXPECT_EQ(first.region().x, kHitRegion.region().x);
+    EXPECT_EQ(first.region().y, kHitRegion.region().y);
+    EXPECT_EQ(first.region().width, kHitRegion.region().width);
+    EXPECT_EQ(first.region().height, kHitRegion.region().height);
 
     // The second one should be magnified by the scale factor.
-    EXPECT_EQ(second.region.x, kScale * kHitRegion.region.x);
-    EXPECT_EQ(second.region.y, kScale * kHitRegion.region.y);
-    EXPECT_EQ(second.region.width, kScale * kHitRegion.region.width);
-    EXPECT_EQ(second.region.height, kScale * kHitRegion.region.height);
+    EXPECT_EQ(second.region().x, kScale * kHitRegion.region().x);
+    EXPECT_EQ(second.region().y, kScale * kHitRegion.region().y);
+    EXPECT_EQ(second.region().width, kScale * kHitRegion.region().width);
+    EXPECT_EQ(second.region().height, kScale * kHitRegion.region().height);
   }
 }
 

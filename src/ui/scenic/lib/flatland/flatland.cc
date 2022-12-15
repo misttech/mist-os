@@ -18,6 +18,7 @@
 #include <utility>
 
 #include "src/lib/fsl/handles/object_info.h"
+#include "src/ui/scenic/lib/flatland/flatland_types.h"
 #include "src/ui/scenic/lib/gfx/util/validate_eventpair.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/lib/utils/logging.h"
@@ -43,12 +44,6 @@ using fuchsia::ui::views::ViewCreationToken;
 using fuchsia::ui::views::ViewportCreationToken;
 
 namespace {
-
-// TODO(fxbug.dev/107310): Default hit regions cover the entire screen. However, since hit
-// regions also have a global position (affected by translation, scale, and rotation), they
-// cannot be specified as numeric limits. The current solution is a short-term workaround but a
-// most robust solution should be investigated.
-constexpr float kDefaultHitRegionBounds = 1'000'000.F;
 
 std::optional<std::string> ValidateViewportProperties(const ViewportProperties& properties) {
   if (properties.has_logical_size()) {
@@ -301,14 +296,7 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
   // root, add a full screen one.
   if (root_transform_.GetInstanceId() != 0 &&
       hit_regions_.find(root_transform_) == hit_regions_.end()) {
-    // TODO(fxbug.dev/107310): Default hit regions cover the entire screen. However, since hit
-    // regions also have a global position (affected by translation, scale, and rotation), they
-    // cannot be specified as numeric limits. The current solution is a short-term workaround but a
-    // most robust solution should be investigated.
-    uber_struct->local_hit_regions_map[root_transform_] = {
-        {{-kDefaultHitRegionBounds, -kDefaultHitRegionBounds, 2 * kDefaultHitRegionBounds,
-          2 * kDefaultHitRegionBounds},
-         fuchsia::ui::composition::HitTestInteraction::DEFAULT}};
+    uber_struct->local_hit_regions_map[root_transform_] = {{flatland::HitRegion::Infinite()}};
   }
 
   uber_struct->images = image_metadatas_;
@@ -1259,7 +1247,8 @@ void Flatland::SetImageOpacity(ContentId image_id, float val) {
   metadata.multiply_color[3] = val;
 }
 
-void Flatland::SetHitRegions(TransformId transform_id, std::vector<HitRegion> regions) {
+void Flatland::SetHitRegions(TransformId transform_id,
+                             std::vector<fuchsia::ui::composition::HitRegion> regions) {
   if (transform_id.value == kInvalidId) {
     error_reporter_->ERROR() << "SetHitRegions called with invalid transform ID";
     ReportBadOperationError();
@@ -1286,7 +1275,31 @@ void Flatland::SetHitRegions(TransformId transform_id, std::vector<HitRegion> re
     }
   }
 
-  hit_regions_[transform_kv->second] = regions;
+  // Reformat into internal type.
+  std::vector<flatland::HitRegion> list;
+  for (auto& region : regions) {
+    list.emplace_back(region.region, region.hit_test);
+  }
+  hit_regions_[transform_kv->second] = list;
+}
+
+void Flatland::SetInfiniteHitRegion(TransformId transform_id,
+                                    fuchsia::ui::composition::HitTestInteraction hit_test) {
+  if (transform_id.value == kInvalidId) {
+    error_reporter_->ERROR() << "SetHitRegions called with invalid transform ID";
+    ReportBadOperationError();
+    return;
+  }
+
+  auto transform_kv = transforms_.find(transform_id.value);
+  if (transform_kv == transforms_.end()) {
+    error_reporter_->ERROR() << "SetHitRegions failed, transform_id " << transform_id.value
+                             << " not found";
+    ReportBadOperationError();
+    return;
+  }
+
+  hit_regions_[transform_kv->second] = {flatland::HitRegion::Infinite(hit_test)};
 }
 
 void Flatland::SetContent(TransformId transform_id, ContentId content_id) {

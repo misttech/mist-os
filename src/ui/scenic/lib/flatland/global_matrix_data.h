@@ -25,8 +25,7 @@ using GlobalImageSampleRegionVector = std::vector<ImageSampleRegion>;
 using GlobalTransformClipRegionVector = std::vector<TransformClipRegion>;
 
 // The set of per-transform hit regions for a particular global topology.
-using GlobalHitRegionsMap =
-    std::unordered_map<TransformHandle, std::vector<fuchsia::ui::composition::HitRegion>>;
+using GlobalHitRegionsMap = std::unordered_map<TransformHandle, std::vector<flatland::HitRegion>>;
 
 const extern ImageSampleRegion kInvalidSampleRegion;
 const extern TransformClipRegion kUnclippedRegion;

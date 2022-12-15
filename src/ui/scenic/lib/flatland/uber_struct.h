@@ -12,6 +12,7 @@
 #include <unordered_map>
 
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
+#include "src/ui/scenic/lib/flatland/flatland_types.h"
 #include "src/ui/scenic/lib/flatland/transform_graph.h"
 #include "src/ui/scenic/lib/flatland/transform_handle.h"
 
@@ -56,8 +57,7 @@ struct UberStruct {
   std::unordered_map<TransformHandle, allocation::ImageMetadata> images;
 
   // Map of local hit regions.
-  std::unordered_map<TransformHandle, std::vector<fuchsia::ui::composition::HitRegion>>
-      local_hit_regions_map;
+  std::unordered_map<TransformHandle, std::vector<flatland::HitRegion>> local_hit_regions_map;
 
   // The ViewRef for the root (View) of this Flatland instance.
   // Can be nullptr when not attached to the scene, otherwise must be set.

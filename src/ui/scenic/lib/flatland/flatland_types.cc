@@ -4,6 +4,8 @@
 
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
 
+#include <lib/syslog/cpp/macros.h>
+
 #include <glm/gtc/epsilon.hpp>
 
 namespace flatland {
@@ -43,5 +45,25 @@ bool ImageRect::operator==(const ImageRect& other) const {
          texel_uvs[1] == other.texel_uvs[1] && texel_uvs[2] == other.texel_uvs[2] &&
          texel_uvs[3] == other.texel_uvs[3];
 }
+
+HitRegion::HitRegion(fuchsia::math::RectF region,
+                     fuchsia::ui::composition::HitTestInteraction interaction)
+    : region_(std::make_optional(region)), interaction_(interaction) {}
+
+HitRegion HitRegion::Infinite(fuchsia::ui::composition::HitTestInteraction interaction) {
+  return HitRegion(interaction);
+}
+
+bool HitRegion::is_finite() const { return region_.has_value(); }
+
+const fuchsia::math::RectF& HitRegion::region() const {
+  FX_DCHECK(region_.has_value()) << "region accessor needs a value";
+  return region_.value();
+}
+
+fuchsia::ui::composition::HitTestInteraction HitRegion::interaction() const { return interaction_; }
+
+HitRegion::HitRegion(fuchsia::ui::composition::HitTestInteraction interaction)
+    : interaction_(interaction) {}
 
 }  // namespace flatland

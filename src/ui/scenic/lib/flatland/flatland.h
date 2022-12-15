@@ -150,6 +150,9 @@ class Flatland : public fuchsia::ui::composition::Flatland,
   void SetHitRegions(TransformId transform_id,
                      std::vector<fuchsia::ui::composition::HitRegion> regions) override;
   // |fuchsia::ui::composition::Flatland|
+  void SetInfiniteHitRegion(TransformId transform_id,
+                            fuchsia::ui::composition::HitTestInteraction hit_test) override;
+  // |fuchsia::ui::composition::Flatland|
   void SetContent(TransformId transform_id, ContentId content_id) override;
   // |fuchsia::ui::composition::Flatland|
   void SetViewportProperties(ContentId viewport_id,
@@ -389,8 +392,7 @@ class Flatland : public fuchsia::ui::composition::Flatland,
 
   // A map of transform handles to hit regions. Each transform's set of hit regions indicate which
   // parts of the transform are user-interactive.
-  std::unordered_map<TransformHandle, std::vector<fuchsia::ui::composition::HitRegion>>
-      hit_regions_;
+  std::unordered_map<TransformHandle, std::vector<flatland::HitRegion>> hit_regions_;
 
   // A map of content (image) transform handles to ImageSampleRegion structs which are used
   // to determine the portion of an image that is actually used for rendering.

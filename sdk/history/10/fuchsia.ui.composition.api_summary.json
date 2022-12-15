@@ -297,6 +297,12 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.ui.composition/Flatland.SetInfiniteHitRegion",
+        "ordinal": "2799016822254507362",
+        "type": "(fuchsia.ui.composition/TransformId transform_id,fuchsia.ui.composition/HitTestInteraction hit_test)"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetOpacity",
         "ordinal": "3996377510281753338",
         "type": "(fuchsia.ui.composition/TransformId transform_id,float32 value)"
