@@ -91,8 +91,11 @@ Images must have meaningful `alt` text.
 
 Markdown file fragments are included in another markdown file by using
 
+
 ```md
+{% verbatim %}
 << relative-path-to/_file.md >>
+{% endverbatim %}
 ```
 
 The path must be relative to the current .md source file—absolute paths
