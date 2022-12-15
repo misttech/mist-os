@@ -552,6 +552,7 @@ const std::vector<TestCase> test_cases = {
      }},
     {NodeKind::kModifiers,
      {
+         // Layouts
          R"FIDL(library x; type MyBits = «flexible» bits { MY_VALUE = 1; };)FIDL",
          R"FIDL(library x; type MyBits = «strict» bits : uint32 { MY_VALUE = 1; };)FIDL",
          R"FIDL(library x; type MyEnum = «flexible» enum : uint32 { MY_VALUE = 1; };)FIDL",
@@ -562,10 +563,26 @@ const std::vector<TestCase> test_cases = {
          R"FIDL(library x; type MyUnion = «flexible» union { 1: my_member bool; };)FIDL",
          R"FIDL(library x; type MyUnion = «strict» union { 1: my_member bool; };)FIDL",
          R"FIDL(library x; type MyUnion = «resource strict» union { 1: my_member bool; };)FIDL",
+         R"FIDL(library x; type MyEnum = @attr «flexible» enum : uint32 { MY_VALUE = 1; };)FIDL",
+         R"FIDL(library x; type MyStruct = @attr «resource» struct {};)FIDL",
+         R"FIDL(library x; type MyUnion = @attr «resource strict» union { 1: my_member bool; };)FIDL",
          // Note that the following 3 tests have union members named like modifiers.
          R"FIDL(library x; type MyUnion = «resource flexible» union { 1: my_member resource; };)FIDL",
          R"FIDL(library x; type MyUnion = «strict resource» union { 1: my_member flexible; };)FIDL",
          R"FIDL(library x; type MyUnion = «flexible resource» union { 1: my_member strict; };)FIDL",
+         // Protocols
+         R"FIDL(library x; «ajar» protocol MyProtocol {};)FIDL",
+         R"FIDL(library x; «closed» protocol MyProtocol {};)FIDL",
+         R"FIDL(library x; «open» protocol MyProtocol {};)FIDL",
+         R"FIDL(library x; @attr «open» protocol MyProtocol {};)FIDL",
+         // Methods
+         R"FIDL(library x; «open» protocol MyProtocol { «flexible» MyMethod(); };)FIDL",
+         R"FIDL(library x; «open» protocol MyProtocol { «strict» MyMethod(); };)FIDL",
+         R"FIDL(library x; «open» protocol MyProtocol { @attr «strict» MyMethod(); };)FIDL",
+         // Note that the following 3 tests have protocol methods named like modifiers.
+         R"FIDL(library x; «open» protocol MyProtocol { «flexible» flexible(); strict(); };)FIDL",
+         R"FIDL(library x; «open» protocol MyProtocol { «strict» strict(); flexible(); };)FIDL",
+         R"FIDL(library x; «open» protocol MyProtocol { @attr «flexible» flexible(); @attr strict(); };)FIDL",
      }},
     {NodeKind::kNamedLayoutReference,
      {
@@ -844,6 +861,7 @@ void RunParseTests(const std::vector<TestCase>& cases, const std::string& insert
 
       // Parse the source with markers removed
       TestLibrary library(clean_source);
+      library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
       std::unique_ptr<fidl::raw::File> ast;
       if (!library.Parse(&ast)) {
         errors.push_back("failed to parse");

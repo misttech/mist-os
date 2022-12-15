@@ -777,7 +777,7 @@ void Parser::ParseProtocolMember(
                                    ? types::Strictness::kFlexible
                                    : types::Strictness::kStrict;
           modifiers = std::make_unique<raw::Modifiers>(
-              scope.GetTokenChain(),
+              raw::TokenChain(maybe_modifier->start(), maybe_modifier->end()),
               raw::Modifier<types::Strictness>(as_strictness, maybe_modifier->start()));
           switch (Peek().kind()) {
             case Token::Kind::kArrow: {
@@ -857,7 +857,8 @@ std::unique_ptr<raw::ProtocolDeclaration> Parser::ParseProtocolDeclaration(
         ZX_PANIC("expected openness token");
     }
     modifiers = std::make_unique<raw::Modifiers>(
-        scope.GetTokenChain(), raw::Modifier<types::Openness>(as_openness, modifier->start()));
+        raw::TokenChain(modifier->start(), modifier->end()),
+        raw::Modifier<types::Openness>(as_openness, modifier->start()));
   }
 
   ConsumeToken(IdentifierOfSubkind(Token::Subkind::kProtocol));
