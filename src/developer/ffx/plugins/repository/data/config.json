@@ -3,7 +3,7 @@
         "server": {
             "enabled": false,
             "listen": "[::]:8083",
-            "mode": "pm"
+            "mode": "ffx"
         }
     }
 }
