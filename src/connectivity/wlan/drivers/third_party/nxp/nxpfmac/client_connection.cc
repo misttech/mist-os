@@ -29,6 +29,7 @@
 namespace wlan::nxpfmac {
 
 using wlan::drivers::timer::Timer;
+constexpr zx_duration_t kDestructionStateTimeout = ZX_SEC(5);
 constexpr zx_duration_t kConnectionTimeout = ZX_MSEC(6000);
 constexpr zx_duration_t kDisconnectTimeout = ZX_MSEC(1000);
 constexpr zx_duration_t kLogTimerTimeout = ZX_SEC(30);
@@ -61,7 +62,16 @@ ClientConnection::~ClientConnection() {
 
   // Using a MAC address of all zeroes will disconnect from the currently connected BSSID.
   constexpr uint8_t kZeroMac[ETH_ALEN] = {};
-  status = Disconnect(kZeroMac, REASON_CODE_LEAVING_NETWORK_DEAUTH, [](IoctlStatus) {});
+  status = Disconnect(kZeroMac, REASON_CODE_LEAVING_NETWORK_DEAUTH, [this](IoctlStatus io_status) {
+    if (io_status != IoctlStatus::Success) {
+      // Because we're waiting for the disconnect to complete in the destructor we should signal
+      // that the state is idle anyway. This allows the destructor to complete instead of
+      // permanently lock up.
+      NXPF_ERR("Failed to disconnect, destroying connection anyway: %d", io_status);
+      std::lock_guard lock(mutex_);
+      state_ = State::Idle;
+    }
+  });
   if (status != ZX_OK && status != ZX_ERR_NOT_CONNECTED && status != ZX_ERR_ALREADY_EXISTS) {
     NXPF_ERR("Failed to disconnect: %s", zx_status_get_string(status));
     // Don't attempt to wait for the disconnected state here, it might never happen.
@@ -74,18 +84,22 @@ ClientConnection::~ClientConnection() {
   // try to stop any ongoing connection attempt. Disconnect attempts should complete fast enough
   // that this shouldn't be an issue.
   std::unique_lock lock(mutex_);
-  connect_in_progress_.Wait(lock, false);
-  disconnect_in_progress_.Wait(lock, false);
+  if (!state_.WaitFor(lock, State::Idle, kDestructionStateTimeout)) {
+    NXPF_ERR("Connection failed to reach idle state at destruction");
+  }
 }
 
 zx_status_t ClientConnection::Connect(const wlan_fullmac_connect_req_t* req,
                                       OnConnectCallback&& on_connect) {
   std::lock_guard lock(mutex_);
-  if (connect_in_progress_) {
+  if (state_ == State::Connecting) {
     return ZX_ERR_ALREADY_EXISTS;
   }
-  if (connected_) {
+  if (state_ == State::Connected) {
     return ZX_ERR_ALREADY_BOUND;
+  }
+  if (state_ == State::Disconnecting) {
+    return ZX_ERR_SHOULD_WAIT;
   }
 
   auto ssid = IeView(req->selected_bss.ies_list, req->selected_bss.ies_count).get(SSID);
@@ -178,7 +192,7 @@ zx_status_t ClientConnection::Connect(const wlan_fullmac_connect_req_t* req,
 
   auto on_connect_complete = [this](mlan_ioctl_req* req, IoctlStatus io_status) {
     std::lock_guard lock(mutex_);
-    if (!connect_in_progress_) {
+    if (state_ != State::Connecting) {
       NXPF_WARN("Connection ioctl completed when no connection was in progress");
       return;
     }
@@ -224,19 +238,17 @@ zx_status_t ClientConnection::Connect(const wlan_fullmac_connect_req_t* req,
   bss.ssid.ssid_len = ssid->size();
   memcpy(bss.ssid.ssid, ssid->data(), bss.ssid.ssid_len);
 
-  // This should be set before issuing the ioctl. The ioctl completion could theoretically be called
-  // before IssueIoctl even returns.
-  connect_in_progress_ = true;
-
   IoctlStatus io_status = context_->ioctl_adapter_->IssueIoctl(
       connect_request_.get(), std::move(on_connect_complete), kConnectionTimeout);
   if (io_status != IoctlStatus::Pending) {
     // Even IoctlStatus::Success should  be considered a failure here. Connecting has to be a
     // pending operation, anything else is unreasonable.
     NXPF_ERR("Connect ioctl failed: %d", io_status);
-    connect_in_progress_ = false;
     return ZX_ERR_IO;
   }
+
+  // The connection attempt is now in progress.
+  state_ = State::Connecting;
 
   return ZX_OK;
 }
@@ -244,7 +256,7 @@ zx_status_t ClientConnection::Connect(const wlan_fullmac_connect_req_t* req,
 zx_status_t ClientConnection::CancelConnect() {
   std::lock_guard lock(mutex_);
 
-  if (!connect_in_progress_) {
+  if (state_ != State::Connecting) {
     // No connection in progress
     return ZX_ERR_NOT_FOUND;
   }
@@ -258,12 +270,15 @@ zx_status_t ClientConnection::Disconnect(
     const uint8_t* addr, uint16_t reason_code,
     std::function<void(IoctlStatus)>&& on_disconnect_complete) {
   std::lock_guard lock(mutex_);
-  if (!connected_) {
-    return ZX_ERR_NOT_CONNECTED;
-  }
-  if (disconnect_in_progress_) {
+  if (state_ == State::Disconnecting) {
     return ZX_ERR_ALREADY_EXISTS;
   }
+  if (state_ != State::Connected) {
+    return ZX_ERR_NOT_CONNECTED;
+  }
+
+  State previous_state = state_.Load();
+  state_ = State::Disconnecting;
 
   // Stop the log timer unconditionally.
   log_timer_->Stop();
@@ -274,26 +289,22 @@ zx_status_t ClientConnection::Disconnect(
                   .param = {.deauth_param{.reason_code = reason_code}}});
   memcpy(request->UserReq().param.deauth_param.mac_addr, addr, ETH_ALEN);
 
-  auto on_ioctl = [this, on_disconnect = std::move(on_disconnect_complete)](pmlan_ioctl_req req,
-                                                                            IoctlStatus status) {
-    if (status == IoctlStatus::Success) {
+  auto on_ioctl = [this, previous_state, on_disconnect = std::move(on_disconnect_complete)](
+                      pmlan_ioctl_req req, IoctlStatus status) {
+    {
       std::lock_guard lock(mutex_);
-      connected_ = false;
+      state_ = status == IoctlStatus::Success ? State::Idle : previous_state;
     }
+
     on_disconnect(status);
     delete reinterpret_cast<const IoctlRequest<mlan_ds_bss>*>(req);
-    std::lock_guard lock(mutex_);
-    disconnect_in_progress_ = false;
   };
 
-  // This flag must be set before IssueIoctl is called, the ioctl callback could be called before
-  // IssueIoctl even returns.
-  disconnect_in_progress_ = true;
   const IoctlStatus io_status =
       context_->ioctl_adapter_->IssueIoctl(request.get(), std::move(on_ioctl), kDisconnectTimeout);
   if (io_status != IoctlStatus::Pending) {
     NXPF_ERR("Failed to disconnect: %d", io_status);
-    disconnect_in_progress_ = false;
+    state_ = previous_state;
     return ZX_ERR_INTERNAL;
   }
 
@@ -306,7 +317,7 @@ zx_status_t ClientConnection::Disconnect(
 void ClientConnection::OnDisconnect(uint16_t reason_code) {
   NXPF_INFO("Client disconnect, reason: %u", reason_code);
   std::lock_guard lock(mutex_);
-  if (disconnect_in_progress_ && reason_code == 0) {
+  if (state_ == State::Disconnecting && reason_code == 0) {
     // If there is a disconnect in progress and the reason code is zero this indicates that this
     // disconnect event is the result of the disconnect call by the driver. Don't handle this case
     // here, it will be handled when the disconnect ioctl completes. The ioctl seems to complete
@@ -314,7 +325,7 @@ void ClientConnection::OnDisconnect(uint16_t reason_code) {
     NXPF_INFO("Driver initiated disconnect");
     return;
   }
-  if (connect_in_progress_) {
+  if (state_ == State::Connecting) {
     // Attempt to cancel any ongoing connection attempt, if the cancel succeeds the connect callback
     // will be called with an indication that the connection failed.
     if (!context_->ioctl_adapter_->CancelIoctl(connect_request_.get())) {
@@ -325,11 +336,11 @@ void ClientConnection::OnDisconnect(uint16_t reason_code) {
     }
     return;
   }
-  if (!connected_) {
+  if (state_ != State::Connected) {
     NXPF_ERR("Received disconnect event when not connected, reason: %u", reason_code);
     return;
   }
-  connected_ = false;
+  state_ = State::Idle;
   // Stop the log timer since the client is disconnected.
   log_timer_->Stop();
   ifc_->OnDisconnectEvent(reason_code);
@@ -512,16 +523,15 @@ void ClientConnection::TriggerConnectCallback(StatusCode status_code, const uint
 
 void ClientConnection::CompleteConnection(StatusCode status_code, const uint8_t* ies,
                                           size_t ies_size) {
-  if (!connect_in_progress_) {
+  if (state_ != State::Connecting && state_ != State::Authenticating) {
     NXPF_WARN("Received connection completion with no connection attempt in progress, ignoring.");
     return;
   }
-  connected_ = status_code == StatusCode::kSuccess;
-  connect_in_progress_ = false;
+  state_ = status_code == StatusCode::kSuccess ? State::Connected : State::Idle;
 
   TriggerConnectCallback(status_code, ies, ies_size);
   // Start periodic timer to update logs/stats every 30 seconds if the connection was successful.
-  if (connected_) {
+  if (state_ == State::Connected) {
     log_timer_->StartPeriodic(kLogTimerTimeout);
   }
 }

@@ -14,6 +14,9 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_WAITABLE_STATE_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_WAITABLE_STATE_H_
 
+#include <zircon/types.h>
+
+#include <chrono>
 #include <condition_variable>
 #include <mutex>
 
@@ -38,6 +41,8 @@ class WaitableState {
     Store(state);
     return *this;
   }
+  bool operator==(const T& state) const { return state_ == state; }
+  bool operator!=(const T& state) const { return state_ != state; }
 
   const T& Load() const { return state_; }
   explicit operator T() const { return state_; }
@@ -49,6 +54,18 @@ class WaitableState {
     while (state_ != expected_state) {
       condition_.wait(lock);
     }
+  }
+
+  // Like Wait but with a timeout. Returns true if the desired state is reached, false if the wait
+  // times out.
+  bool WaitFor(std::unique_lock<std::mutex>& lock, const T& expected_state, zx_duration_t timeout) {
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::nanoseconds(timeout);
+    while (state_ != expected_state) {
+      if (condition_.wait_until(lock, deadline) == std::cv_status::timeout) {
+        return false;
+      }
+    }
+    return true;
   }
 
  private:

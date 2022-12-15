@@ -71,4 +71,76 @@ TEST(WaitableStateTest, WaitForState) {
   storing_thread.join();
 }
 
+TEST(WaitableStateTest, Comparisons) {
+  enum class Color { Red, Green, Blue };
+
+  WaitableState<Color> state(Color::Red);
+  ASSERT_TRUE(state == Color::Red);
+  ASSERT_TRUE(state != Color::Green);
+  ASSERT_TRUE(state != Color::Blue);
+  ASSERT_FALSE(state != Color::Red);
+  ASSERT_FALSE(state == Color::Green);
+  ASSERT_FALSE(state == Color::Blue);
+
+  state = Color::Green;
+  ASSERT_TRUE(state != Color::Red);
+  ASSERT_TRUE(state == Color::Green);
+  ASSERT_TRUE(state != Color::Blue);
+  ASSERT_FALSE(state == Color::Red);
+  ASSERT_FALSE(state != Color::Green);
+  ASSERT_FALSE(state == Color::Blue);
+
+  state = Color::Blue;
+  ASSERT_TRUE(state != Color::Red);
+  ASSERT_TRUE(state != Color::Green);
+  ASSERT_TRUE(state == Color::Blue);
+  ASSERT_FALSE(state == Color::Red);
+  ASSERT_FALSE(state == Color::Green);
+  ASSERT_FALSE(state != Color::Blue);
+}
+
+TEST(WaitableStateTest, WaitForWithTimeout) {
+  // Test that WaitFor correctly times out after the given time and that it returns false.
+
+  constexpr zx_duration_t kTimeout = ZX_MSEC(5);
+  enum class State { Broken, On, Off };
+
+  WaitableState<State> state(State::Off);
+
+  std::mutex mutex;
+  std::unique_lock lock(mutex);
+
+  const zx_time_t start = zx_clock_get_monotonic();
+
+  // WaitFor returns false on timeout, make sure it does.
+  ASSERT_FALSE(state.WaitFor(lock, State::On, kTimeout));
+
+  zx_duration_t elapsed = zx_clock_get_monotonic() - start;
+  // At least kTimeout amount of time should have passed.
+  ASSERT_GE(elapsed, kTimeout);
+}
+
+TEST(WaitableStateTest, WaitForWithSuccess) {
+  // Test that WaitFor correctly returns true when the state changes to the expected state.
+
+  constexpr zx_duration_t kTimeout = ZX_SEC(60);
+  enum class State { Broken, On, Off };
+  constexpr State kExpectedState = State::On;
+
+  WaitableState<State> state(State::Off);
+
+  std::mutex mutex;
+
+  std::thread waiting_thread([&]() {
+    std::unique_lock lock(mutex);
+    ASSERT_TRUE(state.WaitFor(lock, kExpectedState, kTimeout));
+    ASSERT_EQ(kExpectedState, state);
+  });
+  {
+    std::unique_lock lock(mutex);
+    state = kExpectedState;
+  }
+  waiting_thread.join();
+}
+
 }  // namespace

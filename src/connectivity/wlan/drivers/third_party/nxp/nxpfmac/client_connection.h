@@ -84,15 +84,22 @@ class ClientConnection {
       __TA_REQUIRES(mutex_);
   void IndicateSignalQuality();
 
+  enum class State {
+    Idle,
+    Authenticating,
+    Connecting,
+    Connected,
+    Disconnecting,
+  };
+
+  WaitableState<State> state_{State::Idle};
+
   // Periodic timer to log client stats, etc.
   std::unique_ptr<wlan::drivers::timer::Timer> log_timer_;
   ClientConnectionIfc* ifc_ = nullptr;
   DeviceContext* context_ = nullptr;
   KeyRing* key_ring_ = nullptr;
   const uint32_t bss_index_;
-  bool connected_ __TA_GUARDED(mutex_) = false;
-  WaitableState<bool> connect_in_progress_{false};
-  WaitableState<bool> disconnect_in_progress_{false};
   OnConnectCallback on_connect_;
   // Something inside mlan_ds_bss makes this a variable size struct so we need to have a pointer.
   // Otherwise it has to be at the end of this class and that makes this class variable size which

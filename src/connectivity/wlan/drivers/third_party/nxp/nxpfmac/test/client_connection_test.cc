@@ -435,6 +435,7 @@ TEST_F(ClientConnectionTest, DisconnectAsyncFailure) {
   constexpr uint8_t kStaAddr[] = {0x0e, 0x0d, 0x16, 0x28, 0x3a, 0x4c};
   constexpr uint16_t kReasonCode = 2;
 
+  std::atomic<bool> fail_disconnect = true;
   auto on_ioctl = [&](t_void *, pmlan_ioctl_req req) -> mlan_status {
     if (req->action == MLAN_ACT_SET && req->req_id == MLAN_IOCTL_BSS) {
       auto bss = reinterpret_cast<const mlan_ds_bss *>(req->pbuf);
@@ -445,7 +446,11 @@ TEST_F(ClientConnectionTest, DisconnectAsyncFailure) {
       }
       if (bss->sub_command == MLAN_OID_BSS_STOP) {
         // This is the disconnect call. Fail it asynchronously.
-        ioctl_adapter_->OnIoctlComplete(req, wlan::nxpfmac::IoctlStatus::Failure);
+        if (fail_disconnect) {
+          ioctl_adapter_->OnIoctlComplete(req, wlan::nxpfmac::IoctlStatus::Failure);
+        } else {
+          ioctl_adapter_->OnIoctlComplete(req, wlan::nxpfmac::IoctlStatus::Success);
+        }
         return MLAN_STATUS_PENDING;
       }
     }
@@ -465,9 +470,14 @@ TEST_F(ClientConnectionTest, DisconnectAsyncFailure) {
   ASSERT_OK(connection.Connect(&kMinimumConnectReq, std::move(on_connect)));
   ASSERT_OK(sync_completion_wait(&connect_completion, ZX_TIME_INFINITE));
 
+  sync_completion_t disconnect_completion;
   ASSERT_OK(connection.Disconnect(kStaAddr, kReasonCode, [&](wlan::nxpfmac::IoctlStatus status) {
     EXPECT_EQ(wlan::nxpfmac::IoctlStatus::Failure, status);
+    sync_completion_signal(&disconnect_completion);
   }));
+  ASSERT_OK(sync_completion_wait(&disconnect_completion, ZX_TIME_INFINITE));
+  // Allows the disconnect in the destruction of ClientConnection to work.
+  fail_disconnect = false;
 }
 
 TEST_F(ClientConnectionTest, DisconnectWhileDisconnectInProgress) {
