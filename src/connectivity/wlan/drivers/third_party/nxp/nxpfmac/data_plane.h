@@ -22,6 +22,7 @@
 #include <wlan/drivers/components/network_device.h>
 
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/bus_interface.h"
+#include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/mlan.h"
 
 namespace wlan::nxpfmac {
 
@@ -49,7 +50,12 @@ class DataPlane : public wlan::drivers::components::NetworkDevice::Callbacks {
   // this will not be waited upon.
   void FlushRxWork();
 
-  void CompleteTx(wlan::drivers::components::Frame&& frame, zx_status_t status);
+  zx_status_t SendFrame(wlan::drivers::components::Frame&& frame, mlan_buf_type frame_type);
+  zx_status_t SendFrames(cpp20::span<wlan::drivers::components::Frame> frames,
+                         mlan_buf_type frame_type);
+
+  void CompleteTx(wlan::drivers::components::Frame&& frame, zx_status_t status,
+                  mlan_buf_type buf_type);
   void CompleteRx(wlan::drivers::components::Frame&& frame);
   std::optional<wlan::drivers::components::Frame> AcquireFrame();
 
@@ -70,6 +76,7 @@ class DataPlane : public wlan::drivers::components::NetworkDevice::Callbacks {
  private:
   explicit DataPlane(zx_device_t* parent, DataPlaneIfc* ifc, BusInterface* bus, void* mlan_adapter);
   zx_status_t Init();
+  zx_status_t SendFrameImpl(wlan::drivers::components::Frame&& frame, mlan_buf_type frame_type);
 
   DataPlaneIfc* ifc_ = nullptr;
 

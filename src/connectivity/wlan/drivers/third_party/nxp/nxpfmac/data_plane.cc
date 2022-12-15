@@ -19,7 +19,6 @@
 
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/align.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/debug.h"
-#include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/mlan.h"
 
 namespace wlan::nxpfmac {
 
@@ -111,13 +110,54 @@ void DataPlane::FlushRxWork() {
   }
 }
 
-void DataPlane::CompleteTx(wlan::drivers::components::Frame &&frame, zx_status_t status) {
+zx_status_t DataPlane::SendFrame(wlan::drivers::components::Frame &&frame,
+                                 mlan_buf_type frame_type) {
+  zx_status_t status = SendFrameImpl(std::move(frame), frame_type);
+  if (status != ZX_OK) {
+    // SendFrameImpl will have logged the error and completed the TX.
+    return status;
+  }
+
+  status = bus_->TriggerMainProcess();
+  if (status != ZX_OK) {
+    NXPF_ERR("Failed to trigger main process to initiate transmission: %s",
+             zx_status_get_string(status));
+    return status;
+  }
+  return ZX_OK;
+}
+
+zx_status_t DataPlane::SendFrames(cpp20::span<wlan::drivers::components::Frame> frames,
+                                  mlan_buf_type frame_type) {
+  size_t successful_sends = 0;
+  for (auto &frame : frames) {
+    if (likely(SendFrameImpl(std::move(frame), frame_type) == ZX_OK)) {
+      ++successful_sends;
+    }
+  }
+  if (likely(successful_sends > 0)) {
+    const zx_status_t status = bus_->TriggerMainProcess();
+    if (status != ZX_OK) {
+      NXPF_ERR("Failed to trigger main process to initiate transmission: %s",
+               zx_status_get_string(status));
+      return status;
+    }
+  }
+
+  return ZX_OK;
+}
+void DataPlane::CompleteTx(wlan::drivers::components::Frame &&frame, zx_status_t status,
+                           mlan_buf_type buf_type) {
   if (likely(frame.Size() >= sizeof(ethhdr))) {
     auto eth = reinterpret_cast<ethhdr *>(frame.Data());
     if (unlikely(eth->h_proto == 0x8e88)) {
       ifc_->OnEapolTransmitted(std::move(frame), status);
       return;
     }
+  }
+  if (buf_type != MLAN_BUF_TYPE_DATA) {
+    // Only complete data buffers, ignore other types of buffers, they were not sent by netdevice.
+    return;
   }
 
   network_device_.CompleteTx(cpp20::span<wlan::drivers::components::Frame>(&frame, 1), status);
@@ -176,44 +216,9 @@ void DataPlane::NetDevGetInfo(device_info_t *out_info) {
 }
 
 void DataPlane::NetDevQueueTx(cpp20::span<wlan::drivers::components::Frame> frames) {
-  for (auto &frame : frames) {
-    constexpr size_t kStaticHeaderRoom =
-        sizeof(wlan::drivers::components::Frame) + sizeof(mlan_buffer);
-    ZX_ASSERT(frame.Headroom() >= kStaticHeaderRoom);
-    uint8_t *const frame_start = frame.Data() - frame.Headroom();
-    uint8_t *const mlan_buffer_start = frame_start + sizeof(wlan::drivers::components::Frame);
-
-    // Use placement new to copy the frame object into the headroom reserved for this purpose. Keep
-    // the pointer in the mlan_buffer's pdesc.
-    auto frame_ptr = new (frame_start) wlan::drivers::components::Frame(std::move(frame));
-
-    auto mbuf = reinterpret_cast<mlan_buffer *>(mlan_buffer_start);
-    memset(mbuf, 0, sizeof(*mbuf));
-
-    const uint32_t packet_headroom = frame.Headroom() - kStaticHeaderRoom;
-
-    mbuf->bss_index = frame.PortId();
-    mbuf->data_len = frame.Size();
-    mbuf->data_offset = packet_headroom;
-    mbuf->pbuf = frame.Data() - packet_headroom;
-    mbuf->pdesc = frame_ptr;
-
-    mlan_status ml_status = mlan_send_packet(mlan_adapter_, mbuf);
-    if (ml_status == MLAN_STATUS_SUCCESS) {
-      // Transmission completed immediately, unlikely but who knows?
-      NXPF_WARN("Packet transmission completed immediately, suspicious!");
-      CompleteTx(std::move(*frame_ptr), ZX_OK);
-    } else if (ml_status != MLAN_STATUS_PENDING) {
-      // It's not sucess and it's not pending, something went wrong.
-      NXPF_ERR("Failed to send packet: %d", ml_status);
-      CompleteTx(std::move(*frame_ptr), ZX_ERR_INTERNAL);
-    }
-  }
-  zx_status_t status = bus_->TriggerMainProcess();
-  if (status != ZX_OK) {
-    NXPF_ERR("Failed to trigger main process to initiate transmission: %s",
-             zx_status_get_string(status));
-  }
+  // The return status of SendFrames doesn't really matter here. The failed frames are completed by
+  // SendFrames and it will also log any error messages.
+  SendFrames(frames, MLAN_BUF_TYPE_DATA);
 }
 
 void DataPlane::NetDevQueueRxSpace(const rx_space_buffer_t *buffers_list, size_t buffers_count,
@@ -240,5 +245,40 @@ void DataPlane::NetDevReleaseVmo(uint8_t vmo_id) {
 }
 
 void DataPlane::NetDevSetSnoopEnabled(bool snoop) {}
+
+zx_status_t DataPlane::SendFrameImpl(wlan::drivers::components::Frame &&frame,
+                                     mlan_buf_type frame_type) {
+  constexpr size_t kStaticHeaderRoom =
+      sizeof(wlan::drivers::components::Frame) + sizeof(mlan_buffer);
+  ZX_ASSERT(frame.Headroom() >= kStaticHeaderRoom);
+  uint8_t *const frame_start = frame.Data() - frame.Headroom();
+  uint8_t *const mlan_buffer_start = frame_start + sizeof(wlan::drivers::components::Frame);
+
+  // Use placement new to copy the frame object into the headroom reserved for this purpose. Keep
+  // the pointer in the mlan_buffer's pdesc.
+  auto frame_ptr = new (frame_start) wlan::drivers::components::Frame(std::move(frame));
+
+  auto mbuf = reinterpret_cast<mlan_buffer *>(mlan_buffer_start);
+  memset(mbuf, 0, sizeof(*mbuf));
+
+  const uint32_t packet_headroom = frame.Headroom() - kStaticHeaderRoom;
+
+  mbuf->bss_index = frame.PortId();
+  mbuf->data_len = frame.Size();
+  mbuf->data_offset = packet_headroom;
+  mbuf->pbuf = frame.Data() - packet_headroom;
+  mbuf->buf_type = frame_type;
+  mbuf->pdesc = frame_ptr;
+  mbuf->priority = frame.Priority();
+
+  mlan_status ml_status = mlan_send_packet(mlan_adapter_, mbuf);
+  if (ml_status != MLAN_STATUS_PENDING) {
+    NXPF_ERR("Failed to send packet: %d", ml_status);
+    network_device_.CompleteTx(cpp20::span<wlan::drivers::components::Frame>(frame_ptr, 1),
+                               ZX_ERR_INTERNAL);
+    return ZX_ERR_INTERNAL;
+  }
+  return ZX_OK;
+}
 
 }  // namespace wlan::nxpfmac

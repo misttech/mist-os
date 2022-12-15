@@ -172,7 +172,18 @@ TEST_F(DataPlaneTest, CompleteTxData) {
       [&](void*, const tx_result_t* tx_list, size_t tx_count) { EXPECT_EQ(1u, tx_count); });
 
   wlan::drivers::components::Frame frame(nullptr, kVmoId, 0, 0, nullptr, 0, 0);
-  data_plane_->CompleteTx(std::move(frame), ZX_OK);
+  data_plane_->CompleteTx(std::move(frame), ZX_OK, MLAN_BUF_TYPE_DATA);
+
+  complete_tx_.VerifyAndClear();
+}
+
+TEST_F(DataPlaneTest, DoNotCompleteTxNonData) {
+  // Test that calling CompleteTx on the data plane with a non-ethernet data buf type is ignored.
+
+  complete_tx_.ExpectNoCall();
+
+  wlan::drivers::components::Frame frame(nullptr, kVmoId, 0, 0, nullptr, 0, 0);
+  data_plane_->CompleteTx(std::move(frame), ZX_OK, MLAN_BUF_TYPE_RAW_DATA);
 
   complete_tx_.VerifyAndClear();
 }
@@ -207,7 +218,7 @@ TEST_F(DataPlaneTest, CompleteTxEapolFrame) {
 
   wlan::drivers::components::Frame frame(
       nullptr, kVmoId, 0, 0, reinterpret_cast<uint8_t*>(&eapol_data), sizeof(eapol_data), 0);
-  data_plane_->CompleteTx(std::move(frame), ZX_OK);
+  data_plane_->CompleteTx(std::move(frame), ZX_OK, MLAN_BUF_TYPE_DATA);
 
   complete_tx_.VerifyAndClear();
   ifc_.on_eapol_transmitted_.VerifyAndClear();
@@ -280,10 +291,43 @@ TEST_F(DataPlaneTest, QueueTx) {
   ASSERT_EQ(std::size(frames), sent_packets.size());
 
   for (size_t i = 0; i < std::size(frames); ++i) {
+    EXPECT_EQ(MLAN_BUF_TYPE_DATA, sent_packets[0]->buf_type);
     EXPECT_EQ(frames[i].PortId(), sent_packets[i]->bss_index);
     EXPECT_EQ(frames[i].Size(), sent_packets[i]->data_len);
     EXPECT_EQ(frames[i].Data(), sent_packets[i]->pbuf);
   }
+
+  ASSERT_TRUE(trigger_main_process_called);
+}
+
+TEST_F(DataPlaneTest, SendRawFrame) {
+  std::vector<pmlan_buffer> sent_packets;
+  mlan_mocks_.SetOnMlanSendPacket([&](t_void*, pmlan_buffer buffer) -> mlan_status {
+    sent_packets.push_back(buffer);
+    return MLAN_STATUS_PENDING;
+  });
+
+  bool trigger_main_process_called = false;
+  bus_.SetTriggerMainProcess([&]() -> zx_status_t {
+    trigger_main_process_called = true;
+    return ZX_OK;
+  });
+
+  constexpr size_t kHeadRoom = sizeof(wlan::drivers::components::Frame) + sizeof(mlan_buffer);
+  uint8_t first_data[kHeadRoom + 1024];
+
+  wlan::drivers::components::Frame frame(nullptr, kVmoId, 0, 0, first_data, sizeof(first_data), 0);
+
+  frame.ShrinkHead(kHeadRoom);
+
+  ASSERT_OK(data_plane_->SendFrame(std::move(frame), MLAN_BUF_TYPE_RAW_DATA));
+
+  ASSERT_EQ(1u, sent_packets.size());
+
+  EXPECT_EQ(MLAN_BUF_TYPE_RAW_DATA, sent_packets[0]->buf_type);
+  EXPECT_EQ(frame.PortId(), sent_packets[0]->bss_index);
+  EXPECT_EQ(frame.Size(), sent_packets[0]->data_len);
+  EXPECT_EQ(frame.Data(), sent_packets[0]->pbuf);
 
   ASSERT_TRUE(trigger_main_process_called);
 }
@@ -295,13 +339,12 @@ TEST_F(DataPlaneTest, PrepareVmo) {
   const zx_handle_t vmo_handle = netdev_vmo_.get();
 
   bool prepare_vmo_called = false;
-  bus_.SetPrepareVmo(
-      [&](uint8_t vmo_id, zx::vmo vmo) -> zx_status_t {
-        EXPECT_EQ(kVmoId, vmo_id);
-        EXPECT_EQ(vmo_handle, vmo.get());
-        prepare_vmo_called = true;
-        return ZX_OK;
-      });
+  bus_.SetPrepareVmo([&](uint8_t vmo_id, zx::vmo vmo) -> zx_status_t {
+    EXPECT_EQ(kVmoId, vmo_id);
+    EXPECT_EQ(vmo_handle, vmo.get());
+    prepare_vmo_called = true;
+    return ZX_OK;
+  });
 
   data_plane_->NetDevPrepareVmo(kVmoId, std::move(netdev_vmo_), &test_byte, sizeof(test_byte));
 
