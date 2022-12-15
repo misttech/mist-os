@@ -108,7 +108,7 @@
 #     Using `deps` might be necessary in the case where the headers are
 #     auto-generated though.
 #
-#  configs, public_configs, testonly, visibility (optional)
+#  public_configs, testonly, visibility (optional)
 #     Usual GN meaning.
 #
 template("library_headers") {
@@ -138,16 +138,10 @@ template("library_headers") {
       public += [ "${_include_dir}/$header" ]
     }
 
-    # source_set() already has a set of default configs that is set
-    # in //build/config/BUILDCONFIG.gn. Hence there is no need for:
-    #
-    #   if (!defined(configs)) {
-    #     configs = []
-    #   }
-    #
-    if (defined(invoker.configs)) {
-      configs += invoker.configs
-    }
+    # There are no sources here, so configs should not matter.  Make sure no
+    # unintended propagating effects come from the set_defaults("source_set")
+    # configs for the toolchain.
+    configs = []
 
     if (!defined(public_configs)) {
       public_configs = []
