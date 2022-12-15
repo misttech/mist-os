@@ -161,13 +161,13 @@ if (is_fuchsia) {
 
     exclude_toolchain_tags = [ "instrumented" ]
   }
-}
 
-fuchsia_unittest_package("elfldltl-static-pie-test") {
-  deps = [
-    ":fuchsia-static-pie-test",
-    "//src/sys/testing/elftest",
-  ]
+  fuchsia_unittest_package("elfldltl-static-pie-test") {
+    deps = [
+      ":fuchsia-static-pie-test",
+      "//src/sys/testing/elftest",
+    ]
+  }
 }
 
 source_set("test-data") {
@@ -184,9 +184,11 @@ template("load_test_lib") {
 
     sources = invoker.sources
 
-    if (defined(invoker.ldflags)) {
-      ldflags = invoker.ldflags
-    }
+    forward_variables_from(invoker,
+                           [
+                             "defines",
+                             "ldflags",
+                           ])
 
     deps = [ ":test-data" ]
 
@@ -214,15 +216,36 @@ load_test_lib("elfldltl-test-ret24") {
   ldflags = [ "-Wl,-e,Return24" ]
 }
 
+foreach(data_size,
+        [
+          0,
+          65536,
+        ]) {
+  load_test_lib("elfldltest-no-execute-data-$data_size") {
+    sources = [ "no-x-segment.cc" ]
+    defines = [ "DATA_SIZE=$data_size" ]
+    ldflags = [ "-Wl,-e,test_data" ]
+  }
+}
+
+load_test_data_deps = [ "elfldltl-test-ret24" ]
+
+foreach(data_size,
+        [
+          0,
+          65536,
+        ]) {
+  load_test_data_deps += [ "elfldltest-no-execute-data-$data_size" ]
+}
+
 if (is_host && is_elf) {
   host_test_data("loader-test-libs") {
     deps = []
     sources = []
 
-    load_test_data_deps = [ "elfldltl-test-ret24" ]
     foreach(lib, load_test_data_deps) {
       deps += [ ":$lib" ]
-      sources = [ "$root_out_dir/$lib.so" ]
+      sources += [ "$root_out_dir/$lib.so" ]
     }
 
     outputs = [ "$root_out_dir/test_data/elfldltl/{{source_file_part}}" ]
@@ -233,7 +256,10 @@ if (is_host && is_elf) {
   group("loader-test-libs") {
     testonly = true
 
-    deps = [ ":elfldltl-test-ret24" ]
+    deps = []
+    foreach(lib, load_test_data_deps) {
+      deps += [ ":$lib" ]
+    }
   }
 }
 

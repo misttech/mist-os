@@ -250,7 +250,7 @@ class LoadInfo {
       return add(ZeroFillSegment(vaddr, memsz));
     }
     if (phdr.memsz > phdr.filesz) {
-      return add(DataWithZeroFillSegment(offset, vaddr, memsz, filesz));
+      return add(DataWithZeroFillSegment(offset, vaddr, memsz, phdr.offset + phdr.filesz - offset));
     }
     return add(DataSegment(offset, vaddr, memsz, filesz));
   }

@@ -110,8 +110,8 @@ class MmapLoader {
       if (copy_size > 0) {
         if (pread(fd, addr, copy_size, segment.offset() + map_size) !=
             static_cast<ssize_t>(copy_size)) [[unlikely]] {
-          diag.SystemError("couldn't pread ", copy_size, " bytes at offset ",
-                           segment.offset() + map_size, PosixError{errno});
+          diag.SystemError("couldn't pread ", copy_size, " bytes ",
+                           FileOffset{segment.offset() + map_size}, PosixError{errno});
           return false;
         }
       }
