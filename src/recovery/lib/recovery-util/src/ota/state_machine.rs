@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::ota::state_machine::DataSharingConsent::{DontAllow, Unknown};
+use crate::ota::state_machine::DataSharingConsent::Unknown;
 use crate::wlan::NetworkInfo;
 use mockall::automock;
 pub use ota_lib::OtaStatus;
@@ -170,7 +170,7 @@ impl StateMachine {
             }
 
             (State::Connecting(_, _), Event::WiFiConnected) => {
-                Some(State::ReinstallConfirm { desired: DontAllow, reported: Unknown })
+                Some(State::ReinstallConfirm { desired: Unknown, reported: Unknown })
             }
             (State::Connecting(network, password), Event::Error(_reason)) => {
                 Some(State::ConnectionFailed(network.clone(), password.clone()))
@@ -243,8 +243,9 @@ mod test {
     // c.f. https://cs.opensource.google/fuchsia/fuchsia/+/main:src/recovery/system/src/fdr.rs;l=183.
 
     use super::OtaStatus;
-    use crate::ota::state_machine::DataSharingConsent::{DontAllow, Unknown};
+    use crate::ota::state_machine::DataSharingConsent::Unknown;
     use crate::ota::state_machine::{DataSharingConsent, Event, Operation, State, StateMachine};
+    use assert_matches::assert_matches;
     use lazy_static::lazy_static;
 
     lazy_static! {
@@ -308,7 +309,7 @@ mod test {
     }
 
     #[test]
-    fn run_through_a_sucessful_user_flow() {
+    fn run_through_a_successful_user_flow() {
         let mut sm = StateMachine::new(State::Home);
         let mut state = sm.event(Event::TryAnotherWay).unwrap();
         assert_eq!(state, State::Reinstall);
@@ -321,7 +322,7 @@ mod test {
         state = sm.event(Event::UserInput("Password".to_string())).unwrap();
         assert_eq!(state, State::Connecting("Network".to_string(), "Password".to_string()));
         state = sm.event(Event::WiFiConnected).unwrap();
-        assert_eq!(state, State::ReinstallConfirm { desired: DontAllow, reported: Unknown });
+        assert_matches!(state, State::ReinstallConfirm { desired: Unknown, reported: Unknown });
         state = sm.event(Event::Reinstall).unwrap();
         assert_eq!(state, State::ExecuteReinstall);
         state = sm.event(Event::Reinstall).unwrap();

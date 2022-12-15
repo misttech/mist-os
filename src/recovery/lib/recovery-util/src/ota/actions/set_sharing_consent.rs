@@ -27,8 +27,8 @@ impl SetSharingConsentAction {
         reported: DataSharingConsent,
         proxy: PrivacyProxy,
     ) {
-        // Do we need to ask?
-        if desired == reported && desired != Unknown {
+        // We only need to update if the desired state is known and different
+        if desired == reported || desired == Unknown {
             return;
         }
         let task = async move {

@@ -307,6 +307,10 @@ impl Screens {
         _desired: DataSharingConsent,
         reported: DataSharingConsent,
     ) -> ViewAssistantPtr {
+        let next_privacy_state = match reported {
+            DataSharingConsent::Unknown => Allow,
+            _ => reported.toggle(),
+        };
         let view_assistant_ptr = Box::new(
             GenericSplitViewAssistant::new(
                 self.app_sender.clone(),
@@ -332,8 +336,8 @@ impl Screens {
                     "Permission",
                     None,
                     false,
-                    reported == Allow,
-                    Event::SendReports(reported.toggle()),
+                    reported == Allow, // Unknown and DontAllow show metrics as disabled
+                    Event::SendReports(next_privacy_state),
                 )]),
                 Some(IMAGE_DEVICE_INSTALL),
                 Some(IMAGE_DEFAULT_SIZE),
