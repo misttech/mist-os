@@ -401,7 +401,7 @@ impl FsNodeOps for BpfFsDir {
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        Ok(node.fs().create_node(Box::new(BpfFsDir), mode, owner))
+        Ok(node.fs().create_node(BpfFsDir, mode, owner))
     }
 
     fn mknod(

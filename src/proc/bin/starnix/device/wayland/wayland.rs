@@ -258,11 +258,7 @@ async fn handle_server_data(
                 let vmo = zx::Vmo::from(handle);
                 let file = FileObject::new_anonymous(
                     Box::new(VmoFileObject::new(Arc::new(vmo))),
-                    anon_fs(&kernel).create_node(
-                        Box::new(Anon),
-                        FileMode::from_bits(0o600),
-                        FsCred::root(),
-                    ),
+                    anon_fs(&kernel).create_node(Anon, FileMode::from_bits(0o600), FsCred::root()),
                     OpenFlags::RDWR,
                 );
                 files.push(file);

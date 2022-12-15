@@ -229,7 +229,7 @@ impl DirEntry {
         ops: impl FsNodeOps,
     ) -> Result<DirEntryHandle, Errno> {
         self.create_entry(name, || {
-            let node = self.node.fs().create_node(Box::new(ops), mode, FsCred::root());
+            let node = self.node.fs().create_node(ops, mode, FsCred::root());
             {
                 let mut info = node.info_write();
                 info.rdev = dev;

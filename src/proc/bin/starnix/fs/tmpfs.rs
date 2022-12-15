@@ -172,7 +172,7 @@ impl FsNodeOps for TmpfsDirectory {
     ) -> Result<FsNodeHandle, Errno> {
         node.info_write().link_count += 1;
         *self.child_count.lock() += 1;
-        Ok(node.fs().create_node(Box::new(TmpfsDirectory::new()), mode, owner))
+        Ok(node.fs().create_node(TmpfsDirectory::new(), mode, owner))
     }
 
     fn mknod(
@@ -191,7 +191,7 @@ impl FsNodeOps for TmpfsDirectory {
             _ => return error!(EACCES),
         };
         *self.child_count.lock() += 1;
-        let node = node.fs().create_node(ops, mode, owner);
+        let node = node.fs().create_node_box(ops, mode, owner);
         node.info_write().rdev = dev;
         Ok(node)
     }
@@ -204,7 +204,7 @@ impl FsNodeOps for TmpfsDirectory {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         *self.child_count.lock() += 1;
-        Ok(node.fs().create_node(Box::new(SymlinkNode::new(target)), mode!(IFLNK, 0o777), owner))
+        Ok(node.fs().create_node(SymlinkNode::new(target), mode!(IFLNK, 0o777), owner))
     }
 
     fn link(&self, _node: &FsNode, _name: &FsStr, child: &FsNodeHandle) -> Result<(), Errno> {

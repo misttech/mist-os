@@ -224,7 +224,7 @@ impl Pipe {
 /// sys_pipe2().
 pub fn new_pipe(current_task: &CurrentTask) -> Result<(FileHandle, FileHandle), Errno> {
     let fs = pipe_fs(current_task.kernel());
-    let node = fs.create_node(Box::new(SpecialNode), mode!(IFIFO, 0o600), current_task.as_fscred());
+    let node = fs.create_node(SpecialNode, mode!(IFIFO, 0o600), current_task.as_fscred());
     node.info_write().blksize = ATOMIC_IO_BYTES;
 
     let open = |flags: OpenFlags| {

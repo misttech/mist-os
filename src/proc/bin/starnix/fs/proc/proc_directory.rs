@@ -36,19 +36,19 @@ impl ProcDirectory {
         let nodes = btreemap! {
             &b"cmdline"[..] => {
                 let cmdline = kernel.upgrade().unwrap().cmdline.clone();
-                fs.create_node_with_ops(ByteVecFile::new_node(cmdline), mode!(IFREG, 0o444), FsCred::root())
+                fs.create_node(ByteVecFile::new_node(cmdline), mode!(IFREG, 0o444), FsCred::root())
             },
             &b"self"[..] => SelfSymlink::new_node(fs),
             &b"thread-self"[..] => ThreadSelfSymlink::new_node(fs),
             // TODO(tbodt): Put actual data in /proc/meminfo. Android is currently satistified by
             // an empty file though.
-            &b"meminfo"[..] => fs.create_node_with_ops(ByteVecFile::new_node(vec![]), mode!(IFREG, 0o444), FsCred::root()),
+            &b"meminfo"[..] => fs.create_node(ByteVecFile::new_node(vec![]), mode!(IFREG, 0o444), FsCred::root()),
             // Fake kmsg as being empty.
             &b"kmsg"[..] =>
-                fs.create_node_with_ops(SimpleFileNode::new(|| Ok(ProcKmsgFile{})), mode!(IFREG, 0o100), FsCred::root()),
+                fs.create_node(SimpleFileNode::new(|| Ok(ProcKmsgFile{})), mode!(IFREG, 0o100), FsCred::root()),
             // File must exist to pass the CgroupsAvailable check, which is a little bit optional
             // for init but not optional for a lot of the system!
-            &b"cgroups"[..] => fs.create_node_with_ops(ByteVecFile::new_node(vec![]), mode!(IFREG, 0o444), FsCred::root()),
+            &b"cgroups"[..] => fs.create_node(ByteVecFile::new_node(vec![]), mode!(IFREG, 0o444), FsCred::root()),
         };
 
         Arc::new(ProcDirectory { kernel, nodes })
@@ -196,7 +196,7 @@ struct SelfSymlink;
 
 impl SelfSymlink {
     fn new_node(fs: &FileSystemHandle) -> FsNodeHandle {
-        fs.create_node_with_ops(Self, mode!(IFLNK, 0o777), FsCred::root())
+        fs.create_node(Self, mode!(IFLNK, 0o777), FsCred::root())
     }
 }
 
@@ -214,7 +214,7 @@ struct ThreadSelfSymlink;
 
 impl ThreadSelfSymlink {
     fn new_node(fs: &FileSystemHandle) -> FsNodeHandle {
-        fs.create_node_with_ops(Self, mode!(IFLNK, 0o777), FsCred::root())
+        fs.create_node(Self, mode!(IFLNK, 0o777), FsCred::root())
     }
 }
 

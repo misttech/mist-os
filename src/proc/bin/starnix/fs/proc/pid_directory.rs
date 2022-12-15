@@ -122,7 +122,7 @@ impl FsNodeOps for FdDirectory {
         // Make sure that the file descriptor exists before creating the node.
         let _ = self.task.files.get(fd).map_err(|_| errno!(ENOENT))?;
         Ok(node.fs().create_node(
-            FdSymlink::new_node(self.task.clone(), fd),
+            FdSymlink::new(self.task.clone(), fd),
             FdSymlink::file_mode(),
             self.task.as_fscred(),
         ))
@@ -194,7 +194,7 @@ impl FsNodeOps for NsDirectory {
             if NS_IDENTIFIER_RE.is_match(id) {
                 // TODO(qsr): For now, returns an empty file. In the future, this should create a
                 // reference to to correct namespace, and ensures it keeps it alive.
-                Ok(node.fs().create_node_with_ops(
+                Ok(node.fs().create_node(
                     ByteVecFile::new_node(vec![]),
                     mode!(IFREG, 0o444),
                     self.task.as_fscred(),
@@ -205,7 +205,7 @@ impl FsNodeOps for NsDirectory {
         } else {
             // The name is {namespace}, link to the correct one of the current task.
             Ok(node.fs().create_node(
-                Box::new(NsDirectoryEntry { name }),
+                NsDirectoryEntry { name },
                 mode!(IFLNK, 0o7777),
                 self.task.as_fscred(),
             ))
@@ -265,7 +265,7 @@ impl FsNodeOps for FdInfoDirectory {
         let pos = *file.offset.lock();
         let flags = file.flags();
         let data = format!("pos:\t{}flags:\t0{:o}\n", pos, flags.bits()).into_bytes();
-        Ok(node.fs().create_node_with_ops(
+        Ok(node.fs().create_node(
             ByteVecFile::new_node(data),
             mode!(IFREG, 0o444),
             self.task.as_fscred(),
@@ -366,8 +366,8 @@ pub struct FdSymlink {
 }
 
 impl FdSymlink {
-    fn new_node(task: Arc<Task>, fd: FdNumber) -> Box<dyn FsNodeOps> {
-        Box::new(FdSymlink { fd, task })
+    fn new(task: Arc<Task>, fd: FdNumber) -> Self {
+        FdSymlink { fd, task }
     }
 
     fn file_mode() -> FileMode {

@@ -41,8 +41,8 @@ pub struct CgroupDirectoryNode {
 }
 
 impl CgroupDirectoryNode {
-    pub fn new() -> Box<Self> {
-        Box::new(Self { control_group: ControlGroup::new() })
+    pub fn new() -> Self {
+        Self { control_group: ControlGroup::new() }
     }
 }
 
@@ -88,7 +88,7 @@ impl FsNodeOps for CgroupDirectoryNode {
             FileMode::IFREG => Box::new(ControlGroupNode::new(self.control_group.clone())),
             _ => return error!(EACCES),
         };
-        let node = node.fs().create_node(ops, mode, owner);
+        let node = node.fs().create_node_box(ops, mode, owner);
         node.info_write().rdev = dev;
         Ok(node)
     }

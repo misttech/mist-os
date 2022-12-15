@@ -184,7 +184,7 @@ impl FileSystem {
         node
     }
 
-    pub fn create_node(
+    pub fn create_node_box(
         self: &Arc<Self>,
         ops: Box<dyn FsNodeOps>,
         mode: FileMode,
@@ -194,13 +194,13 @@ impl FileSystem {
         self.create_node_with_id(ops, inode_num, mode, owner)
     }
 
-    pub fn create_node_with_ops(
+    pub fn create_node(
         self: &Arc<Self>,
         ops: impl FsNodeOps,
         mode: FileMode,
         owner: FsCred,
     ) -> FsNodeHandle {
-        self.create_node(Box::new(ops), mode, owner)
+        self.create_node_box(Box::new(ops), mode, owner)
     }
 
     /// Remove the given FsNode from the node cache.

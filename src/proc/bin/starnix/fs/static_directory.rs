@@ -53,7 +53,7 @@ impl<'a> StaticDirectoryBuilder<'a> {
         mode: FileMode,
         dev: DeviceType,
     ) -> Self {
-        let node = self.fs.create_node_with_ops(ops, mode, self.entry_creds.clone());
+        let node = self.fs.create_node(ops, mode, self.entry_creds.clone());
         {
             let mut info = node.info_write();
             info.rdev = dev;
@@ -96,7 +96,7 @@ impl<'a> StaticDirectoryBuilder<'a> {
     /// Builds an [`FsNode`] that serves as a directory of the entries added to this builder.
     /// The resulting directory has mode `0o777` (`rwxrwxrwx`).
     pub fn build(self) -> Arc<FsNode> {
-        self.fs.create_node_with_ops(
+        self.fs.create_node(
             Arc::new(StaticDirectory { entries: self.entries }),
             self.mode,
             self.creds,

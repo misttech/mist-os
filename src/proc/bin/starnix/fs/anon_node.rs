@@ -27,7 +27,7 @@ impl Anon {
         let fs = anon_fs(current_task.kernel());
         FileObject::new_anonymous(
             ops,
-            fs.create_node(Box::new(Anon), FileMode::from_bits(0o600), current_task.as_fscred()),
+            fs.create_node(Anon, FileMode::from_bits(0o600), current_task.as_fscred()),
             flags,
         )
     }
