@@ -42,19 +42,8 @@ pub enum Error {
     Timeout,
 
     /// The Remote end rejected a command we sent (with this error code)
-    #[error("Remote end rejected the command (code = {:})", _0)]
-    RemoteRejected(u8),
-
-    /// The Remote end rejected a set configuration or reconfigure command we sent,
-    /// indicating this ServiceCategory (code).
-    /// The indicated ServiceCategory can be retrieved using `ServiceCategory::try_from`
-    #[error("Remote end rejected the command (category = {:}, code = {:})", _0, _1)]
-    RemoteConfigRejected(u8, u8),
-
-    /// The Remote end rejected a start or suspend command we sent, indicating this SEID and error
-    /// code.
-    #[error("Remote end rejected the command (SEID = {:}, code = {:})", _0, _1)]
-    RemoteStreamRejected(u8, u8),
+    #[error("Remote end rejected the command ({:})", _0)]
+    RemoteRejected(#[from] RemoteReject),
 
     /// When a message hasn't been implemented yet, the parser will return this.
     #[error("Message has not been implemented yet")]
@@ -101,6 +90,117 @@ pub enum Error {
     /// An error from another source
     #[error(transparent)]
     Other(#[from] anyhow::Error),
+}
+
+/// Errors that can be returned by the remote peer in response to a message
+#[derive(Error, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
+pub struct RemoteReject {
+    /// The signal identifier in this rejection.
+    /// This is the only field populated for a General Rejection, which only occurs when the remote
+    /// end does not understand the SignalIdentifier (but we do, or we would return a
+    /// `Error::InvalidHeader`)
+    signal_id: SignalIdentifier,
+    /// Error code reported for this error.
+    error_code: Option<u8>,
+    /// The service category reported that applies to this error.  Only set when `signal_id` is
+    /// SetConfiguration or Reconfigure.
+    service_category: Option<u8>,
+    /// The StreamEndpointId reported that applies for this rejection.
+    stream_endpoint_id: Option<StreamEndpointId>,
+}
+
+impl RemoteReject {
+    pub(crate) fn from_params(signal_id: SignalIdentifier, params: &[u8]) -> Self {
+        if params.len() == 0 {
+            // General Reject
+            return Self {
+                signal_id,
+                error_code: None,
+                service_category: None,
+                stream_endpoint_id: None,
+            };
+        }
+        let (error_code, service_category, stream_endpoint_id) = match signal_id {
+            SignalIdentifier::SetConfiguration | SignalIdentifier::Reconfigure => {
+                (params.get(1).copied(), params.get(0).copied(), None)
+            }
+            SignalIdentifier::Start | SignalIdentifier::Suspend => {
+                // The Stream ID here is in the top 6 bits, with the bottom 2 bits RFA.
+                (params.get(1).copied(), None, params.get(0).map(StreamEndpointId::from_msg))
+            }
+            _ => (params.get(0).copied(), None, None),
+        };
+        Self { signal_id, error_code, service_category, stream_endpoint_id }
+    }
+
+    /// Retrieve the error code returned by the remote end.
+    /// Returns Some(Err(u8)) if the code isn't recognized, or None if it wasn't included
+    pub fn error_code(&self) -> Option<std::result::Result<ErrorCode, u8>> {
+        self.error_code.map(|e| ErrorCode::try_from(e).map_err(|_| e))
+    }
+
+    /// Retrieve the ServiceCategory returned by the remote end.
+    /// Returns Err(u8) if the category wasn't recognized, or None if it wasn't included
+    pub fn service_category(&self) -> Option<std::result::Result<ServiceCategory, u8>> {
+        self.service_category.map(|e| ServiceCategory::try_from(e).map_err(|_| e))
+    }
+
+    /// Retrieve the stream identifier returned from the remote end.
+    /// Returns None if it wasn't included.
+    pub fn stream_id(&self) -> Option<StreamEndpointId> {
+        self.stream_endpoint_id.clone()
+    }
+
+    #[cfg(test)]
+    pub fn general(signal_id: SignalIdentifier) -> Self {
+        Self { signal_id, error_code: None, service_category: None, stream_endpoint_id: None }
+    }
+
+    #[cfg(test)]
+    pub fn rejected(signal_id: SignalIdentifier, code: u8) -> Self {
+        Self { signal_id, error_code: Some(code), service_category: None, stream_endpoint_id: None }
+    }
+
+    #[cfg(test)]
+    pub fn config(signal_id: SignalIdentifier, cat: u8, code: u8) -> Self {
+        Self {
+            signal_id,
+            error_code: Some(code),
+            service_category: Some(cat),
+            stream_endpoint_id: None,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn stream(signal_id: SignalIdentifier, stream: u8, code: u8) -> Self {
+        Self {
+            signal_id,
+            error_code: Some(code),
+            service_category: None,
+            stream_endpoint_id: stream.try_into().ok(),
+        }
+    }
+}
+
+impl std::fmt::Display for RemoteReject {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        let Some(error_code) = self.error_code else {
+           return write!(f, "did not recognize {:?}", self.signal_id);
+       };
+
+        write!(f, "{:?}, ", self.signal_id)?;
+        match self.signal_id {
+            SignalIdentifier::SetConfiguration | SignalIdentifier::Reconfigure => {
+                write!(f, "category {:?}, ", self.service_category)?;
+            }
+            SignalIdentifier::Start | SignalIdentifier::Suspend => {
+                write!(f, "stream id {:?}, ", self.stream_endpoint_id)?;
+            }
+            _ => {}
+        };
+        write!(f, "{:x}", error_code)
+    }
 }
 
 decodable_enum! {
@@ -226,7 +326,7 @@ decodable_enum! {
     /// Indicates the signaling command on a command packet.  The same identifier is used on the
     /// response to that command packet.
     /// See Section 8.4.4
-    pub(crate) enum SignalIdentifier<u8, Error, OutOfRange> {
+    pub enum SignalIdentifier<u8, Error, OutOfRange> {
         Discover = 0x01,
         GetCapabilities = 0x02,
         SetConfiguration = 0x03,
@@ -247,7 +347,7 @@ decodable_enum! {
 pub(crate) struct SignalingHeader {
     pub label: TxLabel,
     packet_type: SignalingPacketType,
-    message_type: SignalingMessageType,
+    pub(crate) message_type: SignalingMessageType,
     num_packets: u8,
     pub signal: SignalIdentifier,
 }
@@ -775,6 +875,64 @@ impl Encodable for StreamInformation {
 mod test {
     use super::*;
     use assert_matches::assert_matches;
+
+    #[test]
+    fn remote_reject_from_params_short() {
+        let r = RemoteReject::from_params(SignalIdentifier::Discover, &[]);
+        assert_eq!(None, r.error_code());
+        assert_eq!(None, r.service_category());
+        assert_eq!(None, r.stream_id());
+
+        let r = RemoteReject::from_params(SignalIdentifier::Start, &[0x12]);
+        assert_eq!(None, r.error_code());
+        assert_eq!(None, r.service_category());
+        assert_eq!(Some(StreamEndpointId(4)), r.stream_id());
+
+        let r = RemoteReject::from_params(SignalIdentifier::SetConfiguration, &[0x02]);
+        assert_eq!(None, r.error_code());
+        assert_eq!(Some(Ok(ServiceCategory::Reporting)), r.service_category());
+        assert_eq!(None, r.stream_id());
+    }
+
+    #[test]
+    fn remote_reject_ignores_unexpected_params() {
+        let r: RemoteReject =
+            RemoteReject::from_params(SignalIdentifier::Open, &[0x01, 0x02, 0x03, 0x04]);
+        assert_eq!(Some(Ok(ErrorCode::BadHeaderFormat)), r.error_code());
+        assert_eq!(None, r.service_category());
+        assert_eq!(None, r.stream_id());
+
+        let r: RemoteReject = RemoteReject::from_params(
+            SignalIdentifier::SetConfiguration,
+            &[0x02, 0x12, 0x03, 0x04],
+        );
+        assert_eq!(Some(Ok(ErrorCode::BadAcpSeid)), r.error_code());
+        assert_eq!(Some(Ok(ServiceCategory::Reporting)), r.service_category());
+        assert_eq!(None, r.stream_id());
+
+        let r: RemoteReject =
+            RemoteReject::from_params(SignalIdentifier::Start, &[0x04, 0x01, 0x03, 0x04]);
+        assert_eq!(Some(Ok(ErrorCode::BadHeaderFormat)), r.error_code());
+        assert_eq!(None, r.service_category());
+        assert_eq!(Some(StreamEndpointId(1)), r.stream_id());
+    }
+
+    #[test]
+    fn remote_reject_unrecognized_category() {
+        let r: RemoteReject =
+            RemoteReject::from_params(SignalIdentifier::SetConfiguration, &[0xF0, 0x01]);
+        assert_eq!(Some(Ok(ErrorCode::BadHeaderFormat)), r.error_code());
+        assert_eq!(Some(Err(0xF0)), r.service_category());
+        assert_eq!(None, r.stream_id());
+    }
+
+    #[test]
+    fn remote_reject_unrecognized_errorcode() {
+        let r: RemoteReject = RemoteReject::from_params(SignalIdentifier::Discover, &[0xF1]);
+        assert_eq!(Some(Err(0xF1)), r.error_code());
+        assert_eq!(None, r.service_category());
+        assert_eq!(None, r.stream_id());
+    }
 
     #[test]
     fn txlabel_tofrom_u8() {

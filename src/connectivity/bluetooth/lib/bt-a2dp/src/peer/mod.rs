@@ -1052,7 +1052,6 @@ fn capability_to_metric(
 mod tests {
     use super::*;
 
-    use assert_matches::assert_matches;
     use bt_metrics::respond_to_metrics_req_for_test;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_bluetooth::ErrorCode;
@@ -1500,8 +1499,11 @@ mod tests {
         // Should finish!
         match exec.run_until_stalled(&mut collect_future) {
             Poll::Pending => panic!("Should be ready after discovery failure"),
-            Poll::Ready(Ok(x)) => panic!("Should be an error but returned {:?}", x),
-            Poll::Ready(Err(e)) => assert_matches!(e, avdtp::Error::RemoteRejected(0x31)),
+            Poll::Ready(Ok(x)) => panic!("Should be an error but returned {x:?}"),
+            Poll::Ready(Err(avdtp::Error::RemoteRejected(e))) => {
+                assert_eq!(Some(Ok(avdtp::ErrorCode::BadState)), e.error_code());
+            }
+            Poll::Ready(Err(e)) => panic!("Should have been a RemoteRejected was was {e:?}"),
         }
     }
 
@@ -1973,8 +1975,9 @@ mod tests {
         pin_mut!(get_caps_fut);
 
         match exec.run_until_stalled(&mut get_caps_fut) {
-            // 0x12 is BadAcpSeid
-            Poll::Ready(Err(avdtp::Error::RemoteRejected(0x12))) => {}
+            Poll::Ready(Err(avdtp::Error::RemoteRejected(e))) => {
+                assert_eq!(Some(Ok(avdtp::ErrorCode::BadAcpSeid)), e.error_code())
+            }
             x => panic!("Get capabilities should be a ready error but got {:?}", x),
         };
 
@@ -2073,7 +2076,9 @@ mod tests {
         pin_mut!(set_config_fut);
 
         match exec.run_until_stalled(&mut set_config_fut) {
-            Poll::Ready(Err(avdtp::Error::RemoteConfigRejected(_, _))) => {}
+            Poll::Ready(Err(avdtp::Error::RemoteRejected(e))) => {
+                assert!(e.service_category().is_some())
+            }
             x => panic!("Set capabilities should have been rejected but got {:?}", x),
         };
 

@@ -127,7 +127,7 @@ impl Controller {
                     Err(e) => {
                         error!("ReconfigureStream for {} failed: {:?}", endpoint_id, e);
                         match e {
-                            Error::RemoteConfigRejected(_, _) => {}
+                            Error::RemoteRejected(e) if e.service_category().is_some() => {}
                             _ => responder.send(&mut Err(PeerError::ProtocolError))?,
                         }
                     }

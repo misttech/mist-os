@@ -40,8 +40,9 @@ pub use crate::{
     rtp::{RtpError, RtpHeader},
     stream_endpoint::{MediaStream, StreamEndpoint, StreamEndpointUpdateCallback, StreamState},
     types::{
-        ContentProtectionType, EndpointType, Error, ErrorCode, MediaCodecType, MediaType, Result,
-        ServiceCapability, ServiceCategory, StreamEndpointId, StreamInformation,
+        ContentProtectionType, EndpointType, Error, ErrorCode, MediaCodecType, MediaType,
+        RemoteReject, Result, ServiceCapability, ServiceCategory, StreamEndpointId,
+        StreamInformation,
     },
 };
 
@@ -88,8 +89,7 @@ impl Peer {
 
     /// Send a Stream End Point Discovery (Sec 8.6) command to the remote peer.
     /// Asynchronously returns a the reply in a vector of endpoint information.
-    /// Error will be RemoteRejected with the error code returned by the remote
-    /// if the remote peer rejected the command.
+    /// Error will be RemoteRejected if the remote peer rejected the command.
     pub fn discover(&self) -> impl Future<Output = Result<Vec<StreamInformation>>> {
         self.send_command::<DiscoverResponse>(SignalIdentifier::Discover, &[]).ok_into()
     }
@@ -98,9 +98,8 @@ impl Peer {
     /// given `stream_id`.
     /// Asynchronously returns the reply which contains the ServiceCapabilities
     /// reported.
-    /// In general, Get All Capabilities should be preferred to this command.
-    /// Error will be RemoteRejected with the error code reported by the remote
-    /// if the remote peer rejects the command.
+    /// In general, Get All Capabilities should be preferred to this command if is supported.
+    /// Error will be RemoteRejected if the remote peer rejects the command.
     pub fn get_capabilities(
         &self,
         stream_id: &StreamEndpointId,
@@ -117,8 +116,7 @@ impl Peer {
     /// given `stream_id`.
     /// Asynchronously returns the reply which contains the ServiceCapabilities
     /// reported.
-    /// Error will be RemoteRejected with the error code reported by the remote
-    /// if the remote peer rejects the command.
+    /// Error will be RemoteRejected if the remote peer rejects the command.
     pub fn get_all_capabilities(
         &self,
         stream_id: &StreamEndpointId,
@@ -135,8 +133,8 @@ impl Peer {
     /// given remote `stream_id`, communicating the association to a local
     /// `local_stream_id` and the required stream `capabilities`.
     /// Panics if `capabilities` is empty.
-    /// Returns Ok(()) if the command was accepted, and RemoteConfigRejected
-    /// if the remote refused.
+    /// Error will be RemoteRejected if the remote refused.
+    /// ServiceCategory will be set on RemoteReject with the indicated issue category.
     pub fn set_configuration(
         &self,
         stream_id: &StreamEndpointId,
@@ -164,8 +162,7 @@ impl Peer {
     /// for the given remote `stream_id`.
     /// Asynchronously returns the set of ServiceCapabilities previously
     /// configured between these two peers.
-    /// Error will be RemoteRejected with the error code reported by the remote
-    /// if the remote peer rejects this command.
+    /// Error will be RemoteRejected if the remote peer rejects this command.
     pub fn get_configuration(
         &self,
         stream_id: &StreamEndpointId,
@@ -184,8 +181,8 @@ impl Peer {
     /// Note: Per the spec, only the Media Codec and Content Protection
     /// capabilities will be accepted in this command.
     /// Panics if there are no capabilities to configure.
-    /// Returns Ok(()) if the command was accepted, and RemoteConfigRejected
-    /// if the remote refused.
+    /// Error will be RemoteRejected if the remote refused.
+    /// ServiceCategory will be set on RemoteReject with the indicated issue category.
     pub fn reconfigure(
         &self,
         stream_id: &StreamEndpointId,
@@ -212,18 +209,16 @@ impl Peer {
 
     /// Send a Open Stream Command (Sec 8.12) to the remote peer for the given
     /// `stream_id`.
-    /// Returns Ok(()) if the command is accepted, and RemoteRejected if the
-    /// remote peer rejects the command with the code returned by the remote.
+    /// Error will be RemoteRejected if the remote peer rejects the command.
     pub fn open(&self, stream_id: &StreamEndpointId) -> impl Future<Output = Result<()>> {
         let stream_params = &[stream_id.to_msg()];
         self.send_command::<SimpleResponse>(SignalIdentifier::Open, stream_params).ok_into()
     }
 
-    /// Send a Start Stream Command (Sec 8.13) to the remote peer for all the
-    /// streams in `stream_ids`.
-    /// Returns Ok(()) if the command is accepted, and RemoteStreamRejected
-    /// with the stream endpoint id and error code reported by the remote if
-    /// the remote signals a failure.
+    /// Send a Start Stream Command (Sec 8.13) to the remote peer for all the streams in
+    /// `stream_ids`.
+    /// Returns Ok(()) if the command is accepted, and RemoteStreamRejected with the stream
+    /// endpoint id and error code reported by the remote if the remote signals a failure.
     pub fn start(&self, stream_ids: &[StreamEndpointId]) -> impl Future<Output = Result<()>> {
         let mut stream_params = Vec::with_capacity(stream_ids.len());
         for stream_id in stream_ids {
@@ -232,10 +227,8 @@ impl Peer {
         self.send_command::<SimpleResponse>(SignalIdentifier::Start, &stream_params).ok_into()
     }
 
-    /// Send a Close Stream Command (Sec 8.14) to the remote peer for the given
-    /// `stream_id`.
-    /// Returns Ok(()) if the command is accepted, and RemoteRejected if the
-    /// remote peer rejects the command with the code returned by the remote.
+    /// Send a Close Stream Command (Sec 8.14) to the remote peer for the given `stream_id`.
+    /// Error will be RemoteRejected if the remote peer rejects the command.
     pub fn close(&self, stream_id: &StreamEndpointId) -> impl Future<Output = Result<()>> {
         let stream_params = &[stream_id.to_msg()];
         let response: CommandResponseFut<SimpleResponse> =
@@ -243,11 +236,9 @@ impl Peer {
         response.ok_into()
     }
 
-    /// Send a Suspend Command (Sec 8.15) to the remote peer for all the
-    /// streams in `stream_ids`.
-    /// Returns Ok(()) if the command is accepted, and RemoteStreamRejected
-    /// with the stream endpoint id and error code reported by the remote if
-    /// the remote signals a failure.
+    /// Send a Suspend Command (Sec 8.15) to the remote peer for all the streams in `stream_ids`.
+    /// Error will be RemoteRejected if the remote refused, with the stream endpoint identifier
+    /// indicated by the remote set in the RemoteReject.
     pub fn suspend(&self, stream_ids: &[StreamEndpointId]) -> impl Future<Output = Result<()>> {
         let mut stream_params = Vec::with_capacity(stream_ids.len());
         for stream_id in stream_ids {
@@ -269,8 +260,7 @@ impl Peer {
 
     /// Send a Delay Report (Sec 8.19) to the remote peer for the given `stream_id`.
     /// `delay` is in tenths of milliseconds.
-    /// Returns Ok(()) if the command is accepted, and RemoteRejected if the
-    /// remote peer rejects the command with the code returned by the remote.
+    /// Error will be RemoteRejected if the remote peer rejects the command.
     pub fn delay_report(
         &self,
         stream_id: &StreamEndpointId,
@@ -872,19 +862,14 @@ fn decode_signaling_response<D: Decodable<Error = Error>>(
     if header.signal() != expected_signal {
         return Err(Error::InvalidHeader);
     }
-    if !header.is_type(SignalingMessageType::ResponseAccept) {
-        let params_idx = header.encoded_len();
-        match header.signal() {
-            SignalIdentifier::Start | SignalIdentifier::Suspend => {
-                return Err(Error::RemoteStreamRejected(buf[params_idx] >> 2, buf[params_idx + 1]));
-            }
-            SignalIdentifier::SetConfiguration | SignalIdentifier::Reconfigure => {
-                return Err(Error::RemoteConfigRejected(buf[params_idx], buf[params_idx + 1]));
-            }
-            _ => return Err(Error::RemoteRejected(buf[params_idx])),
-        };
+    let params = &buf[header.encoded_len()..];
+    match header.message_type {
+        SignalingMessageType::ResponseAccept => D::decode(params),
+        SignalingMessageType::GeneralReject | SignalingMessageType::ResponseReject => {
+            Err(RemoteReject::from_params(header.signal(), params).into())
+        }
+        SignalingMessageType::Command => unreachable!(),
     }
-    D::decode(&buf[header.encoded_len()..])
 }
 
 /// A future that polls for the response to a command we sent.

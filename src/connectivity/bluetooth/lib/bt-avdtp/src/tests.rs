@@ -493,7 +493,7 @@ fn discover_command_rejected() {
         x => panic!("Should have a ready Error response: {:?}", x),
     };
 
-    assert_matches!(error, Error::RemoteRejected(0x31));
+    assert_matches!(error, Error::RemoteRejected(e) if e == RemoteReject::rejected(SignalIdentifier::Discover, 0x31));
 }
 
 // GetCapabilities tests
@@ -679,7 +679,7 @@ fn get_capabilities_reject_command() {
         x => panic!("Should have a ready Error response: {:?}", x),
     };
 
-    assert_matches!(error, Error::RemoteRejected(0x12));
+    assert_matches!(error, Error::RemoteRejected(e) if e == RemoteReject::rejected(SignalIdentifier::GetCapabilities, 0x12));
 }
 
 //  Get All Capabilities
@@ -852,7 +852,7 @@ fn get_all_capabilities_reject_command() {
 
     let response: &[u8] = &[
         txlabel_raw | 0x0 << 2 | 0x3, // txlabel (same), Single (0b00), Response Reject (0b11)
-        0x0C,                         // Get Capabilities
+        0x0C,                         // Get All Capabilities
         0x12,                         // BAD_ACP_SEID
     ];
 
@@ -865,7 +865,45 @@ fn get_all_capabilities_reject_command() {
         x => panic!("Should have a ready Error response: {:?}", x),
     };
 
-    assert_matches!(error, Error::RemoteRejected(0x12));
+    assert_matches!(
+        error, Error::RemoteRejected(e) if e ==
+        RemoteReject::rejected(SignalIdentifier::GetAllCapabilities, 0x12)
+    );
+}
+
+#[test]
+fn get_all_capabilites_general_reject() {
+    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let (peer, remote) = setup_peer();
+    let seid = StreamEndpointId::try_from(1).unwrap();
+    let mut response_fut = Box::pin(peer.get_all_capabilities(&seid));
+    assert!(exec.run_until_stalled(&mut response_fut).is_pending());
+
+    let received = recv_remote(&remote).unwrap();
+    // Last half of header must be Single (0b00) and Command (0b00)
+    assert_eq!(0x00, received[0] & 0xF);
+    assert_eq!(0x0C, received[1]); // 0x0C = GetAllCapabilities
+    assert_eq!(0x01 << 2, received[2]); // SEID (0x01), RFA
+
+    let txlabel_raw = received[0] & 0xF0;
+
+    let response: &[u8] = &[
+        txlabel_raw | 0x0 << 2 | 0x1, // txlabel (same), Single (0b00), General Reject (0b01)
+        0x0C,                         // Get All Capabilities
+    ];
+
+    assert!(remote.as_ref().write(response).is_ok());
+
+    let complete = exec.run_until_stalled(&mut response_fut);
+
+    let error = match complete {
+        Poll::Ready(Err(response)) => response,
+        x => panic!("Should have a ready Error response: {:?}", x),
+    };
+
+    assert_matches!(
+        error, Error::RemoteRejected(e) if e == RemoteReject::general(SignalIdentifier::GetAllCapabilities)
+    );
 }
 
 // Get Configuration
@@ -1051,7 +1089,10 @@ fn get_configuration_reject_command() {
         x => panic!("Should have a ready Error response: {:?}", x),
     };
 
-    assert_matches!(error, Error::RemoteRejected(0x12));
+    assert_matches!(
+        error, Error::RemoteRejected(e) if e ==
+        RemoteReject::rejected(SignalIdentifier::GetConfiguration, 0x12)
+    );
 }
 
 macro_rules! seid_command_test {
@@ -1155,7 +1196,10 @@ macro_rules! seid_command_reject_test {
                 x => panic!("Should have a ready Error response: {:?}", x),
             };
 
-            assert_matches!(error, Error::RemoteRejected(0x12));
+            assert_matches!(
+                error, Error::RemoteRejected(e) if e ==
+                RemoteReject::rejected($signal_value.try_into().unwrap(), 0x12)
+            );
         }
     };
 }
@@ -1198,7 +1242,10 @@ macro_rules! seids_command_reject_test {
                 x => panic!("Should have a ready Error response: {:?}", x),
             };
 
-            assert_matches!(error, Error::RemoteStreamRejected(0x10, 0x12));
+            assert_matches!(
+                error, Error::RemoteRejected(e) if e ==
+                RemoteReject::stream($signal_value.try_into().unwrap(), 0x10, 0x12)
+            );
         }
     };
 }
@@ -1648,7 +1695,14 @@ fn set_config_error_response() {
     assert!(remote.as_ref().write(response).is_ok());
 
     let complete = exec.run_until_stalled(&mut response_fut);
-    assert_matches!(complete, Poll::Ready(Err(Error::RemoteConfigRejected(0x07, 0x29))));
+    assert_matches!(
+        complete, Poll::Ready(Err(Error::RemoteRejected(e))) if e ==
+        RemoteReject::config(
+            SignalIdentifier::SetConfiguration,
+            0x07,
+            0x29
+        )
+    );
 }
 
 // Set Config: Reporting
@@ -2033,14 +2087,21 @@ fn reconfigure_error_response() {
     // Error response
     let response: &[u8] = &[
         txlabel_raw << 4 | 0x0 << 2 | 0x3, // txlabel (same), Single (0b00), Response Reject
-        0x05,                              // Set Configuration
+        0x05,                              // Reconfigure
         0x00,                              // Relevant Capability (none)
         0x13,                              // SEP In Use
     ];
     assert!(remote.as_ref().write(response).is_ok());
 
     let complete = exec.run_until_stalled(&mut response_fut);
-    assert_matches!(complete, Poll::Ready(Err(Error::RemoteConfigRejected(0x00, 0x13))));
+    assert_matches!(
+        complete, Poll::Ready(Err(Error::RemoteRejected(e))) if e ==
+        RemoteReject::config(
+            SignalIdentifier::Reconfigure,
+            0x00,
+            0x13
+        )
+    );
 }
 
 /// This test covers the valid decoding of all valid ServiceCapabilities.
@@ -2343,5 +2404,5 @@ fn delay_report_reject_command() {
         x => panic!("Should have a ready Error response: {:?}", x),
     };
 
-    assert_matches!(error, Error::RemoteRejected(0x12));
+    assert_matches!(error, Error::RemoteRejected(e) if e == RemoteReject::rejected(SignalIdentifier::DelayReport, 0x12));
 }
