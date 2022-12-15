@@ -1,6 +1,6 @@
 {
-  "pkg/scenic_cpp_testing/include/lib/ui/scenic/cpp/testing/fake_flatland.h": "317cc2167eb1ac22b4273990dbdac878",
-  "pkg/scenic_cpp_testing/include/lib/ui/scenic/cpp/testing/fake_flatland_types.h": "22c2e48b78cf43dbb0919bf8498ae577",
+  "pkg/scenic_cpp_testing/include/lib/ui/scenic/cpp/testing/fake_flatland.h": "99b292d0d226056dee2dbfa8ac3261b8",
+  "pkg/scenic_cpp_testing/include/lib/ui/scenic/cpp/testing/fake_flatland_types.h": "9ccc47f84c4650725283c4c5eff919d9",
   "pkg/scenic_cpp_testing/include/lib/ui/scenic/cpp/testing/fake_focuser.h": "6688f756738697f96c060cd881d31115",
   "pkg/scenic_cpp_testing/include/lib/ui/scenic/cpp/testing/fake_mouse_source.h": "442e155f162bb67ee247d894daab78c8",
   "pkg/scenic_cpp_testing/include/lib/ui/scenic/cpp/testing/fake_touch_source.h": "88f041f7a36f16b2e8e790fbb3e427f9",

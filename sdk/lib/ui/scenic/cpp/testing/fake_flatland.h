@@ -269,6 +269,10 @@ class FakeFlatland : public fuchsia::ui::composition::testing::Allocator_TestBas
                                 fuchsia::ui::composition::BlendMode blend_mode) override;
 
   // |fuchsia::ui::composition::Flatland|
+  void SetImageFlip(fuchsia::ui::composition::ContentId image_id,
+                    fuchsia::ui::composition::ImageFlip flip) override;
+
+  // |fuchsia::ui::composition::Flatland|
   void SetViewportProperties(fuchsia::ui::composition::ContentId viewport_id,
                              fuchsia::ui::composition::ViewportProperties properties) override;
 

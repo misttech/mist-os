@@ -682,6 +682,35 @@ void FakeFlatland::SetImageBlendingFunction(fuchsia::ui::composition::ContentId 
   image->blend_mode = blend_mode;
 }
 
+void FakeFlatland::SetImageFlip(fuchsia::ui::composition::ContentId image_id,
+                                fuchsia::ui::composition::ImageFlip flip) {
+  if (image_id.value == 0) {
+    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageFlip: ContentId 0 is invalid.");
+    ReportBadOperationError();
+    return;
+  }
+
+  auto found_content = pending_graph_.content_map.find(image_id.value);
+  if (found_content == pending_graph_.content_map.end()) {
+    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageFlip: ContentId %lu does not exist.",
+            image_id.value);
+    ReportBadOperationError();
+    return;
+  }
+
+  auto& content = found_content->second;
+  ZX_ASSERT(content);
+  FakeImage* image = std::get_if<FakeImage>(content.get());
+  if (image == nullptr) {
+    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetImageDestinationSize: ContentId %lu is not an Image.",
+            image_id.value);
+    ReportBadOperationError();
+    return;
+  }
+
+  image->flip = flip;
+}
+
 void FakeFlatland::SetViewportProperties(fuchsia::ui::composition::ContentId viewport_id,
                                          fuchsia::ui::composition::ViewportProperties properties) {
   if (viewport_id.value == 0) {
