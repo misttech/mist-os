@@ -4,6 +4,7 @@
 
 #include <lib/syslog/global.h>
 #include <lib/ui/scenic/cpp/testing/fake_flatland.h>
+#include <lib/ui/scenic/cpp/testing/fake_flatland_types.h>
 #include <zircon/assert.h>
 #include <zircon/types.h>
 
@@ -840,6 +841,27 @@ void FakeFlatland::SetHitRegions(fuchsia::ui::composition::TransformId transform
   auto& transform = found_transform->second;
   ZX_ASSERT(transform);
   transform->hit_regions = std::move(regions);
+}
+
+void FakeFlatland::SetInfiniteHitRegion(fuchsia::ui::composition::TransformId transform_id,
+                                        fuchsia::ui::composition::HitTestInteraction hit_test) {
+  if (transform_id.value == 0) {
+    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetTranslation: TransformId 0 is invalid.");
+    ReportBadOperationError();
+    return;
+  }
+
+  auto found_transform = pending_graph_.transform_map.find(transform_id.value);
+  if (found_transform == pending_graph_.transform_map.end()) {
+    FX_LOGF(ERROR, nullptr, "FakeFlatland::SetTranslation: TransformId %lu does not exist.",
+            transform_id.value);
+    ReportBadOperationError();
+    return;
+  }
+
+  auto& transform = found_transform->second;
+  ZX_ASSERT(transform);
+  transform->hit_regions = {kInfiniteHitRegion};
 }
 
 void FakeFlatland::Clear() {

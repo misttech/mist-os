@@ -16,6 +16,7 @@
 #include <zircon/types.h>
 
 #include <algorithm>
+#include <cfloat>
 #include <cstdint>
 #include <optional>
 #include <unordered_map>
@@ -105,6 +106,8 @@ namespace scenic {
 
 constexpr static fuchsia::ui::composition::TransformId kInvalidTransformId{0};
 constexpr static fuchsia::ui::composition::ContentId kInvalidContentId{0};
+constexpr static fuchsia::ui::composition::HitRegion kInfiniteHitRegion = {
+    .region = {-FLT_MAX, -FLT_MAX, FLT_MAX, FLT_MAX}};
 
 struct FakeView {
   bool operator==(const FakeView& other) const;

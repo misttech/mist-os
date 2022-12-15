@@ -291,6 +291,10 @@ class FakeFlatland : public fuchsia::ui::composition::testing::Allocator_TestBas
                      std::vector<fuchsia::ui::composition::HitRegion> regions) override;
 
   // |fuchsia::ui::composition::Flatland|
+  void SetInfiniteHitRegion(fuchsia::ui::composition::TransformId transform_id,
+                            fuchsia::ui::composition::HitTestInteraction hit_test) override;
+
+  // |fuchsia::ui::composition::Flatland|
   void Clear() override;
 
   // |fuchsia::ui::composition::Flatland|
