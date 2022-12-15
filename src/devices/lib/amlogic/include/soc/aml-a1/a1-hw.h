@@ -153,6 +153,8 @@
 // USB
 
 // sys_ctrl
+#define A1_SYS_CTRL_BASE 0xfe005800
+#define A1_SYS_CTRL_LENGTH 0x400
 
 // sticky register -  not reset by watchdog
 #define A1_SYS_CTRL_SEC_STATUS_REG13 ((0x00cd << 2) + 0xfe005800)

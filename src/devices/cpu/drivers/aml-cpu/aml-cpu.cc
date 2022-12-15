@@ -31,9 +31,11 @@ namespace {
 // Each fragment is a combination of the fixed string + id.
 constexpr size_t kFragmentsPerPfDomain = 4;
 constexpr size_t kFragmentsPerPfDomainA5 = 2;
+constexpr size_t kFragmentsPerPfDomainA1 = 1;
 
 constexpr zx_off_t kCpuVersionOffset = 0x220;
 constexpr zx_off_t kCpuVersionOffsetA5 = 0x300;
+constexpr zx_off_t kCpuVersionOffsetA1 = 0x220;
 
 constexpr uint32_t kCpuGetDvfsTableIndexFuncId = 0x82000088;
 constexpr uint64_t kDefaultClusterId = 0;
@@ -121,6 +123,9 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
     }
     fragments_per_pf_domain = kFragmentsPerPfDomainA5;
     cpu_version_offset = kCpuVersionOffsetA5;
+  } else if (info.pid == PDEV_PID_AMLOGIC_A1) {
+    fragments_per_pf_domain = kFragmentsPerPfDomainA1;
+    cpu_version_offset = kCpuVersionOffsetA1;
   }
 
   auto op_points = ddk::GetMetadataArray<operating_point_t>(parent, metadata_type);
@@ -174,13 +179,17 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
       return st;
     }
 
-    fragment_name.Resize(0);
-    fragment_name.AppendPrintf("power-%02d", perf_domain.id);
+    // For A1, the CPU power is VDD_CORE, which share with other module.
+    // The fixed voltage is 0.8v, we can't adjust it dynamically.
     ddk::PowerProtocolClient power_client;
-    if ((st = ddk::PowerProtocolClient::CreateFromDevice(parent, fragment_name.c_str(),
-                                                         &power_client)) != ZX_OK) {
-      zxlogf(ERROR, "%s: Failed to create power client, st = %d", __func__, st);
-      return st;
+    if (info.pid != PDEV_PID_AMLOGIC_A1) {
+      fragment_name.Resize(0);
+      fragment_name.AppendPrintf("power-%02d", perf_domain.id);
+      if ((st = ddk::PowerProtocolClient::CreateFromDevice(parent, fragment_name.c_str(),
+                                                           &power_client)) != ZX_OK) {
+        zxlogf(ERROR, "%s: Failed to create power client, st = %d", __func__, st);
+        return st;
+      }
     }
 
     // Vector of operating points that belong to this power domain.
@@ -288,11 +297,13 @@ zx_status_t AmlCpu::DdkSetPerformanceState(uint32_t requested_state, uint32_t* o
 
     // Put the voltage back if frequency scaling fails.
     uint32_t actual_voltage;
-    zx_status_t vt_st = pwr_.RequestVoltage(initial_state.volt_uv, &actual_voltage);
-    if (vt_st != ZX_OK) {
-      zxlogf(ERROR, "%s: Failed to reset CPU voltage, st = %d, Voltage and frequency mismatch!",
-             __func__, vt_st);
-      return vt_st;
+    if (pwr_.is_valid()) {
+      zx_status_t vt_st = pwr_.RequestVoltage(initial_state.volt_uv, &actual_voltage);
+      if (vt_st != ZX_OK) {
+        zxlogf(ERROR, "%s: Failed to reset CPU voltage, st = %d, Voltage and frequency mismatch!",
+               __func__, vt_st);
+        return vt_st;
+      }
     }
     return st;
   }
@@ -338,9 +349,11 @@ zx_status_t AmlCpu::Init() {
     }
   }
 
-  uint32_t min_voltage, max_voltage;
-  pwr_.GetSupportedVoltageRange(&min_voltage, &max_voltage);
-  pwr_.RegisterPowerDomain(min_voltage, max_voltage);
+  if (pwr_.is_valid()) {
+    uint32_t min_voltage, max_voltage;
+    pwr_.GetSupportedVoltageRange(&min_voltage, &max_voltage);
+    pwr_.RegisterPowerDomain(min_voltage, max_voltage);
+  }
 
   uint32_t actual;
   result = DdkSetPerformanceState(kInitialPstate, &actual);

@@ -69,4 +69,5 @@ uint A5_CLK_ID {
 // Values taken from <soc/aml-meson/a1-clk.h>
 uint A1_CLK_ID {
   CLK_HIFIPLL_CLK = 0x20001,
+  CLK_SYS_CPU_CLK = 0x100000,
 };
