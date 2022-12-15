@@ -80,6 +80,29 @@ storage_driver_test_realm_v2_component("open_partition_test-component") {
   deps = [ ":open_partition_test" ]
 }
 
+rustc_test("static-child-test") {
+  edition = "2021"
+  deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/lib/fuchsia",
+    "//src/lib/storage/fs_management/rust:fs_management",
+    "//src/lib/storage/ramdevice_client/rust:ramdevice_client",
+  ]
+  sources = [ "tests/static_child_test.rs" ]
+  source_root = "tests/static_child_test.rs"
+}
+
+fuchsia_unittest_component("static-child-test-component") {
+  manifest = "meta/static_child_test.cml"
+  deps = [
+    ":static-child-test",
+    "//src/storage/bin/blobfs:component",
+    "//src/storage/bin/minfs:minfs-component",
+    "//src/storage/fxfs:fxfs_component",
+    "//src/storage/testing:storage_driver_test_realm",
+  ]
+}
+
 fuchsia_test_package("fs-management-rust-tests") {
   test_specs = {
     log_settings = {
@@ -89,6 +112,7 @@ fuchsia_test_package("fs-management-rust-tests") {
   test_components = [
     ":fs-management-rust-tests-component",
     ":open_partition_test-component",
+    ":static-child-test-component",
   ]
   deps = [
     "//src/storage/bin/factoryfs",

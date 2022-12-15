@@ -7,7 +7,7 @@
 use {
     crate::{
         error::{CommandError, KillError, QueryError, ShutdownError},
-        launch_process, FSConfig, Mode,
+        launch_process, ComponentType, FSConfig, Mode,
     },
     anyhow::{anyhow, bail, ensure, Error},
     cstr::cstr,
@@ -45,11 +45,10 @@ use {
 pub struct Filesystem<FSC> {
     config: FSC,
     block_device: fio::NodeProxy,
-    component: Option<Arc<ComponentInstance>>,
+    component: Option<Arc<DynamicComponentInstance>>,
 }
 
 // Used to disambiguate children in our component collection.
-const COLLECTION_NAME: &str = "fs-collection";
 static COLLECTION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 impl<FSC: FSConfig> Filesystem<FSC> {
@@ -85,69 +84,66 @@ impl<FSC: FSConfig> Filesystem<FSC> {
     }
 
     async fn get_component_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
-        if let Some(component) = &self.component {
-            return open_childs_exposed_directory(
-                component.name(),
-                Some(COLLECTION_NAME.to_string()),
-            )
-            .await;
-        }
-
-        // Try and connect to a static child.
         let mode = self.config.mode();
-        let component_name = mode.component_name().unwrap();
+        let component_name = mode
+            .component_name()
+            .expect("BUG: called get_component_exposed_dir when mode was not component");
+        let component_type = mode
+            .component_type()
+            .expect("BUG: called get_component_exposed_dir when mode was not component");
         let realm_proxy = connect_to_protocol::<RealmMarker>()?;
-        let (directory_proxy, server_end) = create_proxy::<fio::DirectoryMarker>()?;
-        match realm_proxy
-            .open_exposed_dir(
-                &mut fdecl::ChildRef { name: component_name.to_string(), collection: None },
-                server_end,
-            )
-            .await?
-        {
-            Ok(()) => return Ok(directory_proxy),
-            Err(e) => {
-                if e != fcomponent::Error::InstanceNotFound {
-                    return Err(anyhow!("open_exposed_dir failed: {:?}", e));
+
+        match component_type {
+            ComponentType::StaticChild => open_childs_exposed_directory(component_name, None).await,
+            ComponentType::DynamicChild { collection_name } => {
+                if let Some(component) = &self.component {
+                    return open_childs_exposed_directory(
+                        component.name.clone(),
+                        Some(component.collection.clone()),
+                    )
+                    .await;
                 }
-            }
-        }
 
-        // We failed to connect to a static child, so we need to launch a component in our
-        // collection.  We need a unique name, so we pull in the process Koid here since it's
-        // possible for the same binary in a component to be launched multiple times and we don't
-        // want to collide with children created by other processes.
-        let name = format!(
-            "{}-{}-{}",
-            component_name,
-            fuchsia_runtime::process_self().get_koid().unwrap().raw_koid(),
-            COLLECTION_COUNTER.fetch_add(1, Ordering::Relaxed)
-        );
+                // We need a unique name, so we pull in the process Koid here since it's possible
+                // for the same binary in a component to be launched multiple times and we don't
+                // want to collide with children created by other processes.
+                let name = format!(
+                    "{}-{}-{}",
+                    component_name,
+                    fuchsia_runtime::process_self().get_koid().unwrap().raw_koid(),
+                    COLLECTION_COUNTER.fetch_add(1, Ordering::Relaxed)
+                );
 
-        // Launch a new component in our collection.
-        realm_proxy
-            .create_child(
-                &mut fdecl::CollectionRef { name: COLLECTION_NAME.to_string() },
-                fdecl::Child {
+                let mut collection_ref = fdecl::CollectionRef { name: collection_name };
+                let child_decl = fdecl::Child {
                     name: Some(name.clone()),
                     url: Some(format!("#meta/{}.cm", component_name)),
                     startup: Some(fdecl::StartupMode::Lazy),
-                    environment: None,
                     ..fdecl::Child::EMPTY
-                },
-                fcomponent::CreateChildArgs::EMPTY,
-            )
-            .await?
-            .map_err(|e| anyhow!("create_child failed: {:?}", e))?;
+                };
+                // Launch a new component in our collection.
+                realm_proxy
+                    .create_child(
+                        &mut collection_ref,
+                        child_decl,
+                        fcomponent::CreateChildArgs::EMPTY,
+                    )
+                    .await?
+                    .map_err(|e| anyhow!("create_child failed: {:?}", e))?;
 
-        let component = Arc::new(ComponentInstance(name));
+                let component =
+                    Arc::new(DynamicComponentInstance { name, collection: collection_ref.name });
 
-        let proxy =
-            open_childs_exposed_directory(component.name(), Some(COLLECTION_NAME.to_string()))
+                let proxy = open_childs_exposed_directory(
+                    component.name.clone(),
+                    Some(component.collection.clone()),
+                )
                 .await?;
 
-        self.component = Some(component);
-        Ok(proxy)
+                self.component = Some(component);
+                Ok(proxy)
+            }
+        }
     }
 
     /// Runs `mkfs`, which formats the filesystem onto the block device.
@@ -356,20 +352,17 @@ impl<FSC: FSConfig> Filesystem<FSC> {
 }
 
 // Destroys the child when dropped.
-struct ComponentInstance(/* name: */ String);
-
-impl ComponentInstance {
-    fn name(&self) -> &str {
-        &self.0
-    }
+struct DynamicComponentInstance {
+    name: String,
+    collection: String,
 }
 
-impl Drop for ComponentInstance {
+impl Drop for DynamicComponentInstance {
     fn drop(&mut self) {
         if let Ok(realm_proxy) = connect_to_protocol::<RealmMarker>() {
             let _ = realm_proxy.destroy_child(&mut fdecl::ChildRef {
-                name: self.0.clone(),
-                collection: Some(COLLECTION_NAME.to_string()),
+                name: self.name.clone(),
+                collection: Some(self.collection.clone()),
             });
         }
     }
@@ -413,7 +406,7 @@ pub type ServingFilesystem = ServingSingleVolumeFilesystem;
 pub struct ServingSingleVolumeFilesystem {
     // If the filesystem is running as a component, there will be no process.
     process: Option<Process>,
-    _component: Option<Arc<ComponentInstance>>,
+    _component: Option<Arc<DynamicComponentInstance>>,
     exposed_dir: fio::DirectoryProxy,
     root_dir: fio::DirectoryProxy,
 
@@ -534,7 +527,7 @@ impl Drop for ServingSingleVolumeFilesystem {
 /// Asynchronously manages a serving multivolume filesystem. Created from
 /// [`Filesystem::serve_multi_volume()`].
 pub struct ServingMultiVolumeFilesystem {
-    _component: Option<Arc<ComponentInstance>>,
+    _component: Option<Arc<DynamicComponentInstance>>,
     // exposed_dir will always be Some, except in Self::shutdown.
     exposed_dir: Option<fio::DirectoryProxy>,
     volumes: HashMap<String, ServingVolume>,

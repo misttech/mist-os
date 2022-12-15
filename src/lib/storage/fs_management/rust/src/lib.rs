@@ -40,6 +40,8 @@ pub const FVM_TYPE_GUID: [u8; 16] = [
 
 pub const FVM_TYPE_GUID_STR: &str = "49fd7cb8-df15-4e73-b9d9-992070127f0f";
 
+pub const FS_COLLECTION_NAME: &'static str = "fs-collection";
+
 fn launch_process(
     args: &[&CStr],
     mut actions: Vec<SpawnAction<'_>>,
@@ -61,8 +63,26 @@ fn launch_process(
     }
 }
 
+#[derive(Clone)]
+pub enum ComponentType {
+    /// Launch the filesystem as a static child, using the configured name in the Mode as the child
+    /// name. If the child doesn't exist, this will fail.
+    StaticChild,
+
+    /// Launch the filesystem as a dynamic child, in the configured collection. By default, the
+    /// collection is "fs-collection".
+    DynamicChild { collection_name: String },
+}
+
+impl Default for ComponentType {
+    fn default() -> Self {
+        ComponentType::DynamicChild { collection_name: "fs-collection".to_string() }
+    }
+}
+
 pub enum Mode<'a> {
     /// Run the filesystem as a legacy binary.
+    /// TODO(fxbug.dev/117437): remove legacy filesystem launching support.
     Legacy(LegacyConfig<'a>),
 
     /// Run the filesystem as a component.
@@ -82,10 +102,14 @@ pub enum Mode<'a> {
 
         /// Start options as defined by the startup protocol
         start_options: StartOptions,
+
+        /// Whether to launch this filesystem as a dynamic or static child.
+        component_type: ComponentType,
     },
 }
 
 impl<'a> Mode<'a> {
+    // TODO(fxbug.dev/117437): remove legacy run type
     fn into_legacy_config(self) -> Option<LegacyConfig<'a>> {
         match self {
             Mode::Legacy(config) => Some(config),
@@ -93,14 +117,24 @@ impl<'a> Mode<'a> {
         }
     }
 
+    // TODO(fxbug.dev/117437): remove Option when legacy run type is removed
     fn component_name(&self) -> Option<&str> {
         match self {
             Mode::Component { name, .. } => Some(name),
             _ => None,
         }
     }
+
+    // TODO(fxbug.dev/117437): remove Option when legacy run type is removed
+    fn component_type(&self) -> Option<ComponentType> {
+        match self {
+            Mode::Component { component_type, .. } => Some(component_type.clone()),
+            _ => None,
+        }
+    }
 }
 
+// TODO(fxbug.dev/117437): remove legacy run type
 #[derive(Default)]
 pub struct LegacyConfig<'a> {
     /// Path to the binary.
@@ -180,6 +214,7 @@ pub struct Blobfs {
     pub write_compression_algorithm: Option<BlobCompression>,
     pub write_compression_level: Option<i32>,
     pub cache_eviction_policy_override: Option<BlobEvictionPolicy>,
+    pub component_type: ComponentType,
 }
 
 impl Blobfs {
@@ -193,6 +228,16 @@ impl Blobfs {
     /// the default configuration.
     pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem<Self>, Error> {
         filesystem::Filesystem::from_channel(channel, Self::default())
+    }
+
+    /// Launch blobfs, with the default configuration, as a dynamic child in the fs-collection.
+    pub fn dynamic_child() -> Self {
+        Self {
+            component_type: ComponentType::DynamicChild {
+                collection_name: FS_COLLECTION_NAME.to_string(),
+            },
+            ..Default::default()
+        }
     }
 }
 
@@ -233,6 +278,7 @@ impl FSConfig for Blobfs {
                 }
                 start_options
             },
+            component_type: self.component_type.clone(),
         }
     }
 
@@ -252,6 +298,7 @@ pub struct Minfs {
     // Start Options
     pub readonly: bool,
     pub fsck_after_every_transaction: bool,
+    pub component_type: ComponentType,
 }
 
 impl Minfs {
@@ -265,6 +312,16 @@ impl Minfs {
     /// the default configuration.
     pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem<Self>, Error> {
         filesystem::Filesystem::from_channel(channel, Self::default())
+    }
+
+    /// Launch minfs, with the default configuration, as a dynamic child in the fs-collection.
+    pub fn dynamic_child() -> Self {
+        Self {
+            component_type: ComponentType::DynamicChild {
+                collection_name: FS_COLLECTION_NAME.to_string(),
+            },
+            ..Default::default()
+        }
     }
 }
 
@@ -288,6 +345,7 @@ impl FSConfig for Minfs {
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
             },
+            component_type: self.component_type.clone(),
         }
     }
 
@@ -363,6 +421,7 @@ pub struct Fxfs {
     // Start Options
     pub readonly: bool,
     pub fsck_after_every_transaction: bool,
+    pub component_type: ComponentType,
 }
 
 impl Fxfs {
@@ -380,6 +439,16 @@ impl Fxfs {
     /// the default configuration.
     pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem<Self>, Error> {
         filesystem::Filesystem::from_channel(channel, Self::default())
+    }
+
+    /// Launch Fxfs, with the default configuration, as a dynamic child in the fs-collection.
+    pub fn dynamic_child() -> Self {
+        Self {
+            component_type: ComponentType::DynamicChild {
+                collection_name: FS_COLLECTION_NAME.to_string(),
+            },
+            ..Default::default()
+        }
     }
 }
 
@@ -403,6 +472,7 @@ impl FSConfig for Fxfs {
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
             },
+            component_type: self.component_type.clone(),
         }
     }
 
@@ -422,7 +492,9 @@ impl FSConfig for Fxfs {
 /// F2fs Filesystem Configuration
 /// If fields are None or false, they will not be set in arguments.
 #[derive(Clone, Default)]
-pub struct F2fs {}
+pub struct F2fs {
+    pub component_type: ComponentType,
+}
 
 impl F2fs {
     /// Manages a block device at a given path using
@@ -435,6 +507,16 @@ impl F2fs {
     /// the default configuration.
     pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem<Self>, Error> {
         filesystem::Filesystem::from_channel(channel, Self::default())
+    }
+
+    /// Launch f2fs, with the default configuration, as a dynamic child in the fs-collection.
+    pub fn dynamic_child() -> Self {
+        Self {
+            component_type: ComponentType::DynamicChild {
+                collection_name: FS_COLLECTION_NAME.to_string(),
+            },
+            ..Default::default()
+        }
     }
 }
 
@@ -458,6 +540,7 @@ impl FSConfig for F2fs {
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
             },
+            component_type: self.component_type.clone(),
         }
     }
     fn is_multi_volume(&self) -> bool {
@@ -491,6 +574,7 @@ impl Factoryfs {
 }
 
 impl FSConfig for Factoryfs {
+    // TODO(fxbug.dev/117437): launch factoryfs as a component so we can remove the legacy mode.
     fn mode(&self) -> Mode<'_> {
         Mode::Legacy(LegacyConfig {
             binary_path: cstr!("/pkg/bin/factoryfs"),

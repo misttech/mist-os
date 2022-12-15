@@ -141,16 +141,15 @@ impl<'a> Environment for FshostEnvironment<'a> {
             tracing::warn!("Failed to set max partition size for blobfs: {:?}", e);
         };
 
-        let mut blobfs = Blobfs::default();
-        if let Some(compression) = self.boot_args.blobfs_write_compression_algorithm() {
-            blobfs.write_compression_algorithm = Some(compression);
-        }
-        if let Some(eviction) = self.boot_args.blobfs_eviction_policy() {
-            blobfs.cache_eviction_policy_override = Some(eviction);
-        }
+        let config = Blobfs {
+            write_compression_algorithm: self.boot_args.blobfs_write_compression_algorithm(),
+            cache_eviction_policy_override: self.boot_args.blobfs_eviction_policy(),
+            component_type: fs_management::ComponentType::StaticChild,
+            ..Default::default()
+        };
         let fs = fs_management::filesystem::Filesystem::from_channel(
             device.proxy()?.into_channel().unwrap().into(),
-            blobfs,
+            config,
         )?
         .serve()
         .await?;
@@ -166,9 +165,27 @@ impl<'a> Environment for FshostEnvironment<'a> {
         let _ = self.data.queue().ok_or_else(|| anyhow!("data partition already mounted"))?;
 
         let mut filesystem = match self.config.data_filesystem_format.as_ref() {
-            "fxfs" => self.serve_data(device, Fxfs::default()).await?,
-            "f2fs" => self.serve_data(device, F2fs::default()).await?,
-            _ => self.serve_data(device, Minfs::default()).await?,
+            "fxfs" => {
+                let config = Fxfs {
+                    component_type: fs_management::ComponentType::StaticChild,
+                    ..Default::default()
+                };
+                self.serve_data(device, config).await?
+            }
+            "f2fs" => {
+                let config = F2fs {
+                    component_type: fs_management::ComponentType::StaticChild,
+                    ..Default::default()
+                };
+                self.serve_data(device, config).await?
+            }
+            _ => {
+                let config = Minfs {
+                    component_type: fs_management::ComponentType::StaticChild,
+                    ..Default::default()
+                };
+                self.serve_data(device, config).await?
+            }
         };
 
         let queue = self.data.queue().unwrap();

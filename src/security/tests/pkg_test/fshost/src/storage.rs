@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_io as fio,
     fs_management::{
         filesystem::{Filesystem, ServingSingleVolumeFilesystem},
-        Blobfs,
+        Blobfs, ComponentType,
     },
     fuchsia_zircon::{AsHandleRef, Rights, Vmo},
     ramdevice_client::{RamdiskClient, VmoRamdiskClientBuilder},
@@ -62,7 +62,8 @@ impl BlobfsInstance {
             .expect("blobfs block did not appear");
 
         // Instantiate blobfs.
-        let mut blobfs = Filesystem::from_node(block, Blobfs::default());
+        let config = Blobfs { component_type: ComponentType::StaticChild, ..Default::default() };
+        let mut blobfs = Filesystem::from_node(block, config);
 
         // Check blobfs consistency.
         blobfs.fsck().await.unwrap();
