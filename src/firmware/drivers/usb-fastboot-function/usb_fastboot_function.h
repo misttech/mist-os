@@ -13,15 +13,19 @@
 #include <lib/inspect/cpp/inspect.h>
 #include <zircon/compiler.h>
 
+#include <mutex>
+
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
 #include <usb/request-cpp.h>
 #include <usb/usb-request.h>
 
 namespace usb_fastboot_function {
 
+// The higher the value of `kBulkReqSize`, the higher the speed. But if set too high, the driver
+// will start crashing more often due to memory error. Set to 4k for now which is stable and gives
+// decent speed.
+constexpr uint32_t kBulkReqSize = 4 * 1024;
 constexpr uint16_t kBulkMaxPacketSize = 512;
 
 class UsbFastbootFunction;
@@ -63,6 +67,8 @@ class UsbFastbootFunction : public DeviceType,
   uint8_t bulk_in_addr() const { return descriptors_.bulk_in_ep.b_endpoint_address; }
   zx_status_t ConfigureEndpoints(bool enable);
 
+  std::atomic<bool> configured_ = false;
+
   inspect::Inspector inspect_;
   inspect::BoolProperty is_bound = inspect_.GetRoot().CreateBool("is_bound", false);
   ddk::UsbFunctionProtocolClient function_;
@@ -70,6 +76,20 @@ class UsbFastbootFunction : public DeviceType,
   // Size of a usb request taking into account parent request size + alignment + internal
   // bookkeeping. This is calculated by Usb::Request<>::RequestSize() method.
   size_t usb_request_size_ = 0;
+
+  std::mutex send_lock_;
+  size_t total_to_send_ __TA_GUARDED(send_lock_) = 0;
+  size_t sent_size_ __TA_GUARDED(send_lock_) = 0;
+  fzl::OwnedVmoMapper send_vmo_ __TA_GUARDED(send_lock_);
+  std::optional<SendCompleter::Async> send_completer_ __TA_GUARDED(send_lock_);
+  usb::RequestPool<> bulk_in_reqs_ __TA_GUARDED(send_lock_){};
+
+  std::mutex receive_lock_;
+  fzl::OwnedVmoMapper receive_vmo_ __TA_GUARDED(receive_lock_);
+  size_t received_size_ __TA_GUARDED(receive_lock_) = 0;
+  size_t requested_size_ __TA_GUARDED(receive_lock_) = 0;
+  std::optional<ReceiveCompleter::Async> receive_completer_ __TA_GUARDED(receive_lock_);
+  usb::RequestPool<> bulk_out_reqs_ __TA_GUARDED(receive_lock_){};
 
   // USB request completion callback methods.
   void TxComplete(usb_request_t* req);
@@ -92,6 +112,10 @@ class UsbFastbootFunction : public DeviceType,
           },
       .ctx = this,
   };
+
+  void CleanUpRx(zx_status_t status, usb::Request<> req) __TA_REQUIRES(receive_lock_);
+  void CleanUpTx(zx_status_t status, usb::Request<> req) __TA_REQUIRES(send_lock_);
+  zx_status_t PrepareSendRequest(usb::Request<>& req) __TA_REQUIRES(send_lock_);
 
   // USB Fastboot interface descriptor.
   struct {
