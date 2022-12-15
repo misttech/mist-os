@@ -10,12 +10,7 @@ bool ArenaChecker::IsPointerInArena(const void* pointer, ::fidl::ArenaBase& aren
                                     const uint8_t* initial_buffer, size_t initial_capacity) {
   const uint8_t* data = static_cast<const uint8_t*>(pointer);
   auto in_range = [=](const uint8_t* start, size_t len) -> bool {
-    if (data >= start) {
-      if (data - start < static_cast<ptrdiff_t>(len)) {
-        return true;
-      }
-    }
-    return false;
+    return (data >= start) && (data < start + len);
   };
 
   // Check presence in initial buffer.
