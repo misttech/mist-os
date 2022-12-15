@@ -266,7 +266,7 @@ struct LayoutInvocation {
   const Size* size_resolved = nullptr;
   // This has no users, probably because it's missing in the JSON IR (it is not
   // yet generated for experimental_maybe_from_alias)
-  std::optional<uint32_t> subtype_resolved = std::nullopt;
+  types::HandleSubtype subtype_resolved = types::HandleSubtype::kHandle;
   // This has no users, probably because it's missing in the JSON IR (it is not
   // yet generated for experimental_maybe_from_alias).
   const HandleRights* rights_resolved = nullptr;

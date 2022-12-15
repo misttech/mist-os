@@ -85,7 +85,7 @@ void CalcDependencies::VisitTypeConstructor(const TypeConstructor* type_ctor) {
   }
 
   const Type* type = type_ctor->type;
-  if (type->nullability == types::Nullability::kNullable) {
+  if (type->IsNullable()) {
     // We do not create edges for nullable types. This makes it possible to
     // write some recursive types in FIDL. However, we do not have comprehensive
     // support for recursive types. See fxbug.dev/35218 for details.

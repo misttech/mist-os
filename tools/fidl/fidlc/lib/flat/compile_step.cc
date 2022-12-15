@@ -656,7 +656,7 @@ const Type* CompileStep::UnderlyingType(const Type* type) {
 bool CompileStep::TypeCanBeConst(const Type* type) {
   switch (type->kind) {
     case flat::Type::Kind::kString:
-      return type->nullability != types::Nullability::kNullable;
+      return !type->IsNullable();
     case flat::Type::Kind::kPrimitive:
       return true;
     case flat::Type::Kind::kIdentifier: {
@@ -683,11 +683,10 @@ bool CompileStep::TypeIsConvertibleTo(const Type* from_type, const Type* to_type
       auto from_string_type = static_cast<const flat::StringType*>(from_type);
       auto to_string_type = static_cast<const flat::StringType*>(to_type);
 
-      if (to_string_type->nullability == types::Nullability::kNonnullable &&
-          from_string_type->nullability != types::Nullability::kNonnullable)
+      if (!to_string_type->IsNullable() && from_string_type->IsNullable())
         return false;
 
-      if (to_string_type->max_size->value < from_string_type->max_size->value)
+      if (to_string_type->MaxSize() < from_string_type->MaxSize())
         return false;
 
       return true;
@@ -1232,7 +1231,7 @@ void CompileStep::CompileService(Service* service_decl) {
     if (transport_side_type->end != TransportSide::kClient) {
       Fail(ErrOnlyClientEndsInServices, member.name);
     }
-    if (member.type_ctor->type->nullability != types::Nullability::kNonnullable) {
+    if (member.type_ctor->type->IsNullable()) {
       Fail(ErrOptionalServiceMember, member.name);
     }
 
@@ -1325,7 +1324,7 @@ void CompileStep::CompileTable(Table* table_declaration) {
     if (!member_used.type_ctor->type) {
       continue;
     }
-    if (member_used.type_ctor->type->nullability != types::Nullability::kNonnullable) {
+    if (member_used.type_ctor->type->IsNullable()) {
       Fail(ErrOptionalTableMember, member_used.name);
     }
     if (i == kMaxTableOrdinals - 1) {
@@ -1383,7 +1382,7 @@ void CompileStep::CompileUnion(Union* union_declaration) {
     if (!member_used.type_ctor->type) {
       continue;
     }
-    if (member_used.type_ctor->type->nullability != types::Nullability::kNonnullable) {
+    if (member_used.type_ctor->type->IsNullable()) {
       Fail(ErrOptionalUnionMember, member_used.name);
     }
     derive_resourceness.AddType(member_used.type_ctor->type);
@@ -1437,7 +1436,9 @@ bool CompileStep::ResolveHandleRightsConstant(Resource* resource, Constant* cons
 }
 
 bool CompileStep::ResolveHandleSubtypeIdentifier(Resource* resource, Constant* constant,
-                                                 uint32_t* out_obj_type) {
+                                                 types::HandleSubtype* out_obj_type) {
+  ZX_ASSERT_MSG(resource != nullptr, "must pass resource");
+
   auto subtype_property = resource->LookupProperty("subtype");
   if (!subtype_property) {
     return false;
@@ -1448,7 +1449,8 @@ bool CompileStep::ResolveHandleSubtypeIdentifier(Resource* resource, Constant* c
   }
 
   if (out_obj_type) {
-    *out_obj_type = static_cast<const HandleSubtype*>(&constant->Value())->value;
+    auto constant_value = static_cast<const HandleSubtype*>(&constant->Value());
+    *out_obj_type = static_cast<types::HandleSubtype>(constant_value->value);
   }
   return true;
 }

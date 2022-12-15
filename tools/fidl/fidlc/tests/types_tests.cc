@@ -335,75 +335,75 @@ type TypeDecl= struct {
   auto v0_type = static_cast<const fidl::flat::VectorType*>(v0_type_base);
   EXPECT_EQ(v0_type->nullability, fidl::types::Nullability::kNonnullable);
   EXPECT_EQ(v0_type->element_type->kind, fidl::flat::Type::Kind::kPrimitive);
-  EXPECT_EQ(v0_type->element_count, &fidl::flat::VectorType::kMaxSize);
+  EXPECT_EQ(v0_type->ElementCount(), fidl::flat::Size::Max().value);
 
   auto v1_type_base = type_decl->members[i++].type_ctor->type;
   ASSERT_EQ(v1_type_base->kind, fidl::flat::Type::Kind::kVector);
   auto v1_type = static_cast<const fidl::flat::VectorType*>(v1_type_base);
   EXPECT_EQ(v1_type->nullability, fidl::types::Nullability::kNonnullable);
   EXPECT_EQ(v1_type->element_type->kind, fidl::flat::Type::Kind::kPrimitive);
-  EXPECT_EQ(v1_type->element_count->value, 16u);
+  EXPECT_EQ(v1_type->ElementCount(), 16u);
 
   auto v2_type_base = type_decl->members[i++].type_ctor->type;
   ASSERT_EQ(v2_type_base->kind, fidl::flat::Type::Kind::kVector);
   auto v2_type = static_cast<const fidl::flat::VectorType*>(v2_type_base);
   EXPECT_EQ(v2_type->nullability, fidl::types::Nullability::kNullable);
   EXPECT_EQ(v2_type->element_type->kind, fidl::flat::Type::Kind::kPrimitive);
-  EXPECT_EQ(v2_type->element_count, &fidl::flat::VectorType::kMaxSize);
+  EXPECT_EQ(v2_type->ElementCount(), fidl::flat::Size::Max().value);
 
   auto v3_type_base = type_decl->members[i++].type_ctor->type;
   ASSERT_EQ(v3_type_base->kind, fidl::flat::Type::Kind::kVector);
   auto v3_type = static_cast<const fidl::flat::VectorType*>(v3_type_base);
   EXPECT_EQ(v3_type->nullability, fidl::types::Nullability::kNullable);
-  EXPECT_EQ(v3_type->element_count->value, 16u);
+  EXPECT_EQ(v3_type->ElementCount(), 16u);
 
   auto b4_type_base = type_decl->members[i++].type_ctor->type;
   ASSERT_EQ(b4_type_base->kind, fidl::flat::Type::Kind::kVector);
   auto b4_type = static_cast<const fidl::flat::VectorType*>(b4_type_base);
   EXPECT_EQ(b4_type->nullability, fidl::types::Nullability::kNonnullable);
-  EXPECT_EQ(b4_type->element_count, &fidl::flat::VectorType::kMaxSize);
+  EXPECT_EQ(b4_type->ElementCount(), fidl::flat::Size::Max().value);
 
   auto b5_type_base = type_decl->members[i++].type_ctor->type;
   ASSERT_EQ(b5_type_base->kind, fidl::flat::Type::Kind::kVector);
   auto b5_type = static_cast<const fidl::flat::VectorType*>(b5_type_base);
   EXPECT_EQ(b5_type->nullability, fidl::types::Nullability::kNonnullable);
-  EXPECT_EQ(b5_type->element_count->value, 16u);
+  EXPECT_EQ(b5_type->ElementCount(), 16u);
 
   auto b6_type_base = type_decl->members[i++].type_ctor->type;
   ASSERT_EQ(b6_type_base->kind, fidl::flat::Type::Kind::kVector);
   auto b6_type = static_cast<const fidl::flat::VectorType*>(b6_type_base);
   EXPECT_EQ(b6_type->nullability, fidl::types::Nullability::kNullable);
-  EXPECT_EQ(b6_type->element_count, &fidl::flat::VectorType::kMaxSize);
+  EXPECT_EQ(b6_type->ElementCount(), fidl::flat::Size::Max().value);
 
   auto b7_type_base = type_decl->members[i++].type_ctor->type;
   ASSERT_EQ(b7_type_base->kind, fidl::flat::Type::Kind::kVector);
   auto b7_type = static_cast<const fidl::flat::VectorType*>(b7_type_base);
   EXPECT_EQ(b7_type->nullability, fidl::types::Nullability::kNullable);
-  EXPECT_EQ(b7_type->element_count->value, 16u);
+  EXPECT_EQ(b7_type->ElementCount(), 16u);
 
   auto s8_type_base = type_decl->members[i++].type_ctor->type;
   ASSERT_EQ(s8_type_base->kind, fidl::flat::Type::Kind::kString);
   auto s8_type = static_cast<const fidl::flat::StringType*>(s8_type_base);
   EXPECT_EQ(s8_type->nullability, fidl::types::Nullability::kNonnullable);
-  EXPECT_EQ(s8_type->max_size, &fidl::flat::StringType::kMaxSize);
+  EXPECT_EQ(s8_type->MaxSize(), fidl::flat::Size::Max().value);
 
   auto s9_type_base = type_decl->members[i++].type_ctor->type;
   ASSERT_EQ(s9_type_base->kind, fidl::flat::Type::Kind::kString);
   auto s9_type = static_cast<const fidl::flat::StringType*>(s9_type_base);
   EXPECT_EQ(s9_type->nullability, fidl::types::Nullability::kNonnullable);
-  EXPECT_EQ(s9_type->max_size->value, 16u);
+  EXPECT_EQ(s9_type->MaxSize(), 16u);
 
   auto s10_type_base = type_decl->members[i++].type_ctor->type;
   ASSERT_EQ(s10_type_base->kind, fidl::flat::Type::Kind::kString);
   auto s10_type = static_cast<const fidl::flat::StringType*>(s10_type_base);
   EXPECT_EQ(s10_type->nullability, fidl::types::Nullability::kNullable);
-  EXPECT_EQ(s10_type->max_size, &fidl::flat::StringType::kMaxSize);
+  EXPECT_EQ(s10_type->MaxSize(), fidl::flat::Size::Max().value);
 
   auto s11_type_base = type_decl->members[i++].type_ctor->type;
   ASSERT_EQ(s11_type_base->kind, fidl::flat::Type::Kind::kString);
   auto s11_type = static_cast<const fidl::flat::StringType*>(s11_type_base);
   EXPECT_EQ(s11_type->nullability, fidl::types::Nullability::kNullable);
-  EXPECT_EQ(s11_type->max_size->value, 16u);
+  EXPECT_EQ(s11_type->MaxSize(), 16u);
 
   auto a12_invocation = type_decl->members[i].type_ctor->resolved_params;
   EXPECT_NULL(a12_invocation.element_type_resolved);
@@ -413,7 +413,7 @@ type TypeDecl= struct {
   auto a12_type = static_cast<const fidl::flat::VectorType*>(a12_type_base);
   EXPECT_EQ(a12_type->nullability, fidl::types::Nullability::kNonnullable);
   EXPECT_EQ(a12_type->element_type->kind, fidl::flat::Type::Kind::kPrimitive);
-  EXPECT_EQ(a12_type->element_count, &fidl::flat::VectorType::kMaxSize);
+  EXPECT_EQ(a12_type->ElementCount(), fidl::flat::Size::Max().value);
   EXPECT_NULL(a12_invocation.size_resolved);
 
   auto a13_invocation = type_decl->members[i].type_ctor->resolved_params;
@@ -424,8 +424,8 @@ type TypeDecl= struct {
   auto a13_type = static_cast<const fidl::flat::VectorType*>(a13_type_base);
   EXPECT_EQ(a13_type->nullability, fidl::types::Nullability::kNonnullable);
   EXPECT_EQ(a13_type->element_type->kind, fidl::flat::Type::Kind::kPrimitive);
-  EXPECT_EQ(a13_type->element_count->value, 16u);
-  EXPECT_EQ(a13_type->element_count, a13_invocation.size_resolved);
+  EXPECT_EQ(a13_type->ElementCount(), 16u);
+  EXPECT_EQ(a13_type->ElementCount(), a13_invocation.size_resolved->value);
 
   auto a14_invocation = type_decl->members[i].type_ctor->resolved_params;
   EXPECT_NULL(a14_invocation.element_type_resolved);
@@ -435,8 +435,8 @@ type TypeDecl= struct {
   auto a14_type = static_cast<const fidl::flat::VectorType*>(a14_type_base);
   EXPECT_EQ(a14_type->nullability, fidl::types::Nullability::kNullable);
   EXPECT_EQ(a14_type->element_type->kind, fidl::flat::Type::Kind::kPrimitive);
-  EXPECT_EQ(a14_type->element_count, &fidl::flat::VectorType::kMaxSize);
-  // EXPECT_EQ(a14_type->element_count, a14_invocation->maybe_size);
+  EXPECT_EQ(a14_type->ElementCount(), fidl::flat::Size::Max().value);
+  // EXPECT_EQ(a14_type->ElementCount(), a14_invocation->maybe_size);
   EXPECT_NULL(a14_invocation.size_resolved);
 
   auto a15_invocation = type_decl->members[i].type_ctor->resolved_params;
@@ -446,8 +446,8 @@ type TypeDecl= struct {
   ASSERT_EQ(a15_type_base->kind, fidl::flat::Type::Kind::kVector);
   auto a15_type = static_cast<const fidl::flat::VectorType*>(a15_type_base);
   EXPECT_EQ(a15_type->nullability, fidl::types::Nullability::kNullable);
-  EXPECT_EQ(a15_type->element_count->value, 16u);
-  EXPECT_EQ(a15_type->element_count, a15_invocation.size_resolved);
+  EXPECT_EQ(a15_type->ElementCount(), 16u);
+  EXPECT_EQ(a15_type->ElementCount(), a15_invocation.size_resolved->value);
 }
 
 TEST(NewSyntaxTests, GoodConstraintsOnUnions) {
@@ -518,40 +518,42 @@ type TypeDecl = resource struct {
   ASSERT_NOT_NULL(type_decl);
   ASSERT_EQ(type_decl->members.size(), 6);
 
+  using types::HandleSubtype;
+
   auto& h0 = type_decl->members[0];
   auto h0_type = static_cast<const fidl::flat::HandleType*>(h0.type_ctor->type);
-  EXPECT_EQ(h0_type->obj_type, 0u);
+  EXPECT_EQ(h0_type->subtype, HandleSubtype::kHandle);
   EXPECT_EQ(h0_type->rights, &fidl::flat::HandleType::kSameRights);
   EXPECT_EQ(h0_type->nullability, fidl::types::Nullability::kNonnullable);
 
   auto& h1 = type_decl->members[1];
   auto h1_type = static_cast<const fidl::flat::HandleType*>(h1.type_ctor->type);
-  EXPECT_NE(h1_type->obj_type, 0u);
+  EXPECT_NE(h1_type->subtype, HandleSubtype::kHandle);
   EXPECT_EQ(h1_type->rights, &fidl::flat::HandleType::kSameRights);
   EXPECT_EQ(h1_type->nullability, fidl::types::Nullability::kNonnullable);
 
   auto& h2 = type_decl->members[2];
   auto h2_type = static_cast<const fidl::flat::HandleType*>(h2.type_ctor->type);
-  EXPECT_EQ(h2_type->obj_type, 0u);
+  EXPECT_EQ(h2_type->subtype, HandleSubtype::kHandle);
   EXPECT_EQ(h2_type->rights, &fidl::flat::HandleType::kSameRights);
   EXPECT_EQ(h2_type->nullability, fidl::types::Nullability::kNullable);
 
   auto& h3 = type_decl->members[3];
   auto h3_type = static_cast<const fidl::flat::HandleType*>(h3.type_ctor->type);
-  EXPECT_EQ(h3_type->obj_type, 3u);  // VMO
+  EXPECT_EQ(h3_type->subtype, HandleSubtype::kVmo);  // VMO
   EXPECT_EQ(h3_type->rights, &fidl::flat::HandleType::kSameRights);
   EXPECT_EQ(h3_type->nullability, fidl::types::Nullability::kNullable);
 
   auto& h4 = type_decl->members[4];
   auto h4_type = static_cast<const fidl::flat::HandleType*>(h4.type_ctor->type);
-  EXPECT_EQ(h4_type->obj_type, 3u);          // VMO
-  EXPECT_EQ(h4_type->rights->value, 0x02u);  // TRANSFER
+  EXPECT_EQ(h4_type->subtype, HandleSubtype::kVmo);  // VMO
+  EXPECT_EQ(h4_type->rights->value, 0x02u);          // TRANSFER
   EXPECT_EQ(h4_type->nullability, fidl::types::Nullability::kNonnullable);
 
   auto& h5 = type_decl->members[5];
   auto h5_type = static_cast<const fidl::flat::HandleType*>(h5.type_ctor->type);
-  EXPECT_EQ(h5_type->obj_type, 3u);          // VMO
-  EXPECT_EQ(h5_type->rights->value, 0x02u);  // TRANSFER
+  EXPECT_EQ(h5_type->subtype, HandleSubtype::kVmo);  // VMO
+  EXPECT_EQ(h5_type->rights->value, 0x02u);          // TRANSFER
   EXPECT_EQ(h5_type->nullability, fidl::types::Nullability::kNullable);
 }
 
@@ -585,7 +587,7 @@ TEST(NewSyntaxTests, BadTooManyConstraints) {
   TestLibrary library;
   library.AddFile("bad/fi-0164.test.fidl");
   ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTooManyConstraints);
-  EXPECT_EQ(library.errors()[0]->span.data(), "<0, 20, optional>");
+  EXPECT_EQ(library.errors()[0]->span.data(), "<0, optional, 20>");
 }
 
 TEST(NewSyntaxTests, BadParameterizedAnonymousLayout) {
@@ -687,7 +689,7 @@ type Foo = resource struct {
 )FIDL");
 
   ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrTypeCannotBeConvertedToType,
-                                      fidl::ErrUnexpectedConstraint);
+                                      fidl::ErrCouldNotResolveSizeBound);
 }
 
 TEST(InternalTypes, CannotReferToUnqualifiedInternalType) {

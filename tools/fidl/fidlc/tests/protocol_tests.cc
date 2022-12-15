@@ -1088,6 +1088,8 @@ protocol MyProtocol {
 )FIDL");
   ASSERT_FALSE(library.Compile());
 
+  ASSERT_EQ(library.errors().size(), 5);
+
   // Both uses of "MyStruct" use too many handles.
   EXPECT_ERR(library.errors()[0], fidl::ErrTooManyHandles);
   EXPECT_ERR(library.errors()[1], fidl::ErrTooManyHandles);
@@ -1327,6 +1329,8 @@ protocol MyProtocol {
 )FIDL");
   ASSERT_FALSE(library.Compile());
 
+  ASSERT_EQ(library.errors().size(), 4);
+
   ASSERT_ERR(library.errors()[0], fidl::ErrInvalidMethodPayloadType);
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "bool");
   ASSERT_ERR(library.errors()[1], fidl::ErrInvalidMethodPayloadType);
@@ -1377,6 +1381,8 @@ protocol MyProtocol {
 };
 )FIDL");
   ASSERT_FALSE(library.Compile());
+
+  ASSERT_EQ(library.errors().size(), 5);
 
   // Both uses of "MyTable" use too many handles.
   EXPECT_ERR(library.errors()[0], fidl::ErrTooManyHandles);
@@ -1532,6 +1538,8 @@ protocol MyProtocol {
 };
 )FIDL");
   ASSERT_FALSE(library.Compile());
+
+  ASSERT_EQ(library.errors().size(), 5);
 
   // Both uses of "MyUnion" use too many handles.
   EXPECT_ERR(library.errors()[0], fidl::ErrTooManyHandles);

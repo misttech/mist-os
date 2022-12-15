@@ -178,21 +178,21 @@ void JSONGenerator::Generate(const flat::Type* value) {
         // other handling of kVector is handled in GenerateParameterizedType.
         const auto* type = static_cast<const flat::VectorType*>(value);
         GenerateObjectMember("element_type", type->element_type);
-        if (*type->element_count < flat::Size::Max())
-          GenerateObjectMember("maybe_element_count", type->element_count->value);
+        if (type->ElementCount() < flat::Size::Max().value)
+          GenerateObjectMember("maybe_element_count", type->ElementCount());
         GenerateObjectMember("nullable", type->nullability);
         break;
       }
       case flat::Type::Kind::kString: {
         const auto* type = static_cast<const flat::StringType*>(value);
-        if (*type->max_size < flat::Size::Max())
-          GenerateObjectMember("maybe_element_count", type->max_size->value);
+        if (type->MaxSize() < flat::Size::Max().value)
+          GenerateObjectMember("maybe_element_count", type->MaxSize());
         GenerateObjectMember("nullable", type->nullability);
         break;
       }
       case flat::Type::Kind::kHandle: {
         const auto* type = static_cast<const flat::HandleType*>(value);
-        GenerateObjectMember("obj_type", type->obj_type);
+        GenerateObjectMember("obj_type", static_cast<uint32_t>(type->subtype));
         GenerateObjectMember("subtype", type->subtype);
         GenerateObjectMember(
             "rights",
@@ -520,8 +520,8 @@ void JSONGenerator::GenerateParameterizedType(TypeKind parent_type_kind, const f
       case flat::Type::Kind::kVector: {
         const auto* vector_type = static_cast<const flat::VectorType*>(type);
         GenerateTypeAndFromAlias(TypeKind::kParameterized, invocation.element_type_raw);
-        if (*vector_type->element_count < flat::Size::Max())
-          GenerateObjectMember("maybe_element_count", vector_type->element_count->value);
+        if (vector_type->ElementCount() < flat::Size::Max().value)
+          GenerateObjectMember("maybe_element_count", vector_type->ElementCount());
         GenerateObjectMember("nullable", vector_type->nullability);
         break;
       }

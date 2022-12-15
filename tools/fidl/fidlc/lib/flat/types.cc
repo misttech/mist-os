@@ -16,114 +16,66 @@ namespace fidl::flat {
 // ZX_HANDLE_SAME_RIGHTS
 const HandleRights HandleType::kSameRights = HandleRights(0x80000000);
 
+bool RejectOptionalConstraints::OnUnexpectedConstraint(
+    TypeResolver* resolver, std::optional<SourceSpan> params_span, const Name& layout_name,
+    Resource* resource, size_t num_constraints,
+    const std::vector<std::unique_ptr<Constant>>& params, size_t param_index) const {
+  if (params.size() == 1 && resolver->ResolveAsOptional(params[0].get())) {
+    return resolver->Fail(ErrCannotBeOptional, params[0]->span, layout_name);
+  }
+  return ConstraintsBase::OnUnexpectedConstraint(resolver, params_span, layout_name, resource,
+                                                 num_constraints, params, param_index);
+}
+
 bool ArrayType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
                                  const Reference& layout, std::unique_ptr<Type>* out_type,
                                  LayoutInvocation* out_params) const {
-  size_t num_constraints = constraints.items.size();
-  // assume that a lone constraint was an attempt at specifying `optional` and provide a more
-  // specific error
-  // TODO(fxbug.dev/75112): actually try to compile the optional constraint
-  if (num_constraints == 1) {
-    return resolver->Fail(ErrCannotBeOptional, constraints.items[0]->span,
-                          layout.resolved().name());
+  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
+                                  constraints.items)) {
+    return false;
   }
-  if (num_constraints > 1) {
-    return resolver->Fail(ErrTooManyConstraints, constraints.span.value(), layout.resolved().name(),
-                          0, num_constraints);
-  }
+
   *out_type = std::make_unique<ArrayType>(name, element_type, element_count);
   return true;
 }
 
-const Size VectorBaseType::kMaxSize = Size::Max();
-
-bool VectorBaseType::ResolveSizeAndNullability(TypeResolver* resolver,
-                                               const TypeConstraints& constraints,
-                                               const Reference& layout,
-                                               LayoutInvocation* out_params) {
-  size_t num_constraints = constraints.items.size();
-  if (num_constraints == 1) {
-    TypeResolver::ResolvedConstraint resolved;
-    if (!resolver->ResolveConstraintAs(
-            constraints.items[0].get(),
-            {TypeResolver::ConstraintKind::kSize, TypeResolver::ConstraintKind::kNullability},
-            nullptr /* resource_decl */, &resolved)) {
-      return resolver->Fail(ErrUnexpectedConstraint, constraints.items[0]->span,
-                            layout.resolved().name());
-    }
-    switch (resolved.kind) {
-      case TypeResolver::ConstraintKind::kSize:
-        out_params->size_resolved = resolved.value.size;
-        out_params->size_raw = constraints.items[0].get();
-        break;
-      case TypeResolver::ConstraintKind::kNullability:
-        out_params->nullability = types::Nullability::kNullable;
-        break;
-      default:
-        ZX_PANIC("resolved to wrong constraint kind");
-    }
-  } else if (num_constraints == 2) {
-    // first constraint must be size, followed by optional
-    if (!resolver->ResolveSizeBound(constraints.items[0].get(), &out_params->size_resolved))
-      return resolver->Fail(ErrCouldNotResolveSizeBound, constraints.items[0]->span);
-    out_params->size_raw = constraints.items[0].get();
-    if (!resolver->ResolveAsOptional(constraints.items[1].get())) {
-      return resolver->Fail(ErrUnexpectedConstraint, constraints.items[1]->span,
-                            layout.resolved().name());
-    }
-    out_params->nullability = types::Nullability::kNullable;
-  } else if (num_constraints >= 3) {
-    return resolver->Fail(ErrTooManyConstraints, constraints.span.value(), layout.resolved().name(),
-                          2, num_constraints);
+bool VectorConstraints::OnUnexpectedConstraint(TypeResolver* resolver,
+                                               std::optional<SourceSpan> params_span,
+                                               const Name& layout_name, Resource* resource,
+                                               size_t num_constraints,
+                                               const std::vector<std::unique_ptr<Constant>>& params,
+                                               size_t param_index) const {
+  if (!params.empty() && param_index == 0) {
+    return resolver->Fail(ErrCouldNotResolveSizeBound, params[0]->span);
   }
-  return true;
+  return ConstraintsBase::OnUnexpectedConstraint(resolver, params_span, layout_name, resource,
+                                                 num_constraints, params, param_index);
 }
 
 bool VectorType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
                                   const Reference& layout, std::unique_ptr<Type>* out_type,
                                   LayoutInvocation* out_params) const {
-  if (!ResolveSizeAndNullability(resolver, constraints, layout, out_params))
+  Constraints c;
+  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
+                                  constraints.items, &c, out_params)) {
     return false;
-
-  bool is_already_nullable = nullability == types::Nullability::kNullable;
-  bool is_nullability_applied = out_params->nullability == types::Nullability::kNullable;
-  if (is_already_nullable && is_nullability_applied) {
-    return resolver->Fail(ErrCannotIndicateOptionalTwice, constraints.span.value(),
-                          layout.resolved().name());
   }
-  auto merged_nullability = is_already_nullable || is_nullability_applied
-                                ? types::Nullability::kNullable
-                                : types::Nullability::kNonnullable;
 
-  if (element_count != &kMaxSize && out_params->size_resolved)
-    return resolver->Fail(ErrCannotBoundTwice, constraints.span.value(), layout.resolved().name());
-  auto merged_size = out_params->size_resolved ? out_params->size_resolved : element_count;
-
-  *out_type = std::make_unique<VectorType>(name, element_type, merged_size, merged_nullability);
+  *out_type = std::make_unique<VectorType>(name, element_type, std::move(c));
   return true;
 }
 
 bool StringType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
                                   const Reference& layout, std::unique_ptr<Type>* out_type,
                                   LayoutInvocation* out_params) const {
-  if (!ResolveSizeAndNullability(resolver, constraints, layout, out_params))
+  Constraints c;
+  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
+                                  constraints.items, &c, out_params)) {
     return false;
-
-  bool is_already_nullable = nullability == types::Nullability::kNullable;
-  bool is_nullability_applied = out_params->nullability == types::Nullability::kNullable;
-  if (is_already_nullable && is_nullability_applied) {
-    return resolver->Fail(ErrCannotIndicateOptionalTwice, constraints.span.value(),
-                          layout.resolved().name());
   }
-  auto merged_nullability = is_already_nullable || is_nullability_applied
-                                ? types::Nullability::kNullable
-                                : types::Nullability::kNonnullable;
 
-  if (max_size != &kMaxSize && out_params->size_resolved)
-    return resolver->Fail(ErrCannotBoundTwice, constraints.span.value(), layout.resolved().name());
-  auto merged_size = out_params->size_resolved ? out_params->size_resolved : max_size;
+  *out_type = std::make_unique<StringType>(name, c);
 
-  *out_type = std::make_unique<StringType>(name, merged_size, merged_nullability);
   return true;
 }
 
@@ -132,191 +84,41 @@ bool HandleType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints&
                                   LayoutInvocation* out_params) const {
   ZX_ASSERT(resource_decl);
 
-  // We need to store this separately from out_params, because out_params doesn't
-  // store the raw Constant that gets resolved to a nullability constraint.
-  std::optional<SourceSpan> applied_nullability_span;
-
-  size_t num_constraints = constraints.items.size();
-  if (num_constraints == 0) {
-    // no constraints: set to default subtype below
-  } else if (num_constraints == 1) {
-    // lone constraint can be either subtype or optional
-    auto constraint_span = constraints.items[0]->span;
-    TypeResolver::ResolvedConstraint resolved;
-    if (!resolver->ResolveConstraintAs(constraints.items[0].get(),
-                                       {TypeResolver::ConstraintKind::kHandleSubtype,
-                                        TypeResolver::ConstraintKind::kNullability},
-                                       resource_decl, &resolved))
-      return resolver->Fail(ErrUnexpectedConstraint, constraint_span, layout.resolved().name());
-    switch (resolved.kind) {
-      case TypeResolver::ConstraintKind::kHandleSubtype:
-        out_params->subtype_resolved = resolved.value.handle_subtype;
-        out_params->subtype_raw = constraints.items[0].get();
-        break;
-      case TypeResolver::ConstraintKind::kNullability:
-        out_params->nullability = types::Nullability::kNullable;
-        applied_nullability_span = constraint_span;
-        break;
-      default:
-        ZX_PANIC("resolved to wrong constraint kind");
-    }
-  } else if (num_constraints == 2) {
-    // the first constraint must be subtype
-    auto constraint_span = constraints.items[0]->span;
-    uint32_t obj_type = 0;
-    if (!resolver->ResolveAsHandleSubtype(resource_decl, constraints.items[0].get(), &obj_type))
-      return resolver->Fail(ErrUnexpectedConstraint, constraint_span, layout.resolved().name());
-    out_params->subtype_resolved = obj_type;
-    out_params->subtype_raw = constraints.items[0].get();
-
-    // the second constraint can either be rights or optional
-    constraint_span = constraints.items[1]->span;
-    TypeResolver::ResolvedConstraint resolved;
-    if (!resolver->ResolveConstraintAs(constraints.items[1].get(),
-                                       {TypeResolver::ConstraintKind::kHandleRights,
-                                        TypeResolver::ConstraintKind::kNullability},
-                                       resource_decl, &resolved))
-      return resolver->Fail(ErrUnexpectedConstraint, constraint_span, layout.resolved().name());
-    switch (resolved.kind) {
-      case TypeResolver::ConstraintKind::kHandleRights:
-        out_params->rights_resolved = resolved.value.handle_rights;
-        out_params->rights_raw = constraints.items[1].get();
-        break;
-      case TypeResolver::ConstraintKind::kNullability:
-        out_params->nullability = types::Nullability::kNullable;
-        applied_nullability_span = constraint_span;
-        break;
-      default:
-        ZX_PANIC("resolved to wrong constraint kind");
-    }
-  } else if (num_constraints == 3) {
-    // no degrees of freedom: must be subtype, followed by rights, then optional
-    uint32_t obj_type = 0;
-    if (!resolver->ResolveAsHandleSubtype(resource_decl, constraints.items[0].get(), &obj_type)) {
-      return resolver->Fail(ErrUnexpectedConstraint, constraints.items[0]->span,
-                            layout.resolved().name());
-    }
-    out_params->subtype_resolved = obj_type;
-    out_params->subtype_raw = constraints.items[0].get();
-    const HandleRights* rights = nullptr;
-    if (!resolver->ResolveAsHandleRights(resource_decl, constraints.items[1].get(), &rights)) {
-      return resolver->Fail(ErrUnexpectedConstraint, constraints.items[1]->span,
-                            layout.resolved().name());
-    }
-    out_params->rights_resolved = rights;
-    out_params->rights_raw = constraints.items[1].get();
-    if (!resolver->ResolveAsOptional(constraints.items[2].get())) {
-      return resolver->Fail(ErrUnexpectedConstraint, constraints.items[2]->span,
-                            layout.resolved().name());
-    }
-    out_params->nullability = types::Nullability::kNullable;
-    applied_nullability_span = constraints.items[2]->span;
-  } else {
-    return resolver->Fail(ErrTooManyConstraints, constraints.span.value(), layout.resolved().name(),
-                          3, num_constraints);
+  Constraints c;
+  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(),
+                                  resource_decl, constraints.items, &c, out_params)) {
+    return false;
   }
 
-  bool has_obj_type = subtype != types::HandleSubtype::kHandle;
-  if (has_obj_type && out_params->subtype_resolved) {
-    return resolver->Fail(ErrCannotConstrainTwice, out_params->subtype_raw->span,
-                          layout.resolved().name());
-  }
-  // TODO(fxbug.dev/64629): We need to allow setting a default obj_type in
-  // resource_definition declarations rather than hard-coding.
-  uint32_t merged_obj_type = obj_type;
-  if (out_params->subtype_resolved) {
-    merged_obj_type = out_params->subtype_resolved.value();
-  }
-
-  bool has_nullability = nullability == types::Nullability::kNullable;
-  if (has_nullability && out_params->nullability == types::Nullability::kNullable) {
-    return resolver->Fail(ErrCannotIndicateOptionalTwice, applied_nullability_span.value(),
-                          layout.resolved().name());
-  }
-  auto merged_nullability =
-      has_nullability || out_params->nullability == types::Nullability::kNullable
-          ? types::Nullability::kNullable
-          : types::Nullability::kNonnullable;
-
-  bool has_rights = rights != &kSameRights;
-  if (has_rights && out_params->rights_resolved) {
-    return resolver->Fail(ErrCannotConstrainTwice, out_params->rights_raw->span,
-                          layout.resolved().name());
-  }
-  auto merged_rights = rights;
-  if (out_params->rights_resolved) {
-    merged_rights = out_params->rights_resolved;
-  }
-
-  *out_type = std::make_unique<HandleType>(name, resource_decl, merged_obj_type, merged_rights,
-                                           merged_nullability);
+  *out_type = std::make_unique<HandleType>(name, resource_decl, std::move(c));
   return true;
+}
+
+bool TransportSideConstraints::OnUnexpectedConstraint(
+    TypeResolver* resolver, std::optional<SourceSpan> params_span, const Name& layout_name,
+    Resource* resource, size_t num_constraints,
+    const std::vector<std::unique_ptr<Constant>>& params, size_t param_index) const {
+  if (!params.empty() && param_index == 0) {
+    return resolver->Fail(ErrMustBeAProtocol, params[0]->span, layout_name);
+  }
+  return ConstraintsBase::OnUnexpectedConstraint(resolver, params_span, layout_name, resource,
+                                                 num_constraints, params, param_index);
 }
 
 bool TransportSideType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
                                          const Reference& layout, std::unique_ptr<Type>* out_type,
                                          LayoutInvocation* out_params) const {
-  size_t num_constraints = constraints.items.size();
-
-  // We need to store this separately from out_params, because out_params doesn't
-  // store the raw Constant that gets resolved to a nullability constraint.
-  std::optional<SourceSpan> applied_nullability_span;
-
-  if (num_constraints == 1) {
-    // could either be a protocol or optional
-    auto constraint_span = constraints.items[0]->span;
-    TypeResolver::ResolvedConstraint resolved;
-    if (!resolver->ResolveConstraintAs(
-            constraints.items[0].get(),
-            {TypeResolver::ConstraintKind::kProtocol, TypeResolver::ConstraintKind::kNullability},
-            /* resource_decl */ nullptr, &resolved)) {
-      return resolver->Fail(ErrMustBeAProtocol, constraint_span, layout.resolved().name());
-    }
-    switch (resolved.kind) {
-      case TypeResolver::ConstraintKind::kProtocol:
-        out_params->protocol_decl = resolved.value.protocol_decl;
-        out_params->protocol_decl_raw = constraints.items[0].get();
-        break;
-      case TypeResolver::ConstraintKind::kNullability:
-        out_params->nullability = types::Nullability::kNullable;
-        applied_nullability_span = constraint_span;
-        break;
-      default:
-        ZX_PANIC("resolved to wrong constraint kind");
-    }
-  } else if (num_constraints == 2) {
-    // first constraint must be protocol
-    if (!resolver->ResolveAsProtocol(constraints.items[0].get(), &out_params->protocol_decl)) {
-      return resolver->Fail(ErrMustBeAProtocol, constraints.items[0]->span,
-                            layout.resolved().name());
-    }
-    out_params->protocol_decl_raw = constraints.items[0].get();
-
-    // second constraint must be optional
-    if (!resolver->ResolveAsOptional(constraints.items[1].get())) {
-      return resolver->Fail(ErrUnexpectedConstraint, constraints.items[1]->span,
-                            layout.resolved().name());
-    }
-    out_params->nullability = types::Nullability::kNullable;
-    applied_nullability_span = constraints.items[1]->span;
-  } else if (num_constraints > 2) {
-    return resolver->Fail(ErrTooManyConstraints, constraints.span.value(), layout.resolved().name(),
-                          2, num_constraints);
+  Constraints c;
+  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
+                                  constraints.items, &c, out_params)) {
+    return false;
   }
 
-  if (protocol_decl && out_params->protocol_decl) {
-    return resolver->Fail(ErrCannotConstrainTwice, constraints.items[0]->span,
-                          layout.resolved().name());
-  }
-  if (!protocol_decl && !out_params->protocol_decl) {
+  if (!c.HasConstraint<ConstraintKind::kProtocol>()) {
     return resolver->Fail(ErrProtocolConstraintRequired, layout.span(), layout.resolved().name());
   }
-  const Decl* merged_protocol = protocol_decl;
-  if (out_params->protocol_decl)
-    merged_protocol = out_params->protocol_decl;
 
-  const Attribute* transport_attribute =
-      static_cast<const Protocol*>(merged_protocol)->attributes->Get("transport");
+  const Attribute* transport_attribute = c.protocol_decl->attributes->Get("transport");
   std::string_view transport("Channel");
   if (transport_attribute) {
     auto arg = (transport_attribute->compiled)
@@ -328,61 +130,51 @@ bool TransportSideType::ApplyConstraints(TypeResolver* resolver, const TypeConst
     transport = quoted_transport.substr(1, quoted_transport.size() - 2);
   }
 
-  bool has_nullability = nullability == types::Nullability::kNullable;
-  if (has_nullability && out_params->nullability == types::Nullability::kNullable) {
-    return resolver->Fail(ErrCannotIndicateOptionalTwice, applied_nullability_span.value(),
-                          layout.resolved().name());
-  }
-  auto merged_nullability =
-      has_nullability || out_params->nullability == types::Nullability::kNullable
-          ? types::Nullability::kNullable
-          : types::Nullability::kNonnullable;
-
-  *out_type = std::make_unique<TransportSideType>(name, merged_protocol, merged_nullability, end,
-                                                  transport);
+  *out_type = std::make_unique<TransportSideType>(name, std::move(c), end, transport);
   return true;
 }
 
-IdentifierType::IdentifierType(TypeDecl* type_decl, types::Nullability nullability)
-    : Type(type_decl->name, Kind::kIdentifier, nullability), type_decl(type_decl) {}
+IdentifierType::IdentifierType(TypeDecl* type_decl, Constraints constraints)
+    : Type(type_decl->name, Kind::kIdentifier),
+      Constraints(std::move(constraints)),
+      type_decl(type_decl) {}
 
 bool IdentifierType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
                                       const Reference& layout, std::unique_ptr<Type>* out_type,
                                       LayoutInvocation* out_params) const {
-  size_t num_constraints = constraints.items.size();
+  const auto& layout_name = layout.resolved().name();
+
+  if (type_decl->kind == Decl::Kind::kNewType && !constraints.items.empty()) {
+    // Currently, we are disallowing optional on new-types. And since new-types are semi-opaque
+    // wrappers around types, we need not bother about other constraints. So no constraints for
+    // you, new-types!
+    return resolver->Fail(ErrNewTypeCannotHaveConstraint, constraints.span.value(), layout_name);
+  }
+
+  Constraints c;
+  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
+                                  constraints.items, &c, out_params)) {
+    return false;
+  }
+
   switch (type_decl->kind) {
     // These types have no allowed constraints
     case Decl::Kind::kBits:
     case Decl::Kind::kEnum:
     case Decl::Kind::kTable:
-      // assume that a lone constraint was an attempt at specifying `optional` and provide a more
-      // specific error
-      // TODO(fxbug.dev/75112): actually try to compile the optional constraint
-      if (num_constraints == 1) {
-        return resolver->Fail(ErrCannotBeOptional, constraints.items[0]->span,
-                              layout.resolved().name());
-      }
-      if (num_constraints > 1) {
-        return resolver->Fail(ErrTooManyConstraints, constraints.span.value(),
-                              layout.resolved().name(), 0, num_constraints);
+      if (c.HasConstraint<ConstraintKind::kNullability>()) {
+        return resolver->Fail(ErrCannotBeOptional, constraints.span.value(), layout_name);
       }
       break;
+
     case Decl::Kind::kStruct:
       if (resolver->experimental_flags().IsFlagEnabled(
               ExperimentalFlags::Flag::kNoOptionalStructs)) {
         // Structs are nullable in the sense that they can be boxed. But we are
         // disallowing optional to be used on struct.
-        // Assume first constraint is `optional`.
-        if (num_constraints == 1) {
-          return resolver->Fail(ErrStructCannotBeOptional, constraints.items[0]->span,
-                                layout.resolved().name());
+        if (c.HasConstraint<ConstraintKind::kNullability>()) {
+          return resolver->Fail(ErrStructCannotBeOptional, constraints.span.value(), layout_name);
         }
-      }
-
-      // This is always an error
-      if (num_constraints > 1) {
-        return resolver->Fail(ErrTooManyConstraints, constraints.span.value(),
-                              layout.resolved().name(), 0, num_constraints);
       }
       break;
 
@@ -391,20 +183,13 @@ bool IdentifierType::ApplyConstraints(TypeResolver* resolver, const TypeConstrai
     // if it doesn't the Type itself will catch the error.
     case Decl::Kind::kAlias:
     case Decl::Kind::kUnion:
-      if (num_constraints > 1) {
-        return resolver->Fail(ErrTooManyConstraints, constraints.span.value(),
-                              layout.resolved().name(), 1, num_constraints);
-      }
       break;
-    // Currently, we are disallowing optional on new-types. And since new-types are semi-opaque
-    // wrappers around types, we need not bother about other constraints. So no constraints for
-    // you, new-types!
+
     case Decl::Kind::kNewType:
-      if (num_constraints > 0) {
-        return resolver->Fail(ErrNewTypeCannotHaveConstraint, constraints.span.value(),
-                              layout.resolved().name());
-      }
+      // Constraints on new-types should be handled above.
+      ZX_ASSERT(constraints.items.empty());
       break;
+
     case Decl::Kind::kBuiltin:
     case Decl::Kind::kConst:
     case Decl::Kind::kResource:
@@ -419,44 +204,30 @@ bool IdentifierType::ApplyConstraints(TypeResolver* resolver, const TypeConstrai
       break;
   }
 
-  types::Nullability applied_nullability = types::Nullability::kNonnullable;
-  if (num_constraints == 1) {
-    // must be optional
-    if (!resolver->ResolveAsOptional(constraints.items[0].get())) {
-      return resolver->Fail(ErrUnexpectedConstraint, constraints.items[0]->span,
-                            layout.resolved().name());
-    }
-    applied_nullability = types::Nullability::kNullable;
-  }
-
-  if (nullability == types::Nullability::kNullable &&
-      applied_nullability == types::Nullability::kNullable) {
-    return resolver->Fail(ErrCannotIndicateOptionalTwice, constraints.span.value(),
-                          layout.resolved().name());
-  }
-  auto merged_nullability = nullability;
-  if (applied_nullability == types::Nullability::kNullable)
-    merged_nullability = applied_nullability;
-
-  out_params->nullability = applied_nullability;
-  *out_type = std::make_unique<IdentifierType>(type_decl, merged_nullability);
+  *out_type = std::make_unique<IdentifierType>(type_decl, std::move(c));
   return true;
 }
 
+bool BoxConstraints::OnUnexpectedConstraint(TypeResolver* resolver,
+                                            std::optional<SourceSpan> params_span,
+                                            const Name& layout_name, Resource* resource,
+                                            size_t num_constraints,
+                                            const std::vector<std::unique_ptr<Constant>>& params,
+                                            size_t param_index) const {
+  if (params.size() == 1 && resolver->ResolveAsOptional(params[0].get())) {
+    return resolver->Fail(ErrBoxCannotBeOptional, params[0]->span);
+  }
+  return ConstraintsBase::OnUnexpectedConstraint(resolver, params_span, layout_name, resource,
+                                                 num_constraints, params, param_index);
+}
 bool BoxType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
                                const Reference& layout, std::unique_ptr<Type>* out_type,
                                LayoutInvocation* out_params) const {
-  size_t num_constraints = constraints.items.size();
-  // assume that a lone constraint was an attempt at specifying `optional` and provide a more
-  // specific error
-  // TODO(fxbug.dev/75112): actually try to compile the optional constraint
-  if (num_constraints == 1) {
-    return resolver->Fail(ErrBoxCannotBeOptional, constraints.items[0]->span);
+  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
+                                  constraints.items)) {
+    return false;
   }
-  if (num_constraints > 1) {
-    return resolver->Fail(ErrTooManyConstraints, constraints.span.value(), layout.resolved().name(),
-                          0, num_constraints);
-  }
+
   *out_type = std::make_unique<BoxType>(name, boxed_type);
   return true;
 }
@@ -497,18 +268,11 @@ uint32_t PrimitiveType::SubtypeSize(types::PrimitiveSubtype subtype) {
 bool PrimitiveType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
                                      const Reference& layout, std::unique_ptr<Type>* out_type,
                                      LayoutInvocation* out_params) const {
-  size_t num_constraints = constraints.items.size();
-  // assume that a lone constraint was an attempt at specifying `optional` and provide a more
-  // specific error
-  // TODO(fxbug.dev/75112): actually try to compile the optional constraint
-  if (num_constraints == 1) {
-    return resolver->Fail(ErrCannotBeOptional, constraints.items[0]->span,
-                          layout.resolved().name());
+  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
+                                  constraints.items)) {
+    return false;
   }
-  if (num_constraints > 1) {
-    return resolver->Fail(ErrTooManyConstraints, constraints.span.value(), layout.resolved().name(),
-                          0, num_constraints);
-  }
+
   if ((subtype == types::PrimitiveSubtype::kZxUsize ||
        subtype == types::PrimitiveSubtype::kZxUintptr ||
        subtype == types::PrimitiveSubtype::kZxUchar) &&
@@ -523,17 +287,9 @@ bool PrimitiveType::ApplyConstraints(TypeResolver* resolver, const TypeConstrain
 bool InternalType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
                                     const Reference& layout, std::unique_ptr<Type>* out_type,
                                     LayoutInvocation* out_params) const {
-  size_t num_constraints = constraints.items.size();
-  // assume that a lone constraint was an attempt at specifying `optional` and provide a more
-  // specific error
-  // TODO(fxbug.dev/75112): actually try to compile the optional constraint
-  if (num_constraints == 1) {
-    return resolver->Fail(ErrCannotBeOptional, constraints.items[0]->span,
-                          layout.resolved().name());
-  }
-  if (num_constraints > 1) {
-    return resolver->Fail(ErrTooManyConstraints, constraints.span.value(), layout.resolved().name(),
-                          0, num_constraints);
+  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
+                                  constraints.items)) {
+    return false;
   }
   *out_type = std::make_unique<InternalType>(name, subtype);
   return true;
@@ -544,10 +300,9 @@ bool ZxExperimentalPointerType::ApplyConstraints(TypeResolver* resolver,
                                                  const Reference& layout,
                                                  std::unique_ptr<Type>* out_type,
                                                  LayoutInvocation* out_params) const {
-  size_t num_constraints = constraints.items.size();
-  if (num_constraints > 1) {
-    return resolver->Fail(ErrTooManyConstraints, constraints.span.value(), layout.resolved().name(),
-                          0, num_constraints);
+  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
+                                  constraints.items)) {
+    return false;
   }
   if (!resolver->experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kZxCTypes)) {
     return resolver->Fail(ErrExperimentalZxCTypesDisallowed, layout.span(),

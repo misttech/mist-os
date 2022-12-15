@@ -68,44 +68,6 @@ bool TypeResolver::ResolveParamAsSize(const Reference& layout,
   return true;
 }
 
-bool TypeResolver::ResolveConstraintAs(Constant* constraint,
-                                       const std::vector<ConstraintKind>& interpretations,
-                                       Resource* resource, ResolvedConstraint* out) {
-  for (const auto& constraint_kind : interpretations) {
-    out->kind = constraint_kind;
-    switch (constraint_kind) {
-      case ConstraintKind::kHandleSubtype: {
-        ZX_ASSERT_MSG(resource, "must pass resource if trying to resolve to handle subtype");
-        if (ResolveAsHandleSubtype(resource, constraint, &out->value.handle_subtype))
-          return true;
-        break;
-      }
-      case ConstraintKind::kHandleRights: {
-        ZX_ASSERT_MSG(resource, "must pass resource if trying to resolve to handle rights");
-        if (ResolveAsHandleRights(resource, constraint, &(out->value.handle_rights)))
-          return true;
-        break;
-      }
-      case ConstraintKind::kSize: {
-        if (ResolveSizeBound(constraint, &(out->value.size)))
-          return true;
-        break;
-      }
-      case ConstraintKind::kNullability: {
-        if (ResolveAsOptional(constraint))
-          return true;
-        break;
-      }
-      case ConstraintKind::kProtocol: {
-        if (ResolveAsProtocol(constraint, &(out->value.protocol_decl)))
-          return true;
-        break;
-      }
-    }
-  }
-  return false;
-}
-
 bool TypeResolver::ResolveType(TypeConstructor* type) {
   compile_step_->CompileTypeConstructor(type);
   return type->type != nullptr;
@@ -120,7 +82,7 @@ bool TypeResolver::ResolveAsOptional(Constant* constant) {
 }
 
 bool TypeResolver::ResolveAsHandleSubtype(Resource* resource, Constant* constant,
-                                          uint32_t* out_obj_type) {
+                                          types::HandleSubtype* out_obj_type) {
   return compile_step_->ResolveHandleSubtypeIdentifier(resource, constant, out_obj_type);
 }
 
@@ -137,9 +99,12 @@ bool TypeResolver::ResolveAsProtocol(const Constant* constant, const Protocol** 
 
   const auto* as_identifier = static_cast<const IdentifierConstant*>(constant);
   const auto* target = as_identifier->reference.resolved().element();
-  if (target->kind != Element::Kind::kProtocol)
+  if (target->kind != Element::Kind::kProtocol) {
     return false;
-  *out_decl = static_cast<const Protocol*>(target);
+  }
+  if (out_decl) {
+    *out_decl = static_cast<const Protocol*>(target);
+  }
   return true;
 }
 

@@ -66,7 +66,7 @@ Typespace::Typespace(const Library* root_library, Reporter* reporter) : Reporter
                               std::make_unique<InternalType>(builtin->name, subtype.value()));
     } else if (builtin->id == Builtin::Identity::kString) {
       unbounded_string_type_ =
-          std::make_unique<StringType>(builtin->name, &kMaxSize, types::Nullability::kNonnullable);
+          std::make_unique<StringType>(builtin->name, StringType::Constraints());
     } else if (builtin->id == Builtin::Identity::kVector) {
       vector_layout_name_ = builtin->name;
     } else if (builtin->id == Builtin::Identity::kZxExperimentalPointer) {
@@ -91,7 +91,8 @@ const Type* Typespace::GetStringType(size_t max_size) {
   auto name = unbounded_string_type_->name;
   sizes_.push_back(std::make_unique<Size>(max_size));
   auto size = sizes_.back().get();
-  types_.push_back(std::make_unique<StringType>(name, size, types::Nullability::kNonnullable));
+  types_.push_back(std::make_unique<StringType>(
+      name, StringType::Constraints(size, types::Nullability::kNonnullable)));
   return types_.back().get();
 }
 

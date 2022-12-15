@@ -10,13 +10,10 @@ namespace fidl {
 
 namespace {
 
+const char* NameNullability(bool is_nullable) { return is_nullable ? "nullable" : "nonnullable"; }
+
 const char* NameNullability(types::Nullability nullability) {
-  switch (nullability) {
-    case types::Nullability::kNullable:
-      return "nullable";
-    case types::Nullability::kNonnullable:
-      return "nonnullable";
-  }
+  return NameNullability(nullability == types::Nullability::kNullable);
 }
 
 std::string NameSize(uint64_t size) {
@@ -332,17 +329,17 @@ void NameFlatTypeHelper(std::ostringstream& buf, const flat::Type* type) {
       buf << "<";
       NameFlatTypeHelper(buf, vector_type->element_type);
       buf << ">";
-      if (*vector_type->element_count != flat::Size::Max()) {
+      if (vector_type->ElementCount() != flat::Size::Max().value) {
         buf << ":";
-        buf << vector_type->element_count->value;
+        buf << vector_type->ElementCount();
       }
       break;
     }
     case flat::Type::Kind::kString: {
       const auto* string_type = static_cast<const flat::StringType*>(type);
-      if (*string_type->max_size != flat::Size::Max()) {
+      if (string_type->MaxSize() != flat::Size::Max().value) {
         buf << ":";
-        buf << string_type->max_size->value;
+        buf << string_type->MaxSize();
       }
       break;
     }
@@ -383,7 +380,7 @@ void NameFlatTypeHelper(std::ostringstream& buf, const flat::Type* type) {
       break;
   }  // switch
   // TODO(fxbug.dev/93999): Use the new syntax, `:optional`.
-  if (type->nullability == types::Nullability::kNullable) {
+  if (type->IsNullable()) {
     buf << "?";
   }
 }
@@ -431,7 +428,7 @@ std::string NameFlatCType(const flat::Type* type) {
           case flat::Decl::Kind::kEnum:
           case flat::Decl::Kind::kStruct: {
             std::string name = NameCodedName(identifier_type->name);
-            if (identifier_type->nullability == types::Nullability::kNullable) {
+            if (identifier_type->IsNullable()) {
               name.push_back('*');
             }
             return name;

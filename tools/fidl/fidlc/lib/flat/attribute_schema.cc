@@ -390,7 +390,7 @@ static bool IsSimple(const Type* type, Reporter* reporter) {
   switch (type->kind) {
     case Type::Kind::kVector: {
       auto vector_type = static_cast<const VectorType*>(type);
-      if (*vector_type->element_count == Size::Max())
+      if (vector_type->ElementCount() == Size::Max().value)
         return false;
       switch (vector_type->element_type->kind) {
         case Type::Kind::kHandle:
@@ -412,13 +412,14 @@ static bool IsSimple(const Type* type, Reporter* reporter) {
     }
     case Type::Kind::kString: {
       auto string_type = static_cast<const StringType*>(type);
-      return *string_type->max_size < Size::Max();
+      return string_type->MaxSize() < Size::Max().value;
     }
     case Type::Kind::kZxExperimentalPointer:
       return false;
     case Type::Kind::kArray:
     case Type::Kind::kHandle:
     case Type::Kind::kTransportSide:
+      return true;
     case Type::Kind::kPrimitive:
       switch (static_cast<const PrimitiveType*>(type)->subtype) {
         case types::PrimitiveSubtype::kZxUsize:

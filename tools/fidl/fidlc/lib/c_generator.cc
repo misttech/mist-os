@@ -749,7 +749,7 @@ CGenerator::Member CreateMember(const T& decl, bool* out_allowed = nullptr) {
       auto vector_type = static_cast<const flat::VectorType*>(type);
       const auto element_type = vector_type->element_type;
       element_type_name = NameFlatCType(element_type);
-      max_num_elements = vector_type->element_count->value;
+      max_num_elements = vector_type->ElementCount();
       break;
     }
     case flat::Type::Kind::kZxExperimentalPointer:
@@ -766,7 +766,7 @@ CGenerator::Member CreateMember(const T& decl, bool* out_allowed = nullptr) {
     case flat::Type::Kind::kString: {
       auto string_type = static_cast<const flat::StringType*>(type);
       nullability = string_type->nullability;
-      max_num_elements = string_type->max_size->value;
+      max_num_elements = string_type->MaxSize();
       break;
     }
     case flat::Type::Kind::kHandle:

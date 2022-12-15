@@ -54,7 +54,7 @@ CodedTypesGenerator::FlattenedStructMember::FlattenedStructMember(const flat::Ty
 std::vector<CodedTypesGenerator::FlattenedStructMember> CodedTypesGenerator::FlattenedStructMembers(
     const flat::Struct& input) {
   auto get_struct_decl = [](const flat::StructMember& member) -> const flat::Struct* {
-    if (member.type_ctor->type->nullability == types::Nullability::kNullable) {
+    if (member.type_ctor->type->IsNullable()) {
       return nullptr;
     }
     const flat::Type* type = member.type_ctor->type;
@@ -141,7 +141,7 @@ const coded::Type* CodedTypesGenerator::CompileType(const flat::Type* type,
         return iter->second;
       auto coded_element_type =
           CompileType(vector_type->element_type, coded::CodingContext::kOutsideEnvelope);
-      uint32_t max_count = vector_type->element_count->value;
+      uint32_t max_count = vector_type->ElementCount();
       uint32_t element_size_v2 = coded_element_type->size_v2;
       std::string_view element_name = coded_element_type->coded_name;
       auto name = NameCodedVector(element_name, max_count, vector_type->nullability);
@@ -157,7 +157,7 @@ const coded::Type* CodedTypesGenerator::CompileType(const flat::Type* type,
       auto iter = string_type_map_.find(string_type);
       if (iter != string_type_map_.end())
         return iter->second;
-      uint32_t max_size = string_type->max_size->value;
+      uint32_t max_size = string_type->MaxSize();
       auto name = NameCodedString(max_size, string_type->nullability);
       auto coded_string_type =
           std::make_unique<coded::StringType>(std::move(name), max_size, string_type->nullability);

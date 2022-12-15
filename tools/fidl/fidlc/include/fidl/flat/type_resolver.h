@@ -19,6 +19,7 @@ class TypeResolver : private ReporterMixin {
       : ReporterMixin(compile_step->reporter()), compile_step_(compile_step) {}
 
   using ReporterMixin::Fail;
+  using ReporterMixin::reporter;
 
   const ExperimentalFlags& experimental_flags() const {
     return compile_step_->experimental_flags();
@@ -31,41 +32,13 @@ class TypeResolver : private ReporterMixin {
   bool ResolveParamAsSize(const Reference& layout, const std::unique_ptr<LayoutParameter>& param,
                           const Size** out_size);
 
-  // Top level methods for resolving constraints. These are used by Types
-  enum class ConstraintKind {
-    kHandleSubtype,
-    kHandleRights,
-    kSize,
-    kNullability,
-    kProtocol,
-  };
-
-  struct ResolvedConstraint {
-    ConstraintKind kind;
-
-    union Value {
-      uint32_t handle_subtype;
-      const HandleRights* handle_rights;
-      const Size* size;
-      // Storing a value for nullability is redundant, since there's only one possible value - if we
-      // resolved to optional, then the caller knows that the resulting value is
-      // types::Nullability::kNullable.
-      const Protocol* protocol_decl;
-    } value;
-  };
-
-  // Convenience method to iterate through the possible interpretations, returning the first one
-  // that succeeds. This is valid because the interpretations are mutually exclusive, since a Name
-  // can only ever refer to one kind of thing.
-  bool ResolveConstraintAs(Constant* constraint, const std::vector<ConstraintKind>& interpretations,
-                           Resource* resource_decl, ResolvedConstraint* out);
-
   // These methods forward their implementation to the library_. They are used
   // by the top level methods above
   bool ResolveType(TypeConstructor* type);
   bool ResolveSizeBound(Constant* size_constant, const Size** out_size);
   bool ResolveAsOptional(Constant* constant);
-  bool ResolveAsHandleSubtype(Resource* resource, Constant* constant, uint32_t* out_obj_type);
+  bool ResolveAsHandleSubtype(Resource* resource, Constant* constant,
+                              types::HandleSubtype* out_obj_type);
   bool ResolveAsHandleRights(Resource* resource, Constant* constant,
                              const HandleRights** out_rights);
   bool ResolveAsProtocol(const Constant* size_constant, const Protocol** out_decl);

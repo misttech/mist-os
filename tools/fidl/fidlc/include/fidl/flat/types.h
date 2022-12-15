@@ -10,6 +10,7 @@
 #include <any>
 #include <utility>
 
+#include "tools/fidl/fidlc/include/fidl/flat/constraints.h"
 #include "tools/fidl/fidlc/include/fidl/flat/name.h"
 #include "tools/fidl/fidlc/include/fidl/flat/object.h"
 #include "tools/fidl/fidlc/include/fidl/flat/values.h"
@@ -41,15 +42,12 @@ struct Type : public Object {
     kIdentifier,
   };
 
-  explicit Type(Name name, Kind kind, types::Nullability nullability)
-      : name(std::move(name)), kind(kind), nullability(nullability) {}
+  explicit Type(Name name, Kind kind) : name(std::move(name)), kind(kind) {}
 
   const Name name;
   const Kind kind;
-  // TODO(fxbug.dev/70186): This is temporarily not-const so that we can modify
-  // any boxed structs' nullability to always be nullable, in order use
-  // pre-existing "box <=> nullable struct" logic
-  types::Nullability nullability;
+
+  virtual bool IsNullable() const { return false; }
 
   // Returns the nominal resourceness of the type per the FTP-057 definition.
   // For IdentifierType, can only be called after the Decl has been compiled.
@@ -90,7 +88,7 @@ struct Type : public Object {
   // Derived types should override this, but also call this implementation.
   virtual Comparison Compare(const Type& other) const {
     ZX_ASSERT(kind == other.kind);
-    return Comparison().Compare(nullability, other.nullability);
+    return Comparison().Compare(IsNullable(), other.IsNullable());
   }
 
   // Apply the provided constraints to this type, returning the newly constrained
@@ -106,11 +104,19 @@ struct Type : public Object {
                                 LayoutInvocation* out_params) const = 0;
 };
 
-struct ArrayType final : public Type {
+struct RejectOptionalConstraints : public Constraints<> {
+  using Constraints::Constraints;
+  bool OnUnexpectedConstraint(TypeResolver* resolver, std::optional<SourceSpan> params_span,
+                              const Name& layout_name, Resource* resource, size_t num_constraints,
+                              const std::vector<std::unique_ptr<Constant>>& params,
+                              size_t param_index) const override;
+};
+
+struct ArrayType final : public Type, public RejectOptionalConstraints {
+  using Constraints = RejectOptionalConstraints;
+
   ArrayType(const Name& name, const Type* element_type, const Size* element_count)
-      : Type(name, Kind::kArray, types::Nullability::kNonnullable),
-        element_type(element_type),
-        element_count(element_count) {}
+      : Type(name, Kind::kArray), element_type(element_type), element_count(element_count) {}
 
   const Type* element_type;
   const Size* element_count;
@@ -129,38 +135,36 @@ struct ArrayType final : public Type {
                         LayoutInvocation* out_params) const override;
 };
 
-struct VectorBaseType {
-  // "vector based" types share common code for determining the size and nullability.
-  // This method provides the resolved size and nullability, so that specific implementations
-  // only need to worry about setting the element type on out_args.
-  // We can't abstract away only the element type resolution process, because not
-  // all vector based type templates return a VectorType (the exception being StringTypeTemplate).
-  static bool ResolveSizeAndNullability(TypeResolver* resolver, const TypeConstraints& constraints,
-                                        const Reference& layout, LayoutInvocation* out_params);
-
-  const static Size kMaxSize;
+struct VectorConstraints : public Constraints<ConstraintKind::kSize, ConstraintKind::kNullability> {
+  using Constraints::Constraints;
+  bool OnUnexpectedConstraint(TypeResolver* resolver, std::optional<SourceSpan> params_span,
+                              const Name& layout_name, Resource* resource, size_t num_constraints,
+                              const std::vector<std::unique_ptr<Constant>>& params,
+                              size_t param_index) const override;
 };
 
-struct VectorType final : public Type, public VectorBaseType {
+struct VectorType final : public Type, public VectorConstraints {
+  using Constraints = VectorConstraints;
+
   VectorType(const Name& name, const Type* element_type)
-      : Type(name, Kind::kVector, types::Nullability::kNonnullable),
-        element_type(element_type),
-        element_count(&kMaxSize) {}
-  VectorType(const Name& name, const Type* element_type, const Size* element_count,
-             types::Nullability nullability)
-      : Type(name, Kind::kVector, nullability),
-        element_type(element_type),
-        element_count(element_count) {}
+      : Type(name, Kind::kVector), element_type(element_type) {}
+  VectorType(const Name& name, const Type* element_type, Constraints constraints)
+      : Type(name, Kind::kVector),
+        Constraints(std::move(constraints)),
+        element_type(element_type) {}
 
   const Type* element_type;
-  const Size* element_count;
+
+  uint32_t ElementCount() const { return size ? size->value : Size::Max().value; }
+
+  bool IsNullable() const override { return nullability == types::Nullability::kNullable; }
 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
   Comparison Compare(const Type& other) const override {
     const auto& o = static_cast<const VectorType&>(other);
     return Type::Compare(o)
-        .Compare(element_count->value, o.element_count->value)
+        .Compare(ElementCount(), o.ElementCount())
         .Compare(*element_type, *o.element_type);
   }
 
@@ -169,19 +173,22 @@ struct VectorType final : public Type, public VectorBaseType {
                         LayoutInvocation* out_params) const override;
 };
 
-struct StringType final : public Type, public VectorBaseType {
-  explicit StringType(const Name& name)
-      : Type(name, Kind::kString, types::Nullability::kNonnullable), max_size(&kMaxSize) {}
-  StringType(const Name& name, const Size* max_size, types::Nullability nullability)
-      : Type(name, Kind::kString, nullability), max_size(max_size) {}
+struct StringType final : public Type, public VectorConstraints {
+  using Constraints = VectorConstraints;
 
-  const Size* max_size;
+  explicit StringType(const Name& name) : Type(name, Kind::kString) {}
+  StringType(const Name& name, Constraints constraints)
+      : Type(name, Kind::kString), Constraints(std::move(constraints)) {}
+
+  uint32_t MaxSize() const { return size ? size->value : Size::Max().value; }
+
+  bool IsNullable() const override { return nullability == types::Nullability::kNullable; }
 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
   Comparison Compare(const Type& other) const override {
     const auto& o = static_cast<const StringType&>(other);
-    return Type::Compare(o).Compare(max_size->value, o.max_size->value);
+    return Type::Compare(o).Compare(MaxSize(), o.MaxSize());
   }
 
   bool ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
@@ -189,26 +196,24 @@ struct StringType final : public Type, public VectorBaseType {
                         LayoutInvocation* out_params) const override;
 };
 
-struct HandleType final : public Type {
+using HandleConstraints = Constraints<ConstraintKind::kHandleSubtype, ConstraintKind::kHandleRights,
+                                      ConstraintKind::kNullability>;
+struct HandleType final : public Type, HandleConstraints {
+  using Constraints = HandleConstraints;
+
   HandleType(const Name& name, Resource* resource_decl)
       // TODO(fxbug.dev/64629): The default obj_type and rights should be
       // determined by the resource_definition, not hardcoded here.
-      : HandleType(name, resource_decl, static_cast<uint32_t>(types::HandleSubtype::kHandle),
-                   &kSameRights, types::Nullability::kNonnullable) {}
+      : HandleType(name, resource_decl, Constraints()) {}
 
-  HandleType(const Name& name, Resource* resource_decl, uint32_t obj_type,
-             const HandleRights* rights, types::Nullability nullability)
-      : Type(name, Kind::kHandle, nullability),
-        resource_decl(resource_decl),
-        obj_type(obj_type),
-        // TODO(fxbug.dev/64629): Remove the subtype field.
-        subtype(static_cast<types::HandleSubtype>(obj_type)),
-        rights(rights) {}
+  HandleType(const Name& name, Resource* resource_decl, Constraints constraints)
+      : Type(name, Kind::kHandle),
+        Constraints(std::move(constraints)),
+        resource_decl(resource_decl) {}
 
   Resource* resource_decl;
-  const uint32_t obj_type;
-  const types::HandleSubtype subtype;
-  const HandleRights* rights;
+
+  bool IsNullable() const override { return nullability == types::Nullability::kNullable; }
 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
@@ -217,7 +222,10 @@ struct HandleType final : public Type {
     auto rights_val = static_cast<const NumericConstantValue<types::RightsWrappedType>*>(rights);
     auto other_rights_val = static_cast<const NumericConstantValue<types::RightsWrappedType>*>(
         other_handle_type.rights);
-    return Type::Compare(other_handle_type)
+    // TODO: move Compare into constraints.
+    ZX_ASSERT(kind == other.kind);
+    return Comparison()
+        .Compare(nullability, other_handle_type.nullability)
         .Compare(subtype, other_handle_type.subtype)
         .Compare(*rights_val, *other_rights_val);
   }
@@ -229,9 +237,11 @@ struct HandleType final : public Type {
   const static HandleRights kSameRights;
 };
 
-struct PrimitiveType final : public Type {
+struct PrimitiveType final : public Type, public RejectOptionalConstraints {
+  using Constraints = RejectOptionalConstraints;
+
   explicit PrimitiveType(const Name& name, types::PrimitiveSubtype subtype)
-      : Type(name, Kind::kPrimitive, types::Nullability::kNonnullable), subtype(subtype) {}
+      : Type(name, Kind::kPrimitive), subtype(subtype) {}
 
   types::PrimitiveSubtype subtype;
 
@@ -252,9 +262,11 @@ struct PrimitiveType final : public Type {
 
 // Internal types are types which are used internally by the bindings but not
 // exposed for FIDL libraries to use.
-struct InternalType final : public Type {
+struct InternalType final : public Type, public Constraints<> {
+  using Constraints = Constraints<>;
+
   explicit InternalType(const Name& name, types::InternalSubtype subtype)
-      : Type(name, Kind::kInternal, types::Nullability::kNonnullable), subtype(subtype) {}
+      : Type(name, Kind::kInternal), subtype(subtype) {}
 
   types::InternalSubtype subtype;
 
@@ -273,12 +285,15 @@ struct InternalType final : public Type {
   static uint32_t SubtypeSize(types::InternalSubtype subtype);
 };
 
-struct IdentifierType final : public Type {
-  explicit IdentifierType(TypeDecl* type_decl)
-      : IdentifierType(type_decl, types::Nullability::kNonnullable) {}
-  IdentifierType(TypeDecl* type_decl, types::Nullability nullability);
+struct IdentifierType final : public Type, public Constraints<ConstraintKind::kNullability> {
+  using Constraints = Constraints<ConstraintKind::kNullability>;
+
+  explicit IdentifierType(TypeDecl* type_decl) : IdentifierType(type_decl, Constraints()) {}
+  IdentifierType(TypeDecl* type_decl, Constraints constraints);
 
   TypeDecl* type_decl;
+
+  bool IsNullable() const override { return nullability == types::Nullability::kNullable; }
 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
@@ -298,18 +313,28 @@ enum class TransportSide {
 };
 
 // TODO(fxbug.dev/43803) Add required and optional rights.
-struct TransportSideType final : public Type {
+struct TransportSideConstraints
+    : public Constraints<ConstraintKind::kProtocol, ConstraintKind::kNullability> {
+  using Constraints::Constraints;
+  bool OnUnexpectedConstraint(TypeResolver* resolver, std::optional<SourceSpan> params_span,
+                              const Name& layout_name, Resource* resource, size_t num_constraints,
+                              const std::vector<std::unique_ptr<Constant>>& params,
+                              size_t param_index) const override;
+};
+struct TransportSideType final : public Type, public TransportSideConstraints {
+  using Constraints = TransportSideConstraints;
+
   TransportSideType(const Name& name, TransportSide end, std::string_view protocol_transport)
-      : TransportSideType(name, nullptr, types::Nullability::kNonnullable, end,
-                          protocol_transport) {}
-  TransportSideType(const Name& name, const Decl* protocol_decl, types::Nullability nullability,
-                    TransportSide end, std::string_view protocol_transport)
-      : Type(name, Kind::kTransportSide, nullability),
-        protocol_decl(protocol_decl),
+      : TransportSideType(name, Constraints(), end, protocol_transport) {}
+  TransportSideType(const Name& name, Constraints constraints, TransportSide end,
+                    std::string_view protocol_transport)
+      : Type(name, Kind::kTransportSide),
+        Constraints(std::move(constraints)),
         end(end),
         protocol_transport(protocol_transport) {}
 
-  const Decl* protocol_decl;
+  bool IsNullable() const override { return nullability == types::Nullability::kNullable; }
+
   const TransportSide end;
   // TODO(fxbug.dev/56727): Eventually, this will need to point to a transport declaration.
   const std::string_view protocol_transport;
@@ -329,13 +354,24 @@ struct TransportSideType final : public Type {
                         LayoutInvocation* out_params) const override;
 };
 
-struct BoxType final : public Type {
+struct BoxConstraints : public Constraints<> {
+  using Constraints::Constraints;
+  bool OnUnexpectedConstraint(TypeResolver* resolver, std::optional<SourceSpan> params_span,
+                              const Name& layout_name, Resource* resource, size_t num_constraints,
+                              const std::vector<std::unique_ptr<Constant>>& params,
+                              size_t param_index) const override;
+};
+
+struct BoxType final : public Type, public BoxConstraints {
+  using Constraints = BoxConstraints;
+
   BoxType(const Name& name, const Type* boxed_type)
-      // Note that all boxes are implicitly nullable, so the value of the nullability
-      // member here doesn't actually matter.
-      : Type(name, Kind::kBox, types::Nullability::kNullable), boxed_type(boxed_type) {}
+      : Type(name, Kind::kBox), boxed_type(boxed_type) {}
 
   const Type* boxed_type;
+
+  // All boxes are implicitly nullable.
+  bool IsNullable() const override { return true; }
 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
@@ -349,19 +385,21 @@ struct BoxType final : public Type {
                         LayoutInvocation* out_params) const override;
 };
 
-struct UntypedNumericType final : public Type {
-  explicit UntypedNumericType(const Name& name)
-      : Type(name, Kind::kUntypedNumeric, types::Nullability::kNonnullable) {}
+struct UntypedNumericType final : public Type, public Constraints<> {
+  using Constraints = Constraints<>;
+
+  explicit UntypedNumericType(const Name& name) : Type(name, Kind::kUntypedNumeric) {}
   std::any AcceptAny(VisitorAny* visitor) const override;
   bool ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
                         const Reference& layout, std::unique_ptr<Type>* out_type,
                         LayoutInvocation* out_params) const override;
 };
 
-struct ZxExperimentalPointerType final : public Type {
+struct ZxExperimentalPointerType final : public Type, public Constraints<> {
+  using Constraints = Constraints<>;
+
   explicit ZxExperimentalPointerType(const Name& name, const Type* pointee_type)
-      : Type(name, Kind::kZxExperimentalPointer, types::Nullability::kNonnullable),
-        pointee_type(pointee_type) {}
+      : Type(name, Kind::kZxExperimentalPointer), pointee_type(pointee_type) {}
 
   const Type* pointee_type;
 

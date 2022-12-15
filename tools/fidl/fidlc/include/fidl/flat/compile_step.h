@@ -48,7 +48,7 @@ class CompileStep : public Compiler::Step {
   bool ResolveHandleRightsConstant(Resource* resource, Constant* constant,
                                    const HandleRights** out_rights);
   bool ResolveHandleSubtypeIdentifier(Resource* resource, Constant* constant,
-                                      uint32_t* out_obj_type);
+                                      types::HandleSubtype* out_obj_type);
   bool ResolveSizeBound(Constant* size_constant, const Size** out_size);
   bool ResolveOrOperatorConstant(Constant* constant, std::optional<const Type*> opt_type,
                                  const ConstantValue& left_operand,

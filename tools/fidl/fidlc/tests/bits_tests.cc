@@ -193,7 +193,7 @@ type NotNullable = bits {
 };
 
 type Struct = struct {
-    not_nullable NotNullable:<optional, 1, 2>;
+    not_nullable NotNullable:<1, 2, 3>;
 };
 )FIDL");
   ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTooManyConstraints);

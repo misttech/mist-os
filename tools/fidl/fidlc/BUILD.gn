@@ -28,6 +28,7 @@ source_set("fidl") {
     "lib/flat/availability_step.cc",
     "lib/flat/compile_step.cc",
     "lib/flat/compiler.cc",
+    "lib/flat/constraints.cc",
     "lib/flat/consume_step.cc",
     "lib/flat/name.cc",
     "lib/flat/reference.cc",

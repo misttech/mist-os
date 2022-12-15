@@ -4,5 +4,5 @@
 library test.bad.fi0164;
 
 type Person = struct {
-    name string:<0, 20, optional>;
+    name string:<0, optional, 20>;
 };

@@ -28,7 +28,7 @@ type MyStruct = resource struct {
 
   const auto& h_type_ctor = library.LookupStruct("MyStruct")->members[0].type_ctor;
 
-  EXPECT_TRUE(h_type_ctor->resolved_params.subtype_raw != nullptr);
+  ASSERT_TRUE(h_type_ctor->resolved_params.subtype_raw != nullptr);
   EXPECT_EQ("THREAD", h_type_ctor->resolved_params.subtype_raw->span.data());
 
   auto h_type = h_type_ctor->type;
@@ -36,7 +36,7 @@ type MyStruct = resource struct {
   ASSERT_EQ(h_type->kind, fidl::flat::Type::Kind::kHandle);
   auto handle_type = static_cast<const fidl::flat::HandleType*>(h_type);
 
-  EXPECT_EQ(2, handle_type->obj_type);
+  EXPECT_EQ(fidl::types::HandleSubtype::kThread, handle_type->subtype);
   EXPECT_EQ(
       static_cast<const fidl::flat::NumericConstantValue<uint32_t>*>(handle_type->rights)->value,
       3);
@@ -62,9 +62,9 @@ type MyStruct = resource struct {
   ASSERT_EQ(h_type->kind, fidl::flat::Type::Kind::kHandle);
   auto handle_type = static_cast<const fidl::flat::HandleType*>(h_type);
 
-  EXPECT_TRUE(h_type_ctor->resolved_params.subtype_raw != nullptr);
+  ASSERT_TRUE(h_type_ctor->resolved_params.subtype_raw != nullptr);
   EXPECT_EQ("VMO", h_type_ctor->resolved_params.subtype_raw->span.data());
-  EXPECT_EQ(3, handle_type->obj_type);
+  EXPECT_EQ(fidl::types::HandleSubtype::kVmo, handle_type->subtype);
   EXPECT_EQ(
       static_cast<const fidl::flat::NumericConstantValue<uint32_t>*>(handle_type->rights)->value,
       fidl::flat::kHandleSameRights);
@@ -108,7 +108,7 @@ type MyStruct = resource struct {
   ASSERT_EQ(h_type->kind, fidl::flat::Type::Kind::kHandle);
   auto handle_type = static_cast<const fidl::flat::HandleType*>(h_type);
 
-  EXPECT_EQ(0, handle_type->obj_type);
+  EXPECT_EQ(fidl::types::HandleSubtype::kHandle, handle_type->subtype);
   EXPECT_EQ(
       static_cast<const fidl::flat::NumericConstantValue<uint32_t>*>(handle_type->rights)->value,
       fidl::flat::kHandleSameRights);
@@ -134,7 +134,7 @@ type MyStruct = resource struct {
   ASSERT_NOT_NULL(a_type);
   ASSERT_EQ(a_type->kind, fidl::flat::Type::Kind::kHandle);
   auto a_handle_type = static_cast<const fidl::flat::HandleType*>(a_type);
-  EXPECT_EQ(2, a_handle_type->obj_type);
+  EXPECT_EQ(fidl::types::HandleSubtype::kThread, a_handle_type->subtype);
   EXPECT_EQ(static_cast<const fidl::flat::HandleRights*>(a_handle_type->rights)->value,
             fidl::flat::kHandleSameRights);
 
@@ -143,7 +143,7 @@ type MyStruct = resource struct {
   ASSERT_NOT_NULL(b_type);
   ASSERT_EQ(b_type->kind, fidl::flat::Type::Kind::kHandle);
   auto b_handle_type = static_cast<const fidl::flat::HandleType*>(b_type);
-  EXPECT_EQ(1, b_handle_type->obj_type);
+  EXPECT_EQ(fidl::types::HandleSubtype::kProcess, b_handle_type->subtype);
   EXPECT_EQ(static_cast<const fidl::flat::HandleRights*>(b_handle_type->rights)->value,
             fidl::flat::kHandleSameRights);
 
@@ -152,7 +152,7 @@ type MyStruct = resource struct {
   ASSERT_NOT_NULL(c_type);
   ASSERT_EQ(c_type->kind, fidl::flat::Type::Kind::kHandle);
   auto c_handle_type = static_cast<const fidl::flat::HandleType*>(c_type);
-  EXPECT_EQ(3, c_handle_type->obj_type);
+  EXPECT_EQ(fidl::types::HandleSubtype::kVmo, c_handle_type->subtype);
   ASSERT_NOT_NULL(c_handle_type->rights);
   EXPECT_EQ(static_cast<const fidl::flat::HandleRights*>(c_handle_type->rights)->value, 2);
 }
@@ -216,9 +216,9 @@ type MyStruct = resource struct {
   ASSERT_EQ(h_type->kind, fidl::flat::Type::Kind::kHandle);
   auto handle_type = static_cast<const fidl::flat::HandleType*>(h_type);
 
-  EXPECT_TRUE(h_type_ctor->resolved_params.subtype_raw != nullptr);
-  ASSERT_TRUE(h_type_ctor->resolved_params.subtype_raw->span.data() == "VMO");
-  EXPECT_EQ(3, handle_type->obj_type);
+  ASSERT_TRUE(h_type_ctor->resolved_params.subtype_raw != nullptr);
+  EXPECT_TRUE(h_type_ctor->resolved_params.subtype_raw->span.data() == "VMO");
+  EXPECT_EQ(fidl::types::HandleSubtype::kVmo, handle_type->subtype);
   EXPECT_EQ(
       static_cast<const fidl::flat::NumericConstantValue<uint32_t>*>(handle_type->rights)->value,
       fidl::flat::kHandleSameRights);

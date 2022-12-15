@@ -57,7 +57,7 @@ alias alias_of_int16 = int16;
 
   auto type = msg->members[0].type_ctor->type;
   ASSERT_EQ(type->kind, fidl::flat::Type::Kind::kPrimitive);
-  ASSERT_EQ(type->nullability, fidl::types::Nullability::kNonnullable);
+  ASSERT_FALSE(type->IsNullable());
 
   auto primitive_type = static_cast<const fidl::flat::PrimitiveType*>(type);
   ASSERT_EQ(primitive_type->subtype, fidl::types::PrimitiveSubtype::kInt16);
@@ -86,7 +86,7 @@ type Message = struct {
 
   auto type = msg->members[0].type_ctor->type;
   ASSERT_EQ(type->kind, fidl::flat::Type::Kind::kPrimitive);
-  ASSERT_EQ(type->nullability, fidl::types::Nullability::kNonnullable);
+  ASSERT_FALSE(type->IsNullable());
 
   auto primitive_type = static_cast<const fidl::flat::PrimitiveType*>(type);
   ASSERT_EQ(primitive_type->subtype, fidl::types::PrimitiveSubtype::kInt16);
@@ -124,7 +124,7 @@ TEST(AliasTests, BadMultipleConstraintsOnPrimitive) {
 library test.optionals;
 
 type Bad = struct {
-    opt_num int64:<optional, 1, 2>;
+    opt_num int64:<1, 2, 3>;
 };
 
 )FIDL");
@@ -174,12 +174,11 @@ alias alias_of_vector_of_string = vector<string>;
 
   auto type = msg->members[0].type_ctor->type;
   ASSERT_EQ(type->kind, fidl::flat::Type::Kind::kVector);
-  ASSERT_EQ(type->nullability, fidl::types::Nullability::kNonnullable);
+  ASSERT_FALSE(type->IsNullable());
 
   auto vector_type = static_cast<const fidl::flat::VectorType*>(type);
   ASSERT_EQ(vector_type->element_type->kind, fidl::flat::Type::Kind::kString);
-  ASSERT_EQ(static_cast<uint32_t>(*vector_type->element_count),
-            static_cast<uint32_t>(fidl::flat::Size::Max()));
+  ASSERT_EQ(vector_type->ElementCount(), fidl::flat::Size::Max().value);
 
   auto invocation = msg->members[0].type_ctor->resolved_params;
   ASSERT_NOT_NULL(invocation.from_alias);
@@ -239,11 +238,11 @@ alias alias_of_vector_of_string = vector<string>;
 
   auto type = msg->members[0].type_ctor->type;
   ASSERT_EQ(type->kind, fidl::flat::Type::Kind::kVector);
-  ASSERT_EQ(type->nullability, fidl::types::Nullability::kNonnullable);
+  ASSERT_FALSE(type->IsNullable());
 
   auto vector_type = static_cast<const fidl::flat::VectorType*>(type);
   ASSERT_EQ(vector_type->element_type->kind, fidl::flat::Type::Kind::kString);
-  ASSERT_EQ(static_cast<uint32_t>(*vector_type->element_count), 8u);
+  ASSERT_EQ(vector_type->ElementCount(), 8u);
 
   auto invocation = msg->members[0].type_ctor->resolved_params;
   ASSERT_NOT_NULL(invocation.from_alias);
@@ -278,12 +277,11 @@ alias alias_of_vector_of_string_nullable = vector<string>:optional;
 
   auto type = msg->members[0].type_ctor->type;
   ASSERT_EQ(type->kind, fidl::flat::Type::Kind::kVector);
-  ASSERT_EQ(type->nullability, fidl::types::Nullability::kNullable);
+  ASSERT_TRUE(type->IsNullable());
 
   auto vector_type = static_cast<const fidl::flat::VectorType*>(type);
   ASSERT_EQ(vector_type->element_type->kind, fidl::flat::Type::Kind::kString);
-  ASSERT_EQ(static_cast<uint32_t>(*vector_type->element_count),
-            static_cast<uint32_t>(fidl::flat::Size::Max()));
+  ASSERT_EQ(vector_type->ElementCount(), fidl::flat::Size::Max().value);
 
   auto invocation = msg->members[0].type_ctor->resolved_params;
   ASSERT_NOT_NULL(invocation.from_alias);
@@ -310,12 +308,11 @@ alias alias_of_vector_of_string = vector<string>;
 
   auto type = msg->members[0].type_ctor->type;
   ASSERT_EQ(type->kind, fidl::flat::Type::Kind::kVector);
-  ASSERT_EQ(type->nullability, fidl::types::Nullability::kNullable);
+  ASSERT_TRUE(type->IsNullable());
 
   auto vector_type = static_cast<const fidl::flat::VectorType*>(type);
   ASSERT_EQ(vector_type->element_type->kind, fidl::flat::Type::Kind::kString);
-  ASSERT_EQ(static_cast<uint32_t>(*vector_type->element_count),
-            static_cast<uint32_t>(fidl::flat::Size::Max()));
+  ASSERT_EQ(vector_type->ElementCount(), fidl::flat::Size::Max().value);
 
   auto invocation = msg->members[0].type_ctor->resolved_params;
   ASSERT_NOT_NULL(invocation.from_alias);

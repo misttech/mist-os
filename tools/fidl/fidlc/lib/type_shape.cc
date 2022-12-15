@@ -570,7 +570,7 @@ class MaxHandlesVisitor final : public flat::Object::Visitor<DataSize> {
   }
 
   std::any Visit(const flat::VectorType& object) override {
-    return MaxHandles(object.element_type) * object.element_count->value;
+    return MaxHandles(object.element_type) * object.ElementCount();
   }
 
   std::any Visit(const flat::StringType& object) override { return DataSize(0); }
@@ -710,14 +710,13 @@ class MaxOutOfLineVisitor final : public TypeShapeVisitor<DataSize> {
   }
 
   std::any Visit(const flat::VectorType& object) override {
-    return ObjectAlign(UnalignedSize(object.element_type, wire_format()) *
-                       object.element_count->value) +
-           ObjectAlign(MaxOutOfLine(object.element_type)) * object.element_count->value;
+    return ObjectAlign(UnalignedSize(object.element_type, wire_format()) * object.ElementCount()) +
+           ObjectAlign(MaxOutOfLine(object.element_type)) * object.ElementCount();
   }
 
   std::any Visit(const flat::StringType& object) override {
-    return object.max_size ? ObjectAlign(object.max_size->value)
-                           : std::numeric_limits<DataSize>::max();
+    return object.MaxSize() != flat::Size::Max().value ? ObjectAlign(object.MaxSize())
+                                                       : std::numeric_limits<DataSize>::max();
   }
 
   std::any Visit(const flat::HandleType& object) override { return DataSize(0); }

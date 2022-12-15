@@ -126,11 +126,26 @@ class Reference final {
   };
 
   State state() const;
-  const RawSourced& raw_sourced() const { return std::get<RawSourced>(state_); }
-  const RawSynthetic& raw_synthetic() const { return std::get<RawSynthetic>(state_); }
-  const Key& key() const { return std::get<Key>(state_); }
-  const Contextual& contextual() const { return std::get<Contextual>(state_); }
-  const Target& resolved() const { return std::get<Target>(state_); }
+  const RawSourced& raw_sourced() const {
+    ZX_ASSERT(std::holds_alternative<RawSourced>(state_));
+    return std::get<RawSourced>(state_);
+  }
+  const RawSynthetic& raw_synthetic() const {
+    ZX_ASSERT(std::holds_alternative<RawSynthetic>(state_));
+    return std::get<RawSynthetic>(state_);
+  }
+  const Key& key() const {
+    ZX_ASSERT(std::holds_alternative<Key>(state_));
+    return std::get<Key>(state_);
+  }
+  const Contextual& contextual() const {
+    ZX_ASSERT(std::holds_alternative<Contextual>(state_));
+    return std::get<Contextual>(state_);
+  }
+  const Target& resolved() const {
+    ZX_ASSERT(std::holds_alternative<Target>(state_));
+    return std::get<Target>(state_);
+  }
 
   void SetKey(Key key);
   void MarkContextual();
