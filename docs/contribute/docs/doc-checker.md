@@ -91,12 +91,9 @@ Images must have meaningful `alt` text.
 
 Markdown file fragments are included in another markdown file by using
 
-
-```md
-{% verbatim %}
-<< relative-path-to/_file.md >>
-{% endverbatim %}
-```
+<pre>
+&lt;&lt;relative-path-to/_file.md&gt;&gt;
+</pre>
 
 The path must be relative to the current .md source file—absolute paths
 cannot be used. The `<< >>` directive is a block directive and so must appear

@@ -738,13 +738,12 @@ the `<< >>` directive enclosing the required file path. The path must be relativ
 current .md source file—absolute paths should not be used. The << >> directive is a block directive
 and so must appear on a line by itself.
 
-For example, if the current file en/time-travel/example.md wants to include file en/time-travel/_samples/_sample.md, it would specify:
+For example, if the current file `en/time-travel/example.md` wants to include file
+`en/time-travel/_samples/_sample.md`, it would specify:
 
-```md
-{% verbatim %}
-<<_samples/_sample.md>>
-{% endverbatim %}
-```
+<pre>
+&lt;&lt;_samples/_sample.md&gt;&gt;
+</pre>
 
 ## Inline code
 
