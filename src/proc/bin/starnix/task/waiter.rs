@@ -400,7 +400,10 @@ impl WaitQueue {
     ///
     /// The waiters will wake up on their own threads to handle these events.
     /// They are not called synchronously by this function.
-    pub fn notify_mask_count(&mut self, events: u32, mut limit: usize) {
+    ///
+    /// Returns the number of waiters woken.
+    pub fn notify_mask_count(&mut self, events: u32, mut limit: usize) -> usize {
+        let mut woken = 0;
         self.waiters.retain(|entry| {
             entry.waiter.access(|waiter| {
                 // Drop entries whose waiter no longer exists.
@@ -413,12 +416,14 @@ impl WaitQueue {
                 if limit > 0 && (entry.events & events) != 0 {
                     waiter.queue_events(&entry.key, events);
                     limit -= 1;
+                    woken += 1;
                     return entry.persistent;
                 }
 
                 true
             })
         });
+        woken
     }
 
     pub fn cancel_wait(&mut self, key: WaitKey) -> bool {
@@ -436,19 +441,19 @@ impl WaitQueue {
     }
 
     pub fn notify_mask(&mut self, events: u32) {
-        self.notify_mask_count(events, usize::MAX)
+        self.notify_mask_count(events, usize::MAX);
     }
 
     pub fn notify_events(&mut self, events: FdEvents) {
-        self.notify_mask(events.mask())
+        self.notify_mask(events.mask());
     }
 
     pub fn notify_count(&mut self, limit: usize) {
-        self.notify_mask_count(u32::MAX, limit)
+        self.notify_mask_count(u32::MAX, limit);
     }
 
     pub fn notify_all(&mut self) {
-        self.notify_count(usize::MAX)
+        self.notify_count(usize::MAX);
     }
 
     pub fn transfer(&mut self, other: &mut WaitQueue) {

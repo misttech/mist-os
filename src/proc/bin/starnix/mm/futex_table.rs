@@ -55,7 +55,7 @@ impl FutexTable {
             let mut buf = [0u8; 4];
             vmo.read(&mut buf, offset).map_err(impossible_error)?;
             if u32::from_ne_bytes(buf) != value {
-                return Ok(());
+                return error!(EAGAIN);
             }
 
             waiters.wait_async_mask(&waiter, mask, WaitCallback::none());
@@ -65,7 +65,8 @@ impl FutexTable {
         waiter.wait_until(current_task, deadline)
     }
 
-    /// Wake the given number of waiters on futex at the given address.
+    /// Wake the given number of waiters on futex at the given address. Returns the number of
+    /// waiters actually woken.
     ///
     /// See FUTEX_WAKE.
     pub fn wake(
@@ -74,10 +75,9 @@ impl FutexTable {
         addr: UserAddress,
         count: usize,
         mask: u32,
-    ) -> Result<(), Errno> {
+    ) -> Result<usize, Errno> {
         let (_, key) = self.get_vmo_and_key(task, addr)?;
-        self.get_waiters(key).lock().notify_mask_count(mask, count);
-        Ok(())
+        Ok(self.get_waiters(key).lock().notify_mask_count(mask, count))
     }
 
     /// Requeue the waiters to another address.
@@ -89,17 +89,17 @@ impl FutexTable {
         addr: UserAddress,
         count: usize,
         new_addr: UserAddress,
-    ) -> Result<(), Errno> {
+    ) -> Result<usize, Errno> {
         let (_, key) = self.get_vmo_and_key(current_task, addr)?;
         let (_, new_key) = self.get_vmo_and_key(current_task, new_addr)?;
         let mut waiters = WaitQueue::default();
         if let Some(old_waiters) = self.state.lock().remove(&key) {
             waiters.transfer(&mut old_waiters.lock());
         }
-        waiters.notify_mask_count(FUTEX_BITSET_MATCH_ANY, count);
+        let woken = waiters.notify_mask_count(FUTEX_BITSET_MATCH_ANY, count);
         let new_waiters = self.get_waiters(new_key);
         new_waiters.lock().transfer(&mut waiters);
-        Ok(())
+        Ok(woken)
     }
 
     fn get_vmo_and_key(
