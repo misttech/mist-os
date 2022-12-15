@@ -2167,7 +2167,7 @@ impl BinderDriver {
                 error!(EOPNOTSUPP)
             }
             _ => {
-                log_error!("binder received unknown ioctl request 0x{:08x}", request);
+                log_error!(current_task, "binder received unknown ioctl request 0x{:08x}", request);
                 error!(EINVAL)
             }
         }
@@ -2183,7 +2183,7 @@ impl BinderDriver {
         cursor: &mut UserMemoryCursor<'a>,
     ) -> Result<(), Errno> {
         let command = cursor.read_object::<binder_driver_command_protocol>()?;
-        match command {
+        let result = match command {
             binder_driver_command_protocol_BC_ENTER_LOOPER => {
                 let mut proc_state = binder_proc.lock();
                 binder_thread
@@ -2265,10 +2265,19 @@ impl BinderDriver {
                     .or_else(|err| err.dispatch(binder_thread))
             }
             _ => {
-                log_error!("binder received unknown RW command: 0x{:08x}", command);
+                log_error!(current_task, "binder received unknown RW command: {:#08x}", command);
                 error!(EINVAL)
             }
+        };
+
+        if let Err(err) = result {
+            // TODO(fxbug.dev/117639): Right now there are many errors that happen because a handle
+            // they reference is invalid. This causes libbinder to retry forever, even when the
+            // command will never succeed. This indicates that there is something wrong with our
+            // reference counting.
+            log_error!(current_task, "binder command {:#x} failed: {:?}", command, err);
         }
+        Ok(())
     }
 
     fn get_binder_task(
