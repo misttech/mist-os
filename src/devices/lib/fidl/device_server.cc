@@ -101,6 +101,19 @@ void DeviceServer::Node::Clone(CloneRequestView request, CloneCompleter::Sync& c
 DeviceServer::MessageDispatcher::MessageDispatcher(DeviceServer& parent, bool multiplexing)
     : parent_(parent), multiplexing_(multiplexing) {}
 
+namespace {
+
+// TODO(fxbug.dev/85473): This target uses uses internal FIDL machinery to ad-hoc compose protocols.
+// Ad-hoc composition of protocols (try to match a method against protocol A, then B, etc.) is not
+// supported by FIDL. We should move to public supported APIs.
+template <typename FidlProtocol>
+fidl::DispatchResult TryDispatch(fidl::WireServer<FidlProtocol>* impl,
+                                 fidl::IncomingHeaderAndMessage& msg, fidl::Transaction* txn) {
+  return fidl::internal::WireServerDispatcher<FidlProtocol>::TryDispatch(impl, msg, nullptr, txn);
+}
+
+}  // namespace
+
 void DeviceServer::MessageDispatcher::dispatch_message(
     fidl::IncomingHeaderAndMessage&& msg, fidl::Transaction* txn,
     fidl::internal::MessageStorageViewBase* storage_view) {
@@ -111,10 +124,10 @@ void DeviceServer::MessageDispatcher::dispatch_message(
   }
 
   if (multiplexing_) {
-    if (fidl::WireTryDispatch(&parent_.node_, msg, txn) == fidl::DispatchResult::kFound) {
+    if (TryDispatch(&parent_.node_, msg, txn) == fidl::DispatchResult::kFound) {
       return;
     }
-    if (fidl::WireTryDispatch(&parent_.dev_, msg, txn) == fidl::DispatchResult::kFound) {
+    if (TryDispatch(&parent_.dev_, msg, txn) == fidl::DispatchResult::kFound) {
       return;
     }
   }

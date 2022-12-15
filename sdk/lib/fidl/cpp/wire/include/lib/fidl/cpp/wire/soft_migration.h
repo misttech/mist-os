@@ -17,19 +17,6 @@
       "See documentation on the declaration for details.")]]
 #endif  // FIDL_LLCPP_ALLOW_DEPRECATED_RAW_CHANNELS
 
-#ifdef FIDL_LLCPP_ALLOW_DEPRECATED_TRY_DISPATCH
-#define FIDL_EMIT_STATIC_ASSERT_ERROR_FOR_TRY_DISPATCH(FidlProtocol) (void(0))
-#else
-// |std::is_void| delays the evaluation of the static assert until the user
-// calls |WireTryDispatch|, thus pushing deprecation errors to use-site instead
-// of the |WireTryDispatch| definition.
-#define FIDL_EMIT_STATIC_ASSERT_ERROR_FOR_TRY_DISPATCH(FidlProtocol)                            \
-  static_assert(std::is_void<FidlProtocol>::value,                                              \
-                "[fidl][llcpp] |fidl::WireTryDispatch<Protocol>| is deprecated because it "     \
-                "deviates from normal handling of unknown FIDL methods. Consider migrating to " \
-                "|fidl::WireDispatch<Protocol>|. See fxbug.dev/85473 for details.")
-#endif  // FIDL_LLCPP_ALLOW_DEPRECATED_TRY_DISPATCH
-
 #ifdef FIDL_LLCPP_ALLOW_DEPRECATED_RAW_CHANNELS
 #define FIDL_CONDITIONALLY_EXPLICIT_CONVERSION
 #else

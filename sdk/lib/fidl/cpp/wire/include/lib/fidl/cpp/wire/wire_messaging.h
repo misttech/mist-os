@@ -87,24 +87,6 @@ void WireDispatch(fidl::WireServer<FidlProtocol>* impl, fidl::IncomingHeaderAndM
   fidl::internal::WireServerDispatcher<FidlProtocol>::Dispatch(impl, std::move(msg), nullptr, txn);
 }
 
-// Attempts to dispatch the incoming message to a handler function in the server implementation.
-//
-// This function should only be used in very low-level code, such as when manually
-// dispatching a message to a server implementation.
-//
-// If there is no matching handler, it returns |fidl::DispatchResult::kNotFound|, leaving the
-// message and transaction intact. In all other cases, it consumes the message and returns
-// |fidl::DispatchResult::kFound|. It is possible to chain multiple TryDispatch functions in this
-// manner.
-//
-// The caller does not have to ensure |msg| has a |ZX_OK| status. It is idiomatic to pass a |msg|
-// with potential errors; any error would be funneled through |InternalError| on the |txn|.
-template <typename FidlProtocol>
-fidl::DispatchResult WireTryDispatch(fidl::WireServer<FidlProtocol>* impl,
-                                     fidl::IncomingHeaderAndMessage& msg, fidl::Transaction* txn) {
-  FIDL_EMIT_STATIC_ASSERT_ERROR_FOR_TRY_DISPATCH(FidlProtocol);
-  return fidl::internal::WireServerDispatcher<FidlProtocol>::TryDispatch(impl, msg, nullptr, txn);
-}
 #endif  // __Fuchsia__
 
 namespace internal {

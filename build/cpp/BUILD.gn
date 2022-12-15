@@ -152,22 +152,6 @@ config(
   cflags_cc = [ "-DFIDL_LLCPP_ALLOW_DEPRECATED_RAW_CHANNELS" ]
 }
 
-# TODO(fxbug.dev/85473): Delete this config after all user code
-# migrates off |fidl::WireTryDispatch|.
-config("fidl-llcpp-deprecated-wire-try-dispatch") {
-  cflags_cc = [ "-DFIDL_LLCPP_ALLOW_DEPRECATED_TRY_DISPATCH" ]
-
-  # Please do not add to this list. Refer to fxbug.dev/85473 to see
-  # how a target could be migrated to |fidl::WireDispatch|.
-  #
-  # To regenerate this list, run
-  #
-  #   scripts/gn/trim_visibility.py --target="//build/cpp:fidl-llcpp-deprecated-wire-try-dispatch"
-  #
-  # and replace the contents of `visibility` with the script output.
-  visibility = [ "//src/devices/lib/fidl:devfs_fidl" ]
-}
-
 # This allows code call FIDL wire table constructors and setters rather than using builders.
 config("fidl-wire-deprecated-mutable-tables") {
   cflags_cc = [ "-DFIDL_WIRE_ALLOW_DEPRECATED_MUTABLE_TABLES" ]
