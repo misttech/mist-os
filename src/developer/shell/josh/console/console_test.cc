@@ -234,4 +234,117 @@ TEST_F(ConsoleTest, JsScriptArgsParsing) {
   )");
 }
 
+TEST_F(ConsoleTest, CatchError) {
+  // Test script - unhandled error
+  std::string random_script_unhandled = GetRandomFile("/test_tmp/script.js.XXXXXX");
+  std::ofstream test_script_unhandled;
+  test_script_unhandled.open(random_script_unhandled);
+  test_script_unhandled << R"(
+    function throw_error() {
+      throw "This is an unhandled error!";
+    }
+
+    throw_error();
+  )";
+  test_script_unhandled.close();
+
+  std::array argv_unhandled{
+      "test_program",
+      "-j",
+      "/pkg/data/lib/",
+      "-f",
+      "/pkg/data/fidling",
+      "-r",
+      random_script_unhandled.c_str(),
+      "--",
+  };
+  ASSERT_EQ(1, shell::ConsoleMain(argv_unhandled.size(), argv_unhandled.data()));
+
+  // Test script - handled error
+  std::string random_script_handled = GetRandomFile("/test_tmp/script.js.XXXXXX");
+  std::ofstream test_script_handled;
+  test_script_handled.open(random_script_handled);
+  test_script_handled << R"(
+    function throw_error() {
+      throw "This is a handled error!";
+    }
+
+    try {
+      throw_error();
+    } catch (e) {
+      // Do nothing
+    }
+  )";
+  test_script_handled.close();
+
+  std::array argv_handled{
+      "test_program",
+      "-j",
+      "/pkg/data/lib/",
+      "-f",
+      "/pkg/data/fidling",
+      "-r",
+      random_script_handled.c_str(),
+      "--",
+  };
+  ASSERT_EQ(0, shell::ConsoleMain(argv_handled.size(), argv_handled.data()));
+}
+
+// Sanity check test to make sure async errors are caught.
+TEST_F(ConsoleTest, CatchErrorAsync) {
+  // Test script - unhandled error
+  std::string random_script_unhandled = GetRandomFile("/test_tmp/script.js.XXXXXX");
+  std::ofstream test_script_unhandled;
+  test_script_unhandled.open(random_script_unhandled);
+  test_script_unhandled << R"(
+    async function throw_async_error() {
+      throw "This is an unhandled async error!";
+    }
+
+    throw_async_error();
+  )";
+  test_script_unhandled.close();
+
+  std::array argv_unhandled{
+      "test_program",
+      "-j",
+      "/pkg/data/lib/",
+      "-f",
+      "/pkg/data/fidling",
+      "-r",
+      random_script_unhandled.c_str(),
+      "--",
+  };
+  ASSERT_EQ(1, shell::ConsoleMain(argv_unhandled.size(), argv_unhandled.data()));
+
+  // Test script - handled error
+  std::string random_script_handled = GetRandomFile("/test_tmp/script.js.XXXXXX");
+  std::ofstream test_script_handled;
+  test_script_handled.open(random_script_handled);
+  test_script_handled << R"(
+    async function throw_async_error() {
+      try {
+        throw "This is a handled async error!";
+      } catch (e) {
+        // Do nothing
+      }
+    }
+
+    throw_async_error();
+  )";
+  test_script_handled.close();
+
+  std::array argv_handled{
+      "test_program",
+      "-j",
+      "/pkg/data/lib/",
+      "-f",
+      "/pkg/data/fidling",
+      "-r",
+      random_script_handled.c_str(),
+      "--",
+  };
+  ASSERT_EQ(0, shell::ConsoleMain(argv_handled.size(), argv_handled.data()));
+}
+
 }  // namespace shell

@@ -29,9 +29,36 @@ namespace fs = std::filesystem;
 // we integrate the new version.
 __attribute__((weak)) void js_std_init_handlers(JSRuntime* rt) {}
 
+namespace {
+void js_dump_obj(JSContext* ctx, FILE* f, JSValueConst val) {
+  const char* str;
+
+  str = JS_ToCString(ctx, val);
+  if (str) {
+    fprintf(f, "%s\n", str);
+    JS_FreeCString(ctx, str);
+  } else {
+    fprintf(f, "[unknown object]\n");
+  }
+}
+
+void js_std_dump_error(JSContext* ctx, JSValueConst exception_val) {
+  JSValue val;
+  bool is_error = JS_IsError(ctx, exception_val);
+  js_dump_obj(ctx, stderr, exception_val);
+  if (is_error) {
+    val = JS_GetPropertyStr(ctx, exception_val, "stack");
+    if (!JS_IsUndefined(val)) {
+      js_dump_obj(ctx, stderr, val);
+    }
+    JS_FreeValue(ctx, val);
+  }
+}
+}  // namespace
+
 namespace shell {
 
-Runtime::Runtime() {
+Runtime::Runtime() : has_error_(false) {
   rt_ = JS_NewRuntime();
   js_std_init_handlers(rt_);
   is_valid_ = (rt_ == nullptr);
@@ -45,6 +72,14 @@ Runtime::~Runtime() {
     js_std_free_handlers(rt_);
     JS_FreeRuntime(rt_);
   }
+}
+
+void Runtime::HandlePromiseRejection(JSContext* ctx, JSValueConst promise, JSValueConst reason) {
+  // Currently there is no additional handling of promise rejections
+  has_error_ = true;
+
+  fprintf(stderr, "Unhandled promise rejection: ");
+  js_std_dump_error(ctx, reason);
 }
 
 Context::Context(const Runtime* rt) : ctx_(JS_NewContext(rt->Get())) {
@@ -61,6 +96,7 @@ Context::~Context() {
     JS_FreeContext(ctx_);
   }
 }
+
 bool Context::ExportScript(const std::string& lib, const std::string& js_path) {
   std::string path;
   int flags = JS_EVAL_TYPE_MODULE;

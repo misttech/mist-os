@@ -21,11 +21,17 @@ class Runtime {
 
   JSRuntime* Get() const { return rt_; }
 
+  void HandlePromiseRejection(JSContext* ctx, JSValueConst promise, JSValueConst reason);
+
+  // Check if there is any unhandled error in the current JSRuntime
+  bool HasUnhandledError() const { return has_error_; }
+
   ~Runtime();
 
  private:
   JSRuntime* rt_;
   bool is_valid_;
+  bool has_error_;
 };
 
 // A C++ wrapper for the JSContext type.  You can have multiple JSContexts for a given JSRuntime.

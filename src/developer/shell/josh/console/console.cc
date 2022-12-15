@@ -23,6 +23,16 @@ extern "C" const uint32_t qjsc_repl_size;
 extern "C" const uint8_t qjsc_repl_init[];
 extern "C" const uint32_t qjsc_repl_init_size;
 
+void promise_rejection_tracker(JSContext *ctx, JSValueConst promise, JSValueConst reason,
+                               int is_handled, void *opaque) {
+  if (opaque) {
+    auto rt = reinterpret_cast<Runtime *>(opaque);
+    if (!is_handled) {
+      rt->HandlePromiseRejection(ctx, promise, reason);
+    }
+  }
+}
+
 int ConsoleMain(int argc, const char **argv) {
   CommandLineOptions options;
   std::vector<std::string> params;
@@ -44,6 +54,9 @@ int ConsoleMain(int argc, const char **argv) {
     fprintf(stderr, "Cannot allocate JS context");
     return 1;
   }
+
+  // Assign promise rejection tracker to handle async errors
+  JS_SetHostPromiseRejectionTracker(rt.Get(), promise_rejection_tracker, static_cast<void *>(&rt));
 
   if (!ctx.InitStd()) {
     ctx.DumpError();
@@ -90,6 +103,7 @@ int ConsoleMain(int argc, const char **argv) {
   js_std_loop(ctx_ptr);
 
   if (!options.command_string && !options.run_script_path) {
+    // Running console mode
     if (!options.line_editor) {
       // Use the qjs repl for the time being.
       js_std_eval_binary(ctx_ptr, qjsc_repl, qjsc_repl_size, 0);
@@ -100,28 +114,32 @@ int ConsoleMain(int argc, const char **argv) {
       }
       js_std_eval_binary(ctx_ptr, qjsc_repl_init, qjsc_repl_init_size, 0);
     }
-  } else {
-    std::string command_string;
-    if (options.run_script_path) {
-      std::filesystem::path script_path(*options.run_script_path);
-      if (!std::filesystem::exists(script_path)) {
-        fprintf(stderr, "FATAL: the script %s does not exist!\n", script_path.string().c_str());
-        return 1;
-      }
-      command_string.append("std.loadScript(\"" + script_path.string() + "\");");
-    } else {
-      command_string = *options.command_string;
-    }
 
-    JSValue result = JS_Eval(ctx_ptr, command_string.c_str(), command_string.length(), "batch", 0);
-    if (JS_IsException(result)) {
-      ctx.DumpError();
+    js_std_loop(ctx_ptr);
+    return 0;
+  }
+
+  // Running command string or script file
+  std::string command_string;
+  if (options.run_script_path) {
+    std::filesystem::path script_path(*options.run_script_path);
+    if (!std::filesystem::exists(script_path)) {
+      fprintf(stderr, "FATAL: the script %s does not exist!\n", script_path.string().c_str());
       return 1;
     }
+    command_string.append("std.loadScript(\"" + script_path.string() + "\");");
+  } else {
+    command_string = *options.command_string;
   }
-  js_std_loop(ctx_ptr);
 
-  return 0;
+  JSValue result = JS_Eval(ctx_ptr, command_string.c_str(), command_string.length(), "batch", 0);
+  if (JS_IsException(result)) {
+    ctx.DumpError();
+    return 1;
+  }
+
+  js_std_loop(ctx_ptr);
+  return rt.HasUnhandledError() ? 1 : 0;
 }
 
 }  // namespace shell
