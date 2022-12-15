@@ -40,7 +40,7 @@ var (
 const (
 	ffxConfigServerEnabledKey string = "repository.server.enabled"
 	ffxConfigServerListenKey  string = "repository.server.listen"
-	ffxConfigServerModeKey    string = "repository.server.mode"
+	ffxConfigServerModeKey    string = "repository.server.fserve-mode"
 
 	defaultServerMode string = "pm"
 )
