@@ -40,16 +40,22 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use zerocopy::{AsBytes, FromBytes};
 
+#[derive(Default)]
+struct ContextManagerAndQueue {
+    /// The "name server" process that is addressed via the special handle 0 and is responsible
+    /// for implementing the binder protocol `IServiceManager`.
+    context_manager: Option<Arc<BinderObject>>,
+
+    /// Notification allowing remote binder process to wait for a service manager to be registered.
+    wait_queue: WaitQueue,
+}
+
 /// Android's binder kernel driver implementation.
 #[derive(Derivative)]
 #[derivative(Default)]
 pub struct BinderDriver {
-    /// The "name server" process that is addressed via the special handle 0 and is responsible
-    /// for implementing the binder protocol `IServiceManager`.
-    context_manager: RwLock<Option<Arc<BinderObject>>>,
-
-    /// Notification allowing remote binder process to wait for a service manager to be registered.
-    context_manager_notification: RwLockCondVar,
+    /// The context manager and the associate wait queue.
+    context_manager_and_queue: Mutex<ContextManagerAndQueue>,
 
     /// Manages the internal state of each process interacting with the binder driver.
     ///
@@ -1922,7 +1928,7 @@ impl BinderDriver {
         let driver = Arc::new(Self::default());
         #[cfg(any(test, debug_assertions))]
         {
-            let _l1 = driver.context_manager.read();
+            let _l1 = driver.context_manager_and_queue.lock();
             let _l2 = driver.procs.read();
             let _l3 = driver.remote_tasks.read();
         }
@@ -1989,12 +1995,6 @@ impl BinderDriver {
                             }
                         }
                         fbinder::BinderRequest::Ioctl { tid, request, parameter, responder } => {
-                            {
-                                let mut context_manager = driver.context_manager.read();
-                                while context_manager.is_none() {
-                                    driver.context_manager_notification.wait(&mut context_manager);
-                                }
-                            }
                             let tid = *tid_to_pid
                                 .entry(tid)
                                 .or_insert_with(|| kernel.pids.write().allocate_pid());
@@ -2031,9 +2031,20 @@ impl BinderDriver {
         )
     }
 
-    fn get_context_manager(&self) -> Result<(Arc<BinderObject>, Arc<BinderProcess>), Errno> {
-        let context_manager =
-            self.context_manager.read().as_ref().cloned().ok_or_else(|| errno!(ENOENT))?;
+    fn get_context_manager(
+        &self,
+        current_task: &dyn RunningBinderTask,
+    ) -> Result<(Arc<BinderObject>, Arc<BinderProcess>), Errno> {
+        let context_manager = loop {
+            let mut state = self.context_manager_and_queue.lock();
+            if let Some(context_manager) = state.context_manager.as_ref().cloned() {
+                break context_manager;
+            }
+            let waiter = Waiter::new();
+            state.wait_queue.wait_async(&waiter);
+            std::mem::drop(state);
+            current_task.wait_on_waiter(&waiter)?;
+        };
         let proc = context_manager.owner.upgrade().ok_or_else(|| errno!(ENOENT))?;
         Ok((context_manager, proc))
     }
@@ -2067,9 +2078,10 @@ impl BinderDriver {
 
                 // TODO: Read the flat_binder_object when ioctl is uapi::BINDER_SET_CONTEXT_MGR_EXT.
 
-                *self.context_manager.write() =
+                let mut state = self.context_manager_and_queue.lock();
+                state.context_manager =
                     Some(BinderObject::new(binder_proc, LocalBinderObject::default()));
-                self.context_manager_notification.notify_all();
+                state.wait_queue.notify_all();
                 Ok(SUCCESS)
             }
             uapi::BINDER_WRITE_READ => {
@@ -2284,7 +2296,7 @@ impl BinderDriver {
         let handle = unsafe { data.transaction_data.target.handle }.into();
 
         let (object, target_proc) = match handle {
-            Handle::SpecialServiceManager => self.get_context_manager()?,
+            Handle::SpecialServiceManager => self.get_context_manager(current_task)?,
             Handle::Object { index } => {
                 let object =
                     binder_proc.lock().handles.get(index).ok_or(TransactionError::Failure)?;
@@ -3160,17 +3172,9 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn handle_0_fails_when_context_manager_is_not_set() {
-        let driver = BinderDriver::new();
-        assert_eq!(
-            driver.get_context_manager().expect_err("unexpectedly succeeded"),
-            errno!(ENOENT),
-        );
-    }
-
-    #[fuchsia::test]
     fn handle_0_succeeds_when_context_manager_is_set() {
         let driver = BinderDriver::new();
+        let (_kernel, current_task) = create_kernel_and_task();
         let context_manager_proc = driver.create_process(1);
         let context_manager = BinderObject::new(
             &context_manager_proc,
@@ -3179,8 +3183,10 @@ mod tests {
                 strong_ref_addr: UserAddress::from(0xDEADDEAD),
             },
         );
-        *driver.context_manager.write() = Some(context_manager);
-        let (object, owner) = driver.get_context_manager().expect("failed to find handle 0");
+        driver.context_manager_and_queue.lock().context_manager = Some(context_manager);
+        let (object, owner) = driver
+            .get_context_manager(&CurrentBinderTask { task: &current_task })
+            .expect("failed to find handle 0");
         assert!(Arc::ptr_eq(&context_manager_proc, &owner));
         assert_eq!(object.local.weak_ref_addr, UserAddress::from(0xDEADBEEF));
         assert_eq!(object.local.strong_ref_addr, UserAddress::from(0xDEADDEAD));
@@ -5723,7 +5729,7 @@ mod tests {
                     strong_ref_addr: UserAddress::from(0xDEADDEAD),
                 },
             );
-            *driver.context_manager.write() = Some(context_manager);
+            driver.context_manager_and_queue.lock().context_manager = Some(context_manager);
 
             let process = fuchsia_runtime::process_self()
                 .duplicate(zx::Rights::SAME_RIGHTS)
@@ -5809,29 +5815,6 @@ mod tests {
         let object = BinderObject::new(owner, LocalBinderObject { weak_ref_addr, strong_ref_addr });
         owner.lock().objects.insert(weak_ref_addr, Arc::downgrade(&object));
         object
-    }
-}
-
-/// CondVar wrappers allowing to wait on a notification guarded by a RwLock.
-#[derive(Default)]
-struct RwLockCondVar {
-    c: parking_lot::Condvar,
-    m: parking_lot::Mutex<()>,
-}
-
-impl RwLockCondVar {
-    fn notify_all(&self) {
-        let _guard = self.m.lock();
-        self.c.notify_all();
-    }
-
-    fn wait<T>(&self, g: &mut RwLockReadGuard<'_, T>) {
-        let guard = self.m.lock();
-        RwLockReadGuard::unlocked(g, || {
-            // Move the guard in so it gets unlocked before we re-lock g
-            let mut guard = guard;
-            self.c.wait(&mut guard);
-        });
     }
 }
 
