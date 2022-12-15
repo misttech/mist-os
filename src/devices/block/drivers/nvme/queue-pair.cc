@@ -15,7 +15,7 @@
 namespace nvme {
 
 zx::result<std::unique_ptr<QueuePair>> QueuePair::Create(zx::unowned_bti bti, uint16_t queue_id,
-                                                         size_t max_entries, CapabilityReg& caps,
+                                                         uint32_t max_entries, CapabilityReg& caps,
                                                          fdf::MmioBuffer& mmio, bool prealloc_prp) {
   auto completion_queue = Queue::Create(bti->borrow(), queue_id, max_entries, sizeof(Completion));
   if (completion_queue.is_error()) {
@@ -143,7 +143,7 @@ zx_status_t QueuePair::Submit(cpp20::span<uint8_t> submission_data,
     // Total pages mapped / touched
     const size_t page_count = (byte_offset + bytes + kPageMask) >> kPageShift;
     if (page_count > kMaxTransferPages) {
-      zxlogf(ERROR, "Did not expect a single transaction to transfer more than %zd pages.",
+      zxlogf(ERROR, "Did not expect a single transaction to transfer more than %u pages.",
              kMaxTransferPages);
       return ZX_ERR_BAD_STATE;
     }

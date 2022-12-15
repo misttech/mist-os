@@ -289,7 +289,7 @@ zx_status_t Namespace::Init() {
   list_initialize(&active_commands_);
 
   zx::vmo admin_data;
-  const size_t kPageSize = zx_system_get_page_size();
+  const uint32_t kPageSize = zx_system_get_page_size();
   zx_status_t status = zx::vmo::create(kPageSize, 0, &admin_data);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to create vmo: %s", zx_status_get_string(status));

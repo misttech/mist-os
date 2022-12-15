@@ -50,10 +50,10 @@ class QueuePair {
  public:
   // TODO(fxbug.dev/102133): Tune kMaxTransferPages vs. preallocated PRP buffer usage.
   // Limits the PRP buffer size to a single page.
-  static constexpr size_t kMaxTransferPages = 256;
+  static constexpr uint32_t kMaxTransferPages = 256;
 
   static zx::result<std::unique_ptr<QueuePair>> Create(zx::unowned_bti bti, uint16_t queue_id,
-                                                       size_t max_entries, CapabilityReg& reg,
+                                                       uint32_t max_entries, CapabilityReg& reg,
                                                        fdf::MmioBuffer& mmio, bool prealloc_prp);
 
   // Prefer |QueuePair::Create|.

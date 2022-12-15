@@ -713,7 +713,6 @@ config("Wno-conversion") {
     "//src/developer/shell/josh/lib:*",
     "//src/devices/block/drivers/ftl:*",
     "//src/devices/block/drivers/ftl/tests:*",
-    "//src/devices/block/drivers/nvme:*",
     "//src/devices/board/drivers/x86:*",
     "//src/devices/bus/drivers/pci:*",
     "//src/devices/bus/drivers/pci/test:*",
