@@ -440,12 +440,14 @@ constexpr ErrorDef<189, std::string_view> ErrUnicodeEscapeTooLarge(
     "invalid Unicode code point '{}'; maximum is 10FFFF");
 constexpr ErrorDef<190, flat::Name> ErrSimpleProtocolMustBeClosed(
     "@for_deprecated_c_bindings annotated protocol {} must be closed");
-constexpr ErrorDef<191, std::string_view> ErrMethodMustDefineStrictness(
-    "Method {} must explicitly specify strict or flexible. (The default is changing "
-    "from strict to flexible, and explicit modifiers are mandatory during the migration.)");
-constexpr ErrorDef<192, std::string_view> ErrProtocolMustDefineOpenness(
-    "Protocol {} must explicitly specify open, ajar, or closed. (The default is changing "
-    "from closed to open, and explicit modifiers are mandatory during the migration.)");
+constexpr FixableErrorDef<191, Fixable::Kind::kProtocolModifier, std::string_view>
+    ErrMethodMustDefineStrictness(
+        "Method {} must explicitly specify strict or flexible. (The default is changing "
+        "from strict to flexible, and explicit modifiers are mandatory during the migration.)");
+constexpr FixableErrorDef<192, Fixable::Kind::kProtocolModifier, std::string_view>
+    ErrProtocolMustDefineOpenness(
+        "Protocol {} must explicitly specify open, ajar, or closed. (The default is changing "
+        "from closed to open, and explicit modifiers are mandatory during the migration.)");
 constexpr ErrorDef<193, flat::Name> ErrCannotBeBoxedNorOptional("type {} cannot be boxed");
 }  // namespace fidl
 

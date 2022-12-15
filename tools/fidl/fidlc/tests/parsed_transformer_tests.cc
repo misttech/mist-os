@@ -57,7 +57,7 @@ TEST(ParsedTransformerTests, BadOneParsingFailure) {
   auto errors = transformer.GetErrors();
   ASSERT_EQ(errors.size(), 1);
   ASSERT_EQ(library.reporter()->errors().size(), 1);
-  EXPECT_EQ(errors[0].step, fidl::fix::Transformer::Step::kPreparing);
+  EXPECT_EQ(errors[0].step, fidl::fix::Step::kPreparing);
   EXPECT_ERR(library.reporter()->errors()[0], ErrUnexpectedTokenOfKind);
   EXPECT_SUBSTR(errors[0].msg, "bad.fidl");
 }
@@ -75,10 +75,10 @@ TEST(ParsedTransformerTests, BadManyParsingFailures) {
   auto errors = transformer.GetErrors();
   ASSERT_EQ(errors.size(), 2);
   ASSERT_EQ(library.reporter()->errors().size(), 2);
-  EXPECT_EQ(errors[0].step, fidl::fix::Transformer::Step::kPreparing);
+  EXPECT_EQ(errors[0].step, fidl::fix::Step::kPreparing);
   EXPECT_ERR(library.reporter()->errors()[0], ErrUnexpectedTokenOfKind);
   EXPECT_SUBSTR(errors[0].msg, "bad.fidl");
-  EXPECT_EQ(errors[1].step, fidl::fix::Transformer::Step::kPreparing);
+  EXPECT_EQ(errors[1].step, fidl::fix::Step::kPreparing);
   EXPECT_ERR(library.reporter()->errors()[1], ErrUnexpectedTokenOfKind);
   EXPECT_SUBSTR(errors[1].msg, "also_bad.fidl");
 }
@@ -109,9 +109,9 @@ TEST(ParsedTransformerTests, BadOneTransformingFailure) {
   auto errors = transformer.GetErrors();
   ASSERT_EQ(errors.size(), 2);
   ASSERT_TRUE(library.reporter()->errors().empty());
-  EXPECT_EQ(errors[0].step, fidl::fix::Transformer::Step::kTransforming);
+  EXPECT_EQ(errors[0].step, fidl::fix::Step::kTransforming);
   EXPECT_SUBSTR(errors[0].msg, "failure!");
-  EXPECT_EQ(errors[1].step, fidl::fix::Transformer::Step::kTransforming);
+  EXPECT_EQ(errors[1].step, fidl::fix::Step::kTransforming);
   EXPECT_SUBSTR(errors[1].msg, "valid.fidl");
 }
 
@@ -129,13 +129,13 @@ TEST(ParsedTransformerTests, BadManyTransformingFailures) {
   auto errors = transformer.GetErrors();
   ASSERT_EQ(errors.size(), 4);
   ASSERT_TRUE(library.reporter()->errors().empty());
-  EXPECT_EQ(errors[0].step, fidl::fix::Transformer::Step::kTransforming);
+  EXPECT_EQ(errors[0].step, fidl::fix::Step::kTransforming);
   EXPECT_SUBSTR(errors[0].msg, "failure!");
-  EXPECT_EQ(errors[1].step, fidl::fix::Transformer::Step::kTransforming);
+  EXPECT_EQ(errors[1].step, fidl::fix::Step::kTransforming);
   EXPECT_SUBSTR(errors[1].msg, "valid.fidl");
-  EXPECT_EQ(errors[2].step, fidl::fix::Transformer::Step::kTransforming);
+  EXPECT_EQ(errors[2].step, fidl::fix::Step::kTransforming);
   EXPECT_SUBSTR(errors[2].msg, "failure!");
-  EXPECT_EQ(errors[3].step, fidl::fix::Transformer::Step::kTransforming);
+  EXPECT_EQ(errors[3].step, fidl::fix::Step::kTransforming);
   EXPECT_SUBSTR(errors[3].msg, "also_valid.fidl");
 }
 
@@ -168,7 +168,7 @@ TEST(ParsedTransformerTests, BadOneFormattingFailure) {
   auto errors = transformer.GetErrors();
   ASSERT_EQ(errors.size(), 1);
   ASSERT_EQ(library.reporter()->errors().size(), 1);
-  EXPECT_EQ(errors[0].step, fidl::fix::Transformer::Step::kFormatting);
+  EXPECT_EQ(errors[0].step, fidl::fix::Step::kFormatting);
   EXPECT_ERR(library.reporter()->errors()[0], ErrExpectedDeclaration);
   EXPECT_SUBSTR(errors[0].msg, "a.fidl");
 }
@@ -188,10 +188,10 @@ TEST(ParsedTransformerTests, BadManyFormattingFailures) {
   auto errors = transformer.GetErrors();
   ASSERT_EQ(errors.size(), 2);
   ASSERT_EQ(library.reporter()->errors().size(), 2);
-  EXPECT_EQ(errors[0].step, fidl::fix::Transformer::Step::kFormatting);
+  EXPECT_EQ(errors[0].step, fidl::fix::Step::kFormatting);
   EXPECT_ERR(library.reporter()->errors()[0], ErrExpectedDeclaration);
   EXPECT_SUBSTR(errors[0].msg, "a.fidl");
-  EXPECT_EQ(errors[1].step, fidl::fix::Transformer::Step::kFormatting);
+  EXPECT_EQ(errors[1].step, fidl::fix::Step::kFormatting);
   EXPECT_ERR(library.reporter()->errors()[1], ErrExpectedDeclaration);
   EXPECT_SUBSTR(errors[1].msg, "b.fidl");
 }

@@ -153,6 +153,23 @@ class TokenSlice {
     return SearchForward(begin(), std::move(matcher));
   }
 
+  // Walk the |TokenSlice| from end to beginning, looking for the first |Token| that matches on all
+  // of the supplied search parameters. Its main benefit is that it absolves the user from keeping
+  // tracking of the |end()| themselves, as it will change with each mutation.
+  std::optional<TokenIterator> SearchBackward(TokenIterator from, TokenMatcher matcher) {
+    TokenIterator curr = from;
+    while (curr >= begin()) {
+      if (matcher(*curr)) {
+        return std::make_optional<TokenIterator>(curr);
+      }
+      curr--;
+    }
+    return std::nullopt;
+  }
+  std::optional<TokenIterator> SearchBackward(TokenMatcher matcher) {
+    return SearchBackward(end(), std::move(matcher));
+  }
+
   // Remove a |TokenIterator| from the |TokenSlice|. If the token is not represented at all in the
   // raw AST, this operation alone is sufficient. However, if the |Token| is used as a |start()| or
   // |end()| node anywhere in the raw AST, those nodes must first have |UpdateTokenPointer| called
@@ -540,6 +557,32 @@ class FileTransformState {
   std::unique_ptr<MutableElementMap> mutable_element_map;
 };
 
+// An enumeration of steps that transforms take as they progress.
+enum struct Step {
+  // The starting state.
+  kNew,
+  // The |Prepare()| operation has started.
+  kPreparing,
+  // The |Prepare()| operation has finished successfully.
+  kPrepared,
+  // The |Transform()| operation has started.
+  kTransforming,
+  // The |Transform()| operation has finished successfully.
+  kTransformed,
+  // The |Format()| operation has started.
+  kFormatting,
+  // The |Format()| operation has finished successfully.
+  kSuccess,
+  // Any one of the steps finished with errors.
+  kFailure,
+};
+
+// A transformation error.
+struct Error {
+  Step step;
+  std::string msg;
+};
+
 // A base-class that can be derived from to build transformers that alter FIDL source code in some
 // structured way. When users extend this class, they are expected to provide one or more override
 // for the protected |When*| methods which modify the raw AST nodes they visit.
@@ -586,30 +629,6 @@ class FileTransformState {
 // in |parsed_transformer_tests.cc|.
 class Transformer : public raw::DeclarationOrderTreeVisitor {
  public:
-  enum struct Step {
-    // The starting state.
-    kNew,
-    // The |Prepare()| operation has started.
-    kPreparing,
-    // The |Prepare()| operation has finished successfully.
-    kPrepared,
-    // The |Transform()| operation has started.
-    kTransforming,
-    // The |Transform()| operation has finished successfully.
-    kTransformed,
-    // The |Format()| operation has started.
-    kFormatting,
-    // The |Format()| operation has finished successfully.
-    kSuccess,
-    // Any one of the steps finished with errors.
-    kFailure,
-  };
-
-  struct Error {
-    Step step;
-    std::string msg;
-  };
-
   Transformer(const std::vector<const SourceFile*>& source_files,
               const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter)
       : source_files_(source_files),

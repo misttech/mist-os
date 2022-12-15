@@ -502,6 +502,7 @@ test("fidlc-test") {
     "enums_tests.cc",
     "errcat_good_tests.cc",
     "errors_tests.cc",
+    "fix_tests.cc",
     "flat_ast_tests.cc",
     "flexible_tests.cc",
     "formatter_tests.cc",

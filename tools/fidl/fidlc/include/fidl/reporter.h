@@ -54,6 +54,13 @@ class Reporter {
     return false;
   }
 
+  template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
+  bool Fail(const FixableErrorDef<Id, FixableKind, Args...>& def, SourceSpan span,
+            const identity_t<Args>&... args) {
+    Report(Diagnostic::MakeError(def, span, args...));
+    return false;
+  }
+
   // TODO(fxbug.dev/108248): Remove once all outstanding errors are documented.
   template <ErrorId Id, typename... Args>
   bool Fail(const UndocumentedErrorDef<Id, Args...>& def, SourceSpan span,
@@ -64,6 +71,12 @@ class Reporter {
 
   template <ErrorId Id, typename... Args>
   void Warn(const WarningDef<Id, Args...>& def, SourceSpan span, const identity_t<Args>&... args) {
+    Report(Diagnostic::MakeWarning(def, span, args...));
+  }
+
+  template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
+  void Warn(const FixableWarningDef<Id, FixableKind, Args...>& def, SourceSpan span,
+            const identity_t<Args>&... args) {
     Report(Diagnostic::MakeWarning(def, span, args...));
   }
 
@@ -157,6 +170,12 @@ class ReporterMixin {
     return reporter_->Fail(def, span, args...);
   }
 
+  template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
+  bool Fail(const FixableErrorDef<Id, FixableKind, Args...>& def, SourceSpan span,
+            const identity_t<Args>&... args) {
+    return reporter_->Fail(def, span, args...);
+  }
+
   // TODO(fxbug.dev/108248): Remove once all outstanding errors are documented.
   template <ErrorId Id, typename... Args>
   bool Fail(const UndocumentedErrorDef<Id, Args...>& def, SourceSpan span,
@@ -167,6 +186,12 @@ class ReporterMixin {
   template <ErrorId Id, typename... Args>
   void Warn(const WarningDef<Id, Args...>& def, SourceSpan span,
             const identity_t<Args>&... args) const {
+    reporter_->Warn(def, span, args...);
+  }
+
+  template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
+  void Warn(const FixableWarningDef<Id, FixableKind, Args...>& def, SourceSpan span,
+            const identity_t<Args>&... args) {
     reporter_->Warn(def, span, args...);
   }
 

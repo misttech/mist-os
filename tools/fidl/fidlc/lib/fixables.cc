@@ -19,7 +19,11 @@
 namespace fidl {
 
 std::unordered_map<const Fixable::Kind, const Fixable> Fixable::kActiveFixables = {
-    {Fixable::Kind::kNoop, {Fixable::Kind::kNoop, "noop", Fixable::Scope::kParsed, {}}},
+    {Fixable::Kind::kNoop,
+     {Fixable::Kind::kNoop,
+      "noop",
+      Fixable::Scope::kParsed,
+      {ExperimentalFlags(ExperimentalFlags::Flag::kNoop)}}},
     {Fixable::Kind::kProtocolModifier,
      {Fixable::Kind::kProtocolModifier,
       "protocol_modifier",
