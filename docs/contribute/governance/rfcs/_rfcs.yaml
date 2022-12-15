@@ -2617,6 +2617,19 @@
   submitted: '2022-08-24'
   reviewed: '2022-11-17'
 
+- name: 'RFC-0201'
+  title: 'Reclaim guest VM memory'
+  short_description: 'Allow host to use the previously allocated and lated released guest VM memory'
+  authors: ['alerad@google.com']
+  file: '0201_reclaim_guest_vm_memory.md'
+  area: ['Virtualization']
+  issue: ['10040', '100504', '100511', '88066']
+  gerrit_change_id: ['720508']
+  status: 'Accepted'
+  reviewers: ['abdulla@google.com', 'com', 'dahastin@google.com', 'tjdetwiler@google']
+  submitted: '2022-12-15'
+  reviewed: '2022-12-01'
+
 - name: 'RFC-0202'
   title: 'Test manager as a Service'
   short_description: 'Design for test manager as a service.'
