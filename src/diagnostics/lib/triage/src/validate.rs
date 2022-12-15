@@ -168,8 +168,11 @@ fn check_failure(
 mod test {
     use {
         super::*,
-        crate::act::{Action, Alert, Severity},
-        crate::metrics::ValueSource,
+        crate::{
+            act::{Action, Alert, Severity},
+            make_metrics,
+            metrics::ValueSource,
+        },
         anyhow::Error,
     };
 
@@ -197,13 +200,15 @@ mod test {
 
     #[fuchsia::test]
     fn validate_works() -> Result<(), Error> {
-        let metrics = build_map!((
-            "foo",
-            build_map!(
-                ("true", ValueSource::try_from_expression("1==1")?),
-                ("false", ValueSource::try_from_expression("1==0")?)
-            )
-        ));
+        let metrics = make_metrics!({
+            "foo":{
+                eval: {
+                    "true": "1 == 1",
+                    "false": "1 == 0"
+                }
+            }
+        });
+
         let actions = build_map!((
             "foo",
             build_map!(

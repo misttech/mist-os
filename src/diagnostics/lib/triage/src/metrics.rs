@@ -1181,6 +1181,44 @@ pub(crate) mod test {
         lazy_static::lazy_static,
     };
 
+    #[macro_export]
+    macro_rules! make_metrics {
+    ({$($namespace: literal: {
+            $(eval:  {$($ke: literal: $ve: expr),+ $(,)?})?
+            $(hardcoded: {$($kh: literal: $vh: expr),+ $(,)?})?
+            $(select: {$($ks: literal: [$($vs: expr),+ $(,)?]),+ $(,)?})?
+        }),+ $(,)?}) => {{
+        [$((
+            $namespace.to_string(),
+            [
+                $(
+                    $(
+                        ($ke.to_string(),
+                        ValueSource::try_from_expression($ve)
+                            .expect("Unable to parse expression as value source.")),
+                    )+
+                )?
+                $(
+                    $(
+                        ($kh.to_string(),
+                        ValueSource::new(Metric::Hardcoded($vh))),
+                    )+
+                )?
+                $(
+                    $(
+                        ($ks.to_string(),
+                        ValueSource::new(Metric::Selector(
+                            [$($vs.clone(),)+].to_vec()))),
+                    )+
+                )?
+            ]
+            .into_iter().collect::<HashMap<String, ValueSource>>()
+        )),+]
+        .into_iter()
+        .collect::<HashMap<String, HashMap<String, ValueSource>>>()
+    }};
+}
+
     /// Problem should never equal anything, even an identical Problem. Code (tests) can use
     /// assert_problem!(MetricValue::Problem(_), "foo") to test error messages.
     #[macro_export]
@@ -1319,23 +1357,12 @@ pub(crate) mod test {
     // Test evaluation on static values.
     #[fuchsia::test]
     fn test_evaluation() {
-        let metrics: Metrics = [(
-            "root".to_string(),
-            [
-                ("is42".to_string(), ValueSource::try_from_expression("42").unwrap()),
-                ("isOk".to_string(), ValueSource::try_from_expression("'OK'").unwrap()),
-                (
-                    "unhandled".to_string(),
-                    ValueSource::new(Metric::Hardcoded(unhandled_type("Unhandled"))),
-                ),
-            ]
-            .iter()
-            .cloned()
-            .collect(),
-        )]
-        .iter()
-        .cloned()
-        .collect();
+        let metrics = make_metrics!({
+            "root":{
+                eval: {"is42": "42", "isOk": "'OK'"}
+                hardcoded: {"unhandled": unhandled_type("Unhandled")}
+            }
+        });
         let state = MetricState::new(&metrics, Fetcher::FileData(EMPTY_FILE_FETCHER.clone()), None);
 
         // Can read a value.
@@ -1523,23 +1550,12 @@ pub(crate) mod test {
     // Test caching after evaluating static values
     #[fuchsia::test]
     fn test_caching_after_evaluation() {
-        let metrics: Metrics = [(
-            "root".to_string(),
-            [
-                ("is42".to_string(), ValueSource::try_from_expression("42").unwrap()),
-                ("is43".to_string(), ValueSource::try_from_expression("is42 + 1").unwrap()),
-                (
-                    "unhandled".to_string(),
-                    ValueSource::new(Metric::Hardcoded(unhandled_type("Unhandled"))),
-                ),
-            ]
-            .iter()
-            .cloned()
-            .collect(),
-        )]
-        .iter()
-        .cloned()
-        .collect();
+        let metrics = make_metrics!({
+            "root":{
+                eval: {"is42": "42", "is43": "is42 + 1"}
+                hardcoded: {"unhandled": unhandled_type("Unhandled")}
+            }
+        });
 
         let state = MetricState::new(&metrics, Fetcher::FileData(EMPTY_FILE_FETCHER.clone()), None);
         let trial_state =
@@ -1796,34 +1812,19 @@ pub(crate) mod test {
 
     #[fuchsia::test]
     fn test_not_valid_cycle_same_variable() {
-        let metrics: Metrics = [
-            (
-                "root".to_string(),
-                [
-                    ("is42".to_string(), ValueSource::try_from_expression("42").unwrap()),
-                    (
-                        "shouldBe42".to_string(),
-                        ValueSource::try_from_expression("is42 + 0").unwrap(),
-                    ),
-                ]
-                .iter()
-                .cloned()
-                .collect(),
-            ),
-            (
-                "n2".to_string(),
-                [(
-                    "is42".to_string(),
-                    ValueSource::try_from_expression("root::shouldBe42").unwrap(),
-                )]
-                .iter()
-                .cloned()
-                .collect(),
-            ),
-        ]
-        .iter()
-        .cloned()
-        .collect();
+        let metrics = make_metrics!({
+            "root":{
+                eval: {
+                    "is42": "42",
+                    "shouldBe42": "is42 + 0",
+                }
+            },
+            "n2":{
+                eval: {
+                    "is42": "root::shouldBe42"
+                }
+            }
+        });
         let state = MetricState::new(&metrics, Fetcher::FileData(EMPTY_FILE_FETCHER.clone()), None);
 
         // Evaluation with the same variable name but different namespace should be successful.
@@ -1833,43 +1834,24 @@ pub(crate) mod test {
     #[fuchsia::test]
     fn test_cycle_detected_correctly() {
         // Cycle is between n2::a -> n2::c -> root::b -> n2::a
-        let metrics: Metrics = [
-            (
-                "root".to_string(),
-                [
-                    ("is42".to_string(), ValueSource::try_from_expression("42").unwrap()),
-                    (
-                        "shouldBe62".to_string(),
-                        ValueSource::try_from_expression("is42 + 1 + n2::is19").unwrap(),
-                    ),
-                    ("b".to_string(), ValueSource::try_from_expression("is42 + n2::a").unwrap()),
-                ]
-                .iter()
-                .cloned()
-                .collect(),
-            ),
-            (
-                "n2".to_string(),
-                [
-                    ("is19".to_string(), ValueSource::try_from_expression("19").unwrap()),
-                    (
-                        "shouldBe44".to_string(),
-                        ValueSource::try_from_expression("root::is42 + 2").unwrap(),
-                    ),
-                    ("a".to_string(), ValueSource::try_from_expression("is19 + c").unwrap()),
-                    (
-                        "c".to_string(),
-                        ValueSource::try_from_expression("root::b + root::is42").unwrap(),
-                    ),
-                ]
-                .iter()
-                .cloned()
-                .collect(),
-            ),
-        ]
-        .iter()
-        .cloned()
-        .collect();
+        let metrics = make_metrics!({
+            "root":{
+                eval: {
+                    "is42": "42",
+                    "shouldBe62": "is42 + 1 + n2::is19",
+                    "b": "is42 + n2::a"
+                }
+            },
+            "n2":{
+                eval: {
+                    "is19": "19",
+                    "shouldBe44": "root::is42 + 2",
+                    "a": "is19 + c",
+                    "c": "root::b + root::is42"
+                }
+            }
+        });
+
         let state = MetricState::new(&metrics, Fetcher::FileData(EMPTY_FILE_FETCHER.clone()), None);
 
         // Evaluation when a cycle is not encountered should be successful.

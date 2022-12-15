@@ -553,8 +553,11 @@ impl ActionContext<'_> {
 mod test {
     use {
         super::*,
-        crate::config::Source,
-        crate::metrics::{ExpressionContext, Metric, Metrics, ValueSource},
+        crate::{
+            config::Source,
+            make_metrics,
+            metrics::{ExpressionContext, Metric, Metrics, ValueSource},
+        },
         anyhow::Error,
         std::{cell::RefCell, convert::TryFrom},
     };
@@ -571,15 +574,16 @@ mod test {
 
     #[fuchsia::test]
     fn actions_fire_correctly() {
-        let mut eval_file = HashMap::new();
-        eval_file.insert("true".to_string(), ValueSource::try_from_expression("0==0").unwrap());
-        eval_file.insert("false".to_string(), ValueSource::try_from_expression("0==1").unwrap());
-        eval_file
-            .insert("true_array".to_string(), ValueSource::try_from_expression("[0==0]").unwrap());
-        eval_file
-            .insert("false_array".to_string(), ValueSource::try_from_expression("[0==1]").unwrap());
-        let mut metrics = Metrics::new();
-        metrics.insert("file".to_string(), eval_file);
+        let metrics = make_metrics!({
+            "file":{
+                eval: {
+                    "true": "0 == 0",
+                    "false": "0 == 1",
+                    "true_array": "[0 == 0]",
+                    "false_array": "[0 == 1]"
+                }
+            }
+        });
         let mut actions = Actions::new();
         let mut action_file = ActionsSchema::new();
         action_file.insert(
@@ -646,27 +650,21 @@ mod test {
 
     #[fuchsia::test]
     fn gauges_fire_correctly() {
-        let mut eval_file = HashMap::new();
-        eval_file
-            .insert("gauge_f1".to_string(), ValueSource::try_from_expression("2 / 5").unwrap());
-        eval_file
-            .insert("gauge_f2".to_string(), ValueSource::try_from_expression("4 / 5").unwrap());
-        eval_file
-            .insert("gauge_f3".to_string(), ValueSource::try_from_expression("6 / 5").unwrap());
-        eval_file
-            .insert("gauge_i4".to_string(), ValueSource::try_from_expression("9 // 2").unwrap());
-        eval_file
-            .insert("gauge_i5".to_string(), ValueSource::try_from_expression("11 // 2").unwrap());
-        eval_file
-            .insert("gauge_i6".to_string(), ValueSource::try_from_expression("13 // 2").unwrap());
-        eval_file
-            .insert("gauge_b7".to_string(), ValueSource::try_from_expression("2 == 2").unwrap());
-        eval_file
-            .insert("gauge_b8".to_string(), ValueSource::try_from_expression("2 > 2").unwrap());
-        eval_file
-            .insert("gauge_s9".to_string(), ValueSource::try_from_expression("'foo'").unwrap());
-        let mut metrics = Metrics::new();
-        metrics.insert("file".to_string(), eval_file);
+        let metrics = make_metrics!({
+            "file":{
+                eval: {
+                    "gauge_f1": "2 / 5",
+                    "gauge_f2": "4 / 5",
+                    "gauge_f3": "6 / 5",
+                    "gauge_i4": "9 // 2",
+                    "gauge_i5": "11 // 2",
+                    "gauge_i6": "13 // 2",
+                    "gauge_b7": "2 == 2",
+                    "gauge_b8": "2 > 2",
+                    "gauge_s9": "'foo'"
+                }
+            }
+        });
         let mut actions = Actions::new();
         let mut action_file = ActionsSchema::new();
         macro_rules! insert_gauge {
@@ -839,12 +837,15 @@ mod test {
 
     #[fuchsia::test]
     fn actions_cache_correctly() {
-        let mut eval_file = HashMap::new();
-        eval_file.insert("true".to_string(), ValueSource::try_from_expression("0==0").unwrap());
-        eval_file.insert("false".to_string(), ValueSource::try_from_expression("0==1").unwrap());
-        eval_file.insert("five".to_string(), ValueSource::try_from_expression("5").unwrap());
-        let mut metrics = Metrics::new();
-        metrics.insert("file".to_string(), eval_file);
+        let metrics = make_metrics!({
+            "file":{
+                eval: {
+                    "true": "0 == 0",
+                    "false": "0 == 1",
+                    "five": "5"
+                }
+            }
+        });
         let mut actions = Actions::new();
         let mut action_file = ActionsSchema::new();
         action_file.insert(
