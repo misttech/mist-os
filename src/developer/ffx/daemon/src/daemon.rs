@@ -2,50 +2,68 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{anyhow, bail, Context, Result};
+use ascendd::Ascendd;
+use async_trait::async_trait;
+use errors::ffx_error;
+use ffx_build_version::build_info;
+use ffx_config::EnvironmentContext;
+use ffx_daemon_core::events::{self, EventHandler};
+use ffx_daemon_events::{
+    DaemonEvent, TargetConnectionState, TargetEvent, TargetInfo, WireTrafficType,
+};
+use ffx_daemon_protocols::create_protocol_register_map;
+use ffx_daemon_target::manual_targets::{Config, ManualTargets};
+use ffx_daemon_target::target::Target;
+use ffx_daemon_target::target_collection::TargetCollection;
+use ffx_daemon_target::zedboot::zedboot_discovery;
+use ffx_metrics::{add_daemon_launch_event, add_daemon_metrics_event};
+use ffx_stream_util::TryStreamUtilExt;
+use fidl::{endpoints::ClientEnd, prelude::*};
+use fidl_fuchsia_developer_ffx::{
+    self as ffx, DaemonError, DaemonMarker, DaemonRequest, DaemonRequestStream,
+    RepositoryRegistryMarker, TargetCollectionMarker, VersionInfo,
+};
+use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
+use fidl_fuchsia_overnet::Peer;
+use fidl_fuchsia_overnet::{ServiceProviderRequest, ServiceProviderRequestStream};
+use fidl_fuchsia_overnet_protocol::NodeId;
+use fuchsia_async::{Task, TimeoutExt, Timer};
+use futures::{
+    channel::{mpsc, oneshot},
+    executor::block_on,
+    prelude::*,
+};
+use hoist::{Hoist, OvernetInstance};
+use notify::{RecursiveMode, Watcher};
+use protocols::{DaemonProtocolProvider, ProtocolError, ProtocolRegister};
+use rcs::RcsConnection;
+use std::cell::Cell;
+use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::rc::Rc;
+use std::time::{Duration, Instant};
+
+#[cfg(not(target_os = "macos"))]
+use notify::RecommendedWatcher;
+
+// `RecommendedWatcher` is a type alias to FsEvents in the notify crate.
+// On mac this seems to have bugs about what's reported and when regarding
+// file removal. Without PollWatcher the watcher would report a fresh file
+// as having been deleted even if it is a new file.
+//
+// See fxbug.dev/114564 for details on what happens when using the Default
+// RecommendedWatcher (FsEvents).
+//
+// It's possible that in future versions of this crate this bug will be fixed,
+// so it may be worth revisiting this in the future in order to make the code
+// in this file a little cleaner and easier to read.
+#[cfg(target_os = "macos")]
 use {
-    anyhow::{anyhow, bail, Context, Result},
-    ascendd::Ascendd,
-    async_trait::async_trait,
-    errors::ffx_error,
-    ffx_build_version::build_info,
-    ffx_config::EnvironmentContext,
-    ffx_daemon_core::events::{self, EventHandler},
-    ffx_daemon_events::{
-        DaemonEvent, TargetConnectionState, TargetEvent, TargetInfo, WireTrafficType,
-    },
-    ffx_daemon_protocols::create_protocol_register_map,
-    ffx_daemon_target::manual_targets::{Config, ManualTargets},
-    ffx_daemon_target::target::Target,
-    ffx_daemon_target::target_collection::TargetCollection,
-    ffx_daemon_target::zedboot::zedboot_discovery,
-    ffx_metrics::{add_daemon_launch_event, add_daemon_metrics_event},
-    ffx_stream_util::TryStreamUtilExt,
-    fidl::{endpoints::ClientEnd, prelude::*},
-    fidl_fuchsia_developer_ffx::{
-        self as ffx, DaemonError, DaemonMarker, DaemonRequest, DaemonRequestStream,
-        RepositoryRegistryMarker, TargetCollectionMarker, VersionInfo,
-    },
-    fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy},
-    fidl_fuchsia_overnet::Peer,
-    fidl_fuchsia_overnet::{ServiceProviderRequest, ServiceProviderRequestStream},
-    fidl_fuchsia_overnet_protocol::NodeId,
-    fuchsia_async::{Task, TimeoutExt, Timer},
-    futures::{
-        channel::{mpsc, oneshot},
-        executor::block_on,
-        prelude::*,
-    },
-    hoist::{Hoist, OvernetInstance},
-    notify::{RecommendedWatcher, RecursiveMode, Watcher},
-    protocols::{DaemonProtocolProvider, ProtocolError, ProtocolRegister},
-    rcs::RcsConnection,
-    std::cell::Cell,
-    std::collections::HashSet,
-    std::hash::{Hash, Hasher},
-    std::net::SocketAddr,
-    std::path::PathBuf,
-    std::rc::Rc,
-    std::time::{Duration, Instant},
+    notify::PollWatcher as RecommendedWatcher,
+    std::sync::{Arc, Mutex},
 };
 
 // Daemon
@@ -331,7 +349,6 @@ impl Daemon {
         self.start_ascendd(hoist).await?;
         let _socket_file_watcher =
             self.start_socket_watch(quit_tx.clone()).await.context("Starting socket watcher")?;
-
         let should_start_expiry = ffx_config::get("discovery.expire_targets").await.unwrap_or(true);
         if should_start_expiry == true {
             self.start_target_expiry(Duration::from_secs(1));
@@ -432,7 +449,7 @@ impl Daemon {
     async fn start_socket_watch(&self, quit_tx: mpsc::Sender<()>) -> Result<RecommendedWatcher> {
         let socket_path = self.socket_path.clone();
         let socket_dir = self.socket_path.parent().context("Getting parent directory of socket")?;
-        let mut watcher = RecommendedWatcher::new_immediate(move |res| {
+        let event_handler = move |res| {
             let mut quit_tx = quit_tx.clone();
             block_on(async {
                 use notify::event::{Event, EventKind::Remove};
@@ -441,16 +458,33 @@ impl Daemon {
                         tracing::info!("daemon socket was deleted, triggering quit message.");
                         quit_tx.send(()).await.ok();
                     }
-                    Err(e) => {
-                        // if we get an error, treat that as something that should cause us to exit.
-                        tracing::warn!("watch error: {e:?}");
-                        quit_tx.send(()).await.ok();
+                    Err(ref e @ notify::Error { ref kind, .. }) => {
+                        match kind {
+                            notify::ErrorKind::Io(ioe) => {
+                                tracing::debug!("IO error. Ignoring {ioe:?}");
+                            }
+                            _ => {
+                                // If we get a non-spurious error, treat that as something that
+                                // should cause us to exit.
+                                tracing::warn!("exiting due to file watcher error: {e:?}");
+                                quit_tx.send(()).await.ok();
+                            }
+                        }
                     }
                     Ok(_) => {} // just ignore any non-delete event or for any other file.
                 }
             })
-        })
-        .context("Creating watcher")?;
+        };
+
+        #[cfg(target_os = "macos")]
+        let res = RecommendedWatcher::with_delay(
+            Arc::new(Mutex::new(event_handler)),
+            Duration::from_millis(500),
+        );
+        #[cfg(not(target_os = "macos"))]
+        let res = RecommendedWatcher::new_immediate(event_handler);
+
+        let mut watcher = res.context("Creating watcher")?;
 
         // we have to watch the directory because watching a file does weird things and only
         // half works. This seems to be a limitation of underlying libraries.
