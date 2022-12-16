@@ -795,4 +795,3 @@ func Sys_vmo_set_size(handle Handle, size uint64) Status
 //go:noescape
 //go:nosplit
 func Sys_vmo_write(handle Handle, buffer unsafe.Pointer, offset uint64, buffer_size uint) Status
-

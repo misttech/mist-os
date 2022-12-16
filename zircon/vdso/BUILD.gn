@@ -87,7 +87,7 @@ group("vdso") {
 
 group("tests") {
   testonly = true
-  deps = [ ":goldens($default_toolchain)" ]
+  deps = [ ":goldens" ]
 }
 
 # This is the zx library used by internal FIDL backends. For the library
@@ -356,63 +356,14 @@ if (current_toolchain == default_toolchain) {
     private_gen_dir = syscall_private_gen_dir
     rust_gen_dir = syscall_rust_gen_dir
   }
+}
 
-  #
-  # Golden testing.
-  #
+#
+# Golden testing.
+#
 
-  golden_candidate_dir = "$target_gen_dir/golden-candidates"
-  public_golden_candidate_dir = "$golden_candidate_dir/public"
-  private_golden_candidate_dir = "$golden_candidate_dir/private"
-  rust_golden_candidate_dir = "$golden_candidate_dir/rust"
-  go_golden_candidate_dir = "$golden_candidate_dir/go"
-
-  kazoo("all_outputs") {
-    testonly = true
-    public_gen_dir = public_golden_candidate_dir
-    private_gen_dir = private_golden_candidate_dir
-    go_gen_dir = go_golden_candidate_dir
-    rust_gen_dir = rust_golden_candidate_dir
-  }
-
-  golden_files("goldens") {
-    testonly = true
-
-    categories = [
-      {
-        gen_dir = public_golden_candidate_dir
-        generated = public_generated
-        golden_subdir = "public"
-      },
-      {
-        gen_dir = private_golden_candidate_dir
-        generated = private_generated
-        golden_subdir = "private"
-      },
-      {
-        gen_dir = go_golden_candidate_dir
-        generated = go_generated
-        golden_subdir = "go"
-      },
-      {
-        gen_dir = rust_golden_candidate_dir
-        generated = rust_generated
-        golden_subdir = "rust"
-      },
-    ]
-
-    comparisons = []
-    foreach(category, categories) {
-      foreach(gen, category.generated) {
-        comparisons += [
-          {
-            golden =
-                "//zircon/vdso/goldens/${category.golden_subdir}/" + gen.output
-            candidate = category.gen_dir + "/" + gen.output
-          },
-        ]
-      }
-    }
-    deps = [ ":all_outputs" ]
-  }
+# TODO(fxbug.dev/110295): Reintroduce golden testing against zither outputs.
+group("goldens") {
+  testonly = true
+  deps = []
 }
