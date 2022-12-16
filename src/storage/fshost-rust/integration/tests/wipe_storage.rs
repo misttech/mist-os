@@ -7,12 +7,14 @@
 
 use {
     crate::{data_fs_name, data_fs_spec, new_builder},
+    device_watcher::recursive_wait_and_open_node,
     fidl::endpoints::{create_proxy, Proxy as _},
     fidl_fuchsia_fshost as fshost,
     fidl_fuchsia_hardware_block::BlockProxy,
     fidl_fuchsia_hardware_block_partition::PartitionMarker,
     fidl_fuchsia_io as fio,
     fs_management::Blobfs,
+    fshost_test_fixture::TestFixture,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_zircon as zx,
     remote_block_device::{BlockClient, MutableBufferSlice, RemoteBlockClient},
@@ -35,6 +37,29 @@ async fn write_test_blob(directory: &fio::DirectoryProxy) {
     test_blob.resize(TEST_BLOB_LEN).await.unwrap().expect("Resize failed");
     let bytes_written = test_blob.write(&TEST_BLOB_DATA).await.unwrap().expect("Write failed");
     assert_eq!(bytes_written, TEST_BLOB_LEN);
+}
+
+// TODO(fxbug.dev/112142): Due to a race between the block watcher and some fshost functionality
+// (e.g. WipeStorage), we have to wait for the block watcher to finish binding all expected drivers.
+//
+// Regardless of the `fvm_ramdisk` / `ramdisk_prefix` / `gpt_all` config options, fshost will match
+// the first block device with a GPT or FVM partition and bind those drivers. zxcrypt volumes are
+// also unsealed, unless `no_zxcrypt` is true.
+async fn wait_for_block_watcher(fixture: &TestFixture, has_formatted_fvm: bool) {
+    let dev_root = fixture.dir("dev-topological");
+    let ramdisk_path = fixture.ramdisks.first().unwrap().get_path();
+    let gpt_path = format!("{}/part-000/block", ramdisk_path);
+    recursive_wait_and_open_node(&dev_root, &gpt_path).await.unwrap();
+    if has_formatted_fvm {
+        let blobfs_path = format!("{}/fvm/blobfs-p-1/block", gpt_path);
+        recursive_wait_and_open_node(&dev_root, &blobfs_path).await.unwrap();
+        let data_path = format!("{}/fvm/data-p-2/block", gpt_path);
+        recursive_wait_and_open_node(&dev_root, &data_path).await.unwrap();
+        if data_fs_name() != "fxfs" {
+            let zxcrypt_path = format!("{}/zxcrypt/unsealed/block", data_path);
+            recursive_wait_and_open_node(&dev_root, &zxcrypt_path).await.unwrap();
+        }
+    }
 }
 
 // Ensure fuchsia.fshost.Admin/WipeStorage fails if we cannot identify a storage device to wipe.
@@ -76,6 +101,7 @@ async fn write_blob() {
     // content sniffing of the FVM magic.
     builder.with_disk().with_gpt();
     let fixture = builder.build().await;
+    wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ true).await;
 
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
     let admin =
@@ -101,6 +127,7 @@ async fn blobfs_formatted() {
     builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/nada/zip/zilch");
     builder.with_disk().with_gpt();
     let fixture = builder.build().await;
+    wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ true).await;
     let dev = fixture.dir("dev-topological/class/block");
 
     // Mount Blobfs and write a blob.
@@ -152,6 +179,7 @@ async fn data_unformatted() {
     builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/nada/zip/zilch");
     builder.with_disk().format_data(data_fs_spec()).with_gpt();
     let fixture = builder.build().await;
+    wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ true).await;
     let dev = fixture.dir("dev-topological/class/block");
 
     let orig_instance_guid;
@@ -177,18 +205,6 @@ async fn data_unformatted() {
         block_client.read_at(MutableBufferSlice::Memory(&mut buff), 0).await.unwrap();
         // The data partition should have been formatted so there should be some non-zero bytes.
         assert_ne!(buff, [0; BUFF_LEN]);
-    }
-
-    // TODO(fxbug.dev/112142): Due to a race between the block watcher and WipeStorage, we have to
-    // wait for zxcrypt to be unsealed to ensure all child drivers of the FVM device are bound.
-    if data_fs_name() != "fxfs" {
-        device_watcher::wait_for_device_with(&dev, |info| {
-            info.topological_path
-                .ends_with("/fvm/data-p-2/block/zxcrypt/unsealed/block")
-                .then_some(())
-        })
-        .await
-        .unwrap();
     }
 
     // Invoke WipeStorage.
@@ -236,6 +252,7 @@ async fn handles_corrupt_fvm() {
     // Ensure that, while we allocate an FVM partition inside the GPT, we leave it empty.
     builder.with_disk().with_gpt().with_unformatted_fvm();
     let fixture = builder.build().await;
+    wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ false).await;
 
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
     let admin =
