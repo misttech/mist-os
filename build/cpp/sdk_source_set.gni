@@ -299,10 +299,7 @@ template("sdk_source_set") {
 
     deps = sdk_deps
 
-    non_sdk_deps = [
-      ":$main_target_name",
-      ":$metadata_target_name",
-    ]
+    non_sdk_deps = [ ":$metadata_target_name" ]
     if (should_verify_pragma) {
       non_sdk_deps += [ ":$verify_pragma_target_name" ]
     }
