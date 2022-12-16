@@ -481,24 +481,22 @@ template("assembly_input_bundle") {
     foreach(definition, invoker.config_data) {
       assert(defined(definition.package_name),
              "config_data definitions must include package_name")
-      assert(defined(definition.source_destination),
+      assert(defined(definition.files),
              "config_data definitions must include source")
 
       if (defined(definition.label)) {
         _config_data_deps += [ definition.label ]
       }
 
-      foreach(pair, definition.source_destination) {
-        assert(defined(pair.source),
-               "source_destination pairs must have source in scope")
-        assert(defined(pair.destination),
-               "source_destination pairs must have destination in scope")
-        _config_data_sources += [ pair.source ]
+      foreach(file, definition.files) {
+        assert(defined(file.source), "file must have source in scope")
+        assert(defined(file.destination), "file must have destination in scope")
+        _config_data_sources += [ file.source ]
         config_data_contents += [
           {
             package_name = definition.package_name
-            source = rebase_path(pair.source, root_build_dir)
-            destination = pair.destination
+            source = rebase_path(file.source, root_build_dir)
+            destination = file.destination
           },
         ]
       }
