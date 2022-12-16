@@ -323,6 +323,9 @@ template("assembly_input_bundle_archive") {
 #  qemu_kernel (optional; default: false)
 #    [path] Path to the qemu kernel.
 #
+#  kernel_cmdline (optional: default: [])
+#    [list of strings] Kernel cmdline arguments.
+#
 #  create_aib_package (optional; default: false)
 #    [boolean] Set to true to also create a package that contains the contents
 #    of the AIB.
@@ -374,6 +377,7 @@ template("assembly_input_bundle") {
     config_data = "${target_name}.config_data_list"
     config_data_with_verification = "${target_name}.group_with.config_data"
     bootfs_files_with_verification = "${target_name}.group_with.bootfs_files"
+    kernel_cmdline = "${target_name}.kernel_cmdline"
   }
 
   files = {
@@ -407,6 +411,10 @@ template("assembly_input_bundle") {
     # The output path for the generated file which collects config_data from
     # the invoking scope
     config_data = "${assembly_input_bundle_dir}.config_data_list"
+
+    # The output path for the generated file which collects kernel cmdline
+    # arguments.
+    kernel_cmdline = "${assembly_input_bundle_dir}.kernel_cmdline"
   }
 
   create_aib_package =
@@ -652,6 +660,22 @@ template("assembly_input_bundle") {
       "--qemu-kernel",
       rebase_path(invoker.qemu_kernel, root_build_dir),
     ]
+  }
+
+  if (defined(invoker.kernel_cmdline)) {
+    generated_file(labels.kernel_cmdline) {
+      forward_variables_from(invoker, [ "testonly" ])
+      outputs = [ files.kernel_cmdline ]
+      output_conversion = "json"
+      contents = invoker.kernel_cmdline
+    }
+
+    creation_args += [
+      "--kernel-cmdline",
+      rebase_path(files.kernel_cmdline, root_build_dir),
+    ]
+    creation_inputs += [ files.kernel_cmdline ]
+    creation_deps += [ ":${labels.kernel_cmdline}" ]
   }
 
   # Create the out-of-tree-usable Assembly Input Bundle

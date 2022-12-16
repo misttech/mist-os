@@ -44,6 +44,9 @@ def create_bundle(args: argparse.Namespace) -> None:
     if args.bootfs_files_list:
         add_bootfs_files_from_list(aib_creator, args.bootfs_files_list)
 
+    if args.kernel_cmdline:
+        add_kernel_cmdline_from_file(aib_creator, args.kernel_cmdline)
+
     # Add any bootloaders.
     if args.qemu_kernel:
         aib_creator.qemu_kernel = args.qemu_kernel
@@ -71,6 +74,14 @@ def add_pkg_list_from_file(
             raise ValueError(
                 f"duplicate pkg manifest found: {pkg_manifest_path}")
         pkg_set.add(pkg_manifest_path)
+
+
+def add_kernel_cmdline_from_file(aib_creator: AIBCreator, kernel_cmdline_file):
+    cmdline_list = _read_json_file(kernel_cmdline_file)
+    for cmd in cmdline_list:
+        if cmd in aib_creator.kernel.args:
+            raise ValueError(f"duplicate kernel cmdline arg found: {cmd}")
+        aib_creator.kernel.args.add(cmd)
 
 
 def add_driver_list_from_file(aib_creator: AIBCreator, driver_list_file):
@@ -355,6 +366,10 @@ def main():
         type=argparse.FileType('r'),
         help=
         "Path to a json list of package manifests for the 'cache' package set")
+    bundle_creation_parser.add_argument(
+        "--kernel-cmdline",
+        type=argparse.FileType('r'),
+        help="Path to a json list of kernel cmdline arguments")
     bundle_creation_parser.add_argument(
         "--qemu-kernel", help="Path to the qemu kernel")
     bundle_creation_parser.add_argument(
