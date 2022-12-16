@@ -5,7 +5,7 @@
 //! Download blob data from Google Cloud Storage (GCS).
 
 use {
-    crate::token_store::TokenStore,
+    crate::{error::GcsError, token_store::TokenStore},
     anyhow::{bail, Context, Result},
     fuchsia_hyper::{new_https_client, HttpsClient},
     hyper::{body::HttpBody as _, header::CONTENT_LENGTH, Body, Response, StatusCode},
@@ -44,9 +44,11 @@ pub struct ClientFactory {
 
 impl ClientFactory {
     /// Create a ClientFactory. Avoid creating more than one (see above).
-    pub fn new(token_store: TokenStore) -> Self {
-        let token_store = Arc::new(token_store);
-        Self { token_store }
+    pub fn new() -> Result<Self, GcsError> {
+        tracing::debug!("ClientFactory::new");
+        let auth = TokenStore::new()?;
+        let token_store = Arc::new(auth);
+        Ok(Self { token_store })
     }
 
     /// Create a new https client with shared access to the GCS credentials.
@@ -54,6 +56,12 @@ impl ClientFactory {
     /// Multiple clients may be created to perform downloads in parallel.
     pub fn create_client(&self) -> Client {
         Client::from_token_store(self.token_store.clone())
+    }
+
+    /// Set the access token for all clients created from the same
+    /// ClientFactory.
+    pub async fn set_access_token(&self, access: String) {
+        self.token_store.set_access_token(access).await;
     }
 }
 
@@ -144,6 +152,12 @@ impl Client {
     /// Intentionally not public. Use ClientFactory::new_client() instead.
     fn from_token_store(token_store: Arc<TokenStore>) -> Self {
         Self { https: new_https_client(), token_store }
+    }
+
+    /// Set the access token for all clients created from the same
+    /// ClientFactory.
+    pub async fn set_access_token(&self, access: String) {
+        self.token_store.set_access_token(access).await;
     }
 
     /// Similar to path::exists(), return true if the blob is available.
@@ -338,13 +352,13 @@ impl Client {
 mod test {
     use {
         super::*,
-        crate::token_store::read_boto_refresh_token,
+        crate::{auth::pkce::new_access_token, token_store::read_boto_refresh_token},
         std::{fs::read_to_string, path::Path},
     };
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_client_factory_no_auth() {
-        let client_factory = ClientFactory::new(TokenStore::new_without_auth());
+        let client_factory = ClientFactory::new().expect("creating client factory");
         let client = client_factory.create_client();
         let res =
             client.stream("for_testing_does_not_exist", "face_test_object").await.expect("stream");
@@ -359,12 +373,14 @@ mod test {
     async fn test_client_factory_with_auth() {
         // Set up authorized client.
         use home::home_dir;
-        let boto_path = Path::new(&home_dir().expect("home dir")).join(".boto");
-        let refresh = read_boto_refresh_token(&boto_path).expect("refresh token");
-        let auth =
-            TokenStore::new_with_auth(refresh, /*access_token=*/ None).expect("new with auth");
-        let client_factory = ClientFactory::new(auth);
+        let client_factory = ClientFactory::new().expect("creating client factory");
         let client = client_factory.create_client();
+
+        let boto_path = Path::new(&home_dir().expect("getting home dir")).join(".boto");
+        let refresh_token = read_boto_refresh_token(&boto_path).expect("reading refresh token");
+        let access_token =
+            new_access_token(&refresh_token).await.expect("getting new access token");
+        client.set_access_token(access_token).await;
 
         // Try downloading something that doesn't exist.
         let res =

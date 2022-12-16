@@ -23,6 +23,7 @@ ffx_plugin("ffx_product_bundle") {
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-url",
+    "//src/lib/gcs",
     "//src/lib/structured_ui",
     "//third_party/rust_crates:fs_extra",
     "//third_party/rust_crates:serde",

@@ -11,7 +11,9 @@ use {
         repo_info::RepoInfo,
         AuthFlowChoice,
     },
-    ::gcs::client::{DirectoryProgress, FileProgress, ProgressResponse, ProgressResult, Throttle},
+    ::gcs::client::{
+        Client, DirectoryProgress, FileProgress, ProgressResponse, ProgressResult, Throttle,
+    },
     anyhow::{bail, Context, Result},
     async_fs::File,
     fms::{find_product_bundle, Entries},
@@ -41,6 +43,7 @@ pub(crate) async fn fetch_product_metadata<F, I>(
     auth_flow: &AuthFlowChoice,
     progress: &F,
     ui: &I,
+    client: &Client,
 ) -> Result<()>
 where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
@@ -54,7 +57,7 @@ where
     info.save(&output_dir.join("info"))?;
     tracing::debug!("Wrote 'info' file to {:?}", output_dir);
 
-    fetch_bundle_uri(&repo, output_dir, auth_flow, progress, ui)
+    fetch_bundle_uri(&repo, output_dir, auth_flow, progress, ui, client)
         .await
         .context("fetching product bundle by URL")?;
     Ok(())
@@ -193,6 +196,7 @@ pub(crate) async fn get_product_data_from_gcs<I>(
     local_repo_dir: &std::path::Path,
     auth_flow: &AuthFlowChoice,
     ui: &I,
+    client: &Client,
 ) -> Result<()>
 where
     I: structured_ui::Interface + Sync,
@@ -208,6 +212,7 @@ where
         auth_flow,
         &mut |_d, _f| Ok(ProgressResponse::Continue),
         ui,
+        client,
     )
     .await
     .context("fetching metadata")?;
@@ -220,7 +225,8 @@ where
     entries.add_from_path(&file_path).context("adding entries from gcs")?;
     let product_bundle = find_product_bundle(&entries, &Some(product_name.to_string()))
         .context("finding product bundle")?;
-    fetch_data_for_product_bundle_v1(&product_bundle, &url, local_repo_dir, auth_flow, ui).await
+    fetch_data_for_product_bundle_v1(&product_bundle, &url, local_repo_dir, auth_flow, ui, client)
+        .await
 }
 
 /// Helper for `get_product_data()`, see docs there.
@@ -230,6 +236,7 @@ pub async fn fetch_data_for_product_bundle_v1<I>(
     local_repo_dir: &std::path::Path,
     auth_flow: &AuthFlowChoice,
     ui: &I,
+    client: &Client,
 ) -> Result<()>
 where
     I: structured_ui::Interface + Sync,
@@ -252,7 +259,7 @@ where
 
             let base_url =
                 make_remote_url(product_url, &image.base_uri).context("image.base_uri")?;
-            if !exists_in_gcs(&base_url.as_str(), auth_flow, ui).await? {
+            if !exists_in_gcs(&base_url.as_str(), auth_flow, ui, client).await? {
                 tracing::warn!("The base_uri does not exist: {}", base_url);
             }
             fetch_by_format(
@@ -270,6 +277,7 @@ where
                     Ok(ProgressResponse::Continue)
                 },
                 ui,
+                client,
             )
             .await
             .with_context(|| format!("fetching images for {}.", product_bundle.name))?;
@@ -302,6 +310,7 @@ where
                 Ok(ProgressResponse::Continue)
             },
             ui,
+            client,
         )
         .await
         .with_context(|| {
@@ -350,6 +359,7 @@ async fn fetch_by_format<F, I>(
     auth_flow: &AuthFlowChoice,
     progress: &F,
     ui: &I,
+    client: &Client,
 ) -> Result<()>
 where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
@@ -357,7 +367,7 @@ where
 {
     tracing::debug!("fetch_by_format");
     match format {
-        "files" | "tgz" => fetch_bundle_uri(uri, &local_dir, auth_flow, progress, ui).await,
+        "files" | "tgz" => fetch_bundle_uri(uri, &local_dir, auth_flow, progress, ui, client).await,
         _ =>
         // The schema currently defines only "files" or "tgz" (see RFC-100).
         // This error could be a typo in the product bundle or a new image
@@ -383,6 +393,7 @@ pub(crate) async fn fetch_bundle_uri<F, I>(
     auth_flow: &AuthFlowChoice,
     progress: &F,
     ui: &I,
+    client: &Client,
 ) -> Result<()>
 where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
@@ -390,7 +401,7 @@ where
 {
     tracing::debug!("fetch_bundle_uri {:?}", product_url);
     if product_url.scheme() == GS_SCHEME {
-        fetch_from_gcs(product_url.as_str(), local_dir, auth_flow, progress, ui)
+        fetch_from_gcs(product_url.as_str(), local_dir, auth_flow, progress, ui, client)
             .await
             .context("Downloading from GCS.")?;
     } else if product_url.scheme() == "http" || product_url.scheme() == "https" {
@@ -595,6 +606,8 @@ mod tests {
     async fn test_fetch_by_format() {
         let url = url::Url::parse("fake://foo").expect("url");
         let ui = structured_ui::MockUi::new();
+        let client_factory = gcs::client::ClientFactory::new().expect("creating client factory");
+        let client = client_factory.create_client();
         fetch_by_format(
             "bad",
             &url,
@@ -602,6 +615,7 @@ mod tests {
             &AuthFlowChoice::Default,
             &mut |_d, _f| Ok(ProgressResponse::Continue),
             &ui,
+            &client,
         )
         .await
         .expect("bad fetch");
@@ -612,12 +626,15 @@ mod tests {
     async fn test_fetch_bundle_uri() {
         let url = url::Url::parse("fake://foo").expect("url");
         let ui = structured_ui::MockUi::new();
+        let client_factory = gcs::client::ClientFactory::new().expect("creating client factory");
+        let client = client_factory.create_client();
         fetch_bundle_uri(
             &url,
             &Path::new("unused"),
             &AuthFlowChoice::Default,
             &mut |_d, _f| Ok(ProgressResponse::Continue),
             &ui,
+            &client,
         )
         .await
         .expect("bad fetch");

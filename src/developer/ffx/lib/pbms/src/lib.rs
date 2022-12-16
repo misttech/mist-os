@@ -28,7 +28,7 @@ use {
         },
         repo_info::RepoInfo,
     },
-    ::gcs::client::ProgressResponse,
+    ::gcs::client::{Client, ProgressResponse},
     anyhow::{bail, Context, Result},
     camino::Utf8Path,
     errors::ffx_bail,
@@ -42,6 +42,7 @@ use {
     structured_ui::{Presentation, TableRows},
 };
 
+pub use crate::gcs::handle_new_access_token;
 pub use crate::pbms::{fetch_data_for_product_bundle_v1, get_product_dir, get_storage_dir};
 pub use crate::transfer_manifest::transfer_download;
 
@@ -142,7 +143,8 @@ pub async fn update_metadata_all<I>(
     sdk: &ffx_config::Sdk,
     output_dir: &Path,
     auth_flow: &AuthFlowChoice,
-    ui: &mut I,
+    ui: &I,
+    client: &Client,
 ) -> Result<()>
 where
     I: structured_ui::Interface + Sync,
@@ -162,6 +164,7 @@ where
             auth_flow,
             &mut |_d, _f| Ok(ProgressResponse::Continue),
             ui,
+            client,
         )
         .await
         .context("fetching product metadata")?;
@@ -174,7 +177,8 @@ pub async fn update_metadata_from<I>(
     product_url: &url::Url,
     output_dir: &Path,
     auth_flow: &AuthFlowChoice,
-    ui: &mut I,
+    ui: &I,
+    client: &Client,
 ) -> Result<()>
 where
     I: structured_ui::Interface + Sync,
@@ -186,6 +190,7 @@ where
         &auth_flow,
         &mut |_d, _f| Ok(ProgressResponse::Continue),
         ui,
+        client,
     )
     .await
     .context("fetching product metadata")
@@ -418,7 +423,8 @@ pub async fn get_product_data<I>(
     product_url: &url::Url,
     output_dir: &std::path::Path,
     auth_flow: &AuthFlowChoice,
-    ui: &mut I,
+    ui: &I,
+    client: &Client,
 ) -> Result<bool>
 where
     I: structured_ui::Interface + Sync,
@@ -434,7 +440,7 @@ where
         should_get_data = false;
     }
     if should_get_data {
-        get_product_data_from_gcs(product_url, output_dir, auth_flow, ui)
+        get_product_data_from_gcs(product_url, output_dir, auth_flow, ui, client)
             .await
             .context("reading pbms entries")
             .map(|_| true)
@@ -590,10 +596,12 @@ mod tests {
         let mut input = Box::new(std::io::stdin());
         let mut output = Vec::new();
         let mut err_out = Vec::new();
-        let mut ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+        let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+        let client_factory = ::gcs::client::ClientFactory::new().expect("creating client factory");
+        let client = client_factory.create_client();
 
         let sdk = env.context.get_sdk().await.expect("Loading configured sdk");
-        update_metadata_all(&sdk, output_dir.path(), &AuthFlowChoice::Default, &mut ui)
+        update_metadata_all(&sdk, output_dir.path(), &AuthFlowChoice::Default, &ui, &client)
             .await
             .expect("updating metadata");
         let urls = product_bundle_urls(&sdk).await.expect("get pb urls");

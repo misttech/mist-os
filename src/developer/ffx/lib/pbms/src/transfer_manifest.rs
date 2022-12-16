@@ -11,7 +11,7 @@ use {
         gcs::{fetch_from_gcs, string_from_gcs},
         AuthFlowChoice,
     },
-    ::gcs::client::{ProgressResult, ProgressState},
+    ::gcs::client::{Client, ProgressResult, ProgressState},
     ::gcs::gs_url::split_gs_url,
     ::transfer_manifest::TransferManifest,
     anyhow::{Context, Result},
@@ -28,6 +28,7 @@ pub async fn transfer_download<F, I>(
     auth_flow: &AuthFlowChoice,
     progress: &F,
     ui: &I,
+    client: &Client,
 ) -> Result<()>
 where
     F: Fn(Vec<ProgressState<'_>>) -> ProgressResult,
@@ -41,19 +42,30 @@ where
     );
     assert!(local_dir.is_dir());
 
-    let tm =
-        string_from_gcs(&transfer_manifest_url.as_str(), auth_flow, &|f| progress(vec![f]), ui)
-            .await
-            .with_context(|| format!("string from gcs: {:?}", transfer_manifest_url))?;
+    let tm = string_from_gcs(
+        &transfer_manifest_url.as_str(),
+        auth_flow,
+        &|f| progress(vec![f]),
+        ui,
+        client,
+    )
+    .await
+    .with_context(|| format!("string from gcs: {:?}", transfer_manifest_url))?;
 
     let manifest = serde_json::from_str::<TransferManifest>(&tm)
         .with_context(|| format!("Parsing json {:?}", tm))?;
     match &manifest {
-        TransferManifest::V1(v1_data) => {
-            transfer_download_v1(transfer_manifest_url, v1_data, local_dir, auth_flow, progress, ui)
-                .await
-                .context("transferring from v1 manifest")?
-        }
+        TransferManifest::V1(v1_data) => transfer_download_v1(
+            transfer_manifest_url,
+            v1_data,
+            local_dir,
+            auth_flow,
+            progress,
+            ui,
+            client,
+        )
+        .await
+        .context("transferring from v1 manifest")?,
     }
     tracing::debug!("Total fetch images runtime {} seconds.", start.elapsed().as_secs_f32());
     Ok(())
@@ -70,6 +82,7 @@ async fn transfer_download_v1<F, I>(
     auth_flow: &AuthFlowChoice,
     progress: &F,
     ui: &I,
+    client: &Client,
 ) -> Result<()>
 where
     F: Fn(Vec<ProgressState<'_>>) -> ProgressResult,
@@ -121,6 +134,7 @@ where
                     progress(vec![section, directory, f])
                 },
                 ui,
+                client,
             )
             .await
             .context("fetching from gcs")?;

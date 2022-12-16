@@ -21,7 +21,6 @@ use super::size_check::PackageBlobSizeInfo;
 use gcs::{
     client::{Client, ClientFactory},
     gs_url::split_gs_url,
-    token_store::{RefreshAccessType, TokenStore},
 };
 
 const TOTAL_BLOBFS_GERRIT_COMPONENT_NAME: &str = "Total BlobFS contents";
@@ -189,30 +188,29 @@ pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> 
 }
 
 async fn get_gcs_client_with_auth(auth_mode: AuthMode) -> Result<Client> {
-    let refresh_token = match auth_mode {
-        AuthMode::Default | AuthMode::Pkce => {
-            let mut input = std::io::stdin();
-            let mut output = std::io::stdout();
-            let mut err_out = std::io::stderr();
-            let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+    use pbms::{handle_new_access_token, AuthFlowChoice};
 
-            RefreshAccessType::RefreshToken(
-                gcs::auth::pkce::new_refresh_token(&ui).await.context("pkce: get refresh token")?,
-            )
-        }
-        AuthMode::Oob => RefreshAccessType::RefreshToken(
-            gcs::auth::oob::new_refresh_token().await.context("oob: get refresh token")?,
-        ),
-        AuthMode::Exec(exec_path) => RefreshAccessType::Exec(exec_path),
+    let mut input = std::io::stdin();
+    let mut output = std::io::stdout();
+    let mut err_out = std::io::stderr();
+    let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+
+    let auth_flow = match auth_mode {
+        AuthMode::Default => AuthFlowChoice::Default,
+        AuthMode::Pkce => AuthFlowChoice::Pkce,
+        AuthMode::Oob => AuthFlowChoice::Oob,
+        AuthMode::Exec(p) => AuthFlowChoice::Exec(p),
     };
-    let token_store =
-        TokenStore::new_with_auth(refresh_token, /*access_token=*/ None).expect("token_store");
-    let factory = ClientFactory::new(token_store);
+
+    let access_token = handle_new_access_token(&auth_flow, &ui).await?;
+
+    let factory = ClientFactory::new()?;
+    factory.set_access_token(access_token).await;
     Ok(factory.create_client())
 }
 
 async fn gcs_download(bucket: &str, object: &str, auth_mode: AuthMode) -> Result<PathBuf> {
-    let client = get_gcs_client_with_auth(auth_mode).await?;
+    let client = get_gcs_client_with_auth(auth_mode).await.context("getting gcs client")?;
     let output_path = Path::new("/tmp/fuchsia.json");
     client.fetch_without_progress(bucket, object, &output_path).await.context("Downloading")?;
     Ok(output_path.to_path_buf())

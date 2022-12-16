@@ -8,9 +8,8 @@ use {
     anyhow::{Context, Result},
     fuchsia_hyper::new_https_client,
     gcs::{
-        auth::pkce::new_refresh_token,
+        auth::pkce::{new_access_token, new_refresh_token},
         client::ClientFactory,
-        token_store::{RefreshAccessType, TokenStore},
     },
 };
 
@@ -45,14 +44,12 @@ async fn auth_test() -> Result<()> {
     let mut input = std::io::stdin();
     let mut output = std::io::stdout();
     let mut err_out = std::io::stderr();
-    let mut ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
-    let refresh_token = RefreshAccessType::RefreshToken(
-        new_refresh_token(&mut ui).await.context("get refresh token")?,
-    );
-    let token_store =
-        TokenStore::new_with_auth(refresh_token, /*access_token=*/ None).expect("token_store");
+    let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+    let refresh_token = new_refresh_token(&ui).await.context("get refresh token")?;
+    let access_token = new_access_token(&refresh_token).await?;
 
-    let factory = ClientFactory::new(token_store);
+    let factory = ClientFactory::new()?;
+    factory.set_access_token(access_token).await;
     let client = factory.create_client();
 
     // Test download of an existing blob (the choice of blob is arbitrary, feel

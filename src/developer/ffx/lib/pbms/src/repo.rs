@@ -7,11 +7,12 @@
 
 use {
     crate::{
-        gcs::{get_boto_path, get_gcs_client_with_auth, get_gcs_client_without_auth},
         pbms::{fetch_bundle_uri, make_remote_url, GS_SCHEME},
         AuthFlowChoice,
     },
-    ::gcs::client::{DirectoryProgress, FileProgress, ProgressResponse, ProgressResult, Throttle},
+    ::gcs::client::{
+        Client, DirectoryProgress, FileProgress, ProgressResponse, ProgressResult, Throttle,
+    },
     anyhow::{anyhow, bail, Context, Result},
     camino::Utf8Path,
     chrono::{DateTime, TimeZone, Utc},
@@ -43,6 +44,7 @@ pub(crate) async fn fetch_package_repository_from_mirrors<F, I>(
     auth_flow: &AuthFlowChoice,
     progress: &F,
     ui: &I,
+    client: &Client,
 ) -> Result<()>
 where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
@@ -51,9 +53,16 @@ where
     // The packages list is a set of mirrors. Try downloading the packages from each one. Only error
     // out if we can't download the packages from any mirror.
     for (i, package) in packages.iter().enumerate() {
-        let res =
-            fetch_package_repository(product_url, local_dir, package, auth_flow, progress, ui)
-                .await;
+        let res = fetch_package_repository(
+            product_url,
+            local_dir,
+            package,
+            auth_flow,
+            progress,
+            ui,
+            client,
+        )
+        .await;
 
         match res {
             Ok(()) => {
@@ -81,6 +90,7 @@ async fn fetch_package_repository<F, I>(
     auth_flow: &AuthFlowChoice,
     progress: &F,
     ui: &I,
+    client: &Client,
 ) -> Result<()>
 where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
@@ -130,6 +140,7 @@ where
                 auth_flow,
                 progress,
                 ui,
+                client,
             )
             .await
             .context("fetch_package_repository_from_files")
@@ -140,8 +151,15 @@ where
                 unimplemented!();
             }
 
-            fetch_package_repository_from_tgz(local_dir, repo_metadata_uri, auth_flow, progress, ui)
-                .await
+            fetch_package_repository_from_tgz(
+                local_dir,
+                repo_metadata_uri,
+                auth_flow,
+                progress,
+                ui,
+                client,
+            )
+            .await
         }
         _ =>
         // The schema currently defines only "files" or "tgz" (see RFC-100).
@@ -173,6 +191,7 @@ async fn fetch_package_repository_from_files<F, I>(
     auth_flow: &AuthFlowChoice,
     progress: &F,
     ui: &I,
+    pb_client: &Client,
 ) -> Result<()>
 where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
@@ -180,49 +199,13 @@ where
 {
     match (repo_metadata_uri.scheme(), repo_blobs_uri.scheme()) {
         (GS_SCHEME, GS_SCHEME) => {
-            // FIXME(fxbug.dev/103331): we are reproducing the gcs library's authentication flow,
-            // where we will prompt for an oauth token if we get a permission denied error. This
-            // was done because the pbms library is written to be used a frontend that can prompt
-            // for an oauth token, but the `pkg` library is written to be used on the server side,
-            // which cannot do the prompt. We should eventually restructure things such that we can
-            // deduplicate this logic.
-
-            // First try to fetch with the public client.
-            let client = get_gcs_client_without_auth();
             let backend = Box::new(GcsRepository::new(
-                client,
+                pb_client.clone(),
                 repo_metadata_uri.clone(),
                 repo_blobs_uri.clone(),
             )?) as Box<dyn RepoProvider>;
 
             let metadata_current_time = Utc::now();
-            if let Ok(()) = fetch_package_repository_from_backend(
-                local_dir,
-                repo_keys_uri.clone(),
-                repo_metadata_uri.clone(),
-                repo_blobs_uri.clone(),
-                backend,
-                metadata_current_time,
-                auth_flow,
-                progress,
-                ui,
-            )
-            .await
-            {
-                return Ok(());
-            }
-
-            tracing::debug!("fetch_package_repository_from_backend failed");
-            let boto_path = get_boto_path(auth_flow, ui).await?;
-            let client = get_gcs_client_with_auth(auth_flow, &boto_path)
-                .context("get_gcs_client_with_auth")?;
-
-            let backend = Box::new(GcsRepository::new(
-                client,
-                repo_metadata_uri.clone(),
-                repo_blobs_uri.clone(),
-            )?) as Box<dyn RepoProvider>;
-
             fetch_package_repository_from_backend(
                 local_dir,
                 repo_keys_uri.clone(),
@@ -233,6 +216,7 @@ where
                 auth_flow,
                 progress,
                 ui,
+                pb_client,
             )
             .await
             .context("fetch_package_repository_from_backend")
@@ -255,6 +239,7 @@ where
                 auth_flow,
                 progress,
                 ui,
+                pb_client,
             )
             .await
             .context("fetch_package_repository_from_backend")
@@ -279,6 +264,7 @@ async fn fetch_package_repository_from_backend<'a, F, I>(
     auth_flow: &'a AuthFlowChoice,
     progress: &'a F,
     ui: &'a I,
+    client: &'a Client,
 ) -> Result<()>
 where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
@@ -319,6 +305,7 @@ where
         auth_flow,
         progress,
         ui,
+        client,
     )
     .await
     .context("fetch_bundle_uri targets.json")?;
@@ -329,6 +316,7 @@ where
         auth_flow,
         progress,
         ui,
+        client,
     )
     .await
     .context("fetch_bundle_uri snapshot.json")?;
@@ -339,6 +327,7 @@ where
         auth_flow,
         progress,
         ui,
+        client,
     )
     .await
     .context("fetch_bundle_uri timestamp.json")?;
@@ -434,12 +423,13 @@ async fn fetch_package_repository_from_tgz<F, I>(
     auth_flow: &AuthFlowChoice,
     progress: &F,
     ui: &I,
+    client: &Client,
 ) -> Result<()>
 where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
     I: structured_ui::Interface + Sync,
 {
-    fetch_bundle_uri(&repo_uri, &local_dir, auth_flow, progress, ui)
+    fetch_bundle_uri(&repo_uri, &local_dir, auth_flow, progress, ui, client)
         .await
         .with_context(|| format!("downloading repo URI {}", repo_uri))
 }
@@ -575,6 +565,8 @@ mod tests {
 
         // Download the repository metadata.
         let ui = structured_ui::MockUi::new();
+        let client_factory = gcs::client::ClientFactory::new().expect("creating client factory");
+        let client = client_factory.create_client();
         fetch_package_repository_from_backend(
             local_repo_dir.as_std_path(),
             keys_url,
@@ -585,6 +577,7 @@ mod tests {
             &AuthFlowChoice::Default,
             &|_, _| Ok(ProgressResponse::Continue),
             &ui,
+            &client,
         )
         .await
         .unwrap();

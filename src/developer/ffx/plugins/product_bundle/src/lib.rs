@@ -7,6 +7,7 @@
 //! - acquire related data files, such as disk partition images (data)
 
 use {
+    ::gcs::client::ClientFactory,
     anyhow::{bail, Context, Result},
     errors::ffx_bail,
     ffx_config::ConfigLevel,
@@ -284,7 +285,10 @@ where
         .context("getting sdk env context")?;
     if !cmd.cached {
         let storage_dir = pbms::get_storage_dir().await?;
-        update_metadata_all(&sdk, &storage_dir, select_auth(cmd.oob_auth, &cmd.auth), ui).await?;
+        let client_factory = ClientFactory::new()?;
+        let client = client_factory.create_client();
+        update_metadata_all(&sdk, &storage_dir, select_auth(cmd.oob_auth, &cmd.auth), ui, &client)
+            .await?;
     }
     let mut entries = product_bundle_urls(&sdk).await.context("list pbms")?;
     if entries.is_empty() {
@@ -498,7 +502,10 @@ where
         }
     }
 
-    get_product_data(&product_url, &output_dir, select_auth(cmd.oob_auth, &cmd.auth), ui).await
+    let client_factory = ClientFactory::new()?;
+    let client = client_factory.create_client();
+    get_product_data(&product_url, &output_dir, select_auth(cmd.oob_auth, &cmd.auth), ui, &client)
+        .await
 }
 
 /// Sets up a package server repository for the product bundle being downloaded. This is
@@ -542,7 +549,10 @@ where
 {
     if !cmd.cached {
         let base_dir = pbms::get_storage_dir().await?;
-        update_metadata_all(sdk, &base_dir, select_auth(cmd.oob_auth, &cmd.auth), ui).await?;
+        let client_factory = ClientFactory::new()?;
+        let client = client_factory.create_client();
+        update_metadata_all(sdk, &base_dir, select_auth(cmd.oob_auth, &cmd.auth), ui, &client)
+            .await?;
     }
     let should_print = true;
     select_product_bundle(sdk, &cmd.product_bundle_name, ListingMode::GetableBundles, should_print)

@@ -11,10 +11,11 @@ use {
     anyhow::{anyhow, bail, Result},
     async_trait::async_trait,
     chrono::Utc,
-    errors::ffx_bail,
+    errors::ffx_error,
     gcs::{
+        auth::pkce::new_access_token,
         client::{Client, ClientFactory},
-        token_store::{read_boto_refresh_token, TokenStore},
+        token_store::read_boto_refresh_token,
     },
     sdk_metadata::ProductBundleV1,
     std::io::Write,
@@ -33,18 +34,15 @@ impl GcsResolver {
     pub async fn new(version: String, bundle: String) -> Result<Self> {
         let temp_dir = tempdir()?;
         // TODO(fxb/89584): Change to using ffx client Id and consent screen.
-        let boto: Option<PathBuf> = ffx_config::query("flash.gcs.token").get_file().await?;
-        let auth = match boto {
-            Some(boto_path) => {
-                TokenStore::new_with_auth(
-                    read_boto_refresh_token(&boto_path)?,
-                    /*access_token=*/ None,
-                )?
-            }
-            None => ffx_bail!("GCS authentication not found."),
-        };
+        let boto_path = ffx_config::query("flash.gcs.token")
+            .get_file::<Option<PathBuf>>()
+            .await?
+            .ok_or(ffx_error!("GCS authentication not found."))?;
+        let refresh_token = read_boto_refresh_token(&boto_path)?;
+        let access_token = new_access_token(&refresh_token).await?;
 
-        let client_factory = ClientFactory::new(auth);
+        let client_factory = ClientFactory::new()?;
+        client_factory.set_access_token(access_token).await;
         let client = client_factory.create_client();
 
         let product_bundle_container_path = temp_dir.path().join("product_bundles.json");

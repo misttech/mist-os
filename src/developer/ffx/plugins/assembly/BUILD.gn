@@ -55,6 +55,7 @@ ffx_plugin("ffx_assembly") {
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fastboot",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/pbms:lib",
     "//src/lib/assembly/assembly_manifest",
     "//src/lib/assembly/base_package",
     "//src/lib/assembly/blobfs",
