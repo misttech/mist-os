@@ -111,6 +111,8 @@ action("generate_main_workspace") {
     "//sdk:platform",
   ]
 
+  depfile = "${target_gen_dir}/${target_name}.d"
+
   outputs = [
     "$target_gen_dir/bazel",
     "$target_gen_dir/download_config_file",
@@ -118,6 +120,8 @@ action("generate_main_workspace") {
     "$target_gen_dir/workspace/.bazelrc",
     "$target_gen_dir/workspace/WORKSPACE.bazel",
     "$target_gen_dir/workspace/fuchsia_build_config.bzl",
+    "$target_gen_dir/workspace/fuchsia_sdk_hash",
+    "$target_gen_dir/workspace/internal_sdk_hash",
     "$target_gen_dir/workspace/platform_mappings",
   ]
 
@@ -126,6 +130,8 @@ action("generate_main_workspace") {
     rebase_path(root_build_dir, root_build_dir),
     "--target_arch",
     target_cpu,
+    "--depfile",
+    rebase_path(depfile, root_build_dir),
   ]
 
   # The generated wrapper includes the absolute path of the Ninja output

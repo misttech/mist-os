@@ -366,12 +366,16 @@ template("sdk") {
 
     inputs = [ archive_manifest_file ]
 
-    outputs = [ stamp_file ]
+    _out_dir = "$root_out_dir/sdk/exported/$sdk_name"
+    outputs = [
+      stamp_file,
+      "$_out_dir/meta/manifest.json",
+    ]
     depfile = "${stamp_file}.d"
 
     args = [
       "--out-dir",
-      rebase_path("$root_out_dir/sdk/exported/$sdk_name", root_build_dir),
+      rebase_path(_out_dir, root_build_dir),
       "--stamp-file",
       rebase_path(stamp_file, root_build_dir),
       "--manifest",

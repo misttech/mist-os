@@ -249,6 +249,24 @@ def generate_fuchsia_build_config(fuchsia_dir):
     }
 
 
+def md5_all_files(paths):
+    h = hashlib.new('md5')
+    for p in paths:
+        with open(p, 'rb') as f:
+            h.update(f.read())
+    return h.hexdigest()
+
+
+def all_sdk_metas(sdk_root):
+    sdk_manifest_path = os.path.join(sdk_root, 'meta', 'manifest.json')
+    with open(sdk_manifest_path, 'r') as f:
+        sdk_manifest = json.load(f)
+    part_metas = [
+        os.path.join(sdk_root, part["meta"]) for part in sdk_manifest["parts"]
+    ]
+    return [sdk_manifest_path] + part_metas
+
+
 class GeneratedFiles(object):
     """Models the content of a generated Bazel workspace."""
 
@@ -278,12 +296,9 @@ class GeneratedFiles(object):
 
     def add_file_hash(self, dst_path):
         self._check_new_path(dst_path)
-        h = hashlib.new('md5')
-        with open(dst_path, 'rb') as f:
-            h.update(f.read())
         self._files[dst_path] = {
             "type": "md5",
-            "hash": h.hexdigest(),
+            "hash": md5_all_files([dst_path]),
         }
 
     def add_top_entries(self, fuchsia_dir, subdir, excluded_file):
@@ -382,6 +397,10 @@ def main():
         action='store_true',
         help='Force workspace regeneration, by default this only happens ' +
         'the script determines there is a need for it.')
+    parser.add_argument(
+        '--depfile',
+        type=argparse.FileType('w'),
+        help='If set, write a depfile at this path')
     args = parser.parse_args()
 
     verbosity = args.verbose - args.quiet
@@ -644,6 +663,30 @@ common --experimental_enable_bzlmod
 
     # Ensure regeneration when this script's content changes!
     generated.add_file_hash(os.path.abspath(__file__))
+
+    # Create hash files to capture current state of locally generated SDKs.
+    sdk_root = os.path.join(gn_output_dir, 'sdk', 'exported')
+
+    all_core_sdk_metas = all_sdk_metas(os.path.join(sdk_root, 'core'))
+    fuchsia_sdk_hash = os.path.join('workspace', 'fuchsia_sdk_hash')
+    generated.add_file(fuchsia_sdk_hash, md5_all_files(all_core_sdk_metas))
+    if args.depfile:
+        out = os.path.relpath(
+            os.path.join(topdir, fuchsia_sdk_hash), gn_output_dir)
+        ins = ' '.join(
+            os.path.relpath(p, gn_output_dir) for p in all_core_sdk_metas)
+        args.depfile.write(f'{out}: {ins}\n')
+
+    all_internal_part_metas = all_sdk_metas(os.path.join(sdk_root, 'platform'))
+    internal_sdk_hash = os.path.join('workspace', 'internal_sdk_hash')
+    generated.add_file(
+        internal_sdk_hash, md5_all_files(all_internal_part_metas))
+    if args.depfile:
+        out = os.path.relpath(
+            os.path.join(topdir, internal_sdk_hash), gn_output_dir)
+        ins = ' '.join(
+            os.path.relpath(p, gn_output_dir) for p in all_internal_part_metas)
+        args.depfile.write(f'{out}: {ins}\n')
 
     force = args.force
     generated_json = generated.to_json()
