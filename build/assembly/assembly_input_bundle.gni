@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/bazel/bazel_inputs.gni")
+import("//build/group_with_inputs.gni")
 import("//build/python/python_action.gni")
 import("//src/sys/pkg/bin/pm/pm.gni")
 
@@ -256,6 +257,69 @@ template("assembly_input_bundle_archive") {
 #    like:
 #      "no dependency provides the input <package_name>/package_manifest.json"
 #
+#  bootfs_files [optional]
+#    [list, scopes] A list of scopes, defining each bootfs_file and the source,
+#    label, and destination required to add it in bootfs using assembly.
+#
+#    Example w/ source-files:
+#      bootfs_files = [
+#        {
+#          source = "gn/path/to/source/file"
+#          destination = "bin/bar"  # path within bootfs
+#        }
+#      ]
+#
+#    Example w/ build-output:
+#      bootfs_files = [
+#        {
+#          label = "//optional/label/creating/source/file"
+#          source = "gn/path/to/source/file"
+#          destination = "bin/bar"  # path within bootfs
+#        }
+#      ]
+#
+#  config_data [optional]
+#    [list, scopes] A list of scopes, defining each config_data associated with
+#    a given package, and the source, label, and destination required to add it
+#    in bootfs using assembly.
+#
+#    Example w/ source-files:
+#    config_data = [
+#      {
+#        package_name = "example_package"
+#        files = [
+#          {
+#            source =
+#                "//src/path_to_config/config1.json"
+#            destination = "config1.json"
+#          },
+#          {
+#            source = "//src/path_to_config/other_stuff.txt"
+#            destination = "other_stuff.txt"
+#          },
+#        ]
+#      },
+#    ]
+#
+#    Example w/ build-output:
+#    config_data = [
+#      {
+#        package_name = "example_package"
+#        label = "//src/package/path:example_package"
+#        files = [
+#          {
+#            source =
+#                "//src/path_to_config/config1.json"
+#            destination = "config1.json"
+#          },
+#          {
+#            source = "//src/path_to_config/other_stuff.txt"
+#            destination = "other_stuff.txt"
+#          },
+#        ]
+#      },
+#    ]
+#
 #  qemu_kernel (optional; default: false)
 #    [path] Path to the qemu kernel.
 #
@@ -305,6 +369,11 @@ template("assembly_input_bundle") {
     assembly_input_bundle_archive = "${target_name}.tgz"
 
     bazel_inputs = "${target_name}_bazel_inputs"
+
+    bootfs_files = "${target_name}.bootfs_files_list"
+    config_data = "${target_name}.config_data_list"
+    config_data_with_verification = "${target_name}.group_with.config_data"
+    bootfs_files_with_verification = "${target_name}.group_with.bootfs_files"
   }
 
   files = {
@@ -330,6 +399,14 @@ template("assembly_input_bundle") {
     assembly_input_bundle_archive = "${assembly_input_bundle_dir}.tgz"
     assembly_input_bundle_archive_manifest =
         "${assembly_input_bundle_dir}.tgz.fini_manifest"
+
+    # The output path for the generated file which collects bootfs_files from
+    # the invoking
+    bootfs_files = "${assembly_input_bundle_dir}.bootfs_files_list"
+
+    # The output path for the generated file which collects config_data from
+    # the invoking scope
+    config_data = "${assembly_input_bundle_dir}.config_data_list"
   }
 
   create_aib_package =
@@ -342,6 +419,112 @@ template("assembly_input_bundle") {
   creation_deps = []
   if (defined(invoker.deps)) {
     creation_deps += invoker.deps
+  }
+
+  # Splits bootfs_files inputs from the invoker into:
+  # 1) group_with_inputs deps / sources and
+  # 2) generated_file contents
+  if (defined(invoker.bootfs_files)) {
+    bootfs_files_contents = []
+    _bootfs_files_deps = []
+    _bootfs_files_sources = []
+    foreach(definition, invoker.bootfs_files) {
+      assert(defined(definition.source),
+             "bootfs_files definitions must include source")
+      assert(defined(definition.destination),
+             "bootfs_files definitions must include destination")
+      if (defined(definition.label)) {
+        _bootfs_files_deps += [ definition.label ]
+      }
+
+      _bootfs_files_sources += [ definition.source ]
+      bootfs_files_contents += [
+        {
+          source = rebase_path(definition.source, root_build_dir)
+          destination = definition.destination
+        },
+      ]
+    }
+
+    group_with_inputs(labels.bootfs_files_with_verification) {
+      deps = _bootfs_files_deps
+      sources = _bootfs_files_sources
+    }
+
+    generated_file(labels.bootfs_files) {
+      forward_variables_from(invoker, [ "testonly" ])
+      contents = bootfs_files_contents
+      outputs = [ "${files.bootfs_files}" ]
+      output_conversion = "json"
+    }
+
+    creation_deps += [
+      ":${labels.bootfs_files_with_verification}",
+      ":${labels.bootfs_files}",
+    ]
+
+    creation_args += [
+      "--bootfs-files-list",
+      rebase_path(files.bootfs_files, root_build_dir),
+    ]
+
+    creation_inputs += [ files.bootfs_files ]
+  }
+
+  # Splits config_data inputs from the invoker into:
+  # 1) group_with_inputs deps / sources and
+  # 2) generated_file contents
+  if (defined(invoker.config_data)) {
+    config_data_contents = []
+    _config_data_deps = []
+    _config_data_sources = []
+    foreach(definition, invoker.config_data) {
+      assert(defined(definition.package_name),
+             "config_data definitions must include package_name")
+      assert(defined(definition.source_destination),
+             "config_data definitions must include source")
+
+      if (defined(definition.label)) {
+        _config_data_deps += [ definition.label ]
+      }
+
+      foreach(pair, definition.source_destination) {
+        assert(defined(pair.source),
+               "source_destination pairs must have source in scope")
+        assert(defined(pair.destination),
+               "source_destination pairs must have destination in scope")
+        _config_data_sources += [ pair.source ]
+        config_data_contents += [
+          {
+            package_name = definition.package_name
+            source = rebase_path(pair.source, root_build_dir)
+            destination = pair.destination
+          },
+        ]
+      }
+    }
+    group_with_inputs(labels.config_data_with_verification) {
+      deps = _config_data_deps
+      sources = _config_data_sources
+    }
+
+    generated_file(labels.config_data) {
+      forward_variables_from(invoker, [ "testonly" ])
+      contents = config_data_contents
+      outputs = [ "${files.config_data}" ]
+      output_conversion = "json"
+    }
+
+    creation_deps += [
+      ":${labels.config_data_with_verification}",
+      ":${labels.config_data}",
+    ]
+
+    creation_args += [
+      "--config-data-list",
+      rebase_path(files.config_data, root_build_dir),
+    ]
+    creation_inputs += [ files.config_data ]
   }
 
   # Convert each set of package targets into:

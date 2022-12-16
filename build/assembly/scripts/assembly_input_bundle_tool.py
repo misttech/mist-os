@@ -11,7 +11,7 @@ import sys
 from typing import Dict, List, Set, Tuple
 import logging
 from depfile import DepFile
-from assembly import AssemblyInputBundle, AIBCreator, DriverDetails, FilePath, PackageManifest
+from assembly import AssemblyInputBundle, AIBCreator, DriverDetails, FilePath, PackageManifest, FileEntry
 from serialization.serialization import json_load
 logger = logging.getLogger()
 
@@ -37,6 +37,12 @@ def create_bundle(args: argparse.Namespace) -> None:
 
     if args.drivers_pkg_list:
         add_driver_list_from_file(aib_creator, args.drivers_pkg_list)
+
+    if args.config_data_list:
+        add_config_data_entries_from_file(aib_creator, args.config_data_list)
+
+    if args.bootfs_files_list:
+        add_bootfs_files_from_list(aib_creator, args.bootfs_files_list)
 
     # Add any bootloaders.
     if args.qemu_kernel:
@@ -99,6 +105,43 @@ def add_shell_commands_from_file(
         package = command["package"]
         components = command["components"]
         aib_creator.shell_commands[package].extend(components)
+
+
+def add_config_data_entries_from_file(
+        aib_creator: AIBCreator, config_data_entries):
+    """
+    config_data_entries schema:
+    [
+        {
+            'package_name': 'example_package',
+            'destination': 'foo.txt',
+            'source': 'src/sys/example/configs/example.json'
+        }
+    ]
+    """
+    _config_data = _read_json_file(config_data_entries)
+    for definition in _config_data:
+        entry = FileEntry(
+            definition['source'],
+            f"meta/data/{definition['package_name']}/{definition['destination']}"
+        )
+        aib_creator.config_data.append(entry)
+
+
+def add_bootfs_files_from_list(aib_creator: AIBCreator, bootfs_files):
+    """
+    bootfs_files schema:
+    [
+        {
+            'destination': 'bin/bar',
+            'source': 'src/sys/example/configs/example.json'
+        }
+    ]
+    """
+    _bootfs_files = _read_json_file(bootfs_files)
+    for entry in _bootfs_files:
+        aib_creator.bootfs_files.add(
+            FileEntry(entry['source'], entry['destination']))
 
 
 def _read_json_file(pkg_list_file):
@@ -322,6 +365,15 @@ def main():
         "--export-manifest",
         type=argparse.FileType('w'),
         help="Path to write a FINI manifest of the contents of the AIB")
+    bundle_creation_parser.add_argument(
+        "--config-data-list",
+        type=argparse.FileType('r'),
+        help="Path to a json file of config-data entries")
+    bundle_creation_parser.add_argument(
+        "--bootfs-files-list",
+        type=argparse.FileType('r'),
+        help="Path to a json file of bootfs-file entries")
+
     bundle_creation_parser.set_defaults(handler=create_bundle)
 
     ###
