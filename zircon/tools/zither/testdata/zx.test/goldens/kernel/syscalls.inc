@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// DO NOT EDIT. Generated from FIDL library zx by zither, a Fuchsia platform
+// tool.
+
 KERNEL_SYSCALL(
     channel_read, zx_status_t, /* no attributes */, 8,
     (handle, options, bytes, handles, num_bytes, num_handles, actual_bytes, actual_handles),

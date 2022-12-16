@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// DO NOT EDIT. Generated from FIDL library zx by zither, a Fuchsia platform
+// tool.
+
 extern "C" {
 
 syscall_result wrapper_channel_read(SafeSyscallArgument<zx_handle_t>::RawType handle,

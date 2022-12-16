@@ -58,19 +58,19 @@ func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string)
 
 	var outputs []string
 	for _, file := range []struct {
-		name     string
-		syscalls []zither.Syscall
+		name        string
+		Counterpart string
+		Syscalls    []zither.Syscall
 	}{
-		{"cdecls.inc", public},
-		{"testonly-cdecls.inc", testonly},
-		{"cdecls-next.inc", next},
+		{"cdecls.inc", "<zircon/syscalls.h>", public},
+		{"testonly-cdecls.inc", "<zircon/testonly-syscalls.h>", testonly},
+		{"cdecls-next.inc", "<zircon/syscalls-next.h>", next},
 	} {
 		output := filepath.Join(outputDir, "zircon", "syscalls", "internal", file.name)
-		syscalls := file.syscalls
-		sort.Slice(syscalls, func(i, j int) bool {
-			return strings.Compare(syscalls[i].Name, syscalls[j].Name) < 0
+		sort.Slice(file.Syscalls, func(i, j int) bool {
+			return strings.Compare(file.Syscalls[i].Name, file.Syscalls[j].Name) < 0
 		})
-		if err := gen.GenerateFile(output, "GenerateCDecls", syscalls); err != nil {
+		if err := gen.GenerateFile(output, "GenerateCDecls", file); err != nil {
 			return nil, err
 		}
 		outputs = append(outputs, output)

@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// DO NOT EDIT. Generated from FIDL library zx by zither, a Fuchsia platform
+// tool.
+
 // Re-export the types defined in the fuchsia-zircon-types crate
 pub use fuchsia_zircon_types::*;
 
