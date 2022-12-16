@@ -1977,32 +1977,42 @@ mod tests {
     }
 
     #[derive(Debug, Default)]
-    pub struct TestSendBuffer(Rc<RefCell<Vec<u8>>>, RingBuffer);
+    pub struct TestSendBuffer {
+        fake_stream: Rc<RefCell<Vec<u8>>>,
+        ring: RingBuffer,
+    }
+    impl TestSendBuffer {
+        fn new(fake_stream: Rc<RefCell<Vec<u8>>>, ring: RingBuffer) -> TestSendBuffer {
+            Self { fake_stream, ring }
+        }
+    }
 
     impl Buffer for TestSendBuffer {
         fn len(&self) -> usize {
-            self.1.len() + self.0.borrow().len()
+            let Self { fake_stream, ring } = self;
+            ring.len() + fake_stream.borrow().len()
         }
     }
 
     impl SendBuffer for TestSendBuffer {
         fn mark_read(&mut self, count: usize) {
-            self.1.mark_read(count)
+            let Self { fake_stream: _, ring } = self;
+            ring.mark_read(count)
         }
 
         fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R
         where
             F: FnOnce(SendPayload<'a>) -> R,
         {
-            let v = &self.0;
-            let rb = &mut self.1;
-            if !v.borrow().is_empty() {
-                let len = (rb.cap() - rb.len()).min(v.borrow().len());
-                let rest = v.borrow_mut().split_off(len);
-                let first = v.replace(rest);
-                assert_eq!(rb.enqueue_data(&first[..]), len);
+            let Self { fake_stream, ring } = self;
+            if !fake_stream.borrow().is_empty() {
+                // Pull from the fake stream into the ring if there is capacity.
+                let len = (ring.cap() - ring.len()).min(fake_stream.borrow().len());
+                let rest = fake_stream.borrow_mut().split_off(len);
+                let first = fake_stream.replace(rest);
+                assert_eq!(ring.enqueue_data(&first[..]), len);
             }
-            rb.peek_with(offset, f)
+            ring.peek_with(offset, f)
         }
     }
 
@@ -2035,7 +2045,7 @@ mod tests {
             let client = ClientBuffers::new(buffer_sizes);
             (
                 Rc::clone(&client.receive),
-                TestSendBuffer(Rc::clone(&client.send), RingBuffer::default()),
+                TestSendBuffer::new(Rc::clone(&client.send), RingBuffer::default()),
                 client,
             )
         }
@@ -2051,7 +2061,7 @@ mod tests {
             let buffers = ClientBuffers::new(buffer_sizes);
             *self.as_ref().borrow_mut() = Some(buffers.clone());
             let ClientBuffers { receive, send } = buffers;
-            (receive, TestSendBuffer(send, Default::default()))
+            (receive, TestSendBuffer::new(send, Default::default()))
         }
     }
 
