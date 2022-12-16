@@ -261,7 +261,8 @@ zx_status_t As370AudioStreamOut::AddFormats() {
 
   format.range.min_channels = kNumberOfChannels;
   format.range.max_channels = kNumberOfChannels;
-  format.range.sample_formats = AUDIO_SAMPLE_FORMAT_32BIT;
+  // TODO(fxbug.dev/117743): Restore AUDIO_SAMPLE_FORMAT_32BIT once the AudioCoreV2 refactor lands.
+  format.range.sample_formats = AUDIO_SAMPLE_FORMAT_24BIT_IN32;
   assert(kWantedFrameRate == 48000);
   format.range.min_frames_per_second = kWantedFrameRate;
   format.range.max_frames_per_second = kWantedFrameRate;
