@@ -17,7 +17,7 @@ use {
     fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_component::server::ServiceFs,
-    fuchsia_syslog::fx_log_warn,
+    fuchsia_syslog::{fx_log_err, fx_log_warn},
     fuchsia_zircon::Duration,
     futures::StreamExt,
     input_config_lib::Config,
@@ -329,7 +329,13 @@ async fn make_touch_injector_handler(
     let scenic =
         fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_ui_scenic::ScenicMarker>()
             .expect("Failed to connect to Scenic.");
-    let display_info = scenic.get_display_info().await.expect("Failed to get display info.");
+    let display_info = match scenic.get_display_info().await {
+        Ok(display_info) => display_info,
+        Err(e) => {
+            fx_log_err!("Failed to get display info: {}", e);
+            std::process::exit(-1);
+        }
+    };
     let display_size = input_pipeline_lib::Size {
         width: display_info.width_in_px as f32,
         height: display_info.height_in_px as f32,
