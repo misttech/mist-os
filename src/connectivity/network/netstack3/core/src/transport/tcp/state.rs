@@ -703,16 +703,25 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         }
         let has_fin = FIN_QUEUED && can_send == available;
         let seg = buffer.peek_with(offset, |readable| {
+            let bytes_to_send = u32::min(
+                can_send - u32::from(has_fin),
+                u32::try_from(readable.len()).unwrap_or(u32::MAX),
+            );
+            // Don't send a segment if there isn't any data to read, unless that
+            // segment would carry the FIN.
+            if bytes_to_send == 0 && !has_fin {
+                return None;
+            }
             let (seg, discarded) = Segment::with_data(
                 next_seg,
                 Some(rcv_nxt),
                 has_fin.then(|| Control::FIN),
                 rcv_wnd,
-                readable.slice(0..can_send - u32::from(has_fin)),
+                readable.slice(0..bytes_to_send),
             );
             debug_assert_eq!(discarded, 0);
-            seg
-        });
+            Some(seg)
+        })?;
         let seq_max = next_seg + can_send;
         match *last_seq_ts {
             Some((seq, _ts)) => {
@@ -1785,6 +1794,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
 
 #[cfg(test)]
 mod test {
+    use alloc::vec;
     use core::{fmt::Debug, time::Duration};
 
     use assert_matches::assert_matches;
@@ -3560,5 +3570,106 @@ mod test {
         // send.
         assert_eq!(state.poll_send(DEFAULT_MAXIMUM_SEGMENT_SIZE, clock.now(), keep_alive), None,);
         assert_eq!(state, State::Closed(Closed { reason: UserError::ConnectionClosed }));
+    }
+
+    /// A `SendBuffer` that doesn't allow peeking some number of bytes.
+    #[derive(Debug)]
+    struct ReservingBuffer<B> {
+        buffer: B,
+        reserved_bytes: usize,
+    }
+
+    impl<B: Buffer> Buffer for ReservingBuffer<B> {
+        fn len(&self) -> usize {
+            self.buffer.len()
+        }
+    }
+
+    impl<B: Takeable> Takeable for ReservingBuffer<B> {
+        fn take(&mut self) -> Self {
+            let Self { buffer, reserved_bytes } = self;
+            Self { buffer: buffer.take(), reserved_bytes: *reserved_bytes }
+        }
+    }
+
+    impl<B: SendBuffer> SendBuffer for ReservingBuffer<B> {
+        fn mark_read(&mut self, count: usize) {
+            self.buffer.mark_read(count)
+        }
+
+        fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R
+        where
+            F: FnOnce(SendPayload<'a>) -> R,
+        {
+            let Self { buffer, reserved_bytes } = self;
+            buffer.peek_with(offset, |payload| {
+                let len = payload.len();
+                let new_len = len.saturating_sub(*reserved_bytes);
+                f(payload.slice(0..new_len.try_into().unwrap_or(u32::MAX)))
+            })
+        }
+    }
+
+    #[test_case(true)]
+    #[test_case(false)]
+    fn poll_send_len(has_fin: bool) {
+        const NUM_RESERVED: usize = 16;
+        const VALUE: u8 = 0xaa;
+
+        fn with_poll_send_result<const HAS_FIN: bool>(f: impl FnOnce(Segment<SendPayload<'_>>)) {
+            const DATA_LEN: usize = 40;
+            let buffer = ReservingBuffer {
+                buffer: RingBuffer::with_data(DATA_LEN, &vec![VALUE; DATA_LEN]),
+                reserved_bytes: NUM_RESERVED,
+            };
+            assert_eq!(buffer.len(), DATA_LEN);
+
+            let mut snd = Send::<FakeInstant, _, HAS_FIN> {
+                nxt: ISS_1,
+                max: ISS_1,
+                una: ISS_1,
+                wnd: WindowSize::DEFAULT,
+                buffer,
+                wl1: ISS_2,
+                wl2: ISS_1,
+                rtt_estimator: Estimator::Measured { srtt: RTT, rtt_var: RTT / 2 },
+                last_seq_ts: None,
+                timer: None,
+                congestion_control: CongestionControl::cubic(),
+            };
+
+            f(snd
+                .poll_send(
+                    ISS_1,
+                    WindowSize::DEFAULT,
+                    DEFAULT_MAXIMUM_SEGMENT_SIZE,
+                    FakeInstant::default(),
+                    &KeepAlive::default(),
+                )
+                .expect("has data"))
+        }
+
+        let f = |segment: Segment<SendPayload<'_>>| {
+            let Segment { contents, ack: _, seq: _, wnd: _ } = segment;
+            let contents_len = contents.data().len();
+
+            if has_fin {
+                assert_eq!(
+                    contents.len(),
+                    u32::try_from(contents_len + 1).unwrap(),
+                    "FIN not accounted for"
+                );
+            } else {
+                assert_eq!(contents.len(), u32::try_from(contents_len).unwrap());
+            }
+
+            let mut target = vec![0; contents_len];
+            contents.data().partial_copy(0, target.as_mut_slice());
+            assert_eq!(target, vec![VALUE; contents_len]);
+        };
+        match has_fin {
+            true => with_poll_send_result::<true>(f),
+            false => with_poll_send_result::<false>(f),
+        }
     }
 }
