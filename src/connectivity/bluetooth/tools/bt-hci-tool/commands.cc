@@ -302,12 +302,21 @@ bool HandleWriteLocalName(const CommandData* cmd_data, const fxl::CommandLine& c
   }
 
   const std::string& name = cmd_line.positional_args()[0];
-  auto packet = ::bt::hci::CommandPacket::New(::bt::hci_spec::kWriteLocalName, name.length() + 1);
-  std::strcpy(
-      (char*)packet->mutable_payload<::bt::hci_spec::WriteLocalNameCommandParams>()->local_name,
-      name.c_str());
 
-  auto id = SendCompleteCommand(cmd_data, std::move(packet), std::move(complete_cb));
+  auto write_name =
+      ::bt::hci::EmbossCommandPacket::New<::bt::hci_spec::WriteLocalNameCommandWriter>(
+          ::bt::hci_spec::kWriteLocalName);
+  auto write_name_view = write_name.view_t();
+  auto local_name = write_name_view.local_name().BackingStorage();
+  size_t name_size = std::min(name.size(), ::bt::hci_spec::kMaxNameLength);
+
+  // Use ContiguousBuffer instead of constructing LocalName view in case of invalid view being
+  // created when name is not large enough for the view
+  auto name_buf = emboss::support::ReadOnlyContiguousBuffer(&name);
+
+  local_name.CopyFrom(name_buf, name_size);
+
+  auto id = SendCompleteCommand(cmd_data, std::move(write_name), std::move(complete_cb));
   std::cout << "  Sent HCI_Write_Local_Name (id=" << id << ")" << std::endl;
 
   return true;
