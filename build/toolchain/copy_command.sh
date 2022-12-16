@@ -74,7 +74,7 @@ fi
 if [[ -L "${SOURCE}" ]]; then
   LINK="$(readlink "${SOURCE}")"
   if [[ "${LINK##../}" != "${LINK}" ]]; then
-    ln -sf "$(realpath --relative-to=$(dirname "${DESTINATION}")" "$(realpath "${SOURCE}"))" "${DESTINATION}"
+    ln -sf "$(realpath --relative-to=$(dirname "${DESTINATION}") $(realpath "${SOURCE}"))" "${DESTINATION}"
     exit 0
   fi
 fi
