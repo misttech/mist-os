@@ -292,7 +292,7 @@ EOF
   # Fire up fx serve-updates. Note, test output is captured, so re-route background task output
   # to stderr to avoid hanging.
   BT_EXPECT_FAIL "${FUCHSIA_DEVSHELL_DIR}/serve-updates" -l ":${serve_updates_port}" 2> stderr
-  BT_EXPECT_FILE_CONTAINS_SUBSTRING stderr "Server died"
+  BT_EXPECT_FILE_CONTAINS_SUBSTRING stderr "The repository server died."
 }
 
 TEST_fx_serve_updates_with_ffx() {
@@ -319,10 +319,10 @@ if [[ "\$@" == "config get repository.server.mode" ]]; then
   echo "\"ffx\""
 elif [[ "\$@" == "config get repository.server.listen" ]]; then
   echo "\"[::]:${serve_updates_port}\""
-elif [[ "\$@" == "--config ffx_repository=true repository server start" ]]; then
+elif [[ "\$@" == "repository server start" ]]; then
   touch "${started_server}"
   exit 0
-elif [[ "\$@" == "--config ffx_repository=true repository server stop" ]]; then
+elif [[ "\$@" == "repository server stop" ]]; then
   touch "${stopped_server}"
   exit 0
 else
