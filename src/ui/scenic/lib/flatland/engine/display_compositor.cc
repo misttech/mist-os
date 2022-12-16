@@ -254,12 +254,12 @@ DisplayCompositor::DisplayCompositor(
     async_dispatcher_t* main_dispatcher,
     std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr> display_controller,
     const std::shared_ptr<Renderer>& renderer, fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
-    const bool disable_display_composition)
+    BufferCollectionImportMode import_mode)
     : display_controller_(std::move(display_controller)),
       renderer_(renderer),
       release_fence_manager_(main_dispatcher),
       sysmem_allocator_(std::move(sysmem_allocator)),
-      disable_display_composition_(disable_display_composition),
+      import_mode_(import_mode),
       main_dispatcher_(main_dispatcher) {
   FX_CHECK(main_dispatcher_);
   FX_DCHECK(renderer_);
@@ -331,7 +331,7 @@ bool DisplayCompositor::ImportBufferCollection(
     return false;
   }
 
-  if (disable_display_composition_) {
+  if (import_mode_ == BufferCollectionImportMode::RendererOnly) {
     // Forced fallback to using the renderer; don't attempt direct-to-display.
     // Close |display_token| without importing it to the display controller.
     if (const auto status = display_token->Close(); status != ZX_OK) {
@@ -419,10 +419,10 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
       buffer_collection_supports_display_.find(collection_id) !=
       buffer_collection_supports_display_.end();
 
-  // When display composition is disabled, the only images that should be imported by the display
-  // are the framebuffers, and their display support is already set in AddDisplay() (instead of
-  // below). For every other image with display composition off mode we can early exit.
-  if (disable_display_composition_ &&
+  // In RendererOnly mode, the only images that should be imported by the display is the
+  // framebuffer, and their display support is already set in AddDisplay() (instead of below).
+  // For every other image in RendererOnly mode we can early exit.
+  if (import_mode_ == BufferCollectionImportMode::RendererOnly &&
       (!display_support_already_set || !buffer_collection_supports_display_[collection_id])) {
     buffer_collection_supports_display_[collection_id] = false;
     return true;
@@ -438,8 +438,18 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
   }
 
   if (!buffer_collection_supports_display_[collection_id]) {
-    // When display isn't supported we fallback to using the renderer.
-    return true;
+    // When display isn't supported, so depending on mode we:
+    switch (import_mode_) {
+      case BufferCollectionImportMode::AttemptDisplayConstraints:
+        // Fallback to renderer and continue.
+        return true;
+      case BufferCollectionImportMode::EnforceDisplayConstraints:
+        // Fail outright.
+        return false;
+      default:
+        FX_NOTREACHED() << "Should have been handled above";
+        return false;
+    }
   }
 
   const fuchsia::hardware::display::ImageConfig image_config = CreateImageConfig(metadata);
@@ -769,12 +779,12 @@ void DisplayCompositor::RenderFrame(const uint64_t frame_number, const zx::time 
 
   // Config should be reset before doing anything new.
   DiscardConfig();
+  const bool hardware_failure = !SetRenderDatasOnDisplay(render_data_list);
 
   // Determine whether we need to fall back to GPU composition. Avoid calling CheckConfig() if we
   // don't need to, because this requires a round-trip to the display controller.
-  // Note: SetRenderDatasOnDisplay() failing indicates hardware failure to do display composition.
   const bool fallback_to_gpu_composition =
-      disable_display_composition_ || !SetRenderDatasOnDisplay(render_data_list) || !CheckConfig();
+      hardware_failure || kDisableDisplayComposition || !CheckConfig();
 
   if (fallback_to_gpu_composition) {
     DiscardConfig();
@@ -807,7 +817,9 @@ void DisplayCompositor::RenderFrame(const uint64_t frame_number, const zx::time 
 
 bool DisplayCompositor::SetRenderDatasOnDisplay(const std::vector<RenderData>& render_data_list) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
-  FX_DCHECK(!disable_display_composition_);
+  if (kDisableDisplayComposition) {
+    return false;
+  }
 
   for (const auto& data : render_data_list) {
     if (!SetRenderDataOnDisplay(data)) {
