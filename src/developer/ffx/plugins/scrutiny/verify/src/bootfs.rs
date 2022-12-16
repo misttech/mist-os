@@ -26,8 +26,8 @@ If you are making a change in fuchsia.git that causes this, you need to perform 
 ";
 
 pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
-    if cmd.golden.len() == 0 {
-        bail!("Must specify at least one --golden");
+    if cmd.golden.len() == 0 && cmd.golden_packages.len() == 0 {
+        bail!("Must specify at least one --golden or --golden-packages");
     }
     let mut deps = HashSet::new();
     let command = CommandBuilder::new("zbi.bootfs").build();
