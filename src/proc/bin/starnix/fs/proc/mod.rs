@@ -5,5 +5,6 @@
 mod fs;
 mod pid_directory;
 mod proc_directory;
+mod sysctl;
 
 pub use fs::*;

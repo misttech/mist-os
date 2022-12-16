@@ -432,7 +432,7 @@ macro_rules! fileops_impl_nonblocking {
 
         fn cancel_wait(
             &self,
-            _current_task: &CurrentTask,
+            _current_task: &crate::task::CurrentTask,
             _waiter: &crate::task::Waiter,
             _key: crate::task::WaitKey,
         ) {

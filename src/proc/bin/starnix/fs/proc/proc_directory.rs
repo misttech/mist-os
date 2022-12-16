@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 use super::pid_directory::*;
+use super::sysctl::*;
+
 use crate::auth::FsCred;
 use crate::fs::*;
 use crate::logging::not_implemented;
@@ -49,6 +51,7 @@ impl ProcDirectory {
             // File must exist to pass the CgroupsAvailable check, which is a little bit optional
             // for init but not optional for a lot of the system!
             &b"cgroups"[..] => fs.create_node(ByteVecFile::new_node(vec![]), mode!(IFREG, 0o444), FsCred::root()),
+            &b"sys"[..] => sysctl_directory(fs),
         };
 
         Arc::new(ProcDirectory { kernel, nodes })
