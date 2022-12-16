@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart' hide Action;
 import 'package:shell_settings/src/services/battery_watcher_service.dart';
 import 'package:shell_settings/src/services/brightness_service.dart';
+import 'package:shell_settings/src/services/build_service.dart';
 import 'package:shell_settings/src/services/channel_service.dart';
 import 'package:shell_settings/src/services/datetime_service.dart';
 import 'package:shell_settings/src/services/keyboard_service.dart';
@@ -95,6 +96,8 @@ abstract class SettingsState implements TaskService {
   String get memUsed;
   String get memTotal;
   double? get memPercentUsed;
+  // Build
+  String get buildVersion;
 
   factory SettingsState.fromEnv() {
     // ignore: unnecessary_cast
@@ -109,6 +112,7 @@ abstract class SettingsState implements TaskService {
       networkService: NetworkAddressService(),
       wifiService: WiFiService(),
       memoryWatcherService: MemoryWatcherService(),
+      buildService: BuildService(),
     ) as SettingsState;
   }
 

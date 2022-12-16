@@ -14,6 +14,7 @@
     use: [
         {
             protocol: [
+                "fuchsia.buildinfo.Provider",
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.fonts.Provider",
                 "fuchsia.intl.PropertyProvider",

@@ -14,6 +14,7 @@ import 'package:intl/intl.dart';
 import 'package:mobx/mobx.dart';
 import 'package:shell_settings/src/services/battery_watcher_service.dart';
 import 'package:shell_settings/src/services/brightness_service.dart';
+import 'package:shell_settings/src/services/build_service.dart';
 import 'package:shell_settings/src/services/channel_service.dart';
 import 'package:shell_settings/src/services/datetime_service.dart';
 import 'package:shell_settings/src/services/keyboard_service.dart';
@@ -229,6 +230,12 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
   set memPercentUsed(double? value) => _memPercentUsed.value = value;
   final Observable<double?> _memPercentUsed = Observable<double?>(null);
 
+  // Build
+  @override
+  String get buildVersion => _buildVersion.value;
+  set buildVersion(String value) => _buildVersion.value = value;
+  final Observable<String> _buildVersion = '--'.asObservable();
+
   // Services
   final BrightnessService brightnessService;
   final DateTimeService dateTimeService;
@@ -240,6 +247,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
   final NetworkAddressService networkService;
   final WiFiService wifiService;
   final MemoryWatcherService memoryWatcherService;
+  final BuildService buildService;
 
   // Constructor
   SettingsStateImpl({
@@ -253,6 +261,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
     required this.networkService,
     required this.wifiService,
     required this.memoryWatcherService,
+    required this.buildService,
   })  : _timezones = _loadTimezones(),
         _selectedTimezone = timezoneService.timezone.asObservable() {
     dateTimeService.onChanged = updateDateTime;
@@ -367,6 +376,11 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
             memoryWatcherService.memUsed! / memoryWatcherService.memTotal!;
       });
     };
+    buildService.onChanged = () {
+      runInAction(() {
+        buildVersion = buildService.buildVersion;
+      });
+    };
 
     // We cannot load MaterialIcons font file from pubspec.yaml. So load it
     // explicitly.
@@ -394,6 +408,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
       networkService.start(),
       wifiService.start(),
       memoryWatcherService.start(),
+      buildService.start(),
     ]);
   }
 
@@ -410,6 +425,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
     await networkService.stop();
     await wifiService.stop();
     await memoryWatcherService.stop();
+    await buildService.stop();
     _dateTimeNow = null;
   }
 
@@ -426,6 +442,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
     networkService.dispose();
     wifiService.dispose();
     memoryWatcherService.dispose();
+    buildService.dispose();
   }
 
   // All

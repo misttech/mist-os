@@ -177,6 +177,26 @@ class _ListSettings extends StatelessWidget {
                     ),
                   );
                 }),
+                // Build
+                Observer(builder: (_) {
+                  return ListTile(
+                    contentPadding: EdgeInsets.symmetric(horizontal: 24),
+                    leading: Icon(Icons.build),
+                    title: Text(Strings.build),
+                    trailing: Wrap(
+                      alignment: WrapAlignment.end,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      children: [
+                        Text(
+                          settingsState.buildVersion,
+                          maxLines: 1,
+                          style: TextStyle(overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
                 // Battery
                 Observer(builder: (_) {
                   return ListTile(
