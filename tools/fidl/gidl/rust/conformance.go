@@ -32,7 +32,7 @@ type conformanceTmplInput struct {
 }
 
 type encodeSuccessCase struct {
-	Name, Context, HandleDefs, Value, Bytes, Handles string
+	Name, Context, HandleDefs, Value, Bytes, Handles, HandleDispositions string
 }
 
 type decodeSuccessCase struct {
@@ -89,14 +89,21 @@ func encodeSuccessCases(gidlEncodeSuccesses []gidlir.EncodeSuccess, schema gidlm
 			if !wireFormatSupported(encoding.WireFormat) {
 				continue
 			}
-			encodeSuccessCases = append(encodeSuccessCases, encodeSuccessCase{
+			newCase := encodeSuccessCase{
 				Name:       testCaseName(encodeSuccess.Name, encoding.WireFormat),
 				Context:    encodingContext(encoding.WireFormat),
 				HandleDefs: buildHandleDefs(encodeSuccess.HandleDefs),
 				Value:      value,
 				Bytes:      gidllibrust.BuildBytes(encoding.Bytes),
-				Handles:    buildHandles(gidlir.GetHandlesFromHandleDispositions(encoding.HandleDispositions)),
-			})
+			}
+			if len(newCase.HandleDefs) != 0 {
+				if encodeSuccess.CheckHandleRights {
+					newCase.HandleDispositions = buildRawHandleDispositions(encoding.HandleDispositions)
+				} else {
+					newCase.Handles = buildRawHandles(encoding.HandleDispositions)
+				}
+			}
+			encodeSuccessCases = append(encodeSuccessCases, newCase)
 		}
 	}
 	return encodeSuccessCases, nil

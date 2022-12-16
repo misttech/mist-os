@@ -16,7 +16,7 @@ use {
     fuchsia_criterion::criterion::{BatchSize, Bencher, black_box},
     futures::{future, stream::StreamExt},
     fuchsia_zircon as zx,
-    gidl_util::{HandleDef, HandleSubtype, create_handles, copy_handle, copy_handles_at, disown_vec},
+    gidl_util::{HandleDef, HandleSubtype, copy_handle, create_handles, select_handle_infos},
     std::mem::ManuallyDrop
 };
 
@@ -43,18 +43,14 @@ fn benchmark_{{ .Name }}_builder(b: &mut Bencher) {
     b.iter_batched_ref(
         || {
             {{- if .HandleDefs }}
-            let handle_defs = create_handles(&{{ .HandleDefs }});
-            disown_vec(handle_defs)
+            create_handles(&{{ .HandleDefs }})
             {{- else }}
             {{- /* Use empty vector with b.iter_batched_ref, rather than b.iter,
                 for consistency between handle and non-handle benchmarks. */}}
             Vec::<Handle>::new()
             {{- end }}
         },
-        |_handle_defs| {
-            {{- if .HandleDefs }}
-            let handle_defs = _handle_defs.as_ref();
-            {{- end }}
+        |{{ if not .HandleDefs }}_{{ end }}handle_defs| {
             black_box({{ .Value }}); {{- /* semicolon: include drop time. */}}
         },
         {{- /* Consider using LargeInput or NumIterations if this causes memory issues. */}}
@@ -67,8 +63,6 @@ fn benchmark_{{ .Name }}_encode(b: &mut Bencher) {
         || {
             {{- if .HandleDefs }}
             let handle_defs = create_handles(&{{ .HandleDefs }});
-            let handle_defs = disown_vec(handle_defs);
-            let handle_defs = handle_defs.as_ref();
             {{- end }}
             {{ .Value }}
         },
@@ -96,23 +90,12 @@ fn benchmark_{{ .Name }}_decode(b: &mut Bencher) {
         || {
             {{- if .HandleDefs }}
             let handle_defs = create_handles(&{{ .HandleDefs }});
-            let handle_defs = disown_vec(handle_defs);
-            let handle_defs = handle_defs.as_ref();
             {{- end }}
             let mut bytes = Vec::<u8>::new();
             let mut handles = Vec::<HandleDisposition<'static>>::new();
             let original_value = &mut {{ .Value }};
             Encoder::encode_with_context(_V2_CONTEXT, &mut bytes, &mut handles, original_value).unwrap();
-            let handle_infos : Vec::<HandleInfo> = handles.into_iter().map(|h| {
-                HandleInfo {
-                    handle: match h.handle_op {
-                        HandleOp::Move(hdl) => hdl,
-                        _ => panic!("unexpected handle op"),
-                    },
-                    object_type: h.object_type,
-                    rights: h.rights,
-                }
-            }).collect();
+            let handle_infos = fidl::encoding::convert_handle_dispositions_to_infos(handles).unwrap();
             {{- /* Wrap handle in an Option to allow low-overhead measurement of drop time */}}
             (bytes, handle_infos, ManuallyDrop::new({{ .ValueType }}::new_empty()))
         },
@@ -156,8 +139,6 @@ fn benchmark_{{ .Name }}_send_event(b: &mut Bencher) {
             b.iter_batched_ref(|| {
                 {{- if .HandleDefs }}
                 let handle_defs = create_handles(&{{ .HandleDefs }});
-                let handle_defs = disown_vec(handle_defs);
-                let handle_defs = handle_defs.as_ref();
                 {{- end }}
                 {{ .Value }}
             },
@@ -201,8 +182,6 @@ fn benchmark_{{ .Name }}_echo_call(b: &mut Bencher) {
     b.iter_batched_ref(|| {
         {{- if .HandleDefs }}
         let handle_defs = create_handles(&{{ .HandleDefs }});
-        let handle_defs = disown_vec(handle_defs);
-        let handle_defs = handle_defs.as_ref();
         {{- end }}
         {{ .Value }}
     },

@@ -10,6 +10,7 @@ pub mod socket;
 use crate::invoke_for_handle_types;
 use bitflags::bitflags;
 use fuchsia_zircon_status as zx_status;
+use fuchsia_zircon_types as zx_types;
 use futures::ready;
 use futures::task::noop_waker_ref;
 use slab::Slab;
@@ -242,6 +243,13 @@ pub trait HandleBased: AsHandleRef + From<Handle> + Into<Handle> {
     fn into_handle(self) -> Handle {
         self.into()
     }
+
+    /// Converts the handle into it's raw representation.
+    ///
+    /// The caller takes ownership over the raw handle, and must close it.
+    fn into_raw(self) -> u32 {
+        self.into_handle().raw_take()
+    }
 }
 
 /// Representation of a handle-like object
@@ -282,7 +290,7 @@ impl Handle {
     /// `hdl` must be a valid raw handle. The returned `Handle` takes ownership
     /// of the raw handle, so it must not be modified or closed by other means
     /// after calling `from_raw`.
-    pub unsafe fn from_raw(hdl: u32) -> Handle {
+    pub const unsafe fn from_raw(hdl: u32) -> Handle {
         Handle(hdl)
     }
 
@@ -1285,6 +1293,26 @@ pub struct HandleInfo {
     pub object_type: ObjectType,
     /// The rights of the handle.
     pub rights: Rights,
+}
+
+impl HandleInfo {
+    /// # Safety
+    ///
+    /// See [`Handle::from_raw`] for requirements about the validity and closing
+    /// of `raw.handle`.
+    ///
+    /// `raw.rights` must be a bitwise combination of one or more [`Rights`]
+    /// with no additional bits set.
+    ///
+    /// Note that while `raw.ty` _should_ correspond to the type of the handle,
+    /// that this is not required for safety.
+    pub const unsafe fn from_raw(raw: zx_types::zx_handle_info_t) -> HandleInfo {
+        HandleInfo {
+            handle: Handle::from_raw(raw.handle),
+            object_type: ObjectType(raw.ty),
+            rights: Rights::from_bits_unchecked(raw.rights),
+        }
+    }
 }
 
 #[derive(Default)]

@@ -5,8 +5,9 @@
 //! This crate contains utility functions used in GIDL tests and benchmarks.
 
 use {
-    fidl::{AsHandleRef, Handle, HandleBased, Rights},
+    fidl::{AsHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, Rights},
     fuchsia_zircon_status::Status,
+    fuchsia_zircon_types as zx_types,
 };
 
 /// Handle subtypes that can be created via `create_handles`. Each subtype `X`
@@ -16,6 +17,15 @@ pub enum HandleSubtype {
     Channel,
 }
 
+impl HandleSubtype {
+    fn obj_type(&self) -> zx_types::zx_obj_type_t {
+        match self {
+            HandleSubtype::Event => zx_types::ZX_OBJ_TYPE_EVENT,
+            HandleSubtype::Channel => zx_types::ZX_OBJ_TYPE_CHANNEL,
+        }
+    }
+}
+
 /// Specifies a handle to be created with `create_handles`. Corresponds to
 /// `HandleDef` in //tools/fidl/gidl/ir/test_case.go.
 pub struct HandleDef {
@@ -23,22 +33,28 @@ pub struct HandleDef {
     pub rights: Rights,
 }
 
-/// Creates a vector of handles whose concrete subtypes correspond to the given
-/// list. It panics if creating any of the handles fails.
-pub fn create_handles(defs: &[HandleDef]) -> Vec<Handle> {
+/// Creates a vector of raw handles based on `defs`. Panics if creating any of
+/// the handles fails. The caller is responsible for closing the handles.
+pub fn create_handles(defs: &[HandleDef]) -> Vec<zx_types::zx_handle_info_t> {
     let mut factory: HandleFactory = Default::default();
-    let mut handles = Vec::with_capacity(defs.len());
+    let mut handles_infos = Vec::with_capacity(defs.len());
     for def in defs {
         let default_rights_handle = match def.subtype {
             HandleSubtype::Event => factory.create_event().unwrap().into_handle(),
             HandleSubtype::Channel => factory.create_channel().unwrap().into_handle(),
         };
-        handles.push(match def.rights {
-            Rights::SAME_RIGHTS => default_rights_handle,
-            rights => default_rights_handle.replace(rights).unwrap(),
+        handles_infos.push(zx_types::zx_handle_info_t {
+            handle: match def.rights {
+                Rights::SAME_RIGHTS => default_rights_handle,
+                rights => default_rights_handle.replace(rights).unwrap(),
+            }
+            .into_raw(),
+            ty: def.subtype.obj_type(),
+            rights: def.rights.bits(),
+            unused: 0,
         });
     }
-    handles
+    handles_infos
 }
 
 /// HandleFactory creates handles. For handle subtypes that come in pairs, it
@@ -80,66 +96,51 @@ impl HandleFactory {
     }
 }
 
-/// Unsafely copies `handle`, i.e. makes a new `Handle` object with the same raw
-/// value, and converts it to handle subtype `T`.
-///
-/// # Safety
-///
-/// The caller is responsible for manually leaking one of handles (`handle` or
-/// the returned copy) to avoid double-close errors when handles are dropped.
-/// This can be done with `std::mem::forget` or in aggregate with `disown_vec`.
-pub unsafe fn copy_handle<T: HandleBased>(handle: &Handle) -> T {
-    T::from_handle(Handle::from_raw(handle.raw_handle()))
+/// Copies a raw handle into an owned `HandleBased` handle.
+pub fn copy_handle<T: HandleBased>(handle_info: &zx_types::zx_handle_info_t) -> T {
+    // Safety: The `from_raw` method is only unsafe because it can lead to
+    // handles being double-closed if used incorrectly. GIDL-generated code
+    // ensures that handles are only closed once.
+    T::from_handle(unsafe { Handle::from_raw(handle_info.handle) })
 }
 
-/// Makes unsafe copies of handles at the given indices, i.e. new `Handle`
-/// objects with the same raw values.
-///
-/// # Safety
-///
-/// The caller must use `disown_handles` on one of the lists (`handles` or the
-/// returned vector) to prevent double-close errors when handles are dropped.
-pub unsafe fn copy_handles_at(handles: &[Handle], indices: &[usize]) -> Vec<Handle> {
-    let mut copy = Vec::with_capacity(indices.len());
-    for &i in indices {
-        copy.push(Handle::from_raw(handles[i].raw_handle()));
-    }
-    copy
+/// Copies raw handles from the given indices to a new vector of owned
+/// `HandleInfo`s. The caller must ensure handles are closed exactly once.
+pub fn select_handle_infos(
+    handle_defs: &[zx_types::zx_handle_info_t],
+    indices: &[usize],
+) -> Vec<HandleInfo> {
+    // Safety: The `from_raw` method is only unsafe because it can lead to
+    // handles being double-closed if used incorrectly. GIDL-generated code
+    // ensures that handles are only closed once.
+    indices.iter().map(|&i| unsafe { HandleInfo::from_raw(handle_defs[i]) }).collect()
 }
 
-/// Wraps `Vec<T>` in a structure that prevents elements from being dropped. The
-/// vector itself will release its memory, but it will not invoke `T::drop`.
-///
-/// To use the contained vector after, use this pattern:
-///
-///     let items = disown_vec(...);
-///     let items = items.as_ref(); // or as_mut
-///
-/// The seperate let-bindings are necessary for the `Disowned` value to outlive
-/// the reference obtained from it.
-pub fn disown_vec<T>(vec: Vec<T>) -> Disowned<T> {
-    Disowned(vec)
-}
-
-pub struct Disowned<T>(Vec<T>);
-
-impl<T> AsRef<Vec<T>> for Disowned<T> {
-    fn as_ref(&self) -> &Vec<T> {
-        &self.0
+/// Converts a `HandleDisposition` to a raw `zx_handle_t`.
+pub fn to_zx_handle_t(hd: &HandleDisposition<'_>) -> zx_types::zx_handle_t {
+    match &hd.handle_op {
+        HandleOp::Move(handle) => handle.raw_handle(),
+        HandleOp::Duplicate(handle_ref) => handle_ref.raw_handle(),
     }
 }
 
-impl<T> AsMut<Vec<T>> for Disowned<T> {
-    fn as_mut(&mut self) -> &mut Vec<T> {
-        &mut self.0
-    }
-}
-
-impl<T> Drop for Disowned<T> {
-    fn drop(&mut self) {
-        for h in self.0.drain(..) {
-            std::mem::forget(h);
-        }
+/// Converts a `HandleDisposition` to a raw `zx_handle_disposition_t`.
+pub fn to_zx_handle_disposition_t(hd: &HandleDisposition<'_>) -> zx_types::zx_handle_disposition_t {
+    match &hd.handle_op {
+        HandleOp::Move(handle) => zx_types::zx_handle_disposition_t {
+            operation: zx_types::ZX_HANDLE_OP_MOVE,
+            handle: handle.raw_handle(),
+            type_: hd.object_type.into_raw(),
+            rights: hd.rights.bits(),
+            result: hd.result.into_raw(),
+        },
+        HandleOp::Duplicate(handle_ref) => zx_types::zx_handle_disposition_t {
+            operation: zx_types::ZX_HANDLE_OP_DUPLICATE,
+            handle: handle_ref.raw_handle(),
+            type_: hd.object_type.into_raw(),
+            rights: hd.rights.bits(),
+            result: hd.result.into_raw(),
+        },
     }
 }
 
@@ -153,11 +154,11 @@ impl<T> Drop for Disowned<T> {
 /// integer values of closed handles for newly created objects".
 /// https://fuchsia.dev/fuchsia-src/concepts/kernel/handles#invalid_handles_and_handle_reuse
 #[cfg(target_os = "fuchsia")]
-pub fn get_info_handle_valid(handle: &Handle) -> Result<(), Status> {
+pub fn get_info_handle_valid(handle_info: &zx_types::zx_handle_info_t) -> Result<(), Status> {
     use fuchsia_zircon::sys;
     Status::ok(unsafe {
         sys::zx_object_get_info(
-            handle.raw_handle(),
+            handle_info.handle,
             sys::ZX_INFO_HANDLE_VALID,
             std::ptr::null_mut(),
             0,
@@ -168,8 +169,12 @@ pub fn get_info_handle_valid(handle: &Handle) -> Result<(), Status> {
 }
 
 #[cfg(not(target_os = "fuchsia"))]
-pub fn get_info_handle_valid(handle: &Handle) -> Result<(), Status> {
+pub fn get_info_handle_valid(handle_info: &zx_types::zx_handle_info_t) -> Result<(), Status> {
     use fidl::EmulatedHandleRef;
+    // Safety: The `from_raw` method is only unsafe because it can lead to
+    // handles being double-closed if used incorrectly. We wrap it in
+    // ManuallyDrop to prevent closing the handle.
+    let handle = std::mem::ManuallyDrop::new(unsafe { Handle::from_raw(handle_info.handle) });
     // Match the behavior of the syscall, returning BAD_HANDLE if the handle is
     // the special "never a valid handle" ZX_HANDLE_INVALID, or if it is invalid
     // because it was closed or never assigned in the first place (dangling).

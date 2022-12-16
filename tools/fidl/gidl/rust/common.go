@@ -58,6 +58,33 @@ func buildHandleValues(handles []gidlir.Handle) string {
 	return builder.String()
 }
 
+func buildRawHandleDispositions(handleDispositions []gidlir.HandleDisposition) string {
+	var builder strings.Builder
+	builder.WriteString("[")
+	for _, hd := range handleDispositions {
+		fmt.Fprintf(&builder, `
+zx_types::zx_handle_disposition_t {
+   operation: zx_types::ZX_HANDLE_OP_MOVE,
+   handle: handle_defs[%d].handle,
+   type_: %d,
+   rights: %d,
+   result: zx_types::ZX_OK,
+},`, hd.Handle, hd.Type, hd.Rights)
+	}
+	builder.WriteString("]")
+	return builder.String()
+}
+
+func buildRawHandles(handleDispositions []gidlir.HandleDisposition) string {
+	var builder strings.Builder
+	builder.WriteString("[")
+	for _, hd := range handleDispositions {
+		fmt.Fprintf(&builder, "handle_defs[%d].handle,\n", hd.Handle)
+	}
+	builder.WriteString("]")
+	return builder.String()
+}
+
 func visit(value gidlir.Value, decl gidlmixer.Declaration) string {
 	switch value := value.(type) {
 	case bool:
@@ -299,5 +326,5 @@ func onList(value []gidlir.Value, decl gidlmixer.ListDeclaration) string {
 }
 
 func buildHandleValue(handle gidlir.Handle) string {
-	return fmt.Sprintf("unsafe { copy_handle(&handle_defs[%d]) }", handle)
+	return fmt.Sprintf("copy_handle(&handle_defs[%d])", handle)
 }

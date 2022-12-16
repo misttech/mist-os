@@ -9,6 +9,7 @@ rustc_library("gidl_util") {
   deps = [
     "//src/lib/fidl/rust/fidl",
     "//src/lib/zircon/rust:fuchsia-zircon-status",
+    "//src/lib/zircon/rust:fuchsia-zircon-types",
   ]
   if (is_fuchsia) {
     deps += [ "//src/lib/zircon/rust:fuchsia-zircon" ]

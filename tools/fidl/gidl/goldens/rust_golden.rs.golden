@@ -9,7 +9,8 @@ use {
     fidl::encoding::{Context, Decodable, Decoder, Encoder, WireFormatVersion},
     fidl_test_conformance as test_conformance,
     fuchsia_zircon_status::Status,
-    gidl_util::{HandleDef, HandleSubtype, create_handles, copy_handle, copy_handles_at, disown_vec, get_info_handle_valid},
+    fuchsia_zircon_types as zx_types,
+    gidl_util::{HandleDef, HandleSubtype, copy_handle, create_handles, get_info_handle_valid, select_handle_infos, to_zx_handle_t, to_zx_handle_disposition_t},
 };
 
 const _V1_CONTEXT: &Context = &Context { wire_format_version: WireFormatVersion::V1 };
@@ -26,7 +27,7 @@ fn test_golden_bool_struct_v1_encode() {
     assert_eq!(bytes, &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -39,7 +40,7 @@ fn test_golden_bool_struct_v2_encode() {
     assert_eq!(bytes, &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -52,7 +53,7 @@ fn test_golden_int_struct_v1_encode() {
     assert_eq!(bytes, &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -65,7 +66,7 @@ fn test_golden_int_struct_v2_encode() {
     assert_eq!(bytes, &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -78,7 +79,7 @@ fn test_golden_uint_struct_v1_encode() {
     assert_eq!(bytes, &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -91,7 +92,7 @@ fn test_golden_uint_struct_v2_encode() {
     assert_eq!(bytes, &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -104,7 +105,7 @@ fn test_golden_float_struct_v1_encode() {
     assert_eq!(bytes, &[
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -117,7 +118,7 @@ fn test_golden_float_struct_v2_encode() {
     assert_eq!(bytes, &[
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -130,7 +131,7 @@ fn test_golden_double_struct_v1_encode() {
     assert_eq!(bytes, &[
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -143,7 +144,7 @@ fn test_golden_double_struct_v2_encode() {
     assert_eq!(bytes, &[
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -158,7 +159,7 @@ fn test_golden_string_struct_v1_encode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x61,0x62,0x63,0x64,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -173,7 +174,7 @@ fn test_golden_string_struct_v2_encode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x61,0x62,0x63,0x64,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -188,7 +189,7 @@ fn test_golden_nullable_string_struct_non_null_v1_encode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x61,0x62,0x63,0x64,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -203,7 +204,7 @@ fn test_golden_nullable_string_struct_non_null_v2_encode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x61,0x62,0x63,0x64,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -217,7 +218,7 @@ fn test_golden_nullable_string_struct_null_v1_encode() {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -231,7 +232,7 @@ fn test_golden_nullable_string_struct_null_v2_encode() {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -244,7 +245,7 @@ fn test_golden_enum_struct_v1_encode() {
     assert_eq!(bytes, &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -257,7 +258,7 @@ fn test_golden_enum_struct_v2_encode() {
     assert_eq!(bytes, &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -270,7 +271,7 @@ fn test_golden_bits_struct_v1_encode() {
     assert_eq!(bytes, &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -283,7 +284,7 @@ fn test_golden_bits_struct_v2_encode() {
     assert_eq!(bytes, &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -300,7 +301,7 @@ fn test_golden_table_struct_v1_encode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -315,7 +316,7 @@ fn test_golden_table_struct_v2_encode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x00,0x00,0x00,0x00,0x01,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -331,7 +332,7 @@ fn test_golden_union_struct_v1_encode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -345,7 +346,7 @@ fn test_golden_union_struct_v2_encode() {
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x01,0x00,0x00,0x00,0x00,0x00,0x01,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -361,7 +362,7 @@ fn test_golden_nullable_union_struct_non_null_v1_encode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -375,7 +376,7 @@ fn test_golden_nullable_union_struct_non_null_v2_encode() {
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x01,0x00,0x00,0x00,0x00,0x00,0x01,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -390,7 +391,7 @@ fn test_golden_nullable_union_struct_null_v1_encode() {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -404,7 +405,7 @@ fn test_golden_nullable_union_struct_null_v2_encode() {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -417,7 +418,7 @@ fn test_golden_byte_array_struct_v1_encode() {
     assert_eq!(bytes, &[
 0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -430,7 +431,7 @@ fn test_golden_byte_array_struct_v2_encode() {
     assert_eq!(bytes, &[
 0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -443,7 +444,7 @@ fn test_golden_struct_array_struct_v1_encode() {
     assert_eq!(bytes, &[
 0x01,0x00,0x02,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -456,7 +457,7 @@ fn test_golden_struct_array_struct_v2_encode() {
     assert_eq!(bytes, &[
 0x01,0x00,0x02,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -472,7 +473,7 @@ fn test_golden_byte_vector_struct_v1_encode() {
 0x01,0x02,0x03,0x04,0x01,0x02,0x03,0x04,
 0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -488,7 +489,7 @@ fn test_golden_byte_vector_struct_v2_encode() {
 0x01,0x02,0x03,0x04,0x01,0x02,0x03,0x04,
 0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -503,7 +504,7 @@ fn test_golden_byte_nullable_vector_struct_non_null_v1_encode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -518,7 +519,7 @@ fn test_golden_byte_nullable_vector_struct_non_null_v2_encode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -532,7 +533,7 @@ fn test_golden_nullable_byte_vector_struct_null_v1_encode() {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -546,7 +547,7 @@ fn test_golden_nullable_byte_vector_struct_null_v2_encode() {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -561,7 +562,7 @@ fn test_golden_struct_vector_struct_v1_encode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x02,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -576,7 +577,7 @@ fn test_golden_struct_vector_struct_v2_encode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x02,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -590,7 +591,7 @@ fn test_golden_nullable_struct_non_null_v1_encode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -604,7 +605,7 @@ fn test_golden_nullable_struct_non_null_v2_encode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -617,7 +618,7 @@ fn test_golden_nullable_struct_null_v1_encode() {
     assert_eq!(bytes, &[
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -630,7 +631,7 @@ fn test_golden_nullable_struct_null_v2_encode() {
     assert_eq!(bytes, &[
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 #[cfg(target_os = "fuchsia")]
 #[test]
@@ -642,12 +643,7 @@ HandleDef{
 	rights: Rights::from_bits(61454).unwrap(),
 },
 ]);
-    let handle_defs = disown_vec(handle_defs);
-    let handle_defs = handle_defs.as_ref();
-    let expected_handles = disown_vec(unsafe { copy_handles_at(handle_defs, &[
-0,]) });
-    let expected_handles = expected_handles.as_ref();
-    let value = &mut test_conformance::GoldenHandleBasicRightsStruct { v: unsafe { copy_handle(&handle_defs[0]) } };
+    let value = &mut test_conformance::GoldenHandleBasicRightsStruct { v: copy_handle(&handle_defs[0]) };
     let bytes = &mut Vec::new();
     let handle_dispositions = &mut Vec::new();
     bytes.resize(65536, 0xcd); // fill with junk data
@@ -655,11 +651,17 @@ HandleDef{
     assert_eq!(bytes, &[
 0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,
 ]);
-    let handles = handle_dispositions.drain(..).map(|h| match h.handle_op {
-        HandleOp::Move(hdl) => hdl,
-        _ => panic!("unknown handle op"),
-    }).collect::<Vec<Handle>>();
-    assert_eq!(&handles, expected_handles);
+    assert_eq!(
+        handle_dispositions.iter().map(to_zx_handle_disposition_t).collect::<Vec<_>>(),
+        &[
+zx_types::zx_handle_disposition_t {
+   operation: zx_types::ZX_HANDLE_OP_MOVE,
+   handle: handle_defs[0].handle,
+   type_: 5,
+   rights: 49155,
+   result: zx_types::ZX_OK,
+},]
+    );
 }
 #[cfg(target_os = "fuchsia")]
 #[test]
@@ -671,12 +673,7 @@ HandleDef{
 	rights: Rights::from_bits(61454).unwrap(),
 },
 ]);
-    let handle_defs = disown_vec(handle_defs);
-    let handle_defs = handle_defs.as_ref();
-    let expected_handles = disown_vec(unsafe { copy_handles_at(handle_defs, &[
-0,]) });
-    let expected_handles = expected_handles.as_ref();
-    let value = &mut test_conformance::GoldenHandleBasicRightsStruct { v: unsafe { copy_handle(&handle_defs[0]) } };
+    let value = &mut test_conformance::GoldenHandleBasicRightsStruct { v: copy_handle(&handle_defs[0]) };
     let bytes = &mut Vec::new();
     let handle_dispositions = &mut Vec::new();
     bytes.resize(65536, 0xcd); // fill with junk data
@@ -684,11 +681,17 @@ HandleDef{
     assert_eq!(bytes, &[
 0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,
 ]);
-    let handles = handle_dispositions.drain(..).map(|h| match h.handle_op {
-        HandleOp::Move(hdl) => hdl,
-        _ => panic!("unknown handle op"),
-    }).collect::<Vec<Handle>>();
-    assert_eq!(&handles, expected_handles);
+    assert_eq!(
+        handle_dispositions.iter().map(to_zx_handle_disposition_t).collect::<Vec<_>>(),
+        &[
+zx_types::zx_handle_disposition_t {
+   operation: zx_types::ZX_HANDLE_OP_MOVE,
+   handle: handle_defs[0].handle,
+   type_: 5,
+   rights: 49155,
+   result: zx_types::ZX_OK,
+},]
+    );
 }
 #[cfg(target_os = "fuchsia")]
 #[test]
@@ -700,12 +703,7 @@ HandleDef{
 	rights: Rights::from_bits(2147483648).unwrap(),
 },
 ]);
-    let handle_defs = disown_vec(handle_defs);
-    let handle_defs = handle_defs.as_ref();
-    let expected_handles = disown_vec(unsafe { copy_handles_at(handle_defs, &[
-0,]) });
-    let expected_handles = expected_handles.as_ref();
-    let value = &mut test_conformance::GoldenNullableHandleStruct { v: Some(unsafe { copy_handle(&handle_defs[0]) }) };
+    let value = &mut test_conformance::GoldenNullableHandleStruct { v: Some(copy_handle(&handle_defs[0])) };
     let bytes = &mut Vec::new();
     let handle_dispositions = &mut Vec::new();
     bytes.resize(65536, 0xcd); // fill with junk data
@@ -713,11 +711,11 @@ HandleDef{
     assert_eq!(bytes, &[
 0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,
 ]);
-    let handles = handle_dispositions.drain(..).map(|h| match h.handle_op {
-        HandleOp::Move(hdl) => hdl,
-        _ => panic!("unknown handle op"),
-    }).collect::<Vec<Handle>>();
-    assert_eq!(&handles, expected_handles);
+    assert_eq!(
+        handle_dispositions.iter().map(to_zx_handle_t).collect::<Vec<_>>(),
+        &[handle_defs[0].handle,
+]
+    );
 }
 #[cfg(target_os = "fuchsia")]
 #[test]
@@ -729,12 +727,7 @@ HandleDef{
 	rights: Rights::from_bits(2147483648).unwrap(),
 },
 ]);
-    let handle_defs = disown_vec(handle_defs);
-    let handle_defs = handle_defs.as_ref();
-    let expected_handles = disown_vec(unsafe { copy_handles_at(handle_defs, &[
-0,]) });
-    let expected_handles = expected_handles.as_ref();
-    let value = &mut test_conformance::GoldenNullableHandleStruct { v: Some(unsafe { copy_handle(&handle_defs[0]) }) };
+    let value = &mut test_conformance::GoldenNullableHandleStruct { v: Some(copy_handle(&handle_defs[0])) };
     let bytes = &mut Vec::new();
     let handle_dispositions = &mut Vec::new();
     bytes.resize(65536, 0xcd); // fill with junk data
@@ -742,11 +735,11 @@ HandleDef{
     assert_eq!(bytes, &[
 0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,
 ]);
-    let handles = handle_dispositions.drain(..).map(|h| match h.handle_op {
-        HandleOp::Move(hdl) => hdl,
-        _ => panic!("unknown handle op"),
-    }).collect::<Vec<Handle>>();
-    assert_eq!(&handles, expected_handles);
+    assert_eq!(
+        handle_dispositions.iter().map(to_zx_handle_t).collect::<Vec<_>>(),
+        &[handle_defs[0].handle,
+]
+    );
 }
 
 #[test]
@@ -759,7 +752,7 @@ fn test_golden_nullable_handle_struct_null_v1_encode() {
     assert_eq!(bytes, &[
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 #[test]
@@ -772,7 +765,7 @@ fn test_golden_nullable_handle_struct_null_v2_encode() {
     assert_eq!(bytes, &[
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
-    assert!(handle_dispositions.is_empty());
+    assert_eq!(handle_dispositions, &[]);
 }
 
 
@@ -782,20 +775,9 @@ fn test_golden_bool_struct_v1_decode() {
     let bytes = &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenBoolStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenBoolStruct { v: true });
 }
 
@@ -804,20 +786,9 @@ fn test_golden_bool_struct_v2_decode() {
     let bytes = &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenBoolStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenBoolStruct { v: true });
 }
 
@@ -826,20 +797,9 @@ fn test_golden_int_struct_v1_decode() {
     let bytes = &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenIntStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenIntStruct { v: 1i16 });
 }
 
@@ -848,20 +808,9 @@ fn test_golden_int_struct_v2_decode() {
     let bytes = &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenIntStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenIntStruct { v: 1i16 });
 }
 
@@ -870,20 +819,9 @@ fn test_golden_uint_struct_v1_decode() {
     let bytes = &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenUintStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenUintStruct { v: 1u16 });
 }
 
@@ -892,20 +830,9 @@ fn test_golden_uint_struct_v2_decode() {
     let bytes = &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenUintStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenUintStruct { v: 1u16 });
 }
 
@@ -914,20 +841,9 @@ fn test_golden_float_struct_v1_decode() {
     let bytes = &[
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenFloatStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenFloatStruct { v: 0f32 });
 }
 
@@ -936,20 +852,9 @@ fn test_golden_float_struct_v2_decode() {
     let bytes = &[
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenFloatStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenFloatStruct { v: 0f32 });
 }
 
@@ -958,20 +863,9 @@ fn test_golden_double_struct_v1_decode() {
     let bytes = &[
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenDoubleStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenDoubleStruct { v: 0f64 });
 }
 
@@ -980,20 +874,9 @@ fn test_golden_double_struct_v2_decode() {
     let bytes = &[
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenDoubleStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenDoubleStruct { v: 0f64 });
 }
 
@@ -1004,20 +887,9 @@ fn test_golden_string_struct_v1_decode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x61,0x62,0x63,0x64,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenStringStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenStringStruct { v: String::from("abcd") });
 }
 
@@ -1028,20 +900,9 @@ fn test_golden_string_struct_v2_decode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x61,0x62,0x63,0x64,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenStringStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenStringStruct { v: String::from("abcd") });
 }
 
@@ -1052,20 +913,9 @@ fn test_golden_nullable_string_struct_non_null_v1_decode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x61,0x62,0x63,0x64,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableStringStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableStringStruct { v: Some(String::from("abcd")) });
 }
 
@@ -1076,20 +926,9 @@ fn test_golden_nullable_string_struct_non_null_v2_decode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x61,0x62,0x63,0x64,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableStringStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableStringStruct { v: Some(String::from("abcd")) });
 }
 
@@ -1099,20 +938,9 @@ fn test_golden_nullable_string_struct_null_v1_decode() {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableStringStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableStringStruct { v: None });
 }
 
@@ -1122,20 +950,9 @@ fn test_golden_nullable_string_struct_null_v2_decode() {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableStringStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableStringStruct { v: None });
 }
 
@@ -1144,20 +961,9 @@ fn test_golden_enum_struct_v1_decode() {
     let bytes = &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenEnumStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenEnumStruct { v: test_conformance::GoldenEnum::from_primitive(1u16).unwrap() });
 }
 
@@ -1166,20 +972,9 @@ fn test_golden_enum_struct_v2_decode() {
     let bytes = &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenEnumStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenEnumStruct { v: test_conformance::GoldenEnum::from_primitive(1u16).unwrap() });
 }
 
@@ -1188,20 +983,9 @@ fn test_golden_bits_struct_v1_decode() {
     let bytes = &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenBitsStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenBitsStruct { v: unsafe { test_conformance::GoldenBits::from_bits_unchecked(1u16) } });
 }
 
@@ -1210,20 +994,9 @@ fn test_golden_bits_struct_v2_decode() {
     let bytes = &[
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenBitsStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenBitsStruct { v: unsafe { test_conformance::GoldenBits::from_bits_unchecked(1u16) } });
 }
 
@@ -1236,20 +1009,9 @@ fn test_golden_table_struct_v1_decode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenTableStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenTableStruct { v: test_conformance::GoldenTable { v: Some(1i16), ..test_conformance::GoldenTable::EMPTY } });
 }
 
@@ -1260,20 +1022,9 @@ fn test_golden_table_struct_v2_decode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x00,0x00,0x00,0x00,0x01,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenTableStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenTableStruct { v: test_conformance::GoldenTable { v: Some(1i16), ..test_conformance::GoldenTable::EMPTY } });
 }
 
@@ -1285,20 +1036,9 @@ fn test_golden_union_struct_v1_decode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenUnionStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenUnionStruct { v: test_conformance::GoldenUnion::V(1i16) });
 }
 
@@ -1308,20 +1048,9 @@ fn test_golden_union_struct_v2_decode() {
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x01,0x00,0x00,0x00,0x00,0x00,0x01,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenUnionStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenUnionStruct { v: test_conformance::GoldenUnion::V(1i16) });
 }
 
@@ -1333,20 +1062,9 @@ fn test_golden_nullable_union_struct_non_null_v1_decode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableUnionStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableUnionStruct { v: Some(Box::new(test_conformance::GoldenUnion::V(1i16))) });
 }
 
@@ -1356,20 +1074,9 @@ fn test_golden_nullable_union_struct_non_null_v2_decode() {
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x01,0x00,0x00,0x00,0x00,0x00,0x01,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableUnionStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableUnionStruct { v: Some(Box::new(test_conformance::GoldenUnion::V(1i16))) });
 }
 
@@ -1380,20 +1087,9 @@ fn test_golden_nullable_union_struct_null_v1_decode() {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableUnionStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableUnionStruct { v: None });
 }
 
@@ -1403,20 +1099,9 @@ fn test_golden_nullable_union_struct_null_v2_decode() {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableUnionStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableUnionStruct { v: None });
 }
 
@@ -1425,20 +1110,9 @@ fn test_golden_byte_array_struct_v1_decode() {
     let bytes = &[
 0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenByteArrayStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenByteArrayStruct { v: [1u8, 2u8, 3u8, 4u8] });
 }
 
@@ -1447,20 +1121,9 @@ fn test_golden_byte_array_struct_v2_decode() {
     let bytes = &[
 0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenByteArrayStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenByteArrayStruct { v: [1u8, 2u8, 3u8, 4u8] });
 }
 
@@ -1469,20 +1132,9 @@ fn test_golden_struct_array_struct_v1_decode() {
     let bytes = &[
 0x01,0x00,0x02,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenStructArrayStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenStructArrayStruct { v: [test_conformance::GoldenIntStruct { v: 1i16 }, test_conformance::GoldenIntStruct { v: 2i16 }] });
 }
 
@@ -1491,20 +1143,9 @@ fn test_golden_struct_array_struct_v2_decode() {
     let bytes = &[
 0x01,0x00,0x02,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenStructArrayStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenStructArrayStruct { v: [test_conformance::GoldenIntStruct { v: 1i16 }, test_conformance::GoldenIntStruct { v: 2i16 }] });
 }
 
@@ -1516,20 +1157,9 @@ fn test_golden_byte_vector_struct_v1_decode() {
 0x01,0x02,0x03,0x04,0x01,0x02,0x03,0x04,
 0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenByteVectorStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenByteVectorStruct { v: vec![1u8, 2u8, 3u8, 4u8, 1u8, 2u8, 3u8, 4u8, 1u8, 2u8, 3u8, 4u8] });
 }
 
@@ -1541,20 +1171,9 @@ fn test_golden_byte_vector_struct_v2_decode() {
 0x01,0x02,0x03,0x04,0x01,0x02,0x03,0x04,
 0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenByteVectorStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenByteVectorStruct { v: vec![1u8, 2u8, 3u8, 4u8, 1u8, 2u8, 3u8, 4u8, 1u8, 2u8, 3u8, 4u8] });
 }
 
@@ -1565,20 +1184,9 @@ fn test_golden_byte_nullable_vector_struct_non_null_v1_decode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableByteVectorStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableByteVectorStruct { v: Some(vec![1u8, 2u8, 3u8, 4u8]) });
 }
 
@@ -1589,20 +1197,9 @@ fn test_golden_byte_nullable_vector_struct_non_null_v2_decode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableByteVectorStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableByteVectorStruct { v: Some(vec![1u8, 2u8, 3u8, 4u8]) });
 }
 
@@ -1612,20 +1209,9 @@ fn test_golden_nullable_byte_vector_struct_null_v1_decode() {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableByteVectorStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableByteVectorStruct { v: None });
 }
 
@@ -1635,20 +1221,9 @@ fn test_golden_nullable_byte_vector_struct_null_v2_decode() {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableByteVectorStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableByteVectorStruct { v: None });
 }
 
@@ -1659,20 +1234,9 @@ fn test_golden_struct_vector_struct_v1_decode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x02,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenStructVectorStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenStructVectorStruct { v: vec![test_conformance::GoldenIntStruct { v: 1i16 }, test_conformance::GoldenIntStruct { v: 2i16 }] });
 }
 
@@ -1683,20 +1247,9 @@ fn test_golden_struct_vector_struct_v2_decode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x02,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenStructVectorStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenStructVectorStruct { v: vec![test_conformance::GoldenIntStruct { v: 1i16 }, test_conformance::GoldenIntStruct { v: 2i16 }] });
 }
 
@@ -1706,20 +1259,9 @@ fn test_golden_nullable_struct_non_null_v1_decode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableStruct { v: Some(Box::new(test_conformance::GoldenBoolStruct { v: true })) });
 }
 
@@ -1729,20 +1271,9 @@ fn test_golden_nullable_struct_non_null_v2_decode() {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableStruct { v: Some(Box::new(test_conformance::GoldenBoolStruct { v: true })) });
 }
 
@@ -1751,20 +1282,9 @@ fn test_golden_nullable_struct_null_v1_decode() {
     let bytes = &[
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableStruct { v: None });
 }
 
@@ -1773,20 +1293,9 @@ fn test_golden_nullable_struct_null_v2_decode() {
     let bytes = &[
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableStruct { v: None });
 }
 #[cfg(target_os = "fuchsia")]
@@ -1795,30 +1304,17 @@ fn test_golden_nullable_handle_struct_non_null_v1_decode() {
     let bytes = &[
 0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions = &[
+    let handle_defs = create_handles(&[
 // #0
 HandleDef{
 	subtype: HandleSubtype::Event,
 	rights: Rights::from_bits(2147483648).unwrap(),
 },
-];
-    let handle_defs = create_handles(handle_definitions);
-    let handle_defs = disown_vec(handle_defs);
-    let handle_defs = handle_defs.as_ref();
-    let mut handles = unsafe { copy_handles_at(handle_defs, &[
-0,]) };
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+]);
+    let handle_infos = &mut select_handle_infos(&handle_defs, &[
+0,]);
     let value = &mut test_conformance::GoldenNullableHandleStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     // Forget handles before dropping the expected value, to avoid double closing them.
     struct ForgetHandles(test_conformance::GoldenNullableHandleStruct);
     impl std::ops::Drop for ForgetHandles {
@@ -1827,7 +1323,7 @@ HandleDef{
             std::mem::forget(std::mem::replace((&mut self.0.v).as_mut().unwrap(), Handle::invalid().into()));
         }
     }
-    let expected_value = ForgetHandles(test_conformance::GoldenNullableHandleStruct { v: Some(unsafe { copy_handle(&handle_defs[0]) }) });
+    let expected_value = ForgetHandles(test_conformance::GoldenNullableHandleStruct { v: Some(copy_handle(&handle_defs[0])) });
     assert_eq!(value, &expected_value.0);
 }
 #[cfg(target_os = "fuchsia")]
@@ -1836,30 +1332,17 @@ fn test_golden_nullable_handle_struct_non_null_v2_decode() {
     let bytes = &[
 0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions = &[
+    let handle_defs = create_handles(&[
 // #0
 HandleDef{
 	subtype: HandleSubtype::Event,
 	rights: Rights::from_bits(2147483648).unwrap(),
 },
-];
-    let handle_defs = create_handles(handle_definitions);
-    let handle_defs = disown_vec(handle_defs);
-    let handle_defs = handle_defs.as_ref();
-    let mut handles = unsafe { copy_handles_at(handle_defs, &[
-0,]) };
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+]);
+    let handle_infos = &mut select_handle_infos(&handle_defs, &[
+0,]);
     let value = &mut test_conformance::GoldenNullableHandleStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     // Forget handles before dropping the expected value, to avoid double closing them.
     struct ForgetHandles(test_conformance::GoldenNullableHandleStruct);
     impl std::ops::Drop for ForgetHandles {
@@ -1868,7 +1351,7 @@ HandleDef{
             std::mem::forget(std::mem::replace((&mut self.0.v).as_mut().unwrap(), Handle::invalid().into()));
         }
     }
-    let expected_value = ForgetHandles(test_conformance::GoldenNullableHandleStruct { v: Some(unsafe { copy_handle(&handle_defs[0]) }) });
+    let expected_value = ForgetHandles(test_conformance::GoldenNullableHandleStruct { v: Some(copy_handle(&handle_defs[0])) });
     assert_eq!(value, &expected_value.0);
 }
 
@@ -1877,20 +1360,9 @@ fn test_golden_nullable_handle_struct_null_v1_decode() {
     let bytes = &[
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableHandleStruct::new_empty();
-    Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableHandleStruct { v: None });
 }
 
@@ -1899,20 +1371,9 @@ fn test_golden_nullable_handle_struct_null_v2_decode() {
     let bytes = &[
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let handle_definitions: Vec<HandleDef> = Vec::new();
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).zip(handle_definitions.iter()).map(|(h, hd)| {
-        HandleInfo {
-            handle: h,
-            object_type: match hd.subtype {
-                HandleSubtype::Event => ObjectType::EVENT,
-                HandleSubtype::Channel => ObjectType::CHANNEL,
-            },
-            rights: hd.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenNullableHandleStruct::new_empty();
-    Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value).unwrap();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableHandleStruct { v: None });
 }
 
@@ -1926,17 +1387,9 @@ fn test_golden_string_struct_null_body_v1_decode_failure() {
 0x03,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).map(|h: fidl::Handle| {
-        let info = h.as_handle_ref().basic_info().unwrap();
-        HandleInfo {
-            handle: h,
-            object_type: info.object_type,
-            rights: info.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenStringStruct::new_empty();
-    match Decoder::decode_with_context(_V1_CONTEXT, bytes, &mut handle_infos, value) {
+    match Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value) {
         Err(err) => assert_matches!(err, Error::UnexpectedNullRef { .. }),
         Ok(_) => panic!("unexpected successful decoding"),
     }
@@ -1948,17 +1401,9 @@ fn test_golden_string_struct_null_body_v2_decode_failure() {
 0x03,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ];
-    let mut handles = Vec::new();
-    let mut handle_infos : Vec::<_> = handles.drain(..).map(|h: fidl::Handle| {
-        let info = h.as_handle_ref().basic_info().unwrap();
-        HandleInfo {
-            handle: h,
-            object_type: info.object_type,
-            rights: info.rights,
-        }
-    }).collect();
+    let handle_infos = &mut Vec::new();
     let value = &mut test_conformance::GoldenStringStruct::new_empty();
-    match Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut handle_infos, value) {
+    match Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value) {
         Err(err) => assert_matches!(err, Error::UnexpectedNullRef { .. }),
         Ok(_) => panic!("unexpected successful decoding"),
     }

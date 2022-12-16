@@ -1225,8 +1225,7 @@ func (p *Parser) parseHandleDefSection(rightsConfiguration rightsConfiguration) 
 				tok, "want #%d, got #%d (handle_defs must be #0, #1, #2, etc.)", expected, h)
 		}
 		expected++
-		tok, err = p.consumeToken(tEqual)
-		if err != nil {
+		if _, err = p.consumeToken(tEqual); err != nil {
 			return err
 		}
 		hd, err := p.parseHandleDef(rightsConfiguration)
