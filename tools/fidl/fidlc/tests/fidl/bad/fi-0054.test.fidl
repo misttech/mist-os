@@ -4,7 +4,7 @@
 library test.bad.fi0054;
 
 type Enum = enum {
-  foo_bar = 1;
+    foo_bar = 1;
 };
 
 const EXAMPLE Enum = Enum.FOO_BAR;
