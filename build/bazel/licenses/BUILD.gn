@@ -1,0 +1,54 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# These rules aggregate license information for all the GN-built bazel input resources
+# into a licenses SPDX file to be used in bazel build too.
+#
+# The SPDX file is a bazel input resource as well.
+
+import("//build/bazel/bazel_inputs.gni")
+import("//build/bazel/legacy_ninja_build_outputs.gni")
+import("//tools/check-licenses/build/license_data.gni")
+
+# TODO(fxb/117740): We only need to cover bazel inputs that end up in the product,
+# e.g. not tests or build tools. This can be achieved by adding metadata to
+# the bazel inputs list by splitting the lists.
+
+group("all_bazel_inputs") {
+  # Some of the inputs are testonly
+  testonly = true
+
+  deps = gn_labels_for_bazel_inputs + extra_gn_labels_for_bazel_inputs
+
+  # Remove a potential circular dependency on the spdx bazel_input_resource itself.
+  deps -= [ "//build/bazel/licenses:all_bazel_inputs_licenses_spdx" ]
+}
+
+# Collects the license data for all GN inputs and makes it available for Bazel
+license_data("licenses_data") {
+  testonly = true
+  filter = ""
+  target = "//build/bazel/licenses:all_bazel_inputs"
+  out_dir = "$target_out_dir/licenses_data"
+  produce_spdx = true
+}
+
+# Note: To make this target on the Bazel side, this target needs be added:
+# (1) To `extra_deps` in the relevant `bazel_build_action` rule.
+# (2) To the `extra_gn_labels_for_bazel_inputs` GN arg.
+#
+# Warnings:
+# (1) license_data dependency above is VERY SLOW.
+# (2) When developing locally, since license_data may produce inaccurate
+#     results if you didn't 'fx clean'. If you want to avoid 'fx clean' do:
+#     * fxbug.dev/84924 workaround: Manually delete the SPDX output :
+#       `rm -rf out/default/obj/build/bazel/licenses/licenses_data/`
+#     * fxbug.dev/117694 workaround: Manually delete cached depenedncy calculation:
+#       `rm out/default/project.json`
+bazel_input_resource("all_bazel_inputs_licenses_spdx") {
+  testonly = true
+  deps = [ ":licenses_data" ]
+  sources = get_target_outputs(":licenses_data_spdx_copy")
+  outputs = [ "licenses_data/results.spdx.json" ]
+}

@@ -106,6 +106,7 @@ group("non_hermetic_deps") {
     "//build/bazel:*",
     "//build/bazel/assembly:*",
     "//build/bazel/examples/*",
+    "//build/bazel/licenses:*",
     "//build/bazel/tests/*",
   ]
 }
