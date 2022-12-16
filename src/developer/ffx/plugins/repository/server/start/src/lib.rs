@@ -57,6 +57,23 @@ async fn start_impl(
     {
         Ok(address) => {
             let address = SocketAddress::from(address);
+
+            // Error out if the server is listening on a different address. Either we raced some
+            // other `start` command, or the server was already running, and someone changed the
+            // `repository.server.listen` address without then stopping the server.
+            if listen_address.port() != 0 && listen_address != address.0 {
+                ffx_bail!(
+                    "The server is listening on {} but is configured to listen on {}.\n\
+                    You will need to restart the server for it to listen on the\n\
+                    new address. You can fix this with:\n\
+                    \n\
+                    $ ffx repository server stop\n\
+                    $ ffx repository server start",
+                    listen_address,
+                    address
+                )
+            }
+
             if writer.is_machine() {
                 writer.machine(&ServerInfo { address: address.0 })?;
             } else {
@@ -109,12 +126,19 @@ mod tests {
         run_async_test(async {
             let mut writer = Writer::new_test(None);
 
+            let address = (Ipv4Addr::LOCALHOST, 1234).into();
+            ffx_config::query("repository.server.listen")
+                .level(Some(ffx_config::ConfigLevel::User))
+                .set("127.0.0.1:1234".into())
+                .await
+                .unwrap();
+
             let (sender, receiver) = channel();
             let mut sender = Some(sender);
             let repos = setup_fake_repos(move |req| match req {
                 RepositoryRegistryRequest::ServerStart { responder } => {
                     sender.take().unwrap().send(()).unwrap();
-                    let address = SocketAddress((Ipv4Addr::LOCALHOST, 0).into()).into();
+                    let address = SocketAddress(address).into();
                     responder.send(&mut Ok(address)).unwrap()
                 }
                 other => panic!("Unexpected request: {:?}", other),
@@ -132,6 +156,11 @@ mod tests {
             let mut writer = Writer::new_test(Some(ffx_writer::Format::Json));
 
             let address = (Ipv4Addr::LOCALHOST, 1234).into();
+            ffx_config::query("repository.server.listen")
+                .level(Some(ffx_config::ConfigLevel::User))
+                .set("127.0.0.1:1234".into())
+                .await
+                .unwrap();
 
             let (sender, receiver) = channel();
             let mut sender = Some(sender);
@@ -164,6 +193,35 @@ mod tests {
                 RepositoryRegistryRequest::ServerStart { responder } => {
                     sender.take().unwrap().send(()).unwrap();
                     responder.send(&mut Err(RepositoryError::ServerNotRunning)).unwrap()
+                }
+                other => panic!("Unexpected request: {:?}", other),
+            });
+
+            assert!(start_impl(StartCommand {}, repos, &mut writer).await.is_err());
+            assert_eq!(receiver.await, Ok(()));
+        })
+    }
+
+    #[serial_test::serial]
+    #[test]
+    fn test_start_wrong_port() {
+        run_async_test(async {
+            let mut writer = Writer::new_test(None);
+
+            let address = (Ipv4Addr::LOCALHOST, 1234).into();
+            ffx_config::query("repository.server.listen")
+                .level(Some(ffx_config::ConfigLevel::User))
+                .set("127.0.0.1:4321".into())
+                .await
+                .unwrap();
+
+            let (sender, receiver) = channel();
+            let mut sender = Some(sender);
+            let repos = setup_fake_repos(move |req| match req {
+                RepositoryRegistryRequest::ServerStart { responder } => {
+                    sender.take().unwrap().send(()).unwrap();
+                    let address = SocketAddress(address).into();
+                    responder.send(&mut Ok(address)).unwrap()
                 }
                 other => panic!("Unexpected request: {:?}", other),
             });
