@@ -28,7 +28,14 @@ class Argument;
 template <RefType name_type>
 class Argument<ArgumentType::kNull, name_type> {
  public:
+  template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
+  Argument(T&& name) : Argument{StringRef<name_type>{std::forward<T>(name)}} {}
+
   explicit Argument(StringRef<name_type> name) : name_(name) {}
+
+  Argument(const Argument&) = default;
+  Argument& operator=(const Argument&) = default;
+
   WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize();
   }
@@ -50,12 +57,25 @@ class Argument<ArgumentType::kNull, name_type> {
 #if __cplusplus >= 201703L
 template <RefType name_type>
 Argument(StringRef<name_type>) -> Argument<ArgumentType::kNull, name_type>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kId> = true>
+Argument(T&& name) -> Argument<ArgumentType::kNull, RefType::kId>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
+Argument(T&& name) -> Argument<ArgumentType::kNull, RefType::kInline>;
 #endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kBool, name_type> {
  public:
+  template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
+  Argument(T&& name, bool val) : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+
   Argument(StringRef<name_type> name, bool val) : name_(name), val_(val) {}
+
+  Argument(const Argument&) = default;
+  Argument& operator=(const Argument&) = default;
+
   WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize();
   }
@@ -79,12 +99,25 @@ class Argument<ArgumentType::kBool, name_type> {
 #if __cplusplus >= 201703L
 template <RefType name_type>
 Argument(StringRef<name_type>, bool) -> Argument<ArgumentType::kBool, name_type>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kId> = true>
+Argument(T&& name, bool) -> Argument<ArgumentType::kBool, RefType::kId>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
+Argument(T&& name, bool) -> Argument<ArgumentType::kBool, RefType::kInline>;
 #endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kInt32, name_type> {
  public:
+  template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
+  Argument(T&& name, int32_t val) : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+
   Argument(StringRef<name_type> name, int32_t val) : name_(name), val_(val) {}
+
+  Argument(const Argument&) = default;
+  Argument& operator=(const Argument&) = default;
+
   WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize();
   }
@@ -108,12 +141,25 @@ class Argument<ArgumentType::kInt32, name_type> {
 #if __cplusplus >= 201703L
 template <RefType name_type>
 Argument(StringRef<name_type>, int32_t) -> Argument<ArgumentType::kInt32, name_type>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kId> = true>
+Argument(T&& name, int32_t) -> Argument<ArgumentType::kInt32, RefType::kId>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
+Argument(T&& name, int32_t) -> Argument<ArgumentType::kInt32, RefType::kInline>;
 #endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kUint32, name_type> {
  public:
+  template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
+  Argument(T&& name, uint32_t val) : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+
   Argument(StringRef<name_type> name, uint32_t val) : name_(name), val_(val) {}
+
+  Argument(const Argument&) = default;
+  Argument& operator=(const Argument&) = default;
+
   WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize();
   }
@@ -137,12 +183,25 @@ class Argument<ArgumentType::kUint32, name_type> {
 #if __cplusplus >= 201703L
 template <RefType name_type>
 Argument(StringRef<name_type>, uint32_t) -> Argument<ArgumentType::kUint32, name_type>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kId> = true>
+Argument(T&& name, uint32_t) -> Argument<ArgumentType::kUint32, RefType::kId>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
+Argument(T&& name, uint32_t) -> Argument<ArgumentType::kUint32, RefType::kInline>;
 #endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kInt64, name_type> {
  public:
+  template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
+  Argument(T&& name, int64_t val) : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+
   Argument(StringRef<name_type> name, int64_t val) : name_(name), val_(val) {}
+
+  Argument(const Argument&) = default;
+  Argument& operator=(const Argument&) = default;
+
   WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize() + WordSize(1);
   }
@@ -166,12 +225,25 @@ class Argument<ArgumentType::kInt64, name_type> {
 #if __cplusplus >= 201703L
 template <RefType name_type>
 Argument(StringRef<name_type>, int64_t) -> Argument<ArgumentType::kInt64, name_type>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kId> = true>
+Argument(T&& name, int64_t) -> Argument<ArgumentType::kInt64, RefType::kId>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
+Argument(T&& name, int64_t) -> Argument<ArgumentType::kInt64, RefType::kInline>;
 #endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kUint64, name_type> {
  public:
+  template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
+  Argument(T&& name, uint64_t val) : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+
   Argument(StringRef<name_type> name, uint64_t val) : name_(name), val_(val) {}
+
+  Argument(const Argument&) = default;
+  Argument& operator=(const Argument&) = default;
+
   WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize() + WordSize(1);
   }
@@ -195,12 +267,25 @@ class Argument<ArgumentType::kUint64, name_type> {
 #if __cplusplus >= 201703L
 template <RefType name_type>
 Argument(StringRef<name_type>, uint64_t) -> Argument<ArgumentType::kUint64, name_type>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kId> = true>
+Argument(T&& name, uint64_t) -> Argument<ArgumentType::kUint64, RefType::kId>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
+Argument(T&& name, uint64_t) -> Argument<ArgumentType::kUint64, RefType::kInline>;
 #endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kDouble, name_type> {
  public:
+  template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
+  Argument(T&& name, double val) : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+
   Argument(StringRef<name_type> name, double val) : name_(name), val_(val) {}
+
+  Argument(const Argument&) = default;
+  Argument& operator=(const Argument&) = default;
+
   WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize() + WordSize(1);
   }
@@ -224,12 +309,25 @@ class Argument<ArgumentType::kDouble, name_type> {
 #if __cplusplus >= 201703L
 template <RefType name_type>
 Argument(StringRef<name_type>, double) -> Argument<ArgumentType::kDouble, name_type>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kId> = true>
+Argument(T&& name, double) -> Argument<ArgumentType::kDouble, RefType::kId>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
+Argument(T&& name, double) -> Argument<ArgumentType::kDouble, RefType::kInline>;
 #endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kPointer, name_type> {
  public:
+  template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
+  Argument(T&& name, Pointer val) : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+
   Argument(StringRef<name_type> name, Pointer val) : name_(name), val_(val) {}
+
+  Argument(const Argument&) = default;
+  Argument& operator=(const Argument&) = default;
+
   WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize() + WordSize(1);
   }
@@ -254,12 +352,25 @@ class Argument<ArgumentType::kPointer, name_type> {
 #if __cplusplus >= 201703L
 template <RefType name_type>
 Argument(StringRef<name_type>, Pointer) -> Argument<ArgumentType::kPointer, name_type>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kId> = true>
+Argument(T&& name, Pointer) -> Argument<ArgumentType::kPointer, RefType::kId>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
+Argument(T&& name, Pointer) -> Argument<ArgumentType::kPointer, RefType::kInline>;
 #endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kKoid, name_type> {
  public:
+  template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
+  Argument(T&& name, Koid val) : name_{std::forward<T>(name)}, val_{val} {}
+
   Argument(StringRef<name_type> name, Koid val) : name_(name), val_(val) {}
+
+  Argument(const Argument&) = default;
+  Argument& operator=(const Argument&) = default;
+
   WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize() + WordSize(1);
   }
@@ -283,12 +394,25 @@ class Argument<ArgumentType::kKoid, name_type> {
 #if __cplusplus >= 201703L
 template <RefType name_type>
 Argument(StringRef<name_type>, Koid) -> Argument<ArgumentType::kKoid, name_type>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kId> = true>
+Argument(T&& name, Koid) -> Argument<ArgumentType::kKoid, RefType::kId>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
+Argument(T&& name, Koid) -> Argument<ArgumentType::kKoid, RefType::kInline>;
 #endif
 
 template <RefType name_type, RefType val_type>
 class Argument<ArgumentType::kString, name_type, val_type> {
  public:
+  template <typename T, typename U, EnableIfConvertibleToStringRef<T, name_type> = true,
+            EnableIfConvertibleToStringRef<U, val_type> = true>
+  Argument(T&& name, U&& val) : name_{std::forward<T>(name)}, val_{std::forward<U>(val)} {}
+
   Argument(StringRef<name_type> name, StringRef<val_type> val) : name_(name), val_(val) {}
+
+  Argument(const Argument&) = default;
+  Argument& operator=(const Argument&) = default;
 
   WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize() + val_.PayloadSize();
@@ -315,12 +439,31 @@ class Argument<ArgumentType::kString, name_type, val_type> {
 #if __cplusplus >= 201703L
 Argument(StringRef<RefType::kInline>, StringRef<RefType::kId>)
     ->Argument<ArgumentType::kString, RefType::kInline, RefType::kId>;
+
 Argument(StringRef<RefType::kId>, StringRef<RefType::kId>)
     ->Argument<ArgumentType::kString, RefType::kId, RefType::kId>;
+
 Argument(StringRef<RefType::kInline>, StringRef<RefType::kInline>)
     ->Argument<ArgumentType::kString, RefType::kInline, RefType::kInline>;
+
 Argument(StringRef<RefType::kId>, StringRef<RefType::kInline>)
     ->Argument<ArgumentType::kString, RefType::kId, RefType::kInline>;
+
+template <typename T, typename U, EnableIfConvertibleToStringRef<T, RefType::kInline> = true,
+          EnableIfConvertibleToStringRef<U, RefType::kId> = true>
+Argument(T&& name, U&& val) -> Argument<ArgumentType::kString, RefType::kInline, RefType::kId>;
+
+template <typename T, typename U, EnableIfConvertibleToStringRef<T, RefType::kId> = true,
+          EnableIfConvertibleToStringRef<U, RefType::kId> = true>
+Argument(T&& name, U&& val) -> Argument<ArgumentType::kString, RefType::kId, RefType::kId>;
+
+template <typename T, typename U, EnableIfConvertibleToStringRef<T, RefType::kInline> = true,
+          EnableIfConvertibleToStringRef<U, RefType::kInline> = true>
+Argument(T&& name, U&& val) -> Argument<ArgumentType::kString, RefType::kInline, RefType::kInline>;
+
+template <typename T, typename U, EnableIfConvertibleToStringRef<T, RefType::kId> = true,
+          EnableIfConvertibleToStringRef<U, RefType::kInline> = true>
+Argument(T&& name, U&& val) -> Argument<ArgumentType::kString, RefType::kId, RefType::kInline>;
 #endif
 
 }  // namespace fxt

@@ -15,6 +15,8 @@
 #include <string.h>
 #include <zircon/assert.h>
 
+#include <type_traits>
+
 #include "record_types.h"
 
 namespace fxt {
@@ -26,11 +28,25 @@ namespace fxt {
 template <RefType>
 class StringRef;
 
+template <typename T, RefType ref_type>
+using EnableIfConvertibleToStringRef =
+    std::enable_if_t<(std::is_convertible_v<T, StringRef<ref_type>> &&
+                      !std::is_same_v<T, StringRef<ref_type>>),
+                     bool>;
+
 template <>
 class StringRef<RefType::kInline> {
+  enum Convert { kConvert };
+
  public:
+  template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
+  StringRef(const T& value) : StringRef{kConvert, value} {}
+
   explicit StringRef(const char* string, size_t size = FXT_MAX_STR_LEN)
       : string_{string}, size_{strnlen(string, size < FXT_MAX_STR_LEN ? size : FXT_MAX_STR_LEN)} {}
+
+  StringRef(const StringRef&) = default;
+  StringRef& operator=(const StringRef&) = default;
 
   WordSize PayloadSize() const { return WordSize::FromBytes(size_); }
 
@@ -44,21 +60,36 @@ class StringRef<RefType::kInline> {
   size_t size() const { return size_; }
 
  private:
+  StringRef(Convert, const StringRef& value) : string_{value.string_}, size_{value.size_} {}
+
   static const size_t FXT_MAX_STR_LEN = 32000;
   const char* string_;
   size_t size_;
 };
+
 #if __cplusplus >= 201703L
 StringRef(const char*)->StringRef<RefType::kInline>;
+
 StringRef(const char*, size_t)->StringRef<RefType::kInline>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
+StringRef(const T&) -> StringRef<RefType::kInline>;
 #endif
 
 template <>
 class StringRef<RefType::kId> {
+  enum Convert { kConvert };
+
  public:
+  template <typename T, EnableIfConvertibleToStringRef<T, RefType::kId> = true>
+  StringRef(const T& value) : StringRef{kConvert, value} {}
+
   explicit StringRef(uint16_t id) : id_(id) {
     ZX_ASSERT_MSG(id < 0x8000, "The msb of a StringRef's id must be 0");
   }
+
+  StringRef(const StringRef&) = default;
+  StringRef& operator=(const StringRef&) = default;
 
   static WordSize PayloadSize() { return WordSize(0); }
 
@@ -70,10 +101,16 @@ class StringRef<RefType::kId> {
   }
 
  private:
+  StringRef(Convert, const StringRef& value) : id_{value.id_} {}
+
   uint16_t id_;
 };
+
 #if __cplusplus >= 201703L
 StringRef(uint16_t)->StringRef<RefType::kId>;
+
+template <typename T, EnableIfConvertibleToStringRef<T, RefType::kId> = true>
+StringRef(const T&) -> StringRef<RefType::kId>;
 #endif
 
 }  // namespace fxt

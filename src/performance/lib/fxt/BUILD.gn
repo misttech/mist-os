@@ -32,6 +32,7 @@ source_set("fxt") {
 test("fxt_unittests") {
   testonly = true
   sources = [
+    "deduction_tests.cc",
     "fields_tests.cc",
     "serializer_test.cc",
   ]
