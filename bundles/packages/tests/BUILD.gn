@@ -94,7 +94,6 @@ group("scenic") {
   assert_no_deps = [ "//bundles/platform/*" ]
 
   public_deps = [
-    "//src/ui/benchmarks/transparency_benchmark",
     "//src/ui/examples",
     "//src/ui/scenic:tests",
   ]
