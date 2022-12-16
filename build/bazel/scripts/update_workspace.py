@@ -259,6 +259,10 @@ def md5_all_files(paths):
 
 def all_sdk_metas(sdk_root):
     sdk_manifest_path = os.path.join(sdk_root, 'meta', 'manifest.json')
+    if not os.path.exists(sdk_manifest_path):
+        # The manifest does not exist yet, which happens when this script
+        # is called before the SDK has been built.
+        return []
     with open(sdk_manifest_path, 'r') as f:
         sdk_manifest = json.load(f)
     part_metas = [
