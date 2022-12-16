@@ -14,7 +14,18 @@ namespace server_suite {
 
 namespace {
 
-const uint32_t kVectorEnvelopeSize = 16;
+const uint32_t kVectorHeaderSize = 16;
+const uint32_t kUnionOrdinalAndEnvelopeSize = 16;
+const uint32_t kDefaultElementsCount = kHandleCarryingElementsCount - 1;
+
+// TODO(fxbug.dev/114261): I don't want to update `fidl::MessageDynamicFlags` prematurely, as it is
+// part of the public API exposed through the SDK, so for now we manually define the flags for
+// testing purposes. The desired eventual definition is commented out below for reference.
+const auto kStrictMethodAndByteOverflow = static_cast<fidl::MessageDynamicFlags>(1 << 6);
+// // While this is technically equivalent to just using `kByteOverflow` alone since `kStrictMethod`
+// // is 0, defining this constant makes the intent clearer.
+// const fidl::MessageDynamicFlags kStrictMethodAndByteOverflow =
+//     fidl::MessageDynamicFlags::kStrictMethod & fidl::MessageDynamicFlags::kByteOverflow;
 
 Bytes populate_unset_handles_false() { return u64(0); }
 
@@ -42,17 +53,17 @@ class UnboundedMaybeLargeResourceWriter {
   using ByteVectorSize = size_t;
   UnboundedMaybeLargeResourceWriter(UnboundedMaybeLargeResourceWriter&&) = default;
   UnboundedMaybeLargeResourceWriter& operator=(UnboundedMaybeLargeResourceWriter&&) = default;
-  UnboundedMaybeLargeResourceWriter(const UnboundedMaybeLargeResourceWriter&) = default;
-  UnboundedMaybeLargeResourceWriter& operator=(const UnboundedMaybeLargeResourceWriter&) = default;
+  UnboundedMaybeLargeResourceWriter(const UnboundedMaybeLargeResourceWriter&) = delete;
+  UnboundedMaybeLargeResourceWriter& operator=(const UnboundedMaybeLargeResourceWriter&) = delete;
 
   // The first argument, |num_filled|, is a pair that specifies the number of entries in the
   // |elements| array that should be set to non-empty vectors, with the other number in the pair
   // specifying the number of bytes in each such vector. The second argument, |num_handles|,
   // specifies the number of |elements| that should have a present handle. For instance, the
   // constructor call |UnboundedMaybeLargeResourceWriter({30, 1000}, 20)| would produce an
-  // `elements` array whose first 20 entries have 1000 bytes and a handle, 10 more entries that have
-  // absent byte vectors and a handle, with the final 34 entries containing both absent byte vectors
-  // and absent handles.
+  // `elements` array whose first 20 entries have 1000 bytes and a present handle, 10 more entries
+  // that have 1000 bytes and an absent handle, with the final 34 entries containing both absent
+  // byte vectors and absent handles.
   //
   // Generally speaking, tests will be clearer and more readable if users create a descriptively
   // named static builder on this class for their specific case (ex:
@@ -64,18 +75,26 @@ class UnboundedMaybeLargeResourceWriter {
       handles[i] = HandlePresence::kAbsent;
       if (i < num_filled.first) {
         byte_vector_sizes[i] = num_filled.second;
-        if (num_handles) {
+        if (num_handles > i) {
           handles[i] = HandlePresence::kPresent;
+        } else {
+          handles[i] = HandlePresence::kAbsent;
         }
       }
     }
   }
 
-  static UnboundedMaybeLargeResourceWriter LargestSmallMessage64Handles() {
-    static const uint32_t kDefaultElementsCount = kHandleCarryingElementsCount - 1;
+  static UnboundedMaybeLargeResourceWriter SmallMessageAnd64Handles() {
     auto writer = UnboundedMaybeLargeResourceWriter(
         {kDefaultElementsCount, kFirst63ElementsByteVectorSize}, kHandleCarryingElementsCount);
     writer.byte_vector_sizes[kDefaultElementsCount] = kSmallLastElementByteVectorSize;
+    return writer;
+  }
+
+  static UnboundedMaybeLargeResourceWriter LargeMessageAnd63Handles() {
+    auto writer = UnboundedMaybeLargeResourceWriter(
+        {kDefaultElementsCount, kFirst63ElementsByteVectorSize}, kDefaultElementsCount);
+    writer.byte_vector_sizes[kDefaultElementsCount] = kLargeLastElementByteVectorSize;
     return writer;
   }
 
@@ -88,6 +107,10 @@ class UnboundedMaybeLargeResourceWriter {
     WriteSmallMessage(client, header, populate_unset_handles, out_expected);
   }
 
+  void WriteLargeMessageForDecode(channel_util::Channel& client, Bytes header) {
+    WriteLargeMessage(client, header);
+  }
+
  private:
   Bytes BuildPayload() {
     std::vector<Bytes> payload_bytes;
@@ -98,12 +121,18 @@ class UnboundedMaybeLargeResourceWriter {
            handles[i] == HandlePresence::kPresent ? handle_present() : handle_absent(),
            padding(4)});
     }
+
     // Now do all out of line portions as well.
     for (size_t i = 0; i < kHandleCarryingElementsCount; i++) {
       if (byte_vector_sizes[i] > 0) {
         payload_bytes.push_back(repeat(kSomeByte).times(byte_vector_sizes[i]));
+        if (byte_vector_sizes[i] % FIDL_ALIGNMENT != 0) {
+          payload_bytes.push_back(
+              padding(FIDL_ALIGNMENT - (byte_vector_sizes[i] % FIDL_ALIGNMENT)));
+        }
       }
     }
+
     return Bytes(payload_bytes);
   }
 
@@ -139,7 +168,8 @@ class UnboundedMaybeLargeResourceWriter {
   void WriteSmallMessage(channel_util::Channel& client, Bytes header,
                          Bytes populate_unset_handles = Bytes(), Expected* out_expected = nullptr) {
     Bytes payload = BuildPayload();
-    ZX_ASSERT_MSG(sizeof(fidl_message_header_t) + payload.size() <= ZX_CHANNEL_MAX_MSG_BYTES,
+    ZX_ASSERT_MSG(sizeof(fidl_message_header_t) + payload.size() + populate_unset_handles.size() <=
+                      ZX_CHANNEL_MAX_MSG_BYTES,
                   "attempted to write large message using small message writer");
 
     if (out_expected != nullptr) {
@@ -149,9 +179,31 @@ class UnboundedMaybeLargeResourceWriter {
           .vmo_bytes = std::nullopt,
       };
     }
-    Bytes bytes_in = Bytes({header, populate_unset_handles, payload});
 
+    Bytes bytes_in = Bytes({header, populate_unset_handles, payload});
     ASSERT_OK(client.write(bytes_in, BuildHandleDispositions()));
+  }
+
+  void WriteLargeMessage(channel_util::Channel& client, Bytes header,
+                         Bytes populate_unset_handles = Bytes(), Expected* out_expected = nullptr) {
+    Bytes payload = BuildPayload();
+    ZX_ASSERT_MSG(sizeof(fidl_message_header_t) + payload.size() > ZX_CHANNEL_MAX_MSG_BYTES,
+                  "attempted to write small message using large message writer");
+
+    Bytes large_message_info = aligned_large_message_info(payload.size());
+    if (out_expected != nullptr) {
+      *out_expected = Expected{
+          .handle_infos = BuildHandleInfos(),
+          .channel_bytes = Bytes({header, aligned_large_message_info(payload.size())}),
+          .vmo_bytes = payload,
+      };
+    }
+
+    Bytes channel_bytes_in =
+        Bytes({header, aligned_large_message_info(payload.size() + populate_unset_handles.size())});
+    Bytes vmo_bytes_in = Bytes({populate_unset_handles, payload});
+    ASSERT_OK(
+        client.write_with_overflow(channel_bytes_in, vmo_bytes_in, BuildHandleDispositions()));
   }
 
   std::array<ByteVectorSize, kHandleCarryingElementsCount> byte_vector_sizes;
@@ -175,17 +227,53 @@ void GoodDecodeSmallStructOfByteVector(ServerTest* testing, uint64_t method_ordi
   WAIT_UNTIL_EXT(testing, [&]() { return testing->reporter().received_strict_one_way(); });
 }
 
+void GoodDecodeLargeStructOfByteVector(ServerTest* testing, uint64_t method_ordinal) {
+  uint32_t n = kLargeStructByteVectorSize;
+  Bytes channel_bytes_in = {
+      header(kOneWayTxid, method_ordinal, kStrictMethodAndByteOverflow),
+      aligned_large_message_info(n + kVectorHeaderSize),
+  };
+  Bytes vmo_bytes_in = {
+      vector_header(n),
+      repeat(kSomeByte).times(n),
+      padding(7),
+  };
+
+  ASSERT_OK(testing->client_end().write_with_overflow(channel_bytes_in, vmo_bytes_in));
+  WAIT_UNTIL_EXT(testing, [&]() { return testing->reporter().received_strict_one_way(); });
+}
+
 void GoodDecodeSmallUnionOfByteVector(ServerTest* testing, uint64_t method_ordinal) {
   uint32_t n = kSmallUnionByteVectorSize;
   Bytes bytes_in = {
       header(kOneWayTxid, method_ordinal, fidl::MessageDynamicFlags::kStrictMethod),
       union_ordinal(1),
-      out_of_line_envelope(n + kVectorEnvelopeSize, 0),
+      out_of_line_envelope(n + kVectorHeaderSize, 0),
       vector_header(n),
       repeat(kSomeByte).times(n),
   };
 
   ASSERT_OK(testing->client_end().write(bytes_in));
+  WAIT_UNTIL_EXT(testing, [&]() { return testing->reporter().received_strict_one_way(); });
+}
+
+void GoodDecodeLargeUnionOfByteVector(ServerTest* testing, uint64_t method_ordinal,
+                                      fidl_xunion_tag_t xunion_ordinal) {
+  uint32_t n = kLargeUnionByteVectorSize;
+  uint32_t pad = FIDL_ALIGNMENT - (kLargeUnionByteVectorSize % FIDL_ALIGNMENT);
+  Bytes channel_bytes_in = {
+      header(kOneWayTxid, method_ordinal, kStrictMethodAndByteOverflow),
+      aligned_large_message_info(n + kUnionOrdinalAndEnvelopeSize + kVectorHeaderSize),
+  };
+  Bytes vmo_bytes_in = {
+      union_ordinal(xunion_ordinal),
+      out_of_line_envelope(n + pad + kVectorHeaderSize, 0),
+      vector_header(n),
+      repeat(kSomeByte).times(n),
+      padding(pad),
+  };
+
+  ASSERT_OK(testing->client_end().write_with_overflow(channel_bytes_in, vmo_bytes_in));
   WAIT_UNTIL_EXT(testing, [&]() { return testing->reporter().received_strict_one_way(); });
 }
 
@@ -197,23 +285,48 @@ LARGE_MESSAGE_SERVER_TEST(GoodDecodeBoundedMaybeSmallMessage) {
   GoodDecodeSmallStructOfByteVector(this, kDecodeBoundedMaybeLarge);
 }
 
+LARGE_MESSAGE_SERVER_TEST(GoodDecodeBoundedMaybeLargeMessage) {
+  GoodDecodeLargeStructOfByteVector(this, kDecodeBoundedMaybeLarge);
+}
+
 LARGE_MESSAGE_SERVER_TEST(GoodDecodeSemiBoundedUnknowableSmallMessage) {
   GoodDecodeSmallUnionOfByteVector(this, kDecodeSemiBoundedBelievedToBeSmall);
+}
+
+LARGE_MESSAGE_SERVER_TEST(GoodDecodeSemiBoundedUnknowableLargeMessage) {
+  GoodDecodeLargeUnionOfByteVector(this, kDecodeSemiBoundedBelievedToBeSmall, 2);
 }
 
 LARGE_MESSAGE_SERVER_TEST(GoodDecodeSemiBoundedMaybeSmallMessage) {
   GoodDecodeSmallUnionOfByteVector(this, kDecodeSemiBoundedMaybeLarge);
 }
 
+LARGE_MESSAGE_SERVER_TEST(GoodDecodeSemiBoundedMaybeLargeMessage) {
+  GoodDecodeLargeUnionOfByteVector(this, kDecodeSemiBoundedMaybeLarge, 1);
+}
+
 LARGE_MESSAGE_SERVER_TEST(GoodDecodeUnboundedSmallMessage) {
   GoodDecodeSmallStructOfByteVector(this, kDecodeUnboundedMaybeLargeValue);
 }
 
+LARGE_MESSAGE_SERVER_TEST(GoodDecodeUnboundedLargeMessage) {
+  GoodDecodeLargeStructOfByteVector(this, kDecodeUnboundedMaybeLargeValue);
+}
+
 LARGE_MESSAGE_SERVER_TEST(GoodDecode64HandleSmallMessage) {
-  auto writer = UnboundedMaybeLargeResourceWriter::LargestSmallMessage64Handles();
+  auto writer = UnboundedMaybeLargeResourceWriter::SmallMessageAnd64Handles();
   writer.WriteSmallMessageForDecode(client_end(),
                                     header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource,
                                            fidl::MessageDynamicFlags::kStrictMethod));
+
+  WAIT_UNTIL([this]() { return reporter().received_strict_one_way(); });
+}
+
+LARGE_MESSAGE_SERVER_TEST(GoodDecode63HandleLargeMessage) {
+  auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd63Handles();
+  writer.WriteLargeMessageForDecode(
+      client_end(),
+      header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow));
 
   WAIT_UNTIL([this]() { return reporter().received_strict_one_way(); });
 }
@@ -227,6 +340,22 @@ LARGE_MESSAGE_SERVER_TEST(GoodDecodeUnknownSmallMessage) {
   };
 
   ASSERT_OK(client_end().write(bytes_in));
+  WAIT_UNTIL([this]() { return reporter().received_unknown_method().has_value(); });
+}
+
+LARGE_MESSAGE_SERVER_TEST(GoodDecodeUnknownLargeMessage) {
+  uint32_t n = kLargeStructByteVectorSize;
+  Bytes channel_bytes_in = {
+      header(kOneWayTxid, kOrdinalFakeUnknownMethod, kStrictMethodAndByteOverflow),
+      aligned_large_message_info(n + kUnionOrdinalAndEnvelopeSize + kVectorHeaderSize),
+  };
+  Bytes vmo_bytes_in = {
+      vector_header(n),
+      repeat(kSomeByte).times(n),
+      padding(7),
+  };
+
+  ASSERT_OK(client_end().write_with_overflow(channel_bytes_in, vmo_bytes_in));
   WAIT_UNTIL([this]() { return reporter().received_unknown_method().has_value(); });
 }
 
@@ -253,7 +382,7 @@ void GoodEncodeSmallUnionOfByteVector(ServerTest* testing, uint64_t method_ordin
   Bytes bytes_out = {
       header(kTwoWayTxid, method_ordinal, fidl::MessageDynamicFlags::kStrictMethod),
       union_ordinal(1),
-      out_of_line_envelope(n + kVectorEnvelopeSize, 0),
+      out_of_line_envelope(n + kVectorHeaderSize, 0),
       vector_header(n),
       repeat(kSomeByte).times(n),
   };
@@ -285,7 +414,7 @@ LARGE_MESSAGE_SERVER_TEST(GoodEncodeUnboundedSmallMessage) {
 }
 
 LARGE_MESSAGE_SERVER_TEST(GoodEncode64HandleSmallMessage) {
-  auto writer = UnboundedMaybeLargeResourceWriter::LargestSmallMessage64Handles();
+  auto writer = UnboundedMaybeLargeResourceWriter::SmallMessageAnd64Handles();
   Expected expect;
   writer.WriteSmallMessageForEncode(client_end(),
                                     header(kTwoWayTxid, kEncodeUnboundedMaybeLargeResource,

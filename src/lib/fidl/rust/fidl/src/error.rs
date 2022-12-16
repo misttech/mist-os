@@ -45,24 +45,38 @@ pub enum Error {
     #[error("The FIDL object could not fit within the provided buffer range")]
     OutOfRange,
 
+    // TODO(fxbug.dev/114259): This error is temporarily retained until we migrate encoding off of
+    // the prototype format.
+    //
     /// Overflowing FIDL messages must have exactly 1 handle, pointing to the overflow VMO.
     #[error("Overflowing FIDL messages must have exactly 1 handle, pointing to the overflow VMO.")]
     OverflowIncorrectHandleCount,
 
-    /// Overflowing FIDL messages must have exactly 16 bytes in the control plane message.
-    #[error("Overflowing FIDL messages must have exactly 16 bytes in the control plane message.")]
-    OverflowControlPlaneBodyNotEmpty,
+    /// Large FIDL messages must have at least 1 handle pointing to the overflow VMO.
+    #[error("Large FIDL messages must have at least 1 handle pointing to the overflow VMO.")]
+    LargeMessageMissingHandles,
+
+    // TODO(fxbug.dev/114259): Support for 16 OR 32 bytes is temporary while we migrate from the
+    // prototype implementation (which had no `LargeMessageInfo` struct after the header in the
+    // control plane) to the RFC-compliant one (which does).
+    //
+    /// Large FIDL messages must have either 16 or 32 bytes in the control plane message.
+    #[error("Large FIDL messages must have either 16 or 32 bytes in the control plane message.")]
+    LargeMessageInfoMissized {
+        /// Observed size of the `LargeMessageInfo` struct.
+        size: usize,
+    },
 
     /// Writing the overflow VMO failed.
     #[error("Could not write the overflow VMO, due to status: {status}.")]
-    OverflowCouldNotWrite {
+    LargeMessageCouldNotWriteVmo {
         /// Status returned when either when creating the VMO, or writing to it.
         status: zx_status::Status,
     },
 
     /// Reading the overflow VMO failed.
     #[error("Could not read the overflow VMO, due to status: {status}.")]
-    OverflowCouldNotRead {
+    LargeMessageCouldNotReadVmo {
         /// Status returned when either getting the VMO size, or reading from it.
         status: zx_status::Status,
     },

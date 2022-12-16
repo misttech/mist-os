@@ -12,7 +12,7 @@ using zx;
 // breakage. This means that the receiving side never needs to check for the `byte_overflow` flag.
 //
 //   16      (header)
-//   16      (vector envelope)
+//   16      (vector header)
 // + 65504   (maximum vector allocation)
 // ---------
 //   65536
@@ -31,7 +31,7 @@ const SMALL_STRUCT_BYTE_VECTOR_SIZE uint32 = 65504;
 // correct limit.
 //
 //   16      (header)
-//   16      (vector envelope)
+//   16      (vector header)
 // + 65505   (maximum vector allocation)
 // ---------
 //   65537
@@ -56,8 +56,8 @@ const LARGE_STRUCT_BYTE_VECTOR_SIZE uint32 = 65505;
 // 2) with 65489 bytes instead.
 //
 //   16      (header)
-//   16      (union envelope)
-//   16      (vector envelope)
+//   16      (union ordinal + envelope header)
+//   16      (vector header)
 // + 65488   (maximum vector allocation)
 // ---------
 //   65536
@@ -78,8 +78,8 @@ const SMALL_UNION_BYTE_VECTOR_SIZE uint32 = 65488;
 // (ordinal 2) with 65489 bytes instead.
 //
 //   16      (header)
-//   16      (union envelope)
-//   16      (vector envelope)
+//   16      (union ordinal + envelope header)
+//   16      (vector header)
 // + 65489   (maximum vector allocation)
 // ---------
 //   65537
@@ -109,11 +109,19 @@ type UnboundedMaybeLargeValue = struct {
 // and large-message-with-63-handles should encode/decode successfully, while
 // large-message-with-64-handles should not.
 //
-//   16         (header)
-// + 63(1032)   (for first 63 structs: 16 (vector header) + 984 (vector bytes) + 32 (handle) = 1032)
+//      16      (vector header)
+//    1000      (bytes specified by `FIRST_63_ELEMENTS_BYTE_VECTOR_SIZE`)
+// +     8      (handle + padding)
 // ------------
-//   65032
-// +   ???      (64th struct's total size, set to 504 or 505 to make the message small or large)
+//    1024
+// *    63      (first 63 array entries are identical)
+// ------------
+//   64512
+// +    16      (64th vector header)
+// +     8      (64th handle + padding)
+// ------------
+//   64536
+// +   ???      (64th struct's byte vector size, set to 984/985 to make the message small/large)
 type UnboundedMaybeLargeResource = resource struct {
     elements array< resource struct {
         bytes vector<byte>:FIRST_63_ELEMENTS_BYTE_VECTOR_SIZE;
@@ -133,6 +141,12 @@ const HANDLE_CARRYING_ELEMENTS_COUNT uint32 = 64;
 // bytes (making an `UnboundedMaybeLargeResource` that is the largest small message, or 64KiB) or
 // `LARGE_LAST_ELEMENT_BYTE_VECTOR_SIZE` bytes (making an `UnboundedMaybeLargeResource` that is the
 // smallest large message, or 64KiB + 1).
-const FIRST_63_ELEMENTS_BYTE_VECTOR_SIZE uint32 = 984;
-const SMALL_LAST_ELEMENT_BYTE_VECTOR_SIZE uint32 = 504;
-const LARGE_LAST_ELEMENT_BYTE_VECTOR_SIZE uint32 = 505;
+const FIRST_63_ELEMENTS_BYTE_VECTOR_SIZE uint32 = 1000;
+
+// While at the limit this should be set to 984 to create the "largest possible small message",
+// because we send an extra 8-byte argument (the 8-byte `populated_unset_handles` boolean) when
+// passing the type that consumes this constant in for encode testing, it's much easier if we
+// decrease this number by that amount to ensure that the "largeness" of the incoming message is the
+// same as the outgoing.
+const SMALL_LAST_ELEMENT_BYTE_VECTOR_SIZE uint32 = 976;
+const LARGE_LAST_ELEMENT_BYTE_VECTOR_SIZE uint32 = 985;

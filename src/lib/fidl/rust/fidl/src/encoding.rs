@@ -101,7 +101,7 @@ pub fn with_tls_encoded<T, E: From<Error>, const OVERFLOWABLE: bool>(
 /// # Safety
 ///
 /// This is unsafe when `new_len > old_len` because it leaves new elements at
-/// indices `old_len..new_len` unintialized. The caller must overwrite all the
+/// indices `old_len..new_len` uninitialized. The caller must overwrite all the
 /// new elements before reading them. "Reading" includes any operation that
 /// extends the vector, such as `push`, because this could reallocate the vector
 /// and copy the uninitialized bytes.
@@ -901,7 +901,7 @@ pub fn maybe_overflowing_after_encode(
     _write_bytes: &mut Vec<u8>,
     _write_handles: &mut Vec<HandleDisposition<'_>>,
 ) -> Result<()> {
-    // TODO(fxbug.dev/106641): how do we handle overflow for emulated channels?
+    // TODO(fxbug.dev/114350): how do we handle overflow for emulated channels?
     #[cfg(target_os = "fuchsia")]
     {
         if _write_bytes.len() > fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize {
@@ -915,14 +915,15 @@ pub fn maybe_overflowing_after_encode(
 
             // Build a VMO, then put all of the data_plane information in the VMO.
             let mut vmo = fuchsia_zircon::Vmo::create(body_size)
-                .map_err(|status| Error::OverflowCouldNotWrite { status })?;
-            vmo.write(data_plane, 0).map_err(|status| Error::OverflowCouldNotWrite { status })?;
+                .map_err(|status| Error::LargeMessageCouldNotWriteVmo { status })?;
+            vmo.write(data_plane, 0)
+                .map_err(|status| Error::LargeMessageCouldNotWriteVmo { status })?;
 
             // Add the handle for the VMO to the handles array.
             _write_handles.push(HandleDisposition {
                 handle_op: HandleOp::Move(take_handle(&mut vmo)),
                 object_type: ObjectType::VMO,
-                // TODO(fxbug.dev/106641): generate properly constrained rights!
+                // TODO(fxbug.dev/114259): generate properly constrained rights!
                 rights: Rights::SAME_RIGHTS,
                 result: Status::OK,
             });
@@ -953,31 +954,47 @@ pub fn maybe_overflowing_decode<D: Decodable>(
     handles: &mut Vec<HandleInfo>,
     value: &mut D,
 ) -> Result<()> {
-    // TODO(fxbug.dev/106641): how do we handle overflow for emulated channels?
+    // TODO(fxbug.dev/114350): how do we handle overflow for emulated channels?
     #[cfg(target_os = "fuchsia")]
     {
         if header.dynamic_flags().contains(DynamicFlags::BYTE_OVERFLOW) {
-            if handles.len() != 1 {
-                return Err(Error::OverflowIncorrectHandleCount);
-            }
-            if !body_bytes.is_empty() {
-                return Err(Error::OverflowControlPlaneBodyNotEmpty);
+            // Pop the tail handle off: this is the overflow VMO. Retain the vector of remaining
+            // handles to pass to the decoder for the actual message.
+            let vmo_handle_info = match handles.pop() {
+                Some(handle_info) => handle_info,
+                None => return Err(Error::LargeMessageMissingHandles),
+            };
+
+            // TODO(fxbug.dev/114259): temporarily make the `LargeMessageInfo` struct optional while
+            // transitioning. After the transition to the RFC-compliant implementation is complete,
+            // the `.is_empty()` check must be removed.
+            if !(body_bytes.is_empty() || body_bytes.len() == mem::size_of::<LargeMessageInfo>()) {
+                return Err(Error::LargeMessageInfoMissized { size: body_bytes.len() });
             }
 
-            // Make a syscall to get the actual size of the VMO, and validate immutability.
-            // TODO(fxbug.dev/106641): probably should do this like we do take_next_handle()
-            let vmo = fuchsia_zircon::Vmo::from(handles.remove(0).handle);
-            let size =
-                vmo.get_content_size().map_err(|status| Error::OverflowCouldNotRead { status })?;
+            // Make a syscall to get the actual size of the VMO.
+            //
+            // TODO(fxbug.dev/114259): We'll use the `LargeMessageInfo` struct to get the size in
+            // the future, but while transitioning from the prototype impl to the RFC-compliant one
+            // this is the safer setup.
+            let vmo = fuchsia_zircon::Vmo::from(vmo_handle_info.handle);
+            let size = vmo
+                .get_content_size()
+                .map_err(|status| Error::LargeMessageCouldNotReadVmo { status })?;
             let mut overflow_bytes = Vec::new();
 
+            // TODO(fxbug.dev/114259): Is this actually safe? Since we are now trusting
+            // `LargeMessageInfo` to have the correct number of bytes, could an attacker do
+            // something naughty if they put an incorrect value there? Maybe better to just zero
+            // defensively.
+            //
             // Safety: The call to `vmo.read` below writes exactly `size` bytes on success.
             unsafe {
                 resize_vec_no_zeroing(&mut overflow_bytes, size as usize);
             }
 
             vmo.read(&mut overflow_bytes, 0)
-                .map_err(|status| Error::OverflowCouldNotRead { status })?;
+                .map_err(|status| Error::LargeMessageCouldNotReadVmo { status })?;
             return Decoder::decode_into(header, &overflow_bytes, handles, value);
         }
     }
@@ -3835,9 +3852,9 @@ bitflags! {
     /// the request.
     pub struct DynamicFlags: u8 {
         /// Indicates that the message's data plane is stored elsewhere out of band.
-        const BYTE_OVERFLOW = 0x40;
+        const BYTE_OVERFLOW = 1 << 6;
         /// Indicates that the request is for a flexible method.
-        const FLEXIBLE = 0x80;
+        const FLEXIBLE = 1 << 7;
     }
 }
 
@@ -3921,6 +3938,59 @@ impl TransactionHeader {
         } else {
             Context { wire_format_version: WireFormatVersion::V1 }
         }
+    }
+}
+
+/// Special FIDL message body for large messages.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(C)]
+pub struct LargeMessageInfo {
+    /// Flags specific to large message.
+    flags: u32,
+    /// A reserved field that may in the future be used to store `msg_handle_count` information.
+    reserved: u32,
+    /// The size of the encoded FIDL message in the VMO. Must be a multiple of FIDL alignment.
+    msg_byte_count: u64,
+}
+
+fidl_struct_copy! {
+    name: LargeMessageInfo,
+    members: [
+        flags {
+            ty: u32,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+        reserved {
+            ty: u32,
+            offset_v1: 4,
+            offset_v2: 4,
+        },
+        msg_byte_count {
+            ty: u64,
+            offset_v1: 8,
+            offset_v2: 8,
+        },
+    ],
+    padding_v1: [],
+    padding_v2: [],
+    size_v1: 16,
+    size_v2: 16,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+impl LargeMessageInfo {
+    /// Creates a new large message info struct. Only the `msg_byte_count` is settable at this time.
+    #[inline]
+    pub fn new(msg_byte_count: u64) -> Self {
+        LargeMessageInfo { flags: 0, reserved: 0, msg_byte_count }
+    }
+
+    /// Returns the `msg_byte_count`.
+    #[inline]
+    pub fn msg_byte_count(&self) -> u64 {
+        self.msg_byte_count
     }
 }
 

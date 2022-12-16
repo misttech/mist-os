@@ -390,7 +390,7 @@ type Test = flexible enum : uint32 {
 
     // Call the `DecodeSemiBoundedBelievedToBeSmall(...)` method with the largest possible small
     // message. It is "unknownable" because a flexible type like the one used here might always be
-    // larger than expected at decode time, due to possible oevolution on the part of the encoder.
+    // larger than expected at decode time, due to possible evolution on the part of the encoder.
     GOOD_DECODE_SEMI_BOUNDED_UNKNOWABLE_SMALL_MESSAGE = 68;
 
     // Call the `DecodeSemiBoundedBelievedToBeSmall(...)` method with the smallest possible large

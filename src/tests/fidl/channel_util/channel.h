@@ -7,6 +7,7 @@
 
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 #include <zircon/fidl.h>
 
@@ -37,8 +38,31 @@ class Channel {
 
   explicit Channel(zx::channel channel) : channel_(std::move(channel)) {}
 
+  zx_status_t write_with_overflow(const Bytes& channel_bytes, const Bytes& overflow_bytes,
+                                  HandleDispositions handle_dispositions = {}) {
+    ZX_ASSERT_MSG(channel_bytes.size() % FIDL_ALIGNMENT == 0,
+                  "channel bytes must be 8-byte aligned");
+    ZX_ASSERT_MSG(overflow_bytes.size() % FIDL_ALIGNMENT == 0,
+                  "overflow bytes must be 8-byte aligned");
+    ZX_ASSERT_MSG(handle_dispositions.size() < 64, "cannot pass more than 63 handles here");
+
+    // Create a VMO, write to it, then append the handle representing that VMO to the handle array.
+    zx::vmo vmo;
+    zx::vmo::create(overflow_bytes.size(), 0, &vmo);
+    vmo.write(overflow_bytes.data(), 0, overflow_bytes.size());
+    handle_dispositions.push_back(zx_handle_disposition_t{
+        .handle = vmo.release(),
+        .type = ZX_OBJ_TYPE_VMO,
+        .rights = ZX_RIGHTS_BASIC | ZX_RIGHT_GET_PROPERTY | ZX_RIGHT_READ,
+    });
+
+    return channel_.write_etc(0, channel_bytes.data(), static_cast<uint32_t>(channel_bytes.size()),
+                              const_cast<zx_handle_disposition_t*>(handle_dispositions.data()),
+                              static_cast<uint32_t>(handle_dispositions.size()));
+  }
+
   zx_status_t write(const Bytes& bytes, const HandleDispositions& handle_dispositions = {}) {
-    ZX_ASSERT_MSG(0 == bytes.size() % 8, "bytes must be 8-byte aligned");
+    ZX_ASSERT_MSG(0 == bytes.size() % FIDL_ALIGNMENT, "bytes must be 8-byte aligned");
     return channel_.write_etc(0, bytes.data(), static_cast<uint32_t>(bytes.size()),
                               const_cast<zx_handle_disposition_t*>(handle_dispositions.data()),
                               static_cast<uint32_t>(handle_dispositions.size()));
