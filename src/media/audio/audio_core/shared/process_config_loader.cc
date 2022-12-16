@@ -396,7 +396,7 @@ ParseOutputDeviceProfileFromJsonObject(const rapidjson::Value& value,
     independent_volume_control = independent_volume_control_it->value.GetBool();
   }
 
-  float driver_gain_db = 0.0;
+  std::optional<float> driver_gain_db;
   auto driver_gain_db_it = value.FindMember(kJsonKeyDriverGainDb);
   if (driver_gain_db_it != value.MemberEnd()) {
     FX_CHECK(driver_gain_db_it->value.IsNumber());
@@ -503,7 +503,7 @@ ParseInputDeviceProfileFromJsonObject(const rapidjson::Value& value, VolumeCurve
   }
   auto rate = rate_it->value.GetUint();
 
-  float driver_gain_db = 0.0;
+  std::optional<float> driver_gain_db;
   auto driver_gain_db_it = value.FindMember(kJsonKeyDriverGainDb);
   if (driver_gain_db_it != value.MemberEnd()) {
     FX_CHECK(driver_gain_db_it->value.IsNumber());

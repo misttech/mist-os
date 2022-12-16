@@ -421,8 +421,9 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithOutputGains) {
                                                         0x80, 0x62, 0xa9, 0x76, 0x5b, 0xae, 0xb6,
                                                         0x05, 0x3b}};
   auto& config = result.value().device_config();
-  EXPECT_FLOAT_EQ(config.output_device_profile(expected_id).driver_gain_db(), -6.0f);
-  EXPECT_FLOAT_EQ(config.output_device_profile(unknown_id).driver_gain_db(), 0.0f);
+  ASSERT_TRUE(config.output_device_profile(expected_id).driver_gain_db());
+  EXPECT_FLOAT_EQ(*config.output_device_profile(expected_id).driver_gain_db(), -6.0f);
+  EXPECT_FALSE(config.output_device_profile(unknown_id).driver_gain_db());
 }
 
 TEST(ProcessConfigLoaderTest, LoadProcessConfigWithInputGains) {
@@ -463,9 +464,10 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithInputGains) {
                                                         0x81, 0x42, 0xa9, 0x76, 0x5b, 0xae, 0xb6,
                                                         0x22, 0x3a}};
   auto& config = result.value().device_config();
-  EXPECT_FLOAT_EQ(config.input_device_profile(expected_id).driver_gain_db(), -6.0f);
+  ASSERT_TRUE(config.input_device_profile(expected_id).driver_gain_db());
+  EXPECT_FLOAT_EQ(*config.input_device_profile(expected_id).driver_gain_db(), -6.0f);
   EXPECT_FLOAT_EQ(config.input_device_profile(expected_id).software_gain_db(), -8.0f);
-  EXPECT_FLOAT_EQ(config.input_device_profile(unknown_id).driver_gain_db(), 0.0f);
+  EXPECT_FALSE(config.input_device_profile(unknown_id).driver_gain_db());
   EXPECT_FLOAT_EQ(config.input_device_profile(unknown_id).software_gain_db(), 0.0f);
 }
 

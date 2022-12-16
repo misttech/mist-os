@@ -107,9 +107,11 @@ void AudioInput::OnDriverInfoFetched() {
   }
   auto& selected_format = format_result.value();
 
-  float driver_gain_db = profile.driver_gain_db();
-  AudioDeviceSettings::GainState gain_state = {.gain_db = driver_gain_db, .muted = false};
-  driver()->SetGain(gain_state, AUDIO_SGF_GAIN_VALID | AUDIO_SGF_MUTE_VALID);
+  if (profile.driver_gain_db()) {
+    float driver_gain_db = *profile.driver_gain_db();
+    AudioDeviceSettings::GainState gain_state = {.gain_db = driver_gain_db, .muted = false};
+    driver()->SetGain(gain_state, AUDIO_SGF_GAIN_VALID | AUDIO_SGF_MUTE_VALID);
+  }
 
   const auto& hw_gain = driver()->hw_gain_state();
   if (hw_gain.min_gain > hw_gain.max_gain) {

@@ -390,9 +390,11 @@ void DriverOutput::OnDriverInfoFetched() {
   DeviceConfig::OutputDeviceProfile profile =
       config().output_device_profile(driver()->persistent_unique_id());
 
-  float driver_gain_db = profile.driver_gain_db();
-  AudioDeviceSettings::GainState gain_state = {.gain_db = driver_gain_db, .muted = false};
-  driver()->SetGain(gain_state, AUDIO_SGF_GAIN_VALID | AUDIO_SGF_MUTE_VALID);
+  if (profile.driver_gain_db()) {
+    float driver_gain_db = *profile.driver_gain_db();
+    AudioDeviceSettings::GainState gain_state = {.gain_db = driver_gain_db, .muted = false};
+    driver()->SetGain(gain_state, AUDIO_SGF_GAIN_VALID | AUDIO_SGF_MUTE_VALID);
+  }
 
   PipelineConfig pipeline_config = profile.pipeline_config();
   const Format pipeline_format = pipeline_config.OutputFormat(effects_loader_v2());

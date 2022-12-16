@@ -8,6 +8,7 @@
 #include <fuchsia/media/cpp/fidl.h>
 #include <zircon/device/audio.h>
 
+#include <optional>
 #include <vector>
 
 #include "src/media/audio/audio_core/shared/loudness_transform.h"
@@ -22,7 +23,7 @@ class DeviceConfig {
   class DeviceProfile {
    public:
     explicit DeviceProfile(StreamUsageSet supported_usages, VolumeCurve volume_curve,
-                           float driver_gain_db, float software_gain_db)
+                           std::optional<float> driver_gain_db, float software_gain_db)
         : usage_support_set_(std::move(supported_usages)),
           volume_curve_(std::move(volume_curve)),
           loudness_transform_(std::make_shared<MappedLoudnessTransform>(volume_curve_)),
@@ -41,14 +42,14 @@ class DeviceConfig {
 
     StreamUsageSet supported_usages() const { return usage_support_set_; }
 
-    float driver_gain_db() const { return driver_gain_db_; }
+    std::optional<float> driver_gain_db() const { return driver_gain_db_; }
     float software_gain_db() const { return software_gain_db_; }
 
    private:
     StreamUsageSet usage_support_set_;
     VolumeCurve volume_curve_;
     std::shared_ptr<LoudnessTransform> loudness_transform_;
-    float driver_gain_db_;
+    std::optional<float> driver_gain_db_;
     float software_gain_db_;
   };
 
@@ -60,17 +61,17 @@ class DeviceConfig {
 
     explicit OutputDeviceProfile(VolumeCurve volume_curve)
         : OutputDeviceProfile(true, StreamUsageSetFromRenderUsages(kFidlRenderUsages),
-                              std::move(volume_curve), false, PipelineConfig::Default(), 0.0, 0.0) {
-    }
+                              std::move(volume_curve), false, PipelineConfig::Default(),
+                              std::nullopt, 0.0) {}
 
     OutputDeviceProfile(bool eligible_for_loopback, StreamUsageSet supported_usages)
         : OutputDeviceProfile(eligible_for_loopback, supported_usages,
                               VolumeCurve::DefaultForMinGain(VolumeCurve::kDefaultGainForMinVolume),
-                              false, PipelineConfig::Default(), 0.0, 0.0) {}
+                              false, PipelineConfig::Default(), std::nullopt, 0.0) {}
 
     OutputDeviceProfile(bool eligible_for_loopback, StreamUsageSet supported_usages,
                         VolumeCurve volume_curve, bool independent_volume_control,
-                        PipelineConfig pipeline_config, float driver_gain_db,
+                        PipelineConfig pipeline_config, std::optional<float> driver_gain_db,
                         float software_gain_db)
         : DeviceProfile(std::move(supported_usages), std::move(volume_curve), driver_gain_db,
                         software_gain_db),
@@ -126,15 +127,15 @@ class DeviceConfig {
    public:
     static constexpr uint32_t kDefaultRate = 48000;
 
-    InputDeviceProfile() : InputDeviceProfile(kDefaultRate, 0.0, 0.0) {}
+    InputDeviceProfile() : InputDeviceProfile(kDefaultRate, std::nullopt, 0.0) {}
 
-    InputDeviceProfile(uint32_t rate, float driver_gain_db, float software_gain_db)
+    InputDeviceProfile(uint32_t rate, std::optional<float> driver_gain_db, float software_gain_db)
         : InputDeviceProfile(rate, StreamUsageSetFromCaptureUsages(kFidlCaptureUsages),
                              VolumeCurve::DefaultForMinGain(VolumeCurve::kDefaultGainForMinVolume),
                              driver_gain_db, software_gain_db) {}
 
     InputDeviceProfile(uint32_t rate, StreamUsageSet supported_usages, VolumeCurve volume_curve,
-                       float driver_gain_db, float software_gain_db)
+                       std::optional<float> driver_gain_db, float software_gain_db)
         : DeviceProfile(std::move(supported_usages), std::move(volume_curve), driver_gain_db,
                         software_gain_db),
           rate_(rate) {}
