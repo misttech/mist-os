@@ -1300,9 +1300,9 @@ pub fn sys_timerfd_create(
     clock_id: u32,
     flags: u32,
 ) -> Result<FdNumber, Errno> {
-    match clock_id {
-        CLOCK_MONOTONIC | CLOCK_BOOTTIME => {}
-        CLOCK_REALTIME => return error!(ENOSYS),
+    let timer_file_clock = match clock_id {
+        CLOCK_MONOTONIC | CLOCK_BOOTTIME => TimerFileClock::Monotonic,
+        CLOCK_REALTIME => TimerFileClock::Realtime,
         _ => return error!(EINVAL),
     };
     if flags & !(TFD_NONBLOCK | TFD_CLOEXEC) != 0 {
@@ -1321,7 +1321,7 @@ pub fn sys_timerfd_create(
         fd_flags |= FdFlags::CLOEXEC;
     };
 
-    let timer = TimerFile::new_file(current_task, open_flags)?;
+    let timer = TimerFile::new_file(current_task, timer_file_clock, open_flags)?;
     let fd = current_task.files.add_with_flags(timer, fd_flags)?;
     Ok(fd)
 }

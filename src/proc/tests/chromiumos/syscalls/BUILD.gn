@@ -34,6 +34,7 @@ test("syscalls_test_bin") {
     "test_helper.cc",
     "test_helper.h",
     "test_helper_test.cc",
+    "timerfd_test.cc",
     "trivial_test.cc",
     "waitpid_test.cc",
   ]

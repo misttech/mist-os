@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_runtime::zx_utc_reference_get;
 use fuchsia_zircon as zx;
-use fuchsia_zircon::AsHandleRef;
+use fuchsia_zircon::{AsHandleRef, Clock, Unowned};
 use zerocopy::AsBytes;
 
 use crate::fs::*;
@@ -12,6 +13,12 @@ use crate::mm::MemoryAccessorExt;
 use crate::task::*;
 use crate::types::*;
 
+/// Clock types supported by TimerFiles.
+pub enum TimerFileClock {
+    Monotonic,
+    Realtime,
+}
+
 /// A `TimerFile` represents a file created by `timerfd_create`.
 ///
 /// Clients can read the number of times the timer has triggered from the file. The file supports
@@ -19,6 +26,9 @@ use crate::types::*;
 pub struct TimerFile {
     /// The timer that is used to wait for blocking reads.
     timer: zx::Timer,
+
+    /// The type of clock this file was created with.
+    clock: TimerFileClock,
 
     /// The deadline (`zx::Time`) for the next timer trigger, and the associated interval
     /// (`zx::Duration`).
@@ -32,13 +42,18 @@ impl TimerFile {
     /// Creates a new anonymous `TimerFile` in `kernel`.
     ///
     /// Returns an error if the `zx::Timer` could not be created.
-    pub fn new_file(current_task: &CurrentTask, flags: OpenFlags) -> Result<FileHandle, Errno> {
+    pub fn new_file(
+        current_task: &CurrentTask,
+        clock: TimerFileClock,
+        flags: OpenFlags,
+    ) -> Result<FileHandle, Errno> {
         let timer = zx::Timer::create().map_err(|status| from_status_like_fdio!(status))?;
 
         Ok(Anon::new_file(
             current_task,
             Box::new(TimerFile {
                 timer,
+                clock,
                 deadline_interval: Mutex::new((zx::Time::default(), zx::Duration::default())),
             }),
             flags,
@@ -76,15 +91,36 @@ impl TimerFile {
             // Setting both fields of new_value.it_value to zero disarms the timer.
             self.timer.cancel().map_err(|status| from_status_like_fdio!(status))?;
         } else {
-            let now = zx::Time::get_monotonic();
+            let now_monotonic = zx::Time::get_monotonic();
             let new_deadline = if flags & TFD_TIMER_ABSTIME != 0 {
                 // If the time_spec represents an absolute time, then treat the
                 // `it_value` as the deadline..
-                time_from_timespec(timer_spec.it_value)?
+                match &self.clock {
+                    TimerFileClock::Realtime => {
+                        // Since Zircon does not have realtime timers, compute what the value would
+                        // be in the monotonic clock assuming realtime progresses linearly.
+                        //
+                        // TODO(fxbug.dev/117507) implement proper realtime timers that will work
+                        // when the realtime clock changes, and implement TFD_TIMER_CANCEL_ON_SET.
+                        let utc_clock: Unowned<'static, Clock> = unsafe {
+                            let handle = zx_utc_reference_get();
+                            Unowned::from_raw_handle(handle)
+                        };
+                        let utc_details = utc_clock
+                            .get_details()
+                            .map_err(|status| from_status_like_fdio!(status))?;
+                        utc_details
+                            .mono_to_synthetic
+                            .apply_inverse(time_from_timespec(timer_spec.it_value)?)
+                    }
+                    TimerFileClock::Monotonic => time_from_timespec(timer_spec.it_value)?,
+                }
             } else {
-                // .. otherwise the deadline is computed relative to the current time.
+                // .. otherwise the deadline is computed relative to the current time. Without
+                // realtime timers in Zircon, we assume realtime and monotonic time progresses the
+                // same so relative values need no separate handling.
                 let duration = duration_from_timespec(timer_spec.it_value)?;
-                now + duration
+                now_monotonic + duration
             };
             let new_interval = duration_from_timespec(timer_spec.it_interval)?;
 
