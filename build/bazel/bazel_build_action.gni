@@ -216,11 +216,6 @@ template("bazel_build_action") {
       assert("Unsupported mode optimize = $optimize")
     }
 
-    # Forward ML inliner
-    if (clang_ml_inliner && optimize == "size") {
-      args += [ "--features=ml_inliner" ]
-    }
-
     if (!defined(deps)) {
       deps = []
     }

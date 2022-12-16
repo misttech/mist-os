@@ -13,6 +13,7 @@ load(
     "flag_group",
     "flag_set",
     "tool_path",
+    "with_feature_set",
 )
 load("@prebuilt_clang//:generated_constants.bzl", clang_constants = "constants")
 load("@//:build/bazel/toolchains/clang/sanitizer.bzl", "sanitizer_features")
@@ -116,6 +117,9 @@ def _prebuilt_clang_cc_toolchain_config_impl(ctx):
                         ],
                     ),
                 ],
+                with_features = [with_feature_set(
+                    features = ["opt"],
+                )],
             ),
         ],
     )
