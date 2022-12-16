@@ -11,6 +11,7 @@ use {
     fidl_fuchsia_sysmem::AllocatorMarker,
     fidl_fuchsia_tracing_provider::RegistryMarker,
     fidl_fuchsia_ui_composition::FlatlandMarker,
+    fidl_fuchsia_ui_display_singleton::InfoMarker,
     fidl_fuchsia_ui_test_conformance as ui_conformance,
     fidl_fuchsia_ui_test_context as ui_test_context, fidl_fuchsia_ui_test_input as ui_input,
     fidl_fuchsia_ui_test_scene as test_scene,
@@ -76,6 +77,23 @@ async fn run_context_server(
     let mut connected_to_puppet_under_test = false;
     while let Some(event) = stream.try_next().await? {
         match event {
+            ui_test_context::ContextRequest::GetDisplayDimensions { responder, .. } => {
+                let info_proxy = puppet_realm
+                    .root
+                    .connect_to_protocol_at_exposed_dir::<InfoMarker>()
+                    .expect("failed to connect to display info service");
+                let display_metrics =
+                    info_proxy.get_metrics().await.expect("failed to get display metrics");
+                let dimensions =
+                    display_metrics.extent_in_px.expect("display metrics missing dimensions");
+                responder
+                    .send(ui_test_context::ContextGetDisplayDimensionsResponse {
+                        width_in_physical_px: Some(dimensions.width),
+                        height_in_physical_px: Some(dimensions.height),
+                        ..ui_test_context::ContextGetDisplayDimensionsResponse::EMPTY
+                    })
+                    .expect("failed to respond to get display dimensions request");
+            }
             ui_test_context::ContextRequest::GetRootViewToken { responder, .. } => {
                 assert!(!created_root_view_token);
                 created_root_view_token = true;
@@ -242,6 +260,7 @@ async fn assemble_puppet_realm() -> RealmInstance {
             Route::new()
                 .capability(Capability::protocol::<GraphicalPresenterMarker>())
                 .capability(Capability::protocol::<FlatlandMarker>())
+                .capability(Capability::protocol::<InfoMarker>())
                 .capability(Capability::protocol::<ui_input::RegistryMarker>())
                 .from(Ref::child(TEST_UI_STACK))
                 .to(Ref::parent()),

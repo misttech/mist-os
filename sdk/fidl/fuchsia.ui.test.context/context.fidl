@@ -21,6 +21,12 @@ using fuchsia.ui.views;
 /// associated with the corresponding test.
 protocol Context {
 
+    /// Returns the dimensions of the display, in physical pixels.
+    GetDisplayDimensions() -> (table {
+        1: width_in_physical_px uint32;
+        2: height_in_physical_px uint32;
+    });
+
     /// Returns the view token the test should use to create its "root"
     /// puppet, i.e. the puppet instance of which all others are
     /// descendants.
