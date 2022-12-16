@@ -583,7 +583,11 @@ zither_golden_test("zx.test") {
       backend = "go_runtime"
       files = [
         "syscalls_fuchsia.go",
+        "syscalls_fuchsia_amd64.s",
+        "syscalls_fuchsia_arm64.s",
         "vdso_keys_fuchsia.go",
+        "vdsocalls_fuchsia_amd64.s",
+        "vdsocalls_fuchsia_arm64.s",
       ]
     },
   ]

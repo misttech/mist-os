@@ -1206,6 +1206,9 @@ type SyscallParameter struct {
 	// Orientation gives whether this is an in, out, or in-out parameter.
 	Orientation ParameterOrientation
 
+	// Size is the size of the parameter.
+	Size int
+
 	// Tags gives additional metadata about the parameter.
 	Tags map[ParameterTag]struct{}
 }

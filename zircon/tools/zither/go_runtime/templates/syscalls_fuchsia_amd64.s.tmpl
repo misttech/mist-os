@@ -1,0 +1,25 @@
+{{/*
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+*/}}
+{{- define "Generate-syscalls_fuchsia_amd64.s" -}}
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include "textflag.h"
+
+{{ range . }}
+{{- $name := LowerCaseWithUnderscores . }}
+{{- $lastParamIndex := LastParameterIndex . }}
+// func Sys_{{ $name }}(
+{{- range $i, $param := .Parameters }}
+    {{- LowerCaseWithUnderscores $param }} {{ ParameterType $param }}{{ if ne $i $lastParamIndex }}, {{ end }}
+{{- end -}}
+) {{ ReturnType . }}
+TEXT ·Sys_{{ $name }}(SB),NOSPLIT,$0
+	JMP runtime·vdsoCall_zx_{{ $name }}(SB)
+{{ end }}
+
+{{- end }}

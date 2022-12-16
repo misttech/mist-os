@@ -9,7 +9,11 @@ go_library("go_runtime") {
   sources = [
     "go_runtime.go",
     "templates/syscalls_fuchsia.go.tmpl",
+    "templates/syscalls_fuchsia_amd64.s.tmpl",
+    "templates/syscalls_fuchsia_arm64.s.tmpl",
     "templates/vdso_keys_fuchsia.go.tmpl",
+    "templates/vdsocalls_fuchsia_amd64.s.tmpl",
+    "templates/vdsocalls_fuchsia_arm64.s.tmpl",
   ]
   deps = [
     "..:common",

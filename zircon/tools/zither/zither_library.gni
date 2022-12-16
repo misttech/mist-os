@@ -636,13 +636,11 @@ template("_zither_go_runtime_sources") {
     backend = "go_runtime"
     generated_files = [
       "${output_dir}/src/runtime/vdso_keys_fuchsia.go",
+      "${output_dir}/src/runtime/vdsocalls_fuchsia_amd64.s",
+      "${output_dir}/src/runtime/vdsocalls_fuchsia_arm64.s",
+      "${output_dir}/src/syscall/zx/syscalls_fuchsia_amd64.s",
+      "${output_dir}/src/syscall/zx/syscalls_fuchsia_arm64.s",
       "${output_dir}/src/syscall/zx/syscalls_fuchsia.go",
-
-      # TODO(fxbug.dev/110295): And the rest...
-      #"${output_dir}/src/runtime/vdsocalls_fuchsia_amd64.s",
-      #"${output_dir}/src/runtime/vdsocalls_fuchsia_arm64.s",
-      #"${output_dir}/src/syscall/zx/syscalls_fuchsia_amd64.s",
-      #"${output_dir}/src/syscall/zx/syscalls_fuchsia_arm64.s",
     ]
   }
 
