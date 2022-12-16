@@ -10,4 +10,5 @@ fidl("fuchsia.hardware.rawnand") {
     "//sdk/banjo/fuchsia.hardware.nandinfo",
     "//zircon/vdso/zx",
   ]
+  enable_banjo = true
 }

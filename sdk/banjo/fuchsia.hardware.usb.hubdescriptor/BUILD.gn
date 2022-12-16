@@ -6,4 +6,5 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.usb.hubdescriptor") {
   sources = [ "hub-descriptor.fidl" ]
+  enable_banjo = true
 }

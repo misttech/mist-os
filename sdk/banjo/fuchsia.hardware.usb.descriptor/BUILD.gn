@@ -7,4 +7,5 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.usb.descriptor") {
   sdk_category = "internal"
   sources = [ "usb.fidl" ]
+  enable_banjo = true
 }

@@ -6,4 +6,5 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.usb.phy") {
   sources = [ "usb-phy.fidl" ]
+  enable_banjo = true
 }

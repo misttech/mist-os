@@ -10,4 +10,5 @@ fidl("fuchsia.hardware.mipicsi") {
     "//sdk/banjo/fuchsia.hardware.camera",
     "//zircon/vdso/zx",
   ]
+  enable_banjo = true
 }

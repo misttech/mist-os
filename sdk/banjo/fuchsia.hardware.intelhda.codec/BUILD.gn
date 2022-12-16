@@ -7,4 +7,5 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.intelhda.codec") {
   sources = [ "intel-hda-codec.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_banjo = true
 }

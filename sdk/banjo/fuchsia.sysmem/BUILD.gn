@@ -15,4 +15,5 @@ fidl("fuchsia.sysmem") {
     "usages.fidl",
   ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_banjo = true
 }

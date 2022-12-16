@@ -6,4 +6,5 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.camera") {
   sources = [ "camera.fidl" ]
+  enable_banjo = true
 }

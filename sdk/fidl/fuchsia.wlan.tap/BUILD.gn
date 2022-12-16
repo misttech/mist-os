@@ -17,4 +17,5 @@ fidl("fuchsia.wlan.tap") {
     "//sdk/fidl/fuchsia.wlan.internal",
     "//zircon/vdso/zx",
   ]
+  enable_banjo = true
 }

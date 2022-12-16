@@ -23,6 +23,7 @@ fidl("fuchsia.wlan.policy") {
     "//sdk/fidl/fuchsia.wlan.ieee80211",
     "//zircon/vdso/zx",
   ]
+  enable_banjo = true
 }
 
 measure_tape("measure_tape_for_scan_result") {

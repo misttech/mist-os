@@ -10,4 +10,5 @@ fidl("fuchsia.hardware.display.controller") {
     "//sdk/banjo/fuchsia.hardware.audiotypes",
     "//zircon/vdso/zx",
   ]
+  enable_banjo = true
 }

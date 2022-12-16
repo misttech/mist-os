@@ -7,4 +7,5 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.display.capture") {
   sources = [ "display-capture.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_banjo = true
 }

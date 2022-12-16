@@ -11,4 +11,5 @@ fidl("fuchsia.hardware.serialimpl") {
     "//sdk/banjo/fuchsia.hardware.serial",
     "//zircon/vdso/zx",
   ]
+  enable_banjo = true
 }

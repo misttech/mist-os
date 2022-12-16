@@ -11,4 +11,5 @@ fidl("fuchsia.hardware.gdc") {
     "//sdk/banjo/fuchsia.sysmem",
     "//zircon/vdso/zx",
   ]
+  enable_banjo = true
 }

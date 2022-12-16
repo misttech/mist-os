@@ -16,6 +16,7 @@ group("banjo") {
 fidl("fuchsia.examples.gizmo") {
   sources = [ "gizmo.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_banjo = true
 }
 
 driver_bind_rules("parent_bind") {

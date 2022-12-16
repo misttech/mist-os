@@ -6,4 +6,5 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.nandinfo") {
   sources = [ "nand_info.fidl" ]
+  enable_banjo = true
 }

@@ -11,4 +11,5 @@ fidl("fuchsia.hardware.wlan.associnfo") {
     "//sdk/fidl/fuchsia.wlan.common",
     "//sdk/fidl/fuchsia.wlan.ieee80211",
   ]
+  enable_banjo = true
 }

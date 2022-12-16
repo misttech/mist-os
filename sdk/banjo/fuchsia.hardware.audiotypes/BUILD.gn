@@ -6,4 +6,5 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.audiotypes") {
   sources = [ "audio.fidl" ]
+  enable_banjo = true
 }

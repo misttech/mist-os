@@ -12,4 +12,5 @@ fidl("fuchsia.hardware.isp") {
     "//sdk/banjo/fuchsia.sysmem",
     "//zircon/vdso/zx",
   ]
+  enable_banjo = true
 }

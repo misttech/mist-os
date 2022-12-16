@@ -22,6 +22,7 @@ group("drivers") {
 fidl("fuchsia.lifecycle.test") {
   testonly = true
   sources = [ "lifecycle.test.fidl" ]
+  enable_banjo = true
 }
 
 driver_bind_rules("lifecycle_bind") {

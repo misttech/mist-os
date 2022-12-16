@@ -9,6 +9,7 @@ import("//zircon/tools/zither/zither_golden_files.gni")
 # used to generate checked-in headers which are - but it will be eventually.
 fidl("zbi") {
   sources = [ "driver-config.fidl" ]
+  enable_zither = true
 }
 
 # Depended on by //zircon/public/sysroot/sdk:sysroot_sdk.

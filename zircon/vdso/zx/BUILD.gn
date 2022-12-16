@@ -14,4 +14,6 @@ fidl("zx") {
   sdk_category = "partner"
 
   api = "//sdk/fidl/zx/zx.api"
+
+  enable_banjo = true
 }

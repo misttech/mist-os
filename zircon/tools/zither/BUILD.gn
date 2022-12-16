@@ -159,6 +159,7 @@ template("zither_golden_test") {
     foreach(source, invoker.sources) {
       sources += [ "${case_data_dir}/$source" ]
     }
+    enable_zither = true
   }
 
   case_deps = []

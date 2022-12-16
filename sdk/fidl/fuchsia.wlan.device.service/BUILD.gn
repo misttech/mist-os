@@ -21,4 +21,5 @@ fidl("fuchsia.wlan.device.service") {
     "//sdk/fidl/fuchsia.wlan.sme",
     "//sdk/fidl/fuchsia.wlan.stats",
   ]
+  enable_banjo = true
 }

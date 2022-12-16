@@ -7,4 +7,5 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.pciroot") {
   sources = [ "pciroot.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_banjo = true
 }

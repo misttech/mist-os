@@ -13,4 +13,5 @@ fidl("fuchsia.net") {
     "overview.fidl",
     "socket.fidl",
   ]
+  enable_banjo = true
 }

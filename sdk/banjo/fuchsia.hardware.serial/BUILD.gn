@@ -8,4 +8,5 @@ fidl("fuchsia.hardware.serial") {
   sdk_category = "internal"
   sources = [ "serial.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_banjo = true
 }

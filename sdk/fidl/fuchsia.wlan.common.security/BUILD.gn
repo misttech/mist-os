@@ -11,4 +11,5 @@ fidl("fuchsia.wlan.common.security") {
   sdk_category = "internal"
 
   sources = [ "security.fidl" ]
+  enable_banjo = true
 }

@@ -8,4 +8,5 @@ fidl("fuchsia.hardware.syscalls.pci") {
   sdk_category = "experimental"
   sources = [ "pci.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_banjo = true
 }

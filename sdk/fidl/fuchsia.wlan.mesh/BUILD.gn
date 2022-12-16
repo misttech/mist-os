@@ -11,4 +11,5 @@ fidl("fuchsia.wlan.mesh") {
   sources = [ "wlan_mesh.fidl" ]
 
   public_deps = [ "//sdk/fidl/fuchsia.wlan.ieee80211" ]
+  enable_banjo = true
 }

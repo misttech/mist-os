@@ -12,4 +12,5 @@ fidl("fuchsia.hardware.usb.request") {
     "//sdk/banjo/fuchsia.hardware.usb.descriptor",
     "//zircon/vdso/zx",
   ]
+  enable_banjo = true
 }

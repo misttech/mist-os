@@ -8,4 +8,5 @@ fidl("fuchsia.hardware.i2cimpl") {
   sdk_category = "internal"
   sources = [ "i2c-impl.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_banjo = true
 }

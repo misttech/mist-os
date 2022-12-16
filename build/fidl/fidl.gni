@@ -95,6 +95,13 @@ import("//zircon/tools/zither/zither_library.gni")
 #     Indicates if any of the FIDL files contain the driver transport or
 #     references to the driver transport.
 #
+#   enable_banjo (optional, default to false)
+#     Set to true to enable Banjo bindings for this library.
+#
+#   enable_zither (optional, default to false)
+#     Set to true to enable Zither bindings for this library.
+#     See //zircon/tools/zither/README.md for details.
+#
 #   public_deps
 #   testonly
 #   visibility
@@ -120,6 +127,14 @@ template("fidl") {
     fidl_ir_json = get_label_info(fidl_ir_target, "target_gen_dir") +
                    "/${target_name}.fidl.json"
   }
+
+  enable_banjo = defined(invoker.enable_banjo) && invoker.enable_banjo
+  enable_zither = defined(invoker.enable_zither) && invoker.enable_zither
+
+  not_needed([
+               "enable_banjo",
+               "enable_zither",
+             ])
 
   is_go = current_toolchain == go_toolchain
   is_dart = current_toolchain == dart_toolchain
@@ -176,7 +191,7 @@ template("fidl") {
       fidl_gen_dir += "/dart"
     }
   } else {
-    not_needed(invoker, dart_only)
+    not_needed(invoker, dart_only + [ "sources" ])
   }
 
   if (is_go) {
@@ -190,7 +205,11 @@ template("fidl") {
       forward_variables_from(extra_parameters, "*", [ "fidl_target" ])
       fidl_gen_dir += "/go"
     }
-    not_needed(invoker, [ "sdk_category" ])
+    not_needed(invoker,
+               [
+                 "sdk_category",
+                 "sources",
+               ])
   }
 
   non_dart_go_only = [
@@ -231,15 +250,32 @@ template("fidl") {
       fidl_gen_dir += "/bindlib"
     }
 
-    fidl_banjo("${target_name}_banjo") {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                               "public_deps",
-                             ])
-      forward_variables_from(extra_parameters, "*")
-      fidl_gen_dir += "/banjo"
+    if (enable_banjo) {
+      fidl_banjo("${target_name}_banjo") {
+        forward_variables_from(invoker,
+                               [
+                                 "testonly",
+                                 "visibility",
+                                 "public_deps",
+                               ])
+        forward_variables_from(extra_parameters, "*")
+        fidl_gen_dir += "/banjo"
+      }
+    }
+
+    if (enable_zither) {
+      zither_library("${target_name}_zither") {
+        forward_variables_from(invoker,
+                               [
+                                 "testonly",
+                                 "visibility",
+                                 "sources",
+                               ])
+        forward_variables_from(extra_parameters, "*")
+        fidl_gen_dir += "/zither"
+      }
+    } else {
+      not_needed(invoker, [ "sources" ])
     }
 
     fidl_tables("${target_name}_tables") {
@@ -270,17 +306,6 @@ template("fidl") {
       }
     }
   } else {
-    not_needed(invoker, non_dart_go_only)
-  }
-
-  zither_library("${target_name}_zither") {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                             "sources",
-                           ])
-    forward_variables_from(extra_parameters, "*")
-    fidl_gen_dir += "/zither"
+    not_needed(invoker, non_dart_go_only + [ "sources" ])
   }
 }

@@ -10,4 +10,5 @@ fidl("fuchsia.hardware.platform.bus") {
     "//sdk/banjo/fuchsia.hardware.platform.device",
     "//zircon/vdso/zx",
   ]
+  enable_banjo = true
 }

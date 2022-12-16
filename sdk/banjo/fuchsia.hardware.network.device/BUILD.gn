@@ -10,4 +10,5 @@ fidl("fuchsia.hardware.network.device") {
     "//sdk/banjo/fuchsia.hardware.network.mac",
     "//zircon/vdso/zx",
   ]
+  enable_banjo = true
 }

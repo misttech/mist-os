@@ -12,4 +12,5 @@ fidl("fuchsia.wlan.device") {
     "//sdk/fidl/fuchsia.wlan.ieee80211",
     "//zircon/vdso/zx",
   ]
+  enable_banjo = true
 }
