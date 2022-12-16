@@ -25,4 +25,9 @@ group("tools") {
 group("tests") {
   testonly = true
   deps = [ "echo:tests" ]
+  if (ffx_build_dual_mode_plugins_as_subtools) {
+    # LINT.IfChange
+    deps += dual_mode_subtool_tests  # from config.gni
+    # LINT.ThenChange(../BUILD.gn)
+  }
 }

@@ -62,7 +62,7 @@ if (is_host) {
 
 ffx_tool("ffx_emulator_tool") {
   edition = "2021"
-  output_name = "ffx-emulator"
+  output_name = "ffx-emu"
   deps = [
     ":ffx_emulator_suite",
     "//src/lib/fuchsia-async",

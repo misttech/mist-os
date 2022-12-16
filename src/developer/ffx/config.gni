@@ -47,7 +47,9 @@ dual_mode_plugins = [
 # The same list as `dual_mode_plugins`, but with the normal suffix for plugins converted to
 # subtools.
 dual_mode_subtools = []
+dual_mode_subtool_tests = []
 
 foreach(plugin, dual_mode_plugins) {
   dual_mode_subtools += [ plugin + "_tool_host_tool" ]
+  dual_mode_subtool_tests += [ plugin + "_tests" ]
 }
