@@ -239,10 +239,8 @@ async fn make_execution_runtime(
     }
 
     // Create incoming/outgoing directories, and populate them.
-    let (outgoing_dir_client, outgoing_dir_server) =
-        zx::Channel::create().map_err(|e| ModelError::namespace_creation_failed(e))?;
-    let (runtime_dir_client, runtime_dir_server) =
-        zx::Channel::create().map_err(|e| ModelError::namespace_creation_failed(e))?;
+    let (outgoing_dir_client, outgoing_dir_server) = zx::Channel::create().unwrap();
+    let (runtime_dir_client, runtime_dir_server) = zx::Channel::create().unwrap();
     let mut namespace = IncomingNamespace::new(package);
     let ns = namespace.populate(component.as_weak(), decl).await?;
 

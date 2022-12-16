@@ -49,7 +49,6 @@ use {
         model::{
             component::ComponentManagerInstance,
             environment::Environment,
-            error::ModelError,
             event_logger::EventLogger,
             events::{
                 registry::{EventRegistry, EventSubscription},
@@ -1059,9 +1058,7 @@ impl BuiltinEnvironment {
         let mut service_fs = self.create_service_fs().await?;
 
         // Bind to the channel
-        service_fs
-            .serve_connection(channel)
-            .map_err(|err| ModelError::namespace_creation_failed(err))?;
+        service_fs.serve_connection(channel)?;
 
         self.emit_diagnostics(&mut service_fs).unwrap_or_else(|error| {
             warn!(%error, "Failed to serve diagnostics");
@@ -1094,22 +1091,18 @@ impl BuiltinEnvironment {
     fn emit_diagnostics<'a>(
         &self,
         service_fs: &mut ServiceFs<ServiceObj<'a, ()>>,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), Error> {
         let (service_fs_proxy, service_fs_server_end) =
             create_proxy::<fio::DirectoryMarker>().unwrap();
-        service_fs
-            .serve_connection(service_fs_server_end)
-            .map_err(|err| ModelError::namespace_creation_failed(err))?;
+        service_fs.serve_connection(service_fs_server_end)?;
 
         let (node, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        service_fs_proxy
-            .open(
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                fio::MODE_TYPE_DIRECTORY,
-                "diagnostics",
-                ServerEnd::new(server_end.into_channel()),
-            )
-            .map_err(|err| ModelError::namespace_creation_failed(err))?;
+        service_fs_proxy.open(
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::MODE_TYPE_DIRECTORY,
+            "diagnostics",
+            ServerEnd::new(server_end.into_channel()),
+        )?;
 
         self.directory_ready_notifier.register_component_manager_capability("diagnostics", node);
 
@@ -1120,7 +1113,7 @@ impl BuiltinEnvironment {
     pub(crate) fn emit_diagnostics_for_test<'a>(
         &self,
         service_fs: &mut ServiceFs<ServiceObj<'a, ()>>,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), Error> {
         self.emit_diagnostics(service_fs)
     }
 
