@@ -128,7 +128,7 @@ pub struct RepoPublishCommand {
         option,
         default = "CopyMode::Copy",
         from_str_fn(parse_copy_mode),
-        description = "mode used to copy blobs to repository. Either 'copy' or 'hard-link' (default 'copy')"
+        description = "mode used to copy blobs to repository. Either 'copy', 'copy-overwrite', or 'hard-link' (default 'copy')"
     )]
     pub copy_mode: CopyMode,
 
@@ -139,6 +139,7 @@ pub struct RepoPublishCommand {
 fn parse_copy_mode(value: &str) -> Result<CopyMode, String> {
     match value {
         "copy" => Ok(CopyMode::Copy),
+        "copy-overwrite" => Ok(CopyMode::CopyOverwrite),
         "hard-link" => Ok(CopyMode::HardLink),
         _ => Err(format!("unknown copy mode {}", value)),
     }

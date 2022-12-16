@@ -41,11 +41,18 @@ use {
 /// Describes how package blobs should be copied into the repository.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CopyMode {
-    /// Copy package blobs into the repository.
+    /// Copy package blobs into the repository. This will skip copying the blob if it already exists
+    /// in the repository.
     ///
     /// This will create a Copy-on-Write (reflink) on file systems that support it.
     #[default]
     Copy,
+
+    /// Copy package blobs into the repository. This will overwrite a blob if it already exists in
+    /// the repository.
+    ///
+    /// This will create a Copy-on-Write (reflink) on file systems that support it.
+    CopyOverwrite,
 
     /// Create hard links from the package blobs into the repository.
     HardLink,
@@ -329,16 +336,12 @@ impl RepoStorage for FileSystemRepository {
 
             match self.copy_mode {
                 CopyMode::Copy => {
-                    let temp_path = create_temp_file(&dst).await?;
-                    async_fs::copy(src, &temp_path).await?;
-                    temp_path.persist(&dst)?;
-
-                    // Set the blob to be read-only.
-                    let file = async_fs::File::open(dst).await?;
-                    let mut permissions = file.metadata().await?.permissions();
-                    permissions.set_readonly(true);
-                    file.set_permissions(permissions).await?;
+                    let exists = async_fs::File::open(&dst).await.is_ok();
+                    if !exists {
+                        copy_blob(src, dst).await?
+                    }
                 }
+                CopyMode::CopyOverwrite => copy_blob(src, dst).await?,
                 CopyMode::HardLink => {
                     async_fs::hard_link(src, &dst).await?;
                 }
@@ -360,6 +363,20 @@ async fn create_temp_file(path: &Utf8Path) -> Result<TempPath> {
     };
 
     Ok(temp_file.into_temp_path())
+}
+
+async fn copy_blob(src: Utf8PathBuf, dst: Utf8PathBuf) -> Result<()> {
+    let temp_path = create_temp_file(&dst).await?;
+    async_fs::copy(src, &temp_path).await?;
+    temp_path.persist(&dst)?;
+
+    // Set the blob to be read-only.
+    let file = async_fs::File::open(dst).await?;
+    let mut permissions = file.metadata().await?.permissions();
+    permissions.set_readonly(true);
+    file.set_permissions(permissions).await?;
+
+    Ok(())
 }
 
 #[pin_project::pin_project]
@@ -564,7 +581,57 @@ mod tests {
         let actual = std::fs::read(&blob_path).unwrap();
         assert_eq!(&actual, &contents[..]);
 
-        assert!(std::fs::metadata(blob_path).unwrap().permissions().readonly());
+        assert!(std::fs::metadata(&blob_path).unwrap().permissions().readonly());
+
+        // Next, we won't overwrite a blob that already exists.
+        let contents2 = b"another blob";
+        let path2 = dir.join("my-blob2");
+        std::fs::write(&path2, contents2).unwrap();
+        assert_matches!(repo.store_blob(&hash, &path2).await, Ok(()));
+
+        // Make sure we get the original contents back.
+        let actual = std::fs::read(&blob_path).unwrap();
+        assert_eq!(&actual, &contents[..]);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_store_blob_copy_overwrite() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        let metadata_repo_path = dir.join("metadata");
+        let blob_repo_path = dir.join("blobs");
+        std::fs::create_dir(&metadata_repo_path).unwrap();
+        std::fs::create_dir(&blob_repo_path).unwrap();
+
+        let repo = FileSystemRepository::builder(metadata_repo_path, blob_repo_path.clone())
+            .copy_mode(CopyMode::CopyOverwrite)
+            .build();
+
+        // Store the blob.
+        let contents = b"hello world";
+        let path = dir.join("my-blob");
+        std::fs::write(&path, contents).unwrap();
+
+        let hash = fuchsia_merkle::from_slice(contents).root();
+        assert_matches!(repo.store_blob(&hash, &path).await, Ok(()));
+
+        // Make sure we can read it back.
+        let blob_path = blob_repo_path.join(hash.to_string());
+        let actual = std::fs::read(&blob_path).unwrap();
+        assert_eq!(&actual, &contents[..]);
+
+        assert!(std::fs::metadata(&blob_path).unwrap().permissions().readonly());
+
+        // Next, overwrite a blob that already exists.
+        let contents2 = b"another blob";
+        let path2 = dir.join("my-blob2");
+        std::fs::write(&path2, contents2).unwrap();
+        assert_matches!(repo.store_blob(&hash, &path2).await, Ok(()));
+
+        // Make sure we get the new contents back.
+        let actual = std::fs::read(&blob_path).unwrap();
+        assert_eq!(&actual, &contents2[..]);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
