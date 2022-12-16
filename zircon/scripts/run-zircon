@@ -27,7 +27,8 @@ function HELP {
     echo "-s <number of cpus>  : number of cpus, 1 for uniprocessor, default is $SMP_DEFAULT"
     echo "-t <binary>          : use <binary> as the QEMU->ZBI trampoline"
     echo "-u <path>            : execute qemu startUp script, default is no script"
-    echo "-V                   : try to use virtio devices"
+    echo "-V, --virtio         : use virtio devices; defaults to true."
+    echo "    --no-virtio      : don't use virtio devices."
     echo "-z <zbi>             : boot specified ZBI via trampoline"
     echo "--audio[=<host_drv>] : use Intel HD Audio"
     echo "                       <host_drv> should be one of (alsa, oss, pa, wav, none)"
@@ -80,7 +81,7 @@ AUDIO_WAVFILE="/tmp/qemu.wav"
 DEBUGGER=0
 DISK=0
 DISKFILE=
-DISKTYPE="ahci"
+DISKTYPE=
 DISKFMT="raw"
 GIC=max
 GRAPHICS=0
@@ -92,7 +93,7 @@ QEMUDIR=
 UEFI_IMG=
 UPSCRIPT=no
 VNC=
-VIRTIO=0
+VIRTIO=1
 SERIAL=1
 SMP=$SMP_DEFAULT
 CMDLINE=""
@@ -235,12 +236,7 @@ while getopts "a:c:dD:gHI:km:nNq:s:t::u:Vz:h-:" FLAG; do
         s) SMP=$OPTARG;;
         t) QEMU_KERNEL="$(abspath "$OPTARG")";;
         u) UPSCRIPT="$(abspath "$OPTARG")";;
-        V)
-            VIRTIO=1
-            if [[ -z $DISKTYPE ]]; then
-              DISKTYPE="virtio"
-            fi
-            ;;
+        V) VIRTIO=1;;
         z) QEMU_INITRD="$(abspath "$OPTARG")";;
         h) HELP;;
         \?)
@@ -263,6 +259,8 @@ while getopts "a:c:dD:gHI:km:nNq:s:t::u:Vz:h-:" FLAG; do
             kvm) DO_KVM=1;;
             no-hvf) DO_HVF=0;;
             hvf) DO_HVF=1;;
+            no-virtio) VIRTIO=0;;
+            virtio) VIRTIO=1;;
             uefi=*) UEFI_IMG="$(abspath "${OPTARG#*=}")";;
             *)
                 echo unrecognized long option "$OPTARG"
@@ -278,6 +276,14 @@ shift $((OPTIND-1))
 if [[ -z $ARCH ]]; then
     echo must specify arch
     HELP
+fi
+
+if [[ -z $DISKTYPE ]]; then
+    if (( $VIRTIO )); then
+        DISKTYPE=virtio
+    else
+        DISKTYPE=ahci
+    fi
 fi
 
 # by default use the qemu binary located in the fuchsia //prebuilt
