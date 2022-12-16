@@ -7,8 +7,7 @@ use {
         above_root_capabilities::AboveRootCapabilitiesForTest,
         constants::{
             ENCLOSING_ENV_REALM_NAME, HERMETIC_ENVIRONMENT_NAME, HERMETIC_RESOLVER_REALM_NAME,
-            HERMETIC_TESTS_COLLECTION, TEST_ROOT_COLLECTION, TEST_ROOT_REALM_NAME,
-            WRAPPER_REALM_NAME,
+            TEST_ROOT_COLLECTION, TEST_ROOT_REALM_NAME, WRAPPER_REALM_NAME,
         },
         diagnostics, enclosing_env,
         error::LaunchTestError,
@@ -96,15 +95,10 @@ impl RunningSuite {
         above_root_capabilities_for_test
             .validate(facets.collection)
             .map_err(LaunchTestError::ValidateTestRealm)?;
-        let builder = get_realm(
-            test_url,
-            test_package.as_ref(),
-            &facets,
-            above_root_capabilities_for_test,
-            resolver,
-        )
-        .await
-        .map_err(LaunchTestError::InitializeTestRealm)?;
+        let builder =
+            get_realm(test_package.as_ref(), &facets, above_root_capabilities_for_test, resolver)
+                .await
+                .map_err(LaunchTestError::InitializeTestRealm)?;
         let instance = match instance_name {
             None => builder.build().await,
             Some(name) => builder.build_with_name(name).await,
@@ -534,23 +528,16 @@ impl CaseMatcher {
     }
 }
 
-fn get_allowed_package_value(test_url: &str, suite_facet: &facet::SuiteFacets) -> AllowedPackages {
-    let facet::SuiteFacets { collection, deprecated_allowed_packages } = suite_facet;
-    if let Some(deprecated_allowed_packages) = deprecated_allowed_packages {
-        AllowedPackages::from_iter(deprecated_allowed_packages.iter().cloned())
-    } else {
-        match *collection {
-            HERMETIC_TESTS_COLLECTION => AllowedPackages::zero_allowed_pkgs(),
-            _ => {
-                // based on the flag this can be ALL or zero list.
-                AllowedPackages::default(test_url)
-            }
+fn get_allowed_package_value(suite_facet: &facet::SuiteFacets) -> AllowedPackages {
+    match &suite_facet.deprecated_allowed_packages {
+        Some(deprecated_allowed_packages) => {
+            AllowedPackages::from_iter(deprecated_allowed_packages.iter().cloned())
         }
+        None => AllowedPackages::zero_allowed_pkgs(),
     }
 }
 
 async fn get_realm(
-    test_url: &str,
     test_package: &str,
     suite_facet: &facet::SuiteFacets,
     above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
@@ -561,7 +548,7 @@ async fn get_realm(
         builder.add_child_realm(WRAPPER_REALM_NAME, ChildOptions::new().eager()).await?;
 
     let hermetic_test_package_name = Arc::new(test_package.to_owned());
-    let other_allowed_packages = get_allowed_package_value(&test_url, &suite_facet);
+    let other_allowed_packages = get_allowed_package_value(&suite_facet);
 
     let hermetic_test_package_name_clone = hermetic_test_package_name.clone();
     let other_allowed_packages_clone = other_allowed_packages.clone();
@@ -1035,7 +1022,7 @@ async fn listen_for_completion(mut listener: ftest::CaseListenerRequestStream) -
 
 #[cfg(test)]
 mod tests {
-    use crate::constants::SYSTEM_TESTS_COLLECTION;
+    use crate::constants::{HERMETIC_TESTS_COLLECTION, SYSTEM_TESTS_COLLECTION};
 
     use {super::*, maplit::hashset};
 
@@ -1159,34 +1146,25 @@ mod tests {
             deprecated_allowed_packages: None,
         };
 
-        let url = "test_url";
-
         // default for hermetic realm is no other allowed package.
-        assert_eq!(
-            AllowedPackages::zero_allowed_pkgs(),
-            get_allowed_package_value(&url, &suite_facet)
-        );
+        assert_eq!(AllowedPackages::zero_allowed_pkgs(), get_allowed_package_value(&suite_facet));
 
         // deprecated_allowed_packages overrides HERMETIC_TESTS_COLLECTION
         suite_facet.deprecated_allowed_packages = Some(vec!["pkg-one".to_owned()]);
         assert_eq!(
             AllowedPackages::from_iter(["pkg-one".to_owned()]),
-            get_allowed_package_value(&url, &suite_facet)
+            get_allowed_package_value(&suite_facet)
         );
 
         // test with other collections
         suite_facet.collection = SYSTEM_TESTS_COLLECTION;
         assert_eq!(
             AllowedPackages::from_iter(["pkg-one".to_owned()]),
-            get_allowed_package_value(&url, &suite_facet)
+            get_allowed_package_value(&suite_facet)
         );
 
         // test default with other collection
         suite_facet.deprecated_allowed_packages = None;
-        let expected = match resolver::ENFORCE_HERMETIC_RESOLUTION {
-            true => AllowedPackages::zero_allowed_pkgs(),
-            false => AllowedPackages::all(url.to_string()),
-        };
-        assert_eq!(expected, get_allowed_package_value(&url, &suite_facet));
+        assert_eq!(AllowedPackages::zero_allowed_pkgs(), get_allowed_package_value(&suite_facet));
     }
 }
