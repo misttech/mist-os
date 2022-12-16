@@ -1270,6 +1270,29 @@ async fn test_tcp_socket<N: Netstack, E: netemul::Endpoint>(name: &str) {
     run_tcp_socket_test(&server, SERVER_SUBNET.addr, &client, CLIENT_SUBNET.addr).await
 }
 
+#[netstack_test]
+async fn tcp_sendbuf_size<I: net_types::ip::Ip + TestIpExt, N: Netstack, E: netemul::Endpoint>(
+    name: &str,
+) {
+    tcp_socket_accept_cross_ns::<I, N, N, E, _, _>(name, |mut sender, mut receiver| async move {
+        // If the sender supports setting SO_SNDBUF, it should be able to buffer
+        // a large amount of data even if the receiver isn't reading.
+        const BUFFER_SIZE: usize = 1024 * 1024;
+        socket2::Socket::from(sender.std().try_clone().expect("stream is cloneable"))
+            .set_send_buffer_size(BUFFER_SIZE)
+            .expect("set size is infallible");
+
+        let data = Vec::from_iter((0..BUFFER_SIZE).map(|i| i as u8));
+        sender.write_all(data.as_slice()).await.expect("all written");
+        sender.close().await.expect("close succeeds");
+
+        let mut buf = Vec::with_capacity(BUFFER_SIZE);
+        let read = receiver.read_to_end(&mut buf).await.expect("all bytes read");
+        assert_eq!(read, BUFFER_SIZE);
+    })
+    .await
+}
+
 // Helper function to add ip device to stack.
 async fn install_ip_device(
     realm: &netemul::TestRealm<'_>,

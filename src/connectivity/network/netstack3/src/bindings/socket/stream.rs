@@ -49,10 +49,10 @@ use netstack3_core::{
             accept, bind, close_conn, connect_bound, connect_unbound, create_socket,
             get_bound_info, get_connection_info, get_listener_info, listen, remove_bound,
             remove_unbound, set_bound_device, set_connection_device, set_listener_device,
-            set_unbound_device, shutdown_conn, shutdown_listener, with_keep_alive,
-            with_keep_alive_mut, AcceptError, BindError, BoundId, BoundInfo, ConnectError,
-            ConnectionId, ConnectionInfo, ListenerId, NoConnection, SocketAddr, TcpNonSyncContext,
-            UnboundId,
+            set_send_buffer_size, set_unbound_device, shutdown_conn, shutdown_listener,
+            with_keep_alive, with_keep_alive_mut, AcceptError, BindError, BoundId, BoundInfo,
+            ConnectError, ConnectionId, ConnectionInfo, ListenerId, NoConnection, SocketAddr,
+            TcpNonSyncContext, UnboundId,
         },
         state::Takeable,
         BufferSizes, KeepAlive,
@@ -362,6 +362,18 @@ impl SendBufferWithZirconSocket {
 }
 
 impl SendBuffer for SendBufferWithZirconSocket {
+    fn request_capacity(&mut self, size: usize) {
+        let ring_buffer_size = usize::min(usize::max(size, Self::MIN_CAPACITY), Self::MAX_CAPACITY);
+
+        let Self { capacity, notifier: _, ready_to_send, socket: _ } = self;
+
+        let old_ring_capacity = ready_to_send.cap();
+        ready_to_send.set_target_size(ring_buffer_size);
+        let new_ring_capacity = ready_to_send.cap();
+
+        *capacity = *capacity - old_ring_capacity + new_ring_capacity;
+    }
+
     fn mark_read(&mut self, count: usize) {
         self.ready_to_send.mark_read(count);
         self.poll()
@@ -792,6 +804,19 @@ where
         .map_err(IntoErrno::into_errno)
     }
 
+    async fn set_send_buffer_size(&mut self, new_size: u64) {
+        let mut guard = self.ctx.lock().await;
+        let Ctx { sync_ctx, non_sync_ctx } = &mut *guard;
+        let new_size =
+            usize::try_from(new_size).ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
+        match self.id {
+            SocketId::Unbound(id, _) => set_send_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
+            SocketId::Bound(id, _) => set_send_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
+            SocketId::Connection(id) => set_send_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
+            SocketId::Listener(id) => set_send_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
+        }
+    }
+
     /// Returns a [`ControlFlow`] to indicate whether the parent stream should
     /// continue being polled or dropped.
     ///
@@ -867,8 +892,9 @@ where
             fposix_socket::StreamSocketRequest::GetBroadcast { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
-            fposix_socket::StreamSocketRequest::SetSendBuffer { value_bytes: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+            fposix_socket::StreamSocketRequest::SetSendBuffer { value_bytes, responder } => {
+                self.set_send_buffer_size(value_bytes).await;
+                responder_send!(responder, &mut Ok(()));
             }
             fposix_socket::StreamSocketRequest::GetSendBuffer { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
