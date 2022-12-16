@@ -309,6 +309,7 @@ simplelog = "0.10.2"
 syn = { version = "1.0.98", features = ["full", "visit", "visit-mut", "extra-traits"] }
 synstructure = "0.12.1"
 tar = "0.4.25"
+term_grid = "0.2.0"
 termios = "0.3.2"
 tinyjson = "2.5.0"
 # TODO(fxbug.dev/106164) Enable the "rt" and "net" features here once gnaw

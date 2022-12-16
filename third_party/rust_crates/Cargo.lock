@@ -1468,6 +1468,7 @@ dependencies = [
  "synstructure",
  "tar",
  "tempfile",
+ "term_grid",
  "termion",
  "termios",
  "test-case",
@@ -4086,6 +4087,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "term_grid"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7c9eb7705cb3f0fd71d3955b23db6d372142ac139e8c473952c93bf3c3dc4b7"
+dependencies = [
+ "unicode-width",
+]
+
+[[package]]
 name = "termcolor"
 version = "1.1.2"
 dependencies = [
@@ -4547,9 +4557,9 @@ checksum = "aa6024fc12ddfd1c6dbc14a80fa2324d4568849869b779f6bd37e5e4c03344d1"
 
 [[package]]
 name = "unicode-width"
-version = "0.1.5"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "882386231c45df4700b275c7ff55b6f3698780a650026380e72dabe76fa46526"
+checksum = "c0edd1e5b14653f783770bce4a4dabb4a5108a5370a5f5d8cfe8710c361f6c8b"
 
 [[package]]
 name = "unicode-xid"

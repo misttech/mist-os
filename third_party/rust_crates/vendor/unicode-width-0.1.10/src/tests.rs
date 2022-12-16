@@ -13,7 +13,7 @@ use std::iter;
 #[cfg(feature = "bench")]
 use test::{self, Bencher};
 #[cfg(feature = "bench")]
-use super::UnicodeWidthChar;
+use super::{UnicodeWidthChar, UnicodeWidthStr};
 
 use std::prelude::v1::*;
 
@@ -93,7 +93,23 @@ fn simple_width_match(c: char) -> Option<usize> {
         _ => UnicodeWidthChar::width(c)
     }
 }
-
+#[cfg(all(feature = "bench", not(feature = "no_std")))]
+#[bench]
+fn enwik8(b: &mut Bencher) {
+    // To benchmark, download & unzip `enwik8` from https://data.deepai.org/enwik8.zip
+    let data_path = "bench_data/enwik8";
+    let string = std::fs::read_to_string(data_path).unwrap_or_default();
+    b.iter(|| test::black_box(UnicodeWidthStr::width(string.as_str())));
+}
+#[cfg(all(feature = "bench", not(feature = "no_std")))]
+#[bench]
+fn jawiki(b: &mut Bencher) {
+    // To benchmark, download & extract `jawiki-20220501-pages-articles-multistream-index.txt` from
+    // https://dumps.wikimedia.org/jawiki/20220501/jawiki-20220501-pages-articles-multistream-index.txt.bz2
+    let data_path = "bench_data/jawiki-20220501-pages-articles-multistream-index.txt";
+    let string = std::fs::read_to_string(data_path).unwrap_or_default();
+    b.iter(|| test::black_box(UnicodeWidthStr::width(string.as_str())));
+}
 #[test]
 fn test_str() {
     use super::UnicodeWidthStr;
@@ -106,6 +122,16 @@ fn test_str() {
     assert_eq!("".width_cjk(), 0);
     assert_eq!(UnicodeWidthStr::width("\u{2081}\u{2082}\u{2083}\u{2084}"), 4);
     assert_eq!("\u{2081}\u{2082}\u{2083}\u{2084}".width_cjk(), 8);
+}
+
+#[test]
+fn test_emoji() {
+    // Example from the README.
+    use super::UnicodeWidthStr;
+
+    assert_eq!(UnicodeWidthStr::width("👩"), 2); // Woman
+    assert_eq!(UnicodeWidthStr::width("🔬"), 2); // Microscope
+    assert_eq!(UnicodeWidthStr::width("👩‍🔬"), 4); // Woman scientist
 }
 
 #[test]
@@ -153,4 +179,13 @@ fn test_char2() {
 
     assert_eq!(UnicodeWidthChar::width('\u{300}'),Some(0));
     assert_eq!('\u{300}'.width_cjk(),Some(0));
+}
+
+#[test]
+fn unicode_12() {
+    use super::UnicodeWidthChar;
+    #[cfg(feature = "no_std")]
+    use core::option::Option::{Some, None};
+
+    assert_eq!(UnicodeWidthChar::width('\u{1F971}'), Some(2));
 }
