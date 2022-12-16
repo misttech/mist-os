@@ -619,6 +619,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine + SerializingEngine {
                 match segment {
                     ShowDetail::Cmd => println!("Command line:  {:#?}", self.build_emulator_cmd()),
                     ShowDetail::Config => show_output::config(self.emu_config()),
+                    ShowDetail::Device => show_output::device(self.emu_config()),
                     ShowDetail::Net => show_output::net(self.emu_config()),
                     ShowDetail::Raw | ShowDetail::All =>
                         /* already handled, just needed for completeness */

@@ -20,6 +20,9 @@ fn which_details(cmd: ShowCommand) -> Vec<ShowDetail> {
         if cmd.config || cmd.all {
             details.push(ShowDetail::Config)
         }
+        if cmd.device || cmd.all {
+            details.push(ShowDetail::Device)
+        }
         if cmd.net || cmd.all {
             details.push(ShowDetail::Net)
         }

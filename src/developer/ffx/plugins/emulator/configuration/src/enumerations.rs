@@ -294,6 +294,7 @@ pub enum ShowDetail {
     All,
     Cmd,
     Config,
+    Device,
     Net,
     Raw,
 }
@@ -363,6 +364,13 @@ mod tests {
     fn test_net() -> Result<()> {
         // Verify it returns a default.
         let _default = NetworkingMode::default();
+        Ok(())
+    }
+
+    #[test]
+    fn test_show_detail() -> Result<()> {
+        // Verify it returns a default.
+        let _default = ShowDetail::default();
         Ok(())
     }
 

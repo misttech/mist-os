@@ -23,6 +23,11 @@ pub struct ShowCommand {
     #[argh(switch)]
     pub config: bool,
 
+    /// show the virtual device information used to launch this emulator,
+    /// in a format consistent with the 'start' command's --device flag.
+    #[argh(switch)]
+    pub device: bool,
+
     /// name of the emulator instance to show details for.
     /// See a list of available instances by running `ffx emu list`.
     /// If only one instance is running, this defaults to that instance name.
