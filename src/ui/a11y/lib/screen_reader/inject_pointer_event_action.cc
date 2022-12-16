@@ -43,6 +43,11 @@ void InjectPointerEventAction::Run(GestureContext gesture_context) {
       a11y_focus->view_ref_koid, a11y_focus->node_id);
   FX_DCHECK(node_to_root_transform);
 
+  if (!node->has_location()) {
+    FX_LOGS(ERROR) << "Failed to inject pointer event into view; missing location for focused node";
+    return;
+  }
+
   auto node_bounding_box = node->location();
   auto node_bounding_box_center_x = (node_bounding_box.min.x + node_bounding_box.max.x) / 2.f;
   auto node_bounding_box_center_y = (node_bounding_box.min.y + node_bounding_box.max.y) / 2.f;
