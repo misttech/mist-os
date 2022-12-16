@@ -744,3 +744,118 @@ func TestInterfacesWatcherAddressState(t *testing.T) {
 		}
 	}
 }
+
+func TestAddressesChangeType(t *testing.T) {
+	for _, tc := range []struct {
+		name                           string
+		previouslyKnown                bool
+		prevProperties, nextProperties addressProperties
+		wantPropertiesDiff             interfaces.AddressPropertiesInterest
+		wantAddedOrRemoved             bool
+	}{
+		{
+			name:            "not previously known and visible",
+			previouslyKnown: false,
+			prevProperties:  addressProperties{},
+			nextProperties: addressProperties{
+				state: stack.AddressAssigned,
+			},
+			wantPropertiesDiff: interfaces.AddressPropertiesInterest(0),
+			wantAddedOrRemoved: true,
+		},
+		{
+			name:            "not previously known and not visible",
+			previouslyKnown: false,
+			prevProperties:  addressProperties{},
+			nextProperties: addressProperties{
+				state: stack.AddressDisabled,
+			},
+			wantPropertiesDiff: interfaces.AddressPropertiesInterest(0),
+			wantAddedOrRemoved: false,
+		},
+		{
+			name:            "invisible to visible",
+			previouslyKnown: true,
+			prevProperties: addressProperties{
+				state: stack.AddressDisabled,
+			},
+			nextProperties: addressProperties{
+				state: stack.AddressAssigned,
+			},
+			wantPropertiesDiff: interfaces.AddressPropertiesInterest(0),
+			wantAddedOrRemoved: true,
+		},
+		{
+			name:            "visible to invisible",
+			previouslyKnown: true,
+			prevProperties: addressProperties{
+				state: stack.AddressAssigned,
+			},
+			nextProperties: addressProperties{
+				state: stack.AddressDisabled,
+			},
+			wantPropertiesDiff: interfaces.AddressPropertiesInterest(0),
+			wantAddedOrRemoved: true,
+		},
+		{
+			name:            "invisible property change",
+			previouslyKnown: true,
+			prevProperties: addressProperties{
+				state: stack.AddressDisabled,
+				lifetimes: stack.AddressLifetimes{
+					Deprecated: true,
+				},
+			},
+			nextProperties: addressProperties{
+				state: stack.AddressDisabled,
+				lifetimes: stack.AddressLifetimes{
+					Deprecated: false,
+				},
+			},
+			wantPropertiesDiff: interfaces.AddressPropertiesInterest(0),
+			wantAddedOrRemoved: false,
+		},
+		{
+			name:            "visible property change",
+			previouslyKnown: true,
+			prevProperties: addressProperties{
+				state: stack.AddressAssigned,
+				lifetimes: stack.AddressLifetimes{
+					Deprecated: true,
+				},
+			},
+			nextProperties: addressProperties{
+				state: stack.AddressAssigned,
+				lifetimes: stack.AddressLifetimes{
+					Deprecated: false,
+				},
+			},
+			wantPropertiesDiff: interfaces.AddressPropertiesInterestPreferredLifetimeInfo,
+			wantAddedOrRemoved: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			gotPropertiesDiff, gotAddedOrRemoved := addressesChangeType(tc.previouslyKnown, tc.prevProperties, tc.nextProperties)
+			if gotPropertiesDiff != tc.wantPropertiesDiff {
+				t.Errorf(
+					"got addressChangeType(%t, %#v, %#v): got (%s, _), want (%s, _)",
+					tc.previouslyKnown,
+					tc.prevProperties,
+					tc.nextProperties,
+					gotPropertiesDiff,
+					tc.wantPropertiesDiff,
+				)
+			}
+			if gotAddedOrRemoved != tc.wantAddedOrRemoved {
+				t.Errorf(
+					"got addressChangeType(%t, %#v, %#v): got (_, %t), want (_, %t)",
+					tc.previouslyKnown,
+					tc.prevProperties,
+					tc.nextProperties,
+					gotAddedOrRemoved,
+					tc.wantAddedOrRemoved,
+				)
+			}
+		})
+	}
+}

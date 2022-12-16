@@ -1440,3 +1440,102 @@ async fn test_readded_address_present<N: Netstack>(name: &str) {
         addresses
     );
 }
+
+// TODO(https://fxbug.dev/113056): Enable this test against NS3 when the
+// divergence in behavior has been addressed (currently NS3 does not hide
+// any addresses while an interface is offline).
+//
+// Regression test which asserts that property changes on an address that is
+// hidden from clients of interface watcher (because the interface is offline)
+// does not cause null changes to be emitted via interface watcher.
+#[netstack_test]
+async fn test_lifetime_change_on_hidden_addr(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
+    let interface = sandbox
+        .create_endpoint::<netemul::NetworkDevice, _>(name)
+        .await
+        .expect("create endpoint")
+        .into_interface_in_realm(&realm)
+        .await
+        .expect("add endpoint to Netstack");
+    interface.set_link_up(true).await.expect("bring device up");
+    // Note that the interface is still offline since it is not admin enabled yet.
+
+    let event_stream = interface.get_interface_event_stream().expect("get interface event stream");
+    futures::pin_mut!(event_stream);
+
+    // Must wait until the interface is observed via an Existing/Added event.
+    let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(interface.id());
+    fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
+        event_stream.by_ref(),
+        &mut state,
+        |_: &fidl_fuchsia_net_interfaces_ext::Properties| Some(()),
+    )
+    .await
+    .expect("wait for interface to appear");
+
+    const ADDR: fidl_fuchsia_net::Subnet = fidl_subnet!("1.2.3.4/24");
+    let (address_state_provider, server) = fidl::endpoints::create_proxy::<
+        fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
+    >()
+    .expect("create proxy");
+    let () = interface
+        .control()
+        .add_address(
+            &mut ADDR.clone(),
+            fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+            server,
+        )
+        .expect("Control.AddAddress FIDL error");
+
+    const DEPRECATED_PROPERTIES: fidl_fuchsia_net_interfaces_admin::AddressProperties =
+        fidl_fuchsia_net_interfaces_admin::AddressProperties {
+            preferred_lifetime_info: Some(
+                fidl_fuchsia_net_interfaces::PreferredLifetimeInfo::Deprecated(
+                    fidl_fuchsia_net_interfaces::Empty,
+                ),
+            ),
+            ..fidl_fuchsia_net_interfaces_admin::AddressProperties::EMPTY
+        };
+    address_state_provider
+        .update_address_properties(DEPRECATED_PROPERTIES)
+        .await
+        .expect("FIDL error deprecating address");
+
+    assert!(interface.control().enable().await.expect("terminal error").expect("enable interface"));
+
+    let res = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
+        event_stream.by_ref(),
+        &mut state,
+        |fidl_fuchsia_net_interfaces_ext::Properties {
+             addresses,
+             id: _,
+             name: _,
+             device_class: _,
+             online: _,
+             has_default_ipv4_route: _,
+             has_default_ipv6_route: _,
+         }| {
+            addresses
+                .iter()
+                .any(|fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| {
+                    *addr == ADDR
+                })
+                .then_some(())
+        },
+    )
+    .await;
+    match res {
+        Ok(()) => {}
+        // This guards against the regression where a property change while
+        // the address is hidden from interface watcher clients induces an
+        // empty change.
+        Err(
+            e @ fidl_fuchsia_net_interfaces_ext::WatcherOperationError::Update(
+                fidl_fuchsia_net_interfaces_ext::UpdateError::EmptyChange(_),
+            ),
+        ) => panic!("violated API expectations while waiting for address to appear: {}", e),
+        Err(e) => panic!("wait for address to appear: {}", e),
+    }
+}
