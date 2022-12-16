@@ -385,7 +385,16 @@ impl SendBuffer for SendBufferWithZirconSocket {
         F: FnOnce(SendPayload<'a>) -> R,
     {
         self.poll();
-        self.ready_to_send.peek_with(offset, f)
+        let Self { ready_to_send, capacity: _, notifier: _, socket: _ } = self;
+        // Since the reported readable bytes length includes the bytes in
+        // `socket`, a reasonable caller could try to peek at those. Since only
+        // the bytes in `ready_to_send` are peekable, don't pass through a
+        // request that would result in an out-of-bounds peek.
+        if offset >= ready_to_send.len() {
+            f(SendPayload::Contiguous(&[]))
+        } else {
+            ready_to_send.peek_with(offset, f)
+        }
     }
 }
 
@@ -1360,5 +1369,33 @@ mod tests {
         let sbuf = SendBufferWithZirconSocket::new(Arc::new(local), notifier, target);
         let ring_buffer_capacity = sbuf.capacity - sbuf.socket.info().unwrap().rx_buf_max;
         assert_eq!(ring_buffer_capacity, expected)
+    }
+
+    #[test]
+    fn send_buffer_peek_past_ring_buffer() {
+        let (local, peer) =
+            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create zircon socket");
+        let mut sbuf = SendBufferWithZirconSocket::new(
+            Arc::new(local),
+            NeedsDataNotifier::default(),
+            SendBufferWithZirconSocket::MIN_CAPACITY,
+        );
+
+        // Fill the send buffer up completely.
+        const BYTES: [u8; 1024] = [1; 1024];
+        loop {
+            match peer.write(&BYTES) {
+                Ok(0) | Err(zx::Status::SHOULD_WAIT) => break,
+                Ok(_) => sbuf.poll(),
+                Err(e) => panic!("couldn't write: {:?}", e),
+            }
+        }
+
+        assert!(sbuf.len() > SendBufferWithZirconSocket::MIN_CAPACITY, "len includes zx socket");
+
+        // Peeking past the end of the ring buffer should not cause a crash.
+        sbuf.peek_with(SendBufferWithZirconSocket::MIN_CAPACITY, |payload| {
+            assert_matches!(payload, SendPayload::Contiguous(&[]))
+        })
     }
 }
