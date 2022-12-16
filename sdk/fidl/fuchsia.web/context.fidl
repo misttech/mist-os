@@ -139,6 +139,10 @@ type CreateContextParams = resource table {
     /// - [`fuchsia.ui.composition/Allocator`]
     /// - [`fuchsia.ui.composition/Flatland`]
     /// - [`fuchsia.ui.scenic/Scenic`]
+    ///
+    /// The following services must be present in order to collect diagnostic tracing data.
+    /// - [`fuchsia.tracing.perfetto.ProducerConnector`]: for browser trace data.
+    /// - [`fuchsia.tracing.provider.Registry`]: for Vulkan trace data.
     // TODO(fxbug.dev/64204): Remove gfx references after Flatland migration is completed.
     1: service_directory client_end:fuchsia.io.Directory;
 

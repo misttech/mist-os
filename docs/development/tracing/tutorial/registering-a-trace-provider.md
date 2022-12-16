@@ -136,6 +136,14 @@ should do so in your component's core\_shard.cml.
   }
   ```
 
+If your component uses a Chromium-based `fuchsia.web` service and you would like to be able to collect
+trace data from it, ensure that your `Context` is provided both
+the `fuchsia.tracing.provider.Registry` and `fuchsia.tracing.perfetto.ProducerConnector`
+capabilities.
+
+Note: For more information on how capabilities are passed to the `Context`, see the documentation for
+[`fuchsia.web/CreateContextParams.service_directory`](https://fuchsia.dev/reference/fidl/fuchsia.web#CreateContextParams.service_directory).
+
 Once you have registered your component as a trace provider, you can enable
 tracing in your code. For more information, see
 [Adding tracing in your code](/docs/development/tracing/tutorial/adding-tracing-in-code.md).
