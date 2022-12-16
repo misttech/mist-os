@@ -149,7 +149,7 @@ template("bazel_assembled_system") {
     bazel_outputs = []
     ninja_outputs = []
     foreach(_out, _assembly_outputs) {
-      bazel_outputs += [ "${_bazel_assembly_out_dir}/${_out}" ]
+      bazel_outputs += [ "bazel-bin/${_bazel_assembly_out_dir}/${_out}" ]
       ninja_outputs += [ "${_bazel_image_name}/${_out}" ]
     }
   }
