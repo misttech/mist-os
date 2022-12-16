@@ -35,7 +35,6 @@
 #include <cstdint>
 #include <cstring>
 #include <optional>
-#include <sstream>
 #include <vector>
 
 #include <wifi/wifi-config.h>
@@ -1094,7 +1093,7 @@ static zx_status_t brcmf_do_escan(struct brcmf_if* ifp, const wlan_fullmac_scan_
 zx_status_t brcmf_check_scan_status(unsigned long scan_status,
                                     std::string* out_scan_status_report) {
   zx_status_t out_scan_status = ZX_OK;
-  std::ostringstream scan_status_ss;
+  std::string scan_status_report;
 
   for (auto scan_status_bit : BRCMF_ALL_SCAN_STATUS_BITS) {
     if (brcmf_test_bit(scan_status_bit, scan_status)) {
@@ -1102,19 +1101,30 @@ zx_status_t brcmf_check_scan_status(unsigned long scan_status,
       if (out_scan_status_report == nullptr) {
         return out_scan_status;
       }
-      if (scan_status_ss.tellp() > 0) {
-        scan_status_ss << "+";
+      if (out_scan_status_report != nullptr) {
+        if (!scan_status_report.empty()) {
+          scan_status_report += "+";
+        }
+        scan_status_report += brcmf_get_scan_status_bit_str(scan_status_bit);
       }
-      scan_status_ss << brcmf_get_scan_status_bit_str(scan_status_bit);
     }
   }
 
   if (out_scan_status_report != nullptr) {
-    if (scan_status_ss.tellp() > 0) {
-      scan_status_ss << " ";
+    if (!scan_status_report.empty()) {
+      scan_status_report += " ";
     }
-    scan_status_ss << "(0x" << std::hex << scan_status << ")";
-    *out_scan_status_report = scan_status_ss.str();
+    const char fmt[] = "(%#lx)";
+    int sz = snprintf(nullptr, 0, fmt, scan_status);
+    if (sz < 0) {
+      BRCMF_ERR("Failed to generate scan status report string: %d", sz);
+      return out_scan_status;
+    }
+    char buf[sz + 1];
+    snprintf(buf, sizeof buf, fmt, scan_status);
+    scan_status_report += buf;
+
+    *out_scan_status_report = scan_status_report;
   }
   return out_scan_status;
 }
