@@ -24,7 +24,7 @@
     ],
     expose: [
         {
-            directory: "dev",
+            directory: "dev-topological",
             from: "#driver_test_realm",
             rights: [ "r*" ],
         },

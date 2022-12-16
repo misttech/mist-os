@@ -11,7 +11,7 @@
     ],
     use: [
         {
-            directory: "dev",
+            directory: "dev-topological",
             from: "#storage_driver_test_realm",
             rights: [ "r*" ],
             path: "/dev",

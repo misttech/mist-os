@@ -430,11 +430,11 @@ the appropriate device path to your component from its parent realm.
     offer: [
         ...
         {{ '<strong>' }}{
-            directory: "dev",
+            directory: "dev-dev",
             from: "parent",
             as: "{{ '<var label="device">dev-input-report</var>' }}",
             to: [ "#my_component" ],
-            subdir: "{{ '<var label="device subpath">class/input-report</var>' }}",
+            subdir: "{{ '<var label="device subpath">input-report</var>' }}",
         },{{ '</strong>' }}
     ],
 }

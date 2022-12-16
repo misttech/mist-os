@@ -56,7 +56,7 @@
                 "blob",
                 "boot",
                 "data",
-                "dev",
+                "dev-topological",
                 "factory",
                 "mnt",
                 "system",

@@ -425,7 +425,9 @@ async fn setup_rtc(
     builder
         .add_route(
             Route::new()
-                .capability(Capability::directory("dev").path("/dev").rights(fio::RW_STAR_DIR))
+                .capability(
+                    Capability::directory("dev-topological").path("/dev").rights(fio::RW_STAR_DIR),
+                )
                 .from(&fake_rtc_server)
                 .to(&*timekeeper),
         )

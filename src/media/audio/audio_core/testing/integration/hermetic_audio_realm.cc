@@ -231,15 +231,15 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
       .capabilities =
           {
               Directory{
-                  .name = "dev",
+                  .name = "dev-class",
                   .as = "dev-audio-input",
-                  .subdir = "class/audio-input",
+                  .subdir = "audio-input",
                   .path = "/dev/class/audio-input",
               },
               Directory{
-                  .name = "dev",
+                  .name = "dev-class",
                   .as = "dev-audio-output",
-                  .subdir = "class/audio-output",
+                  .subdir = "audio-output",
                   .path = "/dev/class/audio-output",
               },
           },

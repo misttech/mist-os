@@ -51,11 +51,6 @@
             ],
         },
         {
-            directory: "dev",
-            from: "#storage_driver_test_realm",
-            to: "#fshost-collection",
-        },
-        {
             directory: "dev-topological",
             from: "#storage_driver_test_realm",
             to: "#fshost-collection",

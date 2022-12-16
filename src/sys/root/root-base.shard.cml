@@ -124,7 +124,6 @@
                 "build-info",
                 "config-data",
                 "data",
-                "dev",
                 "dev-class",
                 "dev-topological",
                 "factory",

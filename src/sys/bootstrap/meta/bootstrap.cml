@@ -1075,12 +1075,6 @@
             from: "#pkg-cache",
         },
         {
-            // TODO(fxbug.dev/107961): Stop routing this as "dev".
-            directory: "dev-topological",
-            from: "#devfs",
-            as: "dev",
-        },
-        {
             directory: [
                 "dev-class",
                 "dev-topological",

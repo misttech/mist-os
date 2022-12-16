@@ -17,7 +17,7 @@
     },
     offer: [
         {
-            directory: "dev",
+            directory: "dev-topological",
             from: "#storage_driver_test_realm",
             to: [ "#fs-collection" ],
         },

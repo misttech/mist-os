@@ -10,7 +10,7 @@
     ],
     use: [
         {
-            directory: "dev",
+            directory: "dev-topological",
             from: "#driver_test_realm",
             rights: [ "r*" ],
             path: "/dev",

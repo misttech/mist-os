@@ -12,15 +12,11 @@
     },
     expose: [
         {
-            directory: "dev",
+            directory: [
+                "dev-class",
+                "dev-topological",
+            ],
             from: "#driver_test_realm",
-            as: "dev-topological",
-        },
-        {
-            directory: "dev",
-            from: "#driver_test_realm",
-            as: "dev-class",
-            subdir: "class",
         },
     ],
 }

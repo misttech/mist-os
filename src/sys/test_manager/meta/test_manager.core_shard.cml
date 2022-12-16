@@ -263,7 +263,6 @@
         // Needed for driver tests.
         {
             directory: [
-                "dev",
                 "dev-class",
                 "dev-topological",
             ],
@@ -463,7 +462,7 @@
             to: "#test_manager",
         },
         {
-            directory: "dev",
+            directory: "dev-topological",
             from: "parent",
             as: "sys",
             to: "#test_manager",

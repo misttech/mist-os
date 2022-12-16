@@ -524,15 +524,15 @@ builder.add_route(
 builder.add_route(
     vec![
         RouteCapability::Directory(RouteCapabilityDirectory {
-            name: "dev",
+            name: "dev-class",
             as: "dev-class-input",
-            subdir: "class/input",
+            subdir: "input",
             ..RouteCapabilityDirectory::default()
         }),
         RouteCapability::Directory(RouteCapabilityDirectory {
-            name: "dev",
+            name: "dev-class",
             as: "dev-class-block",
-            subdir: "class/block",
+            subdir: "block",
             ..RouteCapabilityDirectory::default()
         }),
     ],

@@ -54,7 +54,7 @@
             subdir: "block",
         },
         {
-            directory: "dev",
+            directory: "dev-topological",
             from: "parent",
             as: "dev-sys-platform",
             to: "#system_recovery",

@@ -41,10 +41,16 @@ void Setup(component_testing::RealmBuilder& realm_builder) {
   realm_builder.AddRoute(Route{.capabilities = {Protocol{"fuchsia.device.manager.Administrator"}},
                                .source = {ChildRef{"driver_test_realm"}},
                                .targets = {ParentRef()}});
+  // TODO(https://fxbug.dev/107961): Remove this. Include RELNOTES because this affects OOT.
   realm_builder.AddRoute(
-      Route{.capabilities = {Directory{.name = "dev", .rights = fuchsia::io::RW_STAR_DIR}},
+      Route{.capabilities = {Directory{
+                .name = "dev-topological", .as = "dev", .rights = fuchsia::io::RW_STAR_DIR}},
             .source = {ChildRef{"driver_test_realm"}},
             .targets = {ParentRef()}});
+  realm_builder.AddRoute(Route{
+      .capabilities = {Directory{.name = "dev-topological", .rights = fuchsia::io::RW_STAR_DIR}},
+      .source = {ChildRef{"driver_test_realm"}},
+      .targets = {ParentRef()}});
   realm_builder.AddRoute(
       Route{.capabilities = {Directory{.name = "dev-class", .rights = fuchsia::io::RW_STAR_DIR}},
             .source = {ChildRef{"driver_test_realm"}},

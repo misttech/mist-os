@@ -18,7 +18,7 @@
             // We need /dev/class/media-codec to discover the device under test;
             // we can't use dev-class here because test also uses the
             // topological path to open the device's parent.
-            directory: "dev",
+            directory: "dev-topological",
             rights: [ "rw*" ],
             path: "/dev",
         },

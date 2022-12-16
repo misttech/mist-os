@@ -13,10 +13,6 @@
     },
     expose: [
         {
-            directory: "dev",
-            from: "#driver_test_realm",
-        },
-        {
             directory: "dev-topological",
             from: "#driver_test_realm",
         },

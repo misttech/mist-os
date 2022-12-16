@@ -46,6 +46,7 @@ const REALM_COLLECTION_NAME: &str = "netemul";
 const NETEMUL_SERVICES_COMPONENT_NAME: &str = "netemul-services";
 const DEVFS: &str = "dev";
 const DEVFS_PATH: &str = "/dev";
+const DEVFS_CAPABILITY: &str = "dev-topological";
 
 #[derive(Error, Debug)]
 enum CreateRealmError {
@@ -298,7 +299,7 @@ async fn create_realm_instance(
                                         )
                                     })?;
                                 }
-                                let mut capability = Capability::directory(DEVFS)
+                                let mut capability = Capability::directory(DEVFS_CAPABILITY)
                                     .rights(fio::R_STAR_DIR)
                                     .path(DEVFS_PATH)
                                     .as_(capability_name.clone());
@@ -847,7 +848,7 @@ async fn setup_network_realm(sandbox_name: impl std::fmt::Display) -> Result<Rea
     let () = builder
         .add_route(
             Route::new()
-                .capability(Capability::directory(DEVFS).path(DEVFS_PATH).rights(fio::R_STAR_DIR))
+                .capability(Capability::directory(DEVFS_CAPABILITY).path(DEVFS_PATH).rights(fio::R_STAR_DIR))
                 .capability(Capability::protocol::<fidl_fuchsia_driver_test::RealmMarker>())
                 .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
                 .to(&network_context_child),
@@ -1732,7 +1733,7 @@ mod tests {
                     source: Some(fnetemul::ChildSource::Component(COUNTER_URL.to_string())),
                     uses: Some(fnetemul::ChildUses::Capabilities(vec![
                         fnetemul::Capability::NetemulDevfs(fnetemul::DevfsDep {
-                            name: Some(DEVFS.to_string()),
+                            name: Some("does-not-matter".to_string()),
                             subdir: Some("..".to_string()),
                             ..fnetemul::DevfsDep::EMPTY
                         }),
@@ -2117,7 +2118,7 @@ mod tests {
                         uses: Some(fnetemul::ChildUses::Capabilities(vec![
                             fnetemul::Capability::LogSink(fnetemul::Empty {}),
                             fnetemul::Capability::NetemulDevfs(fnetemul::DevfsDep {
-                                name: Some(DEVFS.to_string()),
+                                name: Some("test-specific-devfs".to_string()),
                                 subdir: None,
                                 ..fnetemul::DevfsDep::EMPTY
                             }),

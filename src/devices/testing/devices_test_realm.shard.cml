@@ -45,10 +45,15 @@
             to: [ "#devices-tests" ],
         },
 
-        // These system capabilities are offered for use by the devices tests.
+        // TODO(https://fxbug.dev/107961): Remove this. Include RELNOTES because this affects OOT.
+        {
+            directory: "dev-topological",
+            from: "parent",
+            as: "dev",
+            to: "#devices-tests",
+        },
         {
             directory: [
-                "dev",
                 "dev-class",
                 "dev-topological",
             ],

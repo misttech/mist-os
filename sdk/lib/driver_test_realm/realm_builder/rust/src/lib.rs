@@ -46,7 +46,8 @@ impl DriverTestRealmBuilder for RealmBuilder {
                     "fuchsia.driver.registrar.DriverRegistrar",
                 ))
                 .capability(Capability::protocol_by_name("fuchsia.driver.test.Realm"))
-                .capability(Capability::directory("dev"))
+                // TODO(https://fxbug.dev/107961): Remove this. Include RELNOTES because this affects OOT.
+                .capability(Capability::directory("dev-topological").as_("dev"))
                 .capability(Capability::directory("dev-topological"))
                 .capability(Capability::directory("dev-class"))
                 .from(&driver_realm)
