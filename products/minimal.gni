@@ -22,9 +22,6 @@ product_bootfs_labels -=
     [ "//products/kernel_cmdline:kernel.oom.behavior--jobkill" ]
 product_bootfs_labels += [ "//products/kernel_cmdline:minimal" ]
 
-# Core scheduler profiles.
-product_bootfs_labels += [ "//src/sys/core:bootfs" ]
-
 core_realm_package_name = "core-minimal"
 core_realm_shards = [
   "//src/connectivity/network:virtualization-core-shard",

@@ -113,12 +113,3 @@ fuchsia_unittest_package("core_proxy_integration_test") {
     "//src/sys/component_manager/testing/echo_server",
   ]
 }
-
-group("bootfs") {
-  deps = [ ":core-config" ]
-}
-
-resource("core-config") {
-  sources = [ "config/core.profiles" ]
-  outputs = "config/profiles/core.profiles"
-}
