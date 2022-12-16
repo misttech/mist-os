@@ -16,7 +16,7 @@ use {
     cm_runner::RunnerError,
     fuchsia_zircon as zx,
     moniker::{AbsoluteMoniker, ChildMoniker, MonikerError},
-    std::{ffi::OsString, path::PathBuf},
+    std::path::PathBuf,
     thiserror::Error,
 };
 
@@ -65,9 +65,6 @@ pub enum ModelError {
     PathIsNotUtf8 { path: PathBuf },
     #[error("path is not valid: {:?}", path)]
     PathInvalid { path: String },
-    // TODO(https://fxbug.dev/117080): Remove this error by using the `camino` library
-    #[error("filename is not utf-8: {:?}", name)]
-    NameIsNotUtf8 { name: OsString },
     #[error("Moniker error: {}", err)]
     MonikerError {
         #[from]
@@ -223,10 +220,6 @@ impl ModelError {
 
     pub fn path_invalid(path: impl Into<String>) -> ModelError {
         ModelError::PathInvalid { path: path.into() }
-    }
-
-    pub fn name_is_not_utf8(name: OsString) -> ModelError {
-        ModelError::NameIsNotUtf8 { name }
     }
 
     pub fn namespace_creation_failed(err: impl Into<Error>) -> ModelError {

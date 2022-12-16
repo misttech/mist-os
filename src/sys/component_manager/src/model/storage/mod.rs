@@ -301,7 +301,7 @@ pub async fn delete_isolated_storage(
                 )
             })?
             .to_str()
-            .ok_or_else(|| ModelError::name_is_not_utf8(storage_path.clone().into_os_string()))?
+            .ok_or_else(|| ModelError::path_is_not_utf8(storage_path.clone()))?
             .to_string();
 
         let parent_path = storage_path.parent().ok_or_else(|| {
@@ -309,7 +309,7 @@ pub async fn delete_isolated_storage(
         })?;
         let dir = if parent_path
             .to_str()
-            .ok_or_else(|| ModelError::name_is_not_utf8(storage_path.clone().into_os_string()))?
+            .ok_or_else(|| ModelError::path_is_not_utf8(storage_path.clone()))?
             .is_empty()
         {
             root_dir
@@ -344,7 +344,7 @@ pub async fn delete_isolated_storage(
             ModelError::from(StorageError::invalid_storage_path(relative_moniker.clone(), None))
         })?;
         let name =
-            name.to_str().ok_or_else(|| ModelError::name_is_not_utf8(name.to_os_string()))?;
+            name.to_str().ok_or_else(|| ModelError::path_is_not_utf8(storage_path.clone()))?;
 
         let dir = if dir_path.parent().is_none() {
             root_dir
