@@ -22,5 +22,8 @@ group("tests") {
 group("workstation_tests") {
   testonly = true
 
-  deps = [ "integration_input_tests:workstation_tests" ]
+  deps = [
+    "integration_graphics_tests",
+    "integration_input_tests:workstation_tests",
+  ]
 }
