@@ -53,6 +53,8 @@ using TransformResult = fit::result<Failure, OutputMap>;
 // the syntax, or more complex changes like back-porting support for new features.
 class Fix {
  public:
+  virtual ~Fix() = default;
+
   // Perform the actual transformation.
   virtual TransformResult Transform(Reporter* reporter) = 0;
 
@@ -108,6 +110,7 @@ class NoopParsedFix final : public ParsedFix {
   NoopParsedFix(const std::unique_ptr<SourceManager>& library,
                 const ExperimentalFlags experimental_flags)
       : ParsedFix(Fixable::Get(Fixable::Kind::kNoop), library, experimental_flags) {}
+  ~NoopParsedFix() = default;
 
  protected:
   std::unique_ptr<ParsedTransformer> GetParsedTransformer(
@@ -120,6 +123,7 @@ class ProtocolModifierFix final : public ParsedFix {
   ProtocolModifierFix(const std::unique_ptr<SourceManager>& library,
                       const ExperimentalFlags experimental_flags)
       : ParsedFix(Fixable::Get(Fixable::Kind::kProtocolModifier), library, experimental_flags) {}
+  ~ProtocolModifierFix() = default;
 
  protected:
   std::unique_ptr<ParsedTransformer> GetParsedTransformer(

@@ -80,6 +80,7 @@ source_set("fidl") {
   configs += [ ":fidlc_config" ]
 
   visibility = [
+    ":fidl-fix",
     ":fidl-format",
     ":fidl-lint",
     ":fidlc",
@@ -117,6 +118,14 @@ if (is_host) {
 
   executable("fidl-format") {
     sources = [ "formatter/main.cc" ]
+    deps = [ ":fidl" ]
+  }
+
+  executable("fidl-fix") {
+    sources = [
+      "fix/command_line_options.cc",
+      "fix/main.cc",
+    ]
     deps = [ ":fidl" ]
   }
 

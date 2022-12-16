@@ -889,6 +889,7 @@ build_api_module("tool_paths") {
     "//third_party/cobalt/src/bin/config_change_validator/src:bin($host_toolchain)",
     "//third_party/cobalt/src/bin/config_parser/src:bin($host_toolchain)",
     "//tools/doc_checker($host_toolchain)",
+    "//tools/fidl:fidl-fix($host_toolchain)",
     "//tools/fidl:fidl-lint($host_toolchain)",
     "//tools/fidl:fidlfmt($host_toolchain)",
     "//tools/fidl/fidlc:host($host_toolchain)",
