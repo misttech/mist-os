@@ -108,8 +108,8 @@ std::nullptr_t Parser::Fail(const UndocumentedErrorDef<Id, Args...>& err, Source
   return nullptr;
 }
 
-std::unique_ptr<raw::Identifier> Parser::ParseIdentifier(bool is_discarded) {
-  ASTScope scope(this, is_discarded);
+std::unique_ptr<raw::Identifier> Parser::ParseIdentifier() {
+  ASTScope scope(this);
   std::optional<Token> token = ConsumeToken(OfKind(Token::Kind::kIdentifier));
   if (!Ok() || !token)
     return Fail();

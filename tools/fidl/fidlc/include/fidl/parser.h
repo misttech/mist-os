@@ -87,53 +87,38 @@ class Parser {
   class ASTScope {
    public:
     explicit ASTScope(Parser* parser) : parser_(parser) {
-      suppress_ = parser_->suppress_gap_checks_;
-      parser_->suppress_gap_checks_ = false;
       parser_->active_ast_scopes_.emplace_back(Token(), Token());
-    }
-    // The suppress mechanism
-    ASTScope(Parser* parser, bool suppress) : parser_(parser), suppress_(suppress) {
-      parser_->active_ast_scopes_.emplace_back(Token(), Token());
-      suppress_ = parser_->suppress_gap_checks_;
-      parser_->suppress_gap_checks_ = suppress;
     }
     raw::TokenChain GetTokenChain() {
       parser_->active_ast_scopes_.back().set_end(parser_->previous_token_);
-      if (!parser_->suppress_gap_checks_) {
-        parser_->last_was_gap_start_ = true;
-      }
+      parser_->last_was_gap_start_ = true;
       return raw::TokenChain(parser_->active_ast_scopes_.back());
     }
-    ~ASTScope() {
-      parser_->suppress_gap_checks_ = suppress_;
-      parser_->active_ast_scopes_.pop_back();
-    }
+    ~ASTScope() { parser_->active_ast_scopes_.pop_back(); }
 
     ASTScope(const ASTScope&) = delete;
     ASTScope& operator=(const ASTScope&) = delete;
 
    private:
     Parser* parser_;
-    bool suppress_;
   };
 
   void UpdateMarks(Token& token) {
     // There should always be at least one of these - the outermost.
     ZX_ASSERT_MSG(!active_ast_scopes_.empty(), "unbalanced parse tree");
 
-    if (!suppress_gap_checks_) {
-      // If the end of the last node was the start of a gap, record that.
-      if (last_was_gap_start_ && previous_token_.kind() != Token::Kind::kNotAToken) {
-        gap_start_ = token.previous_end();
-        last_was_gap_start_ = false;
-      }
-
-      // If this is a start node, then the end of it will be the start of
-      // a gap.
-      if (active_ast_scopes_.back().start().kind() == Token::Kind::kNotAToken) {
-        last_was_gap_start_ = true;
-      }
+    // If the end of the last node was the start of a gap, record that.
+    if (last_was_gap_start_ && previous_token_.kind() != Token::Kind::kNotAToken) {
+      gap_start_ = token.previous_end();
+      last_was_gap_start_ = false;
     }
+
+    // If this is a start node, then the end of it will be the start of
+    // a gap.
+    if (active_ast_scopes_.back().start().kind() == Token::Kind::kNotAToken) {
+      last_was_gap_start_ = true;
+    }
+
     // Update the token to record the correct location of the beginning of
     // the gap prior to it.
     if (gap_start_.valid()) {
@@ -283,7 +268,7 @@ class Parser {
     }
   }
 
-  std::unique_ptr<raw::Identifier> ParseIdentifier(bool is_discarded = false);
+  std::unique_ptr<raw::Identifier> ParseIdentifier();
   std::unique_ptr<raw::CompoundIdentifier> ParseCompoundIdentifier();
   std::unique_ptr<raw::CompoundIdentifier> ParseCompoundIdentifier(
       ASTScope& scope, std::unique_ptr<raw::Identifier> first_identifier);
@@ -403,16 +388,15 @@ class Parser {
   // The stack of information interesting to the currently active ASTScope
   // objects.
   std::vector<raw::TokenChain> active_ast_scopes_;
+  // TODO(fxbug.dev/117642): I'm fairly certain that both |gap_start_| and |last_was_gap_start_|
+  // below are redundant, and can be removed alongside |Token::previous_end()|.
+  //
   // The most recent start of a "gap" - the uninteresting source prior to the
   // beginning of a token (usually mostly containing whitespace).
   SourceSpan gap_start_;
   // Indicates that the last element was the start of a gap, and that the
   // scope should be updated accordingly.
   bool last_was_gap_start_ = false;
-  // Suppress updating the gap for the current Scope.  Useful when
-  // you don't know whether a scope is going to be interesting lexically, and
-  // you have to decide at runtime.
-  bool suppress_gap_checks_ = false;
   // The token before last_token_ (below).
   Token previous_token_;
 
