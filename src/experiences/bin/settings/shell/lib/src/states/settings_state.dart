@@ -8,6 +8,7 @@ import 'package:shell_settings/src/services/brightness_service.dart';
 import 'package:shell_settings/src/services/channel_service.dart';
 import 'package:shell_settings/src/services/datetime_service.dart';
 import 'package:shell_settings/src/services/keyboard_service.dart';
+import 'package:shell_settings/src/services/memory_watcher_service.dart';
 import 'package:shell_settings/src/services/network_address_service.dart';
 import 'package:shell_settings/src/services/task_service.dart';
 import 'package:shell_settings/src/services/timezone_service.dart';
@@ -90,6 +91,10 @@ abstract class SettingsState implements TaskService {
   String get currentNetwork;
   bool get clientConnectionsEnabled;
   bool get clientConnectionsMonitor;
+  // Memory
+  String get memUsed;
+  String get memTotal;
+  double? get memPercentUsed;
 
   factory SettingsState.fromEnv() {
     // ignore: unnecessary_cast
@@ -103,6 +108,7 @@ abstract class SettingsState implements TaskService {
       batteryWatcherService: BatteryWatcherService(),
       networkService: NetworkAddressService(),
       wifiService: WiFiService(),
+      memoryWatcherService: MemoryWatcherService(),
     ) as SettingsState;
   }
 

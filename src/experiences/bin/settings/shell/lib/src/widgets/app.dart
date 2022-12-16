@@ -190,8 +190,26 @@ class _ListSettings extends StatelessWidget {
                       children: [
                         if (settingsState.powerLevel != null) ...[
                           Text('${settingsState.powerLevel!.toInt()}%'),
-                          SizedBox(width: 4),
                         ],
+                      ],
+                    ),
+                  );
+                }),
+                // Memory
+                Observer(builder: (_) {
+                  return ListTile(
+                    contentPadding: EdgeInsets.symmetric(horizontal: 24),
+                    leading: Icon(Icons.memory),
+                    title: Text(Strings.memory),
+                    trailing: Wrap(
+                      alignment: WrapAlignment.end,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      children: [
+                        Text(
+                          '${settingsState.memUsed} / ${settingsState.memTotal}',
+                          textAlign: TextAlign.end,
+                        ),
                       ],
                     ),
                   );

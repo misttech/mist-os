@@ -17,6 +17,7 @@ import 'package:shell_settings/src/services/brightness_service.dart';
 import 'package:shell_settings/src/services/channel_service.dart';
 import 'package:shell_settings/src/services/datetime_service.dart';
 import 'package:shell_settings/src/services/keyboard_service.dart';
+import 'package:shell_settings/src/services/memory_watcher_service.dart';
 import 'package:shell_settings/src/services/network_address_service.dart';
 import 'package:shell_settings/src/services/task_service.dart';
 import 'package:shell_settings/src/services/timezone_service.dart';
@@ -212,6 +213,22 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
       _clientConnectionsMonitor.value = value;
   final Observable<bool> _clientConnectionsMonitor = Observable<bool>(true);
 
+  // Memory
+  @override
+  String get memUsed => _memUsed.value;
+  set memUsed(String value) => _memUsed.value = value;
+  final Observable<String> _memUsed = '--'.asObservable();
+
+  @override
+  String get memTotal => _memTotal.value;
+  set memTotal(String value) => _memTotal.value = value;
+  final Observable<String> _memTotal = '--'.asObservable();
+
+  @override
+  double? get memPercentUsed => _memPercentUsed.value;
+  set memPercentUsed(double? value) => _memPercentUsed.value = value;
+  final Observable<double?> _memPercentUsed = Observable<double?>(null);
+
   // Services
   final BrightnessService brightnessService;
   final DateTimeService dateTimeService;
@@ -222,6 +239,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
   final BatteryWatcherService batteryWatcherService;
   final NetworkAddressService networkService;
   final WiFiService wifiService;
+  final MemoryWatcherService memoryWatcherService;
 
   // Constructor
   SettingsStateImpl({
@@ -234,6 +252,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
     required this.batteryWatcherService,
     required this.networkService,
     required this.wifiService,
+    required this.memoryWatcherService,
   })  : _timezones = _loadTimezones(),
         _selectedTimezone = timezoneService.timezone.asObservable() {
     dateTimeService.onChanged = updateDateTime;
@@ -340,6 +359,14 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
         wifiToggleMillisecondsPassed = wifiService.toggleMillisecondsPassed;
       });
     };
+    memoryWatcherService.onChanged = () {
+      runInAction(() {
+        memUsed = '${memoryWatcherService.memUsed!.toStringAsPrecision(2)}GB';
+        memTotal = '${memoryWatcherService.memTotal!.toStringAsPrecision(2)}GB';
+        memPercentUsed =
+            memoryWatcherService.memUsed! / memoryWatcherService.memTotal!;
+      });
+    };
 
     // We cannot load MaterialIcons font file from pubspec.yaml. So load it
     // explicitly.
@@ -366,6 +393,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
       batteryWatcherService.start(),
       networkService.start(),
       wifiService.start(),
+      memoryWatcherService.start(),
     ]);
   }
 
@@ -381,6 +409,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
     await batteryWatcherService.stop();
     await networkService.stop();
     await wifiService.stop();
+    await memoryWatcherService.stop();
     _dateTimeNow = null;
   }
 
@@ -396,6 +425,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
     batteryWatcherService.dispose();
     networkService.dispose();
     wifiService.dispose();
+    memoryWatcherService.dispose();
   }
 
   // All
