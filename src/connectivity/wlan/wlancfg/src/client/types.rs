@@ -7,7 +7,10 @@ use {
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
     std::collections::HashSet,
-    wlan_common::{self, security::SecurityDescriptor},
+    wlan_common::{
+        self, bss::BssDescription, channel::Channel, security::SecurityDescriptor,
+        sequestered::Sequestered,
+    },
     wlan_metrics_registry::{
         PolicyConnectionAttemptMigratedMetricDimensionReason,
         PolicyDisconnectionMigratedMetricDimensionReason,
@@ -121,20 +124,115 @@ impl Bss {
     }
 }
 
-// A candidate with data for one BSS observed in a scan.
+// TODO(fxbug.dev/113996): Move this into `wlan_common::bss` and use it in place of signal fields
+//                         in `BssDescription`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Signal {
+    pub rssi_dbm: i8,
+    pub snr_db: i8,
+}
+
+/// BSS information tracked by the client state machine.
+///
+/// While connected to an AP, some important BSS configuration may change, such as the channel and
+/// signal quality statistics. `TrackedBss` provides fields for this configuration that are managed
+/// by the client state machine.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TrackedBss {
+    pub signal: Signal,
+    pub channel: Channel,
+}
+
+impl TrackedBss {
+    /// Snapshots a BSS description.
+    ///
+    /// A snapshot copies configuration from the given BSS description into a `TrackedBss`.
+    pub fn snapshot(original: &BssDescription) -> Self {
+        TrackedBss {
+            signal: Signal { rssi_dbm: original.rssi_dbm, snr_db: original.snr_db },
+            channel: original.channel,
+        }
+    }
+}
+
+impl PartialEq<BssDescription> for TrackedBss {
+    fn eq(&self, bss: &BssDescription) -> bool {
+        // This implementation is robust in the face of changes to `BssDescription` and
+        // `TrackedBss`, but must copy fields. This could be deceptively expensive for an
+        // equivalence query if `TrackedBss` has many congruent fields with respect to
+        // `BssDescription`.
+        *self == TrackedBss::snapshot(bss)
+    }
+}
+
+impl PartialEq<TrackedBss> for BssDescription {
+    fn eq(&self, tracked: &TrackedBss) -> bool {
+        tracked == self
+    }
+}
+
+// TODO(fxbug.dev/116570): This type should not derive `PartialEq`. Equality is only queried in
+//                         tests and it is unclear what exactly equality should mean in production
+//                         (i.e., what exactly should be considered; sequestered fields should not,
+//                         for example).
+/// Candidate BSS observed in a scan.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScannedCandidate {
     pub network: NetworkIdentifier,
     pub credential: config_management::Credential,
-    pub bss_description: fidl_internal::BssDescription,
+    pub bss_description: Sequestered<fidl_internal::BssDescription>,
     pub observation: ScanObservation,
     pub has_multiple_bss_candidates: bool,
     pub mutual_security_protocols: HashSet<SecurityDescriptor>,
 }
 
-// All data required to connect to a particular BSS.
+// TODO(fxbug.dev/116570): This type should not derive `PartialEq`. Equality is only queried in
+//                         tests and it is unclear what exactly equality should mean in production
+//                         (i.e., what exactly should be considered).
+/// Selected network candidate for a connection.
+///
+/// This type is a promotion of a scanned candidate and provides the necessary data required to
+/// establish a connection.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ConnectSelection {
     pub target: ScannedCandidate,
     pub reason: ConnectReason,
+}
+
+/// The state of a remote AP.
+///
+/// `ApState` describes the configuration of a BSS to which a client is connected. The state is
+/// comprised of an initial BSS description as well as tracked configuration. The tracked
+/// configuration may change while a client is connected and is managed by the client state
+/// machine. The initial BSS description is immutable.
+///
+/// See `TrackedBss`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ApState {
+    /// The initial configuration of the BSS (e.g., as seen from a scan).
+    original: BssDescription,
+    /// Tracked BSS configuration.
+    ///
+    /// This subset of the initial BSS description is managed by the client state machine and may
+    /// change while connected to an AP.
+    pub tracked: TrackedBss,
+}
+
+impl ApState {
+    /// Gets the initial BSS description for the AP to which a client is connected.
+    pub fn original(&self) -> &BssDescription {
+        &self.original
+    }
+
+    /// Returns `true` if the tracked BSS configuration differs from the initial BSS description.
+    pub fn has_changes(&self) -> bool {
+        self.original != self.tracked
+    }
+}
+
+impl From<BssDescription> for ApState {
+    fn from(original: BssDescription) -> Self {
+        let tracked = TrackedBss::snapshot(&original);
+        ApState { original, tracked }
+    }
 }

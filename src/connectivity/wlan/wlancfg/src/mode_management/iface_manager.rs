@@ -1506,7 +1506,7 @@ mod tests {
             target: client_types::ScannedCandidate {
                 network: network,
                 credential: credential,
-                bss_description: random_fidl_bss_description!(Wpa1, ssid: ssid.clone()),
+                bss_description: random_fidl_bss_description!(Wpa1, ssid: ssid.clone()).into(),
                 observation: client_types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::WPA1].into_iter().collect(),
@@ -2220,7 +2220,8 @@ mod tests {
                 target: client_types::ScannedCandidate {
                     network: network_id.clone(),
                     credential: credential,
-                    bss_description: random_fidl_bss_description!(Wpa3, ssid: TEST_SSID.clone()),
+                    bss_description: random_fidl_bss_description!(Wpa3, ssid: TEST_SSID.clone())
+                        .into(),
                     observation: client_types::ScanObservation::Passive,
                     has_multiple_bss_candidates: true,
                     mutual_security_protocols: [SecurityDescriptor::WPA3_PERSONAL]
@@ -2317,7 +2318,7 @@ mod tests {
             target: client_types::ScannedCandidate {
                 network: network,
                 credential: credential,
-                bss_description: random_fidl_bss_description!(Wpa3, ssid: ssid.clone()),
+                bss_description: random_fidl_bss_description!(Wpa3, ssid: ssid.clone()).into(),
                 observation: client_types::ScanObservation::Passive,
                 has_multiple_bss_candidates: false,
                 mutual_security_protocols: [SecurityDescriptor::WPA3_PERSONAL]
@@ -2349,7 +2350,7 @@ mod tests {
             target: client_types::ScannedCandidate {
                 network: network.clone(),
                 credential: credential,
-                bss_description: random_fidl_bss_description!(Wpa3, ssid: ssid.clone()),
+                bss_description: random_fidl_bss_description!(Wpa3, ssid: ssid.clone()).into(),
                 observation: client_types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::WPA3_PERSONAL]
@@ -5317,7 +5318,8 @@ mod tests {
         let network = Some(client_types::ScannedCandidate {
             network: network_id,
             credential: credential,
-            bss_description: random_fidl_bss_description!(Open, bssid: [20, 30, 40, 50, 60, 70]),
+            bss_description: random_fidl_bss_description!(Open, bssid: [20, 30, 40, 50, 60, 70])
+                .into(),
             observation: client_types::ScanObservation::Passive,
             has_multiple_bss_candidates: true,
             mutual_security_protocols: [SecurityDescriptor::OPEN].into_iter().collect(),
@@ -5387,7 +5389,8 @@ mod tests {
         let network = Some(client_types::ScannedCandidate {
             network: network_id,
             credential: credential,
-            bss_description: random_fidl_bss_description!(Open, bssid: [20, 30, 40, 50, 60, 70]),
+            bss_description: random_fidl_bss_description!(Open, bssid: [20, 30, 40, 50, 60, 70])
+                .into(),
             observation: client_types::ScanObservation::Passive,
             has_multiple_bss_candidates: true,
             mutual_security_protocols: [SecurityDescriptor::OPEN].into_iter().collect(),
@@ -5436,7 +5439,8 @@ mod tests {
         let scanned_candidate = client_types::ScannedCandidate {
             network: network_id.clone(),
             credential: credential.clone(),
-            bss_description: random_fidl_bss_description!(Wpa1, bssid: [20, 30, 40, 50, 60, 70]),
+            bss_description: random_fidl_bss_description!(Wpa1, bssid: [20, 30, 40, 50, 60, 70])
+                .into(),
             observation: client_types::ScanObservation::Passive,
             has_multiple_bss_candidates: true,
             mutual_security_protocols: [SecurityDescriptor::WPA1].into_iter().collect(),

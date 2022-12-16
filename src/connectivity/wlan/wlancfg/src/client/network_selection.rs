@@ -456,7 +456,7 @@ impl NetworkSelector {
                 let selected_candidate = types::ScannedCandidate {
                     network: bss.saved_network_info.network_id.clone(),
                     credential: bss.saved_network_info.credential.clone(),
-                    bss_description: bss.scanned_bss.bss_description.clone(),
+                    bss_description: bss.scanned_bss.bss_description.clone().into(),
                     observation: bss.scanned_bss.observation,
                     has_multiple_bss_candidates: bss.multiple_bss_candidates,
                     mutual_security_protocols,
@@ -597,9 +597,10 @@ async fn augment_bss_with_active_scan(
     }
 
     match get_enhanced_bss_description(&scanned_candidate, channel, bssid, scan_requester).await {
-        Ok(new_bss_description) => {
-            types::ScannedCandidate { bss_description: new_bss_description, ..scanned_candidate }
-        }
+        Ok(new_bss_description) => types::ScannedCandidate {
+            bss_description: new_bss_description.into(),
+            ..scanned_candidate
+        },
         Err(()) => scanned_candidate,
     }
 }
@@ -1607,7 +1608,7 @@ mod tests {
         let candidate = types::ScannedCandidate {
             network: test_id_1.clone(),
             credential: credential_1.clone(),
-            bss_description: bss_1.bss_description.clone(),
+            bss_description: bss_1.bss_description.clone().into(),
             observation: types::ScanObservation::Active,
             has_multiple_bss_candidates: false,
             mutual_security_protocols: mutual_security_protocols_1.into_iter().collect(),
@@ -1623,8 +1624,8 @@ mod tests {
 
         // The connect_req comes out the other side with no change
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(res) => {
-            assert_eq!(res, candidate)}
-        );
+            assert_eq!(&res, &candidate);
+        });
     }
 
     #[fuchsia::test]
@@ -1645,7 +1646,7 @@ mod tests {
         let scanned_candidate = types::ScannedCandidate {
             network: test_id_1.clone(),
             credential: Credential::Password("foo_pass".as_bytes().to_vec()),
-            bss_description: bss_1.bss_description.clone(),
+            bss_description: bss_1.bss_description.clone().into(),
             observation: types::ScanObservation::Passive,
             has_multiple_bss_candidates: true,
             mutual_security_protocols: mutual_security_protocols_1.into_iter().collect(),
@@ -1677,10 +1678,11 @@ mod tests {
             },
         ])));
 
+        let candidate = exec.run_singlethreaded(fut);
         // The connect_req comes out the other side with the new bss_description
         assert_eq!(
-            exec.run_singlethreaded(fut),
-            types::ScannedCandidate { bss_description: new_bss_desc, ..scanned_candidate }
+            &candidate,
+            &types::ScannedCandidate { bss_description: new_bss_desc.into(), ..scanned_candidate },
         );
 
         // Check the right scan request was sent
@@ -2066,19 +2068,20 @@ mod tests {
         // Check that we pick a network
         let network_selection_fut = network_selector.find_and_select_scanned_candidate(None);
         pin_mut!(network_selection_fut);
-        let results = exec.run_singlethreaded(&mut network_selection_fut);
+        let results =
+            exec.run_singlethreaded(&mut network_selection_fut).expect("no selected candidate");
         assert_eq!(
-            results,
-            Some(types::ScannedCandidate {
+            &results,
+            &types::ScannedCandidate {
                 network: test_id_1.clone(),
                 credential: credential_1.clone(),
-                bss_description: bss_desc1_active,
+                bss_description: bss_desc1_active.into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: false,
                 mutual_security_protocols: [SecurityDescriptor::WPA3_PERSONAL]
                     .into_iter()
                     .collect(),
-            })
+            },
         );
 
         // Check that the right scan requests were sent
@@ -2192,19 +2195,20 @@ mod tests {
         let network_selection_fut =
             network_selector.find_and_select_scanned_candidate(Some(test_id_1.clone()));
         pin_mut!(network_selection_fut);
-        let results = exec.run_singlethreaded(&mut network_selection_fut);
+        let results =
+            exec.run_singlethreaded(&mut network_selection_fut).expect("no selected candidate");
         assert_eq!(
-            results,
-            Some(types::ScannedCandidate {
+            &results,
+            &types::ScannedCandidate {
                 network: test_id_1.clone(),
                 credential: credential_1.clone(),
-                bss_description: bss_desc_1,
+                bss_description: bss_desc_1.into(),
                 // A passive scan is never performed in the tested code path, so the
                 // observation mode cannot be known and this field should be `Unknown`.
                 observation: types::ScanObservation::Unknown,
                 has_multiple_bss_candidates: false,
                 mutual_security_protocols: mutual_security_protocols_1.into_iter().collect(),
-            })
+            },
         );
 
         // Check that the right scan request was sent

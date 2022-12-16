@@ -103,6 +103,7 @@ rustc_library("wlan-common") {
     "src/security/wpa/data.rs",
     "src/security/wpa/mod.rs",
     "src/sequence.rs",
+    "src/sequestered.rs",
     "src/sink.rs",
     "src/stats/mod.rs",
     "src/stats/signal.rs",

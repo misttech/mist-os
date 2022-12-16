@@ -35,7 +35,10 @@ use {
         convert::{Infallible, TryFrom},
         sync::Arc,
     },
-    wlan_common::{bss::BssDescription, energy::DecibelMilliWatt, stats::SignalStrengthAverage},
+    wlan_common::{
+        bss::BssDescription, energy::DecibelMilliWatt, sequestered::Sequestered,
+        stats::SignalStrengthAverage,
+    },
 };
 
 const MAX_CONNECTION_ATTEMPTS: u8 = 4; // arbitrarily chosen until we have some data
@@ -396,21 +399,23 @@ async fn connecting_state<'a>(
         );
     };
 
-    let parsed_bss_description =
-        BssDescription::try_from(options.connect_selection.target.bss_description.clone())
-            .map_err(|error| {
-                // This only occurs if an invalid `BssDescription` is received from
-                // SME, which should never happen.
-                ExitReason(Err(format_err!(
-                    "Failed to convert BSS description from FIDL: {:?}",
-                    error,
-                )))
-            })?;
+    // Release the sequestered BSS description. While considered a "black box" elsewhere, the state
+    // machine uses this by design to construct its AP state and to report telemetry.
+    let bss_description =
+        Sequestered::release(options.connect_selection.target.bss_description.clone());
+    let ap_state = types::ApState::from(
+        BssDescription::try_from(bss_description.clone()).map_err(|error| {
+            // This only occurs if an invalid `BssDescription` is received from SME, which should
+            // never happen.
+            ExitReason(Err(
+                format_err!("Failed to convert BSS description from FIDL: {:?}", error,),
+            ))
+        })?,
+    );
 
-    // TODO(fxbug.dev/102606): Move this call to network selection and write the
-    //                         result into a field of `ScannedCandidate`. This code
-    //                         should read that field instead of calling this
-    //                         function directly.
+    // TODO(fxbug.dev/102606): Move this call to network selection and write the result into a
+    //                         field of `ScannedCandidate`. This code should read that field
+    //                         instead of calling this function directly.
     let authenticator = config_management::select_authentication_method(
         options.connect_selection.target.mutual_security_protocols.clone(),
         &options.connect_selection.target.credential,
@@ -430,7 +435,7 @@ async fn connecting_state<'a>(
         .map_err(|e| ExitReason(Err(format_err!("Failed to create proxy: {:?}", e))))?;
     let mut sme_connect_request = fidl_sme::ConnectRequest {
         ssid: options.connect_selection.target.network.ssid.to_vec(),
-        bss_description: options.connect_selection.target.bss_description.clone(),
+        bss_description,
         multiple_bss_candidates: options.connect_selection.target.has_multiple_bss_candidates,
         authentication: authenticator.into(),
         deprecated_scan_type: fidl_fuchsia_wlan_common::ScanType::Active,
@@ -454,7 +459,7 @@ async fn connecting_state<'a>(
         .record_connect_result(
             options.connect_selection.target.network.clone(),
             &options.connect_selection.target.credential,
-            parsed_bss_description.bssid,
+            ap_state.original().bssid,
             sme_result,
             options.connect_selection.target.observation,
         )
@@ -462,7 +467,7 @@ async fn connecting_state<'a>(
 
     // Log the connect result for metrics.
     common_options.telemetry_sender.send(TelemetryEvent::ConnectResult {
-        latest_ap_state: parsed_bss_description.clone(),
+        ap_state: ap_state.clone(),
         result: sme_result,
         policy_connect_reason: Some(options.connect_selection.reason),
         multiple_bss_candidates: options.connect_selection.target.has_multiple_bss_candidates,
@@ -483,7 +488,7 @@ async fn connecting_state<'a>(
             let connected_options = ConnectedOptions {
                 currently_fulfilled_connection: options.connect_selection.clone(),
                 connect_txn_stream: connect_txn.take_event_stream(),
-                latest_ap_state: Box::new(parsed_bss_description.clone()),
+                ap_state: Box::new(ap_state),
                 multiple_bss_candidates: options
                     .connect_selection
                     .target
@@ -524,7 +529,7 @@ async fn connecting_state<'a>(
 struct ConnectedOptions {
     // Keep track of the BSSID we are connected in order to record connection information for
     // future network selection.
-    latest_ap_state: Box<BssDescription>,
+    ap_state: Box<types::ApState>,
     multiple_bss_candidates: bool,
     currently_fulfilled_connection: types::ConnectSelection,
     connect_txn_stream: fidl_sme::ConnectTransactionEventStream,
@@ -555,16 +560,16 @@ async fn connected_state(
         .get_past_connections(
             &options.currently_fulfilled_connection.target.network,
             &options.currently_fulfilled_connection.target.credential,
-            &options.latest_ap_state.bssid,
+            &options.ap_state.original().bssid,
         )
         .await;
     let mut bss_quality_data = bss_selection::BssQualityData::new(
         bss_selection::SignalData::new(
-            options.latest_ap_state.rssi_dbm,
-            options.latest_ap_state.snr_db,
+            options.ap_state.tracked.signal.rssi_dbm,
+            options.ap_state.tracked.signal.snr_db,
             bss_selection::EWMA_SMOOTHING_FACTOR,
         ),
-        options.latest_ap_state.channel,
+        options.ap_state.tracked.channel,
         past_connections,
     );
 
@@ -583,7 +588,7 @@ async fn connected_state(
                                 connected_duration: now - connect_start_time,
                                 is_sme_reconnecting: fidl_info.is_sme_reconnecting,
                                 disconnect_source: fidl_info.disconnect_source,
-                                latest_ap_state: (*options.latest_ap_state).clone(),
+                                ap_state: (*options.ap_state).clone(),
                             };
                             common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
 
@@ -616,14 +621,14 @@ async fn connected_state(
                                 // heuristic that if previously there were multiple BSS's, then
                                 // it likely remains the same.
                                 multiple_bss_candidates: options.multiple_bss_candidates,
-                                latest_ap_state: (*options.latest_ap_state).clone(),
+                                ap_state: (*options.ap_state).clone(),
                             });
                             !connected
                         }
                         fidl_sme::ConnectTransactionEvent::OnSignalReport { ind } => {
                             // Update connection data
-                            options.latest_ap_state.rssi_dbm = ind.rssi_dbm;
-                            options.latest_ap_state.snr_db = ind.snr_db;
+                            options.ap_state.tracked.signal.rssi_dbm = ind.rssi_dbm;
+                            options.ap_state.tracked.signal.snr_db = ind.snr_db;
                             bss_quality_data.signal_data.update_with_new_measurement(ind.rssi_dbm, ind.snr_db);
                             avg_rssi.add(DecibelMilliWatt(ind.rssi_dbm));
                             let current_connection = &options.currently_fulfilled_connection.target;
@@ -647,7 +652,7 @@ async fn connected_state(
                             false
                         }
                         fidl_sme::ConnectTransactionEvent::OnChannelSwitched { info } => {
-                            options.latest_ap_state.channel.primary = info.new_channel;
+                            options.ap_state.tracked.channel.primary = info.new_channel;
                             common_options.telemetry_sender.send(TelemetryEvent::OnChannelSwitched { info });
                             false
                         }
@@ -691,7 +696,7 @@ async fn connected_state(
                             reason,
                             bss_quality_data.signal_data
                         ).await;
-                        let latest_ap_state = options.latest_ap_state;
+                        let ap_state = options.ap_state;
                         let options = DisconnectingOptions {
                             disconnect_responder: Some(responder),
                             previous_network: Some((options.currently_fulfilled_connection.target.network, types::DisconnectStatus::ConnectionStopped)),
@@ -702,7 +707,7 @@ async fn connected_state(
                             connected_duration: now - connect_start_time,
                             is_sme_reconnecting: false,
                             disconnect_source: fidl_sme::DisconnectSource::User(types::convert_to_sme_disconnect_reason(options.reason)),
-                            latest_ap_state: *latest_ap_state,
+                            ap_state: *ap_state,
                         };
                         common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
                         return Ok(disconnecting_state(common_options, options).into_state());
@@ -729,7 +734,7 @@ async fn connected_state(
                                 connect_selection: new_connect_selection.clone(),
                                 attempt_counter: 0,
                             };
-                            let latest_ap_state = options.latest_ap_state;
+                            let ap_state = options.ap_state;
                             let options = DisconnectingOptions {
                                 disconnect_responder: None,
                                 previous_network: Some((options.currently_fulfilled_connection.target.network, types::DisconnectStatus::ConnectionStopped)),
@@ -741,7 +746,7 @@ async fn connected_state(
                                 connected_duration: now - connect_start_time,
                                 is_sme_reconnecting: false,
                                 disconnect_source: fidl_sme::DisconnectSource::User(types::convert_to_sme_disconnect_reason(options.reason)),
-                                latest_ap_state: *latest_ap_state,
+                                ap_state: *ap_state,
                             };
                             common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
                             return Ok(disconnecting_state(common_options, options).into_state())
@@ -785,7 +790,7 @@ async fn record_disconnect(
     let curr_time = fasync::Time::now();
     let uptime = curr_time - connect_start_time;
     let data = PastConnectionData::new(
-        options.latest_ap_state.bssid,
+        options.ap_state.original().bssid,
         options.connection_attempt_time,
         options.time_to_connect,
         curr_time,
@@ -1003,7 +1008,7 @@ mod tests {
                     security_type: types::SecurityType::Wep,
                 },
                 credential: Credential::Password("five0".as_bytes().to_vec()),
-                bss_description: bss_description.clone(),
+                bss_description: bss_description.clone().into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::WEP].into_iter().collect(),
@@ -1137,7 +1142,7 @@ mod tests {
                     security_type: types::SecurityType::Wep,
                 },
                 credential: Credential::Password("five0".as_bytes().to_vec()),
-                bss_description: bss_description.clone(),
+                bss_description: bss_description.clone().into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::WEP].into_iter().collect(),
@@ -1237,7 +1242,7 @@ mod tests {
             target: types::ScannedCandidate {
                 network: id.clone(),
                 credential: credential.clone(),
-                bss_description: bss_description.clone(),
+                bss_description: bss_description.clone().into(),
                 observation: types::ScanObservation::Active,
                 has_multiple_bss_candidates: false,
                 mutual_security_protocols: [SecurityDescriptor::WEP].into_iter().collect(),
@@ -1337,8 +1342,8 @@ mod tests {
         // Check that connected telemetry event is sent
         assert_variant!(
             test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::ConnectResult { iface_id: 1, policy_connect_reason, result, multiple_bss_candidates, latest_ap_state })) => {
-                assert_eq!(bss_description, latest_ap_state.into());
+            Ok(Some(TelemetryEvent::ConnectResult { iface_id: 1, policy_connect_reason, result, multiple_bss_candidates, ap_state })) => {
+                assert_eq!(bss_description, ap_state.original().clone().into());
                 assert!(!multiple_bss_candidates);
                 assert_eq!(policy_connect_reason, Some(types::ConnectReason::FidlConnectRequest));
                 assert_eq!(result, fake_successful_connect_result());
@@ -1414,7 +1419,7 @@ mod tests {
                     security_type: type_,
                 },
                 credential: Credential::Password("Anything".as_bytes().to_vec()),
-                bss_description: bss_description.clone(),
+                bss_description: bss_description.clone().into(),
                 observation: types::ScanObservation::Active,
                 has_multiple_bss_candidates: false,
                 mutual_security_protocols: [
@@ -1621,7 +1626,7 @@ mod tests {
             target: types::ScannedCandidate {
                 network: id.clone(),
                 credential: case.credential.clone(),
-                bss_description: bss_description.clone(),
+                bss_description: bss_description.clone().into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: false,
                 mutual_security_protocols: case.mutual_security_protocols.into_iter().collect(),
@@ -1683,7 +1688,8 @@ mod tests {
                     security_type: types::SecurityType::Wpa2,
                 },
                 credential: Credential::Password(b"password".to_vec()),
-                bss_description: bss_description.clone().into(),
+                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
+                    .into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::WPA2_PERSONAL]
@@ -1748,8 +1754,8 @@ mod tests {
         // Check that connect result telemetry event is sent
         assert_variant!(
             test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::ConnectResult { iface_id: 1, policy_connect_reason, result, multiple_bss_candidates, latest_ap_state })) => {
-                assert_eq!(bss_description, latest_ap_state);
+            Ok(Some(TelemetryEvent::ConnectResult { iface_id: 1, policy_connect_reason, result, multiple_bss_candidates, ap_state })) => {
+                assert_eq!(bss_description, *ap_state.original());
                 assert!(multiple_bss_candidates);
                 assert_eq!(policy_connect_reason, Some(types::ConnectReason::FidlConnectRequest));
                 assert_eq!(result, connect_result);
@@ -1883,7 +1889,7 @@ mod tests {
             target: types::ScannedCandidate {
                 network: next_network_identifier,
                 credential: next_credential,
-                bss_description: bss_description.clone(),
+                bss_description: bss_description.clone().into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::OPEN].into_iter().collect(),
@@ -2013,7 +2019,7 @@ mod tests {
             target: types::ScannedCandidate {
                 network: next_network_identifier,
                 credential: next_credential,
-                bss_description: bss_description.clone(),
+                bss_description: bss_description.clone().into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::WPA2_PERSONAL]
@@ -2106,7 +2112,7 @@ mod tests {
                     security_type: types::SecurityType::Wpa2,
                 },
                 credential: Credential::Password(b"password".to_vec()),
-                bss_description: bss_description.clone(),
+                bss_description: bss_description.clone().into(),
                 observation: types::ScanObservation::Active,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::WPA2_PERSONAL]
@@ -2221,7 +2227,7 @@ mod tests {
                     security_type: types::SecurityType::Wpa2,
                 },
                 credential: Credential::None,
-                bss_description: bss_description.clone(),
+                bss_description: bss_description.clone().into(),
                 observation: types::ScanObservation::Active,
                 has_multiple_bss_candidates: false,
                 mutual_security_protocols: [SecurityDescriptor::WPA2_PERSONAL]
@@ -2264,7 +2270,8 @@ mod tests {
             target: types::ScannedCandidate {
                 network: id.clone(),
                 credential: credential.clone(),
-                bss_description: bss_description.clone().into(),
+                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
+                    .into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::WPA2_PERSONAL]
@@ -2281,7 +2288,7 @@ mod tests {
         let options = ConnectedOptions {
             currently_fulfilled_connection: connect_selection,
             multiple_bss_candidates: true,
-            latest_ap_state: Box::new(bss_description.clone()),
+            ap_state: Box::new(bss_description.clone().into()),
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time,
             time_to_connect,
@@ -2343,7 +2350,7 @@ mod tests {
                     connected_duration: 12.hours(),
                     is_sme_reconnecting: false,
                     disconnect_source: fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest),
-                    latest_ap_state: bss_description.clone(),
+                    ap_state: bss_description.clone().into(),
                 });
             });
         });
@@ -2404,7 +2411,8 @@ mod tests {
             target: types::ScannedCandidate {
                 network: id.clone(),
                 credential: credential.clone(),
-                bss_description: bss_description.clone().into(),
+                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
+                    .into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::WPA2_PERSONAL]
@@ -2422,7 +2430,7 @@ mod tests {
         let options = ConnectedOptions {
             currently_fulfilled_connection: connect_selection.clone(),
             multiple_bss_candidates: true,
-            latest_ap_state: Box::new(bss_description.clone()),
+            ap_state: Box::new(bss_description.clone().into()),
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time,
             time_to_connect,
@@ -2477,7 +2485,7 @@ mod tests {
                     connected_duration: 12.hours(),
                     is_sme_reconnecting,
                     disconnect_source: fidl_disconnect_info.disconnect_source,
-                    latest_ap_state: bss_description,
+                    ap_state: bss_description.into(),
                 });
             });
         });
@@ -2506,7 +2514,8 @@ mod tests {
                     security_type: types::SecurityType::Wpa2,
                 },
                 credential: Credential::None,
-                bss_description: bss_description.clone().into(),
+                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
+                    .into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::WPA2_PERSONAL]
@@ -2521,7 +2530,7 @@ mod tests {
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions {
             currently_fulfilled_connection: connect_selection,
-            latest_ap_state: Box::new(bss_description),
+            ap_state: Box::new(bss_description.into()),
             multiple_bss_candidates: true,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
@@ -2607,7 +2616,7 @@ mod tests {
             target: types::ScannedCandidate {
                 network: id.clone(),
                 credential: credential.clone(),
-                bss_description: bss_description.clone(),
+                bss_description: bss_description.clone().into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: false,
                 mutual_security_protocols: [SecurityDescriptor::WPA2_PERSONAL]
@@ -2696,7 +2705,8 @@ mod tests {
                     security_type: types::SecurityType::Wpa2,
                 },
                 credential: Credential::None,
-                bss_description: bss_description.clone().into(),
+                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
+                    .into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::WPA2_PERSONAL]
@@ -2710,7 +2720,7 @@ mod tests {
                 .expect("failed to create a connect txn channel");
         let options = ConnectedOptions {
             currently_fulfilled_connection: connect_selection.clone(),
-            latest_ap_state: Box::new(bss_description),
+            ap_state: Box::new(bss_description.into()),
             multiple_bss_candidates: true,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
@@ -2757,7 +2767,8 @@ mod tests {
             target: types::ScannedCandidate {
                 network: id_1.clone(),
                 credential: credential_1.clone(),
-                bss_description: bss_description.clone().into(),
+                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
+                    .into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::WPA2_PERSONAL]
@@ -2773,7 +2784,7 @@ mod tests {
         let time_to_connect = zx::Duration::from_seconds(10);
         let options = ConnectedOptions {
             currently_fulfilled_connection: connect_selection.clone(),
-            latest_ap_state: Box::new(bss_description.clone()),
+            ap_state: Box::new(bss_description.clone().into()),
             multiple_bss_candidates: true,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time,
@@ -2801,7 +2812,7 @@ mod tests {
                     security_type: types::SecurityType::Wpa2,
                 },
                 credential: Credential::Password(b"password".to_vec()),
-                bss_description: second_bss_desc.clone(),
+                bss_description: second_bss_desc.clone().into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::WPA2_PERSONAL]
@@ -2867,7 +2878,7 @@ mod tests {
                     connected_duration: 12.hours(),
                     is_sme_reconnecting: false,
                     disconnect_source: fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::ProactiveNetworkSwitch),
-                    latest_ap_state: bss_description.clone(),
+                    ap_state: bss_description.clone().into(),
                 });
             });
         });
@@ -2966,7 +2977,8 @@ mod tests {
                     security_type: types::SecurityType::Wpa2,
                 },
                 credential: Credential::Password("Anything".as_bytes().to_vec()),
-                bss_description: bss_description.clone().into(),
+                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
+                    .into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::WPA2_PERSONAL]
@@ -3002,7 +3014,7 @@ mod tests {
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions {
             currently_fulfilled_connection: connect_selection.clone(),
-            latest_ap_state: Box::new(bss_description.clone()),
+            ap_state: Box::new(bss_description.clone().into()),
             multiple_bss_candidates: true,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
@@ -3106,7 +3118,8 @@ mod tests {
                     security_type: types::SecurityType::Wpa2,
                 },
                 credential: Credential::None,
-                bss_description: bss_description.clone().into(),
+                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
+                    .into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::WPA2_PERSONAL]
@@ -3121,7 +3134,7 @@ mod tests {
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions {
             currently_fulfilled_connection: connect_selection.clone(),
-            latest_ap_state: Box::new(bss_description),
+            ap_state: Box::new(bss_description.into()),
             multiple_bss_candidates: true,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
@@ -3175,7 +3188,8 @@ mod tests {
                     security_type: types::SecurityType::Wpa2,
                 },
                 credential: Credential::Password("Anything".as_bytes().to_vec()),
-                bss_description: bss_description.clone().into(),
+                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
+                    .into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::WPA2_PERSONAL]
@@ -3201,7 +3215,7 @@ mod tests {
         let mut connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions {
             currently_fulfilled_connection: connect_selection.clone(),
-            latest_ap_state: Box::new(bss_description.clone()),
+            ap_state: Box::new(bss_description.clone().into()),
             multiple_bss_candidates: true,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
@@ -3513,7 +3527,7 @@ mod tests {
         // Verify telemetry event
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
             assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
-                assert_eq!(info.latest_ap_state.channel.primary, 10);
+                assert_eq!(info.ap_state.tracked.channel.primary, 10);
             });
         });
     }
@@ -3525,7 +3539,8 @@ mod tests {
         bss_description: BssDescription,
     ) -> (impl Future<Output = Result<State, ExitReason>>, fidl_sme::ConnectTransactionRequestStream)
     {
-        let protection = bss_description.protection();
+        let ap_state = types::ApState::from(bss_description);
+        let protection = ap_state.original().protection();
         let security_protocol = match protection {
             Protection::Open => SecurityDescriptor::OPEN,
             Protection::Wep => SecurityDescriptor::WEP,
@@ -3537,11 +3552,12 @@ mod tests {
         let connect_selection = types::ConnectSelection {
             target: types::ScannedCandidate {
                 network: types::NetworkIdentifier {
-                    ssid: bss_description.ssid.clone(),
+                    ssid: ap_state.original().ssid.clone(),
                     security_type: security_protocol.into(),
                 },
                 credential: Credential::None,
-                bss_description: bss_description.clone().into(),
+                bss_description: fidl_internal::BssDescription::from(ap_state.original().clone())
+                    .into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [security_protocol].into_iter().collect(),
@@ -3553,7 +3569,7 @@ mod tests {
                 .expect("failed to create a connect txn channel");
         let options = ConnectedOptions {
             currently_fulfilled_connection: connect_selection,
-            latest_ap_state: Box::new(bss_description.clone()),
+            ap_state: Box::new(ap_state),
             multiple_bss_candidates: true,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
@@ -3622,7 +3638,7 @@ mod tests {
                     security_type: types::SecurityType::Wpa2,
                 },
                 credential: Credential::Password(b"password".to_vec()),
-                bss_description: bss_description.clone(),
+                bss_description: bss_description.clone().into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::WPA2_PERSONAL]
@@ -3752,7 +3768,7 @@ mod tests {
                     security_type: types::SecurityType::None,
                 },
                 credential: Credential::None,
-                bss_description: bss_description.clone(),
+                bss_description: bss_description.clone().into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::OPEN].into_iter().collect(),
@@ -3815,7 +3831,7 @@ mod tests {
                     security_type: types::SecurityType::None,
                 },
                 credential: Credential::None,
-                bss_description: bss_description.clone(),
+                bss_description: bss_description.clone().into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::OPEN].into_iter().collect(),
@@ -3875,7 +3891,7 @@ mod tests {
                     security_type: types::SecurityType::None,
                 },
                 credential: Credential::None,
-                bss_description: bss_description.clone(),
+                bss_description: bss_description.clone().into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::OPEN].into_iter().collect(),
@@ -3968,7 +3984,7 @@ mod tests {
                     security_type: types::SecurityType::None,
                 },
                 credential: Credential::None,
-                bss_description: bss_description.clone(),
+                bss_description: bss_description.clone().into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
                 mutual_security_protocols: [SecurityDescriptor::OPEN].into_iter().collect(),

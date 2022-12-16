@@ -42,7 +42,7 @@ use {
             Arc,
         },
     },
-    wlan_common::{bss::BssDescription, format::MacFmt, hasher::WlanHasher},
+    wlan_common::{format::MacFmt, hasher::WlanHasher},
     wlan_metrics_registry as metrics,
 };
 
@@ -98,7 +98,7 @@ pub struct DisconnectInfo {
     pub connected_duration: zx::Duration,
     pub is_sme_reconnecting: bool,
     pub disconnect_source: fidl_sme::DisconnectSource,
-    pub latest_ap_state: BssDescription,
+    pub ap_state: client::types::ApState,
 }
 
 pub trait DisconnectSourceExt {
@@ -197,7 +197,7 @@ pub enum TelemetryEvent {
         policy_connect_reason: Option<client::types::ConnectReason>,
         result: fidl_sme::ConnectResult,
         multiple_bss_candidates: bool,
-        latest_ap_state: BssDescription,
+        ap_state: client::types::ApState,
     },
     /// Notify the telemetry event loop that the client has disconnected.
     /// Subsequently, the telemetry event loop will increment the downtime counters periodically
@@ -259,7 +259,7 @@ pub enum ConnectionStateInfo {
     Disconnected,
     Connected {
         iface_id: u16,
-        latest_ap_state: BssDescription,
+        ap_state: client::types::ApState,
         telemetry_proxy: Option<fidl_fuchsia_wlan_sme::TelemetryProxy>,
     },
 }
@@ -384,7 +384,7 @@ struct ConnectedState {
     new_connect_start_time: Option<fasync::Time>,
     prev_counters: Option<fidl_fuchsia_wlan_stats::IfaceCounterStats>,
     multiple_bss_candidates: bool,
-    latest_ap_state: BssDescription,
+    ap_state: client::types::ApState,
 
     last_signal_report: fasync::Time,
     num_consecutive_get_counter_stats_failures: InspectableU64,
@@ -465,31 +465,31 @@ fn inspect_record_connection_status(
                 ConnectionStateInfo::Disconnected => "disconnected".to_string(),
                 ConnectionStateInfo::Connected { .. } => "connected".to_string(),
             });
-            if let ConnectionStateInfo::Connected { latest_ap_state, .. } = info {
-                let fidl_channel = fidl_common::WlanChannel::from(latest_ap_state.channel);
+            if let ConnectionStateInfo::Connected { ap_state, .. } = info {
+                let fidl_channel = fidl_common::WlanChannel::from(ap_state.tracked.channel);
                 inspect_insert!(inspector.root(), connected_network: {
-                    rssi_dbm: latest_ap_state.rssi_dbm,
-                    snr_db: latest_ap_state.snr_db,
-                    bssid: latest_ap_state.bssid.0.to_mac_string(),
-                    bssid_hash: hasher.hash_mac_addr(&latest_ap_state.bssid.0),
-                    ssid: latest_ap_state.ssid.to_string(),
-                    ssid_hash: hasher.hash_ssid(&latest_ap_state.ssid),
-                    protection: format!("{:?}", latest_ap_state.protection()),
+                    rssi_dbm: ap_state.tracked.signal.rssi_dbm,
+                    snr_db: ap_state.tracked.signal.snr_db,
+                    bssid: ap_state.original().bssid.0.to_mac_string(),
+                    bssid_hash: hasher.hash_mac_addr(&ap_state.original().bssid.0),
+                    ssid: ap_state.original().ssid.to_string(),
+                    ssid_hash: hasher.hash_ssid(&ap_state.original().ssid),
+                    protection: format!("{:?}", ap_state.original().protection()),
                     channel: {
                         primary: fidl_channel.primary,
                         cbw: format!("{:?}", fidl_channel.cbw),
                         secondary80: fidl_channel.secondary80,
                     },
-                    ht_cap?: latest_ap_state.raw_ht_cap().map(|cap| InspectBytes(cap.bytes)),
-                    vht_cap?: latest_ap_state.raw_vht_cap().map(|cap| InspectBytes(cap.bytes)),
-                    wsc?: latest_ap_state.probe_resp_wsc().as_ref().map(|wsc| make_inspect_loggable!(
+                    ht_cap?: ap_state.original().raw_ht_cap().map(|cap| InspectBytes(cap.bytes)),
+                    vht_cap?: ap_state.original().raw_vht_cap().map(|cap| InspectBytes(cap.bytes)),
+                    wsc?: ap_state.original().probe_resp_wsc().as_ref().map(|wsc| make_inspect_loggable!(
                             device_name: String::from_utf8_lossy(&wsc.device_name[..]).to_string(),
                             manufacturer: String::from_utf8_lossy(&wsc.manufacturer[..]).to_string(),
                             model_name: String::from_utf8_lossy(&wsc.model_name[..]).to_string(),
                             model_number: String::from_utf8_lossy(&wsc.model_number[..]).to_string(),
                         )),
-                    is_wmm_assoc: latest_ap_state.find_wmm_param().is_some(),
-                    wmm_param?: latest_ap_state.find_wmm_param().map(|bytes| InspectBytes(bytes)),
+                    is_wmm_assoc: ap_state.original().find_wmm_param().is_some(),
+                    wmm_param?: ap_state.original().find_wmm_param().map(|bytes| InspectBytes(bytes)),
                 });
             }
             Ok(inspector)
@@ -516,11 +516,11 @@ fn inspect_record_external_data(
                 }
             };
 
-            if let ConnectionStateInfo::Connected { latest_ap_state, telemetry_proxy, .. } = info {
+            if let ConnectionStateInfo::Connected { ap_state, telemetry_proxy, .. } = info {
                 inspect_insert!(inspector.root(), connected_network: {
-                    rssi_dbm: latest_ap_state.rssi_dbm,
-                    snr_db: latest_ap_state.snr_db,
-                    wsc?: latest_ap_state.probe_resp_wsc().as_ref().map(|wsc| make_inspect_loggable!(
+                    rssi_dbm: ap_state.tracked.signal.rssi_dbm,
+                    snr_db: ap_state.tracked.signal.snr_db,
+                    wsc?: ap_state.original().probe_resp_wsc().as_ref().map(|wsc| make_inspect_loggable!(
                             device_name: String::from_utf8_lossy(&wsc.device_name[..]).to_string(),
                             manufacturer: String::from_utf8_lossy(&wsc.manufacturer[..]).to_string(),
                             model_name: String::from_utf8_lossy(&wsc.model_name[..]).to_string(),
@@ -869,7 +869,7 @@ impl Telemetry {
                     ConnectionState::Disconnected(..) => ConnectionStateInfo::Disconnected,
                     ConnectionState::Connected(state) => ConnectionStateInfo::Connected {
                         iface_id: state.iface_id,
-                        latest_ap_state: state.latest_ap_state.clone(),
+                        ap_state: state.ap_state.clone(),
                         telemetry_proxy: state.telemetry_proxy.clone(),
                     },
                 };
@@ -946,7 +946,7 @@ impl Telemetry {
                 policy_connect_reason,
                 result,
                 multiple_bss_candidates,
-                latest_ap_state,
+                ap_state,
             } => {
                 let connect_start_time = match &self.connection_state {
                     ConnectionState::Idle(state) => state.connect_start_time,
@@ -961,20 +961,17 @@ impl Telemetry {
                         policy_connect_reason,
                         result.code,
                         multiple_bss_candidates,
-                        &latest_ap_state,
+                        &ap_state,
                         connect_start_time,
                     )
                     .await;
                 self.stats_logger.log_stat(StatOp::AddConnectAttemptsCount).await;
                 if result.code == fidl_ieee80211::StatusCode::Success {
-                    self.log_connect_event_inspect(&latest_ap_state, multiple_bss_candidates);
+                    self.log_connect_event_inspect(&ap_state, multiple_bss_candidates);
                     self.stats_logger.log_stat(StatOp::AddConnectSuccessfulCount).await;
 
                     self.stats_logger
-                        .log_device_connected_cobalt_metrics(
-                            multiple_bss_candidates,
-                            &latest_ap_state,
-                        )
+                        .log_device_connected_cobalt_metrics(multiple_bss_candidates, &ap_state)
                         .await;
                     if let ConnectionState::Disconnected(state) = &self.connection_state {
                         if state.latest_no_saved_neighbor_time.is_some() {
@@ -1027,7 +1024,7 @@ impl Telemetry {
                         new_connect_start_time: None,
                         prev_counters: None,
                         multiple_bss_candidates,
-                        latest_ap_state,
+                        ap_state,
 
                         // We have not received a signal report yet, but since this is used as
                         // indicator for whether driver is still responsive, set it to the
@@ -1071,7 +1068,7 @@ impl Telemetry {
                         self.stats_logger
                             .log_device_connected_cobalt_metrics(
                                 state.multiple_bss_candidates,
-                                &state.latest_ap_state,
+                                &state.ap_state,
                             )
                             .await;
                     }
@@ -1108,15 +1105,15 @@ impl Telemetry {
             }
             TelemetryEvent::OnSignalReport { ind, rssi_velocity } => {
                 if let ConnectionState::Connected(state) = &mut self.connection_state {
-                    state.latest_ap_state.rssi_dbm = ind.rssi_dbm;
-                    state.latest_ap_state.snr_db = ind.snr_db;
+                    state.ap_state.tracked.signal.rssi_dbm = ind.rssi_dbm;
+                    state.ap_state.tracked.signal.snr_db = ind.snr_db;
                     state.last_signal_report = now;
                     self.stats_logger.log_signal_report_metrics(ind.rssi_dbm, rssi_velocity).await;
                 }
             }
             TelemetryEvent::OnChannelSwitched { info } => {
                 if let ConnectionState::Connected(state) = &mut self.connection_state {
-                    state.latest_ap_state.channel.primary = info.new_channel;
+                    state.ap_state.tracked.channel.primary = info.new_channel;
                     self.stats_logger
                         .log_device_connected_channel_cobalt_metrics(info.new_channel)
                         .await;
@@ -1193,50 +1190,50 @@ impl Telemetry {
 
     pub fn log_connect_event_inspect(
         &self,
-        latest_ap_state: &BssDescription,
+        ap_state: &client::types::ApState,
         multiple_bss_candidates: bool,
     ) {
         inspect_log!(self.connect_events_node.lock().get_mut(), {
             multiple_bss_candidates: multiple_bss_candidates,
             network: {
-                bssid: latest_ap_state.bssid.0.to_mac_string(),
-                bssid_hash: self.hasher.hash_mac_addr(&latest_ap_state.bssid.0),
-                ssid: latest_ap_state.ssid.to_string(),
-                ssid_hash: self.hasher.hash_ssid(&latest_ap_state.ssid),
-                rssi_dbm: latest_ap_state.rssi_dbm,
-                snr_db: latest_ap_state.snr_db,
+                bssid: ap_state.original().bssid.0.to_mac_string(),
+                bssid_hash: self.hasher.hash_mac_addr(&ap_state.original().bssid.0),
+                ssid: ap_state.original().ssid.to_string(),
+                ssid_hash: self.hasher.hash_ssid(&ap_state.original().ssid),
+                rssi_dbm: ap_state.tracked.signal.rssi_dbm,
+                snr_db: ap_state.tracked.signal.snr_db,
             },
         });
     }
 
     pub fn log_disconnect_event_inspect(&self, info: &DisconnectInfo) {
-        let fidl_channel = fidl_common::WlanChannel::from(info.latest_ap_state.channel);
+        let fidl_channel = fidl_common::WlanChannel::from(info.ap_state.original().channel);
         inspect_log!(self.disconnect_events_node.lock().get_mut(), {
             connected_duration: info.connected_duration.into_nanos(),
             disconnect_source: info.disconnect_source.inspect_string(),
             network: {
-                rssi_dbm: info.latest_ap_state.rssi_dbm,
-                snr_db: info.latest_ap_state.snr_db,
-                bssid: info.latest_ap_state.bssid.0.to_mac_string(),
-                bssid_hash: self.hasher.hash_mac_addr(&info.latest_ap_state.bssid.0),
-                ssid: info.latest_ap_state.ssid.to_string(),
-                ssid_hash: self.hasher.hash_ssid(&info.latest_ap_state.ssid),
-                protection: format!("{:?}", info.latest_ap_state.protection()),
+                rssi_dbm: info.ap_state.tracked.signal.rssi_dbm,
+                snr_db: info.ap_state.tracked.signal.snr_db,
+                bssid: info.ap_state.original().bssid.0.to_mac_string(),
+                bssid_hash: self.hasher.hash_mac_addr(&info.ap_state.original().bssid.0),
+                ssid: info.ap_state.original().ssid.to_string(),
+                ssid_hash: self.hasher.hash_ssid(&info.ap_state.original().ssid),
+                protection: format!("{:?}", info.ap_state.original().protection()),
                 channel: {
                     primary: fidl_channel.primary,
                     cbw: format!("{:?}", fidl_channel.cbw),
                     secondary80: fidl_channel.secondary80,
                 },
-                ht_cap?: info.latest_ap_state.raw_ht_cap().map(|cap| InspectBytes(cap.bytes)),
-                vht_cap?: info.latest_ap_state.raw_vht_cap().map(|cap| InspectBytes(cap.bytes)),
-                wsc?: info.latest_ap_state.probe_resp_wsc().as_ref().map(|wsc| make_inspect_loggable!(
+                ht_cap?: info.ap_state.original().raw_ht_cap().map(|cap| InspectBytes(cap.bytes)),
+                vht_cap?: info.ap_state.original().raw_vht_cap().map(|cap| InspectBytes(cap.bytes)),
+                wsc?: info.ap_state.original().probe_resp_wsc().as_ref().map(|wsc| make_inspect_loggable!(
                         device_name: String::from_utf8_lossy(&wsc.device_name[..]).to_string(),
                         manufacturer: String::from_utf8_lossy(&wsc.manufacturer[..]).to_string(),
                         model_name: String::from_utf8_lossy(&wsc.model_name[..]).to_string(),
                         model_number: String::from_utf8_lossy(&wsc.model_number[..]).to_string(),
                     )),
-                is_wmm_assoc: info.latest_ap_state.find_wmm_param().is_some(),
-                wmm_param?: info.latest_ap_state.find_wmm_param().map(|bytes| InspectBytes(bytes)),
+                is_wmm_assoc: info.ap_state.original().find_wmm_param().is_some(),
+                wmm_param?: info.ap_state.original().find_wmm_param().map(|bytes| InspectBytes(bytes)),
             }
         });
         inspect_log!(self.external_inspect_node.disconnect_events.lock(), {
@@ -1246,7 +1243,7 @@ impl Telemetry {
             locally_initiated: info.disconnect_source.locally_initiated(),
             network: {
                 channel: {
-                    primary: info.latest_ap_state.channel.primary,
+                    primary: info.ap_state.tracked.channel.primary,
                 },
             },
         });
@@ -1256,10 +1253,7 @@ impl Telemetry {
         self.stats_logger.log_daily_cobalt_metrics().await;
         if let ConnectionState::Connected(state) = &self.connection_state {
             self.stats_logger
-                .log_device_connected_cobalt_metrics(
-                    state.multiple_bss_candidates,
-                    &state.latest_ap_state,
-                )
+                .log_device_connected_cobalt_metrics(state.multiple_bss_candidates, &state.ap_state)
                 .await;
         }
     }
@@ -1467,14 +1461,14 @@ impl StatsLogger {
         policy_connect_reason: Option<client::types::ConnectReason>,
         code: fidl_ieee80211::StatusCode,
         multiple_bss_candidates: bool,
-        latest_ap_state: &BssDescription,
+        ap_state: &client::types::ApState,
         connect_start_time: Option<fasync::Time>,
     ) {
         self.log_establish_connection_cobalt_metrics(
             policy_connect_reason,
             code,
             multiple_bss_candidates,
-            latest_ap_state,
+            ap_state,
             connect_start_time,
         )
         .await;
@@ -1488,7 +1482,7 @@ impl StatsLogger {
             .or_insert(ConnectAttemptsCounter::default())
             .increment(code);
 
-        let security_type_dim = convert::convert_security_type(&latest_ap_state.protection());
+        let security_type_dim = convert::convert_security_type(&ap_state.original().protection());
         self.last_1d_detailed_stats
             .connect_per_security_type
             .entry(security_type_dim)
@@ -1497,25 +1491,25 @@ impl StatsLogger {
 
         self.last_1d_detailed_stats
             .connect_per_primary_channel
-            .entry(latest_ap_state.channel.primary)
+            .entry(ap_state.tracked.channel.primary)
             .or_insert(ConnectAttemptsCounter::default())
             .increment(code);
 
-        let channel_band_dim = convert::convert_channel_band(latest_ap_state.channel.primary);
+        let channel_band_dim = convert::convert_channel_band(ap_state.tracked.channel.primary);
         self.last_1d_detailed_stats
             .connect_per_channel_band
             .entry(channel_band_dim)
             .or_insert(ConnectAttemptsCounter::default())
             .increment(code);
 
-        let rssi_bucket_dim = convert::convert_rssi_bucket(latest_ap_state.rssi_dbm);
+        let rssi_bucket_dim = convert::convert_rssi_bucket(ap_state.tracked.signal.rssi_dbm);
         self.last_1d_detailed_stats
             .connect_per_rssi_bucket
             .entry(rssi_bucket_dim)
             .or_insert(ConnectAttemptsCounter::default())
             .increment(code);
 
-        let snr_bucket_dim = convert::convert_snr_bucket(latest_ap_state.snr_db);
+        let snr_bucket_dim = convert::convert_snr_bucket(ap_state.tracked.signal.snr_db);
         self.last_1d_detailed_stats
             .connect_per_snr_bucket
             .entry(snr_bucket_dim)
@@ -2098,11 +2092,11 @@ impl StatsLogger {
 
         metric_events.push(MetricEvent {
             metric_id: metrics::DISCONNECT_BREAKDOWN_BY_PRIMARY_CHANNEL_METRIC_ID,
-            event_codes: vec![disconnect_info.latest_ap_state.channel.primary as u32],
+            event_codes: vec![disconnect_info.ap_state.tracked.channel.primary as u32],
             payload: MetricEventPayload::Count(1),
         });
         let channel_band_dim =
-            convert::convert_channel_band(disconnect_info.latest_ap_state.channel.primary);
+            convert::convert_channel_band(disconnect_info.ap_state.tracked.channel.primary);
         metric_events.push(MetricEvent {
             metric_id: metrics::DISCONNECT_BREAKDOWN_BY_CHANNEL_BAND_METRIC_ID,
             event_codes: vec![channel_band_dim as u32],
@@ -2115,7 +2109,7 @@ impl StatsLogger {
             payload: MetricEventPayload::Count(1),
         });
         let security_type_dim =
-            convert::convert_security_type(&disconnect_info.latest_ap_state.protection());
+            convert::convert_security_type(&disconnect_info.ap_state.original().protection());
         metric_events.push(MetricEvent {
             metric_id: metrics::DISCONNECT_BREAKDOWN_BY_SECURITY_TYPE_METRIC_ID,
             event_codes: vec![security_type_dim as u32],
@@ -2209,14 +2203,14 @@ impl StatsLogger {
         policy_connect_reason: Option<client::types::ConnectReason>,
         code: fidl_ieee80211::StatusCode,
         multiple_bss_candidates: bool,
-        latest_ap_state: &BssDescription,
+        ap_state: &client::types::ApState,
         connect_start_time: Option<fasync::Time>,
     ) {
         let mut metric_events = self.build_establish_connection_cobalt_metrics(
             policy_connect_reason,
             code,
             multiple_bss_candidates,
-            latest_ap_state,
+            ap_state,
             connect_start_time,
         );
         log_cobalt_1dot1_batch!(
@@ -2231,7 +2225,7 @@ impl StatsLogger {
         policy_connect_reason: Option<client::types::ConnectReason>,
         code: fidl_ieee80211::StatusCode,
         multiple_bss_candidates: bool,
-        latest_ap_state: &BssDescription,
+        ap_state: &client::types::ApState,
         connect_start_time: Option<fasync::Time>,
     ) -> Vec<MetricEvent> {
         let mut metric_events = vec![];
@@ -2276,7 +2270,7 @@ impl StatsLogger {
             payload: MetricEventPayload::Count(1),
         });
 
-        let security_type_dim = convert::convert_security_type(&latest_ap_state.protection());
+        let security_type_dim = convert::convert_security_type(&ap_state.original().protection());
         metric_events.push(MetricEvent {
             metric_id: metrics::SUCCESSFUL_CONNECT_BREAKDOWN_BY_SECURITY_TYPE_METRIC_ID,
             event_codes: vec![security_type_dim as u32],
@@ -2285,18 +2279,18 @@ impl StatsLogger {
 
         metric_events.push(MetricEvent {
             metric_id: metrics::SUCCESSFUL_CONNECT_BREAKDOWN_BY_PRIMARY_CHANNEL_METRIC_ID,
-            event_codes: vec![latest_ap_state.channel.primary as u32],
+            event_codes: vec![ap_state.tracked.channel.primary as u32],
             payload: MetricEventPayload::Count(1),
         });
 
-        let channel_band_dim = convert::convert_channel_band(latest_ap_state.channel.primary);
+        let channel_band_dim = convert::convert_channel_band(ap_state.tracked.channel.primary);
         metric_events.push(MetricEvent {
             metric_id: metrics::SUCCESSFUL_CONNECT_BREAKDOWN_BY_CHANNEL_BAND_METRIC_ID,
             event_codes: vec![channel_band_dim as u32],
             payload: MetricEventPayload::Count(1),
         });
 
-        let oui = latest_ap_state.bssid.0.to_oui_uppercase("");
+        let oui = ap_state.original().bssid.0.to_oui_uppercase("");
         metric_events.push(MetricEvent {
             metric_id: metrics::SUCCESSFUL_CONNECT_PER_OUI_METRIC_ID,
             event_codes: vec![],
@@ -2377,7 +2371,7 @@ impl StatsLogger {
     async fn log_device_connected_cobalt_metrics(
         &mut self,
         multiple_bss_candidates: bool,
-        latest_ap_state: &BssDescription,
+        ap_state: &client::types::ApState,
     ) {
         let mut metric_events = vec![];
         metric_events.push(MetricEvent {
@@ -2386,14 +2380,14 @@ impl StatsLogger {
             payload: MetricEventPayload::Count(1),
         });
 
-        let security_type_dim = convert::convert_security_type(&latest_ap_state.protection());
+        let security_type_dim = convert::convert_security_type(&ap_state.original().protection());
         metric_events.push(MetricEvent {
             metric_id: metrics::CONNECTED_NETWORK_SECURITY_TYPE_METRIC_ID,
             event_codes: vec![security_type_dim as u32],
             payload: MetricEventPayload::Count(1),
         });
 
-        if latest_ap_state.supports_uapsd() {
+        if ap_state.original().supports_uapsd() {
             metric_events.push(MetricEvent {
                 metric_id: metrics::DEVICE_CONNECTED_TO_AP_THAT_SUPPORTS_APSD_METRIC_ID,
                 event_codes: vec![],
@@ -2401,7 +2395,7 @@ impl StatsLogger {
             });
         }
 
-        if let Some(rm_enabled_cap) = latest_ap_state.rm_enabled_cap() {
+        if let Some(rm_enabled_cap) = ap_state.original().rm_enabled_cap() {
             let rm_enabled_cap_head = rm_enabled_cap.rm_enabled_caps_head;
             if rm_enabled_cap_head.link_measurement_enabled() {
                 metric_events.push(MetricEvent {
@@ -2421,7 +2415,7 @@ impl StatsLogger {
             }
         }
 
-        if latest_ap_state.supports_ft() {
+        if ap_state.original().supports_ft() {
             metric_events.push(MetricEvent {
                 metric_id: metrics::DEVICE_CONNECTED_TO_AP_THAT_SUPPORTS_FT_METRIC_ID,
                 event_codes: vec![],
@@ -2429,7 +2423,7 @@ impl StatsLogger {
             });
         }
 
-        if let Some(cap) = latest_ap_state.ext_cap().and_then(|cap| cap.ext_caps_octet_3) {
+        if let Some(cap) = ap_state.original().ext_cap().and_then(|cap| cap.ext_caps_octet_3) {
             if cap.bss_transition() {
                 metric_events.push(MetricEvent {
                     metric_id: metrics::DEVICE_CONNECTED_TO_AP_THAT_SUPPORTS_BSS_TRANSITION_MANAGEMENT_METRIC_ID,
@@ -2446,7 +2440,7 @@ impl StatsLogger {
             payload: MetricEventPayload::Count(1),
         });
 
-        let oui = latest_ap_state.bssid.0.to_oui_uppercase("");
+        let oui = ap_state.original().bssid.0.to_oui_uppercase("");
         metric_events.push(MetricEvent {
             metric_id: metrics::DEVICE_CONNECTED_TO_AP_OUI_2_METRIC_ID,
             event_codes: vec![],
@@ -2455,7 +2449,7 @@ impl StatsLogger {
 
         append_device_connected_channel_cobalt_metrics(
             &mut metric_events,
-            latest_ap_state.channel.primary,
+            ap_state.tracked.channel.primary,
         );
 
         // Cobalt STRING metrics don't have AT_LEAST_ONCE local aggregation. So in order to
@@ -2864,6 +2858,7 @@ mod tests {
         test_case::test_case,
         wlan_common::{
             assert_variant,
+            bss::BssDescription,
             channel::{Cbw, Channel},
             ie::IeType,
             random_bss_description,
@@ -3469,7 +3464,7 @@ mod tests {
                 ),
                 result: fake_connect_result(fidl_ieee80211::StatusCode::RefusedReasonUnspecified),
                 multiple_bss_candidates: true,
-                latest_ap_state: random_bss_description!(Wpa1),
+                ap_state: random_bss_description!(Wpa1).into(),
             };
             test_helper.telemetry_sender.send(event);
 
@@ -4241,7 +4236,7 @@ mod tests {
                 ),
                 result: fake_connect_result(fidl_ieee80211::StatusCode::RefusedReasonUnspecified),
                 multiple_bss_candidates: true,
-                latest_ap_state: random_bss_description!(Wpa1),
+                ap_state: random_bss_description!(Wpa1).into(),
             };
             test_helper.telemetry_sender.send(event);
         }
@@ -4541,14 +4536,14 @@ mod tests {
 
         let primary_channel = 8;
         let channel = Channel::new(primary_channel, Cbw::Cbw20);
-        let latest_ap_state = random_bss_description!(Wpa2, channel: channel);
+        let ap_state = random_bss_description!(Wpa2, channel: channel).into();
         let info = DisconnectInfo {
             connected_duration: 5.hours(),
             disconnect_source: fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
                 reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
                 mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
             }),
-            latest_ap_state,
+            ap_state,
             ..fake_disconnect_info()
         };
         test_helper
@@ -4795,18 +4790,19 @@ mod tests {
 
         let primary_channel = 8;
         let channel = Channel::new(primary_channel, Cbw::Cbw20);
-        let latest_ap_state = random_bss_description!(Wpa2,
+        let ap_state = random_bss_description!(Wpa2,
             bssid: [0x00, 0xf6, 0x20, 0x03, 0x04, 0x05],
             channel: channel,
             rssi_dbm: -50,
             snr_db: 25,
-        );
+        )
+        .into();
         let event = TelemetryEvent::ConnectResult {
             iface_id: IFACE_ID,
             policy_connect_reason: Some(client::types::ConnectReason::FidlConnectRequest),
             result: fake_connect_result(fidl_ieee80211::StatusCode::Success),
             multiple_bss_candidates: true,
-            latest_ap_state,
+            ap_state,
         };
         test_helper.telemetry_sender.send(event);
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -4887,7 +4883,7 @@ mod tests {
             policy_connect_reason: None,
             result: fake_connect_result(fidl_ieee80211::StatusCode::RefusedCapabilitiesMismatch),
             multiple_bss_candidates: true,
-            latest_ap_state: random_bss_description!(Wpa2),
+            ap_state: random_bss_description!(Wpa2).into(),
         };
         test_helper.telemetry_sender.send(event);
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -4912,7 +4908,7 @@ mod tests {
                 ),
                 result: fake_connect_result(fidl_ieee80211::StatusCode::RefusedReasonUnspecified),
                 multiple_bss_candidates: true,
-                latest_ap_state: random_bss_description!(Wpa1),
+                ap_state: random_bss_description!(Wpa1).into(),
             };
             test_helper.telemetry_sender.send(event);
         }
@@ -4953,7 +4949,7 @@ mod tests {
                 ),
                 result: fake_connect_result(fidl_ieee80211::StatusCode::RefusedReasonUnspecified),
                 multiple_bss_candidates: true,
-                latest_ap_state: random_bss_description!(Wpa1),
+                ap_state: random_bss_description!(Wpa1).into(),
             };
             test_helper.telemetry_sender.send(event);
         }
@@ -5134,7 +5130,7 @@ mod tests {
                 ),
                 result: fake_connect_result(code),
                 multiple_bss_candidates: first_connect_result_params.0,
-                latest_ap_state: first_connect_result_params.1.clone(),
+                ap_state: first_connect_result_params.1.clone().into(),
             };
             test_helper.telemetry_sender.send(event);
         }
@@ -5151,7 +5147,7 @@ mod tests {
                 ),
                 result: fake_connect_result(code),
                 multiple_bss_candidates: second_connect_result_params.0,
-                latest_ap_state: second_connect_result_params.1.clone(),
+                ap_state: second_connect_result_params.1.clone().into(),
             };
             test_helper.telemetry_sender.send(event);
         }
@@ -5662,14 +5658,12 @@ mod tests {
     #[fuchsia::test]
     fn test_log_device_connected_to_ap_oui_cobalt_metrics() {
         let (mut test_helper, mut test_fut) = setup_test();
-        let latest_ap_state = random_bss_description!(Wpa2,
-            bssid: [0x00, 0xf6, 0x20, 0x03, 0x04, 0x05],
+        test_helper.send_connected_event(
+            random_bss_description!(Wpa2, bssid: [0x00, 0xf6, 0x20, 0x03, 0x04, 0x05]),
         );
-        test_helper.send_connected_event(latest_ap_state);
-        let latest_ap_state = random_bss_description!(Wpa2,
-            bssid: [0x33, 0xf1, 0xed, 0x02, 0x03, 0x04],
+        test_helper.send_connected_event(
+            random_bss_description!(Wpa2, bssid: [0x33, 0xf1, 0xed, 0x02, 0x03, 0x04]),
         );
-        test_helper.send_connected_event(latest_ap_state);
         test_helper.advance_by(24.hours(), test_fut.as_mut());
 
         let metrics = test_helper.get_logged_metrics(metrics::DEVICE_CONNECTED_TO_AP_OUI_METRIC_ID);
@@ -5695,10 +5689,9 @@ mod tests {
     fn test_log_device_connected_to_ap_oui_cobalt_metrics_periodically() {
         let (mut test_helper, mut test_fut) = setup_test();
 
-        let latest_ap_state = random_bss_description!(Wpa2,
-            bssid: [0x00, 0xf6, 0x20, 0x03, 0x04, 0x05],
+        test_helper.send_connected_event(
+            random_bss_description!(Wpa2, bssid: [0x00, 0xf6, 0x20, 0x03, 0x04, 0x05]),
         );
-        test_helper.send_connected_event(latest_ap_state);
         test_helper.drain_cobalt_events(&mut test_fut);
         test_helper.cobalt_events.clear();
 
@@ -6234,7 +6227,7 @@ mod tests {
             self.cobalt_events.iter().filter(|ev| ev.metric_id == metric_id).cloned().collect()
         }
 
-        fn send_connected_event(&mut self, latest_ap_state: BssDescription) {
+        fn send_connected_event(&mut self, ap_state: impl Into<client::types::ApState>) {
             let event = TelemetryEvent::ConnectResult {
                 iface_id: IFACE_ID,
                 policy_connect_reason: Some(
@@ -6242,7 +6235,7 @@ mod tests {
                 ),
                 result: fake_connect_result(fidl_ieee80211::StatusCode::Success),
                 multiple_bss_candidates: true,
-                latest_ap_state,
+                ap_state: ap_state.into(),
             };
             self.telemetry_sender.send(event);
         }
@@ -6560,7 +6553,7 @@ mod tests {
             connected_duration: 6.hours(),
             is_sme_reconnecting: fidl_disconnect_info.is_sme_reconnecting,
             disconnect_source: fidl_disconnect_info.disconnect_source,
-            latest_ap_state: random_bss_description!(Wpa2),
+            ap_state: random_bss_description!(Wpa2).into(),
         }
     }
 
