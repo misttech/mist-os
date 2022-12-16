@@ -19,6 +19,9 @@ import("//build/info/info.gni")
 #   target (optional)
 #     [string] Target to analyze. Defaults to "//:default".
 #
+#   product_spdx (optional)
+#     [bool] Whether to also produce an SPDX output. Default = false.
+#
 #   testonly, visibility
 template("license_data") {
   filter = ""
@@ -41,6 +44,9 @@ template("license_data") {
     build_info_board = "board"
   }
 
+  # TODO(fxb/116788): Remove once SPDX generation is not flaky.
+  produce_spdx = defined(invoker.produce_spdx) && invoker.produce_spdx
+
   out_dir = "$target_out_dir/check-licenses"
   if (defined(invoker.out_dir)) {
     out_dir = invoker.out_dir
@@ -52,13 +58,13 @@ template("license_data") {
   copy_txt_notices_target = "${target_name}_txt_copy"
   copy_html_notices_target = "${target_name}_html_copy"
 
-  # TODO(fxb/116788): Uncomment once SPDX generation flakiness resolves
-  # copy_spdx_target = "${target_name}_spdx_copy"
-
   compliance_output = "compliance.csv"
 
-  # TODO(fxb/116788): Uncomment once SPDX generation flakiness resolves
-  # spdx_output = "results.spdx.json"
+  if (produce_spdx) {
+    spdx_output = "results.spdx.json"
+    copy_spdx_target = "${target_name}_spdx_copy"
+  }
+
   txt_notices_output = "license_texts_grouped_by_license_pattern_deduped.txt.gz"
   html_notices_output =
       "license_texts_grouped_by_license_pattern_deduped.html.gz"
@@ -88,10 +94,11 @@ template("license_data") {
       "$temp_out_dir/$path_prefix/out/$txt_notices_output",
       "$temp_out_dir/$path_prefix/out/$html_notices_output",
       "$temp_out_dir/$path_prefix/out/$compliance_output",
-
-      # TODO(fxb/116788): Uncomment once SPDX generation flakiness resolves
-      # "$temp_out_dir/$path_prefix/$spdx_output",
     ]
+
+    if (produce_spdx) {
+      outputs += [ "$temp_out_dir/$path_prefix/$spdx_output" ]
+    }
 
     args = [
       "--log_level",
@@ -164,19 +171,20 @@ template("license_data") {
     deps = [ ":$check_licenses_target" ]
   }
 
-  # TODO(fxb/116788): Uncomment once SPDX generation flakiness resolves
-  # copy(copy_spdx_target) {
-  #   forward_variables_from(invoker,
-  #                          [
-  #                            "fuchsia_dir",
-  #                            "testonly",
-  #                            "visibility",
-  #                          ])
+  if (produce_spdx) {
+    copy(copy_spdx_target) {
+      forward_variables_from(invoker,
+                             [
+                               "fuchsia_dir",
+                               "testonly",
+                               "visibility",
+                             ])
 
-  #   sources = [ "$temp_out_dir/$path_prefix/$spdx_output" ]
-  #   outputs = [ "$out_dir/results.spdx.json" ]
-  #   deps = [ ":$check_licenses_target" ]
-  # }
+      sources = [ "$temp_out_dir/$path_prefix/$spdx_output" ]
+      outputs = [ "$out_dir/results.spdx.json" ]
+      deps = [ ":$check_licenses_target" ]
+    }
+  }
 
   group(target_name) {
     forward_variables_from(invoker,
@@ -189,10 +197,10 @@ template("license_data") {
     deps = [
       ":$check_licenses_target",
       ":$copy_html_notices_target",
-
-      # TODO(fxb/116788): Uncomment once SPDX generation flakiness resolves
-      # ":$copy_spdx_target",
       ":$copy_txt_notices_target",
     ]
+    if (produce_spdx) {
+      deps += [ ":$copy_spdx_target" ]
+    }
   }
 }
