@@ -49,11 +49,6 @@ detect_conditional_files = [
 
 triage_files += detect_unconditional_files + detect_conditional_files
 
-config_data("triage-detect") {
-  for_pkg = "triage-detect"
-  sources = detect_unconditional_files
-}
-
 # This file will be included in builds that include the
 # group //src/sys/pkg:omaha-client
 config_data("omaha-client-detect") {
