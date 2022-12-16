@@ -27,13 +27,6 @@ lazy_static! {
     static ref NULL_KEY: GenericArray<u8, U32> = *GenericArray::from_slice(&[0_u8; 32]);
 }
 
-// Generates a random 256-bit array and returns it as a generic array of 32 u8s.
-fn make_random_256_bit_generic_array() -> GenericArray<u8, U32> {
-    let mut bits = [0_u8; 32];
-    thread_rng().fill(&mut bits[..]);
-    *GenericArray::from_slice(&bits)
-}
-
 // Generates a random 96-bit array and returns it as a generic array of 12 u8s.
 fn make_random_96_bit_generic_array() -> GenericArray<u8, U12> {
     let mut bits = [0_u8; 12];
@@ -95,7 +88,7 @@ impl WrappedKey {
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 // WrappedKeySet holds:
 //
-// - a real key (in this case, the encryption key for some storage volume)
+// - a disk key (in this case, the encryption key for some storage volume)
 //   wrapped via AES-256-GCM with some prekey material.
 //
 // - a null key (i.e. 256 bytes of all zeroes) wrapped via AES-256-GCM with that
@@ -106,20 +99,20 @@ impl WrappedKey {
 // Both keys are stored in (ciphertext+tag, nonce) form (see WrappedKey), and
 // both are wrapped with the same prekey material.
 pub struct WrappedKeySet {
-    pub wrapped_real_key: WrappedKey,
+    pub wrapped_disk_key: WrappedKey,
     pub wrapped_null_key: WrappedKey,
 }
 
 impl WrappedKeySet {
     // First unwraps the null key and ensures that it unwraps to the expected
-    // NULL_KEY value. Then unwraps the real key and returns it.
+    // NULL_KEY value. Then unwraps the disk key and returns it.
     //
     // If the call to self.wrapped_null_key.unwrap_key() does not produce
     // NULL_KEY, it means that the wrong prekey_material was supplied, and we
     // return ApiError::FailedPrecondition.
     //
     // If the internal unwrap_key calls fail, we return ApiError::Internal.
-    pub fn unwrap_real_key(&self, prekey_material: &[u8]) -> Result<[u8; 32], ApiError> {
+    pub fn unwrap_disk_key(&self, prekey_material: &[u8]) -> Result<[u8; 32], ApiError> {
         let mut cipher = Aes256Gcm::new(GenericArray::from_slice(prekey_material));
 
         match self.wrapped_null_key.unwrap_key(&mut cipher) {
@@ -133,8 +126,8 @@ impl WrappedKeySet {
             Err(e) => Err(e),
             Ok(decrypted_null_key) if decrypted_null_key == NULL_KEY.as_slice() => {
                 // If the unwrapped encrypted null key is equal to the NULL_KEY,
-                // then the provided prekey material is correct -- proceed to unwrap the real key.
-                self.wrapped_real_key.unwrap_key(&mut cipher)
+                // then the provided prekey material is correct -- proceed to unwrap the disk key.
+                self.wrapped_disk_key.unwrap_key(&mut cipher)
             }
             Ok(_) => {
                 warn!(
@@ -156,12 +149,13 @@ impl WrappedKeySet {
 //
 // Both the wrapped volume encryption key and the wrapped null key are returned
 // so that they can be stored in the EnrollmentState struct above.
-pub fn produce_wrapped_keys(prekey_material: Vec<u8>) -> Result<WrappedKeySet, ApiError> {
+pub fn produce_wrapped_keys(
+    prekey_material: Vec<u8>,
+    disk_key: &GenericArray<u8, U32>,
+) -> Result<WrappedKeySet, ApiError> {
     let cipher = Aes256Gcm::new(GenericArray::from_slice(&prekey_material));
 
-    let real_key: GenericArray<u8, U32> = make_random_256_bit_generic_array();
-
-    let wrapped_real_key = WrappedKey::make_from(&cipher, &real_key).ok_or_else(|| {
+    let wrapped_disk_key = WrappedKey::make_from(&cipher, disk_key).ok_or_else(|| {
         error!("Could not compute E(volume_encryption_key).");
         ApiError::Internal
     })?;
@@ -171,8 +165,16 @@ pub fn produce_wrapped_keys(prekey_material: Vec<u8>) -> Result<WrappedKeySet, A
         ApiError::Internal
     })?;
 
-    Ok(WrappedKeySet { wrapped_real_key, wrapped_null_key })
+    Ok(WrappedKeySet { wrapped_disk_key, wrapped_null_key })
 }
+
+// Generates a random 256-bit array and returns it as a generic array of 32 u8s.
+pub fn make_random_256_bit_generic_array() -> GenericArray<u8, U32> {
+    let mut bits = [0_u8; 32];
+    thread_rng().fill(&mut bits[..]);
+    *GenericArray::from_slice(&bits)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,16 +189,18 @@ mod tests {
     #[test]
     fn test_wrapped_keys_are_different() {
         let prekey_material = make_random_256_bit_array().to_vec();
-        let wk = assert_matches!(produce_wrapped_keys(prekey_material), Ok(m) => m);
-        assert_ne!(wk.wrapped_real_key, wk.wrapped_null_key);
+        let disk_key = make_random_256_bit_generic_array();
+        let wk = assert_matches!(produce_wrapped_keys(prekey_material, &disk_key), Ok(m) => m);
+        assert_ne!(wk.wrapped_disk_key, wk.wrapped_null_key);
     }
 
     #[test]
     fn test_wrapped_keys_have_correct_length() {
         let prekey_material = make_random_256_bit_array().to_vec();
-        let wk = assert_matches!(produce_wrapped_keys(prekey_material), Ok(m) => m);
+        let disk_key = make_random_256_bit_generic_array();
+        let wk = assert_matches!(produce_wrapped_keys(prekey_material, &disk_key), Ok(m) => m);
         // Expected to be more than 32 because it includes the tag.
-        assert_eq!(wk.wrapped_real_key.ciphertext_and_tag.len(), 48);
+        assert_eq!(wk.wrapped_disk_key.ciphertext_and_tag.len(), 48);
         assert_eq!(wk.wrapped_null_key.ciphertext_and_tag.len(), 48);
     }
 
@@ -204,17 +208,21 @@ mod tests {
     fn test_wrapped_keys_not_hermetic() {
         // Should have different output with the same input.
         let prekey_material = make_random_256_bit_array().to_vec();
+        let disk_key = make_random_256_bit_generic_array();
         let wrapped_keys_1 =
-            assert_matches!(produce_wrapped_keys(prekey_material.clone()), Ok(m) => m);
-        let wrapped_keys_2 = assert_matches!(produce_wrapped_keys(prekey_material), Ok(m) => m);
-        assert_ne!(wrapped_keys_1.wrapped_real_key, wrapped_keys_2.wrapped_real_key,);
+            assert_matches!(produce_wrapped_keys(prekey_material.clone(), &disk_key), Ok(m) => m);
+        let wrapped_keys_2 =
+            assert_matches!(produce_wrapped_keys(prekey_material, &disk_key), Ok(m) => m);
+        assert_ne!(wrapped_keys_1.wrapped_disk_key, wrapped_keys_2.wrapped_disk_key,);
         assert_ne!(wrapped_keys_1.wrapped_null_key, wrapped_keys_2.wrapped_null_key,);
     }
 
     #[test]
     fn test_wrapped_keys_null_key_decrypts_to_null() {
         let prekey_material = make_random_256_bit_array().to_vec();
-        let wk = assert_matches!(produce_wrapped_keys(prekey_material.clone()), Ok(m) => m);
+        let disk_key = make_random_256_bit_generic_array();
+        let wk =
+            assert_matches!(produce_wrapped_keys(prekey_material.clone(), &disk_key), Ok(m) => m);
 
         let cipher = Aes256Gcm::new(GenericArray::from_slice(&prekey_material));
 
@@ -232,15 +240,16 @@ mod tests {
     #[test]
     fn test_wrapped_keys_volume_key_can_be_decrypted() {
         let prekey_material = make_random_256_bit_array().to_vec();
-
-        let wk = assert_matches!(produce_wrapped_keys(prekey_material.clone()), Ok(m) => m);
+        let disk_key = make_random_256_bit_generic_array();
+        let wk =
+            assert_matches!(produce_wrapped_keys(prekey_material.clone(), &disk_key), Ok(m) => m);
 
         let cipher = Aes256Gcm::new(GenericArray::from_slice(&prekey_material));
 
         assert_matches!(
             cipher.decrypt(
-                (&wk.wrapped_real_key.nonce).into(),
-                wk.wrapped_real_key.ciphertext_and_tag.as_ref(),
+                (&wk.wrapped_disk_key.nonce).into(),
+                wk.wrapped_disk_key.ciphertext_and_tag.as_ref(),
             ),
             Ok(_)
         );
@@ -249,15 +258,16 @@ mod tests {
     #[test]
     fn test_wrapped_keys_unwrap_helper_fn() {
         let prekey_material = make_random_256_bit_array().to_vec();
-
-        let wk = assert_matches!(produce_wrapped_keys(prekey_material.clone()), Ok(m) => m);
+        let disk_key = make_random_256_bit_generic_array();
+        let wk =
+            assert_matches!(produce_wrapped_keys(prekey_material.clone(), &disk_key), Ok(m) => m);
 
         // That this returns proves that:
         //  - the codepath to decrypt_wrapped_key(.., wrapped_null_key) succeeds,
         //  - the decrypted null key is null, and
-        //  - the codepath to decrypt_wrapped_key(.., wrapped_real_key) succeeds.
-        let _actual_real_key: [u8; 32] = assert_matches!(
-            wk.unwrap_real_key(&prekey_material),
+        //  - the codepath to decrypt_wrapped_key(.., wrapped_disk_key) succeeds.
+        let _actual_disk_key: [u8; 32] = assert_matches!(
+            wk.unwrap_disk_key(&prekey_material),
             Ok(plaintext) => plaintext
         );
     }
@@ -265,11 +275,12 @@ mod tests {
     #[test]
     fn test_wrapped_keys_wrong_prekey() {
         let prekey_material = make_random_256_bit_array().to_vec();
-        let wk = assert_matches!(produce_wrapped_keys(prekey_material), Ok(m) => m);
+        let disk_key = make_random_256_bit_generic_array();
+        let wk = assert_matches!(produce_wrapped_keys(prekey_material, &disk_key), Ok(m) => m);
 
         let other_prekey_material = make_random_256_bit_array().to_vec();
         assert_matches!(
-            wk.unwrap_real_key(&other_prekey_material),
+            wk.unwrap_disk_key(&other_prekey_material),
             Err(ApiError::FailedAuthentication)
         );
     }

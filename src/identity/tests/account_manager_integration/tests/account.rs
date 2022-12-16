@@ -591,6 +591,11 @@ async fn test_many_account_deletions() -> Result<(), Error> {
     Ok(())
 }
 
+// TODO(fxb/104199): Once this bug is completed and we can use
+// fuchsia.identity.authentication.Interaction in Identity integration tests,
+// let's (a) use Interaction in this integration test and (b) reenable it
+// (delete the #[ignore] line below.)
+#[ignore]
 /// Ensure that an account manager created in a specific environment picks up the state of
 /// previous instances that ran in that environment. Also check that some basic operations work on
 /// accounts created in that previous lifetime.

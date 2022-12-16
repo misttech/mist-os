@@ -8,6 +8,7 @@
 use {
     crate::wrapped_key::{produce_wrapped_keys, WrappedKeySet},
     account_common::AccountId,
+    aes_gcm::aead::generic_array::{typenum::U32, GenericArray},
     fidl_fuchsia_identity_account::Error as ApiError,
     fidl_fuchsia_identity_authentication::Mechanism,
     serde::{Deserialize, Deserializer, Serialize, Serializer},
@@ -107,17 +108,22 @@ where
     serializer.serialize_u32(mechanism.into_primitive())
 }
 
+/// Produce an EnrollmentState::SingleEnrollment enum variant from {
+/// |auth_mechanism_id|, |mechanism|, |enrollment_data| }. Use |prekey_material|
+/// and |disk_key| to produce a wrapped disk encryption key, and also attach that to
+/// the SingleEnrollment.
 pub fn produce_single_enrollment(
     auth_mechanism_id: String,
     mechanism: Mechanism,
-    data: Vec<u8>,
+    enrollment_data: Vec<u8>,
     prekey_material: Vec<u8>,
+    disk_key: &GenericArray<u8, U32>,
 ) -> Result<EnrollmentState, ApiError> {
     Ok(EnrollmentState::SingleEnrollment {
         auth_mechanism_id,
         mechanism,
-        data,
-        wrapped_key_material: produce_wrapped_keys(prekey_material)?,
+        data: enrollment_data,
+        wrapped_key_material: produce_wrapped_keys(prekey_material, disk_key)?,
     })
 }
 
@@ -134,7 +140,7 @@ mod tests {
             mechanism: Mechanism::Test,
             data: vec![1, 2, 3],
             wrapped_key_material: WrappedKeySet {
-                wrapped_real_key: WrappedKey {
+                wrapped_disk_key: WrappedKey {
                     ciphertext_and_tag: vec![4, 5, 6],
                     nonce: [0_u8; 12]
                 },

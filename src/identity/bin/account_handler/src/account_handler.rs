@@ -10,9 +10,11 @@ use {
         interaction::Interaction,
         lock_request,
         pre_auth::{self, produce_single_enrollment, EnrollmentState, State as PreAuthState},
+        wrapped_key::make_random_256_bit_generic_array,
     },
     account_common::{AccountId, AccountManagerError},
-    anyhow::format_err,
+    aes_gcm::aead::generic_array::{typenum::U32, GenericArray},
+    anyhow::{anyhow, format_err},
     fidl::endpoints::{create_endpoints, ServerEnd},
     fidl::prelude::*,
     fidl_fuchsia_identity_account::{AccountMarker, Error as ApiError},
@@ -231,8 +233,10 @@ where
         let mut state_lock = self.state.lock().await;
         match &*state_lock {
             Lifecycle::Uninitialized => {
+                let disk_key: GenericArray<u8, U32> = make_random_256_bit_generic_array();
+
                 let enrollment_state = self
-                    .enroll_auth_mechanism(maybe_auth_mechanism_id, payload.interaction)
+                    .enroll_auth_mechanism(maybe_auth_mechanism_id, payload.interaction, &disk_key)
                     .await
                     .map_err(|err| {
                         warn!("Enrollment error: {:?}", err);
@@ -256,12 +260,13 @@ where
                 .await
                 .map_err(|err| err.api_error)?;
 
-                let () = self.storage_manager.lock().await.provision(&MAGIC_PREKEY).await.map_err(
-                    |err| {
-                        warn!("CreateAccount failed to provision StorageManager: {:?}", err);
-                        ApiError::Resource
-                    },
-                )?;
+                let () =
+                    self.storage_manager.lock().await.provision(disk_key.as_ref()).await.map_err(
+                        |err| {
+                            warn!("CreateAccount failed to provision StorageManager: {:?}", err);
+                            ApiError::Resource
+                        },
+                    )?;
 
                 let pre_auth_state_bytes: Vec<u8> = (&pre_auth_state).try_into()?;
                 *state_lock = Lifecycle::Initialized { account: Arc::new(account), pre_auth_state };
@@ -317,7 +322,7 @@ where
                 Ok(None)
             }
             Lifecycle::Locked { pre_auth_state: pre_auth_state_ref } => {
-                let (maybe_prekey_material, maybe_updated_enrollment_state) = Self::authenticate(
+                let (prekey_material, maybe_updated_enrollment_state) = Self::authenticate(
                     self.is_interaction_enabled,
                     &pre_auth_state_ref.enrollment_state,
                     interaction,
@@ -328,13 +333,7 @@ where
                     warn!("Authentication error: {:?}", err);
                     err.api_error
                 })?;
-                // TODO(fxbug.dev/45041): Use storage manager for key validation
-                if let Some(prekey_material) = maybe_prekey_material {
-                    if prekey_material != *MAGIC_PREKEY {
-                        info!("Encountered a failed authentication attempt");
-                        return Err(ApiError::FailedAuthentication);
-                    }
-                }
+
                 let sender = self
                     .create_lock_request_sender(&pre_auth_state_ref.enrollment_state)
                     .await
@@ -351,13 +350,15 @@ where
                 .await
                 .map_err(|err| err.api_error)?;
 
-                let () =
-                    self.storage_manager.lock().await.unlock_storage(&MAGIC_PREKEY).await.map_err(
-                        |err| {
-                            warn!("UnlockAccount failed to unlock StorageManager: {:?}", err);
-                            ApiError::Resource
-                        },
-                    )?;
+                let key: [u8; 32] =
+                    Self::fetch_key(&prekey_material, &pre_auth_state_ref.enrollment_state)?;
+
+                let () = self.storage_manager.lock().await.unlock_storage(&key).await.map_err(
+                    |err| {
+                        warn!("UnlockAccount failed to unlock StorageManager: {:?}", err);
+                        ApiError::Resource
+                    },
+                )?;
 
                 let mut pre_auth_state = pre_auth_state_ref.clone();
                 let pre_auth_state_bytes = maybe_updated_enrollment_state
@@ -503,24 +504,51 @@ where
         &self,
         maybe_auth_mechanism_id: Option<String>,
         interaction: Option<ServerEnd<InteractionMarker>>,
+        disk_key: &GenericArray<u8, U32>,
     ) -> Result<EnrollmentState, AccountManagerError> {
-        let (enrollment_state, maybe_prekey_material) = if !self.is_interaction_enabled {
-            self.enroll_auth_mechanism_without_interaction(maybe_auth_mechanism_id).await?
+        let enrollment_state = if !self.is_interaction_enabled {
+            self.enroll_auth_mechanism_without_interaction(maybe_auth_mechanism_id, disk_key)
+                .await?
         } else {
             // If interaction mechanisms are enabled, use the interaction
             // protocol for authenticator challenges.
-            self.enroll_auth_mechanism_with_interaction(interaction).await?
+            self.enroll_auth_mechanism_with_interaction(interaction, disk_key).await?
         };
 
-        validate_prekey(maybe_prekey_material)?;
-
         Ok(enrollment_state)
+    }
+
+    fn fetch_key(
+        prekey_material: &[u8],
+        enrollment_state: &EnrollmentState,
+    ) -> Result<[u8; 32], ApiError> {
+        match enrollment_state {
+            EnrollmentState::SingleEnrollment { wrapped_key_material, .. } => {
+                match wrapped_key_material.unwrap_disk_key(prekey_material) {
+                    Ok(key) => Ok(key),
+                    Err(e) => {
+                        warn!("Could not decrypt key material from SingleEnrollment: {:?}", e);
+                        Err(e)
+                    }
+                }
+            }
+            EnrollmentState::NoEnrollments => {
+                warn!(
+                    "Could not decrypt key material from SingleEnrollment: there were no \
+                      enrollments."
+                );
+                // TODO(fxbug.dev/104199): Once we can expect enrollments in all
+                // unit tests, we can remove this fake value.
+                Ok(*MAGIC_PREKEY)
+            }
+        }
     }
 
     async fn enroll_auth_mechanism_without_interaction(
         &self,
         maybe_auth_mechanism_id: Option<String>,
-    ) -> Result<(EnrollmentState, Option<Vec<u8>>), AccountManagerError> {
+        disk_key: &GenericArray<u8, U32>,
+    ) -> Result<EnrollmentState, AccountManagerError> {
         Ok(match (&self.lifetime, maybe_auth_mechanism_id) {
             (AccountLifetime::Persistent { .. }, Some(auth_mechanism_id)) => {
                 let (_, test_interaction_server_end) = create_endpoints().unwrap();
@@ -542,15 +570,13 @@ where
                     })?;
                 // TODO(fxb/116213): Remove the clone once we don't need to
                 // return the prekey for checking outside of this block.
-                (
-                    produce_single_enrollment(
-                        auth_mechanism_id,
-                        Mechanism::Test,
-                        data,
-                        prekey_material.clone(),
-                    )?,
-                    Some(prekey_material),
-                )
+                produce_single_enrollment(
+                    auth_mechanism_id,
+                    Mechanism::Test,
+                    data,
+                    prekey_material,
+                    disk_key,
+                )?
             }
             (AccountLifetime::Ephemeral, Some(_)) => {
                 return Err(AccountManagerError::new(ApiError::InvalidRequest).with_cause(
@@ -560,14 +586,15 @@ where
                     ),
                 ));
             }
-            (_, None) => (pre_auth::EnrollmentState::NoEnrollments, None),
+            (_, None) => pre_auth::EnrollmentState::NoEnrollments,
         })
     }
 
     async fn enroll_auth_mechanism_with_interaction(
         &self,
         mut interaction: Option<ServerEnd<InteractionMarker>>,
-    ) -> Result<(EnrollmentState, Option<Vec<u8>>), AccountManagerError> {
+        disk_key: &GenericArray<u8, U32>,
+    ) -> Result<EnrollmentState, AccountManagerError> {
         Ok(match (&self.lifetime, self.mechanisms.as_slice()) {
             (AccountLifetime::Persistent { .. }, [mechanism]) => {
                 let server_end = interaction.take().ok_or_else(|| {
@@ -578,17 +605,15 @@ where
                     Interaction::enroll(server_end, *mechanism).await?;
                 // TODO(fxb/116213): Remove the clone once we don't need to
                 // return the prekey for checking outside of this block.
-                (
-                    produce_single_enrollment(
-                        "".to_string(),
-                        *mechanism,
-                        data,
-                        prekey_material.clone(),
-                    )?,
-                    Some(prekey_material),
-                )
+                produce_single_enrollment(
+                    "".to_string(),
+                    *mechanism,
+                    data,
+                    prekey_material,
+                    disk_key,
+                )?
             }
-            (AccountLifetime::Ephemeral, []) => (pre_auth::EnrollmentState::NoEnrollments, None),
+            (AccountLifetime::Ephemeral, []) => pre_auth::EnrollmentState::NoEnrollments,
             (AccountLifetime::Persistent { .. }, _) => {
                 // We don't support zero or multiple authentication mechanisms.
                 // We already have a compile time check by providing the
@@ -617,7 +642,7 @@ where
         enrollment_state: &pre_auth::EnrollmentState,
         mut interaction: Option<ServerEnd<InteractionMarker>>,
         mechanisms: &[Mechanism],
-    ) -> Result<(Option<Vec<u8>>, Option<pre_auth::EnrollmentState>), AccountManagerError> {
+    ) -> Result<(Vec<u8>, Option<pre_auth::EnrollmentState>), AccountManagerError> {
         if let pre_auth::EnrollmentState::SingleEnrollment {
             ref auth_mechanism_id,
             ref mechanism,
@@ -640,8 +665,7 @@ where
                 if !mechanisms.contains(mechanism) {
                     return Err(AccountManagerError::new(ApiError::Internal).with_cause(
                         format_err!(
-                            "Enrollment mechanism {:?} is not available for \
-                            authentication.",
+                            "Enrollment mechanism {:?} is not available for authentication.",
                             mechanism
                         ),
                     ));
@@ -674,9 +698,19 @@ where
                     wrapped_key_material: wrapped_key_material.clone(),
                 }
             });
-            Ok((auth_attempt.prekey_material, updated_pre_auth_state))
+
+            let prekey_material: Vec<_> = auth_attempt.prekey_material.ok_or_else(|| {
+                AccountManagerError::new(ApiError::Internal)
+                    .with_cause(anyhow!("Authenticator unexpectedly returned no prekey material"))
+            })?;
+
+            Ok((prekey_material, updated_pre_auth_state))
         } else {
-            Ok((None, None))
+            // TODO(fxbug.dev/104199): Once we can expect enrollments in all
+            // unit tests, we can remove this fake value. For now, throwing an
+            // error in this case breaks several unit tests in this file which
+            // do not attach enrollments.
+            Ok((vec![], None))
         }
     }
 
@@ -790,19 +824,6 @@ where
             }
         }
     }
-}
-
-fn validate_prekey(maybe_prekey_material: Option<Vec<u8>>) -> Result<(), AccountManagerError> {
-    if let Some(prekey_material) = maybe_prekey_material {
-        // TODO(fxbug.dev/45041): Use storage manager for key validation
-        if prekey_material != *MAGIC_PREKEY {
-            return Err(AccountManagerError::new(ApiError::Internal).with_cause(format_err!(
-                "Received unexpected pre-key material from authenticator"
-            )));
-        }
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]
