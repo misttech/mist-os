@@ -33,9 +33,9 @@ DepSet = Set[FilePath]
 def copy_to_assembly_input_bundle(
     legacy: ImageAssemblyConfig, config_data_entries: FileEntryList,
     outdir: FilePath, base_driver_packages_list: List[str],
-    base_driver_components_files_list: List[dict], shell_commands: Dict[str,
-                                                                        List],
-    core_realm_shards: Set[FilePath], core_realm_includes: FileEntryList
+    base_driver_components_files_list: List[dict],
+    shell_commands: Dict[str, List], core_realm_shards: Set[FilePath],
+    core_realm_includes: FileEntryList, core_package_contents: FileEntryList
 ) -> Tuple[AssemblyInputBundle, FilePath, DepSet]:
     """
     Copy all the artifacts from the ImageAssemblyConfig into an AssemblyInputBundle that is in
@@ -75,6 +75,7 @@ def copy_to_assembly_input_bundle(
     if (core_realm_shards):
         aib_creator.component_shards = {"core": {"core": core_realm_shards}}
         aib_creator.component_includes = {"core": core_realm_includes}
+        aib_creator.compiled_package_contents = {"core": core_package_contents}
 
     return aib_creator.build()
 
@@ -101,6 +102,8 @@ def main():
     parser.add_argument("--core-realm-shards-list", type=argparse.FileType('r'))
     parser.add_argument(
         "--core-realm-includes-list", type=argparse.FileType('r'))
+    parser.add_argument(
+        "--core-package-contents-list", type=argparse.FileType('r'))
     args = parser.parse_args()
 
     # Read in the legacy config and the others to subtract from it
@@ -145,7 +148,8 @@ def main():
                     })
 
     core_realm_shards: Set[FilePath] = set()
-    core_realm_includes: List[FileEntry] = []
+    core_realm_includes: FileEntryList = []
+    core_package_contents: FileEntryList = []
     if args.core_realm_shards_list:
         for shard in json.load(args.core_realm_shards_list):
             core_realm_shards.add(shard)
@@ -157,6 +161,10 @@ def main():
             core_realm_includes.append(
                 FileEntry(include["source"], include["destination"]))
 
+        for entry in json.load(args.core_package_contents_list):
+            core_package_contents.append(
+                FileEntry(entry["source"], entry["destination"]))
+
     # Create an Assembly Input Bundle from the remaining contents
     (assembly_input_bundle, assembly_config_manifest_path,
      deps) = copy_to_assembly_input_bundle(
@@ -164,7 +172,7 @@ def main():
          base_driver_components_files_list, {
              package: sorted(list(components))
              for (package, components) in shell_commands.items()
-         }, core_realm_shards, core_realm_includes)
+         }, core_realm_shards, core_realm_includes, core_package_contents)
 
     deps.update(shell_deps)
     # Write out a fini manifest of the files that have been copied, to create a

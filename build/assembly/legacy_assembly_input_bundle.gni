@@ -4,6 +4,7 @@
 
 import("//build/assembly/assembly_input_bundle.gni")
 import("//build/assembly/package_manifests_list.gni")
+import("//build/dist/distribution_manifest.gni")
 import("//build/python/python_action.gni")
 
 # Create a "legacy" assembly input bundle from an image assembly configuration,
@@ -120,6 +121,7 @@ template("legacy_assembly_input_bundle") {
     core_realm_includes = "${target_name}.core_realm_includes"
     core_realm_default_includes = "${target_name}.core_realm_default_includes"
     core_realm_main_cml = "${target_name}.core_realm_main_cml"
+    core_realm_proxy_manifest = "${target_name}.core_realm_proxy_manifest"
   }
 
   files = {
@@ -165,6 +167,8 @@ template("legacy_assembly_input_bundle") {
     core_realm_shards_list =
         "${assembly_input_bundle_dir}.core_realm_shards_list"
     core_realm_includes = "${assembly_input_bundle_dir}.core_realm_includes"
+    core_realm_proxy_manifest =
+        "${assembly_input_bundle_dir}.core_realm_proxy_distribution_manifest"
   }
 
   package_manifests_list(labels.base_driver_package_list) {
@@ -225,6 +229,12 @@ template("legacy_assembly_input_bundle") {
       data_keys = [ "shard_files" ]
       outputs = [ "${files.core_realm_shards_list}" ]
       output_conversion = "json"
+    }
+
+    distribution_manifest(labels.core_realm_proxy_manifest) {
+      forward_variables_from(invoker, [ "testonly" ])
+      deps = [ "//src/sys/core:core_proxy" ]
+      outputs = [ files.core_realm_proxy_manifest ]
     }
 
     # Include files needed by the default core cml in the legacy AIB
@@ -355,13 +365,17 @@ template("legacy_assembly_input_bundle") {
         rebase_path(files.core_realm_shards_list, root_build_dir),
         "--core-realm-includes-list",
         rebase_path(files.core_realm_includes, root_build_dir),
+        "--core-package-contents-list",
+        rebase_path(files.core_realm_proxy_manifest, root_build_dir),
       ]
       inputs += [
         files.core_realm_shards_list,
         files.core_realm_includes,
+        files.core_realm_proxy_manifest,
       ]
       deps += [
         ":${labels.core_realm_includes}",
+        ":${labels.core_realm_proxy_manifest}",
         ":${labels.core_realm_shards_list}",
       ]
     }

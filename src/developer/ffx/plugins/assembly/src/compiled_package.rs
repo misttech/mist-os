@@ -123,7 +123,8 @@ impl CompiledPackageBuilder {
         }
 
         for entry in &main_definition.contents {
-            package_builder.add_file_as_blob(&entry.destination, &entry.source)?;
+            package_builder
+                .add_file_as_blob(&entry.destination, self.main_bundle_path.join(&entry.source))?;
         }
 
         let package_manifest_path = outdir.join("package_manifest.json");

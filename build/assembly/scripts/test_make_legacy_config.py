@@ -157,14 +157,20 @@ class MakeLegacyConfig(unittest.TestCase):
             # Create the outdir path, and perform the "copying" into the
             # AssemblyInputBundle.
             aib, _, deps = make_legacy_config.copy_to_assembly_input_bundle(
-                image_assembly, [], OUTDIR, [driver_manifest_path],
-                [driver_component_file], shell_commands_file, [
+                image_assembly, [],
+                OUTDIR, [driver_manifest_path], [driver_component_file],
+                shell_commands_file, [
                     os.path.join(SOURCE_DIR, "core/realm.cml"),
                     os.path.join(SOURCE_DIR, "core/realm/shard.cml")
                 ], [
                     FileEntry(
                         os.path.join(SOURCE_DIR, "src/include.cml"),
                         "src/include.cml")
+                ],
+                core_package_contents=[
+                    FileEntry(
+                        os.path.join(SOURCE_DIR, "some/core/package/file"),
+                        "core/package/file/destination")
                 ])
             # Validate the contents of the AssemblyInputBundle itself
             self.assertEqual(
@@ -204,7 +210,13 @@ class MakeLegacyConfig(unittest.TestCase):
                             "core":
                                 "outdir/compiled_packages/core/component_shards/source_core_realm_cml"
                         },
-                        contents=set(),
+                        contents=set(
+                            [
+                                FileEntry(
+                                    source=
+                                    "compiled_packages/core/files/core/package/file/destination",
+                                    destination="core/package/file/destination")
+                            ]),
                         includes=set(
                             [
                                 "outdir/compiled_packages/include/src/include.cml"
@@ -306,7 +318,8 @@ class MakeLegacyConfig(unittest.TestCase):
                         'source/system_b/internal/path/file_b_3',
                         'source/kernel.bin', 'source/some/file',
                         'source/another/file', 'source/core/realm.cml',
-                        'source/core/realm/shard.cml', 'source/src/include.cml'
+                        'source/core/realm/shard.cml', 'source/src/include.cml',
+                        'source/some/core/package/file'
                     ]))
 
             # Validate that all the files were correctly copied to the
@@ -430,6 +443,11 @@ class MakeLegacyConfig(unittest.TestCase):
                             'outdir/compiled_packages/core/component_shards/source_core_realm_shard_cml'
                         ),
                         FileEntry(
+                            source='source/some/core/package/file',
+                            destination=
+                            'outdir/compiled_packages/core/files/core/package/file/destination'
+                        ),
+                        FileEntry(
                             source='source/kernel.bin',
                             destination='outdir/kernel/kernel.bin'),
                         FileEntry(
@@ -466,7 +484,7 @@ class MakeLegacyConfig(unittest.TestCase):
 
             # Copies legacy config into AIB
             aib, _, _ = make_legacy_config.copy_to_assembly_input_bundle(
-                image_assembly, [], OUTDIR, [], [], dict(), set(), [])
+                image_assembly, [], OUTDIR, [], [], dict(), set(), [], [])
 
             # Asserts that the duplicate package is present in the base package set after
             # being copied to the AIB
@@ -507,7 +525,7 @@ class MakeLegacyConfig(unittest.TestCase):
                     {make_package_path(duplicate_package)}, list())
                 aib, _, _ = make_legacy_config.copy_to_assembly_input_bundle(
                     image_assembly, [], OUTDIR, [manifest_path], [], dict(),
-                    set(), [])
+                    set(), [], [])
 
             self.assertNotIn(make_package_path(duplicate_package), aib.base)
             self.assertIn(
@@ -555,4 +573,4 @@ class MakeLegacyConfig(unittest.TestCase):
                 DuplicatePackageException,
                 partial(
                     make_legacy_config.copy_to_assembly_input_bundle,
-                    image_assembly, [], OUTDIR, [], [], dict(), set(), []))
+                    image_assembly, [], OUTDIR, [], [], dict(), set(), [], []))

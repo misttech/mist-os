@@ -34,7 +34,7 @@ ComponentName = str
 DepSet = Set[FilePath]
 FileEntryList = List[FileEntry]
 FileEntrySet = Set[FileEntry]
-ComponentShards = Dict[PackageName, Dict[ComponentName, Set[FilePath]]]
+ComponentShards = Set[FilePath]
 Merkle = str
 BlobList = List[Tuple[Merkle, FilePath]]
 SubpackageManifests = Dict[Merkle, FilePath]
@@ -181,7 +181,7 @@ class AssemblyInputBundle(ImageAssemblyConfig):
                        "component1": "path/to/component1.cml",
                        "component2": "path/to/component2.cml",
                    },
-                   "contents:: [
+                   "contents": [
                        {
                            "source": "path/to/source",
                            "destination": "path/to/destination",
@@ -270,6 +270,7 @@ class AssemblyInputBundle(ImageAssemblyConfig):
             if isinstance(package, CompiledPackageMainDefinition):
                 file_paths.extend(package.includes)
                 file_paths.extend(package.components.values())
+                file_paths.extend(package.contents)
             if isinstance(package, CompiledPackageAdditionalShards):
                 file_paths.extend(
                     [
@@ -382,13 +383,18 @@ class AIBCreator:
         # A dict mapping package name to dicts mapping component names to
         # the component shards used to build them, which describes the
         # components to build for each compiled package
-        self.component_shards: ComponentShards = dict()
+        self.component_shards: Dict[PackageName,
+                                    Dict[ComponentName,
+                                         ComponentShards]] = dict()
 
         # A set containing all the core realm shards included by the core
         # package cml. These need to be placed in an include directory for
         # the cml compiler in the AIB containing the core package definition.
         # TODO(fxbug.dev/117397): Handle multiple packages properly
         self.component_includes: Dict[PackageName, FileEntryList] = []
+
+        # A set of file entries to include in compiled packages
+        self.compiled_package_contents: Dict[PackageName, FileEntryList] = []
 
     def build(self) -> Tuple[AssemblyInputBundle, FilePath, DepSet]:
         """
@@ -523,6 +529,11 @@ class AIBCreator:
                     self.component_includes[package_name])
                 deps.update(component_includes_deps)
 
+                # Copy the package contents entries
+                (package_files, package_deps) = self._copy_file_entries(
+                    self.compiled_package_contents[package_name],
+                    os.path.join("compiled_packages", package_name, "files"))
+
                 result.packages_to_compile.append(
                     CompiledPackageMainDefinition(
                         name=package_name,
@@ -530,7 +541,8 @@ class AIBCreator:
                             component_name: components[component_name][0]
                             for component_name in components.keys()
                         },
-                        includes=component_includes))
+                        includes=component_includes,
+                        contents=set(package_files)))
                 result.packages_to_compile.append(
                     CompiledPackageAdditionalShards(
                         name=package_name,
@@ -538,6 +550,8 @@ class AIBCreator:
                             component_name: components[component_name][1:]
                             for component_name in components.keys()
                         }))
+
+                deps.update(package_deps)
 
         # Copy the config_data entries into the out-of-tree layout
         (config_data, config_data_deps) = self._copy_config_data_entries()
@@ -834,7 +848,7 @@ class AIBCreator:
         return shard_file_paths, deps
 
     def _copy_file_entries(self, entries: FileEntrySet,
-                           set_name: str) -> Tuple[FileEntryList, DepSet]:
+                           subdirectory: str) -> Tuple[FileEntryList, DepSet]:
         results: FileEntryList = []
         deps: DepSet = set()
 
@@ -843,7 +857,7 @@ class AIBCreator:
             return (results, deps)
 
         for entry in entries:
-            rebased_destination = os.path.join(set_name, entry.destination)
+            rebased_destination = os.path.join(subdirectory, entry.destination)
             copy_destination = os.path.join(self.outdir, rebased_destination)
 
             # Hardlink the file from source to the destination, relative to the
