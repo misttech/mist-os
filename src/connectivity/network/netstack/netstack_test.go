@@ -434,10 +434,10 @@ func TestTCPEndpointMapAcceptAfterReset(t *testing.T) {
 
 	listener := makeStreamSocketImpl(createEP(t, ns, new(waiter.Queue)))
 
-	if err := listener.ep.Bind(tcpip.FullAddress{}); err != nil {
+	if err := listener.endpoint.ep.Bind(tcpip.FullAddress{}); err != nil {
 		t.Fatalf("Bind({}) = %s", err)
 	}
-	if err := listener.ep.Listen(1); err != nil {
+	if err := listener.endpoint.ep.Listen(1); err != nil {
 		t.Fatalf("Listen(1) = %s", err)
 	}
 
@@ -445,7 +445,7 @@ func TestTCPEndpointMapAcceptAfterReset(t *testing.T) {
 
 	// Connect and wait for the incoming connection.
 	func() {
-		connectAddr, err := listener.ep.GetLocalAddress()
+		connectAddr, err := listener.endpoint.ep.GetLocalAddress()
 		if err != nil {
 			t.Fatalf("GetLocalAddress() = %s", err)
 		}

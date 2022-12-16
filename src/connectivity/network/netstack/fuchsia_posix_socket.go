@@ -325,6 +325,14 @@ type endpoint struct {
 	ns *Netstack
 }
 
+// endpointWithMutators exposes FIDL methods that mutate the state of the
+// endpoint. This division lets endpoints embed non-mutating endpoints while
+// programmatically enforcing special handling for mutators (e.g. datagram
+// sockets need to flush caches on every mutation).
+type endpointWithMutators struct {
+	ep *endpoint
+}
+
 func (ep *endpoint) incRef() {
 	ep.mu.Lock()
 	ep.mu.refcount++
@@ -343,14 +351,14 @@ func (ep *endpoint) decRef() bool {
 	return doClose
 }
 
-func (ep *endpoint) Bind(_ fidl.Context, sockaddr fidlnet.SocketAddress) (socket.BaseNetworkSocketBindResult, error) {
+func (ep *endpointWithMutators) Bind(_ fidl.Context, sockaddr fidlnet.SocketAddress) (socket.BaseNetworkSocketBindResult, error) {
 	addr := fidlconv.ToTCPIPFullAddress(sockaddr)
-	if err := ep.ep.Bind(addr); err != nil {
+	if err := ep.ep.ep.Bind(addr); err != nil {
 		return socket.BaseNetworkSocketBindResultWithErr(tcpipErrorToCode(err)), nil
 	}
 
 	{
-		localAddr, err := ep.ep.GetLocalAddress()
+		localAddr, err := ep.ep.ep.GetLocalAddress()
 		if err != nil {
 			panic(err)
 		}
@@ -409,8 +417,8 @@ func (ep *endpoint) connect(addr tcpip.FullAddress) tcpip.Error {
 	return nil
 }
 
-func (ep *endpoint) Disconnect(fidl.Context) (socket.BaseNetworkSocketDisconnectResult, error) {
-	if err := ep.ep.Disconnect(); err != nil {
+func (ep *endpointWithMutators) Disconnect(fidl.Context) (socket.BaseNetworkSocketDisconnectResult, error) {
+	if err := ep.ep.ep.Disconnect(); err != nil {
 		return socket.BaseNetworkSocketDisconnectResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.BaseNetworkSocketDisconnectResultWithResponse(socket.BaseNetworkSocketDisconnectResponse{}), nil
@@ -445,10 +453,10 @@ func (ep *endpoint) GetTimestampDeprecated(fidl.Context) (socket.BaseSocketGetTi
 }
 
 // TODO(https://fxbug.dev/87656): Remove after ABI transition.
-func (ep *endpoint) SetTimestampDeprecated(_ fidl.Context, value socket.TimestampOption) (socket.BaseSocketSetTimestampDeprecatedResult, error) {
-	ep.mu.Lock()
-	ep.mu.sockOptTimestamp = value
-	ep.mu.Unlock()
+func (ep *endpointWithMutators) SetTimestampDeprecated(_ fidl.Context, value socket.TimestampOption) (socket.BaseSocketSetTimestampDeprecatedResult, error) {
+	ep.ep.mu.Lock()
+	ep.ep.mu.sockOptTimestamp = value
+	ep.ep.mu.Unlock()
 	return socket.BaseSocketSetTimestampDeprecatedResultWithResponse(socket.BaseSocketSetTimestampDeprecatedResponse{}), nil
 }
 
@@ -465,8 +473,8 @@ func (ep *endpoint) setTimestamp(value socket.TimestampOption) {
 	ep.mu.Unlock()
 }
 
-func (ep *endpoint) SetTimestamp(_ fidl.Context, value socket.TimestampOption) (socket.BaseSocketSetTimestampResult, error) {
-	ep.setTimestamp(value)
+func (ep *endpointWithMutators) SetTimestamp(_ fidl.Context, value socket.TimestampOption) (socket.BaseSocketSetTimestampResult, error) {
+	ep.ep.setTimestamp(value)
 	return socket.BaseSocketSetTimestampResultWithResponse(socket.BaseSocketSetTimestampResponse{}), nil
 }
 
@@ -509,8 +517,8 @@ func setBufferSize(size uint64, set func(int64, bool), limits func() (min, max i
 	}
 }
 
-func (ep *endpoint) SetSendBuffer(_ fidl.Context, size uint64) (socket.BaseSocketSetSendBufferResult, error) {
-	opts := ep.ep.SocketOptions()
+func (ep *endpointWithMutators) SetSendBuffer(_ fidl.Context, size uint64) (socket.BaseSocketSetSendBufferResult, error) {
+	opts := ep.ep.ep.SocketOptions()
 	setBufferSize(size, opts.SetSendBufferSize, opts.SendBufferLimits)
 	return socket.BaseSocketSetSendBufferResultWithResponse(socket.BaseSocketSetSendBufferResponse{}), nil
 }
@@ -520,8 +528,8 @@ func (ep *endpoint) GetSendBuffer(fidl.Context) (socket.BaseSocketGetSendBufferR
 	return socket.BaseSocketGetSendBufferResultWithResponse(socket.BaseSocketGetSendBufferResponse{ValueBytes: uint64(size)}), nil
 }
 
-func (ep *endpoint) SetReceiveBuffer(_ fidl.Context, size uint64) (socket.BaseSocketSetReceiveBufferResult, error) {
-	opts := ep.ep.SocketOptions()
+func (ep *endpointWithMutators) SetReceiveBuffer(_ fidl.Context, size uint64) (socket.BaseSocketSetReceiveBufferResult, error) {
+	opts := ep.ep.ep.SocketOptions()
 	setBufferSize(size, opts.SetReceiveBufferSize, opts.ReceiveBufferLimits)
 	return socket.BaseSocketSetReceiveBufferResultWithResponse(socket.BaseSocketSetReceiveBufferResponse{}), nil
 }
@@ -531,8 +539,8 @@ func (ep *endpoint) GetReceiveBuffer(fidl.Context) (socket.BaseSocketGetReceiveB
 	return socket.BaseSocketGetReceiveBufferResultWithResponse(socket.BaseSocketGetReceiveBufferResponse{ValueBytes: uint64(size)}), nil
 }
 
-func (ep *endpoint) SetReuseAddress(_ fidl.Context, value bool) (socket.BaseSocketSetReuseAddressResult, error) {
-	ep.ep.SocketOptions().SetReuseAddress(value)
+func (ep *endpointWithMutators) SetReuseAddress(_ fidl.Context, value bool) (socket.BaseSocketSetReuseAddressResult, error) {
+	ep.ep.ep.SocketOptions().SetReuseAddress(value)
 	return socket.BaseSocketSetReuseAddressResultWithResponse(socket.BaseSocketSetReuseAddressResponse{}), nil
 }
 
@@ -541,8 +549,8 @@ func (ep *endpoint) GetReuseAddress(fidl.Context) (socket.BaseSocketGetReuseAddr
 	return socket.BaseSocketGetReuseAddressResultWithResponse(socket.BaseSocketGetReuseAddressResponse{Value: value}), nil
 }
 
-func (ep *endpoint) SetReusePort(_ fidl.Context, value bool) (socket.BaseSocketSetReusePortResult, error) {
-	ep.ep.SocketOptions().SetReusePort(value)
+func (ep *endpointWithMutators) SetReusePort(_ fidl.Context, value bool) (socket.BaseSocketSetReusePortResult, error) {
+	ep.ep.ep.SocketOptions().SetReusePort(value)
 	return socket.BaseSocketSetReusePortResultWithResponse(socket.BaseSocketSetReusePortResponse{}), nil
 }
 
@@ -559,14 +567,14 @@ func (ep *endpoint) GetAcceptConn(fidl.Context) (socket.BaseSocketGetAcceptConnR
 	return socket.BaseSocketGetAcceptConnResultWithResponse(socket.BaseSocketGetAcceptConnResponse{Value: value}), nil
 }
 
-func (ep *endpoint) SetBindToDevice(_ fidl.Context, value string) (socket.BaseSocketSetBindToDeviceResult, error) {
+func (ep *endpointWithMutators) SetBindToDevice(_ fidl.Context, value string) (socket.BaseSocketSetBindToDeviceResult, error) {
 	if err := func() tcpip.Error {
 		if len(value) == 0 {
-			return ep.ep.SocketOptions().SetBindToDevice(0)
+			return ep.ep.ep.SocketOptions().SetBindToDevice(0)
 		}
-		for id, info := range ep.ns.stack.NICInfo() {
+		for id, info := range ep.ep.ns.stack.NICInfo() {
 			if value == info.Name {
-				return ep.ep.SocketOptions().SetBindToDevice(int32(id))
+				return ep.ep.ep.SocketOptions().SetBindToDevice(int32(id))
 			}
 		}
 		return &tcpip.ErrUnknownDevice{}
@@ -590,8 +598,8 @@ func (ep *endpoint) GetBindToDevice(fidl.Context) (socket.BaseSocketGetBindToDev
 	return socket.BaseSocketGetBindToDeviceResultWithErr(posix.ErrnoEnodev), nil
 }
 
-func (ep *endpoint) SetBroadcast(_ fidl.Context, value bool) (socket.BaseSocketSetBroadcastResult, error) {
-	ep.ep.SocketOptions().SetBroadcast(value)
+func (ep *endpointWithMutators) SetBroadcast(_ fidl.Context, value bool) (socket.BaseSocketSetBroadcastResult, error) {
+	ep.ep.ep.SocketOptions().SetBroadcast(value)
 	return socket.BaseSocketSetBroadcastResultWithResponse(socket.BaseSocketSetBroadcastResponse{}), nil
 }
 
@@ -600,8 +608,8 @@ func (ep *endpoint) GetBroadcast(fidl.Context) (socket.BaseSocketGetBroadcastRes
 	return socket.BaseSocketGetBroadcastResultWithResponse(socket.BaseSocketGetBroadcastResponse{Value: value}), nil
 }
 
-func (ep *endpoint) SetKeepAlive(_ fidl.Context, value bool) (socket.BaseSocketSetKeepAliveResult, error) {
-	ep.ep.SocketOptions().SetKeepAlive(value)
+func (ep *endpointWithMutators) SetKeepAlive(_ fidl.Context, value bool) (socket.BaseSocketSetKeepAliveResult, error) {
+	ep.ep.ep.SocketOptions().SetKeepAlive(value)
 	return socket.BaseSocketSetKeepAliveResultWithResponse(socket.BaseSocketSetKeepAliveResponse{}), nil
 }
 
@@ -610,8 +618,8 @@ func (ep *endpoint) GetKeepAlive(fidl.Context) (socket.BaseSocketGetKeepAliveRes
 	return socket.BaseSocketGetKeepAliveResultWithResponse(socket.BaseSocketGetKeepAliveResponse{Value: value}), nil
 }
 
-func (ep *endpoint) SetLinger(_ fidl.Context, linger bool, seconds uint32) (socket.BaseSocketSetLingerResult, error) {
-	ep.ep.SocketOptions().SetLinger(tcpip.LingerOption{
+func (ep *endpointWithMutators) SetLinger(_ fidl.Context, linger bool, seconds uint32) (socket.BaseSocketSetLingerResult, error) {
+	ep.ep.ep.SocketOptions().SetLinger(tcpip.LingerOption{
 		Enabled: linger,
 		Timeout: time.Second * time.Duration(seconds),
 	})
@@ -628,8 +636,8 @@ func (ep *endpoint) GetLinger(fidl.Context) (socket.BaseSocketGetLingerResult, e
 	), nil
 }
 
-func (ep *endpoint) SetOutOfBandInline(_ fidl.Context, value bool) (socket.BaseSocketSetOutOfBandInlineResult, error) {
-	ep.ep.SocketOptions().SetOutOfBandInline(value)
+func (ep *endpointWithMutators) SetOutOfBandInline(_ fidl.Context, value bool) (socket.BaseSocketSetOutOfBandInlineResult, error) {
+	ep.ep.ep.SocketOptions().SetOutOfBandInline(value)
 	return socket.BaseSocketSetOutOfBandInlineResultWithResponse(socket.BaseSocketSetOutOfBandInlineResponse{}), nil
 }
 
@@ -642,8 +650,8 @@ func (ep *endpoint) GetOutOfBandInline(fidl.Context) (socket.BaseSocketGetOutOfB
 	), nil
 }
 
-func (ep *endpoint) SetNoCheck(_ fidl.Context, value bool) (socket.BaseSocketSetNoCheckResult, error) {
-	ep.ep.SocketOptions().SetNoChecksum(value)
+func (ep *endpointWithMutators) SetNoCheck(_ fidl.Context, value bool) (socket.BaseSocketSetNoCheckResult, error) {
+	ep.ep.ep.SocketOptions().SetNoChecksum(value)
 	return socket.BaseSocketSetNoCheckResultWithResponse(socket.BaseSocketSetNoCheckResponse{}), nil
 }
 
@@ -652,8 +660,8 @@ func (ep *endpoint) GetNoCheck(fidl.Context) (socket.BaseSocketGetNoCheckResult,
 	return socket.BaseSocketGetNoCheckResultWithResponse(socket.BaseSocketGetNoCheckResponse{Value: value}), nil
 }
 
-func (ep *endpoint) SetIpv6Only(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpv6OnlyResult, error) {
-	ep.ep.SocketOptions().SetV6Only(value)
+func (ep *endpointWithMutators) SetIpv6Only(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpv6OnlyResult, error) {
+	ep.ep.ep.SocketOptions().SetV6Only(value)
 	return socket.BaseNetworkSocketSetIpv6OnlyResultWithResponse(socket.BaseNetworkSocketSetIpv6OnlyResponse{}), nil
 }
 
@@ -662,12 +670,12 @@ func (ep *endpoint) GetIpv6Only(fidl.Context) (socket.BaseNetworkSocketGetIpv6On
 	return socket.BaseNetworkSocketGetIpv6OnlyResultWithResponse(socket.BaseNetworkSocketGetIpv6OnlyResponse{Value: value}), nil
 }
 
-func (ep *endpoint) SetIpv6TrafficClass(_ fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpv6TrafficClassResult, error) {
+func (ep *endpointWithMutators) SetIpv6TrafficClass(_ fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpv6TrafficClassResult, error) {
 	v, err := optionalUint8ToInt(value, 0)
 	if err != nil {
 		return socket.BaseNetworkSocketSetIpv6TrafficClassResultWithErr(tcpipErrorToCode(err)), nil
 	}
-	if err := ep.ep.SetSockOptInt(tcpip.IPv6TrafficClassOption, v); err != nil {
+	if err := ep.ep.ep.SetSockOptInt(tcpip.IPv6TrafficClassOption, v); err != nil {
 		return socket.BaseNetworkSocketSetIpv6TrafficClassResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.BaseNetworkSocketSetIpv6TrafficClassResultWithResponse(socket.BaseNetworkSocketSetIpv6TrafficClassResponse{}), nil
@@ -686,11 +694,11 @@ func (ep *endpoint) GetIpv6TrafficClass(fidl.Context) (socket.BaseNetworkSocketG
 	), nil
 }
 
-func (ep *endpoint) SetIpv6MulticastInterface(_ fidl.Context, value uint64) (socket.BaseNetworkSocketSetIpv6MulticastInterfaceResult, error) {
+func (ep *endpointWithMutators) SetIpv6MulticastInterface(_ fidl.Context, value uint64) (socket.BaseNetworkSocketSetIpv6MulticastInterfaceResult, error) {
 	opt := tcpip.MulticastInterfaceOption{
 		NIC: tcpip.NICID(value),
 	}
-	if err := ep.ep.SetSockOpt(&opt); err != nil {
+	if err := ep.ep.ep.SetSockOpt(&opt); err != nil {
 		return socket.BaseNetworkSocketSetIpv6MulticastInterfaceResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.BaseNetworkSocketSetIpv6MulticastInterfaceResultWithResponse(socket.BaseNetworkSocketSetIpv6MulticastInterfaceResponse{}), nil
@@ -704,12 +712,12 @@ func (ep *endpoint) GetIpv6MulticastInterface(fidl.Context) (socket.BaseNetworkS
 	return socket.BaseNetworkSocketGetIpv6MulticastInterfaceResultWithResponse(socket.BaseNetworkSocketGetIpv6MulticastInterfaceResponse{Value: uint64(value.NIC)}), nil
 }
 
-func (ep *endpoint) SetIpv6MulticastHops(_ fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpv6MulticastHopsResult, error) {
+func (ep *endpointWithMutators) SetIpv6MulticastHops(_ fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpv6MulticastHopsResult, error) {
 	v, err := optionalUint8ToInt(value, 1)
 	if err != nil {
 		return socket.BaseNetworkSocketSetIpv6MulticastHopsResultWithErr(tcpipErrorToCode(err)), nil
 	}
-	if err := ep.ep.SetSockOptInt(tcpip.MulticastTTLOption, v); err != nil {
+	if err := ep.ep.ep.SetSockOptInt(tcpip.MulticastTTLOption, v); err != nil {
 		return socket.BaseNetworkSocketSetIpv6MulticastHopsResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.BaseNetworkSocketSetIpv6MulticastHopsResultWithResponse(socket.BaseNetworkSocketSetIpv6MulticastHopsResponse{}), nil
@@ -727,12 +735,12 @@ func (ep *endpoint) GetIpv6MulticastHops(fidl.Context) (socket.BaseNetworkSocket
 	), nil
 }
 
-func (ep *endpoint) SetIpv6UnicastHops(_ fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpv6UnicastHopsResult, error) {
+func (ep *endpointWithMutators) SetIpv6UnicastHops(_ fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpv6UnicastHopsResult, error) {
 	v, err := optionalUint8ToInt(value, -1)
 	if err != nil {
 		return socket.BaseNetworkSocketSetIpv6UnicastHopsResultWithErr(tcpipErrorToCode(err)), nil
 	}
-	if err := ep.ep.SetSockOptInt(tcpip.IPv6HopLimitOption, v); err != nil {
+	if err := ep.ep.ep.SetSockOptInt(tcpip.IPv6HopLimitOption, v); err != nil {
 		return socket.BaseNetworkSocketSetIpv6UnicastHopsResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.BaseNetworkSocketSetIpv6UnicastHopsResultWithResponse(socket.BaseNetworkSocketSetIpv6UnicastHopsResponse{}), nil
@@ -757,8 +765,8 @@ func (ep *endpoint) GetIpv6UnicastHops(fidl.Context) (socket.BaseNetworkSocketGe
 	), nil
 }
 
-func (ep *endpoint) SetIpv6MulticastLoopback(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpv6MulticastLoopbackResult, error) {
-	ep.ep.SocketOptions().SetMulticastLoop(value)
+func (ep *endpointWithMutators) SetIpv6MulticastLoopback(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpv6MulticastLoopbackResult, error) {
+	ep.ep.ep.SocketOptions().SetMulticastLoop(value)
 	return socket.BaseNetworkSocketSetIpv6MulticastLoopbackResultWithResponse(socket.BaseNetworkSocketSetIpv6MulticastLoopbackResponse{}), nil
 }
 
@@ -767,7 +775,7 @@ func (ep *endpoint) GetIpv6MulticastLoopback(fidl.Context) (socket.BaseNetworkSo
 	return socket.BaseNetworkSocketGetIpv6MulticastLoopbackResultWithResponse(socket.BaseNetworkSocketGetIpv6MulticastLoopbackResponse{Value: value}), nil
 }
 
-func (ep *endpoint) SetIpTtl(_ fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpTtlResult, error) {
+func (ep *endpointWithMutators) SetIpTtl(_ fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpTtlResult, error) {
 	v, err := optionalUint8ToInt(value, -1)
 	if err != nil {
 		return socket.BaseNetworkSocketSetIpTtlResultWithErr(tcpipErrorToCode(err)), nil
@@ -779,7 +787,7 @@ func (ep *endpoint) SetIpTtl(_ fidl.Context, value socket.OptionalUint8) (socket
 	case 0:
 		return socket.BaseNetworkSocketSetIpTtlResultWithErr(posix.ErrnoEinval), nil
 	}
-	if err := ep.ep.SetSockOptInt(tcpip.IPv4TTLOption, v); err != nil {
+	if err := ep.ep.ep.SetSockOptInt(tcpip.IPv4TTLOption, v); err != nil {
 		return socket.BaseNetworkSocketSetIpTtlResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.BaseNetworkSocketSetIpTtlResultWithResponse(socket.BaseNetworkSocketSetIpTtlResponse{}), nil
@@ -800,13 +808,13 @@ func (ep *endpoint) GetIpTtl(fidl.Context) (socket.BaseNetworkSocketGetIpTtlResu
 	return socket.BaseNetworkSocketGetIpTtlResultWithResponse(socket.BaseNetworkSocketGetIpTtlResponse{Value: uint8(value)}), nil
 }
 
-func (ep *endpoint) SetIpMulticastTtl(_ fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpMulticastTtlResult, error) {
+func (ep *endpointWithMutators) SetIpMulticastTtl(_ fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpMulticastTtlResult, error) {
 	// Linux translates -1 (unset) to 1
 	v, err := optionalUint8ToInt(value, 1)
 	if err != nil {
 		return socket.BaseNetworkSocketSetIpMulticastTtlResultWithErr(tcpipErrorToCode(err)), nil
 	}
-	if err := ep.ep.SetSockOptInt(tcpip.MulticastTTLOption, v); err != nil {
+	if err := ep.ep.ep.SetSockOptInt(tcpip.MulticastTTLOption, v); err != nil {
 		return socket.BaseNetworkSocketSetIpMulticastTtlResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.BaseNetworkSocketSetIpMulticastTtlResultWithResponse(socket.BaseNetworkSocketSetIpMulticastTtlResponse{}), nil
@@ -820,12 +828,12 @@ func (ep *endpoint) GetIpMulticastTtl(fidl.Context) (socket.BaseNetworkSocketGet
 	return socket.BaseNetworkSocketGetIpMulticastTtlResultWithResponse(socket.BaseNetworkSocketGetIpMulticastTtlResponse{Value: uint8(value)}), nil
 }
 
-func (ep *endpoint) SetIpMulticastInterface(_ fidl.Context, iface uint64, value fidlnet.Ipv4Address) (socket.BaseNetworkSocketSetIpMulticastInterfaceResult, error) {
+func (ep *endpointWithMutators) SetIpMulticastInterface(_ fidl.Context, iface uint64, value fidlnet.Ipv4Address) (socket.BaseNetworkSocketSetIpMulticastInterfaceResult, error) {
 	opt := tcpip.MulticastInterfaceOption{
 		NIC:           tcpip.NICID(iface),
 		InterfaceAddr: fidlconv.ToTcpIpAddressDroppingUnspecifiedv4(value),
 	}
-	if err := ep.ep.SetSockOpt(&opt); err != nil {
+	if err := ep.ep.ep.SetSockOpt(&opt); err != nil {
 		return socket.BaseNetworkSocketSetIpMulticastInterfaceResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.BaseNetworkSocketSetIpMulticastInterfaceResultWithResponse(socket.BaseNetworkSocketSetIpMulticastInterfaceResponse{}), nil
@@ -847,8 +855,8 @@ func (ep *endpoint) GetIpMulticastInterface(fidl.Context) (socket.BaseNetworkSoc
 	), nil
 }
 
-func (ep *endpoint) SetIpMulticastLoopback(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpMulticastLoopbackResult, error) {
-	ep.ep.SocketOptions().SetMulticastLoop(value)
+func (ep *endpointWithMutators) SetIpMulticastLoopback(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpMulticastLoopbackResult, error) {
+	ep.ep.ep.SocketOptions().SetMulticastLoop(value)
 	return socket.BaseNetworkSocketSetIpMulticastLoopbackResultWithResponse(socket.BaseNetworkSocketSetIpMulticastLoopbackResponse{}), nil
 }
 
@@ -857,8 +865,8 @@ func (ep *endpoint) GetIpMulticastLoopback(fidl.Context) (socket.BaseNetworkSock
 	return socket.BaseNetworkSocketGetIpMulticastLoopbackResultWithResponse(socket.BaseNetworkSocketGetIpMulticastLoopbackResponse{Value: value}), nil
 }
 
-func (ep *endpoint) SetIpTypeOfService(_ fidl.Context, value uint8) (socket.BaseNetworkSocketSetIpTypeOfServiceResult, error) {
-	if err := ep.ep.SetSockOptInt(tcpip.IPv4TOSOption, int(value)); err != nil {
+func (ep *endpointWithMutators) SetIpTypeOfService(_ fidl.Context, value uint8) (socket.BaseNetworkSocketSetIpTypeOfServiceResult, error) {
+	if err := ep.ep.ep.SetSockOptInt(tcpip.IPv4TOSOption, int(value)); err != nil {
 		return socket.BaseNetworkSocketSetIpTypeOfServiceResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.BaseNetworkSocketSetIpTypeOfServiceResultWithResponse(socket.BaseNetworkSocketSetIpTypeOfServiceResponse{}), nil
@@ -875,47 +883,47 @@ func (ep *endpoint) GetIpTypeOfService(fidl.Context) (socket.BaseNetworkSocketGe
 	return socket.BaseNetworkSocketGetIpTypeOfServiceResultWithResponse(socket.BaseNetworkSocketGetIpTypeOfServiceResponse{Value: uint8(value)}), nil
 }
 
-func (ep *endpoint) AddIpMembership(_ fidl.Context, membership socket.IpMulticastMembership) (socket.BaseNetworkSocketAddIpMembershipResult, error) {
+func (ep *endpointWithMutators) AddIpMembership(_ fidl.Context, membership socket.IpMulticastMembership) (socket.BaseNetworkSocketAddIpMembershipResult, error) {
 	opt := tcpip.AddMembershipOption{
 		NIC:           tcpip.NICID(membership.Iface),
 		InterfaceAddr: fidlconv.ToTcpIpAddressDroppingUnspecifiedv4(membership.LocalAddr),
 		MulticastAddr: fidlconv.ToTcpIpAddressDroppingUnspecifiedv4(membership.McastAddr),
 	}
-	if err := ep.ep.SetSockOpt(&opt); err != nil {
+	if err := ep.ep.ep.SetSockOpt(&opt); err != nil {
 		return socket.BaseNetworkSocketAddIpMembershipResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.BaseNetworkSocketAddIpMembershipResultWithResponse(socket.BaseNetworkSocketAddIpMembershipResponse{}), nil
 }
 
-func (ep *endpoint) DropIpMembership(_ fidl.Context, membership socket.IpMulticastMembership) (socket.BaseNetworkSocketDropIpMembershipResult, error) {
+func (ep *endpointWithMutators) DropIpMembership(_ fidl.Context, membership socket.IpMulticastMembership) (socket.BaseNetworkSocketDropIpMembershipResult, error) {
 	opt := tcpip.RemoveMembershipOption{
 		NIC:           tcpip.NICID(membership.Iface),
 		InterfaceAddr: fidlconv.ToTcpIpAddressDroppingUnspecifiedv4(membership.LocalAddr),
 		MulticastAddr: fidlconv.ToTcpIpAddressDroppingUnspecifiedv4(membership.McastAddr),
 	}
-	if err := ep.ep.SetSockOpt(&opt); err != nil {
+	if err := ep.ep.ep.SetSockOpt(&opt); err != nil {
 		return socket.BaseNetworkSocketDropIpMembershipResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.BaseNetworkSocketDropIpMembershipResultWithResponse(socket.BaseNetworkSocketDropIpMembershipResponse{}), nil
 }
 
-func (ep *endpoint) AddIpv6Membership(_ fidl.Context, membership socket.Ipv6MulticastMembership) (socket.BaseNetworkSocketAddIpv6MembershipResult, error) {
+func (ep *endpointWithMutators) AddIpv6Membership(_ fidl.Context, membership socket.Ipv6MulticastMembership) (socket.BaseNetworkSocketAddIpv6MembershipResult, error) {
 	opt := tcpip.AddMembershipOption{
 		NIC:           tcpip.NICID(membership.Iface),
 		MulticastAddr: fidlconv.ToTcpIpAddressDroppingUnspecifiedv6(membership.McastAddr),
 	}
-	if err := ep.ep.SetSockOpt(&opt); err != nil {
+	if err := ep.ep.ep.SetSockOpt(&opt); err != nil {
 		return socket.BaseNetworkSocketAddIpv6MembershipResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.BaseNetworkSocketAddIpv6MembershipResultWithResponse(socket.BaseNetworkSocketAddIpv6MembershipResponse{}), nil
 }
 
-func (ep *endpoint) DropIpv6Membership(_ fidl.Context, membership socket.Ipv6MulticastMembership) (socket.BaseNetworkSocketDropIpv6MembershipResult, error) {
+func (ep *endpointWithMutators) DropIpv6Membership(_ fidl.Context, membership socket.Ipv6MulticastMembership) (socket.BaseNetworkSocketDropIpv6MembershipResult, error) {
 	opt := tcpip.RemoveMembershipOption{
 		NIC:           tcpip.NICID(membership.Iface),
 		MulticastAddr: fidlconv.ToTcpIpAddressDroppingUnspecifiedv6(membership.McastAddr),
 	}
-	if err := ep.ep.SetSockOpt(&opt); err != nil {
+	if err := ep.ep.ep.SetSockOpt(&opt); err != nil {
 		return socket.BaseNetworkSocketDropIpv6MembershipResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.BaseNetworkSocketDropIpv6MembershipResultWithResponse(socket.BaseNetworkSocketDropIpv6MembershipResponse{}), nil
@@ -925,8 +933,8 @@ func (ep *endpoint) setIpv6ReceiveTrafficClass(value bool) {
 	ep.ep.SocketOptions().SetReceiveTClass(value)
 }
 
-func (ep *endpoint) SetIpv6ReceiveTrafficClass(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpv6ReceiveTrafficClassResult, error) {
-	ep.setIpv6ReceiveTrafficClass(value)
+func (ep *endpointWithMutators) SetIpv6ReceiveTrafficClass(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpv6ReceiveTrafficClassResult, error) {
+	ep.ep.setIpv6ReceiveTrafficClass(value)
 	return socket.BaseNetworkSocketSetIpv6ReceiveTrafficClassResultWithResponse(socket.BaseNetworkSocketSetIpv6ReceiveTrafficClassResponse{}), nil
 }
 
@@ -939,8 +947,8 @@ func (ep *endpoint) setIpv6ReceiveHopLimit(value bool) {
 	ep.ep.SocketOptions().SetReceiveHopLimit(value)
 }
 
-func (ep *endpoint) SetIpv6ReceiveHopLimit(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpv6ReceiveHopLimitResult, error) {
-	ep.setIpv6ReceiveHopLimit(value)
+func (ep *endpointWithMutators) SetIpv6ReceiveHopLimit(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpv6ReceiveHopLimitResult, error) {
+	ep.ep.setIpv6ReceiveHopLimit(value)
 	return socket.BaseNetworkSocketSetIpv6ReceiveHopLimitResultWithResponse(socket.BaseNetworkSocketSetIpv6ReceiveHopLimitResponse{}), nil
 }
 
@@ -953,8 +961,8 @@ func (ep *endpoint) setIpv6ReceivePacketInfo(value bool) {
 	ep.ep.SocketOptions().SetIPv6ReceivePacketInfo(value)
 }
 
-func (ep *endpoint) SetIpv6ReceivePacketInfo(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpv6ReceivePacketInfoResult, error) {
-	ep.setIpv6ReceivePacketInfo(value)
+func (ep *endpointWithMutators) SetIpv6ReceivePacketInfo(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpv6ReceivePacketInfoResult, error) {
+	ep.ep.setIpv6ReceivePacketInfo(value)
 	return socket.BaseNetworkSocketSetIpv6ReceivePacketInfoResultWithResponse(socket.BaseNetworkSocketSetIpv6ReceivePacketInfoResponse{}), nil
 }
 
@@ -967,8 +975,8 @@ func (ep *endpoint) setIpReceiveTypeOfService(value bool) {
 	ep.ep.SocketOptions().SetReceiveTOS(value)
 }
 
-func (ep *endpoint) SetIpReceiveTypeOfService(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpReceiveTypeOfServiceResult, error) {
-	ep.setIpReceiveTypeOfService(value)
+func (ep *endpointWithMutators) SetIpReceiveTypeOfService(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpReceiveTypeOfServiceResult, error) {
+	ep.ep.setIpReceiveTypeOfService(value)
 	return socket.BaseNetworkSocketSetIpReceiveTypeOfServiceResultWithResponse(socket.BaseNetworkSocketSetIpReceiveTypeOfServiceResponse{}), nil
 }
 
@@ -981,8 +989,8 @@ func (ep *endpoint) setIpReceiveTtl(value bool) {
 	ep.ep.SocketOptions().SetReceiveTTL(value)
 }
 
-func (ep *endpoint) SetIpReceiveTtl(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpReceiveTtlResult, error) {
-	ep.setIpReceiveTtl(value)
+func (ep *endpointWithMutators) SetIpReceiveTtl(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpReceiveTtlResult, error) {
+	ep.ep.setIpReceiveTtl(value)
 	return socket.BaseNetworkSocketSetIpReceiveTtlResultWithResponse(socket.BaseNetworkSocketSetIpReceiveTtlResponse{}), nil
 }
 
@@ -991,8 +999,8 @@ func (ep *endpoint) GetIpReceiveTtl(fidl.Context) (socket.BaseNetworkSocketGetIp
 	return socket.BaseNetworkSocketGetIpReceiveTtlResultWithResponse(socket.BaseNetworkSocketGetIpReceiveTtlResponse{Value: value}), nil
 }
 
-func (ep *endpoint) SetIpPacketInfo(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpPacketInfoResult, error) {
-	ep.ep.SocketOptions().SetReceivePacketInfo(value)
+func (ep *endpointWithMutators) SetIpPacketInfo(_ fidl.Context, value bool) (socket.BaseNetworkSocketSetIpPacketInfoResult, error) {
+	ep.ep.ep.SocketOptions().SetReceivePacketInfo(value)
 	return socket.BaseNetworkSocketSetIpPacketInfoResultWithResponse(socket.BaseNetworkSocketSetIpPacketInfoResponse{}), nil
 }
 
@@ -1091,6 +1099,7 @@ func (eps *endpointWithSocket) HUp() {
 
 type endpointWithEvent struct {
 	endpoint
+	endpointWithMutators
 	nonStreamEndpoint
 
 	local, peer zx.Handle
@@ -1101,7 +1110,7 @@ type endpointWithEvent struct {
 }
 
 func (ep *endpointWithEvent) GetError(fidl.Context) (socket.BaseSocketGetErrorResult, error) {
-	err := ep.ep.LastError()
+	err := ep.endpoint.ep.LastError()
 	ep.pending.mustUpdate()
 	if err != nil {
 		return socket.BaseSocketGetErrorResultWithErr(tcpipErrorToCode(err)), nil
@@ -1139,7 +1148,7 @@ func (epe *endpointWithEvent) shutdown(how socket.ShutdownMode) (posix.Errno, er
 		return posix.ErrnoEinval, nil
 	}
 
-	if err := epe.ep.Shutdown(flags); err != nil {
+	if err := epe.endpoint.ep.Shutdown(flags); err != nil {
 		return tcpipErrorToCode(err), nil
 	}
 	if flags&tcpip.ShutdownRead != 0 {
@@ -1208,7 +1217,7 @@ func (eps *endpointWithSocket) close() {
 			panic(err)
 		}
 
-		eps.ep.Close()
+		eps.endpoint.ep.Close()
 
 		_ = syslog.DebugTf("close", "%p", eps)
 	})
@@ -1226,7 +1235,7 @@ func (s *streamSocketImpl) Listen(_ fidl.Context, backlog int16) (socket.StreamS
 	// Upcast from int16 to int before incrementing to avoid overflow when
 	// backlog is math.MaxInt16. Note that int is always at least 32 bits as per
 	// https://golang.google.cn/pkg/builtin/#int.
-	if err := s.ep.Listen(int(backlog) + 1); err != nil {
+	if err := s.endpoint.ep.Listen(int(backlog) + 1); err != nil {
 		return socket.StreamSocketListenResultWithErr(tcpipErrorToCode(err)), nil
 	}
 
@@ -1361,7 +1370,7 @@ func (s *streamSocketImpl) Connect(_ fidl.Context, address fidlnet.SocketAddress
 			// We're registering after calling Connect, so we might've missed an
 			// event. Call the callback once to check for an already-complete (even
 			// with error) handshake.
-			if m := s.ep.Readiness(waiter.EventOut | waiter.EventErr); m != 0 {
+			if m := s.endpoint.ep.Readiness(waiter.EventOut | waiter.EventErr); m != 0 {
 				cb(m)
 			}
 		})
@@ -1432,7 +1441,7 @@ func (s *streamSocketImpl) accept(wantAddr bool) (posix.Errno, *tcpip.FullAddres
 
 			// Check if the endpoint has already encountered an error since
 			// our installed callback will not fire in this case.
-			if s.ep.Readiness(waiter.EventErr)&waiter.EventErr != 0 {
+			if s.endpoint.ep.Readiness(waiter.EventErr)&waiter.EventErr != 0 {
 				s.HUp()
 			}
 
@@ -1465,7 +1474,7 @@ func (eps *endpointWithSocket) handleZxSocketReadError(err zx.Error, waitCallbac
 		fallthrough
 	case zx.ErrBadState:
 		// Reading has been disabled for this socket endpoint.
-		switch err := eps.ep.Shutdown(tcpip.ShutdownWrite); err.(type) {
+		switch err := eps.endpoint.ep.Shutdown(tcpip.ShutdownWrite); err.(type) {
 		case nil, *tcpip.ErrNotConnected:
 			// Shutdown can return ErrNotConnected if the endpoint was
 			// connected but no longer is.
@@ -1487,7 +1496,7 @@ func (eps *endpointWithSocket) handleEndpointWriteError(err tcpip.Error, transPr
 		// state; an endpoint in an error state will soon be fully closed down,
 		// and shutting it down here would cause signals to be asserted twice,
 		// which can produce races in the client.
-		if eps.ep.Readiness(waiter.EventErr)&waiter.EventErr == 0 {
+		if eps.endpoint.ep.Readiness(waiter.EventErr)&waiter.EventErr == 0 {
 			if err := eps.local.SetDisposition(0, zx.SocketDispositionWriteDisabled); err != nil {
 				panic(err)
 			}
@@ -1526,7 +1535,7 @@ func (s *streamSocketImpl) loopWrite(ch chan<- struct{}) {
 
 		s.sharedState.err.mu.Lock()
 		trace.AsyncBegin("net", "fuchsia_posix_socket.streamSocket.transferTx", trace.AsyncID(uintptr(unsafe.Pointer(s))))
-		n, err := s.ep.Write(&reader, tcpip.WriteOptions{
+		n, err := s.endpoint.ep.Write(&reader, tcpip.WriteOptions{
 			// We must write atomically in order to guarantee all the data fetched
 			// from the zircon socket is consumed by the endpoint.
 			Atomic: true,
@@ -1609,7 +1618,7 @@ func (eps *endpointWithSocket) handleEndpointReadError(err tcpip.Error, inCh <-c
 		// state; an endpoint in an error state will soon be fully closed down,
 		// and shutting it down here would cause signals to be asserted twice,
 		// which can produce races in the client.
-		if eps.ep.Readiness(waiter.EventErr)&waiter.EventErr == 0 {
+		if eps.endpoint.ep.Readiness(waiter.EventErr)&waiter.EventErr == 0 {
 			if err := eps.local.SetDisposition(zx.SocketDispositionWriteDisabled, 0); err != nil {
 				panic(err)
 			}
@@ -1695,7 +1704,7 @@ func (s *streamSocketImpl) loopRead(ch chan<- struct{}) {
 	for {
 		s.sharedState.err.mu.Lock()
 		trace.AsyncBegin("net", "fuchsia_posix_socket.streamSocket.transferRx", trace.AsyncID(uintptr(unsafe.Pointer(s))))
-		res, err := s.ep.Read(&writer, tcpip.ReadOptions{})
+		res, err := s.endpoint.ep.Read(&writer, tcpip.ReadOptions{})
 		trace.AsyncEnd("net", "fuchsia_posix_socket.streamSocket.transferRx", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 		s.sharedState.err.setLocked(err)
 		s.sharedState.err.mu.Unlock()
@@ -1722,7 +1731,7 @@ func (s *streamSocketImpl) loopRead(ch chan<- struct{}) {
 			return
 		case nil, *tcpip.ErrBadBuffer:
 			if err == nil {
-				s.ep.ModerateRecvBuf(res.Count)
+				s.endpoint.ep.ModerateRecvBuf(res.Count)
 			}
 			// `tcpip.Endpoint.Read` returns a nil error if _anything_ was written
 			// - even if the writer returned an error - we always want to handle
@@ -1780,7 +1789,7 @@ func (eps *endpointWithSocket) shutdown(how socket.ShutdownMode) (posix.Errno, e
 	// performed by the loopWrite goroutine: it ensures that it happens *after*
 	// all the buffered data in the zircon socket was read.
 	if disposition&zx.SocketDispositionWriteDisabled != 0 {
-		switch err := eps.ep.Shutdown(tcpip.ShutdownRead); err.(type) {
+		switch err := eps.endpoint.ep.Shutdown(tcpip.ShutdownRead); err.(type) {
 		case nil, *tcpip.ErrNotConnected:
 			// Shutdown can return ErrNotConnected if the endpoint was connected but
 			// no longer is, in which case the loopRead is also expected to be
@@ -2017,6 +2026,33 @@ func newDatagramSocketImpl(ns *Netstack, transProto tcpip.TransportProtocolNumbe
 	return s, nil
 }
 
+// Datagram sockets maintain multiple kinds of distributed state:
+//
+//  1. Payloads are enqueued by the client into a zircon socket and wait there
+//     until they are dequeued by the Netstack.
+//  2. The client caches state locally in order to avoid having to validate
+//     payload metadata (e.g. destination address) over FIDL on each I/O.
+//
+// When the socket is mutated, we have to make sure that this state is handled correctly:
+//
+//  1. Payloads currently enqueued into the zircon socket should be processed with the
+//     state of the socket before mutation.
+//  2. Client caches should be flushed in order to force clients to re-validate metadata
+//     against the socket state after mutation.
+//
+// This method should be used to carry out the above procedure for any method that might affect
+// socket state.
+func executeMutatorWithCacheFlushes[Res any, Err error](s *datagramSocketImpl, setter func(ewm endpointWithMutators) (Res, Err)) (Res, Err) {
+	s.blockUntilSocketDrained()
+	res, err := setter(endpointWithMutators{
+		ep: &s.endpointWithSocket.endpoint,
+	})
+	s.sharedState.destinationCacheMu.Lock()
+	defer s.sharedState.destinationCacheMu.Unlock()
+	s.sharedState.destinationCacheMu.destinationCache.reset()
+	return res, err
+}
+
 // loopRead shuttles signals and data from the tcpip.Endpoint to the zircon socket.
 func (s *datagramSocketImpl) loopRead(ch chan<- struct{}) {
 	defer close(ch)
@@ -2210,152 +2246,227 @@ func (s *datagramSocketImpl) addConnection(_ fidl.Context, channel zx.Channel) {
 // to packets enqueued before the call.
 
 func (s *datagramSocketImpl) Connect(_ fidl.Context, address fidlnet.SocketAddress) (socket.BaseNetworkSocketConnectResult, error) {
-	s.blockUntilSocketDrained()
-	if err := s.nonStreamEndpoint.connect(&s.endpointWithSocket.endpoint, address); err != nil {
-		return socket.BaseNetworkSocketConnectResultWithErr(tcpipErrorToCode(err)), nil
-	}
-	s.sharedState.destinationCacheMu.Lock()
-	s.sharedState.destinationCacheMu.destinationCache.reset()
-	s.sharedState.destinationCacheMu.Unlock()
-	return socket.BaseNetworkSocketConnectResultWithResponse(socket.BaseNetworkSocketConnectResponse{}), nil
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketConnectResult, error) {
+		if err := s.nonStreamEndpoint.connect(ewm.ep, address); err != nil {
+			return socket.BaseNetworkSocketConnectResultWithErr(tcpipErrorToCode(err)), nil
+		}
+		return socket.BaseNetworkSocketConnectResultWithResponse(socket.BaseNetworkSocketConnectResponse{}), nil
+	})
 }
 
 func (s *datagramSocketImpl) Disconnect(ctx fidl.Context) (socket.BaseNetworkSocketDisconnectResult, error) {
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.Disconnect(ctx)
-	return result, err
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketDisconnectResult, error) {
+		return ewm.Disconnect(ctx)
+	})
 }
 
 func (s *datagramSocketImpl) SetIpTypeOfService(ctx fidl.Context, value uint8) (socket.BaseNetworkSocketSetIpTypeOfServiceResult, error) {
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.SetIpTypeOfService(ctx, value)
-	return result, err
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpTypeOfServiceResult, error) {
+		return ewm.SetIpTypeOfService(ctx, value)
+	})
 }
 
 func (s *datagramSocketImpl) SetIpv6Only(ctx fidl.Context, value bool) (socket.BaseNetworkSocketSetIpv6OnlyResult, error) {
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.SetIpv6Only(ctx, value)
-	s.sharedState.destinationCacheMu.Lock()
-	defer s.sharedState.destinationCacheMu.Unlock()
-	s.sharedState.destinationCacheMu.destinationCache.reset()
-	return result, err
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpv6OnlyResult, error) {
+		return ewm.SetIpv6Only(ctx, value)
+	})
 }
 
 func (s *datagramSocketImpl) SetIpv6TrafficClass(ctx fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpv6TrafficClassResult, error) {
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.SetIpv6TrafficClass(ctx, value)
-	return result, err
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpv6TrafficClassResult, error) {
+		return ewm.SetIpv6TrafficClass(ctx, value)
+	})
 }
 
 func (s *datagramSocketImpl) SetIpv6UnicastHops(ctx fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpv6UnicastHopsResult, error) {
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.SetIpv6UnicastHops(ctx, value)
-	return result, err
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpv6UnicastHopsResult, error) {
+		return ewm.SetIpv6UnicastHops(ctx, value)
+	})
 }
 
 func (s *datagramSocketImpl) SetIpTtl(ctx fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpTtlResult, error) {
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.SetIpTtl(ctx, value)
-	return result, err
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpTtlResult, error) {
+		return ewm.SetIpTtl(ctx, value)
+	})
 }
 
 func (s *datagramSocketImpl) SetSendBuffer(ctx fidl.Context, size uint64) (socket.BaseSocketSetSendBufferResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
 	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.SetSendBuffer(ctx, size)
-	return result, err
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetSendBufferResult, error) {
+		return ewm.SetSendBuffer(ctx, size)
+	})
 }
 
 func (s *datagramSocketImpl) SetBindToDevice(ctx fidl.Context, value string) (socket.BaseSocketSetBindToDeviceResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
 	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.SetBindToDevice(ctx, value)
-	return result, err
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetBindToDeviceResult, error) {
+		return ewm.SetBindToDevice(ctx, value)
+	})
 }
 
 func (s *datagramSocketImpl) SetBroadcast(ctx fidl.Context, value bool) (socket.BaseSocketSetBroadcastResult, error) {
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.SetBroadcast(ctx, value)
-	s.sharedState.destinationCacheMu.Lock()
-	defer s.sharedState.destinationCacheMu.Unlock()
-	s.sharedState.destinationCacheMu.destinationCache.reset()
-	return result, err
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetBroadcastResult, error) {
+		return ewm.SetBroadcast(ctx, value)
+	})
 }
 
 func (s *datagramSocketImpl) SetNoCheck(ctx fidl.Context, value bool) (socket.BaseSocketSetNoCheckResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
 	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.SetNoCheck(ctx, value)
-	return result, err
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetNoCheckResult, error) {
+		return ewm.SetNoCheck(ctx, value)
+	})
 }
 
 func (s *datagramSocketImpl) SetIpv6MulticastInterface(ctx fidl.Context, value uint64) (socket.BaseNetworkSocketSetIpv6MulticastInterfaceResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
 	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.SetIpv6MulticastInterface(ctx, value)
-	return result, err
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpv6MulticastInterfaceResult, error) {
+		return ewm.SetIpv6MulticastInterface(ctx, value)
+	})
 }
 
 func (s *datagramSocketImpl) SetIpv6MulticastHops(ctx fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpv6MulticastHopsResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
 	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.SetIpv6MulticastHops(ctx, value)
-	return result, err
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpv6MulticastHopsResult, error) {
+		return ewm.SetIpv6MulticastHops(ctx, value)
+	})
 }
 
 func (s *datagramSocketImpl) SetIpv6MulticastLoopback(ctx fidl.Context, value bool) (socket.BaseNetworkSocketSetIpv6MulticastLoopbackResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
 	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.SetIpv6MulticastLoopback(ctx, value)
-	return result, err
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpv6MulticastLoopbackResult, error) {
+		return ewm.SetIpv6MulticastLoopback(ctx, value)
+	})
 }
 
 func (s *datagramSocketImpl) SetIpMulticastTtl(ctx fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpMulticastTtlResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
 	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.SetIpMulticastTtl(ctx, value)
-	return result, err
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpMulticastTtlResult, error) {
+		return ewm.SetIpMulticastTtl(ctx, value)
+	})
 }
 
 func (s *datagramSocketImpl) SetIpMulticastInterface(ctx fidl.Context, iface uint64, value fidlnet.Ipv4Address) (socket.BaseNetworkSocketSetIpMulticastInterfaceResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
 	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.SetIpMulticastInterface(ctx, iface, value)
-	return result, err
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpMulticastInterfaceResult, error) {
+		return ewm.SetIpMulticastInterface(ctx, iface, value)
+	})
 }
 
 func (s *datagramSocketImpl) SetIpMulticastLoopback(ctx fidl.Context, value bool) (socket.BaseNetworkSocketSetIpMulticastLoopbackResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
 	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.SetIpMulticastLoopback(ctx, value)
-	return result, err
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpMulticastLoopbackResult, error) {
+		return ewm.SetIpMulticastLoopback(ctx, value)
+	})
 }
 
 func (s *datagramSocketImpl) AddIpMembership(ctx fidl.Context, membership socket.IpMulticastMembership) (socket.BaseNetworkSocketAddIpMembershipResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
 	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.AddIpMembership(ctx, membership)
-	return result, err
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketAddIpMembershipResult, error) {
+		return ewm.AddIpMembership(ctx, membership)
+	})
 }
 
 func (s *datagramSocketImpl) DropIpMembership(ctx fidl.Context, membership socket.IpMulticastMembership) (socket.BaseNetworkSocketDropIpMembershipResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
 	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.DropIpMembership(ctx, membership)
-	return result, err
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketDropIpMembershipResult, error) {
+		return ewm.DropIpMembership(ctx, membership)
+	})
 }
 
 func (s *datagramSocketImpl) AddIpv6Membership(ctx fidl.Context, membership socket.Ipv6MulticastMembership) (socket.BaseNetworkSocketAddIpv6MembershipResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
 	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
-	s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.AddIpv6Membership(ctx, membership)
-	return result, err
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketAddIpv6MembershipResult, error) {
+		return ewm.AddIpv6Membership(ctx, membership)
+	})
 }
 
 func (s *datagramSocketImpl) DropIpv6Membership(ctx fidl.Context, membership socket.Ipv6MulticastMembership) (socket.BaseNetworkSocketDropIpv6MembershipResult, error) {
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.s.blockUntilSocketDrained()
-	result, err := s.endpointWithSocket.DropIpv6Membership(ctx, membership)
-	return result, err
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketDropIpv6MembershipResult, error) {
+		return ewm.DropIpv6Membership(ctx, membership)
+	})
+}
+
+func (s *datagramSocketImpl) Bind(ctx fidl.Context, sockaddr fidlnet.SocketAddress) (socket.BaseNetworkSocketBindResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketBindResult, error) {
+		return ewm.Bind(ctx, sockaddr)
+	})
+}
+
+func (s *datagramSocketImpl) SetIpPacketInfo(ctx fidl.Context, value bool) (socket.BaseNetworkSocketSetIpPacketInfoResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpPacketInfoResult, error) {
+		return ewm.SetIpPacketInfo(ctx, value)
+	})
+}
+
+func (s *datagramSocketImpl) SetKeepAlive(ctx fidl.Context, value bool) (socket.BaseSocketSetKeepAliveResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetKeepAliveResult, error) {
+		return ewm.SetKeepAlive(ctx, value)
+	})
+}
+
+func (s *datagramSocketImpl) SetLinger(ctx fidl.Context, linger bool, seconds uint32) (socket.BaseSocketSetLingerResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetLingerResult, error) {
+		return ewm.SetLinger(ctx, linger, seconds)
+	})
+}
+
+func (s *datagramSocketImpl) SetOutOfBandInline(ctx fidl.Context, value bool) (socket.BaseSocketSetOutOfBandInlineResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetOutOfBandInlineResult, error) {
+		return ewm.SetOutOfBandInline(ctx, value)
+	})
+}
+
+func (s *datagramSocketImpl) SetReceiveBuffer(ctx fidl.Context, size uint64) (socket.BaseSocketSetReceiveBufferResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetReceiveBufferResult, error) {
+		return ewm.SetReceiveBuffer(ctx, size)
+	})
+}
+
+func (s *datagramSocketImpl) SetReuseAddress(ctx fidl.Context, value bool) (socket.BaseSocketSetReuseAddressResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetReuseAddressResult, error) {
+		return ewm.SetReuseAddress(ctx, value)
+	})
+}
+
+func (s *datagramSocketImpl) SetReusePort(ctx fidl.Context, value bool) (socket.BaseSocketSetReusePortResult, error) {
+	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends
+	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetReusePortResult, error) {
+		return ewm.SetReusePort(ctx, value)
+	})
 }
 
 // blockUntilSocketDrained blocks the goroutine until all of the payloads in the contained
@@ -2513,7 +2624,7 @@ func (s *datagramSocketImpl) Clone2(ctx fidl.Context, object unknown.CloneableWi
 }
 
 func (s *datagramSocketImpl) close() {
-	if s.endpoint.decRef() {
+	if s.decRef() {
 		s.wq.EventUnregister(&s.sharedState.entry)
 		s.endpointWithSocket.close()
 		if err := s.peer.Close(); err != nil {
@@ -2833,7 +2944,7 @@ func (s *synchronousDatagramSocket) close() {
 			_ = syslog.Errorf("endpoint map delete error, endpoint with key %d does not exist", s.endpoint.key)
 		}
 
-		s.ep.Close()
+		s.endpoint.ep.Close()
 
 		_ = syslog.DebugTf("close", "%p", s.endpointWithEvent)
 	}
@@ -2897,7 +3008,7 @@ func (s *synchronousDatagramSocket) recvMsg(opts tcpip.ReadOptions, dataLen uint
 		N: int64(dataLen),
 	}
 	trace.AsyncBegin("net", "fuchsia_posix_socket.synchronousDatagramSocket.ep.Read", trace.AsyncID(uintptr(unsafe.Pointer(s))))
-	res, err := s.ep.Read(&dst, opts)
+	res, err := s.endpoint.ep.Read(&dst, opts)
 	trace.AsyncEnd("net", "fuchsia_posix_socket.synchronousDatagramSocket.ep.Read", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 	if _, ok := err.(*tcpip.ErrBadBuffer); ok && dataLen == 0 {
 		err = nil
@@ -2955,7 +3066,7 @@ func (s *synchronousDatagramSocket) sendMsg(to *tcpip.FullAddress, data []uint8,
 	var r bytes.Reader
 	r.Reset(data)
 	trace.AsyncBegin("net", "fuchsia_posix_socket.synchronousDatagramSocket.ep.Write", trace.AsyncID(uintptr(unsafe.Pointer(s))))
-	n, err := s.ep.Write(&r, tcpip.WriteOptions{
+	n, err := s.endpoint.ep.Write(&r, tcpip.WriteOptions{
 		To:              to,
 		ControlMessages: cmsg,
 	})
@@ -3035,6 +3146,7 @@ type sharedStreamSocketState struct {
 
 type streamSocketImpl struct {
 	*endpointWithSocket
+	endpointWithMutators
 
 	sharedState *sharedStreamSocketState
 
@@ -3048,8 +3160,9 @@ var _ socket.StreamSocketWithCtx = (*streamSocketImpl)(nil)
 
 func makeStreamSocketImpl(eps *endpointWithSocket) streamSocketImpl {
 	return streamSocketImpl{
-		endpointWithSocket: eps,
-		linger:             make(chan struct{}),
+		endpointWithSocket:   eps,
+		endpointWithMutators: endpointWithMutators{ep: &eps.endpoint},
+		linger:               make(chan struct{}),
 		sharedState: &sharedStreamSocketState{
 			pending: signaler{
 				eventsToSignals: func(events waiter.EventMask) zx.Signals {
@@ -3084,7 +3197,7 @@ func (s *streamSocketImpl) close() {
 	defer s.cancel()
 
 	if s.endpoint.decRef() {
-		linger := s.ep.SocketOptions().GetLinger()
+		linger := s.endpoint.ep.SocketOptions().GetLinger()
 
 		doClose := func() {
 			s.endpointWithSocket.close()
@@ -3134,7 +3247,7 @@ func (s *streamSocketImpl) close() {
 				doClose()
 			} else {
 				var linger tcpip.TCPLingerTimeoutOption
-				if err := s.ep.GetSockOpt(&linger); err != nil {
+				if err := s.endpoint.ep.GetSockOpt(&linger); err != nil {
 					panic(fmt.Sprintf("GetSockOpt(%T): %s", linger, err))
 				}
 				time.AfterFunc(time.Duration(linger), func() { close(s.linger) })
@@ -3159,7 +3272,7 @@ func (s *streamSocketImpl) GetError(fidl.Context) (socket.BaseSocketGetErrorResu
 			err := <-ch
 			return err
 		}
-		err := s.ep.LastError()
+		err := s.endpoint.ep.LastError()
 		s.sharedState.err.setConsumedLocked(err)
 		return err
 	}()
@@ -3268,12 +3381,12 @@ func (s *streamSocketImpl) GetInfo(fidl.Context) (socket.StreamSocketGetInfoResu
 }
 
 func (s *streamSocketImpl) SetTcpNoDelay(_ fidl.Context, value bool) (socket.StreamSocketSetTcpNoDelayResult, error) {
-	s.ep.SocketOptions().SetDelayOption(!value)
+	s.endpoint.ep.SocketOptions().SetDelayOption(!value)
 	return socket.StreamSocketSetTcpNoDelayResultWithResponse(socket.StreamSocketSetTcpNoDelayResponse{}), nil
 }
 
 func (s *streamSocketImpl) GetTcpNoDelay(fidl.Context) (socket.StreamSocketGetTcpNoDelayResult, error) {
-	value := s.ep.SocketOptions().GetDelayOption()
+	value := s.endpoint.ep.SocketOptions().GetDelayOption()
 	return socket.StreamSocketGetTcpNoDelayResultWithResponse(
 		socket.StreamSocketGetTcpNoDelayResponse{
 			Value: !value,
@@ -3282,34 +3395,34 @@ func (s *streamSocketImpl) GetTcpNoDelay(fidl.Context) (socket.StreamSocketGetTc
 }
 
 func (s *streamSocketImpl) SetTcpCork(_ fidl.Context, value bool) (socket.StreamSocketSetTcpCorkResult, error) {
-	s.ep.SocketOptions().SetCorkOption(value)
+	s.endpoint.ep.SocketOptions().SetCorkOption(value)
 	return socket.StreamSocketSetTcpCorkResultWithResponse(socket.StreamSocketSetTcpCorkResponse{}), nil
 }
 
 func (s *streamSocketImpl) GetTcpCork(fidl.Context) (socket.StreamSocketGetTcpCorkResult, error) {
-	value := s.ep.SocketOptions().GetCorkOption()
+	value := s.endpoint.ep.SocketOptions().GetCorkOption()
 	return socket.StreamSocketGetTcpCorkResultWithResponse(socket.StreamSocketGetTcpCorkResponse{Value: value}), nil
 }
 
 func (s *streamSocketImpl) SetTcpQuickAck(_ fidl.Context, value bool) (socket.StreamSocketSetTcpQuickAckResult, error) {
-	s.ep.SocketOptions().SetQuickAck(value)
+	s.endpoint.ep.SocketOptions().SetQuickAck(value)
 	return socket.StreamSocketSetTcpQuickAckResultWithResponse(socket.StreamSocketSetTcpQuickAckResponse{}), nil
 }
 
 func (s *streamSocketImpl) GetTcpQuickAck(fidl.Context) (socket.StreamSocketGetTcpQuickAckResult, error) {
-	value := s.ep.SocketOptions().GetQuickAck()
+	value := s.endpoint.ep.SocketOptions().GetQuickAck()
 	return socket.StreamSocketGetTcpQuickAckResultWithResponse(socket.StreamSocketGetTcpQuickAckResponse{Value: value}), nil
 }
 
 func (s *streamSocketImpl) SetTcpMaxSegment(_ fidl.Context, valueBytes uint32) (socket.StreamSocketSetTcpMaxSegmentResult, error) {
-	if err := s.ep.SetSockOptInt(tcpip.MaxSegOption, int(valueBytes)); err != nil {
+	if err := s.endpoint.ep.SetSockOptInt(tcpip.MaxSegOption, int(valueBytes)); err != nil {
 		return socket.StreamSocketSetTcpMaxSegmentResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.StreamSocketSetTcpMaxSegmentResultWithResponse(socket.StreamSocketSetTcpMaxSegmentResponse{}), nil
 }
 
 func (s *streamSocketImpl) GetTcpMaxSegment(fidl.Context) (socket.StreamSocketGetTcpMaxSegmentResult, error) {
-	value, err := s.ep.GetSockOptInt(tcpip.MaxSegOption)
+	value, err := s.endpoint.ep.GetSockOptInt(tcpip.MaxSegOption)
 	if err != nil {
 		return socket.StreamSocketGetTcpMaxSegmentResultWithErr(tcpipErrorToCode(err)), nil
 	}
@@ -3324,7 +3437,7 @@ func (s *streamSocketImpl) SetTcpKeepAliveIdle(_ fidl.Context, valueSecs uint32)
 		return socket.StreamSocketSetTcpKeepAliveIdleResultWithErr(posix.ErrnoEinval), nil
 	}
 	opt := tcpip.KeepaliveIdleOption(time.Second * time.Duration(valueSecs))
-	if err := s.ep.SetSockOpt(&opt); err != nil {
+	if err := s.endpoint.ep.SetSockOpt(&opt); err != nil {
 		return socket.StreamSocketSetTcpKeepAliveIdleResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.StreamSocketSetTcpKeepAliveIdleResultWithResponse(socket.StreamSocketSetTcpKeepAliveIdleResponse{}), nil
@@ -3332,7 +3445,7 @@ func (s *streamSocketImpl) SetTcpKeepAliveIdle(_ fidl.Context, valueSecs uint32)
 
 func (s *streamSocketImpl) GetTcpKeepAliveIdle(fidl.Context) (socket.StreamSocketGetTcpKeepAliveIdleResult, error) {
 	var value tcpip.KeepaliveIdleOption
-	if err := s.ep.GetSockOpt(&value); err != nil {
+	if err := s.endpoint.ep.GetSockOpt(&value); err != nil {
 		return socket.StreamSocketGetTcpKeepAliveIdleResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.StreamSocketGetTcpKeepAliveIdleResultWithResponse(socket.StreamSocketGetTcpKeepAliveIdleResponse{
@@ -3346,7 +3459,7 @@ func (s *streamSocketImpl) SetTcpKeepAliveInterval(_ fidl.Context, valueSecs uin
 		return socket.StreamSocketSetTcpKeepAliveIntervalResultWithErr(posix.ErrnoEinval), nil
 	}
 	opt := tcpip.KeepaliveIntervalOption(time.Second * time.Duration(valueSecs))
-	if err := s.ep.SetSockOpt(&opt); err != nil {
+	if err := s.endpoint.ep.SetSockOpt(&opt); err != nil {
 		return socket.StreamSocketSetTcpKeepAliveIntervalResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.StreamSocketSetTcpKeepAliveIntervalResultWithResponse(socket.StreamSocketSetTcpKeepAliveIntervalResponse{}), nil
@@ -3354,7 +3467,7 @@ func (s *streamSocketImpl) SetTcpKeepAliveInterval(_ fidl.Context, valueSecs uin
 
 func (s *streamSocketImpl) GetTcpKeepAliveInterval(fidl.Context) (socket.StreamSocketGetTcpKeepAliveIntervalResult, error) {
 	var value tcpip.KeepaliveIntervalOption
-	if err := s.ep.GetSockOpt(&value); err != nil {
+	if err := s.endpoint.ep.GetSockOpt(&value); err != nil {
 		return socket.StreamSocketGetTcpKeepAliveIntervalResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.StreamSocketGetTcpKeepAliveIntervalResultWithResponse(socket.StreamSocketGetTcpKeepAliveIntervalResponse{
@@ -3367,14 +3480,14 @@ func (s *streamSocketImpl) SetTcpKeepAliveCount(_ fidl.Context, value uint32) (s
 	if value < 1 || value > maxTCPKeepCnt {
 		return socket.StreamSocketSetTcpKeepAliveCountResultWithErr(posix.ErrnoEinval), nil
 	}
-	if err := s.ep.SetSockOptInt(tcpip.KeepaliveCountOption, int(value)); err != nil {
+	if err := s.endpoint.ep.SetSockOptInt(tcpip.KeepaliveCountOption, int(value)); err != nil {
 		return socket.StreamSocketSetTcpKeepAliveCountResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.StreamSocketSetTcpKeepAliveCountResultWithResponse(socket.StreamSocketSetTcpKeepAliveCountResponse{}), nil
 }
 
 func (s *streamSocketImpl) GetTcpKeepAliveCount(fidl.Context) (socket.StreamSocketGetTcpKeepAliveCountResult, error) {
-	value, err := s.ep.GetSockOptInt(tcpip.KeepaliveCountOption)
+	value, err := s.endpoint.ep.GetSockOptInt(tcpip.KeepaliveCountOption)
 	if err != nil {
 		return socket.StreamSocketGetTcpKeepAliveCountResultWithErr(tcpipErrorToCode(err)), nil
 	}
@@ -3383,7 +3496,7 @@ func (s *streamSocketImpl) GetTcpKeepAliveCount(fidl.Context) (socket.StreamSock
 
 func (s *streamSocketImpl) SetTcpUserTimeout(_ fidl.Context, valueMillis uint32) (socket.StreamSocketSetTcpUserTimeoutResult, error) {
 	opt := tcpip.TCPUserTimeoutOption(time.Millisecond * time.Duration(valueMillis))
-	if err := s.ep.SetSockOpt(&opt); err != nil {
+	if err := s.endpoint.ep.SetSockOpt(&opt); err != nil {
 		return socket.StreamSocketSetTcpUserTimeoutResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.StreamSocketSetTcpUserTimeoutResultWithResponse(socket.StreamSocketSetTcpUserTimeoutResponse{}), nil
@@ -3391,7 +3504,7 @@ func (s *streamSocketImpl) SetTcpUserTimeout(_ fidl.Context, valueMillis uint32)
 
 func (s *streamSocketImpl) GetTcpUserTimeout(fidl.Context) (socket.StreamSocketGetTcpUserTimeoutResult, error) {
 	var value tcpip.TCPUserTimeoutOption
-	if err := s.ep.GetSockOpt(&value); err != nil {
+	if err := s.endpoint.ep.GetSockOpt(&value); err != nil {
 		return socket.StreamSocketGetTcpUserTimeoutResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.StreamSocketGetTcpUserTimeoutResultWithResponse(socket.StreamSocketGetTcpUserTimeoutResponse{
@@ -3412,7 +3525,7 @@ func (s *streamSocketImpl) SetTcpCongestion(_ fidl.Context, value socket.TcpCong
 		return socket.StreamSocketSetTcpCongestionResultWithErr(posix.ErrnoEnoent), nil
 	}
 	opt := tcpip.CongestionControlOption(cc)
-	if err := s.ep.SetSockOpt(&opt); err != nil {
+	if err := s.endpoint.ep.SetSockOpt(&opt); err != nil {
 		return socket.StreamSocketSetTcpCongestionResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.StreamSocketSetTcpCongestionResultWithResponse(socket.StreamSocketSetTcpCongestionResponse{}), nil
@@ -3420,7 +3533,7 @@ func (s *streamSocketImpl) SetTcpCongestion(_ fidl.Context, value socket.TcpCong
 
 func (s *streamSocketImpl) GetTcpCongestion(fidl.Context) (socket.StreamSocketGetTcpCongestionResult, error) {
 	var value tcpip.CongestionControlOption
-	if err := s.ep.GetSockOpt(&value); err != nil {
+	if err := s.endpoint.ep.GetSockOpt(&value); err != nil {
 		return socket.StreamSocketGetTcpCongestionResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	var cc socket.TcpCongestionControl
@@ -3437,7 +3550,7 @@ func (s *streamSocketImpl) GetTcpCongestion(fidl.Context) (socket.StreamSocketGe
 
 func (s *streamSocketImpl) SetTcpDeferAccept(_ fidl.Context, valueSecs uint32) (socket.StreamSocketSetTcpDeferAcceptResult, error) {
 	opt := tcpip.TCPDeferAcceptOption(time.Second * time.Duration(valueSecs))
-	if err := s.ep.SetSockOpt(&opt); err != nil {
+	if err := s.endpoint.ep.SetSockOpt(&opt); err != nil {
 		return socket.StreamSocketSetTcpDeferAcceptResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.StreamSocketSetTcpDeferAcceptResultWithResponse(socket.StreamSocketSetTcpDeferAcceptResponse{}), nil
@@ -3445,7 +3558,7 @@ func (s *streamSocketImpl) SetTcpDeferAccept(_ fidl.Context, valueSecs uint32) (
 
 func (s *streamSocketImpl) GetTcpDeferAccept(fidl.Context) (socket.StreamSocketGetTcpDeferAcceptResult, error) {
 	var value tcpip.TCPDeferAcceptOption
-	if err := s.ep.GetSockOpt(&value); err != nil {
+	if err := s.endpoint.ep.GetSockOpt(&value); err != nil {
 		return socket.StreamSocketGetTcpDeferAcceptResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.StreamSocketGetTcpDeferAcceptResultWithResponse(socket.StreamSocketGetTcpDeferAcceptResponse{
@@ -3455,7 +3568,7 @@ func (s *streamSocketImpl) GetTcpDeferAccept(fidl.Context) (socket.StreamSocketG
 
 func (s *streamSocketImpl) GetTcpInfo(fidl.Context) (socket.StreamSocketGetTcpInfoResult, error) {
 	var value tcpip.TCPInfoOption
-	if err := s.ep.GetSockOpt(&value); err != nil {
+	if err := s.endpoint.ep.GetSockOpt(&value); err != nil {
 		return socket.StreamSocketGetTcpInfoResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	var info socket.TcpInfo
@@ -3516,14 +3629,14 @@ func (s *streamSocketImpl) GetTcpInfo(fidl.Context) (socket.StreamSocketGetTcpIn
 }
 
 func (s *streamSocketImpl) SetTcpSynCount(_ fidl.Context, value uint32) (socket.StreamSocketSetTcpSynCountResult, error) {
-	if err := s.ep.SetSockOptInt(tcpip.TCPSynCountOption, int(value)); err != nil {
+	if err := s.endpoint.ep.SetSockOptInt(tcpip.TCPSynCountOption, int(value)); err != nil {
 		return socket.StreamSocketSetTcpSynCountResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.StreamSocketSetTcpSynCountResultWithResponse(socket.StreamSocketSetTcpSynCountResponse{}), nil
 }
 
 func (s *streamSocketImpl) GetTcpSynCount(fidl.Context) (socket.StreamSocketGetTcpSynCountResult, error) {
-	value, err := s.ep.GetSockOptInt(tcpip.TCPSynCountOption)
+	value, err := s.endpoint.ep.GetSockOptInt(tcpip.TCPSynCountOption)
 	if err != nil {
 		return socket.StreamSocketGetTcpSynCountResultWithErr(tcpipErrorToCode(err)), nil
 	}
@@ -3531,14 +3644,14 @@ func (s *streamSocketImpl) GetTcpSynCount(fidl.Context) (socket.StreamSocketGetT
 }
 
 func (s *streamSocketImpl) SetTcpWindowClamp(_ fidl.Context, value uint32) (socket.StreamSocketSetTcpWindowClampResult, error) {
-	if err := s.ep.SetSockOptInt(tcpip.TCPWindowClampOption, int(value)); err != nil {
+	if err := s.endpoint.ep.SetSockOptInt(tcpip.TCPWindowClampOption, int(value)); err != nil {
 		return socket.StreamSocketSetTcpWindowClampResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.StreamSocketSetTcpWindowClampResultWithResponse(socket.StreamSocketSetTcpWindowClampResponse{}), nil
 }
 
 func (s *streamSocketImpl) GetTcpWindowClamp(fidl.Context) (socket.StreamSocketGetTcpWindowClampResult, error) {
-	value, err := s.ep.GetSockOptInt(tcpip.TCPWindowClampOption)
+	value, err := s.endpoint.ep.GetSockOptInt(tcpip.TCPWindowClampOption)
 	if err != nil {
 		return socket.StreamSocketGetTcpWindowClampResultWithErr(tcpipErrorToCode(err)), nil
 	}
@@ -3551,7 +3664,7 @@ func (s *streamSocketImpl) SetTcpLinger(_ fidl.Context, valueSecs socket.Optiona
 		return socket.StreamSocketSetTcpLingerResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	opt := tcpip.TCPLingerTimeoutOption(time.Second * time.Duration(v))
-	if err := s.ep.SetSockOpt(&opt); err != nil {
+	if err := s.endpoint.ep.SetSockOpt(&opt); err != nil {
 		return socket.StreamSocketSetTcpLingerResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return socket.StreamSocketSetTcpLingerResultWithResponse(socket.StreamSocketSetTcpLingerResponse{}), nil
@@ -3559,7 +3672,7 @@ func (s *streamSocketImpl) SetTcpLinger(_ fidl.Context, valueSecs socket.Optiona
 
 func (s *streamSocketImpl) GetTcpLinger(fidl.Context) (socket.StreamSocketGetTcpLingerResult, error) {
 	var value tcpip.TCPLingerTimeoutOption
-	if err := s.ep.GetSockOpt(&value); err != nil {
+	if err := s.endpoint.ep.GetSockOpt(&value); err != nil {
 		return socket.StreamSocketGetTcpLingerResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	v := socket.OptionalUint32WithUnset(socket.Empty{})
@@ -3684,6 +3797,7 @@ func makeSynchronousDatagramSocket(ep tcpip.Endpoint, netProto tcpip.NetworkProt
 			},
 		},
 	}
+	s.endpointWithEvent.endpointWithMutators.ep = &s.endpointWithEvent.endpoint
 
 	s.entry = waiter.NewFunctionEntry(s.pending.supported, func(waiter.EventMask) {
 		if err := s.pending.update(); err != nil {
@@ -4019,17 +4133,17 @@ func (s *rawSocketImpl) GetInfo(fidl.Context) (rawsocket.SocketGetInfoResult, er
 }
 
 func (s *rawSocketImpl) SetIpHeaderIncluded(_ fidl.Context, value bool) (rawsocket.SocketSetIpHeaderIncludedResult, error) {
-	s.ep.SocketOptions().SetHeaderIncluded(value)
+	s.endpoint.ep.SocketOptions().SetHeaderIncluded(value)
 	return rawsocket.SocketSetIpHeaderIncludedResultWithResponse(rawsocket.SocketSetIpHeaderIncludedResponse{}), nil
 }
 
 func (s *rawSocketImpl) GetIpHeaderIncluded(fidl.Context) (rawsocket.SocketGetIpHeaderIncludedResult, error) {
-	value := s.ep.SocketOptions().GetHeaderIncluded()
+	value := s.endpoint.ep.SocketOptions().GetHeaderIncluded()
 	return rawsocket.SocketGetIpHeaderIncludedResultWithResponse(rawsocket.SocketGetIpHeaderIncludedResponse{Value: value}), nil
 }
 
 func (s *rawSocketImpl) SetIcmpv6Filter(_ fidl.Context, value rawsocket.Icmpv6Filter) (rawsocket.SocketSetIcmpv6FilterResult, error) {
-	if err := s.ep.SetSockOpt(&tcpip.ICMPv6Filter{DenyType: value.BlockedTypes}); err != nil {
+	if err := s.endpoint.ep.SetSockOpt(&tcpip.ICMPv6Filter{DenyType: value.BlockedTypes}); err != nil {
 		return rawsocket.SocketSetIcmpv6FilterResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return rawsocket.SocketSetIcmpv6FilterResultWithResponse(rawsocket.SocketSetIcmpv6FilterResponse{}), nil
@@ -4037,7 +4151,7 @@ func (s *rawSocketImpl) SetIcmpv6Filter(_ fidl.Context, value rawsocket.Icmpv6Fi
 
 func (s *rawSocketImpl) GetIcmpv6Filter(fidl.Context) (rawsocket.SocketGetIcmpv6FilterResult, error) {
 	var filter tcpip.ICMPv6Filter
-	if err := s.ep.GetSockOpt(&filter); err != nil {
+	if err := s.endpoint.ep.GetSockOpt(&filter); err != nil {
 		return rawsocket.SocketGetIcmpv6FilterResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return rawsocket.SocketGetIcmpv6FilterResultWithResponse(rawsocket.SocketGetIcmpv6FilterResponse{
@@ -4058,14 +4172,14 @@ func (s *rawSocketImpl) SetIpv6Checksum(_ fidl.Context, value rawsocket.Ipv6Chec
 		panic(fmt.Sprintf("unhandled variant = %#v", value))
 	}
 
-	if err := s.ep.SetSockOptInt(tcpip.IPv6Checksum, v); err != nil {
+	if err := s.endpoint.ep.SetSockOptInt(tcpip.IPv6Checksum, v); err != nil {
 		return rawsocket.SocketSetIpv6ChecksumResultWithErr(tcpipErrorToCode(err)), nil
 	}
 	return rawsocket.SocketSetIpv6ChecksumResultWithResponse(rawsocket.SocketSetIpv6ChecksumResponse{}), nil
 }
 
 func (s *rawSocketImpl) GetIpv6Checksum(fidl.Context) (rawsocket.SocketGetIpv6ChecksumResult, error) {
-	v, err := s.ep.GetSockOptInt(tcpip.IPv6Checksum)
+	v, err := s.endpoint.ep.GetSockOptInt(tcpip.IPv6Checksum)
 	if err != nil {
 		return rawsocket.SocketGetIpv6ChecksumResultWithErr(tcpipErrorToCode(err)), nil
 	}
@@ -4313,7 +4427,7 @@ func (s *packetSocketImpl) Bind(_ fidl.Context, proto *packetsocket.ProtocolAsso
 		panic(fmt.Sprintf("unhandled %[1]T variant = %[1]d; %#[2]v", w, interface_id))
 	}
 
-	if err := s.ep.Bind(addr); err != nil {
+	if err := s.endpoint.ep.Bind(addr); err != nil {
 		if _, ok := err.(*tcpip.ErrUnknownNICID); ok {
 			return packetsocket.SocketBindResultWithErr(posix.ErrnoEnodev), nil
 		}
@@ -4324,7 +4438,7 @@ func (s *packetSocketImpl) Bind(_ fidl.Context, proto *packetsocket.ProtocolAsso
 }
 
 func (s *packetSocketImpl) GetInfo(fidl.Context) (packetsocket.SocketGetInfoResult, error) {
-	addr, err := s.ep.GetLocalAddress()
+	addr, err := s.endpoint.ep.GetLocalAddress()
 	if err != nil {
 		return packetsocket.SocketGetInfoResultWithErr(tcpipErrorToCode(err)), nil
 	}
