@@ -11,7 +11,6 @@ use {
         oneshot,
     },
     futures::prelude::*,
-    std::collections::VecDeque,
     std::rc::Weak,
     tracing::warn,
 };
@@ -38,14 +37,15 @@ pub fn start_flatland_presentation_loop(
             }
         };
 
-        let mut channels_awaiting_pingback = VecDeque::from([Vec::new()]);
+        let mut pingback_channel: Option<oneshot::Sender<()>> = None;
 
         loop {
             futures::select! {
                 message = receiver.next().fuse() => {
                     match message {
                         Some(channel) => {
-                            channels_awaiting_pingback.back_mut().unwrap().push(channel);
+                            assert!(pingback_channel.is_none());
+                            pingback_channel = Some(channel);
                             scheduler.request_present();
                         }
                         None => {}
@@ -78,6 +78,10 @@ pub fn start_flatland_presentation_loop(
                                 .into_iter()
                                 .map(|x| x.into())
                                 .collect();
+
+                            if let Some(channel) = pingback_channel.take() {
+                                _ = channel.send(());
+                            }
 
                             scheduler.on_frame_presented(actual_presentation_time, presented_infos);
                         }
