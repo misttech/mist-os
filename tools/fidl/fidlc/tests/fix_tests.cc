@@ -219,10 +219,12 @@ closed protocol MyProtocol {};
 TEST(FixTests, GoodProtocolModifierFixMultipleEmptyProtocols) {
   GoodProtocolModifierFix(R"FIDL(library example;
 protocol MyProtocol {};
+
 protocol MyOtherProtocol {};
 )FIDL",
                           R"FIDL(library example;
 closed protocol MyProtocol {};
+
 closed protocol MyOtherProtocol {};
 )FIDL");
 }
@@ -400,6 +402,7 @@ protocol MyProtocol {
     OneWay();
     TwoWay() -> ();
 };
+
 protocol MyOtherProtocol {
     WithErr() -> () error uint32;
     -> OnEvent();
@@ -410,6 +413,7 @@ closed protocol MyProtocol {
     strict OneWay();
     strict TwoWay() -> ();
 };
+
 closed protocol MyOtherProtocol {
     strict WithErr() -> () error uint32;
     strict -> OnEvent();
@@ -463,6 +467,7 @@ protocol MyProtocol {
     WithErr() -> () error uint32;
     -> OnEvent();
 };
+
 open protocol MyOtherProtocol {
     OneWay();
     TwoWay() -> ();
@@ -477,6 +482,7 @@ closed protocol MyProtocol {
     strict WithErr() -> () error uint32;
     strict -> OnEvent();
 };
+
 open protocol MyOtherProtocol {
     strict OneWay();
     strict TwoWay() -> ();

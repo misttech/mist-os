@@ -54,13 +54,16 @@ class Token {
     Subkind subkind_;
   };
 
-  Token(SourceSpan previous_end, SourceSpan span, Kind kind, Subkind subkind, uint32_t ordinal)
+  Token(SourceSpan previous_end, SourceSpan span, uint16_t leading_newlines, Kind kind,
+        Subkind subkind, uint32_t ordinal)
       : previous_end_(previous_end),
         span_(span),
+        leading_newlines_(leading_newlines),
         kind_and_subkind_(KindAndSubkind(kind, subkind)),
         ordinal_(ordinal) {}
 
-  Token() : Token(SourceSpan(), SourceSpan(), Token::Kind::kNotAToken, Token::Subkind::kNone, 0) {}
+  Token()
+      : Token(SourceSpan(), SourceSpan(), 0, Token::Kind::kNotAToken, Token::Subkind::kNone, 0) {}
 
   static const char* Name(KindAndSubkind kind_and_subkind) {
     switch (kind_and_subkind.combined()) {
@@ -81,12 +84,17 @@ class Token {
 
   std::string_view data() const { return span_.data(); }
   const SourceSpan& span() const { return span_; }
+  uint16_t leading_newlines() const { return leading_newlines_; }
+
+  // TODO(fxbug.dev/117642): We should remove this, and the underlying member it exposes,
+  // altogether. The only major use (which may actually be dead code) is in the linter.
   SourceSpan previous_end() const { return previous_end_; }
   Kind kind() const { return kind_and_subkind_.kind(); }
   Subkind subkind() const { return kind_and_subkind_.subkind(); }
   KindAndSubkind kind_and_subkind() const { return kind_and_subkind_; }
   uint32_t ordinal() const { return ordinal_; }
 
+  void set_leading_newlines(uint16_t leading_newlines) { leading_newlines_ = leading_newlines; }
   void set_previous_end(SourceSpan span) { previous_end_ = span; }
   void set_ordinal(uint32_t ordinal) { ordinal_ = ordinal; }
   uint32_t sub_ordinal() const { return sub_ordinal_; }
@@ -123,6 +131,7 @@ class Token {
   // braces, etc).
   SourceSpan previous_end_;
   SourceSpan span_;
+  uint16_t leading_newlines_;
   KindAndSubkind kind_and_subkind_;
   uint32_t ordinal_;
 
@@ -152,9 +161,9 @@ class Token {
 // after it in the token list.
 class SyntheticToken : public Token {
  public:
-  SyntheticToken(SourceSpan previous_end, SourceSpan span, Token::Kind kind, Token::Subkind subkind,
-                 uint32_t ordinal, uint32_t sub_ordinal)
-      : Token(previous_end, span, kind, subkind, ordinal) {
+  SyntheticToken(SourceSpan previous_end, SourceSpan span, uint16_t leading_newlines,
+                 Token::Kind kind, Token::Subkind subkind, uint32_t ordinal, uint32_t sub_ordinal)
+      : Token(previous_end, span, leading_newlines, kind, subkind, ordinal) {
     ZX_ASSERT(sub_ordinal > 0);
     sub_ordinal_ = sub_ordinal;
   }

@@ -103,39 +103,6 @@ void ClearBlankLinesAfterAttributeList(const std::unique_ptr<raw::AttributeList>
   }
 }
 
-// Count the newlines between two adjacent tokens.  The `start` argument is optional because it is
-// possible that the `end` argument is the first token in the file.
-size_t CountNewlinesBetweenAdjacentTokens(const std::string_view source, const Token& start,
-                                          const Token& end) {
-  const char* source_start_char = source.data();
-  const char* from_char = start.span().data().data() + start.span().data().size();
-  const char* until_char = end.span().data().data();
-
-  // In the event that at least one of the tokens supplied is not inside of the |source|'s
-  // |string_view| (that is, it has been inserted after parsing by something like
-  // |fix::Transformer|), we should not count adjacent newlines.
-  if (start.is_synthetic() || end.is_synthetic()) {
-    // TODO(fxbug.dev/114357): This is not a very good solution to this problem. We're basically
-    // saying that during a transform operation, the formatter will ignore any newlines that may
-    // have abutted a replaced/inserted token before. This is unideal (we may lose newlines during
-    // transforms), but also not catastrophic (they're just newlines, and we're transforming the
-    // source anyway).
-    return 0;
-  }
-
-  ZX_ASSERT(until_char >= from_char);
-  const std::string_view whitespace =
-      source.substr(from_char - source_start_char, until_char - from_char);
-
-  size_t count = 0;
-  size_t newline = whitespace.find('\n');
-  while (newline != std::string::npos) {
-    ++count;
-    newline = whitespace.find('\n', newline + 1);
-  }
-  return count;
-}
-
 // This function is called on a token that represents an entire line (if comment_style ==
 // kStandalone), or at least the trailing portion of it (if comment_style == kInline), that is a
 // comment.  This function ingests up to the end of that line.  The text passed to this function
@@ -227,8 +194,7 @@ std::optional<std::unique_ptr<SpanSequence>> SpanSequenceTreeVisitor::IngestUpTo
 
     ZX_ASSERT(next_token_index_ > 0);
     const Token& prev_token = *(tokens_[next_token_index_ - 1]);
-    const size_t leading_newlines = CountNewlinesBetweenAdjacentTokens(file_, prev_token, token);
-    IngestToken(token, prev_token, leading_newlines, atomic.get());
+    IngestToken(token, prev_token, token.leading_newlines(), atomic.get());
     next_token_index_ += 1;
   }
 
@@ -249,8 +215,7 @@ std::optional<std::unique_ptr<SpanSequence>> SpanSequenceTreeVisitor::IngestUpTo
 
     ZX_ASSERT(next_token_index_ > 0);
     const Token& prev_token = *(tokens_[next_token_index_ - 1]);
-    const size_t leading_newlines = CountNewlinesBetweenAdjacentTokens(file_, prev_token, token);
-    IngestToken(token, prev_token, leading_newlines, atomic.get());
+    IngestToken(token, prev_token, token.leading_newlines(), atomic.get());
     next_token_index_ += 1;
 
     if (until.has_value() && token == until.value()) {
@@ -273,15 +238,14 @@ SpanSequenceTreeVisitor::IngestUpToAndIncludingTokenKind(
     const Token& token = *(tokens_[next_token_index_]);
     ZX_ASSERT(next_token_index_ > 0);
     const Token& prev_token = *(tokens_[next_token_index_ - 1]);
-    const size_t leading_newlines = CountNewlinesBetweenAdjacentTokens(file_, prev_token, token);
 
     // If we have found the token kind we're looking for, make sure to capture any trailing inline
     // comments!
-    if (found && (leading_newlines > 0 ||
+    if (found && (token.leading_newlines() > 0 ||
                   (token.kind() != Token::kComment || token.kind() != Token::kComment))) {
       break;
     }
-    IngestToken(token, prev_token, leading_newlines, atomic.get());
+    IngestToken(token, prev_token, token.leading_newlines(), atomic.get());
 
     next_token_index_ += 1;
     if (token.kind() == until_kind) {
@@ -334,13 +298,8 @@ SpanSequenceTreeVisitor::Builder<T>::Builder(SpanSequenceTreeVisitor* ftv, const
 SpanSequenceTreeVisitor::TokenBuilder::TokenBuilder(SpanSequenceTreeVisitor* ftv,
                                                     const Token& token, bool has_trailing_space)
     : Builder<TokenSpanSequence>(ftv, token, token, false) {
-  const size_t token_index = this->GetFormattingTreeVisitor()->next_token_index_;
-  const Token& prev_token = *(this->GetFormattingTreeVisitor()->tokens_[token_index - 1]);
-  const size_t leading_newlines = CountNewlinesBetweenAdjacentTokens(
-      this->GetFormattingTreeVisitor()->file_, prev_token, token);
-  const size_t leading_blank_lines = leading_newlines == 0 ? 0 : leading_newlines - 1;
-  auto token_span_sequence =
-      std::make_unique<TokenSpanSequence>(token.span().data(), leading_blank_lines);
+  auto token_span_sequence = std::make_unique<TokenSpanSequence>(
+      token.span().data(), token.leading_newlines() == 0 ? 0 : token.leading_newlines() - 1);
   token_span_sequence->SetTrailingSpace(has_trailing_space);
   token_span_sequence->Close();
 

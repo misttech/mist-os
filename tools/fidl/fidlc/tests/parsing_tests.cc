@@ -585,8 +585,7 @@ TEST(ParsingTests, WarnCommentInsideDocCommentTest) {
   TestLibrary library;
   library.AddFile("bad/fi-0026.test.fidl");
 
-  ASSERT_WARNED_TWICE_DURING_COMPILE(library, fidl::WarnCommentWithinDocCommentBlock,
-                                     fidl::WarnBlankLinesWithinDocCommentBlock);
+  ASSERT_WARNED_DURING_COMPILE(library, fidl::WarnCommentWithinDocCommentBlock);
 }
 
 TEST(ParsingTests, WarnDocCommentWithCommentBlankLineTest) {

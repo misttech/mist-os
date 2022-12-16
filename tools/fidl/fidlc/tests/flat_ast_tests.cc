@@ -41,7 +41,7 @@ TEST(FlatAstTests, GoodCompareHandles) {
   auto fake_source_file = SourceFile("fake.fidl", "123");
   auto fake_source_file_start = SourceSpan(fake_source_file.data().substr(0, 0), fake_source_file);
   auto fake_source_span = SourceSpan(fake_source_file.data(), fake_source_file);
-  auto fake_token = Token(fake_source_file_start, fake_source_span, Token::Kind::kNumericLiteral,
+  auto fake_token = Token(fake_source_file_start, fake_source_span, 0, Token::Kind::kNumericLiteral,
                           Token::Subkind::kNone, 0);
   auto fake_source_element =
       SourceElement(SourceElement::NodeKind::kNumericLiteral, fake_token, fake_token);

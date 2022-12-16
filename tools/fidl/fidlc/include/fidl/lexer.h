@@ -41,12 +41,17 @@ class Lexer : private ReporterMixin {
   Token Lex();
 
  private:
+  struct ResetResult {
+    uint16_t leading_newlines;
+    std::string_view data;
+  };
+
   std::string_view data() { return source_file_.data(); }
 
   constexpr char Peek() const;
   void Skip();
   char Consume();
-  std::string_view Reset(Token::Kind kind);
+  ResetResult Reset(Token::Kind kind);
   Token Finish(Token::Kind kind);
 
   void SkipWhitespace();
@@ -65,7 +70,8 @@ class Lexer : private ReporterMixin {
   const char* token_start_ = nullptr;
   const char* previous_end_ = nullptr;
   size_t token_size_ = 0u;
-  uint32_t next_ordinal = 0;
+  uint32_t next_ordinal_ = 0;
+  uint16_t leading_newlines_ = 0;
 };
 
 }  // namespace fidl

@@ -406,9 +406,8 @@ std::unique_ptr<raw::Attribute> Parser::ParseDocComment() {
   std::optional<Token> first_doc_line;
   while (Peek().kind() == Token::Kind::kDocComment) {
     if (first_doc_line) {
-      // disallow any blank lines between this doc comment and the previous one
-      std::string_view trailing_whitespace = last_token_.previous_end().data();
-      if (std::count(trailing_whitespace.cbegin(), trailing_whitespace.cend(), '\n') > 1)
+      // Disallow any blank lines between this doc comment and the previous one.
+      if (last_token_.leading_newlines() > 1)
         reporter_->Warn(WarnBlankLinesWithinDocCommentBlock, previous_token_.span());
     }
 

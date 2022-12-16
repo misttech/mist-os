@@ -139,22 +139,28 @@ char Lexer::Consume() {
   return current;
 }
 
-std::string_view Lexer::Reset(Token::Kind kind) {
+Lexer::ResetResult Lexer::Reset(Token::Kind kind) {
+  uint16_t newlines = leading_newlines_;
   auto data = std::string_view(token_start_, token_size_);
   if (kind != Token::Kind::kComment) {
     previous_end_ = token_start_ + token_size_;
   }
   token_start_ = current_;
   token_size_ = 0u;
-  return data;
+  leading_newlines_ = 0;
+  return {
+      .leading_newlines = newlines,
+      .data = data,
+  };
 }
 
 Token Lexer::Finish(Token::Kind kind) {
   ZX_ASSERT(kind != Token::Kind::kIdentifier);
   std::string_view previous(previous_end_, token_start_ - previous_end_);
   SourceSpan previous_span(previous, source_file_);
-  return Token(previous_span, SourceSpan(Reset(kind), source_file_), kind, Token::Subkind::kNone,
-               next_ordinal++);
+  ResetResult result = Reset(Token::Kind::kIdentifier);
+  return Token(previous_span, SourceSpan(result.data, source_file_), result.leading_newlines, kind,
+               Token::Subkind::kNone, next_ordinal_++);
 }
 
 Token Lexer::LexEndOfStream() { return Finish(Token::Kind::kEndOfFile); }
@@ -170,13 +176,14 @@ Token Lexer::LexIdentifier() {
     Consume();
   std::string_view previous(previous_end_, token_start_ - previous_end_);
   SourceSpan previous_end(previous, source_file_);
-  std::string_view identifier_data = Reset(Token::Kind::kIdentifier);
+  ResetResult identifier_result = Reset(Token::Kind::kIdentifier);
   auto subkind = Token::Subkind::kNone;
-  auto lookup = token_subkinds.find(identifier_data);
+  auto lookup = token_subkinds.find(identifier_result.data);
   if (lookup != token_subkinds.end())
     subkind = lookup->second;
-  return Token(previous_end, SourceSpan(identifier_data, source_file_), Token::Kind::kIdentifier,
-               subkind, next_ordinal++);
+  return Token(previous_end, SourceSpan(identifier_result.data, source_file_),
+               identifier_result.leading_newlines, Token::Kind::kIdentifier, subkind,
+               next_ordinal_++);
 }
 
 static bool IsHexDigit(char c) {
@@ -333,9 +340,11 @@ Token Lexer::LexCommentOrDocComment() {
 void Lexer::SkipWhitespace() {
   for (;;) {
     switch (Peek()) {
-      case ' ':
       case '\n':
+        ++leading_newlines_;
+        [[fallthrough]];
       case '\r':
+      case ' ':
       case '\t':
         Skip();
         continue;
@@ -349,7 +358,7 @@ Token Lexer::Lex() {
   ZX_ASSERT_MSG(token_start_ <= end_of_file_, "already reached EOF");
   ZX_ASSERT_MSG(current_ <= end_of_file_ + 1, "current_ is past null terminator");
 
-  if (next_ordinal == 0) {
+  if (next_ordinal_ == 0) {
     return Finish(Token::Kind::kStartOfFile);
   }
 

@@ -279,7 +279,8 @@ TEST(ParsedTransformerTests, GoodAddTrailingComment) {
   GoodTransform<AddTrailingCommentTransformer>(
       R"FIDL(library example;
 )FIDL",
-      R"FIDL(library example; // Added
+      R"FIDL(library example;
+// Added
 )FIDL");
 }
 
