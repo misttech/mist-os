@@ -19,7 +19,7 @@ fn main() -> Result<(), Error> {
     println!("GetRandom: {:?}", tpm.get_random(8));
 
     println!("Provisioning:");
-    println!("TakeOwnership: {}", tpm.take_ownership());
+    println!("TakeOwnership: {:?}", tpm.take_ownership());
 
     Ok(())
 }
