@@ -8,6 +8,8 @@
 toc:
 - title: "How to run performance tests"
   path: /docs/development/performance/running_performance_tests.md
+- title: "Perfcompare: Try builder for pre-submit testing"
+  path: /docs/development/performance/perfcompare.md
 - title: "Viewing Zircon microbenchmarks with Chromeperf"
   path: /docs/development/performance/chromeperf_user_guide.md
 - title: "Fuchsiaperf format for performance test results"
