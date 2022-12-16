@@ -16,6 +16,7 @@ import 'package:shell_settings/src/utils/themes.dart';
 import 'package:shell_settings/src/widgets/channel_settings.dart';
 import 'package:shell_settings/src/widgets/keyboard_settings.dart';
 import 'package:shell_settings/src/widgets/timezone_settings.dart';
+import 'package:shell_settings/src/widgets/wifi_settings.dart';
 
 /// Defines a widget to display shell settings.
 class App extends StatelessWidget {
@@ -111,6 +112,10 @@ class App extends StatelessWidget {
                 Expanded(
                   child: KeyboardSettings(
                       state: state, onChange: state.updateKeymap),
+                ),
+              if (state.wifiPageVisible)
+                Expanded(
+                  child: WiFiSettings(state: state),
                 ),
             ],
           );
@@ -276,6 +281,30 @@ class _ListSettings extends StatelessWidget {
                             onPressed: settingsState.setBrightnessAuto,
                             child: Text(Strings.auto.toUpperCase()),
                           ),
+                  );
+                }),
+                // Wi-Fi
+                Observer(builder: (_) {
+                  return ListTile(
+                    contentPadding: EdgeInsets.symmetric(horizontal: 24),
+                    leading: Icon(Icons.wifi),
+                    title: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(Strings.wifi),
+                        SizedBox(width: 48),
+                        Expanded(
+                          child: Text(
+                            settingsState.currentNetwork,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.right,
+                            maxLines: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                    trailing: Icon(Icons.arrow_right),
+                    onTap: settingsState.showWiFiSettings,
                   );
                 }),
                 // Timezone

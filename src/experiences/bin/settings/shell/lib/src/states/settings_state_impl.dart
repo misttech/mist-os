@@ -21,6 +21,7 @@ import 'package:shell_settings/src/services/network_address_service.dart';
 import 'package:shell_settings/src/services/task_service.dart';
 import 'package:shell_settings/src/services/timezone_service.dart';
 import 'package:shell_settings/src/services/volume_service.dart';
+import 'package:shell_settings/src/services/wifi_service.dart';
 import 'package:shell_settings/src/states/settings_state.dart';
 
 /// Defines the implementation of [SettingsState].
@@ -162,6 +163,55 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
   @override
   final networkAddresses = ObservableList<String>();
 
+  // Wifi
+  @override
+  bool get wifiPageVisible => _wifiPageVisible.value;
+  late final _wifiPageVisible =
+      (() => settingsPage.value == SettingsPage.wifi).asComputed();
+
+  @override
+  NetworkInformation get targetNetwork => _targetNetwork.value;
+  set targetNetwork(NetworkInformation value) => _targetNetwork.value = value;
+  final Observable<NetworkInformation> _targetNetwork =
+      Observable<NetworkInformation>(NetworkInformation());
+
+  @override
+  TextEditingController get networkPasswordTextController =>
+      _networkPasswordTextController;
+  final TextEditingController _networkPasswordTextController =
+      TextEditingController();
+
+  @override
+  final List<NetworkInformation> availableNetworks =
+      ObservableList<NetworkInformation>();
+
+  @override
+  final List<NetworkInformation> savedNetworks =
+      ObservableList<NetworkInformation>();
+
+  @override
+  String get currentNetwork => _currentNetwork.value;
+  set currentNetwork(String value) => _currentNetwork.value = value;
+  final Observable<String> _currentNetwork = ''.asObservable();
+
+  @override
+  int get wifiToggleMillisecondsPassed => _wifiToggleMillisecondsPassed.value;
+  set wifiToggleMillisecondsPassed(int value) =>
+      _wifiToggleMillisecondsPassed.value = value;
+  final Observable<int> _wifiToggleMillisecondsPassed = Observable<int>(0);
+
+  @override
+  bool get clientConnectionsEnabled => _clientConnectionsEnabled.value;
+  set clientConnectionsEnabled(bool value) =>
+      _clientConnectionsEnabled.value = value;
+  final Observable<bool> _clientConnectionsEnabled = Observable<bool>(true);
+
+  @override
+  bool get clientConnectionsMonitor => _clientConnectionsMonitor.value;
+  set clientConnectionsMonitor(bool value) =>
+      _clientConnectionsMonitor.value = value;
+  final Observable<bool> _clientConnectionsMonitor = Observable<bool>(true);
+
   // Services
   final BrightnessService brightnessService;
   final DateTimeService dateTimeService;
@@ -171,6 +221,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
   final KeyboardService keyboardService;
   final BatteryWatcherService batteryWatcherService;
   final NetworkAddressService networkService;
+  final WiFiService wifiService;
 
   // Constructor
   SettingsStateImpl({
@@ -182,6 +233,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
     required this.keyboardService,
     required this.batteryWatcherService,
     required this.networkService,
+    required this.wifiService,
   })  : _timezones = _loadTimezones(),
         _selectedTimezone = timezoneService.timezone.asObservable() {
     dateTimeService.onChanged = updateDateTime;
@@ -268,6 +320,26 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
             ..clear()
             ..addAll(addresses.map((address) => address.address)));
         });
+    wifiService.onChanged = () {
+      runInAction(() {
+        // TODO(fxb/79885): remove network names with non-ASCII characters
+        availableNetworks
+          ..clear()
+          ..addAll(wifiService.scannedNetworks)
+          ..removeWhere((network) => network.name.isEmpty);
+        targetNetwork = wifiService.targetNetwork;
+        // TODO(fxb/79885): remove saved networks from available networks
+        // by ssid & security type
+        savedNetworks
+          ..clear()
+          ..addAll(wifiService.savedNetworks)
+          ..removeWhere((network) => network.name.isEmpty);
+        currentNetwork = wifiService.currentNetwork;
+        clientConnectionsEnabled = wifiService.clientConnectionsEnabled;
+        clientConnectionsMonitor = wifiService.connectionsEnabled;
+        wifiToggleMillisecondsPassed = wifiService.toggleMillisecondsPassed;
+      });
+    };
 
     // We cannot load MaterialIcons font file from pubspec.yaml. So load it
     // explicitly.
@@ -293,6 +365,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
       keyboardService.start(),
       batteryWatcherService.start(),
       networkService.start(),
+      wifiService.start(),
     ]);
   }
 
@@ -307,6 +380,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
     await keyboardService.stop();
     await batteryWatcherService.stop();
     await networkService.stop();
+    await wifiService.stop();
     _dateTimeNow = null;
   }
 
@@ -321,6 +395,7 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
     keyboardService.dispose();
     batteryWatcherService.dispose();
     networkService.dispose();
+    wifiService.dispose();
   }
 
   // All
@@ -410,4 +485,29 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
   @override
   void showKeyboardSettings() =>
       runInAction(() => settingsPage.value = SettingsPage.keyboard);
+
+  // Wifi
+  @override
+  void showWiFiSettings() =>
+      runInAction(() => settingsPage.value = SettingsPage.wifi);
+
+  @override
+  void connectToNetwork([String password = '']) =>
+      runInAction(() => wifiService.connectToNetwork(password));
+
+  @override
+  void setTargetNetwork(NetworkInformation network) =>
+      runInAction(() => wifiService.targetNetwork = network);
+
+  @override
+  void clearTargetNetwork() =>
+      runInAction(() => wifiService.targetNetwork = NetworkInformation());
+
+  @override
+  void removeNetwork(NetworkInformation network) =>
+      runInAction(() => wifiService.remove(network));
+
+  @override
+  void setClientConnectionsEnabled({bool enabled = true}) =>
+      runInAction(() => wifiService.clientConnectionsEnabled = enabled);
 }

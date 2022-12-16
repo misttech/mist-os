@@ -127,6 +127,7 @@
                 "fuchsia.ui.scenic.Scenic",
                 "fuchsia.ui.views.ViewRefInstalled",
                 "fuchsia.vulkan.loader.Loader",
+                "fuchsia.wlan.policy.ClientProvider",
             ],
             from: "parent",
             to: [
@@ -163,7 +164,6 @@
                 "fuchsia.virtualization.LinuxManager",
                 "fuchsia.virtualization.TerminaGuestManager",
                 "fuchsia.virtualization.ZirconGuestManager",
-                "fuchsia.wlan.policy.ClientProvider",
             ],
             from: "parent",
             to: "#terminal",

@@ -12,6 +12,7 @@ import 'package:shell_settings/src/services/network_address_service.dart';
 import 'package:shell_settings/src/services/task_service.dart';
 import 'package:shell_settings/src/services/timezone_service.dart';
 import 'package:shell_settings/src/services/volume_service.dart';
+import 'package:shell_settings/src/services/wifi_service.dart';
 import 'package:shell_settings/src/states/settings_state_impl.dart';
 import 'package:shell_settings/src/widgets/setting_details.dart';
 
@@ -21,6 +22,7 @@ enum SettingsPage {
   timezone,
   channel,
   keyboard,
+  wifi,
 }
 
 /// Defines states for channel ota.
@@ -78,6 +80,16 @@ abstract class SettingsState implements TaskService {
   double? get powerLevel;
   // Network
   List<String> get networkAddresses;
+  // Wifi
+  bool get wifiPageVisible;
+  int get wifiToggleMillisecondsPassed;
+  List<NetworkInformation> get availableNetworks;
+  NetworkInformation get targetNetwork;
+  List<NetworkInformation> get savedNetworks;
+  TextEditingController get networkPasswordTextController;
+  String get currentNetwork;
+  bool get clientConnectionsEnabled;
+  bool get clientConnectionsMonitor;
 
   factory SettingsState.fromEnv() {
     // ignore: unnecessary_cast
@@ -90,6 +102,7 @@ abstract class SettingsState implements TaskService {
       keyboardService: KeyboardService(),
       batteryWatcherService: BatteryWatcherService(),
       networkService: NetworkAddressService(),
+      wifiService: WiFiService(),
     ) as SettingsState;
   }
 
@@ -117,4 +130,11 @@ abstract class SettingsState implements TaskService {
   // Keyboard
   void showKeyboardSettings();
   void updateKeymap(String id);
+  // Wifi
+  void showWiFiSettings();
+  void connectToNetwork([String password]);
+  void setTargetNetwork(NetworkInformation network);
+  void clearTargetNetwork();
+  void removeNetwork(NetworkInformation network);
+  void setClientConnectionsEnabled({bool enabled});
 }
