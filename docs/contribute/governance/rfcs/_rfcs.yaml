@@ -2642,3 +2642,16 @@
   reviewers: ['geb@google.com', 'shayba@google.com', 'richkadel@google.com', 'kjharland@google.com', 'crjohns@google.com', 'cgonyeo@google.com', 'aaronwood@google.com', 'satsukiu@google.com', 'xbhatnag@google.com', 'yaneury@google.com', 'hjfreyer@google.com', 'akbiggs@google.com']
   submitted: '2022-07-22'
   reviewed: '2022-12-14'
+
+- name: 'RFC-0203'
+  title: 'Introduce `zx_system_energy_info`'
+  short_description: 'Interface for communicating with the kernel to access the energy information.'
+  authors: ['didis@google.com']
+  file: '0203_system_energy_info.md'
+  area: ['Kernel', 'Power']
+  issue: ['103700']
+  gerrit_change_id: ['762927']
+  status: 'Accepted'
+  reviewers: ['cpu@google.com', 'alexlegg@google.com', 'claridge@google.com', 'curtisgalloway@google.com', 'achyb@google.com']
+  submitted: '2022-11-18'
+  reviewed: '2022-12-15'

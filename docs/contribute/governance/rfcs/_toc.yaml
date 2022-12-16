@@ -420,3 +420,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0201_reclaim_guest_vm_memory.md
   - title: "RFC-0202: Test manager as a Service"
     path: /docs/contribute/governance/rfcs/0202_test_manager_as_a_service.md
+  - title: "RFC-0203: Introduce `zx_system_energy_info`"
+    path: /docs/contribute/governance/rfcs/0203_system_energy_info.md
