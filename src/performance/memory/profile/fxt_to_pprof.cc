@@ -148,7 +148,7 @@ fit::result<std::string, perfetto::third_party::perftools::profiles::Profile> fx
   pprof.set_default_sample_type(1);
 
   uint64_t allocation_count = 0;
-  uint64_t deallocation_count = 0;
+  uint64_t deallocation_count = deallocations.size();
   uint64_t duplicate_count = 0;
   uint64_t layout_count = 0;
 
