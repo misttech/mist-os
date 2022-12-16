@@ -176,6 +176,14 @@ class VDsoMutator {
 #undef SYSCALL_IN_CATEGORY_END
 #undef SYSCALL_CATEGORY_END
 
+#ifndef HAVE_SYSCALL_CATEGORY_test_category1
+[[maybe_unused]] void block_test_category1_syscalls(VDsoMutator& mutator) {}
+#endif
+
+#ifndef HAVE_SYSCALL_CATEGORY_test_category2
+[[maybe_unused]] void block_test_category2_syscalls(VDsoMutator& mutator) {}
+#endif
+
 void PatchVmcall(VDsoMutator& mutator) {
   for (auto offset : kSysretOffsets) {
     mutator.PatchVmcall(offset);

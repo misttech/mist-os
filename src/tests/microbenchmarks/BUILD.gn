@@ -7,6 +7,7 @@ import("//build/fidl/fidl.gni")
 import("//build/testing/host_test.gni")
 import("//src/proc/tests/chromiumos/build/starnix_host_test_component.gni")
 import("//src/proc/tests/starnix_test_package.gni")
+import("//zircon/vdso/vdso.gni")
 
 # This can be built as a Fuchsia executable or as a host executable.
 # The latter allows running some of the benchmarks on Linux for
@@ -65,7 +66,6 @@ executable("bin") {
       "sleep.cc",
       "sockets.cc",
       "streams.cc",
-      "syscalls.cc",
       "threads.cc",
       "timer.cc",
       "tracing.cc",
@@ -73,6 +73,11 @@ executable("bin") {
       "vmar.cc",
       "vmo.cc",
     ]
+
+    if (!exclude_testonly_syscalls) {
+      # Uses `zx_syscall_test_*()`.
+      sources += [ "syscalls.cc" ]
+    }
   }
   deps = [
     "//sdk/lib/syslog/cpp",

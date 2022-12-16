@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import("//zircon/vdso/vdso.gni")
 
 test("restricted-mode") {
   output_name = "restricted-mode-test"
@@ -25,5 +26,9 @@ fuchsia_unittest_package("restricted-mode-test-pkg") {
 
 group("tests") {
   testonly = true
-  deps = [ ":restricted-mode-test-pkg" ]
+
+  # This test relies upon test-only 'next' syscalls.
+  if (!exclude_testonly_syscalls) {
+    deps = [ ":restricted-mode-test-pkg" ]
+  }
 }

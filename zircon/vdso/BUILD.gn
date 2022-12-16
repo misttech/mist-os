@@ -18,9 +18,6 @@ public_generated = [
     arg = "--next-public-header"
     output = "internal/cdecls-next.inc"
   },
-]
-
-testonly_generated = [
   {
     arg = "--testonly-public-header"
     output = "internal/testonly-cdecls.inc"
@@ -142,7 +139,6 @@ fidl("zx") {
     "smc.fidl",
     "socket.fidl",
     "stream.fidl",
-    "syscall.fidl",
     "system.fidl",
     "task.fidl",
     "thread.fidl",
@@ -152,6 +148,10 @@ fidl("zx") {
     "vmo.fidl",
     "zx_common.fidl",
   ]
+
+  if (!exclude_testonly_syscalls) {
+    sources += [ "syscall.test.fidl" ]
+  }
 
   # TODO(fxbug.dev/110021): Burn these down.
   experimental_flags = [ "zx_c_types" ]
@@ -285,11 +285,6 @@ rustc_library("fuchsia-zircon-sys") {
 #      runtime will be generated.
 #    - Type: path
 #
-#  * exclude_testonly
-#    - Optional: Whether to exclude generating test-only syscalls.
-#    - Type: bool
-#    - Default: true
-#
 #  * testonly
 #    - Optional: Usual GN meaning.
 #
@@ -302,12 +297,7 @@ template("kazoo") {
                              "private_gen_dir",
                              "rust_gen_dir",
                              "go_gen_dir",
-                             "exclude_testonly",
                            ])
-
-    if (!defined(exclude_testonly)) {
-      exclude_testonly = true
-    }
 
     visibility = [ ":*" ]
 
@@ -333,16 +323,6 @@ template("kazoo") {
         {
           gen_dir = go_gen_dir
           generated = go_generated
-        },
-      ]
-    }
-    if (exclude_testonly) {
-      args += [ "--exclude=testonly" ]
-    } else {
-      categories += [
-        {
-          gen_dir = public_gen_dir
-          generated = testonly_generated
         },
       ]
     }
@@ -375,7 +355,6 @@ if (current_toolchain == default_toolchain) {
     public_gen_dir = syscall_public_gen_dir
     private_gen_dir = syscall_private_gen_dir
     rust_gen_dir = syscall_rust_gen_dir
-    exclude_testonly = exclude_testonly_syscalls
   }
 
   #
@@ -394,7 +373,6 @@ if (current_toolchain == default_toolchain) {
     private_gen_dir = private_golden_candidate_dir
     go_gen_dir = go_golden_candidate_dir
     rust_gen_dir = rust_golden_candidate_dir
-    exclude_testonly = false
   }
 
   golden_files("goldens") {
@@ -403,7 +381,7 @@ if (current_toolchain == default_toolchain) {
     categories = [
       {
         gen_dir = public_golden_candidate_dir
-        generated = public_generated + testonly_generated
+        generated = public_generated
         golden_subdir = "public"
       },
       {

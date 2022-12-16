@@ -19,11 +19,9 @@ fi
 echo >&2 "
 *** ABI mismatch ***
 
-If this is an intentional update to the stable ABI, update the source file:
-
-cp $IMPL $ABI
-
-and then rebuild.
+This suggests that the tooling that creates zircon.ifs has regressed.
+Please file a bug and notify the current maintainers in
+//zircon/tools/zither/OWNERS.
 
 *** ABI mismatch ***
 "
