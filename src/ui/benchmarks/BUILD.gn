@@ -4,8 +4,5 @@
 
 group("benchmarks") {
   testonly = true
-  deps = [
-    "image_grid_cpp",
-    "transparency_benchmark",
-  ]
+  deps = [ "transparency_benchmark" ]
 }
