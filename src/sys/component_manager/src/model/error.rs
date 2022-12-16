@@ -23,8 +23,6 @@ use {
 /// Errors produced by `Model`.
 #[derive(Debug, Error, Clone)]
 pub enum ModelError {
-    #[error("component instance {} not found in realm {}", child, moniker)]
-    InstanceNotFoundInRealm { moniker: AbsoluteMoniker, child: ChildMoniker },
     #[error("component instance {} in realm {} already exists", child, moniker)]
     InstanceAlreadyExists { moniker: AbsoluteMoniker, child: ChildMoniker },
     #[error("component instance with moniker {} has shut down", moniker)]
@@ -167,13 +165,6 @@ pub enum ModelError {
 }
 
 impl ModelError {
-    pub fn instance_not_found_in_realm(
-        moniker: AbsoluteMoniker,
-        child: ChildMoniker,
-    ) -> ModelError {
-        ModelError::InstanceNotFoundInRealm { moniker, child }
-    }
-
     pub fn instance_already_exists(moniker: AbsoluteMoniker, child: ChildMoniker) -> ModelError {
         ModelError::InstanceAlreadyExists { moniker, child }
     }

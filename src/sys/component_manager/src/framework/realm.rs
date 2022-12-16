@@ -282,7 +282,9 @@ impl RealmCapabilityHost {
         let child_moniker = ChildMoniker::try_new(&child.name, child.collection.as_ref())
             .map_err(|_| fcomponent::Error::InvalidArguments)?;
         component.remove_dynamic_child(&child_moniker).await.map_err(|e| match e {
-            ModelError::InstanceNotFoundInRealm { .. } => fcomponent::Error::InstanceNotFound,
+            ModelError::ComponentInstanceError {
+                err: ComponentInstanceError::InstanceNotFound { .. },
+            } => fcomponent::Error::InstanceNotFound,
             ModelError::Unsupported { .. } => fcomponent::Error::Unsupported,
             error => {
                 error!(%error, "remove_dynamic_child() failed");

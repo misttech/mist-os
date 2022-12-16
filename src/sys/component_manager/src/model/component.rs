@@ -744,10 +744,8 @@ impl ComponentInstance {
             if let Some(c) = state.get_child(&child_moniker) {
                 c.incarnation_id()
             } else {
-                return Err(ModelError::instance_not_found_in_realm(
-                    self.abs_moniker.clone(),
-                    child_moniker.clone(),
-                ));
+                let moniker = self.abs_moniker.child(child_moniker.clone());
+                return Err(ModelError::instance_not_found(moniker));
             }
         };
         ActionSet::register(
