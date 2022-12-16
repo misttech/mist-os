@@ -213,7 +213,6 @@ void Magnifier2::BindGestures(a11y::GestureHandler* gesture_handler) {
         if (state_.mode != Mode::TEMPORARY) {
           return;
         }
-        // TODO(fxb/73255): Verify that we can use the raw centroid here.
         auto delta = GetDelta(context /* current */, state_.gesture_context /* previous */);
         state_.gesture_context = context;
         HandleTemporaryDrag(delta);
@@ -241,7 +240,6 @@ void Magnifier2::BindGestures(a11y::GestureHandler* gesture_handler) {
         if (state_.mode != Mode::TEMPORARY) {
           return;
         }
-        // TODO(fxb/73255): Verify that we can use the raw centroid here.
         auto delta = GetDelta(context /* current */, state_.gesture_context /* previous */);
         state_.gesture_context = context;
         HandleTemporaryDrag(delta);
@@ -271,7 +269,6 @@ void Magnifier2::BindGestures(a11y::GestureHandler* gesture_handler) {
         if (state_.mode != Mode::PERSISTENT) {
           return;
         }
-        // TODO(fxb/73255): Verify that we can use the raw centroid here.
         auto delta = GetDelta(context /* current */, state_.gesture_context /* previous */);
 
         HandlePersistentDrag(delta);

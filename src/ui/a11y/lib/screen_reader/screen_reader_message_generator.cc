@@ -144,7 +144,6 @@ void ScreenReaderMessageGenerator::DescribeContainerChanges(
 std::vector<ScreenReaderMessageGenerator::UtteranceAndContext>
 ScreenReaderMessageGenerator::DescribeNode(const Node* node,
                                            ScreenReaderMessageContext message_context) {
-  // TODO(fxbug.dev/81707): Clean up the logic in this method.
   std::vector<UtteranceAndContext> description;
 
   DescribeContainerChanges(message_context, description);

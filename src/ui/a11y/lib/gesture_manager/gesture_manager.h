@@ -56,8 +56,6 @@ class GestureManager : public fuchsia::ui::input::accessibility::PointerEventLis
   // An arena to manage contending of pointer events across multiple gesture recognizers.
   // arena_ should be instantiated after gesture_hander_, since arena_ depends on recognizers owned
   // by handler_.
-  // TODO(fxbug.dev/43223): Recognizer pointers should be owned by a single class. Other users of
-  // these pointers should be able to validate pointers before use.
   GestureArena arena_;
 };
 }  // namespace a11y

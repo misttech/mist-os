@@ -18,7 +18,6 @@
 namespace a11y {
 
 // An interface for a11y query existing semantic information.
-// TODO(fxbug.dev/46164): Move all semantic consuming methods from View manager to this interface.
 class SemanticsSource {
  public:
   SemanticsSource() = default;

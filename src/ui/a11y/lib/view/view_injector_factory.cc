@@ -33,7 +33,6 @@ std::shared_ptr<input::Injector> ViewInjectorFactory::BuildAndConfigureInjector(
         }
 
         // The viewport of the injector needs to match the a11y view size.
-        // TODO(fxbug.dev/76667): Do proper viewport setup when possible.
         input::Injector::Viewport viewport;
         viewport.height = static_cast<float>(properties.logical_size().height);
         viewport.width = static_cast<float>(properties.logical_size().width);

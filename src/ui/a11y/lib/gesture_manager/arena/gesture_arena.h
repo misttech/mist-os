@@ -164,8 +164,6 @@ class GestureArena {
 
   // Get the state of the gesture arena.
   //
-  // TODO(fxbug.dev/109939): gesture arena provides its state.
-  //
   // Virtual for testing; overridden by a mock.
   virtual State GetState();
 

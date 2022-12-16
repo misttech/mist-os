@@ -28,7 +28,6 @@ class A11yViewSemantics : public ViewSemantics {
   // |ViewSemanticsManager|
   void EnableSemanticUpdates(bool enabled) override;
 
-  // TODO: Deprecate.
   // |ViewSemanticsManager|
   fxl::WeakPtr<::a11y::SemanticTree> GetTree() override;
 

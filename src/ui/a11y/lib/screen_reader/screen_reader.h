@@ -31,7 +31,6 @@ namespace a11y {
 //   triggers an Screen Reader action, which then calls the Fuchsia
 //   Accessibility APIs. Finally, some output is communicated (via speech, for
 //   example).
-// TODO(fxbug.dev/17592): Rename this class once the final screen reader name exists.
 class ScreenReader : public SemanticsEventListener {
  public:
   // Pointers to Semantics Manager, Gesture Listener Registry and Gesture Manager must
