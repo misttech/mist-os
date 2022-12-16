@@ -16,6 +16,11 @@ source_set("pw_bluetooth") {
   visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
 }
 
+source_set("pw_random") {
+  public_deps = [ "src/pw_random" ]
+  visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
+}
+
 source_set("pw_span") {
   public_deps = [ "src/pw_span" ]
   visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
@@ -33,5 +38,8 @@ source_set("pw_log") {
 
 group("tests") {
   testonly = true
-  deps = [ "backends/pw_log/dfv1:tests" ]
+  deps = [
+    "backends/pw_log/dfv1:tests",
+    "backends/pw_random:tests",
+  ]
 }
