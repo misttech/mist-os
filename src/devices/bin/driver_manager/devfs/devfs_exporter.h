@@ -26,23 +26,25 @@ class ExportWatcher : public fidl::WireAsyncEventHandler<fuchsia_io::Node> {
       fuchsia_device_fs::wire::ExportOptions options);
 
   // Set a callback that will be called when the connection to `service_path` is closed.
-  void set_on_close_callback(fit::callback<void()> callback) { callback_ = std::move(callback); }
+  void set_on_close_callback(fit::callback<void(ExportWatcher*)> callback) {
+    callback_ = std::move(callback);
+  }
 
   // Because `ExportWatcher` is bound to `client_`, this will be called whenever
   // there is a FIDL error on `client_`. Since we do not send reports, we know
   // that this will only be called when the connection closes.
   void on_fidl_error(fidl::UnbindInfo error) override {
     if (callback_) {
-      callback_();
+      callback_(this);
     }
   }
 
   std::string_view devfs_path() const { return devfs_path_; }
 
-  zx_status_t MakeVisible();
+  zx::result<> MakeVisible();
 
  private:
-  fit::callback<void()> callback_;
+  fit::callback<void(ExportWatcher*)> callback_;
   fidl::WireClient<fuchsia_io::Node> client_;
   std::vector<std::unique_ptr<Devnode>> devnodes_;
   std::string devfs_path_;
@@ -62,13 +64,17 @@ class DevfsExporter : public fidl::WireServer<fuchsia_device_fs::Exporter> {
   void ExportOptions(ExportOptionsRequestView request,
                      ExportOptionsCompleter::Sync& completer) override;
 
+  zx::result<> Export(fidl::ClientEnd<fuchsia_io::Directory> service_dir,
+                      std::string_view service_path, std::string_view devfs_path,
+                      uint32_t protocol_id, fuchsia_device_fs::wire::ExportOptions options);
+
   void MakeVisible(MakeVisibleRequestView request, MakeVisibleCompleter::Sync& completer) override;
 
   Devfs& devfs_;
   Devnode* const root_;
   async_dispatcher_t* const dispatcher_;
 
-  std::vector<std::unique_ptr<ExportWatcher>> exports_;
+  std::unordered_map<ExportWatcher*, std::unique_ptr<ExportWatcher>> exports_;
 };
 
 }  // namespace driver_manager

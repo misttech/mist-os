@@ -219,7 +219,7 @@ TEST(Devfs, ExportWatcher_Export) {
 
   // Set our ExportWatcher to let us know if the service was closed.
   bool did_close = false;
-  result.value()->set_on_close_callback([&did_close, &loop]() {
+  result.value()->set_on_close_callback([&did_close, &loop](driver_manager::ExportWatcher*) {
     did_close = true;
     loop.Quit();
   });

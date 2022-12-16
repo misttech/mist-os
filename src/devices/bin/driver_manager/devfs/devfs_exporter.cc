@@ -17,7 +17,7 @@ zx::result<std::unique_ptr<ExportWatcher>> ExportWatcher::Create(
     fuchsia_device_fs::wire::ExportOptions options) {
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
   if (endpoints.is_error()) {
-    return zx::error(endpoints.error_value());
+    return endpoints.take_error();
   }
 
   auto response =
@@ -42,17 +42,17 @@ zx::result<std::unique_ptr<ExportWatcher>> ExportWatcher::Create(
   return zx::ok(std::move(watcher));
 }
 
-zx_status_t ExportWatcher::MakeVisible() {
+zx::result<> ExportWatcher::MakeVisible() {
   for (auto& node : devnodes_) {
     Devnode::ExportOptions* options = node->export_options();
     if (*options != fuchsia_device_fs::wire::ExportOptions::kInvisible) {
-      return ZX_ERR_BAD_STATE;
+      return zx::error(ZX_ERR_BAD_STATE);
     }
     *options -= fuchsia_device_fs::wire::ExportOptions::kInvisible;
     node->publish();
   }
 
-  return ZX_OK;
+  return zx::ok();
 }
 
 DevfsExporter::DevfsExporter(Devfs& devfs, Devnode* root, async_dispatcher_t* dispatcher)
@@ -63,71 +63,47 @@ void DevfsExporter::PublishExporter(component::OutgoingDirectory& outgoing) {
   ZX_ASSERT(result.is_ok());
 }
 
-void DevfsExporter::Export(ExportRequestView request, ExportCompleter::Sync& completer) {
-  auto result = ExportWatcher::Create(
-      dispatcher_, devfs_, root_, std::move(request->service_dir), request->service_path.get(),
-      request->devfs_path.get(), request->protocol_id, fuchsia_device_fs::wire::ExportOptions());
+zx::result<> DevfsExporter::Export(fidl::ClientEnd<fuchsia_io::Directory> service_dir,
+                                   std::string_view service_path, std::string_view devfs_path,
+                                   uint32_t protocol_id,
+                                   fuchsia_device_fs::wire::ExportOptions options) {
+  zx::result result = ExportWatcher::Create(dispatcher_, devfs_, root_, std::move(service_dir),
+                                            service_path, devfs_path, protocol_id, options);
   if (result.is_error()) {
-    LOGF(ERROR, "Failed to export service to devfs path \"%.*s\": %s",
-         static_cast<int>(request->devfs_path.size()), request->devfs_path.data(),
-         result.status_string());
-    completer.ReplyError(result.error_value());
-    return;
+    LOGF(ERROR, "Failed to export service to devfs path \"%s\": %s",
+         std::string(devfs_path).c_str(), result.status_string());
+    return result.take_error();
   }
-
-  ExportWatcher* export_ptr = result.value().get();
-  exports_.push_back(std::move(result.value()));
-
+  std::unique_ptr watcher = std::move(result).value();
   // Set a callback so when the ExportWatcher sees its connection closed, it
   // will delete itself and its devnodes.
-  export_ptr->set_on_close_callback([this, export_ptr]() {
-    exports_.erase(std::remove_if(exports_.begin(), exports_.end(),
-                                  [&](const auto& it) { return it.get() == export_ptr; }),
-                   exports_.end());
-  });
+  watcher->set_on_close_callback([this](ExportWatcher* self) { exports_.erase(self); });
 
-  completer.ReplySuccess();
+  auto [it, inserted] = exports_.try_emplace(watcher.get(), std::move(watcher));
+  ZX_ASSERT_MSG(inserted, "duplicate pointer %p", it->first);
+
+  return zx::ok();
+}
+
+void DevfsExporter::Export(ExportRequestView request, ExportCompleter::Sync& completer) {
+  completer.Reply(Export(std::move(request->service_dir), request->service_path.get(),
+                         request->devfs_path.get(), request->protocol_id,
+                         fuchsia_device_fs::wire::ExportOptions()));
 }
 
 void DevfsExporter::ExportOptions(ExportOptionsRequestView request,
                                   ExportOptionsCompleter::Sync& completer) {
-  auto result = ExportWatcher::Create(dispatcher_, devfs_, root_, std::move(request->service_dir),
-                                      request->service_path.get(), request->devfs_path.get(),
-                                      request->protocol_id, request->options);
-  if (result.is_error()) {
-    LOGF(ERROR, "Failed to export service to devfs path \"%.*s\": %s",
-         static_cast<int>(request->devfs_path.size()), request->devfs_path.data(),
-         result.status_string());
-    completer.ReplyError(result.error_value());
-    return;
-  }
-
-  ExportWatcher* export_ptr = result.value().get();
-  exports_.push_back(std::move(result.value()));
-
-  // Set a callback so when the ExportWatcher sees its connection closed, it
-  // will delete itself and its devnodes.
-  export_ptr->set_on_close_callback([this, export_ptr]() {
-    exports_.erase(std::remove_if(exports_.begin(), exports_.end(),
-                                  [&](const auto& it) { return it.get() == export_ptr; }),
-                   exports_.end());
-  });
-
-  completer.ReplySuccess();
+  completer.Reply(Export(std::move(request->service_dir), request->service_path.get(),
+                         request->devfs_path.get(), request->protocol_id, request->options));
 }
 
 void DevfsExporter::MakeVisible(MakeVisibleRequestView request,
                                 MakeVisibleCompleter::Sync& completer) {
-  for (auto& e : exports_) {
-    if (e->devfs_path().compare(request->devfs_path.get()) != 0) {
+  for (auto& [k, e] : exports_) {
+    if (e->devfs_path() != request->devfs_path.get()) {
       continue;
     }
-    zx_status_t status = e->MakeVisible();
-    if (status != ZX_OK) {
-      completer.ReplyError(status);
-      return;
-    }
-    completer.ReplySuccess();
+    completer.Reply(e->MakeVisible());
     return;
   }
   completer.ReplyError(ZX_ERR_NOT_FOUND);
