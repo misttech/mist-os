@@ -72,10 +72,7 @@ type SemiBoundedBelievedToBeSmall = flexible union {
 const SMALL_UNION_BYTE_VECTOR_SIZE uint32 = 65488;
 
 // This type is intentionally constructed to be unbounded. This means decoders are always required
-// to check the `byte_overlfow` flag, no matter what they think they know about the type. To test
-// this type as a small message, use the defined union variant and fill it with the maximum number
-// of bytes (65488). To test it as a large message, set the union's contents to an unknown variant
-// (ordinal 2) with 65489 bytes instead.
+// to check the `byte_overlfow` flag, no matter what they think they know about the type.
 //
 //   16      (header)
 //   16      (union ordinal + envelope header)

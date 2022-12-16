@@ -18,14 +18,12 @@ const uint32_t kVectorHeaderSize = 16;
 const uint32_t kUnionOrdinalAndEnvelopeSize = 16;
 const uint32_t kDefaultElementsCount = kHandleCarryingElementsCount - 1;
 
-// TODO(fxbug.dev/114261): I don't want to update `fidl::MessageDynamicFlags` prematurely, as it is
-// part of the public API exposed through the SDK, so for now we manually define the flags for
-// testing purposes. The desired eventual definition is commented out below for reference.
-const auto kStrictMethodAndByteOverflow = static_cast<fidl::MessageDynamicFlags>(1 << 6);
-// // While this is technically equivalent to just using `kByteOverflow` alone since `kStrictMethod`
-// // is 0, defining this constant makes the intent clearer.
-// const fidl::MessageDynamicFlags kStrictMethodAndByteOverflow =
-//     fidl::MessageDynamicFlags::kStrictMethod & fidl::MessageDynamicFlags::kByteOverflow;
+// While this is technically equivalent to just using `kByteOverflow` alone since `kStrictMethod`
+// is 0, defining this constant makes the intent clearer.
+const fidl::MessageDynamicFlags kStrictMethodAndByteOverflow =
+    fidl::MessageDynamicFlags::kStrictMethod | fidl::MessageDynamicFlags::kByteOverflow;
+const fidl::MessageDynamicFlags kFlexibleMethodAndByteOverflow =
+    fidl::MessageDynamicFlags::kFlexibleMethod | fidl::MessageDynamicFlags::kByteOverflow;
 
 Bytes populate_unset_handles_false() { return u64(0); }
 
@@ -346,7 +344,7 @@ LARGE_MESSAGE_SERVER_TEST(GoodDecodeUnknownSmallMessage) {
 LARGE_MESSAGE_SERVER_TEST(GoodDecodeUnknownLargeMessage) {
   uint32_t n = kLargeStructByteVectorSize;
   Bytes channel_bytes_in = {
-      header(kOneWayTxid, kOrdinalFakeUnknownMethod, kStrictMethodAndByteOverflow),
+      header(kOneWayTxid, kOrdinalFakeUnknownMethod, kFlexibleMethodAndByteOverflow),
       aligned_large_message_info(n + kUnionOrdinalAndEnvelopeSize + kVectorHeaderSize),
   };
   Bytes vmo_bytes_in = {

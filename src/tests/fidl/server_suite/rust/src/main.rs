@@ -355,8 +355,7 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                             // TODO(fxbug.dev/99738): Rust bindings should reject V1 wire format.
                             false
                         }
-                        Test::GoodDecodeUnknownLargeMessage
-                        | Test::BadDecodeByteOverflowFlagSetOnSmallMessage
+                        Test::BadDecodeByteOverflowFlagSetOnSmallMessage
                         | Test::BadDecodeByteOverflowFlagUnsetOnLargeMessage
                         | Test::BadDecodeLargeMessageInfoOmitted
                         | Test::BadDecodeLargeMessageInfoTooSmall

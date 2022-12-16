@@ -182,8 +182,7 @@ std::array<uint8_t, sizeof(fidl_message_header_t) + sizeof(fidl_xunion_v2_t)> Ma
   fidl_message_header_t header{
       .txid = txid,
       .at_rest_flags = {FIDL_MESSAGE_HEADER_AT_REST_FLAGS_0_USE_VERSION_V2, 0},
-      .dynamic_flags =
-          static_cast<std::underlying_type_t<fidl::MessageDynamicFlags>>(dynamic_flags),
+      .dynamic_flags = dynamic_flags.value,
       .magic_number = kFidlWireFormatMagicNumberInitial,
       .ordinal = ordinal,
   };
@@ -217,8 +216,7 @@ std::array<uint8_t, sizeof(fidl_message_header_t)> MakeMessage(
   fidl_message_header_t header{
       .txid = txid,
       .at_rest_flags = {FIDL_MESSAGE_HEADER_AT_REST_FLAGS_0_USE_VERSION_V2, 0},
-      .dynamic_flags =
-          static_cast<std::underlying_type_t<fidl::MessageDynamicFlags>>(dynamic_flags),
+      .dynamic_flags = dynamic_flags.value,
       .magic_number = kFidlWireFormatMagicNumberInitial,
       .ordinal = ordinal};
   std::array<uint8_t, sizeof(fidl_message_header_t)> result;
