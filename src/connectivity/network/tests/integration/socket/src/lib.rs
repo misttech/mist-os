@@ -983,16 +983,19 @@ async fn run_tcp_socket_test(
 }
 
 trait TestIpExt {
+    const DOMAIN: fposix_socket::Domain;
     const CLIENT_SUBNET: fnet::Subnet;
     const SERVER_SUBNET: fnet::Subnet;
 }
 
 impl TestIpExt for Ipv4 {
+    const DOMAIN: fposix_socket::Domain = fposix_socket::Domain::Ipv4;
     const CLIENT_SUBNET: fnet::Subnet = fidl_subnet!("192.168.0.2/24");
     const SERVER_SUBNET: fnet::Subnet = fidl_subnet!("192.168.0.1/24");
 }
 
 impl TestIpExt for Ipv6 {
+    const DOMAIN: fposix_socket::Domain = fposix_socket::Domain::Ipv6;
     const CLIENT_SUBNET: fnet::Subnet = fidl_subnet!("2001:0db8:85a3::8a2e:0370:7334/64");
     const SERVER_SUBNET: fnet::Subnet = fidl_subnet!("2001:0db8:85a3::8a2e:0370:7335/64");
 }
@@ -1232,6 +1235,58 @@ async fn tcpv4_tcpv6_listeners_coexist<E: netemul::Endpoint>(name: &str) {
     let _listener_v6 = fasync::net::TcpListener::listen_in_realm(&host, v6_addr)
         .await
         .expect("failed to create v6 socket");
+}
+
+#[netstack_test]
+#[test_case(100; "large positive")]
+#[test_case(1; "min positive")]
+#[test_case(0; "zero")]
+#[test_case(-1; "negative")]
+async fn tcp_socket_listen<N: Netstack, I: net_types::ip::Ip + TestIpExt>(
+    name: &str,
+    backlog: i16,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+
+    let host = sandbox
+        .create_netstack_realm::<N, _>(format!("{}host", name))
+        .expect("failed to create realm");
+
+    const PORT: u16 = 8080;
+
+    let listener = {
+        let socket = host
+            .stream_socket(I::DOMAIN, fposix_socket::StreamSocketProtocol::Tcp)
+            .await
+            .expect("create TCP socket");
+        socket
+            .bind(&std::net::SocketAddr::from((I::UNSPECIFIED_ADDRESS.to_ip_addr(), PORT)).into())
+            .expect("no conflict");
+
+        // Listen with the provided backlog value.
+        socket
+            .listen(backlog.into())
+            .unwrap_or_else(|_| panic!("backlog of {} is accepted", backlog));
+        fasync::net::TcpListener::from_std(socket.into()).expect("is TCP listener")
+    };
+
+    let mut conn = fasync::net::TcpStream::connect_in_realm(
+        &host,
+        (I::LOOPBACK_ADDRESS.to_ip_addr(), PORT).into(),
+    )
+    .await
+    .expect("should be accepted");
+
+    let (_, mut served, _): (fasync::net::TcpListener, _, std::net::SocketAddr) =
+        listener.accept().await.expect("connection waiting");
+
+    // Confirm that the connection is working.
+    const NUM_BYTES: u8 = 10;
+    let written = Vec::from_iter(0..NUM_BYTES);
+    served.write_all(written.as_slice()).await.expect("write succeeds");
+    let mut read = [0; NUM_BYTES as usize];
+    conn.read_exact(&mut read).await.expect("read finished");
+    assert_eq!(&read, written.as_slice());
 }
 
 #[netstack_test]

@@ -29,6 +29,7 @@ use net_types::{
     ip::{IpAddress, IpVersion, IpVersionMarker, Ipv4, Ipv6},
     SpecifiedAddr, ZonedAddr,
 };
+use nonzero_ext::nonzero;
 use packet_formats::utils::NonZeroDuration;
 
 use crate::bindings::{
@@ -649,7 +650,31 @@ where
             SocketId::Bound(bound, ref mut local_socket) => {
                 let mut guard = self.ctx.lock().await;
                 let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
-                let backlog = NonZeroUsize::new(backlog as usize).ok_or(fposix::Errno::Einval)?;
+                // The POSIX specification for `listen` [1] says
+                //
+                //   If listen() is called with a backlog argument value that is
+                //   less than 0, the function behaves as if it had been called
+                //   with a backlog argument value of 0.
+                //
+                //   A backlog argument of 0 may allow the socket to accept
+                //   connections, in which case the length of the listen queue
+                //   may be set to an implementation-defined minimum value.
+                //
+                // [1]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/listen.html
+                //
+                // Always accept connections with a minimum backlog size of 1.
+                // Use a maximum value of 4096 like Linux.
+                const MINIMUM_BACKLOG_SIZE: NonZeroUsize = nonzero!(1usize);
+                const MAXIMUM_BACKLOG_SIZE: NonZeroUsize = nonzero!(4096usize);
+
+                let backlog = usize::try_from(backlog).unwrap_or(0);
+                let backlog = NonZeroUsize::new(backlog).map_or(MINIMUM_BACKLOG_SIZE, |b| {
+                    NonZeroUsize::min(
+                        MAXIMUM_BACKLOG_SIZE,
+                        NonZeroUsize::max(b, MINIMUM_BACKLOG_SIZE),
+                    )
+                });
+
                 let listener = listen::<I, _>(sync_ctx, non_sync_ctx, bound, backlog);
                 let LocalZirconSocketAndNotifier(local, _) = local_socket.take();
                 self.id = SocketId::Listener(listener);

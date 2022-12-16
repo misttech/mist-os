@@ -33,6 +33,17 @@ Netstack3 aims to be POSIX compatible. It also implements a number of common
 extensions to the POSIX specification, though it does not emulate or reproduce
 the behavior of any particular POSIX-like system.
 
+### `listen(int socket, int backlog)`
+
+The [POSIX specification][POSIX listen] for the `listen` syscall requires that
+
+> If listen() is called with a backlog argument value that is less than 0, the
+> function behaves as if it had been called with a backlog argument value of 0.
+
+Linux does not adhere to this requirement, and instead treats a backlog size
+less than 0 as requesting the maximum. Netstack3 treats a backlog size of 0 or
+less as requesting the minimum, and applies a minimum backlog size of 1.
+
 ### `SO_REUSEPORT`
 
 Netstack3 supports the `SO_REUSEPORT` socket option present in Linux and
@@ -69,6 +80,7 @@ is limited by system-defined minimums and maximums.
 [`fuchsia.posix.socket`]: /sdk/fidl/fuchsia.posix.socket/socket.fidl
 [core and bindings]: ./CORE_BINDINGS.md#core-and-bindings
 [`getpeername`]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/getpeername.html
+[POSIX listen]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/listen.html
 [`IPV6_MULTICAST_IF`]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html
 [`IP_MULTICAST_IF`]: https://man7.org/linux/man-pages/man7/ip.7.html
 [POSIX buffer sizes]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html#tagtcjh_8
