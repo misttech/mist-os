@@ -5,10 +5,14 @@
 mod args;
 
 use {
-    anyhow::{anyhow, Context, Error},
+    anyhow::{anyhow, format_err, Context, Error},
     fidl_fuchsia_identity_account::{AccountManagerMarker, AccountManagerProxy, AccountMetadata},
-    fuchsia_component::client::connect_to_protocol,
+    fidl_fuchsia_sys2::RealmQueryMarker,
+    fuchsia_component::client::{connect_to_protocol_at_dir_root, connect_to_protocol_at_path},
 };
+
+const ACCOUNT_MANAGER_MONIKER: &str = "./core/account/account_manager";
+const REALM_QUERY_PATH: &str = "/svc/fuchsia.sys2.RealmQuery.root";
 
 /// Performs the operation defined by the supplied command line arguments using the supplied
 /// `AccountManager`.
@@ -54,12 +58,30 @@ async fn remove_all(account_manager: &AccountManagerProxy) -> Result<(), Error> 
     Ok(())
 }
 
-#[fuchsia::main(logging_tags = ["auth"])]
+/// Connects to a discoverable protocol at the component instance supplied by `moniker`.
+async fn connect_to_exposed_protocol<P: fidl::endpoints::DiscoverableProtocolMarker>(
+    moniker: &str,
+) -> Result<P::Proxy, Error> {
+    let realm_query = connect_to_protocol_at_path::<RealmQueryMarker>(REALM_QUERY_PATH)
+        .context("Failed to connect to realm query")?;
+    let resolved_dirs = realm_query
+        .get_instance_directories(moniker)
+        .await?
+        .map_err(|e| format_err!("RealmQuery error: {:?}", e))?
+        .ok_or(format_err!("{} could not be resolved", moniker))?;
+    let exposed_dir = resolved_dirs.exposed_dir.into_proxy()?;
+    connect_to_protocol_at_dir_root::<P>(&exposed_dir)
+}
+
+#[fuchsia::main(logging_tags = ["identity"])]
 async fn main() -> Result<(), Error> {
     let command: args::Command = argh::from_env();
+
     println!("Connecting to AccountManager");
-    let account_manager = connect_to_protocol::<AccountManagerMarker>()
-        .context("Failed to connect to account manager")?;
+    let account_manager =
+        connect_to_exposed_protocol::<AccountManagerMarker>(ACCOUNT_MANAGER_MONIKER)
+            .await
+            .context("Failed to connect to account manager")?;
 
     perform_command(command, &account_manager).await
 }
