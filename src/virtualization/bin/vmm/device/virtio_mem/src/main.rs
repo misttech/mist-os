@@ -12,14 +12,14 @@ use {
     fidl_fuchsia_virtualization_hardware::VirtioMemRequestStream,
     fuchsia_component::server,
     fuchsia_inspect as inspect,
-    futures::{StreamExt, TryFutureExt, TryStreamExt},
+    futures::{future, StreamExt, TryFutureExt, TryStreamExt},
     tracing,
     virtio_device::chain::ReadableChain,
 };
 
 async fn run_virtio_mem(mut virtio_mem_fidl: VirtioMemRequestStream) -> Result<(), anyhow::Error> {
     // Receive start info as first message.
-    let (start_info, _region_addr, plugged_block_size, plugged_region_size, responder) =
+    let (start_info, region_addr, plugged_block_size, plugged_region_size, responder) =
         virtio_mem_fidl
             .try_next()
             .await?
@@ -32,6 +32,7 @@ async fn run_virtio_mem(mut virtio_mem_fidl: VirtioMemRequestStream) -> Result<(
     responder.send()?;
     let vmo = device_builder.take_vmo().expect("VMO must be provided to virtio_mem device");
 
+    let control_handle = virtio_mem_fidl.control_handle();
     // Complete the setup of queues and get a device.
     let mut virtio_device_fidl = virtio_mem_fidl.cast_stream();
     let (device, ready_responder) = machina_virtio_device::config_builder_from_stream(
@@ -47,9 +48,12 @@ async fn run_virtio_mem(mut virtio_mem_fidl: VirtioMemRequestStream) -> Result<(
     let guest_request_stream = device.take_stream(wire::GUESTREQUESTQ)?;
 
     ready_responder.send()?;
-    let mem_device = MemDevice::new(
+
+    let mut mem_device = MemDevice::new(
         VmoMemoryBackend::new(vmo),
+        control_handle,
         &inspect::component::inspector().root(),
+        region_addr,
         plugged_block_size,
         plugged_region_size,
     );
@@ -57,8 +61,12 @@ async fn run_virtio_mem(mut virtio_mem_fidl: VirtioMemRequestStream) -> Result<(
     futures::future::try_join(
         device.run_device_notify(virtio_device_fidl).err_into(),
         guest_request_stream.map(|chain| Ok(chain)).try_for_each(|chain| {
-            futures::future::ready({
-                mem_device.process_guest_request_chain(ReadableChain::new(chain, &guest_mem));
+            future::ready({
+                if let Err(e) =
+                    mem_device.process_guest_request_chain(ReadableChain::new(chain, &guest_mem))
+                {
+                    tracing::warn!("Failed to process guest request chain {}", e);
+                }
                 Ok(())
             })
         }),

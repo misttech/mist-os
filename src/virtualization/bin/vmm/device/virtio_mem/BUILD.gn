@@ -40,6 +40,11 @@ rustc_binary("virtio_mem_bin") {
 
 fuchsia_unittest_package("virtio_mem_unittests") {
   deps = [ ":virtio_mem_bin_test" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 fuchsia_component("virtio_mem_component") {
