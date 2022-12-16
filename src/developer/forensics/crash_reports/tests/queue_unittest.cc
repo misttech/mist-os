@@ -326,6 +326,27 @@ TEST_F(QueueTest, ReportingPolicyChangedToDoNotFileAndDelete_DeletesSnapshots) {
                                       }));
 }
 
+TEST_F(QueueTest, ReportingPolicyChangedToDoNotFileAndDelete_DuringUploadFromStore) {
+  SetUpQueue({
+      kUploadFailed,
+  });
+  reporting_policy_watcher_.Set(ReportingPolicy::kUndecided);
+
+  auto report_id = AddNewReport(/*is_hourly_report=*/false);
+
+  ASSERT_TRUE(report_id);
+  EXPECT_TRUE(queue_->Contains(*report_id));
+  ASSERT_TRUE(report_store_->GetReportStore().Contains(*report_id));
+
+  reporting_policy_watcher_.Set(ReportingPolicy::kUpload);
+  network_reachability_provider_->TriggerOnNetworkReachable(true);
+
+  reporting_policy_watcher_.Set(ReportingPolicy::kDoNotFileAndDelete);
+
+  RunLoopFor(kUploadResponseDelay);
+  EXPECT_FALSE(queue_->Contains(*report_id));
+}
+
 TEST_F(QueueTest, Upload) {
   SetUpQueue({kUploadSuccessful, kUploadFailed, kUploadSuccessful, kUploadFailed});
 

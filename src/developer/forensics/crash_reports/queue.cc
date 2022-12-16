@@ -305,7 +305,9 @@ void Queue::Upload() {
         Upload();
       });
 
-  // Clear the report from memory if it won't be added to the store.
+  // Clear the report from memory if it won't be added to the store. Don't yet clear
+  // |active_report_| so we know to not yet attempt another upload and can properly retire
+  // |active_report_| once we get a response from the server.
   if (!add_to_store) {
     active_report_->TakeReport();
   }
@@ -451,7 +453,10 @@ void Queue::DeleteAll() {
   // Delete the report being uploaded, but don't retire it; the PendingReport is needed
   // post-upload and will be retired once it is used.
   if (active_report_) {
-    active_report_->TakeReport();
+    if (active_report_->HasReport()) {
+      // The report may have been already deleted from memory after initiating upload.
+      active_report_->TakeReport();
+    }
     active_report_->delete_post_upload = true;
   }
 
