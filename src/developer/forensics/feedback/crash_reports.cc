@@ -55,10 +55,7 @@ CrashReports::CrashReports(async_dispatcher_t* dispatcher,
       crash_register_(info_context_, kCrashRegisterPath),
       crash_reporter_(dispatcher, services, clock, info_context_, options.build_type_config,
                       &crash_register_, &tags_, &crash_server_, &report_store_, data_provider,
-                      options.snapshot_collector_window_duration),
-      info_(info_context_) {
-  info_.ExposeConfig(options.build_type_config);
-}
+                      options.snapshot_collector_window_duration) {}
 
 void CrashReports::Handle(::fidl::InterfaceRequest<fuchsia::feedback::CrashReporter> request,
                           ::fit::function<void(zx_status_t)> error_handler) {

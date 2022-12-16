@@ -4,16 +4,40 @@
 
 #include "src/developer/forensics/feedback/config.h"
 
+#include <lib/inspect/testing/cpp/inspect.h>
+
+#include <initializer_list>
 #include <optional>
 #include <string>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "src/developer/forensics/feedback/constants.h"
+#include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/lib/files/scoped_temp_dir.h"
 
 namespace forensics::feedback {
 namespace {
+
+using inspect::testing::BoolIs;
+using inspect::testing::ChildrenMatch;
+using inspect::testing::NameMatches;
+using inspect::testing::NodeMatches;
+using inspect::testing::PropertyList;
+using inspect::testing::StringIs;
+using inspect::testing::UintIs;
+using testing::IsSupersetOf;
+
+constexpr auto kConfigDisabled = CrashReportUploadPolicy::kDisabled;
+constexpr auto kConfigEnabled = CrashReportUploadPolicy::kEnabled;
+constexpr auto kConfigReadFromPrivacySettings = CrashReportUploadPolicy::kReadFromPrivacySettings;
+
+auto BuildConfigMatcher(
+    std::initializer_list<testing::Matcher<const inspect::PropertyValue&>> properties) {
+  return ChildrenMatch(Contains(AllOf(
+      NodeMatches(AllOf(NameMatches(kInspectConfigKey), PropertyList(IsSupersetOf(properties)))))));
+}
 
 class ConfigTest : public testing::Test {
  public:
@@ -41,6 +65,8 @@ class BuildTypeConfigTest : public ConfigTest {
     return GetBuildTypeConfig(WriteConfig(config));
   }
 };
+
+using InspectConfigTest = UnitTestFixture;
 
 TEST_F(ProductConfigTest, MissingPersistedLogsNumFiles) {
   const std::optional<ProductConfig> config = ParseConfig(R"({
@@ -676,6 +702,247 @@ TEST_F(ConfigTest, GetFeedbackDataConfig) {
   EXPECT_EQ(config->attachment_allowlist, std::set<std::string>({
                                               "attachment_one",
                                           }));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_UploadDisabled) {
+  ExposeConfig(InspectRoot(),
+               BuildTypeConfig{
+                   .crash_report_upload_policy = kConfigDisabled,
+               },
+               {});
+
+  EXPECT_THAT(
+      InspectTree(),
+      BuildConfigMatcher({StringIs(kCrashReportUploadPolicyKey, ToString(kConfigDisabled))}));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_UploadEnabled) {
+  ExposeConfig(InspectRoot(),
+               BuildTypeConfig{
+                   .crash_report_upload_policy = kConfigEnabled,
+               },
+               {});
+
+  EXPECT_THAT(
+      InspectTree(),
+      BuildConfigMatcher({StringIs(kCrashReportUploadPolicyKey, ToString(kConfigEnabled))}));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_UploadReadFromPrivacySettings) {
+  ExposeConfig(InspectRoot(),
+               BuildTypeConfig{
+                   .crash_report_upload_policy = kConfigReadFromPrivacySettings,
+               },
+               {});
+
+  EXPECT_THAT(InspectTree(),
+              BuildConfigMatcher({StringIs(kCrashReportUploadPolicyKey,
+                                           ToString(kConfigReadFromPrivacySettings))}));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_DailyPerProductCrashReportQuotaNone) {
+  ExposeConfig(InspectRoot(),
+               BuildTypeConfig{
+                   .daily_per_product_crash_report_quota = std::nullopt,
+               },
+               {});
+
+  EXPECT_THAT(InspectTree(),
+              BuildConfigMatcher({StringIs(kDailyPerProductCrashReportQuotaKey, "none")}));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_DailyPerProductCrashReportQuotaPositive) {
+  ExposeConfig(InspectRoot(),
+               BuildTypeConfig{
+                   .daily_per_product_crash_report_quota = 1,
+               },
+               {});
+
+  EXPECT_THAT(InspectTree(),
+              BuildConfigMatcher({StringIs(kDailyPerProductCrashReportQuotaKey, "1")}));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_EnableDataRedactionFalse) {
+  ExposeConfig(InspectRoot(),
+               BuildTypeConfig{
+                   .enable_data_redaction = false,
+               },
+               {});
+
+  EXPECT_THAT(InspectTree(), BuildConfigMatcher({BoolIs(kEnableDataRedactionKey, false)}));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_EnableDataRedactionTrue) {
+  ExposeConfig(InspectRoot(),
+               BuildTypeConfig{
+                   .enable_data_redaction = true,
+               },
+               {});
+
+  EXPECT_THAT(InspectTree(), BuildConfigMatcher({BoolIs(kEnableDataRedactionKey, true)}));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_EnableHourlySnapshotsFalse) {
+  ExposeConfig(InspectRoot(),
+               BuildTypeConfig{
+                   .enable_hourly_snapshots = false,
+               },
+               {});
+
+  EXPECT_THAT(InspectTree(), BuildConfigMatcher({BoolIs(kEnableHourlySnapshotsKey, false)}));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_EnableHourlySnapshotsTrue) {
+  ExposeConfig(InspectRoot(),
+               BuildTypeConfig{
+                   .enable_hourly_snapshots = true,
+               },
+               {});
+
+  EXPECT_THAT(InspectTree(), BuildConfigMatcher({BoolIs(kEnableHourlySnapshotsKey, true)}));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_EnableLimitInspectDataFalse) {
+  ExposeConfig(InspectRoot(),
+               BuildTypeConfig{
+                   .enable_limit_inspect_data = false,
+               },
+               {});
+
+  EXPECT_THAT(InspectTree(), BuildConfigMatcher({BoolIs(kEnableLimitInspectDataKey, false)}));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_EnableLimitInspectDataTrue) {
+  ExposeConfig(InspectRoot(),
+               BuildTypeConfig{
+                   .enable_limit_inspect_data = true,
+               },
+               {});
+
+  EXPECT_THAT(InspectTree(), BuildConfigMatcher({BoolIs(kEnableLimitInspectDataKey, true)}));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_BuildTypeEnableAll) {
+  ExposeConfig(InspectRoot(),
+               BuildTypeConfig{
+                   .crash_report_upload_policy = kConfigEnabled,
+                   .daily_per_product_crash_report_quota = 1,
+                   .enable_data_redaction = true,
+                   .enable_hourly_snapshots = true,
+                   .enable_limit_inspect_data = true,
+               },
+               {});
+
+  EXPECT_THAT(InspectTree(), BuildConfigMatcher({
+                                 StringIs(kCrashReportUploadPolicyKey, ToString(kConfigEnabled)),
+                                 StringIs(kDailyPerProductCrashReportQuotaKey, "1"),
+                                 BoolIs(kEnableDataRedactionKey, true),
+                                 BoolIs(kEnableHourlySnapshotsKey, true),
+                                 BoolIs(kEnableLimitInspectDataKey, true),
+                             }));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_PersistedLogsNumFiles) {
+  ExposeConfig(InspectRoot(), {},
+               ProductConfig{
+                   .persisted_logs_num_files = 1,
+               });
+
+  EXPECT_THAT(InspectTree(), BuildConfigMatcher({UintIs(kPersistedLogsNumFilesKey, 1)}));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_PersistedLogsTotalSize) {
+  ExposeConfig(InspectRoot(), {},
+               ProductConfig{
+                   .persisted_logs_total_size = StorageSize::Kilobytes(1),
+               });
+  EXPECT_THAT(InspectTree(), BuildConfigMatcher({UintIs(kPersistedLogsTotalSizeKey, 1)}));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_SnapshotPersistenceMaxTmpSizeNone) {
+  ExposeConfig(InspectRoot(), {},
+               ProductConfig{
+                   .snapshot_persistence_max_tmp_size = std::nullopt,
+               });
+
+  EXPECT_THAT(InspectTree(),
+              BuildConfigMatcher({StringIs(kSnapshotPersistenceMaxTmpSizeKey, "none")}));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_SnapshotPersistenceMaxTmpSizePositive) {
+  ExposeConfig(InspectRoot(), {},
+               ProductConfig{
+                   .snapshot_persistence_max_tmp_size = StorageSize::Megabytes(1),
+               });
+
+  EXPECT_THAT(InspectTree(),
+              BuildConfigMatcher({StringIs(kSnapshotPersistenceMaxTmpSizeKey, "1")}));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_SnapshotPersistenceMaxCacheSizeNone) {
+  ExposeConfig(InspectRoot(), {},
+               ProductConfig{
+                   .snapshot_persistence_max_cache_size = std::nullopt,
+               });
+
+  EXPECT_THAT(InspectTree(),
+              BuildConfigMatcher({StringIs(kSnapshotPersistenceMaxCacheSizeKey, "none")}));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_SnapshotPersistenceMaxCacheSizePositive) {
+  ExposeConfig(InspectRoot(), {},
+               ProductConfig{
+                   .snapshot_persistence_max_cache_size = StorageSize::Megabytes(1),
+               });
+
+  EXPECT_THAT(InspectTree(),
+              BuildConfigMatcher({StringIs(kSnapshotPersistenceMaxCacheSizeKey, "1")}));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_ProductEnableAll) {
+  ExposeConfig(InspectRoot(), {},
+               ProductConfig{
+                   .persisted_logs_num_files = 1,
+                   .persisted_logs_total_size = StorageSize::Kilobytes(1),
+                   .snapshot_persistence_max_tmp_size = StorageSize::Megabytes(1),
+                   .snapshot_persistence_max_cache_size = StorageSize::Megabytes(1),
+               });
+
+  EXPECT_THAT(InspectTree(), BuildConfigMatcher({
+                                 UintIs(kPersistedLogsNumFilesKey, 1),
+                                 UintIs(kPersistedLogsTotalSizeKey, 1),
+                                 StringIs(kSnapshotPersistenceMaxTmpSizeKey, "1"),
+                                 StringIs(kSnapshotPersistenceMaxCacheSizeKey, "1"),
+                             }));
+}
+
+TEST_F(InspectConfigTest, ExposeConfig_EnableAll) {
+  ExposeConfig(InspectRoot(),
+               BuildTypeConfig{
+                   .crash_report_upload_policy = kConfigEnabled,
+                   .daily_per_product_crash_report_quota = 1,
+                   .enable_data_redaction = true,
+                   .enable_hourly_snapshots = true,
+                   .enable_limit_inspect_data = true,
+               },
+               ProductConfig{
+                   .persisted_logs_num_files = 1,
+                   .persisted_logs_total_size = StorageSize::Kilobytes(1),
+                   .snapshot_persistence_max_tmp_size = StorageSize::Megabytes(1),
+                   .snapshot_persistence_max_cache_size = StorageSize::Megabytes(1),
+               });
+
+  EXPECT_THAT(InspectTree(), BuildConfigMatcher({
+                                 StringIs(kCrashReportUploadPolicyKey, ToString(kConfigEnabled)),
+                                 StringIs(kDailyPerProductCrashReportQuotaKey, "1"),
+                                 BoolIs(kEnableDataRedactionKey, true),
+                                 BoolIs(kEnableHourlySnapshotsKey, true),
+                                 BoolIs(kEnableLimitInspectDataKey, true),
+                                 UintIs(kPersistedLogsNumFilesKey, 1),
+                                 UintIs(kPersistedLogsTotalSizeKey, 1),
+                                 StringIs(kSnapshotPersistenceMaxTmpSizeKey, "1"),
+                                 StringIs(kSnapshotPersistenceMaxCacheSizeKey, "1"),
+                             }));
 }
 
 }  // namespace

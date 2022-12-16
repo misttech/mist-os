@@ -22,6 +22,19 @@ const char kOverrideBuildTypeConfigPath[] = "/config/data/build_type/override_co
 const char kDefaultProductConfigPath[] = "/pkg/data/product/default_config.json";
 const char kOverrideProductConfigPath[] = "/config/data/product/override_config.json";
 
+constexpr char kInspectConfigKey[] = "config";
+
+constexpr char kPersistedLogsNumFilesKey[] = "persisted_logs_num_files";
+constexpr char kPersistedLogsTotalSizeKey[] = "persisted_logs_total_size_kib";
+constexpr char kSnapshotPersistenceMaxTmpSizeKey[] = "snapshot_persistence_max_tmp_size_mib";
+constexpr char kSnapshotPersistenceMaxCacheSizeKey[] = "snapshot_persistence_max_cache_size_mib";
+
+constexpr char kCrashReportUploadPolicyKey[] = "crash_report_upload_policy";
+constexpr char kDailyPerProductCrashReportQuotaKey[] = "daily_per_product_crash_report_quota";
+constexpr char kEnableDataRedactionKey[] = "enable_data_redaction";
+constexpr char kEnableHourlySnapshotsKey[] = "enable_hourly_snapshots";
+constexpr char kEnableLimitInspectDataKey[] = "enable_limit_inspect_data";
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Reboot reporting
 ///////////////////////////////////////////////////////////////////////////////////////////////////

@@ -14,7 +14,6 @@
 
 #include "src/developer/forensics/crash_reports/product.h"
 #include "src/developer/forensics/crash_reports/reporting_policy_watcher.h"
-#include "src/developer/forensics/feedback/config.h"
 #include "src/developer/forensics/utils/inspect_node_manager.h"
 #include "src/developer/forensics/utils/storage_size.h"
 #include "src/lib/fxl/macros.h"
@@ -26,9 +25,6 @@ namespace crash_reports {
 class InspectManager {
  public:
   explicit InspectManager(inspect::Node* root_node);
-
-  // Exposes the static configuration related to the crash reporter.
-  void ExposeConfig(const feedback::BuildTypeConfig& config);
 
   // Exposes the reporting policy of the crash reporter.
   void ExposeReportingPolicy(ReportingPolicyWatcher* watcher);
@@ -43,16 +39,6 @@ class InspectManager {
   void IncreaseReportsGarbageCollectedBy(uint64_t num_reports);
 
  private:
-  // Inspect node containing the static configuration.
-  struct Config {
-    // Inspect node containing the crash server configuration.
-    struct CrashServerConfig {
-      inspect::StringProperty upload_policy;
-    };
-
-    CrashServerConfig crash_server;
-  };
-
   // Inspect node containing the mutable settings.
   struct Settings {
     inspect::StringProperty upload_policy;
@@ -73,7 +59,6 @@ class InspectManager {
 
   InspectNodeManager node_manager_;
 
-  Config config_;
   Settings settings_;
   Store store_;
 

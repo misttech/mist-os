@@ -8,6 +8,7 @@
 
 #include <optional>
 
+#include "src/developer/forensics/feedback/constants.h"
 #include "src/developer/forensics/utils/storage_size.h"
 #include "src/lib/files/file.h"
 #include "third_party/rapidjson/include/rapidjson/document.h"
@@ -105,7 +106,7 @@ constexpr char kProductConfigSchema[] = R"({
 
 std::optional<ProductConfig> ParseProductConfig(const rapidjson::Document& json) {
   ProductConfig config;
-  if (const int64_t num_files = json["persisted_logs_num_files"].GetInt64(); num_files > 0) {
+  if (const int64_t num_files = json[kPersistedLogsNumFilesKey].GetInt64(); num_files > 0) {
     config.persisted_logs_num_files = num_files;
   } else {
     FX_LOGS(ERROR) << "Can't use non-positive number of files for system log persistence: "
@@ -113,7 +114,7 @@ std::optional<ProductConfig> ParseProductConfig(const rapidjson::Document& json)
     return std::nullopt;
   }
 
-  if (const int64_t total_size_kib = json["persisted_logs_total_size_kib"].GetInt64();
+  if (const int64_t total_size_kib = json[kPersistedLogsTotalSizeKey].GetInt64();
       total_size_kib > 0) {
     config.persisted_logs_total_size = StorageSize::Kilobytes(total_size_kib);
   } else {
@@ -121,14 +122,14 @@ std::optional<ProductConfig> ParseProductConfig(const rapidjson::Document& json)
     return std::nullopt;
   }
 
-  if (const int64_t max_tmp_size_mib = json["snapshot_persistence_max_tmp_size_mib"].GetInt64();
+  if (const int64_t max_tmp_size_mib = json[kSnapshotPersistenceMaxTmpSizeKey].GetInt64();
       max_tmp_size_mib > 0) {
     config.snapshot_persistence_max_tmp_size = StorageSize::Megabytes(max_tmp_size_mib);
   } else {
     config.snapshot_persistence_max_tmp_size = std::nullopt;
   }
 
-  if (const int64_t max_cache_size_mib = json["snapshot_persistence_max_cache_size_mib"].GetInt64();
+  if (const int64_t max_cache_size_mib = json[kSnapshotPersistenceMaxCacheSizeKey].GetInt64();
       max_cache_size_mib > 0) {
     config.snapshot_persistence_max_cache_size = StorageSize::Megabytes(max_cache_size_mib);
   } else {
@@ -174,12 +175,12 @@ const char kBuildTypeConfigSchema[] = R"({
 
 std::optional<BuildTypeConfig> ParseBuildTypeConfig(const rapidjson::Document& json) {
   BuildTypeConfig config{
-      .enable_data_redaction = json["enable_data_redaction"].GetBool(),
-      .enable_hourly_snapshots = json["enable_hourly_snapshots"].GetBool(),
-      .enable_limit_inspect_data = json["enable_limit_inspect_data"].GetBool(),
+      .enable_data_redaction = json[kEnableDataRedactionKey].GetBool(),
+      .enable_hourly_snapshots = json[kEnableHourlySnapshotsKey].GetBool(),
+      .enable_limit_inspect_data = json[kEnableLimitInspectDataKey].GetBool(),
   };
 
-  if (const std::string policy = json["crash_report_upload_policy"].GetString();
+  if (const std::string policy = json[kCrashReportUploadPolicyKey].GetString();
       policy == "disabled") {
     config.crash_report_upload_policy = CrashReportUploadPolicy::kDisabled;
   } else if (policy == "enabled") {
@@ -190,7 +191,7 @@ std::optional<BuildTypeConfig> ParseBuildTypeConfig(const rapidjson::Document& j
     FX_LOGS(FATAL) << "Upload policy '" << policy << "' not permitted by schema";
   }
 
-  if (const int64_t quota = json["daily_per_product_crash_report_quota"].GetInt64(); quota > 0) {
+  if (const int64_t quota = json[kDailyPerProductCrashReportQuotaKey].GetInt64(); quota > 0) {
     config.daily_per_product_crash_report_quota = quota;
   } else {
     config.daily_per_product_crash_report_quota = std::nullopt;
@@ -221,6 +222,42 @@ std::optional<feedback_data::Config> GetFeedbackDataConfig(const std::string& pa
   }
 
   return config;
+}
+
+void ExposeConfig(inspect::Node& inspect_root, const BuildTypeConfig& build_type_config,
+                  const ProductConfig& product_config) {
+  const std::string crash_report_quota =
+      build_type_config.daily_per_product_crash_report_quota.has_value()
+          ? std::to_string(*build_type_config.daily_per_product_crash_report_quota)
+          : "none";
+
+  const std::string snapshot_persistence_tmp_size =
+      product_config.snapshot_persistence_max_tmp_size.has_value()
+          ? std::to_string(product_config.snapshot_persistence_max_tmp_size->ToMegabytes())
+          : "none";
+
+  const std::string snapshot_persistence_cache_size =
+      product_config.snapshot_persistence_max_cache_size.has_value()
+          ? std::to_string(product_config.snapshot_persistence_max_cache_size->ToMegabytes())
+          : "none";
+
+  inspect_root.RecordChild(
+      kInspectConfigKey,
+      [&build_type_config, &product_config, &crash_report_quota, &snapshot_persistence_tmp_size,
+       &snapshot_persistence_cache_size](inspect::Node& node) {
+        node.RecordString(kCrashReportUploadPolicyKey,
+                          ToString(build_type_config.crash_report_upload_policy));
+        node.RecordString(kDailyPerProductCrashReportQuotaKey, crash_report_quota);
+        node.RecordBool(kEnableDataRedactionKey, build_type_config.enable_data_redaction);
+        node.RecordBool(kEnableHourlySnapshotsKey, build_type_config.enable_hourly_snapshots);
+        node.RecordBool(kEnableLimitInspectDataKey, build_type_config.enable_limit_inspect_data);
+
+        node.RecordUint(kPersistedLogsNumFilesKey, product_config.persisted_logs_num_files);
+        node.RecordUint(kPersistedLogsTotalSizeKey,
+                        product_config.persisted_logs_total_size.ToKilobytes());
+        node.RecordString(kSnapshotPersistenceMaxTmpSizeKey, snapshot_persistence_tmp_size);
+        node.RecordString(kSnapshotPersistenceMaxCacheSizeKey, snapshot_persistence_cache_size);
+      });
 }
 
 std::string ToString(const CrashReportUploadPolicy upload_policy) {

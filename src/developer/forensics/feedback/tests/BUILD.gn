@@ -117,6 +117,7 @@ executable("config_unittest_exe") {
 
   deps = [
     "//src/developer/forensics/feedback:config",
+    "//src/developer/forensics/testing:unit_test_fixture",
     "//src/lib/files",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",

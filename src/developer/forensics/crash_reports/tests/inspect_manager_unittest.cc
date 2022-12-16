@@ -13,11 +13,9 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/developer/forensics/crash_reports/constants.h"
 #include "src/developer/forensics/crash_reports/errors.h"
 #include "src/developer/forensics/crash_reports/product.h"
 #include "src/developer/forensics/crash_reports/reporting_policy_watcher.h"
-#include "src/developer/forensics/feedback/config.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/developer/forensics/utils/errors.h"
 
@@ -38,11 +36,6 @@ using testing::UnorderedElementsAreArray;
 
 constexpr char kComponentUrl[] = "fuchsia-pkg://fuchsia.com/my-pkg#meta/my-component.cmx";
 
-constexpr auto kConfigDisabled = feedback::CrashReportUploadPolicy::kDisabled;
-constexpr auto kConfigEnabled = feedback::CrashReportUploadPolicy::kEnabled;
-constexpr auto kConfigReadFromPrivacySettings =
-    feedback::CrashReportUploadPolicy::kReadFromPrivacySettings;
-
 class InspectManagerTest : public UnitTestFixture {
  public:
   void SetUp() override { inspect_manager_ = std::make_unique<InspectManager>(&InspectRoot()); }
@@ -53,52 +46,10 @@ class InspectManagerTest : public UnitTestFixture {
 
 TEST_F(InspectManagerTest, InitialInspectTree) {
   EXPECT_THAT(InspectTree(),
-              ChildrenMatch(UnorderedElementsAre(NodeMatches(NameMatches("config")),
-                                                 AllOf(NodeMatches(NameMatches("crash_reporter")),
+              ChildrenMatch(UnorderedElementsAre(AllOf(NodeMatches(NameMatches("crash_reporter")),
                                                        ChildrenMatch(UnorderedElementsAreArray({
                                                            NodeMatches(NameMatches("settings")),
                                                        }))))));
-}
-
-TEST_F(InspectManagerTest, ExposeConfig_UploadEnabled) {
-  inspect_manager_->ExposeConfig(feedback::BuildTypeConfig{
-      .crash_report_upload_policy = kConfigEnabled,
-  });
-  EXPECT_THAT(InspectTree(),
-              ChildrenMatch(Contains(
-                  AllOf(NodeMatches(NameMatches("config")),
-                        ChildrenMatch(ElementsAre(NodeMatches(AllOf(
-                            NameMatches(kCrashServerKey),
-                            PropertyList(UnorderedElementsAreArray({
-                                StringIs(kCrashServerUploadPolicyKey, ToString(kConfigEnabled)),
-                            }))))))))));
-}
-
-TEST_F(InspectManagerTest, ExposeConfig_UploadDisabled) {
-  inspect_manager_->ExposeConfig(feedback::BuildTypeConfig{
-      .crash_report_upload_policy = kConfigDisabled,
-  });
-  EXPECT_THAT(InspectTree(),
-              ChildrenMatch(Contains(
-                  AllOf(NodeMatches(NameMatches("config")),
-                        ChildrenMatch(ElementsAre(NodeMatches(AllOf(
-                            NameMatches(kCrashServerKey),
-                            PropertyList(ElementsAre(StringIs(kCrashServerUploadPolicyKey,
-                                                              ToString(kConfigDisabled))))))))))));
-}
-
-TEST_F(InspectManagerTest, ExposeConfig_UploadReadFromPrivacySettings) {
-  inspect_manager_->ExposeConfig(feedback::BuildTypeConfig{
-      .crash_report_upload_policy = kConfigReadFromPrivacySettings,
-  });
-  EXPECT_THAT(
-      InspectTree(),
-      ChildrenMatch(Contains(AllOf(
-          NodeMatches(NameMatches("config")),
-          ChildrenMatch(ElementsAre(NodeMatches(AllOf(
-              NameMatches(kCrashServerKey),
-              PropertyList(ElementsAre(StringIs(kCrashServerUploadPolicyKey,
-                                                ToString(kConfigReadFromPrivacySettings))))))))))));
 }
 
 class TestReportingPolicyWatcher : public ReportingPolicyWatcher {

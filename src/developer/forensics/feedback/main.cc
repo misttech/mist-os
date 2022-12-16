@@ -68,6 +68,8 @@ int main() {
     }
   }
 
+  ExposeConfig(*component.InspectRoot(), *build_type_config, *product_config);
+
   auto reboot_log = RebootLog::ParseRebootLog(
       "/boot/log/last-panic.txt", kPreviousGracefulRebootReasonFile, TestAndSetNotAFdr());
 

@@ -5,6 +5,8 @@
 #ifndef SRC_DEVELOPER_FORENSICS_FEEDBACK_CONFIG_H_
 #define SRC_DEVELOPER_FORENSICS_FEEDBACK_CONFIG_H_
 
+#include <lib/inspect/cpp/vmo/types.h>
+
 #include <optional>
 #include <string>
 
@@ -53,6 +55,10 @@ std::optional<BuildTypeConfig> GetBuildTypeConfig(
 
 std::optional<feedback_data::Config> GetFeedbackDataConfig(
     const std::string& path = kFeedbackDataConfigPath);
+
+// Exposes the static configuration based on build type and product.
+void ExposeConfig(inspect::Node& inspect_root, const BuildTypeConfig& build_type_config,
+                  const ProductConfig& product_config);
 
 // Returns the string version of the enum.
 std::string ToString(CrashReportUploadPolicy upload_policy);

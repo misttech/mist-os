@@ -12,7 +12,6 @@
 #include <map>
 #include <utility>
 
-#include "src/developer/forensics/crash_reports/constants.h"
 #include "src/developer/forensics/crash_reports/errors.h"
 #include "src/lib/files/path.h"
 
@@ -25,16 +24,7 @@ using files::JoinPath;
 }  // namespace
 
 InspectManager::InspectManager(inspect::Node* root_node) : node_manager_(root_node) {
-  node_manager_.Get("/config/crash_server");
   node_manager_.Get("/crash_reporter/settings");
-}
-
-void InspectManager::ExposeConfig(const feedback::BuildTypeConfig& config) {
-  auto* crash_server = &config_.crash_server;
-  inspect::Node& server = node_manager_.Get("/config/crash_server");
-
-  crash_server->upload_policy = server.CreateString(
-      kCrashServerUploadPolicyKey, feedback::ToString(config.crash_report_upload_policy));
 }
 
 void InspectManager::ExposeReportingPolicy(ReportingPolicyWatcher* watcher) {

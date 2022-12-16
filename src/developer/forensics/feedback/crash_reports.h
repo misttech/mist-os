@@ -14,7 +14,6 @@
 #include "src/developer/forensics/crash_reports/crash_reporter.h"
 #include "src/developer/forensics/crash_reports/crash_server.h"
 #include "src/developer/forensics/crash_reports/info/info_context.h"
-#include "src/developer/forensics/crash_reports/info/main_service_info.h"
 #include "src/developer/forensics/crash_reports/log_tags.h"
 #include "src/developer/forensics/crash_reports/report_store.h"
 #include "src/developer/forensics/feedback/annotations/annotation_manager.h"
@@ -58,8 +57,6 @@ class CrashReports {
   crash_reports::ReportStore report_store_;
   crash_reports::CrashRegister crash_register_;
   crash_reports::CrashReporter crash_reporter_;
-
-  crash_reports::MainServiceInfo info_;
 
   ::fidl::BindingSet<fuchsia::feedback::CrashReporter> crash_reporter_connections_;
   ::fidl::BindingSet<fuchsia::feedback::CrashReportingProductRegister>
