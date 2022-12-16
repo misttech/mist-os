@@ -173,9 +173,7 @@ If you don't need to save the Fuchsia image, you can instead use
 Each script supports `--help` to see other supported flags.
 
 These scripts wrap `fx make-fuchsia-vol` to create the Fuchsia image, and
-`bin/run-zircon` to run QEMU. `bin/run-zircon` is a modified version of
-`//zircon/scripts/run-zircon`, which uses [OVMF] to provide a virtual UEFI
-instance that supports ABR partitions.
+`//zircon/scripts/run-zircon` to run QEMU.
 
 Once the VM has finished paving, you can then use it with the upgrade tests:
 
@@ -190,5 +188,3 @@ Once the VM has finished paving, you can then use it with the upgrade tests:
 Note that your QEMU device will always be named `fuchsia-5254-0063-5e7a`.
 Explicitly naming the device for the test will help prevent accidental upgrades
 to your other devices.
-
-[OVMF]: https://github.com/tianocore/tianocore.github.io/wiki/OVMF

@@ -31,7 +31,7 @@ while (($#)); do
       echo
       echo "additional flags that are passed on to run-zircon:"
       echo
-      "${FUCHSIA_DIR}/src/sys/pkg/tests/system-tests/bin/run-zircon" -h
+      "${FUCHSIA_DIR}/zircon/scripts/run-zircon" -h
       exit 1
       ;;
     --image-dir)
@@ -59,13 +59,11 @@ fi
 IMGDIR=$(realpath "${IMGDIR}")
 
 # Launch QEMU.
-exec "${FUCHSIA_DIR}/src/sys/pkg/tests/system-tests/bin/run-zircon" \
+exec "${FUCHSIA_DIR}/zircon/scripts/run-zircon" \
   -a "${FUCHSIA_ARCH}" \
   -q "${PREBUILT_QEMU_DIR}/bin" \
   -N \
   -d \
   -D "${IMGDIR}/fuchsia.efi" \
-  --diskfmt=raw \
-  "--ovmf-code=${PREBUILT_OVMF_DIR}/OVMF_CODE.fd" \
-  "--ovmf-vars=${IMGDIR}/OVMF_VARS.fd" \
+  --uefi="${IMGDIR}/OVMF_VARS.fd" \
   "${trailing_args[@]}"

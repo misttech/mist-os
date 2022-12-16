@@ -44,7 +44,7 @@ while (($#)); do
       echo
       echo "additional flags that are passed on to run-zircon:"
       echo
-      "${FUCHSIA_DIR}/src/sys/pkg/tests/system-tests/bin/run-zircon" -h
+      "${FUCHSIA_DIR}/zircon/scripts/run-zircon" -h
       exit 1
       ;;
     --image-dir)
@@ -152,7 +152,7 @@ fx-info "Created ${IMGDIR_FUCHSIA}"
 # persisted across reboots.
 fx-info "Creating ${IMGDIR_OVMF_VARS}"
 
-cp "${PREBUILT_OVMF_DIR}/OVMF_VARS.fd" "${IMGDIR_OVMF_VARS}"
+cp "${PREBUILT_EDK2_DIR}/qemu-x64/OVMF_VARS.fd" "${IMGDIR_OVMF_VARS}"
 
 fx-info "Created ${IMGDIR_OVMF_VARS}"
 
