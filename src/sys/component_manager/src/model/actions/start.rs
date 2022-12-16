@@ -8,7 +8,7 @@ use {
         component::{
             ComponentInstance, ExecutionState, InstanceState, Package, Runtime, StartReason,
         },
-        error::ModelError,
+        error::{ModelError, StructuredConfigError},
         hooks::{Event, EventPayload, RuntimeInfo},
         namespace::IncomingNamespace,
     },
@@ -267,8 +267,8 @@ async fn make_execution_runtime(
     let encoded_config = if let Some(config) = config {
         let encoded = config.encode_as_fidl_struct();
         let encoded_size = encoded.len() as u64;
-        let vmo = Vmo::create(encoded_size).map_err(ModelError::VmoCreateFailed)?;
-        vmo.write(&encoded, 0).map_err(ModelError::VmoWriteFailed)?;
+        let vmo = Vmo::create(encoded_size).map_err(StructuredConfigError::VmoCreateFailed)?;
+        vmo.write(&encoded, 0).map_err(StructuredConfigError::VmoWriteFailed)?;
         Some(fmem::Data::Buffer(fmem::Buffer { vmo, size: encoded_size }))
     } else {
         None

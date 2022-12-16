@@ -10,7 +10,7 @@ use {
         },
         context::{ModelContext, WeakModelContext},
         environment::Environment,
-        error::ModelError,
+        error::{ModelError, StructuredConfigError},
         exposed_dir::ExposedDir,
         hooks::{Event, EventPayload, Hooks},
         namespace::{populate_and_get_logsink_decl, IncomingNamespace},
@@ -164,9 +164,9 @@ impl TryFrom<ResolvedComponent> for Component {
     ) -> Result<Self, Self::Error> {
         // Verify the component configuration, if it exists
         let config = if let Some(config_decl) = decl.config.as_ref() {
-            let values = config_values.ok_or(ModelError::ConfigValuesMissing)?;
+            let values = config_values.ok_or(StructuredConfigError::ConfigValuesMissing)?;
             let config = ConfigFields::resolve(config_decl, values)
-                .map_err(ModelError::ConfigResolutionFailed)?;
+                .map_err(StructuredConfigError::ConfigResolutionFailed)?;
             Some(config)
         } else {
             None

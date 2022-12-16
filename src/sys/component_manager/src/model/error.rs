@@ -162,14 +162,11 @@ pub enum ModelError {
         #[from]
         err: AbiRevisionError,
     },
-    #[error("component has a config schema but resolver did not provide values")]
-    ConfigValuesMissing,
-    #[error("failed to resolve component's config: {_0}")]
-    ConfigResolutionFailed(#[source] config_encoder::ResolutionError),
-    #[error("couldn't create vmo: {_0}")]
-    VmoCreateFailed(#[source] zx::Status),
-    #[error("couldn't write to vmo: {_0}")]
-    VmoWriteFailed(#[source] zx::Status),
+    #[error("structured config error: {}", err)]
+    StructuredConfigError {
+        #[from]
+        err: StructuredConfigError,
+    },
 }
 
 impl ModelError {
@@ -279,4 +276,16 @@ impl ModelError {
             _ => zx::Status::INTERNAL,
         }
     }
+}
+
+#[derive(Debug, Error, Clone)]
+pub enum StructuredConfigError {
+    #[error("component has a config schema but resolver did not provide values")]
+    ConfigValuesMissing,
+    #[error("failed to resolve component's config: {_0}")]
+    ConfigResolutionFailed(#[source] config_encoder::ResolutionError),
+    #[error("couldn't create vmo: {_0}")]
+    VmoCreateFailed(#[source] zx::Status),
+    #[error("couldn't write to vmo: {_0}")]
+    VmoWriteFailed(#[source] zx::Status),
 }
