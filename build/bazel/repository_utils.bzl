@@ -4,6 +4,8 @@
 
 """Common utilities for repository rules."""
 
+load("//:build/bazel/bazel_version_utils.bzl", "is_bazel6_or_greater")
+
 def workspace_root_path(repo_ctx):
     """Return the main workspace repository directory.
 
@@ -16,8 +18,7 @@ def workspace_root_path(repo_ctx):
     # Starting with Bazel 6.0, repo_ctx.workspace_root can be used.
     # The rest if a work-around that based on
     # https://github.com/bazelbuild/bazel/pull/15441
-    bazel_version_major = native.bazel_version.split(".")[0]
-    if int(bazel_version_major) >= 6:
+    if is_bazel6_or_greater:
         return repo_ctx.workspace_root
     else:
         return repo_ctx.path(Label("@//:WORKSPACE.bazel")).dirname

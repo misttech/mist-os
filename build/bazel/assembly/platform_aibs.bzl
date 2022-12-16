@@ -2,7 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+"""platform_aibs() rule definition."""
+
 load("@rules_fuchsia//fuchsia/private/assembly:providers.bzl", "FuchsiaProductAssemblyBundleInfo")
+load("//:build/bazel/bazel_version_utils.bzl", "actions_symlink_file_or_directory")
 
 def _platform_aibs_impl(ctx):
     aibs_dir_name = ctx.label.name
@@ -19,9 +22,9 @@ def _platform_aibs_impl(ctx):
     # these symlinks can't be created under `aibs_dir_name` directly.
     tmp_aibs_dir_name = aibs_dir_name + "_tmp"
     for aib_dir in aib_dirs:
-        dest = ctx.actions.declare_file(tmp_aibs_dir_name + "/" + aib_dir.basename)
+        dest_path = tmp_aibs_dir_name + "/" + aib_dir.basename
+        dest = actions_symlink_file_or_directory(ctx, dest_path, aib_dir)
         symlinked_aibs.append(dest)
-        ctx.actions.symlink(output = dest, target_file = aib_dir)
 
     aibs_dir = ctx.actions.declare_directory(aibs_dir_name)
     ctx.actions.run_shell(
