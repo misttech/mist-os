@@ -26,6 +26,8 @@ rustc_binary("guest_manager_bin") {
   ]
 
   deps = [
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.virtualization:fuchsia.virtualization_rust",
@@ -33,18 +35,25 @@ rustc_binary("guest_manager_bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-fs",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:tracing",
   ]
 
-  test_deps = [ "//src/lib/async-utils" ]
+  test_deps = [
+    "//src/lib/async-utils",
+    "//third_party/rust_crates:tempfile",
+  ]
 }
 
 fuchsia_unittest_package("guest_manager_rs_test") {
   deps = [ ":guest_manager_bin_test" ]
-
+  manifest = "meta/guest_manager_rs_test.cml"
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
