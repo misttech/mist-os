@@ -28,6 +28,7 @@ class DebuggedThread;
 class ProcessHandleObserver;
 class ThreadHandle;
 
+// LINT.IfChange
 // DEBUGGER INTERFACE IN DYNAMIC LOADER
 //
 // Unlike other libcs that use standard debugger interface (https://gbenson.net/r_debug/,
@@ -60,6 +61,7 @@ class ThreadHandle;
 // When a debugger handles a software breakpoint, it should check whether the breakpoint address
 // matches the value of ZX_PROP_PROCESS_BREAK_ON_LOAD. If so, it should update the module list and
 // continue the execution.
+// LINT.ThenChange(//src/proc/bin/starnix/execution/shared.rs)
 
 class ProcessHandle {
  public:

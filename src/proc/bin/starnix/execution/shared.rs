@@ -132,28 +132,34 @@ pub fn process_completed_syscall(
     block_while_stopped(current_task);
 
     // Handle the debug address after the thread is set up to continue, because
-    // `set_process_debug_addr` expects the register state to be in a post-syscall state (most
-    // importantly the instruction pointer needs to be "correct").
-    set_process_debug_addr(current_task)?;
+    // `notify_debugger_of_module_list` expects the register state to be in a post-syscall state
+    // (most importantly the instruction pointer needs to be "correct").
+    notify_debugger_of_module_list(current_task)?;
 
     Ok(None)
 }
 
-/// Sets the ZX_PROP_PROCESS_DEBUG_ADDR of the process.
+/// Notifies the debugger, if one is attached, that the initial module list has been loaded.
 ///
 /// Sets the process property if a valid address is found in the `DT_DEBUG` entry. If the existing
-/// value of ZX_PROP_PROCESS_DEBUG_ADDR is set to ZX_PROCESS_DEBUG_ADDR_BREAK_ON_SET, the task will
-/// be set up to trigger a software interrupt (for the debugger to catch) before resuming execution
-/// at the current instruction pointer.
+/// value of ZX_PROP_BREAK_ON_LOAD is non-zero, the task will be set up to trigger a software
+/// interrupt (for the debugger to catch) before resuming execution at the current instruction
+/// pointer.
 ///
 /// If the property is set on the process (i.e., nothing fails and the values are valid),
 /// `current_task.debug_address` will be cleared.
+///
+/// TODO(fxbug.dev/117484): Starnix should issue a debug breakpoint on each dlopen/dlclose that
+/// causes the module list to change.
+///
+/// For more information about the debugger protocol, see:
+/// https://cs.opensource.google/fuchsia/fuchsia/+/master:src/developer/debug/debug_agent/process_handle.h;l=31
 ///
 /// # Parameters:
 /// - `current_task`: The task to set the property for. The register's of this task, the instruction
 ///                   pointer specifically, needs to be set to the value with which the task is
 ///                   expected to resume.
-pub fn set_process_debug_addr(current_task: &mut CurrentTask) -> Result<(), Errno> {
+pub fn notify_debugger_of_module_list(current_task: &mut CurrentTask) -> Result<(), Errno> {
     let dt_debug_address = match current_task.dt_debug_address {
         Some(dt_debug_address) => dt_debug_address,
         // The DT_DEBUG entry does not exist, or has already been read and set on the process.
@@ -168,15 +174,15 @@ pub fn set_process_debug_addr(current_task: &mut CurrentTask) -> Result<(), Errn
         return Ok(());
     }
 
-    let existing_debug_addr = current_task
+    let break_on_load = current_task
         .thread_group
         .process
-        .get_debug_addr()
+        .get_break_on_load()
         .map_err(|err| from_status_like_fdio!(err))?;
 
-    // If existing_debug_addr != ZX_PROCESS_DEBUG_ADDR_BREAK_ON_SET then there is no reason to
-    // insert the interrupt.
-    if existing_debug_addr != ZX_PROCESS_DEBUG_ADDR_BREAK_ON_SET as u64 {
+    // If break on load is 0, there is no debugger attached, so return before issuing the software
+    // breakpoint.
+    if break_on_load == 0 {
         // Still set the debug address, and clear the debug address from `current_task` to avoid
         // entering this function again.
         match current_task.thread_group.process.set_debug_addr(&debug_address.value) {
@@ -215,6 +221,14 @@ pub fn set_process_debug_addr(current_task: &mut CurrentTask) -> Result<(), Errn
         MappingOptions::empty(),
         None,
     )?;
+
+    // Set the break on load value to point to the software breakpoint. This is how the debugger
+    // distinguishes the breakpoint from other software breakpoints.
+    current_task
+        .thread_group
+        .process
+        .set_break_on_load(&(instruction_pointer.ptr() as u64))
+        .map_err(|err| from_status_like_fdio!(err))?;
 
     current_task.registers.rip = instruction_pointer.ptr() as u64;
     current_task
