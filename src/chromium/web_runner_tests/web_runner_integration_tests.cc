@@ -97,12 +97,13 @@ class ChromiumAppTest : public gtest::RealLoopFixture,
  protected:
   ChromiumAppTest() : context_(sys::ComponentContext::CreateAndServeOutgoingDirectory()) {
     auto realm_builder = RealmBuilder::Create();
-    realm_builder.AddLegacyChild("context_provider",
-                                 "fuchsia-pkg://fuchsia.com/web_engine#meta/context_provider.cmx");
+    realm_builder.AddChild("context_provider",
+                           "fuchsia-pkg://fuchsia.com/web_engine#meta/context_provider.cm");
     // Capabilities that must be given to ContextProvider
-    realm_builder.AddRoute(Route{.capabilities = {Protocol{"fuchsia.logger.LogSink"}},
-                                 .source = ParentRef(),
-                                 .targets = {ChildRef{"context_provider"}}});
+    realm_builder.AddRoute(Route{
+        .capabilities = {Protocol{"fuchsia.sys.Environment"}, Protocol{"fuchsia.logger.LogSink"}},
+        .source = ParentRef(),
+        .targets = {ChildRef{"context_provider"}}});
 
     // Expose all capabilities to the test
     realm_builder.AddRoute(Route{.capabilities = {Protocol{"fuchsia.web.ContextProvider"}},

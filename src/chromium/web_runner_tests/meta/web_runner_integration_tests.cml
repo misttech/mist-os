@@ -67,6 +67,7 @@
         {
             protocol: [
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.sys.Environment",
                 "fuchsia.sys.Loader",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.tracing.provider.Registry",
