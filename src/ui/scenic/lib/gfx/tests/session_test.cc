@@ -18,8 +18,19 @@ void SessionTest::SetUp() {
       std::make_unique<scheduling::ConstantFramePredictor>(/* static_vsync_offset */ zx::msec(5)));
 
   image_pipe_updater_ = std::make_shared<ImagePipeUpdater>(*frame_scheduler_);
-  frame_scheduler_->Initialize(std::make_shared<scheduling::VsyncTiming>(),
-                               std::weak_ptr<scheduling::FrameRenderer>(), {image_pipe_updater_});
+  frame_scheduler_->Initialize(
+      std::make_shared<scheduling::VsyncTiming>(),
+      /*update_sessions*/
+      [this](auto& sessions_to_update, auto trace_id, auto fences_from_previous_presents) {
+        return image_pipe_updater_->UpdateSessions(sessions_to_update, trace_id);
+      },
+      /*on_cpu_work_done*/
+      [this] { image_pipe_updater_->OnCpuWorkDone(); },
+      /*on_frame_presented*/
+      [this](auto latched_times, auto present_times) {
+        image_pipe_updater_->OnFramePresented(latched_times, present_times);
+      },
+      /*render_scheduled_frame*/ [](auto...) {});
 
   session_context_ = CreateSessionContext();
   session_ = CreateSession();

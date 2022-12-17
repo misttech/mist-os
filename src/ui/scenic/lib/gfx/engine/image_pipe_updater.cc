@@ -70,8 +70,6 @@ scheduling::PresentId ImagePipeUpdater::ScheduleImagePipeUpdate(
 ImagePipeUpdater::UpdateResults ImagePipeUpdater::UpdateSessions(
     const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update,
     uint64_t trace_id) {
-  UpdateResults results{};
-
   for (const auto& [scheduling_id, present_id] : sessions_to_update) {
     // Destroy all unsignalled acquire fence listeners older than |present_id|.
     RemoveFenceListenersPriorTo(scheduling_id, present_id);
@@ -84,7 +82,7 @@ ImagePipeUpdater::UpdateResults ImagePipeUpdater::UpdateSessions(
     }
   }
 
-  return results;
+  return {};
 }
 
 void ImagePipeUpdater::RemoveFenceListenersPriorTo(scheduling::SessionId scheduling_id,

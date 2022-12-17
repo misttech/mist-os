@@ -256,9 +256,29 @@ void InputSystemTest::InitializeScenic(std::shared_ptr<Scenic> scenic) {
         std::move(subtrees), std::move(subscribers));
   }
 
-  frame_scheduler_->Initialize(/*vsync_timing*/ display_->vsync_timing(),
-                               /*frame_renderer*/ engine_,
-                               /*session_updaters*/ {scenic, view_tree_snapshotter_});
+  frame_scheduler_->Initialize(
+      std::make_shared<scheduling::VsyncTiming>(),
+      /*update_sessions*/
+      [scenic, this](auto& sessions_to_update, auto trace_id, auto fences_from_previous_presents) {
+        view_tree_snapshotter_->UpdateSessions(sessions_to_update, trace_id);
+        auto results = scenic->UpdateSessions(sessions_to_update, trace_id);
+        engine_->SignalFencesWhenPreviousRendersAreDone(std::move(fences_from_previous_presents));
+        return results;
+      },
+      /*on_cpu_work_done*/
+      [scenic, this] {
+        view_tree_snapshotter_->OnCpuWorkDone();
+        scenic->OnCpuWorkDone();
+      },
+      /*on_frame_presented*/
+      [scenic, this](auto latched_times, auto present_times) {
+        view_tree_snapshotter_->OnFramePresented(latched_times, present_times);
+        scenic->OnFramePresented(latched_times, present_times);
+      },
+      /*render_scheduled_frame*/
+      [this](auto frame_number, auto presentation_time, auto callback) {
+        engine_->RenderScheduledFrame(frame_number, presentation_time, std::move(callback));
+      });
 }
 
 void InputSystemTest::Inject(float x, float y, fuchsia::ui::pointerinjector::EventPhase phase) {

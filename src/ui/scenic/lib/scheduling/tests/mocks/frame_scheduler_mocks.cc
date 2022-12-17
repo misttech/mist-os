@@ -9,18 +9,7 @@
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
-namespace {
-void SignalAll(const std::vector<zx::event>& events) {
-  for (auto& e : events) {
-    e.signal(0u, ZX_EVENT_SIGNALED);
-  }
-}
-
-zx::time Now() { return async::Now(async_get_default_dispatcher()); }
-}  // namespace
-
-namespace scheduling {
-namespace test {
+namespace scheduling::test {
 
 PresentId MockFrameScheduler::RegisterPresent(SessionId session_id,
                                               std::vector<zx::event> release_fences,
@@ -60,62 +49,4 @@ void MockFrameScheduler::RemoveSession(SessionId session_id) {
   }
 }
 
-void MockFrameRenderer::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_time,
-                                             FramePresentedCallback callback) {
-  FX_CHECK(frame_number);
-  FX_CHECK(callback);
-
-  // Check that no frame numbers were skipped.
-  FX_CHECK(frame_number == last_frame_number_ + 1);
-  last_frame_number_ = frame_number;
-
-  frames_.emplace_back(
-      PendingFrame({.start = Now(), .callback = std::move(callback), .fences = {}}));
-}
-
-void MockFrameRenderer::SignalFencesWhenPreviousRendersAreDone(std::vector<zx::event> fences) {
-  if (frames_.empty()) {
-    SignalAll(std::move(fences));
-  } else {
-    FX_CHECK(!frames_.back().fences.size());
-    frames_.back().fences = std::move(fences);
-  }
-}
-
-void MockFrameRenderer::EndFrame(const Timestamps& timestamps) {
-  FX_CHECK(!frames_.empty());
-  auto& next_frame = frames_.front();
-
-  next_frame.callback(timestamps);
-  SignalAll(pending_fences_);
-  pending_fences_.clear();
-  SignalAll(next_frame.fences);
-  frames_.pop_front();
-}
-
-void MockFrameRenderer::EndFrame() {
-  FX_CHECK(!frames_.empty());
-
-  FrameRenderer::Timestamps timestamps;
-  timestamps.render_done_time = Now();
-  timestamps.actual_presentation_time = Now();
-
-  EndFrame(timestamps);
-}
-
-void MockFrameRenderer::DropFrame() {
-  FX_CHECK(!frames_.empty());
-  auto& next_frame = frames_.front();
-
-  FrameRenderer::Timestamps timestamps;
-  timestamps.render_done_time = Now();
-  timestamps.actual_presentation_time = kTimeDropped;
-
-  next_frame.callback(timestamps);
-  std::move(std::begin(next_frame.fences), std::end(next_frame.fences),
-            std::back_inserter(pending_fences_));
-  frames_.pop_front();
-}
-
-}  // namespace test
-}  // namespace scheduling
+}  // namespace scheduling::test

@@ -46,14 +46,17 @@ DefaultFrameScheduler::DefaultFrameScheduler(std::unique_ptr<FramePredictor> pre
 
 DefaultFrameScheduler::~DefaultFrameScheduler() {}
 
-void DefaultFrameScheduler::Initialize(
-    std::shared_ptr<const VsyncTiming> vsync_timing, std::weak_ptr<FrameRenderer> frame_renderer,
-    std::vector<std::weak_ptr<SessionUpdater>> session_updaters) {
-  FX_CHECK(!initialized_);
-  initialized_ = true;
+void DefaultFrameScheduler::Initialize(std::shared_ptr<const VsyncTiming> vsync_timing,
+                                       UpdateSessions update_sessions,
+                                       OnCpuWorkDone on_cpu_work_done,
+                                       OnFramePresented on_frame_presented,
+                                       RenderScheduledFrame render_scheduled_frame) {
+  FX_CHECK(vsync_timing_ == nullptr) << "Tried to initialize twice";
   vsync_timing_ = vsync_timing;
-  frame_renderer_ = std::move(frame_renderer);
-  session_updaters_ = std::move(session_updaters);
+  update_sessions_ = std::move(update_sessions);
+  on_cpu_work_done_ = std::move(on_cpu_work_done);
+  on_frame_presented_ = std::move(on_frame_presented);
+  render_scheduled_frame_ = std::move(render_scheduled_frame);
 }
 
 void DefaultFrameScheduler::SetRenderContinuously(bool render_continuously) {
@@ -144,8 +147,6 @@ void DefaultFrameScheduler::HandleNextFrameRequest() {
 }
 
 void DefaultFrameScheduler::MaybeRenderFrame(async_dispatcher_t*, async::TaskBase*, zx_status_t) {
-  FX_DCHECK(!frame_renderer_.expired());
-
   const uint64_t frame_number = frame_number_;
 
   {
@@ -215,33 +216,25 @@ void DefaultFrameScheduler::MaybeRenderFrame(async_dispatcher_t*, async::TaskBas
 
   const trace_flow_id_t frame_render_trace_id = TRACE_NONCE();
   TRACE_FLOW_BEGIN("gfx", "render_to_presented", frame_render_trace_id);
-  auto on_presented_callback = [=, weak = weak_factory_.GetWeakPtr()](
-                                   const FrameRenderer::Timestamps& timestamps) {
-    TRACE_FLOW_END("gfx", "render_to_presented", frame_render_trace_id);
-    if (weak) {
-      weak->OnFramePresented(frame_number, render_start_time, target_presentation_time, timestamps);
-    } else {
-      FX_LOGS(ERROR) << "Error, cannot record presentation time: FrameScheduler does not exist";
-    }
-  };
+  auto on_presented_callback =
+      [=, weak = weak_factory_.GetWeakPtr()](const FrameRenderer::Timestamps& timestamps) {
+        TRACE_FLOW_END("gfx", "render_to_presented", frame_render_trace_id);
+        if (weak) {
+          weak->HandleFramePresented(frame_number, render_start_time, target_presentation_time,
+                                     timestamps);
+        } else {
+          FX_LOGS(ERROR) << "Error, cannot record presentation time: FrameScheduler does not exist";
+        }
+      };
   outstanding_latch_points_.push_back(update_end_time);
 
   inspect_frame_number_.Set(frame_number);
 
-  // Render the frame.
-  if (auto renderer = frame_renderer_.lock()) {
-    renderer->RenderScheduledFrame(frame_number, target_presentation_time,
-                                   std::move(on_presented_callback));
-  }
-
+  render_scheduled_frame_(frame_number, target_presentation_time, std::move(on_presented_callback));
   ++frame_number_;
 
   // Let all Session Updaters know of the timing of the end of RenderFrame().
-  for (auto updater : session_updaters_) {
-    if (auto locked = updater.lock()) {
-      locked->OnCpuWorkDone();
-    }
-  }
+  on_cpu_work_done_();
 
   // Schedule next frame if any unhandled presents are left.
   HandleNextFrameRequest();
@@ -323,9 +316,9 @@ std::vector<FuturePresentationInfo> DefaultFrameScheduler::GetFuturePresentation
   return infos;
 }
 
-void DefaultFrameScheduler::OnFramePresented(uint64_t frame_number, zx::time render_start_time,
-                                             zx::time target_presentation_time,
-                                             const FrameRenderer::Timestamps& timestamps) {
+void DefaultFrameScheduler::HandleFramePresented(uint64_t frame_number, zx::time render_start_time,
+                                                 zx::time target_presentation_time,
+                                                 const FrameRenderer::Timestamps& timestamps) {
   FX_DCHECK(frame_number == last_presented_frame_number_ + 1);
   FX_DCHECK(vsync_timing_->vsync_interval().get() >= 0);
 
@@ -431,14 +424,16 @@ std::unordered_map<SessionId, PresentId> DefaultFrameScheduler::CollectUpdatesFo
   return updates;
 }
 
-void DefaultFrameScheduler::PrepareUpdates(const std::unordered_map<SessionId, PresentId>& updates,
-                                           zx::time latched_time, uint64_t frame_number) {
+std::vector<zx::event> DefaultFrameScheduler::PrepareUpdates(
+    const std::unordered_map<SessionId, PresentId>& updates, zx::time latched_time,
+    uint64_t frame_number) {
   latched_updates_.push({.frame_number = frame_number, .updated_sessions = updates});
   std::vector<zx::event> fences;
 
   for (const auto& [session_id, present_id] : updates) {
     SetLatchedTimeForPresentsUpTo({session_id, present_id}, latched_time);
 
+    // Grab all fences from presents previous to this one for this session.
     const auto begin_it = release_fences_.lower_bound({session_id, 0});
     const auto end_it = release_fences_.lower_bound({session_id, present_id});
     FX_DCHECK(std::distance(begin_it, end_it) >= 0);
@@ -451,29 +446,7 @@ void DefaultFrameScheduler::PrepareUpdates(const std::unordered_map<SessionId, P
     release_fences_.erase(begin_it, end_it);
   }
 
-  if (auto renderer = frame_renderer_.lock()) {
-    renderer->SignalFencesWhenPreviousRendersAreDone(std::move(fences));
-  }
-}
-
-SessionUpdater::UpdateResults DefaultFrameScheduler::ApplyUpdatesToEachUpdater(
-    const std::unordered_map<SessionId, PresentId>& sessions_to_update, uint64_t frame_number) {
-  // Apply updates to each SessionUpdater.
-  SessionUpdater::UpdateResults update_results;
-  std::for_each(
-      session_updaters_.begin(), session_updaters_.end(),
-      [&sessions_to_update, &update_results,
-       frame_number](const std::weak_ptr<SessionUpdater>& updater) {
-        if (auto locked_updater = updater.lock()) {
-          // Aggregate results from each updater.
-          // Note: Currently, only one SessionUpdater handles each SessionId. If this
-          // changes, then a SessionId corresponding to a failed update should not be
-          // passed to subsequent SessionUpdaters.
-          update_results.merge(locked_updater->UpdateSessions(sessions_to_update, frame_number));
-        }
-      });
-
-  return update_results;
+  return fences;
 }
 
 void DefaultFrameScheduler::SetLatchedTimeForPresentsUpTo(SchedulingIdPair id_pair,
@@ -507,8 +480,9 @@ bool DefaultFrameScheduler::ApplyUpdates(zx::time target_presentation_time, zx::
 
   const auto update_map = CollectUpdatesForThisFrame(target_presentation_time);
   const bool have_updates = !update_map.empty();
-  PrepareUpdates(update_map, latched_time, frame_number);
-  const auto update_results = ApplyUpdatesToEachUpdater(update_map, frame_number);
+  auto fences_from_previous_presents = PrepareUpdates(update_map, latched_time, frame_number);
+  const auto update_results =
+      update_sessions_(update_map, frame_number, std::move(fences_from_previous_presents));
   RemoveFailedSessions(update_results.sessions_with_failed_updates);
 
   // If anything was updated, we need to render.
@@ -538,15 +512,10 @@ void DefaultFrameScheduler::SignalPresentedUpTo(uint64_t frame_number, zx::time 
     latched_times[session_id] = ExtractLatchTimestampsUpTo({session_id, present_id});
   }
 
-  const PresentTimestamps present_timestamps{
-      .presented_time = zx::time(presentation_time),
-      .vsync_interval = zx::duration(presentation_interval),
-  };
-  for (auto updater : session_updaters_) {
-    if (auto locked = updater.lock()) {
-      locked->OnFramePresented(latched_times, present_timestamps);
-    }
-  }
+  on_frame_presented_(latched_times, PresentTimestamps{
+                                         .presented_time = zx::time(presentation_time),
+                                         .vsync_interval = zx::duration(presentation_interval),
+                                     });
 }
 
 std::map<PresentId, zx::time> DefaultFrameScheduler::ExtractLatchTimestampsUpTo(

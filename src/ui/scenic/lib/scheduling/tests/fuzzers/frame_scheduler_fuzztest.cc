@@ -10,11 +10,10 @@
 
 #include "src/ui/scenic/lib/scheduling/constant_frame_predictor.h"
 #include "src/ui/scenic/lib/scheduling/default_frame_scheduler.h"
-#include "src/ui/scenic/lib/scheduling/tests/mocks/frame_scheduler_mocks.h"
 
 namespace scheduling::test {
 
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t* Data, size_t Size) {
   // Fuzz FrameScheduler against fuzz timing input. The expectation is that all
   // tasks can be posted to the loop and run, and the FrameScheduler will not crash.
   FuzzedDataProvider fuzzed_data(Data, Size);
@@ -40,22 +39,43 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
   vsync_timing->set_vsync_interval(vsync_interval);
   vsync_timing->set_last_vsync_time(last_vsync_time);
 
-  auto updater = std::make_shared<MockSessionUpdater>();
-  auto renderer = std::make_shared<MockFrameRenderer>();
-
-  auto frame_scheduler = std::make_unique<DefaultFrameScheduler>(
+  DefaultFrameScheduler frame_scheduler(
       std::make_unique<ConstantFramePredictor>(constant_prediction_offset));
-  frame_scheduler->Initialize(vsync_timing, renderer, {updater});
+
+  uint32_t update_sessions_count = 0;
+  uint32_t on_cpu_work_done_count = 0;
+  uint32_t on_frame_presented_count = 0;
+  uint32_t render_scheduled_frame_count = 0;
+  frame_scheduler.Initialize(
+      vsync_timing,
+      /*update_sessions*/
+      [&update_sessions_count](auto& sessions_to_update, auto trace_id,
+                               auto fences_from_previous_frames) {
+        update_sessions_count++;
+        return SessionUpdater::UpdateResults{};
+      },
+      /*on_cpu_work_done*/
+      [&on_cpu_work_done_count] { on_cpu_work_done_count++; },
+      /*on_frame_presented*/
+      [&on_frame_presented_count](auto latched_times, auto present_times) {
+        on_frame_presented_count++;
+      },
+      /*render_scheduled_frame*/
+      [&render_scheduled_frame_count](auto frame_number, auto presentation_time, auto callback) {
+        render_scheduled_frame_count++;
+      });
 
   const bool squashable = fuzzed_data.ConsumeIntegral<bool>();
 
   const SessionId client_id = 5;
-  frame_scheduler->ScheduleUpdateForSession(schedule_present_time, {client_id, 1}, squashable);
+  frame_scheduler.ScheduleUpdateForSession(schedule_present_time, {client_id, 1}, squashable);
 
   test_loop.RunUntilIdle();
 
-  EXPECT_EQ(1u, updater->update_sessions_call_count());
-  EXPECT_EQ(1u, renderer->GetNumPendingFrames());
+  EXPECT_EQ(update_sessions_count, 1u);
+  EXPECT_EQ(on_cpu_work_done_count, 1u);
+  EXPECT_EQ(on_frame_presented_count, 1u);
+  EXPECT_EQ(render_scheduled_frame_count, 1u);
   return 0;
 }
 

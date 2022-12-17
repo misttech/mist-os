@@ -750,13 +750,44 @@ void App::InitializeHeartbeat(display::Display& display) {
         std::move(subtrees_generator_callbacks), std::move(subscribers));
   }
 
-  // |session_updaters| will be updated in submission order.
   frame_scheduler_.Initialize(
-      /*vsync_timing*/ display.vsync_timing(),
-      /*frame_renderer*/ frame_renderer_,
-      /*session_updaters*/
-      {scenic_, image_pipe_updater_, flatland_manager_, screen_capture2_manager_,
-       flatland_presenter_, view_tree_snapshotter_});
+      display.vsync_timing(),
+      /*update_sessions*/
+      [this](auto& sessions_to_update, auto trace_id, auto fences_from_previous_presents) {
+        frame_renderer_->SignalFencesWhenPreviousRendersAreDone(
+            std::move(fences_from_previous_presents));
+
+        scheduling::SessionUpdater::UpdateResults results;
+        results.merge(scenic_->UpdateSessions(sessions_to_update, trace_id));
+        results.merge(image_pipe_updater_->UpdateSessions(sessions_to_update, trace_id));
+        results.merge(flatland_manager_->UpdateSessions(sessions_to_update, trace_id));
+        results.merge(screen_capture2_manager_->UpdateSessions(sessions_to_update, trace_id));
+        results.merge(flatland_presenter_->UpdateSessions(sessions_to_update, trace_id));
+        results.merge(view_tree_snapshotter_->UpdateSessions(sessions_to_update, trace_id));
+        return results;
+      },
+      /*on_cpu_work_done*/
+      [this] {
+        scenic_->OnCpuWorkDone();
+        image_pipe_updater_->OnCpuWorkDone();
+        flatland_manager_->OnCpuWorkDone();
+        screen_capture2_manager_->OnCpuWorkDone();
+        flatland_presenter_->OnCpuWorkDone();
+        view_tree_snapshotter_->OnCpuWorkDone();
+      },
+      /*on_frame_presented*/
+      [this](auto latched_times, auto present_times) {
+        scenic_->OnFramePresented(latched_times, present_times);
+        image_pipe_updater_->OnFramePresented(latched_times, present_times);
+        flatland_manager_->OnFramePresented(latched_times, present_times);
+        screen_capture2_manager_->OnFramePresented(latched_times, present_times);
+        flatland_presenter_->OnFramePresented(latched_times, present_times);
+        view_tree_snapshotter_->OnFramePresented(latched_times, present_times);
+      },
+      /*render_scheduled_frame*/
+      [this](auto frame_number, auto presentation_time, auto callback) {
+        frame_renderer_->RenderScheduledFrame(frame_number, presentation_time, std::move(callback));
+      });
 }
 
 }  // namespace scenic_impl

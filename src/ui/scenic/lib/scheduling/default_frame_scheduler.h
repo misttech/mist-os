@@ -22,8 +22,26 @@
 
 namespace scheduling {
 
+using UpdateSessions = fit::function<SessionUpdater::UpdateResults(
+    const std::unordered_map<SessionId, PresentId>& sessions_to_update, uint64_t trace_id,
+    std::vector<zx::event> fences_from_previous_presents)>;
+using OnCpuWorkDone = fit::function<void()>;
+using OnFramePresented = fit::function<void(
+    const std::unordered_map<SessionId, std::map<PresentId, /*latched_time*/ zx::time>>&,
+    PresentTimestamps)>;
+using RenderScheduledFrame =
+    fit::function<void(uint64_t, zx::time, FrameRenderer::FramePresentedCallback)>;
+
 // TODOs can be found in the frame scheduler epic: fxbug.dev/24406. Any new bugs filed concerning
 // the frame scheduler should be added to it as well.
+
+// DefaultFrameScheduler is the source of a number of events:
+// - UpdateSessions: Fired when CPU should be done apply any pending updates to the scene graph and
+//   prepare for rendering.
+// - OnCpuWorkDone: Fired when CPU work has completed.
+// - OnFramePresented: Fired when the renderer has signaled that the previous frame was presented
+//   to the display.
+// - RenderScheduledFrame: Fired when non-CPU-based rendering should begin.
 class DefaultFrameScheduler final : public FrameScheduler {
  public:
   explicit DefaultFrameScheduler(std::unique_ptr<FramePredictor> predictor,
@@ -33,9 +51,9 @@ class DefaultFrameScheduler final : public FrameScheduler {
 
   // Set the renderer and session updaters to be used. Can only be called once.
   // |session_updaters| will be called in this order for every event.
-  void Initialize(std::shared_ptr<const VsyncTiming> vsync_timing,
-                  std::weak_ptr<FrameRenderer> frame_renderer,
-                  std::vector<std::weak_ptr<SessionUpdater>> session_updaters);
+  void Initialize(std::shared_ptr<const VsyncTiming> vsync_timing, UpdateSessions update_sessions,
+                  OnCpuWorkDone on_cpu_work_done, ::scheduling::OnFramePresented on_frame_presented,
+                  RenderScheduledFrame render_scheduled_frame);
 
   // |FrameScheduler|
   void SetRenderContinuously(bool render_continuously) override;
@@ -63,9 +81,9 @@ class DefaultFrameScheduler final : public FrameScheduler {
   void LogPeriodicDebugInfo();
 
  private:
-  void OnFramePresented(uint64_t frame_number, zx::time render_start_time,
-                        zx::time target_presentation_time,
-                        const FrameRenderer::Timestamps& timestamps);
+  void HandleFramePresented(uint64_t frame_number, zx::time render_start_time,
+                            zx::time target_presentation_time,
+                            const FrameRenderer::Timestamps& timestamps);
 
   // Requests a new frame to be drawn, which schedules the next wake up time for rendering. If we've
   // already scheduled a wake up time, it checks if it needs rescheduling and deals with it
@@ -111,12 +129,9 @@ class DefaultFrameScheduler final : public FrameScheduler {
       zx::time target_presentation_time);
 
   // Prepares all per-present data for later OnFrameRendered and OnFramePresented events.
-  void PrepareUpdates(const std::unordered_map<SessionId, PresentId>& updates,
-                      zx::time latched_time, uint64_t frame_number);
-
-  // Cycles through SessionUpdaters, applies updates to each and coalesces their responses.
-  SessionUpdater::UpdateResults ApplyUpdatesToEachUpdater(
-      const std::unordered_map<SessionId, PresentId>& sessions_to_update, uint64_t frame_number);
+  // Returns all the fences from previous presents for each session in |updates|.
+  std::vector<zx::event> PrepareUpdates(const std::unordered_map<SessionId, PresentId>& updates,
+                                        zx::time latched_time, uint64_t frame_number);
 
   // Removes all references to each session passed in.
   void RemoveFailedSessions(const std::unordered_set<SessionId>& sessions_with_failed_updates);
@@ -151,10 +166,10 @@ class DefaultFrameScheduler final : public FrameScheduler {
   // References.
   async_dispatcher_t* const dispatcher_;
   std::shared_ptr<const VsyncTiming> vsync_timing_ = nullptr;
-
-  bool initialized_ = false;
-  std::weak_ptr<FrameRenderer> frame_renderer_;
-  std::vector<std::weak_ptr<SessionUpdater>> session_updaters_;
+  UpdateSessions update_sessions_;
+  OnCpuWorkDone on_cpu_work_done_;
+  OnFramePresented on_frame_presented_;
+  RenderScheduledFrame render_scheduled_frame_;
 
   // State.
   // Frame number is 1-based so that |last_presented_frame_number_| can remain unsigned.

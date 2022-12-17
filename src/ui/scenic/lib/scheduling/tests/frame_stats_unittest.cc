@@ -22,7 +22,6 @@
 #include "lib/inspect/testing/cpp/inspect.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
-#include "src/ui/scenic/lib/gfx/tests/mocks/mocks.h"
 
 namespace scheduling {
 namespace test {

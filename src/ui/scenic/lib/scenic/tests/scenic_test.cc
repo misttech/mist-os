@@ -8,8 +8,7 @@
 
 #include "src/ui/scenic/lib/scheduling/constant_frame_predictor.h"
 
-namespace scenic_impl {
-namespace test {
+namespace scenic_impl::test {
 
 void ScenicTest::SetUp() {
   sys::testing::ComponentContextProvider provider;
@@ -22,7 +21,10 @@ void ScenicTest::SetUp() {
   InitializeScenic(scenic_);
 }
 
-void ScenicTest::TearDown() { scenic_.reset(); }
+void ScenicTest::TearDown() {
+  scenic_.reset();
+  frame_scheduler_.reset();
+}
 
 void ScenicTest::InitializeScenic(std::shared_ptr<Scenic> scenic) {}
 
@@ -35,5 +37,4 @@ std::unique_ptr<::scenic::Session> ScenicTest::CreateSession() {
   return std::make_unique<::scenic::Session>(std::move(session_ptr), std::move(listener_request));
 }
 
-}  // namespace test
-}  // namespace scenic_impl
+}  // namespace scenic_impl::test

@@ -10,7 +10,6 @@ fuzzer("frame-scheduler-fuzzer") {
   deps = [
     "//src/lib/testing/loop_fixture",
     "//src/ui/scenic/lib/scheduling:frame_scheduler",
-    "//src/ui/scenic/lib/scheduling/tests/mocks:frame_scheduler_mocks",
   ]
 }
 

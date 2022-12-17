@@ -22,9 +22,32 @@ void GfxSystemTest::InitializeScenic(std::shared_ptr<Scenic> scenic) {
       scenic->RegisterSystem<GfxSystem>(engine_.get(),
                                         /* sysmem */ nullptr,
                                         /* display_manager */ nullptr, image_pipe_updater);
-  frame_scheduler_->Initialize(std::make_shared<scheduling::VsyncTiming>(),
-                               /*frame_renderer*/ engine_,
-                               /*session_updaters*/ {image_pipe_updater, scenic});
+  frame_scheduler_->Initialize(
+      std::make_shared<scheduling::VsyncTiming>(),
+      /*update_sessions*/
+      [this, scenic, image_pipe_updater](auto& sessions_to_update, auto trace_id,
+                                         auto fences_from_previous_presents) {
+        auto results = image_pipe_updater->UpdateSessions(sessions_to_update, trace_id);
+        results.merge(scenic->UpdateSessions(sessions_to_update, trace_id));
+
+        engine_->SignalFencesWhenPreviousRendersAreDone(std::move(fences_from_previous_presents));
+
+        return results;
+      },
+      /*on_cpu_work_done*/
+      [scenic, image_pipe_updater] {
+        image_pipe_updater->OnCpuWorkDone();
+        scenic->OnCpuWorkDone();
+      },
+      /*on_frame_presented*/
+      [scenic, image_pipe_updater](auto latched_times, auto present_times) {
+        image_pipe_updater->OnFramePresented(latched_times, present_times);
+        scenic->OnFramePresented(latched_times, present_times);
+      },
+      /*render_scheduled_frame*/
+      [this](auto frame_number, auto presentation_time, auto callback) {
+        engine_->RenderScheduledFrame(frame_number, presentation_time, std::move(callback));
+      });
 }
 
 }  // namespace scenic_impl::gfx::test
