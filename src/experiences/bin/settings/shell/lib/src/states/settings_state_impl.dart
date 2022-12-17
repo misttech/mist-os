@@ -236,6 +236,12 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
   set buildVersion(String value) => _buildVersion.value = value;
   final Observable<String> _buildVersion = '--'.asObservable();
 
+  // About
+  @override
+  bool get aboutPageVisible => _aboutPageVisible.value;
+  late final _aboutPageVisible =
+      (() => settingsPage.value == SettingsPage.about).asComputed();
+
   // Services
   final BrightnessService brightnessService;
   final DateTimeService dateTimeService;
@@ -557,4 +563,9 @@ class SettingsStateImpl with Disposable implements SettingsState, TaskService {
   @override
   void setClientConnectionsEnabled({bool enabled = true}) =>
       runInAction(() => wifiService.clientConnectionsEnabled = enabled);
+
+  // About
+  @override
+  void showAboutSettings() =>
+      runInAction(() => settingsPage.value = SettingsPage.about);
 }

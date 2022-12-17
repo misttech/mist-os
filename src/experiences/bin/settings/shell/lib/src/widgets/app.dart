@@ -13,6 +13,7 @@ import 'package:internationalization/strings.dart';
 import 'package:mobx/mobx.dart';
 import 'package:shell_settings/src/states/settings_state.dart';
 import 'package:shell_settings/src/utils/themes.dart';
+import 'package:shell_settings/src/widgets/about_settings.dart';
 import 'package:shell_settings/src/widgets/channel_settings.dart';
 import 'package:shell_settings/src/widgets/keyboard_settings.dart';
 import 'package:shell_settings/src/widgets/timezone_settings.dart';
@@ -116,6 +117,10 @@ class App extends StatelessWidget {
               if (state.wifiPageVisible)
                 Expanded(
                   child: WiFiSettings(state: state),
+                ),
+              if (state.aboutPageVisible)
+                Expanded(
+                  child: AboutSettings(state),
                 ),
             ],
           );
@@ -383,6 +388,21 @@ class _ListSettings extends StatelessWidget {
                     ],
                   ),
                   onTap: settingsState.showKeyboardSettings,
+                ),
+                // About Fuchsia
+                ListTile(
+                  contentPadding: EdgeInsets.symmetric(horizontal: 24),
+                  leading: Icon(Icons.privacy_tip_outlined),
+                  title: Text(Strings.aboutFuchsia),
+                  trailing: Wrap(
+                    alignment: WrapAlignment.end,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    children: [
+                      Icon(Icons.arrow_right),
+                    ],
+                  ),
+                  onTap: settingsState.showAboutSettings,
                 ),
               ],
             ),

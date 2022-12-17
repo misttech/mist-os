@@ -34,6 +34,7 @@ dart_library("lib") {
   ]
 
   widgets = [
+    "src/widgets/about_settings.dart",
     "src/widgets/app.dart",
     "src/widgets/channel_settings.dart",
     "src/widgets/keyboard_settings.dart",

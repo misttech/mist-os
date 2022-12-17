@@ -25,6 +25,7 @@ enum SettingsPage {
   channel,
   keyboard,
   wifi,
+  about,
 }
 
 /// Defines states for channel ota.
@@ -98,6 +99,8 @@ abstract class SettingsState implements TaskService {
   double? get memPercentUsed;
   // Build
   String get buildVersion;
+  // About
+  bool get aboutPageVisible;
 
   factory SettingsState.fromEnv() {
     // ignore: unnecessary_cast
@@ -147,4 +150,6 @@ abstract class SettingsState implements TaskService {
   void clearTargetNetwork();
   void removeNetwork(NetworkInformation network);
   void setClientConnectionsEnabled({bool enabled});
+  // About
+  void showAboutSettings();
 }
