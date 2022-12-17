@@ -60,15 +60,19 @@ void SpinelFramer::LogDebugBuffer(const char *desc, const uint8_t *buffer_ptr,
                                   uint16_t buffer_len) {
   int i = 0;
 
-  while (i < buffer_len) {
-    int j;
-    char dump_string[kDebugBytesPerLine * 3 + 1];
+  // The SPI frame hex string should be generated only when DEBUG level log is enabled.
+  // Generate long strings in data path can cause performance issues.
+  if (zxlog_level_enabled(DEBUG)) {
+    while (i < buffer_len) {
+      int j;
+      char dump_string[kDebugBytesPerLine * 3 + 1];
 
-    for (j = 0; i < buffer_len && j < kDebugBytesPerLine; i++, j++) {
-      snprintf(dump_string + j * 3, kDebugBytesPerLine * 3 + 1, "%02X ", buffer_ptr[i]);
+      for (j = 0; i < buffer_len && j < kDebugBytesPerLine; i++, j++) {
+        snprintf(dump_string + j * 3, kDebugBytesPerLine * 3 + 1, "%02X ", buffer_ptr[i]);
+      }
+
+      zxlogf(DEBUG, "%s: %s", desc, dump_string);
     }
-
-    zxlogf(DEBUG, "%s: %s", desc, dump_string);
   }
 }
 
