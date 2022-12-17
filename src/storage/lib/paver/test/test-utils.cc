@@ -138,7 +138,8 @@ zx::result<> FakePartitionClient::Write(const zx::vmo& vmo, size_t size) {
   }
 
   fzl::VmoMapper mapper;
-  if (auto status = mapper.Map(vmo, 0, size, ZX_VM_PERM_READ); status != ZX_OK) {
+  if (auto status = mapper.Map(vmo, 0, size, ZX_VM_PERM_READ | ZX_VM_ALLOW_FAULTS);
+      status != ZX_OK) {
     return zx::error(status);
   }
   return zx::make_result(partition_.write(mapper.start(), 0, size));

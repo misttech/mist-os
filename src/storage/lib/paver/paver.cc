@@ -93,7 +93,9 @@ bool CheckIfSame(PartitionClient* partition, const zx::vmo& vmo, size_t payload_
   fzl::VmoMapper first_mapper;
   fzl::VmoMapper second_mapper;
 
-  status = first_mapper.Map(vmo, 0, 0, ZX_VM_PERM_READ);
+  // The payload VMO can be pager-backed, mapping which requires ZX_VM_ALLOW_FAULTS. Otherwise, the
+  // ZX_VM_ALLOW_FAULTS flag is a no-op.
+  status = first_mapper.Map(vmo, 0, 0, ZX_VM_PERM_READ | ZX_VM_ALLOW_FAULTS);
   if (status != ZX_OK) {
     ERROR("Error mapping vmo: %s\n", zx_status_get_string(status));
     return false;
@@ -256,7 +258,10 @@ zx::result<> ValidatePartitionPayload(const DevicePartitioner& partitioner,
                                       const zx::vmo& payload_vmo, size_t payload_size,
                                       const PartitionSpec& spec) {
   fzl::VmoMapper payload_mapper;
-  auto status = zx::make_result(payload_mapper.Map(payload_vmo, 0, 0, ZX_VM_PERM_READ));
+  // The payload VMO can be pager-backed, mapping which requires ZX_VM_ALLOW_FAULTS. Otherwise, the
+  // ZX_VM_ALLOW_FAULTS flag is a no-op.
+  auto status =
+      zx::make_result(payload_mapper.Map(payload_vmo, 0, 0, ZX_VM_PERM_READ | ZX_VM_ALLOW_FAULTS));
   if (status.is_error()) {
     ERROR("Could not map payload into memory: %s\n", status.status_string());
     return status.take_error();
