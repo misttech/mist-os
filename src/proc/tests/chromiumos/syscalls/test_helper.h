@@ -4,6 +4,8 @@
 #ifndef SRC_PROC_TESTS_CHROMIUMOS_SYSCALLS_TEST_HELPER_H_
 #define SRC_PROC_TESTS_CHROMIUMOS_SYSCALLS_TEST_HELPER_H_
 
+#include <unistd.h>
+
 #include <functional>
 
 #include "syscall_matchers.h"
@@ -73,5 +75,54 @@ class CloneHelper {
   uint8_t *_childStackBegin;
   static constexpr size_t _childStackSize = 0x5000;
 };
+
+class ScopedFD {
+ public:
+  explicit ScopedFD(int fd = -1) : fd_(fd) {}
+  ScopedFD(ScopedFD &&other) noexcept { *this = std::move(other); }
+  ~ScopedFD() {
+    if (is_valid())
+      close(fd_);
+  }
+
+  ScopedFD &operator=(ScopedFD &&other) noexcept {
+    fd_ = other.fd_;
+    other.fd_ = -1;
+    return *this;
+  }
+
+  bool is_valid() const { return fd_ != -1; }
+  explicit operator bool() const { return is_valid(); }
+
+  int get() const { return fd_; }
+
+ private:
+  int fd_;
+};
+
+class ScopedTempFD {
+ public:
+  ScopedTempFD();
+  ~ScopedTempFD() { unlink(name_.c_str()); }
+
+  bool is_valid() const { return fd_.is_valid(); }
+  explicit operator bool() const { return is_valid(); }
+
+  const std::string &name() const { return name_; }
+  int fd() const { return fd_.get(); }
+
+ public:
+  std::string name_;
+  ScopedFD fd_;
+};
+
+#define HANDLE_EINTR(x)                                     \
+  ({                                                        \
+    decltype(x) eintr_wrapper_result;                       \
+    do {                                                    \
+      eintr_wrapper_result = (x);                           \
+    } while (eintr_wrapper_result == -1 && errno == EINTR); \
+    eintr_wrapper_result;                                   \
+  })
 
 #endif  // SRC_PROC_TESTS_CHROMIUMOS_SYSCALLS_TEST_HELPER_H_

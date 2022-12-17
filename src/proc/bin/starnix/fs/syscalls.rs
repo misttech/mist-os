@@ -136,6 +136,31 @@ pub fn sys_pwrite64(
     file.write_at(current_task, offset, &[UserBuffer { address, length }])
 }
 
+pub fn sys_preadv(
+    current_task: &CurrentTask,
+    fd: FdNumber,
+    iovec_addr: UserAddress,
+    iovec_count: i32,
+    offset: off_t,
+) -> Result<usize, Errno> {
+    let file = current_task.files.get(fd)?;
+    let iovec = current_task.mm.read_iovec(iovec_addr, iovec_count)?;
+    file.read_at(current_task, offset.try_into().map_err(|_| errno!(EINVAL))?, &iovec)
+}
+
+pub fn sys_pwritev(
+    current_task: &CurrentTask,
+    fd: FdNumber,
+    iovec_addr: UserAddress,
+    iovec_count: i32,
+    offset: off_t,
+) -> Result<usize, Errno> {
+    // TODO(fxbug.dev/117677) Allow partial writes.
+    let iovec = current_task.mm.read_iovec(iovec_addr, iovec_count)?;
+    let file = current_task.files.get(fd)?;
+    file.write_at(current_task, offset.try_into().map_err(|_| errno!(EINVAL))?, &iovec)
+}
+
 pub fn sys_readv(
     current_task: &CurrentTask,
     fd: FdNumber,
@@ -153,6 +178,7 @@ pub fn sys_writev(
     iovec_addr: UserAddress,
     iovec_count: i32,
 ) -> Result<usize, Errno> {
+    // TODO(fxbug.dev/117677) Allow partial writes.
     let iovec = current_task.mm.read_iovec(iovec_addr, iovec_count)?;
     let file = current_task.files.get(fd)?;
     file.write(current_task, &iovec)

@@ -90,3 +90,8 @@ int CloneHelper::sleep_1sec(void *) {
 }
 
 int CloneHelper::doNothing(void *) { return 0; }
+
+ScopedTempFD::ScopedTempFD() : name_("/tmp/proc_test_file_XXXXXX") {
+  char *mut_name = const_cast<char *>(name_.c_str());
+  fd_ = ScopedFD(mkstemp(mut_name));
+}

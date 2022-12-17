@@ -28,6 +28,7 @@ test("syscalls_test_bin") {
     "pipe_test.cc",
     "poll_test.cc",
     "prctl_test.cc",
+    "read_write_test.cc",
     "restart_read_test.cc",
     "socket_test.cc",
     "terminal_test.cc",
