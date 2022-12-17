@@ -227,7 +227,7 @@ void jtrace_dump(jtrace::TraceBufferType which) {
   if (which == jtrace::TraceBufferType::Recovered) {
     g_trace->DumpRecovered();
   } else {
-    g_trace->Dump();
+    g_trace->Dump(ZX_MSEC(50));
   }
 }
 
