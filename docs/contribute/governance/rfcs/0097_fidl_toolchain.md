@@ -630,6 +630,6 @@ As noted in text.
 [`fidlcat`]: /tools/fidlcat/
 [`fidldoc`]: /tools/fidl/fidldoc/
 [`fidlgen_rust`]: /tools/fidl/fidlgen_rust/
-[`kazoo`]: /zircon/tools/kazoo/
+[`kazoo`]: https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/tools/kazoo/;l=1;drc=88b44300a8dde40311094c4db1b1fa061a42dfa2
 [`measure-tape`]: /tools/fidl/measure-tape/
 [rfc-0057-terminology]: /docs/contribute/governance/rfcs/0057_default_no_handles.md#terminology

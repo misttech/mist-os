@@ -101,9 +101,9 @@ info entry* `PA_HND(PA_VMO_VDSO, 0)`.
 
 ## vDSO Implementation Details
 
-### **kazoo** tool
+### **zither** tool
 
-The [`kazoo` tool](/zircon/tools/kazoo/) generates both C/C++ function
+The [`zither` tool](/zircon/tools/zither/) generates both C/C++ function
 declarations that form the public [system
 call](/docs/reference/syscalls/README.md) API, and some C++ and assembly code
 used in the implementation of the vDSO. Both the public API and the private

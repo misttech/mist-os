@@ -971,9 +971,6 @@ def main():
         # these directories that are unknown before the metadata collection phase.
         # It was decided to tolerate this behavior.
         "__untraced_shebangs__",
-        # Kazoo golden-test writes temporary test files, we ignore accesses to
-        # them.
-        "__untraced_kazoo_test_dir__",
         # This temporary directory is only used to find nonterministic outputs.
         ".tmp-repro",
         # Dart kernel actions write intermediate outputs in order to generate

@@ -39,7 +39,7 @@ They are C ELF ABI functions of the form `zx_noun_verb()` or
 `zx_noun_verb_direct-object()`.
 
 The system calls are defined in a customized form of FIDL in [//zircon/vdso](/zircon/vdso/).
-Those definitions are first processed by `fidlc`, and then by `kazoo`, which takes the IR
+Those definitions are first processed by `fidlc`, and then by `zither`, which takes the IR
 representation from `fidlc` and outputs various formats that are used as glue in the VDSO, kernel,
 etc.
 

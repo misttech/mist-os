@@ -265,7 +265,7 @@ impl Process {
     pub fn exit(retcode: i64) -> ! {
         unsafe {
             sys::zx_process_exit(retcode);
-            // kazoo generates the syscall returning a unit value. We know it will not proceed
+            // zither generates the syscall returning a unit value. We know it will not proceed
             // past this point however.
             std::hint::unreachable_unchecked()
         }

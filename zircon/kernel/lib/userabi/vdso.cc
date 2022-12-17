@@ -162,7 +162,7 @@ class VDsoMutator {
 #define BLOCK_SYSCALL(mutator, symbol) \
   mutator.BlockSymbol(PASTE(VDSO_DYNSYM_, symbol, ), PASTE(VDSO_DYNSYM__, symbol, ))
 
-// Random attributes in kazoo fidl files become "categories" of syscalls.
+// Random attributes in zx fidl files become "categories" of syscalls.
 // For each category, define a function block_<category> to block all the
 // syscalls in that category.  These functions can be used in
 // VDso::CreateVariant (below) to block a category of syscalls for a particular

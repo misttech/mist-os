@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
     printf("enabled\n");                              \
   }
 
-  // TODO(scottmg): Add an output backend to kazoo to emit a full list of stub
+  // TODO(scottmg): Add an output backend to zither to emit a full list of stub
   // calls to include here.
   size_t actual;
   SYSCALL_STATUS(zx_debug_read, (ZX_HANDLE_INVALID, nullptr, 0, &actual));

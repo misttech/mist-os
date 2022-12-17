@@ -251,9 +251,6 @@ function diff_file_relpath() {
     *.bak) expect=ignore ;;
     *.bkp) expect=ignore ;;
 
-    kazoo-golden-test)
-      expect=diff; diff_text "$left" "$right" ;;  # timestamp
-
     # All others.
     # Binary files diffs will still only be reported tersely.
     *)

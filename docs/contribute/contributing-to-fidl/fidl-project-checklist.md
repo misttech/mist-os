@@ -61,7 +61,7 @@ natural and wire APIs; the wire APIs were called LLCPP).
   * [banjo]
   * [measure-tape]
   * [GIDL][gidl]
-  * [kazoo]
+  * [zither]
 
 ## Change to `fidlgen_<lang>`
 
@@ -107,7 +107,7 @@ Add coverage to:
 [fidlgen-tests]: /tools/fidl/lib/fidlgentest
 [fidlmerge]: /tools/fidl/fidlmerge
 [gidl]: /tools/fidl/gidl
-[kazoo]: /zircon/tools/kazoo
+[zither]: /zircon/tools/zither
 [lexicon]: /docs/reference/fidl/language/lexicon.md
 [llcpp-allocators]: /docs/development/languages/fidl/tutorials/cpp/topics/wire-memory-ownership.md
 [measure-tape]: /tools/fidl/measure-tape

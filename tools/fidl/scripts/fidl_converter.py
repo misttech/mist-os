@@ -104,16 +104,6 @@ def match_converted_files():
         new_syntax_path = FUCHSIA_DIR / 'out/default/fidling/gen' / old_syntax_path
         new_syntax_path = new_syntax_path.with_suffix('.fidl.new')
 
-        # Special handling for these.
-        if str(old_syntax_path).startswith('zircon/tools/kazoo'):
-            converted[str(old_syntax_path)] = str(new_syntax_path) \
-                .replace('/fidling/gen/', '/host_x64/gen/')
-            continue
-        if str(old_syntax_path).startswith('zircon/vdso'):
-            converted[str(old_syntax_path)] = str(new_syntax_path) \
-                .replace('/fidling/gen/zircon/vdso', '/gen/zircon')
-            continue
-
         # The default case: the file's output location matches its location in
         # the source, save a slight redirection to the output directory.
         if new_syntax_path.exists():

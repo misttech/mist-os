@@ -94,7 +94,7 @@ class Libraries : private ReporterMixin {
   // Returns the filtered compilation for the last-inserted library.
   //
   // TODO(fxbug.dev/67858): Add a method that doesn't take a version selection
-  // and preserves everything, for the full-history IR needed by kazoo.
+  // and preserves everything, for the full-history IR needed by zither.
   std::unique_ptr<Compilation> Filter(const VersionSelection* version_selection);
 
   // Insert |library|. It must only depend on already-inserted libraries.

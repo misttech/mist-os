@@ -29,14 +29,6 @@ group("tests") {
     ":structs",
     ":zx.test",
   ]
-
-  # TODO(fxbug.dev/110295): These dependencies constitute build-time checks
-  # that the library remains intelligible to zither. Keep these here as an
-  # aide during the deprecation of kazoo and the migration of its duties over
-  # to zither.
-  foreach(backend, supported_zither_backends) {
-    deps += [ "//zircon/vdso:zx_zither.$backend" ]
-  }
 }
 
 if (is_host) {
