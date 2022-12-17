@@ -18,6 +18,7 @@ template("archivist_optimized_binary") {
     configs += [ "//build/config/rust:bootfs" ]
 
     # Can't dynamically link libstd and libtest for ZBI binaries
+    configs += [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
     configs -= [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
   }
 }

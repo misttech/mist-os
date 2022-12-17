@@ -4,11 +4,15 @@
 
 # This target allows headers to be published to the GN build.
 
-_label = "//zircon/vdso:private($default_toolchain)"
-_gen_dir = get_label_info(_label, "target_gen_dir")
+import("//build/fidl/toolchain.gni")
+
+fidl_root_gen_dir =
+    get_label_info("//anything($fidl_toolchain)", "root_gen_dir")
+kernel_syscall_backend_include_dir =
+    "$fidl_root_gen_dir/zircon/vdso/zx/zither/kernel"
 
 config("headers.config") {
-  include_dirs = [ "$_gen_dir/include" ]
+  include_dirs = [ kernel_syscall_backend_include_dir ]
 }
 
 group("headers") {
@@ -20,9 +24,11 @@ source_set("syscalls-headers") {
     "//zircon/system/ulib",
     "//zircon/system/utest/core/bad-syscall/*",
   ]
-  public = [ "$_gen_dir/include/lib/syscalls/zx-syscall-numbers.h" ]
+  public = [
+    "$kernel_syscall_backend_include_dir/lib/syscalls/zx-syscall-numbers.h",
+  ]
   public_deps = [
     ":headers",
-    _label,
+    "//zircon/vdso:private($default_toolchain)",
   ]
 }

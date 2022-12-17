@@ -9,8 +9,7 @@ import("//zircon/vdso/vdso.gni")
 # //zircon/system/ulib/c/sysroot_entries.gni.
 
 _vdso_generated_headers_dep = "//zircon/vdso:public($default_toolchain)"
-_gen_include_dir =
-    get_label_info(_vdso_generated_headers_dep, "root_gen_dir") + "/include"
+_gen_include_dir = zircon_public_header_include_dir
 
 _rebased_include_dir =
     rebase_path("//src/zircon/lib/zircon/include", root_build_dir)

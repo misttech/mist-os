@@ -902,6 +902,7 @@ build_api_module("tool_paths") {
     "//src/storage/minfs/tools:minfs($host_toolchain)",
     "//zircon/tools/xdc-server($host_toolchain)",
     "//zircon/tools/zbi($host_toolchain)",
+    "//zircon/tools/zither($host_toolchain)",
   ]
   if (host_os == "linux") {
     deps += [ "//zircon/tools/mtd-redundant-storage($host_toolchain)" ]

@@ -8,6 +8,7 @@ import("//build/cpp/library_headers.gni")
 import("//build/go/go_library.gni")
 import("//build/rust/config.gni")
 import("//build/rust/rustc_library.gni")
+import("//build/toolchain/toolchain_environment.gni")
 
 # TODO(fxbug.dev/91102, fxbug.dev/93393): "cpp"
 supported_zither_backends = [
@@ -421,20 +422,25 @@ template("_zither_rust_library") {
   forward_variables_from(invoker,
                          [
                            "source_names",
-                           "output_dir",
                            "output_subdir",
                          ])
 
+  # Underscore to prevent rustc_library() from thinking that this value is a
+  # specification of output_dir for the associated rlib.
+  _output_dir = invoker.output_dir
+
   generated_files = []
   if (invoker.backend == "rust_syscall") {
-    crate_root = "${output_dir}/${output_subdir}/src/definitions.rs"
+    crate_name = "fuchsia-zircon-sys"
+    crate_root = "${_output_dir}/${output_subdir}/src/definitions.rs"
     crate_deps = [ "//src/lib/zircon/rust:fuchsia-zircon-types" ]
     not_needed([ "source_names" ])
   } else {
     foreach(name, source_names) {
-      generated_files += [ "${output_dir}/${output_subdir}/src/${name}.rs" ]
+      generated_files += [ "${_output_dir}/${output_subdir}/src/${name}.rs" ]
     }
-    crate_root = "${output_dir}/${output_subdir}/src/lib.rs"
+    crate_name = output_subdir
+    crate_root = "${_output_dir}/${output_subdir}/src/lib.rs"
     crate_deps = [ "//third_party/rust_crates:bitflags" ]
   }
   generated_files += [ crate_root ]
@@ -450,6 +456,7 @@ template("_zither_rust_library") {
                              "generated_files",
                              "backend",
                              "formatter",
+                             "output_dir",
                            ])
   }
 
@@ -459,9 +466,14 @@ template("_zither_rust_library") {
                              "visibility",
                              "testonly",
                            ])
-    name = output_subdir
+    name = crate_name
     edition = "2021"
     source_root = crate_root
+
+    # Namespace by target so that there is no rlib collision between fidl()
+    # targets in the same file.
+    output_dir = "$target_out_dir/$main_target"
+
     sources = generated_files
     non_rust_deps = [
       ":${zither_target}($default_toolchain)",
@@ -469,6 +481,7 @@ template("_zither_rust_library") {
     ]
     deps = crate_deps
     configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+    disable_clippy = true
   }
 }
 
@@ -598,19 +611,34 @@ template("_zither_legacy_syscall_cdecl_sources") {
                            ])
   }
 
-  library_headers(main_target) {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                             "generated_files",
-                           ])
-    include_dir = output_dir
-    headers = rebase_path(generated_files, include_dir)
-    deps = [
-      ":${zither_target}($default_toolchain)",
-      ":${zither_target}.check($default_toolchain)",
-    ]
+  # HACK: Our build's redefinition of `source_set()` automatically includes
+  # a dependency on the Zircon public headers in the conventional, Fuchsia
+  # toolchains, which in turn depend on this target. Such a dependency is not
+  # conferred in the vDSO toolchain.
+  if (toolchain_environment == "user.vdso") {
+    library_headers(main_target) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                               "generated_files",
+                             ])
+      include_dir = output_dir
+      headers = rebase_path(generated_files, include_dir)
+      public_deps = [ ":${zither_target}($default_toolchain)" ]
+      deps = [ ":${zither_target}.check($default_toolchain)" ]
+    }
+  } else {
+    group(main_target) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      public_deps = [ ":$main_target(//zircon/kernel/lib/userabi/vdso:user.vdso_$current_cpu)" ]
+    }
+    not_needed(invoker, "*")
+    not_needed("*")
   }
 }
 
