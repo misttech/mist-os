@@ -190,7 +190,10 @@ template("load_test_lib") {
                              "ldflags",
                            ])
 
-    deps = [ ":test-data" ]
+    deps = [
+      ":test-data",
+      "//zircon/system/public",
+    ]
 
     # These tests are trying to test something specific, specific segment
     # types, etc, instrumentation will likely perturbe this, so disable
@@ -228,7 +231,14 @@ foreach(data_size,
   }
 }
 
-load_test_data_deps = [ "elfldltl-test-ret24" ]
+load_test_lib("elfldltl-test-symbolic") {
+  sources = [ "symbolic.cc" ]
+}
+
+load_test_data_deps = [
+  "elfldltl-test-ret24",
+  "elfldltl-test-symbolic",
+]
 
 foreach(data_size,
         [

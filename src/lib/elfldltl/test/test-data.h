@@ -6,10 +6,13 @@
 #define SRC_LIB_ELFLDLTL_TEST_TEST_DATA_H_
 
 #include <stddef.h>
+#include <zircon/compiler.h>
 
 #include <string_view>
 
 extern "C" int Return24();
+
+extern "C" const int foo;
 
 struct TestData {
   const int* rodata;
@@ -23,5 +26,6 @@ constexpr size_t kLargeDataCount = 65538;
 constexpr std::string_view kRet24 = "elfldltl-test-ret24.so";
 constexpr std::string_view kNoXSegment = "elfldltest-no-execute-data-0.so";
 constexpr std::string_view kNoXSegmentLargeData = "elfldltest-no-execute-data-65536.so";
+constexpr std::string_view kSymbolic = "elfldltl-test-symbolic.so";
 
 #endif  // SRC_LIB_ELFLDLTL_TEST_TEST_DATA_H_

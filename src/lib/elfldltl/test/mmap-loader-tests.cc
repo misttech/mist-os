@@ -29,13 +29,12 @@ struct LoadOptions {
 class ElfldltlLoaderTests : public testing::Test {
  public:
   void TearDown() override {
-    if (!mapping_.empty()) {
-      munmap(mapping_.data(), mapping_.size());
+    if (!mem_.image().empty()) {
+      munmap(mem_.image().data(), mem_.image().size());
     }
   }
 
   void Load(std::string_view so_path, LoadOptions options = {}) {
-    using Elf = elfldltl::Elf<>;
     using Phdr = Elf::Phdr;
     using Dyn = Elf::Dyn;
 
@@ -62,28 +61,30 @@ class ElfldltlLoaderTests : public testing::Test {
 
     elfldltl::DirectMemory& mem = loader.memory();
 
+    std::optional<Phdr> ph;
+    elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<Elf>(ph));
+    ASSERT_TRUE(ph);
+
+    auto dyn = mem.ReadArray<Dyn>(ph->vaddr(), ph->filesz() / sizeof(Dyn));
+    ASSERT_TRUE(dyn);
+
+    elfldltl::RelocationInfo<Elf> reloc_info;
+    ASSERT_TRUE(elfldltl::DecodeDynamic(diag, mem, *dyn,
+                                        elfldltl::DynamicRelocationInfoObserver(reloc_info),
+                                        elfldltl::DynamicSymbolInfoObserver(sym_info_)));
+
     if (options.reloc) {
-      std::optional<Phdr> ph;
-      elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<Elf>(ph));
-      ASSERT_TRUE(ph);
-
-      auto dyn = mem.ReadArray<Dyn>(ph->vaddr(), ph->filesz() / sizeof(Dyn));
-      ASSERT_TRUE(dyn);
-
-      elfldltl::RelocationInfo<Elf> relocInfo;
-      ASSERT_TRUE(elfldltl::DecodeDynamic(diag, mem, *dyn,
-                                          elfldltl::DynamicRelocationInfoObserver(relocInfo)));
-
       ASSERT_TRUE(
-          RelocateRelative(mem, relocInfo, reinterpret_cast<uintptr_t>(mem.image().data())));
+          RelocateRelative(mem, reloc_info, reinterpret_cast<uintptr_t>(mem.image().data())));
     }
 
     entry_ = mem.GetPointer<std::remove_pointer_t<decltype(entry_)>>(ehdr.entry);
     if (options.commit) {
-      mapping_ = mem.image();
+      mem_.set_image(mem.image());
+      mem_.set_base(mem.base());
       std::move(loader).Commit();
     }
-    EXPECT_EQ(mapping_.empty(), !options.commit);
+    EXPECT_EQ(mem_.image().empty(), !options.commit);
   }
 
   template <typename T>
@@ -91,9 +92,19 @@ class ElfldltlLoaderTests : public testing::Test {
     return reinterpret_cast<T*>(entry_);
   }
 
+  template <typename T>
+  T* lookup_sym(elfldltl::SymbolName name) {
+    auto* sym = name.Lookup(sym_info_);
+    EXPECT_NE(sym, nullptr) << name;
+    return mem_.GetPointer<T>(sym->value);
+  }
+
  private:
+  using Elf = elfldltl::Elf<>;
+
   void (*entry_)() = nullptr;
-  cpp20::span<std::byte> mapping_;
+  elfldltl::DirectMemory mem_;
+  elfldltl::SymbolInfo<Elf> sym_info_;
 };
 
 TEST_F(ElfldltlLoaderTests, Basic) {
@@ -137,6 +148,16 @@ TEST_F(ElfldltlLoaderTests, LargeDataSegment) {
   *data->bss = 2;
   int* rodata = const_cast<int*>(data->rodata);
   EXPECT_DEATH(*rodata = 3, "");
+}
+
+TEST_F(ElfldltlLoaderTests, BasicSymbol) {
+  Load(kSymbolic);
+
+  constexpr elfldltl::SymbolName kFoo("foo");
+
+  auto* foo_ptr = lookup_sym<decltype(foo)>(kFoo);
+  ASSERT_NE(foo_ptr, nullptr);
+  EXPECT_EQ(*foo_ptr, 17);
 }
 
 }  // namespace
