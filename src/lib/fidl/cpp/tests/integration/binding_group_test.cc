@@ -39,7 +39,6 @@ struct TestImpl : fidl::Server<Testable> {
   void Terminate(TerminateCompleter::Sync& completer) override {
     terminate_count_++;
     completer.Close(kTestEpitaph);
-    loop->Quit();
   }
 
   // Fired whenever the binding is closed via a |Close*| call on its parent |ServerBindingGroup|.
@@ -64,7 +63,6 @@ constexpr auto kCloseHandler = [](TestImpl* impl, fidl::UnbindInfo info) {
   EXPECT_TRUE(info.did_send_epitaph());
   EXPECT_EQ(fidl::Reason::kClose, info.reason());
   EXPECT_OK(info.status());
-  impl->loop->Quit();
 };
 
 TEST(BindingGroup, Trivial) { fidl::ServerBindingGroup<Testable> group; }
@@ -112,15 +110,10 @@ void AddBindingTest() {
       ASSERT_TRUE(result.ok());
       EXPECT_OK(result.status());
       EXPECT_EQ(result.value().str.get(), kSimpleEcho);
-
-      // Quit the loop, thereby handing control back to the outer loop of actions being iterated
-      // over.
-      loop.Quit();
     });
 
     // Run the loop until the callback is resolved.
     loop.RunUntilIdle();
-    loop.ResetQuit();
   }
 
   // Ensure that each |impl| was called the number of times that we expect.
@@ -197,15 +190,10 @@ void CreateHandlerTest() {
       ASSERT_TRUE(result.ok());
       EXPECT_OK(result.status());
       EXPECT_EQ(result.value().str.get(), kSimpleEcho);
-
-      // Quit the loop, thereby handing control back to the outer loop of actions being iterated
-      // over.
-      loop.Quit();
     });
 
     // Run the loop until the callback is resolved.
     loop.RunUntilIdle();
-    loop.ResetQuit();
   }
 
   // Ensure that each |impl| was called the number of times that we expect.
@@ -267,7 +255,6 @@ void CloseHandlerTest() {
 
     // Run the loop until the close handlers are resolved.
     loop.RunUntilIdle();
-    loop.ResetQuit();
   }
 
   // Ensure that each |impl| was closed the number of times that we expect. In this case, that means
@@ -302,12 +289,27 @@ void ExternalKillBindingTest(KillSomeBindings kill_some_bindings) {
   constexpr size_t TotalServerBindings = kTestNumImpls * kTestNumBindingsPerImpl;
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
 
+  class EventHandler : public fidl::WireAsyncEventHandler<Testable> {
+   public:
+    void on_fidl_error(fidl::UnbindInfo info) override {
+      ASSERT_TRUE(info.is_peer_closed());
+      closed_ = true;
+    }
+
+    bool closed() const { return closed_; }
+
+   private:
+    bool closed_ = false;
+  };
+
   // Because we're going to be using raw pointers into these vectors for the test, its important to
   // pre-allocate, so that the underlying storage doesn't move.
   std::vector<TestImpl> impls;
   std::vector<fidl::WireClient<Testable>> clients;
+  std::vector<EventHandler> event_handlers;
   impls.reserve(kTestNumImpls);
   clients.reserve(TotalServerBindings);
+  event_handlers.reserve(TotalServerBindings);
 
   // Data we are tracking for the duration of the test which we will assert against.  The
   // |kill_some_bindings| handler should replace all entries in |open_bindings| with |nullptr| when
@@ -333,7 +335,8 @@ void ExternalKillBindingTest(KillSomeBindings kill_some_bindings) {
 
       group.AddBinding(loop.dispatcher(), std::move(endpoints->server), &impls.back(),
                        kCloseHandler);
-      clients.emplace_back(std::move(endpoints->client), loop.dispatcher());
+      event_handlers.emplace_back();
+      clients.emplace_back(std::move(endpoints->client), loop.dispatcher(), &event_handlers.back());
       open_bindings.insert({j, &impls.back()});
     }
   }
@@ -342,18 +345,28 @@ void ExternalKillBindingTest(KillSomeBindings kill_some_bindings) {
 
   // Call the |kill_some_bindings| lambda to kill the servers that the test requires.
   kill_some_bindings(group, &loop, impls, open_bindings);
+  loop.RunUntilIdle();
 
   // Make a |Terminate| call on each remaining |client| to ensure that it is abruptly torn down.
-  for (auto& open_binding : open_bindings) {
-    // Check if the other side of the connection has been dropped - a failure here means that it
-    // has, which should conform to our expectations based on which |open_bindings| we've set as
-    // |nullptr|s (indicating removal/closing) and not.
-    auto result = clients[open_binding.first]->Terminate();
-    EXPECT_EQ(result.ok(), open_binding.second != nullptr);
+  for (const auto& open_binding : open_bindings) {
+    // If a |open_binding| is set to |nullptr|, that means the test body
+    // explicitly removed/closed the binding, and we verify this has happened.
+    // Otherwise, call |Terminate| to tell the server to close it.
+    if (open_binding.second != nullptr) {
+      EXPECT_FALSE(event_handlers[open_binding.first].closed());
+      auto result = clients[open_binding.first]->Terminate();
+      EXPECT_OK(result.status());
+    } else {
+      EXPECT_TRUE(event_handlers[open_binding.first].closed());
+    }
 
     // Run the loop until the close handlers are resolved.
     loop.RunUntilIdle();
-    loop.ResetQuit();
+  }
+
+  // All connections should now be closed.
+  for (const auto& open_binding : open_bindings) {
+    EXPECT_TRUE(event_handlers[open_binding.first].closed());
   }
 
   // Ensure that empty handler was only called once, after the last binding resolved its |Terminate|
@@ -371,7 +384,6 @@ TEST(BindingGroup, RemoveBindings) {
     EXPECT_EQ(group.size(), 2);
 
     loop->RunUntilIdle();
-    loop->ResetQuit();
 
     // Ensure that no close counters were incremented, since this was merely a removal.
     for (auto& impl : open_bindings) {
@@ -397,7 +409,6 @@ TEST(BindingGroup, RemoveAll) {
     EXPECT_EQ(group.size(), 0);
 
     loop->RunUntilIdle();
-    loop->ResetQuit();
 
     // Ensure that no close counters were incremented, since this was merely a removal.
     for (auto& impl : open_bindings) {
@@ -421,12 +432,8 @@ TEST(BindingGroup, CloseBindings) {
     EXPECT_EQ(group.CloseBindings(target_impl, kTestEpitaph), false);
     EXPECT_EQ(group.size(), 2);
 
-    // Run the loop until the close handlers are resolved. We need to do this once for every
-    // close handler being called, so 2 in this case.
-    for (size_t i = 0; i < 2; i++) {
-      loop->RunUntilIdle();
-      loop->ResetQuit();
-    }
+    // Run the loop until the close handlers are resolved.
+    loop->RunUntilIdle();
 
     // Ensure that the close handler was fired for the closed binding's |impl| the correct
     // number of times.
@@ -455,12 +462,8 @@ TEST(BindingGroup, CloseAll) {
     EXPECT_EQ(group.CloseAll(kTestEpitaph), false);
     EXPECT_EQ(group.size(), 0);
 
-    // Run the loop until the close handlers are resolved. We need to do this once for every
-    // close handler being called, so all 4 in this case.
-    for (size_t i = 0; i < 4; i++) {
-      loop->RunUntilIdle();
-      loop->ResetQuit();
-    }
+    // Run the loop until the close handlers are resolved.
+    loop->RunUntilIdle();
 
     // Ensure that the close handler was fired for the closed bindings' |impl|s the correct
     // number of times.
@@ -488,12 +491,8 @@ TEST(BindingGroup, CannotRemoveAfterClose) {
     EXPECT_EQ(group.RemoveAll(), false);
     EXPECT_EQ(group.size(), 0);
 
-    // Run the loop until the close handlers are resolved. We need to do this once for every
-    // close handler being called, so all 4 in this case.
-    for (size_t i = 0; i < 4; i++) {
-      loop->RunUntilIdle();
-      loop->ResetQuit();
-    }
+    // Run the loop until the close handlers are resolved.
+    loop->RunUntilIdle();
 
     // Ensure that the close handler was fired for the closed bindings' |impl|s the correct
     // number of times.
@@ -522,7 +521,6 @@ TEST(BindingGroup, CannotCloseAfterRemove) {
     EXPECT_EQ(group.size(), 0);
 
     loop->RunUntilIdle();
-    loop->ResetQuit();
 
     // Ensure that no close counters were incremented, since this was merely a removal.
     for (auto& impl : open_bindings) {
