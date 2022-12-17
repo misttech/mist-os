@@ -140,6 +140,9 @@ def _prebuilt_clang_cc_toolchain_config_impl(ctx):
                         flags = [
                             "-fprofile-instr-generate",
                             "-fcoverage-mapping",
+                            # Apply some optimizations so tests are fast,
+                            # but not too much so that coverage is inaccurate.
+                            "-O1",
                         ],
                     ),
                 ],
