@@ -474,23 +474,24 @@ mod test {
         .await
         .unwrap();
 
-        let expected_hash =
-            "502806d5763dbb6500983667e8e6466e9efd291a6080372c03570d7372dfbab0".parse().unwrap();
         let pb = ProductBundle::try_load_from(&pb_dir).unwrap();
-        assert_eq!(
+        // NB: do not assert on the package hash because this test is not hermetic; platform
+        // changes such as API level bumps may change the package hash and such changes are
+        // immaterial to the code under test here.
+        assert_matches::assert_matches!(
             pb,
             ProductBundle::V2(ProductBundleV2 {
-                partitions: PartitionsConfig::default(),
+                partitions,
                 system_a: None,
                 system_b: None,
                 system_r: None,
-                repositories: vec![Repository {
-                    name: "fuchsia.com".into(),
-                    metadata_path: pb_dir.join("repository"),
-                    blobs_path: pb_dir.join("blobs"),
-                }],
-                update_package_hash: Some(expected_hash),
-            })
+                repositories,
+                update_package_hash: Some(_),
+            }) if partitions == Default::default() && repositories == &[Repository {
+                name: "fuchsia.com".into(),
+                metadata_path: pb_dir.join("repository"),
+                blobs_path: pb_dir.join("blobs"),
+            }]
         );
     }
 }
