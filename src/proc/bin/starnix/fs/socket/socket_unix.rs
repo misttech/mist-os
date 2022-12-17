@@ -21,6 +21,22 @@ const SOCKET_MIN_SIZE: usize = 4 << 10;
 const SOCKET_DEFAULT_SIZE: usize = 208 << 10;
 const SOCKET_MAX_SIZE: usize = 4 << 20;
 
+/// The data of a socket is stored in the "Inner" struct. Because both ends have separate locks,
+/// care must be taken to avoid taking both locks since there is no way to tell what order to
+/// take them in.
+///
+/// When writing, data is buffered in the "other" end of the socket's Inner.MessageQueue:
+///
+///            UnixSocket end #1          UnixSocket end #2
+///            +---------------+          +---------------+
+///            |               |          |   +-------+   |
+///   Writes -------------------------------->| Inner |------> Reads
+///            |               |          |   +-------+   |
+///            |   +-------+   |          |               |
+///   Reads <------| Inner |<-------------------------------- Writes
+///            |   +-------+   |          |               |
+///            +---------------+          +---------------+
+///
 pub struct UnixSocket {
     inner: Mutex<UnixSocketInner>,
 }
@@ -529,9 +545,9 @@ impl SocketOps for UnixSocket {
         handler: EventHandler,
         options: WaitAsyncOptions,
     ) -> WaitKey {
-        let present_events = self.query_events(socket, current_task);
-        if events & present_events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
-            waiter.wake_immediately(present_events.mask(), handler)
+        let cur_events = self.query_events(socket, current_task);
+        if events & cur_events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
+            waiter.wake_immediately(cur_events.mask(), handler)
         } else {
             self.lock().waiters.wait_async_mask(waiter, events.mask(), handler)
         }
@@ -551,21 +567,47 @@ impl SocketOps for UnixSocket {
     fn query_events(&self, _socket: &Socket, _current_task: &CurrentTask) -> FdEvents {
         // Note that self.lock() must be dropped before acquiring peer.inner.lock() to avoid
         // potential deadlocks.
-        let (mut present_events, peer) = {
+        let (mut events, peer) = {
             let inner = self.lock();
-            (inner.query_events(), inner.peer().cloned())
+
+            let mut events = FdEvents::empty();
+            let local_events = inner.messages.query_events();
+            // From our end's message queue we only care about POLLIN (whether we have data stored
+            // that's readable). POLLOUT is based on whether the peer end has room in its buffer.
+            if local_events & FdEvents::POLLIN {
+                events = FdEvents::POLLIN;
+            }
+
+            if inner.is_shutdown {
+                events |= FdEvents::POLLIN | FdEvents::POLLOUT | FdEvents::POLLHUP;
+            }
+
+            match &inner.state {
+                UnixSocketState::Listening(queue) => {
+                    if !queue.sockets.is_empty() {
+                        events |= FdEvents::POLLIN;
+                    }
+                }
+                UnixSocketState::Closed => {
+                    events |= FdEvents::POLLHUP;
+                }
+                _ => {}
+            }
+
+            (events, inner.peer().cloned())
         };
 
+        // Check the peer (outside of our lock) to see if it can accept data written from our end.
         if let Some(peer) = peer {
             let unix_socket = downcast_socket_to_unix(&peer);
             let peer_inner = unix_socket.lock();
             let peer_events = peer_inner.messages.query_events();
             if peer_events & FdEvents::POLLOUT {
-                present_events |= FdEvents::POLLOUT;
+                events |= FdEvents::POLLOUT;
             }
         }
 
-        present_events
+        events
     }
 
     /// Shuts down this socket according to how, preventing any future reads and/or writes.
@@ -922,32 +964,6 @@ impl UnixSocketInner {
     fn shutdown_one_end(&mut self) {
         self.is_shutdown = true;
         self.waiters.notify_events(FdEvents::POLLIN | FdEvents::POLLOUT | FdEvents::POLLHUP);
-    }
-
-    fn query_events(&self) -> FdEvents {
-        let mut present_events = FdEvents::empty();
-        let local_events = self.messages.query_events();
-        if local_events & FdEvents::POLLIN {
-            present_events = FdEvents::POLLIN;
-        }
-
-        if self.is_shutdown {
-            present_events |= FdEvents::POLLIN | FdEvents::POLLOUT | FdEvents::POLLHUP;
-        }
-
-        match &self.state {
-            UnixSocketState::Listening(queue) => {
-                if !queue.sockets.is_empty() {
-                    present_events |= FdEvents::POLLIN;
-                }
-            }
-            UnixSocketState::Closed => {
-                present_events |= FdEvents::POLLHUP;
-            }
-            _ => {}
-        }
-
-        present_events
     }
 }
 
