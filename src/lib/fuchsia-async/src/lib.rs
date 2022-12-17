@@ -3,6 +3,27 @@
 // found in the LICENSE file.
 
 //! A futures-rs executor design specifically for Fuchsia OS.
+//!
+//! # Example:
+//! A simple, singlethreaded print server:
+//!
+//! ```no_run
+//! #[fuchsia_async::run_singlethreaded]
+//! async fn main() {
+//!     let op = say_world();
+//!
+//!     // This println! will happen first
+//!     println!("Hello...");
+//!
+//!     // Calling `.await` on `op` starts executing `say_world`.
+//!     op.await;
+//! }
+//!
+//!
+//! async fn say_world() {
+//!     println!("...world");
+//! }
+//! ```
 
 #![deny(missing_docs)]
 
