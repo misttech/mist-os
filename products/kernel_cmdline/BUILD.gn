@@ -4,10 +4,6 @@
 
 import("//build/zbi/kernel_cmdline.gni")
 
-kernel_cmdline("blobfs.cache-eviction-policy--NEVER_EVICT") {
-  args = [ "blobfs.cache-eviction-policy=NEVER_EVICT" ]
-}
-
 kernel_cmdline("console.shell--true") {
   args = [ "console.shell=true" ]
   deps = [ "//build/validate:non_production_tag" ]

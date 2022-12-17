@@ -61,6 +61,7 @@ group("swd_bundles") {
 #
 assembly_input_bundle("common_bringup") {
   bootfs_packages = [ "//src/bringup/bin/svchost:pkg" ]
+  kernel_cmdline = [ "blobfs.cache-eviction-policy=NEVER_EVICT" ]
 
   # Create package and archive for use OOT.
   create_aib_package = true

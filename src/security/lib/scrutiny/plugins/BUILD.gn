@@ -4,6 +4,7 @@
 
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/generated_partitions_config.gni")
+import("//build/assembly/product_assembly_configuration.gni")
 import("//build/config.gni")
 import("//build/host.gni")
 import("//build/images/args.gni")
@@ -46,6 +47,13 @@ if (is_fuchsia) {
     outputs = [ "path/to/version" ]
   }
 
+  product_assembly_configuration("assembly_config") {
+    platform = {
+      feature_set_level = "empty"
+      build_type = "eng"
+    }
+  }
+
   assembled_system("assembly") {
     allow_eng_platform_bundle_use = true
     testonly = true
@@ -57,6 +65,10 @@ if (is_fuchsia) {
       "abc",
       "def",
     ]
+
+    product_assembly_config_dep = ":assembly_config"
+    product_assembly_config_file =
+        "$target_out_dir/assembly_config/product_assembly_config.json"
   }
 
   product_bundle("product_bundle") {
