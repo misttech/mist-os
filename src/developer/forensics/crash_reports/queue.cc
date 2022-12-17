@@ -14,6 +14,7 @@
 #include "src/developer/forensics/crash_reports/constants.h"
 #include "src/developer/forensics/crash_reports/info/queue_info.h"
 #include "src/developer/forensics/crash_reports/item_location.h"
+#include "src/developer/forensics/crash_reports/reporting_policy_watcher.h"
 #include "src/developer/forensics/crash_reports/snapshot.h"
 #include "src/developer/forensics/feedback/annotations/constants.h"
 #include "src/lib/fxl/strings/join_strings.h"
@@ -498,7 +499,7 @@ void Queue::WatchReportingPolicy(ReportingPolicyWatcher* watcher) {
 
 void Queue::WatchNetwork(NetworkWatcher* network_watcher) {
   network_watcher->Register([this](const bool network_is_reachable) {
-    if (!stop_uploading_ && network_is_reachable) {
+    if (!stop_uploading_ && network_is_reachable && reporting_policy_ == ReportingPolicy::kUpload) {
       if (!blocked_reports_.empty()) {
         FX_LOGS(INFO) << "Uploading " << blocked_reports_.size()
                       << " reports on network reachable: " << ReportIdsStr(blocked_reports_);
