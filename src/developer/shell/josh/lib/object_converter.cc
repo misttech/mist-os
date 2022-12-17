@@ -33,6 +33,10 @@ void ObjectConverter::VisitTableType(const fidl_codec::TableType* type) {
 
   auto ret = std::make_unique<fidl_codec::TableValue>(type->table_definition());
   for (const auto& member : type->table_definition().members()) {
+    if (!member) {
+      continue;
+    }
+
     auto value = JS_GetPropertyStr(ctx_, value_, member->name().c_str());
     if (JS_IsUndefined(value)) {
       continue;
@@ -93,6 +97,10 @@ void ObjectConverter::VisitStructType(const fidl_codec::StructType* type) {
 
   auto ret = std::make_unique<fidl_codec::StructValue>(type->struct_definition());
   for (const auto& member : type->struct_definition().members()) {
+    if (!member) {
+      continue;
+    }
+
     auto child = ObjectConverter::Convert(ctx_, member->type(), get_item(member->name()));
 
     if (!child) {
@@ -116,6 +124,10 @@ void ObjectConverter::VisitUnionType(const fidl_codec::UnionType* type) {
   }
 
   for (const auto& member : type->union_definition().members()) {
+    if (!member) {
+      continue;
+    }
+
     auto result = JS_GetPropertyStr(ctx_, value_, member->name().c_str());
 
     if (JS_IsUndefined(result)) {

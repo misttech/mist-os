@@ -6,7 +6,9 @@
 
 #include <lib/fit/function.h>
 
+#include <cstdint>
 #include <utility>
+#include <vector>
 
 #include "lib/fpromise/result.h"
 
@@ -54,6 +56,34 @@ void FrobinatorImpl::SendProtocol(fidl::InterfaceHandle<fidl::test::frobinator::
 
 void FrobinatorImpl::SendBasicUnion(fidl::test::frobinator::BasicUnion u) {
   send_basic_union_received_value_ = u.v();
+}
+
+void FrobinatorImpl::SendBasicTable(fidl::test::frobinator::BasicTable t) {
+  send_basic_table_received_value_ = t.v();
+}
+
+void FrobinatorImpl::SendComplexTables(::std::vector<::fidl::test::frobinator::ComplexTable> ct,
+                                       SendComplexTablesCallback callback) {
+  send_complex_tables_received_entry_count_ = static_cast<uint32_t>(ct.size());
+  for (auto &entry : ct) {
+    if (entry.has_x()) {
+      if (entry.x().is_a()) {
+        send_complex_tables_received_x_a_count_++;
+      } else {
+        send_complex_tables_received_x_b_count_++;
+      }
+    }
+
+    if (entry.has_y()) {
+      if (entry.y()) {
+        send_complex_tables_received_y_true_count_++;
+      } else {
+        send_complex_tables_received_y_false_count_++;
+      }
+    }
+  }
+
+  callback({{1, 2, 3}, {4, 5, 6}, {7, 8, 9}});
 }
 
 }  // namespace test

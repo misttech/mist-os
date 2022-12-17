@@ -21,6 +21,14 @@ class FrobinatorImpl : public fidl::test::frobinator::Frobinator {
   ~FrobinatorImpl();
 
   uint32_t send_basic_union_received_value_ = 0;
+  uint32_t send_basic_table_received_value_ = 0;
+
+  uint32_t send_complex_tables_received_entry_count_ = 0;
+  uint32_t send_complex_tables_received_x_a_count_ = 0;
+  uint32_t send_complex_tables_received_x_b_count_ = 0;
+  uint32_t send_complex_tables_received_y_true_count_ = 0;
+  uint32_t send_complex_tables_received_y_false_count_ = 0;
+
   std::vector<std::string> frobs;
   std::vector<std::string> grobs;
   fit::closure on_destroy_;
@@ -33,6 +41,9 @@ class FrobinatorImpl : public fidl::test::frobinator::Frobinator {
   void SendEventHandle(zx::event event) override;
   void SendProtocol(fidl::InterfaceHandle<fidl::test::frobinator::EmptyProtocol> ep) override;
   void SendBasicUnion(fidl::test::frobinator::BasicUnion u) override;
+  void SendBasicTable(fidl::test::frobinator::BasicTable t) override;
+  void SendComplexTables(::std::vector<::fidl::test::frobinator::ComplexTable> ct,
+                         SendComplexTablesCallback callback) override;
 };
 
 }  // namespace test
