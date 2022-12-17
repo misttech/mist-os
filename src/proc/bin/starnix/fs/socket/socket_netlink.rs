@@ -203,6 +203,15 @@ impl NetlinkSocketInner {
         }
         Ok(bytes_written)
     }
+
+    fn query_events(&self) -> FdEvents {
+        let mut events = FdEvents::empty();
+        let local_events = self.messages.query_events();
+        if local_events & FdEvents::POLLIN {
+            events = FdEvents::POLLIN;
+        }
+        events
+    }
 }
 
 impl NetlinkSocket {
@@ -314,18 +323,19 @@ impl SocketOps for NetlinkSocket {
 
     fn wait_async(
         &self,
-        socket: &Socket,
-        current_task: &CurrentTask,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
         options: WaitAsyncOptions,
     ) -> WaitKey {
-        let present_events = self.query_events(socket, current_task);
-        if events & present_events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
-            waiter.wake_immediately(present_events.mask(), handler)
+        let mut inner = self.lock();
+        let cur_events = inner.query_events();
+        if events & cur_events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
+            waiter.wake_immediately(cur_events.mask(), handler)
         } else {
-            self.lock().waiters.wait_async_mask(waiter, events.mask(), handler)
+            inner.waiters.wait_async_mask(waiter, events.mask(), handler)
         }
     }
 
@@ -339,13 +349,7 @@ impl SocketOps for NetlinkSocket {
     }
 
     fn query_events(&self, _socket: &Socket, _current_task: &CurrentTask) -> FdEvents {
-        let mut present_events = FdEvents::empty();
-        let local_events = self.lock().messages.query_events();
-        if local_events & FdEvents::POLLIN {
-            present_events = FdEvents::POLLIN;
-        }
-
-        present_events
+        self.lock().query_events()
     }
 
     fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
