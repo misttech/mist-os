@@ -126,26 +126,45 @@ TEST(UnixSocket, BigWrite) {
   delete[] read_info.mem;
 }
 
-TEST(UnixSocket, ImmediatePeercredCheck) {
-  char* tmp = getenv("TEST_TMPDIR");
-  std::string path = tmp == nullptr ? "/tmp/socktest" : std::string(tmp) + "/socktest";
-  struct sockaddr_un sun;
-  sun.sun_family = AF_UNIX;
-  strcpy(sun.sun_path, path.c_str());
-  struct sockaddr* addr = reinterpret_cast<struct sockaddr*>(&sun);
+class UnixSocketTest : public testing::Test {
+  // SetUp() - make socket
+ protected:
+  void SetUp() override {
+    char* tmp = getenv("TEST_TMPDIR");
+    socket_path_ = tmp == nullptr ? "/tmp/socktest" : std::string(tmp) + "/socktest";
+    struct sockaddr_un sun;
+    sun.sun_family = AF_UNIX;
+    strcpy(sun.sun_path, socket_path_.c_str());
+    struct sockaddr* addr = reinterpret_cast<struct sockaddr*>(&sun);
 
-  int server = socket(AF_UNIX, SOCK_STREAM, 0);
-  ASSERT_GT(server, -1);
-  ASSERT_EQ(bind(server, addr, sizeof(sun)), 0);
-  ASSERT_EQ(listen(server, 1), 0);
+    server_ = socket(AF_UNIX, SOCK_STREAM, 0);
+    ASSERT_GT(server_, -1);
+    ASSERT_EQ(bind(server_, addr, sizeof(sun)), 0);
+    ASSERT_EQ(listen(server_, 1), 0);
 
-  int client = socket(AF_UNIX, SOCK_STREAM, 0);
-  ASSERT_GT(client, -1);
-  ASSERT_EQ(connect(client, addr, sizeof(sun)), 0);
+    client_ = socket(AF_UNIX, SOCK_STREAM, 0);
+    ASSERT_GT(client_, -1);
+    ASSERT_EQ(connect(client_, addr, sizeof(sun)), 0);
+  }
 
+  void TearDown() override {
+    ASSERT_EQ(unlink(socket_path_.c_str()), 0);
+    ASSERT_EQ(close(client_), 0);
+    ASSERT_EQ(close(server_), 0);
+  }
+
+  int client() const { return client_; }
+
+ private:
+  int client_ = 0;
+  int server_ = 0;
+  std::string socket_path_;
+};
+
+TEST_F(UnixSocketTest, ImmediatePeercredCheck) {
   struct ucred cred;
   socklen_t cred_size = sizeof(cred);
-  ASSERT_EQ(getsockopt(client, SOL_SOCKET, SO_PEERCRED, &cred, &cred_size), 0);
+  ASSERT_EQ(getsockopt(client(), SOL_SOCKET, SO_PEERCRED, &cred, &cred_size), 0);
   ASSERT_NE(cred.pid, 0);
   ASSERT_NE(cred.uid, static_cast<uid_t>(-1));
   ASSERT_NE(cred.uid, static_cast<gid_t>(-1));

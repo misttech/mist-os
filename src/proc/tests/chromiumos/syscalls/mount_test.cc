@@ -12,7 +12,7 @@
 
 #include <gtest/gtest.h>
 
-#include "test_helper.h"
+#include "src/proc/tests/chromiumos/syscalls/test_helper.h"
 
 namespace {
 
@@ -44,11 +44,25 @@ void RecursiveUnmount(const char *path) {
   } while (errno != EINVAL);
 }
 
+static bool skip_mount_tests = false;
+
 class MountTest : public ::testing::Test {
  public:
-  static void SetUpTestSuite() { ASSERT_THAT(unshare(CLONE_NEWNS), SyscallSucceeds()); }
+  static void SetUpTestSuite() {
+    int rv = unshare(CLONE_NEWNS);
+    if (rv == -1 && errno == EPERM) {
+      // GTest does not support GTEST_SKIP() from a suite setup, so record that we want to skip
+      // every test here and skip in SetUp().
+      skip_mount_tests = true;
+      return;
+    }
+    ASSERT_EQ(rv, 0) << "unshare(CLONE_NEWNS) failed: " << strerror(errno) << "(" << errno << ")";
+  }
 
   void SetUp() override {
+    if (skip_mount_tests) {
+      GTEST_SKIP() << "Permission denied for unshare(CLONE_NEWNS), skipping suite.";
+    }
     const char *tmp = getenv("TEST_TMPDIR");
     if (tmp == nullptr)
       tmp = "/tmp";
@@ -97,6 +111,7 @@ class MountTest : public ::testing::Test {
     return ::testing::AssertionSuccess();
   }
 
+ private:
   std::string tmp_;
 };
 

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <sys/stat.h>
+
 #include <fstream>
 #include <iostream>
 
@@ -10,6 +12,10 @@
 namespace {
 
 TEST(CustomArtifactTest, WriteFile) {
+  struct stat buf;
+  if (stat("/custom_artifacts", &buf) == -1 && errno == ENOENT) {
+    GTEST_SKIP() << "No /custom_artifacts found, skipping";
+  }
   const std::string file_path = "/custom_artifacts/test_doc.txt";
   const std::string contents = "test content";
   {
