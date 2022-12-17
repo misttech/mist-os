@@ -6,11 +6,11 @@ use {
     crate::{
         builtin_environment::BuiltinEnvironment,
         model::{
-            actions::{ActionKey, ActionSet, ShutdownAction, StartAction, StopAction},
+            actions::{ActionSet, ShutdownAction, StartAction, StopAction},
             component::{ComponentInstance, InstanceState, StartReason},
             error::ModelError,
             events::registry::EventSubscription,
-            hooks::{EventType, HooksRegistration},
+            hooks::{Event, EventType, Hook, HooksRegistration},
             model::Model,
             starter::Starter,
             testing::{
@@ -21,6 +21,7 @@ use {
     },
     ::routing::{config::AllowlistEntry, policy::PolicyError},
     assert_matches::assert_matches,
+    async_trait::async_trait,
     cm_rust::{
         CapabilityPath, ComponentDecl, EventMode, RegistrationSource, RunnerDecl,
         RunnerRegistration,
@@ -28,11 +29,11 @@ use {
     cm_rust_testing::*,
     fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
-    futures::{future::pending, join, lock::Mutex, prelude::*},
+    fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_sys2 as fsys,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
+    futures::{channel::mpsc, future::pending, join, lock::Mutex, prelude::*},
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
-    std::sync::Arc,
+    std::sync::{Arc, Weak},
     std::{collections::HashSet, convert::TryFrom},
 };
 
@@ -75,48 +76,81 @@ async fn bind_non_existent_root_child() {
     assert_eq!(format!("{:?}", res), format!("{:?}", expected_res));
 }
 
+// Blocks the Start action for the "system" component
+pub struct StartBlocker {
+    rx: Mutex<mpsc::Receiver<()>>,
+}
+
+impl StartBlocker {
+    pub fn new() -> (Arc<Self>, mpsc::Sender<()>) {
+        let (tx, rx) = mpsc::channel::<()>(0);
+        let blocker = Arc::new(Self { rx: Mutex::new(rx) });
+        (blocker, tx)
+    }
+}
+
+#[async_trait]
+impl Hook for StartBlocker {
+    async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
+        let moniker = event
+            .target_moniker
+            .unwrap_instance_moniker_or(ModelError::UnexpectedComponentManagerMoniker)
+            .unwrap();
+        let expected_moniker: AbsoluteMoniker = vec!["system"].into();
+        if moniker == &expected_moniker {
+            let mut rx = self.rx.lock().await;
+            rx.next().await.unwrap();
+        }
+        Ok(())
+    }
+}
+
 #[fuchsia::test]
 async fn bind_concurrent() {
     // Test binding twice concurrently to the same component. The component should only be
     // started once.
-
-    let (model, builtin_environment, mock_runner) = new_model(vec![
-        ("root", ComponentDeclBuilder::new().add_lazy_child("system").build()),
-        ("system", component_decl_with_test_runner()),
-    ])
+    let (blocker, mut unblocker) = StartBlocker::new();
+    let (model, _builtin_environment, mock_runner) = new_model_with(
+        vec![
+            ("root", ComponentDeclBuilder::new().add_lazy_child("system").build()),
+            ("system", component_decl_with_test_runner()),
+        ],
+        vec![HooksRegistration::new(
+            "start_blocker",
+            vec![EventType::Started],
+            Arc::downgrade(&blocker) as Weak<dyn Hook>,
+        )],
+    )
     .await;
 
-    let events = vec![EventSubscription::new(EventType::Started.into(), EventMode::Sync)];
-    let mut event_source = builtin_environment
-        .lock()
-        .await
-        .event_source_factory
-        .create_for_above_root()
-        .await
-        .expect("create event source");
+    // Start the root component.
+    model.start().await;
 
-    let mut event_stream = event_source.subscribe(events).await.expect("subscribe to event stream");
+    // Attempt to start the "system" component
+    let system_component = model.find(&vec!["system"].into()).await.unwrap();
+    let first_start = {
+        let mut actions = system_component.lock_actions().await;
+        actions.register_no_wait(&system_component, StartAction::new(StartReason::Debug))
+    };
 
-    // Start the "system", pausing before it starts.
-    let model_copy = model.clone();
-    let (f, bind_handle) = async move {
-        let m: AbsoluteMoniker = vec!["system"].into();
-        model_copy.start_instance(&m, &StartReason::Root).await.expect("failed to start 1");
-    }
-    .remote_handle();
-    fasync::Task::spawn(f).detach();
-    let event = event_stream.wait_until(EventType::Started, vec!["system"].into()).await.unwrap();
+    // While the first start is paused, simulate a second start by explicitly scheduling a second
+    // Start action. This should just be deduplicated to the first start by the action system.
+    let second_start = {
+        let mut actions = system_component.lock_actions().await;
+        actions.register_no_wait(&system_component, StartAction::new(StartReason::Debug))
+    };
 
-    // While the start() is paused, simulate a second start by explicitly scheduling a Start
-    // action. Allow the original start to proceed, then check the result of both starts.
-    let m: AbsoluteMoniker = vec!["system"].into();
-    let component = model.look_up(&m).await.expect("failed component lookup");
-    let f = ActionSet::register(component, StartAction::new(StartReason::Eager));
-    let (f, action_handle) = f.remote_handle();
-    fasync::Task::spawn(f).detach();
-    event.resume();
-    bind_handle.await;
-    action_handle.await.expect("failed to start 2");
+    // Unblock the start hook, then check the result of both starts.
+    unblocker.try_send(()).unwrap();
+
+    // The first and second start results must:
+    // * be the same
+    // * be successful
+    // * indicate that the component was just started
+    let first_result = first_start.await.expect("first start failed");
+    let second_result = second_start.await.expect("second start failed");
+    assert_eq!(first_result, fsys::StartResult::Started);
+    assert_eq!(first_result, second_result);
 
     // Verify that the component was started only once.
     mock_runner.wait_for_urls(&["test:///system_resolved"]).await;
@@ -393,7 +427,7 @@ async fn bind_action_sequence() {
         .subscribe(
             events
                 .into_iter()
-                .map(|event| EventSubscription::new(event, EventMode::Sync))
+                .map(|event| EventSubscription::new(event, EventMode::Async))
                 .collect(),
         )
         .await
@@ -401,53 +435,17 @@ async fn bind_action_sequence() {
 
     // Child of root should start out discovered but not resolved yet.
     let m = AbsoluteMoniker::new(vec!["system".into()]);
-    let start_model = model.start();
-    let check_events = async {
-        let event = event_stream.wait_until(EventType::Discovered, m.clone()).await.unwrap();
-        {
-            let root_state = model.root().lock_state().await;
-            let root_state = match *root_state {
-                InstanceState::Resolved(ref s) => s,
-                _ => panic!("not resolved"),
-            };
-            let realm = root_state.get_child(&"system".into()).unwrap();
-            let actions = realm.lock_actions().await;
-            assert!(actions.contains(&ActionKey::Discover));
-            assert!(!actions.contains(&ActionKey::Resolve));
-        }
-        event.resume();
-        let event = event_stream.wait_until(EventType::Started, vec![].into()).await.unwrap();
-        event.resume();
-    };
-    join!(start_model, check_events);
+    model.start().await;
+    event_stream.wait_until(EventType::Resolved, vec![].into()).await.unwrap();
+    event_stream.wait_until(EventType::Discovered, m.clone()).await.unwrap();
+    event_stream.wait_until(EventType::Started, vec![].into()).await.unwrap();
 
     // Start child and check that it gets resolved, with a Resolve event and action.
-    let bind = async {
-        model.start_instance(&m, &StartReason::Root).await.unwrap();
-    };
-    let check_events = async {
-        let event = event_stream.wait_until(EventType::Resolved, m.clone()).await.unwrap();
-        // While the Resolved hook is handled, it should be possible to look up the component
-        // without deadlocking.
-        let component = model.look_up(&m).await.unwrap();
-        {
-            let actions = component.lock_actions().await;
-            assert!(actions.contains(&ActionKey::Resolve));
-            assert!(!actions.contains(&ActionKey::Discover));
-        }
-        event.resume();
+    model.start_instance(&m, &StartReason::Root).await.unwrap();
+    event_stream.wait_until(EventType::Resolved, m.clone()).await.unwrap();
 
-        // Check that the child is started, with a Start event and action.
-        let event = event_stream.wait_until(EventType::Started, m.clone()).await.unwrap();
-        {
-            let actions = component.lock_actions().await;
-            assert!(actions.contains(&ActionKey::Start));
-            assert!(!actions.contains(&ActionKey::Discover));
-            assert!(!actions.contains(&ActionKey::Resolve));
-        }
-        event.resume();
-    };
-    join!(bind, check_events);
+    // Check that the child is started, with a Start event and action.
+    event_stream.wait_until(EventType::Started, m.clone()).await.unwrap();
 }
 
 #[fuchsia::test]

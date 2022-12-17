@@ -248,7 +248,7 @@ pub mod tests {
             .subscribe(
                 events
                     .into_iter()
-                    .map(|event| EventSubscription::new(event, EventMode::Sync))
+                    .map(|event| EventSubscription::new(event, EventMode::Async))
                     .collect(),
             )
             .await
@@ -280,12 +280,8 @@ pub mod tests {
         };
 
         // Confirm that the Unresolved events are emitted in the expected recursive order.
-        event_stream
-            .wait_until(EventType::Unresolved, vec!["a", "b"].into())
-            .await
-            .unwrap()
-            .resume();
-        event_stream.wait_until(EventType::Unresolved, vec!["a"].into()).await.unwrap().resume();
+        event_stream.wait_until(EventType::Unresolved, vec!["a", "b"].into()).await.unwrap();
+        event_stream.wait_until(EventType::Unresolved, vec!["a"].into()).await.unwrap();
         nf.await.unwrap();
 
         // Now attempt to unresolve again with another UnresolveAction.

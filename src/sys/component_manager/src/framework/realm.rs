@@ -433,7 +433,6 @@ mod tests {
                 testing::{mocks::*, out_dir::OutDir, test_helpers::*, test_hook::*},
             },
         },
-        assert_matches::assert_matches,
         cm_rust::{
             self, CapabilityName, CapabilityPath, ComponentDecl, EventMode, ExposeDecl,
             ExposeProtocolDecl, ExposeSource, ExposeTarget,
@@ -444,7 +443,7 @@ mod tests {
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_component::client,
         fuchsia_fs::OpenFlags,
-        futures::{lock::Mutex, poll, task::Poll},
+        futures::lock::Mutex,
         moniker::AbsoluteMoniker,
         routing_test_helpers::component_decl_with_exposed_binder,
         std::collections::HashSet,
@@ -564,7 +563,7 @@ mod tests {
         .await;
 
         let (_event_source, mut event_stream) =
-            test.new_event_stream(vec![EventType::Discovered.into()], EventMode::Sync).await;
+            test.new_event_stream(vec![EventType::Discovered.into()], EventMode::Async).await;
 
         // Test that a dynamic child with a long name can also be created.
         let long_name = &"c".repeat(cm_types::MAX_LONG_NAME_LENGTH);
@@ -574,24 +573,22 @@ mod tests {
         for (name, moniker) in
             [("a", "coll:a"), ("b", "coll:b"), (long_name, &format!("coll:{}", long_name))]
         {
-            let mut create = fasync::Task::spawn(test.realm_proxy.create_child(
-                &mut collection_ref,
-                child_decl(name),
-                fcomponent::CreateChildArgs::EMPTY,
-            ));
-            let event = event_stream
+            // Create a child
+            test.realm_proxy
+                .create_child(
+                    &mut collection_ref,
+                    child_decl(name),
+                    fcomponent::CreateChildArgs::EMPTY,
+                )
+                .await
+                .unwrap()
+                .unwrap();
+
+            // Ensure that an event exists for the new child
+            event_stream
                 .wait_until(EventType::Discovered, vec!["system", moniker].into())
                 .await
                 .unwrap();
-
-            // Give create requests time to be processed. Ensure they don't return before
-            // Discover action completes.
-            fasync::Timer::new(fasync::Time::after(zx::Duration::from_seconds(5))).await;
-            assert_matches!(poll!(&mut create), Poll::Pending);
-
-            // Unblock Discovered and wait for request to complete.
-            event.resume();
-            create.await.unwrap().unwrap();
         }
 
         // Verify that the component topology matches expectations.
@@ -1000,7 +997,7 @@ mod tests {
         let (_event_source, mut event_stream) = test
             .new_event_stream(
                 vec![EventType::Stopped.into(), EventType::Destroyed.into()],
-                EventMode::Sync,
+                EventMode::Async,
             )
             .await;
 
@@ -1046,16 +1043,11 @@ mod tests {
         fasync::Task::spawn(f).detach();
 
         // The component should be stopped (shut down) before it is destroyed.
-        let event = event_stream
-            .wait_until(EventType::Stopped, vec!["system", "coll:a"].into())
-            .await
-            .unwrap();
-        event.resume();
-        let event = event_stream
+        event_stream.wait_until(EventType::Stopped, vec!["system", "coll:a"].into()).await.unwrap();
+        event_stream
             .wait_until(EventType::Destroyed, vec!["system", "coll:a"].into())
             .await
             .unwrap();
-        event.resume();
 
         // "a" is fully deleted now.
         assert!(!has_child(test.component(), "coll:a").await);
@@ -1170,26 +1162,20 @@ mod tests {
         let (_event_source, mut event_stream) = test
             .new_event_stream(
                 vec![EventType::Started.into(), EventType::Destroyed.into()],
-                EventMode::Sync,
+                EventMode::Async,
             )
             .await;
 
         // Create child "a" in collection. Expect a Started event.
         let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
-        let create_a = fasync::Task::spawn(test.realm_proxy.create_child(
-            &mut collection_ref,
-            child_decl("a"),
-            fcomponent::CreateChildArgs::EMPTY,
-        ));
-        let event_a = event_stream
-            .wait_until(EventType::Started, vec!["system", "coll:a"].into())
+        test.realm_proxy
+            .create_child(&mut collection_ref, child_decl("a"), fcomponent::CreateChildArgs::EMPTY)
             .await
+            .unwrap()
             .unwrap();
+        event_stream.wait_until(EventType::Started, vec!["system", "coll:a"].into()).await.unwrap();
 
         // Started action completes.
-        // Unblock Started and wait for requests to complete.
-        event_a.resume();
-        create_a.await.unwrap().unwrap();
 
         let child = {
             let state = test.component().lock_resolved_state().await.unwrap();
@@ -1201,11 +1187,10 @@ mod tests {
         // The stop should trigger a delete/purge.
         child.stop_instance_internal(false, false).await.unwrap();
 
-        let event_a = event_stream
+        event_stream
             .wait_until(EventType::Destroyed, vec!["system", "coll:a"].into())
             .await
             .unwrap();
-        event_a.resume();
 
         // Verify that the component topology matches expectations.
         let actual_children = get_live_children(test.component()).await;

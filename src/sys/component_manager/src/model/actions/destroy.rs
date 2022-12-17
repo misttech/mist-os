@@ -125,9 +125,9 @@ pub mod tests {
         crate::model::{
             actions::{
                 test_utils::{is_child_deleted, is_destroyed, is_executing},
-                ActionNotifier, DiscoverAction, ShutdownAction,
+                ActionNotifier, ShutdownAction,
             },
-            component::StartReason,
+            component::{Component, StartReason},
             events::{registry::EventSubscription, stream::EventStream},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             starter::Starter,
@@ -140,11 +140,13 @@ pub mod tests {
             },
         },
         assert_matches::assert_matches,
-        cm_rust::EventMode,
+        cm_rust::{ComponentDecl, EventMode},
         cm_rust_testing::ComponentDeclBuilder,
-        fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync, fuchsia_zircon as zx,
-        futures::{join, FutureExt},
+        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
+        fuchsia_zircon as zx,
+        futures::{channel::mpsc, lock::Mutex, StreamExt},
         moniker::{AbsoluteMoniker, ChildMoniker},
+        std::fmt::Debug,
         std::sync::atomic::Ordering,
         std::sync::Weak,
     };
@@ -297,14 +299,35 @@ pub mod tests {
         }
     }
 
-    async fn setup_destroy_waits_test(event_types: Vec<EventType>) -> (ActionsTest, EventStream) {
-        let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", component_decl_with_test_runner()),
-        ];
-        let test = ActionsTest::new("root", components, None).await;
-        let event_stream = setup_destroy_waits_test_event_stream(&test, event_types).await;
-        (test, event_stream)
+    // Blocks an action so that we can verify the number of notifiers for the action
+    // and eventually unblock it.
+    pub struct MockAction<O: Send + Sync + Clone + Debug + 'static> {
+        rx: Mutex<mpsc::Receiver<()>>,
+        key: ActionKey,
+        result: O,
+    }
+
+    impl<O: Send + Sync + Clone + Debug + 'static> MockAction<O> {
+        pub fn new(key: ActionKey, result: O) -> (Self, mpsc::Sender<()>) {
+            let (tx, rx) = mpsc::channel::<()>(0);
+            let blocker = Self { rx: Mutex::new(rx), key, result };
+            (blocker, tx)
+        }
+    }
+
+    #[async_trait]
+    impl<O: Send + Sync + Clone + Debug + 'static> Action for MockAction<O> {
+        type Output = O;
+
+        async fn handle(&self, _: &Arc<ComponentInstance>) -> O {
+            let mut rx = self.rx.lock().await;
+            rx.next().await.unwrap();
+            self.result.clone()
+        }
+
+        fn key(&self) -> ActionKey {
+            self.key.clone()
+        }
     }
 
     async fn setup_destroy_waits_test_event_stream(
@@ -324,7 +347,7 @@ pub mod tests {
             .subscribe(
                 events
                     .into_iter()
-                    .map(|event| EventSubscription::new(event, EventMode::Sync))
+                    .map(|event| EventSubscription::new(event, EventMode::Async))
                     .collect(),
             )
             .await
@@ -334,73 +357,109 @@ pub mod tests {
         event_stream
     }
 
-    async fn run_destroy_waits_test<A>(
-        test: &ActionsTest,
-        event_stream: &mut EventStream,
-        event_type: EventType,
-        action: A,
-        expected_ref_count: usize,
-    ) where
-        A: Action,
+    async fn run_destroy_waits_test<O>(mock_action_key: ActionKey, mock_action_result: O)
+    where
+        O: Send + Sync + Clone + Debug + 'static,
     {
-        let event = event_stream.wait_until(event_type, vec!["a"].into()).await.unwrap();
+        let components = vec![
+            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
+            ("a", component_decl_with_test_runner()),
+        ];
+        let test = ActionsTest::new("root", components, None).await;
+        test.model.start().await;
 
-        // Register destroy child action, while `action` is stalled.
-        let component_root = test.look_up(vec![].into()).await;
+        let component_root = test.model.root().clone();
         let component_a = match *component_root.lock_state().await {
             InstanceState::Resolved(ref s) => {
                 s.get_child(&ChildMoniker::from("a")).expect("child a not found").clone()
             }
             _ => panic!("not resolved"),
         };
-        let (f, delete_handle) = {
-            let component_root = component_root.clone();
-            async move {
-                ActionSet::register(component_root, DestroyChildAction::new("a".into(), 0))
-                    .await
-                    .expect("destroy failed");
-            }
-            .remote_handle()
-        };
-        fasync::Task::spawn(f).detach();
 
-        // Check that `action` is being waited on.
-        let action_key = action.key();
+        let (mock_action, mut mock_action_unblocker) =
+            MockAction::new(mock_action_key.clone(), mock_action_result);
+
+        // Spawn a mock action on 'a' that stalls
+        {
+            let mut actions = component_a.lock_actions().await;
+            let _ = actions.register_no_wait(&component_a, mock_action);
+        }
+
+        // Spawn a destroy child action on root for `a`.
+        // This eventually leads to a destroy action on `a`.
+        let destroy_child_fut = {
+            let mut actions = component_root.lock_actions().await;
+            actions.register_no_wait(&component_root, DestroyChildAction::new("a".into(), 0))
+        };
+
+        // Check that the destroy action is waiting on the mock action.
         loop {
             let actions = component_a.lock_actions().await;
-            assert!(actions.contains(&action_key));
-            let rx = &actions.rep[&action_key];
+            assert!(actions.contains(&mock_action_key));
+
+            // Check the reference count on the notifier of the mock action
+            let rx = &actions.rep[&mock_action_key];
             let rx = rx
-                .downcast_ref::<ActionNotifier<A::Output>>()
+                .downcast_ref::<ActionNotifier<O>>()
                 .expect("action notifier has unexpected type");
             let refcount = rx.refcount.load(Ordering::Relaxed);
-            if refcount == expected_ref_count {
+
+            // expected reference count:
+            // - 1 for the ActionSet that owns the notifier
+            // - 1 for destroy action to wait on the mock action
+            if refcount == 2 {
                 assert!(actions.contains(&ActionKey::Destroy));
                 break;
             }
+
+            // The destroy action hasn't blocked on the mock action yet.
+            // Wait for that to happen and check again.
             drop(actions);
             fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(100))).await;
         }
 
-        // Resuming the action should allow deletion to proceed.
-        event.resume();
-        delete_handle.await;
+        // Unblock the mock action, causing destroy to complete as well
+        mock_action_unblocker.try_send(()).unwrap();
+        destroy_child_fut.await.unwrap();
         assert!(is_child_deleted(&component_root, &component_a).await);
     }
 
     #[fuchsia::test]
     async fn destroy_waits_on_discover() {
-        let (test, mut event_stream) = setup_destroy_waits_test(vec![EventType::Discovered]).await;
         run_destroy_waits_test(
-            &test,
-            &mut event_stream,
-            EventType::Discovered,
-            DiscoverAction::new(),
-            // expected_ref_count:
-            // - 1 for the ActionSet
-            // - 1 for DestroyAction to wait on the action
-            // (the task that registers the action does not wait on it
-            2,
+            ActionKey::Discover,
+            // The mocked action must return a result, even though the result is not used
+            // by the Destroy action.
+            Ok(()) as Result<(), ModelError>,
+        )
+        .await;
+    }
+
+    #[fuchsia::test]
+    async fn destroy_waits_on_resolve() {
+        run_destroy_waits_test(
+            ActionKey::Resolve,
+            // The mocked action must return a result, even though the result is not used
+            // by the Destroy action.
+            Ok(Component {
+                resolved_url: "unused".to_string(),
+                context_to_resolve_children: None,
+                decl: ComponentDecl::default(),
+                package: None,
+                config: None,
+                abi_revision: None,
+            }) as Result<Component, ModelError>,
+        )
+        .await;
+    }
+
+    #[fuchsia::test]
+    async fn destroy_waits_on_start() {
+        run_destroy_waits_test(
+            ActionKey::Start,
+            // The mocked action must return a result, even though the result is not used
+            // by the Destroy action.
+            Ok(fsys::StartResult::Started) as Result<fsys::StartResult, ModelError>,
         )
         .await;
     }
@@ -454,66 +513,10 @@ pub mod tests {
 
         // Wait for Discover action, which should be registered by Destroy, followed by
         // Destroyed.
-        let event = event_stream.wait_until(EventType::Discovered, vec!["a"].into()).await.unwrap();
-        event.resume();
-        let event = event_stream.wait_until(EventType::Destroyed, vec!["a"].into()).await.unwrap();
-        event.resume();
+        event_stream.wait_until(EventType::Discovered, vec!["a"].into()).await.unwrap();
+        event_stream.wait_until(EventType::Destroyed, vec!["a"].into()).await.unwrap();
         nf.await.unwrap();
         assert!(is_child_deleted(&component_root, &component_a).await);
-    }
-
-    #[fuchsia::test]
-    async fn destroy_waits_on_resolve() {
-        let (test, mut event_stream) = setup_destroy_waits_test(vec![EventType::Resolved]).await;
-        let event = event_stream.wait_until(EventType::Resolved, vec![].into()).await.unwrap();
-        event.resume();
-        // Cause `a` to resolve.
-        let look_up_a = async {
-            // This could fail if it races with deletion.
-            let _: Result<Arc<ComponentInstance>, ModelError> =
-                test.model.look_up(&vec!["a"].into()).await;
-        };
-        join!(
-            look_up_a,
-            run_destroy_waits_test(
-                &test,
-                &mut event_stream,
-                EventType::Resolved,
-                ResolveAction::new(),
-                // expected_ref_count:
-                // - 1 for the ActionSet
-                // - 1 for the task that registers the action
-                // - 1 for DestroyAction to wait on the action
-                3,
-            ),
-        );
-    }
-
-    #[fuchsia::test]
-    async fn destroy_waits_on_start() {
-        let (test, mut event_stream) = setup_destroy_waits_test(vec![EventType::Started]).await;
-        let event = event_stream.wait_until(EventType::Started, vec![].into()).await.unwrap();
-        event.resume();
-        // Cause `a` to start.
-        let bind_a = async {
-            // This could fail if it races with deletion.
-            let _: Result<Arc<ComponentInstance>, ModelError> =
-                test.model.start_instance(&vec!["a"].into(), &StartReason::Eager).await;
-        };
-        join!(
-            bind_a,
-            run_destroy_waits_test(
-                &test,
-                &mut event_stream,
-                EventType::Started,
-                StartAction::new(StartReason::Eager),
-                // expected_ref_count:
-                // - 1 for the ActionSet
-                // - 1 for the task that registers the action
-                // - 1 for DestroyAction to wait on the action
-                3,
-            ),
-        );
     }
 
     #[fuchsia::test]

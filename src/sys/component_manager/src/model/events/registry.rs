@@ -279,7 +279,6 @@ impl EventRegistry {
             let dispatchers = dispatcher_map.entry(event.source_name.clone()).or_insert(vec![]);
             let dispatcher = event_stream.create_dispatcher(
                 subscriber.clone(),
-                event.mode.clone(),
                 event.scopes.clone(),
                 event.route.clone(),
             );
@@ -327,39 +326,14 @@ impl EventRegistry {
                 return Ok(());
             }
         };
-        let mut responder_channels = vec![];
 
         for dispatcher in &dispatchers {
-            let result = dispatcher.dispatch(event).await;
-            match result {
-                Ok(Some(responder_channel)) => {
-                    // A future can be canceled if the EventStream was dropped after
-                    // a send. We don't crash the system when this happens. It is
-                    // perfectly valid for a EventStream to be dropped. That simply
-                    // means that the EventStream is no longer interested in future
-                    // events. So we force each future to return a success. This
-                    // ensures that all the futures can be driven to completion.
-                    let responder_channel = async move {
-                        responder_channel.await.unwrap_or(()); // Ignore cancellation.
-                    };
-                    responder_channels.push(responder_channel);
-                }
-                // There's nothing to do if event is outside the scope of the given
-                // `EventDispatcher`.
-                Ok(None) => (),
-                Err(_) => {
-                    // A send can fail if the EventStream was dropped. We don't
-                    // crash the system when this happens. It is perfectly
-                    // valid for a EventStream to be dropped. That simply means
-                    // that the EventStream is no longer interested in future
-                    // events.
-                }
-            }
-        }
-
-        // Wait until all tasks have used the responder to unblock.
-        {
-            futures::future::join_all(responder_channels).await;
+            // A send can fail if the EventStream was dropped. We don't
+            // crash the system when this happens. It is perfectly
+            // valid for a EventStream to be dropped. That simply means
+            // that the EventStream is no longer interested in future
+            // events.
+            let _ = dispatcher.dispatch(event).await;
         }
 
         Ok(())

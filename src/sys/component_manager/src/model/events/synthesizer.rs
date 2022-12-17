@@ -213,7 +213,7 @@ impl SynthesisTask {
     ) -> Result<(), anyhow::Error> {
         let events = provider.provide(target_component, &scope.filter).await;
         for event in events {
-            let event = Event { event, scope_moniker: scope.moniker.clone(), responder: None };
+            let event = Event { event, scope_moniker: scope.moniker.clone() };
             sender.send((event, None)).await?;
         }
         Ok(())

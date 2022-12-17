@@ -8,13 +8,9 @@ use {
         hooks::{Event as ComponentEvent, EventPayload, TransferEvent},
     },
     ::routing::event::EventFilter,
-    anyhow::Error,
-    cm_rust::{DictionaryValue, EventMode},
-    futures::{
-        channel::{mpsc, oneshot},
-        lock::Mutex,
-        sink::SinkExt,
-    },
+    anyhow::{format_err, Error},
+    cm_rust::DictionaryValue,
+    futures::{channel::mpsc, lock::Mutex, sink::SinkExt},
     maplit::hashmap,
     moniker::{AbsoluteMonikerBase, ExtendedMoniker},
 };
@@ -36,10 +32,6 @@ pub struct EventDispatcher {
     // The moniker of the component subscribing to events.
     subscriber: ExtendedMoniker,
 
-    /// Determines whether component manager waits for a response from the
-    /// event receiver.
-    mode: EventMode,
-
     /// Specifies the realms that this EventDispatcher can dispatch events from and under what
     /// conditions.
     scopes: Vec<EventDispatcherScope>,
@@ -60,59 +52,38 @@ pub struct EventDispatcher {
 impl EventDispatcher {
     pub fn new(
         subscriber: ExtendedMoniker,
-        mode: EventMode,
         scopes: Vec<EventDispatcherScope>,
         tx: mpsc::UnboundedSender<(Event, Option<Vec<ComponentEventRoute>>)>,
     ) -> Self {
-        Self::new_with_route(subscriber, mode, scopes, tx, vec![])
+        Self::new_with_route(subscriber, scopes, tx, vec![])
     }
 
     pub fn new_with_route(
         subscriber: ExtendedMoniker,
-        mode: EventMode,
         scopes: Vec<EventDispatcherScope>,
         tx: mpsc::UnboundedSender<(Event, Option<Vec<ComponentEventRoute>>)>,
         route: Vec<ComponentEventRoute>,
     ) -> Self {
         // TODO(fxbug.dev/48360): flatten scope_monikers. There might be monikers that are
         // contained within another moniker in the list.
-        Self { subscriber, mode, scopes, tx: Mutex::new(tx), route }
+        Self { subscriber, scopes, tx: Mutex::new(tx), route }
     }
 
     /// Sends the event to an event stream, if fired in the scope of `scope_moniker`. Returns
     /// a responder which can be blocked on.
-    pub async fn dispatch(
-        &self,
-        event: &ComponentEvent,
-    ) -> Result<Option<oneshot::Receiver<()>>, Error> {
+    pub async fn dispatch(&self, event: &ComponentEvent) -> Result<(), Error> {
         let maybe_scope = self.find_scope(&event);
         if maybe_scope.is_none() {
-            return Ok(None);
+            return Err(format_err!("Could not find scope for event"));
         }
 
         let scope_moniker = maybe_scope.unwrap().moniker.clone();
 
-        let (maybe_responder_tx, maybe_responder_rx) = match self.mode {
-            EventMode::Async => (None, None),
-            EventMode::Sync => {
-                let (responder_tx, responder_rx) = oneshot::channel();
-                (Some(responder_tx), Some(responder_rx))
-            }
-        };
-
         {
             let mut tx = self.tx.lock().await;
-            tx.send((
-                Event {
-                    event: event.transfer().await,
-                    scope_moniker,
-                    responder: maybe_responder_tx,
-                },
-                None,
-            ))
-            .await?;
+            tx.send((Event { event: event.transfer().await, scope_moniker }, None)).await?;
         }
-        Ok(maybe_responder_rx)
+        Ok(())
     }
 
     fn find_scope(&self, event: &ComponentEvent) -> Option<&EventDispatcherScope> {
@@ -225,21 +196,17 @@ mod tests {
             self.rx.next().await.map(|(e, _)| e.event)
         }
 
-        fn create_dispatcher(
-            &self,
-            subscriber: ExtendedMoniker,
-            mode: EventMode,
-        ) -> Arc<EventDispatcher> {
+        fn create_dispatcher(&self, subscriber: ExtendedMoniker) -> Arc<EventDispatcher> {
             let scopes =
                 vec![EventDispatcherScope::new(AbsoluteMoniker::root().into()).for_debug()];
-            Arc::new(EventDispatcher::new(subscriber, mode, scopes, self.tx.clone()))
+            Arc::new(EventDispatcher::new(subscriber, scopes, self.tx.clone()))
         }
     }
 
     async fn dispatch_capability_requested_event(
         dispatcher: &EventDispatcher,
         source_moniker: &AbsoluteMoniker,
-    ) -> Option<oneshot::Receiver<()>> {
+    ) -> Result<(), Error> {
         let (_, capability_server_end) = zx::Channel::create().unwrap();
         let capability_server_end = Arc::new(Mutex::new(Some(capability_server_end)));
         let event = ComponentEvent::new_for_test(
@@ -251,12 +218,10 @@ mod tests {
                 capability: capability_server_end,
             },
         );
-        dispatcher.dispatch(&event).await.ok().flatten()
+        dispatcher.dispatch(&event).await
     }
 
-    async fn dispatch_capability_routed_event(
-        dispatcher: &EventDispatcher,
-    ) -> Option<oneshot::Receiver<()>> {
+    async fn dispatch_capability_routed_event(dispatcher: &EventDispatcher) -> Result<(), Error> {
         let empty_capability_provider = Arc::new(Mutex::new(None));
         let event = ComponentEvent::new_for_test(
             AbsoluteMoniker::root(),
@@ -271,7 +236,7 @@ mod tests {
                 capability_provider: empty_capability_provider,
             },
         );
-        dispatcher.dispatch(&event).await.ok().flatten()
+        dispatcher.dispatch(&event).await
     }
 
     // This test verifies that the CapabilityRequested event can only be sent to a source
@@ -281,10 +246,9 @@ mod tests {
         // Verify we can dispatch to a debug source.
         // Sync events get a responder if the message was dispatched.
         let mut factory = EventDispatcherFactory::new();
-        let dispatcher =
-            factory.create_dispatcher(ExtendedMoniker::ComponentManager, EventMode::Async);
+        let dispatcher = factory.create_dispatcher(ExtendedMoniker::ComponentManager);
         let source_moniker = vec!["root:0", "a:0", "b:0", "c:0"].into();
-        assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_none());
+        assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_ok());
         assert_matches!(
             factory.next_event().await,
             Some(ComponentEvent { payload: EventPayload::CapabilityRequested { .. }, .. })
@@ -292,24 +256,24 @@ mod tests {
 
         // Verify that we cannot dispatch the CapabilityRequested event to the root component.
         let subscriber = ExtendedMoniker::ComponentInstance(vec!["root:0"].into());
-        let dispatcher = factory.create_dispatcher(subscriber, EventMode::Sync);
-        assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_none());
+        let dispatcher = factory.create_dispatcher(subscriber);
+        assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_err());
 
         // Verify that we cannot dispatch the CapabilityRequested event to the root:0/a:0 component.
         let subscriber = ExtendedMoniker::ComponentInstance(vec!["root:0", "a:0"].into());
-        let dispatcher = factory.create_dispatcher(subscriber, EventMode::Sync);
-        assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_none());
+        let dispatcher = factory.create_dispatcher(subscriber);
+        assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_err());
 
         // Verify that we cannot dispatch the CapabilityRequested event to the root:0/a:0/b:0 component.
         let subscriber = ExtendedMoniker::ComponentInstance(vec!["root:0", "a:0", "b:0"].into());
-        let dispatcher = factory.create_dispatcher(subscriber, EventMode::Sync);
-        assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_none());
+        let dispatcher = factory.create_dispatcher(subscriber);
+        assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_err());
 
         // Verify that we CAN dispatch the CapabilityRequested event to the root:0/a:0/b:0/c:0 component.
         let subscriber =
             ExtendedMoniker::ComponentInstance(vec!["root:0", "a:0", "b:0", "c:0"].into());
-        let dispatcher = factory.create_dispatcher(subscriber, EventMode::Sync);
-        assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_some());
+        let dispatcher = factory.create_dispatcher(subscriber);
+        assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_ok());
         assert_matches!(
             factory.next_event().await,
             Some(ComponentEvent { payload: EventPayload::CapabilityRequested { .. }, .. })
@@ -318,8 +282,8 @@ mod tests {
         // Verify that we cannot dispatch the CapabilityRequested event to the root:0/a:0/b:0/c:0/d:0 component.
         let subscriber =
             ExtendedMoniker::ComponentInstance(vec!["root:0", "a:0", "b:0", "c:0", "d:0"].into());
-        let dispatcher = factory.create_dispatcher(subscriber, EventMode::Sync);
-        assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_none());
+        let dispatcher = factory.create_dispatcher(subscriber);
+        assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_err());
     }
 
     // This test verifies that the CapabilityRouted event can never be sent.
@@ -328,15 +292,14 @@ mod tests {
         let factory = EventDispatcherFactory::new();
 
         // Verify that we cannot dispatch the CapabilityRouted event for above-root subscribers.
-        let dispatcher =
-            factory.create_dispatcher(ExtendedMoniker::ComponentManager, EventMode::Sync);
+        let dispatcher = factory.create_dispatcher(ExtendedMoniker::ComponentManager);
         // This indicates that the event was not dispatched.
-        assert!(dispatch_capability_routed_event(&dispatcher).await.is_none());
+        assert!(dispatch_capability_routed_event(&dispatcher).await.is_err());
 
         // Verify that we cannot dispatch the CapabilityRouted event for in-tree subscribers.
         let subscriber = ExtendedMoniker::ComponentInstance(vec!["root:0"].into());
-        let dispatcher = factory.create_dispatcher(subscriber, EventMode::Sync);
+        let dispatcher = factory.create_dispatcher(subscriber);
         // This indicates that the event was not dispatched.
-        assert!(dispatch_capability_routed_event(&dispatcher).await.is_none());
+        assert!(dispatch_capability_routed_event(&dispatcher).await.is_err());
     }
 }

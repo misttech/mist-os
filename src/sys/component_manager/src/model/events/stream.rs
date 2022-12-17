@@ -11,7 +11,6 @@ use {
         },
         hooks::{EventType, HasEventType},
     },
-    cm_rust::EventMode,
     futures::{channel::mpsc, poll, stream::Peekable, task::Context, Stream, StreamExt},
     moniker::{AbsoluteMoniker, ExtendedMoniker},
     std::{
@@ -52,18 +51,12 @@ impl EventStream {
     pub fn create_dispatcher(
         &mut self,
         subscriber: ExtendedMoniker,
-        mode: EventMode,
         scopes: Vec<EventDispatcherScope>,
         route: Vec<ComponentEventRoute>,
     ) -> Weak<EventDispatcher> {
         self.route = route.clone();
-        let dispatcher = Arc::new(EventDispatcher::new_with_route(
-            subscriber,
-            mode,
-            scopes,
-            self.tx.clone(),
-            route,
-        ));
+        let dispatcher =
+            Arc::new(EventDispatcher::new_with_route(subscriber, scopes, self.tx.clone(), route));
         self.dispatchers.push(dispatcher.clone());
         Arc::downgrade(&dispatcher)
     }
@@ -96,7 +89,6 @@ impl EventStream {
             {
                 return Some(event);
             }
-            event.resume();
         }
         None
     }
