@@ -79,7 +79,7 @@ typedef enum {
 /* tunables */
 #define ETH_RXBUF_SIZE 2048
 #define ETH_RXHDR_SIZE 256
-#define ETH_RXBUF_COUNT 32
+#define ETH_RXBUF_COUNT 128
 
 #define ETH_TXBUF_SIZE 2048
 #define ETH_TXBUF_COUNT 32
