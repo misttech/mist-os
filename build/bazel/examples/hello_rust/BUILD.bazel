@@ -10,7 +10,6 @@ load(
     "fuchsia_test_component",
     "fuchsia_test_package",
     "fuchsia_wrap_rust_binary",
-    "if_fuchsia",
 )
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_doc", "rust_test")
 
@@ -23,7 +22,7 @@ rust_binary(
     ],
 
     # TODO(fxbug.dev/114636) make this be included automatically for all rust binaries.
-    deps = if_fuchsia(["@fuchsia_sdk//pkg/fdio"]),
+    deps = ["@fuchsia_sdk//pkg/fdio"],
 )
 
 fuchsia_wrap_rust_binary(
@@ -56,7 +55,7 @@ rust_test(
         "-Zpanic_abort_tests",
         "-Cpanic=abort",
     ],
-    deps = if_fuchsia(["@fuchsia_sdk//pkg/fdio"]),
+    deps = ["@fuchsia_sdk//pkg/fdio"],
 )
 
 fuchsia_wrap_rust_binary(

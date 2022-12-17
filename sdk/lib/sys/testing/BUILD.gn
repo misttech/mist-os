@@ -7,9 +7,11 @@ import("//build/sdk/sdk_component_manifests.gni")
 sdk_component_manifests("testing_sdk") {
   name = "sys/testing"
   manifests = [
-    "elf_test_runner.shard.cml",
-    "system-test.shard.cml",
     "coverage.shard.cml",
+    "elf_test_runner.shard.cml",
+    "gtest_runner.shard.cml",
+    "rust_test_runner.shard.cml",
+    "system-test.shard.cml",
   ]
   category = "partner"
 }
