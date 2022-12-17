@@ -8,15 +8,14 @@ use {
         PuppetRequestStream, Result_,
     },
     futures::TryStreamExt,
-    parking_lot::Mutex,
-    std::rc::Rc,
+    std::{cell::RefCell, rc::Rc},
     tracing::info,
 };
 
 mod presentation_loop;
 mod view;
 
-async fn run_puppet(request_stream: PuppetRequestStream, _puppet_view: Rc<Mutex<view::View>>) {
+async fn run_puppet(request_stream: PuppetRequestStream, _puppet_view: Rc<RefCell<view::View>>) {
     info!("Starting puppet instance");
 
     request_stream

@@ -19,9 +19,8 @@ use {
     futures::channel::{mpsc, oneshot},
     futures::StreamExt,
     once_cell::unsync::OnceCell,
-    parking_lot::Mutex,
     std::collections::HashMap,
-    std::{rc::Rc, slice::Iter},
+    std::{cell::RefCell, rc::Rc, slice::Iter},
     tracing::info,
 };
 
@@ -122,7 +121,7 @@ impl View {
         touch_input_listener: Option<test_input::TouchInputListenerProxy>,
         mouse_input_listener: Option<test_input::MouseInputListenerProxy>,
         keyboard_input_listener: Option<test_input::KeyboardInputListenerProxy>,
-    ) -> Rc<Mutex<Self>> {
+    ) -> Rc<RefCell<Self>> {
         let (flatland, presentation_sender) = connect_to_flatland_and_presenter();
         let mut id_generator = scenic::flatland::IdGenerator::new();
 
@@ -178,7 +177,7 @@ impl View {
             }
         };
 
-        let this = Rc::new(Mutex::new(Self {
+        let this = Rc::new(RefCell::new(Self {
             flatland,
             view_event_listener: OnceCell::new(),
             presentation_sender,
@@ -201,7 +200,7 @@ impl View {
             this.clone(),
             parent_viewport_watcher,
         ));
-        this.lock()
+        this.borrow_mut()
             .view_event_listener
             .set(view_events_task)
             .expect("set event listener task more than once");
@@ -209,21 +208,21 @@ impl View {
         // Start the touch watcher task.
         let touch_task =
             fasync::Task::local(Self::listen_for_touch_events(this.clone(), touch_source));
-        this.lock()
+        this.borrow_mut()
             .touch_watcher_task
             .set(touch_task)
             .expect("set touch watcher task more than once");
 
         let mouse_task =
             fasync::Task::local(Self::listen_for_mouse_events(this.clone(), mouse_source));
-        this.lock()
+        this.borrow_mut()
             .mouse_watched_task
             .set(mouse_task)
             .expect("set mouse watcher task more than once");
 
         let keyboard_task =
             fasync::Task::local(Self::listen_for_key_events(this.clone(), view_ref));
-        this.lock()
+        this.borrow_mut()
             .keyboard_watched_task
             .set(keyboard_task)
             .expect("set keyboard watcher task more than once");
@@ -234,7 +233,7 @@ impl View {
     /// Polls continuously for events reported to the view (parent viewport updates,
     /// touch/mouse/keyboard input, etc.).
     async fn listen_for_view_events(
-        this: Rc<Mutex<Self>>,
+        this: Rc<RefCell<Self>>,
         parent_viewport_watcher: ui_comp::ParentViewportWatcherProxy,
     ) {
         loop {
@@ -246,7 +245,7 @@ impl View {
                         }
                         Ok(parent_status) => {
                             info!("received parent status update");
-                            this.lock().update_parent_status(parent_status);
+                            this.borrow_mut().update_parent_status(parent_status);
                         }
                     }
                 }
@@ -256,7 +255,7 @@ impl View {
                             panic!("error from parent viewport watcher on get_layout");
                         }
                         Ok(ui_comp::LayoutInfo { logical_size, device_pixel_ratio, .. }) => {
-                            this.lock().update_view_parameters(logical_size, device_pixel_ratio);
+                            this.borrow_mut().update_view_parameters(logical_size, device_pixel_ratio);
                         }
                     }
                 }
@@ -477,7 +476,7 @@ impl View {
     }
 
     async fn listen_for_touch_events(
-        this: Rc<Mutex<Self>>,
+        this: Rc<RefCell<Self>>,
         touch_source: ui_pointer::TouchSourceProxy,
     ) {
         let mut pending_responses: Vec<TouchResponse> = vec![];
@@ -487,7 +486,7 @@ impl View {
 
             match events.await {
                 Ok(events) => {
-                    pending_responses = this.lock().process_touch_events(events);
+                    pending_responses = this.borrow_mut().process_touch_events(events);
                 }
                 _ => {
                     info!("TouchSource connection closed");
@@ -553,14 +552,14 @@ impl View {
     }
 
     async fn listen_for_mouse_events(
-        this: Rc<Mutex<Self>>,
+        this: Rc<RefCell<Self>>,
         mouse_source: ui_pointer::MouseSourceProxy,
     ) {
         loop {
             let events = mouse_source.watch();
             match events.await {
                 Ok(events) => {
-                    this.lock().process_mouse_events(events);
+                    this.borrow_mut().process_mouse_events(events);
                 }
                 _ => {
                     info!("MouseSource connection closed");
@@ -608,7 +607,7 @@ impl View {
         }
     }
 
-    async fn listen_for_key_events(this: Rc<Mutex<Self>>, mut view_ref: ui_views::ViewRef) {
+    async fn listen_for_key_events(this: Rc<RefCell<Self>>, mut view_ref: ui_views::ViewRef) {
         let keyboard = connect_to_protocol::<fidl_fuchsia_ui_input3::KeyboardMarker>()
             .expect("failed to connect to Keyboard service");
         let (keyboard_client, mut keyboard_stream) =
@@ -628,7 +627,7 @@ impl View {
                     ..
                 })) => {
                     responder.send(fidl_fuchsia_ui_input3::KeyEventStatus::Handled).expect("send");
-                    this.lock().process_key_event(event);
+                    this.borrow_mut().process_key_event(event);
                 }
                 _ => {
                     info!("keyboard connection closed");
