@@ -81,7 +81,7 @@ func MapVMO(vmo zx.VMO) (MappedVMO, error) {
 	if err != nil {
 		return MappedVMO{}, err
 	}
-	vaddr, err := zx.VMARRoot.Map(0, vmo, 0, size, zx.VMFlagPermRead|zx.VMFlagPermWrite)
+	vaddr, err := zx.VMARRoot.Map(0, vmo, 0, size, zx.VmOptionPermRead|zx.VmOptionPermWrite)
 	if err != nil {
 		return MappedVMO{}, err
 	}

@@ -64,7 +64,7 @@ func buildHandleDefs(defs []gidlir.HandleDef) string {
 		rights := d.Rights
 		switch d.Subtype {
 		case fidlgen.HandleSubtypeChannel:
-			subtype = "zx.ObjectTypeChannel"
+			subtype = "zx.ObjTypeChannel"
 			// Always use real rights instead of a "same rights" placeholder.
 			if rights == fidlgen.HandleRightsSameRights {
 				r, ok := gidlir.HandleRightsByName("channel_default")
@@ -74,7 +74,7 @@ func buildHandleDefs(defs []gidlir.HandleDef) string {
 				rights = r
 			}
 		case fidlgen.HandleSubtypeEvent:
-			subtype = "zx.ObjectTypeEvent"
+			subtype = "zx.ObjTypeEvent"
 			// Always use real rights instead of a "same rights" placeholder.
 			if rights == fidlgen.HandleRightsSameRights {
 				r, ok := gidlir.HandleRightsByName("event_default")

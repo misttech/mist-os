@@ -192,7 +192,7 @@ func (b *equalityCheckBuilder) visitHandle(actualExpr string, expectedValue gidl
 	}
 `, infoVar, handleVar)
 	b.expectEquals(fmt.Sprintf("%s.Koid", infoVar), fmt.Sprintf("%s[%d]", b.koidArrayVar, expectedValue.Handle))
-	b.expectTrue(fmt.Sprintf("%[1]s.Type == %[2]d || %[2]d == zx.ObjectTypeNone", infoVar, expectedValue.Type))
+	b.expectTrue(fmt.Sprintf("%[1]s.Type == %[2]d || %[2]d == zx.ObjTypeNone", infoVar, expectedValue.Type))
 	b.expectTrue(fmt.Sprintf("%[1]s.Rights == %[2]d || %[2]d == zx.RightSameRights", infoVar, expectedValue.Rights))
 	b.write("}\n")
 }

@@ -105,7 +105,7 @@ func readFifo(t *testing.T, fifo zx.Handle, ch chan fifoEvent) {
 }
 
 func mapBufferHeader(t *testing.T, vmo zx.VMO, vmoSize uint64) *trace.BufferHeader {
-	vaddr, err := zx.VMARRoot.Map(0, vmo, 0, vmoSize, zx.VMFlagPermRead)
+	vaddr, err := zx.VMARRoot.Map(0, vmo, 0, vmoSize, zx.VmOptionPermRead)
 	if err != nil {
 		t.Fatalf("VMARRoot.Map(_, _, _, %d, _) = %s", vmoSize, err)
 	}

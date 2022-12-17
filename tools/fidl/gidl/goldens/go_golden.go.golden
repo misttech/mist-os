@@ -406,7 +406,7 @@ func TestAllEncodeSuccessCases(t *testing.T) {
 
 			// #0:
 			{
-				subtype: zx.ObjectTypeChannel,
+				subtype: zx.ObjTypeChannel,
 				rights:  61454,
 			},
 		}
@@ -438,7 +438,7 @@ func TestAllEncodeSuccessCases(t *testing.T) {
 
 			// #0:
 			{
-				subtype: zx.ObjectTypeEvent,
+				subtype: zx.ObjTypeEvent,
 				rights:  53251,
 			},
 		}
@@ -1080,7 +1080,7 @@ func TestAllDecodeSuccessCases(t *testing.T) {
 
 			// #0:
 			{
-				subtype: zx.ObjectTypeEvent,
+				subtype: zx.ObjTypeEvent,
 				rights:  53251,
 			},
 		}
@@ -1118,8 +1118,8 @@ func TestAllDecodeSuccessCases(t *testing.T) {
 					if f2.Koid != koidArray[0] {
 						t.Errorf("unexpectedly unequal: %s and %s", "f2.Koid", "koidArray[0]")
 					}
-					if !(f2.Type == 0 || 0 == zx.ObjectTypeNone) {
-						t.Errorf("expected true but was false: %s", "f2.Type == 0 || 0 == zx.ObjectTypeNone")
+					if !(f2.Type == 0 || 0 == zx.ObjTypeNone) {
+						t.Errorf("expected true but was false: %s", "f2.Type == 0 || 0 == zx.ObjTypeNone")
 					}
 					if !(f2.Rights == 49155 || 49155 == zx.RightSameRights) {
 						t.Errorf("expected true but was false: %s", "f2.Rights == 49155 || 49155 == zx.RightSameRights")
@@ -1135,7 +1135,7 @@ func TestAllDecodeSuccessCases(t *testing.T) {
 
 			// #0:
 			{
-				subtype: zx.ObjectTypeEvent,
+				subtype: zx.ObjTypeEvent,
 				rights:  53251,
 			},
 		}
@@ -1175,8 +1175,8 @@ func TestAllDecodeSuccessCases(t *testing.T) {
 					if f3.Koid != koidArray[0] {
 						t.Errorf("unexpectedly unequal: %s and %s", "f3.Koid", "koidArray[0]")
 					}
-					if !(f3.Type == 0 || 0 == zx.ObjectTypeNone) {
-						t.Errorf("expected true but was false: %s", "f3.Type == 0 || 0 == zx.ObjectTypeNone")
+					if !(f3.Type == 0 || 0 == zx.ObjTypeNone) {
+						t.Errorf("expected true but was false: %s", "f3.Type == 0 || 0 == zx.ObjTypeNone")
 					}
 					if !(f3.Rights == 2147483648 || 2147483648 == zx.RightSameRights) {
 						t.Errorf("expected true but was false: %s", "f3.Rights == 2147483648 || 2147483648 == zx.RightSameRights")

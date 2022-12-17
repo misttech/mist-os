@@ -72,7 +72,7 @@ func (s *session) initializeEngine(mode fidlprovider.BufferingMode, vmo zx.VMO, 
 		return fmt.Errorf("vmo.Size failed: %s", err)
 	}
 	s.vmoSize = sz
-	vaddr, err := zx.VMARRoot.Map(0, s.vmo, 0, s.vmoSize, zx.VMFlagPermRead|zx.VMFlagPermWrite)
+	vaddr, err := zx.VMARRoot.Map(0, s.vmo, 0, s.vmoSize, zx.VmOptionPermRead|zx.VmOptionPermWrite)
 	if err != nil {
 		return fmt.Errorf("VMARRoot.Map failed: %s", err)
 	}
