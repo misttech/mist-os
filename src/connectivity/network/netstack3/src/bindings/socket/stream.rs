@@ -26,20 +26,9 @@ use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, Peered as _};
 use futures::StreamExt as _;
 use net_types::{
-    ip::{IpAddress, IpVersion, IpVersionMarker, Ipv4, Ipv6},
+    ip::{Ip, IpAddress, IpVersion, IpVersionMarker, Ipv4, Ipv6},
     SpecifiedAddr, ZonedAddr,
 };
-use nonzero_ext::nonzero;
-use packet_formats::utils::NonZeroDuration;
-
-use crate::bindings::{
-    devices::Devices,
-    socket::{IntoErrno, IpSockAddrExt, SockAddr, ZXSIO_SIGNAL_CONNECTED, ZXSIO_SIGNAL_INCOMING},
-    util::{IntoFidl, NeedsDataNotifier, NeedsDataWatcher, TryIntoFidl},
-    LockableContext, StackTime,
-};
-
-use net_types::ip::Ip;
 use netstack3_core::{
     device::DeviceId,
     ip::IpExt,
@@ -59,6 +48,15 @@ use netstack3_core::{
         BufferSizes, KeepAlive,
     },
     Ctx,
+};
+use nonzero_ext::nonzero;
+use packet_formats::utils::NonZeroDuration;
+
+use crate::bindings::{
+    devices::Devices,
+    socket::{IntoErrno, IpSockAddrExt, SockAddr, ZXSIO_SIGNAL_CONNECTED, ZXSIO_SIGNAL_INCOMING},
+    util::{IntoFidl, NeedsDataNotifier, NeedsDataWatcher, TryIntoFidl},
+    LockableContext, StackTime,
 };
 
 /// Maximum values allowed on linux: https://github.com/torvalds/linux/blob/0326074ff4652329f2a1a9c8685104576bd8d131/include/net/tcp.h#L159-L161

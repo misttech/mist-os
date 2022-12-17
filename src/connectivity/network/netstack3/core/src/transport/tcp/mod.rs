@@ -18,14 +18,6 @@ use const_unwrap::const_unwrap_option;
 use packet_formats::utils::NonZeroDuration;
 use rand::RngCore;
 
-/// Per RFC 879 section 1 (https://tools.ietf.org/html/rfc879#section-1):
-///
-/// THE TCP MAXIMUM SEGMENT SIZE IS THE IP MAXIMUM DATAGRAM SIZE MINUS
-/// FORTY.
-///   The default IP Maximum Datagram Size is 576.
-///   The default TCP Maximum Segment Size is 536.
-const DEFAULT_MAXIMUM_SEGMENT_SIZE: u32 = 536;
-
 use crate::{
     ip::{IpDeviceId, IpExt},
     sync::Mutex,
@@ -34,6 +26,14 @@ use crate::{
         socket::{isn::IsnGenerator, TcpNonSyncContext, TcpSockets},
     },
 };
+
+/// Per RFC 879 section 1 (https://tools.ietf.org/html/rfc879#section-1):
+///
+/// THE TCP MAXIMUM SEGMENT SIZE IS THE IP MAXIMUM DATAGRAM SIZE MINUS
+/// FORTY.
+///   The default IP Maximum Datagram Size is 576.
+///   The default TCP Maximum Segment Size is 536.
+const DEFAULT_MAXIMUM_SEGMENT_SIZE: u32 = 536;
 
 /// Control flags that can alter the state of a TCP control block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

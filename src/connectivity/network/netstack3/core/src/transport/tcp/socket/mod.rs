@@ -29,7 +29,6 @@ use core::{
     num::{NonZeroU16, NonZeroUsize},
     ops::RangeInclusive,
 };
-use nonzero_ext::nonzero;
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
@@ -41,6 +40,7 @@ use net_types::{
     },
     SpecifiedAddr,
 };
+use nonzero_ext::nonzero;
 use packet::Buf;
 use packet_formats::ip::IpProto;
 use rand::RngCore;
