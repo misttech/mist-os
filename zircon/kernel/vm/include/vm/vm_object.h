@@ -39,6 +39,7 @@ class LazyPageRequest;
 class VmObjectPaged;
 class VmAspace;
 class VmObject;
+class VmHierarchyBase;
 class VmHierarchyState;
 
 class VmObjectChildObserver {
@@ -62,85 +63,45 @@ enum class CloneType {
 namespace internal {
 struct ChildListTag {};
 struct GlobalListTag {};
-}  // namespace internal
-
-// Base class for any objects that want to be part of the VMO hierarchy and share some state,
-// including a lock. Additionally all objects in the hierarchy can become part of the same
-// deferred deletion mechanism to avoid unbounded chained destructors.
-class VmHierarchyBase : public fbl::RefCountedUpgradeable<VmHierarchyBase>,
-                        public fbl::Recyclable<VmHierarchyBase> {
- public:
-  explicit VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state);
-
-  Lock<CriticalMutex>* lock() const TA_RET_CAP(lock_) { return &lock_; }
-  Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
-
- protected:
-  // private destructor, only called from refptr
-  virtual ~VmHierarchyBase() = default;
-  friend fbl::RefPtr<VmHierarchyBase>;
-  // Similar to the destructor, fbl_recycle() needs to be virtual so DoDeferredDelete() can take a
-  // RefPtr<VmHierarchyBase> but when fbl_recycle() is called the VmCowPages::fbl_recycle() will be
-  // run.
-  virtual void fbl_recycle() { delete this; }
-  friend class fbl::Recyclable<VmHierarchyBase>;
-
-  // The lock which protects this class. All objects in a clone tree
-  // share the same lock.
-  Lock<CriticalMutex>& lock_;
-  // Pointer to state shared across all objects in a hierarchy.
-  fbl::RefPtr<VmHierarchyState> const hierarchy_state_ptr_;
-
-  // Convenience helpers that forward operations to the referenced hierarchy state.
-  void IncrementHierarchyGenerationCountLocked() TA_REQ(lock_);
-  uint64_t GetHierarchyGenerationCountLocked() const TA_REQ(lock_);
-
- private:
-  using DeferredDeleteState = fbl::SinglyLinkedListNodeState<fbl::RefPtr<VmHierarchyBase>>;
-  struct DeferredDeleteTraits {
-    static DeferredDeleteState& node_state(VmHierarchyBase& vm) {
-      return vm.deferred_delete_state_;
-    }
-  };
-  friend struct DeferredDeleteTraits;
-  friend VmHierarchyState;
-  DeferredDeleteState deferred_delete_state_;
-
-  DISALLOW_COPY_ASSIGN_AND_MOVE(VmHierarchyBase);
+// This needs to be a manual traits definition and not a tag to avoid a class definition ordering
+// issue.
+struct DeferredDeleteTraits {
+  static fbl::SinglyLinkedListNodeState<fbl::RefPtr<VmHierarchyBase>>& node_state(
+      VmHierarchyBase& vm);
 };
+}  // namespace internal
 
 class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
  public:
   VmHierarchyState() = default;
   ~VmHierarchyState() = default;
 
-  Lock<CriticalMutex>* lock() TA_RET_CAP(lock_) { return &lock_; }
-  Lock<CriticalMutex>& lock_ref() TA_RET_CAP(lock_) { return lock_; }
+  Lock<CriticalMutex>* lock() const TA_RET_CAP(lock_) { return &lock_; }
+  Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
 
   // Drops the refptr to the given object by either placing it on the deferred delete list for
   // another thread already running deferred delete to drop, or drops itself.
   // This can be used to avoid unbounded recursion when dropping chained refptrs, as found in
   // vmo parent_ refs.
-  void DoDeferredDelete(fbl::RefPtr<VmHierarchyBase> vmo) TA_EXCL(lock_);
+  void DoDeferredDelete(fbl::RefPtr<VmHierarchyBase> vmo) TA_EXCL(lock());
 
   // This should be called whenever a change is made to the VMO tree or the VMO's page list, that
   // could result in page attribution counts to change for any VMO in this tree.
-  void IncrementHierarchyGenerationCountLocked() TA_REQ(lock_) {
+  void IncrementHierarchyGenerationCountLocked() TA_REQ(lock()) {
     DEBUG_ASSERT(hierarchy_generation_count_ != 0);
     hierarchy_generation_count_++;
   }
 
   // Get the current generation count.
-  uint64_t GetHierarchyGenerationCountLocked() const TA_REQ(lock_) {
+  uint64_t GetHierarchyGenerationCountLocked() const TA_REQ(lock()) {
     DEBUG_ASSERT(hierarchy_generation_count_ != 0);
     return hierarchy_generation_count_;
   }
 
  private:
-  DECLARE_CRITICAL_MUTEX(VmHierarchyState) lock_;
+  mutable DECLARE_CRITICAL_MUTEX(VmHierarchyState) lock_;
   bool running_delete_ TA_GUARDED(lock_) = false;
-  fbl::SinglyLinkedListCustomTraits<fbl::RefPtr<VmHierarchyBase>,
-                                    VmHierarchyBase::DeferredDeleteTraits>
+  fbl::SinglyLinkedListCustomTraits<fbl::RefPtr<VmHierarchyBase>, internal::DeferredDeleteTraits>
       delete_list_ TA_GUARDED(lock_);
 
   // Each VMO hierarchy has a generation count, which is incremented on any change to the hierarchy
@@ -156,6 +117,53 @@ class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
   // cached generation count starts at 0.
   uint64_t hierarchy_generation_count_ TA_GUARDED(lock_) = 1;
 };
+
+// Base class for any objects that want to be part of the VMO hierarchy and share some state,
+// including a lock. Additionally all objects in the hierarchy can become part of the same
+// deferred deletion mechanism to avoid unbounded chained destructors.
+class VmHierarchyBase : public fbl::RefCountedUpgradeable<VmHierarchyBase>,
+                        public fbl::Recyclable<VmHierarchyBase> {
+ public:
+  explicit VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state);
+
+  Lock<CriticalMutex>* lock() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
+    return hierarchy_state_ptr_->lock();
+  }
+  Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
+    return hierarchy_state_ptr_->lock_ref();
+  }
+
+ protected:
+  // private destructor, only called from refptr
+  virtual ~VmHierarchyBase() = default;
+  friend fbl::RefPtr<VmHierarchyBase>;
+  // Similar to the destructor, fbl_recycle() needs to be virtual so DoDeferredDelete() can take a
+  // RefPtr<VmHierarchyBase> but when fbl_recycle() is called the VmCowPages::fbl_recycle() will be
+  // run.
+  virtual void fbl_recycle() { delete this; }
+  friend class fbl::Recyclable<VmHierarchyBase>;
+
+  // Pointer to state shared across all objects in a hierarchy.
+  fbl::RefPtr<VmHierarchyState> const hierarchy_state_ptr_;
+
+  // Convenience helpers that forward operations to the referenced hierarchy state.
+  void IncrementHierarchyGenerationCountLocked() TA_REQ(lock());
+  uint64_t GetHierarchyGenerationCountLocked() const TA_REQ(lock());
+
+ private:
+  using DeferredDeleteState = fbl::SinglyLinkedListNodeState<fbl::RefPtr<VmHierarchyBase>>;
+
+  friend internal::DeferredDeleteTraits;
+  friend VmHierarchyState;
+  DeferredDeleteState deferred_delete_state_;
+
+  DISALLOW_COPY_ASSIGN_AND_MOVE(VmHierarchyBase);
+};
+
+inline fbl::SinglyLinkedListNodeState<fbl::RefPtr<VmHierarchyBase>>&
+internal::DeferredDeleteTraits::node_state(VmHierarchyBase& vm) {
+  return vm.deferred_delete_state_;
+}
 
 inline void VmHierarchyBase::IncrementHierarchyGenerationCountLocked() {
   AssertHeld(hierarchy_state_ptr_->lock_ref());
@@ -268,7 +276,7 @@ class VmObject : public VmHierarchyBase,
   // public API
   virtual zx_status_t Resize(uint64_t size) { return ZX_ERR_NOT_SUPPORTED; }
 
-  virtual uint64_t size() const TA_EXCL(lock_) { return 0; }
+  virtual uint64_t size() const TA_EXCL(lock()) { return 0; }
   virtual uint32_t create_options() const { return 0; }
 
   // Returns true if the object is backed by RAM.
@@ -285,10 +293,10 @@ class VmObject : public VmHierarchyBase,
   // Returns true if the VMO supports CloneType::PrivatePagerCopy.
   virtual bool is_private_pager_copy_supported() const { return false; }
   // Returns true if the VMO's pages require dirty bit tracking.
-  virtual bool is_dirty_tracked_locked() const TA_REQ(lock_) { return false; }
+  virtual bool is_dirty_tracked_locked() const TA_REQ(lock()) { return false; }
   // Marks the VMO as modified if the VMO tracks modified state (only supported for pager-backed
   // VMOs).
-  virtual void mark_modified_locked() TA_REQ(lock_) {}
+  virtual void mark_modified_locked() TA_REQ(lock()) {}
 
   struct AttributionCounts {
     size_t uncompressed = 0;
@@ -505,7 +513,7 @@ class VmObject : public VmHierarchyBase,
   // Returns a user ID associated with this VMO, or zero.
   // Typically used to hold a zircon koid for Dispatcher-wrapped VMOs.
   uint64_t user_id() const;
-  uint64_t user_id_locked() const TA_REQ(lock_);
+  uint64_t user_id_locked() const TA_REQ(lock());
 
   // Returns the parent's user_id() if this VMO has a parent,
   // otherwise returns zero.
@@ -566,7 +574,7 @@ class VmObject : public VmHierarchyBase,
   // should finalize the request with PageSource::FinalizeRequest.
   zx_status_t GetPage(uint64_t offset, uint pf_flags, list_node* alloc_list,
                       LazyPageRequest* page_request, vm_page_t** page, paddr_t* pa) {
-    Guard<CriticalMutex> guard{&lock_};
+    Guard<CriticalMutex> guard{lock()};
     return GetPageLocked(offset, pf_flags, alloc_list, page_request, page, pa);
   }
 
@@ -579,7 +587,7 @@ class VmObject : public VmHierarchyBase,
   // See VmObject::GetPage
   zx_status_t GetPageLocked(uint64_t offset, uint pf_flags, list_node* alloc_list,
                             LazyPageRequest* page_request, vm_page_t** page, paddr_t* pa)
-      TA_REQ(lock_) {
+      TA_REQ(lock()) {
     __UNINITIALIZED LookupInfo lookup;
     zx_status_t status = LookupPagesLocked(offset, pf_flags, DirtyTrackingAction::None, 1, 1,
                                            alloc_list, page_request, &lookup);
@@ -661,12 +669,12 @@ class VmObject : public VmHierarchyBase,
                                         DirtyTrackingAction mark_dirty, uint64_t max_out_pages,
                                         uint64_t max_waitable_pages, list_node* alloc_list,
                                         LazyPageRequest* page_request, LookupInfo* out)
-      TA_REQ(lock_) {
+      TA_REQ(lock()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  void AddMappingLocked(VmMapping* r) TA_REQ(lock_);
-  void RemoveMappingLocked(VmMapping* r) TA_REQ(lock_);
+  void AddMappingLocked(VmMapping* r) TA_REQ(lock());
+  void RemoveMappingLocked(VmMapping* r) TA_REQ(lock());
   uint32_t num_mappings() const;
 
   // Returns true if this VMO is mapped into any VmAspace whose is_user()
@@ -679,19 +687,19 @@ class VmObject : public VmHierarchyBase,
 
   // Adds a child to this VMO and returns true if the dispatcher which matches
   // user_id should be notified about the first child being added.
-  bool AddChildLocked(VmObject* child) TA_REQ(lock_);
+  bool AddChildLocked(VmObject* child) TA_REQ(lock());
 
   // Notifies the child observer that there is one child.
-  void NotifyOneChild() TA_EXCL(lock_);
+  void NotifyOneChild() TA_EXCL(lock());
 
   // Removes the child |child| from this VMO and notifies the child observer if the new child count
   // is zero. The |guard| must be this VMO's lock.
-  void RemoveChild(VmObject* child, Guard<CriticalMutex>&& guard) TA_REQ(lock_);
+  void RemoveChild(VmObject* child, Guard<CriticalMutex>&& guard) TA_REQ(lock());
 
   // Drops |c| from the child list without going through the full removal
   // process. ::RemoveChild is probably what you want here.
-  void DropChildLocked(VmObject* c) TA_REQ(lock_);
-  void ReplaceChildLocked(VmObject* old, VmObject* new_child) TA_REQ(lock_);
+  void DropChildLocked(VmObject* c) TA_REQ(lock());
+  void ReplaceChildLocked(VmObject* old, VmObject* new_child) TA_REQ(lock());
   uint32_t num_children() const;
 
   // Calls the provided |func(const VmObject&)| on every VMO in the system,
@@ -734,16 +742,14 @@ class VmObject : public VmHierarchyBase,
   fbl::Canary<fbl::magic("VMO_")> canary_;
 
   // list of every mapping
-  fbl::DoublyLinkedList<VmMapping*> mapping_list_ TA_GUARDED(lock_);
+  fbl::DoublyLinkedList<VmMapping*> mapping_list_ TA_GUARDED(lock());
 
   // list of every child
-  fbl::TaggedDoublyLinkedList<VmObject*, internal::ChildListTag> children_list_ TA_GUARDED(lock_);
+  fbl::TaggedDoublyLinkedList<VmObject*, internal::ChildListTag> children_list_ TA_GUARDED(lock());
 
-  // lengths of corresponding lists
-  uint32_t mapping_list_len_ TA_GUARDED(lock_) = 0;
-  uint32_t children_list_len_ TA_GUARDED(lock_) = 0;
-
-  uint64_t user_id_ TA_GUARDED(lock_) = 0;
+  uint64_t user_id_ TA_GUARDED(lock()) = 0;
+  uint32_t mapping_list_len_ TA_GUARDED(lock()) = 0;
+  uint32_t children_list_len_ TA_GUARDED(lock()) = 0;
 
   // The user-friendly VMO name. For debug purposes only. That
   // is, there is no mechanism to get access to a VMO via this name.

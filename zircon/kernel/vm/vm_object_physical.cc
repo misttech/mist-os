@@ -42,7 +42,7 @@ VmObjectPhysical::~VmObjectPhysical() {
   LTRACEF("%p\n", this);
 
   {
-    Guard<CriticalMutex> guard{&lock_};
+    Guard<CriticalMutex> guard{lock()};
     if (parent_) {
       parent_->RemoveChild(this, guard.take());
       // Avoid recursing destructors when we delete our parent by using the deferred deletion
@@ -113,7 +113,7 @@ zx_status_t VmObjectPhysical::CreateChildSlice(uint64_t offset, uint64_t size, b
     // allowing this operation on resizable vmo's, we should still be holding the lock to
     // correctly read size_. Unfortunately we must also drop then drop the lock in order to
     // perform the allocation.
-    Guard<CriticalMutex> guard{&lock_};
+    Guard<CriticalMutex> guard{lock()};
     our_size = size_;
   }
   if (!InRange(offset, size, our_size)) {
@@ -131,7 +131,7 @@ zx_status_t VmObjectPhysical::CreateChildSlice(uint64_t offset, uint64_t size, b
 
   bool notify_one_child;
   {
-    Guard<CriticalMutex> guard{&lock_};
+    Guard<CriticalMutex> guard{lock()};
 
     // Inherit the current cache policy
     vmo->mapping_cache_flags_ = mapping_cache_flags_;
@@ -160,7 +160,7 @@ zx_status_t VmObjectPhysical::CreateChildSlice(uint64_t offset, uint64_t size, b
 void VmObjectPhysical::Dump(uint depth, bool verbose) {
   canary_.Assert();
 
-  Guard<CriticalMutex> guard{&lock_};
+  Guard<CriticalMutex> guard{lock()};
   for (uint i = 0; i < depth; ++i) {
     printf("  ");
   }
@@ -207,7 +207,7 @@ zx_status_t VmObjectPhysical::Lookup(uint64_t offset, uint64_t len,
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<CriticalMutex> guard{&lock_};
+  Guard<CriticalMutex> guard{lock()};
   if (unlikely(!InRange(offset, len, size_))) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -234,7 +234,7 @@ zx_status_t VmObjectPhysical::CommitRangePinned(uint64_t offset, uint64_t len, b
   if (unlikely(len == 0 || !IS_PAGE_ALIGNED(offset))) {
     return ZX_ERR_INVALID_ARGS;
   }
-  Guard<CriticalMutex> guard{&lock_};
+  Guard<CriticalMutex> guard{lock()};
   if (unlikely(!InRange(offset, len, size_))) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -247,7 +247,7 @@ zx_status_t VmObjectPhysical::LookupContiguous(uint64_t offset, uint64_t len, pa
   if (unlikely(len == 0 || !IS_PAGE_ALIGNED(offset))) {
     return ZX_ERR_INVALID_ARGS;
   }
-  Guard<CriticalMutex> guard{&lock_};
+  Guard<CriticalMutex> guard{lock()};
   if (unlikely(!InRange(offset, len, size_))) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -258,7 +258,7 @@ zx_status_t VmObjectPhysical::LookupContiguous(uint64_t offset, uint64_t len, pa
 }
 
 uint32_t VmObjectPhysical::GetMappingCachePolicy() const {
-  Guard<CriticalMutex> guard{&lock_};
+  Guard<CriticalMutex> guard{lock()};
 
   return mapping_cache_flags_;
 }
@@ -269,7 +269,7 @@ zx_status_t VmObjectPhysical::SetMappingCachePolicy(const uint32_t cache_policy)
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<CriticalMutex> guard{&lock_};
+  Guard<CriticalMutex> guard{lock()};
 
   // If the cache policy is already configured on this VMO and matches
   // the requested policy then this is a no-op. This is a common practice

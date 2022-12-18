@@ -74,14 +74,14 @@ zx_status_t VmObject::set_name(const char* name, size_t len) {
 
 void VmObject::set_user_id(uint64_t user_id) {
   canary_.Assert();
-  Guard<CriticalMutex> guard{&lock_};
+  Guard<CriticalMutex> guard{lock()};
   DEBUG_ASSERT(user_id_ == 0);
   user_id_ = user_id;
 }
 
 uint64_t VmObject::user_id() const {
   canary_.Assert();
-  Guard<CriticalMutex> guard{&lock_};
+  Guard<CriticalMutex> guard{lock()};
   return user_id_;
 }
 
@@ -102,13 +102,13 @@ void VmObject::RemoveMappingLocked(VmMapping* r) {
 
 uint32_t VmObject::num_mappings() const {
   canary_.Assert();
-  Guard<CriticalMutex> guard{&lock_};
+  Guard<CriticalMutex> guard{lock()};
   return mapping_list_len_;
 }
 
 bool VmObject::IsMappedByUser() const {
   canary_.Assert();
-  Guard<CriticalMutex> guard{&lock_};
+  Guard<CriticalMutex> guard{lock()};
   return ktl::any_of(mapping_list_.cbegin(), mapping_list_.cend(),
                      [](const VmMapping& m) -> bool { return m.aspace()->is_user(); });
 }
@@ -116,7 +116,7 @@ bool VmObject::IsMappedByUser() const {
 uint32_t VmObject::share_count() const {
   canary_.Assert();
 
-  Guard<CriticalMutex> guard{&lock_};
+  Guard<CriticalMutex> guard{lock()};
   if (mapping_list_len_ < 2) {
     return 1;
   }
@@ -251,7 +251,7 @@ void VmObject::NotifyOneChild() {
 
   // Make sure we're not holding the shared lock while notifying the observer in case it calls
   // back into this object.
-  DEBUG_ASSERT(!lock_.lock().IsHeld());
+  DEBUG_ASSERT(!lock_ref().lock().IsHeld());
 
   Guard<Mutex> observer_guard{&child_observer_lock_};
 
@@ -302,7 +302,7 @@ void VmObject::RemoveChild(VmObject* o, Guard<CriticalMutex>&& adopt) {
 
 uint32_t VmObject::num_children() const {
   canary_.Assert();
-  Guard<CriticalMutex> guard{&lock_};
+  Guard<CriticalMutex> guard{lock()};
   return children_list_len_;
 }
 
@@ -364,7 +364,7 @@ zx_status_t VmObject::GetPageBlocking(uint64_t offset, uint pf_flags, list_node*
 }
 
 VmHierarchyBase::VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state)
-    : lock_(state->lock_ref()), hierarchy_state_ptr_(ktl::move(state)) {}
+    : hierarchy_state_ptr_(ktl::move(state)) {}
 
 void VmHierarchyState::DoDeferredDelete(fbl::RefPtr<VmHierarchyBase> vmo) {
   Guard<CriticalMutex> guard{&lock_};

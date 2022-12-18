@@ -39,7 +39,7 @@ class VmObjectPhysical final : public VmObject {
   bool is_contiguous() const override { return true; }
   bool is_slice() const { return is_slice_; }
   uint64_t parent_user_id() const override {
-    Guard<CriticalMutex> guard{&lock_};
+    Guard<CriticalMutex> guard{lock()};
     return parent_user_id_;
   }
 
@@ -62,7 +62,7 @@ class VmObjectPhysical final : public VmObject {
   zx_status_t LookupPagesLocked(uint64_t offset, uint pf_flags, DirtyTrackingAction mark_dirty,
                                 uint64_t max_out_pages, uint64_t max_waitable_pages,
                                 list_node* alloc_list, LazyPageRequest* page_request,
-                                LookupInfo* out) TA_REQ(lock_) override;
+                                LookupInfo* out) TA_REQ(lock()) override;
 
   uint32_t GetMappingCachePolicy() const override;
   zx_status_t SetMappingCachePolicy(const uint32_t cache_policy) override;
@@ -83,11 +83,11 @@ class VmObjectPhysical final : public VmObject {
   const uint64_t size_ = 0;
   const paddr_t base_ = 0;
   const bool is_slice_ = false;
-  uint64_t parent_user_id_ TA_GUARDED(lock_) = 0;
-  uint32_t mapping_cache_flags_ TA_GUARDED(lock_) = 0;
+  uint64_t parent_user_id_ TA_GUARDED(lock()) = 0;
+  uint32_t mapping_cache_flags_ TA_GUARDED(lock()) = 0;
 
   // parent pointer (may be null)
-  fbl::RefPtr<VmObjectPhysical> parent_ TA_GUARDED(lock_) = nullptr;
+  fbl::RefPtr<VmObjectPhysical> parent_ TA_GUARDED(lock()) = nullptr;
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_VM_OBJECT_PHYSICAL_H_
