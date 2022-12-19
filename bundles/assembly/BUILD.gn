@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembly_input_bundle.gni")
-import("//src/diagnostics/config/triage/config.gni")
 
 assert(is_fuchsia,
        "Assembly Input Bundles can only be in the Fuchsia toolchain")
@@ -113,7 +112,26 @@ assembly_input_bundle("common_minimal") {
     },
   ]
 
-  config_data = [ triage_detect ]
+  config_data = [
+    {
+      package_name = "triage-detect"
+      files = [
+        {
+          source =
+              "//src/diagnostics/config/triage/detect/session-detect.triage"
+          destination = "session-detect.triage"
+        },
+        {
+          source = "//src/diagnostics/config/triage/detect/sysmem-detect.triage"
+          destination = "sysmem-detect.triage"
+        },
+        {
+          source = "//src/diagnostics/config/triage/detect/wlan-detect.triage"
+          destination = "wlan-detect.triage"
+        },
+      ]
+    },
+  ]
 
   # Create package and archive for use OOT.
   create_aib_package = true
