@@ -241,15 +241,6 @@ From //out/not-default/args.gn:10
 
 From //BUILD.gn:46
 
-### base_resolver_enable_subpackages
-DEPRECATED: subpackages is generally available.
-TODO(fxbug.dev/102652): This configuration will be removed when no longer
-referenced.
-
-**Current value (from the default):** `false`
-
-From //build/security.gni:242
-
 ### basic_env_names
 The list of environment names to include in "basic_envs".
 
@@ -3255,15 +3246,6 @@ above changes.
 **Current value (from the default):** `[]`
 
 From //build/security.gni:21
-
-### full_resolver_enable_subpackages
-DEPRECATED: subpackages is generally available.
-TODO(fxbug.dev/102652): This configuration will be removed when no longer
-referenced.
-
-**Current value (from the default):** `false`
-
-From //build/security.gni:247
 
 ### futex_tracing_enabled
 Enables kernel tracing of futex interactions

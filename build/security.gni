@@ -235,16 +235,6 @@ declare_args() {
   # components are loaded only from packages already available locally (for
   # example, because the package is in base).
   auto_update_packages = true
-
-  # DEPRECATED: subpackages is generally available.
-  # TODO(fxbug.dev/102652): This configuration will be removed when no longer
-  # referenced.
-  base_resolver_enable_subpackages = false
-
-  # DEPRECATED: subpackages is generally available.
-  # TODO(fxbug.dev/102652): This configuration will be removed when no longer
-  # referenced.
-  full_resolver_enable_subpackages = false
 }
 
 # Whether to allow testonly=true in base_packages/cache_packages.
