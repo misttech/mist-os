@@ -109,6 +109,9 @@ typedef struct zxio_private {
 } zxio_private_t;
 
 // The storage backing a |zxio_t|.
+//
+// NOTE: users of this type should take care that it is possible for some types
+// of ZXIO objects to be self referential and therefore not trivially movable.
 typedef struct zxio_storage {
   zxio_t io;
   zxio_private_t reserved;

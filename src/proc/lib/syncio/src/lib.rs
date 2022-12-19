@@ -6,12 +6,19 @@ use std::convert::From;
 
 use crate::zxio::{zxio_dirent_iterator_next, zxio_dirent_iterator_t};
 use bitflags::bitflags;
-use fidl::encoding::const_assert_eq;
-use fidl::endpoints::ServerEnd;
+use fidl::{encoding::const_assert_eq, endpoints::ServerEnd};
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::{self as zx, HandleBased};
-use linux_uapi::x86_64::__kernel_sockaddr_storage as sockaddr_storage;
-use zxio::{msghdr, sockaddr, socklen_t, ZXIO_SHUTDOWN_OPTIONS_READ, ZXIO_SHUTDOWN_OPTIONS_WRITE};
+use fuchsia_zircon::{
+    self as zx,
+    sys::{ZX_ERR_INVALID_ARGS, ZX_ERR_NO_MEMORY, ZX_OK},
+    zx_status_t, HandleBased,
+};
+use linux_uapi::x86_64::{__kernel_sockaddr_storage as sockaddr_storage, c_int, c_void};
+use std::{ffi::CStr, pin::Pin};
+use zxio::{
+    msghdr, sockaddr, socklen_t, zx_handle_t, zxio_object_type_t, zxio_storage_t,
+    ZXIO_SHUTDOWN_OPTIONS_READ, ZXIO_SHUTDOWN_OPTIONS_WRITE,
+};
 
 pub mod zxio;
 
@@ -140,18 +147,119 @@ pub struct RecvMessageInfo {
     pub flags: i32,
 }
 
+// `ZxioStorage` is marked as `PhantomPinned` in order to prevent unsafe moves
+// of the `zxio_storage_t`, because it may store self-referential types defined
+// in zxio.
 #[derive(Default)]
-pub struct Zxio {
+struct ZxioStorage {
     storage: zxio::zxio_storage_t,
+    _pin: std::marker::PhantomPinned,
+}
+
+/// A handle to a zxio object.
+///
+/// Note: the underlying storage backing the object is pinned on the heap
+/// because it can contain self referential data.
+pub struct Zxio {
+    inner: Pin<Box<ZxioStorage>>,
+}
+
+impl Default for Zxio {
+    fn default() -> Self {
+        Self { inner: Box::pin(ZxioStorage::default()) }
+    }
+}
+
+/// A trait that provides functionality to connect a channel to a FIDL service.
+//
+// TODO(https://github.com/rust-lang/rust/issues/44291): allow clients to pass
+// in a more general function pointer (`fn(&str, zx::Channel) -> zx::Status`)
+// rather than having to implement this trait.
+pub trait ServiceConnector {
+    /// Connect `server_end` to the protocol available at `service`.
+    fn connect(service: &str, server_end: zx::Channel) -> zx::Status;
+}
+
+/// Connect a handle to a specified service.
+///
+/// SAFETY: Dereferences the raw pointers `service_name` and `provider_handle`.
+unsafe extern "C" fn service_connector<S: ServiceConnector>(
+    service_name: *const std::os::raw::c_char,
+    provider_handle: *mut zx_handle_t,
+) -> zx_status_t {
+    let (client_end, server_end) = match zx::Channel::create() {
+        Err(e) => return e.into_raw(),
+        Ok((c, s)) => (c, s),
+    };
+
+    let service = match CStr::from_ptr(service_name).to_str() {
+        Ok(s) => s,
+        Err(_) => return ZX_ERR_INVALID_ARGS,
+    };
+
+    let status = S::connect(service, server_end).into_raw();
+    if status != ZX_OK {
+        return status;
+    }
+
+    *provider_handle = client_end.into_handle().into_raw();
+    ZX_OK
+}
+
+/// Sets `out_storage` as the zxio_storage of `out_context`.
+///
+/// This function is intended to be passed to zxio_socket().
+///
+/// SAFETY: Dereferences the raw pointer `out_storage`.
+unsafe extern "C" fn storage_allocator(
+    _type: zxio_object_type_t,
+    out_storage: *mut *mut zxio_storage_t,
+    out_context: *mut *mut ::std::os::raw::c_void,
+) -> zx_status_t {
+    let zxio_ptr_ptr = out_context as *mut *mut zxio_storage_t;
+    if let Some(zxio_ptr) = zxio_ptr_ptr.as_mut() {
+        if let Some(zxio) = zxio_ptr.as_mut() {
+            *out_storage = zxio;
+            return ZX_OK;
+        }
+    }
+    ZX_ERR_NO_MEMORY
 }
 
 impl Zxio {
-    fn as_ptr(&self) -> *mut zxio::zxio_t {
-        &self.storage.io as *const zxio::zxio_t as *mut zxio::zxio_t
+    pub fn new_socket<S: ServiceConnector>(
+        domain: c_int,
+        socket_type: c_int,
+        protocol: c_int,
+    ) -> Result<Result<Self, ZxioErrorCode>, zx::Status> {
+        let zxio = Zxio::default();
+        let mut out_context = zxio.as_storage_ptr() as *mut c_void;
+        let mut out_code = 0;
+
+        let status = unsafe {
+            zxio::zxio_socket(
+                Some(service_connector::<S>),
+                domain,
+                socket_type,
+                protocol,
+                Some(storage_allocator),
+                &mut out_context as *mut *mut c_void,
+                &mut out_code,
+            )
+        };
+        zx::ok(status)?;
+        match out_code {
+            0 => Ok(Ok(zxio)),
+            _ => Ok(Err(ZxioErrorCode(out_code))),
+        }
     }
 
-    pub fn as_storage_ptr(&self) -> *mut zxio::zxio_storage_t {
-        &self.storage as *const zxio::zxio_storage_t as *mut zxio::zxio_storage_t
+    fn as_ptr(&self) -> *mut zxio::zxio_t {
+        &self.inner.storage.io as *const zxio::zxio_t as *mut zxio::zxio_t
+    }
+
+    fn as_storage_ptr(&self) -> *mut zxio::zxio_storage_t {
+        &self.inner.storage as *const zxio::zxio_storage_t as *mut zxio::zxio_storage_t
     }
 
     pub fn create(handle: zx::Handle) -> Result<Zxio, zx::Status> {
@@ -161,7 +269,7 @@ impl Zxio {
         Ok(zxio)
     }
 
-    pub fn open(&self, flags: fio::OpenFlags, mode: u32, path: &str) -> Result<Zxio, zx::Status> {
+    pub fn open(&self, flags: fio::OpenFlags, mode: u32, path: &str) -> Result<Self, zx::Status> {
         let zxio = Zxio::default();
         let status = unsafe {
             zxio::zxio_open(
@@ -897,5 +1005,40 @@ mod test {
         found_dir_names.sort();
         assert_eq!(expected_dir_names, found_dir_names);
         Ok(())
+    }
+
+    #[fuchsia::test]
+    fn test_storage_allocator() {
+        let mut out_storage = zxio_storage_t::default();
+        let mut out_storage_ptr = &mut out_storage as *mut zxio_storage_t;
+
+        let mut out_context = Zxio::default();
+        let mut out_context_ptr = &mut out_context as *mut Zxio;
+
+        let out = unsafe {
+            storage_allocator(
+                0 as zxio_object_type_t,
+                &mut out_storage_ptr as *mut *mut zxio_storage_t,
+                &mut out_context_ptr as *mut *mut Zxio as *mut *mut c_void,
+            )
+        };
+        assert_eq!(out, ZX_OK);
+    }
+
+    #[fuchsia::test]
+    fn test_storage_allocator_bad_context() {
+        let mut out_storage = zxio_storage_t::default();
+        let mut out_storage_ptr = &mut out_storage as *mut zxio_storage_t;
+
+        let out_context = std::ptr::null_mut();
+
+        let out = unsafe {
+            storage_allocator(
+                0 as zxio_object_type_t,
+                &mut out_storage_ptr as *mut *mut zxio_storage_t,
+                out_context,
+            )
+        };
+        assert_eq!(out, ZX_ERR_NO_MEMORY);
     }
 }

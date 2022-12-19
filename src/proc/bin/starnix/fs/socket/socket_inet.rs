@@ -16,71 +16,32 @@ use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
 use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
-use fuchsia_zircon::sys::{ZX_ERR_INTERNAL, ZX_ERR_INVALID_ARGS, ZX_ERR_NO_MEMORY, ZX_OK};
-use fuchsia_zircon::HandleBased;
-use std::ffi::CStr;
 use std::sync::Arc;
-use syncio::zxio::{zx_handle_t, zx_status_t, zxio_object_type_t, zxio_socket, zxio_storage_t};
-use syncio::{RecvMessageInfo, Zxio};
+use syncio::{RecvMessageInfo, ServiceConnector, Zxio};
 
-/// Connects to `fuchsia_posix_socket::Provider`.
-///
-/// This function is intended to be passed to zxio_socket().
-///
-/// On success, `provider_handle` will contain a handle to the protocol.
-///
-/// SAFETY: Dereferences the raw pointers `service_name` and `provider_handle`.
-unsafe extern "C" fn socket_provider(
-    service_name: *const c_char,
-    provider_handle: *mut zx_handle_t,
-) -> zx_status_t {
-    let (client_end, server_end) = match zx::Channel::create() {
-        Err(e) => return e.into_raw(),
-        Ok((c, s)) => (c, s),
-    };
+/// Connects to `fuchsia_posix_socket::Provider` or
+/// `fuchsia_posix_socket_raw::Provider`.
+struct SocketProviderServiceConnector;
 
-    let service = match CStr::from_ptr(service_name).to_str() {
-        Ok(s) => s,
-        Err(_) => return ZX_ERR_INVALID_ARGS,
-    };
+impl ServiceConnector for SocketProviderServiceConnector {
+    fn connect(service: &str, server_end: zx::Channel) -> zx::Status {
+        let result = if service == fposix_socket_raw::ProviderMarker::DEBUG_NAME {
+            connect_channel_to_protocol::<fposix_socket_raw::ProviderMarker>(server_end)
+        } else if service == fposix_socket::ProviderMarker::DEBUG_NAME {
+            connect_channel_to_protocol::<fposix_socket::ProviderMarker>(server_end)
+        } else {
+            return zx::Status::INTERNAL;
+        };
 
-    let result = if service == fposix_socket_raw::ProviderMarker::DEBUG_NAME {
-        connect_channel_to_protocol::<fposix_socket_raw::ProviderMarker>(server_end)
-    } else if service == fposix_socket::ProviderMarker::DEBUG_NAME {
-        connect_channel_to_protocol::<fposix_socket::ProviderMarker>(server_end)
-    } else {
-        return ZX_ERR_INTERNAL;
-    };
-
-    if let Err(err) = result {
-        if let Some(status) = err.downcast_ref::<zx::Status>() {
-            return status.into_raw();
+        if let Err(err) = result {
+            if let Some(status) = err.downcast_ref::<zx::Status>() {
+                return *status;
+            }
+            return zx::Status::INTERNAL;
         }
-        return ZX_ERR_INTERNAL;
-    }
 
-    *provider_handle = client_end.into_handle().into_raw();
-    ZX_OK
-}
-
-/// Sets `out_storage` as the zxio_storage of `out_context`.
-///
-/// This function is intended to be passed to zxio_socket().
-///
-/// SAFETY: Dereferences the raw pointer `out_storage`.
-unsafe extern "C" fn storage_allocator(
-    _type: zxio_object_type_t,
-    out_storage: *mut *mut zxio_storage_t,
-    out_context: *mut *mut ::std::os::raw::c_void,
-) -> zx_status_t {
-    let zxio_ptr_ptr = out_context as *mut *mut Zxio;
-    if let Some(zxio_ptr) = zxio_ptr_ptr.as_ref() {
-        if let Some(zxio) = zxio_ptr.as_ref() {
-            *out_storage = zxio.as_storage_ptr();
-            return ZX_OK;
-        }
+        zx::Status::OK
     }
-    ZX_ERR_NO_MEMORY
 }
 
 pub struct InetSocket {
@@ -94,25 +55,13 @@ impl InetSocket {
         socket_type: SocketType,
         protocol: SocketProtocol,
     ) -> Result<InetSocket, Errno> {
-        let mut zxio = Zxio::default();
-        let mut out_context = &mut zxio as *mut _ as *mut c_void;
-        let mut out_code = 0;
-        unsafe {
-            let status = zxio_socket(
-                Some(socket_provider),
-                domain.as_raw() as c_int,
-                socket_type.as_raw() as c_int,
-                protocol.as_raw() as c_int,
-                Some(storage_allocator),
-                &mut out_context as *mut *mut c_void,
-                &mut out_code,
-            );
-            zx::ok(status).map_err(|status| from_status_like_fdio!(status))?;
-        }
-
-        if out_code != 0 {
-            return Err(errno_from_code!(out_code));
-        }
+        let zxio = Zxio::new_socket::<SocketProviderServiceConnector>(
+            domain.as_raw() as c_int,
+            socket_type.as_raw() as c_int,
+            protocol.as_raw() as c_int,
+        )
+        .map_err(|status| from_status_like_fdio!(status))?
+        .map_err(|out_code| errno_from_zxio_code!(out_code))?;
 
         Ok(InetSocket { zxio: Arc::new(zxio) })
     }
@@ -333,45 +282,5 @@ impl SocketOps for InetSocket {
             .getsockopt(level, optname, optlen)
             .map_err(|status| from_status_like_fdio!(status))?
             .map_err(|out_code| errno_from_zxio_code!(out_code))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[::fuchsia::test]
-    fn test_storage_allocator() {
-        let mut out_storage = zxio_storage_t::default();
-        let mut out_storage_ptr = &mut out_storage as *mut zxio_storage_t;
-
-        let mut out_context = Zxio::default();
-        let mut out_context_ptr = &mut out_context as *mut Zxio;
-
-        let out = unsafe {
-            storage_allocator(
-                0 as zxio_object_type_t,
-                &mut out_storage_ptr as *mut *mut zxio_storage_t,
-                &mut out_context_ptr as *mut *mut Zxio as *mut *mut c_void,
-            )
-        };
-        assert_eq!(out, ZX_OK);
-    }
-
-    #[::fuchsia::test]
-    fn test_storage_allocator_bad_context() {
-        let mut out_storage = zxio_storage_t::default();
-        let mut out_storage_ptr = &mut out_storage as *mut zxio_storage_t;
-
-        let out_context = std::ptr::null_mut();
-
-        let out = unsafe {
-            storage_allocator(
-                0 as zxio_object_type_t,
-                &mut out_storage_ptr as *mut *mut zxio_storage_t,
-                out_context,
-            )
-        };
-        assert_eq!(out, ZX_ERR_NO_MEMORY);
     }
 }
