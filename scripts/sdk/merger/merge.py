@@ -157,7 +157,7 @@ class ElementMeta(object):
             common_files.update(self._meta['sources'])
         elif type == 'fidl_library':
             common_files.update(self._meta['sources'])
-        elif type in ['host_tool', 'companion_host_tool']:
+        elif type in ['host_tool', 'companion_host_tool', 'ffx_tool']:
             if 'files' in self._meta:
                 common_files.update(self._meta['files'])
             if 'target_files' in self._meta:
