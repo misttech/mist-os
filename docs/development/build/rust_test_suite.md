@@ -3,9 +3,6 @@
 This guide details the process for running the Rust compiler test suite on an
 emulated Fuchsia image.
 
-Note: The full compiler test suite does not currently pass on Fuchsia (
-[tracking issue](https://fxbug.dev/96554)).
-
 ## Prerequisites
 
 Before running the Rust test suite on Fuchsia, you'll need to
@@ -61,16 +58,20 @@ required for running the test suite.
        --target {{ '<var>' }}x86_64|aarch64{{ '</var>' }}-fuchsia \
        --run=always \
        --jobs 1 \
-       --test-args "
-            --target-panic=abort
-            --remote-test-client $TEST_TOOLCHAIN
-            --target-rustcflags -L
-            --target-rustcflags $DEV_ROOT/sdk/arch/{{ '<var>' }}x64|a64{{ '</var>' }}/lib
-            --target-rustcflags -L
-            --target-rustcflags $DEV_ROOT/sdk/arch/{{ '<var>' }}x64|a64{{ '</var>' }}/sysroot/lib
-            --target-rustcflags -Cpanic=abort
-            --target-rustcflags -Zpanic_abort_tests
-        " \
+       --test-args --target-rustcflags \
+       --test-args -L \
+       --test-args --target-rustcflags \
+       --test-args $DEV_ROOT/sdk/arch/{{ '<var>' }}x64|a64{{ '</var>' }}/sysroot/lib \
+       --test-args --target-rustcflags \
+       --test-args -L \
+       --test-args --target-rustcflags \
+       --test-args $DEV_ROOT/sdk/arch/{{ '<var>' }}x64|a64{{ '</var>' }}/lib \
+       --test-args --target-rustcflags \
+       --test-args -Cpanic=abort \
+       --test-args --target-rustcflags \
+       --test-args -Zpanic_abort_tests \
+       --test-args --remote-test-client  \
+       --test-args $TEST_TOOLCHAIN \
    )
    ```
 
@@ -137,7 +138,10 @@ environments.
    Then set any relevant breakpoints and run the test with:
 
    ```posix-terminal
-    ( \
+   DEV_ROOT={{ '<var>' }}DEV_ROOT{{ '</var>' }}
+   TEST_TOOLCHAIN={{ '<var>' }}RUST_SRC{{ '</var>' }}/src/ci/docker/scripts/fuchsia-test-runner.py
+
+   ( \
      source $DEV_ROOT/rust/fuchsia-env.sh && \
      $DEV_ROOT/rust/x.py \
        --config $DEV_ROOT/rust/fuchsia-config.toml \
@@ -146,22 +150,24 @@ environments.
        --target {{ '<var>' }}x86_64|aarch64{{ '</var>' }}-fuchsia \
        --run=always \
        --jobs 1 \
-       --test-args "
-            --target-panic=abort
-            --remote-test-client $TEST_TOOLCHAIN
-            --target-rustcflags -L
-            --target-rustcflags $DEV_ROOT/sdk/arch/{{ '<var>' }}x64|a64{{ '</var>' }}/lib
-            --target-rustcflags -L
-            --target-rustcflags $DEV_ROOT/sdk/arch/{{ '<var>' }}x64|a64{{ '</var>' }}/sysroot/lib
-            --target-rustcflags -Cpanic=abort
-            --target-rustcflags -Zpanic_abort_tests
-        " \
-        --rustc-args "
-            -Cdebuginfo=2
-            -Copt-level=0
-            -Cstrip=none
-       " \
-    )
+       --test-args --target-rustcflags \
+       --test-args -L \
+       --test-args --target-rustcflags \
+       --test-args $DEV_ROOT/sdk/arch/{{ '<var>' }}x64|a64{{ '</var>' }}/sysroot/lib \
+       --test-args --target-rustcflags \
+       --test-args -L \
+       --test-args --target-rustcflags \
+       --test-args $DEV_ROOT/sdk/arch/{{ '<var>' }}x64|a64{{ '</var>' }}/lib \
+       --test-args --target-rustcflags \
+       --test-args -Cpanic=abort \
+       --test-args --target-rustcflags \
+       --test-args -Zpanic_abort_tests \
+       --test-args --remote-test-client  \
+       --test-args $TEST_TOOLCHAIN \
+       --rustc-args -Cdebuginfo=2 \
+       --rustc-args -Copt-level=0 \
+       --rustc-args  -Cstrip=none \
+   )
    ```
 
    And `zxdb` will catch any crashes and break at any breakpoints you define.
