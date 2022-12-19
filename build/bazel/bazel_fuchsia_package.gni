@@ -39,7 +39,7 @@ import("//build/packages/prebuilt_package.gni")
 #   visibility:
 #     Usual GN meaning.
 template("bazel_fuchsia_package") {
-  if (defined(invoker.bazel_targets)) {
+  if (defined(invoker.bazel_target)) {
     bazel_target = invoker.bazel_target
   } else {
     bazel_target = get_label_info(":$target_name", "label_no_toolchain")
