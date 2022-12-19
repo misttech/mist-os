@@ -3,34 +3,20 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        capability::{CapabilityProvider, CapabilitySource},
-        model::{
-            addable_directory::AddableDirectoryWithResult,
-            error::ModelError,
-            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
-        },
+    crate::model::{
+        error::ModelError,
+        hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
     },
     async_trait::async_trait,
-    cm_task_scope::TaskScope,
-    cm_util::channel,
-    fidl::endpoints::{ClientEnd, ServerEnd},
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{executor::block_on, lock::Mutex, prelude::*},
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase},
-    routing::capability_source::InternalCapability,
     std::{
         cmp::Eq,
         collections::HashMap,
         fmt,
         ops::Deref,
-        path::PathBuf,
         pin::Pin,
         sync::{Arc, Weak},
-    },
-    vfs::{
-        directory::entry::DirectoryEntry, directory::immutable::simple as pfs,
-        execution_scope::ExecutionScope, path::Path as pfsPath, remote::remote_dir,
     },
 };
 
@@ -261,111 +247,6 @@ impl Hook for TestHook {
             }
             _ => (),
         };
-        Ok(())
-    }
-}
-
-pub struct HubInjectionTestHook;
-
-impl HubInjectionTestHook {
-    pub fn new() -> Self {
-        Self
-    }
-
-    pub fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
-        vec![HooksRegistration::new(
-            "TestHook",
-            vec![EventType::CapabilityRouted],
-            Arc::downgrade(self) as Weak<dyn Hook>,
-        )]
-    }
-
-    pub async fn on_scoped_framework_capability_routed_async<'a>(
-        &'a self,
-        scope_moniker: AbsoluteMoniker,
-        capability: &'a InternalCapability,
-        mut capability_provider: Option<Box<dyn CapabilityProvider>>,
-    ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
-        // This Hook is about injecting itself between the Hub and the Model.
-        // If the Hub hasn't been installed, then there's nothing to do here.
-        match (&capability_provider, capability) {
-            (Some(_), InternalCapability::Directory(source_name)) => {
-                if source_name.str() != "hub" {
-                    return Ok(capability_provider);
-                }
-            }
-            _ => return Ok(capability_provider),
-        };
-
-        Ok(Some(Box::new(HubInjectionCapabilityProvider::new(
-            scope_moniker,
-            capability_provider.take().expect("Unable to take original capability."),
-        ))))
-    }
-}
-
-#[async_trait]
-impl Hook for HubInjectionTestHook {
-    async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
-        if let EventPayload::CapabilityRouted {
-            source: CapabilitySource::Framework { capability, component },
-            capability_provider,
-        } = &event.payload
-        {
-            let mut capability_provider = capability_provider.lock().await;
-            *capability_provider = self
-                .on_scoped_framework_capability_routed_async(
-                    component.abs_moniker.clone(),
-                    capability,
-                    capability_provider.take(),
-                )
-                .await?;
-        }
-        Ok(())
-    }
-}
-
-struct HubInjectionCapabilityProvider {
-    moniker: AbsoluteMoniker,
-    intercepted_capability: Box<dyn CapabilityProvider>,
-}
-
-impl HubInjectionCapabilityProvider {
-    pub fn new(
-        moniker: AbsoluteMoniker,
-        intercepted_capability: Box<dyn CapabilityProvider>,
-    ) -> Self {
-        HubInjectionCapabilityProvider { moniker, intercepted_capability }
-    }
-}
-
-#[async_trait]
-impl CapabilityProvider for HubInjectionCapabilityProvider {
-    async fn open(
-        self: Box<Self>,
-        task_scope: TaskScope,
-        flags: fio::OpenFlags,
-        open_mode: u32,
-        relative_path: PathBuf,
-        server_end: &mut zx::Channel,
-    ) -> Result<(), ModelError> {
-        let (client_chan, mut server_chan) = zx::Channel::create().unwrap();
-        self.intercepted_capability
-            .open(task_scope, flags, open_mode, PathBuf::new(), &mut server_chan)
-            .await?;
-
-        let hub_proxy = ClientEnd::<fio::DirectoryMarker>::new(client_chan)
-            .into_proxy()
-            .expect("failed to create directory proxy");
-
-        let dir = pfs::simple();
-        dir.add_node("old_hub", remote_dir(hub_proxy), &self.moniker)?;
-        let mut relative_path = relative_path.to_str().expect("path is not utf8").to_string();
-        relative_path.push('/');
-        let path =
-            pfsPath::validate_and_split(relative_path).expect("failed to split and validate path");
-        let server_end = channel::take_channel(server_end);
-        dir.open(ExecutionScope::new(), flags, open_mode, path, ServerEnd::new(server_end));
         Ok(())
     }
 }
