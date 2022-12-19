@@ -228,7 +228,12 @@ fn copy_file(source: impl AsRef<Utf8Path>, out_dir: impl AsRef<Utf8Path>) -> Res
     let out_dir = out_dir.as_ref();
     let filename = source.file_name().context("getting file name")?;
     let destination = out_dir.join(filename);
-    std::fs::copy(source, &destination).context("copying file")?;
+
+    // Attempt to hardlink, if that fails, fall back to copying.
+    if let Err(_) = std::fs::hard_link(source, &destination) {
+        // falling back to copying.
+        std::fs::copy(source, &destination).context("copying file")?;
+    }
     Ok(destination)
 }
 
