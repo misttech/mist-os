@@ -82,8 +82,6 @@ class SystemDataUpdaterImplTests : public gtest::TestLoopFixture {
     return cobalt_app_->system_make_data().system_profile().channel();
   }
 
-  const std::string& realm() { return cobalt_app_->system_make_data().system_profile().realm(); }
-
   inspect::Hierarchy InspectHierarchy() {
     fpromise::result<inspect::Hierarchy> result =
         inspect::ReadFromVmo(cobalt_app_->inspector().DuplicateVmo());
@@ -99,7 +97,6 @@ TEST_F(SystemDataUpdaterImplTests, SetSoftwareDistributionInfo) {
   SystemDataUpdaterPtr system_data_updater = GetSystemDataUpdater();
 
   EXPECT_EQ(channel(), "<unset>");
-  EXPECT_EQ(realm(), "<unset>");
   EXPECT_THAT(InspectHierarchy(),
               AllOf(NodeMatches(NameMatches("root")),
                     ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
@@ -109,35 +106,31 @@ TEST_F(SystemDataUpdaterImplTests, SetSoftwareDistributionInfo) {
                                                           StringIs("realm", "<unset>")))))))));
 
   SoftwareDistributionInfo info = SoftwareDistributionInfo();
-  info.set_current_realm("");
   system_data_updater->SetSoftwareDistributionInfo(std::move(info), [](FuchsiaStatus s) {});
   RunLoopUntilIdle();
 
   EXPECT_EQ(channel(), "<unset>");
-  EXPECT_EQ(realm(), "<unknown>");
   EXPECT_THAT(InspectHierarchy(),
               AllOf(NodeMatches(NameMatches("root")),
                     ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
                         NameMatches("system_data"),
                         PropertyList(UnorderedElementsAre(IntIs("fidl_calls", 1),
                                                           StringIs("channel", "<unset>"),
-                                                          StringIs("realm", "<unknown>")))))))));
+                                                          StringIs("realm", "<unset>")))))))));
 
   info = SoftwareDistributionInfo();
-  info.set_current_realm("dogfood");
   info.set_current_channel("fishfood_release");
   system_data_updater->SetSoftwareDistributionInfo(std::move(info), [](FuchsiaStatus s) {});
   RunLoopUntilIdle();
 
   EXPECT_EQ(channel(), "fishfood_release");
-  EXPECT_EQ(realm(), "dogfood");
   EXPECT_THAT(InspectHierarchy(),
               AllOf(NodeMatches(NameMatches("root")),
                     ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
                         NameMatches("system_data"),
                         PropertyList(UnorderedElementsAre(IntIs("fidl_calls", 2),
                                                           StringIs("channel", "fishfood_release"),
-                                                          StringIs("realm", "dogfood")))))))));
+                                                          StringIs("realm", "<unset>")))))))));
 
   // Set one software distribution field without overriding the other.
   info = SoftwareDistributionInfo();
@@ -146,14 +139,13 @@ TEST_F(SystemDataUpdaterImplTests, SetSoftwareDistributionInfo) {
   RunLoopUntilIdle();
 
   EXPECT_EQ(channel(), "test_channel");
-  EXPECT_EQ(realm(), "dogfood");
   EXPECT_THAT(InspectHierarchy(),
               AllOf(NodeMatches(NameMatches("root")),
                     ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
                         NameMatches("system_data"),
                         PropertyList(UnorderedElementsAre(IntIs("fidl_calls", 3),
                                                           StringIs("channel", "test_channel"),
-                                                          StringIs("realm", "dogfood")))))))));
+                                                          StringIs("realm", "<unset>")))))))));
 }
 
 namespace {
@@ -174,7 +166,6 @@ TEST(SystemDataUpdaterImpl, TestSoftwareDistributionInfoPersistence) {
   auto updater = make_updater(inspector.GetRoot().CreateChild("system_data"), system_data.get());
 
   EXPECT_EQ(system_data->system_profile().channel(), "<unset>");
-  EXPECT_EQ(system_data->system_profile().realm(), "<unset>");
   EXPECT_THAT(inspect::ReadFromVmo(inspector.DuplicateVmo()).take_value(),
               AllOf(NodeMatches(NameMatches("root")),
                     ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
@@ -184,10 +175,8 @@ TEST(SystemDataUpdaterImpl, TestSoftwareDistributionInfoPersistence) {
                                                           StringIs("realm", "<unset>")))))))));
 
   SoftwareDistributionInfo info = SoftwareDistributionInfo();
-  info.set_current_realm("dogfood");
   info.set_current_channel("fishfood_release");
   updater->SetSoftwareDistributionInfo(std::move(info), [](FuchsiaStatus s) {});
-  EXPECT_EQ(system_data->system_profile().realm(), "dogfood");
   EXPECT_EQ(system_data->system_profile().channel(), "fishfood_release");
   EXPECT_THAT(inspect::ReadFromVmo(inspector.DuplicateVmo()).take_value(),
               AllOf(NodeMatches(NameMatches("root")),
@@ -195,13 +184,12 @@ TEST(SystemDataUpdaterImpl, TestSoftwareDistributionInfoPersistence) {
                         NameMatches("system_data"),
                         PropertyList(UnorderedElementsAre(IntIs("fidl_calls", 1),
                                                           StringIs("channel", "fishfood_release"),
-                                                          StringIs("realm", "dogfood")))))))));
+                                                          StringIs("realm", "<unset>")))))))));
 
   // Test restoring data.
   inspector = inspect::Inspector();
   system_data = make_data();
   updater = make_updater(inspector.GetRoot().CreateChild("system_data"), system_data.get());
-  EXPECT_EQ(system_data->system_profile().realm(), "dogfood");
   EXPECT_EQ(system_data->system_profile().channel(), "fishfood_release");
   EXPECT_THAT(inspect::ReadFromVmo(inspector.DuplicateVmo()).take_value(),
               AllOf(NodeMatches(NameMatches("root")),
@@ -209,7 +197,7 @@ TEST(SystemDataUpdaterImpl, TestSoftwareDistributionInfoPersistence) {
                         NameMatches("system_data"),
                         PropertyList(UnorderedElementsAre(IntIs("fidl_calls", 0),
                                                           StringIs("channel", "fishfood_release"),
-                                                          StringIs("realm", "dogfood")))))))));
+                                                          StringIs("realm", "<unset>")))))))));
 
   // Test default behavior with no data.
   updater->ClearData();
@@ -217,7 +205,6 @@ TEST(SystemDataUpdaterImpl, TestSoftwareDistributionInfoPersistence) {
   system_data = make_data();
   updater = make_updater(inspector.GetRoot().CreateChild("system_data"), system_data.get());
   EXPECT_EQ(system_data->system_profile().channel(), "<unset>");
-  EXPECT_EQ(system_data->system_profile().realm(), "<unset>");
   EXPECT_THAT(inspect::ReadFromVmo(inspector.DuplicateVmo()).take_value(),
               AllOf(NodeMatches(NameMatches("root")),
                     ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
