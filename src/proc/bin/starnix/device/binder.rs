@@ -616,6 +616,11 @@ impl<'a> BinderProcessGuard<'a> {
         thread
     }
 
+    /// Unregister the `BinderThread` with the given `tid`.
+    fn unregister_thread(&mut self, tid: pid_t) {
+        self.thread_pool.0.remove(&tid);
+    }
+
     /// Handle a binder thread's request to increment/decrement a strong/weak reference to a remote
     /// binder object.
     /// Returns any `BinderObjectRef` that should be dropped, so it can happen without holding a
@@ -2155,7 +2160,7 @@ impl BinderDriver {
                 Ok(SUCCESS)
             }
             uapi::BINDER_THREAD_EXIT => {
-                not_implemented!(current_task, "binder ignoring THREAD_EXIT ioctl");
+                binder_proc.lock().unregister_thread(binder_thread.tid);
                 Ok(SUCCESS)
             }
             uapi::BINDER_GET_NODE_DEBUG_INFO => {
