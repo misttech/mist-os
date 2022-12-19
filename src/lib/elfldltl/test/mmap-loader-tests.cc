@@ -74,8 +74,20 @@ class ElfldltlLoaderTests : public testing::Test {
                                         elfldltl::DynamicSymbolInfoObserver(sym_info_)));
 
     if (options.reloc) {
-      ASSERT_TRUE(
-          RelocateRelative(mem, reloc_info, reinterpret_cast<uintptr_t>(mem.image().data())));
+      uintptr_t bias = reinterpret_cast<uintptr_t>(mem.image().data()) - mem.base();
+      ASSERT_TRUE(RelocateRelative(mem, reloc_info, bias));
+
+      auto resolve = [this, bias](const auto& ref,
+                                  elfldltl::RelocateTls tls_type) -> std::optional<Definition> {
+        EXPECT_EQ(tls_type, elfldltl::RelocateTls::kNone) << "Should not have any tls relocs";
+        elfldltl::SymbolName name{sym_info_, ref};
+        if (const Sym* sym = name.Lookup(sym_info_)) {
+          return Definition{sym, bias};
+        }
+        return {};
+      };
+
+      ASSERT_TRUE(elfldltl::RelocateSymbolic(mem, diag, reloc_info, sym_info_, bias, resolve));
     }
 
     entry_ = mem.GetPointer<std::remove_pointer_t<decltype(entry_)>>(ehdr.entry);
@@ -101,6 +113,26 @@ class ElfldltlLoaderTests : public testing::Test {
 
  private:
   using Elf = elfldltl::Elf<>;
+  using Sym = Elf::Sym;
+
+  struct Definition {
+    using size_type = Elf::size_type;
+
+    constexpr bool undefined_weak() const { return false; }
+
+    constexpr const Sym& symbol() const { return *symbol_; }
+
+    constexpr size_type bias() const { return bias_; }
+
+    // These will never actually be called.
+    constexpr size_type tls_module_id() const { return 0; }
+    constexpr size_type static_tls_bias() const { return 0; }
+    constexpr size_type tls_desc_hook() const { return 0; }
+    constexpr size_type tls_desc_value() const { return 0; }
+
+    const Sym* symbol_ = nullptr;
+    size_type bias_ = 0;
+  };
 
   void (*entry_)() = nullptr;
   elfldltl::DirectMemory mem_;
@@ -158,6 +190,13 @@ TEST_F(ElfldltlLoaderTests, BasicSymbol) {
   auto* foo_ptr = lookup_sym<decltype(foo)>(kFoo);
   ASSERT_NE(foo_ptr, nullptr);
   EXPECT_EQ(*foo_ptr, 17);
+}
+
+TEST_F(ElfldltlLoaderTests, ResolveSymbolic) {
+  Load(kSymbolic);
+
+  EXPECT_EQ(lookup_sym<decltype(NeedsPlt)>("NeedsPlt")(), 2);
+  EXPECT_EQ(lookup_sym<decltype(NeedsGot)>("NeedsGot")(), 3);
 }
 
 }  // namespace

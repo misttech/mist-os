@@ -182,11 +182,11 @@ template("load_test_lib") {
     visibility = [ ":*" ]
     testonly = true
 
-    sources = invoker.sources
-
     forward_variables_from(invoker,
                            [
+                             "cflags",
                              "defines",
+                             "sources",
                              "ldflags",
                            ])
 
@@ -205,6 +205,7 @@ template("load_test_lib") {
         "//build/config/linux:default-pie",
         "//build/config/linux:implicit-host-libs",
       ]
+      configs += [ "//build/config/zircon:nolibc" ]
     }
     if (is_fuchsia) {
       # These shared objects aren't necessarily static pie's, this config
@@ -233,6 +234,13 @@ foreach(data_size,
 
 load_test_lib("elfldltl-test-symbolic") {
   sources = [ "symbolic.cc" ]
+
+  # TODO(fxbug.dev/117866): clang will still perform interprocedural
+  # optimization in a PIC, this flag disallows that and requires the PLT call
+  # always be made so we can properly test applying plt relocations.
+  if (!is_gcc) {
+    cflags = [ "-fsemantic-interposition" ]
+  }
 }
 
 load_test_data_deps = [

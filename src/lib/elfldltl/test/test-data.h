@@ -14,6 +14,10 @@ extern "C" int Return24();
 
 extern "C" const int foo;
 
+extern "C" __EXPORT int BasicSymbol();
+extern "C" __EXPORT int NeedsPlt();
+extern "C" __EXPORT int NeedsGot();
+
 struct TestData {
   const int* rodata;
   int* data;
