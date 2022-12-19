@@ -247,6 +247,18 @@ TEST(CommandLine, TcpBindConnectSendRecv) {
   EXPECT_EQ(test.RunCommandLine("tcp bind 0.0.0.0:0 connect 192.168.0.1:2021 send recv close"), 0);
 }
 
+TEST(CommandLine, TcpListenBacklogSizes) {
+  testing::StrictMock<TestApi> test;
+  testing::InSequence s;
+  EXPECT_CALL(test, socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)).WillOnce(testing::Return(kSockFd));
+  EXPECT_CALL(test, listen(kSockFd, 1)).RetiresOnSaturation();
+  EXPECT_CALL(test, listen(kSockFd, 200)).RetiresOnSaturation();
+  EXPECT_CALL(test, listen(kSockFd, 0)).RetiresOnSaturation();
+  EXPECT_CALL(test, listen(kSockFd, -3000)).RetiresOnSaturation();
+
+  EXPECT_EQ(test.RunCommandLine("tcp listen 1 listen 200 listen 0 listen -3000"), 0);
+}
+
 TEST(CommandLine, TcpBindListenAcceptCloseListenerSend) {
   testing::StrictMock<TestApi> test;
   testing::InSequence s;
@@ -290,7 +302,7 @@ TEST(CommandLine, TcpBindListenAcceptCloseListenerSend) {
   EXPECT_CALL(test, close(kSockFd)).WillOnce(testing::Return(0));
   EXPECT_CALL(test, send(kAcceptedFd, testing::_, testing::_, testing::_))
       .WillOnce([](testing::Unused, const void* buf, size_t len, testing::Unused) { return len; });
-  EXPECT_EQ(test.RunCommandLine("tcp bind 0.0.0.0:0 listen accept close-listener send"), 0);
+  EXPECT_EQ(test.RunCommandLine("tcp bind 0.0.0.0:0 listen 0 accept close-listener send"), 0);
 }
 
 TEST(CommandLine, CloseListenerTwice) {

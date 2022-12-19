@@ -16,7 +16,7 @@ bool str2int(const std::string& in_str, int* out_int) {
     return false;
   }
 
-  if (!std::isdigit(in_str[0])) {
+  if (!std::isdigit(in_str[0]) && in_str[0] != '-') {
     return false;
   }
 

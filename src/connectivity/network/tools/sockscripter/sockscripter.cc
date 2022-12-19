@@ -164,7 +164,8 @@ const struct Command {
     {"drop6", "<mcast-ip>-<local-intf-id>",
      "drop IPv6 mcast group (IPV6_DROP_MEMBERSHIP/IPV6_LEAVE_GROUP) on local interface",
      &SockScripter::Drop6},
-    {"listen", nullptr, "listen on TCP socket", &SockScripter::Listen},
+    {"listen", "<backlog>", "listen on TCP socket with accept backlog length",
+     &SockScripter::Listen},
     {"accept", nullptr, "accept on TCP socket", &SockScripter::Accept},
     {"close-listener", nullptr, "close listening TCP socket", &SockScripter::CloseListener},
     {"sendto", "<send-to-ip>:<send-to-port>", "sendto(send_buf, ip, port)", &SockScripter::SendTo},
@@ -255,7 +256,8 @@ int usage(const char* name) {
           "  socket-cmd is one of the following:\n%s\n"
           "  <local-intf-id> is an integer prefixed by '%%', e.g. '%%1'\n"
           "  <local-intf-Addr> is of the format [<IP>][<ID>], e.g. '192.168.1.166',"
-          "'192.168.1.166%%2', '%%2'\n\n"
+          "'192.168.1.166%%2', '%%2'\n"
+          "  <backlog> is a signed integer, e.g. '100', '0', '-5'\n\n"
           "  A command can be repeated by wrapping it in the following structure:\n"
           "    {<cmd>}[N=<n>][T=<t>]\n"
           "        <n> is the number of repeats (default: n=1)\n"
@@ -294,7 +296,7 @@ std::ostream& operator<<(std::ostream& out, const Escaped& logged) {
 int SockScripter::Execute(int argc, char* const argv[]) {
   optind = 1;
   int opt;
-  while ((opt = getopt(argc, argv, "Chsp:ca:")) != -1) {
+  while ((opt = getopt(argc, argv, "+Chsp:ca:")) != -1) {
     switch (opt) {
       case 's':
         print_socket_types();
@@ -951,8 +953,13 @@ bool SockScripter::Drop6(char* arg) {
 }
 
 bool SockScripter::Listen(char* arg) {
-  if (api_->listen(sockfd_, 1) < 0) {
-    LOG(ERROR) << "Error-listen(fd:" << sockfd_ << ") failed-"
+  int backlog = 0;
+  if (!str2int(arg, &backlog)) {
+    LOG(ERROR) << "Error-listen got invalid backlog size=" << arg;
+    return false;
+  }
+  if (api_->listen(sockfd_, backlog) < 0) {
+    LOG(ERROR) << "Error-listen(fd:" << sockfd_ << ", " << backlog << ") failed-"
                << "[" << errno << "]" << strerror(errno);
     return false;
   }
