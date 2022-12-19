@@ -5,6 +5,9 @@
 //! This file tests the public APIs of FIDL large message support
 
 use {
+    assert_matches::assert_matches,
+    fidl::encoding::MAX_HANDLES,
+    fidl::Event,
     fidl::{endpoints::ServerEnd, Channel},
     fidl_fidl_rust_test_external::{
         LargeMessageTable, LargeMessageUnion, LargeMessageUnionUnknown, OverflowingProtocolEvent,
@@ -26,49 +29,84 @@ const LARGE_STR: &'static str = include_str!("./large_string.txt");
 /// 64KiB, thereby guaranteeing that any payload using that layout is not a large message.
 const SMALL_STR: &'static str = "I'm a very small string.";
 
-/// The time to wait for the triggered event on sync clients
+/// The time to wait for the triggered event on sync clients.
 const WAIT_FOR_EVENT: Duration = Duration::from_seconds(1);
 
-fn server_runner(expected_str: &'static str, server_end: Channel) {
+/// For tests sending `LargeMessageResourced`, this function builds the correct number of present handles.
+fn build_handle_array(present: u64) -> [Option<fidl::Handle>; MAX_HANDLES] {
+    std::array::from_fn(|i| {
+        if i < present.try_into().unwrap() {
+            Some(Event::create().unwrap().into())
+        } else {
+            None
+        }
+    })
+}
+
+/// For tests reading `LargeMessageResourced`, this function validates the correct number of present handles.
+fn validate_handle_array(handles: &[Option<fidl::Handle>; MAX_HANDLES], present: u64) {
+    for n in 0..MAX_HANDLES {
+        if n < present.try_into().unwrap() {
+            assert_matches!(handles[n], Some(_));
+        } else {
+            assert_matches!(handles[n], None);
+        }
+    }
+}
+
+fn server_runner(mut expected_str: &'static str, server_end: Channel) {
     fasync::LocalExecutor::new().unwrap().run_singlethreaded(async move {
         let mut stream =
             ServerEnd::<OverflowingProtocolMarker>::new(server_end).into_stream().unwrap();
-        match stream.next().await.unwrap() {
-            Ok(OverflowingProtocolRequest::TwoWayRequestOnly { payload, responder }) => {
-                match payload {
-                    LargeMessageUnion::Str(str) => {
-                        assert_eq!(&str, &expected_str);
+        if let Some(request) = stream.next().await {
+            match request {
+                Ok(OverflowingProtocolRequest::TwoWayRequestOnly { payload, responder }) => {
+                    match payload {
+                        LargeMessageUnion::Str(str) => {
+                            assert_eq!(&str, &expected_str);
 
-                        responder
-                            .send(OverflowingProtocolTwoWayRequestOnlyResponse::EMPTY)
-                            .unwrap();
+                            responder
+                                .send(OverflowingProtocolTwoWayRequestOnlyResponse::EMPTY)
+                                .unwrap();
+                        }
+                        LargeMessageUnionUnknown!() => panic!("unknown data"),
                     }
-                    LargeMessageUnionUnknown!() => panic!("unknown data"),
                 }
-            }
-            Ok(OverflowingProtocolRequest::TwoWayResponseOnly { responder, .. }) => {
-                responder
-                    .send(LargeMessageTable {
-                        str: Some(expected_str.to_string()),
-                        ..LargeMessageTable::EMPTY
-                    })
-                    .unwrap();
-            }
-            Ok(OverflowingProtocolRequest::TwoWayBothRequestAndResponse { str, responder }) => {
-                assert_eq!(&str, expected_str);
+                Ok(OverflowingProtocolRequest::TwoWayResponseOnly { responder, .. }) => {
+                    responder
+                        .send(LargeMessageTable {
+                            str: Some(expected_str.to_string()),
+                            ..LargeMessageTable::EMPTY
+                        })
+                        .unwrap();
+                }
+                Ok(OverflowingProtocolRequest::TwoWayBothRequestAndResponse { str, responder }) => {
+                    assert_eq!(&str, expected_str);
 
-                responder.send(&mut expected_str.to_string().as_str()).unwrap();
-            }
-            Ok(OverflowingProtocolRequest::OneWayCall { payload, control_handle }) => {
-                assert_eq!(&payload.str.unwrap().as_str(), &expected_str);
+                    responder.send(&mut expected_str).unwrap();
+                }
+                Ok(OverflowingProtocolRequest::OneWayCall { payload, control_handle }) => {
+                    assert_eq!(&payload.str.unwrap().as_str(), &expected_str);
 
-                control_handle
-                    .send_on_one_way_reply_event(&mut LargeMessageUnion::Str(
-                        expected_str.to_string(),
-                    ))
-                    .unwrap();
+                    control_handle
+                        .send_on_one_way_reply_event(&mut LargeMessageUnion::Str(
+                            expected_str.to_string(),
+                        ))
+                        .unwrap();
+                }
+                Ok(OverflowingProtocolRequest::Resourced {
+                    str,
+                    expect_handles,
+                    mut handles,
+                    responder,
+                }) => {
+                    assert_eq!(&str, &expected_str);
+                    validate_handle_array(&handles, expect_handles);
+
+                    responder.send(&str, expect_handles, &mut handles).unwrap();
+                }
+                Err(_) => panic!("unexpected err"),
             }
-            Err(_) => panic!("unexpected err"),
         }
     })
 }
@@ -206,7 +244,7 @@ fn overflowing_two_way_both_request_and_response_large_sync() {
     run_client_sync(LARGE_STR, |client| {
         let str = client.two_way_both_request_and_response(LARGE_STR, Time::INFINITE).unwrap();
 
-        assert_eq!(&str, LARGE_STR.to_string().as_str());
+        assert_eq!(&str, LARGE_STR);
     })
 }
 
@@ -215,7 +253,7 @@ fn overflowing_two_way_both_request_and_response_small_sync() {
     run_client_sync(SMALL_STR, |client| {
         let str = client.two_way_both_request_and_response(SMALL_STR, Time::INFINITE).unwrap();
 
-        assert_eq!(&str, SMALL_STR.to_string().as_str());
+        assert_eq!(&str, SMALL_STR);
     })
 }
 
@@ -224,7 +262,7 @@ async fn overflowing_two_way_both_request_and_response_large_async() {
     run_client_async(LARGE_STR, |client| async move {
         let str = client.two_way_both_request_and_response(LARGE_STR).await.unwrap();
 
-        assert_eq!(&str, LARGE_STR.to_string().as_str());
+        assert_eq!(&str, LARGE_STR);
     })
     .await
 }
@@ -234,7 +272,7 @@ async fn overflowing_two_way_both_request_and_response_small_async() {
     run_client_async(SMALL_STR, |client| async move {
         let str = client.two_way_both_request_and_response(SMALL_STR).await.unwrap();
 
-        assert_eq!(&str, SMALL_STR.to_string().as_str());
+        assert_eq!(&str, SMALL_STR);
     })
     .await
 }
@@ -256,7 +294,7 @@ fn overflowing_one_way_large_sync() {
 
         match event {
             LargeMessageUnion::Str(str) => {
-                assert_eq!(&str, LARGE_STR.to_string().as_str());
+                assert_eq!(&str, LARGE_STR);
             }
             LargeMessageUnionUnknown!() => panic!("unknown event data"),
         }
@@ -280,7 +318,7 @@ fn overflowing_one_way_small_sync() {
 
         match event {
             LargeMessageUnion::Str(str) => {
-                assert_eq!(&str, SMALL_STR.to_string().as_str());
+                assert_eq!(&str, SMALL_STR);
             }
             LargeMessageUnionUnknown!() => panic!("unknown event data"),
         }
@@ -301,7 +339,7 @@ async fn overflowing_one_way_large_async() {
 
         match payload {
             LargeMessageUnion::Str(str) => {
-                assert_eq!(&str, LARGE_STR.to_string().as_str());
+                assert_eq!(&str, LARGE_STR);
             }
             LargeMessageUnionUnknown!() => panic!("unknown event data"),
         }
@@ -323,10 +361,114 @@ async fn overflowing_one_way_small_async() {
 
         match payload {
             LargeMessageUnion::Str(str) => {
-                assert_eq!(&str, SMALL_STR.to_string().as_str());
+                assert_eq!(&str, SMALL_STR);
             }
             LargeMessageUnionUnknown!() => panic!("unknown event data"),
         }
+    })
+    .await
+}
+
+#[test]
+fn overflowing_resourced_63_handles_large_sync() {
+    run_client_sync(LARGE_STR, |client| {
+        let present = 63;
+        let (out_str, out_present_handles, out_handles) = client
+            .resourced(LARGE_STR, present, &mut build_handle_array(present), Time::INFINITE)
+            .unwrap();
+
+        assert_eq!(&out_str, LARGE_STR);
+        assert_eq!(out_present_handles, present);
+        validate_handle_array(&out_handles, present);
+    })
+}
+
+#[test]
+fn overflowing_resourced_63_handles_small_sync() {
+    run_client_sync(SMALL_STR, |client| {
+        let present = 63;
+        let (out_str, out_present_handles, out_handles) = client
+            .resourced(SMALL_STR, present, &mut build_handle_array(present), Time::INFINITE)
+            .unwrap();
+
+        assert_eq!(&out_str, SMALL_STR);
+        assert_eq!(out_present_handles, present);
+        validate_handle_array(&out_handles, present);
+    })
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn overflowing_resourced_63_handles_large_async() {
+    run_client_async(LARGE_STR, |client| async move {
+        let present = 63;
+        let (out_str, out_present_handles, out_handles) =
+            client.resourced(LARGE_STR, present, &mut build_handle_array(present)).await.unwrap();
+
+        assert_eq!(&out_str, LARGE_STR);
+        assert_eq!(out_present_handles, present);
+        validate_handle_array(&out_handles, present);
+    })
+    .await
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn overflowing_resourced_63_handles_small_async() {
+    run_client_async(SMALL_STR, |client| async move {
+        let present = 63;
+        let (out_str, out_present_handles, out_handles) =
+            client.resourced(SMALL_STR, present, &mut build_handle_array(present)).await.unwrap();
+
+        assert_eq!(&out_str, SMALL_STR);
+        assert_eq!(out_present_handles, present);
+        validate_handle_array(&out_handles, present);
+    })
+    .await
+}
+
+#[test]
+fn overflowing_resourced_64_handles_large_sync() {
+    run_client_sync(LARGE_STR, |client| {
+        let present = 64;
+        let result =
+            client.resourced(LARGE_STR, present, &mut build_handle_array(present), Time::INFINITE);
+        assert_matches!(result, Err(fidl::Error::LargeMessage64Handles));
+    })
+}
+
+#[test]
+fn overflowing_resourced_64_handles_small_sync() {
+    run_client_sync(SMALL_STR, |client| {
+        let present = 64;
+        let (out_str, out_present_handles, out_handles) = client
+            .resourced(SMALL_STR, present, &mut build_handle_array(present), Time::INFINITE)
+            .unwrap();
+
+        assert_eq!(&out_str, SMALL_STR);
+        assert_eq!(out_present_handles, present);
+        validate_handle_array(&out_handles, present);
+    })
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn overflowing_resourced_64_handles_large_async() {
+    run_client_async(LARGE_STR, |client| async move {
+        let present = 64;
+        let result = client.resourced(LARGE_STR, present, &mut build_handle_array(present)).await;
+        assert_matches!(result, Err(fidl::Error::LargeMessage64Handles));
+    })
+    .await
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn overflowing_resourced_64_handles_small_async() {
+    run_client_async(SMALL_STR, |client| async move {
+        let present = 64;
+        let (out_str, out_present_handles, out_handles) =
+            client.resourced(SMALL_STR, present, &mut build_handle_array(present)).await.unwrap();
+
+        assert_eq!(&out_str, SMALL_STR);
+        assert_eq!(out_present_handles, present);
+        validate_handle_array(&out_handles, present);
     })
     .await
 }

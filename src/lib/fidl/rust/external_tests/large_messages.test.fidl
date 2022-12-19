@@ -3,16 +3,24 @@
 // found in the LICENSE file.
 library fidl.rust.test.external;
 
+using zx;
+
 type LargeMessageTable = table {
     1: str string:MAX;
 };
 
-type LargeMessageUnion = flexible union {
+type LargeMessageUnion = flexible resource union {
     1: str string:MAX;
 };
 
 type LargeMessageStruct = struct {
     str string:MAX;
+};
+
+type LargeMessageResourced = resource struct {
+    str string:MAX;
+    expect_handles uint64;
+    handles array<zx.handle:optional, 64>;
 };
 
 protocol OverflowingProtocol {
@@ -30,4 +38,7 @@ protocol OverflowingProtocol {
 
     @experimental_overflowing(response=true)
     -> OnOneWayReplyEvent(LargeMessageUnion);
+
+    @experimental_overflowing(request=true, response=true)
+    Resourced(LargeMessageResourced) -> (LargeMessageResourced);
 };

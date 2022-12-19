@@ -45,12 +45,11 @@ pub enum Error {
     #[error("The FIDL object could not fit within the provided buffer range")]
     OutOfRange,
 
-    // TODO(fxbug.dev/114259): This error is temporarily retained until we migrate encoding off of
-    // the prototype format.
-    //
-    /// Overflowing FIDL messages must have exactly 1 handle, pointing to the overflow VMO.
-    #[error("Overflowing FIDL messages must have exactly 1 handle, pointing to the overflow VMO.")]
-    OverflowIncorrectHandleCount,
+    // TODO(fxbug.dev/117162): There is a tracking bug keeping tabs on the eventual removal of this
+    // limitation.
+    /// Large FIDL messages must have <=63 handles, rather than the usual limit of 64.
+    #[error("Large FIDL messages must have <=63 handles, rather than the usual limit of 64.")]
+    LargeMessage64Handles,
 
     /// Large FIDL messages must have at least 1 handle pointing to the overflow VMO.
     #[error("Large FIDL messages must have at least 1 handle pointing to the overflow VMO.")]

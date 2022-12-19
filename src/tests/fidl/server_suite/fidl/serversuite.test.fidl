@@ -198,24 +198,35 @@ open protocol OpenTarget {
 // type it receives from the request instead. This setup makes language server specific bugs less
 // likely.
 open protocol LargeMessageTarget {
+    @experimental_overflowing(request=true)
     strict DecodeBoundedKnownToBeSmall(BoundedKnownToBeSmall);
+    @experimental_overflowing(request=true)
     strict DecodeBoundedMaybeLarge(BoundedMaybeLarge);
 
     // When sending a "large" message, the harness will need to create an unknown union variant with
     // a vector that is one byte bigger than the known variant.
+    @experimental_overflowing(request=true)
     strict DecodeSemiBoundedBelievedToBeSmall(SemiBoundedBelievedToBeSmall);
+    @experimental_overflowing(request=true)
     strict DecodeSemiBoundedMaybeLarge(SemiBoundedMaybeLarge);
+    @experimental_overflowing(request=true)
     strict DecodeUnboundedMaybeLargeValue(UnboundedMaybeLargeValue);
+    @experimental_overflowing(request=true)
     strict DecodeUnboundedMaybeLargeResource(UnboundedMaybeLargeResource);
 
     // All replies sent back for this method must be small messages.
+    @experimental_overflowing(request=true, response=true)
     strict EncodeBoundedKnownToBeSmall(BoundedKnownToBeSmall) -> (BoundedKnownToBeSmall);
+    @experimental_overflowing(request=true, response=true)
     strict EncodeBoundedMaybeLarge(BoundedMaybeLarge) -> (BoundedMaybeLarge);
 
     // All replies sent back for this method must be small messages, since it is impossible to
     // request an encoding of an unknown variant.
+    @experimental_overflowing(request=true, response=true)
     strict EncodeSemiBoundedBelievedToBeSmall(SemiBoundedBelievedToBeSmall) -> (SemiBoundedBelievedToBeSmall);
+    @experimental_overflowing(request=true, response=true)
     strict EncodeSemiBoundedMaybeLarge(SemiBoundedMaybeLarge) -> (SemiBoundedMaybeLarge);
+    @experimental_overflowing(request=true, response=true)
     strict EncodeUnboundedMaybeLargeValue(UnboundedMaybeLargeValue) -> (UnboundedMaybeLargeValue);
 
     // If `populate_unset_handles` is false, the implementation should echo back `data` unchanged.
@@ -235,6 +246,7 @@ open protocol LargeMessageTarget {
     // the incoming message is a bit off due to the extra bytes used by the flag - the only behavior
     // under test is the encoding of the response message, so the exact properties of the request
     // message are irrelevant as long as the response is properly sized to be large/small as needed.
+    @experimental_overflowing(request=true, response=true)
     strict EncodeUnboundedMaybeLargeResource(resource struct {
         populate_unset_handles bool;
         data UnboundedMaybeLargeResource;
@@ -257,6 +269,16 @@ type UnknownMethodInfo = struct {
     unknown_method_type UnknownMethodType;
 };
 
+// TODO(fxbug.dev/102339): These could probably be combined with the GIDL error codes for common
+// cases in some way.
+type EncodingFailureKind = strict enum {
+    LARGE_MESSAGE_64_HANDLES = 1;
+};
+
+type EncodingFailureInfo = struct {
+    kind EncodingFailureKind;
+};
+
 // The Reporter sends results of the test to the test harness.
 closed protocol Reporter {
     strict ReceivedOneWayNoPayload();
@@ -266,6 +288,14 @@ closed protocol Reporter {
 
     strict ReceivedStrictOneWay();
     strict ReceivedFlexibleOneWay();
+
+    // The following methods are used to test that encode exceptions (that is, encode errors that
+    // may be caused by user input, rather than internal FIDL binding bugs). Examples of these include
+    // exceeding constraints (too many items in a vector), attempting to send a large mesage with 64
+    // handles, or trying to send a message with a no-longer-valid handle. The goal here is to test
+    // that the encode error was reported to the user of the companion binding correctly.
+    strict ReplyEncodingFailed(EncodingFailureInfo);
+    strict EventEncodingFailed(EncodingFailureInfo);
 };
 
 type Test = flexible enum : uint32 {

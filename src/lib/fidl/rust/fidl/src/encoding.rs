@@ -144,6 +144,11 @@ pub fn take_handle<T: HandleBased>(handle: &mut T) -> Handle {
 /// recursion depth.
 pub const MAX_RECURSION: usize = 32;
 
+/// The maximum number of handles allowed in a FIDL message. Note that this number is one less for
+/// large messages for the time being. See (fxbug.deb/117162) for progress, or to report problems
+/// caused by this specific limitation.
+pub const MAX_HANDLES: usize = 64;
+
 /// Indicates that an optional value is present.
 pub const ALLOC_PRESENT_U64: u64 = u64::MAX;
 /// Indicates that an optional value is present.
@@ -891,11 +896,11 @@ assert_obj_safe!(Encodable);
 
 /// An inlinable function that checks the if the message that was just encoded is larger than the
 /// overflowing limit (64KiB in the case of zx channel), and splits it into a control plane and data
-/// plane: the control plane is just the header of the original encoded message, and pushed onto the
-/// channel like normal, while the data plane is a VMO attached to that control plane message as a
-/// handle. This function handles all of the plumbing required to make this happen: splitting the
-/// byte buffer into two parts, flipping the correct dynamic flag, writing the VMO, and validating
-/// that everything is properly formed.
+/// plane: the control plane is just the header of the original encoded message and a newly minted
+/// `LargeMessageInfo` instance, and is pushed onto the channel like normal. The data plane is a VMO
+/// attached to that control plane message as a handle. This function handles all of the plumbing
+/// required to make this happen: splitting the byte buffer into two parts, flipping the correct
+/// dynamic flag, writing the VMO, and validating that everything is properly formed.
 #[inline]
 pub fn maybe_overflowing_after_encode(
     _write_bytes: &mut Vec<u8>,
@@ -906,11 +911,13 @@ pub fn maybe_overflowing_after_encode(
     {
         if _write_bytes.len() > fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize {
             let header_size = mem::size_of::<TransactionHeader>();
+            let large_msg_info_size = mem::size_of::<LargeMessageInfo>();
+            let control_plane_size = header_size + large_msg_info_size;
             let body_size = (_write_bytes.len() - header_size) as u64;
             let data_plane = &_write_bytes[header_size..];
 
-            if !_write_handles.is_empty() {
-                return Err(Error::OverflowIncorrectHandleCount);
+            if _write_handles.len() == MAX_HANDLES {
+                return Err(Error::LargeMessage64Handles);
             }
 
             // Build a VMO, then put all of the data_plane information in the VMO.
@@ -923,8 +930,11 @@ pub fn maybe_overflowing_after_encode(
             _write_handles.push(HandleDisposition {
                 handle_op: HandleOp::Move(take_handle(&mut vmo)),
                 object_type: ObjectType::VMO,
-                // TODO(fxbug.dev/114259): generate properly constrained rights!
-                rights: Rights::SAME_RIGHTS,
+                rights: Rights::GET_PROPERTY
+                    | Rights::READ
+                    | Rights::TRANSFER
+                    | Rights::WAIT
+                    | Rights::INSPECT,
                 result: Status::OK,
             });
 
@@ -934,9 +944,23 @@ pub fn maybe_overflowing_after_encode(
             dyn_flags.insert(DynamicFlags::BYTE_OVERFLOW);
             control_plane[6] = dyn_flags.bits();
 
-            // Truncate the message to contain only the control plane, aka the transaction
-            // header.
-            _write_bytes.truncate(header_size);
+            // Write and encode the `LargeMessageInfo` for this message.
+            let mut large_msg_info_bytes = Vec::<u8>::with_capacity(large_msg_info_size);
+            let mut large_msg_info = LargeMessageInfo::new(body_size);
+            Encoder::encode(
+                &mut large_msg_info_bytes,
+                &mut Vec::<HandleDisposition>::new(),
+                &mut large_msg_info,
+            )?;
+
+            // We have now copied the message body into the VMO - this means we can modify the
+            // remaining data in `write_bytes` as needed to create a properly formed control plane
+            // message for writing to the channel itself. This message will be exactly 32 bytes: 16
+            // bytes of header (already in place), plus 16 bytes for the `LargeMessageInfo`. Since
+            // all bytes from #16 and up have already been copied out of the `write_bytes` slice, we
+            // can simply overwrite bytes #16-31 for use as the `LargeMessageInfo` struct.
+            _write_bytes.truncate(control_plane_size);
+            _write_bytes[header_size..].copy_from_slice(&large_msg_info_bytes);
         }
     }
     Ok(())
@@ -5349,6 +5373,75 @@ mod test {
             let mut out = TransactionHeader::new_empty();
             Decoder::decode_with_context(ctx, bytes, &mut [], &mut out).expect("Decoding failed");
             assert_eq!(out, header);
+        }
+    }
+
+    #[test]
+    fn direct_encode_transaction_header_byte_overflow() {
+        let bytes = &[
+            0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x01, //
+            0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
+        ];
+        let mut header = TransactionHeader {
+            tx_id: 4,
+            ordinal: 6,
+            at_rest_flags: [0; 2],
+            dynamic_flags: DynamicFlags::BYTE_OVERFLOW.bits,
+            magic_number: 1,
+        };
+
+        for ctx in CONTEXTS {
+            encode_assert_bytes(ctx, &mut header, bytes);
+        }
+    }
+
+    #[test]
+    fn direct_decode_transaction_header_byte_overflow() {
+        let bytes = &[
+            0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x01, //
+            0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
+        ];
+        let header = TransactionHeader {
+            tx_id: 4,
+            ordinal: 6,
+            at_rest_flags: [0; 2],
+            dynamic_flags: DynamicFlags::BYTE_OVERFLOW.bits,
+            magic_number: 1,
+        };
+
+        for ctx in DECODE_ONLY_CONTEXTS {
+            let mut out = TransactionHeader::new_empty();
+            Decoder::decode_with_context(ctx, bytes, &mut [], &mut out).expect("Decoding failed");
+            assert_eq!(out, header);
+        }
+    }
+
+    #[test]
+    fn direct_encode_large_message_info() {
+        let bytes = &[
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
+            0x08, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, //
+        ];
+        let mut large_message_info =
+            LargeMessageInfo { flags: 0, reserved: 0, msg_byte_count: 65544 };
+
+        for ctx in CONTEXTS {
+            encode_assert_bytes(ctx, &mut large_message_info, bytes);
+        }
+    }
+
+    #[test]
+    fn direct_decode_large_message_info() {
+        let bytes = &[
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
+            0x08, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, //
+        ];
+        let large_message_info = LargeMessageInfo { flags: 0, reserved: 0, msg_byte_count: 65544 };
+
+        for ctx in DECODE_ONLY_CONTEXTS {
+            let mut out = LargeMessageInfo::new_empty();
+            Decoder::decode_with_context(ctx, bytes, &mut [], &mut out).expect("Decoding failed");
+            assert_eq!(out, large_message_info);
         }
     }
 

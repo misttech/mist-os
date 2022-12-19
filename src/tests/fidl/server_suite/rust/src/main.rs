@@ -10,7 +10,7 @@ use {
         AjarTargetMarker, AjarTargetRequest, AnyTarget, ClosedTargetMarker, ClosedTargetRequest,
         ClosedTargetTwoWayResultRequest, ClosedTargetTwoWayTablePayloadResponse,
         ClosedTargetTwoWayUnionPayloadRequest, ClosedTargetTwoWayUnionPayloadResponse, Elements,
-        Empty, EventType, LargeMessageTargetMarker, LargeMessageTargetRequest,
+        Empty, EncodingFailureKind, EventType, LargeMessageTargetMarker, LargeMessageTargetRequest,
         OpenTargetFlexibleTwoWayErrRequest, OpenTargetFlexibleTwoWayFieldsErrRequest,
         OpenTargetMarker, OpenTargetRequest, OpenTargetStrictTwoWayErrRequest,
         OpenTargetStrictTwoWayFieldsErrRequest, ReporterProxy, RunnerRequest, RunnerRequestStream,
@@ -304,15 +304,36 @@ async fn run_large_message_target_server(
                     responder.send(&bytes).expect(EXPECT_REPLY_FAILED);
                 }
                 LargeMessageTargetRequest::EncodeUnboundedMaybeLargeResource {
-                    populate_unset_handles: _,
+                    populate_unset_handles,
                     mut data,
                     responder,
                 } => {
                     let mut elements = TryInto::<[&mut Elements; 64]>::try_into(
-                        data.elements.iter_mut().collect::<Vec<&mut Elements>>(),
+                        data.elements
+                            .iter_mut()
+                            .map(|element| {
+                                if populate_unset_handles {
+                                    match element.handle {
+                                        None => {
+                                            element.handle = Some(Event::create().unwrap().into());
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                element
+                            })
+                            .collect::<Vec<&mut Elements>>(),
                     )
                     .unwrap();
-                    responder.send(&mut elements).expect(EXPECT_REPLY_FAILED);
+
+                    if let Err(err) = responder.send(&mut elements) {
+                        match err {
+                            fidl::Error::LargeMessage64Handles => reporter_proxy
+                                .reply_encoding_failed(EncodingFailureKind::LargeMessage64Handles)
+                                .expect("failed to report reply encoding failure"),
+                            _ => panic!("{}", EXPECT_REPLY_FAILED),
+                        }
+                    }
                 }
                 LargeMessageTargetRequest::_UnknownMethod {
                     ordinal,
@@ -370,12 +391,7 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                         | Test::BadDecodeLastHandleNotVmo
                         | Test::BadDecodeLastHandleInsufficientRights
                         | Test::BadDecodeVmoTooSmall
-                        | Test::BadDecodeVmoTooLarge
-                        | Test::GoodEncodeBoundedMaybeLargeMessage
-                        | Test::GoodEncodeSemiBoundedMaybeLargeMessage
-                        | Test::GoodEncodeUnboundedLargeMessage
-                        | Test::GoodEncode63HandleLargeMessage
-                        | Test::BadEncode64HandleLargeMessage => {
+                        | Test::BadDecodeVmoTooLarge => {
                             // TODO(fxbug.dev/114259): Implement large messages for Rust.
                             false
                         }

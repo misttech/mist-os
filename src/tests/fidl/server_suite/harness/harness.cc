@@ -25,6 +25,16 @@ void Reporter::ReceivedFlexibleOneWay(ReceivedFlexibleOneWayCompleter::Sync& com
   received_flexible_one_way_ = true;
 }
 
+void Reporter::ReplyEncodingFailed(ReplyEncodingFailedRequest& request,
+                                   ReplyEncodingFailedCompleter::Sync& completer) {
+  reply_encoding_failed_ = std::move(request);
+}
+
+void Reporter::EventEncodingFailed(EventEncodingFailedRequest& request,
+                                   EventEncodingFailedCompleter::Sync& completer) {
+  event_encoding_failed_ = std::move(request);
+}
+
 void ServerTest::SetUp() {
   auto runner_service = component::Connect<fidl_serversuite::Runner>();
   ASSERT_OK(runner_service.status_value());

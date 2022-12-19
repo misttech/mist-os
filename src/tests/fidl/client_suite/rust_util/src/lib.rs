@@ -13,7 +13,6 @@ pub fn classify_error(error: fidl::Error) -> FidlErrorKind {
         | fidl::Error::IncompatibleMagicNumber(_)
         | fidl::Error::Invalid
         | fidl::Error::OutOfRange
-        | fidl::Error::OverflowIncorrectHandleCount
         | fidl::Error::LargeMessageMissingHandles
         | fidl::Error::LargeMessageCouldNotReadVmo { .. }
         | fidl::Error::LargeMessageInfoMissized { .. }

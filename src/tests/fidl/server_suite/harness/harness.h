@@ -58,11 +58,25 @@ class Reporter : public fidl::Server<fidl_serversuite::Reporter> {
   void ReceivedFlexibleOneWay(ReceivedFlexibleOneWayCompleter::Sync& completer) override;
   bool received_flexible_one_way() const { return received_flexible_one_way_; }
 
+  void ReplyEncodingFailed(EventEncodingFailedRequest& request,
+                           ReplyEncodingFailedCompleter::Sync& completer) override;
+  std::optional<fidl_serversuite::EncodingFailureInfo> reply_encoding_failed() const {
+    return reply_encoding_failed_;
+  }
+
+  void EventEncodingFailed(EventEncodingFailedRequest& request,
+                           EventEncodingFailedCompleter::Sync& completer) override;
+  std::optional<fidl_serversuite::EncodingFailureInfo> event_encoding_failed() const {
+    return event_encoding_failed_;
+  }
+
  private:
   bool received_one_way_no_payload_ = false;
   std::optional<fidl_serversuite::UnknownMethodInfo> unknown_method_info_;
   bool received_strict_one_way_ = false;
   bool received_flexible_one_way_ = false;
+  std::optional<fidl_serversuite::EncodingFailureInfo> reply_encoding_failed_;
+  std::optional<fidl_serversuite::EncodingFailureInfo> event_encoding_failed_;
 };
 
 class ServerTest : private ::loop_fixture::RealLoop, public ::testing::Test {

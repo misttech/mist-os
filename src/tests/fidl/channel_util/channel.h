@@ -79,7 +79,50 @@ class Channel {
   }
 
   zx_status_t read_and_check(const Bytes& expected, const HandleInfos& expected_handles = {}) {
-    return read_and_check_impl(expected, expected_handles, nullptr);
+    return read_and_check_impl(expected, expected_handles);
+  }
+
+  zx_status_t read_and_check_with_overflow(const Bytes& expected_channel, const Bytes& expected_vmo,
+                                           const HandleInfos& expected_handles) {
+    zx_txid_t out_unknown_txid;
+    uint64_t overflow_size;
+    std::vector<zx_handle_info_t> handles;
+    zx_status_t status = read_and_check_impl(expected_channel, expected_handles, &out_unknown_txid,
+                                             &overflow_size, &handles);
+    if (status != ZX_OK) {
+      // No need to print output, as |read_and_check_impl()| will have printed more precise info
+      // anyway.
+      return status;
+    }
+
+    zx_handle_info_t& overflow_buffer_handle = handles.back();
+    if (overflow_buffer_handle.type != ZX_OBJ_TYPE_VMO) {
+      status = ZX_ERR_WRONG_TYPE;
+      std::cerr << "read_and_check_with_overflow: last handle is not VMO, is :"
+                << overflow_buffer_handle.type << std::endl;
+    }
+
+    // TODO(fxbug.dev/114259): check for proper rights as well.
+    if (expected_vmo.size() != overflow_size) {
+      status = ZX_ERR_INVALID_ARGS;
+      std::cerr << "read_and_check_with_overflow: num expected bytes: " << expected_vmo.size()
+                << " num actual bytes: " << overflow_size << std::endl;
+    }
+
+    // Read the VMO, and validate contents.
+    auto vmo = zx::vmo(overflow_buffer_handle.handle);
+    std::vector<uint8_t> bytes(overflow_size);
+    vmo.read(bytes.data(), 0, overflow_size);
+
+    zx_status_t comparison_status =
+        compare_bytes(expected_vmo, &out_unknown_txid, bytes.size(), bytes.data());
+    if (comparison_status != ZX_OK) {
+      status = comparison_status;
+      std::cerr << "read_and_check_with_overflow: bytes mismatch: " << comparison_status
+                << std::endl;
+    }
+
+    return status;
   }
 
   zx_status_t read_and_check_unknown_txid(zx_txid_t* out_txid, const Bytes& expected,
@@ -92,7 +135,9 @@ class Channel {
 
  private:
   zx_status_t read_and_check_impl(const Bytes& expected, const HandleInfos& expected_handles,
-                                  zx_txid_t* out_unknown_txid) {
+                                  zx_txid_t* out_unknown_txid = nullptr,
+                                  uint64_t* out_overflow_size = nullptr,
+                                  std::vector<zx_handle_info_t>* out_handles = nullptr) {
     ZX_ASSERT_MSG(0 == expected.size() % 8, "bytes must be 8-byte aligned");
     uint8_t bytes[ZX_CHANNEL_MAX_MSG_BYTES];
     zx_handle_info_t handles[ZX_CHANNEL_MAX_MSG_HANDLES];
@@ -101,42 +146,32 @@ class Channel {
     zx_status_t status = channel_.read_etc(0, bytes, handles, std::size(bytes), std::size(handles),
                                            &actual_bytes, &actual_handles);
     if (status != ZX_OK) {
-      std::cerr << "read_and_check: channel read() returned status code: " << status << std::endl;
+      std::cerr << "read_and_check*: channel read() returned status code: " << status << std::endl;
       return status;
     }
     if (out_unknown_txid != nullptr) {
       // If out_unknown_txid is non-null, we need to retrieve the txid.
       if (actual_bytes < sizeof(fidl_message_header_t)) {
-        std::cerr << "read_and_check: message body smaller than FIDL message header";
+        std::cerr << "read_and_check*: message body smaller than FIDL message header" << std::endl;
         return ZX_ERR_INVALID_ARGS;
       }
       fidl_message_header_t hdr;
       memcpy(&hdr, bytes, sizeof(fidl_message_header_t));
       *out_unknown_txid = hdr.txid;
     }
-    if (expected.size() != actual_bytes) {
-      status = ZX_ERR_INVALID_ARGS;
-      std::cerr << "read_and_check: num expected bytes: " << expected.size()
-                << " num actual bytes: " << actual_bytes << std::endl;
-    }
     if (expected_handles.size() != actual_handles) {
       status = ZX_ERR_INVALID_ARGS;
-      std::cerr << "read_and_check: num expected handles: " << expected_handles.size()
+      std::cerr << "read_and_check*: num expected handles: " << expected_handles.size()
                 << " num actual handles: " << actual_handles << std::endl;
+      return ZX_ERR_INVALID_ARGS;
     }
-    for (uint32_t i = 0; i < std::min(static_cast<uint32_t>(expected.size()), actual_bytes); i++) {
-      constexpr uint32_t kTxidOffset = offsetof(fidl_message_header_t, txid);
-      if (out_unknown_txid != nullptr && i >= kTxidOffset &&
-          i < kTxidOffset + sizeof(fidl_message_header_t::txid)) {
-        // If out_unknown_txid is non-null, the txid value is unknown so it shouldn't be checked.
-        continue;
-      }
-      if (expected.data()[i] != bytes[i]) {
-        status = ZX_ERR_INVALID_ARGS;
-        std::cerr << std::dec << "read_and_check: bytes[" << i << "] != expected[" << i << "]: 0x"
-                  << std::hex << +bytes[i] << " != 0x" << +expected.data()[i] << std::endl;
-      }
+
+    zx_status_t comparison_status = compare_bytes(expected, out_unknown_txid, actual_bytes, bytes);
+    if (comparison_status != ZX_OK) {
+      status = comparison_status;
+      std::cerr << "read_and_check*: bytes mismatch: " << comparison_status << std::endl;
     }
+
     for (uint32_t i = 0;
          i < std::min(static_cast<uint32_t>(expected_handles.size()), actual_handles); i++) {
       // Sanity checks. These should always be true for a handle sent over a channel.
@@ -155,6 +190,40 @@ class Channel {
         std::cerr << std::dec << "read_and_check: handles[" << i << "].type != expected_handles["
                   << i << "].type: 0x" << std::hex << expected_handles[i].type << " != 0x"
                   << handles[i].type << std::endl;
+      }
+    }
+
+    if (out_handles != nullptr) {
+      for (size_t i = 0; i < actual_handles; i++) {
+        out_handles->push_back(handles[i]);
+      }
+    }
+    if (out_overflow_size != nullptr) {
+      std::memcpy(out_overflow_size, bytes + 24, sizeof(uint64_t));
+    }
+    return status;
+  }
+
+  static zx_status_t compare_bytes(const Bytes& expected, const zx_txid_t* out_unknown_txid,
+                                   uint64_t actual_bytes, const uint8_t* bytes) {
+    zx_status_t status = ZX_OK;
+    if (expected.size() != actual_bytes) {
+      status = ZX_ERR_INVALID_ARGS;
+      std::cerr << "read_and_check*: num expected bytes: " << expected.size()
+                << " num actual bytes: " << actual_bytes << std::endl;
+    }
+
+    for (uint32_t i = 0; i < std::min(static_cast<uint64_t>(expected.size()), actual_bytes); i++) {
+      constexpr uint32_t kTxidOffset = offsetof(fidl_message_header_t, txid);
+      if (out_unknown_txid != nullptr && i >= kTxidOffset &&
+          i < kTxidOffset + sizeof(fidl_message_header_t::txid)) {
+        // If out_unknown_txid is non-null, the txid value is unknown so it shouldn't be checked.
+        continue;
+      }
+      if (expected.data()[i] != bytes[i]) {
+        status = ZX_ERR_INVALID_ARGS;
+        std::cerr << std::dec << "read_and_check: bytes[" << i << "] != expected[" << i << "]: 0x"
+                  << std::hex << +bytes[i] << " != 0x" << +expected.data()[i] << std::endl;
       }
     }
     return status;
