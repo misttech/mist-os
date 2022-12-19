@@ -724,15 +724,6 @@ impl UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
-    }
-
-    #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
@@ -783,15 +774,6 @@ impl UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
     }
 
     #[inline]
@@ -851,15 +833,6 @@ impl UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
-    }
-
-    #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
@@ -907,15 +880,6 @@ impl UnknownInteractionsAjarProtocolStrictEventUnionRequest {
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
     }
 
     #[inline]
@@ -969,15 +933,6 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
-    }
-
-    #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
@@ -1025,15 +980,6 @@ impl UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
     }
 
     #[inline]
@@ -1087,15 +1033,6 @@ impl UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
-    }
-
-    #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
@@ -1143,15 +1080,6 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
     }
 
     #[inline]
@@ -1205,15 +1133,6 @@ impl UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
-    }
-
-    #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
@@ -1264,15 +1183,6 @@ impl UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
     }
 
     #[inline]
@@ -1332,15 +1242,6 @@ impl UnknownInteractionsClosedProtocolStrictEventUnionRequest {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
-    }
-
-    #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
@@ -1388,15 +1289,6 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
     }
 
     #[inline]
@@ -1450,15 +1342,6 @@ impl UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
-    }
-
-    #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
@@ -1506,15 +1389,6 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
     }
 
     #[inline]
@@ -1568,15 +1442,6 @@ impl UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
-    }
-
-    #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
@@ -1624,15 +1489,6 @@ impl UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
     }
 
     #[inline]
@@ -1689,15 +1545,6 @@ impl UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
-    }
-
-    #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
@@ -1745,15 +1592,6 @@ impl UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
     }
 
     #[inline]
@@ -1807,15 +1645,6 @@ impl UnknownInteractionsProtocolFlexibleEventUnionRequest {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
-    }
-
-    #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
@@ -1863,15 +1692,6 @@ impl UnknownInteractionsProtocolStrictEventUnionRequest {
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
     }
 
     #[inline]
@@ -1925,15 +1745,6 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionResponse {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
-    }
-
-    #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
@@ -1981,15 +1792,6 @@ impl UnknownInteractionsProtocolFlexibleEventUnionErrResponse {
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
     }
 
     #[inline]
@@ -2043,15 +1845,6 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
-    }
-
-    #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
@@ -2099,15 +1892,6 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
     }
 
     #[inline]
@@ -2161,15 +1945,6 @@ impl UnknownInteractionsProtocolStrictEventUnionErrResponse {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
-    }
-
-    #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
@@ -2217,15 +1992,6 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
     }
 
     #[inline]

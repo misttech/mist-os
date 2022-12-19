@@ -114,17 +114,12 @@ impl Enum {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u32> {
+    pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown(x) => Err(x),
-            _ => Ok(self),
+            Self::__Unknown(_) => true,
+            _ => false,
         }
-    }
-
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        self.validate().is_err()
     }
 }
 
@@ -157,15 +152,6 @@ impl Union {
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
     }
 
     #[inline]

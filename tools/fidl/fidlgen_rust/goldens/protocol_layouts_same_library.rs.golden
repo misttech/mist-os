@@ -118,12 +118,6 @@ pub enum ComposedProtocolOnAnonComposedRequest {
 }
 
 impl ComposedProtocolOnAnonComposedRequest {
-    #[deprecated = "Strict unions should not use `validate`"]
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
-        Ok(self)
-    }
-
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -151,12 +145,6 @@ pub enum ComposedProtocolTwoWayAnonComposedRequest {
 }
 
 impl ComposedProtocolTwoWayAnonComposedRequest {
-    #[deprecated = "Strict unions should not use `validate`"]
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
-        Ok(self)
-    }
-
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -184,12 +172,6 @@ pub enum ComposedProtocolTwoWayAnonComposedWithErrorResponse {
 }
 
 impl ComposedProtocolTwoWayAnonComposedWithErrorResponse {
-    #[deprecated = "Strict unions should not use `validate`"]
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
-        Ok(self)
-    }
-
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -234,15 +216,6 @@ impl MainProtocolOnAnonRequest {
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
     }
 
     #[inline]
@@ -296,15 +269,6 @@ impl MainProtocolTwoWayAnonRequest {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
-    }
-
-    #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
@@ -355,15 +319,6 @@ impl MainProtocolTwoWayAnonWithErrorResponse {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
-    }
-
-    #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
@@ -394,12 +349,6 @@ pub enum UnionPayload {
 }
 
 impl UnionPayload {
-    #[deprecated = "Strict unions should not use `validate`"]
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
-        Ok(self)
-    }
-
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {

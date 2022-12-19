@@ -36,12 +36,6 @@ pub enum UnionSize12Alignment4 {
 }
 
 impl UnionSize12Alignment4 {
-    #[deprecated = "Strict unions should not use `validate`"]
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
-        Ok(self)
-    }
-
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -69,12 +63,6 @@ pub enum UnionSize24Alignment8 {
 }
 
 impl UnionSize24Alignment8 {
-    #[deprecated = "Strict unions should not use `validate`"]
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
-        Ok(self)
-    }
-
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -102,12 +90,6 @@ pub enum UnionSize36Alignment4 {
 }
 
 impl UnionSize36Alignment4 {
-    #[deprecated = "Strict unions should not use `validate`"]
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
-        Ok(self)
-    }
-
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -135,12 +117,6 @@ pub enum UnionSize8Alignment4 {
 }
 
 impl UnionSize8Alignment4 {
-    #[deprecated = "Strict unions should not use `validate`"]
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
-        Ok(self)
-    }
-
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {

@@ -174,17 +174,12 @@ impl MyFlexibleEnum {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u32> {
+    pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown(x) => Err(x),
-            _ => Ok(self),
+            Self::__Unknown(_) => true,
+            _ => false,
         }
-    }
-
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        self.validate().is_err()
     }
 }
 
@@ -223,12 +218,6 @@ impl MyStrictEnum {
     #[inline]
     pub const fn into_primitive(self) -> u32 {
         self as u32
-    }
-
-    #[deprecated = "Strict enums should not use `validate`"]
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u32> {
-        Ok(self)
     }
 
     #[deprecated = "Strict enums should not use `is_unknown`"]
@@ -275,15 +264,6 @@ impl FlexibleUnion {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
-    }
-
-    #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
@@ -320,12 +300,6 @@ pub enum StrictUnion {
 }
 
 impl StrictUnion {
-    #[deprecated = "Strict unions should not use `validate`"]
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
-        Ok(self)
-    }
-
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {

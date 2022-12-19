@@ -7,7 +7,7 @@
 {{- define "EnumDeclaration" -}}
 {{- range .DocComments}}
 ///{{ . }}
-{{- end}}
+{{- end }}
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 {{- if .IsStrict }}
 #[repr({{ .Type }})]
@@ -53,12 +53,6 @@ impl {{ .Name }} {
         self as {{ .Type }}
     }
 
-    #[deprecated = "Strict enums should not use `validate`"]
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, {{ .Type }}> {
-        Ok(self)
-    }
-
     #[deprecated = "Strict enums should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -94,24 +88,14 @@ impl {{ .Name }} {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, {{ .Type }}> {
+    pub fn is_unknown(&self) -> bool {
         match self {
-            {{- range .Members }}
-            {{- if .IsUnknown }}
-            Self::{{ .Name }} => Err(self.into_primitive()),
-            {{- end }}
-            {{- end }}
             #[allow(deprecated)]
-            Self::__Unknown(x) => Err(x),
+            Self::__Unknown(_) => true,
             {{- if .Members }}
-            _ => Ok(self),
+            _ => false,
             {{- end }}
         }
-    }
-
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        self.validate().is_err()
     }
 {{- end }}
 }

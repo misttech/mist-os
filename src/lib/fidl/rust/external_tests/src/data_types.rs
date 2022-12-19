@@ -74,9 +74,6 @@ fn strict_enum() {
     #[allow(deprecated)]
     let is_unknown = StrictAnimal::Cat.is_unknown();
     assert_eq!(is_unknown, false);
-    #[allow(deprecated)]
-    let validate = StrictAnimal::Cat.validate();
-    assert_eq!(validate, Ok(StrictAnimal::Cat));
 }
 
 #[test]
@@ -96,10 +93,6 @@ fn flexible_enum() {
     assert_eq!(FlexibleAnimal::Cat.is_unknown(), false);
     assert_eq!(FlexibleAnimal::from_primitive_allow_unknown(3).is_unknown(), true);
     assert_eq!(FlexibleAnimal::unknown().is_unknown(), true);
-
-    assert_eq!(FlexibleAnimal::Cat.validate(), Ok(FlexibleAnimal::Cat));
-    assert_eq!(FlexibleAnimal::from_primitive_allow_unknown(3).validate(), Err(3));
-    assert_eq!(FlexibleAnimal::unknown().validate(), Err(i32::MAX));
 }
 
 #[test]
@@ -114,9 +107,6 @@ fn flexible_empty_enum() {
 
     assert_eq!(FlexibleEmptyEnum::from_primitive_allow_unknown(3).is_unknown(), true);
     assert_eq!(FlexibleEmptyEnum::unknown().is_unknown(), true);
-
-    assert_eq!(FlexibleEmptyEnum::from_primitive_allow_unknown(3).validate(), Err(3));
-    assert_eq!(FlexibleEmptyEnum::unknown().validate(), Err(i32::MAX));
 }
 
 #[test]
@@ -126,22 +116,13 @@ fn strict_value_union() {
     #[allow(deprecated)]
     let is_unknown = StrictValueThing::Number(42).is_unknown();
     assert_eq!(is_unknown, false);
-    #[allow(deprecated)]
-    let validate = StrictValueThing::Name("hello".to_owned()).validate();
-    assert_eq!(validate, Ok(StrictValueThing::Name("hello".to_owned())));
 }
 
 #[test]
 fn flexible_value_union() {
     assert_eq!(FlexibleValueThing::Number(42).is_unknown(), false);
     assert_eq!(FlexibleValueThing::Name("hello".to_owned()).is_unknown(), false);
-    assert_eq!(FlexibleValueThing::Number(42).validate(), Ok(FlexibleValueThing::Number(42)));
-    assert_eq!(
-        FlexibleValueThing::Name("hello".to_owned()).validate(),
-        Ok(FlexibleValueThing::Name("hello".to_owned()))
-    );
     assert_eq!(FlexibleValueThing::unknown_variant_for_testing().is_unknown(), true);
-    assert_eq!(FlexibleValueThing::unknown_variant_for_testing().validate(), Err(0));
 }
 
 #[test]
@@ -151,22 +132,13 @@ fn strict_resource_union() {
     #[allow(deprecated)]
     let is_unknown = StrictResourceThing::Number(42).is_unknown();
     assert_eq!(is_unknown, false);
-    #[allow(deprecated)]
-    let validate = StrictResourceThing::Name("hello".to_owned()).validate();
-    assert_eq!(validate, Ok(StrictResourceThing::Name("hello".to_owned())));
 }
 
 #[test]
 fn flexible_resource_union() {
     assert_eq!(FlexibleResourceThing::Number(42).is_unknown(), false);
     assert_eq!(FlexibleResourceThing::Name("hello".to_owned()).is_unknown(), false);
-    assert_eq!(FlexibleResourceThing::Number(42).validate(), Ok(FlexibleResourceThing::Number(42)));
-    assert_eq!(
-        FlexibleResourceThing::Name("hello".to_owned()).validate(),
-        Ok(FlexibleResourceThing::Name("hello".to_owned()))
-    );
     assert_eq!(FlexibleResourceThing::unknown_variant_for_testing().is_unknown(), true);
-    assert_eq!(FlexibleResourceThing::unknown_variant_for_testing().validate(), Err(0));
 }
 
 #[test]

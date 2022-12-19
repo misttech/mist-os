@@ -79,12 +79,6 @@ impl ExampleEnum {
         self as u32
     }
 
-    #[deprecated = "Strict enums should not use `validate`"]
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u32> {
-        Ok(self)
-    }
-
     #[deprecated = "Strict enums should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -105,12 +99,6 @@ pub enum ExampleUnion {
 }
 
 impl ExampleUnion {
-    #[deprecated = "Strict unions should not use `validate`"]
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, (u64, Vec<u8>)> {
-        Ok(self)
-    }
-
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -155,15 +143,6 @@ impl ExampleXUnion {
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
-    }
-
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u64> {
-        match self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => Err(ordinal),
-            _ => Ok(self),
-        }
     }
 
     #[inline]

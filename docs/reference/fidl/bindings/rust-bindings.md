@@ -188,10 +188,6 @@ With the following methods:
 * `from_primitive(prim: u32) -> Option<Self>`: Returns `Some` of the enum
   variant corresponding to the discriminant value if any, and `None` otherwise.
 * `into_primitive(&self) -> u32`: Returns the underlying discriminant value.
-* `validate(self) -> Result<Self, u32>`: Returns `Ok` of the value if it
-  corresponds to a known member, or an `Err` of the underlying primitive value
-  otherwise. For [strict][lang-flexible] types, it is marked `#[deprecated]` and
-  always returns `Ok`.
 * `is_unknown(&self) -> bool`: Returns whether this enum is unknown. For
   [strict][lang-flexible] types, it is marked `#[deprecated]` and always returns
   `false`.
@@ -274,11 +270,6 @@ pub enum JsonValue {
 
 With the following methods:
 
-* `validate(self) -> Result<Self, (u64, Vec<u8>)>`: Returns `Ok` of the value if
-  it corresponds to a known variant, or an `Err` containing the ordinal and raw
-  bytes otherwise. For [resource][lang-resource] types, the `Vec<u8>` changes to
-  `fidl::UnknownData`. For [strict][lang-flexible] types, it is marked
-  `#[deprecated]` and always returns `Ok`.
 * `is_unknown(&self) -> bool`: Returns whether this union is unknown. Always
   returns `false` for non-flexible union types. For [strict][lang-flexible]
   types, it is marked `#[deprecated]` and always returns `false`.
@@ -286,9 +277,8 @@ With the following methods:
 If `JsonValue` is [flexible][lang-flexible], it will have the following
 additional methods:
 
-* `unknown(ordinal: u64, data: Vec<u8>) -> Self`: Create an unknown union value.
-  This should only be used in tests. For [`resource`][lang-resource] types, the
-  `Vec<u8>` changes to `fidl::UnknownData`.)
+* `unknown_variant_for_testing() -> Self`: Create an unknown union value. This
+  should only be used in tests.
 
 The generated `JsonValue` `enum` follows the [`#[derive]` rules](#derives).
 
@@ -316,15 +306,11 @@ The unknown macro acts the same as a `_` pattern, but it can be configured to
 expand to an exhaustive match. This is useful for discovering missing cases.
 
 When a FIDL message containing a union with an unknown variant is decoded into
-`JsonValue`, `JsonValue::validate` returns `Err(ordinal, data)` where `ordinal`
-is the unknown ordinal and `data` contains the raws bytes and handles.
-
-Encoding a union with an unknown variant writes the unknown data and the
-original ordinal back onto the wire.
+`JsonValue`, `JsonValue::is_unknown()` returns true.
 
 [Strict][lang-flexible] unions fail when decoding an unknown variant.
-[Flexible][lang-flexible] unions that are [value][lang-resource] types fail when
-decoding an unknown variant with handles.
+[Flexible][lang-flexible] unions succeed when decoding an unknown variant, but
+fail when re-encoding it.
 
 ### Tables {#types-tables}
 
@@ -352,17 +338,12 @@ And the following associated constants:
 
 * `const EMPTY: User`: A `User` with each member initialized to `None`.
 
-The `unknown_data` member stores a mapping from ordinal to the raw bytes of any
-unknown field that was encountered during decoding. If the table is declared
-as a `resource`, the map will also contain the raw handles in addition to the
-bytes (i.e. the `unknown_data` member will have type
-`Option<BTreeMap<u64, fidl::UnknownData>>`). If no unknown members were
-encountered during decoding, the `unknown_data` field is guaranteed to be
-`None` rather than `Some` of an empty map.
+If any unknown fields are encountered during decoding, they are discarded. There
+is no way to access them or determine if they occurred.
 
 The `__non_exhaustive` member prevents intializing the table exhaustively, which
 causes API breakage when new fields are added. Instead, you should use the
-struct update syntax to fill in unspecified fields with `empty()`. For example:
+struct update syntax to fill in unspecified fields with `EMPTY`. For example:
 
 ```rust
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/rust/fidl_crates/src/main.rs" region_tag="tables_init" adjust_indentation="auto" %}

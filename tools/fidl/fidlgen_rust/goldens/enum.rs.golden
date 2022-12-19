@@ -76,16 +76,11 @@ impl MyEmptyFlexibleEnum {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u32> {
+    pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown(x) => Err(x),
+            Self::__Unknown(_) => true,
         }
-    }
-
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        self.validate().is_err()
     }
 }
 
@@ -149,17 +144,12 @@ impl MyFlexibleEnum {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u32> {
+    pub fn is_unknown(&self) -> bool {
         match self {
             #[allow(deprecated)]
-            Self::__Unknown(x) => Err(x),
-            _ => Ok(self),
+            Self::__Unknown(_) => true,
+            _ => false,
         }
-    }
-
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        self.validate().is_err()
     }
 }
 
@@ -227,18 +217,12 @@ impl MyFlexibleEnumWithCustomUnknown {
     }
 
     #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u32> {
-        match self {
-            Self::CustomUnknown => Err(self.into_primitive()),
-            #[allow(deprecated)]
-            Self::__Unknown(x) => Err(x),
-            _ => Ok(self),
-        }
-    }
-
-    #[inline]
     pub fn is_unknown(&self) -> bool {
-        self.validate().is_err()
+        match self {
+            #[allow(deprecated)]
+            Self::__Unknown(_) => true,
+            _ => false,
+        }
     }
 }
 
@@ -268,12 +252,6 @@ impl MyStrictEnum {
     #[inline]
     pub const fn into_primitive(self) -> u32 {
         self as u32
-    }
-
-    #[deprecated = "Strict enums should not use `validate`"]
-    #[inline]
-    pub fn validate(self) -> std::result::Result<Self, u32> {
-        Ok(self)
     }
 
     #[deprecated = "Strict enums should not use `is_unknown`"]
