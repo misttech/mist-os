@@ -38,6 +38,26 @@ std::optional<std::reference_wrapper<const Devnode>> lookup(const Devnode& paren
   return {};
 }
 
+zx::result<fidl::ServerEnd<fuchsia_io::Directory>> ExportServiceDir(
+    Devnode& dn, std::string_view path, fuchsia_device_fs::wire::ExportOptions export_options,
+    std::optional<std::string_view> topological_path, std::optional<std::string_view> class_path,
+    std::vector<std::unique_ptr<Devnode>>& out) {
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
+  }
+  if (zx_status_t status = dn.export_dir(Devnode::Target(Devnode::Service{
+                                             .remote = std::move(endpoints->client),
+                                             .path = std::string(path),
+                                             .export_options = export_options,
+                                         }),
+                                         topological_path, class_path, out);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(std::move(endpoints->server));
+}
+
 TEST(Devfs, Export) {
   std::optional<Devnode> root_slot;
   const Devfs devfs(root_slot);
@@ -45,7 +65,7 @@ TEST(Devfs, Export) {
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
 
-  ASSERT_OK(root_node.export_dir({}, "svc", "one/two", 0, {}, out));
+  ASSERT_OK(ExportServiceDir(root_node, "svc", {}, "one/two", {}, out));
 
   std::optional node_one = lookup(root_node, "one");
   ASSERT_TRUE(node_one.has_value());
@@ -62,7 +82,9 @@ TEST(Devfs, Export_ExcessSeparators) {
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
 
-  ASSERT_STATUS(root_node.export_dir({}, "svc", "one////two", 0, {}, out), ZX_ERR_INVALID_ARGS);
+  ASSERT_STATUS(ExportServiceDir(root_node, "svc", {}, "one///two", {}, out).status_value(),
+                ZX_ERR_INVALID_ARGS);
+
   ASSERT_FALSE(lookup(root_node, "one").has_value());
   ASSERT_FALSE(lookup(root_node, "two").has_value());
 }
@@ -74,14 +96,12 @@ TEST(Devfs, Export_OneByOne) {
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
 
-  ASSERT_OK(root_node.export_dir({}, "svc", "one", 0, {}, out));
-
+  ASSERT_OK(ExportServiceDir(root_node, "svc", {}, "one", {}, out));
   std::optional node_one = lookup(root_node, "one");
   ASSERT_TRUE(node_one.has_value());
   EXPECT_EQ("one", node_one->get().name());
 
-  ASSERT_OK(root_node.export_dir({}, "svc", "one/two", 0, {}, out));
-
+  ASSERT_OK(ExportServiceDir(root_node, "svc", {}, "one/two", {}, out));
   std::optional node_two = lookup(node_one->get(), "two");
   ASSERT_TRUE(node_two.has_value());
   EXPECT_EQ("two", node_two->get().name());
@@ -94,20 +114,17 @@ TEST(Devfs, Export_InvalidPath) {
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
 
-  ASSERT_EQ(ZX_ERR_INVALID_ARGS, root_node.export_dir({}, "", "one", 0, {}, out));
-  ASSERT_EQ(ZX_ERR_INVALID_ARGS, root_node.export_dir({}, "/svc", "one", 0, {}, out));
-  ASSERT_EQ(ZX_ERR_INVALID_ARGS, root_node.export_dir({}, "svc/", "one", 0, {}, out));
-  ASSERT_EQ(ZX_ERR_INVALID_ARGS, root_node.export_dir({}, "/svc/", "one", 0, {}, out));
-
-  ASSERT_EQ(ZX_ERR_INVALID_ARGS, root_node.export_dir({}, "svc", "", 0, {}, out));
-  ASSERT_EQ(ZX_ERR_INVALID_ARGS, root_node.export_dir({}, "svc", "/one/two", 0, {}, out));
-  ASSERT_EQ(ZX_ERR_INVALID_ARGS, root_node.export_dir({}, "svc", "one/two/", 0, {}, out));
-  ASSERT_EQ(ZX_ERR_INVALID_ARGS, root_node.export_dir({}, "svc", "/one/two/", 0, {}, out));
+  ASSERT_STATUS(ZX_ERR_INVALID_ARGS,
+                ExportServiceDir(root_node, "svc", {}, "", {}, out).status_value());
+  ASSERT_STATUS(ZX_ERR_INVALID_ARGS,
+                ExportServiceDir(root_node, "svc", {}, "/one/two", {}, out).status_value());
+  ASSERT_STATUS(ZX_ERR_INVALID_ARGS,
+                ExportServiceDir(root_node, "svc", {}, "one/two/", {}, out).status_value());
+  ASSERT_STATUS(ZX_ERR_INVALID_ARGS,
+                ExportServiceDir(root_node, "svc", {}, "/one/two/", {}, out).status_value());
 }
 
 TEST(Devfs, Export_WithProtocol) {
-  const async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
-
   std::optional<Devnode> root_slot;
   Devfs devfs(root_slot);
   ASSERT_TRUE(root_slot.has_value());
@@ -123,13 +140,7 @@ TEST(Devfs, Export_WithProtocol) {
   }
 
   std::vector<std::unique_ptr<Devnode>> out;
-  auto outgoing = component::OutgoingDirectory(loop.dispatcher());
-  auto endpoints = fidl::CreateEndpoints<fio::Directory>();
-  ASSERT_OK(endpoints.status_value());
-  ASSERT_OK(outgoing.Serve(std::move(endpoints->server)));
-
-  ASSERT_OK(root_node.export_dir(std::move(endpoints->client), "svc", "one/two", ZX_PROTOCOL_BLOCK,
-                                 {}, out));
+  ASSERT_OK(ExportServiceDir(root_node, "svc", {}, "one/two", "block", out));
 
   std::optional node_one = lookup(root_node, "one");
   ASSERT_TRUE(node_one.has_value());
@@ -140,7 +151,7 @@ TEST(Devfs, Export_WithProtocol) {
   EXPECT_EQ("two", node_two->get().name());
 
   fbl::RefPtr<fs::Vnode> node_000;
-  EXPECT_OK(proto_node.value().get().children().Lookup("000", &node_000));
+  ASSERT_OK(proto_node.value().get().children().Lookup("000", &node_000));
   ASSERT_NE(node_000, nullptr);
 }
 
@@ -151,8 +162,10 @@ TEST(Devfs, Export_AlreadyExists) {
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
 
-  ASSERT_OK(root_node.export_dir({}, "svc", "one/two", 0, {}, out));
-  ASSERT_EQ(ZX_ERR_ALREADY_EXISTS, root_node.export_dir({}, "svc", "one/two", 0, {}, out));
+  ASSERT_OK(ExportServiceDir(root_node, "svc", {}, "one/two", {}, out));
+
+  ASSERT_STATUS(ZX_ERR_ALREADY_EXISTS,
+                ExportServiceDir(root_node, "svc", {}, "one/two", {}, out).status_value());
 }
 
 TEST(Devfs, Export_FailedToClone) {
@@ -162,8 +175,12 @@ TEST(Devfs, Export_FailedToClone) {
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
 
-  ASSERT_EQ(ZX_ERR_BAD_HANDLE,
-            root_node.export_dir({}, "svc", "one/two", ZX_PROTOCOL_BLOCK, {}, out));
+  ASSERT_STATUS(ZX_ERR_BAD_HANDLE, root_node.export_dir(Devnode::Target(Devnode::Service{
+                                                            .remote = {},
+                                                            .path = "svc",
+                                                            .export_options = {},
+                                                        }),
+                                                        "one/two", "block", out));
 }
 
 TEST(Devfs, Export_DropDevfs) {
@@ -173,7 +190,7 @@ TEST(Devfs, Export_DropDevfs) {
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
 
-  ASSERT_OK(root_node.export_dir({}, "svc", "one/two", 0, {}, out));
+  ASSERT_OK(ExportServiceDir(root_node, "svc", {}, "one/two", {}, out));
 
   {
     std::optional node_one = lookup(root_node, "one");

@@ -5,6 +5,7 @@
 #include "src/devices/bin/driver_manager/devfs/devfs_exporter.h"
 
 #include "src/devices/lib/log/log.h"
+#include "src/lib/fxl/strings/split_string.h"
 
 namespace fdfs = fuchsia_device_fs;
 
@@ -15,6 +16,16 @@ zx::result<std::unique_ptr<ExportWatcher>> ExportWatcher::Create(
     fidl::ClientEnd<fuchsia_io::Directory> service_dir, std::string_view service_path,
     std::string_view devfs_path, uint32_t protocol_id,
     fuchsia_device_fs::wire::ExportOptions options) {
+  // Validate service path.
+  {
+    const std::vector segments =
+        fxl::SplitString(service_path, "/", fxl::WhiteSpaceHandling::kKeepWhitespace,
+                         fxl::SplitResult::kSplitWantAll);
+    if (segments.empty() ||
+        std::any_of(segments.begin(), segments.end(), std::mem_fn(&std::string_view::empty))) {
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+  }
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
   if (endpoints.is_error()) {
     return endpoints.take_error();
@@ -33,8 +44,13 @@ zx::result<std::unique_ptr<ExportWatcher>> ExportWatcher::Create(
   watcher->devfs_path_ = std::string(devfs_path);
   watcher->client_ = fidl::WireClient(std::move(endpoints->client), dispatcher, watcher.get());
 
-  zx_status_t status = root->export_dir(std::move(service_dir), service_path, devfs_path,
-                                        protocol_id, options, watcher->devnodes_);
+  zx_status_t status =
+      root->export_dir(Devnode::Target(Devnode::Service{
+                           .remote = std::move(service_dir),
+                           .path = std::string(service_path),
+                           .export_options = options,
+                       }),
+                       devfs_path, ProtocolIdToClassName(protocol_id), watcher->devnodes_);
   if (status != ZX_OK) {
     return zx::error(status);
   }

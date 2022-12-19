@@ -48,9 +48,43 @@ struct overloaded : Ts... {
 template <class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
 
+struct ProtocolInfo {
+  std::string_view name;
+  uint32_t id;
+  uint32_t flags;
+};
+
+static constexpr ProtocolInfo proto_infos[] = {
+#define DDK_PROTOCOL_DEF(tag, val, name, flags) {name, val, flags},
+#include <lib/ddk/protodefs.h>
+};
+
 }  // namespace
 
 namespace fio = fuchsia_io;
+
+std::optional<std::string_view> ProtocolIdToClassName(uint32_t protocol_id) {
+  for (const ProtocolInfo& info : proto_infos) {
+    if (info.id != protocol_id) {
+      continue;
+    }
+    if (info.flags & PF_NOPUB) {
+      return std::nullopt;
+    } else {
+      return info.name;
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<std::reference_wrapper<ProtoNode>> Devfs::proto_node(std::string_view protocol_name) {
+  for (const ProtocolInfo& info : proto_infos) {
+    if (info.name == protocol_name) {
+      return proto_node(info.id);
+    }
+  }
+  return std::nullopt;
+}
 
 std::optional<std::reference_wrapper<ProtoNode>> Devfs::proto_node(uint32_t protocol_id) {
   auto it = proto_info_nodes.find(protocol_id);
@@ -553,22 +587,70 @@ Devfs::Devfs(std::optional<Devnode>& root,
   }
 }
 
-zx_status_t Devnode::export_dir(fidl::ClientEnd<fio::Directory> service_dir,
-                                std::string_view service_path, std::string_view devfs_path,
-                                uint32_t protocol_id, ExportOptions options,
-                                std::vector<std::unique_ptr<Devnode>>& out) {
-  {
-    const std::vector segments =
-        fxl::SplitString(service_path, "/", fxl::WhiteSpaceHandling::kKeepWhitespace,
-                         fxl::SplitResult::kSplitWantAll);
-    if (segments.empty() ||
-        std::any_of(segments.begin(), segments.end(), std::mem_fn(&std::string_view::empty))) {
-      return ZX_ERR_INVALID_ARGS;
-    }
+namespace {
+
+bool should_publish(const Devnode::Target& target) {
+  return std::visit(
+      overloaded{[](const Devnode::NoRemote& no_remote) {
+                   return !(no_remote.export_options & Devnode::ExportOptions::kInvisible);
+                 },
+                 [](const Devnode::Service& service) {
+                   return !(service.export_options & Devnode::ExportOptions::kInvisible);
+                 },
+                 [](const Devnode::Remote&) { return true; }},
+      target);
+}
+
+zx::result<Devnode::Target> clone_target(Devnode::Target& target) {
+  return std::visit(overloaded{[](Devnode::NoRemote& no_remote) -> zx::result<Devnode::Target> {
+                                 return zx::ok(Devnode::Target(Devnode::NoRemote()));
+                               },
+                               [](Devnode::Service& service) -> zx::result<Devnode::Target> {
+                                 zx::result clone = service.Clone();
+                                 if (clone.is_error()) {
+                                   return clone.take_error();
+                                 }
+                                 return zx::ok(Devnode::Target(std::move(clone.value())));
+                               },
+                               [](Devnode::Remote& remote) -> zx::result<Devnode::Target> {
+                                 return zx::ok(Devnode::Target(remote.Clone()));
+                               }},
+                    target);
+}
+
+}  // namespace
+
+zx_status_t Devnode::export_class(Devnode::Target target, std::string_view class_path,
+                                  std::vector<std::unique_ptr<Devnode>>& out) {
+  std::optional proto_node = devfs_.proto_node(class_path);
+  if (!proto_node.has_value()) {
+    return ZX_ERR_NOT_FOUND;
   }
 
-  const std::vector segments = fxl::SplitString(
-      devfs_path, "/", fxl::WhiteSpaceHandling::kKeepWhitespace, fxl::SplitResult::kSplitWantAll);
+  ProtoNode& dn = proto_node.value().get();
+  zx::result seq_name = dn.seq_name();
+  if (seq_name.is_error()) {
+    return seq_name.error_value();
+  }
+  const fbl::String name = seq_name.value();
+
+  Devnode& child =
+      *out.emplace_back(std::make_unique<Devnode>(devfs_, dn.children(), std::move(target), name));
+  if (should_publish(target)) {
+    child.publish();
+  }
+  return ZX_OK;
+}
+
+zx_status_t Devnode::export_topological_path(Devnode::Target target,
+                                             std::string_view topological_path,
+                                             std::vector<std::unique_ptr<Devnode>>& out) {
+  const bool publish = should_publish(target);
+
+  // Validate the topological path.
+  const std::vector segments =
+      fxl::SplitString(topological_path, "/", fxl::WhiteSpaceHandling::kKeepWhitespace,
+                       fxl::SplitResult::kSplitWantAll);
   if (segments.empty() ||
       std::any_of(segments.begin(), segments.end(), std::mem_fn(&std::string_view::empty))) {
     return ZX_ERR_INVALID_ARGS;
@@ -605,12 +687,13 @@ zx_status_t Devnode::export_dir(fidl::ClientEnd<fio::Directory> service_dir,
         continue;
       }
       PseudoDir& parent = dn->node().children();
-      Devnode& child = *out.emplace_back(std::make_unique<Devnode>(devfs_, parent,
-                                                                   NoRemote{
-                                                                       .export_options = options,
-                                                                   },
-                                                                   name));
-      if (!(options & ExportOptions::kInvisible)) {
+      Devnode& child = *out.emplace_back(std::make_unique<Devnode>(
+          devfs_, parent,
+          NoRemote{
+              .export_options = publish ? ExportOptions() : ExportOptions::kInvisible,
+          },
+          name));
+      if (publish) {
         child.publish();
       }
       dn = &child;
@@ -623,55 +706,40 @@ zx_status_t Devnode::export_dir(fidl::ClientEnd<fio::Directory> service_dir,
       return ZX_ERR_ALREADY_EXISTS;
     }
 
-    // If a protocol directory exists for `protocol_id`, then create a Devnode
-    // under the protocol directory too.
-    if (std::optional proto_dir_opt = devfs_.proto_node(protocol_id); proto_dir_opt.has_value()) {
-      ProtoNode& dn = proto_dir_opt.value().get();
-      zx::result seq_name = dn.seq_name();
-      if (seq_name.is_error()) {
-        return seq_name.status_value();
-      }
-      const fbl::String name = seq_name.value();
-
-      // Clone the service node for the entry in the protocol directory.
-      zx::result endpoints = fidl::CreateEndpoints<fio::Directory>();
-      if (endpoints.is_error()) {
-        return endpoints.status_value();
-      }
-      auto& [client, server] = endpoints.value();
-      const fidl::Status result = fidl::WireCall(service_dir)
-                                      ->Clone(fio::wire::OpenFlags::kCloneSameRights,
-                                              fidl::ServerEnd<fio::Node>{server.TakeChannel()});
-      if (!result.ok()) {
-        return result.status();
-      }
-
-      Devnode& child =
-          *out.emplace_back(std::make_unique<Devnode>(devfs_, dn.children(),
-                                                      Service{
-                                                          .remote = std::move(client),
-                                                          .path = std::string(service_path),
-                                                          .export_options = options,
-                                                      },
-                                                      name));
-      if (!(options & ExportOptions::kInvisible)) {
-        child.publish();
-      }
-    }
-
+    // Create the final child.
     {
-      Devnode& child =
-          *out.emplace_back(std::make_unique<Devnode>(devfs_, dn->node().children(),
-                                                      Service{
-                                                          .remote = std::move(service_dir),
-                                                          .path = std::string(service_path),
-                                                          .export_options = options,
-                                                      },
-                                                      name));
-      if (!(options & ExportOptions::kInvisible)) {
+      Devnode& child = *out.emplace_back(
+          std::make_unique<Devnode>(devfs_, dn->node().children(), std::move(target), name));
+      if (publish) {
         child.publish();
       }
     }
   }
+  return ZX_OK;
+}
+
+zx_status_t Devnode::export_dir(Devnode::Target target,
+                                std::optional<std::string_view> topological_path,
+                                std::optional<std::string_view> class_path,
+                                std::vector<std::unique_ptr<Devnode>>& out) {
+  if (topological_path.has_value()) {
+    zx::result target_clone = clone_target(target);
+    if (target_clone.is_error()) {
+      return target_clone.error_value();
+    }
+    zx_status_t status =
+        export_topological_path(std::move(target_clone.value()), topological_path.value(), out);
+    if (status != ZX_OK) {
+      return status;
+    }
+  }
+
+  if (class_path.has_value()) {
+    zx_status_t status = export_class(std::move(target), class_path.value(), out);
+    if (status != ZX_OK) {
+      return status;
+    }
+  }
+
   return ZX_OK;
 }

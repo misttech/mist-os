@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async/dispatcher.h>
+#include <lib/component/incoming/cpp/service_client.h>
 
 #include <variant>
 
@@ -22,6 +23,8 @@ class Devfs;
 class PseudoDir;
 class DevfsDevice;
 
+std::optional<std::string_view> ProtocolIdToClassName(uint32_t protocol_id);
+
 class Devnode {
  public:
   using ExportOptions = fuchsia_device_fs::wire::ExportOptions;
@@ -29,6 +32,17 @@ class Devnode {
     mutable ExportOptions export_options;
   };
   struct Service {
+    zx::result<Service> Clone() {
+      zx::result result = component::Clone(remote);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+      return zx::ok(Service{
+          .remote = std::move(result.value()),
+          .path = path,
+          .export_options = export_options,
+      });
+    }
     fidl::ClientEnd<fuchsia_io::Directory> remote;
     std::string path;
     mutable ExportOptions export_options;
@@ -64,15 +78,13 @@ class Devnode {
   zx_status_t add_child(std::string_view name, uint32_t protocol, Remote remote,
                         DevfsDevice& out_child);
 
-  // Exports `service_path` from `service_dir` to `devfs_path`, under `dn`. If
-  // `protocol_id` matches a known protocol, `service_path` will also be exposed
-  // under a class path.
+  // Exports `target`.
   //
-  // Every Devnode that is created during the export is stored within `out`. As
-  // each of these Devnodes are children of `dn`, they must live as long as `dn`.
-  zx_status_t export_dir(fidl::ClientEnd<fuchsia_io::Directory> service_dir,
-                         std::string_view service_path, std::string_view devfs_path,
-                         uint32_t protocol_id, ExportOptions options,
+  // If `topological_path` is provided, then `target` will be exported at that path under `this`.
+  //
+  // If `class_path` is provided, then `target` will be exported under that class path.
+  zx_status_t export_dir(Devnode::Target target, std::optional<std::string_view> topological_path,
+                         std::optional<std::string_view> class_path,
                          std::vector<std::unique_ptr<Devnode>>& out);
 
   std::string_view name() const;
@@ -140,6 +152,12 @@ class Devnode {
   };
 
  private:
+  zx_status_t export_class(Devnode::Target target, std::string_view class_path,
+                           std::vector<std::unique_ptr<Devnode>>& out);
+
+  zx_status_t export_topological_path(Devnode::Target target, std::string_view topological_path,
+                                      std::vector<std::unique_ptr<Devnode>>& out);
+
   VnodeImpl& node() const { return *node_; }
   const Target& target() const { return node_->target_; }
 
@@ -222,6 +240,7 @@ class Devfs {
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Connect(fs::FuchsiaVfs& vfs);
 
   // This method is exposed for testing.
+  std::optional<std::reference_wrapper<ProtoNode>> proto_node(std::string_view protocol_name);
   std::optional<std::reference_wrapper<ProtoNode>> proto_node(uint32_t protocol_id);
 
  private:
@@ -233,18 +252,6 @@ class Devfs {
   Devnode& root_;
 
   fbl::RefPtr<PseudoDir> class_ = fbl::MakeRefCounted<PseudoDir>();
-
-  struct ProtocolInfo {
-    std::string_view name;
-    uint32_t id;
-    uint32_t flags;
-  };
-
-  static constexpr ProtocolInfo proto_infos[] = {
-#define DDK_PROTOCOL_DEF(tag, val, name, flags) {name, val, flags},
-#include <lib/ddk/protodefs.h>
-  };
-
   std::unordered_map<uint32_t, ProtoNode> proto_info_nodes;
 };
 
