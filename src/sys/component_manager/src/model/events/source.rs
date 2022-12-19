@@ -103,10 +103,7 @@ impl EventSourceV2 {
             if let Some(event_names) = stream_provider.take_events(target_moniker, path).await {
                 let subscriptions = event_names
                     .into_iter()
-                    .map(|name| EventSubscription {
-                        event_name: CapabilityName::from(name),
-                        mode: cm_rust::EventMode::Async,
-                    })
+                    .map(|name| EventSubscription { event_name: CapabilityName::from(name) })
                     .collect();
                 return Ok(Some(self.subscribe(subscriptions).await?));
             }

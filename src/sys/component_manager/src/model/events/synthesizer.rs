@@ -269,9 +269,7 @@ mod tests {
             hooks::EventPayload,
             testing::routing_test_helpers::*,
         },
-        cm_rust::{
-            DirectoryDecl, EventMode, ExposeDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget,
-        },
+        cm_rust::{DirectoryDecl, ExposeDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget},
         cm_rust_testing::*,
         fidl_fuchsia_io as fio,
         fuchsia_component::server::ServiceFs,
@@ -329,7 +327,6 @@ mod tests {
             .into_iter()
             .map(|event| RoutedEvent {
                 source_name: event.into(),
-                mode: EventMode::Async,
                 scopes: scopes.clone(),
                 route: vec![],
             })

@@ -20,8 +20,8 @@ use {
     ::routing::config::RuntimeConfig,
     anyhow::{Context, Error},
     cm_rust::{
-        CapabilityDecl, CapabilityName, ChildDecl, ComponentDecl, EventMode, EventStreamDecl,
-        NativeIntoFidl, RunnerDecl, ValuesData,
+        CapabilityDecl, CapabilityName, ChildDecl, ComponentDecl, EventStreamDecl, NativeIntoFidl,
+        RunnerDecl, ValuesData,
     },
     cm_types::Url,
     diagnostics_message::MonikerWithUrl,
@@ -561,7 +561,6 @@ pub fn get_message_logged_to_socket(socket: zx::Socket) -> Option<String> {
 pub async fn new_event_stream(
     builtin_environment: Arc<Mutex<BuiltinEnvironment>>,
     events: Vec<CapabilityName>,
-    mode: EventMode,
 ) -> (EventSource, EventStream) {
     let mut event_source = builtin_environment
         .as_ref()
@@ -572,9 +571,7 @@ pub async fn new_event_stream(
         .await
         .expect("created event source");
     let event_stream = event_source
-        .subscribe(
-            events.into_iter().map(|event| EventSubscription::new(event, mode.clone())).collect(),
-        )
+        .subscribe(events.into_iter().map(|event| EventSubscription::new(event)).collect())
         .await
         .expect("subscribe to event stream");
     (event_source, event_stream)

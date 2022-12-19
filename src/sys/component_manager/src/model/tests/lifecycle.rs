@@ -22,10 +22,7 @@ use {
     ::routing::{config::AllowlistEntry, policy::PolicyError},
     assert_matches::assert_matches,
     async_trait::async_trait,
-    cm_rust::{
-        CapabilityPath, ComponentDecl, EventMode, RegistrationSource, RunnerDecl,
-        RunnerRegistration,
-    },
+    cm_rust::{CapabilityPath, ComponentDecl, RegistrationSource, RunnerDecl, RunnerRegistration},
     cm_rust_testing::*,
     fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
@@ -424,12 +421,7 @@ async fn bind_action_sequence() {
         .await
         .expect("create event source");
     let mut event_stream = event_source
-        .subscribe(
-            events
-                .into_iter()
-                .map(|event| EventSubscription::new(event, EventMode::Async))
-                .collect(),
-        )
+        .subscribe(events.into_iter().map(|event| EventSubscription::new(event)).collect())
         .await
         .expect("subscribe to event stream");
 

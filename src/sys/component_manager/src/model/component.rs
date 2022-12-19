@@ -2157,10 +2157,10 @@ pub mod tests {
         },
         assert_matches::assert_matches,
         cm_rust::{
-            Availability, CapabilityDecl, CapabilityPath, ChildRef, DependencyType, EventMode,
-            ExposeDecl, ExposeProtocolDecl, ExposeSource, ExposeTarget, OfferDecl,
-            OfferDirectoryDecl, OfferProtocolDecl, OfferServiceDecl, OfferSource, OfferTarget,
-            ProtocolDecl, UseProtocolDecl, UseSource,
+            Availability, CapabilityDecl, CapabilityPath, ChildRef, DependencyType, ExposeDecl,
+            ExposeProtocolDecl, ExposeSource, ExposeTarget, OfferDecl, OfferDirectoryDecl,
+            OfferProtocolDecl, OfferServiceDecl, OfferSource, OfferTarget, ProtocolDecl,
+            UseProtocolDecl, UseSource,
         },
         cm_rust_testing::{
             ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder,
@@ -2642,7 +2642,7 @@ pub mod tests {
                     EventType::DebugStarted.into(),
                 ]
                 .into_iter()
-                .map(|event| EventSubscription::new(event, EventMode::Async))
+                .map(|event| EventSubscription::new(event))
                 .collect(),
             )
             .await
@@ -2693,7 +2693,7 @@ pub mod tests {
             .await
             .expect("failed creating event source");
         let mut stop_event_stream = event_source
-            .subscribe(vec![EventSubscription::new(EventType::Stopped.into(), EventMode::Async)])
+            .subscribe(vec![EventSubscription::new(EventType::Stopped.into())])
             .await
             .expect("couldn't susbscribe to event stream");
 

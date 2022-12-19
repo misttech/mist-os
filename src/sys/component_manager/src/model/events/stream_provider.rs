@@ -13,7 +13,7 @@ use {
         hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
     },
     async_trait::async_trait,
-    cm_rust::{ComponentDecl, EventMode, UseDecl, UseEventStreamDeprecatedDecl},
+    cm_rust::{ComponentDecl, UseDecl, UseEventStreamDeprecatedDecl},
     futures::lock::Mutex,
     moniker::{AbsoluteMoniker, ExtendedMoniker},
     std::{
@@ -174,10 +174,7 @@ impl EventStreamProvider {
                     self.create_v2_static_event_stream(
                         &ExtendedMoniker::ComponentInstance(target_moniker.clone()),
                         decl.source_name.to_string(),
-                        EventSubscription {
-                            event_name: decl.source_name.clone(),
-                            mode: EventMode::Async,
-                        },
+                        EventSubscription { event_name: decl.source_name.clone() },
                         decl.target_path.to_string(),
                     )
                     .await?;

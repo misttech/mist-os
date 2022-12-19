@@ -139,7 +139,6 @@ pub mod tests {
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
         },
         assert_matches::assert_matches,
-        cm_rust::EventMode,
         cm_rust_testing::{CollectionDeclBuilder, ComponentDeclBuilder},
         fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync,
         moniker::ChildMoniker,
@@ -245,12 +244,7 @@ pub mod tests {
             .await
             .expect("create event source");
         let event_stream = event_source
-            .subscribe(
-                events
-                    .into_iter()
-                    .map(|event| EventSubscription::new(event, EventMode::Async))
-                    .collect(),
-            )
+            .subscribe(events.into_iter().map(|event| EventSubscription::new(event)).collect())
             .await
             .expect("subscribe to event stream");
         let model = test.model.clone();

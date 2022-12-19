@@ -68,7 +68,7 @@ use {
         environment::{DebugRegistry, RunnerRegistry},
     },
     anyhow::{anyhow, format_err, Context as _, Error},
-    cm_rust::{CapabilityName, EventMode, RunnerRegistration},
+    cm_rust::{CapabilityName, RunnerRegistration},
     fidl::{
         endpoints::{create_proxy, ServerEnd},
         AsHandleRef,
@@ -1000,37 +1000,19 @@ impl BuiltinEnvironment {
                     serve_event_stream_v2_as_stream(
                         event_source_v2
                             .subscribe(vec![
-                                EventSubscription {
-                                    event_name: CapabilityName::from("started"),
-                                    mode: EventMode::Async,
-                                },
-                                EventSubscription {
-                                    event_name: CapabilityName::from("stopped"),
-                                    mode: EventMode::Async,
-                                },
+                                EventSubscription { event_name: CapabilityName::from("started") },
+                                EventSubscription { event_name: CapabilityName::from("stopped") },
                                 EventSubscription {
                                     event_name: CapabilityName::from("capability_routed"),
-                                    mode: EventMode::Async,
                                 },
-                                EventSubscription {
-                                    event_name: CapabilityName::from("running"),
-                                    mode: EventMode::Async,
-                                },
-                                EventSubscription {
-                                    event_name: CapabilityName::from("destroyed"),
-                                    mode: EventMode::Async,
-                                },
+                                EventSubscription { event_name: CapabilityName::from("running") },
+                                EventSubscription { event_name: CapabilityName::from("destroyed") },
                                 EventSubscription {
                                     event_name: CapabilityName::from("discovered"),
-                                    mode: EventMode::Async,
                                 },
-                                EventSubscription {
-                                    event_name: CapabilityName::from("resolved"),
-                                    mode: EventMode::Async,
-                                },
+                                EventSubscription { event_name: CapabilityName::from("resolved") },
                                 EventSubscription {
                                     event_name: CapabilityName::from("unresolved"),
-                                    mode: EventMode::Async,
                                 },
                             ])
                             .await

@@ -434,8 +434,8 @@ mod tests {
             },
         },
         cm_rust::{
-            self, CapabilityName, CapabilityPath, ComponentDecl, EventMode, ExposeDecl,
-            ExposeProtocolDecl, ExposeSource, ExposeTarget,
+            self, CapabilityName, CapabilityPath, ComponentDecl, ExposeDecl, ExposeProtocolDecl,
+            ExposeSource, ExposeTarget,
         },
         cm_rust_testing::*,
         fidl::endpoints::{self, Proxy},
@@ -521,12 +521,10 @@ mod tests {
         async fn new_event_stream(
             &self,
             events: Vec<CapabilityName>,
-            mode: EventMode,
         ) -> (EventSource, EventStream) {
             new_event_stream(
                 self.builtin_environment.as_ref().expect("builtin_environment is none").clone(),
                 events,
-                mode,
             )
             .await
         }
@@ -563,7 +561,7 @@ mod tests {
         .await;
 
         let (_event_source, mut event_stream) =
-            test.new_event_stream(vec![EventType::Discovered.into()], EventMode::Async).await;
+            test.new_event_stream(vec![EventType::Discovered.into()]).await;
 
         // Test that a dynamic child with a long name can also be created.
         let long_name = &"c".repeat(cm_types::MAX_LONG_NAME_LENGTH);
@@ -995,10 +993,7 @@ mod tests {
         .await;
 
         let (_event_source, mut event_stream) = test
-            .new_event_stream(
-                vec![EventType::Stopped.into(), EventType::Destroyed.into()],
-                EventMode::Async,
-            )
+            .new_event_stream(vec![EventType::Stopped.into(), EventType::Destroyed.into()])
             .await;
 
         // Create children "a" and "b" in collection, and start them.
@@ -1160,10 +1155,7 @@ mod tests {
         .await;
 
         let (_event_source, mut event_stream) = test
-            .new_event_stream(
-                vec![EventType::Started.into(), EventType::Destroyed.into()],
-                EventMode::Async,
-            )
+            .new_event_stream(vec![EventType::Started.into(), EventType::Destroyed.into()])
             .await;
 
         // Create child "a" in collection. Expect a Started event.
@@ -1257,10 +1249,7 @@ mod tests {
         )
         .await;
         let (_event_source, mut event_stream) = test
-            .new_event_stream(
-                vec![EventType::Resolved.into(), EventType::Started.into()],
-                EventMode::Async,
-            )
+            .new_event_stream(vec![EventType::Resolved.into(), EventType::Started.into()])
             .await;
         let mut out_dir = OutDir::new();
         out_dir.add_echo_service(CapabilityPath::try_from("/svc/foo").unwrap());
@@ -1327,10 +1316,7 @@ mod tests {
         .await;
 
         let (_event_source, mut event_stream) = test
-            .new_event_stream(
-                vec![EventType::Resolved.into(), EventType::Started.into()],
-                EventMode::Async,
-            )
+            .new_event_stream(vec![EventType::Resolved.into(), EventType::Started.into()])
             .await;
         let mut out_dir = OutDir::new();
         out_dir.add_echo_service(CapabilityPath::try_from("/svc/foo").unwrap());

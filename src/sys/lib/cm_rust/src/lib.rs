@@ -335,13 +335,6 @@ pub struct EventSubscription {
     pub event_name: String,
 }
 
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum EventMode {
-    Async,
-    Sync,
-}
-
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::UseEventStreamDeprecated")]

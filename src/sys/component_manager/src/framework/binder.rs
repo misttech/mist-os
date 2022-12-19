@@ -189,7 +189,7 @@ mod tests {
             },
         },
         assert_matches::assert_matches,
-        cm_rust::{self, CapabilityName, ComponentDecl, EventMode},
+        cm_rust::{self, CapabilityName, ComponentDecl},
         cm_rust_testing::*,
         cm_task_scope::TaskScope,
         fidl::{client::Client, handle::AsyncChannel},
@@ -214,9 +214,8 @@ mod tests {
         async fn new_event_stream(
             &self,
             events: Vec<CapabilityName>,
-            mode: EventMode,
         ) -> (EventSource, EventStream) {
-            new_event_stream(self.builtin_environment.clone(), events, mode).await
+            new_event_stream(self.builtin_environment.clone(), events).await
         }
 
         async fn provider(
@@ -258,10 +257,7 @@ mod tests {
         ])
         .await;
         let (_event_source, mut event_stream) = fixture
-            .new_event_stream(
-                vec![EventType::Resolved.into(), EventType::Started.into()],
-                EventMode::Async,
-            )
+            .new_event_stream(vec![EventType::Resolved.into(), EventType::Started.into()])
             .await;
         let (_client_end, mut server_end) =
             zx::Channel::create().expect("failed to create channels");

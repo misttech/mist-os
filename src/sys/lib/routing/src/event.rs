@@ -4,7 +4,7 @@
 
 use {
     crate::{error::EventsRoutingError, walk_state::WalkStateUnit},
-    cm_rust::{CapabilityName, DictionaryValue, EventMode},
+    cm_rust::{CapabilityName, DictionaryValue},
     maplit::hashmap,
     std::collections::HashMap,
 };
@@ -12,14 +12,11 @@ use {
 #[derive(Debug)]
 pub struct EventSubscription {
     pub event_name: CapabilityName,
-    /// Determines whether component manager waits for a response from the
-    /// event receiver.
-    pub mode: EventMode,
 }
 
 impl EventSubscription {
-    pub fn new(event_name: CapabilityName, mode: EventMode) -> Self {
-        Self { event_name, mode }
+    pub fn new(event_name: CapabilityName) -> Self {
+        Self { event_name }
     }
 }
 

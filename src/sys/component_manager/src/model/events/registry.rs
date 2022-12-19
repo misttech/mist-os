@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::collections::HashSet;
+
 use {
     crate::{
         capability::CapabilitySource,
@@ -24,7 +26,7 @@ use {
         event::EventFilter, route_capability, route_event_stream_capability,
     },
     async_trait::async_trait,
-    cm_rust::{CapabilityName, EventMode, UseDecl, UseEventDecl, UseEventStreamDecl},
+    cm_rust::{CapabilityName, UseDecl, UseEventDecl, UseEventStreamDecl},
     futures::lock::Mutex,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase, ExtendedMoniker},
     std::{
@@ -39,21 +41,19 @@ pub type EventSubscription = ::routing::event::EventSubscription;
 #[derive(Debug)]
 pub struct RoutedEvent {
     pub source_name: CapabilityName,
-    pub mode: EventMode,
     pub scopes: Vec<EventDispatcherScope>,
     pub route: Vec<ComponentEventRoute>,
 }
 
 #[derive(Debug)]
 pub struct RequestedEventState {
-    pub mode: EventMode,
     pub scopes: Vec<EventDispatcherScope>,
     pub route: Vec<ComponentEventRoute>,
 }
 
 impl RequestedEventState {
-    pub fn new(mode: EventMode, route: Vec<ComponentEventRoute>) -> Self {
-        Self { mode, scopes: Vec::new(), route }
+    pub fn new(route: Vec<ComponentEventRoute>) -> Self {
+        Self { scopes: Vec::new(), route }
     }
 }
 
@@ -71,12 +71,11 @@ impl RouteEventsResult {
     fn insert(
         &mut self,
         source_name: CapabilityName,
-        mode: EventMode,
         scope: EventDispatcherScope,
         route: Vec<ComponentEventRoute>,
     ) {
         let event_state =
-            self.mapping.entry(source_name).or_insert(RequestedEventState::new(mode, route));
+            self.mapping.entry(source_name).or_insert(RequestedEventState::new(route));
         if !event_state.scopes.contains(&scope) {
             event_state.scopes.push(scope);
         }
@@ -95,7 +94,6 @@ impl RouteEventsResult {
             .into_iter()
             .map(|(source_name, state)| RoutedEvent {
                 source_name,
-                mode: state.mode,
                 scopes: state.scopes,
                 route: state.route,
             })
@@ -173,9 +171,9 @@ impl EventRegistry {
         // Register event capabilities if any. It identifies the sources of these events (might be
         // the parent or this component itself). It constructs an "allow-list tree" of events and
         // component instances.
-        let mut event_names = HashMap::new();
+        let mut event_names = HashSet::new();
         for subscription in subscriptions {
-            if event_names.insert(subscription.event_name.clone(), subscription.mode).is_some() {
+            if !event_names.insert(subscription.event_name.clone()) {
                 return Err(EventsError::duplicate_event(subscription.event_name).into());
             }
         }
@@ -183,9 +181,8 @@ impl EventRegistry {
         let events = match &subscriber {
             ExtendedMoniker::ComponentManager => event_names
                 .iter()
-                .map(|(source_name, mode)| RoutedEvent {
+                .map(|source_name| RoutedEvent {
                     source_name: source_name.clone(),
-                    mode: mode.clone(),
                     scopes: vec![
                         EventDispatcherScope::new(AbsoluteMoniker::root().into()).for_debug()
                     ],
@@ -200,9 +197,8 @@ impl EventRegistry {
                     route_result.mapping.values().map(|state| state.scopes.len()).sum();
                 if total_scopes != event_names.len() {
                     let names = event_names
-                        .keys()
+                        .into_iter()
                         .filter(|event_name| !route_result.contains_event(&event_name))
-                        .cloned()
                         .collect();
                     return Err(EventsError::not_available(names).into());
                 }
@@ -222,21 +218,17 @@ impl EventRegistry {
         // Register event capabilities if any. It identifies the sources of these events (might be
         // the parent or this component itself). It consturcts an "allow-list tree" of events and
         // component instances.
-        let mut event_names = HashMap::new();
+        let mut event_names = HashSet::new();
         for subscription in subscriptions {
-            if event_names
-                .insert(subscription.event_name.clone(), subscription.mode.clone())
-                .is_some()
-            {
+            if !event_names.insert(subscription.event_name.clone()) {
                 return Err(EventsError::duplicate_event(subscription.event_name).into());
             }
         }
         let events = match &subscriber {
             ExtendedMoniker::ComponentManager => event_names
                 .iter()
-                .map(|(source_name, mode)| RoutedEvent {
+                .map(|source_name| RoutedEvent {
                     source_name: source_name.clone(),
-                    mode: mode.clone(),
                     scopes: vec![
                         EventDispatcherScope::new(AbsoluteMoniker::root().into()).for_debug()
                     ],
@@ -251,10 +243,8 @@ impl EventRegistry {
                     route_result.mapping.values().map(|state| state.scopes.len()).sum();
                 if total_scopes != event_names.len() {
                     let names = event_names
-                        .keys()
                         .into_iter()
                         .filter(|event_name| !route_result.contains_event(&event_name))
-                        .cloned()
                         .collect();
                     return Err(EventsError::not_available(names).into());
                 }
@@ -344,7 +334,7 @@ impl EventRegistry {
     pub async fn route_events_v2(
         &self,
         target_moniker: &AbsoluteMoniker,
-        events: &HashMap<CapabilityName, EventMode>,
+        events: &HashSet<CapabilityName>,
     ) -> Result<RouteEventsResult, ModelError> {
         let model = self.model.upgrade().ok_or(ModelError::ModelNotAvailable)?;
         let component = model.look_up(&target_moniker).await?;
@@ -370,14 +360,14 @@ impl EventRegistry {
         for use_decl in decl.uses {
             match use_decl {
                 UseDecl::EventStream(event_decl) => {
-                    if let Some(mode) = events.get(&event_decl.source_name) {
+                    if events.contains(&event_decl.source_name) {
                         let (source_name, scope_moniker, route) =
                             Self::route_single_event_v2(event_decl.clone(), &component).await?;
                         let mut scope = EventDispatcherScope::new(scope_moniker);
                         if let Some(filter) = event_decl.filter {
                             scope = scope.with_filter(EventFilter::new(Some(filter)));
                         }
-                        result.insert(source_name, mode.clone(), scope, route);
+                        result.insert(source_name, scope, route);
                     }
                 }
                 _ => {}
@@ -390,7 +380,7 @@ impl EventRegistry {
     pub async fn route_events(
         &self,
         target_moniker: &AbsoluteMoniker,
-        events: &HashMap<CapabilityName, EventMode>,
+        events: &HashSet<CapabilityName>,
     ) -> Result<RouteEventsResult, ModelError> {
         let model = self.model.upgrade().ok_or(ModelError::ModelNotAvailable)?;
         let component = model.look_up(&target_moniker).await?;
@@ -411,12 +401,12 @@ impl EventRegistry {
         for use_decl in decl.uses {
             match use_decl {
                 UseDecl::Event(event_decl) => {
-                    if let Some(mode) = events.get(&event_decl.target_name) {
+                    if events.contains(&event_decl.target_name) {
                         let (source_name, scope_moniker) =
                             Self::route_event(event_decl.clone(), &component).await?;
                         let scope = EventDispatcherScope::new(scope_moniker)
                             .with_filter(EventFilter::new(event_decl.filter));
-                        result.insert(source_name, mode.clone(), scope, vec![]);
+                        result.insert(source_name, scope, vec![]);
                     }
                 }
                 _ => {}
@@ -592,7 +582,7 @@ mod tests {
         let mut event_stream_a = event_registry
             .subscribe(
                 &ExtendedMoniker::ComponentManager,
-                vec![EventSubscription::new(EventType::Discovered.into(), EventMode::Async)],
+                vec![EventSubscription::new(EventType::Discovered.into())],
             )
             .await
             .expect("subscribe succeeds");
@@ -602,7 +592,7 @@ mod tests {
         let mut event_stream_b = event_registry
             .subscribe(
                 &ExtendedMoniker::ComponentManager,
-                vec![EventSubscription::new(EventType::Discovered.into(), EventMode::Async)],
+                vec![EventSubscription::new(EventType::Discovered.into())],
             )
             .await
             .expect("subscribe succeeds");
@@ -645,10 +635,7 @@ mod tests {
         let mut event_stream_a = event_registry
             .subscribe(
                 &ExtendedMoniker::ComponentManager,
-                vec![EventSubscription::new(
-                    EventType::CapabilityRequested.into(),
-                    EventMode::Async,
-                )],
+                vec![EventSubscription::new(EventType::CapabilityRequested.into())],
             )
             .await
             .expect("subscribe succeeds");
@@ -661,10 +648,7 @@ mod tests {
         let mut event_stream_b = event_registry
             .subscribe(
                 &ExtendedMoniker::ComponentManager,
-                vec![EventSubscription::new(
-                    EventType::CapabilityRequested.into(),
-                    EventMode::Async,
-                )],
+                vec![EventSubscription::new(EventType::CapabilityRequested.into())],
             )
             .await
             .expect("subscribe succeeds");
@@ -775,8 +759,8 @@ mod tests {
             .subscribe(
                 &subscriber,
                 vec![
-                    EventSubscription::new("bar_requested".into(), EventMode::Async),
-                    EventSubscription::new("foo_requested".into(), EventMode::Async),
+                    EventSubscription::new("bar_requested".into()),
+                    EventSubscription::new("foo_requested".into()),
                 ],
             )
             .await
