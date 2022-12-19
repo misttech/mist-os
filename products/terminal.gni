@@ -2,9 +2,21 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//products/core.gni")
+import("//products/common/core.gni")
 
 core_realm_package_name = "core-terminal"
+
+product_bootfs_labels += [ "//bundles/drivers:usb-peripheral-stack" ]
+
+core_realm_shards += [
+  "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",
+]
+
+legacy_base_package_labels += [
+  "//src/connectivity/network/netcfg:config-default",
+  "//src/connectivity/network:network-legacy-deprecated",
+  "//src/sys/pkg:system-update-checker",
+]
 
 legacy_base_package_labels += [
   "//src/fonts",
@@ -13,21 +25,14 @@ legacy_base_package_labels += [
 
 # Remove intl_services default shards that were added in core.gni.
 core_realm_shards += [ "//src/intl/intl_services:intl_services_shard" ]
-core_realm_shards -= [ "//src/intl/intl_services:intl_services_small_shard" ]
 
 # TODO(fxbug.dev/102390): deprecate appmgr from terminal.
 import("//src/sys/appmgr/appmgr.gni")
-legacy_base_package_labels += appmgr_base_packages
-core_realm_shards += appmgr_core_shards
 
-# Include sysmgr.
-# TODO(fxbug.dev/108016, fxbug.dev/100732): Remove once tiles is migrated.
-legacy_base_package_labels += [ "//src/sys/appmgr" ]
-legacy_base_package_labels -= [ "//src/sys/appmgr" ]
-legacy_base_package_labels += [
-  "//src/sys/appmgr:appmgr_with_sysmgr",
-  "//src/sys/sysmgr",
-]
+# TODO(fxbug.dev/108016, fxbug.dev/100732): Move to appmgr_base_packages once
+# tiles is migrated.
+legacy_base_package_labels += appmgr_with_sysmgr_base_packages
+core_realm_shards += appmgr_core_shards
 
 # Add build type config data
 legacy_base_package_labels += [
