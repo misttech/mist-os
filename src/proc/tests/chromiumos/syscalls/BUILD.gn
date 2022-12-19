@@ -40,6 +40,7 @@ test("syscalls_test_bin") {
     "waitpid_test.cc",
   ]
   deps = [
+    "//src/lib/files",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",

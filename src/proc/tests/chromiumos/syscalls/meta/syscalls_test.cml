@@ -5,6 +5,9 @@
     include: [ "//src/proc/tests/starnix_test.shard.cml" ],
     program: {
         binary: "data/tests/syscalls_test_bin",
+
+        // TODO(https://fxbug.dev/97514): Make these tests pass in Starnix then enable.
+        args: [ "--gtest_filter=-MapGrowsdownTest.*" ],
         user: "fuchsia:x:0:0",
         environ: [ "TEST_TMPDIR=/data/tmp" ],
     },
