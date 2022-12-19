@@ -511,25 +511,26 @@ type Test = flexible enum : uint32 {
     BAD_DECODE_LARGE_MESSAGE_INFO_TOO_LARGE = 92;
     BAD_DECODE_LARGE_MESSAGE_INFO_TOP_HALF_UNZEROED = 93;
     BAD_DECODE_LARGE_MESSAGE_INFO_BYTE_COUNT_IS_ZERO = 94;
-    BAD_DECODE_LARGE_MESSAGE_INFO_BYTE_COUNT_TOO_SMALL = 95;
-    BAD_DECODE_LARGE_MESSAGE_INFO_BYTE_COUNT_NOT_EQUAL_TO_BOUND = 96;
-    BAD_DECODE_NO_HANDLES = 97;
-    BAD_DECODE_TOO_FEW_HANDLES = 98;
-    BAD_DECODE_64_HANDLE_LARGE_MESSAGE = 99;
+    BAD_DECODE_LARGE_MESSAGE_INFO_BYTE_COUNT_BELOW_MINIMUM = 95;
+    BAD_DECODE_LARGE_MESSAGE_NO_HANDLES = 96;
+    BAD_DECODE_LARGE_MESSAGE_TOO_FEW_HANDLES = 97;
+    BAD_DECODE_LARGE_MESSAGE_64_HANDLES = 98;
 
     // All large message related decode errors that can only be checked after the receiver attempts
     // to read the last handle on the message as a VMO. All tests should be executed using the
     // method `DecodeUnboundedMaybeLargeResource(...)`.
-    BAD_DECODE_LAST_HANDLE_NOT_VMO = 100;
-    BAD_DECODE_LAST_HANDLE_INSUFFICIENT_RIGHTS = 101;
-    BAD_DECODE_VMO_TOO_SMALL = 102;
-    BAD_DECODE_VMO_TOO_LARGE = 103;
+    BAD_DECODE_LARGE_MESSAGE_LAST_HANDLE_NOT_VMO = 99;
+    BAD_DECODE_LARGE_MESSAGE_LAST_HANDLE_INSUFFICIENT_RIGHTS = 100;
+    BAD_DECODE_LARGE_MESSAGE_LAST_HANDLE_EXCESSIVE_RIGHTS = 101;
+    BAD_DECODE_LARGE_MESSAGE_VMO_TOO_SMALL = 102;
+    BAD_DECODE_LARGE_MESSAGE_INFO_BYTE_COUNT_TOO_SMALL = 103;
+    BAD_DECODE_LARGE_MESSAGE_INFO_BYTE_COUNT_TOO_LARGE = 104;
 
     // The lone large message encode test (ie, the only way a user can get an error by attempting to
     // send an otherwise well-formed FIDL type). This test should be exercised by sending the
     // smallest possible large message and 64 handles over the wire using the
     // `EncodeUnboundedMaybeLargeResource(...) -> (...)` method.
-    BAD_ENCODE_64_HANDLE_LARGE_MESSAGE = 104;
+    BAD_ENCODE_64_HANDLE_LARGE_MESSAGE = 108;
 
-    // Next available: 108
+    // Next available: 109
 };

@@ -383,15 +383,15 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                         | Test::BadDecodeLargeMessageInfoTooLarge
                         | Test::BadDecodeLargeMessageInfoTopHalfUnzeroed
                         | Test::BadDecodeLargeMessageInfoByteCountIsZero
+                        | Test::BadDecodeLargeMessageInfoByteCountBelowMinimum
+                        | Test::BadDecodeLargeMessageNoHandles
+                        | Test::BadDecodeLargeMessageTooFewHandles
+                        | Test::BadDecodeLargeMessage64Handles
+                        | Test::BadDecodeLargeMessageLastHandleNotVmo
+                        | Test::BadDecodeLargeMessageLastHandleInsufficientRights
+                        | Test::BadDecodeLargeMessageVmoTooSmall
                         | Test::BadDecodeLargeMessageInfoByteCountTooSmall
-                        | Test::BadDecodeLargeMessageInfoByteCountNotEqualToBound
-                        | Test::BadDecodeNoHandles
-                        | Test::BadDecodeTooFewHandles
-                        | Test::BadDecode64HandleLargeMessage
-                        | Test::BadDecodeLastHandleNotVmo
-                        | Test::BadDecodeLastHandleInsufficientRights
-                        | Test::BadDecodeVmoTooSmall
-                        | Test::BadDecodeVmoTooLarge => {
+                        | Test::BadDecodeLargeMessageInfoByteCountTooLarge => {
                             // TODO(fxbug.dev/114259): Implement large messages for Rust.
                             false
                         }

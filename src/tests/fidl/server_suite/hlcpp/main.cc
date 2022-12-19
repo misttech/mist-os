@@ -282,15 +282,16 @@ class RunnerServer : public fidl::serversuite::Runner {
       case fidl::serversuite::Test::BAD_DECODE_LARGE_MESSAGE_INFO_TOO_LARGE:
       case fidl::serversuite::Test::BAD_DECODE_LARGE_MESSAGE_INFO_TOP_HALF_UNZEROED:
       case fidl::serversuite::Test::BAD_DECODE_LARGE_MESSAGE_INFO_BYTE_COUNT_IS_ZERO:
+      case fidl::serversuite::Test::BAD_DECODE_LARGE_MESSAGE_INFO_BYTE_COUNT_BELOW_MINIMUM:
+      case fidl::serversuite::Test::BAD_DECODE_LARGE_MESSAGE_NO_HANDLES:
+      case fidl::serversuite::Test::BAD_DECODE_LARGE_MESSAGE_TOO_FEW_HANDLES:
+      case fidl::serversuite::Test::BAD_DECODE_LARGE_MESSAGE_64_HANDLES:
+      case fidl::serversuite::Test::BAD_DECODE_LARGE_MESSAGE_LAST_HANDLE_NOT_VMO:
+      case fidl::serversuite::Test::BAD_DECODE_LARGE_MESSAGE_LAST_HANDLE_INSUFFICIENT_RIGHTS:
+      case fidl::serversuite::Test::BAD_DECODE_LARGE_MESSAGE_LAST_HANDLE_EXCESSIVE_RIGHTS:
+      case fidl::serversuite::Test::BAD_DECODE_LARGE_MESSAGE_VMO_TOO_SMALL:
       case fidl::serversuite::Test::BAD_DECODE_LARGE_MESSAGE_INFO_BYTE_COUNT_TOO_SMALL:
-      case fidl::serversuite::Test::BAD_DECODE_LARGE_MESSAGE_INFO_BYTE_COUNT_NOT_EQUAL_TO_BOUND:
-      case fidl::serversuite::Test::BAD_DECODE_NO_HANDLES:
-      case fidl::serversuite::Test::BAD_DECODE_TOO_FEW_HANDLES:
-      case fidl::serversuite::Test::BAD_DECODE_64_HANDLE_LARGE_MESSAGE:
-      case fidl::serversuite::Test::BAD_DECODE_LAST_HANDLE_NOT_VMO:
-      case fidl::serversuite::Test::BAD_DECODE_LAST_HANDLE_INSUFFICIENT_RIGHTS:
-      case fidl::serversuite::Test::BAD_DECODE_VMO_TOO_SMALL:
-      case fidl::serversuite::Test::BAD_DECODE_VMO_TOO_LARGE:
+      case fidl::serversuite::Test::BAD_DECODE_LARGE_MESSAGE_INFO_BYTE_COUNT_TOO_LARGE:
         callback(false);
         // TODO(fxbug.dev/114261): Test decoding large messages.
         return;

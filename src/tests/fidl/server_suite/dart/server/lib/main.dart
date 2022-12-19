@@ -256,15 +256,16 @@ class RunnerImpl extends Runner {
       case Test.badDecodeLargeMessageInfoTooLarge:
       case Test.badDecodeLargeMessageInfoTopHalfUnzeroed:
       case Test.badDecodeLargeMessageInfoByteCountIsZero:
+      case Test.badDecodeLargeMessageInfoByteCountBelowMinimum:
+      case Test.badDecodeLargeMessageNoHandles:
+      case Test.badDecodeLargeMessageTooFewHandles:
+      case Test.badDecodeLargeMessage64Handles:
+      case Test.badDecodeLargeMessageLastHandleNotVmo:
+      case Test.badDecodeLargeMessageLastHandleInsufficientRights:
+      case Test.badDecodeLargeMessageLastHandleExcessiveRights:
+      case Test.badDecodeLargeMessageVmoTooSmall:
       case Test.badDecodeLargeMessageInfoByteCountTooSmall:
-      case Test.badDecodeLargeMessageInfoByteCountNotEqualToBound:
-      case Test.badDecodeNoHandles:
-      case Test.badDecodeTooFewHandles:
-      case Test.badDecode64HandleLargeMessage:
-      case Test.badDecodeLastHandleNotVmo:
-      case Test.badDecodeLastHandleInsufficientRights:
-      case Test.badDecodeVmoTooSmall:
-      case Test.badDecodeVmoTooLarge:
+      case Test.badDecodeLargeMessageInfoByteCountTooLarge:
         // TODO(fxbug.dev/114261): Test decoding large messages.
         return false;
       case Test.goodEncodeBoundedKnownSmallMessage:

@@ -289,15 +289,16 @@ class RunnerServer : public fidl::WireServer<fidl_serversuite::Runner> {
         case fidl_serversuite::Test::kBadDecodeLargeMessageInfoTooLarge:
         case fidl_serversuite::Test::kBadDecodeLargeMessageInfoTopHalfUnzeroed:
         case fidl_serversuite::Test::kBadDecodeLargeMessageInfoByteCountIsZero:
+        case fidl_serversuite::Test::kBadDecodeLargeMessageInfoByteCountBelowMinimum:
+        case fidl_serversuite::Test::kBadDecodeLargeMessageNoHandles:
+        case fidl_serversuite::Test::kBadDecodeLargeMessageTooFewHandles:
+        case fidl_serversuite::Test::kBadDecodeLargeMessage64Handles:
+        case fidl_serversuite::Test::kBadDecodeLargeMessageLastHandleNotVmo:
+        case fidl_serversuite::Test::kBadDecodeLargeMessageLastHandleInsufficientRights:
+        case fidl_serversuite::Test::kBadDecodeLargeMessageLastHandleExcessiveRights:
+        case fidl_serversuite::Test::kBadDecodeLargeMessageVmoTooSmall:
         case fidl_serversuite::Test::kBadDecodeLargeMessageInfoByteCountTooSmall:
-        case fidl_serversuite::Test::kBadDecodeLargeMessageInfoByteCountNotEqualToBound:
-        case fidl_serversuite::Test::kBadDecodeNoHandles:
-        case fidl_serversuite::Test::kBadDecodeTooFewHandles:
-        case fidl_serversuite::Test::kBadDecode64HandleLargeMessage:
-        case fidl_serversuite::Test::kBadDecodeLastHandleNotVmo:
-        case fidl_serversuite::Test::kBadDecodeLastHandleInsufficientRights:
-        case fidl_serversuite::Test::kBadDecodeVmoTooSmall:
-        case fidl_serversuite::Test::kBadDecodeVmoTooLarge:
+        case fidl_serversuite::Test::kBadDecodeLargeMessageInfoByteCountTooLarge:
           // TODO(fxbug.dev/114261): Test decoding large messages.
           return false;
 
