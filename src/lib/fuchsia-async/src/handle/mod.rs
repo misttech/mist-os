@@ -29,7 +29,7 @@ macro_rules! invoke_for_handle_types {
         $x! {Thread, "Thread", THREAD, 2, FuchsiaOnly}
         $x! {Vmo, "Vmo", VMO, 3, FuchsiaOnly}
         $x! {Channel, "Channel", CHANNEL, 4, Everywhere}
-        $x! {Event, "Event", EVENT, 5, FuchsiaOnly}
+        $x! {Event, "Event", EVENT, 5, Everywhere}
         $x! {Port, "Port", PORT, 6,  FuchsiaOnly}
         $x! {Interrupt, "Interrupt", INTERRUPT, 7, FuchsiaOnly}
         $x! {DebugLog, "Debug Log", DEBUGLOG, 9, FuchsiaOnly}

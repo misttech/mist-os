@@ -93,6 +93,14 @@ impl<'a> HandleRef<'a> {
 #[repr(transparent)]
 pub struct Koid(u64);
 
+const INVALID_KOID: Koid = Koid(0);
+
+impl Koid {
+    pub fn raw_koid(&self) -> u64 {
+        self.0
+    }
+}
+
 #[derive(Debug, Eq, PartialEq)]
 pub struct HandleBasicInfo {
     pub koid: Koid,
@@ -188,14 +196,19 @@ pub trait EmulatedHandleRef: AsHandleRef {
         if self.is_invalid() {
             HandleRef(INVALID_HANDLE, std::marker::PhantomData)
         } else {
-            HandleRef(self.as_handle_ref().0 ^ 1, std::marker::PhantomData)
+            let (shard, slot, ty, side) = unpack_handle(self.as_handle_ref().0);
+            if ty.two_sided() {
+                HandleRef(pack_handle(shard, slot, ty, side.opposite()), std::marker::PhantomData)
+            } else {
+                HandleRef(INVALID_HANDLE, std::marker::PhantomData)
+            }
         }
     }
 
     /// Return a "koid" like value.
     fn koid_pair(&self) -> (u64, u64) {
         if self.is_invalid() {
-            (0, 0)
+            (INVALID_KOID.0, INVALID_KOID.0)
         } else {
             with_handle(self.as_handle_ref().0, |mut h, side| h.as_hdl_data().koids(side))
         }
@@ -214,6 +227,7 @@ pub trait EmulatedHandleRef: AsHandleRef {
                 HdlType::StreamSocket => table_contains(&STREAM_SOCKETS, shard, slot, side),
                 HdlType::DatagramSocket => table_contains(&DATAGRAM_SOCKETS, shard, slot, side),
                 HdlType::EventPair => table_contains(&EVENT_PAIRS, shard, slot, side),
+                HdlType::Event => table_contains(&EVENTS, shard, slot, side),
             };
             !present
         }
@@ -335,6 +349,7 @@ impl Handle {
                 table_replace(&DATAGRAM_SOCKETS, shard, slot, side, target_rights)
             }
             HdlType::EventPair => table_replace(&EVENT_PAIRS, shard, slot, side, target_rights),
+            HdlType::Event => table_replace(&EVENTS, shard, slot, side, target_rights),
         };
         let (new_shard, new_slot) = match result {
             Ok(val) => val,
@@ -389,7 +404,7 @@ impl Channel {
     /// sides of the channel. Messages written into one maybe read from the opposite.
     pub fn create() -> Result<(Channel, Channel), zx_status::Status> {
         let rights = Rights::CHANNEL_DEFAULT;
-        let (shard, slot) = CHANNELS.new_handle_slot(rights);
+        let (shard, slot) = CHANNELS.new_two_sided_slot(rights);
         let left = pack_handle(shard, slot, HdlType::Channel, Side::Left);
         let right = pack_handle(shard, slot, HdlType::Channel, Side::Right);
 
@@ -618,7 +633,7 @@ impl Socket {
                     | Rights::WAIT
                     | Rights::SIGNAL
                     | Rights::SIGNAL_PEER;
-                let (shard, slot) = STREAM_SOCKETS.new_handle_slot(rights);
+                let (shard, slot) = STREAM_SOCKETS.new_two_sided_slot(rights);
                 let left = pack_handle(shard, slot, HdlType::StreamSocket, Side::Left);
                 let right = pack_handle(shard, slot, HdlType::StreamSocket, Side::Right);
                 let mut shard = STREAM_SOCKETS.shards[shard].lock().unwrap();
@@ -639,7 +654,7 @@ impl Socket {
                     | Rights::READ
                     | Rights::SIGNAL
                     | Rights::SIGNAL_PEER;
-                let (shard, slot) = DATAGRAM_SOCKETS.new_handle_slot(rights);
+                let (shard, slot) = DATAGRAM_SOCKETS.new_two_sided_slot(rights);
                 let left = pack_handle(shard, slot, HdlType::DatagramSocket, Side::Left);
                 let right = pack_handle(shard, slot, HdlType::DatagramSocket, Side::Right);
                 let mut shard = DATAGRAM_SOCKETS.shards[shard].lock().unwrap();
@@ -802,10 +817,50 @@ impl EventPair {
     /// Create an event pair.
     pub fn create() -> Result<(EventPair, EventPair), Status> {
         let rights = Rights::EVENTPAIR_DEFAULT;
-        let (shard, slot) = EVENT_PAIRS.new_handle_slot(rights);
+        let (shard, slot) = EVENT_PAIRS.new_two_sided_slot(rights);
         let left = pack_handle(shard, slot, HdlType::EventPair, Side::Left);
         let right = pack_handle(shard, slot, HdlType::EventPair, Side::Right);
         Ok((EventPair(left), EventPair(right)))
+    }
+}
+
+/// Emulation of Zircon Event.
+#[derive(PartialEq, Eq, Debug, PartialOrd, Ord, Hash)]
+pub struct Event(u32);
+
+impl From<Handle> for Event {
+    fn from(mut hdl: Handle) -> Event {
+        let out = Event(hdl.0);
+        hdl.0 = INVALID_HANDLE;
+        out
+    }
+}
+impl From<Event> for Handle {
+    fn from(mut hdl: Event) -> Handle {
+        let out = unsafe { Handle::from_raw(hdl.0) };
+        hdl.0 = INVALID_HANDLE;
+        out
+    }
+}
+impl HandleBased for Event {}
+impl AsHandleRef for Event {
+    fn as_handle_ref<'a>(&'a self) -> HandleRef<'a> {
+        HandleRef(self.0, std::marker::PhantomData)
+    }
+}
+
+impl Drop for Event {
+    fn drop(&mut self) {
+        hdl_close(self.0);
+    }
+}
+
+impl Event {
+    /// Create an event .
+    pub fn create() -> Result<Event, Status> {
+        let rights = Rights::EVENT_DEFAULT;
+        let (shard, slot) = EVENTS.new_one_sided_slot(rights);
+        Ok(Event(pack_handle(shard, slot, HdlType::Event, Side::Left)))
     }
 }
 
@@ -1237,13 +1292,16 @@ bitflags! {
                                 Rights::IO.bits() |
                                 Rights::SIGNAL.bits() |
                                 Rights::SIGNAL_PEER.bits();
-        /// Rights of a new channel.
+        /// Rights of a new event pair.
         const EVENTPAIR_DEFAULT =
                                 Rights::TRANSFER.bits() |
                                 Rights::DUPLICATE.bits() |
                                 Rights::IO.bits() |
                                 Rights::SIGNAL.bits() |
                                 Rights::SIGNAL_PEER.bits();
+        /// Rights of a new event.
+        const EVENT_DEFAULT = Rights::BASIC_RIGHTS.bits() |
+                              Rights::SIGNAL.bits();
     }
 }
 
@@ -1348,6 +1406,7 @@ enum HdlType {
     StreamSocket,
     DatagramSocket,
     EventPair,
+    Event,
 }
 
 impl HdlType {
@@ -1357,6 +1416,17 @@ impl HdlType {
             HdlType::StreamSocket => ObjectType::SOCKET,
             HdlType::DatagramSocket => ObjectType::SOCKET,
             HdlType::EventPair => ObjectType::EVENTPAIR,
+            HdlType::Event => ObjectType::EVENT,
+        }
+    }
+
+    fn two_sided(&self) -> bool {
+        match self {
+            HdlType::Channel => true,
+            HdlType::StreamSocket => true,
+            HdlType::DatagramSocket => true,
+            HdlType::EventPair => true,
+            HdlType::Event => false,
         }
     }
 }
@@ -1506,6 +1576,7 @@ trait HdlData {
 }
 
 struct Hdl<Q> {
+    two_sided: bool,
     q: Sided<Q>,
     wakers: Sided<Wakers>,
     liveness: Liveness,
@@ -1550,6 +1621,10 @@ impl<Q> HdlData for Hdl<Q> {
     }
 
     fn koids(&self, side: Side) -> (u64, u64) {
+        if !self.two_sided {
+            assert_eq!(side, Side::Left);
+            return (self.koid_left, INVALID_KOID.0);
+        }
         match side {
             Side::Left => (self.koid_left, self.koid_left + 1),
             Side::Right => (self.koid_left + 1, self.koid_left),
@@ -1566,6 +1641,7 @@ enum HdlRef<'a> {
     StreamSocket(&'a mut Hdl<VecDeque<u8>>),
     DatagramSocket(&'a mut Hdl<VecDeque<Vec<u8>>>),
     EventPair(&'a mut Hdl<()>),
+    Event(&'a mut Hdl<()>),
 }
 
 impl<'a> HdlRef<'a> {
@@ -1575,6 +1651,7 @@ impl<'a> HdlRef<'a> {
             HdlRef::StreamSocket(hdl) => *hdl,
             HdlRef::DatagramSocket(hdl) => *hdl,
             HdlRef::EventPair(hdl) => *hdl,
+            HdlRef::Event(hdl) => *hdl,
         }
     }
 }
@@ -1602,6 +1679,7 @@ fn with_handle<R>(handle: u32, f: impl FnOnce(HdlRef<'_>, Side) -> R) -> R {
         HdlType::EventPair => {
             f(HdlRef::EventPair(&mut EVENT_PAIRS.shards[shard].lock().unwrap()[slot]), side)
         }
+        HdlType::Event => f(HdlRef::Event(&mut EVENTS.shards[shard].lock().unwrap()[slot]), side),
     };
     #[cfg(debug_assertions)]
     IN_WITH_HANDLE.with(|iwh| assert_eq!(iwh.replace(false), true));
@@ -1621,6 +1699,7 @@ lazy_static::lazy_static! {
     static ref STREAM_SOCKETS: HandleTable<VecDeque<u8>> = Default::default();
     static ref DATAGRAM_SOCKETS: HandleTable<VecDeque<Vec<u8>>> = Default::default();
     static ref EVENT_PAIRS: HandleTable<()> = Default::default();
+    static ref EVENTS: HandleTable<()> = Default::default();
 }
 
 static NEXT_KOID: AtomicU64 = AtomicU64::new(1);
@@ -1636,8 +1715,21 @@ impl<T> Default for HandleTable<T> {
 }
 
 impl<T: Default> HandleTable<T> {
-    fn new_handle_slot(&self, rights: Rights) -> (usize, usize) {
+    fn new_one_sided_slot(&self, rights: Rights) -> (usize, usize) {
         self.insert_hdl(Hdl {
+            two_sided: false,
+            q: Default::default(),
+            wakers: Default::default(),
+            liveness: Liveness::Left,
+            koid_left: NEXT_KOID.fetch_add(1, Ordering::Relaxed),
+            rights: Sided { left: rights, right: Rights::NONE },
+            signals: Sided { left: Signals::empty(), right: Signals::empty() },
+        })
+    }
+
+    fn new_two_sided_slot(&self, rights: Rights) -> (usize, usize) {
+        self.insert_hdl(Hdl {
+            two_sided: true,
             q: Default::default(),
             wakers: Default::default(),
             liveness: Liveness::Open,
@@ -1648,7 +1740,7 @@ impl<T: Default> HandleTable<T> {
     }
 
     fn insert_hdl(&self, hdl: Hdl<T>) -> (usize, usize) {
-        let shard = self.next_shard.fetch_add(1, Ordering::Relaxed) & 15;
+        let shard = self.next_shard.fetch_add(1, Ordering::Relaxed) & 0xf;
         let mut h = self.shards[shard].lock().unwrap();
         (shard, h.insert(hdl))
     }
@@ -1656,6 +1748,7 @@ impl<T: Default> HandleTable<T> {
 
 fn pack_handle(shard: usize, slot: usize, ty: HdlType, side: Side) -> u32 {
     assert!(shard <= SHARD_COUNT);
+    assert!(ty.two_sided() || side == Side::Left);
     let side_bit = match side {
         Side::Left => 0,
         Side::Right => 1,
@@ -1665,24 +1758,27 @@ fn pack_handle(shard: usize, slot: usize, ty: HdlType, side: Side) -> u32 {
         HdlType::StreamSocket => 1,
         HdlType::DatagramSocket => 2,
         HdlType::EventPair => 3,
+        HdlType::Event => 4,
     };
     let shard_bits = shard as u32;
     let slot_bits = slot as u32;
-    ((slot_bits << 7) | (shard_bits << 3) | (ty_bits << 1) | side_bit) + 1
+    ((slot_bits << 8) | (shard_bits << 4) | (ty_bits << 1) | side_bit) + 1
 }
 
 fn unpack_handle(handle: u32) -> (usize, usize, HdlType, Side) {
     let handle = handle - 1;
     let side = if handle & 1 == 0 { Side::Left } else { Side::Right };
-    let ty = match (handle >> 1) & 0x3 {
+    let ty = match (handle >> 1) & 0x7 {
         0 => HdlType::Channel,
         1 => HdlType::StreamSocket,
         2 => HdlType::DatagramSocket,
         3 => HdlType::EventPair,
+        4 => HdlType::Event,
         x => panic!("Bad handle type {}", x),
     };
-    let shard = ((handle >> 3) & 15) as usize;
-    let slot = (handle >> 7) as usize;
+    assert!(ty.two_sided() || side == Side::Left);
+    let shard = ((handle >> 4) & 0xf) as usize;
+    let slot = (handle >> 8) as usize;
     (shard, slot, ty, side)
 }
 
@@ -1753,6 +1849,7 @@ fn hdl_close(hdl: u32) {
         HdlType::StreamSocket => close_in_table(&STREAM_SOCKETS, shard, slot, side),
         HdlType::DatagramSocket => close_in_table(&DATAGRAM_SOCKETS, shard, slot, side),
         HdlType::EventPair => close_in_table(&EVENT_PAIRS, shard, slot, side),
+        HdlType::Event => close_in_table(&EVENTS, shard, slot, side),
     }
 }
 
@@ -1774,8 +1871,10 @@ mod test {
     /// handle because that too will trigger a panic.
     #[deny(unsafe_op_in_unsafe_fn)]
     unsafe fn mimic_closed_handle() -> std::mem::ManuallyDrop<Handle> {
-        // This corresponds to the last id we would allocate in its shard; this test won't generate that many handles at once.
-        let raw_unallocated_handle = u32::MAX;
+        // This corresponds to the last shot in the last shard. We won't produce
+        // enough handles in tests to ever collide with this.
+        let raw_unallocated_handle =
+            pack_handle(SHARD_COUNT, (u32::MAX >> 8) as usize, HdlType::Channel, Side::Left);
         let unallocated_handle = unsafe { Handle::from_raw(raw_unallocated_handle) };
         std::mem::ManuallyDrop::new(unallocated_handle)
     }
@@ -2069,8 +2168,8 @@ mod test {
         let c1_info = c1.basic_info().unwrap();
         let c2_info = c2.basic_info().unwrap();
 
-        assert_ne!(c1_info.koid, Koid(0));
-        assert_ne!(c1_info.related_koid, Koid(0));
+        assert_ne!(c1_info.koid, INVALID_KOID);
+        assert_ne!(c1_info.related_koid, INVALID_KOID);
         assert_ne!(c1_info.koid, c1_info.related_koid);
         assert_eq!(c1_info.related_koid, c2_info.koid);
         assert_eq!(c1_info.koid, c2_info.related_koid);
@@ -2277,5 +2376,79 @@ mod test {
         assert_eq!(c2.write(b"abc", &mut []), Ok(()));
         assert_eq!(count, 1);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Ready(Ok(Signals::OBJECT_READABLE)));
+    }
+
+    #[test]
+    fn event_is_one_sided() {
+        let e = Event::create().unwrap();
+        assert_eq!(e.object_type(), ObjectType::EVENT);
+        assert!(e.related().is_invalid());
+        assert_eq!(e.koid_pair().1, INVALID_KOID.0);
+        assert_eq!(e.basic_info().unwrap().related_koid, INVALID_KOID);
+    }
+
+    #[test]
+    fn event_replace_rights() {
+        let e = Event::create().unwrap();
+        assert_eq!(e.basic_info().unwrap().rights, Rights::EVENT_DEFAULT);
+        let e = e.into_handle().replace(Rights::TRANSFER).unwrap();
+        assert_eq!(e.basic_info().unwrap().rights, Rights::TRANSFER);
+    }
+
+    #[test]
+    fn event_user_signal() {
+        let e = Event::create().unwrap();
+        let mut on_sig = on_signals::OnSignals::new(&e, Signals::USER_0);
+        let (waker, count) = futures_test::task::new_count_waker();
+        let mut ctx = Context::from_waker(&waker);
+        assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Pending);
+        assert_eq!(count, 0);
+        assert_eq!(e.signal_handle(Signals::empty(), Signals::USER_0), Ok(()));
+        assert_eq!(count, 1);
+        assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Ready(Ok(Signals::USER_0)));
+    }
+
+    #[test]
+    fn mix_one_sided_and_two_sided_handles() {
+        // Test non-sided, left-side, and right-side handles for odd/even koids.
+        let e1 = Event::create().unwrap(); // odd
+        let (c1, c2) = Channel::create().unwrap(); // (even, odd)
+        let e2 = Event::create().unwrap(); // even
+        let (p1, p2) = EventPair::create().unwrap(); // (odd, even)
+
+        let e1_info = e1.basic_info().unwrap();
+        let c1_info = c1.basic_info().unwrap();
+        let c2_info = c2.basic_info().unwrap();
+        let e2_info = e2.basic_info().unwrap();
+        let p1_info = p1.basic_info().unwrap();
+        let p2_info = p2.basic_info().unwrap();
+
+        assert_eq!(e1_info.object_type, ObjectType::EVENT);
+        assert_eq!(c1_info.object_type, ObjectType::CHANNEL);
+        assert_eq!(c2_info.object_type, ObjectType::CHANNEL);
+        assert_eq!(e2_info.object_type, ObjectType::EVENT);
+        assert_eq!(p1_info.object_type, ObjectType::EVENTPAIR);
+        assert_eq!(p2_info.object_type, ObjectType::EVENTPAIR);
+
+        assert_eq!(e1_info.related_koid, INVALID_KOID);
+        assert_eq!(c1_info.related_koid, c2_info.koid);
+        assert_eq!(c2_info.related_koid, c1_info.koid);
+        assert_eq!(e2_info.related_koid, INVALID_KOID);
+        assert_eq!(p1_info.related_koid, p2_info.koid);
+        assert_eq!(p2_info.related_koid, p1_info.koid);
+
+        assert_eq!(e1.koid_pair(), (e1_info.koid.0, INVALID_KOID.0));
+        assert_eq!(c1.koid_pair(), (c1_info.koid.0, c2_info.koid.0));
+        assert_eq!(c2.koid_pair(), (c2_info.koid.0, c1_info.koid.0));
+        assert_eq!(e2.koid_pair(), (e2_info.koid.0, INVALID_KOID.0));
+        assert_eq!(p1.koid_pair(), (p1_info.koid.0, p2_info.koid.0));
+        assert_eq!(p2.koid_pair(), (p2_info.koid.0, p1_info.koid.0));
+
+        assert!(e1.related().is_invalid());
+        assert_eq!(c1.related(), c2.as_handle_ref());
+        assert_eq!(c2.related(), c1.as_handle_ref());
+        assert!(e2.related().is_invalid());
+        assert_eq!(p1.related(), p2.as_handle_ref());
+        assert_eq!(p2.related(), p1.as_handle_ref());
     }
 }
