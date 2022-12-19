@@ -99,10 +99,8 @@ def parse_min_sdk_version_and_full_dependencies(yaml_path):
     match = re.search(r"^(>=)?((0|[1-9]\d*)\.(0|[1-9]\d*))", env_sdk)
     if match:
         min_sdk_version = match.group(2)
-    elif env_sdk == 'any':
-        min_sdk_version = '2.8'
     else:
-        min_sdk_version = '2.0'
+        min_sdk_version = '2.12'
     deps = get_deps(package_name, parsed, 'dependencies')
     dev_deps = get_deps(package_name, parsed, 'dev_dependencies')
     dep_overrides = get_deps(package_name, parsed, 'dependency_overrides')
@@ -223,9 +221,8 @@ def main():
         if args.debug:
             print(message)
 
-    tempdir = tempfile.mkdtemp()
-    debug_print('Working directory: ' + tempdir)
-    try:
+    with tempfile.TemporaryDirectory() as tempdir:
+        debug_print('Working directory: ' + tempdir)
         importer_dir = os.path.join(tempdir, 'importer')
         os.mkdir(importer_dir)
 
@@ -294,7 +291,7 @@ def main():
                     'dependencies': dependencies,
                     'dependency_overrides': overrides,
                     'environment': {
-                        'sdk': '>=2.0.0 <4.0.0'
+                        'sdk': '>=2.12.0 <3.0.0'
                     }
                 },
                 pubspec,
@@ -350,7 +347,7 @@ def main():
             if not valid_package_path(package_name, source_dir):
                 continue
             if not any(domain in source_dir
-                       for domain in ['/pub.dartlang.org/', '/pub.dev/']):
+                    for domain in ['/pub.dartlang.org/', '/pub.dev/']):
                 print(
                     'Package %s not from dartlang (%s), ignoring' %
                     (package_name, source_dir))
@@ -423,16 +420,13 @@ def main():
         # serialize package_config to JSON by using json.dumps and write to
         # //third_party/dart-pkg/pub/package_config.json.
         with open(os.path.join(args.output, 'package_config.json'), 'w',
-                  encoding='utf-8') as package_config_json:
+                encoding='utf-8') as package_config_json:
             package_config_json.write(
                 json.dumps(package_config, sort_keys=True, indent=2))
         if args.changelog:
             new_packages = read_package_versions(args.output)
             generate_package_diff(old_packages, new_packages, args.changelog)
 
-    finally:
-        if not args.debug:
-            shutil.rmtree(tempdir)
 
 
 if __name__ == '__main__':
