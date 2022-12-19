@@ -18,27 +18,33 @@ static bool smoke_test() {
 
   {
     Semaphore sema;
-    ASSERT_EQ(0u, sema.count());
+    ASSERT_EQ(0, sema.count());
     ASSERT_EQ(0u, sema.num_waiters());
   }
 
   {
     Semaphore sema(0);
-    ASSERT_EQ(0u, sema.count());
+    ASSERT_EQ(0, sema.count());
     ASSERT_EQ(0u, sema.num_waiters());
   }
 
   {
     Semaphore sema(5);
-    ASSERT_EQ(5u, sema.count());
+    ASSERT_EQ(5, sema.count());
     ASSERT_EQ(0u, sema.num_waiters());
   }
 
   {
-    constexpr uint64_t kPostCount = 10;
+    Semaphore sema(-2);
+    ASSERT_EQ(-2, sema.count());
+    ASSERT_EQ(0u, sema.num_waiters());
+  }
+
+  {
+    constexpr int64_t kPostCount = 10;
     Semaphore sema;
 
-    for (uint64_t i = 0; i < kPostCount; ++i) {
+    for (int64_t i = 0; i < kPostCount; ++i) {
       ASSERT_EQ(i, sema.count());
       ASSERT_EQ(0u, sema.num_waiters());
 
@@ -48,7 +54,7 @@ static bool smoke_test() {
       ASSERT_EQ(0u, sema.num_waiters());
     }
 
-    for (uint64_t i = 0; i < kPostCount; ++i) {
+    for (int64_t i = 0; i < kPostCount; ++i) {
       ASSERT_EQ(kPostCount - i, sema.count());
       ASSERT_EQ(0u, sema.num_waiters());
 
@@ -68,10 +74,10 @@ static bool timeout_test() {
   auto dealine = Deadline::after(ZX_USEC(10));
 
   Semaphore sema;
-  ASSERT_EQ(0u, sema.count());
+  ASSERT_EQ(0, sema.count());
   ASSERT_EQ(0u, sema.num_waiters());
   ASSERT_EQ(ZX_ERR_TIMED_OUT, sema.Wait(dealine));
-  ASSERT_EQ(0u, sema.count());
+  ASSERT_GE(0, sema.count());
   ASSERT_EQ(0u, sema.num_waiters());
 
   END_TEST;
@@ -96,7 +102,7 @@ static bool signal_test() {
 
   Semaphore sema;
 
-  ASSERT_EQ(0u, sema.count());
+  ASSERT_EQ(0, sema.count());
   ASSERT_EQ(0u, sema.num_waiters());
 
   auto thread = Thread::Create("test semaphore", wait_sema_thread, &sema, DEFAULT_PRIORITY);
@@ -108,32 +114,35 @@ static bool signal_test() {
     Thread::Current::SleepRelative(ZX_MSEC(1));
   }
 
-  ASSERT_EQ(0u, sema.count());
+  ASSERT_EQ(-1, sema.count());
   ASSERT_EQ(1u, sema.num_waiters());
 
   int expected_error;
+  int64_t expected_count;
   switch (signal) {
     case Signal::kPost:
       sema.Post();
       expected_error = ZX_OK;
+      expected_count = 0;
       break;
 
     case Signal::kKill:
       thread->Kill();
       expected_error = ZX_ERR_INTERNAL_INTR_KILLED;
+      expected_count = -1;
       break;
 
     case Signal::kSuspend:
       thread->Suspend();
       expected_error = ZX_ERR_INTERNAL_INTR_RETRY;
+      expected_count = -1;
       break;
   }
 
   int retcode = ZX_OK;
   thread->Join(&retcode, ZX_TIME_INFINITE);
   ASSERT_EQ(expected_error, retcode);
-
-  ASSERT_EQ(0u, sema.count());
+  ASSERT_EQ(expected_count, sema.count());
   ASSERT_EQ(0u, sema.num_waiters());
 
   END_TEST;

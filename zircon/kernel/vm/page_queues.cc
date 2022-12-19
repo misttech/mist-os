@@ -407,8 +407,8 @@ void PageQueues::RotateReclaimQueues(AgeReason reason) {
     while (mru_semaphore_.Wait(Deadline::after(max_mru_rotate_time_, TimerSlack::none())) ==
            ZX_ERR_TIMED_OUT) {
       timeouts++;
-      printf("[pq] WARNING: Waited %" PRIi64 " seconds for LRU thread, MRU semaphore %" PRIu64
-             ",aging is presently stalled\n",
+      printf("[pq] WARNING: Waited %" PRIi64 " seconds for LRU thread, MRU semaphore %" PRIi64
+             ", aging is presently stalled\n",
              (max_mru_rotate_time_ * timeouts) / ZX_SEC(1), mru_semaphore_.count());
       Dump();
     }
