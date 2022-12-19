@@ -42,9 +42,9 @@ class DeviceOracle {
   uint32_t GetRegAddrMiscCfg() const;
 
  private:
-  explicit DeviceOracle(enum DeviceType device_type) : device_type_(device_type) {}
+  explicit DeviceOracle(DeviceType device_type) : device_type_(device_type) {}
 
-  enum DeviceType device_type_;
+  DeviceType device_type_;
 };
 
 }  // namespace bt_hci_marvell

@@ -9,10 +9,13 @@
 #include <fuchsia/hardware/sdio/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/zircon-internal/thread_annotations.h>
 
 #include <ddktl/device.h>
+#include <fbl/mutex.h>
 
 #include "src/connectivity/bluetooth/hci/vendor/marvell/device_oracle.h"
+#include "src/connectivity/bluetooth/hci/vendor/marvell/host_channel_manager.h"
 
 namespace bt_hci_marvell {
 
@@ -53,9 +56,6 @@ class BtHciMarvell : public BtHciMarvellType, public ddk::BtHciProtocol<BtHciMar
   // Initialize hardware registers and load firmware as needed
   zx_status_t Init();
 
-  // Report initialization status to the driver manager
-  void OnInitComplete(zx_status_t status, ddk::InitTxn txn);
-
   // Load firmware (or wait for notification that firmware has been loaded by another driver)
   zx_status_t LoadFirmware();
 
@@ -65,7 +65,23 @@ class BtHciMarvell : public BtHciMarvellType, public ddk::BtHciProtocol<BtHciMar
   zx_status_t Read24(uint32_t addr, uint32_t* out_value);
   zx_status_t Write8(uint32_t addr, uint8_t value);
 
+  // Read from register |addr|, modify the bits corresponding to the locations of bits set in |mask|
+  // with bits in the same location from |value|, and then write back out to the register.
+  zx_status_t ModifyBits(uint32_t addr, uint8_t mask, uint8_t value);
+
+  // Create a HostChannel object that will use |in_channel| to communicate with the host. |read_id|
+  // is the channel id that will be used in the controller header when we read from this host
+  // channel. |write_id| is the id that the controller will use in the packet header when it is
+  // giving us a packet that should be written to this channel. |write_id| must be unique across
+  // all open channels.
+  zx_status_t OpenChannel(zx::channel in_channel, ControllerChannelId read_id,
+                          ControllerChannelId write_id, const char* name);
+
   const ddk::SdioProtocolClient sdio_;
+  fbl::Mutex mutex_;
+
+  // Keeps track of all open communication channels with the host
+  HostChannelManager channel_mgr_ TA_GUARDED(mutex_);
 
   // The oracle of all values that are device-specific
   std::unique_ptr<DeviceOracle> device_oracle_;

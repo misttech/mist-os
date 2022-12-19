@@ -133,6 +133,8 @@ class BtHciMockSdioTest : public zxtest::Test {
   }
 
  protected:
+  BtHciMarvell* driver_instance_;
+
   // The root of our MockDevice tree
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
 
@@ -142,7 +144,6 @@ class BtHciMockSdioTest : public zxtest::Test {
  private:
   std::unique_ptr<DeviceOracle> device_oracle_;
   MockDevice* dut_;
-  BtHciMarvell* driver_instance_;
 };
 
 }  // namespace bt_hci_marvell

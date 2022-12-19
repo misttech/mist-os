@@ -28,6 +28,9 @@ source_set("common") {
     "bt_hci_marvell.h",
     "device_oracle.cc",
     "device_oracle.h",
+    "host_channel.h",
+    "host_channel_manager.cc",
+    "host_channel_manager.h",
   ]
   deps = [
     ":bt_hci_marvell_bind",
@@ -39,6 +42,7 @@ source_set("common") {
     "//sdk/banjo/fuchsia.hardware.sdio:fuchsia.hardware.sdio_banjo_cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/zircon-internal",
   ]
 }
 

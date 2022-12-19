@@ -10,6 +10,9 @@ group("tests") {
 }
 
 _tests = [
+  "driver-channel",
+  "host-channel",
+  "host-channel-manager",
   "lifecycle",
   "device-oracle",
 ]
@@ -25,6 +28,47 @@ fuchsia_test_package("bt-hci-marvell-tests") {
   foreach(test_name, _tests) {
     test_components += [ ":${test_name}_component" ]
   }
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+executable("driver-channel-tests") {
+  testonly = true
+  output_name = "bt-hci-marvell-driver-channel-tests"
+  sources = [
+    "bt_hci_mock_sdio.h",
+    "bt_hci_mock_sdio_test.h",
+    "driver_channel_unittest.cc",
+  ]
+  deps = [
+    "//sdk/banjo/fuchsia.hardware.sdio:fuchsia.hardware.sdio_banjo_cpp_mock",
+    "//src/connectivity/bluetooth/hci/vendor/marvell:common",
+    "//src/devices/testing/mock-ddk",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("host-channel-manager-tests") {
+  testonly = true
+  output_name = "bt-hci-marvell-host-channel-manager-tests"
+  sources = [ "host_channel_manager_unittest.cc" ]
+  deps = [
+    "//src/connectivity/bluetooth/hci/vendor/marvell:common",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("host-channel-tests") {
+  testonly = true
+  output_name = "bt-hci-marvell-host-channel-tests"
+  sources = [ "host_channel_unittest.cc" ]
+  deps = [
+    "//src/connectivity/bluetooth/hci/vendor/marvell:common",
+    "//zircon/system/ulib/zxtest",
+  ]
 }
 
 executable("lifecycle-tests") {

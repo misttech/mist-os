@@ -8,6 +8,7 @@
 #include <lib/ddk/driver.h>
 
 #include <fbl/alloc_checker.h>
+#include <fbl/auto_lock.h>
 
 #include "src/connectivity/bluetooth/hci/vendor/marvell/bt_hci_marvell_bind.h"
 
@@ -50,7 +51,7 @@ void BtHciMarvell::DdkInit(ddk::InitTxn txn) {
   zx_status_t status = loop_->StartThread("bt-hci-marvell");
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to start thread: %s", zx_status_get_string(status));
-    OnInitComplete(status, std::move(txn));
+    txn.Reply(status);
     return;
   }
   dispatcher_ = loop_->dispatcher();
@@ -58,7 +59,7 @@ void BtHciMarvell::DdkInit(ddk::InitTxn txn) {
   // Continue initialization in the new thread.
   async::PostTask(dispatcher_, [this, txn = std::move(txn)]() mutable {
     zx_status_t status = Init();
-    OnInitComplete(status, std::move(txn));
+    txn.Reply(status);
   });
 }
 
@@ -107,37 +108,19 @@ zx_status_t BtHciMarvell::Init() {
   zxlogf(INFO, "IO port address: %#x", ioport_addr_);
 
   // Set interrupt behavior to "clear-on-read"
-  uint8_t rsr = 0xff;
-  uint32_t rsr_reg_addr = device_oracle_->GetRegAddrInterruptRsr();
-  if ((status = Read8(rsr_reg_addr, &rsr)) != ZX_OK) {
-    return status;
-  }
-  rsr &= ~kRsrClearOnReadMask;
-  rsr |= kRsrClearOnReadValue;
-  if ((status = Write8(rsr_reg_addr, rsr)) != ZX_OK) {
+  uint32_t rsr_addr = device_oracle_->GetRegAddrInterruptRsr();
+  if ((status = ModifyBits(rsr_addr, kRsrClearOnReadMask, kRsrClearOnReadValue)) != ZX_OK) {
     return status;
   }
 
   // Configure interrupts to automatically re-enable
-  uint8_t misc_cfg;
   uint32_t misc_cfg_reg_addr = device_oracle_->GetRegAddrMiscCfg();
-  if ((status = Read8(misc_cfg_reg_addr, &misc_cfg)) != ZX_OK) {
-    return status;
-  }
-  misc_cfg &= ~kMiscCfgAutoReenableMask;
-  misc_cfg |= kMiscCfgAutoReenableValue;
-  if ((status = Write8(misc_cfg_reg_addr, misc_cfg)) != ZX_OK) {
+  if ((status = ModifyBits(misc_cfg_reg_addr, kMiscCfgAutoReenableMask,
+                           kMiscCfgAutoReenableValue)) != ZX_OK) {
     return status;
   }
 
   return status;
-}
-
-void BtHciMarvell::OnInitComplete(zx_status_t status, ddk::InitTxn txn) {
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Device initialization failed: %s", zx_status_get_string(status));
-  }
-  txn.Reply(status);
 }
 
 // For now, we rely on wlan to load the firmware image for us, we just have to wait for it.
@@ -211,23 +194,64 @@ zx_status_t BtHciMarvell::Write8(uint32_t addr, uint8_t value) {
   return status;
 }
 
+zx_status_t BtHciMarvell::ModifyBits(uint32_t addr, uint8_t mask, uint8_t new_value) {
+  zx_status_t status;
+  uint8_t reg_contents = 0xff;
+  if ((status = Read8(addr, &reg_contents)) != ZX_OK) {
+    return status;
+  }
+  reg_contents &= ~mask;
+  reg_contents |= (new_value & mask);
+  return Write8(addr, reg_contents);
+}
+
 void BtHciMarvell::DdkUnbind(ddk::UnbindTxn txn) { txn.Reply(); }
 
 void BtHciMarvell::DdkRelease() { delete this; }
 
 zx_status_t BtHciMarvell::DdkGetProtocol(uint32_t proto_id, void* out_proto) {
+  if (proto_id == ZX_PROTOCOL_BT_HCI) {
+    bt_hci_protocol_t* hci_proto = static_cast<bt_hci_protocol_t*>(out_proto);
+    hci_proto->ops = &bt_hci_protocol_ops_;
+    hci_proto->ctx = this;
+    return ZX_OK;
+  }
   return ZX_ERR_NOT_SUPPORTED;
+}
+
+zx_status_t BtHciMarvell::OpenChannel(zx::channel in_channel, ControllerChannelId read_id,
+                                      ControllerChannelId write_id, const char* name) {
+  fbl::AutoLock lock(&mutex_);
+
+  const HostChannel* new_channel_ref =
+      channel_mgr_.AddChannel(std::move(in_channel), read_id, write_id, name);
+  if (!new_channel_ref) {
+    zxlogf(ERROR, "Failed to open %s channel", name);
+    return ZX_ERR_INTERNAL;
+  }
+
+  return ZX_OK;
 }
 
 zx_status_t BtHciMarvell::BtHciOpenCommandChannel(zx::channel channel) {
-  return ZX_ERR_NOT_SUPPORTED;
+  // Commands are passed host->controller and events are passed controller->host
+  return OpenChannel(std::move(channel), ControllerChannelId::kChannelCommand,
+                     ControllerChannelId::kChannelEvent, "Command");
 }
 
 zx_status_t BtHciMarvell::BtHciOpenAclDataChannel(zx::channel channel) {
-  return ZX_ERR_NOT_SUPPORTED;
+  // The same ID is used for ACL data regardless of whether it is going from host->controller,
+  // or controller->host.
+  return OpenChannel(std::move(channel), ControllerChannelId::kChannelAclData,
+                     ControllerChannelId::kChannelAclData, "ACL Data");
 }
 
-zx_status_t BtHciMarvell::BtHciOpenScoChannel(zx::channel channel) { return ZX_ERR_NOT_SUPPORTED; }
+zx_status_t BtHciMarvell::BtHciOpenScoChannel(zx::channel channel) {
+  // The same ID is used for SCO data regardless of whether it is going from host->controller,
+  // or controller->host.
+  return OpenChannel(std::move(channel), ControllerChannelId::kChannelScoData,
+                     ControllerChannelId::kChannelScoData, "SCO Data");
+}
 
 zx_status_t BtHciMarvell::BtHciOpenSnoopChannel(zx::channel channel) {
   return ZX_ERR_NOT_SUPPORTED;

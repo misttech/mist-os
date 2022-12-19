@@ -14,7 +14,7 @@ namespace bt_hci_marvell {
 // Product ID (PID) => device
 static constexpr struct {
   uint32_t product_id;
-  enum DeviceType device_type;
+  DeviceType device_type;
 } kPidLookupTable[] = {{0x914a, DeviceType::k88W8987}};
 
 zx::result<std::unique_ptr<DeviceOracle>> DeviceOracle::Create(uint32_t pid) {
