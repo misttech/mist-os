@@ -121,7 +121,7 @@ class AssemblyInputBundle(ImageAssemblyConfig):
                 path/to/shard/file/in/tree
             <compiled package name>/
                 component_shards/
-                    path_to_input_file.cml
+                    name.shard.cml
                 files/
                     path/to/file/in/package
         kernel/
@@ -817,12 +817,13 @@ class AIBCreator:
         shard_include_paths: Set[FilePath] = set()
         for entry in component_includes:
             # TODO(fxbug.dev/117397): Handle multiple packages properly
-            copy_destination = os.path.join(
-                self.outdir, "compiled_packages", "include", entry.destination)
+            rebased_destination = os.path.join(
+                "compiled_packages", "include", entry.destination)
+            copy_destination = os.path.join(self.outdir, rebased_destination)
 
             # Hardlink the file from the source to the destination
             deps.add(fast_copy_makedirs(entry.source, copy_destination))
-            shard_include_paths.add(copy_destination)
+            shard_include_paths.add(rebased_destination)
 
         return shard_include_paths, deps
 
@@ -835,15 +836,14 @@ class AIBCreator:
             # Copy the file to a destination based on its path in the source
             # tree. Make sure any directory traversal characters are replaced
             # and it's a valid filename.
-            copy_destination = os.path.join(
-                self.outdir, "compiled_packages", package_name,
-                "component_shards",
-                os.path.basename(
-                    shard.replace(os.path.sep, "_").replace(".", "_")))
+            bundle_destination = os.path.join(
+                "compiled_packages", package_name, "component_shards",
+                os.path.basename(shard))
+            copy_destination = os.path.join(self.outdir, bundle_destination)
 
             # Hardlink the file from the source to the destination
             deps.add(fast_copy_makedirs(shard, copy_destination))
-            shard_file_paths.append(copy_destination)
+            shard_file_paths.append(bundle_destination)
 
         return shard_file_paths, deps
 

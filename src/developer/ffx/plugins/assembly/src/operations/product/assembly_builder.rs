@@ -1217,7 +1217,7 @@ mod tests {
                         "merge",
                          "--output",
                           vars.outdir.join("foo/component1/component1.cml").as_str(),
-                          "cml1"
+                          vars.outdir.join("bundle/cml1").as_str()
                     ]
                 },
                 {
@@ -1235,7 +1235,13 @@ mod tests {
                 },
                 {
                     "tool": "./host_x64/cmc",
-                    "args": ["merge", "--output", vars.outdir.join("foo/component2/component2.cml").as_str(), "cml2", "shard1"]
+                    "args": [
+                        "merge",
+                        "--output",
+                        vars.outdir.join("foo/component2/component2.cml").as_str(),
+                        vars.outdir.join("bundle/cml2").as_str(),
+                        vars.outdir.join("bundle/shard1")
+                    ]
                 },
                 {
                     "tool": "./host_x64/cmc",
@@ -1251,7 +1257,8 @@ mod tests {
                     ]
                 }
             ]
-        })).unwrap();
+        }))
+        .unwrap();
         assert_eq!(&expected_commands, tools.log());
 
         Ok(())

@@ -208,7 +208,7 @@ class MakeLegacyConfig(unittest.TestCase):
                         name="core",
                         components={
                             "core":
-                                "outdir/compiled_packages/core/component_shards/source_core_realm_cml"
+                                "compiled_packages/core/component_shards/realm.cml"
                         },
                         contents=set(
                             [
@@ -218,15 +218,13 @@ class MakeLegacyConfig(unittest.TestCase):
                                     destination="core/package/file/destination")
                             ]),
                         includes=set(
-                            [
-                                "outdir/compiled_packages/include/src/include.cml"
-                            ])),
+                            ["compiled_packages/include/src/include.cml"])),
                     CompiledPackageAdditionalShards(
                         name="core",
                         component_shards={
                             "core":
                                 [
-                                    "outdir/compiled_packages/core/component_shards/source_core_realm_shard_cml"
+                                    "compiled_packages/core/component_shards/shard.cml"
                                 ]
                         })
                 ])
@@ -435,12 +433,12 @@ class MakeLegacyConfig(unittest.TestCase):
                         FileEntry(
                             source='source/core/realm.cml',
                             destination=
-                            'outdir/compiled_packages/core/component_shards/source_core_realm_cml'
+                            'outdir/compiled_packages/core/component_shards/realm.cml'
                         ),
                         FileEntry(
                             source='source/core/realm/shard.cml',
                             destination=
-                            'outdir/compiled_packages/core/component_shards/source_core_realm_shard_cml'
+                            'outdir/compiled_packages/core/component_shards/shard.cml'
                         ),
                         FileEntry(
                             source='source/some/core/package/file',
