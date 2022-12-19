@@ -2,24 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
-import("//build/config.gni")
-import("//build/dist/renamed_binary.gni")
-
+# This is used in legacy_test_runner. Remove this once that goes away.
 source_set("lib") {
   testonly = true
 
   sources = [
     "component.cc",
     "component.h",
-    "log_collector.cc",
-    "log_collector.h",
     "output_collector.cc",
     "output_collector.h",
-    "run_test_component.cc",
-    "run_test_component.h",
-    "sys_tests.cc",
-    "sys_tests.h",
     "test_metadata.cc",
     "test_metadata.h",
   ]
@@ -29,7 +20,6 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.device:fuchsia.device_hlcpp",
     "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_hlcpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_hlcpp",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
     "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp",
     "//sdk/fidl/fuchsia.net.name:fuchsia.net.name_hlcpp",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_hlcpp",
@@ -47,26 +37,8 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/syslog/cpp",
     "//src/lib/cmx",
     "//src/lib/fxl",
     "//src/lib/json_parser",
-    "//src/lib/pkg_url",
-    "//third_party/rapidjson",
   ]
-}
-
-group("run-test-component") {
-  testonly = true
-  deps = []
-}
-
-group("run_test_component") {
-  testonly = true
-  public_deps = []
-}
-
-group("tests") {
-  testonly = true
-  public_deps = []
 }

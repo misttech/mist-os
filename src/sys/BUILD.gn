@@ -7,7 +7,6 @@ group("sys") {
   deps = [
     "activity",
     "pkg",
-    "run_test_component",
     "time/timekeeper",
   ]
 }
@@ -26,7 +25,6 @@ group("tests") {
     "live_usb:tests",
     "pkg:tests",
     "process-resolver:tests",
-    "run_test_component:tests",
     "run_test_suite:tests",
     "stash:tests",
     "test_manager:tests",

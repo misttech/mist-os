@@ -113,8 +113,6 @@ _METRICS_TRACK_COMMAND_OPS=(
     "shell rmdir"
     "shell run"
     "shell run_simplest_app_benchmark.sh"
-    "shell run_test_component"
-    "shell run-test-component"
     "shell run-test-suite"
     "shell scp"
     "shell screencap"

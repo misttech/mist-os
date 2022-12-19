@@ -19,7 +19,7 @@ import("//build/testing/test_spec.gni")
 #     [string] Component name to test.
 #
 #   runner (required)
-#     [string] The runner used to execute the test(run|run_test_component).
+#     [string] The runner used to execute the test(run).
 #
 #   deps (optional)
 #     [list of labels]: List of labels that the test depends on.
