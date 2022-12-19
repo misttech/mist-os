@@ -33,6 +33,7 @@ class NetdeviceMigrationTestHelper {
   }
   size_t netbuf_size() const { return netdev_.netbuf_size_; }
   const device_info_t& Info() { return netdev_.info_; }
+  const port_info_t& PortInfo() { return netdev_.port_info_; }
   const ethernet_ifc_protocol_t& EthernetIfcProto() { return netdev_.ethernet_ifc_proto_; }
   const network_device_impl_protocol_ops_t& NetworkDeviceImplProtoOps() {
     return netdev_.network_device_impl_protocol_ops_;
@@ -255,6 +256,57 @@ class NetdeviceMigrationEthernetDmaSetupTest : public NetdeviceMigrationTest {
     SetUpWithFeatures(ETHERNET_FEATURE_DMA);
   }
 };
+
+struct DeviceClassTestCase {
+  std::string name;
+  ethernet_feature_t features;
+  fuchsia_hardware_network::wire::DeviceClass expected_device_class;
+};
+
+const DeviceClassTestCase device_class_test_cases[]{
+    {
+        .name = "Ethernet",
+        .features = 0,
+        .expected_device_class = fuchsia_hardware_network::wire::DeviceClass::kEthernet,
+    },
+    {
+        .name = "WLAN",
+        .features = ETHERNET_FEATURE_WLAN,
+        .expected_device_class = fuchsia_hardware_network::wire::DeviceClass::kWlan,
+    },
+    {
+        .name = "WLAN_AP",
+        .features = ETHERNET_FEATURE_WLAN_AP,
+        .expected_device_class = fuchsia_hardware_network::wire::DeviceClass::kWlanAp,
+    },
+    {
+        .name = "WLAN_AP_and_WLAN",
+        .features = ETHERNET_FEATURE_WLAN_AP | ETHERNET_FEATURE_WLAN,
+        .expected_device_class = fuchsia_hardware_network::wire::DeviceClass::kWlanAp,
+    },
+    {
+        .name = "Virtual",
+        .features = ETHERNET_FEATURE_SYNTH,
+        .expected_device_class = fuchsia_hardware_network::wire::DeviceClass::kVirtual,
+    },
+};
+
+class DeviceClassSetupTest : public NetdeviceMigrationTest,
+                             public testing::WithParamInterface<DeviceClassTestCase> {};
+
+TEST_P(DeviceClassSetupTest, DeviceClassTest) {
+  const DeviceClassTestCase test_case = GetParam();
+  SetUpWithFeatures(test_case.features);
+  netdevice_migration::NetdeviceMigrationTestHelper helper(Device());
+  const port_info_t port_info = helper.PortInfo();
+  ASSERT_EQ(static_cast<uint8_t>(test_case.expected_device_class), port_info.port_class);
+}
+
+INSTANTIATE_TEST_SUITE_P(NetdeviceMigration, DeviceClassSetupTest,
+                         testing::ValuesIn<DeviceClassTestCase>(device_class_test_cases),
+                         [](const testing::TestParamInfo<DeviceClassSetupTest::ParamType>& info) {
+                           return info.param.name;
+                         });
 
 TEST_F(NetdeviceMigrationDefaultSetupTest, DeviceInfoPreconditions) {
   netdevice_migration::NetdeviceMigrationTestHelper helper(Device());

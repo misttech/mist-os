@@ -92,7 +92,8 @@ class NetdeviceMigration
   void MacAddrSetMode(mode_t mode, const uint8_t* multicast_macs_list, size_t multicast_macs_count);
 
  private:
-  NetdeviceMigration(zx_device_t* parent, ddk::EthernetImplProtocolClient ethernet, uint32_t mtu,
+  NetdeviceMigration(zx_device_t* parent, ddk::EthernetImplProtocolClient ethernet,
+                     fuchsia_hardware_network::wire::DeviceClass device_class, uint32_t mtu,
                      zx::bti eth_bti, vmo_store::Options opts, std::array<uint8_t, MAC_SIZE> mac,
                      size_t netbuf_size, NetbufPool netbuf_pool)
       : DeviceType(parent),
@@ -121,8 +122,7 @@ class NetdeviceMigration
             .type = static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet),
             .features = fuchsia_hardware_network::wire::kFrameFeaturesRaw}},
         port_info_(port_info_t{
-            .port_class =
-                static_cast<uint8_t>(fuchsia_hardware_network::wire::DeviceClass::kEthernet),
+            .port_class = static_cast<uint8_t>(device_class),
             .rx_types_list = rx_types_.data(),
             .rx_types_count = rx_types_.size(),
             .tx_types_list = tx_types_.data(),

@@ -77,6 +77,17 @@ zx::result<std::unique_ptr<NetdeviceMigration>> NetdeviceMigration::Create(zx_de
         .index = true,
     };
   }
+  fuchsia_hardware_network::wire::DeviceClass device_class =
+      fuchsia_hardware_network::wire::DeviceClass::kEthernet;
+  if (eth_info.features & ETHERNET_FEATURE_SYNTH) {
+    device_class = fuchsia_hardware_network::wire::DeviceClass::kVirtual;
+  } else if (eth_info.features & ETHERNET_FEATURE_WLAN_AP) {
+    // If both WLAN and WLAN_AP flags are set, WLAN_AP takes precedence
+    device_class = fuchsia_hardware_network::wire::DeviceClass::kWlanAp;
+  } else if (eth_info.features & ETHERNET_FEATURE_WLAN) {
+    device_class = fuchsia_hardware_network::wire::DeviceClass::kWlan;
+  }
+
   std::array<uint8_t, sizeof(eth_info.mac)> mac;
   std::copy_n(eth_info.mac, sizeof(eth_info.mac), mac.begin());
   if (eth_info.netbuf_size < sizeof(ethernet_netbuf_t)) {
@@ -95,8 +106,8 @@ zx::result<std::unique_ptr<NetdeviceMigration>> NetdeviceMigration::Create(zx_de
   }
   fbl::AllocChecker ac;
   auto netdevm = std::unique_ptr<NetdeviceMigration>(
-      new (&ac) NetdeviceMigration(dev, ethernet, eth_info.mtu, std::move(eth_bti), opts, mac,
-                                   eth_info.netbuf_size, std::move(netbuf_pool)));
+      new (&ac) NetdeviceMigration(dev, ethernet, device_class, eth_info.mtu, std::move(eth_bti),
+                                   opts, mac, eth_info.netbuf_size, std::move(netbuf_pool)));
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
