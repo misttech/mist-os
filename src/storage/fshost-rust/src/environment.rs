@@ -5,10 +5,7 @@
 use {
     crate::{
         boot_args::BootArgs,
-        crypt::{
-            fxfs::{self, UnlockError},
-            zxcrypt,
-        },
+        crypt::{fxfs, zxcrypt},
         device::{constants::DEFAULT_F2FS_MIN_BYTES, Device},
         volume::resize_volume,
     },
@@ -309,30 +306,31 @@ impl FilesystemLauncher {
             }
         }
 
-        match format {
-            DiskFormat::Fxfs => {
-                let mut serving_fs = fs.serve_multi_volume().await?;
-                match fxfs::unlock_data_volume(&mut serving_fs, &self.config).await {
-                    Ok((volume_name, _)) => {
-                        Ok(Filesystem::ServingMultiVolume(serving_fs, volume_name))
-                    }
-                    Err(UnlockError::FsckError(error)) => {
-                        self.report_corruption(format, &error);
-                        if self.config.format_data_on_corruption {
-                            tracing::info!("Reformatting filesystem, expect data loss...");
-                            self.format_data(&mut fs, volume_proxy, inside_zxcrypt).await
-                        } else {
-                            tracing::error!(
-                                ?format,
-                                "format on corruption is disabled, not continuing"
-                            );
-                            Err(error)
-                        }
-                    }
-                    Err(UnlockError::OtherError(error)) => Err(error),
+        // Wrap the serving in an async block so we can use ?.
+        let serve_fut = async {
+            match format {
+                DiskFormat::Fxfs => {
+                    let mut serving_fs = fs.serve_multi_volume().await?;
+                    fxfs::unlock_data_volume(&mut serving_fs, &self.config)
+                        .await
+                        .map(|t| t.0)
+                        .map(|volume_name| Filesystem::ServingMultiVolume(serving_fs, volume_name))
+                }
+                _ => Ok(Filesystem::Serving(fs.serve().await?)),
+            }
+        };
+        match serve_fut.await {
+            Ok(fs) => Ok(fs),
+            Err(error) => {
+                self.report_corruption(format, &error);
+                if self.config.format_data_on_corruption {
+                    tracing::info!("Reformatting filesystem, expect data loss...");
+                    self.format_data(&mut fs, volume_proxy, inside_zxcrypt).await
+                } else {
+                    tracing::error!(?format, "format on corruption is disabled, not continuing");
+                    Err(error)
                 }
             }
-            _ => Ok(Filesystem::Serving(fs.serve().await?)),
         }
     }
 

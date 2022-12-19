@@ -73,44 +73,13 @@ async fn unwrap_or_create_keys(
     Err(last_err)
 }
 
-pub enum UnlockError {
-    FsckError(Error),
-    OtherError(Error),
-}
-
-impl std::ops::Deref for UnlockError {
-    type Target = Error;
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::FsckError(error) => error,
-            Self::OtherError(error) => error,
-        }
-    }
-}
-
-// For convenience (so we can use ?), map anyhow::Error to OtherError by default.
-impl From<Error> for UnlockError {
-    fn from(error: Error) -> Self {
-        Self::OtherError(error)
-    }
-}
-
-impl From<UnlockError> for Error {
-    fn from(error: UnlockError) -> Self {
-        match error {
-            UnlockError::FsckError(error) => error,
-            UnlockError::OtherError(error) => error,
-        }
-    }
-}
-
 // Unwraps the data volume in `fs`.  Any failures should be treated as fatal and the filesystem
 // should be reformatted and re-initialized.
 // Returns the name of the data volume as well as a reference to it.
 pub async fn unlock_data_volume<'a>(
     fs: &'a mut ServingMultiVolumeFilesystem,
     config: &'a fshost_config::Config,
-) -> Result<(String, &'a mut ServingVolume), UnlockError> {
+) -> Result<(String, &'a mut ServingVolume), Error> {
     unlock_or_init_data_volume(fs, config, false).await
 }
 
@@ -120,21 +89,14 @@ pub async fn init_data_volume<'a>(
     fs: &'a mut ServingMultiVolumeFilesystem,
     config: &'a fshost_config::Config,
 ) -> Result<(String, &'a mut ServingVolume), Error> {
-    unlock_or_init_data_volume(fs, config, true).await.map_err(|e| {
-        if let UnlockError::OtherError(err) = e {
-            err
-        } else {
-            // We don't fsck on init.
-            unreachable!();
-        }
-    })
+    unlock_or_init_data_volume(fs, config, true).await
 }
 
 async fn unlock_or_init_data_volume<'a>(
     fs: &'a mut ServingMultiVolumeFilesystem,
     config: &'a fshost_config::Config,
     create: bool,
-) -> Result<(String, &'a mut ServingVolume), UnlockError> {
+) -> Result<(String, &'a mut ServingVolume), Error> {
     let mut use_native_fxfs_crypto = config.use_native_fxfs_crypto;
     let has_native_layout = !fs.has_volume("default").await?;
     if !create && (has_native_layout != use_native_fxfs_crypto) {
@@ -187,8 +149,7 @@ async fn unlock_or_init_data_volume<'a>(
             let crypt_service = if config.check_filesystems {
                 fs.check_volume(&data_volume_name, crypt_service)
                     .await
-                    .context(format!("Failed to verify {}", data_volume_name))
-                    .map_err(UnlockError::FsckError)?;
+                    .context(format!("Failed to verify {}", data_volume_name))?;
                 Some(
                     connect_to_protocol::<CryptMarker>()
                         .expect("Unable to connect to Crypt service")
