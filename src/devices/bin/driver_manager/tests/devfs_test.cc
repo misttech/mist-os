@@ -113,12 +113,12 @@ TEST(Devfs, Export_WithProtocol) {
   ASSERT_TRUE(root_slot.has_value());
   Devnode& root_node = root_slot.value();
 
-  const ProtoNode* proto_node = devfs.proto_node(ZX_PROTOCOL_BLOCK);
-  ASSERT_NE(proto_node, nullptr);
-  EXPECT_EQ("block", proto_node->name());
+  std::optional proto_node = devfs.proto_node(ZX_PROTOCOL_BLOCK);
+  ASSERT_TRUE(proto_node.has_value());
+  EXPECT_EQ("block", proto_node.value().get().name());
   {
     fbl::RefPtr<fs::Vnode> node_000;
-    EXPECT_STATUS(proto_node->children().Lookup("000", &node_000), ZX_ERR_NOT_FOUND);
+    EXPECT_STATUS(proto_node.value().get().children().Lookup("000", &node_000), ZX_ERR_NOT_FOUND);
     ASSERT_EQ(node_000, nullptr);
   }
 
@@ -140,7 +140,7 @@ TEST(Devfs, Export_WithProtocol) {
   EXPECT_EQ("two", node_two->get().name());
 
   fbl::RefPtr<fs::Vnode> node_000;
-  EXPECT_OK(proto_node->children().Lookup("000", &node_000));
+  EXPECT_OK(proto_node.value().get().children().Lookup("000", &node_000));
   ASSERT_NE(node_000, nullptr);
 }
 

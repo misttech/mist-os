@@ -52,13 +52,13 @@ overloaded(Ts...) -> overloaded<Ts...>;
 
 namespace fio = fuchsia_io;
 
-ProtoNode* Devfs::proto_node(uint32_t protocol_id) {
+std::optional<std::reference_wrapper<ProtoNode>> Devfs::proto_node(uint32_t protocol_id) {
   auto it = proto_info_nodes.find(protocol_id);
   if (it == proto_info_nodes.end()) {
-    return nullptr;
+    return std::nullopt;
   }
   auto& [key, value] = *it;
-  return &value;
+  return value;
 }
 
 std::string_view Devnode::name() const {
@@ -398,7 +398,7 @@ zx_status_t Devnode::add_child(std::string_view name, uint32_t protocol, Remote 
   }
 
   // Find the protocol directory.
-  ProtoNode* proto_dir = nullptr;
+  std::optional<std::reference_wrapper<ProtoNode>> proto_dir;
   switch (const uint32_t id = protocol; id) {
     case ZX_PROTOCOL_TEST_PARENT:
     case ZX_PROTOCOL_MISC:
@@ -412,10 +412,10 @@ zx_status_t Devnode::add_child(std::string_view name, uint32_t protocol, Remote 
 
   // Get the name of our new device in the protocol directory.
   fbl::String class_name;
-  if (proto_dir) {
+  if (proto_dir.has_value()) {
     class_name = name;
     if (protocol != ZX_PROTOCOL_CONSOLE) {
-      zx::result seq_name = proto_dir->seq_name();
+      zx::result seq_name = proto_dir.value().get().seq_name();
       if (seq_name.is_error()) {
         return seq_name.status_value();
       }
@@ -424,8 +424,9 @@ zx_status_t Devnode::add_child(std::string_view name, uint32_t protocol, Remote 
   }
 
   // Setup the DevfsDevice.
-  if (proto_dir) {
-    out_child.protocol_node().emplace(devfs_, proto_dir->children(), remote.Clone(), class_name);
+  if (proto_dir.has_value()) {
+    out_child.protocol_node().emplace(devfs_, proto_dir.value().get().children(), remote.Clone(),
+                                      class_name);
   }
   out_child.topological_node().emplace(devfs_, children(), std::move(remote), name);
 
@@ -624,8 +625,8 @@ zx_status_t Devnode::export_dir(fidl::ClientEnd<fio::Directory> service_dir,
 
     // If a protocol directory exists for `protocol_id`, then create a Devnode
     // under the protocol directory too.
-    if (ProtoNode* dir_ptr = devfs_.proto_node(protocol_id); dir_ptr != nullptr) {
-      ProtoNode& dn = *dir_ptr;
+    if (std::optional proto_dir_opt = devfs_.proto_node(protocol_id); proto_dir_opt.has_value()) {
+      ProtoNode& dn = proto_dir_opt.value().get();
       zx::result seq_name = dn.seq_name();
       if (seq_name.is_error()) {
         return seq_name.status_value();

@@ -222,7 +222,7 @@ class Devfs {
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Connect(fs::FuchsiaVfs& vfs);
 
   // This method is exposed for testing.
-  ProtoNode* proto_node(uint32_t protocol_id);
+  std::optional<std::reference_wrapper<ProtoNode>> proto_node(uint32_t protocol_id);
 
  private:
   friend class Devnode;
