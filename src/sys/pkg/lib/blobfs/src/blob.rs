@@ -299,7 +299,7 @@ impl TruncateSuccess {
     pub fn unwrap_needs_data(self) -> Blob<NeedsData> {
         match self {
             TruncateSuccess::NeedsData(blob) => blob,
-            _ => panic!("unwrap_needs_data() called on {:?}", self),
+            _ => panic!("unwrap_needs_data() called on {self:?}"),
         }
     }
 
@@ -311,7 +311,7 @@ impl TruncateSuccess {
     pub fn unwrap_done(self) -> fio::FileProxy {
         match self {
             TruncateSuccess::Done(blob) => blob,
-            _ => panic!("unwrap_done() called on {:?}", self),
+            _ => panic!("unwrap_done() called on {self:?}"),
         }
     }
 }
@@ -325,7 +325,7 @@ impl WriteSuccess {
     pub fn unwrap_more_to_write(self) -> Blob<NeedsData> {
         match self {
             WriteSuccess::MoreToWrite(blob) => blob,
-            _ => panic!("unwrap_more_to_write() called on {:?}", self),
+            _ => panic!("unwrap_more_to_write() called on {self:?}"),
         }
     }
 
@@ -337,7 +337,7 @@ impl WriteSuccess {
     pub fn unwrap_done(self) -> Blob<AtEof> {
         match self {
             WriteSuccess::Done(blob) => blob,
-            _ => panic!("unwrap_done() called on {:?}", self),
+            _ => panic!("unwrap_done() called on {self:?}"),
         }
     }
 }

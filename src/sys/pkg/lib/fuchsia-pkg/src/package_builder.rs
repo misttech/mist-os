@@ -78,7 +78,7 @@ impl PackageBuilder {
     pub fn from_package_build_manifest(manifest: &PackageBuildManifest) -> Result<Self> {
         // Read the package name from `meta/package`, or error out if it's missing.
         let meta_package = if let Some(path) = manifest.far_contents().get("meta/package") {
-            let f = File::open(path).with_context(|| format!("opening {}", path))?;
+            let f = File::open(path).with_context(|| format!("opening {path}"))?;
 
             MetaPackage::deserialize(BufReader::new(f))?
         } else {
@@ -91,14 +91,14 @@ impl PackageBuilder {
 
         // Read the abi revision from `meta/fuchsia.abi/abi-revision`, or error out if it's missing.
         if let Some(path) = manifest.far_contents().get("meta/fuchsia.abi/abi-revision") {
-            let abi_revision = std::fs::read(path).with_context(|| format!("reading {}", path))?;
+            let abi_revision = std::fs::read(path).with_context(|| format!("reading {path}"))?;
             builder.abi_revision(AbiRevision::try_from(abi_revision.as_slice())?.into());
         }
 
         for (at_path, file) in manifest.external_contents() {
             builder
                 .add_file_as_blob(at_path, file)
-                .with_context(|| format!("adding file {} as blob {}", at_path, file))?;
+                .with_context(|| format!("adding file {at_path} as blob {file}"))?;
         }
 
         for (at_path, file) in manifest.far_contents() {
@@ -109,7 +109,7 @@ impl PackageBuilder {
 
             builder
                 .add_file_to_far(at_path, file)
-                .with_context(|| format!("adding file {} to far {}", at_path, file))?;
+                .with_context(|| format!("adding file {at_path} to far {file}"))?;
         }
 
         Ok(builder)
@@ -159,13 +159,13 @@ impl PackageBuilder {
         for (path, contents) in meta_blobs {
             builder
                 .add_contents_to_far(&path, contents, &outdir)
-                .with_context(|| format!("adding {} to far", path))?;
+                .with_context(|| format!("adding {path} to far"))?;
         }
 
         for (path, source_path) in blob_paths {
             builder
                 .add_file_as_blob(&path, &source_path)
-                .with_context(|| format!("adding {}", path))?;
+                .with_context(|| format!("adding {path}"))?;
         }
 
         for (name, (merkle, manifest_path)) in subpackage_names {
@@ -175,7 +175,7 @@ impl PackageBuilder {
                     merkle,
                     manifest_path.into(),
                 )
-                .with_context(|| format!("adding {}", name))?;
+                .with_context(|| format!("adding {name}"))?;
         }
 
         Ok(builder)
@@ -345,7 +345,7 @@ impl PackageBuilder {
     /// Read the contents of a file already added to the builder's meta.far.
     pub fn read_contents_from_far(&self, file_path: &str) -> Result<Vec<u8>> {
         if let Some(p) = self.far_contents.get(file_path) {
-            std::fs::read(p).with_context(|| format!("reading {}", p))
+            std::fs::read(p).with_context(|| format!("reading {p}"))
         } else {
             bail!("couldn't find `{}` in package", file_path);
         }
@@ -390,12 +390,12 @@ impl PackageBuilder {
 
         let abi_revision_file =
             Self::write_contents_to_file(gendir, ABI_REVISION_FILE_PATH, abi_revision.as_bytes())
-                .with_context(|| format!("Writing the {} file", ABI_REVISION_FILE_PATH))?;
+                .with_context(|| format!("Writing the {ABI_REVISION_FILE_PATH} file"))?;
 
         far_contents.insert(
             ABI_REVISION_FILE_PATH.to_string(),
             abi_revision_file.path_to_string().with_context(|| {
-                format!("Adding the {} file to the package", ABI_REVISION_FILE_PATH)
+                format!("Adding the {ABI_REVISION_FILE_PATH} file to the package")
             })?,
         );
 
@@ -433,20 +433,19 @@ impl PackageBuilder {
             let package_manifest = if let RelativeTo::File = blob_sources_relative {
                 package_manifest.write_with_relative_paths(&manifest_path).with_context(|| {
                     format!(
-                        "Failed to create package manifest with relative paths at: {}",
-                        manifest_path
+                        "Failed to create package manifest with relative paths at: {manifest_path}"
                     )
                 })?
             } else {
                 // Write the package manifest to a file.
                 let package_manifest_file = std::fs::File::create(&manifest_path)
-                    .context(format!("Failed to create package manifest: {}", manifest_path))?;
+                    .context(format!("Failed to create package manifest: {manifest_path}"))?;
 
                 serde_json::ser::to_writer(
                     BufWriter::new(package_manifest_file),
                     &package_manifest,
                 )
-                .with_context(|| format!("writing package manifest to {}", manifest_path))?;
+                .with_context(|| format!("writing package manifest to {manifest_path}"))?;
 
                 package_manifest
             };
@@ -501,7 +500,7 @@ impl PackagedMetaFar {
         // copy the contents of the meta.far, skipping files that PackageBuilder will write
         for path in meta_paths {
             let contents =
-                meta_far.read_file(&path).with_context(|| format!("reading {}", path))?;
+                meta_far.read_file(&path).with_context(|| format!("reading {path}"))?;
 
             if path == MetaContents::PATH {
                 continue;
@@ -791,7 +790,7 @@ mod tests {
                             "meta/some/other/file" => {
                                 assert_eq!(far_bytes, second_far_contents.as_bytes());
                             }
-                            other => panic!("unrecognized file in meta.far: {}", other),
+                            other => panic!("unrecognized file in meta.far: {other}"),
                         }
                     }
                 }
@@ -807,7 +806,7 @@ mod tests {
                         second_blob_contents,
                     )
                 }
-                other => panic!("unrecognized path in blobs `{}`", other),
+                other => panic!("unrecognized path in blobs `{other}`"),
             }
         }
     }

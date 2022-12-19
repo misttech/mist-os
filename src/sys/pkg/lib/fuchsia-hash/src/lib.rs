@@ -118,7 +118,7 @@ mod tests {
         #[test]
         fn test_from_str_display(ref s in "[[:xdigit:]]{64}") {
             let hash = Hash::from_str(s).unwrap();
-            let display = format!("{}", hash);
+            let display = format!("{hash}");
             prop_assert_eq!(s.to_ascii_lowercase(), display);
         }
 

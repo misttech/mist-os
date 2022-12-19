@@ -33,7 +33,7 @@ impl MockMetricEventLogger {
                     let _ = responder.send(&mut Ok(()));
                 }
                 _ => {
-                    panic!("unhandled MetricEventLogger method {:?}", event);
+                    panic!("unhandled MetricEventLogger method {event:?}");
                 }
             }
         }
@@ -78,7 +78,7 @@ impl MockMetricEventLoggerFactory {
                     let _ = responder.send(&mut Ok(()));
                 }
                 _ => {
-                    panic!("unhandled MetricEventLoggerFactory method: {:?}", event);
+                    panic!("unhandled MetricEventLoggerFactory method: {event:?}");
                 }
             }
         }

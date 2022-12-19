@@ -31,7 +31,7 @@ pub enum JoinerState {
 impl From<otJoinerState> for JoinerState {
     fn from(x: otJoinerState) -> Self {
         use num::FromPrimitive;
-        Self::from_u32(x).unwrap_or_else(|| panic!("Unknown otJoinerState value: {}", x))
+        Self::from_u32(x).unwrap_or_else(|| panic!("Unknown otJoinerState value: {x}"))
     }
 }
 

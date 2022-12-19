@@ -691,7 +691,7 @@ impl MockPaverService {
                     fasync::Task::spawn(
                         paver_service_clone
                             .run_data_sink_service(data_sink.into_stream()?)
-                            .unwrap_or_else(|e| panic!("error running data sink service: {:?}", e)),
+                            .unwrap_or_else(|e| panic!("error running data sink service: {e:?}")),
                     )
                     .detach();
                 }
@@ -699,7 +699,7 @@ impl MockPaverService {
                     let paver_service_clone = self.clone();
                     fasync::Task::spawn(
                         paver_service_clone.run_boot_manager_service(boot_manager).unwrap_or_else(
-                            |e| panic!("error running boot manager service: {:?}", e),
+                            |e| panic!("error running boot manager service: {e:?}"),
                         ),
                     )
                     .detach();

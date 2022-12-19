@@ -304,7 +304,7 @@ where
 
             j += 1;
         }
-        panic!("index {} too large", index);
+        panic!("index {index} too large");
     }
 
     fn next_event(&mut self, i: usize) {
@@ -796,7 +796,7 @@ mod tests {
         let mut handle = start_event_queue();
         let mut stream = add_client(&mut handle).await;
         for i in 1..12 {
-            handle.queue_event(format!("event{}", i)).await.unwrap();
+            handle.queue_event(format!("event{i}")).await.unwrap();
         }
         assert_client_dropped(&mut stream, "event1").await;
         assert_matches!(stream.next().await, None);

@@ -175,7 +175,7 @@ impl From<Result<(), Error>> for Error {
 
 impl From<otError> for Error {
     fn from(err: otError) -> Self {
-        Error::from_u32(err).unwrap_or_else(|| panic!("Unknown otError value: {}", err))
+        Error::from_u32(err).unwrap_or_else(|| panic!("Unknown otError value: {err}"))
     }
 }
 

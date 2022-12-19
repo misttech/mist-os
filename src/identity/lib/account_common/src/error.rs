@@ -106,7 +106,7 @@ mod tests {
     #[test]
     fn test_new() {
         let cause = format_err!("Example cause");
-        let cause_str = format!("{:?}", cause);
+        let cause_str = format!("{cause:?}");
         let error = AccountManagerError::new(TEST_API_ERROR).with_cause(cause);
         assert_eq!(error.api_error, TEST_API_ERROR);
         assert!(!error.fatal);
@@ -138,7 +138,7 @@ mod tests {
         let expected_cause = format_err!("Authenticator error: InvalidAuthContext");
         assert_eq!(error.api_error, AccountApiError::InvalidRequest);
         assert!(!error.fatal);
-        assert_eq!(format!("{:?}", error.cause.unwrap()), format!("{:?}", expected_cause));
+        assert_eq!(format!("{:?}", error.cause.unwrap()), format!("{expected_cause:?}"));
     }
 
     #[test]

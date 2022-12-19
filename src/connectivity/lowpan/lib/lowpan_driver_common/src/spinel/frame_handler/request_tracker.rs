@@ -158,7 +158,7 @@ pub(crate) mod tests {
         // This works because closures with this signature have a blanket
         // implementation of the `ResponseHandler` trait.
         let handler = move |response: Result<SpinelFrameRef<'_>, Canceled>| {
-            println!("Response handler invoked with {:?}", response);
+            println!("Response handler invoked with {response:?}");
             assert_matches!(response, Err(Canceled));
             *flag_copy.lock() = true;
             Ok(())
@@ -193,7 +193,7 @@ pub(crate) mod tests {
         // This works because closures with this signature have a blanket
         // implementation of the `ResponseHandler` trait.
         let handler = move |response: Result<SpinelFrameRef<'_>, Canceled>| {
-            println!("Response handler invoked with {:?}", response);
+            println!("Response handler invoked with {response:?}");
             assert_matches!(response, Err(Canceled));
             *flag_copy.lock() = true;
             Ok(())

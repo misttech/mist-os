@@ -89,7 +89,7 @@ async fn test_legacy_joining_mutual_exclusion() {
     };
 
     futures::select! {
-        err = server_future.boxed_local().fuse() => panic!("Server task stopped: {:?}", err),
+        err = server_future.boxed_local().fuse() => panic!("Server task stopped: {err:?}"),
         _ = client_future.boxed().fuse() => (),
     }
 }

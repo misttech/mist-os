@@ -42,7 +42,7 @@ impl Mock {
                 let stream = object.into_stream().unwrap().cast_stream();
                 Blob { stream }
             }
-            other => panic!("unexpected request: {:?}", other),
+            other => panic!("unexpected request: {other:?}"),
         }
     }
 
@@ -67,7 +67,7 @@ impl Mock {
                 let stream = object.into_stream().unwrap().cast_stream();
                 Blob { stream }
             }
-            other => panic!("unexpected request: {:?}", other),
+            other => panic!("unexpected request: {other:?}"),
         }
     }
 
@@ -76,7 +76,7 @@ impl Mock {
             Some(Ok(fio::DirectoryRequest::Rewind { responder })) => {
                 responder.send(Status::OK.into_raw()).unwrap();
             }
-            other => panic!("unexpected request: {:?}", other),
+            other => panic!("unexpected request: {other:?}"),
         }
     }
 
@@ -138,7 +138,7 @@ impl Mock {
                         break;
                     }
                 }
-                Some(other) => panic!("unexpected request: {:?}", other),
+                Some(other) => panic!("unexpected request: {other:?}"),
                 None => panic!("unexpected stream termination"),
             }
         }
@@ -175,10 +175,10 @@ impl Mock {
                     } else if missing.remove(&path) {
                         blob.fail_open_with_not_found();
                     } else {
-                        panic!("Unexpected blob existance check for {}", path);
+                        panic!("Unexpected blob existance check for {path}");
                     }
                 }
-                other => panic!("unexpected request: {:?}", other),
+                other => panic!("unexpected request: {other:?}"),
             }
         }
     }
@@ -215,7 +215,7 @@ impl Mock {
     pub async fn expect_done(mut self) {
         match self.stream.next().await {
             None => {}
-            Some(request) => panic!("unexpected request: {:?}", request),
+            Some(request) => panic!("unexpected request: {request:?}"),
         }
     }
 }
@@ -317,7 +317,7 @@ impl Blob {
                 let _ = responder.send(&mut Ok(()));
                 self.expect_done().await;
             }
-            Some(other) => panic!("unexpected request: {:?}", other),
+            Some(other) => panic!("unexpected request: {other:?}"),
         }
     }
 
@@ -329,7 +329,7 @@ impl Blob {
     pub async fn expect_done(mut self) {
         match self.stream.next().await {
             None => {}
-            Some(request) => panic!("unexpected request: {:?}", request),
+            Some(request) => panic!("unexpected request: {request:?}"),
         }
     }
 
@@ -340,7 +340,7 @@ impl Blob {
                 responder.send(&mut Ok(data[..count].to_vec())).unwrap();
                 count
             }
-            other => panic!("unexpected request: {:?}", other),
+            other => panic!("unexpected request: {other:?}"),
         }
     }
 
@@ -366,7 +366,7 @@ impl Blob {
             Some(Ok(fio::FileRequest::Close { responder })) => {
                 let _ = responder.send(&mut Ok(()));
             }
-            Some(other) => panic!("unexpected request: {:?}", other),
+            Some(other) => panic!("unexpected request: {other:?}"),
         }
     }
 
@@ -407,7 +407,7 @@ impl Blob {
                 None => {
                     return;
                 }
-                other => panic!("unexpected request: {:?}", other),
+                other => panic!("unexpected request: {other:?}"),
             }
         }
     }
@@ -421,7 +421,7 @@ impl Blob {
 
                 length
             }
-            other => panic!("unexpected request: {:?}", other),
+            other => panic!("unexpected request: {other:?}"),
         }
     }
 
@@ -442,7 +442,7 @@ impl Blob {
 
                 data
             }
-            other => panic!("unexpected request: {:?}", other),
+            other => panic!("unexpected request: {other:?}"),
         }
     }
 
@@ -495,7 +495,7 @@ impl Blob {
                 Some(Ok(fio::FileRequest::Close { responder })) => {
                     responder.send(&mut Ok(())).unwrap();
                 }
-                other => panic!("unexpected request: {:?}", other),
+                other => panic!("unexpected request: {other:?}"),
             }
 
             self.expect_done().await;

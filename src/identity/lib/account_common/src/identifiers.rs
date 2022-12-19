@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn test_debug() {
         let value = AccountId::new(1111);
-        assert_eq!("AccountId { id: 1111 }", format!("{:?}", value));
+        assert_eq!("AccountId { id: 1111 }", format!("{value:?}"));
     }
 
     #[test]

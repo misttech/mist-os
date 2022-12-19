@@ -191,7 +191,7 @@ impl BorderRouter for Instance {
             )) {
                 Error::NotFound => None,
                 Error::None => Some(ret),
-                err => panic!("Unexpected error from otBorderRouterGetNextRoute: {:?}", err),
+                err => panic!("Unexpected error from otBorderRouterGetNextRoute: {err:?}"),
             }
         }
     }
@@ -209,7 +209,7 @@ impl BorderRouter for Instance {
             )) {
                 Error::NotFound => None,
                 Error::None => Some(ret),
-                err => panic!("Unexpected error from otBorderRouterGetNextOnMeshPrefix: {:?}", err),
+                err => panic!("Unexpected error from otBorderRouterGetNextOnMeshPrefix: {err:?}"),
             }
         }
     }

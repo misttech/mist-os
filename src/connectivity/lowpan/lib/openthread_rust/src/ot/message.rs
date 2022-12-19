@@ -45,7 +45,7 @@ impl Priority {
 impl From<otMessagePriority> for Priority {
     fn from(x: otMessagePriority) -> Self {
         use num::FromPrimitive;
-        Self::from_u32(x).unwrap_or_else(|| panic!("Unknown otMessagePriority value: {}", x))
+        Self::from_u32(x).unwrap_or_else(|| panic!("Unknown otMessagePriority value: {x}"))
     }
 }
 
@@ -58,7 +58,7 @@ impl From<Priority> for otMessagePriority {
 impl From<u8> for Priority {
     fn from(x: u8) -> Self {
         use num::FromPrimitive;
-        Self::from_u8(x).unwrap_or_else(|| panic!("Unknown otMessagePriority value: {}", x))
+        Self::from_u8(x).unwrap_or_else(|| panic!("Unknown otMessagePriority value: {x}"))
     }
 }
 

@@ -781,7 +781,7 @@ mod tests {
 
         let packed = struct_2.try_packed().unwrap();
 
-        println!("packed: {:?}", packed);
+        println!("packed: {packed:?}");
 
         let unpacked = TestStruct2::try_unpack(&mut packed.iter()).unwrap();
 
@@ -809,7 +809,7 @@ mod tests {
 
         let packed = struct_3.try_packed().unwrap();
 
-        println!("packed: {:?}", packed);
+        println!("packed: {packed:?}");
 
         let unpacked = TestStruct3::try_unpack(&mut packed.iter()).unwrap();
 
@@ -839,7 +839,7 @@ mod tests {
 
         let packed = struct_4.try_packed().unwrap();
 
-        println!("packed: {:?}", packed);
+        println!("packed: {packed:?}");
 
         let unpacked = TestStruct4::try_unpack(&mut packed.iter()).unwrap();
 

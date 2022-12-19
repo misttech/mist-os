@@ -227,7 +227,7 @@ impl Debug for Scope {
             Self::SITE_LOCAL => write!(f, "Scope::SITE_LOCAL"),
             Self::ORGANIZATION_LOCAL => write!(f, "Scope::ORGANIZATION_LOCAL"),
             Self::GLOBAL => write!(f, "Scope::GLOBAL"),
-            Scope(x) => write!(f, "Scope({})", x),
+            Scope(x) => write!(f, "Scope({x})"),
         }
     }
 }
@@ -273,7 +273,7 @@ impl Debug for AddressOrigin {
             Self::MANUAL => write!(f, "AddressOrigin::MANUAL"),
             Self::SLAAC => write!(f, "AddressOrigin::SLAAC"),
             Self::THREAD => write!(f, "AddressOrigin::THREAD"),
-            AddressOrigin(x) => write!(f, "AddressOrigin({})", x),
+            AddressOrigin(x) => write!(f, "AddressOrigin({x})"),
         }
     }
 }
@@ -291,7 +291,7 @@ impl Debug for NetifAddress {
         self.addr().fmt(f)?;
         write!(f, "/{} {:?}", self.prefix_len(), self.address_origin())?;
         if let Some(scope) = self.scope() {
-            write!(f, " {:?}", scope)?;
+            write!(f, " {scope:?}")?;
         }
         if self.is_valid() {
             write!(f, " VALID")?;
@@ -536,7 +536,7 @@ pub enum NetifIdentifier {
 impl From<otNetifIdentifier> for NetifIdentifier {
     fn from(x: otNetifIdentifier) -> Self {
         use num::FromPrimitive;
-        Self::from_u32(x).unwrap_or_else(|| panic!("Unknown otNetifIdentifier value: {}", x))
+        Self::from_u32(x).unwrap_or_else(|| panic!("Unknown otNetifIdentifier value: {x}"))
     }
 }
 

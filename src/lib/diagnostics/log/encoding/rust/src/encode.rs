@@ -278,7 +278,7 @@ impl RecordBuilder {
 
 impl Visit for RecordBuilder {
     fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
-        self.push_arg(field, || arg!(field.name(), Text(format!("{:?}", value))));
+        self.push_arg(field, || arg!(field.name(), Text(format!("{value:?}"))));
     }
 
     fn record_str(&mut self, field: &Field, value: &str) {

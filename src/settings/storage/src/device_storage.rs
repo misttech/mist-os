@@ -327,7 +327,7 @@ impl DeviceStorage {
                 let stash_key = prefixed(key);
                 if let Some(stash_value) =
                     cached_storage.stash_proxy.get_value(&stash_key).await.unwrap_or_else(|_| {
-                        panic!("failed to get value from stash for {:?}", stash_key)
+                        panic!("failed to get value from stash for {stash_key:?}")
                     })
                 {
                     if let Value::Stringval(string_value) = &*stash_value {
@@ -354,7 +354,7 @@ impl DeviceStorage {
                 .await;
             } else {
                 typed_storage.flush_sender.unbounded_send(()).with_context(|| {
-                    format!("flush_sender failed to send flush message, associated key is {}", key)
+                    format!("flush_sender failed to send flush message, associated key is {key}")
                 })?;
             }
             cached_storage.current_data = Some(data_as_any);
@@ -407,13 +407,13 @@ impl DeviceStorage {
             .typed_storage_map
             .get(key)
             // TODO(fxbug.dev/113292) Replace this with an error result.
-            .unwrap_or_else(|| panic!("Invalid data keyed by {}", key));
+            .unwrap_or_else(|| panic!("Invalid data keyed by {key}"));
         let cached_storage = typed_storage.cached_storage.lock().await;
         let new = if cached_storage.current_data.is_none() || !self.caching_enabled {
             let stash_key = prefixed(key);
             if let Some(stash_value) =
                 cached_storage.stash_proxy.get_value(&stash_key).await.unwrap_or_else(|_| {
-                    panic!("failed to get value from stash for {:?}", stash_key)
+                    panic!("failed to get value from stash for {stash_key:?}")
                 })
             {
                 if let Value::Stringval(string_value) = *stash_value {
@@ -460,7 +460,7 @@ impl DeviceStorage {
 }
 
 fn prefixed(input_string: &str) -> String {
-    format!("{}_{}", SETTINGS_PREFIX, input_string)
+    format!("{SETTINGS_PREFIX}_{input_string}")
 }
 
 #[cfg(test)]
@@ -526,7 +526,7 @@ mod tests {
                     panic!("Unexpected type for key found in stash");
                 }
             }
-            request => panic!("Unexpected request: {:?}", request),
+            request => panic!("Unexpected request: {request:?}"),
         }
     }
 
@@ -542,7 +542,7 @@ mod tests {
                     .send(Some(&mut Value::Stringval(response)))
                     .expect("unable to send response");
             }
-            request => panic!("Unexpected request: {:?}", request),
+            request => panic!("Unexpected request: {request:?}"),
         }
     }
 
@@ -552,7 +552,7 @@ mod tests {
             Ok(StoreAccessorRequest::Flush { responder }) => {
                 let _ = responder.send(&mut Ok(()));
             } // expected
-            request => panic!("Unexpected request: {:?}", request),
+            request => panic!("Unexpected request: {request:?}"),
         }
     }
 
@@ -562,7 +562,7 @@ mod tests {
             Ok(StoreAccessorRequest::Flush { responder }) => {
                 let _ = responder.send(&mut Err(FlushError::CommitFailed));
             } // expected
-            request => panic!("Unexpected request: {:?}", request),
+            request => panic!("Unexpected request: {request:?}"),
         }
     }
 
@@ -822,7 +822,7 @@ mod tests {
                     Ok(StoreAccessorRequest::SetValue { key, .. }) => {
                         assert_eq!(key, STORE_KEY);
                     }
-                    _ => panic!("Unexpected request {:?}", request),
+                    _ => panic!("Unexpected request {request:?}"),
                 }
             }
         });

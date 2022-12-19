@@ -127,7 +127,7 @@ impl PackageBuildManifest {
                     path: resource_path.to_string(),
                 }
             })?;
-            far_contents.insert(format!("meta/{}", resource_path), host_path);
+            far_contents.insert(format!("meta/{resource_path}"), host_path);
         }
         PackageBuildManifest::from_external_and_far_contents(v1.external_contents, far_contents)
     }
@@ -656,7 +656,7 @@ mod tests {
             let external_contents = btreemap! {
                 external_resource_path.to_string() => external_host_path.to_string()
             };
-            let far_resource_path = format!("meta/{}", far_resource_path);
+            let far_resource_path = format!("meta/{far_resource_path}");
             let far_contents = btreemap! {
                 far_resource_path => far_host_path.to_string()
             };

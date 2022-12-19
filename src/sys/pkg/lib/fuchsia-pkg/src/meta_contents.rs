@@ -97,7 +97,7 @@ impl MetaContents {
         let mut entries = self.contents.iter().collect::<Vec<_>>();
         entries.sort();
         for (path, hash) in entries {
-            writeln!(writer, "{}={}", path, hash)?;
+            writeln!(writer, "{path}={hash}")?;
         }
         Ok(())
     }
@@ -270,7 +270,7 @@ mod tests {
             ref hex in random_merkle_hex())
         {
             prop_assume!(!path.starts_with("meta/"));
-            let invalid_path = format!("{}/", path);
+            let invalid_path = format!("{path}/");
             let map = hashmap! {
                 invalid_path.clone() =>
                     Hash::from_str(hex.as_str()).unwrap(),
@@ -288,7 +288,7 @@ mod tests {
             ref path in random_resource_path(1, 3),
             ref hex in random_merkle_hex())
         {
-            let invalid_path = format!("meta/{}", path);
+            let invalid_path = format!("meta/{path}");
             let map = hashmap! {
                 invalid_path.clone() =>
                     Hash::from_str(hex.as_str()).unwrap(),

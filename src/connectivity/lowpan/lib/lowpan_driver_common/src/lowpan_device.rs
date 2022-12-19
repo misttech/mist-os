@@ -1324,13 +1324,13 @@ mod tests {
             let command = "help";
 
             match proxy.send_mfg_command(command).await {
-                Ok(result) => println!("mfg_command({:?}) result: {:?}", command, result),
-                Err(err) => panic!("mfg_command({:?}) error: {:?}", command, err),
+                Ok(result) => println!("mfg_command({command:?}) result: {result:?}"),
+                Err(err) => panic!("mfg_command({command:?}) error: {err:?}"),
             }
         };
 
         futures::select! {
-            err = server_future.boxed_local().fuse() => panic!("Server task stopped: {:?}", err),
+            err = server_future.boxed_local().fuse() => panic!("Server task stopped: {err:?}"),
             _ = client_future.boxed().fuse() => (),
         }
     }
@@ -1369,7 +1369,7 @@ mod tests {
         };
 
         futures::select! {
-            err = server_future.boxed_local().fuse() => panic!("Server task stopped: {:?}", err),
+            err = server_future.boxed_local().fuse() => panic!("Server task stopped: {err:?}"),
             _ = client_future.boxed().fuse() => (),
         }
     }
@@ -1407,7 +1407,7 @@ mod tests {
         };
 
         futures::select! {
-            err = server_future.boxed_local().fuse() => panic!("Server task stopped: {:?}", err),
+            err = server_future.boxed_local().fuse() => panic!("Server task stopped: {err:?}"),
             _ = client_future.boxed().fuse() => (),
         }
     }
@@ -1438,7 +1438,7 @@ mod tests {
         };
 
         futures::select! {
-            err = server_future.boxed_local().fuse() => panic!("Server task stopped: {:?}", err),
+            err = server_future.boxed_local().fuse() => panic!("Server task stopped: {err:?}"),
             _ = client_future.boxed().fuse() => (),
         }
     }
@@ -1461,7 +1461,7 @@ mod tests {
         };
 
         futures::select! {
-            err = server_future.boxed_local().fuse() => panic!("Server task stopped: {:?}", err),
+            err = server_future.boxed_local().fuse() => panic!("Server task stopped: {err:?}"),
             _ = client_future.boxed().fuse() => (),
         }
     }

@@ -135,7 +135,7 @@ pub async fn handle_package_directory_stream(
                     // Don't do anything with this for now.
                     responder.send(&mut Ok(())).expect("send Close response")
                 }
-                other => panic!("unhandled request type: {:?}", other),
+                other => panic!("unhandled request type: {other:?}"),
             }
         }
     }.await;
@@ -180,7 +180,7 @@ impl MockResolverService {
         let merkle = merkle.as_ref();
         let meta_far_name = meta_far_name.as_ref();
 
-        let url = format!("fuchsia-pkg://{}/{}", domain, name_for_url);
+        let url = format!("fuchsia-pkg://{domain}/{name_for_url}");
         let pkg = self.package(meta_far_name, merkle);
         self.url(url).resolve(&pkg);
         pkg
@@ -221,7 +221,7 @@ impl MockResolverService {
             .expect("create fake package file");
 
         TestPackage::new(root)
-            .add_file("meta/package", format!("{{\"name\": \"{}\", \"version\": \"0\"}}", name))
+            .add_file("meta/package", format!("{{\"name\": \"{name}\", \"version\": \"0\"}}"))
     }
 
     /// Equivalent to `self.url(format!("fuchsia-pkg://fuchsia.com/{}", path))`
@@ -279,7 +279,7 @@ impl MockResolverService {
         dir: ServerEnd<fio::DirectoryMarker>,
         responder: PackageResolverResolveResponder,
     ) -> Result<(), Error> {
-        eprintln!("TEST: Got resolve request for {:?}", package_url);
+        eprintln!("TEST: Got resolve request for {package_url:?}");
 
         (*self.resolve_hook)(&package_url);
 

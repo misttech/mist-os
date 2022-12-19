@@ -222,7 +222,7 @@ pub fn get_thread_version() -> ThreadVersion {
     // SAFETY: otThreadGetVersion() is guaranteed to be safe to call in any context.
     let ver = unsafe { otThreadGetVersion() };
 
-    ThreadVersion::from_u16(ver).unwrap_or_else(|| panic!("Unknown Thread specification: {}", ver))
+    ThreadVersion::from_u16(ver).unwrap_or_else(|| panic!("Unknown Thread specification: {ver}"))
 }
 
 /// Returns a `'static`-scoped string slice describing the version of the
@@ -250,7 +250,7 @@ mod tests {
     #[test]
     fn test_get_version() {
         let vstr = get_version_string();
-        println!("OpenThread Version: {:?}", vstr);
+        println!("OpenThread Version: {vstr:?}");
         assert!(!vstr.is_empty());
     }
 }

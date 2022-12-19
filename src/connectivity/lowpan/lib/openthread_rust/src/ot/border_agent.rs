@@ -32,7 +32,7 @@ pub enum BorderAgentState {
 
 impl From<otBorderAgentState> for BorderAgentState {
     fn from(x: otBorderAgentState) -> Self {
-        Self::from_u32(x).unwrap_or_else(|| panic!("Unknown otBorderAgentState value: {}", x))
+        Self::from_u32(x).unwrap_or_else(|| panic!("Unknown otBorderAgentState value: {x}"))
     }
 }
 

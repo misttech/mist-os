@@ -377,6 +377,6 @@ mod test {
 
         let dataset = dataset_tlvs.try_to_dataset().unwrap();
 
-        println!("dataset = {:#?}", dataset);
+        println!("dataset = {dataset:#?}");
     }
 }

@@ -122,10 +122,10 @@ mod tests {
     #[test]
     fn test_version_debug() {
         let version = Version::from([1, 2, 3, 4]);
-        assert_eq!("1.2.3.4", format!("{:?}", version));
+        assert_eq!("1.2.3.4", format!("{version:?}"));
 
         let version = Version::from([0, 6, 4, 7]);
-        assert_eq!("0.6.4.7", format!("{:?}", version));
+        assert_eq!("0.6.4.7", format!("{version:?}"));
     }
 
     #[test]

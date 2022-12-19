@@ -449,7 +449,7 @@ pub mod host {
         pub fn try_load_from(manifest_path: impl AsRef<Utf8Path>) -> anyhow::Result<Self> {
             fn inner(manifest_path: &Utf8Path) -> anyhow::Result<PackageManifest> {
                 let file = File::open(manifest_path)
-                    .with_context(|| format!("Opening package manifest: {}", manifest_path))?;
+                    .with_context(|| format!("Opening package manifest: {manifest_path}"))?;
 
                 PackageManifest::from_reader(manifest_path, BufReader::new(file))
             }

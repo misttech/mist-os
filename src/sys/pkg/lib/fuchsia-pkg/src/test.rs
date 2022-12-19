@@ -67,7 +67,7 @@ prop_compose! {
     pub(crate) fn random_far_resource_path()
         (s in random_resource_path(1, 4)) -> String
     {
-        format!("meta/{}", s)
+        format!("meta/{s}")
     }
 }
 

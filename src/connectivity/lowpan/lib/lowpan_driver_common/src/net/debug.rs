@@ -40,7 +40,7 @@ impl<'a> std::fmt::Debug for Ipv6PacketDebug<'a> {
                         }
                         write!(f, "SEQ={};", tcp.seq_num())?;
                         if let Some(ack) = tcp.ack_num() {
-                            write!(f, "ACK={};", ack)?;
+                            write!(f, "ACK={ack};")?;
                         }
                         (Some(tcp.src_port()), Some(tcp.dst_port()))
                     }
@@ -66,7 +66,7 @@ impl<'a> std::fmt::Debug for Ipv6PacketDebug<'a> {
                 write!(f, "ICMPv6;")?;
                 match Icmpv6Packet::parse(&mut packet_bytes, args) {
                     Ok(icmp) => {
-                        write!(f, "{:?};", icmp)?;
+                        write!(f, "{icmp:?};")?;
                     }
                     Err(_) => {
                         write!(f, "CORRUPT;")?;
@@ -75,21 +75,21 @@ impl<'a> std::fmt::Debug for Ipv6PacketDebug<'a> {
                 (None, None)
             }
             other_proto => {
-                write!(f, "{:?};", other_proto)?;
+                write!(f, "{other_proto:?};")?;
                 (None, None)
             }
         };
 
         if let Some(port) = src_port {
-            write!(f, "src=[{}]:{};", src_ip, port)?;
+            write!(f, "src=[{src_ip}]:{port};")?;
         } else {
-            write!(f, "src=[{}];", src_ip)?;
+            write!(f, "src=[{src_ip}];")?;
         }
 
         if let Some(port) = dst_port {
-            write!(f, "dst=[{}]:{}", dst_ip, port)?;
+            write!(f, "dst=[{dst_ip}]:{port}")?;
         } else {
-            write!(f, "dst=[{}]", dst_ip)?;
+            write!(f, "dst=[{dst_ip}]")?;
         }
 
         Ok(())

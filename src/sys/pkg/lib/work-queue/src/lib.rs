@@ -785,14 +785,14 @@ mod tests {
         let mut tasks = FuturesUnordered::new();
 
         for i in 0..10000 {
-            let key = format!("task_{}", i);
+            let key = format!("task_{i}");
             tasks.push(enqueue.push(key, ()));
         }
 
         // also queue up some duplicate tasks.
         let task_dups = enqueue
             .push_all((0..10000).filter(|i| i % 2 == 0).map(|i| {
-                let key = format!("task_{}", i);
+                let key = format!("task_{i}");
                 (key, ())
             }))
             .collect::<FuturesUnordered<_>>();

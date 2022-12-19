@@ -44,7 +44,7 @@ impl PackageManifestList {
     /// Write the package list manifest to this path.
     pub fn to_writer(&self, mut writer: impl std::io::Write) -> Result<(), std::io::Error> {
         for package_manifest_path in &self.0 {
-            writeln!(writer, "{}", package_manifest_path)?;
+            writeln!(writer, "{package_manifest_path}")?;
         }
         Ok(())
     }

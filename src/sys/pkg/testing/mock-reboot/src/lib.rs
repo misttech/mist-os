@@ -41,7 +41,7 @@ impl MockRebootService {
                     responder.send(&mut result)?;
                 }
                 _ => {
-                    panic!("unhandled RebootService method {:?}", event);
+                    panic!("unhandled RebootService method {event:?}");
                 }
             }
         }
@@ -58,7 +58,7 @@ impl MockRebootService {
 
         fasync::Task::spawn(
             self.run_reboot_service(stream)
-                .unwrap_or_else(|e| panic!("error running reboot service: {:?}", e)),
+                .unwrap_or_else(|e| panic!("error running reboot service: {e:?}")),
         )
         .detach();
 

@@ -24,7 +24,7 @@ pub struct MockBootArgumentsService {
 impl MockBootArgumentsService {
     /// Inserts pkgfs boot arg into arguments map using `system_image` hash.
     pub fn insert_pkgfs_boot_arg(&mut self, system_image: Hash) {
-        let system_image = format!("{}{}", PKGFS_BOOT_ARG_VALUE_PREFIX, system_image);
+        let system_image = format!("{PKGFS_BOOT_ARG_VALUE_PREFIX}{system_image}");
         assert_eq!(self.args.insert(PKGFS_BOOT_ARG_KEY.to_string(), Some(system_image)), None);
     }
 
@@ -45,7 +45,7 @@ impl MockBootArgumentsService {
                     if let Some(value) = self.args.get(&key) {
                         responder.send(value.as_deref()).unwrap();
                     } else {
-                        panic!("unexpected fuchsia.boot/Arguments.GetString key {:?}", key);
+                        panic!("unexpected fuchsia.boot/Arguments.GetString key {key:?}");
                     }
                 }
                 fidl_fuchsia_boot::ArgumentsRequest::GetStrings { keys, responder } => {
@@ -62,7 +62,7 @@ impl MockBootArgumentsService {
                         .expect("Error sending boot_arguments strings response.");
                 }
                 req => {
-                    panic!("unexpected fuchsia.boot/Arguments request {:?}", req);
+                    panic!("unexpected fuchsia.boot/Arguments request {req:?}");
                 }
             }
         }

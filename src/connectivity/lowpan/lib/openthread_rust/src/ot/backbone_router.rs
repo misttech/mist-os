@@ -118,8 +118,7 @@ impl BackboneRouter for Instance {
                 Error::NotFound => None,
                 Error::None => Some(ret),
                 err => panic!(
-                    "Unexpected error from otBackboneRouterMulticastListenerIterator: {:?}",
-                    err
+                    "Unexpected error from otBackboneRouterMulticastListenerIterator: {err:?}"
                 ),
             }
         }

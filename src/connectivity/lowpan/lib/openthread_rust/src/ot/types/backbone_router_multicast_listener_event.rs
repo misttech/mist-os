@@ -23,7 +23,7 @@ impl From<otBackboneRouterMulticastListenerEvent> for BackboneRouterMulticastLis
     fn from(x: otBackboneRouterMulticastListenerEvent) -> Self {
         use num::FromPrimitive;
         Self::from_u32(x).unwrap_or_else(|| {
-            panic!("Unknown otBackboneRouterMulticastListenerEvent value: {}", x)
+            panic!("Unknown otBackboneRouterMulticastListenerEvent value: {x}")
         })
     }
 }

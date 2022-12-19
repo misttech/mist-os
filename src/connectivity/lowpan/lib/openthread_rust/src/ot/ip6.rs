@@ -23,7 +23,7 @@ pub enum Icmp6EchoMode {
 impl From<otIcmp6EchoMode> for Icmp6EchoMode {
     fn from(x: otIcmp6EchoMode) -> Self {
         use num::FromPrimitive;
-        Self::from_u32(x).unwrap_or_else(|| panic!("Unknown otIcmp6EchoMode value: {}", x))
+        Self::from_u32(x).unwrap_or_else(|| panic!("Unknown otIcmp6EchoMode value: {x}"))
     }
 }
 

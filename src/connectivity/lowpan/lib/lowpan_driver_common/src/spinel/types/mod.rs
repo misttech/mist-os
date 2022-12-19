@@ -135,8 +135,8 @@ impl<'a> std::fmt::Debug for SpinelFrameRef<'a> {
 
         match self.cmd {
             Cmd::PropValueGet => match Prop::try_unpack_from_slice(self.payload) {
-                Ok(x) => write!(f, " {:?}", x)?,
-                Err(e) => write!(f, " {:?}", e)?,
+                Ok(x) => write!(f, " {x:?}")?,
+                Err(e) => write!(f, " {e:?}")?,
             },
 
             Cmd::PropValueSet
@@ -149,15 +149,15 @@ impl<'a> std::fmt::Debug for SpinelFrameRef<'a> {
                     Ok(SpinelPropValueRef { prop, value }) if prop == Prop::LastStatus => {
                         write!(f, " {:?}", &prop)?;
                         match Status::try_unpack_from_slice(value) {
-                            Ok(x) => write!(f, " {:?}", x)?,
-                            Err(e) => write!(f, " {:?}", e)?,
+                            Ok(x) => write!(f, " {x:?}")?,
+                            Err(e) => write!(f, " {e:?}")?,
                         }
                     }
                     Ok(SpinelPropValueRef { prop, value }) if prop == Prop::NcpVersion => {
                         write!(f, " {:?}", &prop)?;
                         match String::try_unpack_from_slice(value) {
-                            Ok(x) => write!(f, " {:?}", x)?,
-                            Err(e) => write!(f, " {:?}", e)?,
+                            Ok(x) => write!(f, " {x:?}")?,
+                            Err(e) => write!(f, " {e:?}")?,
                         }
                     }
                     Ok(SpinelPropValueRef { prop, value })
@@ -169,12 +169,12 @@ impl<'a> std::fmt::Debug for SpinelFrameRef<'a> {
                     {
                         write!(f, " {:?}", &prop)?;
                         match NetworkPacket::try_unpack_from_slice(value) {
-                            Ok(x) => write!(f, " {:?}", x)?,
-                            Err(e) => write!(f, " {:?}", e)?,
+                            Ok(x) => write!(f, " {x:?}")?,
+                            Err(e) => write!(f, " {e:?}")?,
                         }
                     }
                     Ok(x) => write!(f, " {:?} {}", &x.prop, hex::encode(x.value))?,
-                    Err(e) => write!(f, " {:?}", e)?,
+                    Err(e) => write!(f, " {e:?}")?,
                 }
             }
 
