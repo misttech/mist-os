@@ -65,10 +65,7 @@ use crate::{
     device::DeviceId,
     transport::tcp::socket::TcpNonSyncContext,
     transport::{
-        tcp::{
-            socket::{isn::IsnGenerator, TcpSockets, TcpSyncContext},
-            TcpState,
-        },
+        tcp::TcpState,
         udp::{UdpState, UdpStateBuilder},
     },
     NonSyncContext, RngContext, SyncCtx,
@@ -105,54 +102,6 @@ pub(crate) struct TransportLayerState<C: TcpNonSyncContext> {
     udpv6: UdpState<Ipv6, DeviceId<C::Instant>>,
     tcpv4: TcpState<Ipv4, DeviceId<C::Instant>, C>,
     tcpv6: TcpState<Ipv6, DeviceId<C::Instant>, C>,
-}
-
-impl<C: NonSyncContext> TcpSyncContext<Ipv4, C> for &'_ SyncCtx<C> {
-    type IpTransportCtx = Self;
-
-    fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
-        O,
-        F: FnOnce(&mut Self, &IsnGenerator<C::Instant>, &mut TcpSockets<Ipv4, Self::DeviceId, C>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let mut s = *self;
-        let TcpState { isn_generator, sockets } = &s.state.transport.tcpv4;
-        cb(&mut s, isn_generator, &mut sockets.lock())
-    }
-
-    fn with_tcp_sockets<O, F: FnOnce(&TcpSockets<Ipv4, Self::DeviceId, C>) -> O>(
-        &self,
-        cb: F,
-    ) -> O {
-        let TcpState { sockets, isn_generator: _ } = &self.state.transport.tcpv4;
-        cb(&sockets.lock())
-    }
-}
-
-impl<C: NonSyncContext> TcpSyncContext<Ipv6, C> for &'_ SyncCtx<C> {
-    type IpTransportCtx = Self;
-
-    fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
-        O,
-        F: FnOnce(&mut Self, &IsnGenerator<C::Instant>, &mut TcpSockets<Ipv6, Self::DeviceId, C>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let mut s = *self;
-        let TcpState { isn_generator, sockets } = &s.state.transport.tcpv6;
-        cb(&mut s, isn_generator, &mut sockets.lock())
-    }
-
-    fn with_tcp_sockets<O, F: FnOnce(&TcpSockets<Ipv6, Self::DeviceId, C>) -> O>(
-        &self,
-        cb: F,
-    ) -> O {
-        let TcpState { sockets, isn_generator: _ } = &self.state.transport.tcpv6;
-        cb(&sockets.lock())
-    }
 }
 
 /// The identifier for timer events in the transport layer.
