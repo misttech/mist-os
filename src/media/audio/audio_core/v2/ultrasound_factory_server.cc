@@ -30,15 +30,15 @@ zx::clock DupZxClockHandle(const zx::clock& in) {
 }  // namespace
 
 // static
-std::shared_ptr<UltrasoundFactory> UltrasoundFactory::Create(
+std::shared_ptr<UltrasoundFactoryServer> UltrasoundFactoryServer::Create(
     std::shared_ptr<const FidlThread> fidl_thread,
     fidl::ServerEnd<fuchsia_ultrasound::Factory> server_end, Args args) {
   return BaseFidlServer::Create(std::move(fidl_thread), std::move(server_end), std::move(args));
 }
 
-void UltrasoundFactory::CreateRenderer(CreateRendererRequestView request,
-                                       CreateRendererCompleter::Sync& completer) {
-  TRACE_DURATION("audio", "UltrasoundFactory::CreateRenderer");
+void UltrasoundFactoryServer::CreateRenderer(CreateRendererRequestView request,
+                                             CreateRendererCompleter::Sync& completer) {
+  TRACE_DURATION("audio", "UltrasoundFactoryServer::CreateRenderer");
 
   if (!request->renderer) {
     FX_LOGS(WARNING) << "CreateRenderer: invalid handle";
@@ -53,9 +53,9 @@ void UltrasoundFactory::CreateRenderer(CreateRendererRequestView request,
       });
 }
 
-void UltrasoundFactory::CreateCapturer(CreateCapturerRequestView request,
-                                       CreateCapturerCompleter::Sync& completer) {
-  TRACE_DURATION("audio", "UltrasoundFactory::CreateCapturer");
+void UltrasoundFactoryServer::CreateCapturer(CreateCapturerRequestView request,
+                                             CreateCapturerCompleter::Sync& completer) {
+  TRACE_DURATION("audio", "UltrasoundFactoryServer::CreateCapturer");
 
   if (!request->request) {
     FX_LOGS(WARNING) << "CreateCapturer: invalid handle";

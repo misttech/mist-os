@@ -4,12 +4,38 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/async/cpp/task.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/lib/fxl/command_line.h"
+#include "src/media/audio/audio_core/shared/profile_acquirer.h"
 #include "src/media/audio/audio_core/v2/audio_core_component.h"
+#include "src/media/audio/services/common/fidl_thread.h"
+
+using ::media_audio::AudioCoreComponent;
+using ::media_audio::FidlThread;
+
+namespace {
+
+std::shared_ptr<const FidlThread> CreateMainThread(async_dispatcher_t* dispatcher) {
+  auto fidl_thread = FidlThread::CreateFromCurrentThread("fidl_thread", dispatcher);
+
+  // We receive audio payloads over FIDL, which means the FIDL thread has real time requirements
+  // just like the mixing threads.
+  // TODO(fxbug.dev/98652): the mixer service's graph threads should do this too
+  auto profile = media::audio::AcquireAudioCoreImplProfile();
+  if (!profile.is_ok()) {
+    FX_PLOGS(ERROR, profile.status_value())
+        << "Unable to acquire profile for the audio_core FIDL thread";
+  } else {
+    auto status = zx::thread::self()->set_profile(*profile, 0);
+    FX_CHECK(status == ZX_OK) << status;
+  }
+
+  return fidl_thread;
+}
+
+}  // namespace
 
 int main(int argc, const char** argv) {
   FX_LOGS(INFO) << "AudioCore starting up";
@@ -17,20 +43,21 @@ int main(int argc, const char** argv) {
   auto cl = fxl::CommandLineFromArgcArgv(argc, argv);
   const auto enable_cobalt = !cl.HasOption("disable-cobalt");
 
-  async::Loop fidl_loop{&kAsyncLoopConfigAttachToCurrentThread};
-  async::Loop io_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
+  // The main thread will serve FIDL requests for all discoverable protocols.
+  async::Loop main_loop{&kAsyncLoopConfigAttachToCurrentThread};
+  const auto main_thread = CreateMainThread(main_loop.dispatcher());
 
-  auto component_context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
-  media_audio::AudioCoreComponent component(*component_context, fidl_loop.dispatcher(),
-                                            io_loop.dispatcher(), enable_cobalt);
+  // Publish all services.
+  component::OutgoingDirectory outgoing(main_loop.dispatcher());
+  AudioCoreComponent audio_core(outgoing, main_thread, enable_cobalt);
 
-  // Run io on a bg thread and fidl on the main thread.
-  io_loop.StartThread("io");
-  fidl_loop.Run();
+  // TODO(fxbug.dev/98652): also publish mixer and ADR services
 
-  // Join.
-  async::PostTask(io_loop.dispatcher(), [&io_loop] { io_loop.Quit(); });
-  io_loop.JoinThreads();
+  // Run the FIDL loop.
+  if (auto status = outgoing.ServeFromStartupInfo().status_value(); status != ZX_OK) {
+    FX_PLOGS(FATAL, status) << "ServeFromStartupInfo failed";
+  }
+  main_loop.Run();
 
   return 0;
 }

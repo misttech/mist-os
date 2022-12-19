@@ -32,8 +32,7 @@ class AudioCoreServer
     std::shared_ptr<RouteGraph> route_graph;
     std::shared_ptr<media::audio::StreamVolumeManager> stream_volume_manager;
     std::shared_ptr<media::audio::AudioAdmin> audio_admin;
-    const media::audio::VolumeCurve& default_volume_curve;
-    sys::ComponentContext* component_context;
+    media::audio::VolumeCurve default_volume_curve;
   };
   static std::shared_ptr<AudioCoreServer> Create(
       std::shared_ptr<const FidlThread> fidl_thread,

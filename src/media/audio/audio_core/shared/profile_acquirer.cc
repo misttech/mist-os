@@ -4,7 +4,7 @@
 
 #include "src/media/audio/audio_core/shared/profile_acquirer.h"
 
-#include <fuchsia/scheduler/cpp/fidl.h>
+#include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
@@ -12,85 +12,84 @@
 
 #include <cstdlib>
 
+#include <sdk/lib/component/incoming/cpp/service_client.h>
+
 #include "src/media/audio/audio_core/shared/mix_profile_config.h"
 
 namespace media::audio {
 
-zx_status_t AcquireHighPriorityProfile(const MixProfileConfig& mix_profile_config,
-                                       zx::profile* profile) {
-  TRACE_DURATION("audio", "AcquireHighPriorityProfile");
-  // Use threadsafe static initialization to get our one-and-only copy of this profile object. Each
-  // subsequent call will return a duplicate of that profile handle to ensure sharing of thread
-  // pools.
-  static zx::profile high_priority_profile;
-  static zx_status_t initial_status = [&mix_profile_config](zx::profile* profile) {
-    zx::channel ch0, ch1;
-    zx_status_t res = zx::channel::create(0u, &ch0, &ch1);
-    if (res != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to create channel, res=" << res;
-      return res;
-    }
+namespace {
 
-    res = fdio_service_connect(
-        (std::string("/svc/") + fuchsia::scheduler::ProfileProvider::Name_).c_str(), ch0.release());
-    if (res != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to connect to ProfileProvider, res=" << res;
-      return res;
-    }
-
-    fuchsia::scheduler::ProfileProvider_SyncProxy provider(std::move(ch1));
-
-    zx_status_t fidl_status;
-    zx::profile res_profile;
-    res = provider.GetDeadlineProfile(
-        mix_profile_config.capacity.get(), mix_profile_config.deadline.get(),
-        mix_profile_config.period.get(), "src/media/audio/audio_core", &fidl_status, &res_profile);
-    if (res != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to create profile, res=" << res;
-      return res;
-    }
-    if (fidl_status != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to create profile, fidl_status=" << fidl_status;
-      return fidl_status;
-    }
-
-    *profile = std::move(res_profile);
-    return ZX_OK;
-  }(&high_priority_profile);
-
-  // If the initial acquisition of the profile failed, return that status.
-  if (initial_status != ZX_OK)
-    return initial_status;
-
-  // Otherwise, dupe this handle and return it.
-  return high_priority_profile.duplicate(ZX_RIGHT_SAME_RIGHTS, profile);
+zx::result<fidl::SyncClient<fuchsia_scheduler::ProfileProvider>> ConnectToProfileProvider() {
+  auto client_end_result = component::Connect<fuchsia_scheduler::ProfileProvider>();
+  if (!client_end_result.is_ok()) {
+    return client_end_result.take_error();
+  }
+  return zx::ok(fidl::SyncClient(std::move(*client_end_result)));
 }
 
-void AcquireRelativePriorityProfile(uint32_t priority, sys::ComponentContext* context,
-                                    fit::function<void(zx_status_t, zx::profile)> callback) {
+}  // namespace
+
+zx::result<zx::profile> AcquireHighPriorityProfile(const MixProfileConfig& mix_profile_config) {
+  TRACE_DURATION("audio", "AcquireHighPriorityProfile");
+
+  auto client = ConnectToProfileProvider();
+  if (!client.is_ok()) {
+    FX_PLOGS(ERROR, client.status_value())
+        << "Failed to connect to fuchsia.scheduler.ProfileProvider";
+    return zx::error(client.status_value());
+  }
+
+  auto result = (*client)->GetDeadlineProfile({{
+      .capacity = static_cast<uint64_t>(mix_profile_config.capacity.get()),
+      .deadline = static_cast<uint64_t>(mix_profile_config.deadline.get()),
+      .period = static_cast<uint64_t>(mix_profile_config.period.get()),
+      .name = "src/media/audio/audio_core",
+  }});
+  if (!result.is_ok()) {
+    FX_LOGS(ERROR) << "Failed to call GetDeadlineProfile, error=" << result.error_value();
+    return zx::error(result.error_value().status());
+  }
+  if (result->status() != ZX_OK) {
+    FX_PLOGS(ERROR, result->status()) << "Failed to get deadline profile";
+    return zx::error(result->status());
+  }
+
+  return zx::ok(std::move(result->profile()));
+}
+
+zx::result<zx::profile> AcquireRelativePriorityProfile(uint32_t priority) {
   auto nonce = TRACE_NONCE();
   TRACE_DURATION("audio", "AcquireRelativePriorityProfile");
+
+  auto client = ConnectToProfileProvider();
+  if (!client.is_ok()) {
+    FX_PLOGS(ERROR, client.status_value())
+        << "Failed to connect to fuchsia.scheduler.ProfileProvider";
+    return zx::error(client.status_value());
+  }
+
   TRACE_FLOW_BEGIN("audio", "GetProfile", nonce);
-  auto profile_provider = context->svc()->Connect<fuchsia::scheduler::ProfileProvider>();
-  profile_provider->GetProfile(
-      priority, "src/media/audio/audio_core/audio_core_impl",
-      // Note we move the FIDL ptr into the closure to ensure we keep the channel open until we
-      // receive the callback, otherwise it will be impossible to get a response.
-      [profile_provider = std::move(profile_provider), callback = std::move(callback), nonce](
-          zx_status_t status, zx::profile profile) {
-        TRACE_DURATION("audio", "GetProfile callback");
-        TRACE_FLOW_END("audio", "GetProfile", nonce);
-        if (status == ZX_OK) {
-          callback(status, std::move(profile));
-        } else {
-          callback(status, zx::profile());
-        }
-      });
+  auto result = (*client)->GetProfile({{
+      .priority = priority,
+      .name = "src/media/audio/audio_core",
+  }});
+  TRACE_FLOW_END("audio", "GetProfile", nonce);
+
+  if (!result.is_ok()) {
+    FX_LOGS(ERROR) << "Failed to call GetProfile, error=" << result.error_value();
+    return zx::error(result.error_value().status());
+  }
+  if (result->status() != ZX_OK) {
+    FX_PLOGS(ERROR, result->status()) << "Failed to get profile";
+    return zx::error(result->status());
+  }
+
+  return zx::ok(std::move(result->profile()));
 }
 
-void AcquireAudioCoreImplProfile(sys::ComponentContext* context,
-                                 fit::function<void(zx_status_t, zx::profile)> callback) {
-  AcquireRelativePriorityProfile(/* HIGH_PRIORITY in zircon */ 24, context, std::move(callback));
+zx::result<zx::profile> AcquireAudioCoreImplProfile() {
+  return AcquireRelativePriorityProfile(/* HIGH_PRIORITY in zircon */ 24);
 }
 
 }  // namespace media::audio

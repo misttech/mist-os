@@ -20,16 +20,16 @@
 
 namespace media_audio {
 
-class UltrasoundFactory
-    : public BaseFidlServer<UltrasoundFactory, fidl::WireServer, fuchsia_ultrasound::Factory>,
-      public std::enable_shared_from_this<UltrasoundFactory> {
+class UltrasoundFactoryServer
+    : public BaseFidlServer<UltrasoundFactoryServer, fidl::WireServer, fuchsia_ultrasound::Factory>,
+      public std::enable_shared_from_this<UltrasoundFactoryServer> {
  public:
   struct Args {
     std::shared_ptr<RendererCapturerCreator> creator;
     Format renderer_format;
     Format capturer_format;
   };
-  static std::shared_ptr<UltrasoundFactory> Create(
+  static std::shared_ptr<UltrasoundFactoryServer> Create(
       std::shared_ptr<const FidlThread> fidl_thread,
       fidl::ServerEnd<fuchsia_ultrasound::Factory> server_end, Args args);
 
@@ -44,11 +44,11 @@ class UltrasoundFactory
                       CreateCapturerCompleter::Sync& completer) final;
 
  private:
-  static inline constexpr std::string_view kClassName = "UltrasoundFactory";
+  static inline constexpr std::string_view kClassName = "UltrasoundFactoryServer";
   template <typename ServerT, template <typename T> typename FidlServerT, typename ProtocolT>
   friend class BaseFidlServer;
 
-  explicit UltrasoundFactory(Args args)
+  explicit UltrasoundFactoryServer(Args args)
       : creator_(std::move(args.creator)),
         renderer_format_(std::move(args.renderer_format)),
         capturer_format_(std::move(args.capturer_format)) {}

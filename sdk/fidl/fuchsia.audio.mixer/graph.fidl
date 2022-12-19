@@ -23,6 +23,7 @@ const MAX_NAME_LENGTH uint32 = 256;
 const MAX_GAIN_CONTROLS_PER_EDGE uint32 = 32;
 
 /// A factory for creating [`Graph`] protocols.
+@discoverable
 protocol GraphCreator {
     /// Creates a new graph that lives until the channel is closed.
     Create(resource table {

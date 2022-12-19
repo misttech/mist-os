@@ -113,6 +113,7 @@ source_set("shared") {
   deps = [
     ":json_schema_headers",
     ":media_metrics_registry",
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
@@ -144,7 +145,6 @@ executable("unittest_bin") {
     "policy_loader_unittest_data.h",
     "process_config_loader_unittest.cc",
     "process_config_unittest.cc",
-    "profile_acquirer_unittest.cc",
     "profile_provider_unittest.cc",
     "reporter_unittest.cc",
     "stream_usage_unittest.cc",

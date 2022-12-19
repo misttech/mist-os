@@ -37,25 +37,7 @@ AudioCoreServer::AudioCoreServer(Args args)
       route_graph_(std::move(args.route_graph)),
       stream_volume_manager_(std::move(args.stream_volume_manager)),
       audio_admin_(std::move(args.audio_admin)),
-      default_volume_curve_(args.default_volume_curve) {
-  // TODO(fxbug.dev/98652): the following call was copied from v1/audio_core_impl.cc. It should be
-  // moved to a higher-level where the FIDL thread is configured.
-  //
-  // The FIDL thread is responsible for receiving audio payloads sent by applications, so it has
-  // real time requirements just like mixing threads.
-  media::audio::AcquireAudioCoreImplProfile(
-      args.component_context, [](zx_status_t status, zx::profile profile) {
-        if (status != ZX_OK) {
-          FX_PLOGS(ERROR, status) << "Failed to acquire AudioCoreImpl profile";
-          return;
-        }
-        FX_CHECK(profile);
-        if (auto status = zx::thread::self()->set_profile(profile, 0); status != ZX_OK) {
-          FX_PLOGS(ERROR, status) << "Failed to assign AudioCoreImpl profile";
-          return;
-        }
-      });
-
+      default_volume_curve_(std::move(args.default_volume_curve)) {
   LoadDefaults();
 }
 
