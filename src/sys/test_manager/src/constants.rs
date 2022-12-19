@@ -11,8 +11,12 @@ pub const WRAPPER_REALM_NAME: &'static str = "test_wrapper";
 pub const HERMETIC_RESOLVER_REALM_NAME: &'static str = "hermetic_resolver";
 pub const ENCLOSING_ENV_REALM_NAME: &'static str = "enclosing_env";
 
+pub const KERNEL_DEBUG_DATA_FOR_SCP: &'static str = "/tmp/kernel_debug";
+pub const DEBUG_DATA_FOR_SCP: &'static str = "/tmp/debug";
+pub const ISOLATED_TMP: &'static str = "/tmp/isolated";
+
 // TODO(fxbug.dev/100034): Delete these once we no longer need to hard code these in the code.
-pub const HERMETIC_ENVIRONMENT_NAME: &'static str = "hermetic";
+pub const TEST_ENVIRONMENT_NAME: &'static str = "test-env";
 pub const HERMETIC_TESTS_COLLECTION: &'static str = "tests";
 pub const STARNIX_TESTS_COLLECTION: &'static str = "starnix-tests";
 pub const SYSTEM_TESTS_COLLECTION: &'static str = "system-tests";
