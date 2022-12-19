@@ -60,22 +60,12 @@ pub struct TokenStore {
 }
 
 impl TokenStore {
-    /// Only allow access to public GCS data.
-    pub fn new_without_auth() -> Self {
-        Self {
-            api_base: Url::parse(API_BASE).expect("parse API_BASE"),
-            storage_base: Url::parse(STORAGE_BASE).expect("parse STORAGE_BASE"),
-            access_token: Mutex::new("".to_string()),
-        }
-    }
-
     /// Allow access to public and private (auth-required) GCS data.
     pub fn new() -> Result<Self, GcsError> {
-        let access_token = Mutex::new("".to_string());
         Ok(Self {
             api_base: Url::parse(API_BASE).expect("parse API_BASE"),
             storage_base: Url::parse(STORAGE_BASE).expect("parse STORAGE_BASE"),
-            access_token,
+            access_token: Mutex::new("".to_string()),
         })
     }
 
@@ -95,13 +85,18 @@ impl TokenStore {
         *access_token = access;
     }
 
-    /// Apply Authorization header, if available.
+    /// Apply Authorization header, if available and uri is https.
     ///
-    /// If no access_token is set, no changes are made to the builder.
-    async fn authorize(&self, builder: request::Builder) -> Result<request::Builder> {
+    /// IF the access_token is empty OR
+    /// IF the URI is not already set to an "https" uri
+    /// THEN no changes are made to the builder.
+    async fn maybe_authorize(&self, builder: request::Builder) -> Result<request::Builder> {
         let access_token = self.access_token.lock().await;
         if !access_token.is_empty() {
-            return Ok(builder.header("Authorization", format!("Bearer {}", access_token)));
+            // Passing the access token over a non-secure path is forbidden.
+            if builder.uri_ref().and_then(|x| x.scheme()).map(|x| x.as_str()) == Some("https") {
+                return Ok(builder.header("Authorization", format!("Bearer {}", access_token)));
+            }
         }
         Ok(builder)
     }
@@ -157,7 +152,7 @@ impl TokenStore {
     async fn send_request(&self, https_client: &HttpsClient, url: Url) -> Result<Response<Body>> {
         tracing::debug!("https_client.request {:?}", url);
         let req = Request::builder().method(Method::GET).uri(url.into_string());
-        let req = self.authorize(req).await.context("authorizing in send_request")?;
+        let req = self.maybe_authorize(req).await.context("authorizing in send_request")?;
         let req = req.body(Body::empty()).context("creating request body")?;
 
         let res = https_client.request(req).await.context("https_client.request")?;
@@ -369,6 +364,41 @@ mod test {
         token_store.download(&new_https_client(), bucket, object).await.expect("client download");
     }
 
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_maybe_authorize() {
+        let store = TokenStore::new().expect("creating token store");
+        let req = Request::builder().method(Method::GET).uri("http://example.com/".to_string());
+        let req = store
+            .maybe_authorize(req)
+            .await
+            .context("authorizing in send_request")
+            .expect("maybe_authorize");
+        let headers = req.headers_ref().unwrap();
+        // The authorization is not set because the access token is empty.
+        assert!(!headers.contains_key("Authorization"));
+
+        store.set_access_token("fake_token".to_string()).await;
+        let req = Request::builder().method(Method::GET).uri("http://example.com/".to_string());
+        let req = store
+            .maybe_authorize(req)
+            .await
+            .context("authorizing in send_request")
+            .expect("maybe_authorize");
+        let headers = req.headers_ref().unwrap();
+        // The authorization is not set because the uri is not https.
+        assert!(!headers.contains_key("Authorization"));
+
+        let req = Request::builder().method(Method::GET).uri("https://example.com/".to_string());
+        let req = store
+            .maybe_authorize(req)
+            .await
+            .context("authorizing in send_request")
+            .expect("maybe_authorize");
+        let headers = req.headers_ref().unwrap();
+        // The authorization is set because there is a token and an https url.
+        assert_eq!(headers["Authorization"], "Bearer fake_token");
+    }
+
     // This test is marked "ignore" because it actually downloads from GCS,
     // which isn't good for a CI/GI test. It's here because it's handy to have
     // as a local developer test. Run with `fx test gcs_lib_test -- --ignored`.
@@ -376,7 +406,7 @@ mod test {
     #[ignore]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_gcs_download_public() {
-        let token_store = TokenStore::new_without_auth();
+        let token_store = TokenStore::new().expect("creating token store");
         let bucket = "fuchsia";
         let object = "development/5.20210610.3.1/sdk/linux-amd64/gn.tar.gz";
         let res = token_store
