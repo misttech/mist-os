@@ -599,6 +599,76 @@ pub fn poll_for_sme_scan_request(
         Poll::Ready(Some(Ok(scan_req))) => scan_req
     )
 }
+#[track_caller]
+pub fn poll_for_device_monitor_request(
+    exec: &mut fasync::TestExecutor,
+    fut: &mut (impl futures::Future + std::marker::Unpin),
+    stream: &mut fidl_fuchsia_wlan_device_service::DeviceMonitorRequestStream,
+) -> fidl_fuchsia_wlan_device_service::DeviceMonitorRequest {
+    let mut counter = 0;
+    let stream_result = loop {
+        counter += 1;
+        if counter > 1000 {
+            panic!("Failed to progress network selection future until next scan");
+        };
+        let sleep_duration = zx::Duration::from_millis(2);
+        exec.run_singlethreaded(fasync::Timer::new(sleep_duration.after_now()));
+        assert_variant!(
+            exec.run_until_stalled(fut),
+            Poll::Pending,
+            "Did not get 'poll::Pending' on network_selection_fut"
+        );
+        match exec.run_until_stalled(&mut stream.next()) {
+            Poll::Pending => continue,
+            other_result => {
+                debug!("Required {} iterations to get an SME stream message", counter);
+                break other_result;
+            }
+        }
+    };
+
+    assert_variant!(
+        stream_result,
+        Poll::Ready(Some(Ok(stream_item))) => stream_item
+    )
+}
+#[track_caller]
+pub fn poll_for_client_state_update(
+    exec: &mut fasync::TestExecutor,
+    fut: &mut (impl futures::Future + std::marker::Unpin),
+    stream: &mut fidl_policy::ClientStateUpdatesRequestStream,
+) -> fidl_policy::ClientStateSummary {
+    let mut counter = 0;
+    let stream_result = loop {
+        counter += 1;
+        if counter > 1000 {
+            panic!("Failed to progress network selection future until next scan");
+        };
+        let sleep_duration = zx::Duration::from_millis(2);
+        exec.run_singlethreaded(fasync::Timer::new(sleep_duration.after_now()));
+        assert_variant!(
+            exec.run_until_stalled(fut),
+            Poll::Pending,
+            "Did not get 'poll::Pending' on network_selection_fut"
+        );
+        match exec.run_until_stalled(&mut stream.next()) {
+            Poll::Pending => continue,
+            other_result => {
+                debug!("Required {} iterations to get an SME stream message", counter);
+                break other_result;
+            }
+        }
+    };
+
+    assert_variant!(
+        stream_result,
+        Poll::Ready(Some(Ok(stream_item))) =>  {
+            let (update, responder) = stream_item.into_on_client_state_update().unwrap();
+            let _ = responder.send();
+            update
+        }
+    )
+}
 
 /// Gets a set of security protocols that describe the protection of a BSS.
 ///
@@ -797,11 +867,16 @@ fn save_and_connect(
     );
 
     // Expect to get an SME request for state machine creation.
+    let device_monitor_request = poll_for_device_monitor_request(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.monitor_service_stream,
+    );
     let sme_server = assert_variant!(
-        exec.run_until_stalled(&mut test_values.external_interfaces.monitor_service_stream.next()),
-            Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
+        device_monitor_request,
+        fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
             iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
-        }))) => {
+        } => {
             // Send back a positive acknowledgement.
             assert!(responder.send(&mut Ok(())).is_ok());
             sme_server
@@ -1048,8 +1123,11 @@ fn save_and_fail_to_connect(
     }
 
     // Check for a listener update saying we failed to connect
-    let fidl_policy::ClientStateSummary { state, networks, .. } =
-        get_client_state_update(&mut exec, &mut client_listener_update_requests);
+    let fidl_policy::ClientStateSummary { state, networks, .. } = poll_for_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut client_listener_update_requests,
+    );
     assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
     let mut networks = networks.unwrap();
     assert_eq!(networks.len(), 1);
