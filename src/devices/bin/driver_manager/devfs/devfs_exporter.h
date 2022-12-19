@@ -14,40 +14,45 @@ namespace driver_manager {
 
 // Each ExportWatcher represents one call to `DevfsExporter::Export`. It holds all of the
 // nodes created by that export.
-class ExportWatcher : public fidl::WireAsyncEventHandler<fuchsia_io::Node> {
+class ExportWatcher : public fidl::WireAsyncEventHandler<fuchsia_io::Node>,
+                      public fidl::WireAsyncEventHandler<fuchsia_device_fs::Connector> {
  public:
-  explicit ExportWatcher() = default;
-
-  // Create an ExportWatcher.
+  // Create an ExportWatcher with a service directory.
   static zx::result<std::unique_ptr<ExportWatcher>> Create(
       async_dispatcher_t* dispatcher, Devfs& devfs, Devnode* root,
       fidl::ClientEnd<fuchsia_io::Directory> service_dir, std::string_view service_path,
       std::string_view devfs_path, uint32_t protocol_id,
       fuchsia_device_fs::wire::ExportOptions options);
 
-  // Set a callback that will be called when the connection to `service_path` is closed.
+  // Create an ExportWatcher with a connector.
+  static zx::result<std::unique_ptr<ExportWatcher>> Create(
+      async_dispatcher_t* dispatcher, Devfs& devfs, Devnode* root,
+      fidl::ClientEnd<fuchsia_device_fs::Connector> connector,
+      std::optional<std::string> topological_path, std::optional<std::string> class_name,
+      fuchsia_device_fs::wire::ExportOptions options);
+
   void set_on_close_callback(fit::callback<void(ExportWatcher*)> callback) {
     callback_ = std::move(callback);
   }
 
-  // Because `ExportWatcher` is bound to `client_`, this will be called whenever
-  // there is a FIDL error on `client_`. Since we do not send reports, we know
-  // that this will only be called when the connection closes.
   void on_fidl_error(fidl::UnbindInfo error) override {
     if (callback_) {
       callback_(this);
     }
   }
 
-  std::string_view devfs_path() const { return devfs_path_; }
+  const std::optional<std::string>& topological_path() const { return topological_path_; }
 
   zx::result<> MakeVisible();
 
  private:
+  explicit ExportWatcher(std::optional<std::string> topological_path)
+      : topological_path_(std::move(topological_path)) {}
+
   fit::callback<void(ExportWatcher*)> callback_;
   fidl::WireClient<fuchsia_io::Node> client_;
   std::vector<std::unique_ptr<Devnode>> devnodes_;
-  std::string devfs_path_;
+  const std::optional<std::string> topological_path_;
 };
 
 class DevfsExporter : public fidl::WireServer<fuchsia_device_fs::Exporter> {
@@ -64,11 +69,15 @@ class DevfsExporter : public fidl::WireServer<fuchsia_device_fs::Exporter> {
   void ExportOptions(ExportOptionsRequestView request,
                      ExportOptionsCompleter::Sync& completer) override;
 
+  void ExportV2(ExportV2RequestView request, ExportV2Completer::Sync& completer) override;
+
   zx::result<> Export(fidl::ClientEnd<fuchsia_io::Directory> service_dir,
                       std::string_view service_path, std::string_view devfs_path,
                       uint32_t protocol_id, fuchsia_device_fs::wire::ExportOptions options);
 
   void MakeVisible(MakeVisibleRequestView request, MakeVisibleCompleter::Sync& completer) override;
+
+  void AddWatcher(std::unique_ptr<ExportWatcher> watcher);
 
   Devfs& devfs_;
   Devnode* const root_;

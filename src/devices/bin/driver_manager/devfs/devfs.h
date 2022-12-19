@@ -47,6 +47,16 @@ class Devnode {
     std::string path;
     mutable ExportOptions export_options;
   };
+  struct Connector {
+    fidl::WireSharedClient<fuchsia_device_fs::Connector> connector;
+    mutable ExportOptions export_options;
+    Connector Clone() {
+      return Connector{
+          .connector = connector.Clone(),
+          .export_options = export_options,
+      };
+    }
+  };
   struct Remote {
     fidl::WireSharedClient<fuchsia_device_manager::DeviceController> connector;
 
@@ -57,7 +67,7 @@ class Devnode {
     }
   };
 
-  using Target = std::variant<NoRemote, Service, Remote>;
+  using Target = std::variant<NoRemote, Service, Remote, Connector>;
 
   // Constructs a root node.
   explicit Devnode(Devfs& devfs);

@@ -7,6 +7,14 @@ using fuchsia.io;
 
 using zx;
 
+/// A protocol that lets a client connect to another protocol.
+protocol Connector {
+    /// Connect to the underlying protocol.
+    Connect(resource struct {
+        server zx.handle:CHANNEL;
+    });
+};
+
 type ExportOptions = strict bits : uint32 {
     /// If present, the exported service will be invisible.
     INVISIBLE = 0x00000001;
@@ -33,6 +41,26 @@ protocol Exporter {
         service_path string:fuchsia.io.MAX_PATH;
         devfs_path string:fuchsia.io.MAX_PATH;
         protocol_id uint32;
+        options ExportOptions;
+    }) -> () error zx.status;
+
+    /// Export a device in devfs.
+    ///
+    /// * error `ZX_ERR_ALREADY_EXISTS` if `topological_path` already exists.
+    /// * error `ZX_ERR_NOT_FOUND` if `class_name` doesn't match a valid class name.
+    ExportV2(resource struct {
+        /// This is the connector that will have Connect called on it when a client opens the
+        /// device. If the server end of this connection is dropped the export will automatically be
+        /// cleaned up.
+        open_client client_end:Connector;
+
+        /// If this is present, then the device will be exported at this topological path.
+        topological_path string:<fuchsia.io.MAX_PATH, optional>;
+
+        /// If this is present, then the device will be exported into "/dev/class/{class_name}/".
+        class_name string:<fuchsia.io.MAX_NAME_LENGTH, optional>;
+
+        /// The options for the device being exported.
         options ExportOptions;
     }) -> () error zx.status;
 

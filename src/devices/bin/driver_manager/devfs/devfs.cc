@@ -105,6 +105,7 @@ std::string_view Devnode::name() const {
 Devnode::ExportOptions Devnode::export_options() const {
   return std::visit(overloaded{[](const NoRemote& no_remote) { return no_remote.export_options; },
                                [](const Service& service) { return service.export_options; },
+                               [](const Connector& connector) { return connector.export_options; },
                                [](const Remote&) { return ExportOptions{}; }},
                     target());
 }
@@ -112,6 +113,7 @@ Devnode::ExportOptions Devnode::export_options() const {
 Devnode::ExportOptions* Devnode::export_options() {
   return std::visit(overloaded{[](const NoRemote& no_remote) { return &no_remote.export_options; },
                                [](const Service& service) { return &service.export_options; },
+                               [](const Connector& connector) { return &connector.export_options; },
                                [](const Remote&) -> ExportOptions* { return nullptr; }},
                     target());
 }
@@ -128,6 +130,7 @@ Devnode::VnodeImpl::VnodeImpl(Devnode& holder, Target target)
 bool Devnode::VnodeImpl::IsDirectory() const {
   return std::visit(
       overloaded{[&](const NoRemote&) { return true; }, [&](const Service&) { return false; },
+                 [&](const Connector&) { return false; },
                  [&](const Remote& remote) { return !remote.connector.is_valid(); }},
       target_);
 }
@@ -162,6 +165,7 @@ zx_status_t Devnode::VnodeImpl::ConnectService(zx::channel channel) {
   return std::visit(
       overloaded{[&](const NoRemote&) { return ZX_ERR_NOT_SUPPORTED; },
                  [&](const Service&) { return ZX_ERR_NOT_SUPPORTED; },
+                 [&](const Connector&) { return ZX_ERR_NOT_SUPPORTED; },
                  [&](const Remote& remote) {
                    if (remote.connector.is_valid()) {
                      return remote.connector->ConnectMultiplexed(std::move(channel)).status();
@@ -174,6 +178,7 @@ zx_status_t Devnode::VnodeImpl::ConnectService(zx::channel channel) {
 bool Devnode::VnodeImpl::IsService() const {
   return std::visit(
       overloaded{[&](const NoRemote&) { return false; }, [&](const Service&) { return false; },
+                 [&](const Connector&) { return false; },
                  [&](const Remote& remote) { return remote.connector.is_valid(); }},
       target_);
 }
@@ -217,6 +222,9 @@ zx_status_t Devnode::VnodeImpl::RemoteNode::OpenRemote(fio::OpenFlags flags, uin
                        ->Open(flags, mode, fidl::StringView::FromExternal(service.path),
                               std::move(object))
                        .status();
+                 },
+                 [&](const Connector& connector) {
+                   return connector.connector->Connect(object.TakeChannel()).status();
                  },
                  [&](const Remote& remote) {
                    return remote.connector->ConnectMultiplexed(object.TakeChannel()).status();
@@ -279,14 +287,15 @@ Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String nam
                              fidl::ServerEnd<fuchsia_io::Node>(std::move(channel)))
                       .status();
                 });
-            auto device_protocol =
-                fbl::MakeRefCounted<fs::Service>([&service](zx::channel channel) {
-                  return fidl::WireCall(service.remote)
-                      ->Open(fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable, 0,
-                             fidl::StringView::FromExternal(service.path),
-                             fidl::ServerEnd<fuchsia_io::Node>(std::move(channel)))
-                      .status();
+            auto device_protocol = device_controller;
+            return std::make_tuple(std::move(device_controller), std::move(device_protocol));
+          },
+          [](const Connector& connector) {
+            auto device_controller =
+                fbl::MakeRefCounted<fs::Service>([&connector](zx::channel channel) {
+                  return connector.connector->Connect(std::move(channel)).status();
                 });
+            auto device_protocol = device_controller;
             return std::make_tuple(std::move(device_controller), std::move(device_protocol));
           },
           [](const Remote& remote) {
@@ -597,7 +606,10 @@ bool should_publish(const Devnode::Target& target) {
                  [](const Devnode::Service& service) {
                    return !(service.export_options & Devnode::ExportOptions::kInvisible);
                  },
-                 [](const Devnode::Remote&) { return true; }},
+                 [](const Devnode::Remote&) { return true; },
+                 [](const Devnode::Connector& connector) {
+                   return !(connector.export_options & Devnode::ExportOptions::kInvisible);
+                 }},
       target);
 }
 
@@ -614,6 +626,9 @@ zx::result<Devnode::Target> clone_target(Devnode::Target& target) {
                                },
                                [](Devnode::Remote& remote) -> zx::result<Devnode::Target> {
                                  return zx::ok(Devnode::Target(remote.Clone()));
+                               },
+                               [](Devnode::Connector& connector) -> zx::result<Devnode::Target> {
+                                 return zx::ok(Devnode::Target(connector.Clone()));
                                }},
                     target);
 }
