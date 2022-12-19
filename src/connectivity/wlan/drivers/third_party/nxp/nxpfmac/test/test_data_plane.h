@@ -39,6 +39,7 @@ class TestDataPlane {
  private:
   TestDataPlane() = default;
 
+  zx::vmo vmo_;
   std::unique_ptr<std::thread> async_remove_watcher_;
   std::shared_ptr<zx_device_t> net_device_ = nullptr;
   std::unique_ptr<DataPlane> data_plane_;

@@ -17,6 +17,8 @@
 #include <fuchsia/wlan/ieee80211/c/banjo.h>
 #include <stdint.h>
 
+#include <wlan/common/mac_frame.h>
+
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/mlan.h"
 
 namespace wlan::nxpfmac {
@@ -35,6 +37,15 @@ constexpr bool is_wpa_cipher_suite(uint8_t cipher_suite) {
   return cipher_suite == CIPHER_SUITE_TYPE_TKIP || cipher_suite == CIPHER_SUITE_TYPE_CCMP_128 ||
          cipher_suite == CIPHER_SUITE_TYPE_CCMP_256 || cipher_suite == CIPHER_SUITE_TYPE_GCMP_128 ||
          cipher_suite == CIPHER_SUITE_TYPE_GCMP_256;
+}
+
+constexpr bool is_association_reponse(const uint8_t* data, size_t size) {
+  if (size < sizeof(wlan::MgmtFrameHeader) + sizeof(wlan::AssociationResponse)) {
+    return false;
+  }
+  auto mgmt_hdr = reinterpret_cast<const wlan::MgmtFrameHeader*>(data);
+  return mgmt_hdr->fc.type() == wlan::kManagement &&
+         mgmt_hdr->fc.subtype() == wlan::ManagementSubtype::kAssociationResponse;
 }
 
 }  // namespace wlan::nxpfmac

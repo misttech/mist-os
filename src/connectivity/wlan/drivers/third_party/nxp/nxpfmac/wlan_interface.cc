@@ -15,6 +15,7 @@
 
 #include <arpa/inet.h>
 #include <lib/async/cpp/task.h>
+#include <lib/stdcompat/span.h>
 #include <stdint.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
@@ -22,6 +23,7 @@
 #include <wlan/common/element.h>
 #include <wlan/common/ieee80211.h>
 #include <wlan/common/ieee80211_codes.h>
+#include <wlan/common/mac_frame.h>
 
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/data_plane.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device.h"
@@ -297,7 +299,7 @@ void WlanInterface::WlanFullmacImplQueryMacSublayerSupport(mac_sublayer_support_
 
 void WlanInterface::WlanFullmacImplQuerySecuritySupport(security_support_t* resp) {
   std::lock_guard lock(mutex_);
-  resp->sae.sme_handler_supported = false;
+  resp->sae.sme_handler_supported = true;
   resp->sae.driver_handler_supported = false;
   resp->mfp.supported = true;
 }
@@ -337,6 +339,11 @@ void WlanInterface::WlanFullmacImplStartScan(const wlan_fullmac_scan_req_t* req)
 }
 
 void WlanInterface::WlanFullmacImplConnectReq(const wlan_fullmac_connect_req_t* req) {
+  if (req == nullptr) {
+    NXPF_ERR("Invalid connect request parameter");
+    ConfirmConnectReq(ClientConnection::StatusCode::kInvalidParameters);
+    return;
+  }
   auto ssid = IeView(req->selected_bss.ies_list, req->selected_bss.ies_count).get(SSID);
   if (!ssid) {
     ConfirmConnectReq(ClientConnection::StatusCode::kInvalidParameters);
@@ -367,10 +374,9 @@ void WlanInterface::WlanFullmacImplConnectReq(const wlan_fullmac_connect_req_t* 
     return;
   }
 
-  // Now connect while the scan table is populated. Since we're holding the mutex at this point no
-  // scans should be started so the scan table should remain intact.
-  auto on_connect = [this](ClientConnection::StatusCode status, const uint8_t* ies,
-                           size_t ies_size) { ConfirmConnectReq(status, ies, ies_size); };
+  auto on_connect =
+      [this](ClientConnection::StatusCode status_code, const uint8_t* ies, size_t ies_size)
+          __TA_EXCLUDES(mutex_) { ConfirmConnectReq(status_code, ies, ies_size); };
 
   status = client_connection_.Connect(req, std::move(on_connect));
   if (status != ZX_OK) {
@@ -573,11 +579,41 @@ void WlanInterface::WlanFullmacImplDataQueueTx(uint32_t options, ethernet_netbuf
 }
 
 void WlanInterface::WlanFullmacImplSaeHandshakeResp(const wlan_fullmac_sae_handshake_resp_t* resp) {
-  NXPF_ERR("%s", __func__);
+  if (resp == nullptr) {
+    NXPF_ERR("Invalid response parameter");
+    ConfirmConnectReq(ClientConnection::StatusCode::kInvalidParameters);
+    return;
+  }
+  std::lock_guard lock_(mutex_);
+  const zx_status_t status =
+      client_connection_.OnSaeResponse(resp->peer_sta_address, resp->status_code);
+  if (status != ZX_OK) {
+    NXPF_ERR("Failed to handle SAE handshake response: %s", zx_status_get_string(status));
+    if (resp->status_code != STATUS_CODE_SUCCESS) {
+      ConfirmConnectReq(static_cast<ClientConnection::StatusCode>(resp->status_code));
+    } else {
+      ConfirmConnectReq(ClientConnection::StatusCode::kJoinFailure);
+    }
+    return;
+  }
 }
 
-void WlanInterface::WlanFullmacImplSaeFrameTx(const wlan_fullmac_sae_frame_t* frame) {
-  NXPF_ERR("%s", __func__);
+void WlanInterface::WlanFullmacImplSaeFrameTx(const wlan_fullmac_sae_frame_t* sae_frame) {
+  if (sae_frame == nullptr) {
+    NXPF_ERR("Invalid SAE frame parameter");
+    ConfirmConnectReq(ClientConnection::StatusCode::kInvalidParameters);
+    return;
+  }
+
+  std::lock_guard lock(mutex_);
+
+  cpp20::span<const uint8_t> sae_fields(sae_frame->sae_fields_list, sae_frame->sae_fields_count);
+  zx_status_t status =
+      client_connection_.TransmitAuthFrame(mac_address_, sae_frame->peer_sta_address,
+                                           sae_frame->seq_num, sae_frame->status_code, sae_fields);
+  if (status != ZX_OK) {
+    NXPF_ERR("Failed to transmit SAE auth frame: %s", zx_status_get_string(status));
+  }
 }
 
 void WlanInterface::WlanFullmacImplWmmStatusReq() {
@@ -601,6 +637,34 @@ void WlanInterface::SignalQualityIndication(int8_t rssi, int8_t snr) {
   std::lock_guard lock(fullmac_ifc_mutex_);
   wlan_fullmac_signal_report_indication signal_ind = {.rssi_dbm = rssi, .snr_db = snr};
   fullmac_ifc_.SignalReport(&signal_ind);
+}
+
+void WlanInterface::InitiateSaeHandshake(const uint8_t* peer_mac) {
+  std::lock_guard lock(fullmac_ifc_mutex_);
+  if (!fullmac_ifc_.is_valid()) {
+    NXPF_WARN("Received request to initiate SAE handshake when interface is shut down");
+    return;
+  }
+
+  wlan_fullmac_sae_handshake_ind_t ind{};
+  memcpy(ind.peer_sta_address, peer_mac, ETH_ALEN);
+  fullmac_ifc_.SaeHandshakeInd(&ind);
+}
+
+void WlanInterface::OnAuthFrame(const uint8_t* peer_mac, const wlan::Authentication* frame,
+                                cpp20::span<const uint8_t> trailing_data) {
+  std::lock_guard lock(fullmac_ifc_mutex_);
+  if (!fullmac_ifc_.is_valid()) {
+    NXPF_WARN("Received auth frame when interface is shut down");
+    return;
+  }
+  wlan_fullmac_sae_frame_t sae_frame{.status_code = frame->status_code,
+                                     .seq_num = frame->auth_txn_seq_number};
+  memcpy(sae_frame.peer_sta_address, peer_mac, ETH_ALEN);
+  sae_frame.sae_fields_list = trailing_data.data();
+  sae_frame.sae_fields_count = trailing_data.size();
+
+  fullmac_ifc_.SaeFrameRx(&sae_frame);
 }
 
 // Handle STA connect event for SoftAP.

@@ -13,7 +13,14 @@
 
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/test/test_data_plane.h"
 
+#include <lib/zx/vmar.h>
+#include <lib/zx/vmo.h>
+
 namespace wlan::nxpfmac {
+
+constexpr uint64_t kFrameSize = 2048;
+constexpr uint64_t kFramesCount = 256;
+constexpr uint64_t kFrameVmoSize = kFrameSize * kFramesCount;
 
 TestDataPlane::~TestDataPlane() {
   // Deleting the data plane should result in a call to remove the netdevice device.
@@ -29,7 +36,7 @@ zx_status_t TestDataPlane::Create(DataPlaneIfc* data_plane_ifc, BusInterface* bu
                                   std::unique_ptr<TestDataPlane>* out_data_plane) {
   std::unique_ptr<TestDataPlane> test_data_plane(new TestDataPlane());
 
-  const zx_status_t status =
+  zx_status_t status =
       DataPlane::Create(test_data_plane->parent_.get(), data_plane_ifc, bus_interface, mlan_adapter,
                         &test_data_plane->data_plane_);
   if (status != ZX_OK) {
@@ -51,7 +58,30 @@ zx_status_t TestDataPlane::Create(DataPlaneIfc* data_plane_ifc, BusInterface* bu
         }
       });
 
+  status = zx::vmo::create(kFrameVmoSize, 0, &test_data_plane->vmo_);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  zx_vaddr_t addr = 0;
+  status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, test_data_plane->vmo_,
+                                      0, kFrameVmoSize, &addr);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  rx_space_buffer_t buffers[kFramesCount];
+  for (size_t i = 0; i < kFramesCount; ++i) {
+    buffers[i] = {.id = static_cast<uint32_t>(i),
+                  .region{.vmo = 0, .offset = i * kFrameSize, .length = kFrameSize}};
+  }
+
+  uint8_t* vmo_addrs[] = {reinterpret_cast<uint8_t*>(addr)};
+
+  test_data_plane->GetDataPlane()->NetDevQueueRxSpace(buffers, kFramesCount, vmo_addrs);
+
   *out_data_plane = std::move(test_data_plane);
+
   return ZX_OK;
 }
 

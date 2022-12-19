@@ -15,12 +15,14 @@
 
 #include <fidl/fuchsia.wlan.ieee80211/cpp/common_types.h>
 #include <fuchsia/hardware/wlan/fullmac/cpp/banjo.h>
+#include <lib/stdcompat/span.h>
 #include <netinet/if_ether.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
 #include <mutex>
 
+#include <wlan/common/mac_frame.h>
 #include <wlan/drivers/timer/timer.h>
 
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/event_handler.h"
@@ -29,6 +31,7 @@
 
 namespace wlan::nxpfmac {
 
+class ConnectRequestParams;
 struct DeviceContext;
 class KeyRing;
 
@@ -37,8 +40,10 @@ class ClientConnectionIfc {
   virtual ~ClientConnectionIfc() = default;
 
   virtual void OnDisconnectEvent(uint16_t reason_code) = 0;
-
   virtual void SignalQualityIndication(int8_t rssi, int8_t snr) = 0;
+  virtual void InitiateSaeHandshake(const uint8_t* peer_mac) = 0;
+  virtual void OnAuthFrame(const uint8_t* peer_mac, const wlan::Authentication* frame,
+                           cpp20::span<const uint8_t> trailing_data) = 0;
 };
 
 class ClientConnection {
@@ -66,9 +71,24 @@ class ClientConnection {
                          std::function<void(IoctlStatus)>&& on_disconnect_complete)
       __TA_EXCLUDES(mutex_);
 
- private:
-  void OnDisconnect(uint16_t reason_code) __TA_EXCLUDES(mutex_);
+  zx_status_t TransmitAuthFrame(const uint8_t* source_mac, const uint8_t* destination_mac,
+                                uint16_t sequence, uint16_t status_code,
+                                cpp20::span<const uint8_t> sae_fields) __TA_EXCLUDES(mutex_);
+  zx_status_t OnSaeResponse(const uint8_t* peer, uint16_t status_code) __TA_EXCLUDES(mutex_);
 
+ private:
+  zx_status_t ConnectLocked(const wlan_fullmac_connect_req_t* req, OnConnectCallback&& on_connect)
+      __TA_REQUIRES(mutex_);
+
+  zx_status_t OnSaeResponseLocked(const uint8_t* peer, uint16_t status_code) __TA_REQUIRES(mutex_);
+  void OnDisconnect(uint16_t reason_code) __TA_EXCLUDES(mutex_);
+  void OnManagementFrame(pmlan_event event) __TA_EXCLUDES(mutex_);
+  void OnSaeTimeout() __TA_EXCLUDES(mutex_);
+
+  zx_status_t InitiateSaeHandshake(const wlan_fullmac_connect_req_t* req);
+  zx_status_t RegisterForMgmtFrames(const std::vector<wlan::ManagementSubtype>& types);
+  zx_status_t RemainOnChannel(uint8_t channel);
+  zx_status_t CancelRemainOnChannel();
   zx_status_t GetRsnCipherSuites(const uint8_t* ies, size_t ies_count,
                                  uint8_t* out_pairwise_cipher_suite,
                                  uint8_t* out_group_cipher_suite);
@@ -96,11 +116,19 @@ class ClientConnection {
 
   // Periodic timer to log client stats, etc.
   std::unique_ptr<wlan::drivers::timer::Timer> log_timer_;
+  wlan::drivers::timer::Timer sae_timeout_timer_;
+
   ClientConnectionIfc* ifc_ = nullptr;
   DeviceContext* context_ = nullptr;
   KeyRing* key_ring_ = nullptr;
   const uint32_t bss_index_;
+
+  // These addresses are used during authentication and might not be valid at other times.
+  wlan::common::MacAddr client_mac_ __TA_GUARDED(mutex_);
+  wlan::common::MacAddr ap_mac_ __TA_GUARDED(mutex_);
+
   OnConnectCallback on_connect_;
+  std::unique_ptr<ConnectRequestParams> connect_request_params_ __TA_GUARDED(mutex_);
   // Something inside mlan_ds_bss makes this a variable size struct so we need to have a pointer.
   // Otherwise it has to be at the end of this class and that makes this class variable size which
   // means that all instances of this class would have to be at the end of any classes containing it
@@ -109,6 +137,7 @@ class ClientConnection {
   std::mutex mutex_;
 
   EventRegistration disconnect_event_;
+  EventRegistration mgmt_frame_event_;
 };
 
 }  // namespace wlan::nxpfmac

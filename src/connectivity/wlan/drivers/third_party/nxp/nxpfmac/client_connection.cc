@@ -17,6 +17,8 @@
 #include <lib/ddk/debug.h>
 #include <netinet/if_ether.h>
 
+#include <wlan/common/mac_frame.h>
+
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/debug.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device_context.h"
@@ -33,10 +35,43 @@ constexpr zx_duration_t kDestructionStateTimeout = ZX_SEC(5);
 constexpr zx_duration_t kConnectionTimeout = ZX_MSEC(6000);
 constexpr zx_duration_t kDisconnectTimeout = ZX_MSEC(1000);
 constexpr zx_duration_t kLogTimerTimeout = ZX_SEC(30);
+constexpr zx_duration_t kSaeHandshakeTimeout = ZX_SEC(2);
+// Time to wait before a remain on channel request expires
+constexpr uint32_t kRemainOnChannelPeriodMillis = 2400;
+
+constexpr uint8_t kSaeFramePriority = 7u;
+
+// A class that allows us to keep a local copy of a connect request, including copying of allocated
+// data and updating pointers to that data.
+class ConnectRequestParams {
+ public:
+  explicit ConnectRequestParams(const wlan_fullmac_connect_req_t* req)
+      : sae_password_(req->sae_password_list, req->sae_password_list + req->sae_password_count),
+        security_ies_(req->security_ie_list, req->security_ie_list + req->security_ie_count),
+        wep_key_(req->wep_key.key_list, req->wep_key.key_list + req->wep_key.key_count),
+        selected_bss_ies_(req->selected_bss.ies_list,
+                          req->selected_bss.ies_list + req->selected_bss.ies_count) {
+    memcpy(&request_, req, sizeof(request_));
+    request_.sae_password_list = sae_password_.data();
+    request_.security_ie_list = security_ies_.data();
+    request_.wep_key.key_list = wep_key_.data();
+    request_.selected_bss.ies_list = selected_bss_ies_.data();
+  }
+
+  const wlan_fullmac_connect_req_t* get() const { return &request_; }
+
+ private:
+  std::vector<uint8_t> sae_password_;
+  std::vector<uint8_t> security_ies_;
+  std::vector<uint8_t> wep_key_;
+  std::vector<uint8_t> selected_bss_ies_;
+  wlan_fullmac_connect_req_t request_;
+};
 
 ClientConnection::ClientConnection(ClientConnectionIfc* ifc, DeviceContext* context,
                                    KeyRing* key_ring, uint32_t bss_index)
-    : ifc_(ifc),
+    : sae_timeout_timer_(context->device_->GetDispatcher(), [this] { OnSaeTimeout(); }),
+      ifc_(ifc),
       context_(context),
       key_ring_(key_ring),
       bss_index_(bss_index),
@@ -45,6 +80,9 @@ ClientConnection::ClientConnection(ClientConnectionIfc* ifc, DeviceContext* cont
       MLAN_EVENT_ID_FW_DISCONNECTED, bss_index, [this](pmlan_event event) {
         OnDisconnect(*reinterpret_cast<const uint16_t*>(event->event_buf));
       });
+  mgmt_frame_event_ = context_->event_handler_->RegisterForInterfaceEvent(
+      MLAN_EVENT_ID_DRV_MGMT_FRAME, bss_index,
+      [this](pmlan_event event) { OnManagementFrame(event); });
   log_timer_ = std::make_unique<Timer>(context_->device_->GetDispatcher(),
                                        [this]() { IndicateSignalQuality(); });
 }
@@ -52,6 +90,8 @@ ClientConnection::ClientConnection(ClientConnectionIfc* ifc, DeviceContext* cont
 ClientConnection::~ClientConnection() {
   // Stop the periodic log timer unconditionally.
   log_timer_->Stop();
+  // Cancel any SAE authentication in progress.
+  OnSaeResponse(nullptr, STATUS_CODE_CANCELED);
   // Cancel any ongoing connection attempt.
   zx_status_t status = CancelConnect();
   if (status != ZX_OK && status != ZX_ERR_NOT_FOUND) {
@@ -92,16 +132,36 @@ ClientConnection::~ClientConnection() {
 zx_status_t ClientConnection::Connect(const wlan_fullmac_connect_req_t* req,
                                       OnConnectCallback&& on_connect) {
   std::lock_guard lock(mutex_);
-  if (state_ == State::Connecting) {
-    return ZX_ERR_ALREADY_EXISTS;
-  }
-  if (state_ == State::Connected) {
-    return ZX_ERR_ALREADY_BOUND;
-  }
-  if (state_ == State::Disconnecting) {
-    return ZX_ERR_SHOULD_WAIT;
+  if (state_ != State::Idle && state_ != State::Authenticating) {
+    NXPF_ERR("Invalid state for connect call: %d", state_.Load());
+    return ZX_ERR_BAD_STATE;
   }
 
+  const bool is_sae = req->auth_type == WLAN_AUTH_TYPE_SAE;
+  if (is_sae) {
+    zx_status_t status = InitiateSaeHandshake(req);
+    if (status != ZX_OK) {
+      NXPF_ERR("Failed to initiate SAE handshake: %s", zx_status_get_string(status));
+      return status;
+    }
+    // This kicks off an asynchronous process that will eventually complete the connection. At that
+    // point we will call the on_connect callback.
+    on_connect_ = std::move(on_connect);
+    connect_request_params_ = std::make_unique<ConnectRequestParams>(req);
+    state_ = State::Authenticating;
+    status = sae_timeout_timer_.StartOneshot(kSaeHandshakeTimeout);
+    if (status != ZX_OK) {
+      NXPF_ERR("Cannot start SAE timeout timer: %s", zx_status_get_string(status));
+      return status;
+    }
+    return ZX_OK;
+  }
+
+  return ConnectLocked(req, std::move(on_connect));
+}
+
+zx_status_t ClientConnection::ConnectLocked(const wlan_fullmac_connect_req_t* req,
+                                            OnConnectCallback&& on_connect) {
   auto ssid = IeView(req->selected_bss.ies_list, req->selected_bss.ies_count).get(SSID);
   if (!ssid) {
     NXPF_ERR("Missing SSID in connection request");
@@ -190,7 +250,8 @@ zx_status_t ClientConnection::Connect(const wlan_fullmac_connect_req_t* req,
 
   on_connect_ = std::move(on_connect);
 
-  auto on_connect_complete = [this](mlan_ioctl_req* req, IoctlStatus io_status) {
+  const bool is_host_mlme = req->auth_type == WLAN_AUTH_TYPE_SAE;
+  auto on_connect_complete = [this, is_host_mlme](mlan_ioctl_req* req, IoctlStatus io_status) {
     std::lock_guard lock(mutex_);
     if (state_ != State::Connecting) {
       NXPF_WARN("Connection ioctl completed when no connection was in progress");
@@ -214,12 +275,32 @@ zx_status_t ClientConnection::Connect(const wlan_fullmac_connect_req_t* req,
     size_t ies_size = 0;
 
     StatusCode status_code = StatusCode::kSuccess;
-    if (assoc_rsp.assoc_resp_len >= sizeof(IEEEtypes_AssocRsp_t)) {
-      auto response = reinterpret_cast<const IEEEtypes_AssocRsp_t*>(assoc_rsp.assoc_resp_buf);
-      status_code = static_cast<StatusCode>(response->status_code);
-      ies = response->ie_buffer;
-      ies_size = assoc_rsp.assoc_resp_len - sizeof(IEEEtypes_AssocRsp_t) + 1;
-    } else if (io_status != IoctlStatus::Success) {
+    if (is_host_mlme) {
+      if (is_association_reponse(assoc_rsp.assoc_resp_buf, assoc_rsp.assoc_resp_len)) {
+        ies = assoc_rsp.assoc_resp_buf + sizeof(wlan::MgmtFrameHeader) +
+              sizeof(wlan::AssociationResponse);
+        ies_size = assoc_rsp.assoc_resp_buf + assoc_rsp.assoc_resp_len - ies;
+        auto response = reinterpret_cast<const wlan::AssociationResponse*>(
+            assoc_rsp.assoc_resp_buf + sizeof(wlan::MgmtFrameHeader));
+        status_code = static_cast<StatusCode>(response->status_code);
+      }
+    } else {
+      if (assoc_rsp.assoc_resp_len >= sizeof(IEEEtypes_AssocRsp_t)) {
+        auto response = reinterpret_cast<const IEEEtypes_AssocRsp_t*>(assoc_rsp.assoc_resp_buf);
+        ies = response->ie_buffer;
+        ies_size = assoc_rsp.assoc_resp_len - sizeof(IEEEtypes_AssocRsp_t) + 1;
+        status_code = static_cast<StatusCode>(response->status_code);
+      }
+    }
+
+    if (req->status_code == MLAN_ERROR_NO_ERROR && io_status == IoctlStatus::Success) {
+      if (status_code != StatusCode::kSuccess) {
+        NXPF_WARN("Unexpectedly status code is %u", status_code);
+        status_code = StatusCode::kSuccess;
+      }
+    } else if (status_code == StatusCode::kSuccess) {
+      // The connection failed but there was no association response to get a status code from. Make
+      // sure we indicate failure here.
       status_code = StatusCode::kJoinFailure;
     }
 
@@ -231,7 +312,8 @@ zx_status_t ClientConnection::Connect(const wlan_fullmac_connect_req_t* req,
       mlan_ds_bss{
           .sub_command = MLAN_OID_BSS_START,
           .param = {.ssid_bssid = {.idx = bss_index_,
-                                   .channel = req->selected_bss.channel.primary}},
+                                   .channel = req->selected_bss.channel.primary,
+                                   .host_mlme = is_host_mlme}},
       });
   mlan_ssid_bssid& bss = connect_request_->UserReq().param.ssid_bssid;
   memcpy(bss.bssid, req->selected_bss.bssid, ETH_ALEN);
@@ -314,6 +396,147 @@ zx_status_t ClientConnection::Disconnect(
   return ZX_OK;
 }
 
+zx_status_t ClientConnection::TransmitAuthFrame(const uint8_t* source_mac,
+                                                const uint8_t* destination_mac, uint16_t sequence,
+                                                uint16_t status_code,
+                                                cpp20::span<const uint8_t> sae_fields) {
+  uint8_t channel = 0;
+  {
+    std::lock_guard lock(mutex_);
+    if (state_ != State::Authenticating) {
+      NXPF_ERR("Attempted to transmit auth frame when in wrong state %d", state_.Load());
+      return ZX_ERR_BAD_STATE;
+    }
+    if (!connect_request_params_) {
+      NXPF_ERR("Attempt to send auth frame without first initiating a connection attempt");
+      return ZX_ERR_BAD_STATE;
+    }
+    channel = connect_request_params_->get()->selected_bss.channel.primary;
+    client_mac_.Set(source_mac);
+    ap_mac_.Set(destination_mac);
+  }
+
+  std::optional<wlan::drivers::components::Frame> frame = context_->data_plane_->AcquireFrame();
+  if (!frame.has_value()) {
+    NXPF_ERR("Failed to acquire frame container for SAE frame");
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  NXPF_INFO("Transmit SAE auth frame (%d of 4)", sequence == 1 ? 1 : 3);
+
+  struct AuthFrame {
+    uint32_t type;
+    uint32_t tx_ctrl;
+    uint16_t len;
+    IEEE80211_MGMT mgmt;
+  } __PACKED;
+
+  // The length of the auth payload, this is the whole management frame header plus the auth message
+  // and the SAE auth data.
+  const size_t auth_length =
+      offsetof(IEEE80211_MGMT, u) + sizeof(IEEEtypes_Auth_framebody) + sae_fields.size();
+
+  // The packet length is the full auth length plus the type, tx_ctrl and len fields in the header.
+  const size_t packet_length = auth_length + offsetof(AuthFrame, mgmt);
+
+  if (packet_length >= std::numeric_limits<uint16_t>::max()) {
+    NXPF_ERR("Invalid SAE frame length %zu", packet_length);
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (auth_length >= std::numeric_limits<uint16_t>::max() || auth_length > packet_length) {
+    NXPF_ERR("Invalid auth frame length %zu", auth_length);
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (packet_length >= frame->Size()) {
+    NXPF_ERR("SAE frame size %zu exceeds available frame space %u", packet_length, frame->Size());
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  frame->ShrinkHead(256);
+  frame->SetPortId(static_cast<uint8_t>(bss_index_));
+  frame->SetSize(static_cast<uint32_t>(packet_length));
+  frame->SetPriority(kSaeFramePriority);
+
+  auto auth_frame = reinterpret_cast<AuthFrame*>(frame->Data());
+  memset(auth_frame, 0, sizeof(*auth_frame));
+
+  auth_frame->type = PKT_TYPE_MGMT_FRAME;
+  auth_frame->tx_ctrl = 0;
+  auth_frame->len = static_cast<uint16_t>(auth_length);
+
+  // Frame Control
+  auth_frame->mgmt.frame_control = wlan::kManagement | (wlan::kAuthentication << 4);
+
+  memcpy(auth_frame->mgmt.da, destination_mac, ETH_ALEN);                  // Destination
+  memcpy(auth_frame->mgmt.sa, source_mac, ETH_ALEN);                       // Source
+  memcpy(auth_frame->mgmt.bssid, destination_mac, ETH_ALEN);               // BSSID
+  memcpy(auth_frame->mgmt.addr4, wlan::common::kBcastMac.byte, ETH_ALEN);  // addr4
+
+  auth_frame->mgmt.u.auth.auth_alg = wlan::kSae;
+  auth_frame->mgmt.u.auth.auth_transaction = sequence;
+  auth_frame->mgmt.u.auth.status_code = static_cast<uint16_t>(status_code);
+
+  memcpy(auth_frame->mgmt.u.auth.variable, sae_fields.data(), sae_fields.size());
+
+  // Before we transmit the SAE auth frame make sure that firmware will send it on the correct
+  // channel. Do this by instructing firmware to remain on the given channel.
+  zx_status_t status = RemainOnChannel(channel);
+  if (status != ZX_OK) {
+    NXPF_ERR("Failed to remain on channel %u: %s", channel, zx_status_get_string(status));
+    return status;
+  }
+
+  // Send this as a raw data buffer, it's not an ethernet frame.
+  status = context_->data_plane_->SendFrame(std::move(*frame), MLAN_BUF_TYPE_RAW_DATA);
+  if (status != ZX_OK) {
+    NXPF_ERR("Failed to transmit SAE auth frame: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  return ZX_OK;
+}
+
+zx_status_t ClientConnection::OnSaeResponse(const uint8_t* peer, uint16_t status_code) {
+  std::lock_guard lock(mutex_);
+  return OnSaeResponseLocked(peer, status_code);
+}
+
+zx_status_t ClientConnection::OnSaeResponseLocked(const uint8_t* peer, uint16_t status_code) {
+  if (state_ != State::Authenticating) {
+    if (peer) {
+      // This was externally generated, warn about this unexpected state. Internal calls might make
+      // this call just to clean up state, no need to log for those.
+      NXPF_WARN("SAE handshake completion when not authenticating, ignoring.");
+    }
+    return ZX_ERR_NOT_FOUND;
+  }
+
+  // Deregister for management frames (equivalent to registering for an empty list).
+  RegisterForMgmtFrames({});
+
+  // Cancel remain on channel now that the SAE handshake has completed and the normal connection
+  // process will ensure that the correct channel is used.
+  CancelRemainOnChannel();
+
+  sae_timeout_timer_.Stop();
+
+  if (status_code != STATUS_CODE_SUCCESS) {
+    NXPF_ERR("SAE handshake failed: %u", status_code);
+    state_ = State::Idle;
+    return ZX_ERR_INTERNAL;
+  }
+
+  std::unique_ptr<ConnectRequestParams> params(std::move(connect_request_params_));
+  OnConnectCallback on_connect = std::move(on_connect_);
+  zx_status_t status = ConnectLocked(params->get(), std::move(on_connect));
+  if (status != ZX_OK) {
+    NXPF_ERR("Failed to resume connection after SAE handshake: %s", zx_status_get_string(status));
+    state_ = State::Idle;
+    return status;
+  }
+  return ZX_OK;
+}
+
 void ClientConnection::OnDisconnect(uint16_t reason_code) {
   NXPF_INFO("Client disconnect, reason: %u", reason_code);
   std::lock_guard lock(mutex_);
@@ -336,6 +559,10 @@ void ClientConnection::OnDisconnect(uint16_t reason_code) {
     }
     return;
   }
+  if (state_ == State::Authenticating) {
+    OnSaeResponseLocked(nullptr, STATUS_CODE_SPURIOUS_DEAUTH_OR_DISASSOC);
+    return;
+  }
   if (state_ != State::Connected) {
     NXPF_ERR("Received disconnect event when not connected, reason: %u", reason_code);
     return;
@@ -344,6 +571,150 @@ void ClientConnection::OnDisconnect(uint16_t reason_code) {
   // Stop the log timer since the client is disconnected.
   log_timer_->Stop();
   ifc_->OnDisconnectEvent(reason_code);
+}
+
+void ClientConnection::OnManagementFrame(pmlan_event event) {
+  // mlan copies the original event ID into the first four bytes.
+  constexpr size_t kMgmtHdrOffset = 4u;
+  // mlan also adds an additional fourth MAC address, compensate for this here.
+  constexpr size_t kPayloadOffset = kMgmtHdrOffset + sizeof(wlan::MgmtFrameHeader) + ETH_ALEN;
+  if (event->event_len < kPayloadOffset) {
+    NXPF_ERR("Invalid management frame, size %u is less than minimum size of %zu", event->event_len,
+             kPayloadOffset);
+    return;
+  }
+
+  std::lock_guard lock(mutex_);
+  if (state_ != State::Authenticating) {
+    NXPF_WARN("Received management frame when authentication not in progress, ignoring.");
+    return;
+  }
+
+  auto mgmt_hdr = reinterpret_cast<const wlan::MgmtFrameHeader*>(event->event_buf + kMgmtHdrOffset);
+
+  if (client_mac_ != mgmt_hdr->addr1) {
+    NXPF_WARN("Received management frame for unexpected client during authentication, ignoring.");
+    return;
+  }
+  if (ap_mac_ != mgmt_hdr->addr3) {
+    NXPF_WARN("Received management frame from unexpected AP during authentication, ignoring.");
+    return;
+  }
+
+  const uint8_t* payload = event->event_buf + kPayloadOffset;
+  const size_t payload_len = event->event_len - kPayloadOffset;
+  switch (mgmt_hdr->fc.subtype()) {
+    case kDisassociation: {
+      if (payload_len < sizeof(wlan::Disassociation)) {
+        NXPF_ERR("Invalid disassociation frame size %u < %zu", payload_len,
+                 sizeof(wlan::Disassociation));
+        return;
+      }
+      auto disassoc = reinterpret_cast<const wlan::Disassociation*>(payload);
+      NXPF_INFO("Disassociated during authentication, reason: %u", disassoc->reason_code);
+      OnSaeResponseLocked(nullptr, STATUS_CODE_SPURIOUS_DEAUTH_OR_DISASSOC);
+    } break;
+    case kAuthentication: {
+      if (payload_len < sizeof(wlan::Authentication)) {
+        NXPF_ERR("Invalid auth frame size %u < %zu", payload_len, sizeof(wlan::Authentication));
+        return;
+      }
+      auto auth = reinterpret_cast<const wlan::Authentication*>(payload);
+      NXPF_INFO("Received SAE auth frame (%d of 4)", auth->auth_txn_seq_number == 1 ? 2 : 4);
+
+      const uint8_t* trail = payload + sizeof(wlan::Authentication);
+      const size_t trail_size = payload_len - sizeof(wlan::Authentication);
+      ifc_->OnAuthFrame(mgmt_hdr->addr3.byte, auth, cpp20::span<const uint8_t>(trail, trail_size));
+    } break;
+    case kDeauthentication: {
+      if (payload_len < sizeof(wlan::Deauthentication)) {
+        NXPF_ERR("Invalid deauth frame size %u < %zu", payload_len, sizeof(wlan::Deauthentication));
+        return;
+      }
+      auto deauth = reinterpret_cast<const wlan::Deauthentication*>(payload);
+      NXPF_INFO("Deauthenticated during authentication, reason: %u", deauth->reason_code);
+      OnSaeResponseLocked(nullptr, STATUS_CODE_SPURIOUS_DEAUTH_OR_DISASSOC);
+    } break;
+    default:
+      NXPF_INFO("Unexpected management frame %u", mgmt_hdr->fc.subtype());
+      break;
+  }
+}
+
+void ClientConnection::OnSaeTimeout() {
+  std::lock_guard lock(mutex_);
+  OnSaeResponseLocked(nullptr, STATUS_CODE_JOIN_FAILURE);
+  CompleteConnection(StatusCode::kJoinFailure);
+}
+
+zx_status_t ClientConnection::InitiateSaeHandshake(const wlan_fullmac_connect_req_t* req) {
+  // The SAE handshake requires that we manually handle some management frames. Register to receive
+  // them here before the authentication process starts.
+  zx_status_t status = RegisterForMgmtFrames({wlan::ManagementSubtype::kAuthentication,
+                                              wlan::ManagementSubtype::kDeauthentication,
+                                              wlan::ManagementSubtype::kDisassociation});
+  if (status != ZX_OK) {
+    NXPF_ERR("Failed to register for mgmt frames: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  ifc_->InitiateSaeHandshake(req->selected_bss.bssid);
+  return ZX_OK;
+}
+
+zx_status_t ClientConnection::RegisterForMgmtFrames(
+    const std::vector<wlan::ManagementSubtype>& types) {
+  uint32_t subtype_mask = 0;
+  for (auto type : types) {
+    subtype_mask |= 1 << type;
+  }
+
+  IoctlRequest<mlan_ds_misc_cfg> request(
+      MLAN_IOCTL_MISC_CFG, MLAN_ACT_SET, bss_index_,
+      mlan_ds_misc_cfg{.sub_command = MLAN_OID_MISC_RX_MGMT_IND,
+                       .param{.mgmt_subtype_mask = subtype_mask}});
+
+  const IoctlStatus io_status = context_->ioctl_adapter_->IssueIoctlSync(&request);
+  if (io_status != IoctlStatus::Success) {
+    NXPF_ERR("Failed to register for management frames 0x%08x: %d", subtype_mask, io_status);
+    return ZX_ERR_INTERNAL;
+  }
+
+  return ZX_OK;
+}
+
+zx_status_t ClientConnection::RemainOnChannel(uint8_t channel) {
+  IoctlRequest<mlan_ds_radio_cfg> request(
+      MLAN_IOCTL_RADIO_CFG, MLAN_ACT_SET, bss_index_,
+      mlan_ds_radio_cfg{.sub_command = MLAN_OID_REMAIN_CHAN_CFG});
+  auto& remain = request.UserReq().param.remain_chan;
+
+  remain.channel = channel;
+  remain.bandcfg.chanBand = band_from_channel(channel);
+  remain.remain_period = kRemainOnChannelPeriodMillis;
+
+  IoctlStatus io_status = context_->ioctl_adapter_->IssueIoctlSync(&request);
+  if (io_status != IoctlStatus::Success) {
+    NXPF_ERR("Failed to remain on channel %u: %d", channel, io_status);
+    return ZX_ERR_IO;
+  }
+  return ZX_OK;
+}
+
+zx_status_t ClientConnection::CancelRemainOnChannel() {
+  IoctlRequest<mlan_ds_radio_cfg> request(
+      MLAN_IOCTL_RADIO_CFG, MLAN_ACT_SET, bss_index_,
+      mlan_ds_radio_cfg{.sub_command = MLAN_OID_REMAIN_CHAN_CFG});
+  auto& remain = request.UserReq().param.remain_chan;
+
+  remain.remove = true;
+
+  IoctlStatus io_status = context_->ioctl_adapter_->IssueIoctlSync(&request);
+  if (io_status != IoctlStatus::Success) {
+    NXPF_ERR("Failed to cancel remain on channel: %d", io_status);
+    return ZX_ERR_IO;
+  }
+  return ZX_OK;
 }
 
 zx_status_t ClientConnection::GetRsnCipherSuites(const uint8_t* ies, size_t ies_count,

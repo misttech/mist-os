@@ -14,6 +14,7 @@
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/client_connection.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/mock-function/mock-function.h>
 #include <lib/sync/completion.h>
 #include <netinet/ether.h>
 
@@ -29,6 +30,7 @@
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/key_ring.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/test/mlan_mocks.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/test/mock_bus.h"
+#include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/test/test_data_plane.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
@@ -82,9 +84,21 @@ struct TestDevice : public Device {
   wlan::nxpfmac::MockBus bus_;
 };
 
-class TestClientConnectionIfc : public ClientConnectionIfc {
+struct TestClientConnectionIfc : public ClientConnectionIfc {
   void OnDisconnectEvent(uint16_t reason_code) override {}
   void SignalQualityIndication(int8_t rssi, int8_t snr) override {}
+  void InitiateSaeHandshake(const uint8_t *peer_addr) override {
+    initiate_sae_handshake_.Call(peer_addr);
+  }
+  void OnAuthFrame(const uint8_t *peer_addr, const wlan::Authentication *auth,
+                   cpp20::span<const uint8_t> trailing_data) override {}
+
+  mock_function::MockFunction<void, const uint8_t *> initiate_sae_handshake_;
+};
+
+struct TestDataPlaneIfc : public wlan::nxpfmac::DataPlaneIfc {
+  void OnEapolTransmitted(wlan::drivers::components::Frame &&frame, zx_status_t status) override {}
+  void OnEapolReceived(wlan::drivers::components::Frame &&frame) override {}
 };
 
 struct ClientConnectionTest : public zxtest::Test {
@@ -98,10 +112,13 @@ struct ClientConnectionTest : public zxtest::Test {
     parent_ = MockDevice::FakeRootParent();
     ASSERT_OK(TestDevice::Create(parent_.get(), env_.GetDispatcher(), &device_destructed_,
                                  &test_device_));
+    ASSERT_OK(wlan::nxpfmac::TestDataPlane::Create(&data_plane_ifc_, &mock_bus_,
+                                                   mocks_.GetAdapter(), &test_data_plane_));
 
     context_ = wlan::nxpfmac::DeviceContext{.device_ = test_device_,
                                             .event_handler_ = &event_handler_,
-                                            .ioctl_adapter_ = ioctl_adapter_.get()};
+                                            .ioctl_adapter_ = ioctl_adapter_.get(),
+                                            .data_plane_ = test_data_plane_->GetDataPlane()};
   }
 
   void TearDown() override {
@@ -155,6 +172,8 @@ struct ClientConnectionTest : public zxtest::Test {
   wlan::nxpfmac::DeviceContext context_;
   std::unique_ptr<wlan::nxpfmac::IoctlAdapter> ioctl_adapter_;
   std::unique_ptr<wlan::nxpfmac::KeyRing> key_ring_;
+  TestDataPlaneIfc data_plane_ifc_;
+  std::unique_ptr<wlan::nxpfmac::TestDataPlane> test_data_plane_;
   TestClientConnectionIfc test_ifc_;
   sync_completion_t device_destructed_;
   std::shared_ptr<MockDevice> parent_;
@@ -183,6 +202,9 @@ TEST_F(ClientConnectionTest, Connect) {
       ind_rssi = rssi;
       ind_snr = snr;
     }
+    void InitiateSaeHandshake(const uint8_t *peer_addr) override {}
+    void OnAuthFrame(const uint8_t *peer_addr, const wlan::Authentication *auth,
+                     cpp20::span<const uint8_t> trailing_data) override {}
 
    public:
     int8_t get_ind_rssi() { return ind_rssi; }
@@ -530,6 +552,134 @@ TEST_F(ClientConnectionTest, DisconnectWhileDisconnectInProgress) {
   // connection can be destroyed.
   sync_completion_wait(&disconnect_request_received, ZX_TIME_INFINITE);
   ioctl_adapter_->OnIoctlComplete(disconnect_request, wlan::nxpfmac::IoctlStatus::Success);
+}
+
+TEST_F(ClientConnectionTest, InitiateSaeHandshake) {
+  // Test that if a WPA3/SAE connect call is made then the connection will request a handshake.
+
+  // Create a request with a specific BSSID and SAE auth method, this should trigger the SAE
+  // handshake request.
+  const wlan_fullmac_connect_req_t req{
+      .selected_bss = {.bssid{0x01, 0x02, 0x03, 0x04, 0x05, 0x06}},
+      .auth_type = WLAN_AUTH_TYPE_SAE,
+  };
+
+  test_ifc_.initiate_sae_handshake_.ExpectCall(req.selected_bss.bssid);
+
+  ClientConnection connection(&test_ifc_, &context_, key_ring_.get(), kTestBssIndex);
+
+  ASSERT_OK(connection.Connect(&req, [](ClientConnection::StatusCode, const uint8_t *, size_t) {}));
+
+  test_ifc_.initiate_sae_handshake_.VerifyAndClear();
+}
+
+TEST_F(ClientConnectionTest, TransmitAuthFrame) {
+  // Test that calling TransmitAuthFrame works
+
+  constexpr uint8_t kChannel = 10;
+
+  struct AuthFrame {
+    uint32_t type;
+    uint32_t tx_ctrl;
+    uint16_t len;
+    IEEE80211_MGMT mgmt;
+  } __PACKED;
+
+  std::vector<pmlan_buffer> sent_buffers;
+
+  mocks_.SetOnMlanSendPacket([&](t_void *, pmlan_buffer buffer) -> mlan_status {
+    sent_buffers.push_back(buffer);
+    return MLAN_STATUS_PENDING;
+  });
+
+  std::optional<uint8_t> remain_on_channel;
+  std::optional<uint32_t> subtype_mask;
+  mocks_.SetOnMlanIoctl([&](t_void *, pmlan_ioctl_req req) -> mlan_status {
+    if (req->action == MLAN_ACT_SET && req->req_id == MLAN_IOCTL_RADIO_CFG) {
+      auto radio_cfg = reinterpret_cast<const mlan_ds_radio_cfg *>(req->pbuf);
+      if (radio_cfg->sub_command == MLAN_OID_REMAIN_CHAN_CFG) {
+        remain_on_channel = radio_cfg->param.remain_chan.channel;
+        return MLAN_STATUS_SUCCESS;
+      }
+    } else if (req->action == MLAN_ACT_SET && req->req_id == MLAN_IOCTL_MISC_CFG) {
+      auto misc_cfg = reinterpret_cast<const mlan_ds_misc_cfg *>(req->pbuf);
+      if (misc_cfg->sub_command == MLAN_OID_MISC_RX_MGMT_IND) {
+        subtype_mask = misc_cfg->param.mgmt_subtype_mask;
+        return MLAN_STATUS_SUCCESS;
+      }
+    } else if (req->action == MLAN_ACT_SET && req->req_id == MLAN_IOCTL_SEC_CFG) {
+      auto sec_cfg = reinterpret_cast<const mlan_ds_sec_cfg *>(req->pbuf);
+      if (sec_cfg->sub_command == MLAN_OID_SEC_CFG_ENCRYPT_KEY) {
+        // Destroying the test fixture destroys the key ring, which in turn removes all keys. Allow
+        // that ioctl to succeed.
+        return MLAN_STATUS_SUCCESS;
+      }
+    }
+    ADD_FAILURE("Unexpected ioctl 0x%x", req->req_id);
+    return MLAN_STATUS_FAILURE;
+  });
+
+  ClientConnection connection(&test_ifc_, &context_, key_ring_.get(), kTestBssIndex);
+
+  // We need to connect first, there has to be a stored connection request for the auth frame
+  // transmission to work and the connection has to be in the correct state.
+  const wlan_fullmac_connect_req_t req{
+      .selected_bss = {.bssid{0x01, 0x02, 0x03, 0x04, 0x05, 0x06}, .channel{.primary = kChannel}},
+      .auth_type = WLAN_AUTH_TYPE_SAE,
+  };
+
+  test_ifc_.initiate_sae_handshake_.ExpectCall(req.selected_bss.bssid);
+  ASSERT_OK(connection.Connect(&req, [](ClientConnection::StatusCode, const uint8_t *, size_t) {}));
+  test_ifc_.initiate_sae_handshake_.VerifyAndClear();
+
+  // Initiating an SAE connection sould register for auth,deauth,disassoc management frames
+  ASSERT_TRUE(subtype_mask.has_value());
+  constexpr uint32_t kExpectedSubtypeMask = (1 << wlan::ManagementSubtype::kAuthentication) |
+                                            (1 << wlan::ManagementSubtype::kDeauthentication) |
+                                            (1 << wlan::ManagementSubtype::kDisassociation);
+  EXPECT_EQ(kExpectedSubtypeMask, subtype_mask.value());
+
+  const uint8_t source[ETH_ALEN] = {1, 2, 3, 4, 5, 6};
+  const uint8_t dest[ETH_ALEN]{11, 12, 13, 14, 15, 16};
+
+  constexpr uint16_t kSequence = 1;
+  constexpr uint16_t kStatusCode = STATUS_CODE_SUCCESS;
+  constexpr uint8_t kSaeFields[] = {20, 21, 22, 23, 24, 25, 26, 27, 28, 19};
+
+  ASSERT_OK(connection.TransmitAuthFrame(source, dest, kSequence, kStatusCode,
+                                         cpp20::span<const uint8_t>(kSaeFields)));
+
+  ASSERT_EQ(1u, sent_buffers.size());
+
+  // Because IEEE80211_MGMT contains a union of all possible frame types we need to do some trickery
+  // to figure out the size here.
+  constexpr size_t kMinimumSize = offsetof(AuthFrame, mgmt) + offsetof(IEEE80211_MGMT, u) +
+                                  sizeof(IEEEtypes_Auth_framebody) + sizeof(kSaeFields);
+
+  pmlan_buffer buffer = sent_buffers[0];
+  ASSERT_GE(buffer->data_len, kMinimumSize);
+  auto auth = reinterpret_cast<const AuthFrame *>(buffer->pbuf + buffer->data_offset);
+
+  EXPECT_EQ(PKT_TYPE_MGMT_FRAME, auth->type);
+  // Should be an auth frame
+  EXPECT_EQ(wlan::kManagement | (wlan::kAuthentication << 4), auth->mgmt.frame_control);
+  EXPECT_BYTES_EQ(source, auth->mgmt.sa, ETH_ALEN);
+  EXPECT_BYTES_EQ(dest, auth->mgmt.da, ETH_ALEN);
+  EXPECT_BYTES_EQ(dest, auth->mgmt.bssid, ETH_ALEN);
+  // Addr4 is expected to be the broadcast MAC address.
+  EXPECT_BYTES_EQ("\xFF\xFF\xFF\xFF\xFF\xFF", auth->mgmt.addr4, ETH_ALEN);
+
+  EXPECT_EQ(wlan::kSae, auth->mgmt.u.auth.auth_alg);
+  EXPECT_EQ(kStatusCode, auth->mgmt.u.auth.status_code);
+  EXPECT_EQ(kSequence, auth->mgmt.u.auth.auth_transaction);
+
+  EXPECT_EQ(MLAN_BUF_TYPE_RAW_DATA, buffer->buf_type);
+
+  EXPECT_BYTES_EQ(kSaeFields, auth->mgmt.u.auth.variable, sizeof(kSaeFields));
+
+  // Sending the frame should have sent a remain on channel ioctl.
+  ASSERT_TRUE(remain_on_channel.has_value());
+  EXPECT_EQ(kChannel, remain_on_channel.value());
 }
 
 }  // namespace
