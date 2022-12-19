@@ -66,7 +66,7 @@ With a running device available, run `ffx log --help` to see the options for mod
 
 #### `fx test`
 
-Under the hood, `fx test` calls `run-test-component`, which collects isolated `stdout`, `stderr`, and
+Under the hood, `fx test` calls `run-test-suite`, which collects isolated `stdout`, `stderr`, and
 `LogSink` connections from test components, printing the output inline and preventing them showing
 up in the global log buffers.
 
@@ -135,7 +135,7 @@ UI".
 
 For individual test executables botanist invokes [testrunner] and collects that output separately.
 It is this output that can be seen after a failing test, with a link named `stdio`. Most tests that
-testrunner invokes run `run-test-component` via SSH to the target device. This collects the
+testrunner invokes run `run-test-suite` via SSH to the target device. This collects the
 stdout, stderr, and logs from the test environment and prints them inline.
 
 ### syslog.txt

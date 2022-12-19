@@ -15,7 +15,7 @@ fx test <TEST_NAME>
 
 If `TEST_NAME` is a test component, `fx test` connects to your Fuchsia device to
 load and run the test component. That is, the command finds the component's
-corresponding [component URI][component-uri] and calls `run-test-component` on
+corresponding [component URI][component-uri] and calls `run-test-suite` on
 the target device. However, if `TEST_NAME` is a host test, `fx test` directly
 invokes that test binary to run on the host machine.
 
@@ -49,9 +49,9 @@ to include several of the primary testing bundles, build Fuchsia, and then run
 all tests in the build. For example:
 
 ```none
-$ fx set core.x64 --with //bundles/tools,//bundles:tests
-$ fx build
-$ fx test
+fx set core.x64 --with //bundles/tools,//bundles:tests
+fx build
+fx test
 ```
 
 You can also provide multiple targets in a single invocation:
@@ -73,25 +73,17 @@ many test components in a single command, this option may not be ideal.
 The following example passes a `timeout` flag to a test:
 
 ```none
-$ fx test <TEST_NAME> -- --timeout=5
-```
-
-For example, the command above internally calls the following command on the
-device:
-
-```none
-$ fx shell run-test-component <TEST_COMPONENT_URI> -- --timeout=5
-$ fx shell run-test-suite <TEST_COMPONENT_URI> -- --timeout=5
+fx test <TEST_NAME> -- --timeout=5
 ```
 
 ## Specify a test in multiple ways {#specify-a-test-in-multiple-ways}
 
 `fx test` supports multiple ways to reference a specific test:
 
-*   [Host test path](#host-test-path)
-*   [Package URL](#package-url)
-*   [Package name](#package-name)
-*   [Component name](#component-name)
+* [Host test path](#host-test-path)
+* [Package URL](#package-url)
+* [Package name](#package-name)
+* [Component name](#component-name)
 
 ### Host test path {#host-test-path}
 
@@ -166,51 +158,17 @@ To run a component on a specific package, use both `-p <PACKAGE_NAME>` and `-c
 fx test -p my_example_test_pkg -c my_example_test
 ```
 
-## Convert from run-test or run-host-tests {#convert-from-run-test-or-run-host-tests}
+## Convert from run-host-tests {#convert-from-run-host-tests}
 
-The `fx run-test`, `fx run-host-tests` and `fx run-e2e-tests` commands are being
+The `fx run-host-tests` and `fx run-e2e-tests` commands are being
 deprecated in favor of `fx test`. See the following instructions on how to use
 `fx test` in place of these commands:
 
-*   [run-test](#run-test)
-*   [run-host-tests](#run-host-tests)
-*   [run-e2e-tests](#run-e2e-tests)
+* [run-host-tests](#run-host-tests)
+* [run-e2e-tests](#run-e2e-tests)
 
-### run-test {#run-test}
-
-Substitute `fx run-test` with `fx test`.
-
-From:
-
-```posix-terminal
-fx run-test <TEST_PACKAGE_NAME>
-```
-
-To:
-
-```posix-terminal
-fx test <TEST_PACKAGE_NAME>
-```
-
-#### The -t flag
-
-With `run-test`, you were able to use the `-t` flag to specify a single test
-component to run. For example:
-
-```posix-terminal
-fx run-test <PACKAGE_NAME> -t <NESTED_COMPONENT_NAME>
-```
-
-With `fx test`, this command becomes:
-
-```posix-terminal
-fx test -p <PACKAGE_NAME> -c <NESTED_COMPONENT_NAME>
-```
-
-If there are no name collisions for the test component, you can simply run:
-
-```posix-terminal
 fx test <NESTED_COMPONENT_NAME>
+
 ```
 
 ### run-host-tests {#run-host-tests}
@@ -270,7 +228,6 @@ require rebuilding that test's package as well.
 [tests-as-components]: /docs/development/testing/components/README.md
 [scripting-layer-for-fuchsia]: /docs/development/drivers/concepts/driver_development/sl4f.md
 [component-uri]: /docs/reference/components/url.md
-[rust-glob-syntax]: https://docs.rs/glob/0.3.0/glob/struct.Pattern.html
 [fuchsia-package-name]: /docs/concepts/packages/package_url.md#package-name
 [resource-path]: /docs/concepts/packages/package_url.md#resource-paths
 [fx-test-flags]: https://fuchsia.dev/reference/tools/fx/cmd/test

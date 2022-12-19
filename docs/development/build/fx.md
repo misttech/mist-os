@@ -184,8 +184,8 @@ following bundles:
   programs, changing audio volume, and so on. The core product includes
   `bundles:tools` in the universe package set by default.
 * `//bundles:tests` causes all test programs to be built. Most test programs
-  can be invoked using `run-test-component` on the device, or via
-  `fx run-test`.
+  can be invoked using `run-test-suite` on the device, or via
+  `fx test`.
 * `//bundles:kitchen_sink` is a target that causes all other build targets to be
   included. It is useful when testing the impact of core changes, or when
   making large scale changes in the code base. It also may be a fun
@@ -419,9 +419,8 @@ software stack.
 The Fuchsia codebase contains many tests. Most of these tests are themselves
 components and can be launched on the target device in the same way as other
 components. On the target device, some programs also assist with test-specific
-concerns for component launching, such as `runtests` and
-`/bin/run-test-component`. The process can also conveniently be controlled
-from the development host by way of `fx test`. See
+concerns for component launching, such as `run-test-suite`. The process can also
+conveniently be controlled from the development host by way of `fx test`. See
 [Run Fuchsia tests][executing-tests] for more details.
 
 Some users find that an effective high focus workflow is to have the system
