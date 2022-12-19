@@ -36,7 +36,7 @@ class MmapLoader {
   // until destruction of the MmapLoader object. Use Commit() to keep loaded pages mapped.
   // Logically, Commit() isn't sensible after Load has failed.
   template <class Diagnostics, class LoadInfo>
-  bool Load(Diagnostics& diag, const LoadInfo& load_info, int fd) {
+  [[nodiscard]] bool Load(Diagnostics& diag, const LoadInfo& load_info, int fd) {
     // Make a mapping large enough to fit all segments. This mapping will be placed wherever the OS
     // wants, achieving ASLR. We will later map the segments at their specified offsets into this
     // mapping. PROT_NONE is important so that any holes in the layout of the binary will trap if
