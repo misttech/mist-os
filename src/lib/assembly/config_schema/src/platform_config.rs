@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod development_support_config;
 pub mod identity_config;
 pub mod input_config;
 
@@ -44,8 +45,12 @@ pub struct PlatformConfig {
     #[serde(default)]
     pub input: input_config::PlatformInputConfig,
 
-    /// Platform configuration options for the SWD subsystem
+    /// Platform configuration options for the SWD subsystem.
     pub software_delivery: Option<crate::swd_config::SwdConfig>,
+
+    /// Platform configuration options for enabling developer support.
+    #[serde(default)]
+    pub development_support: Option<development_support_config::DevelopmentSupportConfig>,
 }
 
 /// The platform's base service level.
