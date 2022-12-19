@@ -10,7 +10,7 @@
 # should be moved to a higher-level product definition.
 
 import("//build/security/policies.gni")
-import("//products/bringup.gni")
+import("//products/common/bringup.gni")
 
 # Minimal, and all products based on it, use the "standard" assembled_system()
 # impl in `//build/images/fuchsia`
@@ -18,8 +18,6 @@ use_bringup_assembly = false
 bootfs_only = false
 
 # Kernel command line arguments.
-product_bootfs_labels -=
-    [ "//products/kernel_cmdline:kernel.oom.behavior--jobkill" ]
 product_bootfs_labels += [ "//products/kernel_cmdline:minimal" ]
 
 core_realm_package_name = "core-minimal"
@@ -118,11 +116,6 @@ legacy_base_package_labels += [
 product_bootfs_labels += [
   # Core products have pkgfs, so include the base resolver.
   "//src/sys/base-resolver:bootfs",
-]
-
-product_bootfs_labels -= [
-  # Remove diagnostics tooling (iquery).
-  "//bundles:diagnostics-eng",
 ]
 
 # Set the SWD policy for core.gni, details can be found in
