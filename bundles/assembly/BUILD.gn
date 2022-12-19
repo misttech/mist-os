@@ -11,42 +11,37 @@ assert(is_fuchsia,
 group("assembly") {
   testonly = true
   deps = [
-    # The non-testonly assembly bundles
-    ":eng_and_userdebug",
-    ":prod_only",
+    ###
+    # The common platform bundles
 
-    # The testonly assembly bundles
+    # bringup feature-set-level:
+    ":common_bringup",
+
+    # minimal feature-set-level:
+    ":common_minimal",
     ":common_minimal_eng",
     ":common_minimal_userdebug",
 
-    # Feature-support and configuration bundles
-    ":swd_bundles",
+    # Emulator Support
+    ":emulator_support",
+
+    ###
+    # Feature-level / Subsystem-level bundles
+
+    # SWD (Software Delivery)
+    ":system-update-checker",
+    ":omaha-client",
   ]
 }
 
-# This group is used to easily get the set of production (non-testonly) platform
-# assembly input bundles.
+# This group is temporarily used to publish the non-eng assembly bundles to the
+# generated_assembly_inputs() template.
 group("prod_only") {
   testonly = false
   deps = [
     ":common_bringup",
     ":common_minimal",
     ":emulator_support",
-  ]
-}
-
-# This group is used to easily get the set of production (non-testonly) platform
-# assembly input bundles.
-group("eng_and_userdebug") {
-  testonly = false
-  deps = [ ":common_minimal_userdebug" ]
-}
-
-group("swd_bundles") {
-  testonly = false
-  deps = [
-    ":omaha-client",
-    ":system-update-checker",
   ]
 }
 
@@ -171,6 +166,7 @@ assembly_input_bundle("emulator_support") {
 }
 
 assembly_input_bundle("system-update-checker") {
+  testonly = true
 }
 
 assembly_input_bundle("omaha-client") {

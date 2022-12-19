@@ -364,19 +364,25 @@ template("assembled_system") {
     compare_command_logs = "${namespace}.compare_command_logs"
     compare_images_manifests = "${namespace}.compare_images_manifests"
 
-    # The names of all of the platform's Assembly Input Bundles
+    # The names of all of the platform's 'testonly=false' Assembly Input Bundles
     _platform_aib_names = [
       "common_bringup",
       "common_minimal",
-      "emulator_support",
       "common_minimal_userdebug",
-      "system-update-checker",
+      "emulator_support",
       "omaha-client",
     ]
+
+    # The names of all of the platform's 'testonly=true' Assembly Input Bundles
+    _eng_platform_aib_names = [
+      "common_minimal_eng",
+      "system-update-checker",
+    ]
+
     if (defined(invoker.allow_eng_platform_bundle_use) &&
         invoker.allow_eng_platform_bundle_use) {
       # Add the "eng" mode platform Assembly Input Bundles to the set of inputs
-      _platform_aib_names += [ "common_minimal_eng" ]
+      _platform_aib_names += _eng_platform_aib_names
     }
 
     # Add platform AIBs, by their names:
