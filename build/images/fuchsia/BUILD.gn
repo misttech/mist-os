@@ -161,8 +161,10 @@ if (is_fuchsia) {
       "//:developer_base_driver_packages",
       "//:developer_base_packages",
       "//:legacy_base_packages",
-      ":core_realm",
     ]
+
+    core_realm_definition = ":core_realm"
+    core_package_name = core_realm_package_name
 
     # Include the product-defined meta package labels.
     meta_packages = meta_package_labels
@@ -260,8 +262,7 @@ if (is_fuchsia) {
     }
   }
 
-  core_realm("core_realm") {
-    package_name = core_realm_package_name
+  core_realm_definition("core_realm") {
     deps = core_realm_shards + board_core_realm_shards +
            fuchsia_base.extra_core_realm_shards
     restrict_persistent_storage = core_realm_restrict_persistent_storage

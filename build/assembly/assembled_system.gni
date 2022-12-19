@@ -851,6 +851,8 @@ template("assembled_system") {
                            [
                              "testonly",
                              "visibility",
+                             "core_package_name",
+                             "core_realm_definition",
                            ])
     image_assembly_label = ":${namespace}"
     bundles_dir = files.outdir

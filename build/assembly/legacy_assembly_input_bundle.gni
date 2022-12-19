@@ -42,10 +42,8 @@ import("//build/python/python_action.gni")
 #   core_realm_definition [optional]
 #     [label] The GN label of a `core_realm_definition()` template
 #
-#   core_realm_includes [optional]
-#     [list of labels] List of labels to walk for the shard_includes metadata
-#     that specifies cml files included by the core component cml. These
-#     files will be included in the Assembly Input Bundle.
+#   core_package_name [optional; default: "core"]
+#     [string] Name of the core package
 #
 template("legacy_assembly_input_bundle") {
   # TODO:  Switch this over to using the `assembly_input_bundle()` template when
@@ -91,10 +89,6 @@ template("legacy_assembly_input_bundle") {
   _core_realm_definition = false
   if (defined(invoker.core_realm_definition)) {
     _core_realm_definition = invoker.core_realm_definition
-    _core_realm_includes = []
-    if (defined(invoker.core_realm_includes)) {
-      _core_realm_includes = invoker.core_realm_includes
-    }
   }
 
   labels = {
@@ -210,6 +204,25 @@ template("legacy_assembly_input_bundle") {
   }
 
   if (_core_realm_definition != false) {
+    # Legacy list of includes used by core realm shards.
+    core_shard_includes = [
+      "//src/sys/core/meta/svc_for_sys.core_shard.cml",
+      "//src/sys/core/meta/core_proxy.core_shard.cml",
+      "//src/intl/intl_services/meta/intl.core_shard.base.cml",
+      "//src/media/audio/audio_core/meta/audio_core.core_shard.base.cml",
+      "//src/settings/service/meta/setui_service_base.core_shard.cml",
+      "//src/testing/sl4f/meta/sl4f.core_shard.cml",
+
+      # Required for workstation
+      "//src/connectivity/bluetooth/profiles/bt-a2dp/meta/bt-a2dp-common.core_shard.cml",
+      "//src/session/bin/session_manager/meta/optional_capabilities.core_shard.cml",
+      "//src/session/bin/session_manager/meta/required_capabilities.core_shard.cml",
+      "//src/session/bin/session_manager/meta/terminal_capabilities.core_shard.cml",
+      "//src/ui/meta/ui_routes_base.shard.cml",
+      "//src/session/bin/session_manager/meta/session.smart.from_platform.core_shard.cml",
+      "//src/security/bin/tee_manager/meta/tee_manager.core_shard.base.cml",
+    ]
+
     # Include the default core cml in the legacy AIB
     group(labels.core_realm_main_cml) {
       forward_variables_from(invoker, [ "testonly" ])
@@ -249,30 +262,29 @@ template("legacy_assembly_input_bundle") {
       metadata = {
         shard_includes = [
           {
-            source =
-                rebase_path("//src/sys/core/meta/svc_for_sys.core_shard.cml",
-                            root_build_dir)
-            destination = "src/sys/core/meta/svc_for_sys.core_shard.cml"
-          },
-          {
-            source =
-                rebase_path("//src/sys/core/meta/core_proxy.core_shard.cml",
-                            root_build_dir)
-            destination = "src/sys/core/meta/core_proxy.core_shard.cml"
-          },
-
-          #TODO(115630): Add the sdk directory to the include paths
-          {
+            #TODO(115630): Add the sdk directory to the include paths
             source = rebase_path("//sdk/lib/syslog/offer.shard.cml")
             destination = "syslog/offer.shard.cml"
           },
         ]
+
+        foreach(core_shard_include, core_shard_includes) {
+          shard_includes += [
+            {
+              source = rebase_path(core_shard_include, root_build_dir)
+              destination = rebase_path(core_shard_include, "//")
+            },
+          ]
+        }
       }
     }
 
     generated_file(labels.core_realm_includes) {
       forward_variables_from(invoker, [ "testonly" ])
-      deps = _core_realm_includes + [ ":${labels.core_realm_default_includes}" ]
+      deps = [
+        ":${labels.core_realm_default_includes}",
+        "${_core_realm_definition}",
+      ]
       data_keys = [ "shard_includes" ]
       outputs = [ "${files.core_realm_includes}" ]
       output_conversion = "json"
@@ -368,6 +380,14 @@ template("legacy_assembly_input_bundle") {
         "--core-package-contents-list",
         rebase_path(files.core_realm_proxy_manifest, root_build_dir),
       ]
+
+      if (defined(invoker.core_package_name)) {
+        args += [
+          "--core-package-name",
+          invoker.core_package_name,
+        ]
+      }
+
       inputs += [
         files.core_realm_shards_list,
         files.core_realm_includes,

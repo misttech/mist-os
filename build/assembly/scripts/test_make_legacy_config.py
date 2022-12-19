@@ -157,12 +157,17 @@ class MakeLegacyConfig(unittest.TestCase):
             # Create the outdir path, and perform the "copying" into the
             # AssemblyInputBundle.
             aib, _, deps = make_legacy_config.copy_to_assembly_input_bundle(
-                image_assembly, [],
-                OUTDIR, [driver_manifest_path], [driver_component_file],
-                shell_commands_file, [
+                legacy=image_assembly,
+                config_data_entries=[],
+                outdir=OUTDIR,
+                base_driver_packages_list=[driver_manifest_path],
+                base_driver_components_files_list=[driver_component_file],
+                shell_commands=shell_commands_file,
+                core_realm_shards=[
                     os.path.join(SOURCE_DIR, "core/realm.cml"),
                     os.path.join(SOURCE_DIR, "core/realm/shard.cml")
-                ], [
+                ],
+                core_realm_includes=[
                     FileEntry(
                         os.path.join(SOURCE_DIR, "src/include.cml"),
                         "src/include.cml")
@@ -171,7 +176,10 @@ class MakeLegacyConfig(unittest.TestCase):
                     FileEntry(
                         os.path.join(SOURCE_DIR, "some/core/package/file"),
                         "core/package/file/destination")
-                ])
+                ],
+                core_package_name="core")
+            file_paths = aib.all_file_paths()
+
             # Validate the contents of the AssemblyInputBundle itself
             self.assertEqual(
                 aib.base, set(["packages/base/base_a", "packages/base/base_b"]))
@@ -456,6 +464,43 @@ class MakeLegacyConfig(unittest.TestCase):
                             destination='outdir/bootfs/another/file'),
                     ]))
 
+            # Validate that the output manifest will have the right file paths
+            self.assertEqual(
+                sorted(file_paths), [
+                    'blobs/0cdbf3e4f1246ce7522e78c21bcf1c3aef2d41ac2b4de3f0ee98fc6273f62eb9',
+                    'blobs/0f32059964674afd810001c76c2a5d783a2ce012c41303685ec1adfdb83290fd',
+                    'blobs/1834109a42a5ff6501fbe05216475b2b0acc44e0d9c94924469a485d6f45dc86',
+                    'blobs/301e8584305e63f0b764daf52dcf312eecb6378b201663fcc77d7ad68aab1f23',
+                    'blobs/38b7b79ef8e827ea8d283d4e01d61563a8feeecf95650f224c047502ea1edb4b',
+                    'blobs/6468d9d6761c8afcc97744dfd9e066f29bb697a9a0c8248b5e6eec989134a048',
+                    'blobs/8135016519df51d386efaea9b02f50cb454b6c7afe69c77895c1d4d844c3584d',
+                    'blobs/8ca898b1389c58b6cd9a6a777e320f2756ab3437b402c61d774dd2758ad9cf06',
+                    'blobs/a2e574ccd55c815f0a87c4f27e7a3115fe8e46d41a2e0caf2a91096a41421f78',
+                    'blobs/ae9fd81e1c2fd1b084ec2c362737e812c5ef9b3aa8cb0538ec8e2269ea7fbe1a',
+                    'blobs/b548948fd2dc40574775308a92a8330e5c5d84ddf31513d1fe69964b458479e7',
+                    'blobs/bf0c3ae1356b5863258f73a37d555cf878007b8bfe4fd780d74466ec62fe062d',
+                    'blobs/c244c7c6ebf40a9a4c9d59e7b08a1cf54ae3d60404d1cecb417a7b55cc308d91',
+                    'blobs/d3cd38c4881c3bc31f1e2e397a548d431a6430299785446f28be10cc5b76d92b',
+                    'blobs/d66cb673257e25393a319fb2c3e9745ef6e0f1cfa4fb89c5576df73cd3eba586',
+                    'blobs/ef84c6711eaba482164fe4eb08a6c45f18fe62d493e5a31a631c32937bf7229d',
+                    'blobs/efac096092f7cf879c72ac51d23d9f142e97405dec7dd9c69aeee81de083f794',
+                    'blobs/f0601d51be1ec8c11d825b756841937706eb2805ce9b924b67b4b0dc14caba29',
+                    'blobs/fd0891d15ce65d7682f7437e441e917b8ed4bde4db07a11dc100104f25056051',
+                    'bootfs/another/file',
+                    'bootfs/some/file',
+                    'compiled_packages/core/component_shards/realm.cml',
+                    'compiled_packages/core/component_shards/shard.cml',
+                    'compiled_packages/core/files/core/package/file/destination',
+                    'compiled_packages/include/src/include.cml',
+                    'kernel/kernel.bin',
+                    'packages/base/base_a',
+                    'packages/base/base_b',
+                    'packages/cache/cache_a',
+                    'packages/cache/cache_b',
+                    'packages/system/system_a',
+                    'packages/system/system_b',
+                ])
+
     def test_package_found_in_base_and_cache(self):
         """
         Asserts that the copy_to_assembly_input_bundle function has the side effect of
@@ -482,7 +527,8 @@ class MakeLegacyConfig(unittest.TestCase):
 
             # Copies legacy config into AIB
             aib, _, _ = make_legacy_config.copy_to_assembly_input_bundle(
-                image_assembly, [], OUTDIR, [], [], dict(), set(), [], [])
+                image_assembly, [], OUTDIR, [], [], dict(), set(), [], [],
+                "core")
 
             # Asserts that the duplicate package is present in the base package set after
             # being copied to the AIB
@@ -523,7 +569,7 @@ class MakeLegacyConfig(unittest.TestCase):
                     {make_package_path(duplicate_package)}, list())
                 aib, _, _ = make_legacy_config.copy_to_assembly_input_bundle(
                     image_assembly, [], OUTDIR, [manifest_path], [], dict(),
-                    set(), [], [])
+                    set(), [], [], "core")
 
             self.assertNotIn(make_package_path(duplicate_package), aib.base)
             self.assertIn(
@@ -571,4 +617,5 @@ class MakeLegacyConfig(unittest.TestCase):
                 DuplicatePackageException,
                 partial(
                     make_legacy_config.copy_to_assembly_input_bundle,
-                    image_assembly, [], OUTDIR, [], [], dict(), set(), [], []))
+                    image_assembly, [], OUTDIR, [], [], dict(), set(), [], [],
+                    "core"))

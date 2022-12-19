@@ -70,7 +70,7 @@ class CompiledPackageMainDefinition:
     # Other files to include in the compiled package
     contents: Set[FileEntry] = field(default_factory=set)
     # CML files included by the component cml
-    includes: Set[FileEntry] = field(default_factory=set)
+    includes: Set[FilePath] = field(default_factory=set)
 
 
 @dataclass
@@ -270,7 +270,7 @@ class AssemblyInputBundle(ImageAssemblyConfig):
             if isinstance(package, CompiledPackageMainDefinition):
                 file_paths.extend(package.includes)
                 file_paths.extend(package.components.values())
-                file_paths.extend(package.contents)
+                file_paths.extend([entry.source for entry in package.contents])
             if isinstance(package, CompiledPackageAdditionalShards):
                 file_paths.extend(
                     [

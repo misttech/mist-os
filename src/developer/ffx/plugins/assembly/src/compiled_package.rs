@@ -105,6 +105,7 @@ impl CompiledPackageBuilder {
         let main_definition = self.main_definition.as_ref().context("no main definition")?;
 
         let mut package_builder = PackageBuilder::new(&self.name);
+        package_builder.repository("fuchsia.com");
 
         for (component_name, cml) in &main_definition.components {
             let mut component_builder = ComponentBuilder::new(component_name);
