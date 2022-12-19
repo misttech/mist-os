@@ -2581,7 +2581,7 @@ mod tests {
     }
 
     /// Make sure that a new DHCPv6 client was requested, and verify its parameters.
-    async fn check_new_client(
+    async fn check_new_dhcpv6_client(
         server: &mut fnet_dhcpv6::ClientProviderRequestStream,
         id: u64,
         sockaddr: fnet::Ipv6SocketAddress,
@@ -2660,7 +2660,7 @@ mod tests {
             .await
             .context("error handling interface added event with interface up and sockaddr1")
             .map_err::<anyhow::Error, _>(Into::into)?;
-        let _: fnet_dhcpv6::ClientRequestStream = check_new_client(
+        let _: fnet_dhcpv6::ClientRequestStream = check_new_dhcpv6_client(
             &mut dhcpv6_client_provider,
             INTERFACE_ID,
             LINK_LOCAL_SOCKADDR1,
@@ -2699,7 +2699,7 @@ mod tests {
         )
         .await
         .context("error handling interface changed event with sockaddr1 removed")?;
-        let _: fnet_dhcpv6::ClientRequestStream = check_new_client(
+        let _: fnet_dhcpv6::ClientRequestStream = check_new_dhcpv6_client(
             &mut dhcpv6_client_provider,
             INTERFACE_ID,
             LINK_LOCAL_SOCKADDR1,
@@ -2803,7 +2803,7 @@ mod tests {
             .await
             .context("error handling interface added event with interface up and sockaddr1")
             .map_err::<anyhow::Error, _>(Into::into)?;
-        let mut client_server = check_new_client(
+        let mut client_server = check_new_dhcpv6_client(
             &mut servers.dhcpv6_client_provider,
             INTERFACE_ID,
             LINK_LOCAL_SOCKADDR1,
@@ -2863,7 +2863,7 @@ mod tests {
         )
         .await
         .context("error handling netstack event with sockaddr2 added")?;
-        let mut client_server = check_new_client(
+        let mut client_server = check_new_dhcpv6_client(
             &mut servers.dhcpv6_client_provider,
             INTERFACE_ID,
             LINK_LOCAL_SOCKADDR2,
@@ -2900,7 +2900,7 @@ mod tests {
         )
         .await
         .context("error handling interface up event")?;
-        let mut client_server = check_new_client(
+        let mut client_server = check_new_dhcpv6_client(
             &mut servers.dhcpv6_client_provider,
             INTERFACE_ID,
             LINK_LOCAL_SOCKADDR2,
@@ -2930,7 +2930,7 @@ mod tests {
         .await
         .context("error handling client termination due to address change")?;
         assert_matches::assert_matches!(client_server.try_next().await, Ok(None));
-        let _client_server = check_new_client(
+        let _client_server: fnet_dhcpv6::ClientRequestStream = check_new_dhcpv6_client(
             &mut servers.dhcpv6_client_provider,
             INTERFACE_ID,
             LINK_LOCAL_SOCKADDR1,
@@ -2959,7 +2959,7 @@ mod tests {
         )
         .await
         .context("error handling interface change event with sockaddr2 replacing sockaddr1")?;
-        let mut client_server = check_new_client(
+        let mut client_server = check_new_dhcpv6_client(
             &mut servers.dhcpv6_client_provider,
             INTERFACE_ID,
             LINK_LOCAL_SOCKADDR2,
@@ -3127,7 +3127,7 @@ mod tests {
             let dhcpv6_client_request_stream = match kind {
                 InterfaceKind::Unowned | InterfaceKind::NonHost => None,
                 InterfaceKind::Host { upstream: _ } => {
-                    let request_stream = check_new_client(
+                    let request_stream = check_new_dhcpv6_client(
                         &mut dhcpv6_client_provider_request_stream,
                         id,
                         sockaddr,
@@ -3384,7 +3384,7 @@ mod tests {
                 .expect(&format!("error handling interface added event for {} with interface up and link-local addr", id));
 
             // Expect DHCPv6 client to have started with PD configuration.
-            let _ = check_new_client(
+            let _: fnet_dhcpv6::ClientRequestStream = check_new_dhcpv6_client(
                 &mut dhcpv6_client_provider_request_stream,
                 id,
                 sockaddr,
