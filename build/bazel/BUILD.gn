@@ -32,7 +32,7 @@ assert(
 # that this file is generated at `gn gen` time.
 #
 # Doing so allows breaking the testonly boundary, as required to allow
-# non-testonly bazel_build_action() targets to depend on
+# non-testonly bazel_action() targets to depend on
 # :generate_main_workspace below, without depending on this target.
 #
 bazel_inputs_manifest("legacy_ninja_build_outputs") {
@@ -45,7 +45,7 @@ bazel_inputs_manifest("legacy_ninja_build_outputs") {
   inputs_deps = gn_labels_for_bazel_inputs + extra_gn_labels_for_bazel_inputs
 }
 
-# Used by bazel_build_action() to only allow one concurrent `bazel build`
+# Used by bazel_action() to only allow one concurrent `bazel build`
 # action at a time during the build, since doing so modifies the workspace,
 # in particular the `bazel-bin` symlink that is used to copy the Bazel outputs
 # to the Ninja output directory.

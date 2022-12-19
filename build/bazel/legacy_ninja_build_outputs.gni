@@ -81,7 +81,8 @@ declare_args() {
   #      }
   #
   #      # Build the installer with Bazel.
-  #      bazel_build_action("build_installer") {
+  #      bazel_action("build_installer") {
+  #        command = "build"
   #        bazel_targets = "//vendor/acme/proprietary/installer"
   #        bazel_inputs = [ ":acme_firmware" ]
   #        bazel_outputs = [ "vendor/acme/proprietary/installer/installer" ]

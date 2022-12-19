@@ -1462,7 +1462,7 @@ group("package_archive") {
 #
 # Targets that need to depend on the Bazel workspace should instead depend
 # directly on //build/bazel:generate_main_workspace and other targets
-# instead (e.g. see the definition of `bazel_build_action()`).
+# instead (e.g. see the definition of `bazel_action()`).
 #
 if (current_toolchain == default_toolchain) {
   group("bazel_workspace") {

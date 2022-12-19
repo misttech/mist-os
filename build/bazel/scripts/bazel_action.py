@@ -3,7 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"Run a bazel build command from Ninja. See bazel_build_action() for details."
+"Run a Bazel command from Ninja. See bazel_action.gni for details."
 
 import argparse
 import errno
@@ -43,6 +43,10 @@ def main():
     parser.add_argument(
         '--workspace-dir', required=True, help='Bazel workspace path')
     parser.add_argument(
+        '--command',
+        required=True,
+        help='Bazel command, e.g. `build`, `run`, `test`')
+    parser.add_argument(
         '--inputs-manifest',
         help=
         'Path to the manifest file describing Ninja outputs as bazel inputs.')
@@ -55,7 +59,7 @@ def main():
         '--bazel-targets',
         action='append',
         default=[],
-        help='List of bazel target patterns to build.')
+        help='List of bazel target patterns.')
     parser.add_argument(
         '--bazel-outputs',
         default=[],
@@ -125,7 +129,7 @@ For more details, see the comments in //build/bazel/legacy_ninja_build_outputs.g
         return parser.error(
             'Bazel launcher does not exist: %s' % args.bazel_launcher)
 
-    cmd = [args.bazel_launcher, 'build']
+    cmd = [args.bazel_launcher, args.command]
 
     if args.bazel_platform:
         cmd.append('--platforms=' + args.bazel_platform)

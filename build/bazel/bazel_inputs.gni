@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 # A set of GN templates to expose Ninja-generated output files as inputs
-# to bazel_build_action() targets. The latter run a `bazel build` command in
+# to bazel_action() targets. The latter run a `bazel build` command in
 # the Bazel workspace setup by the platform build, which cannot access
 # the Ninja output directory directly.
 #

@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# This file demonstrate how to use the bazel_build_action() template
+# This file demonstrate how to use the bazel_action() template
 # to run a `bazel build ...` command from Ninja. The main idea is
 # that:
 #
@@ -19,7 +19,7 @@
 #    possible, or alternatively as individual source files
 #    `@legacy_ninja_build_outputs//:<file_path>`
 #
-# 4) The `bazel_build_action()` target must know where the command
+# 4) The `bazel_action()` target must know where the command
 #    places its outputs, relative to the workspace `bazel-bin/` symlink,
 #    in case of success.
 #
@@ -31,7 +31,7 @@
 # then hard-linked into $target_gen_dir/example_out.txt
 #
 
-import("//build/bazel/bazel_build_action.gni")
+import("//build/bazel/bazel_action.gni")
 import("//build/bazel/bazel_inputs.gni")
 
 group("build_action") {
@@ -43,7 +43,7 @@ group("build_action") {
 #
 # IMPORTANT: This target must appear in the dependency graph
 # of //build/bazel/legacy_ninja_build_outputs, otherwise the
-# bazel_build_action() below will not work properly.
+# bazel_action() below will not work properly.
 #
 # The name argument below is used as a filegroup() name in the generated
 # @legacy_ninja_build_outputs repository and is hard-coded in the BUILD.bazel
@@ -55,7 +55,8 @@ bazel_input_resource("bazel_inputs") {
 }
 
 # This defines the action that runs a `bazel build` command
-bazel_build_action("run_build_action") {
+bazel_action("run_build_action") {
+  command = "build"
   bazel_targets = [ "//build/bazel/tests/build_action" ]
   bazel_inputs = [ ":bazel_inputs" ]
   bazel_outputs = [ "bazel-bin/build/bazel/tests/build_action/example_out.txt" ]
