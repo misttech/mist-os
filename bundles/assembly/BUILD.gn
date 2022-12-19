@@ -87,6 +87,7 @@ assembly_input_bundle("common_minimal") {
     # Diagnostics
     "//src/diagnostics/log-stats:package",
     "//src/diagnostics/persistence:diagnostics-persistence",
+    "//src/diagnostics/kcounter:diagnostics-kcounter",
 
     # Other
     "//src/developer/memory/monitor",

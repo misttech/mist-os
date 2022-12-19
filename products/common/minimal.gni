@@ -61,9 +61,6 @@ legacy_base_package_labels += [
   "//src/diagnostics/detect:triage-detect",
 
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
-  "//src/diagnostics/kcounter:diagnostics-kcounter",
-
-  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
   "//src/diagnostics/sampler",
 
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
