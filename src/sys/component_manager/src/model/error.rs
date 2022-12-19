@@ -128,7 +128,7 @@ pub enum ModelError {
     #[error("failed to create stream from channel")]
     StreamCreationError {
         #[source]
-        err: ClonableError,
+        err: fidl::Error,
     },
     #[error("failed to send {} to runner for component {}", operation, moniker)]
     RunnerCommunicationError {
@@ -244,8 +244,8 @@ impl ModelError {
         ModelError::OpenDirectoryError { moniker, relative_path: relative_path.into() }
     }
 
-    pub fn stream_creation_error(err: impl Into<Error>) -> ModelError {
-        ModelError::StreamCreationError { err: err.into().into() }
+    pub fn stream_creation_error(err: fidl::Error) -> ModelError {
+        ModelError::StreamCreationError { err }
     }
 
     pub fn as_zx_status(&self) -> zx::Status {
