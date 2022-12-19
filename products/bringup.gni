@@ -4,7 +4,9 @@
 
 import("//products/common/bringup.gni")
 
-product_bootfs_labels +=
-    [ "//products/kernel_cmdline:kernel.oom.behavior--jobkill" ]
+product_bootfs_labels += [
+  "//products/kernel_cmdline:kernel.oom.behavior--jobkill",
+  "//products/kernel_cmdline:oom.reboot-timeout--low",
+]
 
 product_bootfs_labels += [ "//bundles:diagnostics-eng" ]

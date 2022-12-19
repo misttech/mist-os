@@ -1,0 +1,117 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/security/policies.gni")
+import("//products/common/bringup.gni")
+
+# Minimal, and all products based on it, use the "standard" assembled_system()
+# impl in `//build/images/fuchsia`
+use_bringup_assembly = false
+bootfs_only = false
+
+core_realm_package_name = "core-minimal"
+core_realm_shards = [
+  "//src/connectivity/network:virtualization-core-shard",
+  "//src/developer/build_info:build_info_core_shard",
+  "//src/developer/forensics:core_shard",
+  "//src/developer/memory/monitor:memory_monitor_core_shard",
+  "//src/recovery/factory_reset:factory_reset_core_shard",
+  "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",
+  "//src/sys/pkg/bin/system-updater:system-updater-core-shard",
+  "//src/sys/process-resolver:core_shard",
+]
+
+core_realm_restrict_persistent_storage = true
+
+legacy_base_package_labels += [
+  # TODO(http://fxb/91760): remove once build_info is supported in assembly_input_bundle()
+  "//build/info:build-info",
+
+  # TODO(http://fxb/100451): remove once core_realm shards can be compiled via
+  "//src/cobalt/bin/app:cobalt",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/cobalt/bin/app:cobalt_registry",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/cobalt/bin/app:config",
+
+  # TODO(http://fxb/100451): remove once core_realm shards can be compiled via
+  "//src/cobalt/bin/system-metrics:cobalt_system_metrics",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/connectivity/network/mdns/bundles:config",
+
+  # TODO(http://fxb/100451): remove once core_realm shards can be compiled via
+  "//src/connectivity/network/mdns/bundles:services",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/connectivity/network/netcfg:config-default",
+
+  # TODO(http://fxb/100451): remove once core_realm shards can be compiled via
+  "//src/connectivity/network",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/sys/core:core_component_id_index",
+
+  # TODO(https://fxbug.dev/85821): remove once out-of-tree users no longer
+  # reference v1 components.
+  "//src/connectivity/network:network-legacy-deprecated",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/developer/forensics:pkg",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/diagnostics/config/persistence",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/diagnostics/detect:triage-detect",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/diagnostics/kcounter:diagnostics-kcounter",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/diagnostics/sampler",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/hwinfo:default_product_config",
+
+  # TODO(http://fxb/100451): remove once core_realm shards can be compiled via
+  # assembly_input_bundle()
+  "//src/recovery/factory_reset",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/sys/activity",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/sys/full-resolver",  # This seems needed to run the session manager
+
+  # TODO(http://fxb/100451): remove once core_realm shards can be compiled via
+  "//src/sys/pkg:system-update-checker",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/sys/pkg/bin/system-update-committer:enable_reboot_on_verification_failure",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/sys/process-resolver",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/sys/time/httpsdate_time_source:httpsdate-time-source",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/sys/time/timekeeper",
+]
+
+product_bootfs_labels += [
+  # Core products have pkgfs, so include the base resolver.
+  "//src/sys/base-resolver:bootfs",
+]
+
+# Set the SWD policy for core.gni, details can be found in
+# //build/security/policies_swd.gni.
+policy_labels.swd = "unrestricted"
+
+# Set the update_checker policy for core.gni, details can be found in
+# //build/security/policies_swd.gni.
+policy_labels.update_checker = "system_update_checker"
