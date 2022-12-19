@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/identity/lib/storage_manager/meta/fxfs.shard.cml", // For collections.crypt
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
-        "//src/identity/lib/storage_manager/meta/fxfs.shard.cml", // For collections.crypt
     ],
     program: {
         runner: "elf",
@@ -25,6 +25,7 @@
             protocol: [
                 "fuchsia.identity.authentication.AlwaysFailStorageUnlockMechanism",
                 "fuchsia.identity.authentication.AlwaysSucceedStorageUnlockMechanism",
+                "fuchsia.identity.authentication.PasswordStorageUnlockMechanism",
                 "fuchsia.identity.authentication.TestStorageUnlockMechanism",
                 "fuchsia.process.Launcher",
             ],

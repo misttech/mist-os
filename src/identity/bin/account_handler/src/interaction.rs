@@ -27,7 +27,7 @@ lazy_static! {
     /// Set of Authentication Mechanisms which are currently supported
     /// in AccountHandler.
     static ref AVAILABLE_MECHANISMS: HashSet<Mechanism> = HashSet::from([
-        Mechanism::Test
+        Mechanism::Password, Mechanism::Test
     ]);
 }
 
@@ -175,13 +175,21 @@ impl Interaction {
                             self.state_publisher.set(self.create_state());
                         }
                         Ok(()) => {
-                            // TODO(114056): Plug the password authenticator here once both ends are ready.
-                            warn!(
-                                "Unsupported operation: \
-                                fuchsia.identity.authentication.Interaction.StartPassword"
-                            );
-                            control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
-                            return Err(AccountManagerError::from(ApiError::InvalidRequest));
+                            let storage_unlock_proxy = self.get_storage_unlock_proxy()?;
+                            match authenticator_fn(
+                                storage_unlock_proxy,
+                                InteractionProtocolServerEnd::Password(ui),
+                            )
+                            .await
+                            {
+                                Ok(result) => {
+                                    control_handle.shutdown_with_epitaph(zx::Status::OK);
+                                    return Ok(result);
+                                }
+                                Err(err) => {
+                                    warn!("Authenticator operation failed with error: {:?}", err);
+                                }
+                            }
                         }
                     }
                 }
@@ -366,13 +374,6 @@ mod tests {
     }
 
     #[fuchsia_async::run_until_stalled(test)]
-    async fn interaction_get_proxy_for_unavailable_password_mechanism() {
-        let interaction = Interaction::new(Mechanism::Password, Mode::Authenticate);
-
-        assert_matches!(interaction.get_storage_unlock_proxy(), Err(ApiError::InvalidRequest));
-    }
-
-    #[fuchsia_async::run_until_stalled(test)]
     async fn interaction_unsupported_password_mechanism() {
         let (proxy, task) =
             make_proxy(Mechanism::Password, Mode::Enroll, Box::new(move |_, _| async { Ok(()) }));
@@ -387,7 +388,7 @@ mod tests {
         let _ = proxy.start_password(test_password_interaction_server_end, Mode::Enroll).unwrap();
         assert_matches!(
             proxy.take_event_stream().next().await.unwrap(),
-            Err(fidl::Error::ClientChannelClosed { status: fidl::Status::NOT_SUPPORTED, .. })
+            Err(fidl::Error::ClientChannelClosed { status: fidl::Status::OK, .. })
         );
 
         // Check that the state remains valid after the above operation.
@@ -396,11 +397,8 @@ mod tests {
             InteractionWatchStateResponse::Enrollment(vec![Mechanism::Password])
         );
 
-        // The result of the task should report an InvalidRequest error.
-        assert_matches!(
-            task.await,
-            Err(AccountManagerError { api_error: ApiError::InvalidRequest, .. })
-        );
+        // The result of the task should report Ok().
+        assert_matches!(task.await, Ok(()));
     }
 
     #[fuchsia_async::run_until_stalled(test)]

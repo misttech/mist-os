@@ -48,6 +48,11 @@
             to: "#account_manager",
         },
         {
+            protocol: [ "fuchsia.identity.authentication.PasswordStorageUnlockMechanism" ],
+            from: "#password_authenticator",
+            to: "#account_manager",
+        },
+        {
             protocol: [ "fuchsia.tpm.cr50.PinWeaver" ],
             from: "parent",
             to: "#credential_manager",

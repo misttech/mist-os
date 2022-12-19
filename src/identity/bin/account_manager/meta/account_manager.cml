@@ -41,6 +41,7 @@
     offer: [
         {
             protocol: [
+                "fuchsia.identity.authentication.PasswordStorageUnlockMechanism",
                 "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
             ],
