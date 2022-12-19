@@ -153,7 +153,11 @@ template("bazel_build_action") {
     # it. Moreoever, it is testonly=true, which would prevent
     # non-testonly bazel_build_action() from being added to the GN graph.
     # This is "safe" because the file is generated at GN gen time.
-    inputs = [ bazel_launcher ] + _bazel_build_files
+    inputs = [
+               bazel_launcher,
+               "//.git/HEAD",
+               "//.git/index",
+             ] + _bazel_build_files
     outputs = _outputs
     args = [
              "--bazel-launcher",
