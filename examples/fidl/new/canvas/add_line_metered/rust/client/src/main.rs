@@ -29,15 +29,25 @@ async fn main() -> Result<(), Error> {
         // from the server.
         if action == "WAIT" {
             let mut event_stream = instance.take_event_stream();
-            let InstanceEvent::OnDrawn { top_left, bottom_right } = event_stream
-                .try_next()
-                .await
-                .context("Error getting event response from proxy")?
-                .ok_or_else(|| format_err!("Proxy sent no events"))?;
-            println!(
-                "OnDrawn event received: top_left: {:?}, bottom_right: {:?}",
-                top_left, bottom_right
-            );
+            loop {
+                match event_stream
+                    .try_next()
+                    .await
+                    .context("Error getting event response from proxy")?
+                    .ok_or_else(|| format_err!("Proxy sent no events"))?
+                {
+                    InstanceEvent::OnDrawn { top_left, bottom_right } => {
+                        println!(
+                            "OnDrawn event received: top_left: {:?}, bottom_right: {:?}",
+                            top_left, bottom_right
+                        );
+                        break;
+                    }
+                    InstanceEvent::_UnknownEvent { ordinal, .. } => {
+                        println!("Received an unknown event with ordinal {ordinal}");
+                    }
+                }
+            }
             continue;
         }
 

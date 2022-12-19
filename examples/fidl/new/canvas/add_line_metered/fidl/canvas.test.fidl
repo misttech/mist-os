@@ -23,7 +23,7 @@ type BoundingBox = struct {
 /// Manages a single instance of a canvas. Each session of this protocol is responsible for a new
 /// canvas.
 @discoverable
-protocol Instance {
+open protocol Instance {
     // [START diff_1]
     /// Add a line to the canvas.
     ///
@@ -33,12 +33,12 @@ protocol Instance {
     /// by the server before proceeding. This change represents a trade-off: we get much greater
     /// synchronization of message flow between the client and the server, at the cost of worse
     /// performance at the limit due to the extra wait imposed by each ack.
-    AddLine(struct {
+    flexible AddLine(struct {
         line Line;
     }) -> ();
     // [END diff_1]
 
     /// Update the client with the latest drawing state. The server makes no guarantees about how
     /// often this event occurs - it could occur multiple times per board state, for example.
-    -> OnDrawn(BoundingBox);
+    flexible -> OnDrawn(BoundingBox);
 };

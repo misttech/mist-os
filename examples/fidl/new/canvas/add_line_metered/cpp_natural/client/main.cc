@@ -28,6 +28,11 @@ class EventHandler : public fidl::AsyncEventHandler<examples_canvas_addlinemeter
 
   void on_fidl_error(fidl::UnbindInfo error) override { FX_LOGS(ERROR) << error; }
 
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<examples_canvas_addlinemetered::Instance> metadata) override {
+    FX_LOGS(WARNING) << "Received an unknown event with ordinal " << metadata.event_ordinal;
+  }
+
   explicit EventHandler(async::Loop& loop) : loop_(loop) {}
 
  private:
@@ -106,9 +111,9 @@ int main(int argc, const char** argv) {
         [&](fidl::Result<examples_canvas_addlinemetered::Instance::AddLine>& result) {
           // Check if the FIDL call succeeded or not.
           if (!result.is_ok()) {
-            // Check that our one-way call was enqueued successfully, and handle the error
-            // appropriately. In the case of this example, there is nothing we can do to recover
-            // here, except to log an error and exit the program.
+            // Check that our two-way call succeeded, and handle the error appropriately. In the
+            // case of this example, there is nothing we can do to recover here, except to log an
+            // error and exit the program.
             FX_LOGS(ERROR) << "Could not send AddLine request: "
                            << result.error_value().FormatDescription();
           }

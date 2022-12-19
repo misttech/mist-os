@@ -23,12 +23,12 @@ type BoundingBox = struct {
 /// Manages a single instance of a canvas. Each session of this protocol is responsible for a new
 /// canvas.
 @discoverable
-protocol Instance {
+open protocol Instance {
     // [START diff_1]
     /// Add multiple lines to the canvas. We are able to reduce protocol chatter and the number of
     /// requests needed by batching instead of calling the simpler `AddLine(...)` one line at a
     /// time.
-    AddLines(struct {
+    flexible AddLines(struct {
         lines vector<Line>;
     });
 
@@ -42,10 +42,10 @@ protocol Instance {
     /// enforced semantic that each `-> OnDrawn(...)` call must follow a unique `Ready() -> ()` call
     /// from the client. An unprompted `-> OnDrawn(...)` is invalid, and should cause the channel to
     /// immediately close.
-    Ready() -> ();
+    flexible Ready() -> ();
     // [END diff_1]
 
     /// Update the client with the latest drawing state. The server makes no guarantees about how
     /// often this event occurs - it could occur multiple times per board state, for example.
-    -> OnDrawn(BoundingBox);
+    flexible -> OnDrawn(BoundingBox);
 };

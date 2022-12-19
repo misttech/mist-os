@@ -72,6 +72,12 @@ class InstanceImpl final : public fidl::Server<examples_canvas_baseline::Instanc
     state_.changed = true;
   }
 
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<examples_canvas_baseline::Instance> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    FX_LOGS(WARNING) << "Received an unknown method with ordinal " << metadata.method_ordinal;
+  }
+
  private:
   // Each scheduled update waits for the allotted amount of time, sends an update if something has
   // changed, and schedules the next update.

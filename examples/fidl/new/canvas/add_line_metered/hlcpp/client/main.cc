@@ -12,6 +12,8 @@
 #include <examples/canvas/addlinemetered/cpp/fidl.h>
 #include <examples/fidl/new/canvas/add_line_metered/hlcpp/client/config.h>
 
+#include "lib/fpromise/result.h"
+
 // A helper function that takes a coordinate in string form, like "123,-456", and parses it into a
 // a struct of the form |{ in64 x; int64 y; }|.
 ::examples::canvas::addlinemetered::Point ParsePoint(std::string_view input) {
@@ -70,6 +72,10 @@ int main(int argc, const char** argv) {
     loop.Quit();
   };
 
+  instance_proxy.events().handle_unknown_event = [](uint64_t ordinal) {
+    FX_LOGS(WARNING) << "Received an unknown event with ordinal " << ordinal;
+  };
+
   for (const auto& action : conf.script()) {
     // If the next action in the script is to "WAIT", block until an |OnDrawn| event is received
     // from the server.
@@ -86,7 +92,13 @@ int main(int argc, const char** argv) {
                   << " }, Point { x: " << line[0].x << ", y: " << line[0].y << " }]";
 
     // [START diff_1]
-    instance_proxy->AddLine(line, [&] {
+    instance_proxy->AddLine(line, [&](fpromise::result<void, fidl::TransportErr> result) {
+      if (result.is_error()) {
+        // Check that our flexible two-way call was known to the server and handle the case of an
+        // unknown method appropriately. In the case of this example, there is nothing we can do to
+        // recover here, except to log an error and exit the program.
+        FX_LOGS(ERROR) << "Server does not implement AddLine";
+      }
       FX_LOGS(INFO) << "AddLine response received";
 
       // Quit the loop, thereby handing control back to the outer loop of actions being iterated

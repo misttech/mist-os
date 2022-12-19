@@ -117,7 +117,10 @@ async fn run_server(stream: InstanceRequestStream) -> Result<(), Error> {
                     responder.send().context("Error responding")?;
                     println!("AddLine response sent");
                 } //
-                  // [END diff_1]
+                // [END diff_1]
+                InstanceRequest::_UnknownMethod { ordinal, .. } => {
+                    println!("Received an unknown method with ordinal {ordinal}");
+                }
             }
             Ok(())
         });

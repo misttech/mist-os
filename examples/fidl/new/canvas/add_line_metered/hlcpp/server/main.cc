@@ -76,9 +76,13 @@ class InstanceImpl final : public examples::canvas::addlinemetered::Instance {
     // this case empty reply back to the client. This is the mechanic which syncs the flow rate
     // between the client and server on this method, thereby preventing the client from "flooding"
     // the server with unacknowledged work.
-    callback();
+    callback(fpromise::ok());
     FX_LOGS(INFO) << "AddLine response sent";
     // [END diff_2]
+  }
+
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    FX_LOGS(WARNING) << "Received an unknown method with ordinal " << ordinal;
   }
 
  private:

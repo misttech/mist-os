@@ -74,6 +74,10 @@ class InstanceImpl final : public examples::canvas::baseline::Instance {
     state_.changed = true;
   }
 
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    FX_LOGS(WARNING) << "Received an unknown method with ordinal " << ordinal;
+  }
+
  private:
   // Each scheduled update waits for the allotted amount of time, sends an update if something has
   // changed, and schedules the next update.

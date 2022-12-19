@@ -93,9 +93,13 @@ class InstanceImpl final : public examples::canvas::clientrequesteddraw::Instanc
     }
 
     state_.ready = true;
-    callback();
+    callback(fpromise::ok());
   }
   // [END diff_3]
+
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    FX_LOGS(WARNING) << "Received an unknown method with ordinal " << ordinal;
+  }
 
  private:
   // Each scheduled update waits for the allotted amount of time, sends an update if something

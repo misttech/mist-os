@@ -30,6 +30,11 @@ class EventHandler
 
   void on_fidl_error(fidl::UnbindInfo error) override { FX_LOGS(ERROR) << error; }
 
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<examples_canvas_clientrequesteddraw::Instance> metadata) override {
+    FX_LOGS(WARNING) << "Received an unknown event with ordinal " << metadata.event_ordinal;
+  }
+
   explicit EventHandler(async::Loop& loop) : loop_(loop) {}
 
  private:

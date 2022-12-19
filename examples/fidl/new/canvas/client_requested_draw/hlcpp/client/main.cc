@@ -70,6 +70,10 @@ int main(int argc, const char** argv) {
         loop.Quit();
       };
 
+  instance_proxy.events().handle_unknown_event = [](uint64_t ordinal) {
+    FX_LOGS(WARNING) << "Received an unknown event with ordinal " << ordinal;
+  };
+
   // [START diff_1]
   std::vector<Line> batched_lines;
   for (const auto& action : conf.script()) {
@@ -92,7 +96,14 @@ int main(int argc, const char** argv) {
       // Now, inform the server that we are ready to receive more updates whenever they are ready
       // for us.
       FX_LOGS(INFO) << "Ready request sent";
-      instance_proxy->Ready([&]() {
+      instance_proxy->Ready([&](fpromise::result<void, fidl::TransportErr> result) {
+        if (result.is_error()) {
+          // Check that our flexible two-way call was known to the server and handle the case of an
+          // unknown method appropriately. In the case of this example, there is nothing we can do
+          // to recover here, except to log an error and exit the program.
+          FX_LOGS(ERROR) << "Server does not implement AddLine";
+        }
+
         FX_LOGS(INFO) << "Ready success";
 
         // Quit the loop, thereby handing control back to the outer loop of actions being iterated

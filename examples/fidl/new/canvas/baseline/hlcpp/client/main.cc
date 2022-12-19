@@ -71,6 +71,10 @@ int main(int argc, const char** argv) {
     loop.Quit();
   };
 
+  instance_proxy.events().handle_unknown_event = [](uint64_t ordinal) {
+    FX_LOGS(WARNING) << "Received an unknown event with ordinal " << ordinal;
+  };
+
   for (const auto& action : conf.script()) {
     // If the next action in the script is to "WAIT", block until an |OnDrawn| event is received
     // from the server.

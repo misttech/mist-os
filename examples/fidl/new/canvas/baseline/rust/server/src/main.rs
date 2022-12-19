@@ -104,6 +104,9 @@ async fn run_server(stream: InstanceRequestStream) -> Result<(), Error> {
                     println!("AddLine request received: {:?}", line);
                     add_line(&mut state_ref.lock().unwrap(), line);
                 }
+                InstanceRequest::_UnknownMethod { ordinal, .. } => {
+                    println!("Received an unknown method with ordinal {ordinal}");
+                }
             }
             Ok(())
         });
