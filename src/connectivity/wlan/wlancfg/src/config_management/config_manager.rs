@@ -58,11 +58,6 @@ pub struct SavedNetworksManager {
 /// networks with the same name.
 type NetworkConfigMap = HashMap<NetworkIdentifier, Vec<NetworkConfig>>;
 
-pub enum ScanResultType {
-    Undirected,
-    Directed(Vec<types::Ssid>), // Contains list of target SSIDs
-}
-
 #[async_trait]
 pub trait SavedNetworksManagerApi: Send + Sync {
     /// Attempt to remove the NetworkConfig described by the specified NetworkIdentifier and
@@ -127,7 +122,7 @@ pub trait SavedNetworksManagerApi: Send + Sync {
     /// passive scan or a directed active scan.
     async fn record_scan_result(
         &self,
-        scan_type: ScanResultType,
+        target_ssids: Vec<types::Ssid>,
         results: Vec<types::NetworkIdentifierDetailed>,
     );
 
@@ -496,59 +491,53 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
 
     async fn record_scan_result(
         &self,
-        scan_type: ScanResultType,
+        target_ssids: Vec<types::Ssid>,
         results: Vec<types::NetworkIdentifierDetailed>,
     ) {
         let mut saved_networks = self.saved_networks.lock().await;
-        match scan_type {
-            ScanResultType::Undirected => {
-                // For each network we have seen, look for compatible configs and record results.
-                for scan_id in results {
-                    for security in compatible_policy_securities(&scan_id.security_type) {
-                        let configs = match saved_networks
-                            .get_mut(&NetworkIdentifier::new(scan_id.ssid.clone(), security))
-                        {
-                            Some(configs) => configs,
-                            None => continue,
-                        };
-                        // Check that the credential is compatible with the actual security type of
-                        // the scan result.
-                        let compatible_configs = configs.iter_mut().filter(|config| {
-                            security_is_compatible(&scan_id.security_type, &config.credential)
-                        });
-                        for config in compatible_configs {
-                            config.update_hidden_prob(HiddenProbEvent::SeenPassive)
-                        }
-                        // TODO(60619): Update the stash with new probability if it has changed
-                    }
+
+        // Filter to networks that were seen but not targeted, i.e. networks which showed up without
+        // a directed active scan and are therefore non-hidden.
+        let seen_and_not_targeted = results.iter().filter(|r| !target_ssids.contains(&r.ssid));
+        // For each of these networks, look for compatible configs and record it as "SeenPassive"
+        for scan_id in seen_and_not_targeted {
+            for security in compatible_policy_securities(&scan_id.security_type) {
+                let configs = match saved_networks
+                    .get_mut(&NetworkIdentifier::new(scan_id.ssid.clone(), security))
+                {
+                    Some(configs) => configs,
+                    None => continue,
+                };
+                // Check that the credential is compatible with the actual security type of
+                // the scan result.
+                let compatible_configs = configs.iter_mut().filter(|config| {
+                    security_is_compatible(&scan_id.security_type, &config.credential)
+                });
+                for config in compatible_configs {
+                    config.update_hidden_prob(HiddenProbEvent::SeenPassive)
                 }
+                // TODO(60619): Update the stash with new probability if it has changed
             }
-            ScanResultType::Directed(target_ssids) => {
-                for (id, configs) in saved_networks.iter_mut() {
-                    // Only consider saved networks that match one of the targeted SSIDs
-                    if !target_ssids.contains(&id.ssid) {
-                        continue;
-                    }
-                    // For each config, check whether there is a scan result that
-                    // could be used to connect. If not, update the hidden probability.
-                    let potential_scans = results
-                        .iter()
-                        .filter(|scan_id| scan_id.ssid == id.ssid)
-                        .collect::<Vec<_>>();
-                    for config in configs {
-                        if !potential_scans.iter().any(|scan_id| {
-                            compatible_policy_securities(&scan_id.security_type)
-                                .contains(&config.security_type)
-                                && security_is_compatible(
-                                    &scan_id.security_type,
-                                    &config.credential,
-                                )
-                        }) {
-                            config.update_hidden_prob(HiddenProbEvent::NotSeenActive);
-                        }
-                        // TODO(60619): Update the stash with new probability if it has changed
-                    }
+        }
+
+        // Update saved networks that match one of the targeted SSIDs but were *not* in scan results
+        for (id, configs) in saved_networks.iter_mut() {
+            if !target_ssids.contains(&id.ssid) {
+                continue;
+            }
+            // For each config, check whether there is a scan result that
+            // could be used to connect. If not, update the hidden probability.
+            let potential_scan_results =
+                results.iter().filter(|scan_id| scan_id.ssid == id.ssid).collect::<Vec<_>>();
+            for config in configs {
+                if !potential_scan_results.iter().any(|scan_id| {
+                    compatible_policy_securities(&scan_id.security_type)
+                        .contains(&config.security_type)
+                        && security_is_compatible(&scan_id.security_type, &config.credential)
+                }) {
+                    config.update_hidden_prob(HiddenProbEvent::NotSeenActive);
                 }
+                // TODO(60619): Update the stash with new probability if it has changed
             }
         }
     }
@@ -1352,7 +1341,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_record_passive_scan() {
+    async fn test_record_undirected_scan() {
         let saved_networks = SavedNetworksManager::new_for_test()
             .await
             .expect("Failed to create SavedNetworksManager");
@@ -1384,7 +1373,9 @@ mod tests {
 
         // Record passive scan results, including the saved network and another network.
         let seen_networks = vec![saved_seen_network, unsaved_network];
-        saved_networks.record_scan_result(ScanResultType::Undirected, seen_networks).await;
+        saved_networks
+            .record_scan_result(vec!["some_other_ssid".try_into().unwrap()], seen_networks)
+            .await;
 
         assert_variant!(saved_networks.lookup(&saved_seen_id).await.as_slice(), [config] => {
             assert_eq!(config.hidden_probability, PROB_HIDDEN_IF_SEEN_PASSIVE);
@@ -1416,7 +1407,7 @@ mod tests {
             ssid: id.ssid.clone(),
             security_type: types::SecurityTypeDetailed::Wpa3Personal,
         }];
-        saved_networks.record_scan_result(ScanResultType::Undirected, seen_networks).await;
+        saved_networks.record_scan_result(vec![], seen_networks).await;
         // The network was seen in a passive scan, so hidden probability should be updated.
         assert_variant!(saved_networks.lookup(&id).await.as_slice(), [config] => {
             assert_eq!(config.hidden_probability, PROB_HIDDEN_IF_SEEN_PASSIVE);
@@ -1445,7 +1436,7 @@ mod tests {
             ssid: id.ssid.clone(),
             security_type: types::SecurityTypeDetailed::Wpa3Personal,
         }];
-        saved_networks.record_scan_result(ScanResultType::Undirected, seen_networks).await;
+        saved_networks.record_scan_result(vec![], seen_networks).await;
         // The network in the passive scan results was not compatible, so hidden probability should
         // not have been updated.
         assert_variant!(saved_networks.lookup(&id).await.as_slice(), [config] => {
@@ -1479,7 +1470,7 @@ mod tests {
             security_type: types::SecurityTypeDetailed::Wpa2Personal,
         }];
         let target = vec![id.ssid.clone()];
-        saved_networks.record_scan_result(ScanResultType::Directed(target), seen_networks).await;
+        saved_networks.record_scan_result(target, seen_networks).await;
 
         let config = saved_networks.lookup(&id).await.pop().expect("failed to lookup config");
         assert_eq!(config.hidden_probability, PROB_HIDDEN_DEFAULT);
@@ -1512,7 +1503,7 @@ mod tests {
             ssid: id.ssid.clone(),
             security_type: types::SecurityTypeDetailed::Wpa3Personal,
         }];
-        saved_networks.record_scan_result(ScanResultType::Directed(target), seen_networks).await;
+        saved_networks.record_scan_result(target, seen_networks).await;
         // The hidden probability should have been lowered because a directed scan failed to find
         // the network.
         let config = saved_networks.lookup(&id).await.pop().expect("failed to lookup config");
@@ -1546,7 +1537,7 @@ mod tests {
             ssid: diff_ssid,
             security_type: types::SecurityTypeDetailed::Wpa2Personal,
         }];
-        saved_networks.record_scan_result(ScanResultType::Directed(target), seen_networks).await;
+        saved_networks.record_scan_result(target, seen_networks).await;
 
         let config = saved_networks.lookup(&id).await.pop().expect("failed to lookup config");
         assert!(config.hidden_probability < PROB_HIDDEN_DEFAULT);
@@ -1585,11 +1576,57 @@ mod tests {
                 security_type: types::SecurityTypeDetailed::Wpa2Personal,
             },
         ];
-        saved_networks.record_scan_result(ScanResultType::Directed(target), seen_networks).await;
+        saved_networks.record_scan_result(target, seen_networks).await;
         // Since the directed scan found a matching network, the hidden probability should not
         // have been lowered.
         let config = saved_networks.lookup(&id).await.pop().expect("failed to lookup config");
         assert_eq!(config.hidden_probability, PROB_HIDDEN_DEFAULT);
+    }
+
+    #[fuchsia::test]
+    async fn test_record_both_directed_and_undirected() {
+        let saved_networks = SavedNetworksManager::new_for_test()
+            .await
+            .expect("Failed to create SavedNetworksManager");
+        let saved_undirected_id = NetworkIdentifier::try_from("foo", SecurityType::None).unwrap();
+        let saved_undirected_network = types::NetworkIdentifierDetailed {
+            ssid: saved_undirected_id.ssid.clone(),
+            security_type: types::SecurityTypeDetailed::Open,
+        };
+        let saved_directed_id = NetworkIdentifier::try_from("bar", SecurityType::None).unwrap();
+        let credential = Credential::None;
+
+        // Save the networks
+        assert!(saved_networks
+            .store(saved_undirected_id.clone(), credential.clone())
+            .await
+            .expect("Failed to save network")
+            .is_none());
+        assert!(saved_networks
+            .store(saved_directed_id.clone(), credential.clone())
+            .await
+            .expect("Failed to save network")
+            .is_none());
+
+        // Verify assumption
+        assert_variant!(saved_networks.lookup(&saved_directed_id).await.as_slice(), [config] => {
+            assert_eq!(config.hidden_probability, PROB_HIDDEN_DEFAULT);
+        });
+
+        // Record scan results
+        let seen_networks = vec![saved_undirected_network];
+        saved_networks
+            .record_scan_result(vec![saved_directed_id.ssid.clone()], seen_networks)
+            .await;
+
+        // The undirected (but seen) network is modified
+        assert_variant!(saved_networks.lookup(&saved_undirected_id).await.as_slice(), [config] => {
+            assert_eq!(config.hidden_probability, PROB_HIDDEN_IF_SEEN_PASSIVE);
+        });
+        // The directed (but *not* seen) network is modified
+        assert_variant!(saved_networks.lookup(&saved_directed_id).await.as_slice(), [config] => {
+            assert!(config.hidden_probability < PROB_HIDDEN_DEFAULT);
+        });
     }
 
     #[fuchsia::test]
@@ -2004,7 +2041,7 @@ mod tests {
 
         let seen_ids = vec![];
         let not_seen_ids = vec![id_1.ssid.clone(), id_2.ssid.clone(), id_3.ssid.clone()];
-        saved_networks.record_scan_result(ScanResultType::Directed(not_seen_ids), seen_ids).await;
+        saved_networks.record_scan_result(not_seen_ids, seen_ids).await;
 
         // Check that the configs' hidden probability has decreased
         let config_1 = saved_networks.lookup(&id_1).await.pop().expect("failed to lookup");

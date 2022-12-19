@@ -8,7 +8,7 @@ use {
         client::{bss_selection::SignalData, scan, types as client_types},
         config_management::{
             Credential, NetworkConfig, NetworkConfigError, NetworkIdentifier, PastConnectionData,
-            PastConnectionList, SavedNetworksManagerApi, ScanResultType,
+            PastConnectionList, SavedNetworksManagerApi,
         },
     },
     async_trait::async_trait,
@@ -30,8 +30,7 @@ pub struct FakeSavedNetworksManager {
     connect_results_recorded: Mutex<Vec<ConnectResultRecord>>,
     lookup_compatible_response: Mutex<LookupCompatibleResponse>,
     pub fail_all_stores: bool,
-    pub active_scan_result_recorded: Arc<Mutex<bool>>,
-    pub passive_scan_result_recorded: Arc<Mutex<bool>>,
+    pub scan_result_recorded: Arc<Mutex<bool>>,
     pub past_connections_response: PastConnectionList,
 }
 
@@ -73,8 +72,7 @@ impl FakeSavedNetworksManager {
             connect_results_recorded: Mutex::new(vec![]),
             fail_all_stores: false,
             lookup_compatible_response: Mutex::new(LookupCompatibleResponse::new()),
-            active_scan_result_recorded: Arc::new(Mutex::new(false)),
-            passive_scan_result_recorded: Arc::new(Mutex::new(false)),
+            scan_result_recorded: Arc::new(Mutex::new(false)),
             past_connections_response: PastConnectionList::new(),
         }
     }
@@ -95,8 +93,7 @@ impl FakeSavedNetworksManager {
             connect_results_recorded: Mutex::new(vec![]),
             fail_all_stores: false,
             lookup_compatible_response: Mutex::new(LookupCompatibleResponse::new()),
-            active_scan_result_recorded: Arc::new(Mutex::new(false)),
-            passive_scan_result_recorded: Arc::new(Mutex::new(false)),
+            scan_result_recorded: Arc::new(Mutex::new(false)),
             past_connections_response: PastConnectionList::new(),
         }
     }
@@ -244,19 +241,11 @@ impl SavedNetworksManagerApi for FakeSavedNetworksManager {
 
     async fn record_scan_result(
         &self,
-        scan_type: ScanResultType,
+        _target_ssids: Vec<client_types::Ssid>,
         _results: Vec<client_types::NetworkIdentifierDetailed>,
     ) {
-        match scan_type {
-            ScanResultType::Undirected => {
-                let mut v = self.passive_scan_result_recorded.lock().await;
-                *v = true;
-            }
-            ScanResultType::Directed(_) => {
-                let mut v = self.active_scan_result_recorded.lock().await;
-                *v = true
-            }
-        }
+        let mut v = self.scan_result_recorded.lock().await;
+        *v = true;
     }
 
     async fn get_networks(&self) -> Vec<NetworkConfig> {

@@ -6,7 +6,7 @@
 use {
     crate::{
         client::types,
-        config_management::{SavedNetworksManagerApi, ScanResultType},
+        config_management::SavedNetworksManagerApi,
         mode_management::iface_manager_api::{IfaceManagerApi, SmeForScan},
         telemetry::{ScanIssue, TelemetryEvent, TelemetrySender},
     },
@@ -243,7 +243,7 @@ async fn perform_scan(
 
         match scan_results {
             Ok(results) => {
-                record_undirected_scan_results(&results, saved_networks_manager.clone()).await;
+                record_scan_results(vec![], &results, saved_networks_manager.clone()).await;
                 insert_bss_to_network_bss_map(&mut bss_by_network, results, true);
                 break;
             }
@@ -288,22 +288,6 @@ async fn perform_scan(
     Ok(scan_results)
 }
 
-/// Update the hidden network probabilties of saved networks seen in a
-/// passive scan.
-async fn record_undirected_scan_results(
-    scan_results: &Vec<wlan_common::scan::ScanResult>,
-    saved_networks_manager: Arc<dyn SavedNetworksManagerApi>,
-) {
-    let ids = scan_results
-        .iter()
-        .map(|result| types::NetworkIdentifierDetailed {
-            ssid: result.bss_description.ssid.clone(),
-            security_type: result.bss_description.protection().into(),
-        })
-        .collect();
-    saved_networks_manager.record_scan_result(ScanResultType::Undirected, ids).await;
-}
-
 /// Perform a directed active scan for a given network on given channels.
 async fn perform_directed_active_scan(
     iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
@@ -332,7 +316,7 @@ async fn perform_directed_active_scan(
 
     match sme_result {
         Ok(results) => {
-            record_directed_scan_results(ssids.clone(), &results, saved_networks_manager).await;
+            record_scan_results(ssids.clone(), &results, saved_networks_manager).await;
 
             let mut bss_by_network: HashMap<SmeNetworkIdentifier, Vec<types::Bss>> = HashMap::new();
             insert_bss_to_network_bss_map(&mut bss_by_network, results, false);
@@ -346,9 +330,8 @@ async fn perform_directed_active_scan(
     }
 }
 
-/// Figure out which saved networks we actively scanned for and did not get results for, and update
-/// their configs to update the rate at which we would actively scan for these networks.
-async fn record_directed_scan_results(
+/// Update the hidden network probabilties of saved networks seen (or not) in a scan.
+async fn record_scan_results(
     target_ssids: Vec<types::Ssid>,
     scan_result_list: &Vec<wlan_common::scan::ScanResult>,
     saved_networks_manager: Arc<dyn SavedNetworksManagerApi>,
@@ -360,7 +343,7 @@ async fn record_directed_scan_results(
             security_type: scan_result.bss_description.protection().into(),
         })
         .collect();
-    saved_networks_manager.record_scan_result(ScanResultType::Directed(target_ssids), ids).await;
+    saved_networks_manager.record_scan_result(target_ssids, ids).await;
 }
 
 /// The location sensor module uses scan results to help determine the
@@ -1148,11 +1131,8 @@ mod tests {
         // will be pending, otherwise it will be ready.
         let _ = exec.run_until_stalled(&mut scan_fut);
 
-        // Verify that the passive scan results were recorded. The network seen in passive scan
-        // results should have a lowered probability of being hidden.
-        assert!(
-            *exec.run_singlethreaded(saved_networks_manager.passive_scan_result_recorded.lock())
-        );
+        // Verify that the passive scan results were recorded.
+        assert!(*exec.run_singlethreaded(saved_networks_manager.scan_result_recorded.lock()));
 
         // Note: the decision to active scan is non-deterministic (using the hidden network probabilities),
         // no need to continue and verify the results in this test case.
