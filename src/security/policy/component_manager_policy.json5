@@ -413,6 +413,7 @@
                     //
                     // TODO(fxbug.dev/114052): The `1` in `application_shell:1`
                     // will change eventually.
+                    "/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/elements:**",
                     "/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/terminal:**",
 
                     // TODO(https://fxbug.dev/106062): Scrutiny throws an routing error unless
@@ -469,6 +470,7 @@
                     //
                     // TODO(fxbug.dev/114052): The `1` in `application_shell:1`
                     // will change eventually.
+                    "/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/elements:**",
                     "/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/terminal:**",
                 ],
             },
@@ -514,6 +516,7 @@
                     //
                     // TODO(fxbug.dev/114052): The `1` in `application_shell:1`
                     // will change eventually.
+                    "/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/elements:**",
                     "/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/terminal:**",
                 ],
             },
