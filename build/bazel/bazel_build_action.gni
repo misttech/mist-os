@@ -7,6 +7,11 @@ import("//build/bazel/legacy_ninja_build_outputs.gni")
 import("//build/config/clang/clang.gni")
 import("//build/config/compiler.gni")
 
+declare_args() {
+  # Suppress Bazel non-error output
+  bazel_quiet = true
+}
+
 # Run a Bazel build action, which is run in the special workspace
 # setup by `//build/bazel:bazel_workspace`.
 #
@@ -175,11 +180,18 @@ template("bazel_build_action") {
     }
 
     args += [ "--" ]
+    if (bazel_quiet) {
+      args += [
+        "--noshow_loading_progress",
+        "--noshow_progress",
+        "--show_result=0",
+        "--ui_event_filters=-info",
+      ]
+    }
+
     if (defined(invoker.extra_bazel_args)) {
       args += invoker.extra_bazel_args
     }
-
-    # Below are extra args to Bazel
 
     # Forward GN sanitizer configuration to Bazel
     if (is_asan) {
