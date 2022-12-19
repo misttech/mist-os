@@ -18,7 +18,6 @@
 
 #include <string>
 
-#include "src/lib/fxl/strings/string_printf.h"
 #include "src/ui/tests/integration_graphics_tests/web-pixel-tests/chromium_pixel_client/chromium_pixel_client_config.h"
 
 namespace {
@@ -58,17 +57,15 @@ class NavListener : public fuchsia::web::NavigationEventListener {
     }
     if (nav_state.has_title()) {
       FX_LOGS(INFO) << "nav_state.title = " << nav_state.title();
-      if (nav_state.title() == "about:blank") {
-        loaded_about_blank_ = true;
-      } else if (nav_state.title() == "window_resized") {
-        FX_CHECK(loaded_about_blank_);
+      loaded_title_ = true;
+      if (nav_state.title() == "window_resized") {
         window_resized_ = true;
       }
     }
 
     send_ack();
   }
-  bool loaded_about_blank_ = false;
+  bool loaded_title_ = false;
   bool is_main_document_loaded_ = false;
   bool window_resized_ = false;
 };
@@ -102,36 +99,34 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
 
     // Load the web page.
     FX_LOGS(INFO) << "Loading web page";
-    navigation_controller->LoadUrl("about:blank", fuchsia::web::LoadUrlParams(), [](auto result) {
-      if (result.is_err()) {
-        FX_LOGS(FATAL) << "Error while loading URL: " << static_cast<uint32_t>(result.err());
-      } else {
-        FX_LOGS(INFO) << "Loaded about:blank";
-      }
-    });
+    navigation_controller->LoadUrl(
+        chromium_pixel_client_config.html(), fuchsia::web::LoadUrlParams(),
+        [chromium_pixel_client_config](auto result) {
+          if (result.is_err()) {
+            FX_LOGS(FATAL) << "Error while loading URL: " << static_cast<uint32_t>(result.err());
+          } else {
+            FX_LOGS(INFO) << "Loaded " << chromium_pixel_client_config.html();
+          }
+        });
 
-    // Wait for navigation loaded "about:blank" page then inject JS code, to avoid inject JS to
-    // wrong page.
+    // Wait for navigation loaded |chromium_pixel_client_config.html()| page then inject JS code, to
+    // avoid inject JS to wrong page.
     RunLoopUntil([&navigation_event_listener] {
-      return navigation_event_listener.loaded_about_blank_ &&
+      return navigation_event_listener.loaded_title_ &&
              navigation_event_listener.is_main_document_loaded_;
     });
 
     FX_LOGS(INFO) << "Running javascript to inject html: " << chromium_pixel_client_config.html();
     bool is_js_loaded = false;
-    web_frame_->ExecuteJavaScript(
-        {"*"},
-        BufferFromString(kAppCode + fxl::StringPrintf("document.write(`%s`);",
-                                                      chromium_pixel_client_config.html().c_str())),
-        [&is_js_loaded](auto result) {
-          if (result.is_err()) {
-            FX_LOGS(FATAL) << "Error while executing JavaScript: "
-                           << static_cast<uint32_t>(result.err());
-          } else {
-            is_js_loaded = true;
-            FX_LOGS(INFO) << "Injected html";
-          }
-        });
+    web_frame_->ExecuteJavaScript({"*"}, BufferFromString(kAppCode), [&is_js_loaded](auto result) {
+      if (result.is_err()) {
+        FX_LOGS(FATAL) << "Error while executing JavaScript: "
+                       << static_cast<uint32_t>(result.err());
+      } else {
+        is_js_loaded = true;
+        FX_LOGS(INFO) << "Injected html";
+      }
+    });
     RunLoopUntil([&] { return is_js_loaded; });
 
     // Wait for the window resized message.

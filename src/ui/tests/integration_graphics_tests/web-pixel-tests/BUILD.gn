@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//src/fonts/build/fonts.gni")
 import("//src/lib/vulkan/vulkan.gni")
 
 group("tests") {
@@ -50,6 +51,14 @@ executable("web_runner_pixel_test_bin") {
   ]
 }
 
+font_collection("single-font-collection") {
+  testonly = true
+  product_config_path =
+      "//src/ui/testing/data/single-font-collection.fontcfg.json5"
+  local_asset_names = [ "Roboto-Regular.ttf" ]
+  font_service_pkg = "web_runner_pixel_test"
+}
+
 fuchsia_test_component("web_runner_pixel_test_component") {
   manifest = "meta/web_runner_pixeltest.cml"
   deps = [
@@ -67,16 +76,25 @@ fuchsia_test_component("web_runner_pixel_test_component") {
     "//src/ui/testing/test_ui_stack:test-ui-stack-component",
     "//src/ui/tests/integration_graphics_tests/web-pixel-tests/chromium_pixel_client:chromium_pixel_client_component",
     "//src/ui/tests/integration_graphics_tests/web-pixel-tests/chromium_pixel_client:chromium_pixel_client_default_config",
+    "//src/ui/tests/integration_graphics_tests/web-pixel-tests/http_server:http_server_component",
   ]
 }
 
 fuchsia_test_package("web_runner_pixel_test") {
   test_components = [ ":web_runner_pixel_test_component" ]
+  deps = [ ":single-font-collection" ]
 
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
     }
-    environments = vulkan_envs
+    environments = [
+      {
+        dimensions = {
+          # Ensure the device has Vulkan.
+          device_type = "AEMU"
+        }
+      },
+    ]
   }
 }

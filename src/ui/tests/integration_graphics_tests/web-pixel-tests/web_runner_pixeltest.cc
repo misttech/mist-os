@@ -34,9 +34,10 @@
 
 #include <gtest/gtest.h>
 
+#include "constants.h"
+#include "src/lib/fxl/strings/string_printf.h"
 #include "src/ui/testing/util/portable_ui_test.h"
 #include "src/ui/testing/util/screenshot_helper.h"
-#include "src/ui/tests/integration_graphics_tests/web-pixel-tests/html_config.h"
 
 namespace integration_tests {
 
@@ -119,7 +120,8 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest {
   void ExtendRealm() override {
     // Add child components.
     for (auto [child, url] : GetTestComponents()) {
-      realm_builder()->AddChild(child, url);
+      realm_builder()->AddChild(child, url,
+                                {.startup_mode = component_testing::StartupMode::EAGER});
     }
 
     // Add routes between components.
@@ -132,7 +134,7 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest {
     realm_builder()->SetConfigValue(kWebClient, "html", HtmlForTestCase());
   }
 
-  virtual const char* HtmlForTestCase() = 0;
+  virtual std::string HtmlForTestCase() = 0;
 
   std::vector<std::pair<std::string, std::string>> GetTestComponents() {
     return {
@@ -145,6 +147,7 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest {
         std::make_pair(kWebClient, kWebClientUrl),
         std::make_pair(kTextManager, kTextManagerUrl),
         std::make_pair(kWebContextProvider, kWebContextProviderUrl),
+        std::make_pair(kHttpServer, kHttpServerUrl),
     };
   }
 
@@ -182,7 +185,7 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest {
                               Protocol{fuchsia::media::ProfileProvider::Name_},
                               Protocol{fuchsia::media::AudioDeviceEnumerator::Name_}},
              .source = ParentRef(),
-             .targets = {target, ChildRef{kWebContextProvider}}},
+             .targets = {target, ChildRef{kWebContextProvider}, ChildRef{kHttpServer}}},
             {.capabilities = {Protocol{fuchsia::tracing::provider::Registry::Name_}},
              .source = ParentRef(),
              .targets = {ChildRef{kFontsProvider}}},
@@ -201,7 +204,7 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest {
              .targets = {ChildRef{kMemoryPressureProvider}}},
             {.capabilities = {Protocol{fuchsia::posix::socket::Provider::Name_}},
              .source = ChildRef{kNetstack},
-             .targets = {target}},
+             .targets = {target, ChildRef{kHttpServer}}},
             {.capabilities = {Protocol{fuchsia::buildinfo::Provider::Name_}},
              .source = ChildRef{kBuildInfoProvider},
              .targets = {target, ChildRef{kWebContextProvider}}},
@@ -210,7 +213,17 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest {
              .targets = {target}},
             {.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
              .source = ChildRef{kWebClient},
-             .targets = {ParentRef()}}};
+             .targets = {ParentRef()}},
+            {.capabilities =
+                 {
+                     Protocol{fuchsia::tracing::provider::Registry::Name_},
+                     Protocol{fuchsia::logger::LogSink::Name_},
+                     Directory{.name = "config-data",
+                               .rights = fuchsia::io::R_STAR_DIR,
+                               .path = "/config/data"},
+                 },
+             .source = ParentRef(),
+             .targets = {ChildRef{kFontsProvider}}}};
   }
 
   static constexpr auto kWebClient = "chromium_pixel_client";
@@ -241,6 +254,9 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest {
   static constexpr auto kMockCobalt = "cobalt";
   static constexpr auto kMockCobaltUrl = "#meta/mock_cobalt.cm";
 
+  static constexpr auto kHttpServer = "http_server";
+  static constexpr auto kHttpServerUrl = "#meta/http_server.cm";
+
   fuchsia::ui::composition::ScreenshotPtr screenshotter_;
   fuchsia::ui::display::singleton::InfoPtr info_;
 };
@@ -248,7 +264,9 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest {
 // Displays a non interactive HTML page with a solid red background.
 class StaticHtmlPixelTests : public WebRunnerPixelTest {
  private:
-  const char* HtmlForTestCase() override { return kStaticHtml; }
+  std::string HtmlForTestCase() override {
+    return fxl::StringPrintf("http://localhost:%d/%s", kPort, kStaticHtml);
+  }
 };
 
 TEST_F(StaticHtmlPixelTests, ValidPixelTest) {
@@ -276,10 +294,10 @@ class DynamicHtmlPixelTests : public WebRunnerPixelTest {
     auto touch = std::make_unique<fuchsia::ui::input::TouchscreenReport>();
     switch (tap_location) {
       case TapLocation::kTopLeft:
-        InjectTap(/* x = */ -500, /* y = */ -500);
+        InjectTapWithRetry(/* x = */ -500, /* y = */ -500);
         break;
       case TapLocation::kTopRight:
-        InjectTap(/* x = */ 500, /* y = */ -500);
+        InjectTapWithRetry(/* x = */ 500, /* y = */ -500);
         break;
       default:
         FX_NOTREACHED();
@@ -287,7 +305,9 @@ class DynamicHtmlPixelTests : public WebRunnerPixelTest {
   }
 
  private:
-  const char* HtmlForTestCase() override { return kDynamicHtml; }
+  std::string HtmlForTestCase() override {
+    return fxl::StringPrintf("http://localhost:%d/%s", kPort, kDynamicHtml);
+  }
 };
 
 TEST_F(DynamicHtmlPixelTests, ValidPixelTest) {
@@ -313,6 +333,52 @@ TEST_F(DynamicHtmlPixelTests, ValidPixelTest) {
                                                 num_pixels);
                                     }));
   }
+}
+
+// This test renders a video in the browser and takes a screenshot to verify the pixels. The video
+// displays a scene as shown below:-
+//  __________________________________
+// |                |                |
+// |     Yellow     |        Red     |
+// |                |                |
+// |________________|________________|
+// |                |                |
+// |                |                |
+// |      Blue      |     Green      |
+// |________________|________________|
+class VideoHtmlPixelTests : public WebRunnerPixelTest {
+ private:
+  std::string HtmlForTestCase() override {
+    return fxl::StringPrintf("http://localhost:%d/%s", kPort, kVideoHtml);
+  }
+};
+
+TEST_F(VideoHtmlPixelTests, ValidPixelTest) {
+  // BGRA values,
+  const ui_testing::Pixel kYellow = {16, 255, 255, 255};
+  const ui_testing::Pixel kRed = {26, 17, 255, 255};
+  const ui_testing::Pixel kBlue = {255, 11, 13, 255};
+  const ui_testing::Pixel kGreenv1 = {17, 255, 45, 255};
+  const ui_testing::Pixel kGreenv2 = {18, 255, 45, 255};
+  const ui_testing::Pixel kMagenta = {255, 255, 255, 255};
+
+  LaunchClient();
+
+  // The web page should render the scene as shown above.
+  // TODO(fxb/116631): Find a better replacement for screenshot loops to verify that content has
+  // been rendered on the display.
+  ASSERT_TRUE(TakeScreenshotUntil(kBlue, [&](std::map<ui_testing::Pixel, uint32_t> histogram) {
+    // Video's background color should not be visible.
+    EXPECT_EQ(histogram[kMagenta], 0u);
+
+    // Note that we do not see pure colors in the video but a shade of the colors shown in the
+    // diagram. Since it is hard to assert on the exact number of pixels for each shade of the
+    // color, the test asserts on the most prominent shade which was visible in the video.
+    EXPECT_GT(histogram[kYellow], 100000u);
+    EXPECT_GT(histogram[kRed], 100000u);
+    EXPECT_GT(histogram[kBlue], 100000u);
+    EXPECT_GT(histogram[kGreenv1] + histogram[kGreenv2], 100000u);
+  }));
 }
 
 }  // namespace integration_tests

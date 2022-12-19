@@ -35,6 +35,12 @@
             from: "parent",
             to: "#realm_builder",
         },
+        {
+            directory: "config-data",
+            from: "parent",
+            to: "#realm_builder",
+            subdir: "web_runner_pixel_test",
+        },
     ],
     facets: {
         "fuchsia.test": {
