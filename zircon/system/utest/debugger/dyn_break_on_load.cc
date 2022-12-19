@@ -1,6 +1,7 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
+#include <lib/tbi/tbi.h>
 #include <link.h>
 #include <zircon/status.h>
 #include <zircon/syscalls/port.h>
@@ -72,6 +73,10 @@ void dyn_break_on_load_test_handler(inferior_data_t* data, const zx_port_packet_
           zx_object_get_property(test_state->process_handle, ZX_PROP_PROCESS_DEBUG_ADDR,
                                  &r_debug_address, sizeof(r_debug_address));
       ASSERT_EQ(status, ZX_OK);
+
+      // Syscalls do not accept tagged addresses, so if this user pointer
+      // contains a tag, the debugger should strip it.
+      r_debug_address = tbi::RemoveTag(r_debug_address);
 
       size_t actual = 0;
       r_debug dl_debug = {};
