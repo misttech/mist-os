@@ -197,8 +197,6 @@ def parse_test(test):
     test_val = test['test']
     if 'package_url' in test_val:
         suffix = test_val['package_url'][-3:]
-        if suffix == 'cmx':
-            return Test(test_type='v1', package_url=test_val['package_url'])
         elif suffix == '.cm':
             return Test(test_type='v2', package_url=test_val['package_url'])
         else:
@@ -292,12 +290,6 @@ class StartedTest:
 #
 # Returns a StartedTest if the test could be started, and None otherwise.
 def start_test(test_object, parallel=None, timeout=None):
-    if test_object.test_type == 'v1':
-        command_line = ['fx', 'shell', 'run-test-component']
-        if timeout:
-            command_line.append(f'--timeout={int(timeout)}')
-        command_line.append(test_object.package_url)
-        return StartedTest.create(command_line)
     if test_object.test_type == 'v2':
         command_line = [
             'fx', 'shell', 'run-test-suite', test_object.package_url

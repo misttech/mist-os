@@ -20,7 +20,7 @@ cmc is available at `$OUT_DIR/host_x64/cmc` in the build output path after an `f
 invocation.
 
 ```
-$ ./out/default/host_x64/cmc --help
+./out/default/host_x64/cmc --help
 ```
 
 ## Testing
@@ -32,13 +32,13 @@ Unit tests for cmc are available in the `cmc_bin_tests` binary, which can be
 invoked with the `fx run-host-tests` command:
 
 ```
-$ fx run-host-tests --names cmc_bin_test
+fx run-host-tests --names cmc_bin_test
 ```
 
 Integration tests are also available in the `cmc_integration_test` package.
 
 ```
-$ fx run-test cmc_integration_test
+fx test cmc_integration_test
 ```
 
 ## Source layout

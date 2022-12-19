@@ -23,8 +23,6 @@ BT_MOCKED_TOOLS=(
   "tools/devshell/set"
   "tools/devshell/shell"
   "tools/devshell/fidlcat"
-  "tools/devshell/run-test"
-  "tools/devshell/run-test-component"
   "tools/devshell/run-host-tests"
   "tools/devshell/build"
   "tools/devshell/test"
