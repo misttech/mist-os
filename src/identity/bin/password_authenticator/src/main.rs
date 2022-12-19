@@ -92,11 +92,8 @@ async fn main() -> Result<(), Error> {
         cred_manager_provider,
         || {
             MinfsStorageManager::new(DevDiskManager::new(
-                open_in_namespace(
-                    "/dev",
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                )
-                .expect("open /dev root for disk manager"),
+                open_in_namespace("/dev", fio::OpenFlags::RIGHT_READABLE)
+                    .expect("open /dev root for disk manager"),
             ))
         },
     ));

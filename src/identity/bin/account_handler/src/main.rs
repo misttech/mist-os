@@ -75,7 +75,7 @@ where
 }
 
 fn get_dev_directory() -> fio::DirectoryProxy {
-    open_in_namespace("/dev", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE)
+    open_in_namespace("/dev", fio::OpenFlags::RIGHT_READABLE)
         .expect("open /dev root for disk manager")
 }
 

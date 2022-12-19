@@ -57,7 +57,7 @@
             directory: "dev-topological",
             from: "parent",
             to: [ "#account_handlers" ],
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
     ],
     expose: [

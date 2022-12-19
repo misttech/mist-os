@@ -37,7 +37,7 @@
         {
             directory: "dev-topological",
             from: "parent",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev",
         },
         {
