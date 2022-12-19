@@ -1,0 +1,21 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+triage_detect = {
+  package_name = "triage-detect"
+  files = [
+    {
+      source = "//src/diagnostics/config/triage/detect/session-detect.triage"
+      destination = "session-detect.triage"
+    },
+    {
+      source = "//src/diagnostics/config/triage/detect/sysmem-detect.triage"
+      destination = "sysmem-detect.triage"
+    },
+    {
+      source = "//src/diagnostics/config/triage/detect/wlan-detect.triage"
+      destination = "wlan-detect.triage"
+    },
+  ]
+}
