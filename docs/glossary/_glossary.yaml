@@ -478,19 +478,23 @@
   area: ["System", "Component Framework"]
 
 - term: "Driver"
-  short_description: "A driver is a dynamic shared library that
-  <a href=\"/docs/glossary#driver-manager\">driver manager</a> can
-  load into a <a href=\"/docs/glossary#driver-host\">driver-host</a> and that enables, and
-  controls one or more devices."
-  full_description: ""
+  short_description: "A driver is a dynamic shared library that enables and
+  controls one or more <a href=\"/docs/glossary#node\">nodes</a>."
+  full_description: "A driver is a dynamic shared library that enables and
+  controls one or more <a href=\"/docs/glossary#node\">nodes</a>. Drivers are
+  loaded into <a href=\"/docs/glossary#driver-host\">driver hosts</a> by the
+  <a href=\"/docs/glossary#driver-manager\">driver manager</a>."
   see_also: ["<a href=\"/docs/development/drivers/developer_guide/driver-development.md\">Fuchsia driver development</a>",
-             "<a href=\"/src/devices\">Driver source code</a>"]
+             "<a href=\"/src/devices\">Driver source code</a>",
+             "<a href=\"/docs/concepts/drivers/drivers_and_nodes.md\">Driver and nodes</a>"]
   related_guides: [""]
   area: ["System", "Devices"]
 
 - term: "Driver binding"
-  short_description: "The process in which drivers bind to nodes. A driver bound to a node can
-  access the node’s resources and create child nodes."
+  short_description: "The process where a <a href=\"/docs/glossary#driver\">driver</a> gets
+  assigned to a <a href=\"/docs/glossary#node\">node</a>, in which the driver becomes bound
+  to the node. A driver bound to a node can access the node’s
+  <a href=\"/docs/glossary#resource\">resources</a> and create child nodes."
   full_description: ""
   see_also: [""]
   related_guides: ["<a href=\"/docs/development/drivers/concepts/device_driver_model/driver-binding.md\">Driver binding</a>",
@@ -1070,6 +1074,17 @@
   related_guides: ["<a href=\"https://ninja-build.org/manual.html\">Ninja manual</a>"]
   area: ["System", "Developer"]
 
+- term: "Node"
+  short_description: "An entity in the Driver Framework that contains a set of
+  <a href=\"/docs/glossary#resource\">resources</a> that a
+  <a href=\"/docs/glossary#driver\">driver</a> can interact with and a set of
+  properties. A node can be thought of as a hardware or virtual device, or a node can be a part
+  of a hardware device."
+  full_description: ""
+  see_also: ["<a href=\"/docs/concepts/drivers/drivers_and_nodes.md\">Driver and nodes</a>"]
+  related_guides: [""]
+  area: ["System", "Devices"]
+
 - term: "offer"
   short_description: "A keyword for a component instance to route a capability that was exposed to it."
   full_description: "A <a href=\"/docs/glossary#component-instance\">component instance</a>
@@ -1272,6 +1287,15 @@
   see_also: ["<a href=\"/docs/concepts/components/v2/realms.md\">Realms</a>"]
   related_guides: [""]
   area: ["Component Framework"]
+
+- term: "Resource"
+  short_description: "Resources are contained in <a href=\"/docs/glossary#node\">nodes</a> and are
+  used by <a href=\"/docs/glossary#driver\">drivers</a> for communication. There are multiple
+  types of resources, including but not limited to: IPC, kernel, memory map, and I/O."
+  full_description: ""
+  see_also: [""]
+  related_guides: [""]
+  area: ["System", "Devices"]
 
 - term: "Roller"
   short_description: "A roller is an infrastructure job that watches for updates to a repository's
