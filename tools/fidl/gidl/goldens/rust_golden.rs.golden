@@ -633,7 +633,7 @@ fn test_golden_nullable_struct_null_v2_encode() {
 ]);
     assert_eq!(handle_dispositions, &[]);
 }
-#[cfg(target_os = "fuchsia")]
+
 #[test]
 fn test_golden_handle_basic_rights_struct_v1_encode() {
     let handle_defs = create_handles(&[
@@ -663,7 +663,7 @@ zx_types::zx_handle_disposition_t {
 },]
     );
 }
-#[cfg(target_os = "fuchsia")]
+
 #[test]
 fn test_golden_handle_basic_rights_struct_v2_encode() {
     let handle_defs = create_handles(&[
@@ -693,7 +693,7 @@ zx_types::zx_handle_disposition_t {
 },]
     );
 }
-#[cfg(target_os = "fuchsia")]
+
 #[test]
 fn test_golden_nullable_handle_struct_non_null_v1_encode() {
     let handle_defs = create_handles(&[
@@ -717,7 +717,7 @@ HandleDef{
 ]
     );
 }
-#[cfg(target_os = "fuchsia")]
+
 #[test]
 fn test_golden_nullable_handle_struct_non_null_v2_encode() {
     let handle_defs = create_handles(&[
@@ -1298,7 +1298,7 @@ fn test_golden_nullable_struct_null_v2_decode() {
     Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableStruct { v: None });
 }
-#[cfg(target_os = "fuchsia")]
+
 #[test]
 fn test_golden_nullable_handle_struct_non_null_v1_decode() {
     let bytes = &[
@@ -1326,7 +1326,7 @@ HandleDef{
     let expected_value = ForgetHandles(test_conformance::GoldenNullableHandleStruct { v: Some(copy_handle(&handle_defs[0])) });
     assert_eq!(value, &expected_value.0);
 }
-#[cfg(target_os = "fuchsia")]
+
 #[test]
 fn test_golden_nullable_handle_struct_non_null_v2_decode() {
     let bytes = &[

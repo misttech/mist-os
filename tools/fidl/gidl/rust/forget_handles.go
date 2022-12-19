@@ -31,7 +31,12 @@ func (b *forgetHandleBuilder) write(format string, args ...interface{}) {
 
 func (b *forgetHandleBuilder) visit(expr string, value gidlir.Value, decl gidlmixer.Declaration) {
 	if decl.IsNullable() {
+		// Unwrap the Option<...>.
 		expr = fmt.Sprintf("%s.as_mut().unwrap()", expr)
+		if _, ok := value.(gidlir.Record); ok {
+			// Unwrap again for Option<Box<...>>.
+			expr = fmt.Sprintf("%s.as_mut()", expr)
+		}
 	}
 	switch value := value.(type) {
 	case gidlir.Handle, gidlir.HandleWithRights:
@@ -70,7 +75,7 @@ func (b *forgetHandleBuilder) visit(expr string, value gidlir.Value, decl gidlmi
 				// Use another builder so that we only emit the match statement
 				// if there are any handles within to forget.
 				var inner forgetHandleBuilder
-				inner.visit("x", field, decl.Field(field.Key.Name))
+				inner.visit("x", field.Value, decl.Field(field.Key.Name))
 				if inner.Len() == 0 {
 					break
 				}
@@ -78,9 +83,11 @@ func (b *forgetHandleBuilder) visit(expr string, value gidlir.Value, decl gidlmi
 	%s::%s(x) => {
 		%s
 	}
-	_ => unreachable!(),
-}
-`, expr, declName(decl), fieldName, inner.String())
+	`, expr, declName(decl), fieldName, inner.String())
+				if len(decl.FieldNames()) > 1 {
+					b.write("_ => unreachable!(),")
+				}
+				b.write("}")
 			} else {
 				unknownData := field.Value.(gidlir.UnknownData)
 				if len(unknownData.Handles) != 0 {

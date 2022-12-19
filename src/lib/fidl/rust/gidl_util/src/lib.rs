@@ -64,12 +64,14 @@ struct HandleFactory {
     extra_channel: Option<fidl::Channel>,
 }
 
-// See src/lib/fidl/rust/fidl/src/lib.rs for handle subtypes. The ones marked
-// "Everywhere" are fully emulated on non-Fuchsia, so we can define create_*
-// functions that work on all platforms. The ones marked "FuchsiaOnly" are not
-// emulated, so we have to define create_* differently based on target_os.
-
+// See src/lib/fuchsia-async/src/handle/mod.rs for handle subtypes. The ones
+// marked "Everywhere" are fully emulated on non-Fuchsia, so we can define
+// factory functions that work on all platforms.
 impl HandleFactory {
+    fn create_event(&mut self) -> Result<fidl::Event, Status> {
+        fidl::Event::create()
+    }
+
     fn create_channel(&mut self) -> Result<fidl::Channel, Status> {
         match self.extra_channel.take() {
             Some(channel) => Ok(channel),
@@ -79,20 +81,6 @@ impl HandleFactory {
                 Ok(c1)
             }
         }
-    }
-}
-
-#[cfg(target_os = "fuchsia")]
-impl HandleFactory {
-    fn create_event(&mut self) -> Result<fidl::Event, Status> {
-        fidl::Event::create()
-    }
-}
-
-#[cfg(not(target_os = "fuchsia"))]
-impl HandleFactory {
-    fn create_event(&mut self) -> Result<fidl::Event, Status> {
-        Ok(Handle::invalid().into())
     }
 }
 
