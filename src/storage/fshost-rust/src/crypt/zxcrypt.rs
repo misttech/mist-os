@@ -59,7 +59,7 @@ async fn unseal(zxcrypt: &DeviceManagerProxy) -> Result<UnsealOutcome, Error> {
 pub async fn unseal_or_format(device: &mut dyn Device) -> Result<(), Error> {
     let controller = fuchsia_fs::directory::open_in_namespace(
         device.topological_path(),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        fio::OpenFlags::RIGHT_READABLE,
     )?;
     let zxcrypt = recursive_wait_and_open_node(&controller, "zxcrypt")
         .await

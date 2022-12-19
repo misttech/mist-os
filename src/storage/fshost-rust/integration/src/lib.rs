@@ -115,7 +115,7 @@ impl TestFixtureBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::directory("dev-topological").rights(fio::RW_STAR_DIR))
+                    .capability(Capability::directory("dev-topological").rights(fio::R_STAR_DIR))
                     .from(&drivers)
                     .to(Ref::parent())
                     .to(&fshost),

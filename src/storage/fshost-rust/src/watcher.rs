@@ -289,7 +289,7 @@ mod tests {
         let scope = ExecutionScope::new();
         class_block_and_nand.open(
             scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
             fio::MODE_TYPE_DIRECTORY,
             Path::dot(),
             fidl::endpoints::ServerEnd::new(server.into_channel()),
