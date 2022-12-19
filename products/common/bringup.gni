@@ -14,7 +14,6 @@ product_bootfs_labels = [
   "//bundles/drivers:bootstrap",
   "//bundles/drivers:bootstrap-eng",
   "//bundles/drivers:usb-host-stack",
-  "//bundles/drivers:usb-peripheral-stack",
   "//bundles/drivers:utils",
 ]
 

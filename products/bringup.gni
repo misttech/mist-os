@@ -7,6 +7,7 @@ import("//products/common/bringup.gni")
 product_bootfs_labels += [
   "//products/kernel_cmdline:kernel.oom.behavior--jobkill",
   "//products/kernel_cmdline:oom.reboot-timeout--low",
+  "//bundles/drivers:usb-peripheral-stack",
 ]
 
 product_bootfs_labels += [ "//bundles:diagnostics-eng" ]

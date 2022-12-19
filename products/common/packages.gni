@@ -1,0 +1,26 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+declare_args() {
+  developer_packages = [
+    "//src/intl/intl_services:pkg",
+    "//src/media/audio/bundles:services",
+    "//src/power:battery",
+    "//src/ui:ui_packages",
+    "//src/ui/bin/brightness_manager",
+    "//src/ui/bin/screensaver",
+    "//src/ui/bin/sensor-config:empty-sensor-config-pkg",
+    "//src/experiences/bin/settings/license:license_settings",
+    "//src/experiences/bin/settings/shell:shell_settings",
+    "//src/experiences/session_shells/ermine",
+    "//src/experiences/session_shells/gazelle",
+    "//src/media/playback/bundles:services",
+    "//src/session",
+    "//src/ui/bin/terminal",
+    "//examples/fortune:fortune_teller",
+
+    # Starnix
+    "//src/proc/bundles:starnix",
+  ]
+}

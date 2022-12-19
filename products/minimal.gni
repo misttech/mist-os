@@ -15,6 +15,23 @@ import("//products/common/minimal.gni")
 product_bootfs_labels += [
   "//products/kernel_cmdline:minimal",
   "//products/kernel_cmdline:oom.reboot-timeout--low",
+  "//bundles/drivers:usb-peripheral-stack",
+]
+
+core_realm_shards += [
+  "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",
+]
+
+legacy_base_package_labels += [
+  # TODO(http://fxb/100451): remove once core_realm shards can be compiled via
+  "//src/sys/pkg:system-update-checker",
+
+  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
+  "//src/connectivity/network/netcfg:config-default",
+
+  # TODO(https://fxbug.dev/85821): remove once out-of-tree users no longer
+  # reference v1 components.
+  "//src/connectivity/network:network-legacy-deprecated",
 ]
 
 # Use the product assembly config file to specify the product configuration.

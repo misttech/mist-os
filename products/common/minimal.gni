@@ -17,7 +17,6 @@ core_realm_shards = [
   "//src/developer/forensics:core_shard",
   "//src/developer/memory/monitor:memory_monitor_core_shard",
   "//src/recovery/factory_reset:factory_reset_core_shard",
-  "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",
   "//src/sys/pkg/bin/system-updater:system-updater-core-shard",
   "//src/sys/process-resolver:core_shard",
 ]
@@ -46,18 +45,11 @@ legacy_base_package_labels += [
   # TODO(http://fxb/100451): remove once core_realm shards can be compiled via
   "//src/connectivity/network/mdns/bundles:services",
 
-  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
-  "//src/connectivity/network/netcfg:config-default",
-
   # TODO(http://fxb/100451): remove once core_realm shards can be compiled via
   "//src/connectivity/network",
 
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
   "//src/sys/core:core_component_id_index",
-
-  # TODO(https://fxbug.dev/85821): remove once out-of-tree users no longer
-  # reference v1 components.
-  "//src/connectivity/network:network-legacy-deprecated",
 
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
   "//src/developer/forensics:pkg",
@@ -86,9 +78,6 @@ legacy_base_package_labels += [
 
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
   "//src/sys/full-resolver",  # This seems needed to run the session manager
-
-  # TODO(http://fxb/100451): remove once core_realm shards can be compiled via
-  "//src/sys/pkg:system-update-checker",
 
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
   "//src/sys/pkg/bin/system-update-committer:enable_reboot_on_verification_failure",

@@ -2,114 +2,25 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//products/common/minimal.gni")
-
-include_shell_commands_package = true
-
-product_system_image_deps = []
-
-product_bootfs_labels +=
-    [ "//products/kernel_cmdline:kernel.oom.behavior--reboot" ]
-
-core_realm_package_name = "core"
-core_realm_shards += [
-  "//src/connectivity/bluetooth/tools/bt-snoop:bt-snoop-core-shard",
-  "//src/connectivity/wlan/wlancfg:wlancfg-core-shard",
-  "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-core-shard",
-  "//src/connectivity/wlan/wlanstack:wlanstack-core-shard",
-  "//src/developer/debug/debug_agent:core_shard",
-  "//src/developer:default-laboratory-env-core-shard",
-  "//src/developer/remote-control:laboratory-core-shard",
-  "//src/devices/bin/driver_playground:driver-playground-core-shard",
-  "//src/developer/process_explorer:process_explorer_core_shard",
-  "//src/media/audio/audio_core:core_shard",
-  "//src/media/sounds/soundplayer:core_shard",
-  "//src/performance/trace_manager:trace_manager_core_shard",
-  "//src/proc/bin/starnix_manager:starnix_manager_core_shard",
-  "//src/settings/service:setui_service_core_shard",
-  "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",
-  "//src/sys/pkg/bin/system-updater:system-updater-core-shard",
-  "//src/intl/tzdata_provider:core-shard",
-  "//src/testing/metrics-logger:metrics-logger-shard",
-
-  # TODO(fxbug.dev/80375): only include in eng builds
-  "//src/sys/test_manager:test_manager_core_shard",
-  "//src/sys/fuzzing:fuzzing-core-shard",
-  "//src/developer/sshd-host:core_shard",
-
-  # TODO(fxbug.dev/103301): consider moving virtualization to another product
-  "//src/virtualization/bin/guest_manager:debian_core_shard",
-  "//src/virtualization/bin/guest_manager:termina_core_shard",
-  "//src/virtualization/bin/guest_manager:zircon_core_shard",
-]
-core_realm_restrict_persistent_storage = false
-
-core_realm_shards += [
-  "//src/intl/intl_services:intl_services_small_shard",
-
-  # Serve fuchsia.intl.TimeZones through intl_services by default. This is
-  # needed in core.gni for tests that use the core image.
-  "//src/intl/intl_services:intl_services_small_timezones_shard",
-]
-
-legacy_base_package_labels += [
-  "//src/developer/forensics/snapshot:pkg",
-  "//src/diagnostics/log_listener:log_listener_shell",
-  "//src/connectivity/bluetooth:core",
-  "//src/connectivity/wlan:packages",
-  "//src/devices/sysmem/bin/sysmem_connector",
-  "//src/intl/intl_services:pkg_small",
-  "//src/intl/tzdata_provider:pkg",
-  "//src/settings/service:setui_service",
-
-  # TODO(fxbug.dev/80375): only include in eng builds
-  "//src/developer/sshd-host",
-  "//src/developer/sshd-host:config",
-]
-
-# TODO(fxbug.dev/102390): We include this separately from appmgr because if
-# this is excluded when appmgr is removed, it will cause scrutiny errors in
-# test_manager.
-#
-# This is a workaround to make it easier to remove appmgr. Ideally,
-# we ought to create a variant of test_manager that excludes fuchsia.sys routes.
-core_realm_shards +=
-    [ "//src/sys/test_manager:test_manager_cmx_support_core_shard" ]
+import("//products/common/core.gni")
 
 # TODO(fxbug.dev/102390): deprecate appmgr from core.
 import("//src/sys/appmgr/appmgr.gni")
 legacy_base_package_labels += appmgr_base_packages
 core_realm_shards += appmgr_core_shards
 
-# Tools to control the pkg subsystem are in the base package set by default
-# so the software delivery system can be debugged and reconfigured without
-# access to the full universe package set.
-# Product configurations that lack an accessible shell environment should
-# remove these tools from the base package set.
-legacy_base_package_labels += [ "//src/sys/pkg:tools" ]
+product_bootfs_labels += [ "//bundles/drivers:usb-peripheral-stack" ]
 
-# cargo-gnaw is currently part of all build graphs, but it should only
-# built by fx tooling
-legacy_base_package_labels += [ "//tools/cargo-gnaw:install-cargo-gnaw" ]
-
-base_driver_package_labels += [ "//src/connectivity/bluetooth:core-drivers" ]
-
-legacy_cache_package_labels += [ "//src/developer/ffx:runtime" ]
-
-legacy_universe_package_labels += [
-  "//bundles/tools",
-  "//src/devices/bin/driver_playground:pkg",
-  "//src/testing/metrics-logger",
-
-  # Archivist for manual embedding in tests. Note that this archivist won't attribute logs by
-  # moniker and is unable to ingest Inspect.
-  "//src/diagnostics/archivist:archivist-without-attribution",
+core_realm_shards += [
+  "//src/intl/intl_services:intl_services_small_shard",
+  "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",
 ]
 
-# Set the default pkgfs allowlist to use for all core-based products to the
-# "eng" allowlist.
-product_system_image_deps +=
-    [ "//src/security/policy:pkgfs_non_static_pkgs_allowlist_eng" ]
+legacy_base_package_labels += [
+  "//src/connectivity/network/netcfg:config-default",
+  "//src/connectivity/network:network-legacy-deprecated",
+  "//src/sys/pkg:system-update-checker",
+]
 
 # Use the product assembly config file to specify the product configuration.
 #
