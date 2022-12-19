@@ -659,10 +659,8 @@ async fn test_forwarding<E: netemul::Endpoint, M: Manager>(name: &str) {
     realm.shutdown().await.expect("failed to shutdown realm");
 }
 
-// TODO(https://fxbug.dev/114132): Remove this test when multiple clients
-// requesting prefixes is supported.
 #[netstack_test]
-async fn test_prefix_provider_already_acquiring<M: Manager>(name: &str) {
+async fn test_prefix_provider_not_supported<M: Manager>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
         .create_netstack_realm_with::<Netstack2, _, _>(
@@ -675,6 +673,49 @@ async fn test_prefix_provider_already_acquiring<M: Manager>(name: &str) {
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
+            ],
+        )
+        .expect("create netstack realm");
+
+    let prefix_provider = realm
+        .connect_to_protocol::<fnet_dhcpv6::PrefixProviderMarker>()
+        .expect("connect to fuchsia.net.dhcpv6/PrefixProvider server");
+    // Attempt to Acquire a prefix when DHCPv6 is not supported (DHCPv6 client
+    // is not made available to netcfg).
+    let (prefix_control, server_end) =
+        fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
+            .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
+    prefix_provider
+        .acquire_prefix(fnet_dhcpv6::AcquirePrefixConfig::EMPTY, server_end)
+        .expect("acquire prefix");
+    assert_eq!(
+        prefix_control
+            .take_event_stream()
+            .map_ok(fnet_dhcpv6::PrefixControlEvent::into_on_exit)
+            .try_collect::<Vec<_>>()
+            .await
+            .expect("collect event stream")[..],
+        [Some(fnet_dhcpv6::PrefixControlExitReason::NotSupported)],
+    );
+}
+
+// TODO(https://fxbug.dev/114132): Remove this test when multiple clients
+// requesting prefixes is supported.
+#[netstack_test]
+async fn test_prefix_provider_already_acquiring<M: Manager>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox
+        .create_netstack_realm_with::<Netstack2, _, _>(
+            name,
+            &[
+                KnownServiceProvider::Manager {
+                    agent: M::MANAGEMENT_AGENT,
+                    use_dhcp_server: false,
+                    config: ManagerConfig::Dhcpv6,
+                },
+                KnownServiceProvider::DnsResolver,
+                KnownServiceProvider::FakeClock,
+                KnownServiceProvider::Dhcpv6Client,
             ],
         )
         .expect("create netstack realm");
@@ -773,10 +814,11 @@ async fn test_prefix_provider_config_error<M: Manager>(
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
                     use_dhcp_server: false,
-                    config: ManagerConfig::Empty,
+                    config: ManagerConfig::Dhcpv6,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
+                KnownServiceProvider::Dhcpv6Client,
             ],
         )
         .expect("create netstack realm");
@@ -807,10 +849,11 @@ async fn test_prefix_provider_double_watch<M: Manager>(name: &str) {
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
                     use_dhcp_server: false,
-                    config: ManagerConfig::Empty,
+                    config: ManagerConfig::Dhcpv6,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
+                KnownServiceProvider::Dhcpv6Client,
             ],
         )
         .expect("create netstack realm");

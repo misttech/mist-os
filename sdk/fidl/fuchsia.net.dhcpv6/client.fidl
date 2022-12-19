@@ -335,6 +335,8 @@ protocol PrefixControl {
             INTERFACE_REMOVED = 4;
             /// More than one concurrent call to a watch method was made.
             DOUBLE_WATCH = 5;
+            /// Acquiring prefixes is not supported.
+            NOT_SUPPORTED = 6;
         };
     });
 };

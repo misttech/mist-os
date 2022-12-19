@@ -116,17 +116,17 @@ fn take_any<T: std::marker::Copy + std::cmp::Eq + std::hash::Hash>(
     })
 }
 
-pub(super) struct Virtualization<B: BridgeHandler> {
+pub(super) struct Virtualization<'a, B: BridgeHandler> {
     installer: fnet_interfaces_admin::InstallerProxy,
     // TODO(https://fxbug.dev/101224): Use this field as the allowed upstream
     // device classes when NAT is supported.
-    _allowed_upstream_device_classes: HashSet<DeviceClass>,
+    _allowed_upstream_device_classes: &'a HashSet<DeviceClass>,
     bridge: Bridge<B>,
 }
 
-impl<B: BridgeHandler> Virtualization<B> {
+impl<'a, B: BridgeHandler> Virtualization<'a, B> {
     pub fn new(
-        _allowed_upstream_device_classes: HashSet<DeviceClass>,
+        _allowed_upstream_device_classes: &'a HashSet<DeviceClass>,
         allowed_bridge_upstream_device_classes: HashSet<DeviceClass>,
         bridge_handler: B,
         installer: fnet_interfaces_admin::InstallerProxy,
@@ -584,7 +584,7 @@ impl<B: BridgeHandler> Bridge<B> {
 }
 
 #[async_trait(?Send)]
-impl<B: BridgeHandler> Handler for Virtualization<B> {
+impl<'a, B: BridgeHandler> Handler for Virtualization<'a, B> {
     async fn handle_event(
         &'async_trait mut self,
         event: Event,
