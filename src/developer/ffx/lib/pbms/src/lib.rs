@@ -597,8 +597,7 @@ mod tests {
         let mut output = Vec::new();
         let mut err_out = Vec::new();
         let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
-        let client_factory = ::gcs::client::ClientFactory::new().expect("creating client factory");
-        let client = client_factory.create_client();
+        let client = Client::initial().expect("creating client");
 
         let sdk = env.context.get_sdk().await.expect("Loading configured sdk");
         update_metadata_all(&sdk, output_dir.path(), &AuthFlowChoice::Default, &ui, &client)

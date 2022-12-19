@@ -606,8 +606,7 @@ mod tests {
     async fn test_fetch_by_format() {
         let url = url::Url::parse("fake://foo").expect("url");
         let ui = structured_ui::MockUi::new();
-        let client_factory = gcs::client::ClientFactory::new().expect("creating client factory");
-        let client = client_factory.create_client();
+        let client = Client::initial().expect("creating client");
         fetch_by_format(
             "bad",
             &url,
@@ -626,8 +625,7 @@ mod tests {
     async fn test_fetch_bundle_uri() {
         let url = url::Url::parse("fake://foo").expect("url");
         let ui = structured_ui::MockUi::new();
-        let client_factory = gcs::client::ClientFactory::new().expect("creating client factory");
-        let client = client_factory.create_client();
+        let client = Client::initial().expect("creating client");
         fetch_bundle_uri(
             &url,
             &Path::new("unused"),

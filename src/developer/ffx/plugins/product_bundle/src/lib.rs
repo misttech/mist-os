@@ -7,7 +7,7 @@
 //! - acquire related data files, such as disk partition images (data)
 
 use {
-    ::gcs::client::ClientFactory,
+    ::gcs::client::Client,
     anyhow::{bail, Context, Result},
     errors::ffx_bail,
     ffx_config::ConfigLevel,
@@ -285,8 +285,7 @@ where
         .context("getting sdk env context")?;
     if !cmd.cached {
         let storage_dir = pbms::get_storage_dir().await?;
-        let client_factory = ClientFactory::new()?;
-        let client = client_factory.create_client();
+        let client = Client::initial()?;
         update_metadata_all(&sdk, &storage_dir, select_auth(cmd.oob_auth, &cmd.auth), ui, &client)
             .await?;
     }
@@ -502,8 +501,7 @@ where
         }
     }
 
-    let client_factory = ClientFactory::new()?;
-    let client = client_factory.create_client();
+    let client = Client::initial()?;
     get_product_data(&product_url, &output_dir, select_auth(cmd.oob_auth, &cmd.auth), ui, &client)
         .await
 }
@@ -549,8 +547,7 @@ where
 {
     if !cmd.cached {
         let base_dir = pbms::get_storage_dir().await?;
-        let client_factory = ClientFactory::new()?;
-        let client = client_factory.create_client();
+        let client = Client::initial()?;
         update_metadata_all(sdk, &base_dir, select_auth(cmd.oob_auth, &cmd.auth), ui, &client)
             .await?;
     }

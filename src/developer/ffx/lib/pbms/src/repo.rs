@@ -565,8 +565,7 @@ mod tests {
 
         // Download the repository metadata.
         let ui = structured_ui::MockUi::new();
-        let client_factory = gcs::client::ClientFactory::new().expect("creating client factory");
-        let client = client_factory.create_client();
+        let client = Client::initial().expect("creating client");
         fetch_package_repository_from_backend(
             local_repo_dir.as_std_path(),
             keys_url,

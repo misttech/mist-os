@@ -56,7 +56,7 @@ pub struct TokenStore {
     storage_base: Url,
 
     /// A limited time token used in an Authorization header.
-    access_token: Mutex<String>,
+    pub(crate) access_token: Mutex<String>,
 }
 
 impl TokenStore {

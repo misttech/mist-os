@@ -2,24 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//!
-//! Request that the user open a browser to this location:
-//!   - gcs::token_store::REFRESH_TOKEN_URL
-//! The user should then authenticate and grant permission to this program to
-//! use GCS. Upon approval, the web page will present a long string to
-//! copy-paste, this is the `refresh_token`.
-//!
-//! Ask the user to paste the token back into your application. Then use that
-//! token to create a TokenStore.
-//!
-//! The token_store may then be used to create a ClientFactory.
+//! A GCS Client may be given an initial access token up front or it may be
+//! added later.
 //!
 //! E.g.
 //! ```
-//! let refresh_token = new_refresh_token();
-//! let token_store = TokenStore::new(pasted_token);
-//! let client_factory = ClientFactory::new_with_auth(token_store);
-//! let client = client_factory.create_client();
+//! let client = Client.initial();
+//! let access_token = new_access_token();
+//! client.set_access_token(access_token).await;
 //! let res = client.download("some-bucket", "some-object").await?;
 //! if res.status() == StatusCode::OK {
 //!     let stdout = io::stdout();
@@ -30,6 +20,10 @@
 //!     }
 //! }
 //! ```
+//!
+//! After creating an initial client, it's a good idea to keep using that client
+//! repeatedly and/or create clones (.clone()) if multiple are desired. This
+//! practices shares an access token which provides a better experience.
 
 pub mod auth;
 pub mod client;

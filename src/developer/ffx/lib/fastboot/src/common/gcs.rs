@@ -14,7 +14,7 @@ use {
     errors::ffx_error,
     gcs::{
         auth::pkce::new_access_token,
-        client::{Client, ClientFactory},
+        client::{Client},
         token_store::read_boto_refresh_token,
     },
     sdk_metadata::ProductBundleV1,
@@ -41,9 +41,8 @@ impl GcsResolver {
         let refresh_token = read_boto_refresh_token(&boto_path)?;
         let access_token = new_access_token(&refresh_token).await?;
 
-        let client_factory = ClientFactory::new()?;
-        client_factory.set_access_token(access_token).await;
-        let client = client_factory.create_client();
+        let client = Client::initial()?;
+        client.set_access_token(access_token).await;
 
         let product_bundle_container_path = temp_dir.path().join("product_bundles.json");
         let gcs_path = format!("development/{}/sdk/product_bundles.json", version);

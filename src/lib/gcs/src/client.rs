@@ -5,7 +5,7 @@
 //! Download blob data from Google Cloud Storage (GCS).
 
 use {
-    crate::{error::GcsError, token_store::TokenStore},
+    crate::{token_store::TokenStore},
     anyhow::{bail, Context, Result},
     fuchsia_hyper::{new_https_client, HttpsClient},
     hyper::{body::HttpBody as _, header::CONTENT_LENGTH, Body, Response, StatusCode},
@@ -16,54 +16,6 @@ use {
         sync::Arc,
     },
 };
-
-/// Create clients with credentials for use with GCS.
-///
-/// Avoid more than one GCS ClientFactory with the *same auth* at a time. One way
-/// to accomplish this is with a static once cell.
-/// ```
-/// use once_cell::sync::OnceCell;
-/// static GCS_CLIENT_FACTORY: OnceCell<ClientFactory> = OnceCell::new();
-/// let client_factory = GCS_CLIENT_FACTORY.get_or_init(|| {
-///     let auth = [...];
-///     ClientFactory::new_with_auth(auth).expect(...)
-/// });
-/// ```
-/// If more than one GCS ClientFactory with auth is active at the same time, the
-/// creation of access tokens may create unnecessary network traffic (spamming)
-/// or contention.
-///
-/// Note: A ClientFactory using `TokenStore::new_without_auth()` doesn't have
-/// issues with more than one instance since there are no tokens to update.
-///
-/// The ClientFactory is thread/async safe to encourage creating a single,
-/// shared instance.
-pub struct ClientFactory {
-    token_store: Arc<TokenStore>,
-}
-
-impl ClientFactory {
-    /// Create a ClientFactory. Avoid creating more than one (see above).
-    pub fn new() -> Result<Self, GcsError> {
-        tracing::debug!("ClientFactory::new");
-        let auth = TokenStore::new()?;
-        let token_store = Arc::new(auth);
-        Ok(Self { token_store })
-    }
-
-    /// Create a new https client with shared access to the GCS credentials.
-    ///
-    /// Multiple clients may be created to perform downloads in parallel.
-    pub fn create_client(&self) -> Client {
-        Client::from_token_store(self.token_store.clone())
-    }
-
-    /// Set the access token for all clients created from the same
-    /// ClientFactory.
-    pub async fn set_access_token(&self, access: String) {
-        self.token_store.set_access_token(access).await;
-    }
-}
 
 /// A snapshot of the progress.
 #[derive(Clone, Debug, PartialEq)]
@@ -140,22 +92,24 @@ pub struct Client {
 }
 
 impl Client {
-    /// An https client that used a `token_store` to authenticate with GCS.
+    /// An https client that uses a `token_store` to authenticate with GCS.
     ///
-    /// The `token_store` may be used by multiple clients, even in separate
-    /// threads. It's preferable to share a single token_store to share the
-    /// access token stored therein.
+    /// This is sufficient for downloading public or private data blobs from
+    /// GCS. Reuse a client (or clones of a single client) for best results.
     ///
-    /// This is sufficient for downloading publicly accessible data blobs from
-    /// GCS.
+    /// If more than one client is desired (to download in parallel, for
+    /// example), clone an existing client. This will cause them to share
+    /// access token information. It's preferable to share a single token_store
+    /// to share the access token stored therein, to avoid unnecessary network
+    /// traffic or repeatedly asking the user for access.
     ///
-    /// Intentionally not public. Use ClientFactory::new_client() instead.
-    fn from_token_store(token_store: Arc<TokenStore>) -> Self {
-        Self { https: new_https_client(), token_store }
+    /// The shared access token is thread/async safe to encourage cloning for
+    /// shared instance. (Cloning the mutex to the token, not the token).
+    pub fn initial() -> Result<Self> {
+        Ok(Self { https: new_https_client(), token_store: Arc::new(TokenStore::new()?) })
     }
 
-    /// Set the access token for all clients created from the same
-    /// ClientFactory.
+    /// Set the access token for all clients cloned from this client.
     pub async fn set_access_token(&self, access: String) {
         self.token_store.set_access_token(access).await;
     }
@@ -358,11 +312,21 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_client_factory_no_auth() {
-        let client_factory = ClientFactory::new().expect("creating client factory");
-        let client = client_factory.create_client();
+        let client = Client::initial().expect("creating client");
         let res =
             client.stream("for_testing_does_not_exist", "face_test_object").await.expect("stream");
         assert_eq!(res.status(), 404);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_client_clone() {
+        let client_a = Client::initial().expect("creating client");
+        client_a.set_access_token("fake_token".to_string()).await;
+        let client_b = client_a.clone();
+        let client_c = Client::initial().expect("creating client");
+        assert_eq!("fake_token", *client_a.token_store.access_token.lock().await);
+        assert_eq!("fake_token", *client_b.token_store.access_token.lock().await);
+        assert_eq!("", *client_c.token_store.access_token.lock().await);
     }
 
     /// This test relies on a local file which is not present on test bots, so
@@ -373,8 +337,7 @@ mod test {
     async fn test_client_factory_with_auth() {
         // Set up authorized client.
         use home::home_dir;
-        let client_factory = ClientFactory::new().expect("creating client factory");
-        let client = client_factory.create_client();
+        let client = Client::initial().expect("creating client");
 
         let boto_path = Path::new(&home_dir().expect("getting home dir")).join(".boto");
         let refresh_token = read_boto_refresh_token(&boto_path).expect("reading refresh token");

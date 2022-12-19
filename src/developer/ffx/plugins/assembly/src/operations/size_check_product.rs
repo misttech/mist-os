@@ -19,7 +19,7 @@ use std::str::FromStr;
 
 use super::size_check::PackageBlobSizeInfo;
 use gcs::{
-    client::{Client, ClientFactory},
+    client::{Client},
     gs_url::split_gs_url,
 };
 
@@ -204,9 +204,9 @@ async fn get_gcs_client_with_auth(auth_mode: AuthMode) -> Result<Client> {
 
     let access_token = handle_new_access_token(&auth_flow, &ui).await?;
 
-    let factory = ClientFactory::new()?;
-    factory.set_access_token(access_token).await;
-    Ok(factory.create_client())
+    let client = Client::initial()?;
+    client.set_access_token(access_token).await;
+    Ok(client)
 }
 
 async fn gcs_download(bucket: &str, object: &str, auth_mode: AuthMode) -> Result<PathBuf> {

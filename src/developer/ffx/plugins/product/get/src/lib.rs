@@ -7,7 +7,7 @@
 //! - acquire related data files, such as disk partition images (data)
 
 use {
-    ::gcs::client::{ClientFactory, ProgressResponse, ProgressState},
+    ::gcs::client::{Client, ProgressResponse, ProgressState},
     anyhow::{Context, Result},
     errors::ffx_bail,
     ffx_core::ffx_plugin,
@@ -41,8 +41,7 @@ async fn pb_get_impl<I: structured_ui::Interface + Sync>(
     let local_dir = &cmd.out_dir;
     make_way_for_output(&local_dir, cmd.force).await.context("make_way_for_output")?;
 
-    let client_factory = ClientFactory::new()?;
-    let client = client_factory.create_client();
+    let client = Client::initial()?;
     tracing::debug!("transfer_manifest, transfer_manifest_url {:?}", transfer_manifest_url);
     transfer_download(
         &transfer_manifest_url,
