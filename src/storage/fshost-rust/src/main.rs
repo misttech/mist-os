@@ -5,6 +5,7 @@
 use {
     crate::{
         boot_args::BootArgs, config::apply_boot_args_to_config, environment::FshostEnvironment,
+        inspect::register_stats,
     },
     anyhow::{format_err, Error},
     fidl::prelude::*,
@@ -12,6 +13,7 @@ use {
     fuchsia_runtime::{take_startup_handle, HandleType},
     fuchsia_zircon::sys::zx_debug_write,
     futures::channel::mpsc,
+    inspect_runtime,
     std::sync::Arc,
     vfs::{
         directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path,
@@ -24,6 +26,7 @@ mod config;
 mod crypt;
 mod device;
 mod environment;
+mod inspect;
 mod manager;
 mod matcher;
 mod ramdisk;
@@ -49,6 +52,7 @@ async fn main() -> Result<(), Error> {
     let (watcher, device_stream) = watcher::Watcher::new().await?;
 
     let mut env = FshostEnvironment::new(config.clone(), boot_args);
+    let inspector = fuchsia_inspect::component::inspector();
     let export = vfs::pseudo_directory! {
         "svc" => vfs::pseudo_directory! {
             fshost::AdminMarker::PROTOCOL_NAME =>
@@ -61,7 +65,12 @@ async fn main() -> Result<(), Error> {
             "data" => remote_dir(env.data_root()?),
         },
         "mnt" => vfs::pseudo_directory! {},
+        inspect_runtime::DIAGNOSTICS_DIR => inspect_runtime::create_diagnostics_dir(
+            inspector.clone(),
+        ),
     };
+    // Records inspect metrics
+    register_stats(inspector.root(), env.data_root()?).await;
 
     let _ = service::handle_lifecycle_requests(shutdown_tx)?;
 
