@@ -128,6 +128,38 @@ in [Codelab: QEMU edu driver][codelab-qemu-edu-driver].
 
 ## Appendices
 
+### Update the environment to the latest SDK {:#update-the-environment-to-the-latest-sdk}
+
+To update your development environment to use the latest version
+of the Fuchsia SDK, do the following:
+
+1. In a terminal, go to your `fuchsia-drivers` directory:
+
+   ```posix-terminal
+   cd $HOME/fuchsia-drivers
+   ```
+
+1. Update the project repository and its submodules
+   to the latest version:
+
+   ```posix-terminal
+   git pull --rebase --recurse-submodules
+   ```
+
+1. Update the Fuchsia SDK toolchain and dependencies:
+
+   ```posix-terminal
+   tools/bazel build @fuchsia_sdk//:fuchsia_toolchain_sdk
+   ```
+
+1. Check the new version of the Fuchsia SDK:
+
+   ```posix-terminal
+   tools/ffx sdk version
+   ```
+
+   Verify that the SDK version is now the latest release version.
+
 ### Clean up the environment {:#clean-up-the-environment}
 
 If you run into a problem while following this guide and decide to start over
