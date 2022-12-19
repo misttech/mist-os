@@ -41,12 +41,11 @@ void main() {
           'environments': [],
           'test': {
             'cpu': 'arm64',
-            'path':
-                '/pkgfs/packages/run_test_component_test/0/test/run_test_component_test',
-            'name': '//src/sys/run_test_component/test:run_test_component_test',
+            'path': '/pkgfs/packages/component_test/0/test/component_test',
+            'name': '//src/sys/component/test:component_test',
             'os': 'fuchsia',
             'package_url':
-                'fuchsia-pkg://fuchsia.com/run_test_component_test#meta/run_test_component_test.cm',
+                'fuchsia-pkg://fuchsia.com/component_test#meta/component_test.cm',
             'log_settings': {'max_severity': 'ERROR'},
           }
         },
@@ -75,12 +74,11 @@ void main() {
           'environments': [],
           'test': {
             'cpu': 'arm64',
-            'path':
-                '/pkgfs/packages/run_test_component_test/0/test/run_test_component_test',
-            'name': '//src/sys/run_test_component/test:run_test_component_test',
+            'path': '/pkgfs/packages/component_test/0/test/component_test',
+            'name': '//src/sys/component/test:component_test',
             'os': 'fuchsia',
             'package_url':
-                'fuchsia-pkg://fuchsia.com/run_test_component_test#meta/run_test_component_test.cm',
+                'fuchsia-pkg://fuchsia.com/component_test#meta/component_test.cm',
             'log_settings': {},
           }
         },
@@ -108,12 +106,11 @@ void main() {
           'environments': [],
           'test': {
             'cpu': 'arm64',
-            'path':
-                '/pkgfs/packages/run_test_component_test/0/test/run_test_component_test',
-            'name': '//src/sys/run_test_component/test:run_test_component_test',
+            'path': '/pkgfs/packages/component_test/0/test/component_test',
+            'name': '//src/sys/component/test:component_test',
             'os': 'fuchsia',
             'package_url':
-                'fuchsia-pkg://fuchsia.com/run_test_component_test#meta/run_test_component_test.cm',
+                'fuchsia-pkg://fuchsia.com/component_test#meta/component_test.cm',
           }
         },
       ];
@@ -140,7 +137,7 @@ void main() {
           'environments': [],
           'test': {
             'cpu': 'arm64',
-            'name': '//src/sys/run_test_component/test:run_test_component_test',
+            'name': '//src/sys/component/test:component_test',
             'os': 'fuchsia',
           }
         },
@@ -148,12 +145,11 @@ void main() {
           'environments': [],
           'test': {
             'cpu': 'arm64',
-            'path':
-                '/pkgfs/packages/run_test_component_test/0/test/run_test_component_test',
-            'name': '//src/sys/run_test_component/test:run_test_component_test',
+            'path': '/pkgfs/packages/component_test/0/test/component_test',
+            'name': '//src/sys/component/test:component_test',
             'os': 'fuchsia',
             'package_url':
-                'fuchsia-pkg://fuchsia.com/run_test_component_test#meta/run_test_component_test.cmx',
+                'fuchsia-pkg://fuchsia.com/component_test#meta/component_test.cmx',
           }
         },
       ];
