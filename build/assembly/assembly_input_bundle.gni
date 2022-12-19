@@ -326,6 +326,18 @@ template("assembly_input_bundle_archive") {
 #  kernel_cmdline (optional: default: [])
 #    [list of strings] Kernel cmdline arguments.
 #
+#  shell_commands (optional; default: empty)
+#    [list of scopes] A list of scopes that describe the shell commands for each
+#    listed package
+#
+#    Example:
+#    shell_commands = [
+#      {
+#        package = "//third_party/sbase"
+#        components = [ "ls" ]
+#      },
+#    ]
+#
 #  create_aib_package (optional; default: false)
 #    [boolean] Set to true to also create a package that contains the contents
 #    of the AIB.
@@ -378,6 +390,7 @@ template("assembly_input_bundle") {
     config_data_with_verification = "${target_name}.group_with.config_data"
     bootfs_files_with_verification = "${target_name}.group_with.bootfs_files"
     kernel_cmdline = "${target_name}.kernel_cmdline"
+    shell_commands_list = "${target_name}.shell_commands.list"
   }
 
   files = {
@@ -403,6 +416,9 @@ template("assembly_input_bundle") {
     assembly_input_bundle_archive = "${assembly_input_bundle_dir}.tgz"
     assembly_input_bundle_archive_manifest =
         "${assembly_input_bundle_dir}.tgz.fini_manifest"
+
+    _gen_files = "${target_gen_dir}/${target_name}"
+    shell_commands_list = "${_gen_files}/shell_commands.list"
 
     # The output path for the generated file which collects bootfs_files from
     # the invoking
@@ -653,6 +669,45 @@ template("assembly_input_bundle") {
       #            +-> [ cache package deps ]
       creation_deps += [ ":${_manifest_list}" ]
     }
+  }
+
+  # Only add the shell command packages list if it's non-empty
+  if (defined(invoker.shell_commands) && invoker.shell_commands != []) {
+    shell_commands_json_contents = []
+
+    foreach(shell_command, invoker.shell_commands) {
+      assert(
+          defined(shell_command.package),
+          "shell_command entries must specify a package name: ${shell_command}")
+      assert(
+          defined(shell_command.components),
+          "shell_command components must be a list of strings pointing to binaries that are components in the package that make up the package: ${shell_command}")
+      _package_name = get_label_info(shell_command.package, "name")
+      shell_commands_json_contents += [
+        {
+          package = _package_name
+          components = shell_command.components
+        },
+      ]
+    }
+
+    generated_file(labels.shell_commands_list) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      outputs = [ files.shell_commands_list ]
+      output_conversion = "json"
+      contents = shell_commands_json_contents
+    }
+
+    creation_args += [
+      "--shell-cmds-list",
+      rebase_path(files.shell_commands_list, root_build_dir),
+    ]
+    creation_inputs += [ files.shell_commands_list ]
+    creation_deps += [ ":${labels.shell_commands_list}" ]
   }
 
   if (defined(invoker.qemu_kernel)) {

@@ -115,7 +115,8 @@ def add_shell_commands_from_file(
     for command in loaded_file:
         package = command["package"]
         components = command["components"]
-        aib_creator.shell_commands[package].extend(components)
+        aib_creator.shell_commands[package].extend(
+            ["bin/" + component for component in components])
 
 
 def add_config_data_entries_from_file(
