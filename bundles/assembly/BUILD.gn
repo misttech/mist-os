@@ -98,8 +98,9 @@ assembly_input_bundle("common_minimal") {
     "//src/diagnostics/persistence:diagnostics-persistence",
 
     # Other
-    "//src/sys/stash:pkg",
     "//src/developer/memory/monitor",
+    "//src/sys/stash:pkg",
+    "//src/sys/time/timekeeper",
 
     # Security
     "//src/security/bin/root_ssl_certificates",
