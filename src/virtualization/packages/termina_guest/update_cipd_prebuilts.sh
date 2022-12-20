@@ -50,7 +50,7 @@ print_usage_and_exit() {
   echo "      work_dir - An empty directory to place source trees and build artifacts."
   echo "      Note: script may generate contents of ~125 GB"
   echo ""
-  echo "   -t target - An optional target: all,clean,debian,angle"
+  echo "   -t target - An optional target: all,clean,debian,angle,termina"
   echo ""
   echo "   -n Dry run. Don't actually upload anything, just show what would be"
   echo "      uploaded."
@@ -118,6 +118,20 @@ create_cros_tree() {
     git checkout fuchsia/${mesa_branch})
 
   git clone https://fuchsia.googlesource.com/fuchsia src/third_party/fuchsia
+
+  cros_sdk bash -c "setup_board --board=${board}"
+
+  # Switch to source build for mesa
+  cros_sdk bash -c "cros_workon --board=${board} start mesa"
+
+  # Switch to source build of sommelier
+  cros_sdk bash -c "cros_workon --board=${board} start sommelier"
+
+  # Switch to source build of magma
+  cros_sdk bash -c "cros_workon --board=${board} start magma"
+
+  # Switch to source build of tremplin
+  cros_sdk bash -c "cros_workon --board=${board} start tremplin"
 
   popd
 }
@@ -308,27 +322,16 @@ build_termina_image() {
   # system relies on doing a chroot into a sysroot to support the build. This
   # is handled by the 'cros_sdk' command below.
   local -r chroot_outdir="~/termina-${board}-image"
-  local -r input_image="~/trunk/src/build/images/${board}/latest/chromiumos_image.bin"
+  local -r input_image="~/trunk/src/build/images/${board}/latest/chromiumos_base_image.bin"
 
   pushd "${cros_dir}"
 
-  cros_sdk bash -c "setup_board --board=${board}"
-
-  # Switch to source build for mesa
-  cros_sdk bash -c "cros_workon --board=${board} start mesa"
-
-  # Switch to source build of sommelier
-  cros_sdk bash -c "cros_workon --board=${board} start sommelier"
-
-  # Switch to source build of magma
-  cros_sdk bash -c "cros_workon --board=${board} start magma"
-
-  # Switch to source build of tremplin
-  cros_sdk bash -c "cros_workon --board=${board} start tremplin"
+  # Not needed for clean build but ensure that any of the prebuilts are picked up
+  cros_sdk bash -c "emerge-${board} mesa termina_container_tools"
 
   # Build chromeos image
   cros_sdk bash -c "./build_packages --board=${board} --nowithautotest && \
-    ./build_image --board=${board} --noenable_rootfs_verification"
+    ./build_image --board=${board} --noenable_rootfs_verification base"
 
   # Extract Termina from chromeos image
   cros_sdk bash -c "sudo rm -rf ${chroot_outdir} && \
@@ -388,7 +391,7 @@ main() {
     exit 1
   fi
 
-  if [[ "${target}" != "all" && "${target}" != "debian" && "${target}" != "angle" && "${target}" != "clean" ]]; then
+  if [[ "${target}" != "all" && "${target}" != "debian" && "${target}" != "angle" && "${target}" != "termina" && "${target}" != "clean" ]]; then
     print_usage_and_exit 1
   fi
 
@@ -446,7 +449,7 @@ main() {
     fi
   fi
 
-  if [[ "${target}" == "all" ]]; then
+  if [[ "${target}" == "all" || "${target}" == "termina" ]]; then
     echo "*** Build Termina image"
     build_termina_image "${arch}" "${work_dir}/cros"
 
@@ -463,7 +466,7 @@ main() {
     build_extras_image "${extras_dir}" "${work_dir}/termina-${board}-image/vm_extras.img"
   fi
 
-  if [[ "${target}" == "all" ]]; then
+  if [[ "${target}" == "all" || "${target}" == "termina" ]]; then
     options=()
     options+=("create")
     options+=("-in" "${work_dir}/termina-${board}-image")
