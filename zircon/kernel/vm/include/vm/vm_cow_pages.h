@@ -1149,7 +1149,9 @@ class VmCowPages final : public VmHierarchyBase,
   // reclaim to block on that'll do priority inheritance to the thread that needs to finish moving
   // pages.
   fbl::RefPtr<VmCowPagesContainer> container_;
+#if DEBUG_ASSERT_IMPLEMENTED
   VmCowPagesContainer* debug_retained_raw_container_ = nullptr;
+#endif
 
   VmCowPagesOptions options_ TA_GUARDED(lock());
 

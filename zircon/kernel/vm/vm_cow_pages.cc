@@ -294,11 +294,13 @@ VmCowPages::VmCowPages(ktl::unique_ptr<VmCowPagesContainer> cow_container,
     : VmHierarchyBase(ktl::move(hierarchy_state_ptr)),
       pmm_alloc_flags_(pmm_alloc_flags),
       container_(fbl::AdoptRef(cow_container.release())),
-      debug_retained_raw_container_(container_.get()),
       options_(options),
       size_(size),
       page_source_(ktl::move(page_source)),
       discardable_tracker_(ktl::move(discardable_tracker)) {
+#if DEBUG_ASSERT_IMPLEMENTED
+  debug_retained_raw_container_ = container_.get();
+#endif
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
   DEBUG_ASSERT(!(pmm_alloc_flags & PMM_ALLOC_FLAG_CAN_BORROW));
 }
@@ -404,7 +406,7 @@ VmCowPages::~VmCowPages() {
   // We only intent to delete VmCowPages when the container is also deleting, and the container
   // won't be deleting unless it's ref is 0.
   DEBUG_ASSERT(!container_);
-  DEBUG_ASSERT(0 == debug_retained_raw_container_->ref_count_debug());
+  DEBUG_ASSERT_COND(0 == debug_retained_raw_container_->ref_count_debug());
 }
 
 bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
