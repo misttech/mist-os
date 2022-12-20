@@ -6902,4 +6902,49 @@ TEST(PagerWriteback, DelayedDirtyNotFound) {
   ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
 }
 
+// Tests attributed counts for a child created against a pager-backed parent.
+TEST(PagerWriteback, ChildAttributedCounts) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* root_vmo;
+  ASSERT_TRUE(pager.CreateVmoWithOptions(1, ZX_VMO_TRAP_DIRTY, &root_vmo));
+
+  zx::vmo child_vmo;
+  ASSERT_OK(root_vmo->vmo().create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, 0,
+                                         zx_system_get_page_size(), &child_vmo));
+
+  // Dirty a page in the parent.
+  ASSERT_TRUE(pager.SupplyPages(root_vmo, 0, 1));
+  ASSERT_TRUE(pager.DirtyPages(root_vmo, 0, 1));
+  const uint32_t val = 42;
+  ASSERT_OK(root_vmo->vmo().write(&val, 0, sizeof(val)));
+
+  // Child can read the parent.
+  uint32_t data;
+  ASSERT_OK(child_vmo.read(&data, 0, sizeof(data)));
+  EXPECT_EQ(val, data);
+
+  // Committed pages are attributed to the parent.
+  zx_info_vmo_t info;
+  ASSERT_OK(root_vmo->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
+  EXPECT_EQ(zx_system_get_page_size(), info.committed_bytes);
+
+  // Committed pages are not attributed to the child.
+  ASSERT_OK(child_vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
+  EXPECT_EQ(0u, info.committed_bytes);
+
+  // Drop the parent.
+  pager.ReleaseVmo(root_vmo);
+
+  // Committed pages are still not attributed to the child.
+  ASSERT_OK(child_vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
+  EXPECT_EQ(0u, info.committed_bytes);
+
+  // Child can read the parent's pages though.
+  data = 0;
+  ASSERT_OK(child_vmo.read(&data, 0, sizeof(data)));
+  EXPECT_EQ(val, data);
+}
+
 }  // namespace pager_tests
