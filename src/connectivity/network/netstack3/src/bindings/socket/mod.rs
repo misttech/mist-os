@@ -534,6 +534,7 @@ impl IntoErrno for SetDeviceError {
         match self {
             Self::Conflict => Errno::Eaddrinuse,
             Self::Unroutable => Errno::Ehostunreach,
+            Self::ZoneChange => Errno::Einval,
         }
     }
 }

@@ -1002,8 +1002,18 @@ impl<I: IpExt, C: NonSyncContext, SC: TcpSyncContext<I, C>> TcpSocketHandler<I, 
             let TcpSockets { socketmap, inactive: _, port_alloc: _ } = sockets;
             let entry = socketmap.listeners_mut().entry(&id.into()).expect("invalid ID");
             let (_, _, addr): &(MaybeListener<_, _>, (), _) = entry.get();
-            let addr = addr.clone();
-            match entry.try_update_addr(ListenerAddr { device, ..addr }) {
+            let ListenerAddr { device: old_device, ip: ip_addr } = addr;
+            let ListenerIpAddr { identifier: _, addr: ip } = ip_addr;
+            if let Some(ip) = ip {
+                // TODO(https://fxbug.dev/115524): add an assert for
+                // `must_have_zone = true` implying `device != None` once that's
+                // enforced as an invariant for bind & connect.
+                if crate::socket::must_have_zone(ip) && &device != old_device {
+                    return Err(SetDeviceError::ZoneChange);
+                }
+            }
+            let ip = *ip_addr;
+            match entry.try_update_addr(ListenerAddr { device, ip }) {
                 Ok(_entry) => Ok(()),
                 Err((ExistsError, _entry)) => Err(SetDeviceError::Conflict),
             }
@@ -1021,9 +1031,20 @@ impl<I: IpExt, C: NonSyncContext, SC: TcpSyncContext<I, C>> TcpSocketHandler<I, 
                 let entry = socketmap.conns_mut().entry(&id.into()).expect("invalid conn ID");
                 let (_, _, addr): &(Connection<_, _, _, _, _, _>, (), _) = entry.get();
                 let ConnAddr {
-                    device: _,
+                    device,
                     ip: ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) },
                 } = addr;
+
+                // TODO(https://fxbug.dev/115524): add an assert for
+                // `must_have_zone = true` implying `device != None` once that's
+                // enforced as an invariant for bind & connect.
+                if crate::socket::must_have_zone(local_ip)
+                    || crate::socket::must_have_zone(remote_ip)
+                {
+                    if &new_device != device {
+                        return Err(SetDeviceError::ZoneChange);
+                    }
+                }
 
                 let new_socket = ip_transport_ctx
                     .new_ip_socket(
@@ -1312,6 +1333,8 @@ pub enum SetDeviceError {
     Conflict,
     /// The socket would become unroutable.
     Unroutable,
+    /// The socket has an address with a different zone.
+    ZoneChange,
 }
 
 /// Sets the device on which a listening socket will receive new connections.
@@ -1926,11 +1949,15 @@ impl<I: Ip> Into<usize> for UnboundId<I> {
 
 #[cfg(test)]
 mod tests {
-    use const_unwrap::const_unwrap_option;
     use core::{cell::RefCell, fmt::Debug};
-    use fakealloc::rc::Rc;
+    use fakealloc::{rc::Rc, vec};
+
+    use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
-    use net_types::ip::{AddrSubnet, Ip, Ipv4, Ipv6, Ipv6SourceAddr};
+    use net_types::{
+        ip::{AddrSubnet, Ip, Ipv4, Ipv6, Ipv6SourceAddr},
+        LinkLocalAddr,
+    };
     use packet::ParseBuffer as _;
     use packet_formats::tcp::{TcpParseArgs, TcpSegment};
     use rand::Rng as _;
@@ -1946,7 +1973,7 @@ mod tests {
             device::state::{
                 AddrConfig, AddressState, IpDeviceState, IpDeviceStateIpExt, Ipv6AddressEntry,
             },
-            socket::testutil::{FakeBufferIpSocketCtx, FakeIpSocketCtx},
+            socket::testutil::{FakeBufferIpSocketCtx, FakeDeviceConfig, FakeIpSocketCtx},
             testutil::{FakeDeviceId, MultipleDevicesId},
             BufferIpTransportContext as _, SendIpPacketMeta,
         },
@@ -1975,6 +2002,19 @@ mod tests {
     struct FakeTcpState<I: TcpTestIpExt, D: IpDeviceId> {
         isn_generator: IsnGenerator<FakeInstant>,
         sockets: TcpSockets<I, D, TcpNonSyncCtx>,
+    }
+
+    impl<I: TcpTestIpExt, D: IpDeviceId> Default for FakeTcpState<I, D> {
+        fn default() -> Self {
+            Self {
+                isn_generator: Default::default(),
+                sockets: TcpSockets {
+                    inactive: IdMap::new(),
+                    socketmap: BoundSocketMap::default(),
+                    port_alloc: PortAlloc::new(&mut FakeCryptoRng::new_xorshift(0)),
+                },
+            }
+        }
     }
 
     type TcpSyncCtx<I, D> = WrappedFakeSyncCtx<
@@ -2179,14 +2219,7 @@ mod tests {
                 FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::<I, _>::with_devices_state(
                     core::iter::empty(),
                 )),
-                FakeTcpState {
-                    isn_generator: Default::default(),
-                    sockets: TcpSockets {
-                        inactive: IdMap::new(),
-                        socketmap: BoundSocketMap::default(),
-                        port_alloc: PortAlloc::new(&mut FakeCryptoRng::new_xorshift(0)),
-                    },
-                },
+                Default::default(),
             )
         }
     }
@@ -2715,6 +2748,95 @@ mod tests {
             Some(LOCAL_PORT),
         )
         .expect("no conflict");
+    }
+
+    #[test_case(None)]
+    #[test_case(Some(MultipleDevicesId::B); "other")]
+    fn set_bound_device_listener_on_zoned_addr(set_device: Option<MultipleDevicesId>) {
+        set_logger_for_test();
+        let ll_addr = LinkLocalAddr::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network()).unwrap();
+
+        let TcpCtx { mut sync_ctx, mut non_sync_ctx } =
+            TcpCtx::with_sync_ctx(TcpSyncCtx::<Ipv6, _>::with_inner_and_outer_state(
+                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new(
+                    MultipleDevicesId::all().into_iter().map(|device| FakeDeviceConfig {
+                        device,
+                        local_ips: vec![ll_addr.into_specified()],
+                        remote_ips: vec![ll_addr.into_specified()],
+                    }),
+                )),
+                Default::default(),
+            ));
+
+        let unbound = TcpSocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        // TODO(https://fxbug.dev/115524): Use a local address with a zone
+        // instead of setting the device manually.
+        TcpSocketHandler::set_unbound_device(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            unbound,
+            Some(MultipleDevicesId::A),
+        );
+        let bound = TcpSocketHandler::bind(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            unbound,
+            *ll_addr,
+            Some(LOCAL_PORT),
+        )
+        .expect("bind should succeed");
+
+        assert_matches!(
+            TcpSocketHandler::set_bound_device(&mut sync_ctx, &mut non_sync_ctx, bound, set_device),
+            Err(SetDeviceError::ZoneChange)
+        );
+    }
+
+    #[test_case(None)]
+    #[test_case(Some(MultipleDevicesId::B); "other")]
+    fn set_bound_device_connected_to_zoned_addr(set_device: Option<MultipleDevicesId>) {
+        set_logger_for_test();
+        let ll_addr = LinkLocalAddr::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network()).unwrap();
+
+        let TcpCtx { mut sync_ctx, mut non_sync_ctx } =
+            TcpCtx::with_sync_ctx(TcpSyncCtx::<Ipv6, _>::with_inner_and_outer_state(
+                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new(
+                    MultipleDevicesId::all().into_iter().map(|device| FakeDeviceConfig {
+                        device,
+                        local_ips: vec![ll_addr.into_specified()],
+                        remote_ips: vec![ll_addr.into_specified()],
+                    }),
+                )),
+                Default::default(),
+            ));
+
+        let unbound = TcpSocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        // TODO(https://fxbug.dev/115524): Use a remote address with a zone
+        // instead of setting the device manually.
+        TcpSocketHandler::set_unbound_device(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            unbound,
+            Some(MultipleDevicesId::A),
+        );
+        let bound = TcpSocketHandler::connect_unbound(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            unbound,
+            SocketAddr { ip: ll_addr.into_specified(), port: LOCAL_PORT },
+            Default::default(),
+        )
+        .expect("connect should succeed");
+
+        assert_matches!(
+            TcpSocketHandler::set_connection_device(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                bound,
+                set_device
+            ),
+            Err(SetDeviceError::ZoneChange)
+        );
     }
 
     #[ip_test]
