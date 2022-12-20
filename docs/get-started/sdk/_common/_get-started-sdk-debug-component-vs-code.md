@@ -15,7 +15,7 @@ In VS Code, do the following:
 1. To set a breakpoint at the `main()` method, click the space to the left of
    the line number.
 
-   ![Breakpoint](images/get-started-vscode-breakpoint.png "A breakpoint in VS Code"){: .screenshot width="500"}
+   ![Breakpoint](/docs/get-started/sdk/images/get-started-vscode-breakpoint.png "A breakpoint in VS Code"){: .screenshot width="500"}
 
    When a breakpoint is set, a red dot appears.
 
@@ -27,7 +27,7 @@ In VS Code, do the following:
 
 1. Click the **DEBUG CONSOLE** tab on the VS Code panel.
 
-   ![Debug console](images/get-started-vscode-debug-console.png "The Debug console panel in VS Code"){: .screenshot}
+   ![Debug console](/docs/get-started/sdk/images/get-started-vscode-debug-console.png "The Debug console panel in VS Code"){: .screenshot}
 
    This shows the console output of the Fuchsia debugger (`zxdb`).
 
@@ -40,12 +40,12 @@ In VS Code, do the following:
 
 1. In the debug toolbar at the top of VS Code, click the **Step Over** icon.
 
-   ![Step over](images/get-started-vscode-step-over-icon.png "The Step Over icon in VS Code"){: .screenshot width="250"}
+   ![Step over](/docs/get-started/sdk/images/get-started-vscode-step-over-icon.png "The Step Over icon in VS Code"){: .screenshot width="250"}
 
 1. In the **FUCHSIA LOGS** panel, verify that a new `Hello again, World!`
    entry is printed in the logs.
 
-   ![Hello again](images/get-started-vscode-debug-hello-again-world.png "Hello again, World in the Fuchsia logs panel of VS Code"){: .screenshot}
+   ![Hello again](/docs/get-started/sdk/images/get-started-vscode-debug-hello-again-world.png "Hello again, World in the Fuchsia logs panel of VS Code"){: .screenshot}
 
 1. In the debug toolbar at the top of VS Code, click the **Stop** icon.
 
