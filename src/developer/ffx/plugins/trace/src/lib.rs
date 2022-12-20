@@ -14,11 +14,13 @@ use {
     lazy_static::lazy_static,
     regex::Regex,
     serde::{Deserialize, Serialize},
-    std::collections::{BTreeSet, HashSet},
+    std::collections::BTreeSet,
     std::future::Future,
     std::io::{stdin, Stdin},
     std::path::{Component, PathBuf},
     std::time::Duration,
+    term_grid::Grid,
+    termion::terminal_size,
 };
 
 // This is to make the schema make sense as this plugin can output one of these based on the
@@ -31,68 +33,33 @@ enum TraceOutput {
     ListProviders(Vec<TraceProviderInfo>),
 }
 
-// This list should be kept in sync with DEFAULT_CATEGORIES in
-// //src/testing/sl4f/src/tracing/facade.rs as well the default
-// group in data/config.json
-// TODO(fxbug.dev/115872): Remove this once category discovery is
-// available.
-const DEFAULT_CATEGORIES: &[&'static str] = &[
-    "app",
-    "audio",
-    "benchmark",
-    "blobfs",
-    "gfx",
-    "input",
-    "kernel:meta",
-    "kernel:sched",
-    "ledger",
-    "magma",
-    "minfs",
-    "modular",
-    "view",
-    "flutter",
-    "dart",
-    "dart:compiler",
-    "dart:dart",
-    "dart:debugger",
-    "dart:embedder",
-    "dart:gc",
-    "dart:isolate",
-    "dart:profiler",
-    "dart:vm",
-];
-
 // These fields are arranged this way because deriving Ord uses field declaration order.
 #[derive(Debug, Deserialize, Serialize, PartialOrd, Ord, PartialEq, Eq)]
 struct TraceKnownCategory {
     /// The name of the category.
     name: String,
-    /// Whether this category is returned by the GetKnownCategories FIDL call.
-    known: bool,
-    /// Whether this category is a default category used when starting a trace.
-    default: bool,
     /// A short, possibly empty description of this category.
     description: String,
 }
 
 impl From<KnownCategory> for TraceKnownCategory {
     fn from(category: KnownCategory) -> Self {
-        let default = DEFAULT_CATEGORIES.iter().any(|&c| c == category.name);
-        Self { name: category.name, description: category.description, default, known: true }
+        Self { name: category.name, description: category.description }
     }
 }
 
 impl From<&'static str> for TraceKnownCategory {
     fn from(name: &'static str) -> Self {
-        Self { name: name.to_string(), description: String::new(), known: false, default: true }
+        Self { name: name.to_string(), description: String::new() }
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+// These fields are arranged this way because deriving Ord uses field declaration order.
+#[derive(Debug, Deserialize, Serialize, PartialOrd, Ord, PartialEq, Eq)]
 struct TraceProviderInfo {
+    name: String,
     id: Option<u32>,
     pid: Option<u64>,
-    name: String,
 }
 
 impl From<ProviderInfo> for TraceProviderInfo {
@@ -196,6 +163,26 @@ async fn expand_categories(categories: Vec<String>) -> Result<Vec<String>> {
     Ok(expanded_categories.into_iter().collect())
 }
 
+// Print as a grid that fills the width of the terminal. Falls back to one value
+// per line if any value is wider than the terminal.
+fn print_grid(writer: &Writer, values: Vec<String>) -> Result<()> {
+    let mut grid = Grid::new(term_grid::GridOptions {
+        direction: term_grid::Direction::TopToBottom,
+        filling: term_grid::Filling::Spaces(2),
+    });
+    for value in &values {
+        grid.add(term_grid::Cell::from(value.as_str()));
+    }
+
+    let terminal_width = terminal_size().unwrap_or((80, 80)).0;
+    let formatted_values = match grid.fit_into_width(terminal_width.into()) {
+        Some(grid_display) => grid_display.to_string(),
+        None => values.join("\n"),
+    };
+    writer.line(formatted_values)?;
+    Ok(())
+}
+
 // OPTIMIZATION: Only grab a tracing controller proxy only when necessary.
 #[ffx_plugin(
     TracingProxy = "daemon::protocol",
@@ -210,49 +197,33 @@ pub async fn trace(
     let default_target: Option<String> = ffx_config::get("target.default").await?;
     match cmd.sub_cmd {
         TraceSubCommand::ListCategories(_) => {
-            let categories = handle_fidl_error(controller.get_known_categories().await)?;
+            let mut categories = handle_fidl_error(controller.get_known_categories().await)?;
+            categories.sort_unstable();
             if writer.is_machine() {
-                let mut categories = categories
+                let categories = categories
                     .into_iter()
                     .map(TraceKnownCategory::from)
                     .collect::<Vec<TraceKnownCategory>>();
 
-                let names = categories.iter().map(|c| c.name.as_str()).collect::<HashSet<&str>>();
-                let mut extra_categories = DEFAULT_CATEGORIES
-                    .iter()
-                    .filter_map(|&c| if !names.contains(c) { Some(c.into()) } else { None })
-                    .collect::<Vec<_>>();
-                categories.append(&mut extra_categories);
-                categories.sort();
-
                 writer.machine(&TraceOutput::ListCategories(categories))?;
             } else {
-                writer.line("Known Categories:")?;
-                for category in &categories {
-                    writer.line(format!("- {} - {}", category.name, category.description))?;
-                }
-                writer.line("\nDefault Categories:")?;
-                for category in DEFAULT_CATEGORIES {
-                    writer.line(format!("- {}", category))?;
-                }
+                print_grid(
+                    &writer,
+                    categories.into_iter().map(|category| category.name).collect(),
+                )?;
             }
         }
         TraceSubCommand::ListProviders(_) => {
-            let providers = handle_fidl_error(controller.get_providers().await)?;
+            let mut providers = handle_fidl_error(controller.get_providers().await)?
+                .into_iter()
+                .map(TraceProviderInfo::from)
+                .collect::<Vec<TraceProviderInfo>>();
+            providers.sort_unstable();
             if writer.is_machine() {
-                let providers = providers
-                    .into_iter()
-                    .map(TraceProviderInfo::from)
-                    .collect::<Vec<TraceProviderInfo>>();
                 writer.machine(&TraceOutput::ListProviders(providers))?;
             } else {
                 writer.line("Trace providers:")?;
-                for provider in &providers {
-                    writer.line(format!(
-                        "- {}",
-                        provider.name.as_ref().unwrap_or(&"unknown".to_string())
-                    ))?;
-                }
+                print_grid(&writer, providers.into_iter().map(|provider| provider.name).collect())?;
             }
         }
         TraceSubCommand::Start(opts) => {
@@ -551,6 +522,30 @@ mod tests {
         assert_eq!(want, got);
     }
 
+    #[test]
+    fn test_print_grid_too_wide() {
+        let writer = Writer::new_test(None);
+        print_grid(
+            &writer,
+            vec![
+                "really_really_really_really\
+                _really_really_really_really\
+                _really_really_long_category"
+                    .to_string(),
+                "short_category".to_string(),
+                "another_short_category".to_string(),
+            ],
+        )
+        .unwrap();
+        let output = writer.test_output().unwrap();
+        let want = "really_really_really_really\
+                          _really_really_really_really\
+                          _really_really_long_category\n\
+                          short_category\n\
+                          another_short_category\n";
+        assert_eq!(want, output);
+    }
+
     fn setup_fake_service() -> TracingProxy {
         setup_fake_proxy(|req| match req {
             ffx::TracingRequest::StartRecording { responder, .. } => responder
@@ -650,27 +645,6 @@ mod tests {
         ]
     }
 
-    fn fake_trace_known_categories() -> Vec<TraceKnownCategory> {
-        let mut categories =
-            DEFAULT_CATEGORIES.iter().cloned().map(TraceKnownCategory::from).collect::<Vec<_>>();
-        categories.sort();
-
-        let mut fake_known =
-            fake_known_categories().into_iter().map(TraceKnownCategory::from).collect::<Vec<_>>();
-        // This inserts the data from fake_known_categories above into the vector of
-        // DEFAULT_CATEGORIES in the right places to make the final output sorted by name.
-        // fake_known[0] is input which is in the list already so we replace it
-        let i = categories.iter().position(|c| c.name == fake_known[0].name).unwrap();
-        categories[i] = fake_known.remove(0);
-        // These three go before kernel:meta which is in the list, so we find the insertion point
-        // and then put these three in place.
-        let j = categories.iter().position(|c| c.name == "kernel:meta").unwrap();
-        categories.insert(j, fake_known.remove(0));
-        categories.insert(j + 1, fake_known.remove(0));
-        categories.insert(j + 2, fake_known.remove(0));
-        categories
-    }
-
     fn fake_provider_infos() -> Vec<trace::ProviderInfo> {
         vec![
             trace::ProviderInfo {
@@ -689,7 +663,10 @@ mod tests {
     }
 
     fn fake_trace_provider_infos() -> Vec<TraceProviderInfo> {
-        fake_provider_infos().into_iter().map(TraceProviderInfo::from).collect()
+        let mut infos: Vec<TraceProviderInfo> =
+            fake_provider_infos().into_iter().map(TraceProviderInfo::from).collect();
+        infos.sort_unstable();
+        infos
     }
 
     fn setup_closed_fake_controller_proxy() -> ControllerProxy {
@@ -710,13 +687,6 @@ mod tests {
         trace(proxy, controller, writer, cmd).await.unwrap();
     }
 
-    fn default_categories_expected_output() -> String {
-        std::iter::once("Default Categories:".to_string())
-            .chain(DEFAULT_CATEGORIES.iter().map(|&c| format!("- {}", c)))
-            .collect::<Vec<String>>()
-            .join("\n")
-    }
-
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_categories() {
         let _env = ffx_config::test_init().await.unwrap();
@@ -727,16 +697,7 @@ mod tests {
         )
         .await;
         let output = writer.test_output().unwrap();
-        let known_categories_expected_output = "Known Categories:\n\
-                   - input - Input system\n\
-                   - kernel - All kernel trace events\n\
-                   - kernel:arch - Kernel arch events\n\
-                   - kernel:ipc - Kernel ipc events";
-        let want = format!(
-            "{}\n\n{}\n",
-            known_categories_expected_output,
-            default_categories_expected_output()
-        );
+        let want = "input  kernel  kernel:arch  kernel:ipc\n\n";
         assert_eq!(want, output);
     }
 
@@ -750,7 +711,13 @@ mod tests {
         )
         .await;
         let output = writer.test_output().unwrap();
-        let want = serde_json::to_string(&fake_trace_known_categories()).unwrap();
+        let want = serde_json::to_string(
+            &fake_known_categories()
+                .into_iter()
+                .map(TraceKnownCategory::from)
+                .collect::<Vec<TraceKnownCategory>>(),
+        )
+        .unwrap();
         assert_eq!(want, output);
     }
 
@@ -768,7 +735,7 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_get_providers() {
+    async fn test_list_providers() {
         let _env = ffx_config::test_init().await.unwrap();
         let writer = Writer::new_test(None);
         run_trace_test(
@@ -778,15 +745,13 @@ mod tests {
         .await;
         let output = writer.test_output().unwrap();
         let want = "Trace providers:\n\
-                   - foo\n\
-                   - bar\n\
-                   - unknown\n"
+                   bar  foo  unknown\n\n"
             .to_string();
         assert_eq!(want, output);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_get_providers_peer_closed() {
+    async fn test_list_providers_peer_closed() {
         let _env = ffx_config::test_init().await.unwrap();
         let writer = Writer::new_test(None);
         let proxy = setup_fake_service();
@@ -799,7 +764,7 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_get_providers_machine() {
+    async fn test_list_providers_machine() {
         let _env = ffx_config::test_init().await.unwrap();
         let writer = Writer::new_test(Some(Format::Json));
         run_trace_test(

@@ -29,6 +29,8 @@ ffx_plugin("ffx_trace") {
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:regex",
     "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:term_grid",
+    "//third_party/rust_crates:termion",
   ]
 
   args_deps = [
