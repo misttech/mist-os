@@ -213,15 +213,16 @@ impl FramedStreamReaderInner {
     async fn read_exact(&mut self, buf: &mut [u8]) -> Result<bool, Error> {
         match self {
             FramedStreamReaderInner::Quic(quic) => quic.read_exact(buf).await,
-            FramedStreamReaderInner::Circuit(reader, _) => {
-                reader
-                    .read(buf.len(), |input| {
-                        buf.copy_from_slice(&input[..buf.len()]);
-                        Ok(((), buf.len()))
-                    })
-                    .await?;
-                Ok(reader.is_closed())
-            }
+            FramedStreamReaderInner::Circuit(reader, _) => reader
+                .read(buf.len(), |input| {
+                    buf.copy_from_slice(&input[..buf.len()]);
+                    Ok((true, buf.len()))
+                })
+                .await
+                .or_else(|x| match x {
+                    circuit::Error::ConnectionClosed => Ok(false),
+                    other => Err(other.into()),
+                }),
         }
     }
 }
@@ -289,17 +290,15 @@ impl FramedStreamReader {
         }
     }
 
-    pub(crate) async fn next<'b>(&'b mut self) -> Result<(FrameType, Vec<u8>, bool), Error> {
+    pub(crate) async fn next<'b>(&'b mut self) -> Result<Option<(FrameType, Vec<u8>)>, Error> {
         if let ReadState::Initial = self.read_state {
-            let fin = self.inner.read_exact(&mut self.hdr).await?;
+            if !self.inner.read_exact(&mut self.hdr).await? {
+                return Ok(None);
+            }
             let hdr = FrameHeader::from_bytes(&self.hdr)?;
 
             if hdr.length == 0 {
-                return Ok((hdr.frame_type, Vec::new(), fin));
-            }
-
-            if fin {
-                return Err(format_err!("Unexpected end of stream"));
+                return Ok(Some((hdr.frame_type, Vec::new())));
             }
 
             self.read_state = ReadState::GotHeader(hdr);
@@ -308,10 +307,12 @@ impl FramedStreamReader {
         if let ReadState::GotHeader(hdr) = &self.read_state {
             let mut payload = Vec::new();
             payload.resize(hdr.length, 0);
-            let fin = self.inner.read_exact(&mut payload).await?;
+            if !self.inner.read_exact(&mut payload).await? {
+                return Err(format_err!("Unexpected end of stream"));
+            }
             let frame_type = hdr.frame_type;
             self.read_state = ReadState::Initial;
-            Ok((frame_type, payload, fin))
+            Ok(Some((frame_type, payload)))
         } else {
             unreachable!();
         }

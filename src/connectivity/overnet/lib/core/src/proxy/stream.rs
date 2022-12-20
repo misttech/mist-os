@@ -183,7 +183,7 @@ pub(crate) struct ReadNext<'a, Msg: Message> {
 }
 
 enum ReadNextFrameOrPeerConnRef<'a> {
-    ReadNextFrame(BoxFuture<'a, Result<(FrameType, Vec<u8>, bool), Error>>),
+    ReadNextFrame(BoxFuture<'a, Result<Option<(FrameType, Vec<u8>)>, Error>>),
     PeerConnRef(PeerConnRef<'a>),
 }
 
@@ -203,7 +203,7 @@ impl std::fmt::Debug for ReadNextFrameOrPeerConnRef<'_> {
 impl<'a> ReadNextFrameOrPeerConnRef<'a> {
     fn as_read_next_frame_mut(
         &mut self,
-    ) -> Option<&mut BoxFuture<'a, Result<(FrameType, Vec<u8>, bool), Error>>> {
+    ) -> Option<&mut BoxFuture<'a, Result<Option<(FrameType, Vec<u8>)>, Error>>> {
         match self {
             Self::ReadNextFrame(x) => Some(x),
             _ => None,
@@ -222,25 +222,22 @@ impl<'a, Msg: Message> ReadNext<'a, Msg> {
         loop {
             return Poll::Ready(Ok(match *self.state {
                 ReadNextState::Reading => {
-                    let (frame_type, mut bytes, fin) = ready!(self
+                    let Some((frame_type, mut bytes)) = ready!(self
                         .read_next_frame_or_peer_conn_ref
                         .as_read_next_frame_mut()
                         .unwrap()
-                        .poll_unpin(ctx))?;
+                        .poll_unpin(ctx))? else {
+                            return Poll::Ready(Err(format_err!("unexpected end of stream")));
+                        };
+
                     match frame_type {
                         FrameType::Hello => {
-                            if fin {
-                                return Poll::Ready(Err(format_err!("unexpected end of stream")));
-                            }
                             if bytes.len() != 0 {
                                 return Poll::Ready(Err(format_err!("Hello frame must be empty")));
                             }
                             Frame::Hello
                         }
                         FrameType::Data(coding_context) => {
-                            if fin {
-                                return Poll::Ready(Err(format_err!("unexpected end of stream")));
-                            }
                             *self.state = ReadNextState::DeserializingData(
                                 coding_context,
                                 bytes,
@@ -248,42 +245,22 @@ impl<'a, Msg: Message> ReadNext<'a, Msg> {
                             );
                             continue;
                         }
-                        FrameType::Signal(coding_context) => {
-                            if fin {
-                                return Poll::Ready(Err(format_err!("unexpected end of stream")));
-                            }
-                            Frame::SignalUpdate(decode_fidl_with_context(
-                                coding_context,
-                                &mut bytes,
-                            )?)
-                        }
+                        FrameType::Signal(coding_context) => Frame::SignalUpdate(
+                            decode_fidl_with_context(coding_context, &mut bytes)?,
+                        ),
                         FrameType::Control(coding_context) => {
-                            match (fin, decode_fidl_with_context(coding_context, &mut bytes)?) {
-                                (true, StreamControl::AckTransfer(Empty {})) => Frame::AckTransfer,
-                                (true, StreamControl::EndTransfer(Empty {})) => Frame::EndTransfer,
-                                (true, StreamControl::Shutdown(status_code)) => {
+                            match decode_fidl_with_context(coding_context, &mut bytes)? {
+                                StreamControl::AckTransfer(Empty {}) => Frame::AckTransfer,
+                                StreamControl::EndTransfer(Empty {}) => Frame::EndTransfer,
+                                StreamControl::Shutdown(status_code) => {
                                     Frame::Shutdown(zx_status::Status::ok(status_code))
                                 }
-                                (
-                                    false,
-                                    StreamControl::BeginTransfer(BeginTransfer {
-                                        new_destination_node,
-                                        transfer_key,
-                                    }),
-                                ) => {
+
+                                StreamControl::BeginTransfer(BeginTransfer {
+                                    new_destination_node,
+                                    transfer_key,
+                                }) => {
                                     Frame::BeginTransfer(new_destination_node.into(), transfer_key)
-                                }
-                                (true, x) => {
-                                    return Poll::Ready(Err(format_err!(
-                                        "Unexpected end of stream after {:?}",
-                                        x
-                                    )))
-                                }
-                                (false, x) => {
-                                    return Poll::Ready(Err(format_err!(
-                                        "Expected end of stream after {:?}",
-                                        x
-                                    )))
                                 }
                             }
                         }

@@ -509,7 +509,7 @@ impl Drop for AsyncQuicStreamWriter {
             let id = self.id;
             // TODO: don't detach
             Task::spawn(async move {
-                let _ = conn.io.lock().await.conn.stream_shutdown(id, Shutdown::Write, 0);
+                let _ = conn.io.lock().await.conn.stream_send(id, &[], true);
             })
             .detach();
         }
@@ -550,34 +550,45 @@ impl Drop for AsyncQuicStreamReader {
 }
 
 impl AsyncQuicStreamReader {
-    pub async fn read<'b>(&'b mut self, bytes: &'b mut [u8]) -> Result<(usize, bool), Error> {
+    pub async fn read<'b>(&'b mut self, bytes: &'b mut [u8]) -> Result<usize, Error> {
         if !self.buffered.is_empty() {
             let to_drain = std::cmp::min(self.buffered.len(), bytes.len());
             self.buffered
                 .drain(..to_drain)
                 .zip(bytes.iter_mut())
                 .for_each(|(src, dest)| *dest = src);
-            return Ok((to_drain, self.observed_closed && self.buffered.is_empty()));
+            return Ok(to_drain);
         }
 
-        let (n, fin) = loop {
+        if self.observed_closed {
+            return Ok(0);
+        }
+
+        Ok(loop {
             let mut io = self.conn.io.lock().await;
             let got = {
                 io.conn_send.ready();
                 match io.conn.stream_recv(self.id, bytes) {
                     Ok((n, fin)) => {
+                        self.observed_closed = self.observed_closed || fin;
                         self.ready = true;
-                        Some(Ok((n, fin)))
+                        if n > 0 || fin {
+                            Some(Ok(n))
+                        } else {
+                            None
+                        }
                     }
                     Err(quiche::Error::StreamReset(_)) | Err(quiche::Error::Done) => {
                         self.ready = true;
                         let finished = io.conn.stream_finished(self.id);
                         if finished {
-                            Some(Ok((0, true)))
+                            self.observed_closed = true;
+                            Some(Ok(0))
                         } else if io.closed {
                             tracing::trace!(debug_id = ?self.debug_id(), "reader abandon");
                             let _ = io.conn.stream_shutdown(self.id, Shutdown::Read, 0);
-                            Some(Ok((0, true)))
+                            self.observed_closed = true;
+                            Some(Ok(0))
                         } else {
                             None
                         }
@@ -586,7 +597,8 @@ impl AsyncQuicStreamReader {
                     Err(quiche::Error::InvalidStreamState(_))
                         if io.conn.stream_finished(self.id) =>
                     {
-                        Some(Ok((0, true)))
+                        self.observed_closed = true;
+                        Some(Ok(0))
                     }
                     Err(x) => Some(Err(x).with_context(|| {
                         format_err!(
@@ -611,13 +623,7 @@ impl AsyncQuicStreamReader {
                 })
                 .await;
             }
-        };
-
-        if fin {
-            self.observed_closed = true;
-        }
-
-        Ok((n, fin))
+        })
     }
 
     pub async fn read_exact<'b>(&'b mut self, bytes: &'b mut [u8]) -> Result<bool, Error> {
@@ -642,16 +648,20 @@ impl AsyncQuicStreamReader {
         }
 
         loop {
-            let (n, fin) = state.this.read(&mut state.bytes[state.read..]).await?;
+            let n = state.this.read(&mut state.bytes[state.read..]).await?;
             state.read += n;
 
             if state.read == state.bytes.len() {
                 state.done = true;
-                break Ok(fin);
+                break Ok(true);
             }
 
-            if fin {
-                break Err(format_err!("Endo of stream"));
+            if n == 0 {
+                break if state.read == 0 {
+                    Ok(false)
+                } else {
+                    Err(format_err!("Unexpected end of stream"))
+                };
             }
         }
     }
@@ -816,9 +826,8 @@ mod test {
 
             cli_tx.send(&[1, 2, 3], false).await.unwrap();
             let mut buf = [0u8; 32];
-            let (n, fin) = svr_rx.read(buf.as_mut()).await.unwrap();
+            let n = svr_rx.read(buf.as_mut()).await.unwrap();
             assert_eq!(n, 3);
-            assert_eq!(fin, false);
             assert_eq!(&buf[..n], &[1, 2, 3]);
         })
         .await
@@ -832,10 +841,11 @@ mod test {
 
             cli_tx.send(&[1, 2, 3], true).await.unwrap();
             let mut buf = [0u8; 32];
-            let (n, fin) = svr_rx.read(buf.as_mut()).await.unwrap();
+            let n = svr_rx.read(buf.as_mut()).await.unwrap();
             assert_eq!(n, 3);
-            assert_eq!(fin, true);
             assert_eq!(&buf[..n], &[1, 2, 3]);
+            let n = svr_rx.read(buf.as_mut()).await.unwrap();
+            assert_eq!(n, 0);
         })
         .await
     }
@@ -859,16 +869,14 @@ mod test {
                     tracing::trace!("sent second");
                 },
                 async move {
-                    let (n, fin) = svr_rx.read(buf.as_mut()).await.unwrap();
-                    tracing::trace!("got: {} {}", n, fin);
+                    let n = svr_rx.read(buf.as_mut()).await.unwrap();
+                    tracing::trace!("got: {}", n);
                     assert_eq!(n, 3);
-                    assert_eq!(fin, false);
                     assert_eq!(&buf[..n], &[1, 2, 3]);
                     unpause.send(()).unwrap();
-                    let (n, fin) = svr_rx.read(buf.as_mut()).await.unwrap();
-                    tracing::trace!("got: {} {}", n, fin);
+                    let n = svr_rx.read(buf.as_mut()).await.unwrap();
+                    tracing::trace!("got: {}", n);
                     assert_eq!(n, 0);
-                    assert_eq!(fin, true);
                 },
             )
             .await;
@@ -893,11 +901,10 @@ mod test {
             loop_a_tasks.push(Task::spawn(async move {
                 let mut buf = [0; 256];
                 loop {
-                    let (size, fin) = server_reader.read(&mut buf).await.unwrap();
+                    let size = server_reader.read(&mut buf).await.unwrap();
                     if size > 0 {
-                        server_writer.send(&buf[..size], fin).await.unwrap();
-                    }
-                    if fin {
+                        server_writer.send(&buf[..size], false).await.unwrap();
+                    } else {
                         break;
                     }
                 }
@@ -908,11 +915,10 @@ mod test {
             loop_b_tasks.push(Task::spawn(async move {
                 let mut buf = [0; 256];
                 loop {
-                    let (size, fin) = server_reader.read(&mut buf).await.unwrap();
+                    let size = server_reader.read(&mut buf).await.unwrap();
                     if size > 0 {
-                        server_writer.send(&buf[..size], fin).await.unwrap();
-                    }
-                    if fin {
+                        server_writer.send(&buf[..size], false).await.unwrap();
+                    } else {
                         break;
                     }
                 }
@@ -921,11 +927,10 @@ mod test {
             loop_c_tasks.push(Task::spawn(async move {
                 let mut buf = [0; 256];
                 loop {
-                    let (size, fin) = client_reader_a.read(&mut buf).await.unwrap();
+                    let size = client_reader_a.read(&mut buf).await.unwrap();
                     if size > 0 {
-                        client_writer_b.send(&buf[..size], fin).await.unwrap();
-                    }
-                    if fin {
+                        client_writer_b.send(&buf[..size], false).await.unwrap();
+                    } else {
                         break;
                     }
                 }
@@ -942,7 +947,10 @@ mod test {
                     let mut buf = [0; 8];
 
                     for i in 0..65536u64 {
-                        assert_eq!(i == 65535, client_reader_b.read_exact(&mut buf).await.unwrap());
+                        assert!(
+                            client_reader_b.read_exact(&mut buf).await.unwrap(),
+                            "failed on {i}"
+                        );
                         assert_eq!(i, u64::from_le_bytes(buf.clone()));
                     }
                 };

@@ -967,7 +967,7 @@ async fn client_handshake(
         tracing::trace!(my_node_id = my_node_id.0, clipeer = peer_node_id.0, "read config");
         let mut conn_stream_reader = conn_stream_reader_fut.await?;
         let _ = Config::from_response(
-            if let (FrameType::Data(coding_context), mut bytes, false) =
+            if let Some((FrameType::Data(coding_context), mut bytes)) =
                 conn_stream_reader.next().await?
             {
                 decode_fidl_with_context(coding_context, &mut bytes)?
@@ -1052,8 +1052,11 @@ async fn client_conn_stream(
         .map_err(RunnerError::ServiceError),
         async move {
             loop {
-                let (frame_type, mut bytes, fin) =
-                    conn_stream_reader.next().await.map_err(RunnerError::ServiceError)?;
+                let (frame_type, mut bytes) = conn_stream_reader
+                    .next()
+                    .await
+                    .map_err(RunnerError::ServiceError)?
+                    .ok_or(RunnerError::ConnectionClosed)?;
                 match frame_type {
                     FrameType::Hello | FrameType::Control(_) | FrameType::Signal(_) => {
                         return Err(RunnerError::BadFrameType(frame_type));
@@ -1068,9 +1071,6 @@ async fn client_conn_stream(
                         .await
                         .map_err(RunnerError::ServiceError)?;
                     }
-                }
-                if fin {
-                    return Err(RunnerError::ConnectionClosed);
                 }
             }
         },
@@ -1214,7 +1214,7 @@ async fn server_handshake(
     // Await config request
     tracing::trace!(my_node_id = my_node_id.0, svrpeer = node_id.0, "read config");
     let (_, mut response) = Config::negotiate(
-        if let (FrameType::Data(coding_context), mut bytes, false) =
+        if let Some((FrameType::Data(coding_context), mut bytes)) =
             conn_stream_reader.next().await?
         {
             decode_fidl_with_context(coding_context, &mut bytes)?
@@ -1251,8 +1251,11 @@ async fn server_conn_stream(
 
     loop {
         tracing::trace!(my_node_id = my_node_id.0, svrpeer = node_id.0, "await message");
-        let (frame_type, mut bytes, fin) =
-            conn_stream_reader.next().map_err(RunnerError::ServiceError).await?;
+        let (frame_type, mut bytes) = conn_stream_reader
+            .next()
+            .await
+            .map_err(RunnerError::ServiceError)?
+            .ok_or(RunnerError::ConnectionClosed)?;
 
         let router = Weak::upgrade(&router).ok_or_else(|| RunnerError::RouterGone)?;
         match frame_type {
@@ -1321,10 +1324,6 @@ async fn server_conn_stream(
                     }
                 }
             }
-        }
-
-        if fin {
-            return Err(RunnerError::ConnectionClosed);
         }
     }
 }
