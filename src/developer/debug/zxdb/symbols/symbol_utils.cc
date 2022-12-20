@@ -6,6 +6,7 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/zxdb/symbols/array_type.h"
 #include "src/developer/debug/zxdb/symbols/base_type.h"
 #include "src/developer/debug/zxdb/symbols/collection.h"
@@ -14,9 +15,62 @@
 #include "src/developer/debug/zxdb/symbols/dwarf_tag.h"
 #include "src/developer/debug/zxdb/symbols/modified_type.h"
 #include "src/developer/debug/zxdb/symbols/namespace.h"
+#include "src/developer/debug/zxdb/symbols/template_parameter.h"
 #include "src/developer/debug/zxdb/symbols/type.h"
+#include "src/developer/debug/zxdb/symbols/variable.h"
+#include "src/lib/fxl/strings/string_printf.h"
 
 namespace zxdb {
+
+namespace {
+
+// Since we can't use the expression system to resolve the actual value from
+// DW_TAG_template_value_parameters, we have to do a simple decoding ourselves.
+void AddTemplateValueToName(std::string& name, const TemplateParameter* template_value) {
+  auto base_type = template_value->type().Get()->As<Type>()->StripCVT()->As<BaseType>();
+
+  if (!base_type)
+    return;
+
+  // This vector assumes little endian, so it's in LSB -> MSB order.
+  std::vector<uint8_t> v = template_value->const_value().GetConstValue(base_type->byte_size());
+  std::string s;
+
+  switch (base_type->base_type()) {
+    case BaseType::kBaseTypeBoolean: {
+      FX_DCHECK(v.size() == 1);
+      if (v[0] == 1) {
+        s = "true";
+      } else {
+        s = "false";
+      }
+      break;
+    }
+    case BaseType::kBaseTypeSignedChar:
+    case BaseType::kBaseTypeUnsignedChar: {
+      FX_DCHECK(v.size() == 1);
+      s = fxl::StringPrintf("'%c'", static_cast<char>(v[0]));
+      break;
+    }
+    case BaseType::kBaseTypeSigned:
+    case BaseType::kBaseTypeUnsigned: {
+      FX_DCHECK(v.size() >= 2);
+      uint64_t t = 0;
+      for (int i = base_type->byte_size() - 1; i >= 0; i--) {
+        t |= (static_cast<uint64_t>(v[i]) << (8 * i));
+      }
+      s = std::to_string(t);
+      break;
+    }
+    default:
+      LOGS(Warn) << BaseType::BaseTypeToString(base_type->base_type(), true)
+                 << " is not supported.";
+      return;
+  }
+
+  AddTemplateParameterToName(name, s.c_str());
+}
+}  // namespace
 
 Identifier GetSymbolScopePrefix(const Symbol* symbol) {
   if (!symbol->parent().is_valid())
@@ -74,6 +128,42 @@ fxl::RefPtr<Type> AddCVQualifiersToMatch(const Type* reference, fxl::RefPtr<Type
   }
 
   return modified;
+}
+
+bool NameHasTemplate(std::string_view name) { return !name.empty() && name.back() == '>'; }
+
+void AddTemplateParameterToName(std::string& original, const char* type_name) {
+  if (!type_name)
+    return;
+
+  // This type already has a template type, we need to append this one.
+  if (NameHasTemplate(original)) {
+    original.pop_back();
+    std::string append_str = ", ";
+    append_str += type_name;
+    original.append(append_str);
+  } else {
+    // No template type yet, add "<...>".
+    original.push_back('<');
+    original.append(type_name);
+  }
+
+  original.push_back('>');
+}
+
+void AddAllTemplateParametersToName(std::string& name,
+                                    const std::vector<LazySymbol>& template_params) {
+  for (const auto& param : template_params) {
+    const TemplateParameter* template_parameter = param.Get()->As<TemplateParameter>();
+    if (template_parameter) {
+      if (template_parameter->is_value() && template_parameter->const_value().has_value()) {
+        AddTemplateValueToName(name, template_parameter);
+      } else {
+        AddTemplateParameterToName(
+            name, template_parameter->type().Get()->As<Type>()->GetAssignedName().c_str());
+      }
+    }
+  }
 }
 
 }  // namespace zxdb

@@ -30,7 +30,9 @@ class IndexNode {
     kEndPhysical,  // Marker for the end of the kinds that have children for every node.
 
     kNone = kEndPhysical,
-    kRoot,  // Root index node (meaning nothing semantically).
+    kRoot,               // Root index node (meaning nothing semantically).
+    kTemplateParameter,  // Either a template_type or template_value parameter. These are never
+                         // actually indexed, and will never have children nodes.
   };
 
   // A reference to a DIE that doesn't need the unit or the underlying llvm::DwarfDebugInfoEntry to
@@ -70,8 +72,8 @@ class IndexNode {
   Kind kind() const { return kind_; }
 
   // The SymbolRef can be omitted when indexing namespaces as the DIEs are not stored for that case.
-  IndexNode* AddChild(Kind kind, const char* name);
-  IndexNode* AddChild(Kind kind, const char* name, const SymbolRef& ref);
+  IndexNode* AddChild(Kind kind, std::string_view name);
+  IndexNode* AddChild(Kind kind, std::string_view name, const SymbolRef& ref);
   void AddDie(const SymbolRef& ref);
 
   const Map& namespaces() const { return children_[static_cast<int>(Kind::kNamespace)]; }

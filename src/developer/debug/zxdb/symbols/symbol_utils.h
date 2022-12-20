@@ -32,6 +32,12 @@ fxl::RefPtr<Type> MakeStringLiteralType(size_t length);
 // type.
 fxl::RefPtr<Type> AddCVQualifiersToMatch(const Type* reference, fxl::RefPtr<Type> modified);
 
+bool NameHasTemplate(std::string_view name);
+
+void AddTemplateParameterToName(std::string& original, const char* type_name);
+
+void AddAllTemplateParametersToName(std::string& name,
+                                    const std::vector<LazySymbol>& template_params);
 }  // namespace zxdb
 
 #endif  // SRC_DEVELOPER_DEBUG_ZXDB_SYMBOLS_SYMBOL_UTILS_H_

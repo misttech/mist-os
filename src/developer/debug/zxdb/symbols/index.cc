@@ -13,6 +13,7 @@
 #include "src/developer/debug/zxdb/symbols/dwarf_die_decoder.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_die_scanner.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_tag.h"
+#include "src/developer/debug/zxdb/symbols/symbol_utils.h"
 
 namespace zxdb {
 
@@ -45,8 +46,9 @@ class NamedSymbolRef : public IndexNode::SymbolRef {
   // of a function with a specification, the implementation will have should_index set, but we'll
   // traverse the specification to fill in the name. This will generate a valid but not indexable
   // item for the specification.
-  const char* name() const { return name_; }
+  const std::string& name() const { return name_; }
   void set_name(const char* n) { name_ = n; }
+  void set_name(std::string n) { name_ = std::move(n); }
 
   // If this DIE has a declaration associated with it (a DW_AT_declaration tag), this indicates the
   // absolute offset of the declaration DIE. Will be 0 if none. It may or may not be inside the
@@ -92,12 +94,20 @@ class NamedSymbolRef : public IndexNode::SymbolRef {
   bool has_abstract_origin() const { return has_abstract_origin_; }
   void set_has_abstract_origin(bool b) { has_abstract_origin_ = b; }
 
+  // Set the flag that tells us we've modified the name with template types. This is primarily used
+  // for dealing with symbols that have been generated without the simple-template-names compiler
+  // flag, and the name already has the template types.
+  bool has_modified_template_name() const { return has_modified_template_name_; }
+  // Once we set this, it will never change.
+  void set_has_modified_template_name() { has_modified_template_name_ = true; }
+
  private:
   IndexNode::Kind kind_ = IndexNode::Kind::kNone;
-  const char* name_ = nullptr;
+  std::string name_;
   uint64_t decl_offset_ = 0;
   IndexNode* index_node_ = nullptr;
   bool has_abstract_origin_ = false;
+  bool has_modified_template_name_ = false;
 };
 
 // Returns true if the given abbreviation defines a PC range.
@@ -287,13 +297,51 @@ void UnitIndexer::Scan(std::vector<IndexNode::SymbolRef>* main_functions) {
       //
       // As a result, we don't also check DW_AT_external.
       continue;
+    } else if (kind == IndexNode::Kind::kTemplateParameter) {
+      // This is a template type parameter. We don't need to index this, but we do need to fixup the
+      // name of the parent DIE to reflect the template types. There can be any number of these for
+      // a type.
+      uint32_t parent_idx = scanner_.GetParentIndex(scanner_.die_index());
+      if (parent_idx == DwarfDieScanner::kNoParent)
+        continue;
+
+      NamedSymbolRef& parent = indexable_[parent_idx];
+
+      // Check to see if the parent DIE already has a template parameter present in the name before
+      // we've modified anything. If this is the case, it's likely that the program was not compiled
+      // with the simple-template-names flag and the template parameters will be present directly in
+      // the name.
+      if (!parent.has_modified_template_name() && parent.name().find('<') != std::string::npos)
+        continue;
+
+      std::string fixup_template_name = parent.name();
+
+      // Unfortunately, we need to decode again here to get the actual type instantiation. This
+      // should be relatively quick and there should still be an overall speedup when using
+      // -gsimple-template-names due to the drastically reduced symbol size.
+      llvm::DWARFDie type_die;
+      DwarfDieDecoder type_decoder(context_);
+      type_decoder.AddReference(llvm::dwarf::DW_AT_type, &type_die);
+
+      if (!type_decoder.Decode(llvm::DWARFDie(unit_, die))) {
+        continue;
+      }
+
+      if (type_die.isValid()) {
+        AddTemplateParameterToName(fixup_template_name, type_die.getShortName());
+        parent.set_name(std::move(fixup_template_name));
+        parent.set_has_modified_template_name();
+      }
+
+      continue;
     }
 
     FX_DCHECK(scanner_.die_index() < indexable_.size());
     auto ref_kind = is_declaration && *is_declaration ? IndexNode::SymbolRef::kDwarfDeclaration
                                                       : IndexNode::SymbolRef::kDwarf;
+
     indexable_[scanner_.die_index()] = NamedSymbolRef(
-        ref_kind, die->getOffset(), kind, name ? *name : nullptr, decl_offset, has_abstract_origin);
+        ref_kind, die->getOffset(), kind, name ? *name : "", decl_offset, has_abstract_origin);
 
     // Check for "main" function annotation.
     if (kind == IndexNode::Kind::kFunction && is_main_subprogram && *is_main_subprogram)
@@ -356,6 +404,10 @@ IndexNode::Kind UnitIndexer::GetKindForDie(const llvm::DWARFDebugInfoEntry* die)
       // Caller needs to check this case (see declaration comment).
       return IndexNode::Kind::kVar;
 
+    case DwarfTag::kTemplateTypeParameter:
+    case DwarfTag::kTemplateValueParameter:
+      return IndexNode::Kind::kTemplateParameter;
+
     default:
       // Don't index anything else.
       return IndexNode::Kind::kNone;
@@ -391,9 +443,9 @@ void UnitIndexer::AddEntryToIndex(uint32_t index_me, IndexNode* root) {
     }
     cur = unit_->getDIEIndex(die);
 
-    if (!indexable_[index_me].name()) {
+    if (indexable_[index_me].name().empty()) {
       // When there's no name, take the name from the declaration.
-      if (!indexable_[cur].name()) {
+      if (indexable_[cur].name().empty()) {
         // The declaration has no name because the first pass didn't need to index it. Compute
         // the name now. Caching it on both the declaration and the implementation is useful because
         // many implementation can share the same declaration and this saves multiple name
@@ -409,7 +461,7 @@ void UnitIndexer::AddEntryToIndex(uint32_t index_me, IndexNode* root) {
 
   // If at this point we still don't have a name for the thing being indexed, give up trying to
   // index it.
-  if (!indexable_[cur].name() || !indexable_[cur].name()[0])
+  if (indexable_[cur].name().empty())
     return;
 
   // Move to the abstract origin if present to start walking the scopes. The abstract origin (if
@@ -449,7 +501,6 @@ void UnitIndexer::AddEntryToIndex(uint32_t index_me, IndexNode* root) {
   // Add the path to the index (walk in reverse to start from the root).
   for (int path_i = static_cast<int>(path_.size()) - 1; path_i >= 0; path_i--) {
     NamedSymbolRef* named_ref = path_[path_i];
-    const char* name = named_ref->name() ? named_ref->name() : "";
 
     // Only save the DIE reference for the thing we're attempting to index (the leaf node at
     // path_[0]). Intermediate things like the namespaces and classes along the path don't need DIE
@@ -457,9 +508,9 @@ void UnitIndexer::AddEntryToIndex(uint32_t index_me, IndexNode* root) {
     // is adding these DIEs unnecessary, it can create unnamed type entries for things like
     // anonymous enums which we don't want.
     if (path_i == 0)
-      index_from = index_from->AddChild(named_ref->kind(), name, *named_ref);
+      index_from = index_from->AddChild(named_ref->kind(), named_ref->name(), *named_ref);
     else
-      index_from = index_from->AddChild(named_ref->kind(), name);
+      index_from = index_from->AddChild(named_ref->kind(), named_ref->name());
     named_ref->set_index_node(index_from);
   }
 }
@@ -471,20 +522,21 @@ void UnitIndexer::AddStandaloneEntryToIndex(uint32_t index_me, IndexNode* index_
   // cross-unit references.
 
   // Thing to add to the index.
-  const NamedSymbolRef& named_ref = indexable_[index_me];
+  NamedSymbolRef& named_ref = indexable_[index_me];
 
   // Compute the name (avoiding GetDieName()) and the DIE to start indexing from.
-  const char* name = named_ref.name();
+  std::string name = named_ref.name();
   llvm::DWARFDie die;
   if (named_ref.decl_offset()) {
     // When there's a separate declaration, its parent encodes the scope information.
     die = context_->getDIEForOffset(named_ref.decl_offset());
     if (!die)
       return;  // Invalid decl offset, skip indexing.
-    if (!name) {
+    if (name.empty()) {
       // The declaration can fill in the name if the name is not present on the implementation
       // (normally it's not there).
-      name = die.getName(llvm::DINameKind::ShortName);
+      const char* n = die.getName(llvm::DINameKind::ShortName);
+      name = n ? n : "";
     }
   } else {
     // When there's no declaration, the name will already have been filled in (if present) to the
@@ -492,8 +544,10 @@ void UnitIndexer::AddStandaloneEntryToIndex(uint32_t index_me, IndexNode* index_
     die = context_->getDIEForOffset(named_ref.offset());
   }
 
-  if (!name)
+  if (name.empty())
     return;  // This item has no name, can't index it.
+
+  named_ref.set_name(std::move(name));
 
   // When walking the dependency path, the abstract origin (if any) encodes the lexical scope
   // (see has_abstract_origin() declaration above).
@@ -504,9 +558,9 @@ void UnitIndexer::AddStandaloneEntryToIndex(uint32_t index_me, IndexNode* index_
   // and classes in reverse order, but does not include the thing we're inserting itself.
   // So when insertng std::vector::vector this will be { "vector" (type), "std" (namespace) }.
   struct NameKind {
-    NameKind(const char* n, IndexNode::Kind k) : name(n), kind(k) {}
+    NameKind(std::string_view n, IndexNode::Kind k) : name(n), kind(k) {}
 
-    const char* name = nullptr;
+    std::string_view name;
     IndexNode::Kind kind = IndexNode::Kind::kNone;
   };
   std::vector<NameKind> path;
@@ -520,16 +574,17 @@ void UnitIndexer::AddStandaloneEntryToIndex(uint32_t index_me, IndexNode* index_
     if (kind == IndexNode::Kind::kNone)
       break;  // Hit the top of what we want to index (like the unit).
 
-    path.emplace_back(die.getName(llvm::DINameKind::ShortName), kind);
+    const char* n = die.getName(llvm::DINameKind::ShortName);
+    path.emplace_back(n ? n : "", kind);
   }
 
   // Insert the containing elements (in reverse order to start from the top level and work inwards).
   IndexNode* cur_index = index_root;
   for (const auto& name_kind : Reversed(path))
-    cur_index = cur_index->AddChild(name_kind.kind, name_kind.name ? name_kind.name : "");
+    cur_index = cur_index->AddChild(name_kind.kind, name_kind.name);
 
   // Add the leaf item (holding the DIE reference) to the index.
-  cur_index->AddChild(named_ref.kind(), name, named_ref);
+  cur_index->AddChild(named_ref.kind(), named_ref.name(), named_ref);
 }
 
 bool UnitIndexer::GetAbstractOriginIndex(uint32_t source, uint32_t* abstract_origin_index) const {
