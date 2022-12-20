@@ -42,8 +42,8 @@ struct WlantapMacImpl : WlantapMac,
 
   zx_status_t InitWlanSoftmacIfcClient() {
     // Create dispatcher for FIDL client of WlanSoftmacIfc protocol.
-    auto dispatcher =
-        fdf::Dispatcher::Create(0, WLAN_SOFTMAC_IFC_DISPATCHER_NAME, [&](fdf_dispatcher_t*) {
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        {}, WLAN_SOFTMAC_IFC_DISPATCHER_NAME, [&](fdf_dispatcher_t*) {
           if (unbind_txn_) {
             unbind_txn_->Reply();
             return;
@@ -63,8 +63,8 @@ struct WlantapMacImpl : WlantapMac,
 
   zx_status_t InitWlanSoftmacServer() {
     // Create dispatcher for FIDL server of WlanSoftmac protocol.
-    auto dispatcher =
-        fdf::Dispatcher::Create(0, WLAN_SOFTMAC_DISPATCHER_NAME, [&](fdf_dispatcher_t*) {
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        {}, WLAN_SOFTMAC_DISPATCHER_NAME, [&](fdf_dispatcher_t*) {
           if (unbind_txn_) {
             wlan_softmac_ifc_dispatcher_.ShutdownAsync();
             return;

@@ -64,9 +64,9 @@ class WlanSoftmacDeviceTest : public SingleApTest,
     auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmac>();
     ASSERT_FALSE(endpoints.is_error());
 
-    auto dispatcher =
-        fdf::Dispatcher::Create(0, "wlan-softmac-device-test-driver-dispatcher",
-                                [&](fdf_dispatcher_t*) { driver_completion_.Signal(); });
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        {}, "wlan-softmac-device-test-driver-dispatcher",
+        [&](fdf_dispatcher_t*) { driver_completion_.Signal(); });
     ASSERT_FALSE(dispatcher.is_error());
     driver_dispatcher_ = *std::move(dispatcher);
 
@@ -85,8 +85,8 @@ class WlanSoftmacDeviceTest : public SingleApTest,
 
     // Create a dispatcher for the server end of WlansoftmacIfc protocol to wait on the runtime
     // channel.
-    dispatcher = fdf::Dispatcher::Create(0, "wlansoftmacifc_server_test",
-                                         [&](fdf_dispatcher_t*) { server_completion_.Signal(); });
+    dispatcher = fdf::SynchronizedDispatcher::Create(
+        {}, "wlansoftmacifc_server_test", [&](fdf_dispatcher_t*) { server_completion_.Signal(); });
     ASSERT_FALSE(dispatcher.is_error());
     server_dispatcher_ = *std::move(dispatcher);
 

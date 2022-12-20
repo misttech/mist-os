@@ -66,9 +66,9 @@ Device::Device(zx_device_t *parent) : DeviceType(parent) {
 void Device::DdkInit(ddk::InitTxn txn) {
   bool fw_init_pending = false;
   const zx_status_t status = [&]() -> zx_status_t {
-    auto dispatcher = fdf::Dispatcher::Create(0, "nxpfmac-sdio-wlanphy", [&](fdf_dispatcher_t *) {
-      sync_completion_signal(&fidl_dispatcher_completion_);
-    });
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        {}, "nxpfmac-sdio-wlanphy",
+        [&](fdf_dispatcher_t *) { sync_completion_signal(&fidl_dispatcher_completion_); });
     if (dispatcher.is_error()) {
       NXPF_ERR("Failed to create fdf dispatcher: %s", dispatcher.status_string());
       return dispatcher.status_value();

@@ -52,8 +52,8 @@ class WlanPhyImplDeviceTest : public FakeUcodeTest {
     ASSERT_FALSE(endpoints.is_error());
 
     // Create a dispatcher to wait on the runtime channel.
-    auto dispatcher = fdf::Dispatcher::Create(0, "iwlwifi-test-driver-dispatcher",
-                                              [&](fdf_dispatcher_t*) { completion_.Signal(); });
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        {}, "iwlwifi-test-driver-dispatcher", [&](fdf_dispatcher_t*) { completion_.Signal(); });
 
     ASSERT_FALSE(dispatcher.is_error());
 

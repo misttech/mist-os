@@ -115,9 +115,9 @@ struct DeviceTest : public zxtest::Test {
 
     auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>();
     ASSERT_OK(endpoints.status_value());
-    auto dispatcher = fdf::Dispatcher::Create(0, "TestDispatcher", [&](fdf_dispatcher_t*) {
-      sync_completion_signal(&dispatcher_completion_);
-    });
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        {}, "TestDispatcher",
+        [&](fdf_dispatcher_t*) { sync_completion_signal(&dispatcher_completion_); });
 
     ASSERT_OK(dispatcher.status_value());
     fidl_dispatcher_ = *std::move(dispatcher);

@@ -24,9 +24,9 @@ class WlanphyDeviceTest : public ::zxtest::Test {
 
     wlanphy_device_ = std::make_unique<Device>(nullptr, fake_wlan_phy_impl_protocol_);
 
-    auto driver_dispatcher =
-        fdf::Dispatcher::Create(0, "wlanphy-test-driver-dispatcher",
-                                [&](fdf_dispatcher_t*) { driver_dispatcher_completion_.Signal(); });
+    auto driver_dispatcher = fdf::SynchronizedDispatcher::Create(
+        {}, "wlanphy-test-driver-dispatcher",
+        [&](fdf_dispatcher_t*) { driver_dispatcher_completion_.Signal(); });
     ASSERT_FALSE(driver_dispatcher.is_error());
     driver_dispatcher_ = *std::move(driver_dispatcher);
 

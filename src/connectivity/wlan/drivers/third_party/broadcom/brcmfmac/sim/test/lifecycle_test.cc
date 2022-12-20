@@ -67,8 +67,8 @@ TEST(LifecycleTest, StartWithSmeChannel) {
 
   auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>();
   ASSERT_FALSE(endpoints.is_error());
-  auto dispatcher =
-      fdf::Dispatcher::Create(0, __func__, [&](fdf_dispatcher_t*) { completion_.Signal(); });
+  auto dispatcher = fdf::SynchronizedDispatcher::Create(
+      {}, __func__, [&](fdf_dispatcher_t*) { completion_.Signal(); });
 
   ASSERT_FALSE(dispatcher.is_error());
   auto client_dispatcher_ = *std::move(dispatcher);
