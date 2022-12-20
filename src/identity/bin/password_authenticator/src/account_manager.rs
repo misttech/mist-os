@@ -300,8 +300,10 @@ where
                         error!("retrieve_user_key: could not get credential manager: {:?}", err);
                         KeyRetrievalError::CredentialManagerConnectionError(err)
                     })?;
-                let key_source =
-                    PinweaverKeyRetriever::new(PinweaverParams::from(*p_meta), cred_manager);
+                let key_source = PinweaverKeyRetriever::new(
+                    PinweaverParams::from(*p_meta),
+                    Arc::new(Mutex::new(cred_manager)),
+                );
                 info!("retrieve_user_key: retrieving a pinweaver key");
                 key_source.retrieve_key(password).await
             }

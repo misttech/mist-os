@@ -8,7 +8,9 @@ use {
             translate_from_enrollment, translate_to_enrollment, AuthenticatorMetadata,
         },
         password_interaction::{PasswordInteractionHandler, Validator},
-        pinweaver::{CredManagerProvider, EnrollPinweaverValidator},
+        pinweaver::{
+            AuthenticatePinweaverValidator, CredManagerProvider, EnrollPinweaverValidator,
+        },
         scrypt::{AuthenticateScryptValidator, EnrollScryptValidator},
         Config,
     },
@@ -130,9 +132,16 @@ where
             translate_from_enrollment(enrollment).map_err(|_| ApiError::InvalidDataFormat)?;
 
         let validator: Box<dyn Validator<PrekeyMaterial>> = match authenticator_data {
-            AuthenticatorMetadata::Pinweaver(_) => {
-                // TODO(fxb/116491): Implement this match arm.
-                return Err(ApiError::UnsupportedOperation);
+            AuthenticatorMetadata::Pinweaver(p) => {
+                if !self.config.allow_pinweaver {
+                    warn!("Enrollment used pinweaver which is not supported by the current configuration");
+                    return Err(ApiError::InvalidDataFormat);
+                }
+                let cred_manager = self
+                    .cred_manager_provider
+                    .new_cred_manager()
+                    .map_err(|_| ApiError::Resource)?;
+                Box::new(AuthenticatePinweaverValidator::new(cred_manager, p.pinweaver_params))
             }
 
             AuthenticatorMetadata::ScryptOnly(s) => {
@@ -188,7 +197,7 @@ mod test {
     use {
         super::*,
         crate::{
-            account_metadata::ScryptOnlyMetadata,
+            account_metadata::{PinweaverMetadata, ScryptOnlyMetadata},
             keys::KEY_LEN,
             pinweaver::{
                 MockCredManager, MockCredManagerProvider, PinweaverParams,
@@ -225,12 +234,14 @@ mod test {
         StorageUnlockMechanism::new(config, cmp, clock)
     }
 
-    async fn pinweaver_success_case(config: Config) -> Result<()> {
+    async fn enroll_pinweaver_success_case(
+        config: Config,
+    ) -> Result<(MockCredManagerProvider, Enrollment, PrekeyMaterial)> {
         let mcm = MockCredManager::new_expect_le_secret(&TEST_PINWEAVER_LE_SECRET);
         let initial_creds = mcm.get_number_of_creds();
         let cred_manager_provider = MockCredManagerProvider::new_with_cred_manager(mcm.clone());
         let storage_unlock_mechanism =
-            create_storage_unlock_with_custom_cmp(config, cred_manager_provider);
+            create_storage_unlock_with_custom_cmp(config, cred_manager_provider.clone());
         let (client, interaction_server) =
             fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
 
@@ -245,9 +256,9 @@ mod test {
         let (enrollment_data, prekey) = result.unwrap();
         assert_eq!(prekey.0.len(), KEY_LEN);
 
-        let str_enrollment = std::str::from_utf8(&enrollment_data.0).unwrap();
+        let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enrollment_data.0 };
         let authenticator_data: AuthenticatorMetadata =
-            serde_json::from_str(str_enrollment).unwrap();
+            translate_from_enrollment(&enrollment).unwrap();
 
         let pinweaver_params = if let AuthenticatorMetadata::Pinweaver(p) = authenticator_data {
             p.pinweaver_params
@@ -262,6 +273,35 @@ mod test {
 
         let final_creds = mcm.get_number_of_creds();
         assert!(final_creds > initial_creds);
+        Ok((cred_manager_provider, enrollment, prekey))
+    }
+
+    async fn authenticate_pinweaver_success(
+        config: Config,
+        cmp: MockCredManagerProvider,
+        enrollment: Enrollment,
+        enroll_key: PrekeyMaterial,
+    ) -> Result<()> {
+        let auth_storage_unlock_mechanism = create_storage_unlock_with_custom_cmp(config, cmp);
+        let (client, auth_interaction_server) =
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+
+        let _ = client.into_proxy().unwrap().set_password(TEST_SCRYPT_PASSWORD).unwrap();
+
+        let auth_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Password(auth_interaction_server),
+        )
+        .unwrap();
+
+        let attempted_event = auth_storage_unlock_mechanism
+            .authenticate(auth_stream, vec![enrollment])
+            .await
+            .unwrap();
+
+        assert_eq!(attempted_event.enrollment_id, Some(TEST_ENROLLMENT_ID));
+        assert_eq!(attempted_event.updated_enrollment_data, None);
+        assert_eq!(attempted_event.prekey_material, Some(enroll_key.0));
+
         Ok(())
     }
 
@@ -327,6 +367,34 @@ mod test {
     }
 
     #[fuchsia::test]
+    async fn test_authenticate_pinweaver_invalid_label_error() {
+        let storage_unlock_mechanism = create_storage_unlock_with_default(PINWEAVER_ONLY_CONFIG);
+
+        let meta = AuthenticatorMetadata::Pinweaver(PinweaverMetadata {
+            pinweaver_params: PinweaverParams {
+                scrypt_params: TEST_SCRYPT_PARAMS,
+                credential_label: TEST_PINWEAVER_CREDENTIAL_LABEL,
+            },
+        });
+        let data = serde_json::to_vec(&meta).unwrap();
+
+        let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: data.clone() };
+
+        let (client, auth_interaction_server) =
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+
+        let _ = client.into_proxy().unwrap().set_password("password").unwrap();
+        let auth_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Password(auth_interaction_server),
+        )
+        .unwrap();
+
+        let result = storage_unlock_mechanism.authenticate(auth_stream, vec![enrollment]).await;
+
+        assert_eq!(result, Err(ApiError::Resource));
+    }
+
+    #[fuchsia::test]
     async fn test_enroll_scrypt_authenticate_pinweaver_error() {
         let enroll_storage_unlock_mechanism =
             create_storage_unlock_with_default(SCRYPT_ONLY_CONFIG);
@@ -348,6 +416,26 @@ mod test {
         let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enroll_data.0 };
         let auth_storage_unlock_mechanism =
             create_storage_unlock_with_default(PINWEAVER_ONLY_CONFIG);
+        let auth_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Password(auth_interaction_server),
+        )
+        .unwrap();
+
+        let result =
+            auth_storage_unlock_mechanism.authenticate(auth_stream, vec![enrollment]).await;
+        assert_eq!(result, Err(ApiError::InvalidDataFormat));
+    }
+
+    #[fuchsia::test]
+    async fn test_enroll_pinweaver_authenticate_scrypt_error() {
+        let (_, enrollment, _) =
+            enroll_pinweaver_success_case(PINWEAVER_ONLY_CONFIG).await.unwrap();
+
+        let (client, auth_interaction_server) =
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+        let _ = client.into_proxy().unwrap().set_password(TEST_SCRYPT_PASSWORD).unwrap();
+
+        let auth_storage_unlock_mechanism = create_storage_unlock_with_default(SCRYPT_ONLY_CONFIG);
         let auth_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
             InteractionProtocolServerEnd::Password(auth_interaction_server),
         )
@@ -393,6 +481,48 @@ mod test {
         assert_eq!(attempted_event.enrollment_id, Some(TEST_ENROLLMENT_ID));
         assert_eq!(attempted_event.updated_enrollment_data, None);
         assert_eq!(attempted_event.prekey_material, Some(enroll_key.0));
+    }
+
+    #[fuchsia::test]
+    async fn test_enroll_pinweaver_authenticate_both_config() -> Result<()> {
+        let (cmp, enrollment, enroll_prekey) =
+            enroll_pinweaver_success_case(PINWEAVER_ONLY_CONFIG).await.unwrap();
+        authenticate_pinweaver_success(DEFAULT_CONFIG, cmp, enrollment, enroll_prekey).await
+    }
+
+    #[fuchsia::test]
+    async fn test_enroll_default_authenticate_pinweaver() -> Result<()> {
+        let (cmp, enrollment, enroll_prekey) =
+            enroll_pinweaver_success_case(DEFAULT_CONFIG).await.unwrap();
+        authenticate_pinweaver_success(PINWEAVER_ONLY_CONFIG, cmp, enrollment, enroll_prekey).await
+    }
+
+    #[fuchsia::test]
+    async fn test_pinweaver_roundtrip_success() -> Result<()> {
+        let (cmp, enrollment, enroll_prekey) =
+            enroll_pinweaver_success_case(PINWEAVER_ONLY_CONFIG).await.unwrap();
+        authenticate_pinweaver_success(PINWEAVER_ONLY_CONFIG, cmp, enrollment, enroll_prekey).await
+    }
+
+    #[fuchsia::test]
+    async fn test_pinweaver_authenticate_wrong_password_raises_resource_error() {
+        let (cmp, enrollment, _) =
+            enroll_pinweaver_success_case(PINWEAVER_ONLY_CONFIG).await.unwrap();
+
+        let auth_storage_unlock_mechanism =
+            create_storage_unlock_with_custom_cmp(PINWEAVER_ONLY_CONFIG, cmp);
+        let (client, auth_interaction_server) =
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+
+        let _ = client.into_proxy().unwrap().set_password("wrong password").unwrap();
+        let auth_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Password(auth_interaction_server),
+        )
+        .unwrap();
+
+        let result =
+            auth_storage_unlock_mechanism.authenticate(auth_stream, vec![enrollment]).await;
+        assert_eq!(result, Err(ApiError::Resource));
     }
 
     #[fuchsia::test]
@@ -476,8 +606,8 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_enroll_pinweaver_success() -> Result<()> {
-        pinweaver_success_case(PINWEAVER_ONLY_CONFIG).await
+    async fn test_enroll_pinweaver_success() {
+        assert!(enroll_pinweaver_success_case(PINWEAVER_ONLY_CONFIG).await.is_ok())
     }
 
     #[fuchsia::test]
@@ -506,8 +636,8 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_enroll_pinweaver_and_scrypt() -> Result<()> {
-        pinweaver_success_case(DEFAULT_CONFIG).await
+    async fn test_enroll_pinweaver_and_scrypt() {
+        assert!(enroll_pinweaver_success_case(DEFAULT_CONFIG).await.is_ok())
     }
 
     #[fuchsia::test]

@@ -348,7 +348,7 @@ where
     CM: CredManager,
 {
     pinweaver_params: PinweaverParams,
-    credential_manager: CM,
+    credential_manager: Arc<Mutex<CM>>,
 }
 
 impl<CM> PinweaverKeyRetriever<CM>
@@ -357,7 +357,7 @@ where
 {
     pub fn new(
         pinweaver_params: PinweaverParams,
-        credential_manager: CM,
+        credential_manager: Arc<Mutex<CM>>,
     ) -> PinweaverKeyRetriever<CM> {
         PinweaverKeyRetriever { pinweaver_params, credential_manager }
     }
@@ -372,6 +372,8 @@ where
         let low_entropy_secret = compute_low_entropy_secret(password);
         let high_entropy_secret = self
             .credential_manager
+            .lock()
+            .await
             .retrieve(&low_entropy_secret, self.pinweaver_params.credential_label)
             .await?;
 
@@ -433,6 +435,63 @@ where
     }
 }
 
+/// Implements the pinweaver key retrieval function for authenticating and
+/// validating a password.
+pub struct AuthenticatePinweaverValidator<CM>
+where
+    CM: CredManager,
+{
+    // Wrap CM in an Arc<Mutex<>> because it needs to be owned by
+    // PinweaverKeyRetriever.
+    cred_manager: Arc<Mutex<CM>>,
+    pinweaver_params: PinweaverParams,
+}
+
+impl<CM> AuthenticatePinweaverValidator<CM>
+where
+    CM: CredManager,
+{
+    /// Instantiate an AuthenticatePinweaverValidator with given CM and PinweaverParams.
+    pub fn new(cred_manager: CM, pinweaver_params: PinweaverParams) -> Self {
+        Self { cred_manager: Arc::new(Mutex::new(cred_manager)), pinweaver_params }
+    }
+}
+
+#[async_trait]
+impl<CM> Validator<PrekeyMaterial> for AuthenticatePinweaverValidator<CM>
+where
+    CM: CredManager + std::marker::Sync + std::marker::Send,
+{
+    async fn validate(&self, password: &str) -> Result<PrekeyMaterial, ValidationError> {
+        let key_source =
+            PinweaverKeyRetriever::new(self.pinweaver_params, Arc::clone(&self.cred_manager));
+        key_source.retrieve_key(password).await.map(|key| PrekeyMaterial(key.into())).map_err(
+            |err| match err {
+                KeyRetrievalError::PasswordError => {
+                    ValidationError::InternalError(anyhow!("Password did not meet preconditions."))
+                }
+                KeyRetrievalError::ParamsError => {
+                    ValidationError::InternalError(anyhow!("Invalid parameters provided."))
+                }
+                KeyRetrievalError::FidlError(e) => {
+                    ValidationError::DependencyError(anyhow!("Dependency error: {:?}", e))
+                }
+                KeyRetrievalError::CredentialManagerConnectionError(e) => {
+                    ValidationError::DependencyError(anyhow!("Dependency error: {:?}", e))
+                }
+                KeyRetrievalError::CredentialManagerError(e) => {
+                    ValidationError::DependencyError(anyhow!("Dependency error: {:?}", e))
+                }
+                KeyRetrievalError::InvalidCredentialManagerDataError => {
+                    ValidationError::DependencyError(anyhow!(
+                        "Credential manager returned invalid data"
+                    ))
+                }
+            },
+        )
+    }
+}
+
 #[cfg(test)]
 #[derive(Clone, Debug)]
 enum EnrollBehavior {
@@ -449,6 +508,7 @@ enum RetrieveBehavior {
 }
 
 #[cfg(test)]
+#[derive(Clone, Debug)]
 pub struct MockCredManagerProvider {
     mcm: MockCredManager,
 }
@@ -682,7 +742,7 @@ mod test {
             mcm.add(&le_secret, &TEST_PINWEAVER_HE_SECRET).await.expect("enroll key with mock");
         let pw_retriever = PinweaverKeyRetriever::new(
             PinweaverParams { scrypt_params: TEST_SCRYPT_PARAMS, credential_label: label },
-            mcm,
+            Arc::new(Mutex::new(mcm)),
         );
         let account_key_retrieved =
             pw_retriever.retrieve_key(TEST_SCRYPT_PASSWORD).await.expect("key should be found");
@@ -697,7 +757,7 @@ mod test {
                 scrypt_params: TEST_SCRYPT_PARAMS,
                 credential_label: TEST_PINWEAVER_CREDENTIAL_LABEL,
             },
-            mcm,
+            Arc::new(Mutex::new(mcm)),
         );
         let err = pw_retriever
             .retrieve_key(TEST_SCRYPT_PASSWORD)
@@ -731,7 +791,7 @@ mod test {
 
         // Retrieve the key, and verify it matches.
         let mcm2 = MockCredManager::new_with_creds(creds.clone());
-        let pw_retriever = PinweaverKeyRetriever::new(enrollment_data, mcm2);
+        let pw_retriever = PinweaverKeyRetriever::new(enrollment_data, Arc::new(Mutex::new(mcm2)));
         let key_retrieved =
             pw_retriever.retrieve_key(TEST_SCRYPT_PASSWORD).await.expect("retrieve");
         assert_eq!(key_retrieved, account_key);
@@ -791,5 +851,65 @@ mod test {
         let result = validator.validate(TEST_SCRYPT_PASSWORD).await;
 
         assert_matches!(result, Err(ValidationError::DependencyError(_)));
+    }
+
+    #[fuchsia::test]
+    async fn test_authenticator_validator_failure() {
+        let mcm = MockCredManager::new();
+
+        let validator = AuthenticatePinweaverValidator::new(
+            mcm,
+            PinweaverParams { scrypt_params: TEST_SCRYPT_PARAMS, credential_label: 0 },
+        );
+        let result = validator.validate(TEST_SCRYPT_PASSWORD).await;
+        assert_matches!(result, Err(ValidationError::DependencyError(_)));
+    }
+
+    #[fuchsia::test]
+    async fn test_authenticator_validator_success() {
+        let mut mcm = MockCredManager::new();
+        let le_secret = compute_low_entropy_secret(TEST_SCRYPT_PASSWORD);
+        let label =
+            mcm.add(&le_secret, &TEST_PINWEAVER_HE_SECRET).await.expect("enroll key with mock");
+        let validator = AuthenticatePinweaverValidator::new(
+            mcm,
+            PinweaverParams { scrypt_params: TEST_SCRYPT_PARAMS, credential_label: label },
+        );
+
+        let result = validator.validate(TEST_SCRYPT_PASSWORD).await;
+        assert!(result.is_ok());
+
+        let prekey = result.unwrap();
+        assert_eq!(prekey.0.len(), KEY_LEN);
+    }
+
+    #[fuchsia::test]
+    async fn test_validator_roundtrip() -> Result<()> {
+        let expected_le_secret = compute_low_entropy_secret(TEST_SCRYPT_PASSWORD);
+        let mcm = MockCredManager::new_expect_le_secret(&expected_le_secret);
+
+        let enroll_validator = EnrollPinweaverValidator::new(mcm.clone());
+        let (meta_data, enroll_prekey) =
+            enroll_validator.validate(TEST_SCRYPT_PASSWORD).await.unwrap();
+
+        let pinweaver_data = if let AuthenticatorMetadata::Pinweaver(p) = meta_data {
+            p.pinweaver_params
+        } else {
+            return Err(anyhow!("wrong authenticator metadata type"));
+        };
+
+        assert_matches!(
+            pinweaver_data,
+            PinweaverParams { scrypt_params: _, credential_label: TEST_PINWEAVER_CREDENTIAL_LABEL }
+        );
+
+        assert_eq!(enroll_prekey.0.len(), KEY_LEN);
+
+        let auth_validator = AuthenticatePinweaverValidator::new(mcm, pinweaver_data);
+        let auth_prekey = auth_validator.validate(TEST_SCRYPT_PASSWORD).await.unwrap();
+
+        assert_eq!(enroll_prekey, auth_prekey);
+
+        Ok(())
     }
 }
