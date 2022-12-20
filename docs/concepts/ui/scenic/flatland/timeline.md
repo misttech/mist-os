@@ -62,7 +62,7 @@ main pieces of information:
 *   Timing feedback to the client so they can evaluate how their frame
     scheduling strategy is working (latency, dropped frames, etc).
 *   It is signal for *when the effects of a present has updated the state of the
-    [ViewTree](/docs/concepts/ui/scenic/views#view-tree))*. After
+    [ViewTree](/docs/concepts/ui/scenic/views.md#view-tree))*. After
     `->OnFramePresented()` Scenic guarantees that any subsequent calls to APIs
     that interact with the `ViewTree` (such as those in
     `Flatland::ViewBoundProtocols`) will act as if the previous present has been
