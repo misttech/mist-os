@@ -28,9 +28,13 @@
 #include "spinel_framer.h"
 
 #include <lib/ddk/debug.h>
+#include <lib/ddk/trace/event.h>
 #include <string.h>
 
 namespace ot {
+namespace {
+constexpr char kSpinelFramerTraceCategory[] = "spinel-framer";
+}  // namespace
 
 const int kImmediateRetryCnt = 5;
 const int kFastRetryCnt = 15;
@@ -116,6 +120,8 @@ uint8_t *SpinelFramer::GetRealRxFrameStart(void) {
 }
 
 zx_status_t SpinelFramer::DoSpiXfer(uint16_t len) {
+  TRACE_DURATION(kSpinelFramerTraceCategory, __func__, "len", len, "spi_rx_align_allowance_",
+                 spi_rx_align_allowance_, "spi_frame_count_", spi_frame_count_);
   zx_status_t status = ZX_OK;
   size_t rx_actual = 0;
   uint16_t tot_len = len + kHeaderLen + spi_rx_align_allowance_;
@@ -145,6 +151,9 @@ void SpinelFramer::DebugSpiHeader(const char *hint) {
 }
 
 zx_status_t SpinelFramer::PushPullSpi(void) {
+  TRACE_DURATION(kSpinelFramerTraceCategory, __func__, "spi_valid_frame_count_",
+                 spi_valid_frame_count_);
+
   zx_status_t status = ZX_OK;
   uint16_t spi_xfer_bytes = 0;
   const uint8_t *spiRxFrameBuffer = NULL;
@@ -411,6 +420,7 @@ bool SpinelFramer::IsPacketPresent(void) {
 }
 
 zx_status_t SpinelFramer::SendPacketToRadio(uint8_t *packet, uint16_t length) {
+  TRACE_DURATION(kSpinelFramerTraceCategory, __func__);
   if (!spi_tx_is_ready_) {
     memcpy(&spi_tx_frame_buffer_[kHeaderLen], packet, length);
     spi_tx_payload_size_ = length;
@@ -428,6 +438,7 @@ zx_status_t SpinelFramer::SendPacketToRadio(uint8_t *packet, uint16_t length) {
 }
 
 void SpinelFramer::ReceivePacketFromRadio(uint8_t *rxPacket, uint16_t *length) {
+  TRACE_DURATION(kSpinelFramerTraceCategory, __func__);
   const uint8_t *spiRxFrameBuffer = GetRealRxFrameStart();
   static uint8_t raw_frame_buffer[kMaxFrameSize];
   static uint16_t raw_frame_len;
@@ -473,6 +484,9 @@ bail:
 }
 
 void SpinelFramer::TrySpiTransaction() {
+  TRACE_DURATION(kSpinelFramerTraceCategory, __func__, "radio_data_rx_pending_",
+                 radio_data_rx_pending_, "spi_rx_payload_size_", spi_rx_payload_size_,
+                 "spi_rx_payload_size_", spi_rx_payload_size_);
   if (radio_data_rx_pending_ ||
       ((spi_rx_payload_size_ == 0) && (spi_tx_is_ready_ || CheckAndClearInterrupt()))) {
     // We guard this with the above check because we don't

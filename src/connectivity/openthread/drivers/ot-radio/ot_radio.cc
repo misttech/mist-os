@@ -10,6 +10,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/hw/reg.h>
 #include <lib/ddk/metadata.h>
+#include <lib/ddk/trace/event.h>
 #include <lib/driver-unit-test/utils.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fit/defer.h>
@@ -31,6 +32,10 @@
 #include "src/connectivity/openthread/drivers/ot-radio/ot_radio_bootloader.h"
 
 namespace ot {
+namespace {
+constexpr char kOtRadioTraceCategory[] = "ot-radio";
+}  // namespace
+
 namespace lowpan_spinel_fidl = fuchsia_lowpan_spinel;
 
 constexpr uint32_t kRcpBusyPollingDelayMs = 3;
@@ -105,6 +110,11 @@ void OtRadioDevice::LowpanSpinelDeviceFidlImpl::GetMaxFrameSize(
 
 void OtRadioDevice::LowpanSpinelDeviceFidlImpl::SendFrame(SendFrameRequestView request,
                                                           SendFrameCompleter::Sync& completer) {
+  [[maybe_unused]] auto data_count = request->data.count();
+  TRACE_DURATION(kOtRadioTraceCategory, __func__, "ot_radio_obj_.power_status_",
+                 ot_radio_obj_.power_status_, "request->data.count()", data_count,
+                 "ot_radio_obj_.outbound_allowance", ot_radio_obj_.outbound_allowance_,
+                 "ot_radio_obj_.outbound_cnt", ot_radio_obj_.outbound_cnt_);
   if (ot_radio_obj_.power_status_ == OT_SPINEL_DEVICE_OFF) {
     // TODO(fxbug.dev/94739): Consider handling errors instead of ignoring them.
     (void)fidl::WireSendEvent(*ot_radio_obj_.fidl_binding_)
@@ -139,6 +149,9 @@ void OtRadioDevice::LowpanSpinelDeviceFidlImpl::SendFrame(SendFrameRequestView r
 
 void OtRadioDevice::LowpanSpinelDeviceFidlImpl::ReadyToReceiveFrames(
     ReadyToReceiveFramesRequestView request, ReadyToReceiveFramesCompleter::Sync& completer) {
+  TRACE_DURATION(kOtRadioTraceCategory, __func__, "request->number_of_frames",
+                 request->number_of_frames, "ot_radio_obj_.inbound_allowance",
+                 ot_radio_obj_.inbound_allowance_);
   zxlogf(DEBUG, "ot-radio: allow to receive %u frame", request->number_of_frames);
   ot_radio_obj_.inbound_allowance_ += request->number_of_frames;
   if (ot_radio_obj_.inbound_allowance_ > 0 && ot_radio_obj_.spinel_framer_.get()) {
@@ -254,6 +267,9 @@ zx_status_t OtRadioDevice::Init() {
 }
 
 zx_status_t OtRadioDevice::ReadRadioPacket() {
+  [[maybe_unused]] auto is_packet_present = spinel_framer_->IsPacketPresent();
+  TRACE_DURATION(kOtRadioTraceCategory, __func__, "inbound_allowance_", inbound_allowance_,
+                 "is_packet_present", is_packet_present, "spi_rx_buffer_len_", spi_rx_buffer_len_);
   if ((inbound_allowance_ > 0) && (spinel_framer_->IsPacketPresent())) {
     spinel_framer_->ReceivePacketFromRadio(spi_rx_buffer_, &spi_rx_buffer_len_);
     if (spi_rx_buffer_len_ > 0) {
@@ -288,6 +304,8 @@ void OtRadioDevice::InspectInboundFrame(uint8_t* frame_buffer, uint16_t length) 
 }
 
 zx_status_t OtRadioDevice::HandleRadioRxFrame(uint8_t* frameBuffer, uint16_t length) {
+  TRACE_DURATION(kOtRadioTraceCategory, __func__, "power_status_", power_status_,
+                 "inbound_allowance_", inbound_allowance_, "inbound_cnt_", inbound_cnt_);
   zxlogf(DEBUG, "ot-radio: received frame of len:%d", length);
   if (power_status_ == OT_SPINEL_DEVICE_ON) {
     auto data = fidl::VectorView<uint8_t>::FromExternal(frameBuffer, length);
@@ -317,6 +335,7 @@ void OtRadioDevice::InspectOutboundFrame(uint8_t* frame_buffer, uint16_t length)
 }
 
 zx_status_t OtRadioDevice::RadioPacketTx(uint8_t* frameBuffer, uint16_t length) {
+  TRACE_DURATION(kOtRadioTraceCategory, __func__);
   zxlogf(DEBUG, "ot-radio: RadioPacketTx");
   zx_port_packet packet = {PORT_KEY_TX_TO_RADIO, ZX_PKT_TYPE_USER, ZX_OK, {}};
   if (!port_.is_valid()) {
@@ -332,6 +351,7 @@ zx_status_t OtRadioDevice::RadioPacketTx(uint8_t* frameBuffer, uint16_t length) 
 }
 
 zx_status_t OtRadioDevice::InvokeInterruptHandler() {
+  TRACE_DURATION(kOtRadioTraceCategory, __func__);
   zxlogf(INFO, "ot-radio: InvokeInterruptHandler");
   zx_port_packet packet = {PORT_KEY_RADIO_IRQ, ZX_PKT_TYPE_USER, ZX_OK, {}};
   if (!port_.is_valid()) {
@@ -341,6 +361,7 @@ zx_status_t OtRadioDevice::InvokeInterruptHandler() {
 }
 
 bool OtRadioDevice::IsInterruptAsserted() {
+  TRACE_DURATION(kOtRadioTraceCategory, __func__);
   uint8_t pin_level = 0;
   gpio_[OT_RADIO_INT_PIN].Read(&pin_level);
   return pin_level == 0;
@@ -367,6 +388,7 @@ zx_status_t OtRadioDevice::DriverUnitTestGetResetEvent() {
 }
 
 zx_status_t OtRadioDevice::AssertResetPin() {
+  TRACE_DURATION(kOtRadioTraceCategory, __func__);
   zx_status_t status = ZX_OK;
   zxlogf(DEBUG, "ot-radio: assert reset pin");
 
@@ -443,9 +465,13 @@ zx_status_t OtRadioDevice::RadioThread() {
   zxlogf(INFO, "ot-radio: entered thread");
 
   while (true) {
+    TRACE_DURATION_BEGIN(kOtRadioTraceCategory, "OtRadioDevice::RadioThread_port_wait");
     zx_port_packet_t packet = {};
     uint32_t timeout_ms = GetTimeoutMs();
     auto status = port_.wait(zx::deadline_after(zx::msec(timeout_ms)), &packet);
+    TRACE_DURATION_END(kOtRadioTraceCategory, "OtRadioDevice::RadioThread_port_wait");
+    TRACE_DURATION(kOtRadioTraceCategory, "OtRadioDevice::RadioThread_handle_packet", "status",
+                   status);
 
     if (status == ZX_ERR_TIMED_OUT) {
       spinel_framer_->TrySpiTransaction();
