@@ -115,7 +115,9 @@ impl HostPipeChild {
     ) -> Result<(Option<HostAddr>, HostPipeChild)> {
         std::env::set_var(
             "FFX_DAEMON_ABI_REVISION",
-            version_history::LATEST_VERSION.abi_revision.0.to_string(),
+            // TODO(fxb/117872): Update this to an ABI revision from API level
+            // 11 once enough time has elapsed.
+            "17110537485609514211",
         );
         let id_string = format!("{}", id);
         let mut args = vec![
