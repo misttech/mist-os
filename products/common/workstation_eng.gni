@@ -35,21 +35,12 @@ legacy_base_package_labels +=
 # Improve DX by allowing iteration on these packages without and OTA.
 legacy_cache_package_labels += developer_packages
 
-# Add examples to universe.
-legacy_universe_package_labels += [
-  "//examples/fidl:tests",
-  "//src/lib/ui/carnelian:examples",
-
-  # TODO(fxb/102262): This is an anti-pattern, do not imitate. Remove when we are ready.
-  "//src/devices/tests/fhcp:device-tests",
-]
+# Add carnelian examples to universe.
+legacy_universe_package_labels += [ "//src/lib/ui/carnelian:examples" ]
 
 # Set the SWD policy for workstation_eng, details can be found in //build/security/policies_swd.gni.
 policy_labels.swd = "unrestricted"
 
-# End to end (E2E) product test runtime dependencies. Must be added to cache,
-# not universe, so the test can run on bots where there is no package server.
-#
 # TODO(fxbug.dev/9892): Support a package server on bots so this can be added to
 # universe like the tests.
 legacy_cache_package_labels += [
@@ -58,10 +49,6 @@ legacy_cache_package_labels += [
 
   # Used for Chromium e2e tests. See fxb/96503.
   "//src/experiences/session_shells/ermine/tools",
-
-  "//src/tests/end_to_end/bundles:end_to_end_deps",
-  "//src/experiences/tests/e2e:end_to_end_deps",
-  "//src/experiences/tests/performance:performance_deps",
 
   # CFv2 test framework.
   "//src/sys/run_test_suite",
@@ -74,18 +61,7 @@ legacy_cache_package_labels += [
   "//src/diagnostics/archivist:archivist-without-attribution",
 ]
 
-legacy_universe_package_labels += [
-  # E2E Product Tests. They don't produce fuchsia packages, but host
-  # executables, and must just be included somewhere in the build configuration
-  # of the product.
-  "//src/tests/end_to_end/sl4f:test",
-  "//src/tests/end_to_end/time_sync:test",
-
-  # Only for products in which Flutter is supported.
-  "//src/tests/intl/timezone:tests-for-flutter",
-
-  "//src/fonts:open-fonts",
-]
+legacy_universe_package_labels += [ "//src/fonts:open-fonts" ]
 
 # Add SDK tools set to "cache" so these tools are automatically available in
 # QEMU images generated for the SDK, but in cache, so they can be updated.

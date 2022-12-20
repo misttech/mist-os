@@ -32,6 +32,13 @@ group("workstation") {
 
     # Integration tests
     "//src/ui/tests:workstation_tests",
+
+    # FHCP device tests
+    # TODO(fxb/102262): Remove when we are ready.
+    "//src/devices/tests/fhcp:device-tests",
+
+    # FIDL example tests
+    "//examples/fidl:tests",
   ]
 
   # Remove when all builder bots that use the workstation_eng product explicitly
