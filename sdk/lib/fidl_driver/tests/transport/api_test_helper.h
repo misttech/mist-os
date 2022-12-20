@@ -25,10 +25,10 @@
 inline std::pair<fdf::Dispatcher, std::shared_ptr<libsync::Completion>> CreateSyncDispatcher() {
   // Use |FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS| to encourage the driver dispatcher
   // to spawn more threads to back the same synchronized dispatcher.
-  constexpr uint32_t kSyncDispatcherOptions = FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS;
+  constexpr auto kSyncDispatcherOptions = fdf::SynchronizedDispatcher::Options::kAllowSyncCalls;
   std::shared_ptr<libsync::Completion> dispatcher_shutdown =
       std::make_shared<libsync::Completion>();
-  zx::result dispatcher = fdf::Dispatcher::Create(
+  zx::result dispatcher = fdf::SynchronizedDispatcher::Create(
       kSyncDispatcherOptions, "",
       [dispatcher_shutdown](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown->Signal(); });
   ZX_ASSERT(dispatcher.status_value() == ZX_OK);

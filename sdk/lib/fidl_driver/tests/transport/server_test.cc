@@ -23,9 +23,8 @@ TEST(Server, OnUnboundFnCalledOnClientReset) {
   fidl_driver_testing::ScopedFakeDriver driver;
 
   libsync::Completion dispatcher_shutdown;
-  auto dispatcher =
-      fdf::Dispatcher::Create(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, "",
-                              [&](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown.Signal(); });
+  auto dispatcher = fdf::UnsynchronizedDispatcher::Create(
+      {}, "", [&](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown.Signal(); });
   ASSERT_OK(dispatcher.status_value());
 
   auto channels = fdf::ChannelPair::Create(0);
@@ -67,14 +66,14 @@ TEST(Server, UnbindInMethodHandler) {
   fidl_driver_testing::ScopedFakeDriver driver;
 
   libsync::Completion client_dispatcher_shutdown;
-  auto client_dispatcher = fdf::Dispatcher::Create(
-      FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, "",
+  auto client_dispatcher = fdf::SynchronizedDispatcher::Create(
+      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "",
       [&](fdf_dispatcher_t* dispatcher) { client_dispatcher_shutdown.Signal(); });
   ASSERT_OK(client_dispatcher.status_value());
 
   libsync::Completion server_dispatcher_shutdown;
-  auto server_dispatcher = fdf::Dispatcher::Create(
-      FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, "",
+  auto server_dispatcher = fdf::SynchronizedDispatcher::Create(
+      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "",
       [&](fdf_dispatcher_t* dispatcher) { server_dispatcher_shutdown.Signal(); });
   ASSERT_OK(server_dispatcher.status_value());
 

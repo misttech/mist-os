@@ -208,9 +208,8 @@ TEST(WireClient, CannotBindUnsynchronizedDispatcher) {
   fidl_driver_testing::ScopedFakeDriver driver;
 
   libsync::Completion dispatcher_shutdown;
-  zx::result dispatcher =
-      fdf::Dispatcher::Create(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, "",
-                              [&](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown.Signal(); });
+  zx::result dispatcher = fdf::UnsynchronizedDispatcher::Create(
+      {}, "", [&](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown.Signal(); });
   ASSERT_OK(dispatcher.status_value());
 
   zx::result endpoints = fdf::CreateEndpoints<test_transport::TwoWayTest>();
@@ -236,8 +235,17 @@ TEST_P(WireSharedClient, CanBindAnyDispatcher) {
   fidl_driver_testing::ScopedFakeDriver driver;
 
   libsync::Completion dispatcher_shutdown;
-  zx::result dispatcher = fdf::Dispatcher::Create(
-      GetParam(), "", [&](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown.Signal(); });
+  zx::result<fdf::Dispatcher> dispatcher;
+  uint32_t options = GetParam();
+  if ((options & FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK) ==
+      FDF_DISPATCHER_OPTION_SYNCHRONIZED) {
+    dispatcher = fdf::SynchronizedDispatcher::Create(
+        fdf::SynchronizedDispatcher::Options{options}, "",
+        [&](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown.Signal(); });
+  } else {
+    dispatcher = fdf::UnsynchronizedDispatcher::Create(
+        {}, "", [&](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown.Signal(); });
+  }
   ASSERT_OK(dispatcher.status_value());
 
   zx::result endpoints = fdf::CreateEndpoints<test_transport::TwoWayTest>();

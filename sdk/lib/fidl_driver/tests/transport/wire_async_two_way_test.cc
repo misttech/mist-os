@@ -41,8 +41,8 @@ TEST(DriverTransport, WireTwoWayAsync) {
   fidl_driver_testing::ScopedFakeDriver driver;
 
   libsync::Completion dispatcher_shutdown;
-  auto dispatcher = fdf::Dispatcher::Create(
-      0, "", [&](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown.Signal(); });
+  auto dispatcher = fdf::SynchronizedDispatcher::Create(
+      {}, "", [&](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown.Signal(); });
   ASSERT_OK(dispatcher.status_value());
 
   auto channels = fdf::ChannelPair::Create(0);
@@ -89,9 +89,8 @@ TEST(DriverTransport, WireTwoWayAsyncShared) {
   fidl_driver_testing::ScopedFakeDriver driver;
 
   libsync::Completion dispatcher_shutdown;
-  auto dispatcher =
-      fdf::Dispatcher::Create(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, "",
-                              [&](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown.Signal(); });
+  auto dispatcher = fdf::UnsynchronizedDispatcher::Create(
+      {}, "", [&](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown.Signal(); });
   ASSERT_OK(dispatcher.status_value());
 
   auto channels = fdf::ChannelPair::Create(0);
