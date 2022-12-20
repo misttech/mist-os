@@ -59,7 +59,8 @@ TEST(OpenclLoader, VmosIndependent) {
   ASSERT_TRUE(vmo_out.is_valid());
 
   fzl::VmoMapper mapper;
-  EXPECT_EQ(ZX_OK, mapper.Map(vmo_out, 0, 0, ZX_VM_PERM_EXECUTE | ZX_VM_PERM_READ));
+  EXPECT_EQ(ZX_OK,
+            mapper.Map(vmo_out, 0, 0, ZX_VM_PERM_EXECUTE | ZX_VM_PERM_READ | ZX_VM_ALLOW_FAULTS));
   uint8_t original_value = *static_cast<uint8_t*>(mapper.start());
   uint8_t byte_to_write = original_value + 1;
   size_t actual;
@@ -83,7 +84,8 @@ TEST(OpenclLoader, VmosIndependent) {
   EXPECT_TRUE(vmo2.is_valid());
 
   fzl::VmoMapper mapper2;
-  EXPECT_EQ(ZX_OK, mapper2.Map(vmo2, 0, 0, ZX_VM_PERM_EXECUTE | ZX_VM_PERM_READ));
+  EXPECT_EQ(ZX_OK,
+            mapper2.Map(vmo2, 0, 0, ZX_VM_PERM_EXECUTE | ZX_VM_PERM_READ | ZX_VM_ALLOW_FAULTS));
   EXPECT_EQ(original_value, *static_cast<uint8_t*>(mapper2.start()));
 }
 

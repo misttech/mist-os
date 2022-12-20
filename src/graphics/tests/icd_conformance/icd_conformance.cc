@@ -78,7 +78,7 @@ std::set<std::string> GetSymbolAllowlist() {
 
 void ValidateSharedObject(const zx::vmo& vmo) {
   fzl::VmoMapper mapper;
-  ASSERT_EQ(ZX_OK, mapper.Map(vmo, 0, 0, ZX_VM_PERM_READ));
+  ASSERT_EQ(ZX_OK, mapper.Map(vmo, 0, 0, ZX_VM_PERM_READ | ZX_VM_ALLOW_FAULTS));
 
   std::unique_ptr<elflib::ElfLib> lib =
       elflib::ElfLib::Create(reinterpret_cast<uint8_t*>(mapper.start()), mapper.size());
