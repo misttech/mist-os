@@ -1141,6 +1141,8 @@ class VmCowPages final : public VmHierarchyBase,
   // magic value
   fbl::Canary<fbl::magic("VMCP")> canary_;
 
+  const uint32_t pmm_alloc_flags_;
+
   // VmCowPages keeps this ref on VmCowPagesContainer until the end of VmCowPages::fbl_recycle().
   // This allows loaned page reclaim to upgrade a raw container pointer until _after_ all the pages
   // have been removed from the VmCowPages.  This way there's always something for loaned page
@@ -1150,6 +1152,9 @@ class VmCowPages final : public VmHierarchyBase,
   VmCowPagesContainer* debug_retained_raw_container_ = nullptr;
 
   VmCowPagesOptions options_ TA_GUARDED(lock());
+
+  // length of children_list_
+  uint32_t children_list_len_ TA_GUARDED(lock()) = 0;
 
   uint64_t size_ TA_GUARDED(lock());
   // Offset in the *parent* where this object starts.
@@ -1170,21 +1175,6 @@ class VmCowPages final : public VmHierarchyBase,
   // used to simplify some operations and so this invariant of not overflowing accumulated offsets
   // needs to be maintained.
   uint64_t root_parent_offset_ TA_GUARDED(lock()) = 0;
-  const uint32_t pmm_alloc_flags_;
-
-  // Flag which is true if there was a call to ::ReleaseCowParentPagesLocked which was
-  // not able to update the parent limits. When this is not set, it is sometimes
-  // possible for ::MergeContentWithChildLocked to do significantly less work. This flag acts as a
-  // proxy then for how precise the parent_limit_ and parent_start_limit_ are. It is always an
-  // absolute guarantee that descendants cannot see outside of the limits, but when this flag is
-  // true there is a possibility that there is a sub range inside the limits that they also cannot
-  // see.
-  // Imagine a two siblings that see the parent range [0x1000-0x2000) and [0x3000-0x4000)
-  // respectively. The parent can have the start_limit of 0x1000 and limit of 0x4000, but without
-  // additional allocations it cannot track the free region 0x2000-0x3000, and so
-  // partial_cow_release_ must be set to indicate in the future we need to do more expensive
-  // processing to check for such free regions.
-  bool partial_cow_release_ TA_GUARDED(lock()) = false;
 
   // parent pointer (may be null)
   fbl::RefPtr<VmCowPages> parent_ TA_GUARDED(lock());
@@ -1192,9 +1182,6 @@ class VmCowPages final : public VmHierarchyBase,
   // list of every child
   fbl::TaggedDoublyLinkedList<VmCowPages*, internal::ChildListTag> children_list_
       TA_GUARDED(lock());
-
-  // length of children_list_
-  uint32_t children_list_len_ TA_GUARDED(lock()) = 0;
 
   // Flag used for walking back up clone tree without recursion. See ::CloneCowPageLocked.
   enum class StackDir : bool {
@@ -1273,6 +1260,20 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Non-null if this is a discardable VMO.
   const ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker_;
+
+  // Flag which is true if there was a call to ::ReleaseCowParentPagesLocked which was
+  // not able to update the parent limits. When this is not set, it is sometimes
+  // possible for ::MergeContentWithChildLocked to do significantly less work. This flag acts as a
+  // proxy then for how precise the parent_limit_ and parent_start_limit_ are. It is always an
+  // absolute guarantee that descendants cannot see outside of the limits, but when this flag is
+  // true there is a possibility that there is a sub range inside the limits that they also cannot
+  // see.
+  // Imagine a two siblings that see the parent range [0x1000-0x2000) and [0x3000-0x4000)
+  // respectively. The parent can have the start_limit of 0x1000 and limit of 0x4000, but without
+  // additional allocations it cannot track the free region 0x2000-0x3000, and so
+  // partial_cow_release_ must be set to indicate in the future we need to do more expensive
+  // processing to check for such free regions.
+  bool partial_cow_release_ TA_GUARDED(lock()) = false;
 
   // TODO(fxb/101641): This is a temporary solution and needs to be replaced with something that is
   // formalized.

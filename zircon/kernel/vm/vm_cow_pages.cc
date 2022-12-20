@@ -292,11 +292,11 @@ VmCowPages::VmCowPages(ktl::unique_ptr<VmCowPagesContainer> cow_container,
                        fbl::RefPtr<PageSource> page_source,
                        ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker)
     : VmHierarchyBase(ktl::move(hierarchy_state_ptr)),
+      pmm_alloc_flags_(pmm_alloc_flags),
       container_(fbl::AdoptRef(cow_container.release())),
       debug_retained_raw_container_(container_.get()),
       options_(options),
       size_(size),
-      pmm_alloc_flags_(pmm_alloc_flags),
       page_source_(ktl::move(page_source)),
       discardable_tracker_(ktl::move(discardable_tracker)) {
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
