@@ -370,7 +370,6 @@ pub mod filter {
         }
     }
 
-    // TODO(fxbug.dev/68663): investigate implementing std::ops::Bit* traits.
     /// `Conjugation` dictates how multiple conditions are combined to determine
     /// a match.
     #[derive(Clone, Debug, PartialEq)]
