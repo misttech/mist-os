@@ -86,7 +86,6 @@ mod tests {
     use crate::model::{
         component::StartReason,
         model::Model,
-        starter::Starter,
         testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
     };
     use cm_rust_testing::ComponentDeclBuilder;

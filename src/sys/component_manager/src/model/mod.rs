@@ -10,7 +10,6 @@ pub mod error;
 pub mod event_logger;
 pub mod hooks;
 pub mod model;
-pub mod starter;
 
 pub(crate) mod context;
 pub(crate) mod environment;

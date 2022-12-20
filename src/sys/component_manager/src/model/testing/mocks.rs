@@ -6,20 +6,12 @@ use {
     crate::{
         builtin::runner::BuiltinRunnerFactory,
         model::{
-            component::{
-                ComponentInstance, ComponentManagerInstance, StartReason, WeakComponentInstance,
-            },
-            environment::Environment,
-            error::ModelError,
-            resolver::{Resolver, ResolverRegistry},
-            starter::Starter,
+            component::{ComponentInstance, WeakComponentInstance},
+            resolver::Resolver,
         },
     },
+    ::routing::policy::ScopedPolicyChecker,
     ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolvedPackage, ResolverError},
-    ::routing::{
-        environment::{DebugRegistry, RunnerRegistry},
-        policy::ScopedPolicyChecker,
-    },
     anyhow::format_err,
     async_trait::async_trait,
     cm_runner::{Runner, RunnerError},
@@ -42,12 +34,11 @@ use {
         lock::Mutex,
         prelude::*,
     },
-    moniker::AbsoluteMoniker,
     std::{
         boxed::Box,
         collections::{HashMap, HashSet},
         mem,
-        sync::{Arc, Mutex as SyncMutex, Weak},
+        sync::{Arc, Mutex as SyncMutex},
     },
     tracing::warn,
     version_history,
@@ -461,40 +452,6 @@ impl Runner for MockRunner {
                 waiter.send(()).expect("failed to send url notice");
             }
         }
-    }
-}
-
-/// A fake `Binder` implementation that always returns `Ok(())` in a `BoxFuture`.
-pub struct FakeStarter {
-    top_instance: Arc<ComponentManagerInstance>,
-}
-
-impl FakeStarter {
-    pub fn new(top_instance: Arc<ComponentManagerInstance>) -> Arc<dyn Starter> {
-        Arc::new(Self { top_instance })
-    }
-}
-
-#[async_trait]
-impl Starter for FakeStarter {
-    async fn start_instance<'a>(
-        &'a self,
-        _abs_moniker: &'a AbsoluteMoniker,
-        _reason: &'a StartReason,
-    ) -> Result<Arc<ComponentInstance>, ModelError> {
-        let resolver = ResolverRegistry::new();
-        let root_component_url = "test:///root".to_string();
-        Ok(ComponentInstance::new_root(
-            Environment::new_root(
-                &self.top_instance,
-                RunnerRegistry::default(),
-                resolver,
-                DebugRegistry::default(),
-            ),
-            Weak::new(),
-            Weak::new(),
-            root_component_url,
-        ))
     }
 }
 

@@ -182,7 +182,6 @@ template("component_manager") {
     "src/model/routing/providers.rs",
     "src/model/routing/service.rs",
     "src/model/routing_fns.rs",
-    "src/model/starter.rs",
     "src/model/storage/admin_protocol.rs",
     "src/model/storage/mod.rs",
     "src/root_stop_notifier.rs",

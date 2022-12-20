@@ -804,7 +804,6 @@ mod tests {
             },
             component::StartReason,
             hooks::{self, EventPayload, EventType, Hook, HooksRegistration},
-            starter::Starter,
             testing::{
                 test_helpers::{
                     component_decl_with_test_runner, default_component_decl,

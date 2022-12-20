@@ -429,7 +429,6 @@ mod tests {
             model::{
                 component::{ComponentInstance, StartReason},
                 events::{source::EventSource, stream::EventStream},
-                starter::Starter,
                 testing::{mocks::*, out_dir::OutDir, test_helpers::*, test_hook::*},
             },
         },

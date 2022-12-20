@@ -12,7 +12,6 @@ use {
             events::registry::EventSubscription,
             hooks::{Event, EventType, Hook, HooksRegistration},
             model::Model,
-            starter::Starter,
             testing::{
                 mocks::*, out_dir::OutDir, routing_test_helpers::RoutingTestBuilder,
                 test_helpers::*, test_hook::TestHook,

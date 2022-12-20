@@ -2148,7 +2148,6 @@ pub mod tests {
             actions::{test_utils::is_discovered, ShutdownAction},
             events::{registry::EventSubscription, stream::EventStream},
             hooks::EventType,
-            starter::Starter,
             testing::{
                 mocks::{ControlMessage, ControllerActionResponse, MockController},
                 routing_test_helpers::{RoutingTest, RoutingTestBuilder},

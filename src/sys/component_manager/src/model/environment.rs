@@ -178,7 +178,6 @@ mod tests {
             component::StartReason,
             error::ModelError,
             model::{Model, ModelParams},
-            starter::Starter,
             testing::mocks::MockResolver,
         },
         ::routing::{

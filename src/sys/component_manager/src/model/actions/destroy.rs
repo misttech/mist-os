@@ -130,7 +130,6 @@ pub mod tests {
             component::{Component, StartReason},
             events::{registry::EventSubscription, stream::EventStream},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
-            starter::Starter,
             testing::{
                 test_helpers::{
                     component_decl_with_test_runner, execution_is_shut_down, get_incarnation_id,

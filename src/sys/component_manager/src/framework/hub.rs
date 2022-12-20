@@ -454,7 +454,6 @@ mod tests {
             model::{
                 component::StartReason,
                 model::Model,
-                starter::Starter,
                 testing::test_helpers::{
                     dir_contains, list_directory, list_directory_recursive, list_sub_directory,
                     read_file, TestEnvironmentBuilder, TestModelResult,

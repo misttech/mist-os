@@ -10,7 +10,6 @@ use {
             events::{registry::EventSubscription, source::EventSource, stream::EventStream},
             hooks::HooksRegistration,
             model::Model,
-            starter::Starter,
             testing::{
                 mocks::{ControlMessage, MockResolver, MockRunner},
                 test_hook::TestHook,

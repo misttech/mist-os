@@ -9,7 +9,6 @@ use {
         context::ModelContext,
         environment::Environment,
         error::ModelError,
-        starter::Starter,
     },
     ::routing::{component_id_index::ComponentIdIndex, config::RuntimeConfig},
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
@@ -167,8 +166,7 @@ impl Model {
                 protocol to start the root component."
             );
         } else {
-            if let Err(e) = self.start_instance(&AbsoluteMoniker::root(), &StartReason::Root).await
-            {
+            if let Err(e) = self.root.start(&StartReason::Root).await {
                 // If we fail to start the root, but the root is being shutdown, that's ok. The
                 // system is tearing down, so it doesn't matter any more if we never got everything
                 // started that we wanted to.
@@ -178,6 +176,19 @@ impl Model {
                 }
             }
         }
+    }
+
+    /// Starts the component instance in the given component if it's not already running.
+    /// Returns the component that was bound to.
+    #[cfg(test)]
+    pub async fn start_instance<'a>(
+        self: &Arc<Model>,
+        abs_moniker: &'a AbsoluteMoniker,
+        reason: &StartReason,
+    ) -> Result<Arc<ComponentInstance>, ModelError> {
+        let component = self.look_up(abs_moniker).await?;
+        component.start(reason).await?;
+        Ok(component)
     }
 }
 

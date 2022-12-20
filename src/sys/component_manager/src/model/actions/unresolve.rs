@@ -135,7 +135,6 @@ pub mod tests {
             error::ModelError,
             events::{registry::EventSubscription, stream::EventStream},
             hooks::EventType,
-            starter::Starter,
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
         },
         assert_matches::assert_matches,

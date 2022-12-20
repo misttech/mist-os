@@ -11,7 +11,6 @@ use {
             error::ModelError,
             hooks::HooksRegistration,
             model::Model,
-            starter::Starter,
             testing::{echo_service::*, mocks::*, out_dir::OutDir, test_helpers::*},
         },
     },
