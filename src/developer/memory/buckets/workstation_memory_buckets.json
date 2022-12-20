@@ -62,7 +62,7 @@
     {
         "event_code": 9,
         "name": "Scenic",
-        "process": "(scenic|scene_manager)\\.cm",
+        "process": "scenic\\.cm",
         "vmo": ""
     },
     {
@@ -129,6 +129,12 @@
         "event_code": 48,
         "name": "OtherDrivers",
         "process": "driver_host:.*",
+        "vmo": ""
+    },
+    {
+        "event_code": 69,
+        "name": "SceneManager",
+        "process": "scene_manager\\.cm",
         "vmo": ""
     }
 ]
