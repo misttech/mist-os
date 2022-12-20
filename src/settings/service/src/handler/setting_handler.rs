@@ -345,6 +345,7 @@ impl<C: controller::Create + controller::Handle + Send + Sync + 'static> Handler
 
 /// `IntoHandlerResult` helps with converting a value into the result of a setting request.
 pub trait IntoHandlerResult {
+    #[allow(clippy::result_large_err)] // TODO(fxbug.dev/117896)
     /// Converts `Self` into a `SettingHandlerResult` for use in a `Controller`.
     fn into_handler_result(self) -> SettingHandlerResult;
 }

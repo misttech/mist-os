@@ -60,6 +60,7 @@ enum HandlerAction {
 }
 
 impl SettingHandler {
+    #[allow(clippy::result_large_err)] // TODO(fxbug.dev/117896)
     fn process_state(&mut self, state: State) -> SettingHandlerResult {
         self.state_tx.unbounded_send(state).unwrap();
         Ok(None)
