@@ -212,6 +212,8 @@ template("legacy_assembly_input_bundle") {
       "//src/media/audio/audio_core/meta/audio_core.core_shard.base.cml",
       "//src/settings/service/meta/setui_service_base.core_shard.cml",
       "//src/testing/sl4f/meta/sl4f.core_shard.cml",
+      "//src/recovery/system/meta/core_shards/base.shard.cml",
+      "//src/recovery/system/meta/core_shards/ui.shard.cml",
 
       # Required for workstation
       "//src/connectivity/bluetooth/profiles/bt-a2dp/meta/bt-a2dp-common.core_shard.cml",

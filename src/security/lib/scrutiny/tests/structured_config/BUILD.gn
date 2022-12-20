@@ -54,8 +54,7 @@ if (is_fuchsia) {
     shard_file = "meta/core_shard.cml"
   }
 
-  core_realm("core_realm") {
-    package_name = core_realm_package_name
+  core_realm_definition("core_realm") {
     deps = [ ":core_shard" ]
   }
 
@@ -90,15 +89,14 @@ if (is_fuchsia) {
 
     # Needed for scrutiny to find root.cm and other component config.
     bootfs_labels = [ "//build/input:bootfs" ]
-    base_packages = [
-      ":core_realm",
-      ":package",
-    ]
+    base_packages = [ ":package" ]
 
     generate_image_metadata = false
 
     # Needed for scrutiny to find things for the component model.
     include_component_id_index = true
+    core_realm_definition = ":core_realm"
+    core_package_name = core_realm_package_name
   }
 
   generated_partitions_config("partitions_config") {

@@ -17,7 +17,7 @@ import("//src/sys/root/build/root.gni")
 template("assemble_network_conformance_system") {
   core_name = "core-${target_name}"
 
-  core_realm("core") {
+  core_realm_definition("core") {
     testonly = true
 
     deps = [
@@ -26,7 +26,6 @@ template("assemble_network_conformance_system") {
       "//src/sys/process-resolver:core_shard",
     ]
 
-    package_name = core_name
     restrict_persistent_storage = false
     restrict_core_env_to_base = false
   }
@@ -41,7 +40,6 @@ template("assemble_network_conformance_system") {
     testonly = true
 
     base_packages = [
-      ":core",
       "//src/developer/sshd-host",
       "//src/developer/sshd-host:config",
       "//src/sys/process-resolver",
@@ -61,6 +59,9 @@ template("assemble_network_conformance_system") {
       "//src/sys/full-resolver",
     ]
     base_packages += invoker.additional_base_packages
+
+    core_realm_definition = ":core"
+    core_package_name = core_name
 
     generate_fvm = !bootfs_only
     ramdisk_fvm_in_zbi = true

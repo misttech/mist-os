@@ -9,8 +9,7 @@ import("//src/sys/root/build/root.gni")
 
 core_name = "core-overnet"
 
-core_realm("core") {
-  package_name = core_name
+core_realm_definition("core") {
   testonly = true
   restrict_persistent_storage = false
   deps = [
@@ -28,7 +27,6 @@ assembled_system("overnet") {
   testonly = true
 
   base_packages = [
-    ":core",
     "//src/connectivity/overnet/overnetstack",
     "//src/connectivity/overnet/tools/debug-serial",
     "//src/sys/pkg/bin/system-updater",
@@ -51,6 +49,9 @@ assembled_system("overnet") {
     "//src/power/power-manager:base_config",
     "//src/diagnostics/archivist:default-service-config",
   ]
+
+  core_realm_definition = ":core"
+  core_package_name = core_name
 
   ramdisk_fvm_in_zbi = true
   include_component_id_index = true
