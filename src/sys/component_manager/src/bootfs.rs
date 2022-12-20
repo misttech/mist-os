@@ -12,6 +12,7 @@ use {
     std::convert::TryFrom,
     std::mem::replace,
     std::sync::Arc,
+    tracing::info,
     vfs::{
         directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
         file::vmo::asynchronous as vmo, tree_builder::TreeBuilder,
@@ -171,7 +172,7 @@ impl BootfsSvc {
                     }
                 }
                 Err(error) => {
-                    println!("[BootfsSvc] Bootfs parsing error: {}", error);
+                    info!("[BootfsSvc] Bootfs parsing error: {}", error);
                 }
             }
         }
@@ -237,11 +238,7 @@ impl BootfsSvc {
                         Ok(dir_entry) => {
                             self.tree_builder.add_entry(&path_parts, dir_entry).unwrap_or_else(
                                 |error| {
-                                    println!(
-                                        "[BootfsSvc] Failed to add bootfs entry {} \
-                                        to directory: {}.",
-                                        name, error
-                                    );
+                                    info!(%error, %name, "[BootfsSvc] Failed to add bootfs entry to directory.");
                                 },
                             );
                         }
@@ -255,7 +252,7 @@ impl BootfsSvc {
                     }
                 }
                 Err(error) => {
-                    println!("[BootfsSvc] Bootfs parsing error: {}", error);
+                    info!(%error, "[BootfsSvc] Bootfs parsing error");
                 }
             }
         }
@@ -300,10 +297,7 @@ impl BootfsSvc {
         ) {
             Ok(dir_entry) => {
                 self.tree_builder.add_entry(&path_parts, dir_entry).unwrap_or_else(|error| {
-                    println!(
-                        "[BootfsSvc] Failed to publish kernel VMO {} to directory: {}.",
-                        path, error
-                    );
+                    info!(%error, %path, "[BootfsSvc] Failed to publish kernel VMO to directory.");
                 });
             }
             Err(error) => {
@@ -322,7 +316,7 @@ impl BootfsSvc {
         handle_type: HandleType,
         first_index: u16,
     ) -> Result<Self, Error> {
-        println!(
+        info!(
             "[BootfsSvc] Adding kernel VMOs of type {:?} starting at index {}.",
             handle_type, first_index
         );
@@ -343,7 +337,7 @@ impl BootfsSvc {
     }
 
     pub fn create_and_bind_vfs(&mut self) -> Result<(), Error> {
-        println!("[BootfsSvc] Finalizing rust bootfs service.");
+        info!("[BootfsSvc] Finalizing rust bootfs service.");
 
         let tree_builder = replace(&mut self.tree_builder, TreeBuilder::empty_dir());
 
@@ -367,7 +361,7 @@ impl BootfsSvc {
 
         ns.bind("/boot", directory)?;
 
-        println!("[BootfsSvc] Bootfs is ready and is now serving /boot.");
+        info!("[BootfsSvc] Bootfs is ready and is now serving /boot.");
 
         Ok(())
     }

@@ -29,7 +29,7 @@ use {
         sync::{Arc, Weak},
         time::Duration,
     },
-    tracing::warn,
+    tracing::{info, warn},
 };
 
 lazy_static! {
@@ -129,11 +129,7 @@ impl SystemControllerCapabilityProvider {
                     match responder.send() {
                         Ok(()) => {}
                         Err(e) => {
-                            println!(
-                                "error sending response to shutdown requester:\
-                                 {}\n shut down proceeding",
-                                e
-                            );
+                            info!(%e, "Error sending response to shutdown requester. Shut down proceeding");
                         }
                     }
                 }

@@ -19,6 +19,7 @@ use {
         env,
         sync::Arc,
     },
+    tracing::info,
 };
 
 lazy_static! {
@@ -154,12 +155,12 @@ impl Arguments {
         for line in lines {
             let split = line.splitn(2, "=").collect::<Vec<&str>>();
             if split.len() == 0 {
-                println!("[Arguments] Empty argument string after parsing, ignoring: {}", line);
+                info!("[Arguments] Empty argument string after parsing, ignoring: {}", line);
                 continue;
             }
 
             if split[0].is_empty() {
-                println!("[Arguments] Argument name cannot be empty, ignoring: {}", line);
+                info!("[Arguments] Argument name cannot be empty, ignoring: {}", line);
                 continue;
             }
 
@@ -184,18 +185,18 @@ impl Arguments {
             if trimmed.contains(char::is_whitespace) {
                 // Leading and trailing whitespace have already been trimmed, so any other
                 // internal whitespace makes this argument malformed.
-                println!("[Arguments] Argument contains unexpected spaces, ignoring: {}", trimmed);
+                info!("[Arguments] Argument contains unexpected spaces, ignoring: {}", trimmed);
                 continue;
             }
 
             let split = trimmed.splitn(2, "=").collect::<Vec<&str>>();
             if split.len() == 0 {
-                println!("[Arguments] Empty argument string after parsing, ignoring: {}", trimmed);
+                info!("[Arguments] Empty argument string after parsing, ignoring: {}", trimmed);
                 continue;
             }
 
             if split[0].is_empty() {
-                println!("[Arguments] Argument name cannot be empty, ignoring: {}", trimmed);
+                info!("[Arguments] Argument name cannot be empty, ignoring: {}", trimmed);
                 continue;
             }
 

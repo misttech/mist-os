@@ -60,8 +60,12 @@ impl<S: Subscriber> Layer<S> for KernelLogger {
                 // log levels, but they seem to be mostly unused and not displayed today, so we don't pass
                 // along log level yet.
                 let msg_to_write = format!("{}{}", msg_prefix, msg);
-                if let Err(s) = self.debuglog.write(msg_to_write.as_bytes()) {
-                    eprintln!("failed to write log ({}): {}", s, msg);
+                if let Err(_) = self.debuglog.write(msg_to_write.as_bytes()) {
+                    // If we do in fact fail to write to debuglog, then component_manager
+                    // has no sink to write messages to. However, it's extremely
+                    // unlikely that this error state will ever be hit since
+                    // component_manager receives a valid handle from userboot.
+                    // Perhaps panicking would be better here?
                 }
                 let num_to_drain =
                     std::cmp::min(msg.len(), zx::sys::ZX_LOG_RECORD_DATA_MAX - msg_prefix.len());
