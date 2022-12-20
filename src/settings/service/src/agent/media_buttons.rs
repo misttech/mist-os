@@ -140,7 +140,7 @@ impl EventHandler {
                 id,
 
                 "media buttons send event",
-                "setting_type" => format!("{:?}", setting_type).as_str()
+                "setting_type" => format!("{setting_type:?}").as_str()
             );
             let mut receptor = self
                 .messenger

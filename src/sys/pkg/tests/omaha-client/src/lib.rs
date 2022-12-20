@@ -716,7 +716,7 @@ impl MockCache {
                 fidl_fuchsia_pkg::PackageCacheRequest::Sync { responder } => {
                     responder.send(&mut Ok(())).unwrap();
                 }
-                other => panic!("unsupported PackageCache request: {:?}", other),
+                other => panic!("unsupported PackageCache request: {other:?}"),
             }
         }
     }
@@ -746,7 +746,7 @@ pub mod fuchsia_update_config_optout {
                     OptOutRequest::Get { responder } => {
                         let value = *self.0.lock();
                         if let Err(e) = responder.send(value) {
-                            eprintln!("fuchsia_update_config_optout::Mock::serve() failed to send a response, possibly because the client is shut down: {:?}", e);
+                            eprintln!("fuchsia_update_config_optout::Mock::serve() failed to send a response, possibly because the client is shut down: {e:?}");
                         }
                     }
                 }
@@ -869,9 +869,7 @@ async fn omaha_client_update(
                         installation_progress.as_ref().unwrap().fraction_completed.unwrap();
                     assert!(
                         last <= current,
-                        "progress is not increasing, last: {}, current: {}",
-                        last,
-                        current,
+                        "progress is not increasing, last: {last}, current: {current}",
                     );
                 }
                 last_progress = installation_progress;
@@ -884,7 +882,7 @@ async fn omaha_client_update(
                 assert_matches!(env.reboot_called.try_recv(), Ok(None));
             }
             state => {
-                panic!("Unexpected state: {:?}", state);
+                panic!("Unexpected state: {state:?}");
             }
         }
         responder.send().unwrap();
@@ -1667,9 +1665,7 @@ async fn test_omaha_client_update_error() {
                         installation_progress.as_ref().unwrap().fraction_completed.unwrap();
                     assert!(
                         last <= current,
-                        "progress is not increasing, last: {}, current: {}",
-                        last,
-                        current,
+                        "progress is not increasing, last: {last}, current: {current}",
                     );
                 }
                 last_progress = installation_progress;
@@ -1685,7 +1681,7 @@ async fn test_omaha_client_update_error() {
                 installation_error = true;
             }
             state => {
-                panic!("Unexpected state: {:?}", state);
+                panic!("Unexpected state: {state:?}");
             }
         }
         responder.send().unwrap();
@@ -1939,7 +1935,7 @@ async fn test_omaha_client_perform_pending_reboot_after_out_of_space() {
                 installation_error = true;
             }
             state => {
-                panic!("Unexpected state: {:?}", state);
+                panic!("Unexpected state: {state:?}");
             }
         }
         responder.send().unwrap();

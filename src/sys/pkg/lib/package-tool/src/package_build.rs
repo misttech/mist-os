@@ -70,7 +70,7 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
         for (url, hash, package_manifest_path) in subpackages_build_manifest.to_subpackages()? {
             builder
                 .add_subpackage(&url, hash, package_manifest_path.into())
-                .with_context(|| format!("adding subpackage {} : {}", url, hash))?;
+                .with_context(|| format!("adding subpackage {url} : {hash}"))?;
         }
     }
 
@@ -83,12 +83,12 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
     let meta_far_path = cmd.out.join(META_FAR_NAME);
     let package_manifest = builder
         .build(gendir.path(), &meta_far_path)
-        .with_context(|| format!("creating package manifest {}", meta_far_path))?;
+        .with_context(|| format!("creating package manifest {meta_far_path}"))?;
 
     // Write out the package manifest to `package_manifest.json`.
     let package_manifest_path = cmd.out.join(PACKAGE_MANIFEST_NAME);
     let file = File::create(&package_manifest_path)
-        .with_context(|| format!("creating {}", package_manifest_path))?;
+        .with_context(|| format!("creating {package_manifest_path}"))?;
     to_writer_json_pretty(file, &package_manifest)?;
 
     // FIXME(fxbug.dev/101306): We're replicating `pm build --depfile` here, and directly expressing
@@ -99,10 +99,10 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
     if cmd.depfile {
         let depfile_path = cmd.out.join(META_FAR_DEPFILE_NAME);
         let file =
-            File::create(&depfile_path).with_context(|| format!("creating {}", depfile_path))?;
+            File::create(&depfile_path).with_context(|| format!("creating {depfile_path}"))?;
         let mut file = BufWriter::new(file);
 
-        write!(file, "{}:", meta_far_path)?;
+        write!(file, "{meta_far_path}:")?;
 
         let mut deps = package_build_manifest
             .far_contents()
@@ -134,7 +134,7 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
             // Spaces are separators, so spaces in filenames must be escaped.
             let path = path.replace(' ', "\\ ");
 
-            write!(file, " {}", path)?;
+            write!(file, " {path}")?;
         }
     }
 
@@ -154,7 +154,7 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
     if cmd.blobs_json {
         let blobs_json_path = cmd.out.join(BLOBS_JSON_NAME);
         let file = File::create(&blobs_json_path)
-            .with_context(|| format!("creating {}", blobs_json_path))?;
+            .with_context(|| format!("creating {blobs_json_path}"))?;
         to_writer_json_pretty(file, package_manifest.blobs())?;
     }
 
@@ -163,7 +163,7 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
     if cmd.blobs_manifest {
         let blobs_manifest_path = cmd.out.join(BLOBS_MANIFEST_NAME);
         let file = File::create(&blobs_manifest_path)
-            .with_context(|| format!("creating {}", blobs_manifest_path))?;
+            .with_context(|| format!("creating {blobs_manifest_path}"))?;
         let mut file = BufWriter::new(file);
 
         for entry in package_manifest.blobs() {
@@ -305,7 +305,7 @@ mod test {
         let mut package_build_manifest = File::create(&package_build_manifest_path).unwrap();
 
         package_build_manifest
-            .write_all(format!("meta/package={}", meta_package_path).as_bytes())
+            .write_all(format!("meta/package={meta_package_path}").as_bytes())
             .unwrap();
 
         cmd_package_build(PackageBuildCommand {
@@ -388,7 +388,7 @@ mod test {
         let mut package_build_manifest = File::create(&package_build_manifest_path).unwrap();
 
         package_build_manifest
-            .write_all(format!("meta/package={}", meta_package_path).as_bytes())
+            .write_all(format!("meta/package={meta_package_path}").as_bytes())
             .unwrap();
 
         cmd_package_build(PackageBuildCommand {
@@ -472,7 +472,7 @@ mod test {
         let mut package_build_manifest = File::create(&package_build_manifest_path).unwrap();
 
         package_build_manifest
-            .write_all(format!("meta/package={}", meta_package_path).as_bytes())
+            .write_all(format!("meta/package={meta_package_path}").as_bytes())
             .unwrap();
 
         assert!(cmd_package_build(PackageBuildCommand {
@@ -512,7 +512,7 @@ mod test {
 
         package_build_manifest
             .write_all(
-                format!("empty-file={}\nmeta/package={}\n", empty_file_path, meta_package_path,)
+                format!("empty-file={empty_file_path}\nmeta/package={meta_package_path}\n",)
                     .as_bytes(),
             )
             .unwrap();
@@ -671,7 +671,7 @@ mod test {
 
         package_build_manifest
             .write_all(
-                format!("empty-file={}\nmeta/package={}", empty_file_path, meta_package_path)
+                format!("empty-file={empty_file_path}\nmeta/package={meta_package_path}")
                     .as_bytes(),
             )
             .unwrap();
@@ -702,7 +702,7 @@ mod test {
         assert_eq!(
             read_meta_far_contents(&meta_far_path),
             BTreeMap::from([
-                ("meta/contents".into(), format!("empty-file={}\n", empty_file_hash)),
+                ("meta/contents".into(), format!("empty-file={empty_file_hash}\n")),
                 ("meta/package".into(), r#"{"name":"my-package","version":"0"}"#.into()),
                 (
                     "meta/fuchsia.abi/abi-revision".into(),

@@ -308,7 +308,7 @@ fn repo_config_format(value: &str) -> Result<RepoConfigFormat, String> {
     match value {
         "1" => Ok(RepoConfigFormat::Version1),
         "2" => Ok(RepoConfigFormat::Version2),
-        _ => Err(format!("unknown format {:?}", value)),
+        _ => Err(format!("unknown format {value:?}")),
     }
 }
 
@@ -364,7 +364,7 @@ mod tests {
     fn open_reject_malformed_blobs() {
         match Args::from_args(CMD_NAME, &["open", "bad_id"]) {
             Err(argh::EarlyExit { output: _, status: _ }) => {}
-            result => panic!("unexpected result {:?}", result),
+            result => panic!("unexpected result {result:?}"),
         }
     }
 
@@ -529,7 +529,7 @@ mod tests {
                 Args { command: Command::Rule(cmd) } => {
                     assert_eq!(cmd, expected);
                 }
-                result => panic!("unexpected result {:?}", result),
+                result => panic!("unexpected result {result:?}"),
             }
         }
 
@@ -617,7 +617,7 @@ mod tests {
     fn gc() {
         match Args::from_args(CMD_NAME, &["gc"]).unwrap() {
             Args { command: Command::Gc(GcCommand {}) } => {}
-            result => panic!("unexpected result {:?}", result),
+            result => panic!("unexpected result {result:?}"),
         }
     }
 
@@ -626,7 +626,7 @@ mod tests {
         let url = "fuchsia-pkg://fuchsia.com/foo/bar";
         match Args::from_args(CMD_NAME, &["get-hash", url]).unwrap() {
             Args { command: Command::GetHash(GetHashCommand { pkg_url }) } if pkg_url == url => {}
-            result => panic!("unexpected result {:?}", result),
+            result => panic!("unexpected result {result:?}"),
         }
     }
 
@@ -636,7 +636,7 @@ mod tests {
         match Args::from_args(CMD_NAME, &["pkg-status", url]).unwrap() {
             Args { command: Command::PkgStatus(PkgStatusCommand { pkg_url }) }
                 if pkg_url == url => {}
-            result => panic!("unexpected result {:?}", result),
+            result => panic!("unexpected result {result:?}"),
         }
     }
 }

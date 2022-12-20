@@ -219,7 +219,7 @@ impl ServedRepositoryBuilder {
             .executor(fuchsia_hyper::Executor)
             .serve(make_svc)
             .with_graceful_shutdown(rx_stop.map(|res| res.unwrap_or(())))
-            .unwrap_or_else(|e| panic!("error serving repo over http: {}", e));
+            .unwrap_or_else(|e| panic!("error serving repo over http: {e}"));
 
         let server = Task::spawn(server);
 
@@ -373,8 +373,7 @@ impl ServedRepository {
             .await
             .unwrap_or_else(|e| {
                 eprintln!(
-                    "hyper tuf server error creating response for request {:?}: {:#}",
-                    req, e
+                    "hyper tuf server error creating response for request {req:?}: {e:#}"
                 );
                 Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -461,7 +460,7 @@ fn make_range_response(
         .header(header::CONTENT_LENGTH, data.len())
         .header(
             header::CONTENT_RANGE,
-            format!("bytes {}-{}/{}", first_byte_pos, last_byte_pos, file_size),
+            format!("bytes {first_byte_pos}-{last_byte_pos}/{file_size}"),
         )
         .body(Body::from(data))
         .unwrap())

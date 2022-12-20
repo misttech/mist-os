@@ -238,7 +238,7 @@ impl TestEnv {
             .snapshot::<Inspect>()
             .await
             .expect("got inspect data");
-        assert_eq!(data.len(), 1, "expected 1 match: {:?}", data);
+        assert_eq!(data.len(), 1, "expected 1 match: {data:?}");
         data.pop().expect("one result").payload.expect("payload is not none")
     }
 }

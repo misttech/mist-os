@@ -9,7 +9,7 @@ use {
 };
 
 fn print_state(state: &State) {
-    println!("State: {:?}", state);
+    println!("State: {state:?}");
 }
 
 pub async fn monitor_state(mut stream: MonitorRequestStream) -> Result<(), anyhow::Error> {

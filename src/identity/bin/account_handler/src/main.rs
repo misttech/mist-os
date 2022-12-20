@@ -93,9 +93,8 @@ fn get_storage_manager(config: &Config) -> StorageManagerEnum {
         ))),
         other => {
             let error = format!(
-                "AccountHandler was configured with invalid argument: storage_manager={:?}. \
-                See the CML declaration for valid values.",
-                other
+                "AccountHandler was configured with invalid argument: storage_manager={other:?}. \
+                See the CML declaration for valid values."
             );
             warn!("{}", error);
             panic!("{}", error);
@@ -112,7 +111,7 @@ fn get_available_mechanisms(config: &Config) -> Vec<Mechanism> {
             "PASSWORD" => Mechanism::Password,
             other => {
                 let error =
-                    format!("AccountHandler was configured with invalid mechanism: {:?}.", other);
+                    format!("AccountHandler was configured with invalid mechanism: {other:?}.");
                 warn!("{}", error);
                 panic!("{}", error);
             }

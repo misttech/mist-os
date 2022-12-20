@@ -373,7 +373,7 @@ impl<T: Resolver> EagerPackageManager<T> {
             |proxy| async move {
                 fuchsia_fs::write_file_fidl(&proxy, &mut packages)
                     .await
-                    .with_context(|| format!("writing file: {}", temp_path))
+                    .with_context(|| format!("writing file: {temp_path}"))
             },
         )
         .await
@@ -756,12 +756,12 @@ mod tests {
                                     stream.next().await.unwrap().unwrap();
                                 responder.send(&mut std::iter::empty()).unwrap();
                             }
-                            r => panic!("Unexpected request: {:?}", r),
+                            r => panic!("Unexpected request: {r:?}"),
                         }
                     }
                     responder.send(&mut Ok(())).unwrap();
                 }
-                r => panic!("Unexpected request: {:?}", r),
+                r => panic!("Unexpected request: {r:?}"),
             }
         }
     }

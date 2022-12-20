@@ -145,7 +145,7 @@ impl BrightnessManager for () {
             return Err(ControllerError::InvalidArgument(
                 SettingType::Display,
                 "display_info".into(),
-                format!("{:?}", info).into(),
+                format!("{info:?}").into(),
             ));
         }
         client.write_setting(info.into(), id).await.into_handler_result()
@@ -180,7 +180,7 @@ impl BrightnessManager for ExternalBrightnessControl {
             return Err(ControllerError::InvalidArgument(
                 SettingType::Display,
                 "display_info".into(),
-                format!("{:?}", info).into(),
+                format!("{info:?}").into(),
             ));
         }
         let update_state = client.write_setting(info.into(), id).await?;

@@ -1251,7 +1251,7 @@ mod tests {
                 }) => {
                     assert_eq!(installation_progress.unwrap().fraction_completed.unwrap(), progress)
                 }
-                state => panic!("unexpected state: {:?}", state),
+                state => panic!("unexpected state: {state:?}"),
             }
             responder.send().unwrap();
         }

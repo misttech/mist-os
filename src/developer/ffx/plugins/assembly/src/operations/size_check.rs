@@ -107,7 +107,7 @@ impl fmt::Display for PackageSizeInfos<'_> {
 }
 
 fn process_path_str(input_path: String, column_width: usize, is_duplicate: bool) -> String {
-    let path_str = if is_duplicate { format!("{}*", input_path) } else { input_path };
+    let path_str = if is_duplicate { format!("{input_path}*") } else { input_path };
     if path_str.len() > (column_width - 3) {
         let mut v: Vec<String> =
             textwrap::wrap(&path_str, column_width - 5).iter().map(|x| x.to_string()).collect();

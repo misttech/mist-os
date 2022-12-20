@@ -27,8 +27,7 @@ async fn assert_count_events(
     assert_eq!(
         actual_events.len(),
         expected_event_codes.len(),
-        "event count different than expected, actual_events: {:?}",
-        actual_events
+        "event count different than expected, actual_events: {actual_events:?}"
     );
 
     for (event, expected_codes) in

@@ -85,7 +85,7 @@ mod tests {
                                                 .send(None)
                                                 .expect("should be able to send response");
                                         }
-                                        _ => panic!("unexpected request: {:?}", request),
+                                        _ => panic!("unexpected request: {request:?}"),
                                     }
                                 }
                             }
@@ -137,7 +137,7 @@ mod tests {
                                         .send(Some(&mut Value::Stringval("data".to_owned())))
                                         .expect("should be able to send response");
                                 }
-                                _ => panic!("unexpected request: {:?}", request),
+                                _ => panic!("unexpected request: {request:?}"),
                             }
                         }
                     }))

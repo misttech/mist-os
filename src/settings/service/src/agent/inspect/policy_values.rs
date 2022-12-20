@@ -348,7 +348,7 @@ mod tests {
         assert_data_tree!(inspector, root: {
             policy_values: {
                 "Audio": {
-                    value: format!("{:?}", expected_state),
+                    value: format!("{expected_state:?}"),
                     timestamp: "0.000000000",
                 }
             }
@@ -472,7 +472,7 @@ mod tests {
         assert_data_tree!(inspector, root: {
             policy_values: {
                 "Audio": {
-                    value: format!("{:?}", expected_state),
+                    value: format!("{expected_state:?}"),
                     timestamp: "0.000000000",
                 }
             }

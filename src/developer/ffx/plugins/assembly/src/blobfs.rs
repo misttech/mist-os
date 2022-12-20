@@ -104,7 +104,7 @@ mod tests {
             "blobs": []
         }
         "#;
-        write!(base_package_manifest_file, "{}", contents).unwrap();
+        write!(base_package_manifest_file, "{contents}").unwrap();
         let base = BasePackage {
             merkle: Hash::from_str(
                 "0000000000000000000000000000000000000000000000000000000000000000",
@@ -184,7 +184,7 @@ mod tests {
             "blobs": []
         }
         "#;
-        write!(base_package_manifest_file, "{}", contents).unwrap();
+        write!(base_package_manifest_file, "{contents}").unwrap();
         let base = BasePackage {
             merkle: Hash::from_str(
                 "0000000000000000000000000000000000000000000000000000000000000000",

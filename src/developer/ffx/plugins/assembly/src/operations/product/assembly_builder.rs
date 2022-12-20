@@ -489,23 +489,23 @@ impl ImageAssemblyConfigBuilder {
                 // get the manifest for this package name, returning the set from which it was removed
                 if let Some((manifest, source_package_set)) =
                     remove_package_from_sets(&package, [&mut base, &mut cache, &mut system])
-                        .with_context(|| format!("removing {} for repackaging", package))?
+                        .with_context(|| format!("removing {package} for repackaging"))?
                 {
                     let outdir = outdir.join("repackaged").join(&package);
                     let mut repackager = Repackager::new(manifest, outdir)
-                        .with_context(|| format!("reading existing manifest for {}", package))?;
+                        .with_context(|| format!("reading existing manifest for {package}"))?;
 
                     // Iterate over the components to get their structured config values
                     for (component, values) in &config.components {
                         repackager
                             .set_component_config(component, values.fields.clone())
-                            .with_context(|| format!("setting new config for {}", component))?;
+                            .with_context(|| format!("setting new config for {component}"))?;
                     }
                     let new_path = repackager
                         .build()
-                        .with_context(|| format!("building repackaged {}", package))?;
+                        .with_context(|| format!("building repackaged {package}"))?;
                     let new_entry = PackageEntry::parse_from(new_path)
-                        .with_context(|| format!("parsing repackaged {}", package))?;
+                        .with_context(|| format!("parsing repackaged {package}"))?;
                     source_package_set.insert(new_entry.name().to_owned(), new_entry);
                 } else {
                     // TODO(https://fxbug.dev/101556) return an error here
@@ -622,7 +622,7 @@ impl PackageEntry {
     fn parse_from(path: impl Into<Utf8PathBuf>) -> Result<Self> {
         let path = path.into();
         let manifest = PackageManifest::try_load_from(&path)
-            .with_context(|| format!("parsing {} as a package manifest", path))?;
+            .with_context(|| format!("parsing {path} as a package manifest"))?;
         Ok(Self { path, manifest })
     }
 
@@ -806,7 +806,7 @@ mod tests {
         } else {
             builder.repository("fuchsia.com");
         }
-        builder.build(path, path.join(format!("{}_meta.far", name))).unwrap();
+        builder.build(path, path.join(format!("{name}_meta.far"))).unwrap();
         manifest_path.into()
     }
 

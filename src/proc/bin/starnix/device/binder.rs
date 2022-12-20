@@ -3469,7 +3469,7 @@ mod tests {
             let address = {
                 let (buffer, _, _) = shared_memory
                     .allocate_buffers(VMO_LENGTH / n, 0, 0)
-                    .unwrap_or_else(|_| panic!("allocate {:?}-th buffer", n));
+                    .unwrap_or_else(|_| panic!("allocate {n:?}-th buffer"));
                 buffer.memory.user_address + buffer.offset
             };
             addresses.push(address);
@@ -3487,12 +3487,12 @@ mod tests {
         for buffer in fill_with_buffers(&mut shared_memory, n) {
             shared_memory
                 .allocate_buffers(VMO_LENGTH / n, 0, 0)
-                .expect_err(&format!("allocated buffer when shared memory was full {:?}", n));
+                .expect_err(&format!("allocated buffer when shared memory was full {n:?}"));
 
             shared_memory.free_buffer(buffer).expect("didn't free buffer");
 
             shared_memory.allocate_buffers(VMO_LENGTH / n, 0, 0).unwrap_or_else(|_| {
-                panic!("couldn't allocate new buffer even after {:?}-th was released", n)
+                panic!("couldn't allocate new buffer even after {n:?}-th was released")
             });
         }
     }

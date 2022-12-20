@@ -631,7 +631,7 @@ mod tests {
                         .await
                         .unwrap();
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         };
         future::join(installer_fut, stream_fut).await;
@@ -690,7 +690,7 @@ mod tests {
                     assert_eq!(signature, Some(vec![10, 11, 12]));
                     responder.send(&mut Ok(())).unwrap();
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         };
         future::join(installer_fut, stream_fut).await;
@@ -741,7 +741,7 @@ mod tests {
                         .await
                         .unwrap();
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         };
         future::join(installer_fut, stream_fut).await;
@@ -787,7 +787,7 @@ mod tests {
                         .await
                         .unwrap();
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         };
         future::join(installer_fut, stream_fut).await;

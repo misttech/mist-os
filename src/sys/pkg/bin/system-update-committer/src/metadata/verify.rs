@@ -214,7 +214,7 @@ mod tests {
 
         // Since the timer has not expired, the future should still be pending.
         match executor.run_until_stalled(&mut fut) {
-            Poll::Ready(res) => panic!("future unexpectedly completed with response: {:?}", res),
+            Poll::Ready(res) => panic!("future unexpectedly completed with response: {res:?}"),
             Poll::Pending => {}
         };
 

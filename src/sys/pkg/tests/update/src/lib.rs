@@ -120,7 +120,7 @@ impl TestEnvBuilder {
                 fasync::Task::spawn(
                     Arc::clone(&paver_service)
                         .run_paver_service(stream)
-                        .unwrap_or_else(|e| panic!("error running paver service: {:?}", e)),
+                        .unwrap_or_else(|e| panic!("error running paver service: {e:?}")),
                 )
                 .detach()
             });
@@ -132,7 +132,7 @@ impl TestEnvBuilder {
                 fasync::Task::spawn(
                     Arc::clone(&reboot_service)
                         .run_reboot_service(stream)
-                        .unwrap_or_else(|e| panic!("error running reboot service: {:?}", e)),
+                        .unwrap_or_else(|e| panic!("error running reboot service: {e:?}")),
                 )
                 .detach()
             });
@@ -294,7 +294,7 @@ async fn force_install_fails_on_invalid_pkg_url() {
     assert!(!output.is_ok());
 
     let stderr = output.stderr_str();
-    assert!(stderr.contains("Error: parsing update package url"), "stderr: {}", stderr);
+    assert!(stderr.contains("Error: parsing update package url"), "stderr: {stderr}");
 
     env.assert_update_installer_called_with(vec![]);
 

@@ -46,7 +46,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     for platform_bundle_name in &configuration.bundles {
         let platform_bundle_path = make_bundle_path(&input_bundles_dir, platform_bundle_name);
         builder.add_bundle(&platform_bundle_path).with_context(|| {
-            format!("Adding platform bundle {} ({})", platform_bundle_name, platform_bundle_path)
+            format!("Adding platform bundle {platform_bundle_name} ({platform_bundle_path})")
         })?;
     }
 
@@ -54,7 +54,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     let legacy_bundle_path = legacy_bundle.join("assembly_config.json");
     builder
         .add_bundle(&legacy_bundle_path)
-        .context(format!("Adding legacy bundle: {}", legacy_bundle_path))?;
+        .context(format!("Adding legacy bundle: {legacy_bundle_path}"))?;
 
     // Set the Structured Configuration for the components in Bootfs
     builder.set_bootfs_structured_config(configuration.bootfs.components);
@@ -88,7 +88,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
 
     let image_assembly_path = outdir.join("image_assembly.json");
     let image_assembly_file = std::fs::File::create(&image_assembly_path)
-        .context(format!("Failed to create image assembly config file: {}", image_assembly_path))?;
+        .context(format!("Failed to create image assembly config file: {image_assembly_path}"))?;
     serde_json::to_writer_pretty(image_assembly_file, &image_assembly)?;
 
     Ok(())

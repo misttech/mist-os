@@ -351,8 +351,7 @@ async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, Ver
                     fio::NodeInfoDeprecated::File(fio::FileObject { event, .. }) => event,
                     other => {
                         panic!(
-                            "fio::NodeInfoDeprecated from fio::FileEventStream to be File variant with event: {:?}",
-                            other
+                            "fio::NodeInfoDeprecated from fio::FileEventStream to be File variant with event: {other:?}"
                         )
                     }
                 }
@@ -360,7 +359,7 @@ async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, Ver
             fio::FileEvent::OnRepresentation { payload } => match payload {
                 fio::Representation::File(fio::FileInfo { observer, .. }) => observer,
                 other => {
-                    panic!("ConnectionInfo from fio::FileEventStream to be File variant with event: {:?}", other)
+                    panic!("ConnectionInfo from fio::FileEventStream to be File variant with event: {other:?}")
                 }
             },
         };
@@ -559,9 +558,9 @@ impl PackageBuilder {
     ) -> Self {
         let path = path.into();
         let () = fuchsia_url::validate_resource_path(
-            path.to_str().unwrap_or_else(|| panic!("path must be utf8: {:?}", path)),
+            path.to_str().unwrap_or_else(|| panic!("path must be utf8: {path:?}")),
         )
-        .unwrap_or_else(|_| panic!("path must be an object relative path expression: {:?}", path));
+        .unwrap_or_else(|_| panic!("path must be an object relative path expression: {path:?}"));
         let mut data = vec![];
         contents.read_to_end(&mut data).unwrap();
 
@@ -569,7 +568,7 @@ impl PackageBuilder {
             self.make_dirs(parent);
         }
         let replaced = self.contents.insert(path.clone(), PackageEntry::File(data));
-        assert_eq!(None, replaced, "already contains an entry at {:?}", path);
+        assert_eq!(None, replaced, "already contains an entry at {path:?}");
         self
     }
 
@@ -583,9 +582,9 @@ impl PackageBuilder {
     ) -> Self {
         let path = path.into();
         let () = fuchsia_url::validate_resource_path(
-            path.to_str().unwrap_or_else(|| panic!("path must be utf8: {:?}", path)),
+            path.to_str().unwrap_or_else(|| panic!("path must be utf8: {path:?}")),
         )
-        .unwrap_or_else(|_| panic!("path must be an object relative path expression: {:?}", path));
+        .unwrap_or_else(|_| panic!("path must be an object relative path expression: {path:?}"));
         let mut data = vec![];
         contents.read_to_end(&mut data).unwrap();
 
@@ -606,8 +605,7 @@ impl PackageBuilder {
                     .entry(ancestor.to_owned())
                     .or_insert(PackageEntry::Directory)
                     .is_dir(),
-                "{:?} is not a directory",
-                ancestor
+                "{ancestor:?} is not a directory"
             );
         }
     }
@@ -739,7 +737,7 @@ impl PackageBuilder {
                     PackageEntry::File(data) => data,
                     _ => continue,
                 };
-                let path = format!("file{}", i);
+                let path = format!("file{i}");
                 fs::write(packagedir.join("contents").join(&path), contents)?;
                 writeln!(
                     manifest,
@@ -759,7 +757,7 @@ impl PackageBuilder {
             .arg(format!("-n={}", self.name))?
             .arg("-m=/in/package.manifest")?
             .arg("-r=fuchsia.com")?
-            .arg(format!("-o={}", package_mount_path))?;
+            .arg(format!("-o={package_mount_path}"))?;
 
         if !self.subpackages.is_empty() {
             pm = pm.arg("-subpackages=/in/subpackages/manifest")?

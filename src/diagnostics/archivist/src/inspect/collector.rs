@@ -246,7 +246,7 @@ mod tests {
                             assert_eq!(content, &buf);
                         }
                         v => {
-                            panic!("Expected Vmo, got {:?}", v);
+                            panic!("Expected Vmo, got {v:?}");
                         }
                     }
                 };
@@ -320,7 +320,7 @@ mod tests {
                         });
                     }
                     v => {
-                        panic!("Expected Tree, got {:?}", v);
+                        panic!("Expected Tree, got {v:?}");
                     }
                 }
 

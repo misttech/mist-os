@@ -315,9 +315,8 @@ async fn assert_describe_meta_file(package_root: &fio::DirectoryProxy, path: &st
             .unwrap();
         if let Err(e) = verify_describe_file(node, flag, false).await {
             panic!(
-                "failed to verify describe. path: {:?}, flag: {:?}, \
-                    mode: fio::MODE_TYPE_FILE, error: {:#}",
-                path, flag, e
+                "failed to verify describe. path: {path:?}, flag: {flag:?}, \
+                    mode: fio::MODE_TYPE_FILE, error: {e:#}"
             );
         }
     }
@@ -563,7 +562,7 @@ async fn assert_set_attr(package_root: &fio::DirectoryProxy, path: &str, mode: u
         .unwrap();
 
     if let Err(e) = verify_set_attr(node).await {
-        panic!("set_attr failed. path: {:?}, error: {:#}", path, e);
+        panic!("set_attr failed. path: {path:?}, error: {e:#}");
     }
 }
 
@@ -615,7 +614,7 @@ async fn assert_sync(package_root: &fio::DirectoryProxy, path: &str, mode: u32) 
         .unwrap();
 
     if let Err(e) = verify_sync(node).await {
-        panic!("sync failed. path: {:?}, error: {:#}", path, e);
+        panic!("sync failed. path: {path:?}, error: {e:#}");
     }
 }
 

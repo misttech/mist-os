@@ -141,7 +141,7 @@ fn parse_copy_mode(value: &str) -> Result<CopyMode, String> {
         "copy" => Ok(CopyMode::Copy),
         "copy-overwrite" => Ok(CopyMode::CopyOverwrite),
         "hard-link" => Ok(CopyMode::HardLink),
-        _ => Err(format!("unknown copy mode {}", value)),
+        _ => Err(format!("unknown copy mode {value}")),
     }
 }
 

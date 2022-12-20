@@ -204,7 +204,7 @@ impl TryFrom<DisplayRequest> for Job {
             DisplayRequest::WatchLightSensor { delta, responder } => {
                 let mut hasher = DefaultHasher::new();
                 // Bucket watch requests to the nearest 0.01.
-                format!("{:.2}", delta).hash(&mut hasher);
+                format!("{delta:.2}").hash(&mut hasher);
                 Ok(watch::Work::new_job_with_change_function(
                     SettingType::LightSensor,
                     responder,

@@ -594,7 +594,7 @@ pub mod test {
                         // fuchsia.device.Controller methods
                         MockPartitionRequest::GetTopologicalPath { responder } => {
                             responder
-                                .send(&mut Ok(format!("/dev/mocks/{}", id)))
+                                .send(&mut Ok(format!("/dev/mocks/{id}")))
                                 .expect("failed to send Controller.GetTopologicalPath response");
                         }
 
@@ -981,12 +981,12 @@ pub mod test {
         encrypted_block_device.format(&key).await.expect("format");
 
         let state = arc_mock_zxcrypt_block_clone.state().await;
-        assert!(matches!(state, MockZxcryptBlockState::Sealed), "{:?}", state);
+        assert!(matches!(state, MockZxcryptBlockState::Sealed), "{state:?}");
 
         let _ = encrypted_block_device.unseal(&key).await.expect("unseal");
 
         let state = arc_mock_zxcrypt_block_clone.state().await;
-        assert!(matches!(state, MockZxcryptBlockState::Unsealed), "{:?}", state);
+        assert!(matches!(state, MockZxcryptBlockState::Unsealed), "{state:?}");
 
         scope.shutdown();
         scope.wait().await;
@@ -1022,31 +1022,31 @@ pub mod test {
         // Format and unseal the device.
         encrypted_block_device.format(&key).await.expect("format");
         let state = arc_mock_zxcrypt_block_clone.state().await;
-        assert!(matches!(state, MockZxcryptBlockState::Sealed), "{:?}", state);
+        assert!(matches!(state, MockZxcryptBlockState::Sealed), "{state:?}");
 
         let _ = encrypted_block_device.unseal(&key).await.expect("unseal");
         let state = arc_mock_zxcrypt_block_clone.state().await;
-        assert!(matches!(state, MockZxcryptBlockState::Unsealed), "{:?}", state);
+        assert!(matches!(state, MockZxcryptBlockState::Unsealed), "{state:?}");
 
         // Verify that we can also shred the device
         let _ = encrypted_block_device.shred().await.expect("shred");
         let state = arc_mock_zxcrypt_block_clone.state().await;
-        assert!(matches!(state, MockZxcryptBlockState::UnsealedShredded), "{:?}", state);
+        assert!(matches!(state, MockZxcryptBlockState::UnsealedShredded), "{state:?}");
 
         // And then seal it again
         let _ = encrypted_block_device.seal().await.expect("seal");
         let state = arc_mock_zxcrypt_block_clone.state().await;
-        assert!(matches!(state, MockZxcryptBlockState::Shredded), "{:?}", state);
+        assert!(matches!(state, MockZxcryptBlockState::Shredded), "{state:?}");
 
         // And format it again
         encrypted_block_device.format(&key).await.expect("format");
         let state = arc_mock_zxcrypt_block_clone.state().await;
-        assert!(matches!(state, MockZxcryptBlockState::Sealed), "{:?}", state);
+        assert!(matches!(state, MockZxcryptBlockState::Sealed), "{state:?}");
 
         // And shred it from Sealed
         let _ = encrypted_block_device.shred().await.expect("shred");
         let state = arc_mock_zxcrypt_block_clone.state().await;
-        assert!(matches!(state, MockZxcryptBlockState::Shredded), "{:?}", state);
+        assert!(matches!(state, MockZxcryptBlockState::Shredded), "{state:?}");
 
         scope.shutdown();
         scope.wait().await;

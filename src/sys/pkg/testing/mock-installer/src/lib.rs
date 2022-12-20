@@ -150,7 +150,7 @@ impl MockUpdateInstallerService {
                 InstallerRequest::GetLastUpdateResult { .. }
                 | InstallerRequest::GetUpdateResult { .. }
                 | InstallerRequest::MonitorUpdate { .. } => {
-                    panic!("unexpected request: {:?}", req);
+                    panic!("unexpected request: {req:?}");
                 }
             }
         }

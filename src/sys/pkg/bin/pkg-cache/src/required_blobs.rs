@@ -125,14 +125,12 @@ mod tests {
                     .await
                     .unwrap(),
                 HashSet::from_iter([hash(1)]),
-                "strategy {:?}",
-                strategy
+                "strategy {strategy:?}"
             );
             assert_eq!(
                 *memoized_packages.read().await,
                 HashMap::from_iter([(hash(0), HashSet::from_iter([hash(1)]))]),
-                "strategy {:?}",
-                strategy
+                "strategy {strategy:?}"
             );
         }
     }
@@ -152,8 +150,7 @@ mod tests {
                     .await
                     .unwrap(),
                 HashSet::from_iter([hash(1), hash(2), hash(3), hash(4), hash(5)]),
-                "strategy {:?}",
-                strategy
+                "strategy {strategy:?}"
             );
             assert_eq!(
                 *memoized_packages.read().await,
@@ -163,8 +160,7 @@ mod tests {
                     (hash(2), HashSet::from_iter([hash(4), hash(5)])),
                     (hash(4), HashSet::from_iter([hash(5)])),
                 ]),
-                "strategy {:?}",
-                strategy
+                "strategy {strategy:?}"
             );
         }
     }

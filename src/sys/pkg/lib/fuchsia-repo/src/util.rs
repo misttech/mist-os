@@ -158,7 +158,7 @@ mod tests {
         let mut actual = vec![];
         assert_eq!(
             read_stream_to_end(stream, &mut actual).await.unwrap_err().to_string(),
-            format!("file truncated: only read {} out of {} bytes", len, long_len)
+            format!("file truncated: only read {len} out of {long_len} bytes")
         );
     }
 

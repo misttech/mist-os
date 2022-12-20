@@ -143,8 +143,8 @@ async fn base_pkg_index_verify_multiple_chunks() {
     let hash = *pkg_0.meta_far_merkle_root();
 
     for i in 0..bundle_size {
-        let name = format!("base-package-{:04}", i);
-        let url = format!("fuchsia-pkg://fuchsia.com/{}", name);
+        let name = format!("base-package-{i:04}");
+        let url = format!("fuchsia-pkg://fuchsia.com/{name}");
         let path = PackagePath::from_name_and_variant(name.parse().unwrap(), "0".parse().unwrap());
 
         expected_entries.push((url, hash));

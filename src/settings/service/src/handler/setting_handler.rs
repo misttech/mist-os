@@ -261,7 +261,7 @@ impl ClientImpl {
                             id,
 
                             "change state",
-                            "state" => format!("{:?}", state).as_str()
+                            "state" => format!("{state:?}").as_str()
                         );
                         match state {
                             State::Startup => {
@@ -443,7 +443,7 @@ pub mod persist {
                 {
                     return setting_info;
                 } else {
-                    panic!("Incorrect response received from storage: {:?}", payload);
+                    panic!("Incorrect response received from storage: {payload:?}");
                 }
             }
 
@@ -474,7 +474,7 @@ pub mod persist {
             id: ftrace::Id,
         ) -> Result<UpdateState, ControllerError> {
             let setting_type = (&setting_info).into();
-            let fst = format!("{:?}", setting_type);
+            let fst = format!("{setting_type:?}");
             let guard = trace_guard!(
                 id,
 

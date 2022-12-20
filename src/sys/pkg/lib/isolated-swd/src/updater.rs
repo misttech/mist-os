@@ -194,7 +194,7 @@ pub(crate) mod for_tests {
             fasync::Task::spawn(
                 Arc::clone(&paver_clone)
                     .run_paver_service(stream)
-                    .unwrap_or_else(|e| panic!("Failed to run mock paver: {:?}", e)),
+                    .unwrap_or_else(|e| panic!("Failed to run mock paver: {e:?}")),
             )
             .detach();
         }

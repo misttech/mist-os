@@ -378,7 +378,7 @@ impl AudioPolicyHandler {
             PolicyError::InvalidArgument(
                 PolicyType::Audio,
                 "target".into(),
-                format!("{:?}", target).into(),
+                format!("{target:?}").into(),
             )
         })?;
 
@@ -402,7 +402,7 @@ impl AudioPolicyHandler {
             PolicyError::InvalidArgument(
                 PolicyType::Audio,
                 ARG_POLICY_ID.into(),
-                format!("{:?}", policy_id).into(),
+                format!("{policy_id:?}").into(),
             )
         })?;
 
@@ -423,7 +423,7 @@ impl AudioPolicyHandler {
             return Err(PolicyError::InvalidArgument(
                 PolicyType::Audio,
                 ARG_POLICY_ID.into(),
-                format!("{:?}", policy_id).into(),
+                format!("{policy_id:?}").into(),
             ));
         }
 

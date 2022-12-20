@@ -44,7 +44,7 @@ impl Watch<Arc<RepositoryConfig>> for InspectableRepositoryConfigWatcher {
             .iter()
             .enumerate()
             .map(|(i, root_key)| {
-                self.root_keys_node.create_string(i.to_string(), format!("{:?}", root_key))
+                self.root_keys_node.create_string(i.to_string(), format!("{root_key:?}"))
             })
             .collect();
         self._mirror_configs_states = config

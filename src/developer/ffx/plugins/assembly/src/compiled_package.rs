@@ -128,7 +128,7 @@ impl CompiledPackageBuilder {
                     cmc_tool,
                     self.main_bundle_dir.join("compiled_packages").join("include"),
                 )
-                .with_context(|| format!("building component {}", component_name))?;
+                .with_context(|| format!("building component {component_name}"))?;
             let component_manifest_file_name =
                 component_manifest_path.file_name().context("component file name")?;
 

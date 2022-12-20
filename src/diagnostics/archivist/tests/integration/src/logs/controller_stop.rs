@@ -149,7 +149,7 @@ async fn run_logging_component(realm: &RealmInstance, event_stream: &mut EventSt
     let _ = instance.connect_to_protocol_at_exposed_dir::<fcomponent::BinderMarker>().unwrap();
     utils::wait_for_component_stopped_event(
         realm.root.child_name(),
-        &format!("coll:{}", LOGGING_COMPONENT),
+        &format!("coll:{LOGGING_COMPONENT}"),
         ExitStatusMatcher::Clean,
         event_stream,
     )

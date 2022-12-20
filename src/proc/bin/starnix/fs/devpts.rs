@@ -92,7 +92,7 @@ impl FsNodeOps for DevPtsRootDir {
                 if !terminal.read().is_main_closed() {
                     result.push(VecDirectoryEntry {
                         entry_type: DirectoryEntryType::CHR,
-                        name: format!("{}", id).as_bytes().to_vec(),
+                        name: format!("{id}").as_bytes().to_vec(),
                         inode: Some((*id as ino_t) + FIRST_PTS_INODE),
                     });
                 }

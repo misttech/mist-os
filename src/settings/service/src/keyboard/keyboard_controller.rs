@@ -58,7 +58,7 @@ impl controller::Handle for KeyboardController {
                     return Some(Err(ControllerError::InvalidArgument(
                         SettingType::Keyboard,
                         "keyboard".into(),
-                        format!("{:?}", keyboard_info).into(),
+                        format!("{keyboard_info:?}").into(),
                     )));
                 }
                 // Save the value locally.

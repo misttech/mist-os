@@ -653,7 +653,7 @@ async fn fetch_blob(
                 context.expected_len,
             )
             .await;
-            guard.end(&[ftrace::ArgValue::of("result", format!("{:?}", res).as_str())]);
+            guard.end(&[ftrace::ArgValue::of("result", format!("{res:?}").as_str())]);
             res
         }
         (true, false, _) => {
@@ -680,7 +680,7 @@ async fn fetch_blob(
                 trace_id,
             )
             .await;
-            guard.end(&[ftrace::ArgValue::of("result", format!("{:?}", res).as_str())]);
+            guard.end(&[ftrace::ArgValue::of("result", format!("{res:?}").as_str())]);
             res
         }
         (use_remote_mirror, use_local_mirror, local_mirror) => Err(FetchError::NoBlobSource {

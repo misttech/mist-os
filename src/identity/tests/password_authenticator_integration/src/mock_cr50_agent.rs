@@ -155,8 +155,7 @@ async fn handle_request(
                     resp.send(version).expect("failed to send response");
                 }
                 _ => panic!(
-                    "Next mock response type was {:?} but expected GetVersion.",
-                    next_response
+                    "Next mock response type was {next_response:?} but expected GetVersion."
                 ),
             };
         }
@@ -167,8 +166,7 @@ async fn handle_request(
                         .expect("failed to send response");
                 }
                 _ => panic!(
-                    "Next mock response type was {:?} but expected ResetTree.",
-                    next_response
+                    "Next mock response type was {next_response:?} but expected ResetTree."
                 ),
             };
         }
@@ -184,8 +182,7 @@ async fn handle_request(
                         .expect("failed to send response");
                 }
                 _ => panic!(
-                    "Next mock response type was {:?} but expected InsertLeaf.",
-                    next_response
+                    "Next mock response type was {next_response:?} but expected InsertLeaf."
                 ),
             };
         }
@@ -196,8 +193,7 @@ async fn handle_request(
                         .expect("failed to send response");
                 }
                 _ => panic!(
-                    "Next mock response type was {:?} but expected RemoveLeaf.",
-                    next_response
+                    "Next mock response type was {next_response:?} but expected RemoveLeaf."
                 ),
             };
         }
@@ -217,7 +213,7 @@ async fn handle_request(
                     }
                 }
                 _ => {
-                    panic!("Next mock response type was {:?} but expected TryAuth.", next_response)
+                    panic!("Next mock response type was {next_response:?} but expected TryAuth.")
                 }
             };
         }
@@ -252,8 +248,7 @@ pub(crate) async fn mock(
             {
                 // Look at the next (FIFO) response.
                 let next_response = task_mock_responses.pop_front().expect(&format!(
-                    "Ran out of mock Pinweaver responses. Next request received is: {:?}",
-                    request
+                    "Ran out of mock Pinweaver responses. Next request received is: {request:?}"
                 ));
 
                 handle_request(request, next_response, &he_secret).await;

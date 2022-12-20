@@ -32,8 +32,7 @@ async fn fails_on_paver_connect_error_v1() {
     assert!(
         interactions.is_empty()
             || interactions == [Gc, PackageResolve(UPDATE_PKG_URL.to_string()), Gc, BlobfsSync,],
-        "expected early failure or failure while querying current configuration. Got {:#?}",
-        interactions
+        "expected early failure or failure while querying current configuration. Got {interactions:#?}"
     );
 }
 
@@ -58,8 +57,7 @@ async fn fails_on_paver_connect_error() {
     assert!(
         interactions.is_empty()
             || interactions == [Gc, PackageResolve(UPDATE_PKG_URL.to_string()), Gc, BlobfsSync,],
-        "expected early failure or failure while querying current configuration. Got {:#?}",
-        interactions
+        "expected early failure or failure while querying current configuration. Got {interactions:#?}"
     );
 }
 

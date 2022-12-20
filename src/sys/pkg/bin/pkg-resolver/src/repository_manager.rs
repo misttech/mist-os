@@ -260,7 +260,7 @@ impl RepositoryManager {
                 |proxy| async move {
                     fuchsia_fs::file::write(&proxy, &data)
                         .await
-                        .with_context(|| format!("writing file: {}", temp_path))
+                        .with_context(|| format!("writing file: {temp_path}"))
                 },
             )
             .await
@@ -1073,10 +1073,10 @@ mod tests {
         match &err {
             LoadError::Io { path, error } => {
                 assert_eq!(path, missing_path);
-                assert_eq!(error.kind(), std::io::ErrorKind::NotFound, "{}", error);
+                assert_eq!(error.kind(), std::io::ErrorKind::NotFound, "{error}");
             }
             err => {
-                panic!("unexpected error: {}", err);
+                panic!("unexpected error: {err}");
             }
         }
     }
@@ -1087,7 +1087,7 @@ mod tests {
                 assert_eq!(path, &invalid_path.into());
             }
             err => {
-                panic!("unexpected error: {}", err);
+                panic!("unexpected error: {err}");
             }
         }
     }
@@ -1098,7 +1098,7 @@ mod tests {
                 assert_eq!(replaced_config, config);
             }
             err => {
-                panic!("unexpected error: {}", err);
+                panic!("unexpected error: {err}");
             }
         }
     }
@@ -1222,7 +1222,7 @@ mod tests {
             .unwrap()
             .load_static_configs_dir(&does_not_exist_dir)
             .unwrap_err();
-        assert_eq!(errors.len(), 1, "{:?}", errors);
+        assert_eq!(errors.len(), 1, "{errors:?}");
         assert_does_not_exist_error(&errors[0], &does_not_exist_dir);
     }
 
@@ -1271,7 +1271,7 @@ mod tests {
                 .unwrap()
                 .load_static_configs_dir(dir.path())
                 .unwrap_err();
-        assert_eq!(errors.len(), 1, "{:?}", errors);
+        assert_eq!(errors.len(), 1, "{errors:?}");
         assert_parse_error(&errors[0], &invalid_path);
         let repomgr = builder.build();
 
@@ -1360,7 +1360,7 @@ mod tests {
                 assert_overridden_error(&errors[3], &oem_config);
                 builder
             }
-            res => panic!("unexpected result: {:?}", res),
+            res => panic!("unexpected result: {res:?}"),
         };
 
         let repomgr = builder.build();
@@ -1403,7 +1403,7 @@ mod tests {
                 builder
             }
             res => {
-                panic!("unexpected result: {:?}", res);
+                panic!("unexpected result: {res:?}");
             }
         };
 

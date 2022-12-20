@@ -91,7 +91,7 @@ pub(super) async fn open_sensor(
         let proxy = service_context
             .connect_path::<InputDeviceMarker>(path)
             .await
-            .with_context(|| format!("Failed to connect to InputDevice path at {:?}", path))?;
+            .with_context(|| format!("Failed to connect to InputDevice path at {path:?}"))?;
         let res = call_async!(proxy => get_descriptor()).await;
         if let Ok(device_descriptor) = res {
             if let Some(DeviceInfo { vendor_id, product_id, .. }) = device_descriptor.device_info {
@@ -311,7 +311,7 @@ mod tests {
                 fx_log_info!("No report found!");
             }
             Err(e) => {
-                panic!("Sensor read failed: {:?}", e);
+                panic!("Sensor read failed: {e:?}");
             }
         }
     }

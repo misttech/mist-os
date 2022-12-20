@@ -235,7 +235,7 @@ mod tests {
                 "status": "ok",
                 "updatecheck": {
                     "status": "ok",
-                    "urls": { "url": [{ "codebase": format!("{}/", TEST_REPO_URL) }] },
+                    "urls": { "url": [{ "codebase": format!("{TEST_REPO_URL}/") }] },
                     "manifest": {
                         "version": "20200101.1.0.0",
                         "actions": {

@@ -85,7 +85,7 @@ async fn monitor_control_requests<T: TimeSource>(
             Some(ControlRequest::ConsecutiveFailedUpdateChecks(n)) => {
                 let min = params.min_consecutive_failed_update_checks;
                 if (n >= min) && (n - min + 1).is_power_of_two() {
-                    let signature = format!("fuchsia-{}-consecutive-failed-update-checks", n);
+                    let signature = format!("fuchsia-{n}-consecutive-failed-update-checks");
                     file_report(&params.proxy, &signature).await;
                 }
             }

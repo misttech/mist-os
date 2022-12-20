@@ -963,8 +963,7 @@ impl<B: Blobfs> TestEnv<B> {
         assert_eq!(
             actual_events.len(),
             expected_event_codes.len(),
-            "event count different than expected, actual_events: {:?}",
-            actual_events
+            "event count different than expected, actual_events: {actual_events:?}"
         );
 
         for (event, expected_codes) in actual_events
@@ -1003,24 +1002,24 @@ pub const EMPTY_REPO_PATH: &str = "/pkg/empty-repo";
 // The following functions generate unique test package dummy content. Callers are recommended
 // to pass in the name of the test case.
 pub fn test_package_bin(s: &str) -> Vec<u8> {
-    return format!("!/boot/bin/sh\n{}", s).as_bytes().to_owned();
+    return format!("!/boot/bin/sh\n{s}").as_bytes().to_owned();
 }
 
 pub fn test_package_cml(s: &str) -> Vec<u8> {
-    return format!("{{program:{{runner:\"elf\",binary:\"bin/{}\"}}}}", s).as_bytes().to_owned();
+    return format!("{{program:{{runner:\"elf\",binary:\"bin/{s}\"}}}}").as_bytes().to_owned();
 }
 
 pub fn extra_blob_contents(s: &str, i: u32) -> Vec<u8> {
-    format!("contents of file {}-{}", s, i).as_bytes().to_owned()
+    format!("contents of file {s}-{i}").as_bytes().to_owned()
 }
 
 pub async fn make_pkg_with_extra_blobs(s: &str, n: u32) -> Package {
     let mut pkg = PackageBuilder::new(s)
-        .add_resource_at(format!("bin/{}", s), &test_package_bin(s)[..])
-        .add_resource_at(format!("meta/{}.cml", s), &test_package_cml(s)[..]);
+        .add_resource_at(format!("bin/{s}"), &test_package_bin(s)[..])
+        .add_resource_at(format!("meta/{s}.cml"), &test_package_cml(s)[..]);
     for i in 0..n {
         pkg =
-            pkg.add_resource_at(format!("data/{}-{}", s, i), extra_blob_contents(s, i).as_slice());
+            pkg.add_resource_at(format!("data/{s}-{i}"), extra_blob_contents(s, i).as_slice());
     }
     pkg.build().await.unwrap()
 }

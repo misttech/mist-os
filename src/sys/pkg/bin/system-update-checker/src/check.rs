@@ -323,7 +323,7 @@ pub mod test_check_for_system_update_impl {
                 .ok_or_else(|| {
                     io::Error::new(
                         io::ErrorKind::NotFound,
-                        format!("not present in fake file system: {}", path),
+                        format!("not present in fake file system: {path}"),
                     )
                 })
                 .map(|s| s.to_string())
@@ -332,7 +332,7 @@ pub mod test_check_for_system_update_impl {
             self.contents.remove(path).and(Some(())).ok_or_else(|| {
                 io::Error::new(
                     io::ErrorKind::NotFound,
-                    format!("fake file system cannot remove non-existent file: {}", path),
+                    format!("fake file system cannot remove non-existent file: {path}"),
                 )
             })
         }
@@ -367,7 +367,7 @@ pub mod test_check_for_system_update_impl {
 
         fn with_system_image_merkle(mut self, merkle: &str) -> Self {
             assert!(self.write_packages_json);
-            self.packages.push(format!("fuchsia-pkg://fuchsia.com/system_image/0?hash={}", merkle));
+            self.packages.push(format!("fuchsia-pkg://fuchsia.com/system_image/0?hash={merkle}"));
             self
         }
 
@@ -390,14 +390,14 @@ pub mod test_check_for_system_update_impl {
                     "content": self.packages
                 })
                 .to_string();
-                eprintln!("{}", packages_json);
+                eprintln!("{packages_json}");
                 fs::write(self.temp_dir.path().join("packages.json"), packages_json)
                     .expect("write packages.json");
             }
 
             for (name, image) in self.images.into_iter() {
                 fs::write(self.temp_dir.path().join(name.clone()), image)
-                    .unwrap_or_else(|_| panic!("write {}", name));
+                    .unwrap_or_else(|_| panic!("write {name}"));
             }
             PackageResolverProxyTempDir {
                 temp_dir: self.temp_dir,

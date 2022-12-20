@@ -142,7 +142,7 @@ where
     let output_blobs_dir = output_blobs_dir.as_ref();
 
     let desc = repo.get_target_description(package_path).await?.with_context(|| {
-        format!("repository is missing missing target description for {}", package_path)
+        format!("repository is missing missing target description for {package_path}")
     })?;
 
     let meta_far_hash = merkle_from_description(&desc)?;
@@ -358,7 +358,7 @@ where
     // Otherwise download the blob into a temporary file, and validate that it has the right
     // hash.
     let mut resource =
-        repo.fetch_blob(&blob_str).await.with_context(|| format!("fetching {}", blob))?;
+        repo.fetch_blob(&blob_str).await.with_context(|| format!("fetching {blob}"))?;
 
     let (file, temp_path) = NamedTempFile::new_in(dir)?.into_parts();
     let mut file = async_fs::File::from(file);

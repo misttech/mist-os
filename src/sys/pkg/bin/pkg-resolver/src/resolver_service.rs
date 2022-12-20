@@ -445,8 +445,7 @@ pub async fn run_resolver_service(
                     let () =
                         responder.send(&mut response.map_err(Into::into)).with_context(|| {
                             format!(
-                                "sending fuchsia.pkg/PackageResolver.Resolve response for {:?}",
-                                package_url
+                                "sending fuchsia.pkg/PackageResolver.Resolve response for {package_url:?}"
                             )
                         })?;
                     Ok(())
@@ -471,8 +470,7 @@ pub async fn run_resolver_service(
                         responder.send(&mut response.map_err(Into::into)).with_context(|| {
                             format!(
                                 "sending fuchsia.pkg/PackageResolver.ResolveWithContext response \
-                                 for {:?}",
-                                package_url
+                                 for {package_url:?}"
                             )
                         })?;
                     Ok(())

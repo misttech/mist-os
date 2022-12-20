@@ -134,10 +134,10 @@ fn process_payload(
     match payload {
         Ok((Payload::Complete(Ok(_) | Err(AgentError::UnhandledLifespan)), _)) => Ok(()),
         Ok((Payload::Complete(result), _)) => {
-            result.with_context(|| format!("Invocation failed for {:?}", debug_id))
+            result.with_context(|| format!("Invocation failed for {debug_id:?}"))
         }
         Ok(_) => Err(format_err!("Unexpected result for {:?}", debug_id)),
-        Err(e) => Err(e).with_context(|| format!("Invocation failed {:?}", debug_id)),
+        Err(e) => Err(e).with_context(|| format!("Invocation failed {debug_id:?}")),
     }
 }
 
@@ -190,6 +190,6 @@ mod tests {
                 false,
             )
             .await;
-        assert_matches!(result, Err(e) if format!("{:?}", e).contains("test_agent"));
+        assert_matches!(result, Err(e) if format!("{e:?}").contains("test_agent"));
     }
 }

@@ -316,7 +316,7 @@ impl SettingProxyInspectAgent {
     ///
     /// Returns the request count of this request.
     fn record_request(&mut self, setting_type: SettingType, request: Request) -> u64 {
-        let setting_type_str = format!("{:?}", setting_type);
+        let setting_type_str = format!("{setting_type:?}");
         let timestamp = clock::inspect_format_now();
 
         // Get or create the info for this setting type.
@@ -328,14 +328,14 @@ impl SettingProxyInspectAgent {
         request_response_info.count += 1;
 
         let pending_request_info = PendingRequestInspectInfo {
-            request: format!("{:?}", request).into(),
+            request: format!("{request:?}").into(),
             request_type: request.for_inspect().to_string(),
             timestamp: timestamp.into(),
             count: request_count,
             inspect_node: inspect::Node::default(),
         };
 
-        let count_key = format!("{:020}", request_count);
+        let count_key = format!("{request_count:020}");
         request_response_info.pending_requests.push(&count_key, pending_request_info);
 
         request_count
@@ -349,7 +349,7 @@ impl SettingProxyInspectAgent {
         count: u64,
         response: Result<Option<SettingInfo>, Error>,
     ) {
-        let setting_type_str = format!("{:?}", setting_type);
+        let setting_type_str = format!("{setting_type:?}");
         let timestamp = clock::inspect_format_now();
 
         // Update the response counter.
@@ -396,7 +396,7 @@ impl SettingProxyInspectAgent {
         // re-insert to update the key displayed in inspect.
         let removed_info = request_type_info_map.map_mut().remove(&map_key);
 
-        let response_str = format!("{:?}", response);
+        let response_str = format!("{response:?}");
         let mut info = removed_info.unwrap_or_else(|| {
             RequestResponsePairInfo::new(pending.request.into_inner(), response_str, pending.count)
         });
@@ -459,7 +459,7 @@ impl SettingProxyInspectAgent {
         let response_type: ResponseType = response.clone().into();
         let response_count = response_count_info
             .response_counts_by_type
-            .get_or_insert_with(format!("{:?}", response_type), ResponseTypeCount::default);
+            .get_or_insert_with(format!("{response_type:?}"), ResponseTypeCount::default);
         response_count.count.add(1u64);
     }
 }
@@ -875,7 +875,7 @@ mod tests {
             for i in 1..MAX_REQUEST_RESPONSE_PAIRS + 1 {
                 // We don't need to set clock here since we don't do exact match.
                 request_assertion
-                    .add_child_assertion(TreeAssertion::new(&format!("{:020}", i), false));
+                    .add_child_assertion(TreeAssertion::new(&format!("{i:020}"), false));
             }
             request_response_assertion.add_child_assertion(request_assertion);
             tree_assertion.add_child_assertion(request_response_assertion);

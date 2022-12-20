@@ -52,19 +52,17 @@ pub fn construct_base_package(
                 subpackage.merkle,
                 &subpackage.manifest_path,
             )
-            .with_context(|| format!("Adding subpackages for {}", pkg_manifest_path))?;
+            .with_context(|| format!("Adding subpackages for {pkg_manifest_path}"))?;
         }
         base_pkg_builder.add_base_package(pkg_manifest).context(format!(
-            "Failed to add package to base package list with manifest: {}",
-            pkg_manifest_path
+            "Failed to add package to base package list with manifest: {pkg_manifest_path}"
         ))?;
     }
 
     for pkg_manifest_path in &product.cache {
         let pkg_manifest = PackageManifest::try_load_from(pkg_manifest_path)?;
         base_pkg_builder.add_cache_package(pkg_manifest).context(format!(
-            "Failed to add package to cache package list with manifest: {}",
-            pkg_manifest_path
+            "Failed to add package to cache package list with manifest: {pkg_manifest_path}"
         ))?;
     }
 

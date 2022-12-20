@@ -194,7 +194,7 @@ mod tests {
         let configs = (0..200)
             .map(|i| {
                 let url =
-                    RepositoryUrl::parse(&format!("fuchsia-pkg://fuchsia{:04}.com", i)).unwrap();
+                    RepositoryUrl::parse(&format!("fuchsia-pkg://fuchsia{i:04}.com")).unwrap();
                 RepositoryConfigBuilder::new(url).build()
             })
             .collect::<Vec<_>>();
@@ -227,7 +227,7 @@ mod tests {
         let configs = (0..20)
             .map(|i| {
                 let url =
-                    RepositoryUrl::parse(&format!("fuchsia-pkg://fuchsia{:04}.com", i)).unwrap();
+                    RepositoryUrl::parse(&format!("fuchsia-pkg://fuchsia{i:04}.com")).unwrap();
                 RepositoryConfigBuilder::new(url).build()
             })
             .collect::<Vec<_>>();

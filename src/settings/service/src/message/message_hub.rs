@@ -608,7 +608,7 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageHub<P
                     id,
 
                     "process request send",
-                    "payload" => format!("{:?}", payload).as_str()
+                    "payload" => format!("{payload:?}").as_str()
                 );
                 (Message::new(fingerprint, timestamp, payload, message_type), guard)
             }

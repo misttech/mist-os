@@ -100,7 +100,7 @@ where
             fio::OpenFlags::RIGHT_WRITABLE,
         )
         .await
-        .with_context(|| format!("creating file: {}", path))
+        .with_context(|| format!("creating file: {path}"))
         .map_err(make_opaque_error)?;
 
         write_all(&temp_proxy, reader).await.map_err(make_opaque_error)?;
@@ -126,7 +126,7 @@ where
 }
 
 fn make_opaque_error(e: Error) -> tuf::Error {
-    tuf::Error::Opaque(format!("{:#}", e))
+    tuf::Error::Opaque(format!("{e:#}"))
 }
 
 // Read everything from `reader` and write it to the file proxy.
@@ -323,7 +323,7 @@ mod tests {
         for path in ["", ".", "/", "./a", "../a", "a/", "a//b", "a/./b", "a/../b"] {
             let mut cursor = Cursor::new(&path);
             let store_result = repo.store_path(path.to_string(), &mut cursor).await;
-            assert!(store_result.is_err(), "path = {}", path);
+            assert!(store_result.is_err(), "path = {path}");
 
             assert!(
                 repo.fetch_path(
@@ -335,8 +335,7 @@ mod tests {
                 )
                 .await
                 .is_err(),
-                "path = {}",
-                path
+                "path = {path}"
             );
         }
     }

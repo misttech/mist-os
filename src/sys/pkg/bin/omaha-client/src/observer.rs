@@ -438,7 +438,7 @@ mod tests {
             consecutive_failed_update_checks: n,
             ..ProtocolState::default()
         });
-        let signature = format!("fuchsia-{}-consecutive-failed-update-checks", n);
+        let signature = format!("fuchsia-{n}-consecutive-failed-update-checks");
         assert_signature(recv.next().await.unwrap(), &signature);
     }
 

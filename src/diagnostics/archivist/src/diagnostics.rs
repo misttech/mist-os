@@ -515,7 +515,7 @@ mod test {
         });
 
         for time in 0..60 {
-            tracker.track(&format!("b{}", time), time * 1e9 as u64);
+            tracker.track(&format!("b{time}"), time * 1e9 as u64);
         }
 
         assert_data_tree!(inspector,

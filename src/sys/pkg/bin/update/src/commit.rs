@@ -46,7 +46,7 @@ impl CommitObserver for Printer {
             }
             CommitEvent::End => "Committed!",
         };
-        println!("{}", text);
+        println!("{text}");
     }
 }
 
@@ -139,7 +139,7 @@ mod tests {
 
         // Begin the `wait_for_commit`.
         match executor.run_until_stalled(&mut fut) {
-            Poll::Ready(res) => panic!("future unexpectedly completed with: {:?}", res),
+            Poll::Ready(res) => panic!("future unexpectedly completed with: {res:?}"),
             Poll::Pending => (),
         };
         observer.assert_events(&[CommitEvent::Begin]);
@@ -150,7 +150,7 @@ mod tests {
             .set_fake_time(fasync::Time::after((WARNING_DURATION - Duration::from_secs(1)).into()));
         assert!(!executor.wake_expired_timers());
         match executor.run_until_stalled(&mut fut) {
-            Poll::Ready(res) => panic!("future unexpectedly completed with: {:?}", res),
+            Poll::Ready(res) => panic!("future unexpectedly completed with: {res:?}"),
             Poll::Pending => (),
         };
         observer.assert_events(&[CommitEvent::Begin]);
@@ -159,7 +159,7 @@ mod tests {
         executor.set_fake_time(fasync::Time::after(1.seconds()));
         assert!(executor.wake_expired_timers());
         match executor.run_until_stalled(&mut fut) {
-            Poll::Ready(res) => panic!("future unexpectedly completed with: {:?}", res),
+            Poll::Ready(res) => panic!("future unexpectedly completed with: {res:?}"),
             Poll::Pending => (),
         };
         observer.assert_events(&[CommitEvent::Begin, CommitEvent::Warning]);

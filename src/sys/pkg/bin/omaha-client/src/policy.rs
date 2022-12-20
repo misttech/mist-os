@@ -824,12 +824,7 @@ mod tests {
             let lower_bound = nanos - (nanos * fuzz_percentage_range as u128 / (MAX_FUZZ_PERCENTAGE_RANGE as u128) );
             assert!(
                 fuzzed_interval >= lower_bound,
-                "bound exceeded: {} <= {} for interval {:?}, seed {}, and range {}",
-                lower_bound,
-                fuzzed_interval,
-                interval,
-                interval_fuzz_seed,
-                fuzz_percentage_range,
+                "bound exceeded: {lower_bound} <= {fuzzed_interval} for interval {interval:?}, seed {interval_fuzz_seed}, and range {fuzz_percentage_range}",
             );
         }
 
@@ -849,12 +844,7 @@ mod tests {
             // after conversion to nanos.
             assert!(
                 fuzzed_interval <= upper_bound,
-                "bounds exceeded: {} <= {} for interval {:?}, seed {}, and range {}",
-                upper_bound,
-                fuzzed_interval,
-                interval,
-                interval_fuzz_seed,
-                fuzz_percentage_range,
+                "bounds exceeded: {upper_bound} <= {fuzzed_interval} for interval {interval:?}, seed {interval_fuzz_seed}, and range {fuzz_percentage_range}",
             );
         }
     }
@@ -868,9 +858,7 @@ mod tests {
         let fuzzed_interval = fuzz_interval(interval, u64::MAX, 100);
         assert!(
             fuzzed_interval == interval,
-            "invariant failed: {:?} != {:?}",
-            fuzzed_interval,
-            interval
+            "invariant failed: {fuzzed_interval:?} != {interval:?}"
         );
     }
 
@@ -884,9 +872,7 @@ mod tests {
         let fuzzed_interval = fuzz_interval(interval, 1, 201);
         assert!(
             interval == fuzzed_interval,
-            "invariant failed: {:?} != {:?}",
-            fuzzed_interval,
-            interval
+            "invariant failed: {fuzzed_interval:?} != {interval:?}"
         );
     }
 
@@ -1604,9 +1590,9 @@ mod tests {
                 log_tag,
                 omaha_client::common::PrettyOptionDisplay(last_update_time)
             );
-            eprintln!("[{}]              now: {}", log_tag, now);
-            eprintln!("[{}] expected: {}", log_tag, expected);
-            eprintln!("[{}]   result: {}", log_tag, result);
+            eprintln!("[{log_tag}]              now: {now}");
+            eprintln!("[{log_tag}] expected: {expected}");
+            eprintln!("[{log_tag}]   result: {result}");
             if let Some(last_update_time) = last_update_time {
                 if let Some(last_update_time) = last_update_time.checked_to_system_time() {
                     eprintln!(

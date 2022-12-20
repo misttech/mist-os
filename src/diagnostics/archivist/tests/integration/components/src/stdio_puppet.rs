@@ -15,10 +15,10 @@ async fn run_stdio_puppet(mut stream: StdioPuppetRequestStream) -> Result<(), Er
     while let Some(request) = stream.try_next().await? {
         match request {
             StdioPuppetRequest::WritelnStdout { line, .. } => {
-                println!("{}", line);
+                println!("{line}");
             }
             StdioPuppetRequest::WritelnStderr { line, .. } => {
-                eprintln!("{}", line);
+                eprintln!("{line}");
             }
         }
     }

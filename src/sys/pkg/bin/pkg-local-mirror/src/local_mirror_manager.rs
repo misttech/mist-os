@@ -73,7 +73,7 @@ impl LocalMirrorManager {
     ) -> Result<(), GetBlobError> {
         let blob_id = blob_id.to_string();
         let (first, last) = blob_id.split_at(2);
-        let path = format!("{}/{}", first, last);
+        let path = format!("{first}/{last}");
 
         let () = self
             .blobs_dir

@@ -131,8 +131,7 @@ mod tests {
             assert_eq!(
                 rate_limiter.should_rate_limit(now),
                 i >= MAX_CHECKS_IN_SHORT_PERIOD,
-                "i = {}",
-                i
+                "i = {i}"
             );
             rate_limiter.add_time(now);
         }

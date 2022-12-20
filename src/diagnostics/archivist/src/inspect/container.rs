@@ -107,7 +107,7 @@ impl SnapshotData {
                         SnapshotData::successful(ReadSnapshot::Tree(snapshot_tree), filename)
                     }
                     Err(e) => SnapshotData::failed(
-                        schema::InspectError { message: format!("{:?}", e) },
+                        schema::InspectError { message: format!("{e:?}") },
                         filename,
                     ),
                 }
@@ -118,7 +118,7 @@ impl SnapshotData {
                         SnapshotData::successful(ReadSnapshot::Finished(hierarchy), filename)
                     }
                     Err(e) => SnapshotData::failed(
-                        schema::InspectError { message: format!("{:?}", e) },
+                        schema::InspectError { message: format!("{e:?}") },
                         filename,
                     ),
                 }
@@ -126,14 +126,14 @@ impl SnapshotData {
             InspectData::Vmo(vmo) => match Snapshot::try_from(&vmo) {
                 Ok(snapshot) => SnapshotData::successful(ReadSnapshot::Single(snapshot), filename),
                 Err(e) => SnapshotData::failed(
-                    schema::InspectError { message: format!("{:?}", e) },
+                    schema::InspectError { message: format!("{e:?}") },
                     filename,
                 ),
             },
             InspectData::File(contents) => match Snapshot::try_from(contents) {
                 Ok(snapshot) => SnapshotData::successful(ReadSnapshot::Single(snapshot), filename),
                 Err(e) => SnapshotData::failed(
-                    schema::InspectError { message: format!("{:?}", e) },
+                    schema::InspectError { message: format!("{e:?}") },
                     filename,
                 ),
             },

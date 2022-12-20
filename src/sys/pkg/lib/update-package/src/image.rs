@@ -335,7 +335,7 @@ mod tests {
             image.name();
             image.subtype();
             image.classify();
-            format!("{:?}", image);
+            format!("{image:?}");
         }
 
         #[test]
@@ -346,7 +346,7 @@ mod tests {
         #[test]
         fn filename_ends_with_underscore_subtype_if_present(image in arb_image()) {
             if let Some(subtype) = image.subtype() {
-                let suffix = format!("_{}", subtype);
+                let suffix = format!("_{subtype}");
                 prop_assert!(image.name().ends_with(&suffix));
             }
         }

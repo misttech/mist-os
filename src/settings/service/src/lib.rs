@@ -915,7 +915,7 @@ where
             DEFAULT_TEARDOWN_TIMEOUT,
             Some(DEFAULT_SETTING_PROXY_RESPONSE_TIMEOUT_MS.millis()),
             true,
-            setting_proxies_node.create_child(format!("{:?}", setting_type)),
+            setting_proxies_node.create_child(format!("{setting_type:?}")),
             listener_logger.clone(),
         )
         .await?;

@@ -290,7 +290,7 @@ fn record_task_command_to_node<'a>(
 ) {
     match task.command().to_str() {
         Ok(command) => node.record_string(name, command),
-        Err(err) => node.record_string(name, format!("{}", err)),
+        Err(err) => node.record_string(name, format!("{err}")),
     }
 }
 

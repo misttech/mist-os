@@ -154,7 +154,7 @@ mod hex_serde {
     {
         let value = String::deserialize(deserializer)?;
         hex::decode(value.as_bytes())
-            .map_err(|e| serde::de::Error::custom(format!("bad hex value: {:?}: {}", value, e)))
+            .map_err(|e| serde::de::Error::custom(format!("bad hex value: {value:?}: {e}")))
     }
 }
 

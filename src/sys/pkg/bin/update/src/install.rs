@@ -54,7 +54,7 @@ async fn handle_force_install_impl(
         reboot_controller.detach().context("notify installer do not reboot")?;
     }
     while let Some(state) = update_attempt.try_next().await.context("getting next state")? {
-        println!("State: {:?}", state);
+        println!("State: {state:?}");
         if state.id() == StateId::WaitToReboot {
             if reboot {
                 return Ok(());

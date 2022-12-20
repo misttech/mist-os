@@ -117,9 +117,9 @@ where
                 assert!(driver_stream_count < 1000, "STUCK: Driver stream had 10^3 iterations");
                 futures::future::ready(Ok(()))
             }).fuse()
-                => panic!("Driver stream error: {:?}", ret),
+                => panic!("Driver stream error: {ret:?}"),
             ret = ncp_task.fuse()
-                => panic!("NCP task error: {:?}", ret),
+                => panic!("NCP task error: {ret:?}"),
             _ = app_task.boxed().fuse() => (),
         }
 

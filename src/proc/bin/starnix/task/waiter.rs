@@ -185,8 +185,7 @@ impl Waiter {
         assert!(key != 0, "bad key from u64 wraparound");
         assert!(
             self.0.key_map.lock().insert(key, callback).is_none(),
-            "unexpected callback already present for key {}",
-            key
+            "unexpected callback already present for key {key}"
         );
         key
     }

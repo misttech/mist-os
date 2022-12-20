@@ -64,11 +64,11 @@ mod tests {
         executor.set_fake_time(fasync::Time::after(Duration::from_secs(timer_duration - 1).into()));
         assert!(!executor.wake_expired_timers());
         match executor.run_until_stalled(&mut reboot_fut) {
-            Poll::Ready(res) => panic!("future unexpectedly completed with response: {:?}", res),
+            Poll::Ready(res) => panic!("future unexpectedly completed with response: {res:?}"),
             Poll::Pending => {}
         };
         match executor.run_until_stalled(&mut recv) {
-            Poll::Ready(res) => panic!("future unexpectedly completed with response: {:?}", res),
+            Poll::Ready(res) => panic!("future unexpectedly completed with response: {res:?}"),
             Poll::Pending => {}
         };
 
@@ -77,7 +77,7 @@ mod tests {
         executor.set_fake_time(fasync::Time::after(Duration::from_secs(1).into()));
         assert!(executor.wake_expired_timers());
         match executor.run_until_stalled(&mut recv) {
-            Poll::Ready(res) => panic!("future unexpectedly completed with response: {:?}", res),
+            Poll::Ready(res) => panic!("future unexpectedly completed with response: {res:?}"),
             Poll::Pending => {}
         };
         match executor.run_until_stalled(&mut reboot_fut) {

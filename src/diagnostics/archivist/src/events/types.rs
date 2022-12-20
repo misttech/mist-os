@@ -160,7 +160,7 @@ pub struct MonikerSegment {
 impl std::fmt::Display for MonikerSegment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(collection) = &self.collection {
-            write!(f, "{}:", collection)?;
+            write!(f, "{collection}:")?;
         }
         write!(f, "{}", self.name)
     }

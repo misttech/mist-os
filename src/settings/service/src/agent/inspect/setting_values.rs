@@ -123,10 +123,10 @@ impl SettingValuesInspectAgent {
             .available_components
             .clone()
             .iter()
-            .map(|component| format!("{:?}", component))
+            .map(|component| format!("{component:?}"))
             .collect();
         setting_types_list.sort();
-        let setting_types_value = format!("{:?}", setting_types_list);
+        let setting_types_value = format!("{setting_types_list:?}");
         let setting_types_inspect_info = SettingTypesInspectInfo::new(
             setting_types_value,
             inspector.root(),

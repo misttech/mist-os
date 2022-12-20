@@ -69,7 +69,7 @@ impl controller::Handle for AccessibilityController {
                     return Some(Err(ControllerError::InvalidArgument(
                         SettingType::Accessibility,
                         "accessibility".into(),
-                        format!("{:?}", info).into(),
+                        format!("{info:?}").into(),
                     )));
                 }
                 let result = self.client.write_setting(original_info.merge(info).into(), id).await;

@@ -86,7 +86,7 @@ impl DynamicIndex {
             },
             Package::WithMetaFar { path, required_blobs } => PackageNode::WithMetaFar {
                 state: child_node.create_string("state", "with_meta_far"),
-                path: child_node.create_string("path", format!("{}", path)),
+                path: child_node.create_string("path", format!("{path}")),
                 time: child_node.create_int("time", zx::Time::get_monotonic().into_nanos()),
                 required_blobs: child_node
                     .create_int("required_blobs", required_blobs.len().try_into().unwrap_or(-1)),
@@ -94,7 +94,7 @@ impl DynamicIndex {
             },
             Package::Active { path, required_blobs } => PackageNode::Active {
                 state: child_node.create_string("state", "active"),
-                path: child_node.create_string("path", format!("{}", path)),
+                path: child_node.create_string("path", format!("{path}")),
                 time: child_node.create_int("time", zx::Time::get_monotonic().into_nanos()),
                 required_blobs: child_node
                     .create_int("required_blobs", required_blobs.len().try_into().unwrap_or(-1)),
@@ -238,7 +238,7 @@ impl DynamicIndex {
                     *package = Package::Active { path: path.clone(), required_blobs };
                     *package_node = PackageNode::Active {
                         state: child_node.create_string("state", "active"),
-                        path: child_node.create_string("path", format!("{}", path)),
+                        path: child_node.create_string("path", format!("{path}")),
                         required_blobs: child_node
                             .create_int("required_blobs", required_blobs_size),
                         time: child_node.create_int("time", zx::Time::get_monotonic().into_nanos()),

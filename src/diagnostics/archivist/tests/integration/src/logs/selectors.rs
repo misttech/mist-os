@@ -43,7 +43,7 @@ async fn component_selectors_filter_logs() {
         reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
     let _errors = fasync::Task::spawn(async move {
         while let Some(e) = errors.next().await {
-            panic!("error in subscription: {}", e);
+            panic!("error in subscription: {e}");
         }
     });
 
@@ -85,7 +85,7 @@ async fn launch_and_wait_for_exit(
 
     utils::wait_for_component_stopped_event(
         realm.root.child_name(),
-        &format!("coll:{}", name),
+        &format!("coll:{name}"),
         ExitStatusMatcher::Clean,
         event_stream,
     )

@@ -76,7 +76,7 @@ mod tests {
                     assert_eq!(info.current_channel.unwrap(), "current-channel");
                     responder.send(fidl_fuchsia_cobalt::Status::Ok).unwrap();
                 }
-                err => panic!("Err in request handler: {:?}", err),
+                err => panic!("Err in request handler: {err:?}"),
             }
             assert!(stream.next().await.is_none());
         };

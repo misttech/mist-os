@@ -171,7 +171,7 @@ async fn test_write_notify() {
             if let Ok(()) = result {
                 break;
             } else {
-                panic!("Bad result from storage agent invocation: {:?}", result);
+                panic!("Bad result from storage agent invocation: {result:?}");
             }
         }
     }

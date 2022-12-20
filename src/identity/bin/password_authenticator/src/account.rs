@@ -338,13 +338,13 @@ mod test {
             State::Unlocked { .. } => {
                 let root_dir = match account.storage_manager.get_root_dir().await {
                     Ok(directory_proxy) => directory_proxy,
-                    Err(err) => panic!("Unexpected error opening directory: {:?}", err),
+                    Err(err) => panic!("Unexpected error opening directory: {err:?}"),
                 };
 
                 match directory::open_directory(&root_dir, path, fio::OpenFlags::empty()).await {
                     Ok(_) => true,
                     Err(OpenError::OpenError(Status::NOT_FOUND)) => false,
-                    Err(err) => panic!("Unexpected error opening directory: {:?}", err),
+                    Err(err) => panic!("Unexpected error opening directory: {err:?}"),
                 }
             }
         }

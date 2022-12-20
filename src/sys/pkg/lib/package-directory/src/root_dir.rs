@@ -547,7 +547,7 @@ mod tests {
             Err(Error::FileDirectoryCollision { path }) => {
                 assert_eq!(path, "meta/dir".to_string());
             }
-            Err(e) => panic!("Expected collision error, receieved {:?}", e),
+            Err(e) => panic!("Expected collision error, receieved {e:?}"),
         };
     }
 

@@ -303,7 +303,7 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
         Ok(entries
             .entry(name.to_vec())
             .or_insert_with(|| {
-                let index = format!("{}\n", next_index).into_bytes();
+                let index = format!("{next_index}\n").into_bytes();
                 StaticDirectoryBuilder::new(&node.fs())
                     .entry(b"index", ByteVecFile::new_node(index), mode!(IFREG, 0o444))
                     .subdir(b"perms", 0o555, |mut perms| {

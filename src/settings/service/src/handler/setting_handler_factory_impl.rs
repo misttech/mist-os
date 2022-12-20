@@ -62,7 +62,7 @@ impl SettingHandlerFactory for SettingHandlerFactoryImpl {
         .map_err(|e| {
             SettingHandlerFactoryError::HandlerStartupError(
                 setting_type,
-                format!("Failed to generate setting handler: {:?}", e).into(),
+                format!("Failed to generate setting handler: {e:?}").into(),
             )
         })?;
 
@@ -91,20 +91,20 @@ impl SettingHandlerFactory for SettingHandlerFactoryImpl {
                     return result.map(|_| signature).map_err(|e| {
                         SettingHandlerFactoryError::HandlerStartupError(
                             setting_type,
-                            format!("Got bad startup response: {:?}", e).into(),
+                            format!("Got bad startup response: {e:?}").into(),
                         )
                     });
                 }
                 e => {
                     return Err(SettingHandlerFactoryError::HandlerStartupError(
                         setting_type,
-                        format!("Unexpected startup response: {:?}", e).into(),
+                        format!("Unexpected startup response: {e:?}").into(),
                     ));
                 }
             }
         }
 
-        panic!("Did not get any responses from {:?} controller startup", setting_type);
+        panic!("Did not get any responses from {setting_type:?} controller startup");
     }
 }
 

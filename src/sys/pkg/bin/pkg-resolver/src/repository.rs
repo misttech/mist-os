@@ -247,7 +247,7 @@ async fn get_local_repo(
                     | fio::OpenFlags::CREATE,
             )
             .await
-            .with_context(|| format!("opening {}", persisted_repos_dir))?;
+            .with_context(|| format!("opening {persisted_repos_dir}"))?;
             let host = config.repo_url().host();
             let proxy = fuchsia_fs::directory::open_directory(
                 &repos_proxy,
@@ -257,7 +257,7 @@ async fn get_local_repo(
                     | fio::OpenFlags::CREATE,
             )
             .await
-            .with_context(|| format!("opening {}", host))?;
+            .with_context(|| format!("opening {host}"))?;
             let local = FuchsiaFileSystemRepository::new(proxy);
             Ok(Box::new(local))
         }
@@ -724,7 +724,7 @@ mod tests {
         assert_matches!(repo.get_merkle_at_path(&target_path).await, Ok(_));
 
         let entries = history.take();
-        assert!(entries.is_empty(), "{:#?}", entries);
+        assert!(entries.is_empty(), "{entries:#?}");
 
         // Advance time right after the timeout, and make sure we access the server.
         clock::mock::set(
@@ -733,9 +733,9 @@ mod tests {
         assert_matches!(repo.get_merkle_at_path(&target_path).await, Ok(_));
 
         let entries = history.take();
-        assert_eq!(entries.len(), 2, "{:#?}", entries);
-        assert_eq!(entries[0].uri_path(), Path::new("/2.root.json"), "{:#?}", entries);
-        assert_eq!(entries[1].uri_path(), Path::new("/timestamp.json"), "{:#?}", entries);
+        assert_eq!(entries.len(), 2, "{entries:#?}");
+        assert_eq!(entries[0].uri_path(), Path::new("/2.root.json"), "{entries:#?}");
+        assert_eq!(entries[1].uri_path(), Path::new("/timestamp.json"), "{entries:#?}");
     }
 }
 

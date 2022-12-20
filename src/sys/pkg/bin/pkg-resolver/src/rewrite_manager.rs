@@ -105,7 +105,7 @@ impl RewriteManager {
                 |proxy| async move {
                     fuchsia_fs::file::write(&proxy, &data)
                         .await
-                        .with_context(|| format!("writing file: {}", temp_filename))
+                        .with_context(|| format!("writing file: {temp_filename}"))
                 },
             )
             .await
@@ -785,7 +785,7 @@ pub(crate) mod tests {
                             path_prefix_replacement: "/that_rolldice",
                         },
                     },
-                    dynamic_rules_path: format!("{:?}", dynamic_config_file),
+                    dynamic_rules_path: format!("{dynamic_config_file:?}"),
                     static_rules: {
                         "0": {
                             host_match: "example.com",
@@ -865,7 +865,7 @@ pub(crate) mod tests {
                             path_prefix_replacement: "/that_rolldice/",
                         },
                     },
-                    dynamic_rules_path: format!("{:?}", dynamic_config_file),
+                    dynamic_rules_path: format!("{dynamic_config_file:?}"),
                     static_rules: {},
                     generation: 1u64,
                 }

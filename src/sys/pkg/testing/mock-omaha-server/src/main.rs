@@ -81,7 +81,7 @@ struct Args {
 }
 
 fn parse_responses_by_appid(value: &str) -> Result<HashMap<String, ResponseAndMetadata>, String> {
-    serde_json::from_str(value).map_err(|e| format!("Parsing failed: {:?}", e))
+    serde_json::from_str(value).map_err(|e| format!("Parsing failed: {e:?}"))
 }
 
 /// Adapt [async_net::TcpStream] to work with hyper.

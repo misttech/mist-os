@@ -328,7 +328,7 @@ mod tests {
         fn unwrap(self) -> Arc<T> {
             match self {
                 LazyItem::Next(i) => i,
-                LazyItem::ItemsRolledOut(n) => panic!("{} unexpected rolled out items in test", n),
+                LazyItem::ItemsRolledOut(n) => panic!("{n} unexpected rolled out items in test"),
             }
         }
 
@@ -336,7 +336,7 @@ mod tests {
         fn expect_rolled_out(self, expected: u64) {
             match self {
                 LazyItem::Next(i) => {
-                    panic!("expected {} rolled out items, found Next({:#?})", expected, i)
+                    panic!("expected {expected} rolled out items, found Next({i:#?})")
                 }
                 LazyItem::ItemsRolledOut(n) => {
                     assert_eq!(n, expected, "wrong number of rolled out items")

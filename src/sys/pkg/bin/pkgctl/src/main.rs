@@ -56,7 +56,7 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
         Command::Resolve(ResolveCommand { pkg_url, verbose }) => {
             let resolver = connect_to_protocol::<PackageResolverMarker>()
                 .context("Failed to connect to resolver service")?;
-            println!("resolving {}", pkg_url);
+            println!("resolving {pkg_url}");
 
             let (dir, dir_server_end) = fidl::endpoints::create_proxy()?;
 
@@ -64,7 +64,7 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                 .resolve(&pkg_url, dir_server_end)
                 .await?
                 .map_err(fidl_fuchsia_pkg_ext::ResolveError::from)
-                .with_context(|| format!("Failed to resolve {}", pkg_url))?;
+                .with_context(|| format!("Failed to resolve {pkg_url}"))?;
 
             if verbose {
                 println!("package contents:");
@@ -132,7 +132,7 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
         Command::Open(OpenCommand { meta_far_blob_id }) => {
             let cache = connect_to_protocol::<PackageCacheMarker>()
                 .context("Failed to connect to cache service")?;
-            println!("opening {}", meta_far_blob_id);
+            println!("opening {meta_far_blob_id}");
 
             let (dir, dir_server_end) = fidl::endpoints::create_proxy()?;
 
@@ -164,12 +164,12 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                         let mut urls =
                             repos.into_iter().map(|r| r.repo_url().to_string()).collect::<Vec<_>>();
                         urls.sort_unstable();
-                        urls.into_iter().for_each(|url| println!("{}", url));
+                        urls.into_iter().for_each(|url| println!("{url}"));
                     } else {
                         let repos = fetch_repos(repo_manager).await?;
 
                         let s = serde_json::to_string_pretty(&repos).expect("valid json");
-                        println!("{}", s);
+                        println!("{s}");
                     }
                     Ok(0)
                 }
@@ -288,12 +288,12 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                     for repo in repos.into_iter() {
                         if repo.repo_url().to_string() == repo_url {
                             let s = serde_json::to_string_pretty(&repo).expect("valid json");
-                            println!("{}", s);
+                            println!("{s}");
                             return Ok(0);
                         }
                     }
 
-                    println!("Package repository not found: {:?}", repo_url);
+                    println!("Package repository not found: {repo_url:?}");
                     Ok(1)
                 }
             }
@@ -322,7 +322,7 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                     )?;
 
                     for rule in rules {
-                        println!("{:#?}", rule);
+                        println!("{rule:#?}");
                     }
                 }
                 RuleSubCommand::Clear(RuleClearCommand {}) => {
@@ -352,7 +352,7 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                     )?;
                     let rule_configs = RuleConfig::Version1(rules);
                     let dynamic_rules = serde_json::to_string_pretty(&rule_configs)?;
-                    println!("{}", dynamic_rules);
+                    println!("{dynamic_rules}");
                 }
                 RuleSubCommand::Replace(RuleReplaceCommand { subcommand }) => {
                     let RuleConfig::Version1(ref rules) = match subcommand {

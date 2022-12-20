@@ -286,7 +286,7 @@ mod tests {
             Ok(LogListenerSafeRequest::Log { log: _, responder }) => {
                 responder.send().unwrap();
             }
-            other => panic!("Unexpected request: {:?}", other),
+            other => panic!("Unexpected request: {other:?}"),
         }
         drop(requests);
 

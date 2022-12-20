@@ -229,7 +229,7 @@ mod tests {
         storage.commit().await.unwrap();
         match stream.next().await.unwrap() {
             Ok(StoreAccessorRequest::Commit { .. }) => {} // expected
-            request => panic!("Unexpected request: {:?}", request),
+            request => panic!("Unexpected request: {request:?}"),
         }
     }
 }

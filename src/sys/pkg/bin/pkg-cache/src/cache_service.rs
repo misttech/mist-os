@@ -2258,7 +2258,7 @@ mod serve_needed_blobs_tests {
         // operations finish.
         let abort_fut =
             match future::select(proxy.abort(), Timer::new(Duration::from_millis(50))).await {
-                Either::Left((r, _)) => panic!("abort future finished early ({:?})!", r),
+                Either::Left((r, _)) => panic!("abort future finished early ({r:?})!"),
                 Either::Right(((), abort_fut)) => abort_fut,
             };
 
@@ -2881,7 +2881,7 @@ mod serve_write_blob_tests {
                         prop_assert_eq!(received, bad_request.method_name());
                         prop_assert_eq!(expected, initial_state.expected_method_name());
                     }
-                    res => panic!("Expected UnexpectedRequest error, got {:?}", res),
+                    res => panic!("Expected UnexpectedRequest error, got {res:?}"),
                 }
                 Ok(())
             })?;

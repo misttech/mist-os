@@ -108,7 +108,7 @@ where
     let value = String::deserialize(value)?;
     match Salt::decode_hex(value.as_str()) {
         Ok(salt) => Ok(Some(salt)),
-        Err(e) => Err(serde::de::Error::custom(format!("not a valid salt value: {}", e))),
+        Err(e) => Err(serde::de::Error::custom(format!("not a valid salt value: {e}"))),
     }
 }
 
@@ -144,10 +144,10 @@ where
         Err(serde::de::Error::custom("version must be in `A.B` format"))
     } else {
         let a = parts[0].parse::<u32>().map_err(|e| {
-            serde::de::Error::custom(format!("unable to parse major version: {}", e))
+            serde::de::Error::custom(format!("unable to parse major version: {e}"))
         })?;
         let b = parts[1].parse::<u32>().map_err(|e| {
-            serde::de::Error::custom(format!("unable to parse major version: {}", e))
+            serde::de::Error::custom(format!("unable to parse major version: {e}"))
         })?;
         Ok(Some([a, b]))
     }

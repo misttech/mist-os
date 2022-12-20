@@ -252,10 +252,10 @@ where
             let mut bytes = vec![];
             self.fetch_blob(&meta_far_hash)
                 .await
-                .with_context(|| format!("fetching blob {}", meta_far_hash))?
+                .with_context(|| format!("fetching blob {meta_far_hash}"))?
                 .read_to_end(&mut bytes)
                 .await
-                .with_context(|| format!("reading blob {}", meta_far_hash))?;
+                .with_context(|| format!("reading blob {meta_far_hash}"))?;
 
             let mut archive =
                 fuchsia_archive::AsyncUtf8Reader::new(Adapter::new(Cursor::new(bytes))).await?;
@@ -281,7 +281,7 @@ where
                 .remote_repo()
                 .blob_modification_time(&meta_far_hash)
                 .await
-                .with_context(|| format!("fetching blob modification time {}", meta_far_hash))?
+                .with_context(|| format!("fetching blob modification time {meta_far_hash}"))?
                 .map(|x| -> anyhow::Result<u64> {
                     Ok(x.duration_since(SystemTime::UNIX_EPOCH)?.as_secs())
                 })
@@ -351,10 +351,10 @@ where
         let mut meta_far_bytes = vec![];
         self.fetch_blob(&hash)
             .await
-            .with_context(|| format!("fetching blob {}", hash))?
+            .with_context(|| format!("fetching blob {hash}"))?
             .read_to_end(&mut meta_far_bytes)
             .await
-            .with_context(|| format!("reading blob {}", hash))?;
+            .with_context(|| format!("reading blob {hash}"))?;
 
         let mut archive =
             fuchsia_archive::AsyncUtf8Reader::new(Adapter::new(Cursor::new(meta_far_bytes)))

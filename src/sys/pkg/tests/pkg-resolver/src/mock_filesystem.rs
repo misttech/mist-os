@@ -44,7 +44,7 @@ async fn handle_directory_request(req: fio::DirectoryRequest, open_counts: OpenC
             }
             *open_counts.lock().entry(path).or_insert(0) += 1;
         }
-        other => panic!("unhandled request type: {:?}", other),
+        other => panic!("unhandled request type: {other:?}"),
     }
 }
 

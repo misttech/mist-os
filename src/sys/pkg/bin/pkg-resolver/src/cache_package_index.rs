@@ -82,7 +82,7 @@ mod tests {
                         let iterator = iterator.into_stream().unwrap();
                         self.serve_package_iterator(iterator);
                     }
-                    _ => panic!("unexpected PackageCache request: {:?}", req),
+                    _ => panic!("unexpected PackageCache request: {req:?}"),
                 }
             }
         }
@@ -175,10 +175,10 @@ mod tests {
     fn index_with_n_entries(n: u32) -> Vec<(UnpinnedAbsolutePackageUrl, BlobId)> {
         let mut cache = vec![];
         for i in 0..n {
-            let pkg_url = format!("fuchsia-pkg://fuchsia.com/{}", i)
+            let pkg_url = format!("fuchsia-pkg://fuchsia.com/{i}")
                 .parse::<UnpinnedAbsolutePackageUrl>()
                 .unwrap();
-            let blob_id = format!("{:064}", i).parse::<BlobId>().unwrap();
+            let blob_id = format!("{i:064}").parse::<BlobId>().unwrap();
             cache.push((pkg_url, blob_id));
         }
         cache

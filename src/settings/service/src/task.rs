@@ -332,7 +332,7 @@ impl<C: Category + 'static> Statistics<C> {
         let start_time = self
             .active_tasks
             .remove(&id)
-            .unwrap_or_else(|| panic!("timestamp for {:?} should be present", id));
+            .unwrap_or_else(|| panic!("timestamp for {id:?} should be present"));
         let duration = end_time - start_time;
 
         self.lifetime_count += 1;

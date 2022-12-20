@@ -35,7 +35,7 @@ async fn blobfs() -> Result<(), Error> {
     let mut f = d.write_file(BLOB_MERKLE, 0).expect("open file 1");
     f.set_len(6_u64).expect("truncate");
 
-    f.write_all(b"Hello").unwrap_or_else(|e| eprintln!("write 1 error: {}", e));
+    f.write_all(b"Hello").unwrap_or_else(|e| eprintln!("write 1 error: {e}"));
     drop(f);
 
     assert_eq!(
@@ -86,16 +86,14 @@ async fn open_blob(
             match *info.expect("fio::FileEvent to have fio::NodeInfoDeprecated") {
                 fio::NodeInfoDeprecated::File(fio::FileObject { event: Some(event), .. }) => event,
                 other => panic!(
-                    "fio::NodeInfoDeprecated from fio::FileEventStream to be File variant with event: {:?}",
-                    other
+                    "fio::NodeInfoDeprecated from fio::FileEventStream to be File variant with event: {other:?}"
                 ),
             }
         }
         fio::FileEvent::OnRepresentation { payload } => match payload {
             fio::Representation::File(fio::FileInfo { observer: Some(event), .. }) => event,
             other => panic!(
-                "ConnectionInfo from fio::FileEventStream to be File variant with event: {:?}",
-                other
+                "ConnectionInfo from fio::FileEventStream to be File variant with event: {other:?}"
             ),
         },
     };
@@ -153,7 +151,7 @@ async fn wait_for_blob_to_be_creatable(blobfs: &fio::DirectoryProxy, merkle: &st
                 continue;
             }
             Err(err) => {
-                panic!("unexpected error waiting for blob to become writable: {:?}", err);
+                panic!("unexpected error waiting for blob to become writable: {err:?}");
             }
             Ok((blob, _)) => {
                 // Explicitly close the blob so that when this function returns the blob

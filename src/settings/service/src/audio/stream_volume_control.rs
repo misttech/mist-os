@@ -144,7 +144,7 @@ impl StreamVolumeControl {
 
         let (vol_control_proxy, server_end) = create_proxy().map_err(|err| {
             ControllerError::UnexpectedError(
-                format!("failed to create proxy for volume control: {:?}", err).into(),
+                format!("failed to create proxy for volume control: {err:?}").into(),
             )
         })?;
         let stream_type = self.stored_stream.stream_type;
@@ -157,7 +157,7 @@ impl StreamVolumeControl {
             return Err(ControllerError::ExternalFailure(
                 SettingType::Audio,
                 CONTROLLER_ERROR_DEPENDENCY.into(),
-                format!("bind_usage_volume_control for audio_core {:?}", usage).into(),
+                format!("bind_usage_volume_control for audio_core {usage:?}").into(),
                 format!("{e:?}").into(),
             ));
         }
@@ -169,7 +169,7 @@ impl StreamVolumeControl {
             return Err(ControllerError::ExternalFailure(
                 SettingType::Audio,
                 CONTROLLER_ERROR_DEPENDENCY.into(),
-                format!("set_volume for vol_control {:?}", stream_type).into(),
+                format!("set_volume for vol_control {stream_type:?}").into(),
                 format!("{e:?}").into(),
             ));
         }

@@ -96,7 +96,7 @@ pub(crate) use not_implemented_log_once;
 // TODO(tbodt): find a better way to handle this than a panic.
 #[track_caller]
 pub fn impossible_error(status: zx::Status) -> Errno {
-    panic!("encountered impossible error: {}", status);
+    panic!("encountered impossible error: {status}");
 }
 
 fn truncate_name(name: &[u8]) -> std::ffi::CString {

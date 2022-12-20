@@ -50,7 +50,7 @@ impl ComponentBuilder {
 
         cmc_tool
             .run(&args)
-            .with_context(|| format!("Failed to run cmc merge with shards {:?}", args))?;
+            .with_context(|| format!("Failed to run cmc merge with shards {args:?}"))?;
 
         let cmfile = outdir.join(format!("{}.cm", &self.name));
 
@@ -67,7 +67,7 @@ impl ComponentBuilder {
 
         cmc_tool
             .run(&args)
-            .with_context(|| format!("Failed to run cmc compile with args {:?}", args))?;
+            .with_context(|| format!("Failed to run cmc compile with args {args:?}"))?;
 
         Ok(cmfile)
     }

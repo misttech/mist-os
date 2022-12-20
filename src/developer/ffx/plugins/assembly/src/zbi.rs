@@ -297,8 +297,7 @@ mod tests {
 
         assert!(
             expected_bootfs_files_regex.is_match(&bootfs_files),
-            "Failed to regex match: {:?}",
-            bootfs_files
+            "Failed to regex match: {bootfs_files:?}"
         );
     }
 

@@ -155,10 +155,10 @@ where
     pub async fn add_package(self, path: Utf8PathBuf) -> Result<RepoBuilder<'a, R>> {
         let contents = async_fs::read(path.as_std_path())
             .await
-            .with_context(|| format!("reading package manifest {}", path))?;
+            .with_context(|| format!("reading package manifest {path}"))?;
 
         let package = PackageManifest::from_reader(&path, &contents[..])
-            .with_context(|| format!("reading package manifest {}", path))?;
+            .with_context(|| format!("reading package manifest {path}"))?;
 
         self.add_package_manifest(Some(path), package).await
     }
@@ -190,7 +190,7 @@ where
     pub async fn add_package_archive(self, path: Utf8PathBuf) -> Result<RepoBuilder<'a, R>> {
         let archive_out = TempDir::new().unwrap();
         let manifest = PackageManifest::from_archive(path.as_std_path(), archive_out.path())
-            .with_context(|| format!("reading package archive {}", path))
+            .with_context(|| format!("reading package archive {path}"))
             .expect("archive to manifest");
 
         self.stage_package(ToBeStagedPackage {
@@ -272,10 +272,10 @@ where
 
             let contents = async_fs::read(path.as_std_path())
                 .await
-                .with_context(|| format!("reading package manifest {}", path))?;
+                .with_context(|| format!("reading package manifest {path}"))?;
 
             let package = PackageManifest::from_reader(&path, &contents[..])
-                .with_context(|| format!("reading package manifest {}", path))?;
+                .with_context(|| format!("reading package manifest {path}"))?;
 
             subpackage_paths.extend(self.add_subpackage_manifest(path, package).into_iter());
         }
@@ -329,10 +329,10 @@ where
     pub async fn add_package_list(mut self, path: Utf8PathBuf) -> Result<RepoBuilder<'a, R>> {
         let contents = async_fs::read(path.as_std_path())
             .await
-            .with_context(|| format!("reading package manifest list {}", path))?;
+            .with_context(|| format!("reading package manifest list {path}"))?;
 
         let package_list_manifest = PackageManifestList::from_reader(&contents[..])
-            .with_context(|| format!("reading package manifest list {}", path))?;
+            .with_context(|| format!("reading package manifest list {path}"))?;
 
         self.deps.insert(path);
 
@@ -527,8 +527,7 @@ fn check_manifests_are_equivalent(
         new_package.path.as_ref().map(|path| path.as_str()).unwrap_or("<generated>");
 
     let mut msg = vec![format!(
-        "conflict for repository path '{}'\n  manifest paths:\n  - {}\n  - {}\n  differences:",
-        package_path, old_manifest_path, new_manifest_path,
+        "conflict for repository path '{package_path}'\n  manifest paths:\n  - {old_manifest_path}\n  - {new_manifest_path}\n  differences:",
     )];
 
     #[derive(PartialEq, Eq)]
@@ -578,17 +577,17 @@ fn check_manifests_are_equivalent(
                     }
                     (old_entry, new_entry) => {
                         if old_entry != new_entry {
-                            msg.push(format!("  - {}: different contents", path));
+                            msg.push(format!("  - {path}: different contents"));
                         }
                     }
                 }
             } else {
-                msg.push(format!("  - {}: missing from manifest {}", path, new_manifest_path));
+                msg.push(format!("  - {path}: missing from manifest {new_manifest_path}"));
             }
         }
 
         for path in new_contents.into_keys() {
-            msg.push(format!("  - {}: missing from manifest {}", path, old_manifest_path));
+            msg.push(format!("  - {path}: missing from manifest {old_manifest_path}"));
         }
     }
 
@@ -617,16 +616,14 @@ fn check_manifests_are_equivalent(
                 }
             } else {
                 msg.push(format!(
-                    "  - {}: subpackage missing from manifest {}",
-                    name, new_manifest_path
+                    "  - {name}: subpackage missing from manifest {new_manifest_path}"
                 ));
             }
         }
 
         for name in new_subpackages.into_keys() {
             msg.push(format!(
-                "  - {}: subpackage missing from manifest {}",
-                name, old_manifest_path
+                "  - {name}: subpackage missing from manifest {old_manifest_path}"
             ));
         }
     }

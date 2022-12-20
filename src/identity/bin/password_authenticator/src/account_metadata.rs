@@ -205,7 +205,7 @@ impl DataDirAccountMetadataStore {
 }
 
 fn format_account_id(account_id: &AccountId) -> String {
-    format!("{}", account_id)
+    format!("{account_id}")
 }
 
 fn parse_account_id(text: &str) -> Option<AccountId> {
@@ -247,7 +247,7 @@ impl AccountMetadataStore for DataDirAccountMetadataStore {
 
         // Tempfiles will have the prefix "temp-{accountid}"
         let id = format_account_id(account_id);
-        let tempfile_prefix = format!("temp-{}", id);
+        let tempfile_prefix = format!("temp-{id}");
 
         let mut staged_file = StagedFile::new(&self.accounts_dir, &tempfile_prefix).await?;
         let serialized =

@@ -124,7 +124,7 @@ pub fn remap_memory(
 pub fn fill_page(current_task: &CurrentTask, addr: UserAddress, data: char) {
     let data = [data as u8].repeat(*PAGE_SIZE as usize);
     if let Err(err) = current_task.mm.write_memory(addr, &data) {
-        panic!("write page: failed to fill page @ {:?} with {:?}: {:?}", addr, data, err);
+        panic!("write page: failed to fill page @ {addr:?} with {data:?}: {err:?}");
     }
 }
 
@@ -137,13 +137,11 @@ pub fn fill_page(current_task: &CurrentTask, addr: UserAddress, data: char) {
 pub fn check_page_eq(current_task: &CurrentTask, addr: UserAddress, data: char) {
     let mut buf = vec![0; *PAGE_SIZE as usize];
     if let Err(err) = current_task.mm.read_memory(addr, &mut buf) {
-        panic!("read page: failed to read page @ {:?}: {:?}", addr, err);
+        panic!("read page: failed to read page @ {addr:?}: {err:?}");
     }
     assert!(
         buf.into_iter().all(|c| c == data as u8),
-        "unexpected payload: page @ {:?} should be filled with {:?}",
-        addr,
-        data
+        "unexpected payload: page @ {addr:?} should be filled with {data:?}"
     );
 }
 
@@ -156,13 +154,11 @@ pub fn check_page_eq(current_task: &CurrentTask, addr: UserAddress, data: char) 
 pub fn check_page_ne(current_task: &CurrentTask, addr: UserAddress, data: char) {
     let mut buf = vec![0; *PAGE_SIZE as usize];
     if let Err(err) = current_task.mm.read_memory(addr, &mut buf) {
-        panic!("read page: failed to read page @ {:?}: {:?}", addr, err);
+        panic!("read page: failed to read page @ {addr:?}: {err:?}");
     }
     assert!(
         !buf.into_iter().all(|c| c == data as u8),
-        "unexpected payload: page @ {:?} should not be filled with {:?}",
-        addr,
-        data
+        "unexpected payload: page @ {addr:?} should not be filled with {data:?}"
     );
 }
 
@@ -175,10 +171,10 @@ pub fn check_page_ne(current_task: &CurrentTask, addr: UserAddress, data: char) 
 pub fn check_unmapped(current_task: &CurrentTask, addr: UserAddress) {
     let mut buf = vec![0; *PAGE_SIZE as usize];
     match current_task.mm.read_memory(addr, &mut buf) {
-        Ok(()) => panic!("read page: page @ {:?} should be unmapped", addr),
+        Ok(()) => panic!("read page: page @ {addr:?} should be unmapped"),
         Err(err) if err == crate::types::errno::EFAULT => {}
         Err(err) => {
-            panic!("read page: expected EFAULT reading page @ {:?} but got {:?} instead", addr, err)
+            panic!("read page: expected EFAULT reading page @ {addr:?} but got {err:?} instead")
         }
     }
 }

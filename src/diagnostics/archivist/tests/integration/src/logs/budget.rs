@@ -111,7 +111,7 @@ impl PuppetEnv {
             .unwrap();
 
         for i in 0..max_puppets {
-            let name = format!("puppet-{}", i);
+            let name = format!("puppet-{i}");
             let puppet = test_realm
                 .add_child(name.clone(), SOCKET_PUPPET_COMPONENT_URL, ChildOptions::new())
                 .await
@@ -164,7 +164,7 @@ impl PuppetEnv {
 
         let _log_errors = Task::spawn(async move {
             if let Some(error) = errors.next().await {
-                panic!("{:#?}", error);
+                panic!("{error:#?}");
             }
         });
 
@@ -181,7 +181,7 @@ impl PuppetEnv {
 
     async fn create_puppet(&mut self, id: usize) -> String {
         assert!(id < self.max_puppets);
-        let mut child_ref = ChildRef { name: format!("puppet-{}", id), collection: None };
+        let mut child_ref = ChildRef { name: format!("puppet-{id}"), collection: None };
 
         let (exposed_dir, server_end) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();

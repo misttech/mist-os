@@ -35,7 +35,7 @@ pub fn create_flash_manifest(args: CreateFlashManifestArgs) -> Result<()> {
     // Write the flash manifest.
     let flash_manifest_path = args.outdir.join("flash.json");
     let mut flash_manifest_file = File::create(&flash_manifest_path)
-        .with_context(|| format!("Failed to create: {}", flash_manifest_path))?;
+        .with_context(|| format!("Failed to create: {flash_manifest_path}"))?;
     manifest.write(&mut flash_manifest_file)?;
 
     Ok(())
@@ -45,9 +45,9 @@ pub fn create_flash_manifest(args: CreateFlashManifestArgs) -> Result<()> {
 fn manifest_from_file(path: impl AsRef<Utf8Path>) -> Result<AssemblyManifest> {
     let path = path.as_ref();
     let file = File::open(path)
-        .with_context(|| format!("Failed to open the system images file: {}", path))?;
+        .with_context(|| format!("Failed to open the system images file: {path}"))?;
     serde_json::from_reader(BufReader::new(file))
-        .with_context(|| format!("Failed to parse the system images file: {}", path))
+        .with_context(|| format!("Failed to parse the system images file: {path}"))
 }
 
 #[cfg(test)]

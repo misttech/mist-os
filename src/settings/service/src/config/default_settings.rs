@@ -76,7 +76,7 @@ where
                         config_load_info = Some(ConfigLoadInfo {
                             status: config::base::ConfigLoadStatus::Success,
                             contents: if let Some(ref payload) = config {
-                                Some(format!("{:?}", payload))
+                                Some(format!("{payload:?}"))
                             } else {
                                 None
                             },
@@ -85,7 +85,7 @@ where
                     }
                     Err(e) => {
                         // Found file, but failed to parse.
-                        let err_msg = format!("unable to parse config: {:?}", e);
+                        let err_msg = format!("unable to parse config: {e:?}");
                         config_load_info = Some(ConfigLoadInfo {
                             status: config::base::ConfigLoadStatus::ParseFailure(err_msg.clone()),
                             contents: None,

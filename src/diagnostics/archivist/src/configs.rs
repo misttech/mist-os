@@ -69,7 +69,7 @@ impl PipelineConfig {
                                     match validate_static_selector(&selector) {
                                         Ok(()) => validated_selectors.push(selector),
                                         Err(e) => {
-                                            errors.push(format!("Invalid static selector: {}", e))
+                                            errors.push(format!("Invalid static selector: {e}"))
                                         }
                                     }
                                 }
@@ -121,7 +121,7 @@ impl PipelineConfig {
         if !self.errors.is_empty() {
             let errors = node.create_child("errors");
             for (i, error) in self.errors.iter().enumerate() {
-                let error_node = errors.create_child(format!("{}", i));
+                let error_node = errors.create_child(format!("{i}"));
                 error_node.record_string("message", error);
                 errors.record(error_node);
             }

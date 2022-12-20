@@ -567,7 +567,7 @@ mod tests {
                     ];
                     responder.send(&mut vec.into_iter()).expect("send failed");
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         };
         future::join(fut, stream_fut).await;
@@ -587,7 +587,7 @@ mod tests {
                     let ret: Vec<Option<&str>> = vec![None; 5];
                     responder.send(&mut ret.into_iter()).expect("send failed");
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         };
         future::join(fut, stream_fut).await;
@@ -604,7 +604,7 @@ mod tests {
                 Ok(ArgumentsRequest::GetStrings { .. }) => {
                     // Don't respond.
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         };
         future::join(fut, stream_fut).await;
@@ -714,11 +714,11 @@ mod tests {
                             "fuchsia-pkg://example.com/package2" => {
                                 ("4.5.6".into(), "stable".into())
                             }
-                            url => panic!("unexpected url {}", url),
+                            url => panic!("unexpected url {url}"),
                         };
                         responder.send(&mut Ok(response)).unwrap();
                     }
-                    request => panic!("Unexpected request: {:?}", request),
+                    request => panic!("Unexpected request: {request:?}"),
                 }
             }
         };
@@ -756,7 +756,7 @@ mod tests {
                     assert_eq!(url.url, "fuchsia-pkg://example.com/package");
                     responder.send(&mut Ok(("abc".into(), "beta".into()))).unwrap();
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         };
         let stable_channel_config = ChannelConfig {
@@ -790,7 +790,7 @@ mod tests {
                     assert_eq!(url.url, "fuchsia-pkg://example.com/package");
                     responder.send(&mut Err(GetInfoError::NotAvailable)).unwrap();
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         };
         let ((version, channel_config), ()) = future::join(

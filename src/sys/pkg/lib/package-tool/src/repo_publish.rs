@@ -55,7 +55,7 @@ pub async fn cmd_repo_publish(cmd: RepoPublishCommand) -> Result<()> {
     let client = if let Some(trusted_root_path) = cmd.trusted_root {
         let buf = async_fs::read(&trusted_root_path)
             .await
-            .with_context(|| format!("reading trusted root {}", trusted_root_path))?;
+            .with_context(|| format!("reading trusted root {trusted_root_path}"))?;
 
         let trusted_root = RawSignedMetadata::new(buf);
 
@@ -119,17 +119,17 @@ pub async fn cmd_repo_publish(cmd: RepoPublishCommand) -> Result<()> {
         let timestamp_path = cmd.repo_path.join("repository").join("timestamp.json");
 
         let file =
-            File::create(&depfile_path).with_context(|| format!("creating {}", depfile_path))?;
+            File::create(&depfile_path).with_context(|| format!("creating {depfile_path}"))?;
 
         let mut file = BufWriter::new(file);
 
-        write!(file, "{}:", timestamp_path)?;
+        write!(file, "{timestamp_path}:")?;
 
         for path in deps {
             // Spaces are separators, so spaces in filenames must be escaped.
             let path = path.as_str().replace(' ', "\\ ");
 
-            write!(file, " {}", path)?;
+            write!(file, " {path}")?;
         }
     }
 
@@ -526,7 +526,7 @@ mod tests {
         let mut manifests = vec![];
         for name in ["package1", "package2", "package3", "package4", "package5"] {
             let pkg_build_path = root.join(name);
-            let pkg_manifest_path = root.join(format!("{}.json", name));
+            let pkg_manifest_path = root.join(format!("{name}.json"));
 
             let (_, pkg_manifest) =
                 test_utils::make_package_manifest(name, pkg_build_path.as_std_path(), Vec::new());

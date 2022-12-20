@@ -201,10 +201,10 @@ async fn verify_package_cached(
             Err(fidl::Error::ClientChannelClosed { status: Status::OK, .. }) => true,
             Ok(Ok(false)) => false,
             Ok(r) => {
-                panic!("Meta blob not cached: unexpected response {:?}", r)
+                panic!("Meta blob not cached: unexpected response {r:?}")
             }
             Err(e) => {
-                panic!("Meta blob not cached: unexpected FIDL error {:?}", e)
+                panic!("Meta blob not cached: unexpected FIDL error {e:?}")
             }
         };
 
@@ -237,7 +237,7 @@ async fn verify_package_cached(
                 );
             }
             Err(e) => {
-                panic!("Content blobs not cached: unexpected error {:?}", e)
+                panic!("Content blobs not cached: unexpected error {e:?}")
             }
         }
     } else {

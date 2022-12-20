@@ -546,7 +546,7 @@ impl HttpResponder for NBytesThenError {
             let mut bytes = body_to_bytes(body).await;
             let initial_len = bytes.len();
             if initial_len <= n {
-                panic!("not enough bytes to shorten, {} {}", initial_len, n);
+                panic!("not enough bytes to shorten, {initial_len} {n}");
             }
             bytes.truncate(n);
             Response::from_parts(

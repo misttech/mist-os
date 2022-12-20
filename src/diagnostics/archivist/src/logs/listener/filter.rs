@@ -299,7 +299,7 @@ mod tests {
             ..MessageFilter::default()
         };
 
-        assert!(filter.should_send(&message), "the filter should have sent {:#?}", message);
+        assert!(filter.should_send(&message), "the filter should have sent {message:#?}");
     }
 
     #[fuchsia::test]
@@ -311,23 +311,23 @@ mod tests {
             ..MessageFilter::default()
         };
 
-        assert!(filter.should_send(&message), "the filter should have sent {:#?}", message);
+        assert!(filter.should_send(&message), "the filter should have sent {message:#?}");
 
         let message2 = test_message_with_tag(Some("foobar"));
-        assert!(!filter.should_send(&message2), "the filter should not have sent {:#?}", message2);
+        assert!(!filter.should_send(&message2), "the filter should not have sent {message2:#?}");
 
         let filter = MessageFilter {
             tags: vec!["foo::bar".to_string()].into_iter().collect(),
             ..MessageFilter::default()
         };
 
-        assert!(filter.should_send(&message), "the filter should have sent {:#?}", message);
+        assert!(filter.should_send(&message), "the filter should have sent {message:#?}");
 
         let filter = MessageFilter {
             tags: vec!["foo:ba".to_string()].into_iter().collect(),
             ..MessageFilter::default()
         };
 
-        assert!(!filter.should_send(&message), "the filter should not have sent {:#?}", message);
+        assert!(!filter.should_send(&message), "the filter should not have sent {message:#?}");
     }
 }

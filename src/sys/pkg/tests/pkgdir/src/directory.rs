@@ -220,9 +220,8 @@ async fn assert_open_success<V, Fut>(
         let node = open_node(&parent, flag, mode, child_path);
         if let Err(e) = verifier(node, flag).await {
             panic!(
-                "failed to verify open. parent: {:?}, child: {:?}, flag: {:?}, \
-                       mode: {:#x}, error: {:#}",
-                parent_path, child_path, flag, mode, e
+                "failed to verify open. parent: {parent_path:?}, child: {child_path:?}, flag: {flag:?}, \
+                       mode: {mode:#x}, error: {e:#}"
             );
         }
     }
@@ -300,9 +299,8 @@ async fn assert_open_flag_mode_and_child_path_failure<V, Fut>(
         let node = open_node(&parent, flag, mode, child_path);
         if let Err(e) = verifier(node).await {
             panic!(
-                "failed to verify open failed. parent: {:?}, child: {:?}, flag: {:?}, \
-                       mode: {:#x}, error: {:#}",
-                parent_path, child_path, flag, mode, e
+                "failed to verify open failed. parent: {parent_path:?}, child: {child_path:?}, flag: {flag:?}, \
+                       mode: {mode:#x}, error: {e:#}"
             );
         }
     }
@@ -597,10 +595,10 @@ fn open_node(
 fn generate_lax_directory_paths(base: &str) -> Vec<String> {
     let mut paths = generate_valid_directory_paths(base);
     if base == "." {
-        paths.extend([format!("{}/", base), format!("/{}", base), format!("/{}/", base)]);
+        paths.extend([format!("{base}/"), format!("/{base}"), format!("/{base}/")]);
     }
     // "path segment rules are checked"
-    paths.extend([format!("./{}", base), format!("{}/.", base)]);
+    paths.extend([format!("./{base}"), format!("{base}/.")]);
     if base.contains('/') {
         paths.push(base.replace('/', "//"));
         paths.push(base.replace('/', "/to-be-removed/../"));
@@ -614,7 +612,7 @@ fn generate_valid_directory_paths(base: &str) -> Vec<String> {
     if base == "." {
         vec![base.to_string()]
     } else {
-        vec![base.to_string(), format!("{}/", base), format!("/{}", base), format!("/{}/", base)]
+        vec![base.to_string(), format!("{base}/"), format!("/{base}"), format!("/{base}/")]
     }
 }
 
@@ -625,12 +623,12 @@ fn generate_valid_directory_only_paths(base: &str) -> Vec<String> {
     if base == "." {
         return vec![];
     }
-    vec![format!("{}/", base), format!("/{}/", base)]
+    vec![format!("{base}/"), format!("/{base}/")]
 }
 
 /// Generates a set of path variations which are valid when opening files.
 fn generate_valid_file_paths(base: &str) -> Vec<String> {
-    vec![base.to_string(), format!("/{}", base)]
+    vec![base.to_string(), format!("/{base}")]
 }
 
 async fn verify_directory_opened(node: fio::NodeProxy, flag: fio::OpenFlags) -> Result<(), Error> {
@@ -900,7 +898,7 @@ async fn assert_clone_sends_on_open_event(package_root: &fio::DirectoryProxy, pa
     let (node, server_end) = create_proxy::<fio::NodeMarker>().expect("create_proxy");
     parent.clone(fio::OpenFlags::DESCRIBE, server_end).expect("clone dir");
     if let Err(e) = verify_directory_clone_sends_on_open_event(node).await {
-        panic!("failed to verify clone. path: {:?}, error: {:#}", path, e);
+        panic!("failed to verify clone. path: {path:?}, error: {e:#}");
     }
 }
 

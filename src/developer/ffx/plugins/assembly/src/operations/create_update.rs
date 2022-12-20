@@ -42,7 +42,7 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
     // Add the packages to update.
     if let Some(packages_path) = &args.packages {
         let mut file = File::open(packages_path)
-            .with_context(|| format!("Failed to open: {}", packages_path))?;
+            .with_context(|| format!("Failed to open: {packages_path}"))?;
         let packages: UpdatePackagesManifest =
             from_reader(&mut file).context("Failed to parse the packages manifest")?;
         builder.add_packages(packages);

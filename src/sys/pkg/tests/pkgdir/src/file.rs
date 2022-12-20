@@ -70,8 +70,7 @@ async fn assert_read_buffer_success(
             .map_err(zx::Status::from_raw)
             .unwrap_or_else(|_| {
                 panic!(
-                    "path: {}, expected_contents: {}, buffer size: {}",
-                    path, expected_contents, buffer_size
+                    "path: {path}, expected_contents: {expected_contents}, buffer size: {buffer_size}"
                 )
             });
         assert_eq!(std::str::from_utf8(&bytes).unwrap(), expected_contents);
@@ -152,8 +151,7 @@ async fn assert_read_at_success(
                 .map_err(zx::Status::from_raw)
                 .unwrap_or_else(|_| {
                     panic!(
-                        "path: {}, offset: {}, count: {}, expected_contents: {}",
-                        path, offset, count, expected_contents
+                        "path: {path}, offset: {offset}, count: {count}, expected_contents: {expected_contents}"
                     )
                 });
             assert_eq!(std::str::from_utf8(&bytes).unwrap(), expected_contents);
@@ -170,7 +168,7 @@ async fn assert_read_at_does_not_affect_seek_offset(root_dir: &fio::DirectoryPro
             .await
             .unwrap()
             .map_err(zx::Status::from_raw)
-            .unwrap_or_else(|_| panic!("path: {}, seek_offset: {}", path, seek_offset));
+            .unwrap_or_else(|_| panic!("path: {path}, seek_offset: {seek_offset}"));
         assert_eq!(position, seek_offset as u64);
 
         let _: Vec<u8> = file
@@ -178,7 +176,7 @@ async fn assert_read_at_does_not_affect_seek_offset(root_dir: &fio::DirectoryPro
             .await
             .unwrap()
             .map_err(zx::Status::from_raw)
-            .unwrap_or_else(|_| panic!("path: {}, seek_offset: {}", path, seek_offset));
+            .unwrap_or_else(|_| panic!("path: {path}, seek_offset: {seek_offset}"));
 
         // get seek offset
         let position = file
@@ -186,7 +184,7 @@ async fn assert_read_at_does_not_affect_seek_offset(root_dir: &fio::DirectoryPro
             .await
             .unwrap()
             .map_err(zx::Status::from_raw)
-            .unwrap_or_else(|_| panic!("path: {}, seek_offset: {}", path, seek_offset));
+            .unwrap_or_else(|_| panic!("path: {path}, seek_offset: {seek_offset}"));
         assert_eq!(position, seek_offset as u64)
     }
 }
@@ -200,14 +198,14 @@ async fn assert_read_at_is_unaffected_by_seek(root_dir: &fio::DirectoryProxy, pa
             .await
             .unwrap()
             .map_err(zx::Status::from_raw)
-            .unwrap_or_else(|_| panic!("path: {}, seek_offset: {}", path, seek_offset));
+            .unwrap_or_else(|_| panic!("path: {path}, seek_offset: {seek_offset}"));
 
         let position = file
             .seek(fio::SeekOrigin::Start, seek_offset)
             .await
             .unwrap()
             .map_err(zx::Status::from_raw)
-            .unwrap_or_else(|_| panic!("path: {}, seek_offset: {}", path, seek_offset));
+            .unwrap_or_else(|_| panic!("path: {path}, seek_offset: {seek_offset}"));
         assert_eq!(position, seek_offset as u64);
 
         let second_read_bytes = file
@@ -215,7 +213,7 @@ async fn assert_read_at_is_unaffected_by_seek(root_dir: &fio::DirectoryProxy, pa
             .await
             .unwrap()
             .map_err(zx::Status::from_raw)
-            .unwrap_or_else(|_| panic!("path: {}, seek_offset: {}", path, seek_offset));
+            .unwrap_or_else(|_| panic!("path: {path}, seek_offset: {seek_offset}"));
         assert_eq!(
             std::str::from_utf8(&first_read_bytes).unwrap(),
             std::str::from_utf8(&second_read_bytes).unwrap()
@@ -260,8 +258,7 @@ async fn assert_seek_success(
             .map_err(zx::Status::from_raw)
             .unwrap_or_else(|_| {
                 panic!(
-                    "path: {}, seek_origin: {:?}, expected_position: {}",
-                    path, seek_origin, expected_position
+                    "path: {path}, seek_origin: {seek_origin:?}, expected_position: {expected_position}"
                 )
             });
         assert_eq!(position, expected_position as u64);
@@ -276,7 +273,7 @@ async fn assert_seek_affects_read(root_dir: &fio::DirectoryProxy, path: &str, ex
             .await
             .unwrap()
             .map_err(zx::Status::from_raw)
-            .unwrap_or_else(|_| panic!("path: {}, seek_offset: {}", path, seek_offset));
+            .unwrap_or_else(|_| panic!("path: {path}, seek_offset: {seek_offset}"));
         assert_eq!(std::str::from_utf8(&bytes).unwrap(), expected);
 
         let bytes = file
@@ -284,7 +281,7 @@ async fn assert_seek_affects_read(root_dir: &fio::DirectoryProxy, path: &str, ex
             .await
             .unwrap()
             .map_err(zx::Status::from_raw)
-            .unwrap_or_else(|_| panic!("path: {}, seek_offset: {}", path, seek_offset));
+            .unwrap_or_else(|_| panic!("path: {path}, seek_offset: {seek_offset}"));
         assert_eq!(bytes, &[]);
 
         let expected_contents = &expected[expected.len() - seek_offset..];
@@ -293,7 +290,7 @@ async fn assert_seek_affects_read(root_dir: &fio::DirectoryProxy, path: &str, ex
             .await
             .unwrap()
             .map_err(zx::Status::from_raw)
-            .unwrap_or_else(|_| panic!("path: {}, seek_offset: {}", path, seek_offset));
+            .unwrap_or_else(|_| panic!("path: {path}, seek_offset: {seek_offset}"));
 
         assert_eq!(position, (expected.len() - seek_offset) as u64);
 
@@ -302,7 +299,7 @@ async fn assert_seek_affects_read(root_dir: &fio::DirectoryProxy, path: &str, ex
             .await
             .unwrap()
             .map_err(zx::Status::from_raw)
-            .unwrap_or_else(|_| panic!("path: {}, seek_offset: {}", path, seek_offset));
+            .unwrap_or_else(|_| panic!("path: {path}, seek_offset: {seek_offset}"));
         assert_eq!(std::str::from_utf8(&bytes).unwrap(), expected_contents);
     }
 }
@@ -354,7 +351,7 @@ async fn get_backing_memory_per_package_source(source: PackageSource) {
 
     // calls with supported flags should succeed for files that are not meta-as-file.
     for size in [0, 1, 4095, 4096, 4097] {
-        for path in [format!("file_{}", size), format!("meta/file_{}", size)] {
+        for path in [format!("file_{size}"), format!("meta/file_{size}")] {
             if path == "file_0" {
                 continue;
             }
@@ -474,8 +471,7 @@ async fn test_get_backing_memory_success(
             .chain(std::iter::repeat(b'\0'))
             .take(rounded_size)
             .eq(actual_contents.iter().copied()),
-        "vmo content mismatch for file size {}",
-        vmo_size,
+        "vmo content mismatch for file size {vmo_size}",
     );
 
     vmo
@@ -537,7 +533,7 @@ async fn assert_clone_sends_on_open_event(package_root: &fio::DirectoryProxy, pa
     parent.clone(fio::OpenFlags::DESCRIBE, server_end.into_channel().into()).expect("clone file");
 
     if let Err(e) = verify_file_clone_sends_on_open_event(file_proxy).await {
-        panic!("failed to verify clone. parent: {:?}, error: {:#}", path, e);
+        panic!("failed to verify clone. parent: {path:?}, error: {e:#}");
     }
 }
 

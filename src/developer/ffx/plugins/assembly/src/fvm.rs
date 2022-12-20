@@ -287,7 +287,7 @@ impl<'a> MultiFvmBuilder<'a> {
                 info!("Creating FVM filesystem: {}", name);
                 let (image, filesystem) = self
                     .build_filesystem(tools, params)
-                    .context(format!("Building filesystem: {}", name))?;
+                    .context(format!("Building filesystem: {name}"))?;
                 if let Some(image) = image {
                     self.assembly_manifest.images.push(image);
                 }
@@ -654,7 +654,7 @@ mod tests {
             "blobs": []
         }
         "#;
-        write!(base_package_manifest_file, "{}", contents).unwrap();
+        write!(base_package_manifest_file, "{contents}").unwrap();
         let base_package = BasePackage {
             merkle: [0u8; 32].into(),
             contents: BTreeMap::new(),
@@ -785,7 +785,7 @@ mod tests {
             "blobs": []
         }
         "#;
-        write!(base_package_manifest_file, "{}", contents).unwrap();
+        write!(base_package_manifest_file, "{contents}").unwrap();
         let base_package = BasePackage {
             merkle: [0u8; 32].into(),
             contents: BTreeMap::new(),

@@ -168,7 +168,7 @@ where
         event: &tracing::Event<'_>,
     ) -> std::fmt::Result {
         let level = *event.metadata().level();
-        write!(writer, "[archivist] {}: ", level)?;
+        write!(writer, "[archivist] {level}: ")?;
         ctx.field_format().format_fields(writer.by_ref(), event)?;
         writeln!(writer)
     }

@@ -171,7 +171,7 @@ async fn main_inner() -> Result<(), Error> {
 
     inspector
         .root()
-        .record_string("executability-restrictions", format!("{:?}", executability_restrictions));
+        .record_string("executability-restrictions", format!("{executability_restrictions:?}"));
     inspector
         .root()
         .record_child("non_static_allow_list", |n| non_static_allow_list.record_inspect(n));

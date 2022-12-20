@@ -386,7 +386,7 @@ mod tests {
             Ok(fio::NodeEvent::OnOpen_ { s: status, .. }) => Some(zx::Status::from_raw(status)),
             Ok(fio::NodeEvent::OnRepresentation { .. }) => Some(zx::Status::OK),
             Err(fidl::Error::ClientChannelClosed { status, .. }) => Some(status),
-            other => panic!("unexpected stream event or error: {:?}", other),
+            other => panic!("unexpected stream event or error: {other:?}"),
         }
     }
 

@@ -113,7 +113,7 @@ pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> 
         print_size_diff(&package_sizes, &other_package_sizes);
     } else if args.verbose {
         println!("{}", PackageSizeInfos(&package_sizes));
-        println!("Total size: {} bytes", total_blobfs_size);
+        println!("Total size: {total_blobfs_size} bytes");
     }
 
     if let Some(gerrit_output) = args.gerrit_output {
@@ -411,10 +411,10 @@ fn print_size_diff(
     }
 
     let product_level_output_lines = generate_product_level_diff_output(product_level_diffs_map);
-    product_level_output_lines.iter().for_each(|line| println!("{}", line));
+    product_level_output_lines.iter().for_each(|line| println!("{line}"));
 
     let package_level_output_lines = generate_package_level_diff_output(package_diff_map);
-    package_level_output_lines.iter().for_each(|line| println!("{}", line));
+    package_level_output_lines.iter().for_each(|line| println!("{line}"));
 
     println!();
     println!("[A] -> indicates that this blob is a new addition in the current image.");
@@ -674,8 +674,8 @@ fn create_gerrit_report(
 ) -> serde_json::Value {
     json!({
         TOTAL_BLOBFS_GERRIT_COMPONENT_NAME: total_blobfs_size,
-        format!("{}.budget", TOTAL_BLOBFS_GERRIT_COMPONENT_NAME): max_contents_size,
-        format!("{}.creepBudget", TOTAL_BLOBFS_GERRIT_COMPONENT_NAME): blobfs_creep_budget
+        format!("{TOTAL_BLOBFS_GERRIT_COMPONENT_NAME}.budget"): max_contents_size,
+        format!("{TOTAL_BLOBFS_GERRIT_COMPONENT_NAME}.creepBudget"): blobfs_creep_budget
     })
 }
 
@@ -1247,8 +1247,8 @@ test_base_package                                                            65 
             gerrit_report,
             json!({
                 TOTAL_BLOBFS_GERRIT_COMPONENT_NAME: 151,
-                format!("{}.budget", TOTAL_BLOBFS_GERRIT_COMPONENT_NAME): 200,
-                format!("{}.creepBudget", TOTAL_BLOBFS_GERRIT_COMPONENT_NAME): 20,
+                format!("{TOTAL_BLOBFS_GERRIT_COMPONENT_NAME}.budget"): 200,
+                format!("{TOTAL_BLOBFS_GERRIT_COMPONENT_NAME}.creepBudget"): 20,
             })
         )
     }
@@ -1875,7 +1875,7 @@ test_base_package                                                            65 
         dir_path: &Utf8Path,
     ) -> Result<()> {
         let mut package_manifest_file = NamedTempFile::new()?;
-        write!(package_manifest_file, "{}", content)?;
+        write!(package_manifest_file, "{content}")?;
         let path = package_manifest_file.into_temp_path();
         path.persist(dir_path.join(file_name))?;
         Ok(())

@@ -94,7 +94,7 @@ mod tests {
                     );
                     responder.send().expect("sent response");
                 }
-                err => panic!("error in request handler: {:?}", err),
+                err => panic!("error in request handler: {err:?}"),
             }
             assert!(stream.next().await.is_none());
         };

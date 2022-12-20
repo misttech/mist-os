@@ -149,7 +149,7 @@ impl SettingTypeUsageInspectAgent {
     /// Write a usage count to inspect.
     fn record_usage(&mut self, setting_type: SettingType, request: &Request) {
         let inspect_node = &self.inspect_node;
-        let setting_type_str = format!("{:?}", setting_type);
+        let setting_type_str = format!("{setting_type:?}");
         let setting_type_info = self
             .api_call_counts
             .entry(setting_type_str.clone())

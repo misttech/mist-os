@@ -34,12 +34,12 @@ async fn monitor_all(mut stream: AttemptsMonitorRequestStream) -> Result<(), any
 
                 match options.initiator {
                     Some(initiator) => {
-                        println!("{:?} started an update attempt", initiator)
+                        println!("{initiator:?} started an update attempt")
                     }
                     None => println!("an update attempt was started"),
                 }
                 if let Err(e) = monitor_state(monitor.into_stream()?).await {
-                    eprintln!("Error: {:?}", e);
+                    eprintln!("Error: {e:?}");
                 }
             }
         }

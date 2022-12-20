@@ -28,7 +28,7 @@ impl LocalMirrorRepositoryProvider {
 }
 
 fn make_opaque_error(e: Error) -> tuf::Error {
-    tuf::Error::Opaque(format!("{:#}", e))
+    tuf::Error::Opaque(format!("{e:#}"))
 }
 
 impl RepositoryProvider<Pouf1> for LocalMirrorRepositoryProvider {
@@ -73,7 +73,7 @@ impl RepositoryProvider<Pouf1> for LocalMirrorRepositoryProvider {
                 Err(Status::NOT_FOUND) => {
                     return Err(tuf::Error::MetadataNotFound { path: meta_path, version })
                 }
-                Err(e) => return Err(tuf::Error::Opaque(format!("open failed: {:?}", e))),
+                Err(e) => return Err(tuf::Error::Opaque(format!("open failed: {e:?}"))),
             }
 
             // Drop the stream so that AsyncReader has sole ownership of the proxy.

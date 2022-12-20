@@ -348,7 +348,7 @@ mod tests {
         // it can handle the MAX_STRING_SEARCH_SIZE boundary falling in the middle of a multi-byte
         // character.
         let long_padding = (0..100).map(|_| "\u{10FF}").collect::<String>();
-        let long_log = format!("{}ERROR: fifth log", long_padding);
+        let long_log = format!("{long_padding}ERROR: fifth log");
         debug_log.enqueue_read_entry(&TestDebugEntry::new(long_log.as_bytes())).await;
 
         let log_bridge = DebugLogBridge::create(debug_log);

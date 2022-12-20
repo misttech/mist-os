@@ -74,7 +74,7 @@ impl IsolatedOtaTestExecutor {
                     if key == "tuf_repo_config" {
                         responder.send(channel.as_deref()).unwrap();
                     } else {
-                        eprintln!("Unexpected arguments GetString: {}, closing channel.", key);
+                        eprintln!("Unexpected arguments GetString: {key}, closing channel.");
                     }
                 }
                 _ => eprintln!("Unexpected arguments request, closing channel."),
@@ -481,11 +481,11 @@ pub async fn test_updater_succeeds() -> Result<(), Error> {
         .add_image("epoch.json", make_current_epoch_json().as_bytes())
         .add_image("firmware_test", "This is the test firmware".as_bytes());
     for i in 0i64..3 {
-        let name = format!("test-package{}", i);
+        let name = format!("test-package{i}");
         let package = PackageBuilder::new(name)
             .add_resource_at(
-                format!("data/my-package-data-{}", i),
-                format!("This is some test data for test package {}", i).as_bytes(),
+                format!("data/my-package-data-{i}"),
+                format!("This is some test data for test package {i}").as_bytes(),
             )
             .add_resource_at("bin/binary", "#!/boot/bin/sh\necho Hello".as_bytes())
             .build()
@@ -555,7 +555,7 @@ fn launch_cloned_blobfs(
     fasync::Task::spawn(async move {
         serve_failing_blobfs(stream, flags)
             .await
-            .unwrap_or_else(|e| panic!("Failed to serve cloned blobfs handle: {:?}", e));
+            .unwrap_or_else(|e| panic!("Failed to serve cloned blobfs handle: {e:?}"));
     })
     .detach();
 }
@@ -709,7 +709,7 @@ pub async fn test_blobfs_broken() -> Result<(), Error> {
     fasync::Task::spawn(async move {
         serve_failing_blobfs(stream, fio::OpenFlags::empty())
             .await
-            .unwrap_or_else(|e| panic!("Failed to serve blobfs: {:?}", e));
+            .unwrap_or_else(|e| panic!("Failed to serve blobfs: {e:?}"));
     })
     .detach();
 
@@ -754,11 +754,11 @@ pub async fn test_omaha_works() -> Result<(), Error> {
         .add_image("epoch.json", make_current_epoch_json().as_bytes())
         .add_image("firmware_test", "This is the test firmware".as_bytes());
     for i in 0i64..3 {
-        let name = format!("test-package{}", i);
+        let name = format!("test-package{i}");
         let package = PackageBuilder::new(name)
             .add_resource_at(
-                format!("data/my-package-data-{}", i),
-                format!("This is some test data for test package {}", i).as_bytes(),
+                format!("data/my-package-data-{i}"),
+                format!("This is some test data for test package {i}").as_bytes(),
             )
             .add_resource_at("bin/binary", "#!/boot/bin/sh\necho Hello".as_bytes())
             .build()

@@ -42,7 +42,7 @@ impl TryFrom<fidl_fuchsia_input::KeymapId> for KeymapId {
             fidl_fuchsia_input::KeymapId::FrAzerty => Ok(KeymapId::FrAzerty),
             fidl_fuchsia_input::KeymapId::UsDvorak => Ok(KeymapId::UsDvorak),
             fidl_fuchsia_input::KeymapId::UsColemak => Ok(KeymapId::UsColemak),
-            _ => Err(format!("Received an invalid keymap id: {:?}.", src)),
+            _ => Err(format!("Received an invalid keymap id: {src:?}.")),
         }
     }
 }

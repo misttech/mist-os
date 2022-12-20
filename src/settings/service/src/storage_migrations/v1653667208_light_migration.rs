@@ -113,7 +113,7 @@ mod tests {
                                 // Just ignore the responder so the client receives an error.
                                 drop(responder);
                             } else {
-                                panic!("unexpected request: {:?}", request);
+                                panic!("unexpected request: {request:?}");
                             }
                         }
                     }))
@@ -155,7 +155,7 @@ mod tests {
                             if let StoreAccessorRequest::GetValue { responder, .. } = request {
                                 responder.send(None).expect("should be able to send response");
                             } else {
-                                panic!("unexpected request: {:?}", request);
+                                panic!("unexpected request: {request:?}");
                             }
                         }
                     }))
@@ -254,7 +254,7 @@ mod tests {
                                     )))
                                     .expect("should be able to respond");
                             } else {
-                                panic!("unexpected request: {:?}", request);
+                                panic!("unexpected request: {request:?}");
                             }
                         }
                     }))

@@ -162,7 +162,7 @@ impl FileOps for ControlGroupFile {
                     return Ok(None);
                 }
                 let pid = remaining_tasks[cursor].get_pid();
-                write!(sink, "{}", pid)?;
+                write!(sink, "{pid}")?;
                 Ok(Some(cursor + 1))
             },
             offset,

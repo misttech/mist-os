@@ -867,7 +867,7 @@ mod tests {
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::return_error(|event| match event {
                     PaverEvent::WriteAsset { .. } => Status::INTERNAL,
-                    _ => panic!("Unexpected event: {:?}", event),
+                    _ => panic!("Unexpected event: {event:?}"),
                 }))
                 .build(),
         );

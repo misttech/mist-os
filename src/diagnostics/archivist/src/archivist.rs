@@ -161,7 +161,7 @@ impl Archivist {
         for name in &config.bind_services {
             info!("Connecting to service {}", name);
             let (_local, remote) = zx::Channel::create().expect("cannot create channels");
-            if let Err(e) = fdio::service_connect(&format!("/svc/{}", name), remote) {
+            if let Err(e) = fdio::service_connect(&format!("/svc/{name}"), remote) {
                 error!("Couldn't connect to service {}: {:?}", name, e);
             }
         }
@@ -615,7 +615,7 @@ mod tests {
         let mut expected = vec![];
         let mut actual = vec![];
         for i in 1..=9 {
-            expected.push(format!("msg {}", i));
+            expected.push(format!("msg {i}"));
             actual.push(recv_logs.next().await.unwrap());
         }
         expected.sort();

@@ -36,7 +36,7 @@ fn run_listener(tag: &str, proxy: LogProxy) -> impl Stream<Item = LogMessage> {
             None,
         );
         if let Err(e) = fut.await {
-            panic!("test fail {:?}", e);
+            panic!("test fail {e:?}");
         }
     })
     .detach();
@@ -113,7 +113,7 @@ async fn listen_for_syslog_routed_stdio() {
     let (mut logs, mut errors) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
     let _errors = fasync::Task::spawn(async move {
         while let Some(e) = errors.next().await {
-            panic!("error in subscription: {}", e);
+            panic!("error in subscription: {e}");
         }
     });
 

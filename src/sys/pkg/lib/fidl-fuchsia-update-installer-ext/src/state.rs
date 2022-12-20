@@ -405,7 +405,7 @@ impl FailFetchData {
 
 impl PrepareFailureReason {
     fn write_to_inspect(&self, node: &inspect::Node) {
-        node.record_string("reason", format!("{:?}", self))
+        node.record_string("reason", format!("{self:?}"))
     }
 }
 
@@ -435,7 +435,7 @@ impl From<PrepareFailureReason> for fidl::PrepareFailureReason {
 
 impl StageFailureReason {
     fn write_to_inspect(&self, node: &inspect::Node) {
-        node.record_string("reason", format!("{:?}", self))
+        node.record_string("reason", format!("{self:?}"))
     }
 }
 
@@ -459,7 +459,7 @@ impl From<StageFailureReason> for fidl::StageFailureReason {
 
 impl FetchFailureReason {
     fn write_to_inspect(&self, node: &inspect::Node) {
-        node.record_string("reason", format!("{:?}", self))
+        node.record_string("reason", format!("{self:?}"))
     }
 }
 

@@ -330,7 +330,7 @@ mod tests {
                         .send(&mut Ok("00000000-0000-0000-0000-000000000001".to_owned()))
                         .unwrap();
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         };
         future::join(installer_fut, stream_fut).await;
@@ -376,7 +376,7 @@ mod tests {
                         .send_state_and_recv_ack(State::FailPrepare(PrepareFailureReason::Internal))
                         .await;
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         };
         future::join(installer_fut, stream_fut).await;
@@ -406,7 +406,7 @@ mod tests {
                 Ok(InstallerRequest::StartUpdate { .. }) => {
                     // Don't send attempt id.
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         };
         future::join(installer_fut, stream_fut).await;
@@ -468,7 +468,7 @@ mod tests {
                         ))
                         .await;
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         };
         future::join(installer_fut, stream_fut).await;
@@ -543,7 +543,7 @@ mod tests {
                     // Higher layers of the system (ex. omaha-client/system-update-checker) convert
                     // this situation into an error.
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         };
         future::join(installer_fut, stream_fut).await;
@@ -563,7 +563,7 @@ mod tests {
                 InstallerRequest::MonitorUpdate { attempt_id, .. } => {
                     assert_eq!(attempt_id.as_deref(), Some("id"));
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         };
 
@@ -586,7 +586,7 @@ mod tests {
                     drop(monitor);
                     responder.send(false).unwrap();
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
             assert_matches!(stream.next().await, None);
         };
@@ -607,7 +607,7 @@ mod tests {
                 Ok(InstallerRequest::MonitorUpdate { .. }) => {
                     // Close the channel instead of sending a response.
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         };
         future::join(client_fut, server_fut).await;
@@ -639,7 +639,7 @@ mod tests {
                         .send_state_and_recv_ack(State::FailPrepare(PrepareFailureReason::Internal))
                         .await;
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
             assert_matches!(stream.next().await, None);
         };

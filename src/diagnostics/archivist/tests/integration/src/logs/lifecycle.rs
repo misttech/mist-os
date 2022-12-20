@@ -94,7 +94,7 @@ async fn test_logs_with_hanging_log_connector() {
         reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
     let _log_errors = fasync::Task::spawn(async move {
         if let Some(error) = errors.next().await {
-            panic!("{:#?}", error);
+            panic!("{error:#?}");
         }
     });
 
@@ -134,7 +134,7 @@ async fn test_logs_lifecycle() {
         reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
     let _log_errors = fasync::Task::spawn(async move {
         if let Some(error) = errors.next().await {
-            panic!("{:#?}", error);
+            panic!("{error:#?}");
         }
     });
 
@@ -156,7 +156,7 @@ async fn test_logs_lifecycle() {
 
         utils::wait_for_component_stopped_event(
             realm.root.child_name(),
-            &format!("coll:{}", LOG_AND_EXIT_COMPONENT),
+            &format!("coll:{LOG_AND_EXIT_COMPONENT}"),
             ExitStatusMatcher::Clean,
             &mut event_stream,
         )

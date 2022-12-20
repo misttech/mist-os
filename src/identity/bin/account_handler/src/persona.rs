@@ -176,7 +176,7 @@ mod tests {
                 test_object
                     .handle_requests_from_stream(&persona_context, request_stream, cancel)
                     .await
-                    .unwrap_or_else(|err| panic!("Fatal error handling test request: {:?}", err));
+                    .unwrap_or_else(|err| panic!("Fatal error handling test request: {err:?}"));
             })
             .await
             .expect("Unable to spawn task");

@@ -192,7 +192,7 @@ impl Repository {
 
     /// Reads the contents of requested blob from the repository.
     pub fn read_blob(&self, merkle_root: &Hash) -> Result<Vec<u8>, io::Error> {
-        fs::read(self.dir.path().join(format!("repository/blobs/{}", merkle_root)))
+        fs::read(self.dir.path().join(format!("repository/blobs/{merkle_root}")))
     }
 
     /// Returns the path of the base of the repository.

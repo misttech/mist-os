@@ -145,7 +145,7 @@ impl VolumeController {
                             return ControllerError::InvalidArgument(
                                 SettingType::Audio,
                                 "stream".into(),
-                                format!("{:?}", set_stream).into(),
+                                format!("{set_stream:?}").into(),
                             );
                         })?;
                     new_vec.push(AudioStream {
@@ -304,7 +304,7 @@ impl controller::Handle for AudioController {
                         return Some(Err(ControllerError::InvalidArgument(
                             SettingType::Audio,
                             "stream".into(),
-                            format!("{:?}", audio_stream).into(),
+                            format!("{audio_stream:?}").into(),
                         )));
                     }
                 }

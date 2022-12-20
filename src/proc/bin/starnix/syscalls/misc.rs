@@ -62,7 +62,7 @@ pub fn sys_reboot(
         return error!(EPERM);
     }
     // TODO(tbodt): only shut down the current Kernel rather than panicking the entire process
-    panic!("starnix reboot({:#x})", cmd);
+    panic!("starnix reboot({cmd:#x})");
 }
 
 pub fn sys_sched_yield(_current_task: &CurrentTask) -> Result<(), Errno> {

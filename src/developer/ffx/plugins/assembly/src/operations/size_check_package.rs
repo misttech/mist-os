@@ -192,7 +192,7 @@ fn verify_budgets_with_tools(
     let over_budget = results.iter().filter(|e| e.used_bytes > e.budget_bytes).count();
 
     if over_budget > 0 {
-        println!("FAILED: {} package set(s) over budget", over_budget);
+        println!("FAILED: {over_budget} package set(s) over budget");
     }
     if args.verbose || over_budget > 0 {
         // Order the results by package set name.
@@ -234,7 +234,7 @@ fn verify_budgets_with_tools(
             }
         }
         if let Some(out_path) = &args.gerrit_output {
-            println!("Report written to {}", out_path);
+            println!("Report written to {out_path}");
         }
     }
 
@@ -551,9 +551,7 @@ mod tests {
             Ok(_) => panic!("Unexpected success, where a failure was expected."),
             Err(e) => assert!(
                 e.to_string().starts_with(prefix),
-                "Unexpected error message:\n\t{:#}\ndoes not start with:\n\t{}",
-                e,
-                prefix
+                "Unexpected error message:\n\t{e:#}\ndoes not start with:\n\t{prefix}"
             ),
         }
     }

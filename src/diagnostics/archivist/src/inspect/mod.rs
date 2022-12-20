@@ -56,7 +56,7 @@ impl From<SnapshotData> for NodeHierarchyData {
                 Err(e) => NodeHierarchyData {
                     filename: data.filename,
                     timestamp: data.timestamp,
-                    errors: vec![schema::InspectError { message: format!("{:?}", e) }],
+                    errors: vec![schema::InspectError { message: format!("{e:?}") }],
                     hierarchy: None,
                 },
             },
@@ -210,7 +210,7 @@ impl ReaderServer {
                                     filename: node_hierarchy_data.filename,
                                     timestamp: node_hierarchy_data.timestamp,
                                     errors: vec![schema::InspectError {
-                                        message: format!("{:?}", e),
+                                        message: format!("{e:?}"),
                                     }],
                                     hierarchy: None,
                                 }
@@ -276,7 +276,7 @@ impl ReaderServer {
                         Err(e) => NodeHierarchyData {
                             filename: node_hierarchy_data.filename,
                             timestamp: node_hierarchy_data.timestamp,
-                            errors: vec![schema::InspectError { message: format!("{:?}", e) }],
+                            errors: vec![schema::InspectError { message: format!("{e:?}") }],
                             hierarchy: None,
                         },
                     }
@@ -461,7 +461,7 @@ mod tests {
                             assert_eq!(content, &buf);
                         }
                         v => {
-                            panic!("Expected Vmo, got {:?}", v);
+                            panic!("Expected Vmo, got {v:?}");
                         }
                     }
                 };
@@ -535,7 +535,7 @@ mod tests {
                         });
                     }
                     v => {
-                        panic!("Expected Tree, got {:?}", v);
+                        panic!("Expected Tree, got {v:?}");
                     }
                 }
 
@@ -699,7 +699,7 @@ mod tests {
         let dir_name_and_filecount: Vec<(String, usize)> = directory_vmo_counts
             .into_iter()
             .enumerate()
-            .map(|(index, filecount)| (format!("diagnostics_{}", index), filecount))
+            .map(|(index, filecount)| (format!("diagnostics_{index}"), filecount))
             .collect();
 
         // Make a ServiceFs that will host inspect vmos under each
@@ -712,7 +712,7 @@ mod tests {
             for i in 0..filecount {
                 let vmo = inspector.duplicate_vmo().expect("Failed to duplicate vmo");
 
-                fs.dir(directory_name.clone()).add_vmo_file_at(format!("root_{}.inspect", i), vmo);
+                fs.dir(directory_name.clone()).add_vmo_file_at(format!("root_{i}.inspect"), vmo);
             }
         }
         let (h0, h1) = fidl::endpoints::create_endpoints().unwrap();
@@ -744,7 +744,7 @@ mod tests {
                             let proxy = collector::find_directory_proxy(&full_path).await.unwrap();
                             let unique_cid = ComponentIdentifier::Legacy {
                                 instance_id: "1234".into(),
-                                moniker: vec![format!("component_{}.cmx", dir)].into(),
+                                moniker: vec![format!("component_{dir}.cmx")].into(),
                             };
                             (unique_cid, proxy)
                         }
@@ -1169,7 +1169,7 @@ mod tests {
 
         let result_string = format!("[{}]", result_vec.join(","));
         serde_json::from_str(&result_string).unwrap_or_else(|_| {
-            panic!("unit tests shouldn't be creating malformed json: {}", result_string)
+            panic!("unit tests shouldn't be creating malformed json: {result_string}")
         })
     }
 
@@ -1213,7 +1213,7 @@ mod tests {
 
         let result_string = format!("[{}]", result_vec.join(","));
         serde_json::from_str(&result_string).unwrap_or_else(|_| {
-            panic!("unit tests shouldn't be creating malformed json: {}", result_string)
+            panic!("unit tests shouldn't be creating malformed json: {result_string}")
         })
     }
 }

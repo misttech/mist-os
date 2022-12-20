@@ -17,7 +17,7 @@ pub(crate) fn inspect_format_now() -> String {
     let timestamp = now().into_nanos();
     let seconds = timestamp / TIMESTAMP_DIVIDEND;
     let nanos = timestamp % TIMESTAMP_DIVIDEND;
-    format!("{}.{:09}", seconds, nanos)
+    format!("{seconds}.{nanos:09}")
 }
 
 #[cfg(test)]
@@ -45,7 +45,7 @@ pub(crate) mod mock {
         let timestamp = now().into_nanos();
         let seconds = timestamp / TIMESTAMP_DIVIDEND;
         let nanos = timestamp % TIMESTAMP_DIVIDEND;
-        format!("{}.{:09}", seconds, nanos)
+        format!("{seconds}.{nanos:09}")
     }
 }
 

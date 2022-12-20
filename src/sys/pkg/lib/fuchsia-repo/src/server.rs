@@ -701,7 +701,7 @@ mod tests {
             None => "".to_owned(),
         };
         let req = Request::get(url.as_ref())
-            .header("Range", format!("bytes={}-{}", start_str, end_str))
+            .header("Range", format!("bytes={start_str}-{end_str}"))
             .body(Body::empty())?;
         let client = fuchsia_hyper::new_client();
         let response = client.request(req).await?;
@@ -725,7 +725,7 @@ mod tests {
         let end_str = end.map(|i| i.to_string()).unwrap_or_else(String::new);
         assert_eq!(
             response.headers()["Content-Range"],
-            format!("bytes {}-{}/{}", start_str, end_str, total_len)
+            format!("bytes {start_str}-{end_str}/{total_len}")
         );
 
         Ok(hyper::body::to_bytes(response).await?)
@@ -809,7 +809,7 @@ mod tests {
         run_test(manager, |server_url| async move {
             for (devhost, bodies) in &test_cases {
                 for body in &bodies[..] {
-                    let url = format!("{}/{}/{}", server_url, devhost, body);
+                    let url = format!("{server_url}/{devhost}/{body}");
                     assert_matches!(get_bytes(&url).await, Ok(bytes) if bytes == body[..]);
                 }
             }
@@ -840,7 +840,7 @@ mod tests {
         run_test(manager, |server_url| async move {
             for (devhost, bodies) in &test_cases {
                 for body in &bodies[..] {
-                    let url = format!("{}/{}/{}", server_url, devhost, body);
+                    let url = format!("{server_url}/{devhost}/{body}");
 
                     assert_eq!(
                         &body[1..=2],
@@ -882,7 +882,7 @@ mod tests {
         run_test(manager, |server_url| async move {
             for (devhost, bodies) in &test_cases {
                 for body in &bodies[..] {
-                    let url = format!("{}/{}/{}", server_url, devhost, body);
+                    let url = format!("{server_url}/{devhost}/{body}");
                     let response = get_range(&url, Some(1), Some(5)).await.unwrap();
                     assert_eq!(response.status(), StatusCode::RANGE_NOT_SATISFIABLE);
                 }
@@ -913,7 +913,7 @@ mod tests {
         run_test(manager, |server_url| {
             let timestamp_file = timestamp_file.clone();
             async move {
-                let url = format!("{}/devhost/auto", server_url);
+                let url = format!("{server_url}/devhost/auto");
                 let mut client =
                     SseClient::connect(fuchsia_hyper::new_https_client(), url).await.unwrap();
 
@@ -1010,7 +1010,7 @@ mod tests {
             // We should block until we receive an error because the server went away.
             match sse.next().await {
                 Some(Ok(event)) => {
-                    panic!("unexpected event {:?}", event);
+                    panic!("unexpected event {event:?}");
                 }
                 Some(Err(_)) => {}
                 None => {

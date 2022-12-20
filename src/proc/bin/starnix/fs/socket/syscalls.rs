@@ -104,7 +104,7 @@ fn generate_autobind_address() -> Vec<u8> {
     let mut bytes = [0u8; 4];
     zx::cprng_draw(&mut bytes);
     let value = u32::from_ne_bytes(bytes) & 0xFFFFF;
-    format!("\0{:05x}", value).into_bytes()
+    format!("\0{value:05x}").into_bytes()
 }
 
 fn translate_fs_error(errno: Errno) -> Errno {
@@ -783,7 +783,7 @@ mod tests {
                     // Ok.
                 }
                 bad => {
-                    panic!("bad byte: {}", bad);
+                    panic!("bad byte: {bad}");
                 }
             }
         }

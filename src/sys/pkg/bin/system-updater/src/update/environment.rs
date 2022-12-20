@@ -130,13 +130,13 @@ impl NamespaceBuildInfo {
                 return Ok(None)
             }
             Err(e) => {
-                return Err(e).with_context(|| format!("while opening /config/build-info/{}", name))
+                return Err(e).with_context(|| format!("while opening /config/build-info/{name}"))
             }
         };
 
         let contents = fuchsia_fs::file::read_to_string(&file)
             .await
-            .with_context(|| format!("while reading /config/build-info/{}", name))?;
+            .with_context(|| format!("while reading /config/build-info/{name}"))?;
         Ok(Some(contents))
     }
 }

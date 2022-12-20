@@ -35,7 +35,7 @@ impl From<&paver::Configuration> for Configuration {
         match *config {
             paver::Configuration::A => Self::A,
             paver::Configuration::B => Self::B,
-            other => panic!("unsupported config: {:?}", other),
+            other => panic!("unsupported config: {other:?}"),
         }
     }
 }

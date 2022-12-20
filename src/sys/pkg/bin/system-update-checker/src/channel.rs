@@ -189,7 +189,7 @@ impl<S: ServiceConnect> TargetChannelManager<S> {
                 if target_channel.is_empty() {
                     None
                 } else {
-                    Some(format!("fuchsia-pkg://{}/update", target_channel))
+                    Some(format!("fuchsia-pkg://{target_channel}/update"))
                 }
             }
         }

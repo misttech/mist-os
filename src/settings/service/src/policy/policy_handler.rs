@@ -181,11 +181,11 @@ impl ClientProxy {
                         policy_type
                     );
                 } else {
-                    panic!("Incorrect response received from storage: {:?}", payload);
+                    panic!("Incorrect response received from storage: {payload:?}");
                 }
             }
             Err(err) => {
-                panic!("Error reading from storage: {:?}", err);
+                panic!("Error reading from storage: {err:?}");
             }
         }
     }

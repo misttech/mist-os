@@ -271,7 +271,7 @@ impl SettingProxy {
                 id,
 
                 "setting_proxy",
-                "setting_type" => format!("{:?}", setting_type).as_str()
+                "setting_type" => format!("{setting_type:?}").as_str()
             );
             let receptor_fuse = receptor.fuse();
             let proxy_fuse = proxy_request_receiver.fuse();
@@ -419,7 +419,7 @@ impl SettingProxy {
                 Err(e) => {
                     let node = self.error_node.create_child(format!("{:020}", self.error_count));
                     let timestamp = node.create_string("timestamp", clock::inspect_format_now());
-                    let value = node.create_string("value", format!("{:?}", e));
+                    let value = node.create_string("value", format!("{e:?}"));
                     self.node_errors.push_back(NodeError {
                         _node: node,
                         _timestamp: timestamp,

@@ -236,7 +236,7 @@ impl InputControllerInner {
 
             let mut hw_state = hw_state_res.map_err(|err| {
                 ControllerError::UnexpectedError(
-                    format!("Could not fetch current hw mute state: {:?}", err).into(),
+                    format!("Could not fetch current hw mute state: {err:?}").into(),
                 )
             })?;
 
@@ -333,7 +333,7 @@ impl InputControllerInner {
         let camera_proxy =
             connect_to_camera(self.client.get_service_context()).await.map_err(|e| {
                 ControllerError::UnexpectedError(
-                    format!("Could not connect to camera device: {:?}", e).into(),
+                    format!("Could not connect to camera device: {e:?}").into(),
                 )
             })?;
 

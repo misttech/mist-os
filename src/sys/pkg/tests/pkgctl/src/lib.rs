@@ -69,7 +69,7 @@ impl TestEnv {
             fasync::Task::spawn(
                 package_resolver_clone
                     .run_service(stream)
-                    .unwrap_or_else(|e| panic!("error running resolver service: {:?}", e)),
+                    .unwrap_or_else(|e| panic!("error running resolver service: {e:?}")),
             )
             .detach()
         });
@@ -81,7 +81,7 @@ impl TestEnv {
             fasync::Task::spawn(
                 package_cache_clone
                     .run_service(stream)
-                    .unwrap_or_else(|e| panic!("error running cache service: {:?}", e)),
+                    .unwrap_or_else(|e| panic!("error running cache service: {e:?}")),
             )
             .detach()
         });
@@ -93,7 +93,7 @@ impl TestEnv {
             fasync::Task::spawn(
                 engine_clone
                     .run_service(stream)
-                    .unwrap_or_else(|e| panic!("error running engine service: {:?}", e)),
+                    .unwrap_or_else(|e| panic!("error running engine service: {e:?}")),
             )
             .detach()
         });
@@ -105,7 +105,7 @@ impl TestEnv {
             fasync::Task::spawn(
                 repository_manager_clone
                     .run_service(stream)
-                    .unwrap_or_else(|e| panic!("error running repository service: {:?}", e)),
+                    .unwrap_or_else(|e| panic!("error running repository service: {e:?}")),
             )
             .detach()
         });
@@ -117,7 +117,7 @@ impl TestEnv {
             fasync::Task::spawn(
                 space_manager_clone
                     .run_service(stream)
-                    .unwrap_or_else(|e| panic!("error running space service: {:?}", e)),
+                    .unwrap_or_else(|e| panic!("error running space service: {e:?}")),
             )
             .detach()
         });
@@ -251,13 +251,13 @@ impl MockEngineService {
                                 responder.send(&mut Ok(())).expect("send ok");
                             }
                             _ => {
-                                panic!("unhandled request method {:?}", sub_req);
+                                panic!("unhandled request method {sub_req:?}");
                             }
                         }
                     }
                 }
                 _ => {
-                    panic!("unhandled request method {:?}", req);
+                    panic!("unhandled request method {req:?}");
                 }
             }
         }

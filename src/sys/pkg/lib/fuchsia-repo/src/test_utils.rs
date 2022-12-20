@@ -123,7 +123,7 @@ fn copy_dir(from: &Path, to: &Path) -> Result<()> {
             if to_path.exists() {
                 continue;
             } else {
-                create_dir(&to_path).with_context(|| format!("creating {:?}", to_path))?;
+                create_dir(&to_path).with_context(|| format!("creating {to_path:?}"))?;
             }
         } else {
             copy(entry.path(), &to_path)
@@ -187,29 +187,29 @@ pub fn make_package_manifest(
 
     builder
         .add_contents_as_blob(
-            format!("bin/{}", name),
-            format!("binary {}", name).as_bytes(),
+            format!("bin/{name}"),
+            format!("binary {name}").as_bytes(),
             &package_path,
         )
         .unwrap();
     builder
         .add_contents_as_blob(
-            format!("lib/{}", name),
-            format!("lib {}", name).as_bytes(),
+            format!("lib/{name}"),
+            format!("lib {name}").as_bytes(),
             &package_path,
         )
         .unwrap();
     builder
         .add_contents_to_far(
-            format!("meta/{}.cm", name),
-            format!("cm {}", name).as_bytes(),
+            format!("meta/{name}.cm"),
+            format!("cm {name}").as_bytes(),
             &package_path,
         )
         .unwrap();
     builder
         .add_contents_to_far(
-            format!("meta/{}.cmx", name),
-            format!("cmx {}", name).as_bytes(),
+            format!("meta/{name}.cmx"),
+            format!("cmx {name}").as_bytes(),
             &package_path,
         )
         .unwrap();
@@ -228,7 +228,7 @@ pub async fn make_package_archive(archive_name: &str, outdir: &Path) -> Utf8Path
     let build_path = TempDir::new().unwrap();
     let package_path = build_path.path().join(archive_name);
     let (_, manifest) = make_package_manifest(archive_name, build_path.path(), Vec::new());
-    let far_file = format!("{}.far", archive_name);
+    let far_file = format!("{archive_name}.far");
 
     let archive_path = outdir.join(&far_file);
     let archive_file = File::create(archive_path.clone()).unwrap();
@@ -296,7 +296,7 @@ pub async fn make_repo_dir(metadata_dir: &Path, blobs_dir: &Path) {
     for (name, meta_far_path, meta_far_merkle) in packages {
         builder = builder
             .add_target_with_custom(
-                TargetPath::new(format!("{}/0", name)).unwrap(),
+                TargetPath::new(format!("{name}/0")).unwrap(),
                 AllowStdIo::new(File::open(meta_far_path).unwrap()),
                 hashmap! { "merkle".into() => meta_far_merkle.into() },
             )

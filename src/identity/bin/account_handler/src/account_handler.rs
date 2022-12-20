@@ -107,7 +107,7 @@ where
             Lifecycle::Initialized { .. } => "Initialized",
             Lifecycle::Finished => "Finished",
         };
-        write!(f, "{}", name)
+        write!(f, "{name}")
     }
 }
 
@@ -909,7 +909,7 @@ mod tests {
             test_object
                 .handle_requests_from_stream(request_stream)
                 .await
-                .unwrap_or_else(|err| panic!("Fatal error handling test request: {:?}", err));
+                .unwrap_or_else(|err| panic!("Fatal error handling test request: {err:?}"));
 
             // Check that no more objects are lurking in inspect
             std::mem::drop(test_object);

@@ -118,7 +118,7 @@ impl RewriteService {
                             responder.send(&mut response)?;
                         }
                         EditTransactionRequest::Commit { responder } => {
-                            let stringified = format!("{:?}", transaction);
+                            let stringified = format!("{transaction:?}");
                             let mut response = match state.write().await.apply(transaction).await {
                                 Ok(()) => {
                                     info!("rewrite transaction committed: {}", stringified);

@@ -106,7 +106,7 @@ pub(super) async fn resuming_get<'a>(
                         let request = Request::get(uri)
                             .header(
                                 http::header::RANGE,
-                                format!("bytes={}-{}", first_byte_pos, last_byte_pos)
+                                format!("bytes={first_byte_pos}-{last_byte_pos}")
                             )
                             .body(Body::empty())
                             .map_err(|e| FetchError::Http { e, uri: uri.to_string() })?;

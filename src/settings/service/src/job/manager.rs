@@ -161,7 +161,7 @@ impl Manager {
                         if let Err(error) =
                             execution_tx.unbounded_send((source_id, job_info, details))
                         {
-                            panic!("Failed to send message. error: {:?}", error);
+                            panic!("Failed to send message. error: {error:?}");
                         };
                     },
                     id,

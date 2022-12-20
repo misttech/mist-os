@@ -64,7 +64,7 @@ impl ConnectivityStateExt for ConnectivityState {
             ConnectivityState::Isolated => true,
             ConnectivityState::Commissioning => false,
 
-            x => panic!("Unexpected connectivity state: {:?}", x),
+            x => panic!("Unexpected connectivity state: {x:?}"),
         }
     }
 
@@ -79,7 +79,7 @@ impl ConnectivityStateExt for ConnectivityState {
             ConnectivityState::Isolated => true,
             ConnectivityState::Commissioning => true,
 
-            x => panic!("Unexpected connectivity state: {:?}", x),
+            x => panic!("Unexpected connectivity state: {x:?}"),
         }
     }
 
@@ -106,7 +106,7 @@ impl ConnectivityStateExt for ConnectivityState {
             ConnectivityState::Isolated => true,
             ConnectivityState::Commissioning => false,
 
-            x => panic!("Unexpected connectivity state: {:?}", x),
+            x => panic!("Unexpected connectivity state: {x:?}"),
         }
     }
 

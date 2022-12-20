@@ -25,7 +25,7 @@ pub async fn wait_for_component_stopped_event(
     status_match: ExitStatusMatcher,
     event_stream: &mut EventStream,
 ) {
-    let moniker_for_match = format!("./realm_builder:{}/test/{}", instance_child_name, component);
+    let moniker_for_match = format!("./realm_builder:{instance_child_name}/test/{component}");
     EventMatcher::ok()
         .stop(Some(status_match))
         .moniker(moniker_for_match)

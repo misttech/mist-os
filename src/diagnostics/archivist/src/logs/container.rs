@@ -181,7 +181,7 @@ impl LogsArtifactsContainer {
                                             })
                                             .add_error(
                                                 diagnostics_data::LogError::FailedToParseRecord(
-                                                    format!("{:?}", err),
+                                                    format!("{err:?}"),
                                                 ),
                                             )
                                             .build(),

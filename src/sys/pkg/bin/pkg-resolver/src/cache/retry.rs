@@ -127,9 +127,7 @@ mod tests {
             let delay = backoff.next_backoff(&make_rate_limit_error()).unwrap();
             assert!(
                 delay <= MAX_RATE_LIMIT_RETRY_DELAY,
-                "{:?} <= {:?}",
-                delay,
-                MAX_RATE_LIMIT_RETRY_DELAY
+                "{delay:?} <= {MAX_RATE_LIMIT_RETRY_DELAY:?}"
             );
         }
     }
@@ -145,13 +143,13 @@ mod tests {
         // comparison to be >= instead of >.
         if last_delay == Duration::from_secs(2) {
             let next_delay = backoff.next_backoff(&make_rate_limit_error()).unwrap();
-            assert!(next_delay >= last_delay, "{:?} >= {:?}", next_delay, last_delay);
+            assert!(next_delay >= last_delay, "{next_delay:?} >= {last_delay:?}");
             last_delay = next_delay;
         }
 
         while last_delay < MAX_RATE_LIMIT_RETRY_DELAY {
             let next_delay = backoff.next_backoff(&make_rate_limit_error()).unwrap();
-            assert!(next_delay > last_delay, "{:?} > {:?}", next_delay, last_delay);
+            assert!(next_delay > last_delay, "{next_delay:?} > {last_delay:?}");
             last_delay = next_delay;
         }
     }

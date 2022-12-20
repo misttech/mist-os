@@ -135,7 +135,7 @@ impl FileOps for Arc<ProcDirectory> {
                 // TODO: Figure out if this inode number is fine, given the content of the task
                 // directories.
                 let inode_num = file.fs.next_inode_num();
-                let name = format!("{}", pid);
+                let name = format!("{pid}");
 
                 // The + 1 is to set the offset to the next possible pid for subsequent reads.
                 let next_offset = (*pid + pid_offset + 1) as i64;

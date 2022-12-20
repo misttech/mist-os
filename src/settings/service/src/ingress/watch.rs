@@ -204,7 +204,7 @@ impl<
                 }))
             }
             _ => {
-                panic!("invalid variant {:?}", response);
+                panic!("invalid variant {response:?}");
             }
         }
     }

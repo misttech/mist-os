@@ -52,7 +52,7 @@ impl ListenerInspectLogger {
 
     /// Adds a listener to the count for [setting_type].
     pub fn add_listener(&mut self, setting_type: SettingType) {
-        let setting_type_str = format!("{:?}", setting_type);
+        let setting_type_str = format!("{setting_type:?}");
         let inspect_info =
             self.listener_counts.get_or_insert_with(setting_type_str, ListenerInspectInfo::default);
         inspect_info.count.add(1u64);
@@ -60,7 +60,7 @@ impl ListenerInspectLogger {
 
     /// Removes a listener from the count for [setting_type].
     pub fn remove_listener(&mut self, setting_type: SettingType) {
-        let setting_type_str = format!("{:?}", setting_type);
+        let setting_type_str = format!("{setting_type:?}");
         match self.listener_counts.map_mut().get_mut(&setting_type_str) {
             Some(listener_inspect_info) => listener_inspect_info.count.subtract(1u64),
             None => fx_log_err!("Tried to subtract from nonexistent listener count"),

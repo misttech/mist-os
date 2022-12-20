@@ -96,10 +96,10 @@ async fn stop_component(realm_ref: &RealmInstance, child_name: &str) {
         .connect_to_protocol_at_exposed_dir::<fsys2::LifecycleControllerMarker>()
         .expect("Failed to connect to LifecycleController");
     lifecycle
-        .stop(&format!("./{}", child_name), true)
+        .stop(&format!("./{child_name}"), true)
         .await
-        .expect(&format!("Failed to stop child: {}", child_name))
-        .expect(&format!("Failed to unwrap stop child result: {}", child_name));
+        .expect(&format!("Failed to stop child: {child_name}"))
+        .expect(&format!("Failed to unwrap stop child result: {child_name}"));
 }
 
 /// Utility function to start a component using LifecycleController.
@@ -109,10 +109,10 @@ async fn start_component(realm_ref: &RealmInstance, child_name: &str) {
         .connect_to_protocol_at_exposed_dir::<fsys2::LifecycleControllerMarker>()
         .expect("Failed to connect to LifecycleController");
     lifecycle
-        .start(&format!("./{}", child_name))
+        .start(&format!("./{child_name}"))
         .await
-        .expect(&format!("Failed to start child: {}", child_name))
-        .expect(&format!("Failed to unwrap start child result: {}", child_name));
+        .expect(&format!("Failed to start child: {child_name}"))
+        .expect(&format!("Failed to unwrap start child result: {child_name}"));
 }
 
 /// A proxy to an account manager running in a nested environment.

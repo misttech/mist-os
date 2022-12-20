@@ -117,7 +117,7 @@ where
                         let content_len =
                             ContentLength::from_http_content_length_header(content_len)
                                 .with_context(|| {
-                                    format!("parsing Content-Length header: {}", url)
+                                    format!("parsing Content-Length header: {url}")
                                 })?;
 
                         // Make sure we didn't try to fetch data that's out of bounds.
@@ -345,7 +345,7 @@ mod tests {
             let res = match bucket {
                 "my-tuf-repo" => self.repo.fetch_metadata_range(object, Range::Full).await,
                 "my-blob-repo" => self.repo.fetch_blob_range(object, Range::Full).await,
-                _ => panic!("unknown bucket {:?}", bucket),
+                _ => panic!("unknown bucket {bucket:?}"),
             };
 
             match res {
@@ -363,7 +363,7 @@ mod tests {
                     .status(StatusCode::NOT_FOUND)
                     .body(Body::empty())
                     .unwrap()),
-                res => panic!("unexpected result {:#?}", res),
+                res => panic!("unexpected result {res:#?}"),
             }
         }
     }

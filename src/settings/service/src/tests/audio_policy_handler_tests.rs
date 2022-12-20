@@ -135,7 +135,7 @@ impl TestEnvironment {
         let result = handler.handle_policy_request(Request::Restore).await;
         match result {
             Ok(Payload::Restore) => {} // no-op
-            _ => panic!("Failed to restore policy handler: {:?}", result),
+            _ => panic!("Failed to restore policy handler: {result:?}"),
         }
 
         Self {
@@ -546,7 +546,7 @@ async fn test_handler_remove_unknown_policy() {
         Err(PolicyError::InvalidArgument(
             PolicyType::Audio,
             ARG_POLICY_ID.into(),
-            format!("{:?}", invalid_policy_id).into()
+            format!("{invalid_policy_id:?}").into()
         ))
     );
 }

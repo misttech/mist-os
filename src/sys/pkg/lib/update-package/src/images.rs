@@ -532,8 +532,7 @@ impl<'de> Deserialize<'de> for ImagePackagesManifest {
                     && !keys.contains(&(slot, SlotImage::Zbi))
                 {
                     return Err(D::Error::custom(format!(
-                        "vbmeta without zbi entry in partition {:?}",
-                        slot
+                        "vbmeta without zbi entry in partition {slot:?}"
                     )));
                 }
             }

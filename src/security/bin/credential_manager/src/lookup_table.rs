@@ -169,7 +169,7 @@ impl PersistentLookupTable {
 fn format_version(val: &Version) -> String {
     // Since we do not do any padding on the version, the expected format of
     // a version is it's base10 represented value.
-    format!("{}", val)
+    format!("{val}")
 }
 
 fn parse_version(val: &str) -> Option<Version> {
@@ -413,7 +413,7 @@ mod test {
                 // We got the correct error
             }
             err => {
-                panic!("expected NotFound error {}", err)
+                panic!("expected NotFound error {err}")
             }
         }
     }
@@ -500,7 +500,7 @@ mod test {
         .unwrap();
         let stale_file = fuchsia_fs::directory::open_file(
             &child_dir,
-            &format!("{}01234", STAGEDFILE_PREFIX),
+            &format!("{STAGEDFILE_PREFIX}01234"),
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
                 | fio::OpenFlags::CREATE,

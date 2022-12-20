@@ -136,7 +136,7 @@ impl StateNode {
     }
 
     pub fn set(&self, state: &State) {
-        self.state.set(&format!("{:?}", state));
+        self.state.set(&format!("{state:?}"));
     }
 }
 
@@ -151,7 +151,7 @@ impl ScheduleNode {
     }
 
     pub fn set(&self, schedule: &UpdateCheckSchedule) {
-        self.schedule.set(&format!("{:?}", schedule));
+        self.schedule.set(&format!("{schedule:?}"));
     }
 }
 
@@ -169,7 +169,7 @@ impl ProtocolStateNode {
     }
 
     pub fn set(&self, protocol_state: &ProtocolState) {
-        self.protocol_state.set(&format!("{:?}", protocol_state));
+        self.protocol_state.set(&format!("{protocol_state:?}"));
     }
 }
 
@@ -192,7 +192,7 @@ impl LastResultsNode {
         let time_str = DateTime::<Utc>::from(start_time).to_rfc3339();
         let result_node = self.node.create_child(time_str);
 
-        result_node.record_string("result", format!("{:#?}", result));
+        result_node.record_string("result", format!("{result:#?}"));
 
         self.last_results.push_back(result_node);
         // Dropping the string property will remove it from inspect.
@@ -274,7 +274,7 @@ mod tests {
             inspector,
             root: {
                 apps: {
-                    apps: format!("[{:?}]", app),
+                    apps: format!("[{app:?}]"),
                     apps_metadata: "[(\"id_2\", AppMetadata { appid_source: VbMetadata })]".to_string(),
                 }
             }
@@ -296,7 +296,7 @@ mod tests {
             inspector,
             root: {
                 state: {
-                    state: format!("{:?}", state),
+                    state: format!("{state:?}"),
                 }
             }
         );
@@ -313,7 +313,7 @@ mod tests {
             inspector,
             root: {
                 schedule: {
-                    schedule: format!("{:?}", schedule),
+                    schedule: format!("{schedule:?}"),
                 }
             }
         );
@@ -330,7 +330,7 @@ mod tests {
             inspector,
             root: {
                 protocol_state: {
-                    protocol_state: format!("{:?}", protocol_state),
+                    protocol_state: format!("{protocol_state:?}"),
                 }
             }
         );
@@ -355,8 +355,8 @@ mod tests {
             inspector,
             root: {
                 last_results: {
-                    "1970-01-01T00:00:00+00:00": {result: format!("{:#?}", result)},
-                    "1970-01-02T03:46:40+00:00": {result: format!("{:#?}", result)},
+                    "1970-01-01T00:00:00+00:00": {result: format!("{result:#?}")},
+                    "1970-01-02T03:46:40+00:00": {result: format!("{result:#?}")},
                 }
             }
         );
@@ -368,16 +368,16 @@ mod tests {
             inspector,
             root: {
                 last_results: {
-                    "1970-01-01T00:00:00+00:00": {result: format!("{:#?}", result)},
-                    "1970-01-12T13:46:40+00:00": {result: format!("{:#?}", result)},
-                    "1970-01-24T03:33:20+00:00": {result: format!("{:#?}", result)},
-                    "1970-02-04T17:20:00+00:00": {result: format!("{:#?}", result)},
-                    "1970-02-16T07:06:40+00:00": {result: format!("{:#?}", result)},
-                    "1970-02-27T20:53:20+00:00": {result: format!("{:#?}", result)},
-                    "1970-03-11T10:40:00+00:00": {result: format!("{:#?}", result)},
-                    "1970-03-23T00:26:40+00:00": {result: format!("{:#?}", result)},
-                    "1970-04-03T14:13:20+00:00": {result: format!("{:#?}", result)},
-                    "1970-04-15T04:00:00+00:00": {result: format!("{:#?}", result)},
+                    "1970-01-01T00:00:00+00:00": {result: format!("{result:#?}")},
+                    "1970-01-12T13:46:40+00:00": {result: format!("{result:#?}")},
+                    "1970-01-24T03:33:20+00:00": {result: format!("{result:#?}")},
+                    "1970-02-04T17:20:00+00:00": {result: format!("{result:#?}")},
+                    "1970-02-16T07:06:40+00:00": {result: format!("{result:#?}")},
+                    "1970-02-27T20:53:20+00:00": {result: format!("{result:#?}")},
+                    "1970-03-11T10:40:00+00:00": {result: format!("{result:#?}")},
+                    "1970-03-23T00:26:40+00:00": {result: format!("{result:#?}")},
+                    "1970-04-03T14:13:20+00:00": {result: format!("{result:#?}")},
+                    "1970-04-15T04:00:00+00:00": {result: format!("{result:#?}")},
                 }
             }
         );

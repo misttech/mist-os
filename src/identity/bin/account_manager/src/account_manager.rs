@@ -367,7 +367,7 @@ mod tests {
             account_manager_clone
                 .handle_requests_from_stream(request_stream)
                 .await
-                .unwrap_or_else(|err| panic!("Fatal error handling test request: {:?}", err))
+                .unwrap_or_else(|err| panic!("Fatal error handling test request: {err:?}"))
         })
         .detach();
 

@@ -168,10 +168,10 @@ mod test {
         fasync::Task::spawn(async move {
             match stream.next().await.unwrap() {
                 Ok(ArgumentsRequest::GetString { key, responder }) => {
-                    assert_eq!(key, "tuf_repo_config", "Unexpected GetString request: {}", key);
+                    assert_eq!(key, "tuf_repo_config", "Unexpected GetString request: {key}");
                     responder.send(Some("test-repo-config")).unwrap();
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         })
         .detach();

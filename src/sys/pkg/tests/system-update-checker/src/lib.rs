@@ -110,7 +110,7 @@ impl TestEnvBuilder {
                 fasync::Task::spawn(
                     Arc::clone(&resolver)
                         .run_resolver_service(stream)
-                        .unwrap_or_else(|e| panic!("error running resolver service {:?}", e)),
+                        .unwrap_or_else(|e| panic!("error running resolver service {e:?}")),
                 )
                 .detach()
             });
@@ -145,7 +145,7 @@ impl TestEnvBuilder {
                 fasync::Task::spawn(
                     Arc::clone(&space)
                         .run_space_service(stream)
-                        .unwrap_or_else(|e| panic!("error running space service {:?}", e)),
+                        .unwrap_or_else(|e| panic!("error running space service {e:?}")),
                 )
                 .detach()
             });

@@ -460,7 +460,7 @@ mod tests {
                         .handle_requests_from_stream(&context, request_stream, cancel)
                         .await
                         .unwrap_or_else(|err| {
-                            panic!("Fatal error handling test request: {:?}", err)
+                            panic!("Fatal error handling test request: {err:?}")
                         })
                 })
                 .await

@@ -85,7 +85,7 @@ where
                     // through the response for logic related errors or the return value of
                     // receptor::next_of. Work should never encounter a different type of payload
                     // and therefore treat this scenario as fatal.
-                    panic!("should not have received a different payload type:{:?}", payload);
+                    panic!("should not have received a different payload type:{payload:?}");
                 }
             },
             _ => Err(crate::policy::response::Error::CommunicationError),

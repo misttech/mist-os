@@ -537,14 +537,14 @@ async fn fail_additional_start_requests_when_not_compatible() {
 pub fn assert_success_monitor_states(states: Vec<State>, ordering: &[StateId]) {
     let res = util::verify_monitor_states(&states, ordering, false);
     if let Err(e) = res {
-        panic!("Error received when verifying monitor states: {:#}\nWant ordering: {:#?}\nGot states:{:#?}", e, ordering, states);
+        panic!("Error received when verifying monitor states: {e:#}\nWant ordering: {ordering:#?}\nGot states:{states:#?}");
     }
 }
 
 pub fn _assert_failure_monitor_states(states: Vec<State>, ordering: Vec<StateId>) {
     let res = util::verify_monitor_states(&states, &ordering, false);
     if let Err(e) = res {
-        panic!("Error received when verifying monitor states: {:#}\nWant ordering: {:#?}\nGot states:{:#?}", e, ordering, states);
+        panic!("Error received when verifying monitor states: {e:#}\nWant ordering: {ordering:#?}\nGot states:{states:#?}");
     }
 }
 
@@ -591,7 +591,7 @@ mod util {
         }
         let ordering_set: HashSet<StateId> = ordering.iter().cloned().collect();
         if ordering_set.len() != ordering.len() {
-            panic!("Ordering should not have duplicates: {:?} ", ordering);
+            panic!("Ordering should not have duplicates: {ordering:?} ");
         }
         for state in states.iter() {
             if !ordering.contains(&state.id()) {

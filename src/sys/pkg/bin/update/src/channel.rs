@@ -22,11 +22,11 @@ async fn handle_channel_control_cmd_impl(
     match cmd {
         args::channel::Command::Get(_) => {
             let channel = channel_control.get_current().await?;
-            println!("current channel: {}", channel);
+            println!("current channel: {channel}");
         }
         args::channel::Command::Target(_) => {
             let channel = channel_control.get_target().await?;
-            println!("target channel: {}", channel);
+            println!("target channel: {channel}");
         }
         args::channel::Command::Set(args::channel::Set { channel }) => {
             channel_control.set_target(&channel).await?;
@@ -38,7 +38,7 @@ async fn handle_channel_control_cmd_impl(
             } else {
                 println!("known channels:");
                 for channel in channels {
-                    println!("{}", channel);
+                    println!("{channel}");
                 }
             }
         }
@@ -66,7 +66,7 @@ mod tests {
             let result = stream.next().await.unwrap();
             match result {
                 Ok(cmd) => verifier(cmd),
-                err => panic!("Err in request handler: {:?}", err),
+                err => panic!("Err in request handler: {err:?}"),
             }
         };
         future::join(fut, stream_fut).await;
@@ -79,7 +79,7 @@ mod tests {
                 ChannelControlRequest::GetCurrent { responder } => {
                     responder.send("channel").unwrap();
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         })
         .await;
@@ -93,7 +93,7 @@ mod tests {
                 ChannelControlRequest::GetTarget { responder } => {
                     responder.send("target-channel").unwrap();
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             },
         )
         .await;
@@ -108,7 +108,7 @@ mod tests {
                     assert_eq!(channel, "new-channel");
                     responder.send().unwrap();
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             },
         )
         .await;
@@ -121,7 +121,7 @@ mod tests {
                 ChannelControlRequest::GetTargetList { responder } => {
                     responder.send(&mut vec!["some-channel", "other-channel"].into_iter()).unwrap();
                 }
-                request => panic!("Unexpected request: {:?}", request),
+                request => panic!("Unexpected request: {request:?}"),
             }
         })
         .await;

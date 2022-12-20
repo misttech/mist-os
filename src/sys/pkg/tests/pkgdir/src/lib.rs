@@ -77,14 +77,14 @@ impl std::fmt::Debug for Mode {
                 write!(f, " | ")?;
             }
             first = false;
-            write!(f, "{}", flag)?;
+            write!(f, "{flag}")?;
         }
         if flags != 0 {
             if !first {
                 write!(f, " | ")?;
             }
             first = false;
-            write!(f, "{:#o}", flags)?;
+            write!(f, "{flags:#o}")?;
         }
         if first {
             write!(f, "0")?;

@@ -124,7 +124,7 @@ impl controller::Handle for LightController {
                         return Some(Err(ControllerError::InvalidArgument(
                             SettingType::Light,
                             "state".into(),
-                            format!("{:?}", light_state).into(),
+                            format!("{light_state:?}").into(),
                         )));
                     }
                 }
@@ -154,7 +154,7 @@ impl LightController {
             .await
             .map_err(|e| {
                 ControllerError::InitFailure(
-                    format!("failed to connect to fuchsia.hardware.light with error: {:?}", e)
+                    format!("failed to connect to fuchsia.hardware.light with error: {e:?}")
                         .into(),
                 )
             })?;
@@ -200,7 +200,7 @@ impl LightController {
             return Err(ControllerError::InvalidArgument(
                 SettingType::Light,
                 "state".into(),
-                format!("{:?}", state).into(),
+                format!("{state:?}").into(),
             ));
         }
 
@@ -216,7 +216,7 @@ impl LightController {
             return Err(ControllerError::InvalidArgument(
                 SettingType::Light,
                 "state".into(),
-                format!("{:?}", state).into(),
+                format!("{state:?}").into(),
             ));
         }
 
@@ -253,7 +253,7 @@ impl LightController {
                         ControllerError::InvalidArgument(
                             SettingType::Light,
                             "value".into(),
-                            format!("{:?}", rgb).into(),
+                            format!("{rgb:?}").into(),
                         )
                     })?;
                     (
@@ -275,7 +275,7 @@ impl LightController {
                     ControllerError::ExternalFailure(
                         SettingType::Light,
                         "fuchsia.hardware.light".into(),
-                        format!("{} for light {}", method_name, hardware_index).into(),
+                        format!("{method_name} for light {hardware_index}").into(),
                         e.into(),
                     )
                 })?;
@@ -395,7 +395,7 @@ impl LightController {
                     ControllerError::ExternalFailure(
                         SettingType::Light,
                         "fuchsia.hardware.light".into(),
-                        format!("get_info for light {}", i).into(),
+                        format!("get_info for light {i}").into(),
                         e.into(),
                     )
                 })?;
@@ -450,7 +450,7 @@ impl LightController {
                         ControllerError::ExternalFailure(
                             SettingType::Light,
                             "fuchsia.hardware.light".into(),
-                            format!("get_current_brightness_value for light {}", index).into(),
+                            format!("get_current_brightness_value for light {index}").into(),
                             e.into(),
                         )
                     })?
@@ -464,7 +464,7 @@ impl LightController {
                     ControllerError::ExternalFailure(
                         SettingType::Light,
                         "fuchsia.hardware.light".into(),
-                        format!("get_current_rgb_value for light {}", index).into(),
+                        format!("get_current_rgb_value for light {index}").into(),
                         e.into(),
                     )
                 })?,
@@ -477,7 +477,7 @@ impl LightController {
                     ControllerError::ExternalFailure(
                         SettingType::Light,
                         "fuchsia.hardware.light".into(),
-                        format!("get_current_simple_value for light {}", index).into(),
+                        format!("get_current_simple_value for light {index}").into(),
                         e.into(),
                     )
                 })?,

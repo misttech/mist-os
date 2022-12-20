@@ -180,11 +180,11 @@ impl OmahaServer {
         let server = Server::builder(from_stream(connections))
             .executor(fuchsia_hyper::Executor)
             .serve(make_svc)
-            .unwrap_or_else(|e| panic!("error serving omaha server: {}", e));
+            .unwrap_or_else(|e| panic!("error serving omaha server: {e}"));
 
         fasync::Task::spawn(server).detach();
 
-        Ok(format!("http://{}/", addr))
+        Ok(format!("http://{addr}/"))
     }
 }
 
@@ -200,7 +200,7 @@ fn make_etag(
         return None;
     }
 
-    let parsed_uri = Url::parse(&format!("https://example.com{}", uri)).unwrap();
+    let parsed_uri = Url::parse(&format!("https://example.com{uri}")).unwrap();
     let mut query_pairs = parsed_uri.query_pairs();
 
     let (cup2key_key, cup2key_val) = query_pairs.next().unwrap();

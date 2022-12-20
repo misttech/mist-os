@@ -67,7 +67,7 @@ impl From<SettingInfo> for Vec<LightGroup> {
             // Internally we store the data in a HashMap, need to flatten it out into a vector.
             light_info.light_groups.values().cloned().map(LightGroup::from).collect::<Vec<_>>()
         } else {
-            panic!("incorrect value sent to light: {:?}", info);
+            panic!("incorrect value sent to light: {info:?}");
         }
     }
 }

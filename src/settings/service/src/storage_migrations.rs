@@ -70,7 +70,7 @@ mod tests {
         let (store_proxy, _) =
             create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
         if let Err(e) = register_migrations(&settings, &policies, directory_proxy, store_proxy) {
-            panic!("Unable to register migrations: Err({:?})", e);
+            panic!("Unable to register migrations: Err({e:?})");
         }
     }
 

@@ -360,13 +360,13 @@ pub mod filter {
     impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> Debug for Condition<P, A, R> {
         fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
             let condition = match self {
-                Condition::Audience(audience) => format!("audience:{:?}", audience),
-                Condition::Author(signature) => format!("author:{:?}", signature),
+                Condition::Audience(audience) => format!("audience:{audience:?}"),
+                Condition::Author(signature) => format!("author:{signature:?}"),
                 Condition::Custom(_) => "custom".to_string(),
-                Condition::Filter(filter) => format!("filter:{:?}", filter),
+                Condition::Filter(filter) => format!("filter:{filter:?}"),
             };
 
-            write!(f, "Condition: {:?}", condition)
+            write!(f, "Condition: {condition:?}")
         }
     }
 

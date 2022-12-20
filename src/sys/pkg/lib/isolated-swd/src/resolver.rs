@@ -98,7 +98,7 @@ pub(crate) mod for_tests {
                         if key == "tuf_repo_config" {
                             responder.send(channel.as_deref()).unwrap();
                         } else {
-                            eprintln!("Unexpected arguments GetString: {}, closing channel.", key);
+                            eprintln!("Unexpected arguments GetString: {key}, closing channel.");
                         }
                     }
                     _ => eprintln!("Unexpected arguments request, closing channel."),
@@ -323,7 +323,7 @@ pub mod tests {
             .await
             .context("launching resolver")?;
         let (root_dir, _resolved_context) =
-            resolver.resolve_package(&format!("{}/{}", TEST_REPO_URL, name)).await.unwrap();
+            resolver.resolve_package(&format!("{TEST_REPO_URL}/{name}")).await.unwrap();
 
         package.verify_contents(&root_dir).await.unwrap();
         Ok(())
@@ -366,7 +366,7 @@ pub mod tests {
             .await
             .context("launching resolver")?;
         let (root_dir, _resolved_context) =
-            resolver.resolve_package(&format!("fuchsia-pkg://fuchsia.com/{}", name)).await.unwrap();
+            resolver.resolve_package(&format!("fuchsia-pkg://fuchsia.com/{name}")).await.unwrap();
 
         package.verify_contents(&root_dir).await.unwrap();
         Ok(())

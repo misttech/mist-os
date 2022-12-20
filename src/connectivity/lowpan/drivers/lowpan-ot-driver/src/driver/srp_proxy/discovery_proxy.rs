@@ -481,11 +481,11 @@ impl DiscoveryProxy {
             let srp_domain = instance.srp_server_get_domain().to_str()?;
 
             let instance_name_srp =
-                CString::new(format!("{}.{}{}", instance_name, service_name, srp_domain))?;
+                CString::new(format!("{instance_name}.{service_name}{srp_domain}"))?;
 
-            let service_name_srp = CString::new(format!("{}{}", service_name, srp_domain))?;
+            let service_name_srp = CString::new(format!("{service_name}{srp_domain}"))?;
 
-            let host_name_srp = CString::new(format!("{}.{}", host_name, srp_domain))?;
+            let host_name_srp = CString::new(format!("{host_name}.{srp_domain}"))?;
 
             let (addresses, port) = process_addresses_from_socket_addresses(addresses);
 

@@ -275,7 +275,7 @@ impl TestEnvBuilder {
                     fasync::Task::spawn(
                         Arc::clone(&resolver)
                             .run_resolver_service(stream)
-                            .unwrap_or_else(|e| panic!("error running resolver service: {:?}", e)),
+                            .unwrap_or_else(|e| panic!("error running resolver service: {e:?}")),
                     )
                     .detach()
                 });
@@ -285,7 +285,7 @@ impl TestEnvBuilder {
                     fasync::Task::spawn(
                         Arc::clone(&paver_service)
                             .run_paver_service(stream)
-                            .unwrap_or_else(|e| panic!("error running paver service: {:?}", e)),
+                            .unwrap_or_else(|e| panic!("error running paver service: {e:?}")),
                     )
                     .detach()
                 });
@@ -295,7 +295,7 @@ impl TestEnvBuilder {
                     fasync::Task::spawn(
                         Arc::clone(&reboot_service)
                             .run_reboot_service(stream)
-                            .unwrap_or_else(|e| panic!("error running reboot service: {:?}", e)),
+                            .unwrap_or_else(|e| panic!("error running reboot service: {e:?}")),
                     )
                     .detach()
                 });
@@ -305,7 +305,7 @@ impl TestEnvBuilder {
                     fasync::Task::spawn(
                         Arc::clone(&cache_service)
                             .run_cache_service(stream)
-                            .unwrap_or_else(|e| panic!("error running cache service: {:?}", e)),
+                            .unwrap_or_else(|e| panic!("error running cache service: {e:?}")),
                     )
                     .detach()
                 });
@@ -321,7 +321,7 @@ impl TestEnvBuilder {
                     fasync::Task::spawn(
                         Arc::clone(&space_service)
                             .run_space_service(stream)
-                            .unwrap_or_else(|e| panic!("error running space service: {:?}", e)),
+                            .unwrap_or_else(|e| panic!("error running space service: {e:?}")),
                     )
                     .detach()
                 });
@@ -332,7 +332,7 @@ impl TestEnvBuilder {
                         Arc::clone(&retained_packages_service)
                             .run_retained_packages_service(stream)
                             .unwrap_or_else(|e| {
-                                panic!("error running retained packages service: {:?}", e)
+                                panic!("error running retained packages service: {e:?}")
                             }),
                     )
                     .detach()
@@ -596,7 +596,7 @@ impl MockCacheService {
                         &mut self.sync_response.lock().unwrap_or(Ok(())).map_err(|s| s.into_raw()),
                     )?;
                 }
-                other => panic!("unsupported PackageCache request: {:?}", other),
+                other => panic!("unsupported PackageCache request: {other:?}"),
             }
         }
 
@@ -719,7 +719,7 @@ impl OtaMetrics {
                 // Ignore the value since timing is not predictable.
             }
             other => {
-                panic!("unexpected duration payload {:?}", other);
+                panic!("unexpected duration payload {other:?}");
             }
         }
 

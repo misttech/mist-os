@@ -56,13 +56,13 @@ impl Range {
                 return None;
             }
             Range::Inclusive { first_byte_pos, last_byte_pos } => {
-                format!("bytes={}-{}", first_byte_pos, last_byte_pos)
+                format!("bytes={first_byte_pos}-{last_byte_pos}")
             }
             Range::From { first_byte_pos } => {
-                format!("bytes={}-", first_byte_pos)
+                format!("bytes={first_byte_pos}-")
             }
             Range::Suffix { len } => {
-                format!("bytes=-{}", len)
+                format!("bytes=-{len}")
             }
         };
 
@@ -174,7 +174,7 @@ impl ContentRange {
         match self {
             ContentRange::Full { .. } => None,
             ContentRange::Inclusive { first_byte_pos, last_byte_pos, complete_len } => {
-                let value = format!("bytes {}-{}/{}", first_byte_pos, last_byte_pos, complete_len);
+                let value = format!("bytes {first_byte_pos}-{last_byte_pos}/{complete_len}");
 
                 // The unwrap should be safe here since HeaderValue only fails if there are
                 // non-ascii characters in the string.
@@ -459,7 +459,7 @@ mod tests {
             (ContentRange::Inclusive { first_byte_pos: 1, last_byte_pos: 1, complete_len: 10 }, 1),
             (ContentRange::Inclusive { first_byte_pos: 5, last_byte_pos: 1, complete_len: 10 }, 0),
         ] {
-            assert_eq!(range.content_len(), expected, "{:?}", range);
+            assert_eq!(range.content_len(), expected, "{range:?}");
         }
     }
 
@@ -471,7 +471,7 @@ mod tests {
             (ContentRange::Inclusive { first_byte_pos: 1, last_byte_pos: 1, complete_len: 10 }, 10),
             (ContentRange::Inclusive { first_byte_pos: 5, last_byte_pos: 1, complete_len: 10 }, 10),
         ] {
-            assert_eq!(range.total_len(), expected, "{:?}", range);
+            assert_eq!(range.total_len(), expected, "{range:?}");
         }
     }
 
@@ -488,7 +488,7 @@ mod tests {
                 Some(HeaderValue::from_static("bytes 5-10/1234")),
             ),
         ] {
-            assert_eq!(range.to_http_content_range_header(), expected, "{:?}", range);
+            assert_eq!(range.to_http_content_range_header(), expected, "{range:?}");
         }
     }
 

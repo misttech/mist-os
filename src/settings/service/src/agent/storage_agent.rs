@@ -256,7 +256,7 @@ where
                 store
                     .write::<S::Storable>(storable_value)
                     .await
-                    .map_err(|e| Error { message: format!("{:?}", e) })
+                    .map_err(|e| Error { message: format!("{e:?}") })
             }
         };
 
@@ -294,7 +294,7 @@ where
     {
         let update_result = {
             let store = self.fidl_storage_factory.get_store().await;
-            store.write::<S>(data).await.map_err(|e| Error { message: format!("{:?}", e) })
+            store.write::<S>(data).await.map_err(|e| Error { message: format!("{e:?}") })
         };
 
         // Ignore the receptor result.

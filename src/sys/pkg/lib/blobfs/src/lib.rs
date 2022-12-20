@@ -439,7 +439,7 @@ mod tests {
                     assert_eq!(name, blob_merkle.to_string());
                     responder.send(&mut Ok(())).unwrap();
                 }
-                other => panic!("unexpected request: {:?}", other),
+                other => panic!("unexpected request: {other:?}"),
             }
         })
         .detach();
@@ -725,7 +725,7 @@ mod tests {
                     counter_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     responder.send(&mut Ok(())).unwrap();
                 }
-                other => panic!("unexpected request: {:?}", other),
+                other => panic!("unexpected request: {other:?}"),
             }
         })
         .detach();
