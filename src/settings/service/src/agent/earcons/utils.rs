@@ -23,9 +23,7 @@ fn resource_file(name: &str) -> Result<fidl::endpoints::ClientEnd<fio::FileMarke
     Ok(fidl::endpoints::ClientEnd::<fio::FileMarker>::new(zx::Channel::from(fdio::transfer_fd(
         File::open(format!("/config/data/{name}"))
             .or_else(|_| {
-                File::open(format!(
-                    "/pkgfs/packages/config-data/0/meta/data/setui_service/{name}"
-                ))
+                File::open(format!("/pkgfs/packages/config-data/0/meta/data/setui_service/{name}"))
             })
             .context("Opening package data file")?,
     )?)))

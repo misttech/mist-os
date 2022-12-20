@@ -81,9 +81,7 @@ pub async fn run_process_async<'a>(
 
     let args: Vec<CString> = std::iter::once(binary_path)
         .chain(args)
-        .map(|a| {
-            CString::new(a).unwrap_or_else(|e| panic!("failed to parse {a} to CString: {e}"))
-        })
+        .map(|a| CString::new(a).unwrap_or_else(|e| panic!("failed to parse {a} to CString: {e}")))
         .collect();
     let args: Vec<&CStr> = args.iter().map(|s| s.as_c_str()).collect();
 

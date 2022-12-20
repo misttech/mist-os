@@ -143,12 +143,12 @@ where
     if parts.len() != 2 {
         Err(serde::de::Error::custom("version must be in `A.B` format"))
     } else {
-        let a = parts[0].parse::<u32>().map_err(|e| {
-            serde::de::Error::custom(format!("unable to parse major version: {e}"))
-        })?;
-        let b = parts[1].parse::<u32>().map_err(|e| {
-            serde::de::Error::custom(format!("unable to parse major version: {e}"))
-        })?;
+        let a = parts[0]
+            .parse::<u32>()
+            .map_err(|e| serde::de::Error::custom(format!("unable to parse major version: {e}")))?;
+        let b = parts[1]
+            .parse::<u32>()
+            .map_err(|e| serde::de::Error::custom(format!("unable to parse major version: {e}")))?;
         Ok(Some([a, b]))
     }
 }

@@ -154,9 +154,9 @@ async fn handle_request(
                 MockResponse::GetVersion { version } => {
                     resp.send(version).expect("failed to send response");
                 }
-                _ => panic!(
-                    "Next mock response type was {next_response:?} but expected GetVersion."
-                ),
+                _ => {
+                    panic!("Next mock response type was {next_response:?} but expected GetVersion.")
+                }
             };
         }
         PinWeaverRequest::ResetTree { bits_per_level: _, height: _, responder: resp } => {
@@ -165,9 +165,9 @@ async fn handle_request(
                     resp.send(&mut std::result::Result::Ok(root_hash))
                         .expect("failed to send response");
                 }
-                _ => panic!(
-                    "Next mock response type was {next_response:?} but expected ResetTree."
-                ),
+                _ => {
+                    panic!("Next mock response type was {next_response:?} but expected ResetTree.")
+                }
             };
         }
         PinWeaverRequest::InsertLeaf { params, responder: resp } => {
@@ -181,9 +181,9 @@ async fn handle_request(
                     resp.send(&mut std::result::Result::Ok(response))
                         .expect("failed to send response");
                 }
-                _ => panic!(
-                    "Next mock response type was {next_response:?} but expected InsertLeaf."
-                ),
+                _ => {
+                    panic!("Next mock response type was {next_response:?} but expected InsertLeaf.")
+                }
             };
         }
         PinWeaverRequest::RemoveLeaf { params: _, responder: resp } => {
@@ -192,9 +192,9 @@ async fn handle_request(
                     resp.send(&mut std::result::Result::Ok(root_hash))
                         .expect("failed to send response");
                 }
-                _ => panic!(
-                    "Next mock response type was {next_response:?} but expected RemoveLeaf."
-                ),
+                _ => {
+                    panic!("Next mock response type was {next_response:?} but expected RemoveLeaf.")
+                }
             };
         }
         PinWeaverRequest::TryAuth { params: _, responder: resp } => {

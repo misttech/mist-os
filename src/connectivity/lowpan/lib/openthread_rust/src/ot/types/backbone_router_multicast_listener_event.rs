@@ -22,9 +22,8 @@ pub enum BackboneRouterMulticastListenerEvent {
 impl From<otBackboneRouterMulticastListenerEvent> for BackboneRouterMulticastListenerEvent {
     fn from(x: otBackboneRouterMulticastListenerEvent) -> Self {
         use num::FromPrimitive;
-        Self::from_u32(x).unwrap_or_else(|| {
-            panic!("Unknown otBackboneRouterMulticastListenerEvent value: {x}")
-        })
+        Self::from_u32(x)
+            .unwrap_or_else(|| panic!("Unknown otBackboneRouterMulticastListenerEvent value: {x}"))
     }
 }
 

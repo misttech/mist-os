@@ -1018,8 +1018,7 @@ pub async fn make_pkg_with_extra_blobs(s: &str, n: u32) -> Package {
         .add_resource_at(format!("bin/{s}"), &test_package_bin(s)[..])
         .add_resource_at(format!("meta/{s}.cml"), &test_package_cml(s)[..]);
     for i in 0..n {
-        pkg =
-            pkg.add_resource_at(format!("data/{s}-{i}"), extra_blob_contents(s, i).as_slice());
+        pkg = pkg.add_resource_at(format!("data/{s}-{i}"), extra_blob_contents(s, i).as_slice());
     }
     pkg.build().await.unwrap()
 }

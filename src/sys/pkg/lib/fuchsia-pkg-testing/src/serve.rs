@@ -372,9 +372,7 @@ impl ServedRepository {
         let mut response = Self::handle_tuf_repo_request(repo, auto_response_creator, &req)
             .await
             .unwrap_or_else(|e| {
-                eprintln!(
-                    "hyper tuf server error creating response for request {req:?}: {e:#}"
-                );
+                eprintln!("hyper tuf server error creating response for request {req:?}: {e:#}");
                 Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .body(Body::from("Error creating response".to_owned().into_bytes()))

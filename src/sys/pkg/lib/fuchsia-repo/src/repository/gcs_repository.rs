@@ -116,9 +116,7 @@ where
                     if let Some(content_len) = resp.headers().get(CONTENT_LENGTH) {
                         let content_len =
                             ContentLength::from_http_content_length_header(content_len)
-                                .with_context(|| {
-                                    format!("parsing Content-Length header: {url}")
-                                })?;
+                                .with_context(|| format!("parsing Content-Length header: {url}"))?;
 
                         // Make sure we didn't try to fetch data that's out of bounds.
                         if !content_len.contains_range(range) {

@@ -197,7 +197,7 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                                             RepositoryStorageType::Persistent,
                                         );
                                     }
-                                    
+
                                     repo_manager.add(repo.into()).await?
                                 }
                                 RepoConfigFormat::Version2 => {
@@ -218,7 +218,7 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                                             .repo_storage_type(RepositoryStorageType::Persistent)
                                             .build();
                                     }
-                                    
+
                                     repo_manager.add(repo.into()).await?
                                 }
                             };
@@ -246,7 +246,7 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                                             RepositoryStorageType::Persistent,
                                         );
                                     }
-                                    
+
                                     repo_manager.add(repo.into()).await?
                                 }
                                 RepoConfigFormat::Version2 => {
@@ -265,7 +265,7 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                                             .repo_storage_type(RepositoryStorageType::Persistent)
                                             .build();
                                     }
-                                    
+
                                     repo_manager.add(repo.into()).await?
                                 }
                             };

@@ -499,8 +499,7 @@ impl PackagedMetaFar {
 
         // copy the contents of the meta.far, skipping files that PackageBuilder will write
         for path in meta_paths {
-            let contents =
-                meta_far.read_file(&path).with_context(|| format!("reading {path}"))?;
+            let contents = meta_far.read_file(&path).with_context(|| format!("reading {path}"))?;
 
             if path == MetaContents::PATH {
                 continue;

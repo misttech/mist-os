@@ -79,10 +79,7 @@ pub fn parse_argument(buf: &[u8]) -> ParseResult<'_, Argument> {
     parse_argument_internal(buf, &mut state)
 }
 
-fn parse_argument_internal<'a>(
-    buf: &'a [u8],
-    state: &mut ParseState,
-) -> ParseResult<'a, Argument> {
+fn parse_argument_internal<'a>(buf: &'a [u8], state: &mut ParseState) -> ParseResult<'a, Argument> {
     let (after_header, header) = parse_header(buf)?;
     let arg_ty = ArgType::try_from(header.raw_type()).map_err(nom::Err::Failure)?;
 

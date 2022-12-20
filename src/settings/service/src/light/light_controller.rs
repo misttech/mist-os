@@ -154,8 +154,7 @@ impl LightController {
             .await
             .map_err(|e| {
                 ControllerError::InitFailure(
-                    format!("failed to connect to fuchsia.hardware.light with error: {e:?}")
-                        .into(),
+                    format!("failed to connect to fuchsia.hardware.light with error: {e:?}").into(),
                 )
             })?;
 

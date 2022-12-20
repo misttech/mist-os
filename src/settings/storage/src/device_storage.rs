@@ -221,7 +221,8 @@ impl DeviceStorage {
                         // The time of the last flush. Initialized to MIN_FLUSH_INTERVAL_MS before the
                         // current time so that the first flush always goes through, no matter the
                         // timing.
-                        let mut last_flush: Instant = Instant::now().checked_sub(MIN_FLUSH_DURATION).unwrap();
+                        let mut last_flush: Instant =
+                            Instant::now().checked_sub(MIN_FLUSH_DURATION).unwrap();
 
                         // Timer for flush cooldown. OptionFuture allows us to wait on the future even
                         // if it's None.
@@ -411,10 +412,11 @@ impl DeviceStorage {
         let cached_storage = typed_storage.cached_storage.lock().await;
         let new = if cached_storage.current_data.is_none() || !self.caching_enabled {
             let stash_key = prefixed(key);
-            if let Some(stash_value) =
-                cached_storage.stash_proxy.get_value(&stash_key).await.unwrap_or_else(|_| {
-                    panic!("failed to get value from stash for {stash_key:?}")
-                })
+            if let Some(stash_value) = cached_storage
+                .stash_proxy
+                .get_value(&stash_key)
+                .await
+                .unwrap_or_else(|_| panic!("failed to get value from stash for {stash_key:?}"))
             {
                 if let Value::Stringval(string_value) = *stash_value {
                     Some(Some(string_value))
