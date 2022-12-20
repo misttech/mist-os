@@ -270,6 +270,8 @@ pub enum JsonValue {
 
 With the following methods:
 
+* `ordinal(&self) -> u64`: Returns the ordinal of the active variant, as
+  specified in the FIDL type.
 * `is_unknown(&self) -> bool`: Returns whether this union is unknown. Always
   returns `false` for non-flexible union types. For [strict][lang-flexible]
   types, it is marked `#[deprecated]` and always returns `false`.

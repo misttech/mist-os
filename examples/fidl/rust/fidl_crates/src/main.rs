@@ -47,7 +47,9 @@ mod test {
                 fex::LocationType::Museum => println!("museum"),
                 fex::LocationType::Airport => println!("airport"),
                 fex::LocationType::Restaurant => println!("restaurant"),
-                fex::LocationTypeUnknown!() => println!("unknown!"),
+                fex::LocationTypeUnknown!() => {
+                    println!("unknown value: {}", location_type.into_primitive())
+                }
             }
             // [END enums_flexible_match]
         }
@@ -71,7 +73,7 @@ mod test {
             match json_value {
                 fex::JsonValue::IntValue(val) => println!("int: {}", val),
                 fex::JsonValue::StringValue(val) => println!("string: {}", val),
-                fex::JsonValueUnknown!() => println!("unknown!"),
+                fex::JsonValueUnknown!() => println!("unknown ordinal: {}", json_value.ordinal()),
             }
             // [END unions_flexible_match]
         }

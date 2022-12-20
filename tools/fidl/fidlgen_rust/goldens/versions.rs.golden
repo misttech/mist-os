@@ -149,6 +149,14 @@ macro_rules! UnionUnknown {
 
 impl Union {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::X(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }

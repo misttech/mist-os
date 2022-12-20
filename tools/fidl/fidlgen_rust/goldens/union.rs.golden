@@ -49,6 +49,13 @@ macro_rules! EmptyFlexibleUnionUnknown {
 
 impl EmptyFlexibleUnion {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -95,6 +102,15 @@ macro_rules! ExplicitFooUnknown {
 
 impl ExplicitFoo {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::I(_) => 1,
+            Self::S(_) => 2,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -136,6 +152,13 @@ pub enum ExplicitPizzaOrPasta {
 }
 
 impl ExplicitPizzaOrPasta {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Pizza(_) => 1,
+            Self::Pasta(_) => 4,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -168,6 +191,13 @@ pub enum ExplicitStrictFoo {
 }
 
 impl ExplicitStrictFoo {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::I(_) => 2,
+            Self::S(_) => 3,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -200,6 +230,13 @@ pub enum ExplicitUnion {
 }
 
 impl ExplicitUnion {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Primitive(_) => 1,
+            Self::StringNeedsConstructor(_) => 3,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -246,6 +283,15 @@ macro_rules! ExplicitXUnionUnknown {
 
 impl ExplicitXUnion {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::I(_) => 1,
+            Self::F(_) => 4,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -286,6 +332,12 @@ pub enum FieldCollision {
 }
 
 impl FieldCollision {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::FieldCollisionTag(_) => 1,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -327,6 +379,15 @@ macro_rules! FlexibleFooUnknown {
 }
 
 impl FlexibleFoo {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::S(_) => 1,
+            Self::I(_) => 2,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -383,6 +444,15 @@ macro_rules! FlexiblePizzaOrPastaUnknown {
 
 impl FlexiblePizzaOrPasta {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Pizza(_) => 1,
+            Self::Pasta(_) => 2,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -438,6 +508,16 @@ macro_rules! FlexibleUnionUnknown {
 }
 
 impl FlexibleUnion {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Primitive(_) => 1,
+            Self::StringNeedsConstructor(_) => 2,
+            Self::VectorStringAlsoNeedsConstructor(_) => 3,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -499,6 +579,16 @@ macro_rules! NewerSimpleUnionUnknown {
 
 impl NewerSimpleUnion {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::I(_) => 1,
+            Self::S(_) => 2,
+            Self::V(_) => 3,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -558,6 +648,15 @@ macro_rules! OlderSimpleUnionUnknown {
 
 impl OlderSimpleUnion {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::I(_) => 1,
+            Self::F(_) => 2,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -609,6 +708,13 @@ macro_rules! OnlyReservedFlexibleUnionUnknown {
 
 impl OnlyReservedFlexibleUnion {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -641,6 +747,13 @@ pub enum PizzaOrPasta {
 }
 
 impl PizzaOrPasta {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Pizza(_) => 1,
+            Self::Pasta(_) => 2,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -673,6 +786,13 @@ pub enum ReverseOrdinalUnion {
 }
 
 impl ReverseOrdinalUnion {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::First(_) => 1,
+            Self::Second(_) => 2,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -704,6 +824,12 @@ pub enum StrictBoundedXUnion {
 }
 
 impl StrictBoundedXUnion {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::V(_) => 1,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -732,6 +858,13 @@ pub enum StrictFoo {
 }
 
 impl StrictFoo {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::S(_) => 1,
+            Self::I(_) => 2,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -764,6 +897,13 @@ pub enum StrictPizzaOrPasta {
 }
 
 impl StrictPizzaOrPasta {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Pizza(_) => 1,
+            Self::Pasta(_) => 2,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -797,6 +937,14 @@ pub enum StrictSimpleXUnion {
 }
 
 impl StrictSimpleXUnion {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::I(_) => 1,
+            Self::F(_) => 2,
+            Self::S(_) => 3,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -834,6 +982,14 @@ pub enum StrictUnion {
 }
 
 impl StrictUnion {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Primitive(_) => 1,
+            Self::StringNeedsConstructor(_) => 2,
+            Self::VectorStringAlsoNeedsConstructor(_) => 3,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -871,6 +1027,14 @@ pub enum Union {
 }
 
 impl Union {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Primitive(_) => 1,
+            Self::StringNeedsConstructor(_) => 2,
+            Self::VectorStringAlsoNeedsConstructor(_) => 3,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -919,6 +1083,14 @@ macro_rules! UnionWithAttributesUnknown {
 }
 
 impl UnionWithAttributes {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::X(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -969,6 +1141,14 @@ macro_rules! XUnionContainingEmptyStructUnknown {
 }
 
 impl XUnionContainingEmptyStruct {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Empty(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]

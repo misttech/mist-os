@@ -111,6 +111,9 @@ fn flexible_empty_enum() {
 
 #[test]
 fn strict_value_union() {
+    assert_eq!(StrictValueThing::Number(42).ordinal(), 1);
+    assert_eq!(StrictValueThing::Name("hello".to_owned()).ordinal(), 2);
+
     // You can use the flexible methods on strict types, but it produces a
     // deprecation warning.
     #[allow(deprecated)]
@@ -122,11 +125,17 @@ fn strict_value_union() {
 fn flexible_value_union() {
     assert_eq!(FlexibleValueThing::Number(42).is_unknown(), false);
     assert_eq!(FlexibleValueThing::Name("hello".to_owned()).is_unknown(), false);
+    assert_eq!(FlexibleValueThing::Number(42).ordinal(), 1);
+    assert_eq!(FlexibleValueThing::Name("hello".to_owned()).ordinal(), 2);
     assert_eq!(FlexibleValueThing::unknown_variant_for_testing().is_unknown(), true);
+    assert_eq!(FlexibleValueThing::unknown_variant_for_testing().ordinal(), 0);
 }
 
 #[test]
 fn strict_resource_union() {
+    assert_eq!(StrictResourceThing::Number(42).ordinal(), 1);
+    assert_eq!(StrictResourceThing::Name("hello".to_owned()).ordinal(), 2);
+
     // You can use the flexible methods on strict types, but it produces a
     // deprecation warning.
     #[allow(deprecated)]
@@ -138,7 +147,10 @@ fn strict_resource_union() {
 fn flexible_resource_union() {
     assert_eq!(FlexibleResourceThing::Number(42).is_unknown(), false);
     assert_eq!(FlexibleResourceThing::Name("hello".to_owned()).is_unknown(), false);
+    assert_eq!(FlexibleResourceThing::Number(42).ordinal(), 1);
+    assert_eq!(FlexibleResourceThing::Name("hello".to_owned()).ordinal(), 2);
     assert_eq!(FlexibleResourceThing::unknown_variant_for_testing().is_unknown(), true);
+    assert_eq!(FlexibleResourceThing::unknown_variant_for_testing().ordinal(), 0);
 }
 
 #[test]

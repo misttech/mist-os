@@ -118,6 +118,12 @@ pub enum ComposedProtocolOnAnonComposedRequest {
 }
 
 impl ComposedProtocolOnAnonComposedRequest {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::B(_) => 1,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -145,6 +151,12 @@ pub enum ComposedProtocolTwoWayAnonComposedRequest {
 }
 
 impl ComposedProtocolTwoWayAnonComposedRequest {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::B(_) => 1,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -172,6 +184,12 @@ pub enum ComposedProtocolTwoWayAnonComposedWithErrorResponse {
 }
 
 impl ComposedProtocolTwoWayAnonComposedWithErrorResponse {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::B(_) => 1,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -212,6 +230,14 @@ macro_rules! MainProtocolOnAnonRequestUnknown {
 }
 
 impl MainProtocolOnAnonRequest {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::B(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -263,6 +289,14 @@ macro_rules! MainProtocolTwoWayAnonRequestUnknown {
 
 impl MainProtocolTwoWayAnonRequest {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::B(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -313,6 +347,14 @@ macro_rules! MainProtocolTwoWayAnonWithErrorResponseUnknown {
 
 impl MainProtocolTwoWayAnonWithErrorResponse {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::B(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -349,6 +391,12 @@ pub enum UnionPayload {
 }
 
 impl UnionPayload {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::B(_) => 1,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {

@@ -258,6 +258,14 @@ macro_rules! FlexibleUnionUnknown {
 
 impl FlexibleUnion {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Field(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -300,6 +308,12 @@ pub enum StrictUnion {
 }
 
 impl StrictUnion {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Field(_) => 1,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {

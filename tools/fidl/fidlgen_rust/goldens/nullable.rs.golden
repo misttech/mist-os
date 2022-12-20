@@ -39,6 +39,13 @@ pub enum SimpleUnion {
 }
 
 impl SimpleUnion {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::A(_) => 1,
+            Self::B(_) => 2,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {

@@ -86,6 +86,14 @@ macro_rules! UnionWithHandleUnknown {
 
 impl UnionWithHandle {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::H(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }

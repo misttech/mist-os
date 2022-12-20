@@ -3617,21 +3617,6 @@ macro_rules! fidl_union {
         )*],
         $( unknown_member: $unknown_name:ident, )?
     ) => {
-        impl $name {
-            #[inline]
-            fn ordinal(&self) -> u64 {
-                match *self {
-                    $(
-                        $name::$member_name(_) => $member_ordinal,
-                    )*
-                    $(
-                        #[allow(deprecated)]
-                        $name::$unknown_name { ordinal } => ordinal,
-                    )?
-                }
-            }
-        }
-
         impl $crate::encoding::Layout for $name {
             #[inline(always)]
             fn inline_align(_context: &$crate::encoding::Context) -> usize { 8 }
@@ -4806,6 +4791,14 @@ mod test {
             Okay(u64),
             Error(u32),
         }
+        impl OkayOrError {
+            pub fn ordinal(&self) -> u64 {
+                match *self {
+                    Self::Okay(_) => 1,
+                    Self::Error(_) => 2,
+                }
+            }
+        }
         fidl_union! {
             name: OkayOrError,
             members: [
@@ -4848,6 +4841,14 @@ mod test {
         enum OkayOrError {
             Okay(Empty),
             Error(i32),
+        }
+        impl OkayOrError {
+            pub fn ordinal(&self) -> u64 {
+                match *self {
+                    Self::Okay(_) => 1,
+                    Self::Error(_) => 2,
+                }
+            }
         }
         fidl_union! {
             name: OkayOrError,
@@ -5475,6 +5476,13 @@ mod test {
         #[derive(Debug, Copy, Clone, Eq, PartialEq)]
         enum BigOrdinal {
             X(u64),
+        }
+        impl BigOrdinal {
+            pub fn ordinal(&self) -> u64 {
+                match *self {
+                    Self::X(_) => 0xffffffffffffffffu64,
+                }
+            }
         }
         fidl_union! {
             name: BigOrdinal,

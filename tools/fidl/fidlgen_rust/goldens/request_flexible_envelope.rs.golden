@@ -53,6 +53,15 @@ macro_rules! FlexibleFooUnknown {
 
 impl FlexibleFoo {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::S(_) => 1,
+            Self::I(_) => 2,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -94,6 +103,13 @@ pub enum StrictFoo {
 }
 
 impl StrictFoo {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::S(_) => 1,
+            Self::I(_) => 2,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {

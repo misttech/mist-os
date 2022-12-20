@@ -36,6 +36,12 @@ pub enum UnionLargeArray {
 }
 
 impl UnionLargeArray {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::A(_) => 1,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -63,6 +69,12 @@ pub enum UnionSmallArray {
 }
 
 impl UnionSmallArray {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::A(_) => 1,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {

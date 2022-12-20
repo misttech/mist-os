@@ -718,6 +718,14 @@ macro_rules! UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponseUnkno
 
 impl UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -770,6 +778,14 @@ macro_rules! UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponseUn
 }
 
 impl UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -827,6 +843,14 @@ macro_rules! UnknownInteractionsAjarProtocolFlexibleEventUnionRequestUnknown {
 
 impl UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -876,6 +900,14 @@ macro_rules! UnknownInteractionsAjarProtocolStrictEventUnionRequestUnknown {
 }
 
 impl UnknownInteractionsAjarProtocolStrictEventUnionRequest {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -927,6 +959,14 @@ macro_rules! UnknownInteractionsAjarProtocolStrictTwoWayUnionResponseUnknown {
 
 impl UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -976,6 +1016,14 @@ macro_rules! UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponseUnknown
 }
 
 impl UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -1027,6 +1075,14 @@ macro_rules! UnknownInteractionsAjarProtocolStrictEventUnionErrResponseUnknown {
 
 impl UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -1077,6 +1133,14 @@ macro_rules! UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponseUnknown 
 
 impl UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -1126,6 +1190,14 @@ macro_rules! UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponseUnk
 }
 
 impl UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -1179,6 +1251,14 @@ macro_rules! UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse
 }
 
 impl UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -1236,6 +1316,14 @@ macro_rules! UnknownInteractionsClosedProtocolStrictEventUnionRequestUnknown {
 
 impl UnknownInteractionsClosedProtocolStrictEventUnionRequest {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -1285,6 +1373,14 @@ macro_rules! UnknownInteractionsClosedProtocolStrictTwoWayUnionResponseUnknown {
 }
 
 impl UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -1336,6 +1432,14 @@ macro_rules! UnknownInteractionsClosedProtocolStrictEventUnionErrResponseUnknown
 
 impl UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -1385,6 +1489,14 @@ macro_rules! UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponseUnknow
 }
 
 impl UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -1436,6 +1548,14 @@ macro_rules! UnknownInteractionsDriverProtocolStrictTwoWayUnionResponseUnknown {
 
 impl UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -1485,6 +1605,14 @@ macro_rules! UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponseUnkn
 }
 
 impl UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -1539,6 +1667,14 @@ macro_rules! UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponseUnknown
 
 impl UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -1588,6 +1724,14 @@ macro_rules! UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponseUnknow
 }
 
 impl UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -1639,6 +1783,14 @@ macro_rules! UnknownInteractionsProtocolFlexibleEventUnionRequestUnknown {
 
 impl UnknownInteractionsProtocolFlexibleEventUnionRequest {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -1688,6 +1840,14 @@ macro_rules! UnknownInteractionsProtocolStrictEventUnionRequestUnknown {
 }
 
 impl UnknownInteractionsProtocolStrictEventUnionRequest {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -1739,6 +1899,14 @@ macro_rules! UnknownInteractionsProtocolStrictTwoWayUnionResponseUnknown {
 
 impl UnknownInteractionsProtocolStrictTwoWayUnionResponse {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -1788,6 +1956,14 @@ macro_rules! UnknownInteractionsProtocolFlexibleEventUnionErrResponseUnknown {
 }
 
 impl UnknownInteractionsProtocolFlexibleEventUnionErrResponse {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -1839,6 +2015,14 @@ macro_rules! UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponseUnknown {
 
 impl UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -1888,6 +2072,14 @@ macro_rules! UnknownInteractionsProtocolFlexibleTwoWayUnionResponseUnknown {
 }
 
 impl UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
@@ -1939,6 +2131,14 @@ macro_rules! UnknownInteractionsProtocolStrictEventUnionErrResponseUnknown {
 
 impl UnknownInteractionsProtocolStrictEventUnionErrResponse {
     #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]
         Self::__Unknown { ordinal: 0 }
@@ -1988,6 +2188,14 @@ macro_rules! UnknownInteractionsProtocolStrictTwoWayUnionErrResponseUnknown {
 }
 
 impl UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::SomeField(_) => 1,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
         #[allow(deprecated)]

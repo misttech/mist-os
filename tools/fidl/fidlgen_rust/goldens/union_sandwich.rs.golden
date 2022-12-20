@@ -36,6 +36,12 @@ pub enum UnionSize12Alignment4 {
 }
 
 impl UnionSize12Alignment4 {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Variant(_) => 1,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -63,6 +69,12 @@ pub enum UnionSize24Alignment8 {
 }
 
 impl UnionSize24Alignment8 {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Variant(_) => 1,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -90,6 +102,12 @@ pub enum UnionSize36Alignment4 {
 }
 
 impl UnionSize36Alignment4 {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Variant(_) => 1,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
@@ -117,6 +135,12 @@ pub enum UnionSize8Alignment4 {
 }
 
 impl UnionSize8Alignment4 {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            Self::Variant(_) => 1,
+        }
+    }
     #[deprecated = "Strict unions should not use `is_unknown`"]
     #[inline]
     pub fn is_unknown(&self) -> bool {
