@@ -161,7 +161,7 @@ foreach(test, netstack_socket_tests_without_manifest) {
 expect_includes("socket_test_includes") {
   includes = [
     "//src/connectivity/network/dns/meta/client.shard.cml",
-    "//src/connectivity/network/netstack/meta/client-debug.shard.cml",
+    "//src/connectivity/network/netstack/meta/client-with-sync-udp-debug.shard.cml",
     "//src/sys/test_runners/gtest/default.shard.cml",
     "//sdk/lib/syslog/client.shard.cml",
   ]
@@ -247,8 +247,8 @@ fuchsia_test_package("netstack-c-api-tests") {
     "//src/connectivity/network/dns:component",
 
     # netstack is under test.
-    "//src/connectivity/network/netstack:component-debug",
     "//src/connectivity/network/netstack:component-with-fast-udp-debug",
+    "//src/connectivity/network/netstack:component-with-sync-udp-debug",
     "//src/connectivity/network/netstack3:component-debug",
 
     # cat is used to test FD passing in :netstack_fuchsia_c_api_test.

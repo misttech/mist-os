@@ -388,7 +388,8 @@ template("syscall_test_suite") {
   stacks = [
     {
       label = "netstack2_syncudp"
-      component = "//src/connectivity/network/netstack:component-debug"
+      component =
+          "//src/connectivity/network/netstack:component-with-sync-udp-debug"
       expectations = ":${netstack2_expectations_target}"
       manifest = "meta/netstack2/syncudp/${suite_label}_syscall_tests.cml"
     },
