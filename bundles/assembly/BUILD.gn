@@ -86,6 +86,7 @@ assembly_input_bundle("common_minimal") {
 
     # Diagnostics
     "//src/cobalt/bin/app:cobalt",
+    "//src/cobalt/bin/system-metrics:cobalt_system_metrics",
     "//src/diagnostics/log-stats:package",
     "//src/diagnostics/persistence:diagnostics-persistence",
     "//src/diagnostics/kcounter:diagnostics-kcounter",
