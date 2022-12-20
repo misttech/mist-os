@@ -14,7 +14,7 @@ use {
     fidl_test_conformance as test_conformance,
     fuchsia_zircon_status::Status,
     fuchsia_zircon_types as zx_types,
-    gidl_util::{HandleDef, HandleSubtype, copy_handle, create_handles, get_info_handle_valid, select_handle_infos, to_zx_handle_t, to_zx_handle_disposition_t},
+    gidl_util::{HandleDef, HandleSubtype, copy_handle, create_handles, get_handle_koid, get_info_handle_valid, select_handle_infos, to_zx_handle_t, to_zx_handle_disposition_t},
 };
 
 const _V1_CONTEXT: &Context = &Context { wire_format_version: WireFormatVersion::V1 };
@@ -54,26 +54,14 @@ fn test_{{ .Name }}_decode() {
     let bytes = &{{ .Bytes }};
     {{- if .HandleDefs }}
     let handle_defs = create_handles(&{{ .HandleDefs }});
+    let _handle_koids = handle_defs.iter().map(get_handle_koid).collect::<Vec<_>>();
     let handle_infos = &mut select_handle_infos(&handle_defs, &{{ .Handles }});
     {{- else }}
     let handle_infos = &mut Vec::new();
     {{- end }}
     let value = &mut {{ .ValueType }}::new_empty();
     Decoder::decode_with_context({{ .Context }}, bytes, handle_infos, value).unwrap();
-    {{- if .ForgetHandles }}
-    // Forget handles before dropping the expected value, to avoid double closing them.
-    struct ForgetHandles({{ .ValueType }});
-    impl std::ops::Drop for ForgetHandles {
-        #[allow(unused_parens)]
-        fn drop(&mut self) {
-            {{ .ForgetHandles }}
-        }
-    }
-    let expected_value = ForgetHandles({{ .Value }});
-    assert_eq!(value, &expected_value.0);
-    {{- else }}
-    assert_eq!(value, &{{ .Value }});
-    {{- end }}
+    {{ .EqualityCheck }}
 }
 {{ end }}
 

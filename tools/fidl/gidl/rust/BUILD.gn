@@ -19,7 +19,7 @@ if (is_host) {
       "common.go",
       "conformance.go",
       "conformance.tmpl",
-      "forget_handles.go",
+      "equality_builder.go",
       "measure_tape.go",
       "measure_tape.tmpl",
     ]

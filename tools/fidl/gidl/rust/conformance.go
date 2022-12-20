@@ -36,7 +36,7 @@ type encodeSuccessCase struct {
 }
 
 type decodeSuccessCase struct {
-	Name, Context, HandleDefs, ValueType, Value, Bytes, Handles, ForgetHandles string
+	Name, Context, HandleDefs, ValueType, ValueVar, Bytes, Handles, EqualityCheck string
 }
 
 type encodeFailureCase struct {
@@ -117,10 +117,8 @@ func decodeSuccessCases(gidlDecodeSuccesses []gidlir.DecodeSuccess, schema gidlm
 			return nil, fmt.Errorf("decode success %s: %s", decodeSuccess.Name, err)
 		}
 		valueType := declName(decl)
-		value := visit(decodeSuccess.Value, decl)
-		// Start with "self.0" because this code is placed in a drop(&mut self)
-		// function, where self is a wrapper around valueType.
-		forgetHandles := buildForgetHandles("self.0", decodeSuccess.Value, decl)
+		valueVar := "value"
+		equalityCheck := buildEqualityCheck(valueVar, decodeSuccess.Value, decl)
 		for _, encoding := range decodeSuccess.Encodings {
 			if !wireFormatSupported(encoding.WireFormat) {
 				continue
@@ -130,10 +128,10 @@ func decodeSuccessCases(gidlDecodeSuccesses []gidlir.DecodeSuccess, schema gidlm
 				Context:       encodingContext(encoding.WireFormat),
 				HandleDefs:    buildHandleDefs(decodeSuccess.HandleDefs),
 				ValueType:     valueType,
-				Value:         value,
+				ValueVar:      valueVar,
 				Bytes:         gidllibrust.BuildBytes(encoding.Bytes),
 				Handles:       buildHandles(encoding.Handles),
-				ForgetHandles: forgetHandles,
+				EqualityCheck: equalityCheck,
 			})
 		}
 	}

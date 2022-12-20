@@ -104,6 +104,16 @@ pub fn select_handle_infos(
     indices.iter().map(|&i| unsafe { HandleInfo::from_raw(handle_defs[i]) }).collect()
 }
 
+/// Gets the koid of a handle from its raw handle info. Panics if the
+/// `zx_object_get_info` syscall fails.
+pub fn get_handle_koid(handle_info: &zx_types::zx_handle_info_t) -> zx_types::zx_koid_t {
+    // Safety: The `from_raw` method is only unsafe because it can lead to
+    // handles being double-closed if used incorrectly. We wrap it in
+    // ManuallyDrop to prevent closing the handle.
+    let handle = std::mem::ManuallyDrop::new(unsafe { Handle::from_raw(handle_info.handle) });
+    handle.basic_info().unwrap().koid.raw_koid()
+}
+
 /// Converts a `HandleDisposition` to a raw `zx_handle_t`.
 pub fn to_zx_handle_t(hd: &HandleDisposition<'_>) -> zx_types::zx_handle_t {
     match &hd.handle_op {

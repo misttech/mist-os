@@ -10,7 +10,7 @@ use {
     fidl_test_conformance as test_conformance,
     fuchsia_zircon_status::Status,
     fuchsia_zircon_types as zx_types,
-    gidl_util::{HandleDef, HandleSubtype, copy_handle, create_handles, get_info_handle_valid, select_handle_infos, to_zx_handle_t, to_zx_handle_disposition_t},
+    gidl_util::{HandleDef, HandleSubtype, copy_handle, create_handles, get_handle_koid, get_info_handle_valid, select_handle_infos, to_zx_handle_t, to_zx_handle_disposition_t},
 };
 
 const _V1_CONTEXT: &Context = &Context { wire_format_version: WireFormatVersion::V1 };
@@ -1300,6 +1300,66 @@ fn test_golden_nullable_struct_null_v2_decode() {
 }
 
 #[test]
+fn test_golden_handle_basic_rights_struct_v1_decode() {
+    let bytes = &[
+0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,
+];
+    let handle_defs = create_handles(&[
+// #0
+HandleDef{
+	subtype: HandleSubtype::Event,
+	rights: Rights::from_bits(53251).unwrap(),
+},
+]);
+    let _handle_koids = handle_defs.iter().map(get_handle_koid).collect::<Vec<_>>();
+    let handle_infos = &mut select_handle_infos(&handle_defs, &[
+0,]);
+    let value = &mut test_conformance::GoldenHandleBasicRightsStruct::new_empty();
+    Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
+    
+match value.v.basic_info() {
+	Ok(info) => {
+		assert_eq!(info.koid.raw_koid(), _handle_koids[0]);
+		
+		assert_eq!(info.rights, Rights::from_bits(49155).unwrap());
+	},
+	Err(e) => panic!("handle basic_info failed: {}", e),
+}
+
+
+}
+
+#[test]
+fn test_golden_handle_basic_rights_struct_v2_decode() {
+    let bytes = &[
+0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,
+];
+    let handle_defs = create_handles(&[
+// #0
+HandleDef{
+	subtype: HandleSubtype::Event,
+	rights: Rights::from_bits(53251).unwrap(),
+},
+]);
+    let _handle_koids = handle_defs.iter().map(get_handle_koid).collect::<Vec<_>>();
+    let handle_infos = &mut select_handle_infos(&handle_defs, &[
+0,]);
+    let value = &mut test_conformance::GoldenHandleBasicRightsStruct::new_empty();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
+    
+match value.v.basic_info() {
+	Ok(info) => {
+		assert_eq!(info.koid.raw_koid(), _handle_koids[0]);
+		
+		assert_eq!(info.rights, Rights::from_bits(49155).unwrap());
+	},
+	Err(e) => panic!("handle basic_info failed: {}", e),
+}
+
+
+}
+
+#[test]
 fn test_golden_nullable_handle_struct_non_null_v1_decode() {
     let bytes = &[
 0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,
@@ -1311,20 +1371,22 @@ HandleDef{
 	rights: Rights::from_bits(2147483648).unwrap(),
 },
 ]);
+    let _handle_koids = handle_defs.iter().map(get_handle_koid).collect::<Vec<_>>();
     let handle_infos = &mut select_handle_infos(&handle_defs, &[
 0,]);
     let value = &mut test_conformance::GoldenNullableHandleStruct::new_empty();
     Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
-    // Forget handles before dropping the expected value, to avoid double closing them.
-    struct ForgetHandles(test_conformance::GoldenNullableHandleStruct);
-    impl std::ops::Drop for ForgetHandles {
-        #[allow(unused_parens)]
-        fn drop(&mut self) {
-            std::mem::forget(std::mem::replace((&mut self.0.v).as_mut().unwrap(), Handle::invalid().into()));
-        }
-    }
-    let expected_value = ForgetHandles(test_conformance::GoldenNullableHandleStruct { v: Some(copy_handle(&handle_defs[0])) });
-    assert_eq!(value, &expected_value.0);
+    
+match value.v.as_ref().unwrap().basic_info() {
+	Ok(info) => {
+		assert_eq!(info.koid.raw_koid(), _handle_koids[0]);
+		
+		
+	},
+	Err(e) => panic!("handle basic_info failed: {}", e),
+}
+
+
 }
 
 #[test]
@@ -1339,20 +1401,22 @@ HandleDef{
 	rights: Rights::from_bits(2147483648).unwrap(),
 },
 ]);
+    let _handle_koids = handle_defs.iter().map(get_handle_koid).collect::<Vec<_>>();
     let handle_infos = &mut select_handle_infos(&handle_defs, &[
 0,]);
     let value = &mut test_conformance::GoldenNullableHandleStruct::new_empty();
     Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
-    // Forget handles before dropping the expected value, to avoid double closing them.
-    struct ForgetHandles(test_conformance::GoldenNullableHandleStruct);
-    impl std::ops::Drop for ForgetHandles {
-        #[allow(unused_parens)]
-        fn drop(&mut self) {
-            std::mem::forget(std::mem::replace((&mut self.0.v).as_mut().unwrap(), Handle::invalid().into()));
-        }
-    }
-    let expected_value = ForgetHandles(test_conformance::GoldenNullableHandleStruct { v: Some(copy_handle(&handle_defs[0])) });
-    assert_eq!(value, &expected_value.0);
+    
+match value.v.as_ref().unwrap().basic_info() {
+	Ok(info) => {
+		assert_eq!(info.koid.raw_koid(), _handle_koids[0]);
+		
+		
+	},
+	Err(e) => panic!("handle basic_info failed: {}", e),
+}
+
+
 }
 
 #[test]
