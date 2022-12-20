@@ -11,7 +11,7 @@ use {
     aes_gcm::aead::generic_array::{typenum::U32, GenericArray},
     fidl_fuchsia_identity_account::Error as ApiError,
     fidl_fuchsia_identity_authentication::Mechanism,
-    identity_common::PrekeyMaterial,
+    identity_common::{EnrollmentData, PrekeyMaterial},
     serde::{Deserialize, Deserializer, Serialize, Serializer},
     tracing::warn,
 };
@@ -87,7 +87,7 @@ pub enum EnrollmentState {
         /// the mechanism used for authentication challenges.
         mechanism: Mechanism,
         /// the enrollment data for that authentication mechanism,
-        data: Vec<u8>,
+        data: EnrollmentData,
         /// both the volume encryption key and the null key (a key of all
         /// zeroes), wrapped with the authenticator prekey material.
         wrapped_key_material: WrappedKeySet,
@@ -116,7 +116,7 @@ where
 pub fn produce_single_enrollment(
     auth_mechanism_id: String,
     mechanism: Mechanism,
-    enrollment_data: Vec<u8>,
+    enrollment_data: EnrollmentData,
     prekey_material: PrekeyMaterial,
     disk_key: &GenericArray<u8, U32>,
 ) -> Result<EnrollmentState, ApiError> {
@@ -139,7 +139,7 @@ mod tests {
         static ref TEST_ENROLLMENT_STATE: EnrollmentState = EnrollmentState::SingleEnrollment {
             auth_mechanism_id: String::from("test_id"),
             mechanism: Mechanism::Test,
-            data: vec![1, 2, 3],
+            data: EnrollmentData(vec![1, 2, 3]),
             wrapped_key_material: WrappedKeySet {
                 wrapped_disk_key: WrappedKey {
                     ciphertext_and_tag: vec![4, 5, 6],

@@ -10,14 +10,25 @@
 // (and needs to be used).
 #![allow(clippy::let_unit_value)]
 
+use serde::{Deserialize, Serialize};
+
 // Async task management.
 mod task_group;
 // Staged file atomic write support.
 mod staged_file;
 
 /// Data associated with authentication enrollment.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct EnrollmentData(pub Vec<u8>);
+
+impl std::ops::Deref for EnrollmentData {
+    type Target = Vec<u8>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 /// Data associated with an enrollment of an authentication mechanism
 /// capable of storage unlock.

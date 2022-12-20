@@ -576,7 +576,7 @@ where
                 produce_single_enrollment(
                     auth_mechanism_id,
                     Mechanism::Test,
-                    data.0,
+                    data,
                     prekey_material,
                     disk_key,
                 )?
@@ -604,8 +604,7 @@ where
                     AccountManagerError::new(ApiError::InvalidRequest)
                         .with_cause(format_err!("Interaction ServerEnd missing."))
                 })?;
-                let (EnrollmentData(data), prekey_material) =
-                    Interaction::enroll(server_end, *mechanism).await?;
+                let (data, prekey_material) = Interaction::enroll(server_end, *mechanism).await?;
                 // TODO(fxb/116213): Remove the clone once we don't need to
                 // return the prekey for checking outside of this block.
                 produce_single_enrollment(
@@ -653,7 +652,7 @@ where
             ref wrapped_key_material,
         } = enrollment_state
         {
-            let mut enrollments = vec![Enrollment { id: ENROLLMENT_ID, data: data.clone() }];
+            let mut enrollments = vec![Enrollment { id: ENROLLMENT_ID, data: data.to_vec() }];
             let auth_attempt = if !is_interaction_enabled {
                 let (_, test_interaction_server_end) = create_endpoints().unwrap();
                 let mut test_ipse = InteractionProtocolServerEnd::Test(test_interaction_server_end);
@@ -697,7 +696,7 @@ where
                 pre_auth::EnrollmentState::SingleEnrollment {
                     auth_mechanism_id: auth_mechanism_id.to_string(),
                     mechanism: *mechanism,
-                    data,
+                    data: EnrollmentData(data),
                     wrapped_key_material: wrapped_key_material.clone(),
                 }
             });
