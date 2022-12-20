@@ -299,7 +299,8 @@ zx_status_t UsbXhci::UsbHciResetEndpoint(uint32_t device_id, uint8_t ep_address)
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-TRBPromise UsbXhci::UsbHciResetEndpointAsync(uint32_t device_id, uint8_t ep_address) {
+fpromise::promise<void, zx_status_t> UsbXhci::UsbHciResetEndpointAsync(uint32_t device_id,
+                                                                       uint8_t ep_address) {
   auto harness = static_cast<EventRingHarness*>(GetTestHarness());
   std::unique_ptr<Command> command = std::make_unique<Command>();
   fpromise::bridge<TRB*, zx_status_t> bridge;
@@ -308,7 +309,7 @@ TRBPromise UsbXhci::UsbHciResetEndpointAsync(uint32_t device_id, uint8_t ep_addr
   command->endpoint = ep_address;
   command->completer = std::move(bridge.completer);
   harness->AddCommand(std::move(command));
-  return bridge.consumer.promise();
+  return bridge.consumer.promise().discard_value();
 }
 
 zx_status_t UsbXhci::UsbHciResetDevice(uint32_t hub_address, uint32_t device_id) {
@@ -328,8 +329,9 @@ void UsbXhci::UsbHciRequestQueue(usb_request_t* usb_request,
 
 uint16_t UsbXhci::InterrupterMapping() { return 0; }
 
-TRBPromise UsbXhci::Timeout(uint16_t target_interrupter, zx::time deadline) {
-  return fpromise::make_ok_promise(static_cast<TRB*>(nullptr));
+fpromise::promise<void, zx_status_t> UsbXhci::Timeout(uint16_t target_interrupter,
+                                                      zx::time deadline) {
+  return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok());
 }
 
 zx_status_t TransferRing::Init(size_t page_size, const zx::bti& bti, EventRing* ring, bool is_32bit,
@@ -357,11 +359,12 @@ fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> TransferRing::TakePendingTRBs
   return empty;
 }
 
-TRBPromise UsbXhci::DeviceOffline(uint32_t slot, TRB* continuation) {
-  return fpromise::make_error_promise(ZX_ERR_NOT_SUPPORTED);
+fpromise::promise<void, zx_status_t> UsbXhci::DeviceOffline(uint32_t slot) {
+  return fpromise::make_error_promise<zx_status_t>(ZX_ERR_NOT_SUPPORTED);
 }
 
-TRBPromise EnumerateDevice(UsbXhci* hci, uint8_t port, std::optional<HubInfo> hub_info) {
+fpromise::promise<void, zx_status_t> EnumerateDevice(UsbXhci* hci, uint8_t port,
+                                                     std::optional<HubInfo> hub_info) {
   auto harness = static_cast<EventRingHarness*>(hci->GetTestHarness());
   std::unique_ptr<Command> command = std::make_unique<Command>();
   fpromise::bridge<TRB*, zx_status_t> bridge;
@@ -370,7 +373,7 @@ TRBPromise EnumerateDevice(UsbXhci* hci, uint8_t port, std::optional<HubInfo> hu
   command->hub = hub_info;
   command->completer = std::move(bridge.completer);
   harness->AddCommand(std::move(command));
-  return bridge.consumer.promise();
+  return bridge.consumer.promise().discard_value();
 }
 
 TRB* TransferRing::PhysToVirt(zx_paddr_t paddr) {

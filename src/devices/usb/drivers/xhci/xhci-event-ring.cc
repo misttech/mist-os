@@ -9,10 +9,12 @@
 #include <lib/fit/defer.h>
 #include <lib/fpromise/promise.h>
 #include <lib/zx/clock.h>
+#include <zircon/errors.h>
 
 #include <optional>
 
 #include "src/devices/usb/drivers/xhci/usb-xhci.h"
+#include "src/devices/usb/drivers/xhci/xhci-enumeration.h"
 
 namespace usb_xhci {
 
@@ -180,9 +182,9 @@ zx_status_t EventRing::AddSegment() {
   return ZX_OK;
 }
 
-TRBPromise EventRing::HandlePortStatusChangeEvent(uint8_t port_id) {
+fpromise::promise<void, zx_status_t> EventRing::HandlePortStatusChangeEvent(uint8_t port_id) {
   auto sc = PORTSC::Get(cap_length_, port_id).ReadFrom(mmio_);
-  std::optional<TRBPromise> pending_enumeration;
+  std::optional<fpromise::promise<void, zx_status_t>> pending_enumeration;
   // Read status bits
   bool needs_enum = false;
 
@@ -234,10 +236,9 @@ TRBPromise EventRing::HandlePortStatusChangeEvent(uint8_t port_id) {
         // USB 2.0 specification section 9.2.6.3
         // states that we must wait 10 milliseconds.
         needs_enum = false;
-        pending_enumeration =
-            hci_->Timeout(interrupter_, zx::deadline_after(zx::msec(10)))
-                .and_then([=](TRB*& result) { return LinkUp(static_cast<uint8_t>(port_id)); })
-                .box();
+        pending_enumeration = hci_->Timeout(interrupter_, zx::deadline_after(zx::msec(10)))
+                                  .and_then([=]() { return LinkUp(static_cast<uint8_t>(port_id)); })
+                                  .box();
       } else {
         needs_enum = false;
         pending_enumeration = LinkUp(static_cast<uint8_t>(port_id));
@@ -252,7 +253,7 @@ TRBPromise EventRing::HandlePortStatusChangeEvent(uint8_t port_id) {
     hci_->GetPortState()[port_id - 1].is_connected = false;
     hci_->GetPortState()[port_id - 1].is_USB3 = false;
     if (hci_->GetPortState()[port_id - 1].slot_id) {
-      ScheduleTask(hci_->DeviceOffline(hci_->GetPortState()[port_id - 1].slot_id, nullptr).box());
+      ScheduleTask(hci_->DeviceOffline(hci_->GetPortState()[port_id - 1].slot_id).box());
     }
   }
 
@@ -289,7 +290,7 @@ TRBPromise EventRing::HandlePortStatusChangeEvent(uint8_t port_id) {
         .WriteTo(mmio_);
   }
   if (sc.PEC()) {
-    return fpromise::make_error_promise(ZX_ERR_BAD_STATE);
+    return fpromise::make_error_promise<zx_status_t>(ZX_ERR_BAD_STATE);
   }
   if (sc.PRC() || sc.WRC()) {
     PORTSC::Get(cap_length_, port_id)
@@ -308,37 +309,37 @@ TRBPromise EventRing::HandlePortStatusChangeEvent(uint8_t port_id) {
   }
   if (needs_enum) {
     return WaitForPortStatusChange(port_id)
-        .and_then([=](TRB*& trb) {
+        .and_then([=]() {
           // Retry enumeration
           SchedulePortStatusChange(port_id, true);
-          return fpromise::ok(trb);
+          return fpromise::ok();
         })
         .box();
   }
-  return fpromise::make_ok_promise(static_cast<TRB*>(nullptr));
+  return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok());
 }
 
-TRBPromise EventRing::WaitForPortStatusChange(uint8_t port_id) {
+fpromise::promise<void, zx_status_t> EventRing::WaitForPortStatusChange(uint8_t port_id) {
   fpromise::bridge<TRB*, zx_status_t> bridge;
   auto context = hci_->GetCommandRing()->AllocateContext();
   context->completer = std::move(bridge.completer);
   hci_->GetPortState()[port_id - 1].wait_for_port_status_change_ = std::move(context);
-  return bridge.consumer.promise();
+  return bridge.consumer.promise().discard_value();
 }
 
 void EventRing::CallPortStatusChanged(fbl::RefPtr<PortStatusChangeState> state) {
   if (state->port_index < state->port_count) {
     ScheduleTask(HandlePortStatusChangeEvent(static_cast<uint8_t>(state->port_index))
-                     .then([=](fpromise::result<TRB*, zx_status_t>& trb)
-                               -> fpromise::result<TRB*, zx_status_t> {
-                       if (trb.is_error()) {
-                         if (trb.error() == ZX_ERR_BAD_STATE) {
-                           return trb;
+                     .then([=](fpromise::result<void, zx_status_t>& result)
+                               -> fpromise::result<void, zx_status_t> {
+                       if (result.is_error()) {
+                         if (result.error() == ZX_ERR_BAD_STATE) {
+                           return fpromise::error(ZX_ERR_BAD_STATE);
                          }
                        }
                        state->port_index++;
                        CallPortStatusChanged(state);
-                       return fpromise::ok(nullptr);
+                       return fpromise::ok();
                      })
                      .box());
   } else {
@@ -349,18 +350,19 @@ void EventRing::CallPortStatusChanged(fbl::RefPtr<PortStatusChangeState> state) 
       auto enum_task = enumeration_queue_.pop_front();
       ScheduleTask(HandlePortStatusChangeEvent(enum_task->port_number)
                        .then([this, state, task = std::move(enum_task)](
-                                 fpromise::result<TRB*, zx_status_t>& trb) mutable {
-                         if (trb.is_error()) {
-                           if (trb.error() == ZX_ERR_BAD_STATE) {
-                             return trb;
+                                 fpromise::result<void, zx_status_t>& result) mutable
+                             -> fpromise::result<void, zx_status_t> {
+                         if (result.is_error()) {
+                           if (result.error() == ZX_ERR_BAD_STATE) {
+                             return fpromise::error(ZX_ERR_BAD_STATE);
                            }
-                           task->completer->complete_error(trb.error());
+                           task->completer->complete_error(result.error());
                          } else {
-                           task->completer->complete_ok(trb.value());
+                           task->completer->complete_ok(nullptr);
                          }
                          state->port_index = state->port_count;
                          CallPortStatusChanged(state);
-                         return trb;
+                         return result;
                        }));
     }
   }
@@ -391,21 +393,17 @@ zx_status_t EventRing::Ring0Bringup() {
   return ZX_OK;
 }
 
-void EventRing::ScheduleTask(fpromise::promise<TRB*, zx_status_t> promise) {
-  {
-    auto continuation = promise.then([=](fpromise::result<TRB*, zx_status_t>& result) {
-      if (result.is_error()) {
-        // ZX_ERR_BAD_STATE is a special value that we use to signal
-        // a fatal error in xHCI. When this occurs, we should immediately
-        // attempt to shutdown the controller. This error cannot be recovered from.
-        if (result.error() == ZX_ERR_BAD_STATE) {
-          hci_->Shutdown(ZX_ERR_BAD_STATE);
-        }
-      }
-      return result;
-    });
-    executor_.schedule_task(std::move(continuation));
-  }
+void EventRing::ScheduleTask(fpromise::promise<void, zx_status_t> promise) {
+  auto continuation = promise.or_else([=](const zx_status_t& status) {
+    // ZX_ERR_BAD_STATE is a special value that we use to signal
+    // a fatal error in xHCI. When this occurs, we should immediately
+    // attempt to shutdown the controller. This error cannot be recovered from.
+    if (status == ZX_ERR_BAD_STATE) {
+      zxlogf(ERROR, "Scheduled task returned a fatal error, shutting down");
+      hci_->Shutdown(status);
+    }
+  });
+  executor_.schedule_task(std::move(continuation));
 }
 
 void EventRing::RunUntilIdle() { executor_.run_until_idle(); }
@@ -421,9 +419,9 @@ bool EventRing::StallWorkaroundForDefectiveHubs(std::unique_ptr<TRBContext>& con
       desc->b_device_protocol =
           0;  // Don't support multi-TT unless we're sure the device supports it.
       ScheduleTask(hci_->UsbHciResetEndpointAsync(request->header.device_id, 0)
-                       .and_then([ctx = std::move(context)](TRB*& result) {
+                       .and_then([ctx = std::move(context)]() {
                          ctx->request->Complete(ZX_OK, sizeof(*desc));
-                         return fpromise::ok(result);
+                         return fpromise::ok();
                        }));
 
       return true;
@@ -854,7 +852,7 @@ void EventRing::HandleTransferInterrupt() {
   context->request->Complete(ZX_OK, context->request->request()->header.length);
 }
 
-TRBPromise EventRing::LinkUp(uint8_t port_id) {
+fpromise::promise<void, zx_status_t> EventRing::LinkUp(uint8_t port_id) {
   // Port is in U0 state (link up)
   // Enumerate device
   return EnumerateDevice(hci_, port_id, std::nullopt);

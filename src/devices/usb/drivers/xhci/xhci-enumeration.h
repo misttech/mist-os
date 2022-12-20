@@ -5,7 +5,10 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_XHCI_XHCI_ENUMERATION_H_
 #define SRC_DEVICES_USB_DRIVERS_XHCI_XHCI_ENUMERATION_H_
 
-#include "src/devices/usb/drivers/xhci/xhci-context.h"
+#include <lib/fpromise/promise.h>
+#include <zircon/types.h>
+
+#include "src/devices/usb/drivers/xhci/xhci-hub.h"
 
 // Helper functions to assist with setup and teardown of USB devices.
 
@@ -18,7 +21,8 @@ class UsbXhci;
 // initialized.
 // Control TRBs must be run on the primary interrupter. Section 4.9.4.3: secondary interrupters
 // cannot handle them..
-TRBPromise EnumerateDevice(UsbXhci* hci, uint8_t port, std::optional<HubInfo> hub_info);
+fpromise::promise<void, zx_status_t> EnumerateDevice(UsbXhci* hci, uint8_t port,
+                                                     std::optional<HubInfo> hub_info);
 
 }  // namespace usb_xhci
 

@@ -57,17 +57,17 @@ zx_status_t Interrupter::Start(const RuntimeRegisterOffset& offset, fdf::MmioVie
   return ZX_OK;
 }
 
-TRBPromise Interrupter::Timeout(zx::time deadline) {
-  fpromise::bridge<TRB*, zx_status_t> bridge;
+fpromise::promise<void, zx_status_t> Interrupter::Timeout(zx::time deadline) {
+  fpromise::bridge<void, zx_status_t> bridge;
   zx_status_t status = async::PostTaskForTime(
       async_loop_->dispatcher(),
       [completer = std::move(bridge.completer), this]() mutable {
-        completer.complete_ok(nullptr);
+        completer.complete_ok();
         hci_->RunUntilIdle(interrupter_);
       },
       deadline);
   if (status != ZX_OK) {
-    return fpromise::make_error_promise(status);
+    return fpromise::make_error_promise<zx_status_t>(status);
   }
   return bridge.consumer.promise().box();
 }

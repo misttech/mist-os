@@ -9,6 +9,7 @@
 #include <lib/sync/completion.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/vmar.h>
+#include <zircon/types.h>
 
 #include <list>
 
@@ -458,14 +459,14 @@ fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> TransferRing::TakePendingTRBs
   return std::move(pending_trbs_);
 }
 
-void EventRing::ScheduleTask(fpromise::promise<TRB*, zx_status_t> promise) {
-  auto continuation = promise.then([=](fpromise::result<TRB*, zx_status_t>& result) {
-    if (result.is_error()) {
-      if (result.error() == ZX_ERR_BAD_STATE) {
-        hci_->Shutdown(ZX_ERR_BAD_STATE);
-      }
+void EventRing::ScheduleTask(fpromise::promise<void, zx_status_t> promise) {
+  auto continuation = promise.or_else([=](const zx_status_t& status) {
+    // ZX_ERR_BAD_STATE is a special value that we use to signal
+    // a fatal error in xHCI. When this occurs, we should immediately
+    // attempt to shutdown the controller. This error cannot be recovered from.
+    if (status == ZX_ERR_BAD_STATE) {
+      hci_->Shutdown(ZX_ERR_BAD_STATE);
     }
-    return result;
   });
   executor_.schedule_task(std::move(continuation));
 }
@@ -693,15 +694,16 @@ zx_status_t Interrupter::Start(const RuntimeRegisterOffset& offset,
 
 int Interrupter::IrqThread() { return 0; }
 
-TRBPromise Interrupter::Timeout(zx::time deadline) {
-  return fpromise::make_ok_promise(static_cast<TRB*>(nullptr));
+fpromise::promise<void, zx_status_t> Interrupter::Timeout(zx::time deadline) {
+  return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok());
 }
 
 // Enumerates a device as specified in xHCI section 4.3 starting from step 4
 // This method should be called once the physical port of a device has been
 // initialized.
-TRBPromise EnumerateDevice(UsbXhci* hci, uint8_t port, std::optional<HubInfo> hub_info) {
-  fpromise::bridge<TRB*, zx_status_t> bridge;
+fpromise::promise<void, zx_status_t> EnumerateDevice(UsbXhci* hci, uint8_t port,
+                                                     std::optional<HubInfo> hub_info) {
+  fpromise::bridge<void, zx_status_t> bridge;
   return bridge.consumer.promise();
 }
 

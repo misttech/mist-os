@@ -82,18 +82,16 @@ struct TestState {
   }
 };
 
-void EventRing::ScheduleTask(fpromise::promise<TRB*, zx_status_t> promise) {
-  {
-    auto continuation = promise.then([=](fpromise::result<TRB*, zx_status_t>& result) {
-      if (result.is_error()) {
-        if (result.error() == ZX_ERR_BAD_STATE) {
-          hci_->Shutdown(ZX_ERR_BAD_STATE);
-        }
-      }
-      return result;
-    });
-    executor_.schedule_task(std::move(continuation));
-  }
+void EventRing::ScheduleTask(fpromise::promise<void, zx_status_t> promise) {
+  auto continuation = promise.or_else([=](const zx_status_t& status) {
+    // ZX_ERR_BAD_STATE is a special value that we use to signal
+    // a fatal error in xHCI. When this occurs, we should immediately
+    // attempt to shutdown the controller. This error cannot be recovered from.
+    if (status == ZX_ERR_BAD_STATE) {
+      hci_->Shutdown(ZX_ERR_BAD_STATE);
+    }
+  });
+  executor_.schedule_task(std::move(continuation));
 }
 
 void EventRing::RunUntilIdle() { executor_.run_until_idle(); }
@@ -111,7 +109,7 @@ zx_status_t Interrupter::Start(const RuntimeRegisterOffset& offset,
   return ZX_OK;
 }
 
-TRBPromise Interrupter::Timeout(zx::time deadline) {
+fpromise::promise<void, zx_status_t> Interrupter::Timeout(zx::time deadline) {
   fpromise::bridge<TRB*, zx_status_t> bridge;
   auto state = reinterpret_cast<TestState*>(hci_->parent());
   auto context = state->trb_context_allocator_.New();
@@ -121,7 +119,7 @@ TRBPromise Interrupter::Timeout(zx::time deadline) {
   context->trb = trb;
   context->completer = std::move(bridge.completer);
   state->pending_operations.push_back(std::move(context));
-  return bridge.consumer.promise();
+  return bridge.consumer.promise().discard_value();
 }
 
 void UsbXhci::SetDeviceInformation(uint8_t slot, uint8_t port, const std::optional<HubInfo>& hub) {
@@ -250,7 +248,7 @@ TRBPromise UsbXhci::EnableSlotCommand() {
   return bridge.consumer.promise();
 }
 
-TRBPromise UsbXhci::DisableSlotCommand(uint32_t slot) {
+fpromise::promise<void, zx_status_t> UsbXhci::DisableSlotCommand(uint32_t slot) {
   fpromise::bridge<TRB*, zx_status_t> bridge;
   auto state = reinterpret_cast<TestState*>(parent_);
   auto context = state->trb_context_allocator_.New();
@@ -264,7 +262,7 @@ TRBPromise UsbXhci::DisableSlotCommand(uint32_t slot) {
   context->trb = trb;
   context->completer = std::move(bridge.completer);
   state->pending_operations.push_back(std::move(context));
-  return bridge.consumer.promise();
+  return bridge.consumer.promise().discard_value();
 }
 
 void UsbXhci::ResetPort(uint16_t port) {}
@@ -355,7 +353,8 @@ fpromise::promise<OwnedRequest, void> UsbXhci::UsbHciRequestQueue(OwnedRequest u
 
 size_t UsbXhci::UsbHciGetRequestSize() { return Request::RequestSize(sizeof(usb_request_t)); }
 
-TRBPromise UsbXhci::Timeout(uint16_t target_interrupter, zx::time deadline) {
+fpromise::promise<void, zx_status_t> UsbXhci::Timeout(uint16_t target_interrupter,
+                                                      zx::time deadline) {
   return interrupter(target_interrupter).Timeout(deadline);
 }
 
@@ -447,11 +446,9 @@ TEST_F(EnumerationTests, AddressDeviceCommandPassesThroughFailureCode) {
   hub_info->hub_speed = kSpeed;
   hub_info->multi_tt = kMultiTT;
   zx_status_t completion_code = -1;
-  TRB* completion_trb = nullptr;
   auto enumeration_task = EnumerateDevice(&controller(), kPort, std::move(hub_info))
-                              .then([&](fpromise::result<TRB*, zx_status_t>& result) {
+                              .then([&](fpromise::result<void, zx_status_t>& result) {
                                 if (result.is_ok()) {
-                                  completion_trb = result.value();
                                   completion_code = ZX_OK;
                                 } else {
                                   completion_code = result.error();
@@ -508,11 +505,9 @@ TEST_F(EnumerationTests, AddressDeviceCommandReturnsErrorOnFailure) {
   hub_info->hub_speed = kSpeed;
   hub_info->multi_tt = kMultiTT;
   zx_status_t completion_code = -1;
-  TRB* completion_trb = nullptr;
   auto enumeration_task = EnumerateDevice(&controller(), kPort, std::move(hub_info))
-                              .then([&](fpromise::result<TRB*, zx_status_t>& result) {
+                              .then([&](fpromise::result<void, zx_status_t>& result) {
                                 if (result.is_ok()) {
-                                  completion_trb = result.value();
                                   completion_code = ZX_OK;
                                 } else {
                                   completion_code = result.error();
@@ -572,11 +567,9 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceUponCompletion) {
   hub_info->hub_speed = kSpeed;
   hub_info->multi_tt = kMultiTT;
   zx_status_t completion_code = -1;
-  TRB* completion_trb = nullptr;
   auto enumeration_task = EnumerateDevice(&controller(), kPort, std::move(hub_info))
-                              .then([&](fpromise::result<TRB*, zx_status_t>& result) {
+                              .then([&](fpromise::result<void, zx_status_t>& result) {
                                 if (result.is_ok()) {
-                                  completion_trb = result.value();
                                   completion_code = ZX_OK;
                                 } else {
                                   completion_code = result.error();
@@ -683,11 +676,9 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceAfterSuccessfulRe
   hub_info->hub_speed = kSpeed;
   hub_info->multi_tt = false;
   zx_status_t completion_code = -1;
-  TRB* completion_trb = nullptr;
   auto enumeration_task = EnumerateDevice(&controller(), kPort, std::move(hub_info))
-                              .then([&](fpromise::result<TRB*, zx_status_t>& result) {
+                              .then([&](fpromise::result<void, zx_status_t>& result) {
                                 if (result.is_ok()) {
-                                  completion_trb = result.value();
                                   completion_code = ZX_OK;
                                 } else {
                                   completion_code = result.error();
@@ -892,7 +883,7 @@ TEST_F(EnumerationTests, DisableSlotAfterFailedRetry) {
   hub_info->multi_tt = false;
   zx_status_t completion_code = ZX_OK;
   auto enumeration_task = EnumerateDevice(&controller(), 5, std::move(hub_info))
-                              .then([&](fpromise::result<TRB*, zx_status_t>& result) {
+                              .then([&](fpromise::result<void, zx_status_t>& result) {
                                 if (result.is_ok()) {
                                   completion_code = ZX_OK;
                                 } else {

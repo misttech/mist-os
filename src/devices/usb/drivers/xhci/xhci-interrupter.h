@@ -56,7 +56,7 @@ class Interrupter {
   // owned by this interrupter
   zx::interrupt& GetIrq() { return irq_; }
 
-  TRBPromise Timeout(zx::time deadline);
+  fpromise::promise<void, zx_status_t> Timeout(zx::time deadline);
 
  private:
   std::atomic_bool active_ = false;

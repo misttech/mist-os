@@ -6,10 +6,12 @@
 #define SRC_DEVICES_USB_DRIVERS_XHCI_XHCI_EVENT_RING_H_
 
 #include <lib/dma-buffer/buffer.h>
+#include <lib/fpromise/promise.h>
 #include <lib/mmio/mmio.h>
 #include <lib/synchronous-executor/executor.h>
 #include <lib/trace/event.h>
 #include <lib/zx/bti.h>
+#include <zircon/errors.h>
 
 #include <optional>
 
@@ -105,15 +107,18 @@ class EventRing {
   TRB* erdp_virt() { return erdp_virt_; }
   zx_status_t HandleIRQ();
   zx_status_t Ring0Bringup();
-  void ScheduleTask(fpromise::promise<TRB*, zx_status_t> promise);
+
+  void ScheduleTask(TRBPromise promise) { ScheduleTask(promise.discard_value()); }
+  void ScheduleTask(fpromise::promise<void, zx_status_t> promise);
+
   void RunUntilIdle();
 
  private:
   void SchedulePortStatusChange(uint8_t port_id, bool preempt = false);
-  TRBPromise HandlePortStatusChangeEvent(uint8_t port_id);
-  TRBPromise WaitForPortStatusChange(uint8_t port_id);
+  fpromise::promise<void, zx_status_t> HandlePortStatusChangeEvent(uint8_t port_id);
+  fpromise::promise<void, zx_status_t> WaitForPortStatusChange(uint8_t port_id);
 
-  TRBPromise LinkUp(uint8_t port_id);
+  fpromise::promise<void, zx_status_t> LinkUp(uint8_t port_id);
   void CallPortStatusChanged(fbl::RefPtr<PortStatusChangeState> state);
 
   // Advance ERDP according to Section 4.9.4.1. Evaluates the validity of the current TRB and the

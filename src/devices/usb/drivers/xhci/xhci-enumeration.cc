@@ -84,8 +84,9 @@ struct AsyncState : public fbl::RefCounted<AsyncState> {
 
 // Retries enumeration if we get a USB transaction error.
 // See section 4.3 of revision 1.2 of the xHCI specification for details
-TRBPromise RetryEnumeration(UsbXhci* hci, uint8_t port, std::optional<HubInfo> hub_info,
-                            const fbl::RefPtr<AsyncState>& state) {
+fpromise::promise<void, zx_status_t> RetryEnumeration(UsbXhci* hci, uint8_t port,
+                                                      std::optional<HubInfo> hub_info,
+                                                      const fbl::RefPtr<AsyncState>& state) {
   // Take the current slot out of state, so the error handler won't try to disable the slot a second
   // time.
   uint8_t old_slot = *state->slot;
@@ -93,7 +94,7 @@ TRBPromise RetryEnumeration(UsbXhci* hci, uint8_t port, std::optional<HubInfo> h
 
   // Disabling the slot is required due to fxbug.dev/41924
   return hci->DisableSlotCommand(old_slot)
-      .and_then([=](TRB*& result) -> TRBPromise {
+      .and_then([=]() -> TRBPromise {
         // DisableSlotCommand will never return an error in the TRB.
         // Failure to disable a slot is considered a fatal error, and will result in
         // ZX_ERR_BAD_STATE being returned.
@@ -128,17 +129,18 @@ TRBPromise RetryEnumeration(UsbXhci* hci, uint8_t port, std::optional<HubInfo> h
         // Issue a SET_ADDRESS request to the device
         return hci->AddressDeviceCommand(*state->slot);
       })
-      .and_then([=](TRB*& result) -> fpromise::result<TRB*, zx_status_t> {
+      .and_then([=](TRB*& result) -> fpromise::result<void, zx_status_t> {
         auto completion_event = static_cast<CommandCompletionEvent*>(result);
         if (completion_event->CompletionCode() != CommandCompletionEvent::Success) {
           return fpromise::error(ZX_ERR_IO);
         }
-        return fpromise::ok(nullptr);
+        return fpromise::ok();
       })
       .box();
 }
 
-TRBPromise EnumerateDevice(UsbXhci* hci, uint8_t port, std::optional<HubInfo> hub_info) {
+fpromise::promise<void, zx_status_t> EnumerateDevice(UsbXhci* hci, uint8_t port,
+                                                     std::optional<HubInfo> hub_info) {
   auto state = fbl::MakeRefCounted<AsyncState>();
 
   // Obtain a Device Slot for the newly attached device
@@ -156,32 +158,33 @@ TRBPromise EnumerateDevice(UsbXhci* hci, uint8_t port, std::optional<HubInfo> hu
         // For the first attempt, BSR should be set to false. Section 4.3.4.
         return hci->AddressDeviceCommand(*state->slot, port, hub_info, /*bsr=*/false);
       })
-      .and_then([=](TRB*& result) -> TRBPromise {
+      .and_then([=](TRB*& result) -> fpromise::promise<void, zx_status_t> {
         // Check for errors and retry if the device refuses the SET_ADDRESS command
         auto completion_event = static_cast<CommandCompletionEvent*>(result);
         if (completion_event->CompletionCode() == CommandCompletionEvent::UsbTransactionError) {
           if (!hci->IsDeviceConnected(*state->slot)) {
-            return fpromise::make_error_promise(ZX_ERR_IO);
+            return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO);
           }
           return RetryEnumeration(hci, port, hub_info, state);
         }
         if (completion_event->CompletionCode() != CommandCompletionEvent::Success) {
-          return fpromise::make_error_promise(ZX_ERR_IO);
+          return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO);
         }
-        return fpromise::make_result_promise<TRB*, zx_status_t>(fpromise::ok(nullptr));
+        return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok());
       })
-      .and_then([=](TRB*& result) -> TRBPromise {
+      .and_then([=]() -> fpromise::promise<void, zx_status_t> {
         auto speed = hci->GetDeviceSpeed(*state->slot);
         if (!speed.has_value()) {
-          return fpromise::make_error_promise(ZX_ERR_BAD_STATE);
+          return fpromise::make_error_promise<>(ZX_ERR_BAD_STATE);
         }
         if (speed.value() != USB_SPEED_SUPER) {
           // See USB 2.0 specification (revision 2.0) section 9.2.6
-          return hci->Timeout(kPrimaryInterrupter, zx::deadline_after(zx::msec(10)));
+          return hci->Timeout(kPrimaryInterrupter, zx::deadline_after(zx::msec(10)))
+              .discard_value();
         }
-        return fpromise::make_result_promise<TRB*, zx_status_t>(fpromise::ok(nullptr));
+        return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok());
       })
-      .and_then([=](TRB*& result) -> fpromise::promise<uint8_t, zx_status_t> {
+      .and_then([=]() -> fpromise::promise<uint8_t, zx_status_t> {
         // For full-speed devices, system software should read the first 8 bytes
         // of the device descriptor to determine the max packet size of the default control
         // endpoint. Additionally, certain devices may require the controller to read this value
@@ -208,7 +211,7 @@ TRBPromise EnumerateDevice(UsbXhci* hci, uint8_t port, std::optional<HubInfo> hu
         // Now read the whole descriptor.
         return GetDeviceDescriptor(hci, *state->slot, sizeof(usb_device_descriptor_t));
       })
-      .and_then([=](usb_device_descriptor_t& descriptor) -> fpromise::result<TRB*, zx_status_t> {
+      .and_then([=](usb_device_descriptor_t& descriptor) -> fpromise::result<void, zx_status_t> {
         hci->CreateDeviceInspectNode(*state->slot, le16toh(descriptor.id_vendor),
                                      le16toh(descriptor.id_product));
 
@@ -221,9 +224,9 @@ TRBPromise EnumerateDevice(UsbXhci* hci, uint8_t port, std::optional<HubInfo> hu
         if (status != ZX_OK) {
           return fpromise::error(status);
         }
-        return fpromise::ok(nullptr);
+        return fpromise::ok();
       })
-      .or_else([=](const zx_status_t& status) -> fpromise::result<TRB*, zx_status_t> {
+      .or_else([=](const zx_status_t& status) -> fpromise::result<void, zx_status_t> {
         // Clean up the slot if we didn't successfully enumerate.
         if (state->slot.has_value()) {
           hci->ScheduleTask(kPrimaryInterrupter, hci->DisableSlotCommand(*state->slot));

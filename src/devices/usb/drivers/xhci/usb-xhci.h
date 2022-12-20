@@ -13,7 +13,9 @@
 #include <lib/async/cpp/executor.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/device-protocol/pdev.h>
+#include <lib/dma-buffer/buffer.h>
 #include <lib/fit/function.h>
+#include <lib/fpromise/promise.h>
 #include <lib/fpromise/single_threaded_executor.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
@@ -34,15 +36,13 @@
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 
-#include "lib/dma-buffer/buffer.h"
+#include "src/devices/usb/drivers/xhci/xhci-context.h"
 #include "src/devices/usb/drivers/xhci/xhci-device-state.h"
-#include "src/devices/usb/drivers/xhci/xhci-enumeration.h"
 #include "src/devices/usb/drivers/xhci/xhci-event-ring.h"
 #include "src/devices/usb/drivers/xhci/xhci-hub.h"
 #include "src/devices/usb/drivers/xhci/xhci-interrupter.h"
 #include "src/devices/usb/drivers/xhci/xhci-port-state.h"
 #include "src/devices/usb/drivers/xhci/xhci-transfer-ring.h"
-#include "zircon/system/ulib/inspect/include/lib/inspect/cpp/vmo/types.h"
 
 namespace usb_xhci {
 
@@ -136,16 +136,19 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
   // Queues a request and returns a promise
   fpromise::promise<OwnedRequest, void> UsbHciRequestQueue(OwnedRequest usb_request);
 
-  TRBPromise UsbHciEnableEndpoint(uint32_t device_id, const usb_endpoint_descriptor_t* ep_desc,
-                                  const usb_ss_ep_comp_descriptor_t* ss_com_desc);
-  TRBPromise UsbHciDisableEndpoint(uint32_t device_id, const usb_endpoint_descriptor_t* ep_desc,
-                                   const usb_ss_ep_comp_descriptor_t* ss_com_desc);
-  TRBPromise UsbHciResetEndpointAsync(uint32_t device_id, uint8_t ep_address);
+  fpromise::promise<void, zx_status_t> UsbHciEnableEndpoint(
+      uint32_t device_id, const usb_endpoint_descriptor_t* ep_desc,
+      const usb_ss_ep_comp_descriptor_t* ss_com_desc);
+  fpromise::promise<void, zx_status_t> UsbHciDisableEndpoint(
+      uint32_t device_id, const usb_endpoint_descriptor_t* ep_desc,
+      const usb_ss_ep_comp_descriptor_t* ss_com_desc);
+  fpromise::promise<void, zx_status_t> UsbHciResetEndpointAsync(uint32_t device_id,
+                                                                uint8_t ep_address);
 
   bool Running() const { return running_; }
 
   // Offlines a device slot, removing its device node from the topology.
-  TRBPromise DeviceOffline(uint32_t slot, TRB* continuation);
+  fpromise::promise<void, zx_status_t> DeviceOffline(uint32_t slot);
 
   // Onlines a device, publishing a device node in the DDK.
   zx_status_t DeviceOnline(uint32_t slot, uint16_t port, usb_speed_t speed);
@@ -161,7 +164,7 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
   }
 
   // Disables a slot
-  TRBPromise DisableSlotCommand(uint32_t slot_id);
+  fpromise::promise<void, zx_status_t> DisableSlotCommand(uint32_t slot_id);
 
   TRBPromise EnableSlotCommand();
 
@@ -225,12 +228,18 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
     interrupter(target_interrupter).ring().ScheduleTask(std::move(promise));
   }
 
+  // Schedules a promise for execution on the executor
+  void ScheduleTask(uint16_t target_interrupter, fpromise::promise<void, zx_status_t> promise) {
+    interrupter(target_interrupter).ring().ScheduleTask(std::move(promise));
+  }
+
   // Schedules the promise for execution and synchronously waits for it to complete
+  template <typename V>
   zx_status_t RunSynchronously(uint16_t target_interrupter,
-                               fpromise::promise<TRB*, zx_status_t> promise) {
+                               fpromise::promise<V, zx_status_t> promise) {
     sync_completion_t completion;
     zx_status_t completion_code;
-    auto continuation = promise.then([&](fpromise::result<TRB*, zx_status_t>& result) {
+    auto continuation = promise.then([&](fpromise::result<V, zx_status_t>& result) {
       if (result.is_ok()) {
         completion_code = ZX_OK;
         sync_completion_signal(&completion);
@@ -247,7 +256,7 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
   }
 
   // Creates a promise that resolves after a timeout
-  TRBPromise Timeout(uint16_t target_interrupter, zx::time deadline);
+  fpromise::promise<void, zx_status_t> Timeout(uint16_t target_interrupter, zx::time deadline);
 
   // Provides a barrier for promises.
   // After this method is invoked, all pending promises on all interrupters will be flushed.
@@ -337,16 +346,18 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
         }));
   }
 
-  TRBPromise ConfigureHubAsync(uint32_t device_id, usb_speed_t speed,
-                               const usb_hub_descriptor_t* desc, bool multi_tt);
+  fpromise::promise<void, zx_status_t> ConfigureHubAsync(uint32_t device_id, usb_speed_t speed,
+                                                         const usb_hub_descriptor_t* desc,
+                                                         bool multi_tt);
 
   // UsbHci Helper Functions
   // Queues a control request
   void UsbHciControlRequestQueue(Request request);
   // Queues a normal request
   void UsbHciNormalRequestQueue(Request request);
-  TRBPromise UsbHciCancelAllAsync(uint32_t device_id, uint8_t ep_address);
-  TRBPromise UsbHciHubDeviceAddedAsync(uint32_t device_id, uint32_t port, usb_speed_t speed);
+  fpromise::promise<void, zx_status_t> UsbHciCancelAllAsync(uint32_t device_id, uint8_t ep_address);
+  fpromise::promise<void, zx_status_t> UsbHciHubDeviceAddedAsync(uint32_t device_id, uint32_t port,
+                                                                 usb_speed_t speed);
 
   // InterrupterMapping: finds an interrupter. Currently finds the interrupter with the least
   // pressure.

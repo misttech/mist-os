@@ -22,6 +22,7 @@
 #include <threads.h>
 #include <unistd.h>
 #include <zircon/errors.h>
+#include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
@@ -34,6 +35,8 @@
 #include <usb/usb-request.h>
 
 #include "src/devices/usb/drivers/xhci/usb_xhci_bind.h"
+#include "src/devices/usb/drivers/xhci/xhci-context.h"
+#include "src/devices/usb/drivers/xhci/xhci-enumeration.h"
 
 namespace usb_xhci {
 
@@ -92,18 +95,6 @@ uint8_t XhciEndpointIndex(uint8_t ep_address) {
   if ((ep_address & USB_ENDPOINT_DIR_MASK) == USB_ENDPOINT_OUT)
     index--;
   return index;
-}
-
-// Converts a USB request promise to a TRB promise. The returned TRB pointer
-// will be nullptr.
-TRBPromise USBRequestToTRBPromise(fpromise::promise<OwnedRequest> promise) {
-  return promise.then(
-      [=](fpromise::result<OwnedRequest>& result) -> fpromise::result<TRB*, zx_status_t> {
-        if (result.value().request()->response.status != ZX_OK) {
-          return fpromise::error(result.value().request()->response.status);
-        }
-        return fpromise::ok<TRB*>(nullptr);
-      });
 }
 
 }  // namespace
@@ -208,20 +199,20 @@ uint16_t UsbXhci::InterrupterMapping() {
   return idx;
 }
 
-TRBPromise UsbXhci::Timeout(uint16_t target_interrupter, zx::time deadline) {
+fpromise::promise<void, zx_status_t> UsbXhci::Timeout(uint16_t target_interrupter,
+                                                      zx::time deadline) {
   return interrupter(target_interrupter).Timeout(deadline);
 }
 
-TRBPromise UsbXhci::DisableSlotCommand(uint32_t slot_id) {
+fpromise::promise<void, zx_status_t> UsbXhci::DisableSlotCommand(uint32_t slot_id) {
   uint8_t port;
   bool connected_to_hub = false;
   {
     auto& state = device_state_[slot_id - 1];
     fbl::AutoLock _(&state.transaction_lock());
     if (!state.IsValid()) {
-      return fpromise::make_result_promise(
-                 fpromise::result<TRB*, zx_status_t>(fpromise::error(ZX_OK)))
-          .box();
+      // TODO(fxbug.dev/116231): Use and test appropriate result status.
+      return fpromise::make_error_promise<zx_status_t>(ZX_OK);
     }
     state.Disconnect();
     port = state.GetPort();
@@ -231,9 +222,7 @@ TRBPromise UsbXhci::DisableSlotCommand(uint32_t slot_id) {
   cmd.set_slot(slot_id);
   auto context = command_ring_.AllocateContext();
   if (!context) {
-    return fpromise::make_result_promise(
-               fpromise::result<TRB*, zx_status_t>(fpromise::error(ZX_ERR_BAD_STATE)))
-        .box();
+    return fpromise::make_error_promise<zx_status_t>(ZX_ERR_BAD_STATE);
   }
   if (!connected_to_hub) {
     port_state_[port - 1].slot_id = 0;
@@ -241,9 +230,9 @@ TRBPromise UsbXhci::DisableSlotCommand(uint32_t slot_id) {
 
   return SubmitCommand(cmd, std::move(context))
       .then([slot_id, this](fpromise::result<TRB*, zx_status_t>& result)
-                -> fpromise::result<TRB*, zx_status_t> {
+                -> fpromise::result<void, zx_status_t> {
         if (result.is_error()) {
-          return result;
+          return fpromise::error(result.error());
         }
         TRB* trb = result.value();
         auto completion_event = reinterpret_cast<CommandCompletionEvent*>(trb);
@@ -255,7 +244,7 @@ TRBPromise UsbXhci::DisableSlotCommand(uint32_t slot_id) {
           fbl::AutoLock _(&device_state_[slot_id - 1].transaction_lock());
           device_state_[slot_id - 1].Reset();
         }
-        return fpromise::ok(trb);
+        return fpromise::ok();
       })
       .box();
 }
@@ -395,18 +384,18 @@ zx_status_t UsbXhci::DeviceOnline(uint32_t slot, uint16_t port, usb_speed_t spee
   return ZX_OK;
 }
 
-TRBPromise UsbXhci::DeviceOffline(uint32_t slot, TRB* continuation) {
+fpromise::promise<void, zx_status_t> UsbXhci::DeviceOffline(uint32_t slot) {
   auto& state = device_state_[slot - 1];
   {
     fbl::AutoLock _(&state.transaction_lock());
     if (state.IsDisconnecting()) {
-      return fpromise::make_error_promise(ZX_ERR_IO_NOT_PRESENT);
+      return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
     }
     state.Disconnect();
   }
-  fpromise::bridge<TRB*, zx_status_t> bridge;
-  PostCallback([this, slot, cb = std::move(bridge.completer),
-                continuation](const ddk::UsbBusInterfaceProtocolClient& bus) mutable {
+  fpromise::bridge<void, zx_status_t> bridge;
+  PostCallback([this, slot, cb = std::move(bridge.completer)](
+                   const ddk::UsbBusInterfaceProtocolClient& bus) mutable {
     for (size_t i = 0; i < kMaxEndpoints; i++) {
       fbl::AutoLock _(&device_state_[slot - 1].transaction_lock());
       auto trbs = device_state_[slot - 1].GetTransferRing(i).TakePendingTRBs();
@@ -427,7 +416,7 @@ TRBPromise UsbXhci::DeviceOffline(uint32_t slot, TRB* continuation) {
       cb.complete_error(status);
       return status;
     }
-    cb.complete_ok(continuation);
+    cb.complete_ok();
     return status;
   });
   return bridge.consumer.promise().box();
@@ -455,8 +444,9 @@ void UsbXhci::ResetPort(uint16_t port) {
       .WriteTo(&mmio_.value());
 }
 
-TRBPromise UsbXhci::UsbHciHubDeviceAddedAsync(uint32_t device_id, uint32_t port,
-                                              usb_speed_t speed) {
+fpromise::promise<void, zx_status_t> UsbXhci::UsbHciHubDeviceAddedAsync(uint32_t device_id,
+                                                                        uint32_t port,
+                                                                        usb_speed_t speed) {
   auto state = &device_state_[device_id];
   // Acquire a slot
   HubInfo hub;
@@ -478,8 +468,10 @@ TRBPromise UsbXhci::UsbHciHubDeviceAddedAsync(uint32_t device_id, uint32_t port,
   return EnumerateDevice(this, static_cast<uint8_t>(port), std::make_optional(hub));
 }
 
-TRBPromise UsbXhci::ConfigureHubAsync(uint32_t device_id, usb_speed_t speed,
-                                      const usb_hub_descriptor_t* desc, bool multi_tt) {
+fpromise::promise<void, zx_status_t> UsbXhci::ConfigureHubAsync(uint32_t device_id,
+                                                                usb_speed_t speed,
+                                                                const usb_hub_descriptor_t* desc,
+                                                                bool multi_tt) {
   auto state = &device_state_[device_id];
   HubInfo hub;
   struct AddressDeviceStruct cmd;
@@ -487,7 +479,7 @@ TRBPromise UsbXhci::ConfigureHubAsync(uint32_t device_id, usb_speed_t speed,
   {
     fbl::AutoLock _(&state->transaction_lock());
     if (state->IsDisconnecting()) {
-      return fpromise::make_error_promise(ZX_ERR_IO_NOT_PRESENT);
+      return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
     }
     hub.hub_id = static_cast<uint8_t>(device_id);
     hub.speed = speed;
@@ -524,39 +516,43 @@ TRBPromise UsbXhci::ConfigureHubAsync(uint32_t device_id, usb_speed_t speed,
     context = command_ring_.AllocateContext();
   }
   return SubmitCommand(cmd, std::move(context))
-      .then([=](fpromise::result<TRB*, zx_status_t>& result) -> TRBPromise {
-        if (result.is_error()) {
-          return fpromise::make_error_promise(result.error());
-        }
-        auto completion = reinterpret_cast<CommandCompletionEvent*>(result.value());
+      .and_then([=](TRB*& trb) -> fpromise::promise<void, zx_status_t> {
+        auto completion = reinterpret_cast<CommandCompletionEvent*>(trb);
         if (completion->CompletionCode() != CommandCompletionEvent::Success) {
-          return fpromise::make_error_promise(ZX_ERR_IO);
+          return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO);
         }
-        if (speed == USB_SPEED_SUPER) {
-          std::optional<usb::Request<void>> request_wrapper;
-          zx_status_t status =
-              usb::Request<void>::Alloc(&request_wrapper, 0, 0, UsbHciGetRequestSize());
-          if (status != ZX_OK) {
-            return fpromise::make_error_promise(status);
-          }
-          usb_request_t* request = request_wrapper->request();
-          request->direct = true;
-          request->header.device_id = device_id;
-          request->header.ep_address = 0;
-          request->setup.bm_request_type = USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_DEVICE;
-          {
-            fbl::AutoLock _(&state->transaction_lock());
-            if (state->IsDisconnecting()) {
-              return fpromise::make_error_promise(ZX_ERR_IO_NOT_PRESENT);
-            }
-            request->setup.w_value = state->GetHubLocked()->hub_depth;
-          }
-          request->setup.w_index = 0;
-          request->setup.b_request = USB_HUB_SET_DEPTH;
-          request->setup.w_length = 0;
-          return USBRequestToTRBPromise(UsbHciRequestQueue(std::move(*request_wrapper)).box());
+        if (speed != USB_SPEED_SUPER) {
+          return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok());
         }
-        return fpromise::make_result_promise(result);
+        std::optional<usb::Request<void>> request_wrapper;
+        zx_status_t status =
+            usb::Request<void>::Alloc(&request_wrapper, 0, 0, UsbHciGetRequestSize());
+        if (status != ZX_OK) {
+          return fpromise::make_error_promise<zx_status_t>(status);
+        }
+        usb_request_t* request = request_wrapper->request();
+        request->direct = true;
+        request->header.device_id = device_id;
+        request->header.ep_address = 0;
+        request->setup.bm_request_type = USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_DEVICE;
+        {
+          fbl::AutoLock _(&state->transaction_lock());
+          if (state->IsDisconnecting()) {
+            return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
+          }
+          request->setup.w_value = state->GetHubLocked()->hub_depth;
+        }
+        request->setup.w_index = 0;
+        request->setup.b_request = USB_HUB_SET_DEPTH;
+        request->setup.w_length = 0;
+        return UsbHciRequestQueue(std::move(*request_wrapper))
+            .then(
+                [](fpromise::result<OwnedRequest>& result) -> fpromise::result<void, zx_status_t> {
+                  if (result.value().request()->response.status != ZX_OK) {
+                    return fpromise::error(result.value().request()->response.status);
+                  }
+                  return fpromise::ok();
+                });
       })
       .box();
 }
@@ -1185,9 +1181,9 @@ zx_status_t UsbXhci::UsbHciEnableEndpoint(uint32_t device_id,
                           UsbHciEnableEndpoint(device_id, ep_desc, ss_com_desc));
 }
 
-TRBPromise UsbXhci::UsbHciEnableEndpoint(uint32_t device_id,
-                                         const usb_endpoint_descriptor_t* ep_desc,
-                                         const usb_ss_ep_comp_descriptor_t* ss_com_desc) {
+fpromise::promise<void, zx_status_t> UsbXhci::UsbHciEnableEndpoint(
+    uint32_t device_id, const usb_endpoint_descriptor_t* ep_desc,
+    const usb_ss_ep_comp_descriptor_t* ss_com_desc) {
   auto context = command_ring_.AllocateContext();
   auto state = &device_state_[device_id];
   SlotContext* slot_context;
@@ -1197,7 +1193,7 @@ TRBPromise UsbXhci::UsbHciEnableEndpoint(uint32_t device_id,
   {
     fbl::AutoLock _(&state->transaction_lock());
     if (state->IsDisconnecting()) {
-      return fpromise::make_error_promise(ZX_ERR_IO_NOT_PRESENT);
+      return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
     }
     auto control = reinterpret_cast<uint32_t*>(state->GetInputContext()->virt());
 
@@ -1217,7 +1213,7 @@ TRBPromise UsbXhci::UsbHciEnableEndpoint(uint32_t device_id,
         page_size_, bti_, &this->interrupter(state->GetInterrupterTarget()).ring(), is_32bit_,
         &mmio_.value(), *this);
     if (status != ZX_OK) {
-      return fpromise::make_error_promise(status);
+      return fpromise::make_error_promise<zx_status_t>(status);
     }
     CRCR trb_phys = state->GetTransferRing(index - 1).phys(cap_length_);
     // Initialize endpoint context 0
@@ -1265,30 +1261,31 @@ TRBPromise UsbXhci::UsbHciEnableEndpoint(uint32_t device_id,
   // TODO (fxbug.dev/34140): Implement async support
   hw_mb();
   return SubmitCommand(trb, std::move(context))
-      .then([=](fpromise::result<TRB*, zx_status_t>& result) {
-        auto free_buffers = fit::defer([=]() {
-          fbl::AutoLock _(&state->transaction_lock());
-          state->GetTransferRing(index - 1).Deinit();
-          slot_context->set_CONTEXT_ENTRIES(context_entries);
-        });
-        if (result.is_error()) {
-          return result;
-        }
-        auto completion = static_cast<CommandCompletionEvent*>(result.value());
-        bool success = completion->CompletionCode() == CommandCompletionEvent::Success;
-        if (success) {
-          free_buffers.cancel();
-        } else {
-          return fpromise::result<TRB*, zx_status_t>(fpromise::error(ZX_ERR_IO));
-        }
-        return result;
-      })
+      .then(
+          [=](fpromise::result<TRB*, zx_status_t>& result) -> fpromise::result<void, zx_status_t> {
+            auto free_buffers = fit::defer([=]() {
+              fbl::AutoLock _(&state->transaction_lock());
+              state->GetTransferRing(index - 1).Deinit();
+              slot_context->set_CONTEXT_ENTRIES(context_entries);
+            });
+            if (result.is_error()) {
+              return fpromise::error(result.error());
+            }
+            auto completion = static_cast<CommandCompletionEvent*>(result.value());
+            bool success = completion->CompletionCode() == CommandCompletionEvent::Success;
+            if (success) {
+              free_buffers.cancel();
+            } else {
+              return fpromise::error(ZX_ERR_IO);
+            }
+            return fpromise::ok();
+          })
       .box();
 }
 
-TRBPromise UsbXhci::UsbHciDisableEndpoint(uint32_t device_id,
-                                          const usb_endpoint_descriptor_t* ep_desc,
-                                          const usb_ss_ep_comp_descriptor_t* ss_com_desc) {
+fpromise::promise<void, zx_status_t> UsbXhci::UsbHciDisableEndpoint(
+    uint32_t device_id, const usb_endpoint_descriptor_t* ep_desc,
+    const usb_ss_ep_comp_descriptor_t* ss_com_desc) {
   auto context = command_ring_.AllocateContext();
   auto state = &device_state_[device_id];
   uint8_t index = XhciEndpointIndex(ep_desc->b_endpoint_address);
@@ -1297,7 +1294,7 @@ TRBPromise UsbXhci::UsbHciDisableEndpoint(uint32_t device_id,
   {
     fbl::AutoLock _(&state->transaction_lock());
     if (state->IsDisconnecting()) {
-      return fpromise::make_error_promise(ZX_ERR_IO_NOT_PRESENT);
+      return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
     }
     control = reinterpret_cast<uint32_t*>(state->GetInputContext()->virt());
     // Initialize input slot context data structure (6.2.2) with 1 context entry
@@ -1314,7 +1311,7 @@ TRBPromise UsbXhci::UsbHciDisableEndpoint(uint32_t device_id,
   hw_mb();
   return SubmitCommand(trb, std::move(context))
       .then(
-          [=](fpromise::result<TRB*, zx_status_t>& result) -> fpromise::result<TRB*, zx_status_t> {
+          [=](fpromise::result<TRB*, zx_status_t>& result) -> fpromise::result<void, zx_status_t> {
             if (result.is_error()) {
               return fpromise::error(ZX_ERR_BAD_STATE);
             }
@@ -1335,7 +1332,7 @@ TRBPromise UsbXhci::UsbHciDisableEndpoint(uint32_t device_id,
             if (status != ZX_OK) {
               return fpromise::error(ZX_ERR_BAD_STATE);
             }
-            return result;
+            return fpromise::ok();
           })
       .box();
 }
@@ -1365,7 +1362,7 @@ zx_status_t UsbXhci::UsbHciConfigureHub(uint32_t device_id, usb_speed_t speed,
   sync_completion_t completion;
   zx_status_t hub_status = ZX_OK;
   ScheduleTask(kPrimaryInterrupter, ConfigureHubAsync(device_id, speed, desc, multi_tt)
-                                        .then([&](fpromise::result<TRB*, zx_status_t>& result) {
+                                        .then([&](fpromise::result<void, zx_status_t>& result) {
                                           if (result.is_ok()) {
                                             hub_status = ZX_OK;
                                           } else {
@@ -1385,7 +1382,7 @@ zx_status_t UsbXhci::UsbHciHubDeviceAdded(uint32_t device_id, uint32_t port, usb
   sync_completion_t completion;
   zx_status_t out_status;
   ScheduleTask(kPrimaryInterrupter, UsbHciHubDeviceAddedAsync(device_id, port, speed)
-                                        .then([&](fpromise::result<TRB*, zx_status_t>& result) {
+                                        .then([&](fpromise::result<void, zx_status_t>& result) {
                                           if (result.is_ok()) {
                                             out_status = ZX_OK;
                                           } else {
@@ -1452,19 +1449,12 @@ zx_status_t UsbXhci::UsbHciHubDeviceRemoved(uint32_t hub_id, uint32_t port) {
   if (status != ZX_OK) {
     return status;
   }
-  ScheduleTask(kPrimaryInterrupter,
-               DisableSlotCommand(slot)
-                   .then([&](fpromise::result<TRB*, zx_status_t>& result) {
-                     if (result.is_error()) {
-                       success = false;
-                       return result;
-                     }
-                     auto completion = static_cast<CommandCompletionEvent*>(result.value());
-                     success = completion->CompletionCode() == CommandCompletionEvent::Success;
-                     sync_completion_signal(&event);
-                     return result;
-                   })
-                   .box());
+  ScheduleTask(kPrimaryInterrupter, DisableSlotCommand(slot)
+                                        .inspect([&](fpromise::result<void, zx_status_t>& result) {
+                                          success = result.is_error();
+                                          sync_completion_signal(&event);
+                                        })
+                                        .box());
   sync_completion_wait(&event, ZX_TIME_INFINITE);
   return success ? ZX_OK : ZX_ERR_IO;
 }
@@ -1477,9 +1467,10 @@ zx_status_t UsbXhci::UsbHciResetEndpoint(uint32_t device_id, uint8_t ep_address)
   return RunSynchronously(kPrimaryInterrupter, UsbHciResetEndpointAsync(device_id, ep_address));
 }
 
-TRBPromise UsbXhci::UsbHciResetEndpointAsync(uint32_t device_id, uint8_t ep_address) {
+fpromise::promise<void, zx_status_t> UsbXhci::UsbHciResetEndpointAsync(uint32_t device_id,
+                                                                       uint8_t ep_address) {
   if (device_id >= params_.MaxSlots()) {
-    return fpromise::make_error_promise(ZX_ERR_NOT_SUPPORTED);
+    return fpromise::make_error_promise<zx_status_t>(ZX_ERR_NOT_SUPPORTED);
   }
   auto state = &device_state_[device_id];
   uint8_t index = XhciEndpointIndex(ep_address) - 1;
@@ -1487,14 +1478,14 @@ TRBPromise UsbXhci::UsbHciResetEndpointAsync(uint32_t device_id, uint8_t ep_addr
   {
     fbl::AutoLock _(&state->transaction_lock());
     if (state->IsDisconnecting()) {
-      return fpromise::make_error_promise(ZX_ERR_IO_NOT_PRESENT);
+      return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
     }
     reset_command.set_ENDPOINT(XhciEndpointIndex(ep_address) + 1);
     reset_command.set_SLOT(state->GetSlot());
   }
   auto context = command_ring_.AllocateContext();
   if (!context) {
-    return fpromise::make_error_promise(ZX_ERR_NO_MEMORY);
+    return fpromise::make_error_promise<zx_status_t>(ZX_ERR_NO_MEMORY);
   }
 
   TransferRing* ring;
@@ -1507,21 +1498,16 @@ TRBPromise UsbXhci::UsbHciResetEndpointAsync(uint32_t device_id, uint8_t ep_addr
       ring = &state->GetTransferRing(index);
     }
     if (!ring->stalled()) {
-      return fpromise::make_error_promise(ZX_ERR_INVALID_ARGS);
+      return fpromise::make_error_promise<zx_status_t>(ZX_ERR_INVALID_ARGS);
     }
   }
   return SubmitCommand(reset_command, std::move(context))
-      .then([=](fpromise::result<TRB*, zx_status_t>& result) {
-        if (result.is_error()) {
-          return fpromise::make_result_promise(result);
-        }
-        CommandCompletionEvent* evt = static_cast<CommandCompletionEvent*>(result.value());
+      .and_then([=](TRB*& trb) -> TRBPromise {
+        CommandCompletionEvent* evt = static_cast<CommandCompletionEvent*>(trb);
         if (evt->CompletionCode() != CommandCompletionEvent::Success) {
           return fpromise::make_error_promise(ZX_ERR_IO);
         }
-        return fpromise::make_result_promise(result);
-      })
-      .and_then([=](TRB*& trb) -> TRBPromise {
+
         SetTRDequeuePointer cmd;
         cmd.set_ENDPOINT(XhciEndpointIndex(ep_address) + 1);
         cmd.set_SLOT(state->GetSlot());
@@ -1543,6 +1529,7 @@ TRBPromise UsbXhci::UsbHciResetEndpointAsync(uint32_t device_id, uint8_t ep_addr
             })
             .box();
       })
+      .discard_value()
       .box();
 }
 
@@ -1573,14 +1560,15 @@ zx_status_t UsbXhci::UsbHciCancelAll(uint32_t device_id, uint8_t ep_address) {
   return RunSynchronously(kPrimaryInterrupter, UsbHciCancelAllAsync(device_id, ep_address));
 }
 
-TRBPromise UsbXhci::UsbHciCancelAllAsync(uint32_t device_id, uint8_t ep_address) {
+fpromise::promise<void, zx_status_t> UsbXhci::UsbHciCancelAllAsync(uint32_t device_id,
+                                                                   uint8_t ep_address) {
   auto* state = &device_state_[device_id];
 
   StopEndpoint stop;
   {
     fbl::AutoLock state_lock(&state->transaction_lock());
     if (state->IsDisconnecting()) {
-      return fpromise::make_error_promise(ZX_ERR_IO_NOT_PRESENT);
+      return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
     }
     uint8_t index = static_cast<uint8_t>(XhciEndpointIndex(ep_address) + 1);
     stop.set_ENDPOINT(index);
@@ -1588,16 +1576,13 @@ TRBPromise UsbXhci::UsbHciCancelAllAsync(uint32_t device_id, uint8_t ep_address)
   }
   auto context = command_ring_.AllocateContext();
   return SubmitCommand(stop, std::move(context))
-      .then([=](fpromise::result<TRB*, zx_status_t>& result) -> TRBPromise {
-        if (result.is_error()) {
-          return fpromise::make_result_promise(result);
-        }
-        auto completion_event = static_cast<CommandCompletionEvent*>(result.value());
+      .and_then([=](TRB*& trb) -> fpromise::promise<void, zx_status_t> {
+        auto completion_event = static_cast<CommandCompletionEvent*>(trb);
         auto completion_code = completion_event->CompletionCode();
         zx_status_t status =
             (completion_code == CommandCompletionEvent::Success) ? ZX_OK : ZX_ERR_IO;
         if (status != ZX_OK) {
-          return fpromise::make_error_promise(status);
+          return fpromise::make_error_promise<zx_status_t>(status);
         }
         // We can now move everything off of the transfer ring starting at the dequeue pointer
         uint8_t index;
@@ -1607,11 +1592,11 @@ TRBPromise UsbXhci::UsbHciCancelAllAsync(uint32_t device_id, uint8_t ep_address)
           TRB* new_ptr = nullptr;
           fbl::AutoLock _(&state->transaction_lock());
           if (state->IsDisconnecting()) {
-            return fpromise::make_error_promise(ZX_ERR_IO_NOT_PRESENT);
+            return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
           }
           index = static_cast<uint8_t>(XhciEndpointIndex(ep_address) - 1);
           if (!state->GetTransferRing(index).active()) {
-            return fpromise::make_error_promise(ZX_ERR_IO_NOT_PRESENT);
+            return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
           }
           trbs = state->GetTransferRing(index).TakePendingTRBs();
           for (auto& trb : trbs) {
@@ -1626,34 +1611,30 @@ TRBPromise UsbXhci::UsbHciCancelAllAsync(uint32_t device_id, uint8_t ep_address)
         for (auto& trb : trbs) {
           trb.request->Complete(ZX_ERR_CANCELED, 0);
         }
+
+        if (!new_ptr_phys) {
+          return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok());
+        }
+
         // It's possible that the dequeue pointer was in the middle of a multi-TRB TD when we
         // stopped. If this is the case, we need to adjust the dequeue pointer to point to the index
         // of the first TRB that we know about.
-        if (new_ptr_phys) {
-          SetTRDequeuePointer cmd;
-          cmd.set_ENDPOINT(index + 2);
-          cmd.set_SLOT(state->GetSlot());
-          cmd.ptr = new_ptr_phys;
-          auto context = command_ring_.AllocateContext();
-          return SubmitCommand(cmd, std::move(context))
-              .then([=](fpromise::result<TRB*, zx_status_t>& result)
-                        -> fpromise::result<TRB*, zx_status_t> {
-                if (result.is_error()) {
-                  return result;
-                }
-                auto completion_event = static_cast<CommandCompletionEvent*>(result.value());
-                auto completion_code = completion_event->CompletionCode();
-                bool command_success = completion_code == CommandCompletionEvent::Success;
-                zx_status_t status = command_success ? ZX_OK : ZX_ERR_IO;
-                if (status == ZX_OK) {
-                  return fpromise::ok(result.value());
-                } else {
-                  return fpromise::error(status);
-                }
-              });
-        } else {
-          return fpromise::make_ok_promise(result.value());
-        }
+        SetTRDequeuePointer cmd;
+        cmd.set_ENDPOINT(index + 2);
+        cmd.set_SLOT(state->GetSlot());
+        cmd.ptr = new_ptr_phys;
+        auto context = command_ring_.AllocateContext();
+        return SubmitCommand(cmd, std::move(context))
+            .and_then([=](TRB*& trb) -> fpromise::result<void, zx_status_t> {
+              auto completion_event = static_cast<CommandCompletionEvent*>(trb);
+              auto completion_code = completion_event->CompletionCode();
+              bool command_success = completion_code == CommandCompletionEvent::Success;
+              zx_status_t status = command_success ? ZX_OK : ZX_ERR_IO;
+              if (status != ZX_OK) {
+                return fpromise::error(status);
+              }
+              return fpromise::ok();
+            });
       })
       .box();
 }
@@ -1666,7 +1647,9 @@ void UsbXhci::Shutdown(zx_status_t status) {
   }
   if (status != ZX_OK) {
     // If we're shutting down due to an error (not just regular unbind)
-    // ensure that
+    // ensure that we remove the device.
+    zxlogf(ERROR, "Internal xhci error, shutting down with error: %s",
+           zx_status_get_string(status));
     DdkAsyncRemove();
   }
 }
