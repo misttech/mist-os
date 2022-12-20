@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 // This component represents the set of capabilities required to use the package stack in recovery
-// mode. It will eventually 'offer' and 'expose' the minimal set of capabilities required to perform
-// an OTA, but as the CFv1 -> CFv2 migration is ongoing, we will require offering and exposing more
-// than that set.
-// TODO(fxbug.dev/104919): ensure this set is minimal to and from the parent component.
+// mode.
 {
     include: [
         "inspect/client.shard.cml",

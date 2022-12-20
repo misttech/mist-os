@@ -2,55 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl::endpoints::Proxy as _,
-    fidl_fuchsia_io as fio,
-    std::sync::Arc,
-};
+use anyhow::Error;
 
 /// Represents the sandboxed package resolver.
 pub struct Resolver {
     _pkg_resolver_proxy: fidl_fuchsia_pkg::PackageResolverProxy,
-    svc_dir_proxy: fio::DirectoryProxy,
 }
 
 impl Resolver {
     pub fn new_with_proxy(
         pkg_resolver_proxy: fidl_fuchsia_pkg::PackageResolverProxy,
-        directory_proxy_with_access_to_pkg_resolver: fio::DirectoryProxy,
     ) -> Result<Self, Error> {
-        Ok(Self {
-            _pkg_resolver_proxy: pkg_resolver_proxy,
-            svc_dir_proxy: directory_proxy_with_access_to_pkg_resolver,
-        })
+        Ok(Self { _pkg_resolver_proxy: pkg_resolver_proxy })
     }
 
     pub fn new() -> Result<Self, Error> {
-        let svc_dir_proxy = fuchsia_component::client::clone_namespace_svc()
-            .context("error cloning svc directory")?;
-
         Ok(Self {
             _pkg_resolver_proxy: fuchsia_component::client::connect_to_protocol::<
                 fidl_fuchsia_pkg::PackageResolverMarker,
             >()?,
-            svc_dir_proxy,
         })
-    }
-
-    #[cfg(test)]
-    pub fn package_resolver_proxy(&self) -> fidl_fuchsia_pkg::PackageResolverProxy {
-        self._pkg_resolver_proxy.clone()
-    }
-
-    pub fn directory_request(
-        &self,
-    ) -> Result<Arc<fidl::endpoints::ClientEnd<fio::DirectoryMarker>>, Error> {
-        let clone = fuchsia_fs::directory::clone_no_describe(&self.svc_dir_proxy, None)?;
-        // TODO(https://fxbug.dev/108786): Use Proxy::into_client_end when available.
-        Ok(std::sync::Arc::new(
-            clone.into_channel().expect("proxy into channel").into_zx_channel().into(),
-        ))
     }
 }
 
@@ -59,10 +30,10 @@ pub(crate) mod for_tests {
     use {
         super::*,
         crate::cache::for_tests::CacheForTest,
-        anyhow::anyhow,
+        anyhow::{anyhow, Context, Error},
         blobfs_ramdisk::BlobfsRamdisk,
         fidl_fuchsia_boot::{ArgumentsRequest, ArgumentsRequestStream},
-        fidl_fuchsia_pkg_ext as pkg,
+        fidl_fuchsia_io as fio, fidl_fuchsia_pkg_ext as pkg,
         fidl_fuchsia_pkg_ext::RepositoryConfigs,
         fuchsia_component_test::ChildRef,
         fuchsia_component_test::{
@@ -72,6 +43,7 @@ pub(crate) mod for_tests {
         fuchsia_url::RepositoryUrl,
         futures::StreamExt,
         futures::TryStreamExt,
+        std::sync::Arc,
     };
 
     const SSL_TEST_CERTS_PATH: &str = "/pkg/data/ssl/cert.pem";
@@ -106,8 +78,6 @@ pub(crate) mod for_tests {
             }
         }
 
-        // TODO(fxbug.dev/104919): Delete these mocks when all of isolated-swd is migrated to v2,
-        // as the components will have the same behavior as their non-isolated counterparts.
         async fn run_mocks(
             handles: fuchsia_component_test::LocalComponentHandles,
             channel: Option<String>,
@@ -237,15 +207,7 @@ pub(crate) mod for_tests {
                 .connect_to_protocol_at_exposed_dir::<fidl_fuchsia_pkg::PackageResolverMarker>()
                 .expect("connect to pkg resolver");
 
-            let (resolver_clone, remote) =
-                fidl::endpoints::create_endpoints::<fio::DirectoryMarker>()?;
-            realm_instance
-                .root
-                .get_exposed_dir()
-                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, remote.into_channel().into())?;
-
-            let resolver =
-                Resolver::new_with_proxy(resolver_proxy, resolver_clone.into_proxy()?).unwrap();
+            let resolver = Resolver::new_with_proxy(resolver_proxy).unwrap();
 
             let cache_proxy = cache.cache.package_cache_proxy().unwrap();
 
@@ -260,7 +222,7 @@ pub(crate) mod for_tests {
             &self,
             url: &str,
         ) -> Result<(fio::DirectoryProxy, pkg::ResolutionContext), Error> {
-            let proxy = self.resolver.package_resolver_proxy();
+            let proxy = &self.resolver._pkg_resolver_proxy;
             let (package, package_remote) =
                 fidl::endpoints::create_proxy().context("creating package directory endpoints")?;
             let resolved_context = proxy
@@ -278,9 +240,11 @@ pub mod tests {
     use {
         super::for_tests::{ResolverForTest, EMPTY_REPO_PATH},
         super::*,
+        anyhow::Context,
         fuchsia_async as fasync,
         fuchsia_component_test::RealmBuilder,
         fuchsia_pkg_testing::{PackageBuilder, RepositoryBuilder},
+        std::sync::Arc,
     };
 
     const TEST_REPO_URL: &str = "fuchsia-pkg://test";
