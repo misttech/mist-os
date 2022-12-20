@@ -27,13 +27,13 @@ void DumpMap(const IndexNode::Map& map, int indent, const char* heading,
 
 }  // namespace
 
-IndexNode* IndexNode::AddChild(Kind kind, std::string_view name) {
-  FX_DCHECK(name.data());
+IndexNode* IndexNode::AddChild(Kind kind, const char* name) {
+  FX_DCHECK(name);
 
   // TODO(brettw) Get some kind of transparent lookup here to avoid making an intermediate
   // std::string.
   Map& map = MapForKind(kind);
-  auto found = map.find(name.data());
+  auto found = map.find(name);
   if (found == map.end()) {
     found = map.emplace(std::piecewise_construct, std::forward_as_tuple(name),
                         std::forward_as_tuple(kind))
@@ -43,7 +43,7 @@ IndexNode* IndexNode::AddChild(Kind kind, std::string_view name) {
   return &found->second;
 }
 
-IndexNode* IndexNode::AddChild(Kind kind, std::string_view name, const SymbolRef& ref) {
+IndexNode* IndexNode::AddChild(Kind kind, const char* name, const SymbolRef& ref) {
   auto added = AddChild(kind, name);
   added->AddDie(ref);
   return added;
@@ -53,8 +53,7 @@ void IndexNode::AddDie(const SymbolRef& ref) {
   switch (kind_) {
     case Kind::kNone:
     case Kind::kRoot:
-    case Kind::kTemplateParameter:
-      FX_NOTREACHED() << "Should not try to add a none, root, or template param DIE.";
+      FX_NOTREACHED() << "Should not try to add a none or root DIE.";
       return;
     case Kind::kNamespace:
       // Don't bother saving namespaces.

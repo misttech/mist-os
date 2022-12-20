@@ -4,6 +4,7 @@
 
 #include "src/developer/debug/zxdb/symbols/collection.h"
 
+#include "src/developer/debug/zxdb/symbols/compile_unit.h"
 #include "src/developer/debug/zxdb/symbols/data_member.h"
 #include "src/developer/debug/zxdb/symbols/symbol_utils.h"
 #include "src/lib/fxl/strings/string_printf.h"
@@ -52,13 +53,7 @@ const char* Collection::GetKindString() const {
 Identifier Collection::ComputeIdentifier() const {
   Identifier result = GetSymbolScopePrefix(this);
 
-  if (auto assigned_name = GetAssignedName(); !assigned_name.empty()) {
-    // When compiled with simplified template names, the template parameters will be omitted from
-    // the type name in the DIE, and included in following child elements. If the name already has
-    // template parameters present, skip this.
-    if (!NameHasTemplate(assigned_name)) {
-      AddAllTemplateParametersToName(assigned_name, template_params_);
-    }
+  if (auto& assigned_name = GetAssignedName(); !assigned_name.empty()) {
     result.AppendComponent(IdentifierComponent(assigned_name));
   } else {
     // Provide a name for anonymous structs.

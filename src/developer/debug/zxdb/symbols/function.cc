@@ -7,8 +7,6 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/developer/debug/zxdb/symbols/symbol_utils.h"
-#include "src/developer/debug/zxdb/symbols/template_parameter.h"
-#include "src/developer/debug/zxdb/symbols/type.h"
 #include "src/developer/debug/zxdb/symbols/variable.h"
 
 namespace zxdb {
@@ -61,15 +59,7 @@ const Variable* Function::GetObjectPointerVariable() const {
 
 Identifier Function::ComputeIdentifier() const {
   Identifier result = GetSymbolScopePrefix(this);
-  std::string name = GetAssignedName();
-
-  // Be careful not to modify the names that already have template parameters present. This likely
-  // means that the code was compiled without the simple-template-names flag.
-  if (NameHasTemplate(name)) {
-    AddAllTemplateParametersToName(name, template_params_);
-  }
-
-  result.AppendComponent(IdentifierComponent(name));
+  result.AppendComponent(IdentifierComponent(GetAssignedName()));
   return result;
 }
 
