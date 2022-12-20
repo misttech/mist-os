@@ -173,6 +173,21 @@ impl FromExt<&ot::BorderRoutingCounters>
     }
 }
 
+impl FromExt<&ot::DnssdCounters> for fidl_fuchsia_lowpan_experimental::DnssdCounters {
+    fn from_ext(x: &ot::DnssdCounters) -> Self {
+        fidl_fuchsia_lowpan_experimental::DnssdCounters {
+            success_response: Some(x.success_response()),
+            server_failure_response: Some(x.server_failure_response()),
+            format_error_response: Some(x.format_error_response()),
+            name_error_response: Some(x.name_error_response()),
+            not_implemented_response: Some(x.not_implemented_response()),
+            other_response: Some(x.other_response()),
+            resolved_by_srp: Some(x.resolved_by_srp()),
+            ..fidl_fuchsia_lowpan_experimental::DnssdCounters::EMPTY
+        }
+    }
+}
+
 pub trait UpdateOperationalDataset<T> {
     fn update_from(&mut self, data: &T) -> Result<(), anyhow::Error>;
 }

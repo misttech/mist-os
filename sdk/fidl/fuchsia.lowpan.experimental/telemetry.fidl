@@ -106,6 +106,44 @@ type BorderRoutingCounters = table {
    14: rs_tx_failure uint32;
 };
 
+/// Counters associated with the DNS-SD server.
+type DnssdCounters = table {
+    /// The number of successful responses.
+    ///
+    /// Required.
+    1: success_response uint32;
+
+    /// The number of 'server failure' responses.
+    ///
+    /// Required.
+    2: server_failure_response uint32;
+
+    /// The number of 'format error' responses.
+    ///
+    /// Required.
+    3: format_error_response uint32;
+
+    /// The number of 'name error' responses.
+    ///
+    /// Required.
+    4: name_error_response uint32;
+
+    /// The number of 'not implemented' responses.
+    ///
+    /// Required.
+    5: not_implemented_response uint32;
+
+    /// The number of 'other' responses.
+    ///
+    /// Required.
+    6: other_response uint32;
+
+    /// The number of queries completely resolved by the local SRP server.
+    ///
+    /// Required.
+    7: resolved_by_srp uint32;
+};
+
 /// SRP server operational states.
 type SrpServerState = strict enum {
     /// The server is disabled.
@@ -212,4 +250,9 @@ type Telemetry = table {
     ///
     /// Only present on Thread networks.
    17: srp_server_info SrpServerInfo;
+
+    /// The DNS-SD server counters.
+    ///
+    /// Only present on Thread networks.
+   18: dnssd_counters DnssdCounters;
 };

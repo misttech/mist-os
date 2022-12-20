@@ -63,6 +63,7 @@ rustc_library("openthread") {
     "src/ot/types/castable.rs",
     "src/ot/types/channel_mask.rs",
     "src/ot/types/device_role.rs",
+    "src/ot/types/dnssd_counters.rs",
     "src/ot/types/ext_address.rs",
     "src/ot/types/extended_pan_id.rs",
     "src/ot/types/external_route_config.rs",

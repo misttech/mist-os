@@ -688,6 +688,41 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                         if let Some(x) = telemetry_data.rssi {
                             inspector.root().record_int("rssi", x.into());
                         }
+                        if let Some(x) = telemetry_data.dnssd_counters {
+                            inspector.root().record_child(
+                                "dnssd_counters",
+                                |dnssd_counters_child| {
+                                    if let Some(y) = x.success_response {
+                                        dnssd_counters_child
+                                            .record_uint("success_response", y.into());
+                                    }
+                                    if let Some(y) = x.server_failure_response {
+                                        dnssd_counters_child
+                                            .record_uint("server_failure_response", y.into());
+                                    }
+                                    if let Some(y) = x.format_error_response {
+                                        dnssd_counters_child
+                                            .record_uint("format_error_response", y.into());
+                                    }
+                                    if let Some(y) = x.name_error_response {
+                                        dnssd_counters_child
+                                            .record_uint("name_error_response", y.into());
+                                    }
+                                    if let Some(y) = x.not_implemented_response {
+                                        dnssd_counters_child
+                                            .record_uint("not_implemented_response", y.into());
+                                    }
+                                    if let Some(y) = x.other_response {
+                                        dnssd_counters_child
+                                            .record_uint("other_response", y.into());
+                                    }
+                                    if let Some(y) = x.resolved_by_srp {
+                                        dnssd_counters_child
+                                            .record_uint("resolved_by_srp", y.into());
+                                    }
+                                },
+                            );
+                        }
                         if let Some(x) = telemetry_data.thread_border_routing_counters {
                             inspector.root().record_child(
                                 "border_routing_counters",

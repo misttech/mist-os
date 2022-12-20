@@ -861,6 +861,7 @@ where
                 },
                 ..SrpServerInfo::EMPTY
             }),
+            dnssd_counters: Some(ot.dnssd_get_counters().into_ext()),
             ..Telemetry::EMPTY
         })
     }

@@ -303,6 +303,10 @@ pub trait Dnssd {
     fn dnssd_query_set_callbacks<'a, F>(&'a self, f: Option<F>)
     where
         F: FnMut(bool, &CStr) + 'a;
+
+    /// Functional equivalent of
+    /// [`otsys::otDnssdGetCounters`](crate::otsys::otDnssdGetCounters).
+    fn dnssd_get_counters(&self) -> &DnssdCounters;
 }
 
 impl<T: Dnssd + Boxable> Dnssd for ot::Box<T> {
@@ -349,6 +353,10 @@ impl<T: Dnssd + Boxable> Dnssd for ot::Box<T> {
         F: FnMut(bool, &CStr) + 'a,
     {
         self.as_ref().dnssd_query_set_callbacks(f)
+    }
+
+    fn dnssd_get_counters(&self) -> &DnssdCounters {
+        self.as_ref().dnssd_get_counters()
     }
 }
 
@@ -480,6 +488,10 @@ impl Dnssd for Instance {
                 Option<Box<dyn FnMut(bool, &CStr) + 'static>>,
             >(fn_box));
         }
+    }
+
+    fn dnssd_get_counters(&self) -> &DnssdCounters {
+        unsafe { DnssdCounters::ref_from_ot_ptr(otDnssdGetCounters(self.as_ot_ptr())).unwrap() }
     }
 }
 
