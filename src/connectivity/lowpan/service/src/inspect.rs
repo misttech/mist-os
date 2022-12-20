@@ -555,19 +555,23 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                                         "short_address",
                                         neighbor_info_clone.short_address.unwrap_or(0).into(),
                                     );
-                                    inspector.root().record_string(
+                                    inspector.root().record_uint(
                                         "age",
-                                        neighbor_info_clone.age.unwrap_or(0).to_string(),
+                                        neighbor_info_clone
+                                            .age
+                                            .unwrap_or(0)
+                                            .try_into()
+                                            .unwrap_or(0),
                                     );
                                     inspector.root().record_bool(
                                         "is_child",
                                         neighbor_info_clone.is_child.unwrap_or(false).into(),
                                     );
-                                    inspector.root().record_int(
+                                    inspector.root().record_uint(
                                         "link_frame_count",
                                         neighbor_info_clone.link_frame_count.unwrap_or(0).into(),
                                     );
-                                    inspector.root().record_int(
+                                    inspector.root().record_uint(
                                         "mgmt_frame_count",
                                         neighbor_info_clone.mgmt_frame_count.unwrap_or(0).into(),
                                     );
@@ -583,7 +587,7 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                                         "lqi_in",
                                         neighbor_info_clone.lqi_in.unwrap_or(0).into(),
                                     );
-                                    inspector.root().record_int(
+                                    inspector.root().record_uint(
                                         "thread_mode",
                                         neighbor_info_clone.thread_mode.unwrap_or(0).into(),
                                     );
