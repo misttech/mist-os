@@ -599,17 +599,17 @@ void MsdVsiDevice::StopRingBufferAndSuspend() {
   CHECK_THREAD_IS_CURRENT(device_thread_id_);
 
   if (!StopRingbuffer()) {
-    MAGMA_LOG(WARNING, "Wait for idle failed");
+    MAGMA_LOG(ERROR, "Stop ring buffer for suspend failed");
     DASSERT(false);
   }
 
   constexpr uint32_t kTimeoutMs = 100;
   if (!WaitUntilIdle(kTimeoutMs)) {
-    MAGMA_LOG(WARNING, "Stop ringbuffer failed");
+    MAGMA_LOG(WARNING, "Timeout stopping ringbuffer for suspend");
     DASSERT(false);
+  } else {
+    PowerSuspend();
   }
-
-  PowerSuspend();
 }
 #else
 bool MsdVsiDevice::IsSuspendSupported() const { return false; }
