@@ -11,7 +11,6 @@ group("tests") {
     "ui:system_validation_test_pkg",
     "web:dynamic_elements_web_system_validation_test_pkg",
     "web:simple_png_web_system_validation_test_pkg",
-    "web:simple_video_web_system_validation_test_pkg",
     "//src/chromium:web_engine",
     "//src/connectivity/network/tests/benchmarks:netstack_perftest_pkg",
   ]
@@ -19,5 +18,8 @@ group("tests") {
 
 group("tests_with_host_script") {
   testonly = true
-  deps = [ "ui:flatland_view_provider_with_host_script($host_toolchain)" ]
+  deps = [
+    "ui:flatland_view_provider_with_host_script($host_toolchain)",
+    "web:simple_video_web_with_host_script($host_toolchain)",
+  ]
 }

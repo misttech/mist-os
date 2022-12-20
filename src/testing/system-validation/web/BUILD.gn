@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 import("//build/components.gni")
+import("//build/testing/run_target_test_and_host_script.gni")
 
 fuchsia_component("web_view_system_validation_component") {
   testonly = true
@@ -62,4 +63,25 @@ fuchsia_test_package("simple_video_web_system_validation_test_pkg") {
     "//src/testing/system-validation/web/apps:simple_video_web_view_component",
     "//src/testing/system-validation/web/file_server:file_server_component",
   ]
+}
+
+# fx set workstation_eng_paused.qemu-x64 --release --with-base //sdk/bundles:tools  \
+# --with-base //src/testing/system-validation:tests \
+# --with-host //src/testing/system-validation/web:simple_video_web_with_host_script
+#
+# fx test --e2e simple_video_web_with_host_script
+if (is_host && target_cpu == "x64" && !is_asan) {
+  run_target_test_and_host_script("simple_video_web_with_host_script") {
+    test_url = "fuchsia-pkg://fuchsia.com/simple_video_web_system_validation#meta/web_view_system_validation.cm"
+    test_package = "//src/testing/system-validation/web:simple_video_web_system_validation_test_pkg(${target_toolchain})"
+    host_script = "//src/performance/trace2json:bin"
+    host_script_args = [
+      "--input-file=" + "{test_artifact_dir}/custom-0/trace.fxt",
+      "--output-file=" + "{test_artifact_dir}/custom-0/trace.json",
+    ]
+    environments = [ emu_env ]
+  }
+} else {
+  group("simple_video_web_with_host_script") {
+  }
 }
