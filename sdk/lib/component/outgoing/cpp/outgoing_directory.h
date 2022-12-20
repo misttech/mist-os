@@ -73,10 +73,10 @@ class OutgoingDirectory final {
 
   // Starts serving the outgoing directory on the given channel.
   //
-  // This should be invoked after the outgoing directory has been populated, i.e. after
-  // |AddProtocol|. While |OutgoingDirectory| does not require calling |AddProtocol|
-  // before |Serve|, if you call them in the other order there is a chance that requests
-  // that arrive in between will be dropped.
+  // This should be invoked after the outgoing directory has been populated,
+  // i.e. after |AddProtocol|. While |OutgoingDirectory| does not require
+  // calling |AddProtocol| before |Serve|, if you call them in the other order
+  // there is a chance that requests that arrive in between will be dropped.
   //
   // This object will implement the |fuchsia.io.Directory| interface using this
   // channel. Note that this method returns immediately and that the |dispatcher|
@@ -96,9 +96,6 @@ class OutgoingDirectory final {
   // This object will implement the |fuchsia.io.Directory| interface using this
   // channel.
   //
-  // If |dispatcher| is nullptr, then the global dispatcher set via
-  // |async_get_default_dispatcher| will be used.
-  //
   // # Errors
   //
   // ZX_ERR_BAD_HANDLE: the process did not receive a |PA_DIRECTORY_REQUEST|
@@ -108,12 +105,15 @@ class OutgoingDirectory final {
   // rights.
   zx::result<> ServeFromStartupInfo();
 
-  // Adds a FIDL Protocol instance.
+  // Adds a FIDL Protocol server instance.
   //
   // |impl| will be used to handle requests for this protocol.
   // |name| is used to determine where to host the protocol. This protocol will
-  // be hosted under the path /svc/{name} where name is the discoverable name
-  // of the protocol by default.
+  // be hosted under the path /svc/{name}, where `name` is the discoverable name
+  // of the protocol, by default. A pointer to |impl| is returned on the success
+  // case of this function call. This pointer will be valid until either this
+  // |OutgoingDirectory| is destroyed or |RemoveProtocol| is invoked with the
+  // provided |name|.
   //
   // Note, if and when |RemoveProtocol| is called for the provided |name|, this
   // object will asynchronously close down the associated server end channel and
@@ -130,57 +130,23 @@ class OutgoingDirectory final {
   // # Examples
   //
   // See sample use cases in test case(s) located at
-  // //sdk/lib/sys/component/cpp/outgoing_directory_test.cc
-  template <typename Protocol>
-  zx::result<> AddProtocol(fidl::WireServer<Protocol>* impl,
-                           cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
-    static_assert(fidl::IsProtocol<Protocol>(), "Type of |Protocol| must be FIDL protocol");
-
-    return AddProtocolAt(kServiceDirectoryWithNoSlash, impl, name);
+  // //sdk/lib/component/tests/outgoing_directory_test.cc
+  template <typename Protocol, typename ServerImpl>
+  zx::result<ServerImpl*> AddProtocol(
+      std::unique_ptr<ServerImpl> impl,
+      cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+    return AddProtocolAt<Protocol>(kServiceDirectoryWithNoSlash, std::move(impl), name);
   }
 
-  // Same as above but overloaded to support servers implementations speaking
-  // FIDL C++ natural types: |fidl::Server<P>|, part of the unified bindings.
-  template <typename Protocol>
-  zx::result<> AddProtocol(fidl::Server<Protocol>* impl,
-                           cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
-    static_assert(fidl::IsProtocol<Protocol>(), "Type of |Protocol| must be FIDL protocol");
-    if (impl == nullptr || inner().dispatcher_ == nullptr) {
-      return zx::make_result(ZX_ERR_INVALID_ARGS);
-    }
-
-    return AddProtocol<Protocol>(
-        [dispatcher = inner().dispatcher_, impl](fidl::ServerEnd<Protocol> request) {
-          // This object is safe to drop. Server will still begin to operate
-          // past its lifetime.
-          auto _server = fidl::BindServer(dispatcher, std::move(request), impl);
-        },
-        name);
-  }
-
-  // Adds a FIDL Protocol instance.
-  //
-  // A |handler| is added to handle connection requests for the this particular
-  // protocol. |name| is used to determine where to host the protocol.
-  // This protocol will be hosted under the path /svc/{name} where name
-  // is the discoverable name of the protocol.
+  // Same as |AddProtocol| except that a typed handler is used. The
+  // |handler| is a callback that handles connection requests for this
+  // particular protocol.
   //
   // # Note
   //
   // Active connections are never torn down when/if |RemoveProtocol| is invoked
   // with the same |name|. Users of this method should manage teardown of
   // all active connections.
-  //
-  // # Errors
-  //
-  // ZX_ERR_ALREADY_EXISTS: An entry already exists for this protocol.
-  //
-  // ZX_ERR_INVALID_ARGS: |name| is an empty string.
-  //
-  // # Examples
-  //
-  // See sample use cases in test case(s) located at
-  // //sdk/lib/sys/component/cpp/outgoing_directory_test.cc
   template <typename Protocol>
   zx::result<> AddProtocol(TypedHandler<Protocol> handler,
                            cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
@@ -193,34 +159,25 @@ class OutgoingDirectory final {
   // is made available if a generic handler needs to be provided.
   zx::result<> AddProtocol(AnyHandler handler, cpp17::string_view name);
 
-  // Same as above but allows overriding the parent directory in which the
-  // protocol will be hosted.
-  //
-  // |path| is used as the parent directory for the protocol, e.g. `svc`.
-  // |name| is the name under |path| at which the protocol will be hosted. By
-  // default, the FIDL protocol name, e.g. `fuchsia.logger.LogSink`, is used.
-  //
-  // # Errors
-  //
-  // ZX_ERR_ALREADY_EXISTS: An entry already exists for this protocol.
-  //
-  // ZX_ERR_INVALID_ARGS: |impl| is nullptr. |path| or |name| is an empty
-  // string.
-  template <typename Protocol>
-  zx::result<> AddProtocolAt(cpp17::string_view path, fidl::WireServer<Protocol>* impl,
-                             cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+  // Same as |AddProtocol| but allows setting the parent directory in
+  // which the protocol will be installed.
+  template <typename Protocol, typename ServerImpl>
+  zx::result<ServerImpl*> AddProtocolAt(
+      cpp17::string_view path, std::unique_ptr<ServerImpl> impl,
+      cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
     static_assert(fidl::IsProtocol<Protocol>(), "Type of |Protocol| must be FIDL protocol");
     if (impl == nullptr || inner().dispatcher_ == nullptr) {
-      return zx::make_result(ZX_ERR_INVALID_ARGS);
+      return zx::error(ZX_ERR_INVALID_ARGS);
     }
 
-    return AddProtocolAt<Protocol>(
+    ServerImpl* server_reference = impl.get();
+    zx::result<> result = AddProtocolAt<Protocol>(
         path,
-        [dispatcher = inner().dispatcher_, impl,
+        [dispatcher = inner().dispatcher_, impl = std::move(impl),
          unbind_protocol_callbacks = &inner().unbind_protocol_callbacks_,
          name = std::string(name)](fidl::ServerEnd<Protocol> request) {
           fidl::ServerBindingRef<Protocol> server =
-              fidl::BindServer(dispatcher, std::move(request), impl);
+              fidl::BindServer(dispatcher, std::move(request), impl.get());
 
           auto cb = [server = std::move(server)]() mutable { server.Unbind(); };
           // We don't have to check for entry existing because the |AddProtocol|
@@ -228,8 +185,16 @@ class OutgoingDirectory final {
           AppendUnbindConnectionCallback(unbind_protocol_callbacks, name, std::move(cb));
         },
         name);
+
+    if (result.is_error()) {
+      return zx::error(result.error_value());
+    }
+
+    return zx::ok(server_reference);
   }
 
+  // Same as |AddProtocol| but uses a typed handler and allows the usage of
+  // setting the parent directory in which the protocol will be installed.
   template <typename Protocol>
   zx::result<> AddProtocolAt(cpp17::string_view path, TypedHandler<Protocol> handler,
                              cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
@@ -377,6 +342,100 @@ class OutgoingDirectory final {
   // that the directory will be removed from. The parent directory, |path|,
   // will not be removed.
   zx::result<> RemoveDirectoryAt(cpp17::string_view path, cpp17::string_view directory_name);
+
+  // This method signature is DEPRECATED. Use |AddProtocol| with unique_ptr
+  // instead.
+  //
+  // Adds a FIDL Protocol instance.
+  //
+  // |impl| will be used to handle requests for this protocol.
+  // |name| is used to determine where to host the protocol. This protocol will
+  // be hosted under the path /svc/{name} where name is the discoverable name
+  // of the protocol by default.
+  //
+  // Note, if and when |RemoveProtocol| is called for the provided |name|, this
+  // object will asynchronously close down the associated server end channel and
+  // stop receiving requests. This method provides no facilities for waiting
+  // until teardown is complete. If such control is desired, then the
+  // |TypedHandler| overload of this method listed below ought to be used.
+  //
+  // # Errors
+  //
+  // ZX_ERR_ALREADY_EXISTS: An entry already exists for this protocol.
+  //
+  // ZX_ERR_INVALID_ARGS: |impl| is nullptr or |name| is an empty string.
+  //
+  // # Examples
+  //
+  // See sample use cases in test case(s) located at
+  // //sdk/lib/sys/component/cpp/outgoing_directory_test.cc
+  template <typename Protocol>
+  zx::result<> AddProtocol(fidl::WireServer<Protocol>* impl,
+                           cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+    static_assert(fidl::IsProtocol<Protocol>(), "Type of |Protocol| must be FIDL protocol");
+
+    return AddProtocolAt(kServiceDirectoryWithNoSlash, impl, name);
+  }
+
+  // This method signature is DEPRECATED. Use |AddProtocol| instead.
+  //
+  // Same as above but overloaded to support servers implementations speaking
+  // FIDL C++ natural types: |fidl::Server<P>|, part of the unified bindings.
+  template <typename Protocol>
+  zx::result<> AddProtocol(fidl::Server<Protocol>* impl,
+                           cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+    static_assert(fidl::IsProtocol<Protocol>(), "Type of |Protocol| must be FIDL protocol");
+    if (impl == nullptr || inner().dispatcher_ == nullptr) {
+      return zx::make_result(ZX_ERR_INVALID_ARGS);
+    }
+
+    return AddProtocol<Protocol>(
+        [dispatcher = inner().dispatcher_, impl](fidl::ServerEnd<Protocol> request) {
+          // This object is safe to drop. Server will still begin to operate
+          // past its lifetime.
+          auto _server = fidl::BindServer(dispatcher, std::move(request), impl);
+        },
+        name);
+  }
+
+  // This method signature is DEPRECATED. Use |AddProtocol| instead.
+  //
+  // Same as above but allows overriding the parent directory in which the
+  // protocol will be hosted.
+  //
+  // |path| is used as the parent directory for the protocol, e.g. `svc`.
+  // |name| is the name under |path| at which the protocol will be hosted. By
+  // default, the FIDL protocol name, e.g. `fuchsia.logger.LogSink`, is used.
+  //
+  // # Errors
+  //
+  // ZX_ERR_ALREADY_EXISTS: An entry already exists for this protocol.
+  //
+  // ZX_ERR_INVALID_ARGS: |impl| is nullptr. |path| or |name| is an empty
+  // string.
+  template <typename Protocol>
+  zx::result<> AddProtocolAt(cpp17::string_view path, fidl::WireServer<Protocol>* impl,
+                             cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+    static_assert(fidl::IsProtocol<Protocol>(), "Type of |Protocol| must be FIDL protocol");
+    if (impl == nullptr || inner().dispatcher_ == nullptr) {
+      return zx::make_result(ZX_ERR_INVALID_ARGS);
+    }
+
+    return AddProtocolAt<Protocol>(
+        path,
+        [dispatcher = inner().dispatcher_, impl,
+         unbind_protocol_callbacks = &inner().unbind_protocol_callbacks_,
+         name = std::string(name)](fidl::ServerEnd<Protocol> request) {
+          fidl::ServerBindingRef<Protocol> server =
+              fidl::BindServer(dispatcher, std::move(request), impl);
+
+          auto cb = [server = std::move(server)]() mutable { server.Unbind(); };
+          // We don't have to check for entry existing because the |AddProtocol|
+          // overload being invoked here will do that internally.
+          AppendUnbindConnectionCallback(unbind_protocol_callbacks, name, std::move(cb));
+        },
+        name);
+  }
 
  private:
   // |svc_dir_add_service_by_path| takes in a void* |context| that is passed to

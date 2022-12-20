@@ -62,6 +62,13 @@ OutgoingDirectory::~OutgoingDirectory() = default;
 OutgoingDirectory::Inner::~Inner() {
   std::lock_guard guard(checker_);
 
+  // Close all active connections managed by |OutgoingDirectory|.
+  for (auto& [k, callbacks] : unbind_protocol_callbacks_) {
+    for (auto& cb : callbacks) {
+      cb();
+    }
+  }
+
   if (root_) {
 #if __Fuchsia_API_level__ >= 10
     svc_directory_destroy(root_);
@@ -217,18 +224,16 @@ zx::result<> OutgoingDirectory::RemoveProtocolAt(cpp17::string_view directory,
   // Remove svc_dir_t entry first so that no new connections are attempted on
   // handler after we remove the pointer to it in |svc_root_handlers|.
 #if __Fuchsia_API_level__ >= 10
-  zx_status_t status = svc_directory_remove_entry(
-      inner().root_, kServiceDirectoryWithNoSlash,
-      std::char_traits<char>::length(kServiceDirectoryWithNoSlash), name.data(), name.size());
-#else
   zx_status_t status =
-      svc_dir_remove_service(inner().root_, kServiceDirectoryWithNoSlash, name.data());
+      svc_directory_remove_entry(inner().root_, key.c_str(), key.size(), name.data(), name.size());
+#else
+  zx_status_t status = svc_dir_remove_service(inner().root_, key.c_str(), name.data());
 #endif
   if (status != ZX_OK) {
     return zx::make_result(status);
   }
 
-  // If teardown is managed, e.g. through |AddProtocol| overload for `fidl::Server<T>*`,
+  // If teardown is managed, e.g. through |AddProtocol| overload,
   // then close all active connections.
   UnbindAllConnections(name);
 

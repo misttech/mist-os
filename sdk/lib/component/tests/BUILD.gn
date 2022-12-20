@@ -135,6 +135,7 @@ fuchsia_test_package("component_cpp_outgoing_directory_tests") {
 test("service_server_test") {
   sources = [ "server_test.cc" ]
   deps = [
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/component/tests:fidl.service.test_cpp_wire",
     "//sdk/lib/fdio",

@@ -9,10 +9,12 @@
 #include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/outgoing/cpp/handlers.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/namespace.h>
 #include <lib/fidl/cpp/wire/client.h>
+#include <lib/fit/defer.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/handle.h>
@@ -46,6 +48,9 @@ class EchoImpl final : public fidl::WireServer<fuchsia_examples::Echo> {
  public:
   explicit EchoImpl(bool reversed) : reversed_(reversed) {}
 
+  EchoImpl(bool reversed, fit::deferred_callback on_destruction)
+      : reversed_(reversed), on_destruction_(std::move(on_destruction)) {}
+
   void SendString(SendStringRequestView request, SendStringCompleter::Sync& completer) override {}
 
   void EchoString(EchoStringRequestView request, EchoStringCompleter::Sync& completer) override {
@@ -59,6 +64,8 @@ class EchoImpl final : public fidl::WireServer<fuchsia_examples::Echo> {
 
  private:
   bool reversed_ = false;
+
+  std::optional<fit::deferred_callback> on_destruction_ = std::nullopt;
 };
 
 class NaturalEchoImpl final : public fidl::Server<fuchsia_examples::Echo> {
@@ -82,8 +89,7 @@ class NaturalEchoImpl final : public fidl::Server<fuchsia_examples::Echo> {
 class OutgoingDirectoryTest : public gtest::RealLoopFixture {
  public:
   void SetUp() override {
-    outgoing_directory_ =
-        std::make_unique<component::OutgoingDirectory>(component::OutgoingDirectory(dispatcher()));
+    outgoing_directory_ = std::make_unique<component::OutgoingDirectory>(dispatcher());
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ZX_ASSERT(outgoing_directory_->Serve(std::move(endpoints->server)).is_ok());
     client_end_ = std::move(endpoints->client);
@@ -91,11 +97,15 @@ class OutgoingDirectoryTest : public gtest::RealLoopFixture {
 
   component::OutgoingDirectory* GetOutgoingDirectory() { return outgoing_directory_.get(); }
 
+  std::unique_ptr<component::OutgoingDirectory> TakeOutgoingDirectory() {
+    return std::move(outgoing_directory_);
+  }
+
   fidl::ClientEnd<fuchsia_io::Directory> TakeSvcClientEnd(
       fidl::ClientEnd<fuchsia_io::Directory> root, fidl::StringView path = kSvcDirectoryPath) {
     zx::channel server_end, client_end;
     ZX_ASSERT(ZX_OK == zx::channel::create(0, &server_end, &client_end));
-    // Check if this has already be initialized.
+    // Check if this has already been initialized.
     if (!svc_client_.is_valid()) {
       svc_client_ = fidl::WireClient<fuchsia_io::Directory>(std::move(root), dispatcher());
     }
@@ -151,8 +161,9 @@ TEST_F(OutgoingDirectoryTest, MutualExclusionGuarantees_CheckOperations) {
       {
         std::thread t([&] {
           EXPECT_NE(nullptr, outgoing_directory);
-          EchoImpl impl(/*reversed=*/false);
-          outgoing_directory->AddProtocol<fuchsia_examples::Echo>(&impl).status_value();
+          outgoing_directory
+              ->AddProtocol<fuchsia_examples::Echo>(std::make_unique<EchoImpl>(/*reversed=*/false))
+              .status_value();
         });
         t.join();
       },
@@ -177,8 +188,10 @@ TEST_F(OutgoingDirectoryTest, MutualExclusionGuarantees_CheckOperations) {
 TEST_F(OutgoingDirectoryTest, CanBeMovedSafely) {
   auto outgoing_directory = component::OutgoingDirectory(dispatcher());
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  EchoImpl impl(/*reversed=*/false);
-  ASSERT_EQ(outgoing_directory.AddProtocol<fuchsia_examples::Echo>(&impl).status_value(), ZX_OK);
+  ASSERT_EQ(outgoing_directory
+                .AddProtocol<fuchsia_examples::Echo>(std::make_unique<EchoImpl>(/*reversed=*/false))
+                .status_value(),
+            ZX_OK);
   ZX_ASSERT(outgoing_directory.Serve(std::move(endpoints->server)).is_ok());
 
   component::OutgoingDirectory moved_in_constructor(std::move(outgoing_directory));
@@ -204,11 +217,13 @@ TEST_F(OutgoingDirectoryTest, CanBeMovedSafely) {
   EXPECT_EQ(reply_received, kTestString);
 }
 
-TEST_F(OutgoingDirectoryTest, AddProtocolWireServer) {
+TEST_F(OutgoingDirectoryTest, AddProtocol) {
   // Setup fuchsia.examples.Echo server.
-  EchoImpl impl(/*reversed=*/false);
-  ASSERT_EQ(GetOutgoingDirectory()->AddProtocol<fuchsia_examples::Echo>(&impl).status_value(),
-            ZX_OK);
+  ASSERT_EQ(
+      GetOutgoingDirectory()
+          ->AddProtocol<fuchsia_examples::Echo>(std::make_unique<EchoImpl>(/*reversed=*/false))
+          .status_value(),
+      ZX_OK);
 
   // Setup fuchsia.examples.Echo client.
   auto client_end =
@@ -231,9 +246,10 @@ TEST_F(OutgoingDirectoryTest, AddProtocolWireServer) {
 }
 
 TEST_F(OutgoingDirectoryTest, AddProtocolNaturalServer) {
-  // Setup fuchsia.examples.Echo server.
-  NaturalEchoImpl impl(/*reversed=*/false);
-  ASSERT_EQ(GetOutgoingDirectory()->AddProtocol<fuchsia_examples::Echo>(&impl).status_value(),
+  ASSERT_EQ(GetOutgoingDirectory()
+                ->AddProtocol<fuchsia_examples::Echo>(
+                    std::make_unique<NaturalEchoImpl>(/*reversed=*/false))
+                .status_value(),
             ZX_OK);
 
   // Setup fuchsia.examples.Echo client.
@@ -312,13 +328,11 @@ TEST_F(OutgoingDirectoryTest, AddProtocolCanServeMultipleProtocols) {
       {{false, "fuchsia.examples.Echo"}, {true, "fuchsia.examples.Ohce"}}};
 
   // Setup fuchsia.examples.Echo servers
-  EchoImpl regular_impl(/*reversed=*/false);
-  EchoImpl reversed_impl(/*reversed=*/true);
   for (auto [reversed, path] : kIsReversedAndPaths) {
-    auto* impl = reversed ? &reversed_impl : &regular_impl;
-    ASSERT_EQ(
-        GetOutgoingDirectory()->AddProtocol<fuchsia_examples::Echo>(impl, path).status_value(),
-        ZX_OK);
+    ASSERT_EQ(GetOutgoingDirectory()
+                  ->AddProtocol<fuchsia_examples::Echo>(std::make_unique<EchoImpl>(reversed), path)
+                  .status_value(),
+              ZX_OK);
   }
 
   // Setup fuchsia.examples.Echo client
@@ -344,69 +358,14 @@ TEST_F(OutgoingDirectoryTest, AddProtocolCanServeMultipleProtocols) {
   }
 }
 
-// Test that after removing protocol, all clients are unable to make a call on
-// the channel.
-TEST_F(OutgoingDirectoryTest, RemoveProtocolClosesAllConnections) {
-  // For this test case, 3 clients will connect to one Echo protocol.
-  static constexpr size_t kNumClients = 3;
-
-  class EventHandler : public fidl::AsyncEventHandler<fuchsia_examples::Echo> {
-   public:
-    EventHandler() = default;
-
-    void on_fidl_error(fidl::UnbindInfo error) override { errors_.emplace_back(error); }
-
-    std::vector<fidl::UnbindInfo> GetErrors() { return errors_; }
-
-   private:
-    std::vector<fidl::UnbindInfo> errors_;
-  };
-
-  EventHandler event_handler;
-  EchoImpl regular_impl(/*reversed=*/false);
-  ASSERT_EQ(
-      GetOutgoingDirectory()->AddProtocol<fuchsia_examples::Echo>(&regular_impl).status_value(),
-      ZX_OK);
-
-  fidl::ClientEnd<fuchsia_io::Directory> svc_directory = TakeSvcClientEnd(TakeRootClientEnd());
-  std::vector<fidl::Client<fuchsia_examples::Echo>> clients = {};
-  for (size_t i = 0; i < kNumClients; ++i) {
-    auto client_end = component::ConnectAt<fuchsia_examples::Echo>(svc_directory.borrow());
-
-    ASSERT_EQ(client_end.status_value(), ZX_OK);
-
-    fidl::Client<fuchsia_examples::Echo> client(std::move(*client_end), dispatcher(),
-                                                &event_handler);
-    client->EchoString(std::string(kTestString))
-        .ThenExactlyOnce([quit_loop = QuitLoopClosure()](
-                             fidl::Result<fuchsia_examples::Echo::EchoString>& result) {
-          ASSERT_TRUE(result.is_ok());
-          ASSERT_EQ(result->response(), kTestString);
-          quit_loop();
-        });
-    RunLoop();
-
-    clients.emplace_back(std::move(client));
-  }
-
-  ASSERT_EQ(GetOutgoingDirectory()->RemoveProtocol<fuchsia_examples::Echo>().status_value(), ZX_OK);
-  RunLoopUntilIdle();
-
-  ASSERT_EQ(event_handler.GetErrors().size(), kNumClients);
-  for (auto& error : event_handler.GetErrors()) {
-    EXPECT_TRUE(error.is_peer_closed())
-        << "Expected peer_closed. Got : " << error.FormatDescription();
-  }
-}
-
 // Test that serving a FIDL Protocol from a non-svc directory works as expected.
 TEST_F(OutgoingDirectoryTest, AddProtocolAtServesProtocol) {
   constexpr static char kDirectory[] = "test";
 
   // Setup fuchsia.examples.Echo servers
-  EchoImpl regular_impl(/*reversed=*/false);
   ASSERT_EQ(GetOutgoingDirectory()
-                ->AddProtocolAt<fuchsia_examples::Echo>(kDirectory, &regular_impl)
+                ->AddProtocolAt<fuchsia_examples::Echo>(
+                    kDirectory, std::make_unique<EchoImpl>(/*reversed=*/false))
                 .status_value(),
             ZX_OK);
 
@@ -489,9 +448,10 @@ TEST_F(OutgoingDirectoryTest, AddDirectoryAtCanServeADirectory) {
 // Test that we can connect to the outgoing directory via multiple connections.
 TEST_F(OutgoingDirectoryTest, ServeCanYieldMultipleConnections) {
   // Setup fuchsia.examples.Echo server
-  EchoImpl regular_impl(/*reversed=*/false);
   ASSERT_EQ(
-      GetOutgoingDirectory()->AddProtocol<fuchsia_examples::Echo>(&regular_impl).status_value(),
+      GetOutgoingDirectory()
+          ->AddProtocol<fuchsia_examples::Echo>(std::make_unique<EchoImpl>(/*reversed=*/false))
+          .status_value(),
       ZX_OK);
 
   // Setup fuchsia.examples.Echo client
@@ -528,6 +488,106 @@ TEST_F(OutgoingDirectoryTest, ServeCanYieldMultipleConnections) {
 
     EXPECT_EQ(reply_received, kTestString);
   }
+}
+
+class EchoEventHandler : public fidl::AsyncEventHandler<fuchsia_examples::Echo> {
+ public:
+  EchoEventHandler() = default;
+
+  void on_fidl_error(fidl::UnbindInfo error) override { errors_.emplace_back(error); }
+
+  std::vector<fidl::UnbindInfo> GetErrors() { return errors_; }
+
+ private:
+  std::vector<fidl::UnbindInfo> errors_;
+};
+
+// Test that after removing protocol, all clients are unable to make a call on
+// the channel.
+TEST_F(OutgoingDirectoryTest, RemoveProtocolClosesAllConnections) {
+  // For this test case, 3 clients will connect to one Echo protocol.
+  static constexpr size_t kNumClients = 3;
+
+  EchoEventHandler event_handler;
+  bool destroyed = false;
+  ASSERT_EQ(GetOutgoingDirectory()
+                ->AddProtocol<fuchsia_examples::Echo>(std::make_unique<EchoImpl>(
+                    /*reversed*/ false, /*on_destruction=*/fit::deferred_callback(
+                        [&destroyed]() { destroyed = true; })))
+                .status_value(),
+            ZX_OK);
+
+  fidl::ClientEnd<fuchsia_io::Directory> svc_directory = TakeSvcClientEnd(TakeRootClientEnd());
+  std::vector<fidl::Client<fuchsia_examples::Echo>> clients = {};
+  for (size_t i = 0; i < kNumClients; ++i) {
+    auto client_end = component::ConnectAt<fuchsia_examples::Echo>(svc_directory.borrow());
+
+    ASSERT_EQ(client_end.status_value(), ZX_OK);
+
+    fidl::Client<fuchsia_examples::Echo> client(std::move(*client_end), dispatcher(),
+                                                &event_handler);
+    client->EchoString(std::string(kTestString))
+        .ThenExactlyOnce([quit_loop = QuitLoopClosure()](
+                             fidl::Result<fuchsia_examples::Echo::EchoString>& result) {
+          ASSERT_TRUE(result.is_ok());
+          ASSERT_EQ(result->response(), kTestString);
+          quit_loop();
+        });
+    RunLoop();
+
+    clients.emplace_back(std::move(client));
+  }
+
+  ASSERT_EQ(GetOutgoingDirectory()->RemoveProtocol<fuchsia_examples::Echo>().status_value(), ZX_OK);
+  RunLoopUntilIdle();
+
+  ASSERT_EQ(event_handler.GetErrors().size(), kNumClients);
+  for (auto& error : event_handler.GetErrors()) {
+    EXPECT_TRUE(error.is_peer_closed())
+        << "Expected peer_closed. Got : " << error.FormatDescription();
+  }
+  ASSERT_TRUE(destroyed);
+}
+
+TEST_F(OutgoingDirectoryTest, OutgoingDirectoryDestructorClosesAllConnections) {
+  bool destroyed = false;
+  ASSERT_EQ(GetOutgoingDirectory()
+                ->AddProtocol<fuchsia_examples::Echo>(std::make_unique<EchoImpl>(
+                    /*reversed*/ false, /*on_destruction=*/fit::deferred_callback(
+                        [&destroyed]() { destroyed = true; })))
+                .status_value(),
+            ZX_OK);
+
+  // Setup client
+  auto client_end =
+      component::ConnectAt<fuchsia_examples::Echo>(TakeSvcClientEnd(TakeRootClientEnd()));
+  ASSERT_EQ(client_end.status_value(), ZX_OK);
+
+  EchoEventHandler event_handler;
+  fidl::Client<fuchsia_examples::Echo> client(std::move(*client_end), dispatcher(), &event_handler);
+  client->EchoString(std::string(kTestString))
+      .ThenExactlyOnce([quit_loop = QuitLoopClosure()](
+                           fidl::Result<fuchsia_examples::Echo::EchoString>& result) {
+        ASSERT_TRUE(result.is_ok());
+        ASSERT_EQ(result->response(), kTestString);
+        quit_loop();
+      });
+  RunLoop();
+
+  // We have to take the outgoing directory instead of creating a local one
+  // because they would share a dispatcher and may fail synchronization checks.
+  auto outgoing_directory = TakeOutgoingDirectory();
+  // Destroy outgoing directory object.
+  outgoing_directory.reset();
+  RunLoopUntilIdle();
+
+  ASSERT_EQ(event_handler.GetErrors().size(), 1u);
+  for (auto& error : event_handler.GetErrors()) {
+    EXPECT_TRUE(error.is_peer_closed())
+        << "Expected peer_closed. Got : " << error.FormatDescription();
+  }
+
+  ASSERT_TRUE(destroyed);
 }
 
 TEST_F(OutgoingDirectoryTest, CreateFailsIfDispatcherIsNullptr) {
@@ -583,39 +643,43 @@ TEST_F(OutgoingDirectoryTest, AddServiceFailsIfServiceNameIsEmpty) {
 TEST_F(OutgoingDirectoryTest, AddProtocolFailsIfImplIsNullptr) {
   EXPECT_EQ(GetOutgoingDirectory()
                 ->AddProtocol<fuchsia_examples::Echo>(
-                    /*impl*/ static_cast<fidl::WireServer<fuchsia_examples::Echo>*>(nullptr))
-                .status_value(),
-            ZX_ERR_INVALID_ARGS);
-  EXPECT_EQ(GetOutgoingDirectory()
-                ->AddProtocol<fuchsia_examples::Echo>(
-                    /*impl*/ static_cast<fidl::Server<fuchsia_examples::Echo>*>(nullptr))
+                    /*impl=*/static_cast<std::unique_ptr<fidl::WireServer<fuchsia_examples::Echo>>>(
+                        nullptr))
                 .status_value(),
             ZX_ERR_INVALID_ARGS);
 }
 
-TEST_F(OutgoingDirectoryTest, AddProtocolFailsIfNameIsEmpty) {
-  EchoImpl regular_impl(/*reversed=*/false);
-  EXPECT_EQ(GetOutgoingDirectory()
-                ->AddProtocol<fuchsia_examples::Echo>(&regular_impl, /*name=*/"")
-                .status_value(),
-            ZX_ERR_INVALID_ARGS);
-}
+TEST_F(OutgoingDirectoryTest, AddProtocolAtFailsIfEntryExists) {
+  constexpr std::string_view kProtocolName = "fuchsia.example.Echo";
 
-TEST_F(OutgoingDirectoryTest, AddProtocolFailsIfEntryExists) {
-  EchoImpl regular_impl(/*reversed=*/false);
+  component::AnyHandler handler = [](zx::channel request) {};
   ASSERT_EQ(
-      GetOutgoingDirectory()->AddProtocol<fuchsia_examples::Echo>(&regular_impl).status_value(),
+      GetOutgoingDirectory()
+          ->AddProtocolAt(std::move(handler), /*path=*/kSvcDirectoryPath, /*name=*/kProtocolName)
+          .status_value(),
       ZX_OK);
 
-  EXPECT_EQ(
-      GetOutgoingDirectory()->AddProtocol<fuchsia_examples::Echo>(&regular_impl).status_value(),
-      ZX_ERR_ALREADY_EXISTS);
+  component::AnyHandler another_handler = [](zx::channel request) {};
+  EXPECT_EQ(GetOutgoingDirectory()
+                ->AddProtocolAt(std::move(another_handler), /*path=*/kSvcDirectoryPath,
+                                /*name=*/kProtocolName)
+                .status_value(),
+            ZX_ERR_ALREADY_EXISTS);
+}
+
+TEST_F(OutgoingDirectoryTest, AddProtocolAtFailsIfNameIsEmpty) {
+  component::AnyHandler handler = [](zx::channel request) {};
+  EXPECT_EQ(GetOutgoingDirectory()
+                ->AddProtocolAt(std::move(handler), /*path=*/kSvcDirectoryPath, /*name=*/"")
+                .status_value(),
+            ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(OutgoingDirectoryTest, AddProtocolAtFailsIfDirectoryIsEmpty) {
-  EchoImpl regular_impl(/*reversed=*/false);
+  component::AnyHandler handler = [](zx::channel request) {};
   EXPECT_EQ(GetOutgoingDirectory()
-                ->AddProtocolAt<fuchsia_examples::Echo>(/*directory=*/"", &regular_impl)
+                ->AddProtocolAt(/*handler=*/std::move(handler), /*path=*/"",
+                                /*name=*/"fuchsia.examples.Echo")
                 .status_value(),
             ZX_ERR_INVALID_ARGS);
 }
