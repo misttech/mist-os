@@ -5,33 +5,133 @@
 use {
     crate::args::RepoPublishCommand,
     anyhow::{Context, Result},
+    fuchsia_async as fasync,
+    fuchsia_lockfile::Lockfile,
     fuchsia_repo::{
+        package_manifest_watcher::{PackageManifestWatcher, PackageManifestWatcherBuilder},
         repo_builder::RepoBuilder,
         repo_client::RepoClient,
         repo_keys::RepoKeys,
         repository::{Error as RepoError, PmRepository},
     },
+    futures::{FutureExt, StreamExt},
     std::{
         collections::BTreeSet,
         fs::File,
         io::{BufWriter, Write},
+        path::Path,
+        pin::Pin,
     },
+    tracing::{error, warn},
     tuf::{metadata::RawSignedMetadata, Error as TufError},
 };
 
+/// Time in seconds after which the attempt to get a lock file is considered failed.
+const LOCK_TIMEOUT_SEC: u64 = 2 * 60;
+
+/// Time in milliseconds at which the filesystem update events are rated.
+const WATCHER_NEXT_EVENT_RATE_MILLIS: u64 = 200;
+
+/// Filename for lockfile for repository that's being processed by the command.
+const REPOSITORY_LOCK_FILENAME: &str = ".repository.lock";
+
 pub async fn cmd_repo_publish(cmd: RepoPublishCommand) -> Result<()> {
+    if cmd.watch {
+        repo_incremental_publish(&cmd, WATCHER_NEXT_EVENT_RATE_MILLIS).await
+    } else {
+        repo_publish(&cmd).await
+    }
+}
+
+async fn repo_incremental_publish(cmd: &RepoPublishCommand, watcher_rate: u64) -> Result<()> {
+    let mut watcher = PackageManifestWatcher::watch(
+        PackageManifestWatcherBuilder::builder()
+            .manifests(cmd.package_manifests.iter())
+            .lists(cmd.package_list_manifests.iter())
+            .build(),
+    )?
+    .peekable();
+    loop {
+        repo_publish(cmd).await.unwrap_or_else(|e| warn!("Repo publish error: {:?}", e));
+
+        // TODO(fxb/117882): The current implementation of `PackageManifestWatcher` guarantees that
+        // all buffered events can be processed, but future implementations might change this. It
+        // should be considered to rewrite things such that the watcher only retains the last event
+        // to avoid the risk of a bunch of changes being queued up to avoid unnecessary
+        // re-publishes.
+        // Wait for 200ms after last file change.
+        let watcher_result = loop {
+            let watcher_result = watcher.next().await;
+            fuchsia_async::Timer::new(fuchsia_async::Duration::from_millis(watcher_rate)).await;
+            // If the stream is empty, return the result.
+            if Pin::new(&mut watcher).peek().now_or_never().is_none() {
+                break watcher_result;
+            } else {
+                // Skip all but the last item on the stream.
+                while Pin::new(&mut watcher).peek().now_or_never().is_some() {
+                    let _ = watcher.next().await;
+                }
+            }
+        };
+
+        // Exit the loop if the notify watcher has shut down.
+        if watcher_result.is_none() {
+            break Ok(());
+        }
+    }
+}
+
+async fn lock_repository(lock_path: &Path) -> Result<Lockfile> {
+    Ok(Lockfile::lock_for(lock_path, std::time::Duration::from_secs(LOCK_TIMEOUT_SEC))
+        .await
+        .map_err(|e| {
+            error!(
+                "Failed to aquire a lockfile. Check that {lockpath} doesn't exist and \
+                 can be written to. Ownership information: {owner:#?}",
+                lockpath = e.lock_path.display(),
+                owner = e.owner
+            );
+            e
+        })?)
+}
+
+async fn repo_publish(cmd: &RepoPublishCommand) -> Result<()> {
+    if !cmd.repo_path.exists() {
+        std::fs::create_dir(&cmd.repo_path).expect("creating repository parent dir");
+    }
+    let dir = cmd.repo_path.join("repository");
+    if !dir.exists() {
+        std::fs::create_dir(&dir).expect("creating repository dir");
+    }
+    let lock_path = dir.join(REPOSITORY_LOCK_FILENAME).into_std_path_buf();
+    let lock_file = {
+        let _log_warning_task = fasync::Task::local({
+            let lock_path = lock_path.clone();
+            async move {
+                fasync::Timer::new(fasync::Duration::from_secs(30)).await;
+                warn!("Obtaining a lock at {} not complete after 30s", &lock_path.display());
+            }
+        });
+        lock_repository(&lock_path).await?
+    };
+    let publish_result = repo_publish_oneshot(cmd).await;
+    lock_file.unlock()?;
+    publish_result
+}
+
+async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
     let repo = PmRepository::builder(cmd.repo_path.clone()).copy_mode(cmd.copy_mode).build();
 
     let mut deps = BTreeSet::new();
 
     // Load the signing metadata keys if from a file if specified.
-    let repo_signing_keys = if let Some(path) = cmd.signing_keys {
+    let repo_signing_keys = if let Some(path) = &cmd.signing_keys {
         if !path.exists() {
             anyhow::bail!("--signing-keys path {} does not exist", path);
         }
 
         let keys = RepoKeys::from_dir(path.as_std_path())?;
-        deps.insert(path);
+        deps.insert(path.clone());
 
         Some(keys)
     } else {
@@ -40,7 +140,7 @@ pub async fn cmd_repo_publish(cmd: RepoPublishCommand) -> Result<()> {
 
     // Load the trusted metadata keys. If they weren't passed in a trusted keys file, try to read
     // the keys from the repository.
-    let repo_trusted_keys = if let Some(path) = cmd.trusted_keys {
+    let repo_trusted_keys = if let Some(path) = &cmd.trusted_keys {
         if !path.exists() {
             anyhow::bail!("--trusted-keys path {} does not exist", path);
         }
@@ -52,7 +152,7 @@ pub async fn cmd_repo_publish(cmd: RepoPublishCommand) -> Result<()> {
 
     // Try to connect to the repository. This should succeed if we have at least some root metadata
     // in the repository. If none exists, we'll create a new repository.
-    let client = if let Some(trusted_root_path) = cmd.trusted_root {
+    let client = if let Some(trusted_root_path) = &cmd.trusted_root {
         let buf = async_fs::read(&trusted_root_path)
             .await
             .with_context(|| format!("reading trusted root {trusted_root_path}"))?;
@@ -105,21 +205,21 @@ pub async fn cmd_repo_publish(cmd: RepoPublishCommand) -> Result<()> {
     // Publish all the packages.
     deps.extend(
         repo_builder
-            .add_packages(cmd.package_manifests.into_iter())
+            .add_packages(cmd.package_manifests.iter().cloned())
             .await?
-            .add_package_lists(cmd.package_list_manifests.into_iter())
+            .add_package_lists(cmd.package_list_manifests.iter().cloned())
             .await?
-            .add_package_archives(cmd.package_archives.into_iter())
+            .add_package_archives(cmd.package_archives.iter().cloned())
             .await?
             .commit()
             .await?,
     );
 
-    if let Some(depfile_path) = cmd.depfile {
+    if let Some(depfile_path) = &cmd.depfile {
         let timestamp_path = cmd.repo_path.join("repository").join("timestamp.json");
 
         let file =
-            File::create(&depfile_path).with_context(|| format!("creating {depfile_path}"))?;
+            File::create(depfile_path).with_context(|| format!("creating {depfile_path}"))?;
 
         let mut file = BufWriter::new(file);
 
@@ -141,12 +241,144 @@ mod tests {
     use {
         super::*,
         assert_matches::assert_matches,
-        camino::Utf8Path,
+        camino::{Utf8Path, Utf8PathBuf},
         chrono::{TimeZone, Utc},
-        fuchsia_pkg::PackageManifestList,
+        fuchsia_async as fasync,
+        fuchsia_pkg::{PackageManifest, PackageManifestList},
         fuchsia_repo::{repository::CopyMode, test_utils},
         tuf::metadata::Metadata as _,
     };
+
+    struct TestEnv {
+        _tmp: tempfile::TempDir,
+        cmd: RepoPublishCommand,
+        repo_path: Utf8PathBuf,
+        manifests: Vec<PackageManifest>,
+        manifest_paths: Vec<Utf8PathBuf>,
+        list_paths: Vec<Utf8PathBuf>,
+        depfile_path: Utf8PathBuf,
+    }
+
+    impl TestEnv {
+        fn new() -> Self {
+            let tempdir = tempfile::tempdir().unwrap();
+            let root = Utf8Path::from_path(tempdir.path()).unwrap();
+
+            let repo_path = root.join("repo");
+            test_utils::make_empty_pm_repo_dir(&repo_path);
+
+            // Build some packages to publish.
+            let mut manifests = vec![];
+            let mut manifest_paths = vec![];
+            for name in (1..=5).map(|i| format!("package{}", i)) {
+                let (pkg_manifest, pkg_manifest_path) = create_manifest(&name, root);
+                manifests.push(pkg_manifest);
+                manifest_paths.push(pkg_manifest_path);
+            }
+
+            let list_names = (1..=2).map(|i| format!("list{}.json", i)).collect::<Vec<_>>();
+            let list_paths = list_names.iter().map(|name| root.join(name)).collect::<Vec<_>>();
+            // Bundle up package3, package4, and package5 into package list manifests.
+            let list_parent = list_paths[0].parent().unwrap();
+            let pkg_list1_manifest = PackageManifestList::from_iter(
+                [&manifest_paths[2], &manifest_paths[3]]
+                    .iter()
+                    .map(|path| path.strip_prefix(list_parent).unwrap())
+                    .map(Into::into),
+            );
+            pkg_list1_manifest.to_writer(File::create(&list_paths[0]).unwrap()).unwrap();
+
+            let list_parent = list_paths[1].parent().unwrap();
+            let pkg_list2_manifest = PackageManifestList::from_iter(
+                [&manifest_paths[4]]
+                    .iter()
+                    .map(|path| path.strip_prefix(list_parent).unwrap())
+                    .map(Into::into),
+            );
+            pkg_list2_manifest.to_writer(File::create(&list_paths[1]).unwrap()).unwrap();
+
+            let depfile_path = root.join("deps");
+
+            let cmd = RepoPublishCommand {
+                watch: false,
+                signing_keys: None,
+                trusted_keys: None,
+                trusted_root: None,
+                package_archives: vec![],
+                package_manifests: manifest_paths[0..2].to_vec(),
+                package_list_manifests: list_paths.clone(),
+                metadata_current_time: Utc::now(),
+                time_versioning: false,
+                refresh_root: false,
+                clean: false,
+                depfile: Some(depfile_path.clone()),
+                copy_mode: CopyMode::Copy,
+                repo_path: repo_path.to_path_buf(),
+            };
+
+            TestEnv {
+                _tmp: tempdir,
+                cmd,
+                repo_path,
+                manifests,
+                list_paths,
+                depfile_path,
+                manifest_paths,
+            }
+        }
+
+        // takes paths to manifests - lists and packages
+        fn validate_manifest_blobs(&self, expected_deps: BTreeSet<Utf8PathBuf>) {
+            let mut expected_deps = expected_deps;
+            let blob_repo_path = self.repo_path.join("repository").join("blobs");
+
+            for package_manifest in &self.manifests {
+                for blob in package_manifest.blobs() {
+                    expected_deps.insert(blob.source_path.clone().into());
+                    let blob_path = blob_repo_path.join(blob.merkle.to_string());
+                    assert_eq!(
+                        std::fs::read(&blob.source_path).unwrap(),
+                        std::fs::read(blob_path).unwrap(),
+                    );
+                }
+            }
+
+            assert_eq!(
+                std::fs::read_to_string(&self.depfile_path).unwrap(),
+                format!(
+                    "{}: {}",
+                    self.repo_path.join("repository").join("timestamp.json"),
+                    expected_deps.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(" "),
+                )
+            );
+        }
+    }
+
+    fn create_manifest(name: &str, root: &Utf8Path) -> (PackageManifest, Utf8PathBuf) {
+        let pkg_build_path = root.join(name);
+        let pkg_manifest_path = root.join(format!("{}.json", name));
+
+        let (_, pkg_manifest) =
+            test_utils::make_package_manifest(name, pkg_build_path.as_std_path(), Vec::new());
+        serde_json::to_writer(File::create(&pkg_manifest_path).unwrap(), &pkg_manifest).unwrap();
+        (pkg_manifest, pkg_manifest_path)
+    }
+
+    fn update_file(path: &Utf8PathBuf, bytes: &[u8]) {
+        let mut file = std::fs::OpenOptions::new().write(true).truncate(true).open(path).unwrap();
+        file.write_all(bytes).unwrap();
+    }
+
+    fn update_manifest(path: &Utf8PathBuf, manifest: &PackageManifest) {
+        let file = std::fs::OpenOptions::new().write(true).truncate(true).open(path).unwrap();
+        serde_json::to_writer(file, manifest).unwrap();
+    }
+
+    // Waits for the repo to be unlocked.
+    async fn ensure_repo_unlocked(repo_path: &Utf8Path) {
+        fasync::Timer::new(fasync::Duration::from_millis(100)).await;
+        lock_repository(repo_path.as_std_path()).await.unwrap().unlock().unwrap();
+    }
 
     #[fuchsia::test]
     async fn test_repository_should_error_with_no_keys_if_it_does_not_exist() {
@@ -154,6 +386,7 @@ mod tests {
         let repo_path = Utf8Path::from_path(tempdir.path()).unwrap();
 
         let cmd = RepoPublishCommand {
+            watch: false,
             signing_keys: None,
             trusted_keys: None,
             trusted_root: None,
@@ -183,6 +416,7 @@ mod tests {
         test_utils::make_repo_keys_dir(&repo_keys_path);
 
         let cmd = RepoPublishCommand {
+            watch: false,
             signing_keys: None,
             trusted_keys: Some(repo_keys_path),
             trusted_root: None,
@@ -234,6 +468,7 @@ mod tests {
         .unwrap();
 
         let cmd = RepoPublishCommand {
+            watch: false,
             signing_keys: None,
             trusted_keys: None,
             trusted_root: None,
@@ -279,6 +514,7 @@ mod tests {
         assert_eq!(repo_client.database().trusted_timestamp().map(|m| m.version()), Some(1));
 
         let cmd = RepoPublishCommand {
+            watch: false,
             signing_keys: None,
             trusted_keys: None,
             trusted_root: None,
@@ -322,6 +558,7 @@ mod tests {
         assert_eq!(repo_client.database().trusted_timestamp().map(|m| m.version()), Some(1));
 
         let cmd = RepoPublishCommand {
+            watch: false,
             signing_keys: None,
             trusted_keys: None,
             trusted_root: None,
@@ -361,6 +598,7 @@ mod tests {
         std::fs::rename(repo_path.join("keys"), &keys_path).unwrap();
 
         let cmd = RepoPublishCommand {
+            watch: false,
             signing_keys: None,
             trusted_keys: None,
             trusted_root: None,
@@ -380,6 +618,7 @@ mod tests {
 
         // Explicitly specifying the keys path should work though.
         let cmd = RepoPublishCommand {
+            watch: false,
             signing_keys: None,
             trusted_keys: Some(keys_path),
             trusted_root: None,
@@ -412,6 +651,7 @@ mod tests {
         test_utils::make_empty_pm_repo_dir(repo_path);
 
         let cmd = RepoPublishCommand {
+            watch: false,
             signing_keys: None,
             trusted_keys: None,
             trusted_root: None,
@@ -472,6 +712,7 @@ mod tests {
 
         // Publish the packages.
         let cmd = RepoPublishCommand {
+            watch: false,
             signing_keys: None,
             trusted_keys: None,
             trusted_root: None,
@@ -516,66 +757,12 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_publish_packages() {
-        let tempdir = tempfile::tempdir().unwrap();
-        let root = Utf8Path::from_path(tempdir.path()).unwrap();
-
-        let repo_path = root.join("repo");
-        test_utils::make_empty_pm_repo_dir(&repo_path);
-
-        // Build some packages to publish.
-        let mut manifests = vec![];
-        for name in ["package1", "package2", "package3", "package4", "package5"] {
-            let pkg_build_path = root.join(name);
-            let pkg_manifest_path = root.join(format!("{name}.json"));
-
-            let (_, pkg_manifest) =
-                test_utils::make_package_manifest(name, pkg_build_path.as_std_path(), Vec::new());
-
-            serde_json::to_writer(File::create(pkg_manifest_path).unwrap(), &pkg_manifest).unwrap();
-
-            manifests.push(pkg_manifest);
-        }
-
-        let pkg1_manifest_path = root.join("package1.json");
-        let pkg2_manifest_path = root.join("package2.json");
-        let pkg3_manifest_path = root.join("package3.json");
-        let pkg4_manifest_path = root.join("package4.json");
-        let pkg5_manifest_path = root.join("package5.json");
-
-        // Bundle up package3, package4, and package5 into package list manifests.
-        let pkg_list1_manifest =
-            PackageManifestList::from(vec![root.join("package3.json"), root.join("package4.json")]);
-        let pkg_list1_manifest_path = root.join("list1.json");
-        pkg_list1_manifest.to_writer(File::create(&pkg_list1_manifest_path).unwrap()).unwrap();
-
-        let pkg_list2_manifest = PackageManifestList::from(vec![root.join("package5.json")]);
-        let pkg_list2_manifest_path = root.join("list2.json");
-        pkg_list2_manifest.to_writer(File::create(&pkg_list2_manifest_path).unwrap()).unwrap();
-
-        let depfile_path = root.join("deps");
+        let env = TestEnv::new();
 
         // Publish the packages.
-        let cmd = RepoPublishCommand {
-            signing_keys: None,
-            trusted_keys: None,
-            trusted_root: None,
-            package_archives: vec![],
-            package_manifests: vec![pkg1_manifest_path.clone(), pkg2_manifest_path.clone()],
-            package_list_manifests: vec![
-                pkg_list1_manifest_path.clone(),
-                pkg_list2_manifest_path.clone(),
-            ],
-            metadata_current_time: Utc::now(),
-            time_versioning: false,
-            refresh_root: false,
-            clean: false,
-            depfile: Some(depfile_path.clone()),
-            copy_mode: CopyMode::Copy,
-            repo_path: repo_path.to_path_buf(),
-        };
-        assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
+        assert_matches!(repo_publish(&env.cmd).await, Ok(()));
 
-        let repo = PmRepository::new(repo_path.to_path_buf());
+        let repo = PmRepository::new(env.repo_path.to_path_buf());
         let mut repo_client = RepoClient::from_trusted_remote(repo).await.unwrap();
 
         assert_matches!(repo_client.update().await, Ok(true));
@@ -585,39 +772,9 @@ mod tests {
         assert_eq!(repo_client.database().trusted_snapshot().map(|m| m.version()), Some(2));
         assert_eq!(repo_client.database().trusted_timestamp().map(|m| m.version()), Some(2));
 
-        let blob_repo_path = repo_path.join("repository").join("blobs");
-
-        let mut expected_deps = BTreeSet::from([
-            pkg1_manifest_path,
-            pkg2_manifest_path,
-            pkg3_manifest_path,
-            pkg4_manifest_path,
-            pkg5_manifest_path,
-            pkg_list1_manifest_path,
-            pkg_list2_manifest_path,
-        ]);
-
-        for package_manifest in manifests {
-            for blob in package_manifest.blobs() {
-                expected_deps.insert(blob.source_path.clone().into());
-
-                let blob_path = blob_repo_path.join(blob.merkle.to_string());
-
-                assert_eq!(
-                    std::fs::read(&blob.source_path).unwrap(),
-                    std::fs::read(blob_path).unwrap(),
-                );
-            }
-        }
-
-        assert_eq!(
-            std::fs::read_to_string(&depfile_path).unwrap(),
-            format!(
-                "{}: {}",
-                repo_path.join("repository").join("timestamp.json"),
-                expected_deps.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(" "),
-            )
-        );
+        let expected_deps =
+            BTreeSet::from_iter(env.manifest_paths.iter().chain(env.list_paths.iter()).cloned());
+        env.validate_manifest_blobs(expected_deps);
     }
 
     #[fuchsia::test]
@@ -639,6 +796,7 @@ mod tests {
         serde_json::to_writer(File::create(&pkg3_manifest_path).unwrap(), &pkg3_manifest).unwrap();
 
         let cmd = RepoPublishCommand {
+            watch: false,
             signing_keys: None,
             trusted_keys: None,
             trusted_root: None,
@@ -674,6 +832,7 @@ mod tests {
         serde_json::to_writer(File::create(&pkg4_manifest_path).unwrap(), &pkg4_manifest).unwrap();
 
         let cmd = RepoPublishCommand {
+            watch: false,
             signing_keys: None,
             trusted_keys: None,
             trusted_root: None,
@@ -711,6 +870,7 @@ mod tests {
 
         // Refresh all the metadata using 1.root.json.
         let cmd = RepoPublishCommand {
+            watch: false,
             signing_keys: None,
             trusted_keys: None,
             trusted_root: Some(root.join("repository").join("1.root.json")),
@@ -734,5 +894,62 @@ mod tests {
 
         assert_matches!(repo_client.update().await, Ok(true));
         assert_eq!(repo_client.database().trusted_root().version(), 1);
+    }
+
+    #[fuchsia::test]
+    async fn test_concurrent_publish() {
+        let env = TestEnv::new();
+        assert_matches!(
+            futures::join!(repo_publish(&env.cmd), repo_publish(&env.cmd)),
+            (Ok(()), Ok(()))
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_watch_republishes_on_package_change() {
+        let mut env = TestEnv::new();
+        env.cmd.watch = true;
+        let mut publish_fut = Box::pin(repo_incremental_publish(&env.cmd, 10)).fuse();
+
+        futures::select! {
+            r = publish_fut => panic!("Incremental publishing exited early: {:?}", r),
+            _ = ensure_repo_unlocked(&env.repo_path).fuse() => {},
+        }
+
+        // Make changes to the watched manifest.
+        let (_, manifest) =
+            test_utils::make_package_manifest("foobar", env.repo_path.as_std_path(), Vec::new());
+        update_manifest(&env.manifest_paths[4], &manifest);
+
+        futures::select! {
+            r = publish_fut => panic!("Incremental publishing exited early: {:?}", r),
+            _ = ensure_repo_unlocked(&env.repo_path).fuse() => {},
+        }
+
+        let expected_deps =
+            BTreeSet::from_iter(env.manifest_paths.iter().chain(env.list_paths.iter()).cloned());
+        env.validate_manifest_blobs(expected_deps);
+    }
+
+    #[fuchsia::test]
+    async fn test_watch_unlocks_repository_on_error() {
+        let mut env = TestEnv::new();
+        env.cmd.watch = true;
+        let mut publish_fut = Box::pin(repo_incremental_publish(&env.cmd, 10)).fuse();
+
+        futures::select! {
+            r = publish_fut => panic!("Incremental publishing exited early: {:?}", r),
+            _ = ensure_repo_unlocked(&env.repo_path).fuse() => {},
+        }
+
+        // Make changes to the watched manifests.
+        update_file(&env.manifest_paths[4], br#"invalid content"#);
+
+        futures::select! {
+            r = publish_fut => panic!("Incremental publishing exited early: {:?}", r),
+            _ = ensure_repo_unlocked(&env.repo_path).fuse() => {},
+        }
+
+        // Test will timeout if the repository is not unlocked because of the error.
     }
 }

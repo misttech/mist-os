@@ -134,6 +134,9 @@ pub struct RepoPublishCommand {
 
     #[argh(positional, description = "path to the repository directory")]
     pub repo_path: Utf8PathBuf,
+
+    #[argh(switch, description = "republish packages on file change")]
+    pub watch: bool,
 }
 
 fn parse_copy_mode(value: &str) -> Result<CopyMode, String> {

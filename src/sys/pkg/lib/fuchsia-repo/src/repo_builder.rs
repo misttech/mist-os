@@ -326,6 +326,7 @@ where
     }
 
     /// Stage all the packages pointed to by the package list to be published.
+    /// Paths in the package list file are relative to the directory that contains the package list.
     pub async fn add_package_list(mut self, path: Utf8PathBuf) -> Result<RepoBuilder<'a, R>> {
         let contents = async_fs::read(path.as_std_path())
             .await
@@ -334,9 +335,15 @@ where
         let package_list_manifest = PackageManifestList::from_reader(&contents[..])
             .with_context(|| format!("reading package manifest list {path}"))?;
 
-        self.deps.insert(path);
+        self.deps.insert(path.clone());
 
-        self.add_packages(package_list_manifest.into_iter()).await
+        let builder = if let Some(parent) = path.parent() {
+            self.add_packages(package_list_manifest.into_iter().map(|p| parent.join(p))).await?
+        } else {
+            self.add_packages(package_list_manifest.into_iter()).await?
+        };
+
+        Ok(builder)
     }
 
     /// Stage all the packages pointed to by the iterator of package lists to be published.
@@ -622,9 +629,7 @@ fn check_manifests_are_equivalent(
         }
 
         for name in new_subpackages.into_keys() {
-            msg.push(format!(
-                "  - {name}: subpackage missing from manifest {old_manifest_path}"
-            ));
+            msg.push(format!("  - {name}: subpackage missing from manifest {old_manifest_path}"));
         }
     }
 
