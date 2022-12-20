@@ -5,16 +5,19 @@
 use crate::api::Blob as BlobApi;
 use crate::api::DataSource as DataSourceApi;
 use crate::api::Hash as HashApi;
+use crate::data_source::BlobDirectory;
 use crate::data_source::BlobFsArchive;
 use crate::hash::Hash;
 use fuchsia_hash::ParseHashError as FuchsiaParseHashError;
 use fuchsia_merkle::Hash as FuchsiaMerkleHash;
+use fuchsia_merkle::MerkleTree;
 use scrutiny_utils::blobfs::BlobFsReader;
 use scrutiny_utils::blobfs::BlobFsReaderBuilder;
 use scrutiny_utils::io::ReadSeek;
 use scrutiny_utils::io::TryClonableBufReaderFile;
 use std::cell::RefCell;
 use std::error;
+use std::fs;
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
@@ -264,9 +267,467 @@ impl BlobFsBlobSetBuilder {
     }
 }
 
+/// [`BlobSet`] implementation backed by a directory of blobs named after their Fuchsia merkle root
+/// hashes. This object wraps a reference-counted pointer to its state, which makes it cheap to
+/// clone. Note that objects of this type are constructed via a builder that that is responsible
+/// for pre-computing the identity of blobs that can be loaded from the underlying directory.
+#[derive(Clone)]
+pub(crate) struct BlobDirectoryBlobSet(Rc<BlobDirectoryBlobSetData>);
+
+impl BlobDirectoryBlobSet {
+    fn new(directory: PathBuf, blob_ids: Vec<Hash>) -> Self {
+        Self(Rc::new(BlobDirectoryBlobSetData::new(directory, blob_ids)))
+    }
+
+    /// Gets the path to this blobs directory.
+    pub fn directory(&self) -> &PathBuf {
+        self.0.directory()
+    }
+
+    /// Gets the hashes in this blobs directory.
+    pub fn blob_ids(&self) -> &Vec<Hash> {
+        self.0.blob_ids()
+    }
+}
+
+/// Internal state of a [`BlobDirectoryBlobSet`].
+pub(crate) struct BlobDirectoryBlobSetData {
+    /// Path to the underlying directory on the local filesystem.
+    directory: PathBuf,
+
+    /// Set of blob identities (content hashes) found in the underlying directory.
+    blob_ids: Vec<Hash>,
+}
+
+impl BlobDirectoryBlobSetData {
+    fn new(directory: PathBuf, blob_ids: Vec<Hash>) -> Self {
+        Self { directory, blob_ids }
+    }
+
+    fn directory(&self) -> &PathBuf {
+        &self.directory
+    }
+
+    fn blob_ids(&self) -> &Vec<Hash> {
+        &self.blob_ids
+    }
+}
+
+/// Errors that can be encountered accessing blobs via a [`BlobDirectoryBlobSet`].
+#[derive(Debug, Error)]
+pub(crate) enum BlobDirectoryError {
+    #[error("Blob not found: {hash}, in blob directory: {directory}")]
+    BlobNotFound { directory: PathBuf, hash: Hash },
+    #[error("Error reading from blob directory: {directory}: {error}")]
+    IoError { directory: PathBuf, error: io::Error },
+}
+
+/// [`Iterator`] implementation for for blobs backed by a [`BlobDirectoryBlobSet`].
+pub(crate) struct BlobDirectoryIterator {
+    next_blob_id_idx: usize,
+    blob_set: BlobDirectoryBlobSet,
+}
+
+impl BlobDirectoryIterator {
+    /// Constructs a [`BlobDirectoryIterator`] that will iterate over all blobs in `blob_set`.
+    pub fn new(blob_set: BlobDirectoryBlobSet) -> Self {
+        Self { next_blob_id_idx: 0, blob_set }
+    }
+}
+
+impl Iterator for BlobDirectoryIterator {
+    type Item = FileBlob;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let blob_ids = self.blob_set.blob_ids();
+        if self.next_blob_id_idx >= blob_ids.len() {
+            return None;
+        }
+
+        let blob_id_idx = self.next_blob_id_idx;
+        self.next_blob_id_idx += 1;
+
+        let hash = blob_ids[blob_id_idx].clone();
+        let blob_set = self.blob_set.clone();
+        Some(FileBlob::new(hash, blob_set))
+    }
+}
+
+impl BlobSet for BlobDirectoryBlobSet {
+    type Hash = Hash;
+    type Blob = FileBlob;
+    type DataSource = BlobDirectory;
+    type Error = BlobDirectoryError;
+
+    fn iter(&self) -> Box<dyn Iterator<Item = Self::Blob>> {
+        Box::new(BlobDirectoryIterator::new(self.clone()))
+    }
+
+    fn blob(&self, hash: Self::Hash) -> Result<Self::Blob, Self::Error> {
+        if self.blob_ids().contains(&hash) {
+            Ok(FileBlob::new(hash, self.clone()))
+        } else {
+            Err(BlobDirectoryError::BlobNotFound { directory: self.directory().clone(), hash })
+        }
+    }
+
+    fn data_sources(&self) -> Box<dyn Iterator<Item = Self::DataSource>> {
+        Box::new([BlobDirectory::new(self.directory().clone())].into_iter())
+    }
+}
+
+/// [`Blob`] implementation for a blobs backed by a [`BlobDirectoryBlobSet`].
+pub(crate) struct FileBlob {
+    hash: Hash,
+    blob_set: BlobDirectoryBlobSet,
+}
+
+impl FileBlob {
+    fn new(hash: Hash, blob_set: BlobDirectoryBlobSet) -> Self {
+        Self { hash, blob_set }
+    }
+}
+
+impl BlobApi for FileBlob {
+    type Hash = Hash;
+    type ReaderSeeker = Box<dyn ReadSeek>;
+    type DataSource = BlobDirectory;
+    type Error = BlobDirectoryError;
+
+    fn hash(&self) -> Self::Hash {
+        self.hash.clone()
+    }
+
+    fn reader_seeker(&self) -> Result<Self::ReaderSeeker, Self::Error> {
+        let hash = format!("{}", self.hash());
+        let path = self.blob_set.directory().join(&hash);
+        Ok(Box::new(fs::File::open(&path).map_err(|error| BlobDirectoryError::IoError {
+            directory: self.blob_set.directory().clone(),
+            error,
+        })?))
+    }
+
+    fn data_sources(&self) -> Box<dyn Iterator<Item = Self::DataSource>> {
+        self.blob_set.data_sources()
+    }
+}
+
+/// Errors that may be emitted by `BlobFsBlobSetBuilder::build`.
+#[derive(Debug, Error)]
+pub(crate) enum BlobDirectoryBlobSetBuilderError {
+    #[error("Attempt to build blob directory blob set without specifying a directory")]
+    MissingDirectory,
+    #[error("Failed to list files in blob directory: {0}")]
+    ListError(io::Error),
+    #[error("Failed to stat directory entry: {0}")]
+    DirEntryError(io::Error),
+    #[error("Failed to losslessly convert file name to string: {0}")]
+    PathStringError(String),
+    #[error("Failed to process blob path: {0}")]
+    PathError(#[from] ParseHashPathError),
+    #[error("Failed to read blob from blob directory: {0}")]
+    ReadBlobError(io::Error),
+    #[error("Hash mismatch: hash from path: {hash_from_path}; computed hash: {computed_hash}")]
+    HashMismatch { hash_from_path: Hash, computed_hash: Hash },
+}
+
+/// Builder pattern for constructing [`BlobDirectoryBlobSet`].
+pub(crate) struct BlobDirectoryBlobSetBuilder {
+    directory: Option<PathBuf>,
+}
+
+impl BlobDirectoryBlobSetBuilder {
+    /// Instantiates empty builder.
+    pub fn new() -> Self {
+        Self { directory: None }
+    }
+
+    /// Associates builder with directory specified by `directory`.
+    pub fn directory<P: AsRef<Path>>(mut self, directory: P) -> Self {
+        self.directory = Some(directory.as_ref().to_path_buf());
+        self
+    }
+
+    /// Builds a [`BlobDirectoryBlobSet`] based on data accumulated in builder. This builder
+    /// enumerates entries in the underlying directory and ensures that:
+    ///
+    /// - All entries are files with content lowercase hash hex strings;
+    /// - File names match content hash of file contents.
+    ///
+    /// After these checks are performed, the set of verified hashes is passed to a
+    /// [`BlobDirectoryBlobSet`] constructor.
+    pub fn build(self) -> Result<BlobDirectoryBlobSet, BlobDirectoryBlobSetBuilderError> {
+        if self.directory.is_none() {
+            return Err(BlobDirectoryBlobSetBuilderError::MissingDirectory);
+        }
+
+        let directory = self.directory.unwrap();
+        let paths =
+            fs::read_dir(&directory).map_err(BlobDirectoryBlobSetBuilderError::ListError)?;
+        let mut blob_ids = vec![];
+        for dir_entry_result in paths {
+            let dir_entry =
+                dir_entry_result.map_err(BlobDirectoryBlobSetBuilderError::DirEntryError)?;
+            let file_name = dir_entry.file_name();
+            let file_name = file_name.to_str().ok_or_else(|| {
+                BlobDirectoryBlobSetBuilderError::PathStringError(String::from(
+                    file_name.to_string_lossy(),
+                ))
+            })?;
+            let hash_from_path = parse_path_as_hash(file_name)
+                .map_err(BlobDirectoryBlobSetBuilderError::PathError)?;
+            let mut blob_file = fs::File::open(directory.join(file_name))
+                .map_err(BlobDirectoryBlobSetBuilderError::ReadBlobError)?;
+            let fuchsia_hash = MerkleTree::from_reader(&mut blob_file)
+                .map_err(BlobDirectoryBlobSetBuilderError::ReadBlobError)?
+                .root();
+            let computed_hash = Hash::from(fuchsia_hash);
+            if hash_from_path != computed_hash {
+                return Err(BlobDirectoryBlobSetBuilderError::HashMismatch {
+                    hash_from_path,
+                    computed_hash,
+                });
+            }
+            blob_ids.push(computed_hash);
+        }
+
+        Ok(BlobDirectoryBlobSet::new(directory, blob_ids))
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::BlobDirectoryBlobSetBuilder;
+    use super::BlobDirectoryBlobSetBuilderError;
+    use super::BlobDirectoryError;
     use super::BlobFsBlobSetBuilder;
+    use super::BlobSet;
+    use super::ParseHashPathError;
+    use crate::api::Blob as BlobApi;
+    use crate::hash::Hash;
+    use fuchsia_hash::HASH_SIZE as FUCHSIA_HASH_SIZE;
+    use fuchsia_merkle::Hash as FuchsiaMerkleHash;
+    use fuchsia_merkle::MerkleTree;
+    use maplit::hashmap;
+    use std::fs;
+    use std::io::Read;
+    use std::io::Write;
+    use tempfile::tempdir;
+
+    macro_rules! fuchsia_hash {
+        ($bytes:expr) => {
+            MerkleTree::from_reader($bytes).unwrap().root()
+        };
+    }
+
+    macro_rules! assert_blob_is {
+        ($blob_set:expr, $blob:expr, $bytes:expr) => {
+            let blob_fuchsia_hash = fuchsia_hash!($bytes);
+            let blob_hash = Hash::from(blob_fuchsia_hash);
+            assert_eq!(blob_hash, $blob.hash());
+            let expected_data_sources: Vec<_> = $blob_set.data_sources().collect();
+            let actual_data_sources: Vec<_> = $blob.data_sources().collect();
+            assert_eq!(expected_data_sources, actual_data_sources);
+            let mut blob_reader_seeker = $blob.reader_seeker().unwrap();
+            let mut blob_contents = vec![];
+            blob_reader_seeker.read_to_end(&mut blob_contents).unwrap();
+            assert_eq!($bytes, blob_contents.as_slice());
+        };
+    }
+
+    macro_rules! assert_blob_set_contains {
+        ($blob_set:expr, $bytes:expr) => {
+            let blob_fuchsia_hash = fuchsia_hash!($bytes);
+            let blob_hash = Hash::from(blob_fuchsia_hash);
+            let found_blob = $blob_set.blob(blob_hash.clone()).unwrap();
+            assert_blob_is!($blob_set, found_blob, $bytes);
+        };
+    }
+
+    macro_rules! mk_temp_dir {
+        ($file_hash_map:expr) => {{
+            let temp_dir = tempdir().unwrap();
+            let dir_path = temp_dir.path();
+            for (name, contents) in $file_hash_map.into_iter() {
+                let path = dir_path.join(format!("{}", &name));
+                let mut file = fs::File::create(&path).unwrap();
+                file.write_all(&contents).unwrap();
+            }
+            temp_dir
+        }};
+    }
+
+    #[fuchsia::test]
+    fn empty_blobs_dir() {
+        let temp_dir = tempdir().unwrap();
+        BlobDirectoryBlobSetBuilder::new().directory(temp_dir.path()).build().unwrap();
+    }
+
+    #[fuchsia::test]
+    fn single_blob_dir() {
+        let blob_data = "Hello, World!";
+
+        // Target directory contains one well-formed blob entry.
+        let temp_dir = mk_temp_dir!(hashmap! {
+            fuchsia_hash!(blob_data.as_bytes()) => blob_data.as_bytes(),
+        });
+        let blob_set =
+            BlobDirectoryBlobSetBuilder::new().directory(temp_dir.path()).build().unwrap();
+
+        let hash_not_in_set = Hash::from(FuchsiaMerkleHash::from([0u8; FUCHSIA_HASH_SIZE]));
+
+        // Check error contents on "failed to find blob" case.
+        let missing_blob = blob_set.blob(hash_not_in_set.clone()).err().unwrap();
+        match missing_blob {
+            BlobDirectoryError::BlobNotFound { directory, hash } => {
+                assert_eq!(temp_dir.path().to_path_buf(), directory);
+                assert_eq!(hash_not_in_set, hash);
+            }
+            _ => {
+                assert!(false, "Expected BlobNotFound error, but got {:?}", missing_blob);
+            }
+        }
+
+        // Check `BlobSet` and `Blob` APIs for single blob in blob set.
+        assert_blob_set_contains!(blob_set, blob_data.as_bytes());
+
+        // Check that `BlobSet::iter` yields the expected single well-formed `Blob`.
+        let blobs: Vec<_> = blob_set.iter().collect();
+        assert_eq!(1, blobs.len());
+        let single_blob = &blobs[0];
+        assert_blob_is!(blob_set, single_blob, blob_data.as_bytes());
+    }
+
+    #[fuchsia::test]
+    fn multi_blob_dir() {
+        let blob_data = vec!["Hello, World!", "Hello, Universe!"];
+
+        // Target directory contains two well-formed blob entries.
+        let temp_dir_map = hashmap! {
+            fuchsia_hash!(blob_data[0].as_bytes()) => blob_data[0].as_bytes(),
+            fuchsia_hash!(blob_data[1].as_bytes()) => blob_data[1].as_bytes(),
+        };
+        let temp_dir = mk_temp_dir!(&temp_dir_map);
+        let blob_set =
+            BlobDirectoryBlobSetBuilder::new().directory(temp_dir.path()).build().unwrap();
+
+        let hash_not_in_set = Hash::from(FuchsiaMerkleHash::from([0u8; FUCHSIA_HASH_SIZE]));
+
+        // Check error contents on "failed to find blob" case.
+        let missing_blob = blob_set.blob(hash_not_in_set.clone()).err().unwrap();
+        match missing_blob {
+            BlobDirectoryError::BlobNotFound { directory, hash } => {
+                assert_eq!(temp_dir.path().to_path_buf(), directory);
+                assert_eq!(hash_not_in_set, hash);
+            }
+            _ => {
+                assert!(false, "Expected BlobNotFound error, but got {:?}", missing_blob);
+            }
+        }
+
+        // Check `BlobSet` and `Blob` APIs for two blobs in blob set.
+        assert_blob_set_contains!(blob_set, blob_data[0].as_bytes());
+        assert_blob_set_contains!(blob_set, blob_data[1].as_bytes());
+
+        // Check that `BlobSet::iter` yields the expected two well-formed `Blob`.
+        let blobs: Vec<_> = blob_set.iter().collect();
+        assert_eq!(2, blobs.len());
+        for blob in blobs {
+            let blob_contents = *temp_dir_map.get(&blob.hash().into()).unwrap();
+            assert_blob_is!(blob_set, blob, blob_contents);
+        }
+    }
+
+    #[fuchsia::test]
+    fn blob_dir_builder_incomplete() {
+        match BlobDirectoryBlobSetBuilder::new().build().err().unwrap() {
+            BlobDirectoryBlobSetBuilderError::MissingDirectory => {}
+            err => {
+                assert!(false, "Expected MissingDirectory error, but got {:?}", err);
+            }
+        };
+    }
+
+    #[fuchsia::test]
+    fn blob_dir_directory_does_not_exist() {
+        match BlobDirectoryBlobSetBuilder::new()
+            .directory("/this/directory/definitely/does/not/exist")
+            .build()
+            .err()
+            .unwrap()
+        {
+            BlobDirectoryBlobSetBuilderError::ListError(_) => {}
+            err => {
+                assert!(false, "Expected ListError error, but got {:?}", err);
+            }
+        };
+    }
+
+    #[fuchsia::test]
+    fn blob_dir_invalid_path_subdir() {
+        let temp_dir = tempdir().unwrap();
+        let dir_path = temp_dir.path();
+
+        let subdir_path = dir_path.join("subdir");
+        fs::create_dir(subdir_path).unwrap();
+
+        match BlobDirectoryBlobSetBuilder::new().directory(dir_path).build().err().unwrap() {
+            BlobDirectoryBlobSetBuilderError::PathError(
+                ParseHashPathError::NonFuchsiaMerkleRoot { path_string, .. },
+            ) => {
+                assert_eq!("subdir", &path_string);
+            }
+            err => {
+                assert!(false, "Expected ReadBlobError error, but got {:?}", err);
+            }
+        };
+    }
+
+    #[fuchsia::test]
+    fn blob_dir_valid_path_invalid_subdir() {
+        let temp_dir = tempdir().unwrap();
+        let dir_path = temp_dir.path();
+
+        let valid_merkle_root = format!("{}", fuchsia_hash!("Hello, World!".as_bytes()));
+        let subdir_path = dir_path.join(&valid_merkle_root);
+        fs::create_dir(subdir_path).unwrap();
+
+        match BlobDirectoryBlobSetBuilder::new().directory(dir_path).build().err().unwrap() {
+            BlobDirectoryBlobSetBuilderError::ReadBlobError(_) => {}
+            err => {
+                assert!(false, "Expected ReadBlobError error, but got {:?}", err);
+            }
+        };
+    }
+
+    #[fuchsia::test]
+    fn blob_dir_wrong_data() {
+        let world_str = "Hello, World!";
+        let universe_str = "Hello, Universe!";
+        let world_bytes = world_str.as_bytes();
+        let universe_bytes = universe_str.as_bytes();
+        let world_hash = fuchsia_hash!(world_bytes);
+        let universe_hash = fuchsia_hash!(universe_bytes);
+
+        // Target directory contains a malformed blob entry: hello-world file-name-as-hash
+        // contains hello-universe bytes.
+        let temp_dir_map = hashmap! {
+            world_hash => universe_bytes,
+        };
+        let temp_dir = mk_temp_dir!(&temp_dir_map);
+
+        match BlobDirectoryBlobSetBuilder::new().directory(temp_dir.path()).build().err().unwrap() {
+            BlobDirectoryBlobSetBuilderError::HashMismatch { hash_from_path, computed_hash } => {
+                let (world_hash, universe_hash): (Hash, Hash) =
+                    (world_hash.into(), universe_hash.into());
+                assert_eq!(world_hash, hash_from_path);
+                assert_eq!(universe_hash, computed_hash);
+            }
+            err => {
+                assert!(false, "Expected HashMismatch error, but got {:?}", err);
+            }
+        };
+    }
 
     // TODO(fxbug.dev/116719): Below is a vacuous test that exercise `super::BlobFs*` code. When
     // this code is updated to use a stable storage API, these tests should be updated to be

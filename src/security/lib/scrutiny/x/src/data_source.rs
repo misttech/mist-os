@@ -47,6 +47,45 @@ impl DataSourceApi for BlobFsArchive {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub struct BlobDirectory {
+    directory: PathBuf,
+}
+
+impl BlobDirectory {
+    /// Construct a [`BlobFsArchive`] that is backed by the file located at `path`.
+    pub fn new(directory: PathBuf) -> Self {
+        Self { directory }
+    }
+}
+
+impl DataSourceApi for BlobDirectory {
+    type SourcePath = PathBuf;
+
+    fn kind(&self) -> DataSourceKind {
+        DataSourceKind::BlobDirectory
+    }
+
+    fn parent(&self) -> Option<Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>> {
+        None
+    }
+
+    fn children(
+        &self,
+    ) -> Box<dyn Iterator<Item = Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>>> {
+        Box::new(iter::empty())
+    }
+
+    fn path(&self) -> Option<Self::SourcePath> {
+        Some(self.directory.clone())
+    }
+
+    fn version(&self) -> DataSourceVersion {
+        // TODO: Add support for directory-as-blob-archive versioning.
+        DataSourceVersion::Unknown
+    }
+}
+
 // TODO(fxbug.dev/111251): Add additional data source types for production System API.
 
 #[cfg(test)]

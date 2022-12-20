@@ -273,6 +273,8 @@ pub enum DataSourceKind {
     /// A blobfs archive (typically named "blob.blk" in Fuchsia builds). For details about blobfs
     /// itself, see https://fuchsia.dev/fuchsia-src/concepts/filesystems/blobfs.
     BlobfsArchive,
+    /// A directory of blob files that are named after their Fuchsia merkle root hashes.
+    BlobDirectory,
     /// An update package that designates a set of packages that constitute an over-the-air (OTA)
     /// system software update. See https://fuchsia.dev/fuchsia-src/concepts/packages/update_pkg
     /// for details.
