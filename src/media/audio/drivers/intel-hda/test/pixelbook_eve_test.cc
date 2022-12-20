@@ -83,14 +83,13 @@ TEST(PixelbookEveAudio, Topology) {
 
 int main(int argc, char** argv) {
   // Only run tests on the Eve.
-  fbl::String board_name;
-  zx_status_t status = audio::intel_hda::GetBoardName(&board_name);
-  if (status != ZX_OK) {
-    std::cerr << "Unable to determine hardware platform: " << zx_status_get_string(status) << ".";
-    return status;
+  zx::result board_name = audio::intel_hda::GetBoardName();
+  if (board_name.is_error()) {
+    std::cerr << "Unable to determine hardware platform: " << board_name.status_string() << ".";
+    return -1;
   }
-  if (board_name != "Eve") {
-    std::cerr << "Skipping tests on unsupported platform '" << board_name.c_str() << "'.";
+  if (board_name.value() != "Eve") {
+    std::cerr << "Skipping tests on unsupported platform '" << board_name.value().c_str() << "'.";
     return 0;
   }
 

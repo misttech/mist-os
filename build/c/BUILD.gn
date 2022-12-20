@@ -108,7 +108,6 @@ config("fidl-deprecated-c-bindings") {
     "//src/media/audio/bin/ihda",
     "//src/media/audio/drivers/intel-hda/controller:controller_test",
     "//src/media/audio/drivers/intel-hda/controller:src",
-    "//src/media/audio/drivers/intel-hda/test:test_libs",
     "//src/performance/ktrace_provider:bin",
     "//src/power/thermd:bin",
 

@@ -5,7 +5,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_INTEL_HDA_TEST_BOARD_NAME_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_INTEL_HDA_TEST_BOARD_NAME_H_
 
-#include <zircon/types.h>
+#include <lib/zx/result.h>
 
 #include <fbl/string.h>
 
@@ -13,7 +13,7 @@ namespace audio::intel_hda {
 
 // Get the name of the board we are running on, such as
 // "Standard PC (Q35 + ICH9, 2009)" (qemu) or "Eve" (Pixelbook).
-zx_status_t GetBoardName(fbl::String* result);
+zx::result<fbl::String> GetBoardName();
 
 }  // namespace audio::intel_hda
 
