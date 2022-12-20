@@ -141,7 +141,7 @@ FlatlandScreenshot::FlatlandScreenshot(
       });
 }
 
-FlatlandScreenshot::~FlatlandScreenshot() {}
+FlatlandScreenshot::~FlatlandScreenshot() { FX_LOGS(INFO) << "Dtor for FlatlandScreenshot."; }
 
 void FlatlandScreenshot::Take(fuchsia::ui::composition::ScreenshotTakeRequest format,
                               TakeCallback callback) {
@@ -188,6 +188,7 @@ void FlatlandScreenshot::Take(fuchsia::ui::composition::ScreenshotTakeRequest fo
   GetNextFrameArgs frame_args;
   frame_args.set_event(std::move(dup));
 
+  FX_LOGS(INFO) << "Capturing next frame for screenshot.";
   screen_capturer_->GetNextFrame(std::move(frame_args), [](auto result) {});
 
   // Wait for the frame to render in an async fashion.

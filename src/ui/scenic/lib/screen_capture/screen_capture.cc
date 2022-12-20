@@ -121,6 +121,7 @@ void ScreenCapture::Configure(ScreenCaptureConfig args, ConfigureCallback callba
     available_buffers_.push_back(i);
   }
   // Everything was successful!
+  FX_LOGS(INFO) << "ScreenCapture::Configure: Configuration was successful.";
   callback(fpromise::ok());
 }
 
