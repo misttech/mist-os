@@ -1,17 +1,13 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::arguments::*,
-    anyhow::{anyhow, Error},
-};
+use {crate::arguments::*, anyhow::Error};
 
 mod arguments;
 mod balloon;
 mod services;
 mod socat;
 mod vsh;
-mod vsockperf;
 
 #[fuchsia::main(logging_tags = ["guest"])]
 async fn main() -> Result<(), Error> {
@@ -59,10 +55,11 @@ async fn main() -> Result<(), Error> {
             println!("{}", output);
             Ok(())
         }
-        SubCommands::VsockPerf(args) => match args.guest_type {
-            GuestType::Debian => vsockperf::run_micro_benchmark(args.guest_type).await,
-            _ => Err(anyhow!("Vsock Perf is not supported for '{}'", args.guest_type)),
-        },
+        SubCommands::VsockPerf(vsockperf_args) => {
+            let output = guest_cli::vsockperf::handle_vsockperf(&services, &vsockperf_args).await?;
+            println!("{}", output);
+            Ok(())
+        }
         SubCommands::Socat(socat_args) => {
             let vsock_endpoint = socat::connect_to_vsock_endpoint(socat_args.guest_type).await?;
             socat::handle_socat(vsock_endpoint, socat_args.port).await

@@ -107,7 +107,7 @@ pub enum SubCommands {
     Socat(SocatArgs),
     SocatListen(SocatListenArgs),
     Vsh(VshArgs),
-    VsockPerf(VsockPerfArgs),
+    VsockPerf(crate::vsockperf_args::VsockPerfArgs),
     Wipe(crate::wipe_args::WipeArgs),
 }
 
@@ -197,13 +197,17 @@ pub mod wipe_args {
     }
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
-/// Perform a vsock micro benchmark on the target guest. Only Debian is supported.
-#[argh(subcommand, name = "vsock-perf")]
-pub struct VsockPerfArgs {
-    #[argh(positional)]
-    /// type of the guest
-    pub guest_type: GuestType,
+pub mod vsockperf_args {
+    use super::*;
+    #[derive(FromArgs, PartialEq, Debug)]
+    /// Perform a vsock micro benchmark on the target guest. Only Debian is supported.
+    #[argh(subcommand, name = "vsock-perf")]
+    #[cfg_attr(not(target_os = "fuchsia"), ffx_command())]
+    pub struct VsockPerfArgs {
+        #[argh(positional)]
+        /// type of the guest
+        pub guest_type: GuestType,
+    }
 }
 
 pub mod launch_args {
