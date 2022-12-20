@@ -46,6 +46,7 @@ if (is_host) {
       "//third_party/rust_crates:tokio",
       "//third_party/rust_crates:tracing",
       "//third_party/rust_crates:tuf",
+      "//third_party/rust_crates:typed-builder",
       "//third_party/rust_crates:url",
       "//third_party/rust_crates:walkdir",
     ]
@@ -66,6 +67,7 @@ if (is_host) {
       "src/async_spooled.rs",
       "src/lib.rs",
       "src/manager.rs",
+      "src/package_manifest_watcher.rs",
       "src/range.rs",
       "src/repo_builder.rs",
       "src/repo_client.rs",

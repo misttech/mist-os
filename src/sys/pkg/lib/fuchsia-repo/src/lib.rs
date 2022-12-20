@@ -7,6 +7,7 @@
 #![allow(clippy::let_unit_value)]
 
 pub mod manager;
+pub mod package_manifest_watcher;
 pub mod range;
 pub mod repo_builder;
 pub mod repo_client;
