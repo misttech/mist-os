@@ -6,7 +6,8 @@
 #include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fdio/fdio.h>
+#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/fdio/cpp/caller.h>
 #include <lib/trace-provider/provider.h>
 #include <lib/trace/event.h>
 #include <string.h>
@@ -14,8 +15,6 @@
 #include <zircon/status.h>
 
 #include <optional>
-
-#include <fbl/unique_fd.h>
 
 #include "src/lib/fsl/io/device_watcher.h"
 #include "src/lib/fxl/command_line.h"
@@ -51,21 +50,13 @@ zx_status_t ParseUintArg(const char* arg, uint32_t min, uint32_t max, uint32_t* 
 
 std::optional<fidl::WireSharedClient<fuchsia_input_report::InputDevice>> GetClientFromPath(
     Printer* printer, const std::string& path, async_dispatcher_t* dispatcher) {
-  fbl::unique_fd fd(open(path.c_str(), O_RDWR));
-  if (!fd.is_valid()) {
-    printer->Print("could not open %s\n", path.c_str());
+  zx::result connection = component::Connect<fuchsia_input_report::InputDevice>(path);
+  if (connection.is_error()) {
+    printer->Print("could not open %s: %s\n", path.c_str(), connection.status_string());
     return std::nullopt;
   }
 
-  zx::channel chan;
-  zx_status_t status = fdio_get_service_handle(fd.release(), chan.reset_and_get_address());
-  if (status != ZX_OK) {
-    printer->Print("fdio_get_service_handle failed with %s\n", zx_status_get_string(status));
-    return std::nullopt;
-  }
-
-  return fidl::WireSharedClient(fidl::ClientEnd<fuchsia_input_report::InputDevice>(std::move(chan)),
-                                dispatcher);
+  return fidl::WireSharedClient(std::move(connection.value()), dispatcher);
 }
 
 std::optional<fuchsia_input_report::wire::DeviceType> GetDeviceTypeFromString(
@@ -93,22 +84,16 @@ int ReadAllDevices(async::Loop* loop, Printer* printer) {
   auto watcher = fsl::DeviceWatcher::Create(
       "/dev/class/input-report/", [&](int dir_fd, const std::string& filename) {
         printer->Print("Reading reports from %s:\n", filename.c_str());
-        fbl::unique_fd fd(openat(dir_fd, filename.c_str(), O_RDWR));
-        if (!fd.is_valid()) {
-          printer->Print("could not open %s\n", filename.c_str());
+        fdio_cpp::UnownedFdioCaller caller(dir_fd);
+
+        zx::result connection =
+            component::ConnectAt<fuchsia_input_report::InputDevice>(caller.directory(), filename);
+        if (connection.is_error()) {
+          printer->Print("could not open %s: %s\n", filename.c_str(), connection.status_string());
           return;
         }
 
-        zx::channel chan;
-        zx_status_t status = fdio_get_service_handle(fd.release(), chan.reset_and_get_address());
-        if (status != ZX_OK) {
-          printer->Print("fdio_get_service_handle failed with %s\n", zx_status_get_string(status));
-          return;
-        }
-
-        auto device = fidl::WireSharedClient(
-            fidl::ClientEnd<fuchsia_input_report::InputDevice>(std::move(chan)),
-            loop->dispatcher());
+        auto device = fidl::WireSharedClient(std::move(connection.value()), loop->dispatcher());
 
         auto res = print_input_report::GetReaderClient(&device, loop->dispatcher());
         if (!res.is_ok()) {
@@ -129,25 +114,20 @@ int ReadAllDescriptors(async::Loop* loop, Printer* printer) {
   auto watcher = fsl::DeviceWatcher::Create(
       "/dev/class/input-report/", [&](int dir_fd, const std::string& filename) {
         printer->Print("Reading descriptor from %s:\n", filename.c_str());
-        fbl::unique_fd fd(openat(dir_fd, filename.c_str(), O_RDWR));
-        if (!fd.is_valid()) {
-          printer->Print("could not open %s\n", filename.c_str());
+        fdio_cpp::UnownedFdioCaller caller(dir_fd);
+
+        zx::result connection =
+            component::ConnectAt<fuchsia_input_report::InputDevice>(caller.directory(), filename);
+        if (connection.is_error()) {
+          printer->Print("could not open %s: %s\n", filename.c_str(), connection.status_string());
           return;
         }
 
-        zx::channel chan;
-        zx_status_t status = fdio_get_service_handle(fd.release(), chan.reset_and_get_address());
-        if (status != ZX_OK) {
-          printer->Print("Fdio get handle failed with %s\n", zx_status_get_string(status));
-          return;
-        }
-
-        auto device = fidl::WireSharedClient(
-            fidl::ClientEnd<fuchsia_input_report::InputDevice>(std::move(chan)),
-            loop->dispatcher());
-        status = print_input_report::PrintInputDescriptor(filename, printer, std::move(device));
-        if (status != 0) {
-          printer->Print("Failed to PrintInputReports\n");
+        auto device = fidl::WireSharedClient(std::move(connection.value()), loop->dispatcher());
+        if (zx_status_t status =
+                print_input_report::PrintInputDescriptor(filename, printer, std::move(device));
+            status != ZX_OK) {
+          printer->Print("Failed to PrintInputReports: %s\n", zx_status_get_string(status));
           return;
         }
       });
@@ -170,8 +150,8 @@ int main(int argc, const char** argv) {
 
   print_input_report::Printer printer;
   const fxl::CommandLine command_line = fxl::CommandLineFromArgcArgv(argc, argv);
-  const auto args = command_line.positional_args();
-  if (args.size() == 0) {
+  const auto& args = command_line.positional_args();
+  if (args.empty()) {
     print_input_report::PrintHelp(&printer);
     return 0;
   }
@@ -195,7 +175,7 @@ int main(int argc, const char** argv) {
       }
     }
 
-    const std::string& device_path = args[1].c_str();
+    const std::string& device_path = args[1];
     auto client = print_input_report::GetClientFromPath(&printer, device_path, loop.dispatcher());
     if (!client) {
       return -1;
@@ -213,7 +193,7 @@ int main(int argc, const char** argv) {
     loop.Run();
     // The "get" command.
   } else if (args[0] == "get" && args.size() >= 3) {
-    const std::string& device_path = args[1].c_str();
+    const std::string& device_path = args[1];
     auto client = print_input_report::GetClientFromPath(&printer, device_path, loop.dispatcher());
     if (!client) {
       return -1;
@@ -236,7 +216,7 @@ int main(int argc, const char** argv) {
       return ReadAllDescriptors(&loop, &printer);
     }
 
-    const std::string& device_path = args[1].c_str();
+    const std::string& device_path = args[1];
     auto client = print_input_report::GetClientFromPath(&printer, device_path, loop.dispatcher());
     if (!client) {
       return -1;
@@ -246,7 +226,7 @@ int main(int argc, const char** argv) {
 
     loop.Run();
   } else if (args[0] == "feature" && args.size() == 2) {
-    const std::string& device_path = args[1].c_str();
+    const std::string& device_path = args[1];
     auto client = print_input_report::GetClientFromPath(&printer, device_path, loop.dispatcher());
     if (!client) {
       return -1;

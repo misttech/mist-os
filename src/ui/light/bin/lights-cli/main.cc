@@ -4,19 +4,18 @@
 
 #include <fcntl.h>
 #include <fidl/fuchsia.hardware.light/cpp/wire.h>
-#include <lib/fdio/fdio.h>
+#include <lib/component/incoming/cpp/service_client.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <zircon/status.h>
 
 #include <filesystem>
 
-#include <fbl/unique_fd.h>
-
 #include "lights-cli.h"
 
-#define LIGHT_DEV_CLASS_PATH "/dev/class/light/"
+constexpr char kLightDevClassPath[] = "/dev/class/light/";
 
 // LINT.IfChange
 constexpr char kUsageMessage[] = R"""(Usage:
@@ -78,20 +77,6 @@ Notes:
 )""";
 // LINT.ThenChange(//docs/reference/tools/hardware/lights-cli.md)
 
-zx_status_t GetDeviceHandle(const char* path, zx::channel* handle) {
-  fbl::unique_fd fd(open(path, O_RDWR));
-  if (fd.get() < -1) {
-    fprintf(stderr, "Failed to open lights device: %d\n", fd.get());
-    return ZX_ERR_IO;
-  }
-
-  zx_status_t status = fdio_get_service_handle(fd.release(), handle->reset_and_get_address());
-  if (status != ZX_OK) {
-    fprintf(stderr, "Failed to get FDIO handle for lights device: %d\n", status);
-  }
-  return status;
-}
-
 int main(int argc, char** argv) {
   if (argc < 2) {
     printf("%s expects at least 2 arguments\n", argv[0]);
@@ -100,21 +85,21 @@ int main(int argc, char** argv) {
   }
 
   if (strcmp(argv[1], "list") == 0 && argc == 2) {
-    for (auto const& dir_entry : std::filesystem::directory_iterator(LIGHT_DEV_CLASS_PATH)) {
+    for (auto const& dir_entry : std::filesystem::directory_iterator(kLightDevClassPath)) {
       printf("%s\n", dir_entry.path().c_str());
     }
     return 0;
   }
 
-  zx::channel channel;
-  zx_status_t status = GetDeviceHandle(argv[1], &channel);
-  if (status != ZX_OK) {
-    printf("Failed to open lights device at '%s'\n", argv[1]);
+  zx::result client = component::Connect<fuchsia_hardware_light::Light>(argv[1]);
+  if (client.is_error()) {
+    printf("Failed to open lights device at '%s': %s\n", argv[1], client.status_string());
     return 1;
   }
 
-  LightsCli lights_cli(std::move(channel));
+  LightsCli lights_cli(std::move(client.value()));
 
+  zx_status_t status;
   if (strcmp(argv[2], "print") == 0 && argc == 4) {
     status = lights_cli.PrintValue(atoi(argv[3]));
   } else if (strcmp(argv[2], "set") == 0 && argc == 5) {
@@ -129,6 +114,7 @@ int main(int argc, char** argv) {
   }
 
   if (status != ZX_OK) {
+    printf("%s\n", zx_status_get_string(status));
     return 1;
   }
   return 0;
