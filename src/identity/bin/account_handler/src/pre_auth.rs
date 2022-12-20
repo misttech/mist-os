@@ -11,6 +11,7 @@ use {
     aes_gcm::aead::generic_array::{typenum::U32, GenericArray},
     fidl_fuchsia_identity_account::Error as ApiError,
     fidl_fuchsia_identity_authentication::Mechanism,
+    identity_common::PrekeyMaterial,
     serde::{Deserialize, Deserializer, Serialize, Serializer},
     tracing::warn,
 };
@@ -116,7 +117,7 @@ pub fn produce_single_enrollment(
     auth_mechanism_id: String,
     mechanism: Mechanism,
     enrollment_data: Vec<u8>,
-    prekey_material: Vec<u8>,
+    prekey_material: PrekeyMaterial,
     disk_key: &GenericArray<u8, U32>,
 ) -> Result<EnrollmentState, ApiError> {
     Ok(EnrollmentState::SingleEnrollment {

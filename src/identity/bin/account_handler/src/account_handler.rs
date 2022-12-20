@@ -519,7 +519,7 @@ where
     }
 
     fn fetch_key(
-        prekey_material: &[u8],
+        prekey_material: &PrekeyMaterial,
         enrollment_state: &EnrollmentState,
     ) -> Result<[u8; 32], ApiError> {
         match enrollment_state {
@@ -567,13 +567,16 @@ where
                             "Error while enrolling account: {:?}",
                             authenticator_err
                         ))
+                    })
+                    .map(|(enrollment_data, prekey_material)| {
+                        (EnrollmentData(enrollment_data), PrekeyMaterial(prekey_material))
                     })?;
                 // TODO(fxb/116213): Remove the clone once we don't need to
                 // return the prekey for checking outside of this block.
                 produce_single_enrollment(
                     auth_mechanism_id,
                     Mechanism::Test,
-                    data,
+                    data.0,
                     prekey_material,
                     disk_key,
                 )?
@@ -601,7 +604,7 @@ where
                     AccountManagerError::new(ApiError::InvalidRequest)
                         .with_cause(format_err!("Interaction ServerEnd missing."))
                 })?;
-                let (EnrollmentData(data), PrekeyMaterial(prekey_material)) =
+                let (EnrollmentData(data), prekey_material) =
                     Interaction::enroll(server_end, *mechanism).await?;
                 // TODO(fxb/116213): Remove the clone once we don't need to
                 // return the prekey for checking outside of this block.
@@ -642,7 +645,7 @@ where
         enrollment_state: &pre_auth::EnrollmentState,
         mut interaction: Option<ServerEnd<InteractionMarker>>,
         mechanisms: &[Mechanism],
-    ) -> Result<(Vec<u8>, Option<pre_auth::EnrollmentState>), AccountManagerError> {
+    ) -> Result<(PrekeyMaterial, Option<pre_auth::EnrollmentState>), AccountManagerError> {
         if let pre_auth::EnrollmentState::SingleEnrollment {
             ref auth_mechanism_id,
             ref mechanism,
@@ -699,10 +702,12 @@ where
                 }
             });
 
-            let prekey_material: Vec<_> = auth_attempt.prekey_material.ok_or_else(|| {
-                AccountManagerError::new(ApiError::Internal)
-                    .with_cause(anyhow!("Authenticator unexpectedly returned no prekey material"))
-            })?;
+            let prekey_material =
+                PrekeyMaterial(auth_attempt.prekey_material.ok_or_else(|| {
+                    AccountManagerError::new(ApiError::Internal).with_cause(anyhow!(
+                        "Authenticator unexpectedly returned no prekey material"
+                    ))
+                })?);
 
             Ok((prekey_material, updated_pre_auth_state))
         } else {
@@ -710,7 +715,7 @@ where
             // unit tests, we can remove this fake value. For now, throwing an
             // error in this case breaks several unit tests in this file which
             // do not attach enrollments.
-            Ok((vec![], None))
+            Ok((PrekeyMaterial(vec![]), None))
         }
     }
 

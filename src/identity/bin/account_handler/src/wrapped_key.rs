@@ -17,6 +17,7 @@ use {
         Aes256Gcm, Nonce,
     },
     fidl_fuchsia_identity_account::Error as ApiError,
+    identity_common::PrekeyMaterial,
     lazy_static::lazy_static,
     rand::{thread_rng, Rng},
     serde::{Deserialize, Serialize},
@@ -112,7 +113,7 @@ impl WrappedKeySet {
     // return ApiError::FailedPrecondition.
     //
     // If the internal unwrap_key calls fail, we return ApiError::Internal.
-    pub fn unwrap_disk_key(&self, prekey_material: &[u8]) -> Result<[u8; 32], ApiError> {
+    pub fn unwrap_disk_key(&self, prekey_material: &PrekeyMaterial) -> Result<[u8; 32], ApiError> {
         let mut cipher = Aes256Gcm::new(GenericArray::from_slice(prekey_material));
 
         match self.wrapped_null_key.unwrap_key(&mut cipher) {
@@ -150,7 +151,7 @@ impl WrappedKeySet {
 // Both the wrapped volume encryption key and the wrapped null key are returned
 // so that they can be stored in the EnrollmentState struct above.
 pub fn produce_wrapped_keys(
-    prekey_material: Vec<u8>,
+    prekey_material: PrekeyMaterial,
     disk_key: &GenericArray<u8, U32>,
 ) -> Result<WrappedKeySet, ApiError> {
     let cipher = Aes256Gcm::new(GenericArray::from_slice(&prekey_material));
@@ -188,7 +189,7 @@ mod tests {
 
     #[test]
     fn test_wrapped_keys_are_different() {
-        let prekey_material = make_random_256_bit_array().to_vec();
+        let prekey_material = PrekeyMaterial(make_random_256_bit_array().to_vec());
         let disk_key = make_random_256_bit_generic_array();
         let wk = assert_matches!(produce_wrapped_keys(prekey_material, &disk_key), Ok(m) => m);
         assert_ne!(wk.wrapped_disk_key, wk.wrapped_null_key);
@@ -196,7 +197,7 @@ mod tests {
 
     #[test]
     fn test_wrapped_keys_have_correct_length() {
-        let prekey_material = make_random_256_bit_array().to_vec();
+        let prekey_material = PrekeyMaterial(make_random_256_bit_array().to_vec());
         let disk_key = make_random_256_bit_generic_array();
         let wk = assert_matches!(produce_wrapped_keys(prekey_material, &disk_key), Ok(m) => m);
         // Expected to be more than 32 because it includes the tag.
@@ -207,7 +208,7 @@ mod tests {
     #[test]
     fn test_wrapped_keys_not_hermetic() {
         // Should have different output with the same input.
-        let prekey_material = make_random_256_bit_array().to_vec();
+        let prekey_material = PrekeyMaterial(make_random_256_bit_array().to_vec());
         let disk_key = make_random_256_bit_generic_array();
         let wrapped_keys_1 =
             assert_matches!(produce_wrapped_keys(prekey_material.clone(), &disk_key), Ok(m) => m);
@@ -219,7 +220,7 @@ mod tests {
 
     #[test]
     fn test_wrapped_keys_null_key_decrypts_to_null() {
-        let prekey_material = make_random_256_bit_array().to_vec();
+        let prekey_material = PrekeyMaterial(make_random_256_bit_array().to_vec());
         let disk_key = make_random_256_bit_generic_array();
         let wk =
             assert_matches!(produce_wrapped_keys(prekey_material.clone(), &disk_key), Ok(m) => m);
@@ -239,7 +240,7 @@ mod tests {
 
     #[test]
     fn test_wrapped_keys_volume_key_can_be_decrypted() {
-        let prekey_material = make_random_256_bit_array().to_vec();
+        let prekey_material = PrekeyMaterial(make_random_256_bit_array().to_vec());
         let disk_key = make_random_256_bit_generic_array();
         let wk =
             assert_matches!(produce_wrapped_keys(prekey_material.clone(), &disk_key), Ok(m) => m);
@@ -257,7 +258,7 @@ mod tests {
 
     #[test]
     fn test_wrapped_keys_unwrap_helper_fn() {
-        let prekey_material = make_random_256_bit_array().to_vec();
+        let prekey_material = PrekeyMaterial(make_random_256_bit_array().to_vec());
         let disk_key = make_random_256_bit_generic_array();
         let wk =
             assert_matches!(produce_wrapped_keys(prekey_material.clone(), &disk_key), Ok(m) => m);
@@ -274,11 +275,11 @@ mod tests {
 
     #[test]
     fn test_wrapped_keys_wrong_prekey() {
-        let prekey_material = make_random_256_bit_array().to_vec();
+        let prekey_material = PrekeyMaterial(make_random_256_bit_array().to_vec());
         let disk_key = make_random_256_bit_generic_array();
         let wk = assert_matches!(produce_wrapped_keys(prekey_material, &disk_key), Ok(m) => m);
 
-        let other_prekey_material = make_random_256_bit_array().to_vec();
+        let other_prekey_material = PrekeyMaterial(make_random_256_bit_array().to_vec());
         assert_matches!(
             wk.unwrap_disk_key(&other_prekey_material),
             Err(ApiError::FailedAuthentication)

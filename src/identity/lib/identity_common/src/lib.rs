@@ -21,8 +21,16 @@ pub struct EnrollmentData(pub Vec<u8>);
 
 /// Data associated with an enrollment of an authentication mechanism
 /// capable of storage unlock.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct PrekeyMaterial(pub Vec<u8>);
+
+impl std::ops::Deref for PrekeyMaterial {
+    type Target = Vec<u8>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 pub use crate::task_group::{cancel_or, TaskGroup, TaskGroupCancel, TaskGroupError};
 
