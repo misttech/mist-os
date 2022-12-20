@@ -38,14 +38,21 @@ sdk_host_tools_manifest = get_label_info(sdk_host_tools_label, "root_out_dir") +
 #       of these change. If inputs is empty, the step will run only when the
 #       plugin itself changes.
 #
-#   ffx_tool (optional)
-#       The gn label of the ffx tool binary to run, if not the default ffx
-#       binary produced for the SDK. See compiled_action()'s tool argument.
+#   ffx_tool
+#       The gn label of the ffx tool binary to run. If you want to run through
+#       the main ffx binary, you can set this to `//src/developer/ffx:ffx_bin',
+#       but it's strongly preferred to use separately compiled ffx subtools
+#       instead, to avoid stalling the build on completing the whole ffx build.
+#       For eg. `//src/developer/ffx/plugins/product:ffx_product_tool_versioned`.
+#       See compiled_action()'s tool argument.
 #
-#   ffx_tool_output_name (optional)
-#       The binary name of the ffx tool binary to run, if not the default ffx
-#       binary produced for the SDK. See compiled_action()'s tool_output_name
-#       argument.
+#   ffx_tool_output_name
+#       The binary name of the ffx tool binary to run. If you want to run through
+#       the main ffx binary, you can set this to `ffx',
+#       but it's strongly preferred to use separately compiled ffx subtools
+#       instead, to avoid stalling the build on completing the whole ffx build.
+#       For eg. `ffx-product`.
+#       See compiled_action()'s tool_output_name argument.
 #
 #   args (all optional)
 #   depfile
@@ -66,6 +73,9 @@ sdk_host_tools_manifest = get_label_info(sdk_host_tools_label, "root_out_dir") +
 #     # The tool takes this input.
 #     inputs = [ "my_input_file" ]
 #
+#     ffx_tool = "//src/developer/ffx/tools/echo:ffx_echo_versioned"
+#     ffx_tool_output_name = "ffx-echo"
+#
 #     # In this case, the plugin takes as arguments the input file and the output
 #     # build dir (both relative to the root_build_dir that the plugin will be
 #     # run in) and will produce the output files listed above.
@@ -83,6 +93,10 @@ sdk_host_tools_manifest = get_label_info(sdk_host_tools_label, "root_out_dir") +
 template("ffx_action") {
   assert(defined(invoker.args), "args must be defined for $target_name")
   assert(defined(invoker.outputs), "outputs must be defined for $target_name")
+  assert(defined(invoker.ffx_tool),
+         "ffx_tool must be specified for $target_name")
+  assert(defined(invoker.ffx_tool_output_name),
+         "ffx_tool_output_name must be specified for $target_name")
 
   # Only generate our own hermetic inputs file if a depfile is not specified
   # OR hermetic_deps is not turned off.
