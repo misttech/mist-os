@@ -8,6 +8,7 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 
 #include <iostream>
+#include <memory>
 
 #include "fidl/fidl.clientsuite/cpp/wire_types.h"
 #include "src/tests/fidl/client_suite/cpp_util/error_util.h"
@@ -563,8 +564,7 @@ int main(int argc, const char** argv) {
 
   auto outgoing = component::OutgoingDirectory(loop.dispatcher());
   ZX_ASSERT(outgoing.ServeFromStartupInfo().is_ok());
-  RunnerServer runner_server;
-  auto result = outgoing.AddProtocol<fidl_clientsuite::Runner>(&runner_server);
+  auto result = outgoing.AddProtocol<fidl_clientsuite::Runner>(std::make_unique<RunnerServer>());
   ZX_ASSERT(result.is_ok());
 
   std::cout << "CPP wire sync client: ready!" << std::endl;

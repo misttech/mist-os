@@ -41,6 +41,7 @@
 #include "coordinator.h"
 #include "driver_host_loader_service.h"
 #include "fdio.h"
+#include "fidl/fuchsia.process.lifecycle/cpp/markers.h"
 #include "lib/async/cpp/task.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/bin/driver_manager/devfs/devfs_exporter.h"
@@ -342,10 +343,9 @@ int RunDfv1(DriverManagerParams driver_manager_params,
     void Stop(StopCompleter::Sync& completer) override { completer.Close(ZX_OK); }
   };
 
-  DevfsLifecycle devfs_lifecycle;
   {
-    zx::result result =
-        outgoing.AddProtocol(&devfs_lifecycle, "fuchsia.device.fs.lifecycle.Lifecycle");
+    zx::result result = outgoing.AddProtocol<fuchsia_process_lifecycle::Lifecycle>(
+        std::make_unique<DevfsLifecycle>(), "fuchsia.device.fs.lifecycle.Lifecycle");
     ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
   }
 

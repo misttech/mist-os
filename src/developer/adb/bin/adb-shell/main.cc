@@ -24,8 +24,6 @@ int main(int argc, char** argv) {
 
   auto config = adb_shell_config::Config::TakeFromStartupHandle();
 
-  adb_shell::AdbShell adb_shell(std::move(*svc), loop.dispatcher(), config);
-
   auto outgoing = component::OutgoingDirectory(loop.dispatcher());
 
   zx::result result = outgoing.ServeFromStartupInfo();
@@ -34,7 +32,9 @@ int main(int argc, char** argv) {
     return -1;
   }
 
-  result = outgoing.AddProtocol<fuchsia_hardware_adb::Provider>(&adb_shell);
+  auto adb_shell =
+      std::make_unique<adb_shell::AdbShell>(std::move(*svc), loop.dispatcher(), config);
+  result = outgoing.AddProtocol<fuchsia_hardware_adb::Provider>(std::move(adb_shell));
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Failed to serve outgoing directory: " << result.status_string();
     return -1;

@@ -29,6 +29,8 @@
 #include <lib/syslog/cpp/macros.h>
 #include <math.h>
 
+#include "fidl/fuchsia.examples.calculator/cpp/markers.h"
+
 // For more information on the boilerplate for a fidl::Server, refer to:
 // https://fuchsia.dev/fuchsia-src/development/languages/fidl/tutorials/cpp/basics/server#prerequisites
 // The essential pattern here is that the local server implementation, |CalculatorServerImpl|,
@@ -135,7 +137,7 @@ int main(int argc, const char** argv) {
   // This is the most straightforward way to add the protocol to this component's outgoing "served"
   // capabilities - we pass it the server instance (which overrides fidl::Server) and it calls
   // fidl::BindServer() for us.
-  result = outgoing.AddProtocol(server_ptr.get());
+  result = outgoing.AddProtocol<fuchsia_examples_calculator::Calculator>(std::move(server_ptr));
 
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Failed to add Calculator protocol: " << result.status_string();

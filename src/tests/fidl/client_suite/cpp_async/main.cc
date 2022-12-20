@@ -583,8 +583,8 @@ int main(int argc, const char** argv) {
 
   auto outgoing = component::OutgoingDirectory(loop.dispatcher());
   ZX_ASSERT(outgoing.ServeFromStartupInfo().is_ok());
-  RunnerServer runner_server(loop.dispatcher());
-  auto result = outgoing.AddProtocol<fidl_clientsuite::Runner>(&runner_server);
+  auto result = outgoing.AddProtocol<fidl_clientsuite::Runner>(
+      std::make_unique<RunnerServer>(loop.dispatcher()));
   ZX_ASSERT(result.is_ok());
 
   std::cout << "CPP async client: ready!" << std::endl;

@@ -116,8 +116,9 @@ int main(int argc, const char** argv) {
     printf("console: zx::eventpair::create() = %s\n", zx_status_get_string(status));
     return status;
   }
-  Console console(loop.dispatcher(), std::move(event1), std::move(event2), std::move(rx_source),
-                  std::move(tx_sink), std::move(opts.denied_log_tags));
+  auto console = std::make_unique<Console>(loop.dispatcher(), std::move(event1), std::move(event2),
+                                           std::move(rx_source), std::move(tx_sink),
+                                           std::move(opts.denied_log_tags));
 
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_logger::LogListenerSafe>();
   if (endpoints.is_error()) {
@@ -131,10 +132,10 @@ int main(int argc, const char** argv) {
   }
 
   fidl::BindServer(loop.dispatcher(), std::move(server),
-                   static_cast<fidl::WireServer<fuchsia_logger::LogListenerSafe>*>(&console));
+                   static_cast<fidl::WireServer<fuchsia_logger::LogListenerSafe>*>(console.get()));
 
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());
-  if (zx::result status = outgoing.AddProtocol<fuchsia_hardware_pty::Device>(&console);
+  if (zx::result status = outgoing.AddProtocol<fuchsia_hardware_pty::Device>(std::move(console));
       status.is_error()) {
     printf("console: outgoing.AddProtocol() = %s\n", status.status_string());
     return status.status_value();

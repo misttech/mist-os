@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
 
   // Add the Playground protocol to our outgoing directory.
   auto server = std::make_unique<Playground>();
-  status = outgoing.AddProtocol<fuchsia_driver_playground::ToolRunner>(server.get());
+  status = outgoing.AddProtocol<fuchsia_driver_playground::ToolRunner>(std::move(server));
   LOGF(INFO, "Running Playground server");
   loop.Run();
   return 0;
