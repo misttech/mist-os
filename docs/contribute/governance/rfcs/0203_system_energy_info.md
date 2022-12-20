@@ -189,7 +189,8 @@ value is unspecified.
 
 `ZX_ERR_NOT_SUPPORTED`
 
-- The processor is not a [supported x86-64 processor](https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0073_x86_64_platform_requirement).
+- The processor is not a [supported x86-64 processor](/docs/contribute/governance/rfcs/0073_x86_64_platform_requirement.md).
+
 - The processor is a supported x86-64 processor, but the `Energy Status` MSR of
   the specified domain is not available on this processor.
 - The processor is a supported x86-64 processor and  the `Energy Status` MSR of
@@ -234,6 +235,7 @@ processor ids for various x86 processors, and can be used to determine the
 availability of the MSRs.
 
 ### Component manager
+
 A new protocol `EnergyInfoResource` must be defined and must be implemented by
 Component Manager to provide the `ZX_RSRC_SYSTEM_ENERGY_INFO_BASE` resource.
 This follows a pre-existing pattern for resources that gate syscalls.
