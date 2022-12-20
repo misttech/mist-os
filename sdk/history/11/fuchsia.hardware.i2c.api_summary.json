@@ -18,6 +18,12 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.hardware.i2c/Device.GetName",
+        "ordinal": "8381876914474840322",
+        "type": "() -> (fuchsia.hardware.i2c/Device_GetName_Result result)"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.hardware.i2c/Device.Transfer",
         "ordinal": "871058866166117179",
         "type": "(vector<fuchsia.hardware.i2c/Transaction>:256 transactions) -> (fuchsia.hardware.i2c/Device_Transfer_Result result)"
@@ -25,6 +31,33 @@
     {
         "kind": "protocol",
         "name": "fuchsia.hardware.i2c/Device"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.i2c/Device_GetName_Response.name",
+        "ordinal": "1",
+        "type": "string:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.i2c/Device_GetName_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.i2c/Device_GetName_Result.err",
+        "ordinal": "2",
+        "type": "int32"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.i2c/Device_GetName_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.i2c/Device_GetName_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.hardware.i2c/Device_GetName_Result",
+        "strictness": "strict"
     },
     {
         "kind": "struct/member",
@@ -58,6 +91,12 @@
         "name": "fuchsia.hardware.i2c/MAX_COUNT_TRANSACTIONS",
         "type": "uint32",
         "value": "256"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.hardware.i2c/MAX_I2C_NAME_LEN",
+        "type": "uint32",
+        "value": "64"
     },
     {
         "kind": "const",

@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 library fuchsia.hardware.i2c.businfo;
 
+using fuchsia.hardware.i2c;
+
 const MAX_I2C_CHANNEL uint32 = 128; // Enough for every address to be used in 7-bit mode.
 
 /// Used to inform the i2c driver about an attached i2c device.
@@ -29,6 +31,10 @@ type I2CChannel = table {
     8: is_ten_bit bool;
     /// Speed of the bus.
     9: bus_speed uint32;
+
+    /// Friendly name for this bus. Will default to the empty string if not
+    /// specified.
+   10: name string:fuchsia.hardware.i2c.MAX_I2C_NAME_LEN;
 };
 
 /// Passed to the i2c driver in metadata as DEVICE_METADATA_I2C_CHANNELS.

@@ -86,6 +86,10 @@ class FakeI2c : public fidl::WireServer<fuchsia_hardware_i2c::Device> {
     completer.Reply(::fit::ok(response.get()));
   }
 
+  void GetName(GetNameCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
  protected:
   // The main function to be overriden for a specific fake. This is called on each
   // I2cTransact, but with serialized write and read information so it is easier to

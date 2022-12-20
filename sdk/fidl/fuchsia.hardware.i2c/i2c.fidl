@@ -16,6 +16,10 @@ const MAX_TRANSFER_SIZE uint32 = 32768;
 /// The maximum number of transactions that can be specified in a call to `Transfer`.
 const MAX_COUNT_TRANSACTIONS uint32 = 256;
 
+/// Maximum length of the I2C Channel name.
+@available(added=11)
+const MAX_I2C_NAME_LEN uint32 = 64;
+
 /// If `read_size` is set: This is a read transfer, and `read_size` bytes will be read from the
 /// target.
 /// If `write_data` is set: This is a write transfer, and `write_data` will be written to the
@@ -58,6 +62,13 @@ protocol Device {
         transactions vector<Transaction>:MAX_COUNT_TRANSACTIONS;
     }) -> (struct {
         read_data vector<ReadData>:MAX_COUNT_TRANSACTIONS;
+    }) error zx.status;
+
+    /// Get the name of this I2C Device. Returns ZX_ERR_NOT_SUPPORTED if the
+    /// name is unspecified or the empty string.
+    @available(added=11)
+    GetName() -> (struct {
+        name string:MAX_I2C_NAME_LEN;
     }) error zx.status;
 };
 

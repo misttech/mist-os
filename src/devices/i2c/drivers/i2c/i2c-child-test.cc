@@ -24,8 +24,8 @@ constexpr uint8_t kTestRead2 = 0x56;
 class I2cTestChild : public I2cChild {
  public:
   I2cTestChild(zx_device_t* parent, fbl::RefPtr<I2cBus> bus, uint16_t address,
-               async_dispatcher_t* dispatcher)
-      : I2cChild(parent, std::move(bus), address, dispatcher) {
+               async_dispatcher_t* dispatcher, std::string name)
+      : I2cChild(parent, std::move(bus), address, dispatcher, name) {
     ZX_ASSERT(DdkAdd("Test-device") == ZX_OK);
   }
 };
@@ -96,7 +96,7 @@ TEST_F(I2cChildTest, Write3BytesOnce) {
         callback(cookie, ZX_OK, nullptr, 0);
       }));
   // Allocate using new as the mock DDK takes ownership of the child.
-  auto server = new I2cTestChild(fake_root_.get(), std::move(bus), 0, loop_.dispatcher());
+  auto server = new I2cTestChild(fake_root_.get(), std::move(bus), 0, loop_.dispatcher(), "");
   fidl::WireSyncClient<fuchsia_hardware_i2c::Device> client_wrap;
   ASSERT_NO_FATAL_FAILURE(StartFidl(server, &client_wrap));
 
@@ -146,7 +146,7 @@ TEST_F(I2cChildTest, Read3BytesOnce) {
         callback(cookie, ZX_OK, replies, std::size(replies));
       }));
   // Allocate using new as the mock DDK takes ownership of the child.
-  auto server = new I2cTestChild(fake_root_.get(), std::move(bus), 0, loop_.dispatcher());
+  auto server = new I2cTestChild(fake_root_.get(), std::move(bus), 0, loop_.dispatcher(), "");
   fidl::WireSyncClient<fuchsia_hardware_i2c::Device> client_wrap;
   ASSERT_NO_FATAL_FAILURE(StartFidl(server, &client_wrap));
 
@@ -201,7 +201,7 @@ TEST_F(I2cChildTest, Write1ByteOnceRead1Byte3Times) {
       }));
 
   // Allocate using new as the mock DDK takes ownership of the child.
-  auto server = new I2cTestChild(fake_root_.get(), std::move(bus), 0, loop_.dispatcher());
+  auto server = new I2cTestChild(fake_root_.get(), std::move(bus), 0, loop_.dispatcher(), "");
   fidl::WireSyncClient<fuchsia_hardware_i2c::Device> client_wrap;
   ASSERT_NO_FATAL_FAILURE(StartFidl(server, &client_wrap));
 
@@ -266,7 +266,7 @@ TEST_F(I2cChildTest, StopFlagPropagates) {
         callback(cookie, ZX_OK, replies, std::size(replies));
       }));
 
-  auto server = new I2cTestChild(fake_root_.get(), std::move(bus), 0, loop_.dispatcher());
+  auto server = new I2cTestChild(fake_root_.get(), std::move(bus), 0, loop_.dispatcher(), "");
   fidl::WireSyncClient<fuchsia_hardware_i2c::Device> client_wrap;
   ASSERT_NO_FATAL_FAILURE(StartFidl(server, &client_wrap));
 
@@ -302,7 +302,7 @@ TEST_F(I2cChildTest, BadTransfers) {
   // Allocate using new as the mock DDK takes ownership of the child.
   auto server = new I2cTestChild(fake_root_.get(),
                                  fbl::AdoptRef<I2cBus>(new I2cBus(fake_root_.get(), i2c, 0)), 0,
-                                 loop_.dispatcher());
+                                 loop_.dispatcher(), "");
   fidl::WireSyncClient<fuchsia_hardware_i2c::Device> client_wrap;
   ASSERT_NO_FATAL_FAILURE(StartFidl(server, &client_wrap));
 
@@ -370,6 +370,80 @@ TEST_F(I2cChildTest, BadTransfers) {
     ASSERT_OK(read.status());
     ASSERT_TRUE(read->is_error());
   }
+}
+
+TEST_F(I2cChildTest, GetNameTest) {
+  const std::string kTestName = "foo";
+  ddk::I2cImplProtocolClient i2c = {};
+  auto bus = fbl::AdoptRef(new I2cBusTest(
+      fake_root_.get(), i2c, 0,
+      [](uint16_t address, const I2cBus::TransactOp* op_list, size_t op_count,
+         I2cBus::TransactCallback callback, void* cookie) {
+        if (op_count != 1) {
+          callback(cookie, ZX_ERR_INTERNAL, nullptr, 0);
+          return;
+        }
+        if (op_list[0].data_size != 3 || op_list[0].is_read != true || op_list[0].stop != true) {
+          callback(cookie, ZX_ERR_INTERNAL, nullptr, 0);
+          return;
+        }
+        uint8_t reply0 = kTestRead0;
+        uint8_t reply1 = kTestRead1;
+        uint8_t reply2 = kTestRead2;
+        I2cBus::TransactOp replies[3] = {
+            {&reply0, 1, true, false},
+            {&reply1, 1, true, false},
+            {&reply2, 1, true, false},
+        };
+        callback(cookie, ZX_OK, replies, std::size(replies));
+      }));
+  // Allocate using new as the mock DDK takes ownership of the child.
+  auto server =
+      new I2cTestChild(fake_root_.get(), std::move(bus), 0, loop_.dispatcher(), kTestName);
+  fidl::WireSyncClient<fuchsia_hardware_i2c::Device> client_wrap;
+  ASSERT_NO_FATAL_FAILURE(StartFidl(server, &client_wrap));
+
+  auto name = client_wrap->GetName();
+  ASSERT_OK(name.status());
+  ASSERT_FALSE(name->is_error());
+
+  ASSERT_EQ(std::string(name->value()->name.get()), kTestName);
+}
+
+TEST_F(I2cChildTest, GetEmptyNameTest) {
+  ddk::I2cImplProtocolClient i2c = {};
+  auto bus = fbl::AdoptRef(new I2cBusTest(
+      fake_root_.get(), i2c, 0,
+      [](uint16_t address, const I2cBus::TransactOp* op_list, size_t op_count,
+         I2cBus::TransactCallback callback, void* cookie) {
+        if (op_count != 1) {
+          callback(cookie, ZX_ERR_INTERNAL, nullptr, 0);
+          return;
+        }
+        if (op_list[0].data_size != 3 || op_list[0].is_read != true || op_list[0].stop != true) {
+          callback(cookie, ZX_ERR_INTERNAL, nullptr, 0);
+          return;
+        }
+        uint8_t reply0 = kTestRead0;
+        uint8_t reply1 = kTestRead1;
+        uint8_t reply2 = kTestRead2;
+        I2cBus::TransactOp replies[3] = {
+            {&reply0, 1, true, false},
+            {&reply1, 1, true, false},
+            {&reply2, 1, true, false},
+        };
+        callback(cookie, ZX_OK, replies, std::size(replies));
+      }));
+  // Allocate using new as the mock DDK takes ownership of the child.
+  auto server = new I2cTestChild(fake_root_.get(), std::move(bus), 0, loop_.dispatcher(), "");
+  fidl::WireSyncClient<fuchsia_hardware_i2c::Device> client_wrap;
+  ASSERT_NO_FATAL_FAILURE(StartFidl(server, &client_wrap));
+
+  auto name = client_wrap->GetName();
+  ASSERT_OK(name.status());
+
+  // Empty string here means this endpoint returns an error.
+  ASSERT_TRUE(name->is_error());
 }
 
 }  // namespace i2c

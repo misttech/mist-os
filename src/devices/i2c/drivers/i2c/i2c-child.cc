@@ -27,6 +27,7 @@ zx_status_t I2cChild::CreateAndAddDevice(
   const uint32_t vid = channel.has_vid() ? channel.vid() : 0;
   const uint32_t pid = channel.has_pid() ? channel.pid() : 0;
   const uint32_t did = channel.has_did() ? channel.did() : 0;
+  const std::string friendly_name = channel.has_name() ? std::string(channel.name().get()) : "";
 
   fuchsia_hardware_i2c_businfo::wire::I2CChannel local_channel(channel);
   fit::result metadata = fidl::Persist(local_channel);
@@ -55,7 +56,8 @@ zx_status_t I2cChild::CreateAndAddDevice(
   }
 
   fbl::AllocChecker ac;
-  std::unique_ptr<I2cChild> dev(new (&ac) I2cChild(parent, bus, address, dispatcher));
+  std::unique_ptr<I2cChild> dev(new (&ac)
+                                    I2cChild(parent, bus, address, dispatcher, friendly_name));
   if (!ac.check()) {
     zxlogf(ERROR, "Failed to create child device: %s", zx_status_get_string(ZX_ERR_NO_MEMORY));
     return ZX_ERR_NO_MEMORY;
@@ -186,6 +188,15 @@ void I2cChild::Transfer(fidl::WireServer<fidl_i2c::Device>::TransferRequestView 
   };
   bus_->Transact(address_, op_list.get(), request->transactions.count(), callback, &ctx);
   sync_completion_wait(&ctx.done, zx::duration::infinite().get());
+}
+
+void I2cChild::GetName(fidl::WireServer<fidl_i2c::Device>::GetNameCompleter::Sync& completer) {
+  if (name_.empty()) {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+
+  completer.ReplySuccess(::fidl::StringView::FromExternal(name_));
 }
 
 }  // namespace i2c

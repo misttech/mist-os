@@ -13,6 +13,7 @@
 #include <lib/fdf/cpp/dispatcher.h>
 
 #include <optional>
+#include <string>
 
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
@@ -32,8 +33,12 @@ using I2cChildType = ddk::Device<I2cChild, ddk::Messageable<fidl_i2c::Device>::M
 class I2cChild : public I2cChildType {
  public:
   I2cChild(zx_device_t* parent, fbl::RefPtr<I2cBus> bus, uint16_t address,
-           async_dispatcher_t* dispatcher)
-      : I2cChildType(parent), outgoing_dir_(dispatcher), bus_(std::move(bus)), address_(address) {}
+           async_dispatcher_t* dispatcher, const std::string& name)
+      : I2cChildType(parent),
+        outgoing_dir_(dispatcher),
+        bus_(std::move(bus)),
+        address_(address),
+        name_(name) {}
 
   static zx_status_t CreateAndAddDevice(
       zx_device_t* parent, const fuchsia_hardware_i2c_businfo::wire::I2CChannel& channel,
@@ -42,6 +47,8 @@ class I2cChild : public I2cChildType {
   void DdkRelease() { delete this; }
 
   void Transfer(TransferRequestView request, TransferCompleter::Sync& completer) override;
+
+  void GetName(GetNameCompleter::Sync& completer) override;
 
  private:
   void Bind(fidl::ServerEnd<fidl_i2c::Device> request) {
@@ -52,6 +59,7 @@ class I2cChild : public I2cChildType {
 
   fbl::RefPtr<I2cBus> bus_;
   const uint16_t address_;
+  const std::string name_;
 };
 
 }  // namespace i2c

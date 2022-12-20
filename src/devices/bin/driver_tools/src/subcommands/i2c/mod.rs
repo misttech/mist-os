@@ -187,6 +187,12 @@ mod tests {
                                 .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                                 .context("Failed to respond to Transfer request")?;
                         }
+                        fi2c::DeviceRequest::GetName { responder } => {
+                            responder
+                                .send(&mut Ok("test-i2c-name".to_owned()))
+                                .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
+                                .context("Failed to respond to GetName request")?;
+                        }
                     }
                     Ok(())
                 }
@@ -205,6 +211,12 @@ mod tests {
                                 .send(&mut Ok(vec![vec![0]]))
                                 .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                                 .context("Failed to respond to Transfer request")?;
+                        }
+                        fi2c::DeviceRequest::GetName { responder } => {
+                            responder
+                                .send(&mut Ok("test-i2c-name".to_owned()))
+                                .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
+                                .context("Failed to respond to GetName request")?;
                         }
                     }
                     Ok(())
@@ -246,6 +258,12 @@ class/i2c/B: OK
                                 .send(&mut Ok(vec![vec![245]]))
                                 .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                                 .context("Failed to respond to Transfer request")?;
+                        }
+                        fi2c::DeviceRequest::GetName { responder } => {
+                            responder
+                                .send(&mut Ok("test-i2c-name".to_owned()))
+                                .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
+                                .context("Failed to respond to GetName request")?;
                         }
                     }
                     Ok(())
@@ -293,6 +311,12 @@ class/i2c/B: OK
                                 .send(&mut Ok(vec![vec![]]))
                                 .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                                 .context("Failed to respond to Transfer request")?;
+                        }
+                        fi2c::DeviceRequest::GetName { responder } => {
+                            responder
+                                .send(&mut Ok("test-i2c-name".to_owned()))
+                                .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
+                                .context("Failed to respond to GetName request")?;
                         }
                     }
                     Ok(())
@@ -342,6 +366,12 @@ class/i2c/B: OK
                                 .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                                 .context("Failed to respond to Transfer request")?;
                         }
+                        fi2c::DeviceRequest::GetName { responder } => {
+                            responder
+                                .send(&mut Ok("test-i2c-name".to_owned()))
+                                .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
+                                .context("Failed to respond to GetName request")?;
+                        }
                     }
                     Ok(())
                 }
@@ -386,6 +416,12 @@ class/i2c/B: OK
                                 .send(&mut Ok(vec![]))
                                 .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                                 .context("Failed to respond to Transfer request")?;
+                        }
+                        fi2c::DeviceRequest::GetName { responder } => {
+                            responder
+                                .send(&mut Ok("test-i2c-name".to_owned()))
+                                .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
+                                .context("Failed to respond to GetName request")?;
                         }
                     }
                     Ok(())
@@ -441,6 +477,12 @@ class/i2c/B: OK
                                 .send(&mut Ok(vec![vec![26, 45], vec![8]]))
                                 .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                                 .context("Failed to respond to Transfer request")?;
+                        }
+                        fi2c::DeviceRequest::GetName { responder } => {
+                            responder
+                                .send(&mut Ok("test-i2c-name".to_owned()))
+                                .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
+                                .context("Failed to respond to GetName request")?;
                         }
                     }
                     Ok(())

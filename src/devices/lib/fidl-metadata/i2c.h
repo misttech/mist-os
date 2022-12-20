@@ -13,6 +13,8 @@
 
 #include <vector>
 
+constexpr size_t kMaxI2cNameLength = 64;
+
 namespace fidl_metadata::i2c {
 struct Channel {
   uint32_t bus_id;
@@ -21,6 +23,8 @@ struct Channel {
   uint32_t vid;
   uint32_t pid;
   uint32_t did;
+
+  char name[kMaxI2cNameLength];
 };
 
 // Convert an array of i2c_channel to fuchsia.hardware.i2c.I2CBusMetadata encoded

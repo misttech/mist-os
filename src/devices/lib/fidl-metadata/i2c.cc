@@ -1,9 +1,14 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #include "src/devices/lib/fidl-metadata/i2c.h"
 
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
+
+// Put this static assert to avoid having all clients to need to take a dep on
+// fuchsia.hardware.i2c.businfo_cpp_wire.
+static_assert(fuchsia_hardware_i2c::wire::kMaxI2CNameLen == kMaxI2cNameLength);
 
 namespace fidl_metadata::i2c {
 zx::result<std::vector<uint8_t>> I2CChannelsToFidl(const cpp20::span<const Channel> channels) {
@@ -23,6 +28,7 @@ zx::result<std::vector<uint8_t>> I2CChannelsToFidl(const cpp20::span<const Chann
       chan.set_did(src_chan.did);
       chan.set_vid(src_chan.vid);
     }
+    chan.set_name(fidl::ObjectView<fidl::StringView>(allocator, allocator, src_chan.name));
   }
 
   fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata metadata(allocator);

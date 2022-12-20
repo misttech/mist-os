@@ -107,6 +107,10 @@ class I2cDevice : public fidl::WireServer<fuchsia_hardware_i2c::Device> {
     completer.Reply(::fit::ok(response.get()));
   }
 
+  void GetName(GetNameCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
   const std::vector<uint8_t>& tx_data() const { return tx_data_; }
   void set_rx_data(std::vector<uint8_t> rx_data) { rx_data_ = std::move(rx_data); }
   const std::vector<bool>& stop() const { return stop_; }

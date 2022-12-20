@@ -43,6 +43,10 @@ class FakeI2c : public fidl::WireServer<fuchsia_hardware_i2c::Device> {
   // Implementation of |fuchsia.hardware.i2c.Device|.
   void Transfer(TransferRequestView request, TransferCompleter::Sync& completer) override;
 
+  void GetName(GetNameCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
  private:
   fit::function<DataType(AddressType)> on_read_;
   fit::function<void(AddressType, DataType)> on_write_;

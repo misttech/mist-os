@@ -68,6 +68,10 @@ class MockI2c : public fidl::WireServer<fuchsia_hardware_i2c::Device> {
     expectations_index_ = 0;
   }
 
+  void GetName(GetNameCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
   void Transfer(TransferRequestView request, TransferCompleter::Sync& completer) override {
     fidl::Arena arena;
     fbl::Vector<fidl::VectorView<uint8_t>> read_ops;

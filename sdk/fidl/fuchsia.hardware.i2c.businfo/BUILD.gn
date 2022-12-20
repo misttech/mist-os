@@ -6,4 +6,5 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.i2c.businfo") {
   sources = [ "businfo.fidl" ]
+  public_deps = [ "//sdk/fidl/fuchsia.hardware.i2c" ]
 }
