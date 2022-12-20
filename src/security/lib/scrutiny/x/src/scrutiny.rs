@@ -15,6 +15,7 @@ pub mod fake {
     use crate::component_manager::fake::ComponentManager;
     use crate::component_resolver::fake::ComponentResolver;
     use crate::data_source::fake::DataSource;
+    use crate::hash::fake::Hash;
     use crate::package::fake::Package;
     use crate::package_resolver::fake::PackageResolver;
     use crate::system::fake::System;
@@ -24,7 +25,7 @@ pub mod fake {
     pub(crate) struct Scrutiny;
 
     impl ScrutinyApi for Scrutiny {
-        type Blob = Blob;
+        type Blob = Blob<Hash>;
         type Package = Package;
         type PackageResolver = PackageResolver;
         type Component = Component;

@@ -37,13 +37,13 @@ impl fmt::Display for Hash {
 #[cfg(test)]
 mod tests {
     use super::Hash;
-    use fuchsia_merkle::MerkleTree;
+    use fuchsia_merkle::MerkleTree as FuchsiaMerkleTree;
 
     #[fuchsia::test]
     fn test_hex_merkle_root_fmt() {
         let contents = "hello_world";
         let hash = Hash::from_contents(contents.as_bytes());
-        let merkle_root = MerkleTree::from_reader(contents.as_bytes()).unwrap().root();
+        let merkle_root = FuchsiaMerkleTree::from_reader(contents.as_bytes()).unwrap().root();
         assert_eq!(format!("{}", hash), format!("{}", merkle_root));
     }
 
@@ -54,6 +54,35 @@ mod tests {
         let goodbye = Hash::from_contents("goodbye".as_bytes());
         assert_eq!(hello1, hello2);
         assert_ne!(hello1, goodbye)
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use super::Hash;
+    use fuchsia_merkle::MerkleTree as FuchsiaMerkleTree;
+    use std::ops::Add;
+
+    pub trait HashGenerator: Default {
+        fn next(self) -> Self;
+    }
+
+    impl<T: Add<Output = T> + Default + From<u8>> HashGenerator for T {
+        fn next(self) -> Self {
+            self + (1 as u8).into()
+        }
+    }
+
+    impl Default for Hash {
+        fn default() -> Self {
+            Hash::from(FuchsiaMerkleTree::from_reader("".as_bytes()).unwrap().root())
+        }
+    }
+
+    impl HashGenerator for Hash {
+        fn next(self) -> Self {
+            Hash::from(FuchsiaMerkleTree::from_reader(self.0.as_bytes()).unwrap().root())
+        }
     }
 }
 

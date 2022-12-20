@@ -742,8 +742,9 @@ mod tests {
 pub mod fake {
     use super::BlobSet as BlobSetApi;
     use crate::api::Blob as BlobApi;
+    use crate::api::Hash as HashApi;
     use crate::data_source::fake::DataSource;
-    use crate::hash::fake::Hash;
+    use crate::hash::test::HashGenerator;
     use std::collections::HashMap;
     use std::hash;
     use std::io::Cursor;
@@ -756,26 +757,26 @@ pub mod fake {
     }
 
     #[derive(Clone, Debug, Eq, PartialEq)]
-    pub(crate) struct Blob {
-        hash: Hash,
+    pub(crate) struct Blob<H: HashApi> {
+        hash: H,
         blob: Result<Cursor<Vec<u8>>, BlobError>,
         data_sources: Vec<DataSource>,
     }
 
-    impl Default for Blob {
+    impl<H: Default + HashApi> Default for Blob<H> {
         fn default() -> Self {
             Self {
-                hash: Hash::default(),
+                hash: H::default(),
                 blob: Ok(Cursor::new(vec![])),
                 data_sources: vec![DataSource::default()],
             }
         }
     }
 
-    impl hash::Hash for Blob {
-        fn hash<H>(&self, state: &mut H)
+    impl<H: HashApi> hash::Hash for Blob<H> {
+        fn hash<S>(&self, state: &mut S)
         where
-            H: hash::Hasher,
+            S: hash::Hasher,
         {
             self.hash.hash(state)
         }
@@ -789,12 +790,12 @@ pub mod fake {
         BlobError(#[from] BlobError),
     }
 
-    impl Blob {
-        pub fn new(hash: Hash, blob: Vec<u8>) -> Self {
+    impl<H: HashApi> Blob<H> {
+        pub fn new(hash: H, blob: Vec<u8>) -> Self {
             Self { hash, blob: Ok(Cursor::new(blob)), data_sources: vec![DataSource::default()] }
         }
 
-        pub fn new_error(hash: Hash) -> Self {
+        pub fn new_error(hash: H) -> Self {
             Self {
                 hash,
                 blob: Err(BlobError::BlobError),
@@ -803,26 +804,26 @@ pub mod fake {
         }
 
         pub fn new_with_data_sources(
-            hash: Hash,
+            hash: H,
             blob: Vec<u8>,
             data_sources: Vec<DataSource>,
         ) -> Self {
             Self { hash, blob: Ok(Cursor::new(blob)), data_sources }
         }
 
-        pub fn new_error_with_data_sources(hash: Hash, data_sources: Vec<DataSource>) -> Self {
+        pub fn new_error_with_data_sources(hash: H, data_sources: Vec<DataSource>) -> Self {
             Self { hash, blob: Err(BlobError::BlobError), data_sources: data_sources }
         }
     }
 
-    impl BlobApi for Blob {
-        type Hash = Hash;
+    impl<H: HashApi> BlobApi for Blob<H> {
+        type Hash = H;
         type ReaderSeeker = Cursor<Vec<u8>>;
         type DataSource = DataSource;
         type Error = BlobError;
 
         fn hash(&self) -> Self::Hash {
-            self.hash
+            self.hash.clone()
         }
 
         fn reader_seeker(&self) -> Result<Self::ReaderSeeker, Self::Error> {
@@ -834,24 +835,24 @@ pub mod fake {
         }
     }
 
-    pub(crate) struct BlobSet {
-        blobs: HashMap<Hash, Result<Blob, BlobError>>,
+    pub(crate) struct BlobSet<H: HashApi> {
+        blobs: HashMap<H, Result<Blob<H>, BlobError>>,
     }
 
-    impl BlobSet {
-        pub fn from_hash_map(blobs: HashMap<Hash, Result<Blob, BlobError>>) -> Self {
+    impl<H: HashApi> BlobSet<H> {
+        pub fn from_hash_map(blobs: HashMap<H, Result<Blob<H>, BlobError>>) -> Self {
             Self { blobs }
         }
 
-        pub fn into_hash_map(self) -> HashMap<Hash, Result<Blob, BlobError>> {
+        pub fn into_hash_map(self) -> HashMap<H, Result<Blob<H>, BlobError>> {
             self.blobs
         }
     }
 
-    impl BlobSetApi for BlobSet {
-        type Blob = Blob;
+    impl<H: HashApi + 'static> BlobSetApi for BlobSet<H> {
+        type Blob = Blob<H>;
         type DataSource = DataSource;
-        type Hash = Hash;
+        type Hash = H;
         type Error = BlobSetError;
 
         fn iter(&self) -> Box<dyn Iterator<Item = Self::Blob>> {
@@ -877,49 +878,49 @@ pub mod fake {
         }
     }
 
-    pub(crate) struct BlobSetBuilder {
-        next_id: Hash,
-        blobs: HashMap<Hash, Result<Blob, BlobError>>,
+    pub(crate) struct BlobSetBuilder<H: HashApi + HashGenerator> {
+        next_id: H,
+        blobs: HashMap<H, Result<Blob<H>, BlobError>>,
     }
 
-    impl BlobSetBuilder {
+    impl<H: HashApi + HashGenerator> BlobSetBuilder<H> {
         pub fn new() -> Self {
-            Self { next_id: 0, blobs: HashMap::new() }
+            Self { next_id: H::default(), blobs: HashMap::new() }
         }
 
-        pub fn new_with_start_id(start_id: Hash) -> Self {
+        pub fn new_with_start_id(start_id: H) -> Self {
             Self { next_id: start_id, blobs: HashMap::new() }
         }
 
-        pub fn blob(mut self, blob: Vec<u8>) -> (Self, Hash) {
+        pub fn blob(mut self, blob: Vec<u8>) -> (Self, H) {
             if self.blobs.contains_key(&self.next_id) {
                 panic!("Duplicate ID inserting contents into fake blob set: {}", self.next_id)
             }
-            let id = self.next_id;
-            self.next_id += 1;
-            self.blobs.insert(id, Ok(Blob::new(id, blob)));
+            let id = self.next_id.clone();
+            self.next_id = self.next_id.next();
+            self.blobs.insert(id.clone(), Ok(Blob::new(id.clone(), blob)));
             (self, id)
         }
 
-        pub fn error(mut self, err: BlobError) -> (Self, Hash) {
+        pub fn error(mut self, err: BlobError) -> (Self, H) {
             if self.blobs.contains_key(&self.next_id) {
                 panic!("Duplicate ID inserting error into fake blob set: {}", self.next_id)
             }
-            let id = self.next_id;
-            self.next_id += 1;
-            self.blobs.insert(id, Err(err));
+            let id = self.next_id.clone();
+            self.next_id = self.next_id.next();
+            self.blobs.insert(id.clone(), Err(err));
             (self, id)
         }
 
-        pub fn hash_blob(mut self, hash: Hash, blob: Vec<u8>) -> Self {
+        pub fn hash_blob(mut self, hash: H, blob: Vec<u8>) -> Self {
             if self.blobs.contains_key(&hash) {
                 panic!("Duplicate ID inserting contents with predefined hash: {}", hash)
             }
-            self.blobs.insert(hash, Ok(Blob::new(hash, blob)));
+            self.blobs.insert(hash.clone(), Ok(Blob::new(hash, blob)));
             self
         }
 
-        pub fn hash_error(mut self, hash: Hash, err: BlobError) -> Self {
+        pub fn hash_error(mut self, hash: H, err: BlobError) -> Self {
             if self.blobs.contains_key(&hash) {
                 panic!("Duplicate ID inserting error with predefined hash: {}", hash)
             }
@@ -927,7 +928,7 @@ pub mod fake {
             self
         }
 
-        pub fn build(self) -> (BlobSet, Hash) {
+        pub fn build(self) -> (BlobSet<H>, H) {
             (BlobSet::from_hash_map(self.blobs), self.next_id)
         }
     }
@@ -941,6 +942,7 @@ pub mod fake {
         use crate::api::Blob as BlobApi;
         use crate::blob::BlobSet as BlobSetApi;
         use crate::data_source::fake::DataSource;
+        use crate::hash::fake::Hash;
         use maplit::hashmap;
         use maplit::hashset;
 
@@ -1057,11 +1059,11 @@ pub mod fake {
 
         #[fuchsia::test]
         fn test_blob_set_builder_simple() {
-            let (blob_set, next_id) = BlobSetBuilder::new().build();
+            let (blob_set, next_id) = BlobSetBuilder::<Hash>::new().build();
             assert_eq!(next_id, 0);
             assert_eq!(blob_set.into_hash_map(), hashmap! {});
 
-            let (_, assigned_id) = BlobSetBuilder::new().blob(vec![]);
+            let (_, assigned_id) = BlobSetBuilder::<Hash>::new().blob(vec![]);
             assert_eq!(assigned_id, 0);
         }
 

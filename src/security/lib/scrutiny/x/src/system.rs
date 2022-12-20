@@ -13,6 +13,7 @@ pub mod fake {
     use crate::api::VbMeta as VbMetaApi;
     use crate::api::Zbi as ZbiApi;
     use crate::blob::fake::Blob;
+    use crate::hash::fake::Hash;
     use crate::package::fake::Package;
     use std::iter;
 
@@ -22,7 +23,7 @@ pub mod fake {
     impl SystemApi for System {
         type DataSourcePath = &'static str;
         type Zbi = Zbi;
-        type Blob = Blob;
+        type Blob = Blob<Hash>;
         type Package = Package;
         type KernelFlags = KernelFlags;
         type VbMeta = VbMeta;
@@ -64,7 +65,7 @@ pub mod fake {
 
     impl ZbiApi for Zbi {
         type BootfsPath = &'static str;
-        type Blob = Blob;
+        type Blob = Blob<Hash>;
 
         fn bootfs(&self) -> Box<dyn Iterator<Item = (Self::BootfsPath, Self::Blob)>> {
             Box::new(iter::empty())

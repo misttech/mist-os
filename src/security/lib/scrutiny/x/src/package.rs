@@ -21,7 +21,7 @@ pub mod fake {
         type Hash = Hash;
         type MetaPackage = MetaPackage;
         type MetaContents = MetaContents;
-        type Blob = Blob;
+        type Blob = Blob<Hash>;
         type PackagePath = &'static str;
         type Component = Component;
 
