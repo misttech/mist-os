@@ -3136,7 +3136,7 @@ TEST_F(DispatcherTest, SynchronizedDispatcherWrapper) {
   {
     libsync::Completion completion;
     auto destructed_handler = [&](fdf_dispatcher_t* dispatcher) { completion.Signal(); };
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(0, "", destructed_handler);
+    auto dispatcher = fdf::SynchronizedDispatcher::Create({}, "", destructed_handler);
     ASSERT_FALSE(dispatcher.is_error());
     auto options = dispatcher->options();
     ASSERT_TRUE(options.has_value());
@@ -3150,7 +3150,7 @@ TEST_F(DispatcherTest, SynchronizedDispatcherWrapper) {
     libsync::Completion completion;
     auto destructed_handler = [&](fdf_dispatcher_t* dispatcher) { completion.Signal(); };
     auto blocking_dispatcher = fdf::SynchronizedDispatcher::Create(
-        FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, "", destructed_handler);
+        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "", destructed_handler);
     ASSERT_FALSE(blocking_dispatcher.is_error());
     auto options = blocking_dispatcher->options();
     ASSERT_TRUE(options.has_value());
@@ -3171,7 +3171,7 @@ TEST_F(DispatcherTest, UnsynchronizedDispatcherWrapper) {
   {
     libsync::Completion completion;
     auto destructed_handler = [&](fdf_dispatcher_t* dispatcher) { completion.Signal(); };
-    auto dispatcher = fdf::UnsynchronizedDispatcher::Create(0, "", destructed_handler);
+    auto dispatcher = fdf::UnsynchronizedDispatcher::Create({}, "", destructed_handler);
     ASSERT_FALSE(dispatcher.is_error());
     auto options = dispatcher->options();
     ASSERT_TRUE(options.has_value());

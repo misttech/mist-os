@@ -221,10 +221,22 @@ class Dispatcher {
 // Dispatcher that disallows parallel calls into callbacks.
 class SynchronizedDispatcher : public Dispatcher {
  public:
+  // Options that may be passed to |fdf::SynchronizedDispatcher::Create|.
+  // When using the |SynchronizedDispatcher| class, the dispatcher options must set
+  // FDF_DISPATCHER_OPTION_SYNCHRONIZED.
+  struct Options {
+    // The options to set for the dispatcher. In additional to FDF_DISPATCHER_OPTION_SYNCHRONIZED,
+    // the following options are supported:
+    //   * `FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS` - blocking calls may be made on this dispatcher.
+    uint32_t value = FDF_DISPATCHER_OPTION_SYNCHRONIZED;
+    // Specifies a synchronized dispatcher that allows blocking calls to be made.
+    static const Options kAllowSyncCalls;
+  };
+
   // Creates a dispatcher for performing asynchronous operations.
   //
-  // |options| provides the dispatcher configuration. The following options are supported:
-  //   * `FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS` - blocking calls may be made on this dispatcher.
+  // |options| provides the dispatcher configuration. This will panic if options does not
+  // set FDF_DISPATCHER_OPTION_SYNCHRONIZED.
   //
   // |name| is reported via diagnostics. It is similar to setting the name of a thread. Names longer
   // than `ZX_MAX_NAME_LEN` may be truncated.
@@ -247,10 +259,13 @@ class SynchronizedDispatcher : public Dispatcher {
   //
   // ZX_ERR_BAD_STATE: Dispatchers are currently not allowed to be created, such as when a driver
   // is being shutdown by its driver host.
-  static zx::result<SynchronizedDispatcher> Create(uint32_t options, cpp17::string_view name,
+  static zx::result<SynchronizedDispatcher> Create(Options options, cpp17::string_view name,
                                                    ShutdownHandler shutdown_handler,
                                                    cpp17::string_view scheduler_role = {}) {
-    options &= (~FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK);
+    ZX_ASSERT_MSG((options.value & FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK) ==
+                      FDF_DISPATCHER_OPTION_SYNCHRONIZED,
+                  "options.value=%u, needs to have FDF_DISPATCHER_OPTION_SYNCHRONIZED",
+                  options.value);
     // We need to create an additional shutdown context in addition to the fdf::Dispatcher
     // object, as the fdf::SynchronizedDispatcher may be destructed before the shutdown handler
     // is called. This can happen if the raw pointer is released from the
@@ -259,7 +274,7 @@ class SynchronizedDispatcher : public Dispatcher {
         std::make_unique<DispatcherShutdownContext>(std::move(shutdown_handler));
     fdf_dispatcher_t* dispatcher;
     zx_status_t status =
-        fdf_dispatcher_create(FDF_DISPATCHER_OPTION_SYNCHRONIZED | options, name.data(),
+        fdf_dispatcher_create(FDF_DISPATCHER_OPTION_SYNCHRONIZED | options.value, name.data(),
                               name.size(), scheduler_role.data(), scheduler_role.size(),
                               dispatcher_shutdown_context->observer(), &dispatcher);
     if (status != ZX_OK) {
@@ -281,12 +296,24 @@ class SynchronizedDispatcher : public Dispatcher {
   }
 };
 
+inline constexpr SynchronizedDispatcher::Options SynchronizedDispatcher::Options::kAllowSyncCalls =
+    {FDF_DISPATCHER_OPTION_SYNCHRONIZED | FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS};
+
 // Dispatcher that allows parallel calls into callbacks.
 class UnsynchronizedDispatcher : public Dispatcher {
  public:
+  // Options that may be passed to |fdf::UnsynchronizedDispatcher::Create|.
+  // When using the |UnsynchronizedDispatcher| class, the dispatcher options must set
+  // FDF_DISPATCHER_OPTION_UNSYNCHRONIZED.
+  struct Options {
+    // The options to set for the dispatcher. Currently no additional options are supported.
+    uint32_t value = FDF_DISPATCHER_OPTION_UNSYNCHRONIZED;
+  };
+
   // Creates a dispatcher for performing asynchronous operations.
   //
-  // |options| provides the dispatcher configuration. Currently no options are supported.
+  // |options| provides the dispatcher configuration. This will panic if options does not
+  // set FDF_DISPATCHER_OPTION_UNSYNCHRONIZED.
   //
   // |name| is reported via diagnostics. It is similar to setting the name of a thread. Names longer
   // than `ZX_MAX_NAME_LEN` may be truncated.
@@ -312,10 +339,13 @@ class UnsynchronizedDispatcher : public Dispatcher {
   //
   // ZX_ERR_BAD_STATE: Dispatchers are currently not allowed to be created, such as when a driver
   // is being shutdown by its driver host.
-  static zx::result<UnsynchronizedDispatcher> Create(uint32_t options, cpp17::string_view name,
+  static zx::result<UnsynchronizedDispatcher> Create(Options options, cpp17::string_view name,
                                                      ShutdownHandler shutdown_handler,
                                                      cpp17::string_view scheduler_role = {}) {
-    options &= (~FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK);
+    ZX_ASSERT_MSG((options.value & FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK) ==
+                      FDF_DISPATCHER_OPTION_UNSYNCHRONIZED,
+                  "options.value=%u, needs to have FDF_DISPATCHER_OPTION_UNSYNCHRONIZED",
+                  options.value);
     // We need to create an additional shutdown context in addition to the fdf::Dispatcher
     // object, as the fdf::UnsynchronizedDispatcher may be destructed before the shutdown handler
     // is called. This can happen if the raw pointer is released from the
@@ -324,7 +354,7 @@ class UnsynchronizedDispatcher : public Dispatcher {
         std::make_unique<DispatcherShutdownContext>(std::move(shutdown_handler));
     fdf_dispatcher_t* dispatcher;
     zx_status_t status =
-        fdf_dispatcher_create(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED | options, name.data(),
+        fdf_dispatcher_create(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED | options.value, name.data(),
                               name.size(), scheduler_role.data(), scheduler_role.size(),
                               dispatcher_shutdown_context->observer(), &dispatcher);
     if (status != ZX_OK) {
