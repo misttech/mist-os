@@ -2888,9 +2888,9 @@ that users can easily switch revisions using a single arg.
 
 From //build/images/args.gni:65
 
-### flatland_disable_display_composition
-If true, this forces the display compositor to always use the GPU/Vulkan
-rendering path, instead of attempting the display controller rendering path.
+### flatland_enable_display_composition
+If true, this enables the compositor to attempt to use the display controller
+rendering path instead of always using the GPU/Vulkan rendering path.
 
 **Current value (from the default):** `false`
 

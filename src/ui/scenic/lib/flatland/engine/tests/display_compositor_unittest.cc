@@ -107,7 +107,7 @@ class DisplayCompositorTest : public DisplayCompositorTestBase {
     display_compositor_ = std::make_shared<flatland::DisplayCompositor>(
         dispatcher(), std::move(shared_display_controller), renderer_,
         utils::CreateSysmemAllocatorSyncPtr("display_compositor_unittest"),
-        BufferCollectionImportMode::AttemptDisplayConstraints);
+        /*enable_display_composition*/ true);
   }
 
   void TearDown() override {
@@ -135,8 +135,8 @@ class DisplayCompositorTest : public DisplayCompositorTestBase {
     };
   }
 
-  void SetBufferCollectionImportMode(BufferCollectionImportMode import_mode) {
-    display_compositor_->import_mode_ = import_mode;
+  void ForceRendererOnlyMode(bool force_renderer_only) {
+    display_compositor_->enable_display_composition_ = !force_renderer_only;
   }
 
   void SendOnVsyncEvent(fuchsia::hardware::display::ConfigStamp stamp) {
@@ -168,12 +168,7 @@ class DisplayCompositorTest : public DisplayCompositorTestBase {
                                                   fhd_Transform expected_transform);
 };
 
-class ParameterizedDisplayCompositorTest
-    : public DisplayCompositorTest,
-      public ::testing::WithParamInterface<BufferCollectionImportMode> {};
-
-TEST_P(ParameterizedDisplayCompositorTest, ImportAndReleaseBufferCollectionTest) {
-  SetBufferCollectionImportMode(GetParam());
+TEST_F(DisplayCompositorTest, ImportAndReleaseBufferCollectionTest) {
   // Expected calls: ImportBufferCollection(), SetBufferCollectionConstraints(),
   // ReleaseBufferCollection(), CheckConfig(), and one for deletion.
   const auto server = CreateServerWaitingForMessages(*mock_display_controller_, 5);
@@ -220,10 +215,6 @@ TEST_P(ParameterizedDisplayCompositorTest, ImportAndReleaseBufferCollectionTest)
 
   display_compositor_.reset();
 }
-
-INSTANTIATE_TEST_SUITE_P(BufferCollectionImportModes, ParameterizedDisplayCompositorTest,
-                         ::testing::Values(BufferCollectionImportMode::EnforceDisplayConstraints,
-                                           BufferCollectionImportMode::AttemptDisplayConstraints));
 
 // This test makes sure the buffer negotiations work as intended.
 // There are three participants: the client, the display and the renderer.
@@ -466,7 +457,7 @@ TEST_F(DisplayCompositorTest,
 }
 
 TEST_F(DisplayCompositorTest, SysmemNegotiationTest_InRendererOnlyMode_DisplayShouldExcludeItself) {
-  SetBufferCollectionImportMode(BufferCollectionImportMode::RendererOnly);
+  ForceRendererOnlyMode(true);
 
   // Expected calls: CheckConfig(), and one for deletion.
   const auto server = CreateServerWaitingForMessages(*mock_display_controller_, 2);
@@ -1582,7 +1573,7 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
 
 // Tests that RenderOnly mode does not attempt to ImportBufferCollection() to display.
 TEST_F(DisplayCompositorTest, RendererOnly_ImportAndReleaseBufferCollectionTest) {
-  SetBufferCollectionImportMode(BufferCollectionImportMode::RendererOnly);
+  ForceRendererOnlyMode(true);
 
   // Wait once for call to ReleaseBufferCollection and once for the deleter.
   const auto server = CreateServerWaitingForMessages(*mock_display_controller_, 2);
@@ -1627,7 +1618,6 @@ class ParameterizedYuvDisplayCompositorTest
 // TODO(fxbug.dev/85601): This test tries to import a YUV buffer to display and confirms that
 // Flatland falls back to vulkan compositing. Remove this test when i915 supports YUV buffers.
 TEST_P(ParameterizedYuvDisplayCompositorTest, EnforceDisplayConstraints_SkipsYuvImages) {
-  SetBufferCollectionImportMode(BufferCollectionImportMode::EnforceDisplayConstraints);
   // Wait for call to: ImportBufferCollection(), SetBufferCollectionConstraints(), DiscardConfig().
   const auto server = CreateServerWaitingForMessages(*mock_display_controller_, 3);
 

@@ -87,7 +87,7 @@ constexpr auto kSceneProviderName = "scene-provider";
 // Contents of config file used to allow scenic to use gfx.
 constexpr auto kUseGfxScenicConfig = R"(
 {
-  "flatland_buffer_collection_import_mode": "renderer_only",
+  "flatland_enable_display_composition": false,
   "i_can_haz_flatland": false
 }
 )";
@@ -95,7 +95,7 @@ constexpr auto kUseGfxScenicConfig = R"(
 // Contents of config file used to force scenic to use flatland.
 constexpr auto kUseFlatlandScenicConfig = R"(
 {
-  "flatland_buffer_collection_import_mode": "renderer_only",
+  "flatland_enable_display_composition": false,
   "i_can_haz_flatland": true
 }
 )";

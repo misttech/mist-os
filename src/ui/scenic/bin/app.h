@@ -74,8 +74,13 @@ struct ConfigValues {
 #endif  // USE_FLATLAND_BY_DEFAULT
   bool enable_allocator_for_flatland = true;
   bool pointer_auto_focus_on = true;
-  flatland::BufferCollectionImportMode flatland_buffer_collection_import_mode =
-      flatland::BufferCollectionImportMode::RendererOnly;
+#ifdef FLATLAND_ENABLE_DISPLAY_COMPOSITION
+  bool flatland_enable_display_composition = true;
+#else
+  // Uses the GPU/Vulkan compositor by default, instead of attempting to composite using the display
+  // controller.
+  bool flatland_enable_display_composition = false;
+#endif  // FLATLAND_DISABLE_DISPLAY_COMPOSITION
   // TODO(fxb/76985): Remove these when we have proper multi-display support.
   std::optional<uint64_t> i_can_haz_display_id;
   std::optional<size_t> i_can_haz_display_mode;

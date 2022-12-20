@@ -9,8 +9,8 @@ config("engine_config") {
   if (flatland_visual_debugging) {
     defines += [ "VISUAL_DEBUGGING_ENABLED" ]
   }
-  if (flatland_disable_display_composition) {
-    defines += [ "FLATLAND_DISABLE_DISPLAY_COMPOSITION" ]
+  if (flatland_enable_display_composition) {
+    defines += [ "FLATLAND_ENABLE_DISPLAY_COMPOSITION" ]
   }
 }
 
