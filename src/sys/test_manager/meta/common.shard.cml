@@ -99,7 +99,7 @@
         },
         {
             name: "debug_data",
-            url: "fuchsia-pkg://fuchsia.com/test_manager#meta/debug_data_processor.cm",
+            url: "fuchsia-pkg://fuchsia.com/test_manager#meta/debug_data_rust.cm",
         },
         {
             name: "early_boot_instrumentation",
@@ -192,7 +192,7 @@
             path: "/debugdata",
         },
         {
-            protocol: "fuchsia.test.debug.DebugDataProcessor",
+            protocol: "fuchsia.test.internal.DebugDataController",
             from: "#debug_data",
         },
         {
@@ -292,6 +292,11 @@
                 "#g3_dart_jit_product_runner",
             ],
             availability: "optional",
+        },
+        {
+            protocol: [ "fuchsia.sys2.EventSource" ],
+            from: "parent",
+            to: [ "#debug_data" ],
         },
 
         // These capabilities are offered for use by certain non-hermetic tests.
@@ -421,6 +426,17 @@
             to: "#fuzz_test_runner",
         },
         {
+            event_stream: [
+                "capability_requested",
+                "destroyed",
+                "directory_ready",
+                "started",
+                "stopped",
+            ],
+            from: "parent",
+            to: "#debug_data",
+        },
+        {
             protocol: "fuchsia.diagnostics.ArchiveAccessor",
             from: "parent",
             as: "fuchsia.diagnostics.RealArchiveAccessor",
@@ -458,6 +474,12 @@
                 "#system-tests",
                 "#tests",
             ],
+            rights: [ "rw*" ],
+        },
+        {
+            storage: "tmp",
+            from: "parent",
+            to: "#debug_data",
             rights: [ "rw*" ],
         },
         {
@@ -510,6 +532,7 @@
             storage: "cache",
             from: "self",
             to: [
+                "#debug_data",
                 "#starnix-tests",
                 "#system-tests",
                 "#tests",

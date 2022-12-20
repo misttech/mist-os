@@ -5,7 +5,7 @@
 use {
     anyhow::{anyhow, Context, Error},
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
-    fuchsia_async as fasync,
+    fidl_fuchsia_test_internal as ftest_internal, fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_component::server::ServiceFs,
     futures::StreamExt,
@@ -13,7 +13,7 @@ use {
         convert::{TryFrom, TryInto},
         sync::Arc,
     },
-    test_manager_lib::{constants, AboveRootCapabilitiesForTest},
+    test_manager_lib::AboveRootCapabilitiesForTest,
     tracing::{info, warn},
 };
 
@@ -51,9 +51,9 @@ async fn main() -> Result<(), Error> {
     let args: TestManagerArgs = std::env::args().try_into()?;
     let mut fs = ServiceFs::new();
 
-    std::fs::create_dir_all(constants::KERNEL_DEBUG_DATA_FOR_SCP)?;
-    std::fs::create_dir_all(constants::DEBUG_DATA_FOR_SCP)?;
-    std::fs::create_dir_all(constants::ISOLATED_TMP)?;
+    if !std::path::Path::new("/tmp").exists() {
+        return Err(anyhow!("Expected /tmp to be available"));
+    }
 
     if !std::path::Path::new("/data").exists() {
         return Err(anyhow!("Expected /data to be available"));
@@ -67,6 +67,10 @@ async fn main() -> Result<(), Error> {
     let resolver = Arc::new(
         connect_to_protocol::<fresolution::ResolverMarker>()
             .expect("Cannot connect to component resolver"),
+    );
+    let debug_data_controller = Arc::new(
+        connect_to_protocol::<ftest_internal::DebugDataControllerMarker>()
+            .expect("Cannnot connect to debug data control"),
     );
     let resolver_clone = resolver.clone();
     let root_inspect = Arc::new(test_manager_lib::RootInspectNode::new(
@@ -90,11 +94,13 @@ async fn main() -> Result<(), Error> {
         .add_fidl_service(move |stream| {
             let routing_info_for_task = routing_info_clone.clone();
             let resolver = resolver.clone();
+            let debug_data_controller = debug_data_controller.clone();
             let root_inspect_clone = root_inspect.clone();
             fasync::Task::local(async move {
                 test_manager_lib::run_test_manager(
                     stream,
                     resolver,
+                    debug_data_controller,
                     routing_info_for_task,
                     &*root_inspect_clone,
                 )
@@ -107,7 +113,7 @@ async fn main() -> Result<(), Error> {
             let routing_info_for_task = routing_info.clone();
             let resolver = resolver_clone.clone();
 
-            fasync::Task::local(async move {
+            fasync::Task::spawn(async move {
                 test_manager_lib::run_test_manager_query_server(
                     stream,
                     resolver,
