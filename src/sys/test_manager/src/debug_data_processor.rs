@@ -292,7 +292,7 @@ mod test {
                 OpenFlags::CREATE | OpenFlags::RIGHT_WRITABLE,
             )
             .expect("open file");
-            fuchsia_fs::write_file(&file, &test_url).await.expect("write file");
+            fuchsia_fs::file::write(&file, &test_url).await.expect("write file");
         }
         finish_responder.unwrap().send().unwrap();
     }

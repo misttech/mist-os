@@ -60,7 +60,7 @@ mod tests {
         let permanent_path = dir.path().join("foo");
 
         do_with_atomic_file(&dir_proxy, "foo.new", "foo", |proxy| async move {
-            fuchsia_fs::write_file(&proxy, "bar").await
+            fuchsia_fs::file::write(&proxy, "bar").await.map_err(Into::into)
         })
         .await
         .unwrap();
@@ -71,7 +71,7 @@ mod tests {
         std::fs::write(&temp_path, "garbage").unwrap();
         assert!(temp_path.exists());
         do_with_atomic_file(&dir_proxy, "foo.new", "foo", |proxy| async move {
-            fuchsia_fs::write_file(&proxy, "baz").await
+            fuchsia_fs::file::write(&proxy, "baz").await.map_err(Into::into)
         })
         .await
         .unwrap();
@@ -79,7 +79,7 @@ mod tests {
         assert!(!temp_path.exists());
 
         do_with_atomic_file(&dir_proxy, "foo.new", "foo", |proxy| async move {
-            fuchsia_fs::write_file(&proxy, "qux").await
+            fuchsia_fs::file::write(&proxy, "qux").await.map_err(Into::into)
         })
         .await
         .unwrap();

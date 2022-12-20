@@ -647,7 +647,7 @@ let file_proxy = fuchsia_fs::open_file(
     "config-file.json",
     fio::OpenFlags::RIGHT_WRITABLE|fio::OpenFlags::CREATE,
 )?;
-fuchsia_fs::write_file(&file_proxy, "{ \"foo\": \"bar\"}").await?;
+fuchsia_fs::file::write(&file_proxy, "{ \"foo\": \"bar\"}").await?;
 let realm_instance = builder.create().await?;
 ```
 

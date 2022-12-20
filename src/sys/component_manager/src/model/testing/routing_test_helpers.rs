@@ -1156,7 +1156,7 @@ pub mod capability_util {
         };
 
         // Write contents.
-        fuchsia_fs::write_file(&file_proxy, contents).await
+        fuchsia_fs::file::write(&file_proxy, contents).await.map_err(Into::into)
     }
 
     pub async fn check_file_in_storage(

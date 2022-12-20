@@ -49,7 +49,7 @@ fn new_data_user_mock<T: Into<String>, U: Into<String>>(
                 fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
             )
             .expect("failed to open file");
-            fuchsia_fs::write_file(&file, &contents_clone).await.expect("write file failed");
+            fuchsia_fs::file::write(&file, &contents_clone).await.expect("write file failed");
             send_clone.send(()).await.unwrap();
             Ok(())
         }

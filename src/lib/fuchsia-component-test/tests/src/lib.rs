@@ -1575,7 +1575,7 @@ async fn route_storage() -> Result<(), Error> {
                     .await
                     .expect("failed to open example_file");
                     let example_data = "example data";
-                    fuchsia_fs::write_file(&example_file, example_data).await?;
+                    fuchsia_fs::file::write(&example_file, example_data).await?;
                     let _: Result<u64, i32> = example_file.seek(fio::SeekOrigin::Start, 0).await?;
                     let file_contents = fuchsia_fs::read_file(&example_file).await?;
                     assert_eq!(example_data, file_contents.as_str());

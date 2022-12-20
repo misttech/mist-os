@@ -71,12 +71,6 @@ pub async fn read_file(file: &fio::FileProxy) -> Result<String, Error> {
     Ok(string)
 }
 
-/// Write the given string as UTF-8 bytes into a file open for writing.
-pub async fn write_file(file: &fio::FileProxy, data: &str) -> Result<(), Error> {
-    file::write(file, data).await?;
-    Ok(())
-}
-
 /// Write the given bytes into a file at `path`. The path must be an absolute path.
 /// * If the file already exists, replaces existing contents.
 /// * If the file does not exist, creates the file.
@@ -209,7 +203,7 @@ mod tests {
         let data = "abc".repeat(10000);
         let file = open_file(&dir, &file_name, OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE)
             .expect("could not open file");
-        write_file(&file, &data).await.expect("could not write file");
+        file::write(&file, &data).await.expect("could not write file");
 
         // Verify contents.
         let contents = std::fs::read_to_string(tempdir.path().join(file_name)).unwrap();

@@ -82,7 +82,7 @@ mod test {
             fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
         )
         .expect("create file");
-        fuchsia_fs::write_file(&file, "file content").await.expect("write to file");
+        fuchsia_fs::file::write(&file, "file content").await.expect("write to file");
         drop(file);
 
         let mut collected_vmos = vec![];
@@ -108,7 +108,7 @@ mod test {
                         fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
                     )
                     .expect("create file");
-                    fuchsia_fs::write_file(&file, "file content").await.expect("write to file");
+                    fuchsia_fs::file::write(&file, "file content").await.expect("write to file");
                     drop(file);
 
                     finish_called = true;

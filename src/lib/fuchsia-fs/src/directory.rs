@@ -654,7 +654,7 @@ fn remove_dir_contents(dir: fio::DirectoryProxy) -> BoxFuture<'static, Result<()
 mod tests {
     use {
         super::*,
-        crate::write_file,
+        crate::file::write,
         anyhow::Context as _,
         assert_matches::assert_matches,
         fuchsia_async as fasync,
@@ -1517,7 +1517,7 @@ mod tests {
         .await
         .expect("open_file failed");
 
-        write_file(&file, &data).await.expect("writing to the file failed");
+        write(&file, &data).await.expect("writing to the file failed");
 
         let contents = std::fs::read_to_string(tempdir.path().join(path).join(file_name))
             .expect("read_to_string failed");

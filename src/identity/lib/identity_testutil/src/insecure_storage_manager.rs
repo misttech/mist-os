@@ -280,7 +280,7 @@ impl InsecureKeyDirectoryStorageManager {
             AccountManagerError::new(ApiError::Resource)
                 .with_cause(format_err!("Failed to open keyfile while saving key: {:?}", e))
         })?;
-        fuchsia_fs::write_file(&key_file, &serialized_key).await.map_err(|e| {
+        fuchsia_fs::file::write(&key_file, &serialized_key).await.map_err(|e| {
             AccountManagerError::new(ApiError::Resource)
                 .with_cause(format_err!("Failed to write key to keyfile: {:?}", e))
         })
@@ -331,7 +331,7 @@ mod test {
             fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
         )
         .unwrap();
-        fuchsia_fs::write_file(&file, content).await.unwrap();
+        fuchsia_fs::file::write(&file, content).await.unwrap();
     }
 
     async fn assert_directory_empty(dir: &fio::DirectoryProxy) {
