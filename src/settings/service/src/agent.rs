@@ -89,13 +89,25 @@ pub trait Blueprint {
 
 pub type BlueprintHandle = Arc<dyn Blueprint + Send + Sync>;
 
-/// TODO(fxbug.dev/68659): Add documentation.
+/// Agent Context contains necessary parts to create an agent.
 pub struct Context {
+    /// The receivor end to receive messages.
     pub receptor: Receptor,
+
+    /// Publishers are used to publish events.
     publisher: event::Publisher,
+
+    /// Delegates are used to create new messengers.
     pub delegate: service::message::Delegate,
+
+    /// Indicates available Settings interfaces.
     pub(crate) available_components: HashSet<SettingType>,
+
+    /// Indicates available policy types supported by the Settings interfaces.
     pub available_policies: HashSet<PolicyType>,
+
+    /// Used to monitor resources, but it has been turned off.
+    // TODO(fxbug.dev/117894): Investigate if we need to turn on the resource monitor or remove it.
     pub resource_monitor_actor: Option<monitor::environment::Actor>,
 }
 
