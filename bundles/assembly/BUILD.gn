@@ -143,6 +143,19 @@ assembly_input_bundle("common_minimal") {
         },
       ]
     },
+    {
+      package_name = "diagnostics-persistence"
+      files = [
+        {
+          source = "//src/diagnostics/config/persistence/netstack.persist"
+          destination = "netstack.persist"
+        },
+        {
+          source = "//src/diagnostics/config/persistence/wlan.persist"
+          destination = "wlan.persist"
+        },
+      ]
+    },
   ]
 }
 
