@@ -35,7 +35,7 @@ pub enum BootfsParserError {
     #[error("Invalid magic for bootfs payload")]
     BadMagic,
 
-    #[error("Directory entry {} exceeds expected dirsize of {}", entry_index, dirsize)]
+    #[error("Directory entry {} exceeds available dirsize of {}", entry_index, dirsize)]
     DirEntryTooBig { entry_index: u32, dirsize: u32 },
 
     #[error("Failed to read payload: {}", status)]
@@ -201,7 +201,7 @@ impl<'parser> Iterator for BootfsParserIterator<'parser> {
         if dirent_size > self.available_dirsize {
             self.errored = true;
             return Some(Err(BootfsParserError::DirEntryTooBig {
-                dirsize: self.parser.dirsize,
+                dirsize: self.available_dirsize,
                 entry_index: self.entry_index,
             }));
         }
