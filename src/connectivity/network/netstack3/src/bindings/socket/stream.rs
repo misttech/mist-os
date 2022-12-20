@@ -33,6 +33,7 @@ use netstack3_core::{
     device::DeviceId,
     ip::IpExt,
     transport::tcp::{
+        self,
         buffer::{Buffer, IntoBuffers, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload},
         segment::Payload,
         socket::{
@@ -41,8 +42,7 @@ use netstack3_core::{
             remove_unbound, set_bound_device, set_connection_device, set_listener_device,
             set_send_buffer_size, set_unbound_device, shutdown_conn, shutdown_listener,
             with_keep_alive, with_keep_alive_mut, AcceptError, BoundId, BoundInfo, ConnectError,
-            ConnectionId, ConnectionInfo, ListenerId, NoConnection, SocketAddr, TcpNonSyncContext,
-            UnboundId,
+            ConnectionId, ConnectionInfo, ListenerId, NoConnection, SocketAddr, UnboundId,
         },
         state::Takeable,
         BufferSizes, KeepAlive,
@@ -73,7 +73,7 @@ enum SocketId<I: Ip> {
 }
 
 pub(crate) trait SocketWorkerDispatcher:
-    TcpNonSyncContext<
+    tcp::socket::NonSyncContext<
     ProvidedBuffers = LocalZirconSocketAndNotifier,
     ReturnedBuffers = PeerZirconSocketAndWatcher,
 >
@@ -153,7 +153,7 @@ pub(crate) struct PeerZirconSocketAndWatcher {
     socket: Arc<zx::Socket>,
 }
 
-impl TcpNonSyncContext for crate::bindings::BindingsNonSyncCtxImpl {
+impl tcp::socket::NonSyncContext for crate::bindings::BindingsNonSyncCtxImpl {
     type ReceiveBuffer = ReceiveBufferWithZirconSocket;
     type SendBuffer = SendBufferWithZirconSocket;
     type ReturnedBuffers = PeerZirconSocketAndWatcher;

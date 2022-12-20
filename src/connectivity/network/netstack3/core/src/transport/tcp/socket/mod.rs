@@ -73,7 +73,7 @@ use crate::{
         state::{CloseError, Closed, Initial, State, Takeable},
         BufferSizes, KeepAlive, DEFAULT_MAXIMUM_SEGMENT_SIZE,
     },
-    DeviceId, Instant, NonSyncContext, SyncCtx,
+    DeviceId, Instant, SyncCtx,
 };
 
 /// Timer ID for TCP connections.
@@ -117,7 +117,7 @@ impl TimerId {
 /// |     v                  v      |
 /// |receive buffer     send buffer |
 /// +-------------------------------+
-pub trait TcpNonSyncContext: TimerContext<TimerId> {
+pub trait NonSyncContext: TimerContext<TimerId> {
     /// Receive buffer used by TCP.
     type ReceiveBuffer: ReceiveBuffer;
     /// Send buffer used by TCP.
@@ -141,9 +141,7 @@ pub trait TcpNonSyncContext: TimerContext<TimerId> {
 }
 
 /// Sync context for TCP.
-pub(crate) trait TcpSyncContext<I: IpExt, C: TcpNonSyncContext>:
-    IpDeviceIdContext<I>
-{
+pub(crate) trait TcpSyncContext<I: IpExt, C: NonSyncContext>: IpDeviceIdContext<I> {
     type IpTransportCtx: BufferTransportIpContext<I, C, Buf<Vec<u8>>, DeviceId = Self::DeviceId>;
 
     /// Calls the function with a `Self::IpTransportCtx`, immutable reference to
@@ -215,7 +213,7 @@ pub(crate) enum TcpIpTransportContext {}
 /// Uninstantiatable type for implementing [`SocketMapStateSpec`].
 struct TcpSocketSpec<Ip, Device, NonSyncContext>(PhantomData<(Ip, Device, NonSyncContext)>, Never);
 
-impl<I: IpExt, D: IpDeviceId, C: TcpNonSyncContext> SocketMapStateSpec for TcpSocketSpec<I, D, C> {
+impl<I: IpExt, D: IpDeviceId, C: NonSyncContext> SocketMapStateSpec for TcpSocketSpec<I, D, C> {
     type ListenerId = MaybeListenerId<I>;
     type ConnId = MaybeClosedConnectionId<I>;
 
@@ -231,7 +229,7 @@ impl<I: IpExt, D: IpDeviceId, C: TcpNonSyncContext> SocketMapStateSpec for TcpSo
     type ConnAddrState = MaybeClosedConnectionId<I>;
 }
 
-impl<I: IpExt, D: IpDeviceId, C: TcpNonSyncContext>
+impl<I: IpExt, D: IpDeviceId, C: NonSyncContext>
     SocketMapConflictPolicy<ListenerAddr<I::Addr, D, NonZeroU16>, (), IpPortSpec<I, D>>
     for TcpSocketSpec<I, D, C>
 {
@@ -256,7 +254,7 @@ impl<I: IpExt, D: IpDeviceId, C: TcpNonSyncContext>
     }
 }
 
-impl<I: IpExt, D: IpDeviceId, C: TcpNonSyncContext>
+impl<I: IpExt, D: IpDeviceId, C: NonSyncContext>
     SocketMapConflictPolicy<ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>, (), IpPortSpec<I, D>>
     for TcpSocketSpec<I, D, C>
 {
@@ -296,13 +294,13 @@ struct Unbound<D> {
 }
 
 /// Holds all the TCP socket states.
-pub struct TcpSockets<I: IpExt, D: IpDeviceId, C: TcpNonSyncContext> {
+pub struct TcpSockets<I: IpExt, D: IpDeviceId, C: NonSyncContext> {
     port_alloc: PortAlloc<BoundSocketMap<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>>,
     inactive: IdMap<Unbound<D>>,
     socketmap: BoundSocketMap<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>,
 }
 
-impl<I: IpExt, D: IpDeviceId, C: TcpNonSyncContext> PortAllocImpl
+impl<I: IpExt, D: IpDeviceId, C: NonSyncContext> PortAllocImpl
     for BoundSocketMap<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>
 {
     const TABLE_SIZE: NonZeroUsize = nonzero!(20usize);
@@ -330,7 +328,7 @@ impl<I: IpExt, D: IpDeviceId, C: TcpNonSyncContext> PortAllocImpl
     }
 }
 
-impl<I: IpExt, D: IpDeviceId, C: TcpNonSyncContext> TcpSockets<I, D, C> {
+impl<I: IpExt, D: IpDeviceId, C: NonSyncContext> TcpSockets<I, D, C> {
     fn get_listener_by_id_mut(
         &mut self,
         id: ListenerId<I>,
@@ -475,7 +473,7 @@ impl<I: Ip> IdMapCollectionKey for ListenerId<I> {
 }
 
 impl<I: IpExt> ConnectionId<I> {
-    fn get_from_socketmap<D: IpDeviceId, C: TcpNonSyncContext>(
+    fn get_from_socketmap<D: IpDeviceId, C: NonSyncContext>(
         self,
         socketmap: &BoundSocketMap<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>,
     ) -> (
@@ -489,7 +487,7 @@ impl<I: IpExt> ConnectionId<I> {
         (conn, (), addr)
     }
 
-    fn get_from_socketmap_mut<D: IpDeviceId, C: TcpNonSyncContext>(
+    fn get_from_socketmap_mut<D: IpDeviceId, C: NonSyncContext>(
         self,
         socketmap: &mut BoundSocketMap<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>,
     ) -> (
@@ -604,9 +602,7 @@ impl<I: Ip> SocketMapAddrStateSpec for MaybeClosedConnectionId<I> {
     }
 }
 
-pub(crate) trait TcpSocketHandler<I: Ip, C: TcpNonSyncContext>:
-    IpDeviceIdContext<I>
-{
+pub(crate) trait TcpSocketHandler<I: Ip, C: NonSyncContext>: IpDeviceIdContext<I> {
     fn create_socket(&mut self, ctx: &mut C) -> UnboundId<I>;
 
     fn bind(
@@ -682,7 +678,7 @@ pub(crate) trait TcpSocketHandler<I: Ip, C: TcpNonSyncContext>:
     fn set_send_buffer_size<Id: Into<TcpSocketId<I>>>(&mut self, ctx: &mut C, id: Id, size: usize);
 }
 
-impl<I: IpExt, C: TcpNonSyncContext, SC: TcpSyncContext<I, C>> TcpSocketHandler<I, C> for SC {
+impl<I: IpExt, C: NonSyncContext, SC: TcpSyncContext<I, C>> TcpSocketHandler<I, C> for SC {
     fn create_socket(&mut self, _ctx: &mut C) -> UnboundId<I> {
         let unbound = Unbound::default();
         UnboundId(
@@ -1241,7 +1237,7 @@ fn do_send_inner<I, SC, C>(
     ctx: &mut C,
 ) where
     I: IpExt,
-    C: TcpNonSyncContext,
+    C: NonSyncContext,
     SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>>,
 {
     while let Some(seg) =
@@ -1276,7 +1272,7 @@ fn do_send_inner<I, SC, C>(
 pub fn create_socket<I, C>(mut sync_ctx: &SyncCtx<C>, ctx: &mut C) -> UnboundId<I>
 where
     I: IpExt,
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
 {
     I::map_ip(
         IpInvariant((&mut sync_ctx, ctx)),
@@ -1296,7 +1292,7 @@ pub fn set_unbound_device<I, C>(
     device: Option<DeviceId<C::Instant>>,
 ) where
     I: IpExt,
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
 {
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, device)), id),
@@ -1330,7 +1326,7 @@ pub fn set_listener_device<I, C>(
 ) -> Result<(), SetDeviceError>
 where
     I: IpExt,
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
 {
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, device)), id),
@@ -1356,7 +1352,7 @@ pub fn set_bound_device<I, C>(
 ) -> Result<(), SetDeviceError>
 where
     I: IpExt,
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
 {
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, device)), id),
@@ -1381,7 +1377,7 @@ pub fn set_connection_device<I, C>(
 ) -> Result<(), SetDeviceError>
 where
     I: IpExt,
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
 {
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, device)), id),
@@ -1404,7 +1400,7 @@ pub fn bind<I, C>(
 ) -> Result<BoundId<I>, LocalAddressError>
 where
     I: IpExt,
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
 {
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, port)), id, local_ip),
@@ -1426,7 +1422,7 @@ pub fn listen<I, C>(
 ) -> ListenerId<I>
 where
     I: IpExt,
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
 {
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, backlog)), id),
@@ -1457,7 +1453,7 @@ pub fn accept<I: Ip, C>(
     id: ListenerId<I>,
 ) -> Result<(ConnectionId<I>, SocketAddr<I::Addr>, C::ReturnedBuffers), AcceptError>
 where
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
 {
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx)), id),
@@ -1490,7 +1486,7 @@ pub fn connect_bound<I, C>(
 ) -> Result<ConnectionId<I>, ConnectError>
 where
     I: IpExt,
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
 {
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, netstack_buffers)), id, remote),
@@ -1513,7 +1509,7 @@ pub fn connect_unbound<I, C>(
 ) -> Result<ConnectionId<I>, ConnectError>
 where
     I: IpExt,
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
 {
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, netstack_buffers)), id, remote),
@@ -1541,7 +1537,7 @@ fn connect_inner<I, SC, C>(
 ) -> Result<ConnectionId<I>, ConnectError>
 where
     I: IpExt,
-    C: TcpNonSyncContext,
+    C: NonSyncContext,
     SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>>,
 {
     let isn = isn.generate(
@@ -1596,7 +1592,7 @@ where
 pub fn close_conn<I, C>(mut sync_ctx: &SyncCtx<C>, ctx: &mut C, id: ConnectionId<I>)
 where
     I: IpExt,
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
 {
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
@@ -1617,7 +1613,7 @@ pub fn shutdown_conn<I, C>(
 ) -> Result<(), NoConnection>
 where
     I: IpExt,
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
 {
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
@@ -1630,7 +1626,7 @@ where
 pub fn remove_unbound<I, C>(mut sync_ctx: &SyncCtx<C>, id: UnboundId<I>)
 where
     I: IpExt,
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
 {
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
@@ -1643,7 +1639,7 @@ where
 pub fn remove_bound<I, C>(mut sync_ctx: &SyncCtx<C>, id: BoundId<I>)
 where
     I: IpExt,
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
 {
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
@@ -1663,7 +1659,7 @@ pub fn shutdown_listener<I, C>(
 ) -> BoundId<I>
 where
     I: IpExt,
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
 {
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
@@ -1724,7 +1720,7 @@ impl<A: IpAddress, D> From<ConnAddr<A, D, NonZeroU16, NonZeroU16>> for Connectio
 }
 
 /// Get information for unbound TCP socket.
-pub fn get_unbound_info<I: Ip, C: NonSyncContext>(
+pub fn get_unbound_info<I: Ip, C: crate::NonSyncContext>(
     mut sync_ctx: &SyncCtx<C>,
     id: UnboundId<I>,
 ) -> UnboundInfo<DeviceId<C::Instant>> {
@@ -1736,7 +1732,7 @@ pub fn get_unbound_info<I: Ip, C: NonSyncContext>(
 }
 
 /// Get information for bound TCP socket.
-pub fn get_bound_info<I: Ip, C: NonSyncContext>(
+pub fn get_bound_info<I: Ip, C: crate::NonSyncContext>(
     mut sync_ctx: &SyncCtx<C>,
     id: BoundId<I>,
 ) -> BoundInfo<I::Addr, DeviceId<C::Instant>> {
@@ -1748,7 +1744,7 @@ pub fn get_bound_info<I: Ip, C: NonSyncContext>(
 }
 
 /// Get information for listener TCP socket.
-pub fn get_listener_info<I: Ip, C: NonSyncContext>(
+pub fn get_listener_info<I: Ip, C: crate::NonSyncContext>(
     mut sync_ctx: &SyncCtx<C>,
     id: ListenerId<I>,
 ) -> BoundInfo<I::Addr, DeviceId<C::Instant>> {
@@ -1760,7 +1756,7 @@ pub fn get_listener_info<I: Ip, C: NonSyncContext>(
 }
 
 /// Get information for connection TCP socket.
-pub fn get_connection_info<I: Ip, C: NonSyncContext>(
+pub fn get_connection_info<I: Ip, C: crate::NonSyncContext>(
     mut sync_ctx: &SyncCtx<C>,
     id: ConnectionId<I>,
 ) -> ConnectionInfo<I::Addr, DeviceId<C::Instant>> {
@@ -1778,7 +1774,7 @@ pub fn get_connection_info<I: Ip, C: NonSyncContext>(
 /// Access keep-alive options mutably for a TCP socket.
 pub fn with_keep_alive_mut<
     I: Ip,
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
     R,
     F: FnOnce(&mut KeepAlive) -> R,
     Id: Into<TcpSocketId<I>>,
@@ -1803,7 +1799,7 @@ pub fn with_keep_alive_mut<
 /// Access keep-alive options immutably for a TCP socket.
 pub fn with_keep_alive<
     I: Ip,
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
     R,
     F: FnOnce(&KeepAlive) -> R,
     Id: Into<TcpSocketId<I>>,
@@ -1825,7 +1821,7 @@ pub fn with_keep_alive<
 }
 
 /// Set the size of the send buffer for this socket and future derived sockets.
-pub fn set_send_buffer_size<I: Ip, C: NonSyncContext, Id: Into<TcpSocketId<I>>>(
+pub fn set_send_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<TcpSocketId<I>>>(
     mut sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: Id,
@@ -1850,7 +1846,7 @@ pub fn set_send_buffer_size<I: Ip, C: NonSyncContext, Id: Into<TcpSocketId<I>>>(
 pub fn do_send<I, C>(mut sync_ctx: &SyncCtx<C>, ctx: &mut C, conn_id: MaybeClosedConnectionId<I>)
 where
     I: IpExt,
-    C: NonSyncContext,
+    C: crate::NonSyncContext,
 {
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), conn_id),
@@ -1861,7 +1857,7 @@ where
 
 pub(crate) fn handle_timer<SC, C>(sync_ctx: &mut SC, ctx: &mut C, timer_id: TimerId)
 where
-    C: TcpNonSyncContext,
+    C: NonSyncContext,
     SC: TcpSyncContext<Ipv4, C> + TcpSyncContext<Ipv6, C>,
 {
     match timer_id {
@@ -2089,7 +2085,7 @@ mod tests {
         }
     }
 
-    impl TcpNonSyncContext for TcpNonSyncCtx {
+    impl NonSyncContext for TcpNonSyncCtx {
         type ReceiveBuffer = Rc<RefCell<RingBuffer>>;
         type SendBuffer = TestSendBuffer;
         type ReturnedBuffers = ClientBuffers;

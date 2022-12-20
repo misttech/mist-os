@@ -186,8 +186,8 @@ impl<C: NonSyncContext + Default> Default for StackState<C> {
 /// The non synchronized context for the stack with a buffer.
 pub trait BufferNonSyncContextInner<B: BufferMut>:
     device::BufferDeviceLayerEventDispatcher<B>
-    + transport::udp::BufferUdpContext<Ipv4, B>
-    + transport::udp::BufferUdpContext<Ipv6, B>
+    + transport::udp::BufferNonSyncContext<Ipv4, B>
+    + transport::udp::BufferNonSyncContext<Ipv6, B>
     + BufferIcmpContext<Ipv4, B>
     + BufferIcmpContext<Ipv6, B>
 {
@@ -195,8 +195,8 @@ pub trait BufferNonSyncContextInner<B: BufferMut>:
 impl<
         B: BufferMut,
         C: device::BufferDeviceLayerEventDispatcher<B>
-            + transport::udp::BufferUdpContext<Ipv4, B>
-            + transport::udp::BufferUdpContext<Ipv6, B>
+            + transport::udp::BufferNonSyncContext<Ipv4, B>
+            + transport::udp::BufferNonSyncContext<Ipv6, B>
             + BufferIcmpContext<Ipv4, B>
             + BufferIcmpContext<Ipv6, B>,
     > BufferNonSyncContextInner<B> for C
@@ -223,11 +223,11 @@ pub trait NonSyncContext:
     + EventContext<ip::IpLayerEvent<DeviceId<Self::Instant>, Ipv6>>
     + EventContext<ip::device::dad::DadEvent<DeviceId<Self::Instant>>>
     + EventContext<ip::device::route_discovery::Ipv6RouteDiscoveryEvent<DeviceId<Self::Instant>>>
-    + transport::udp::UdpContext<Ipv4>
-    + transport::udp::UdpContext<Ipv6>
+    + transport::udp::NonSyncContext<Ipv4>
+    + transport::udp::NonSyncContext<Ipv6>
     + IcmpContext<Ipv4>
     + IcmpContext<Ipv6>
-    + transport::tcp::socket::TcpNonSyncContext
+    + transport::tcp::socket::NonSyncContext
     + device::DeviceLayerEventDispatcher
     + 'static
 {
@@ -245,11 +245,11 @@ impl<
             + EventContext<ip::device::dad::DadEvent<DeviceId<Self::Instant>>>
             + EventContext<
                 ip::device::route_discovery::Ipv6RouteDiscoveryEvent<DeviceId<Self::Instant>>,
-            > + transport::udp::UdpContext<Ipv4>
-            + transport::udp::UdpContext<Ipv6>
+            > + transport::udp::NonSyncContext<Ipv4>
+            + transport::udp::NonSyncContext<Ipv6>
             + IcmpContext<Ipv4>
             + IcmpContext<Ipv6>
-            + transport::tcp::socket::TcpNonSyncContext
+            + transport::tcp::socket::NonSyncContext
             + device::DeviceLayerEventDispatcher
             + 'static,
     > NonSyncContext for C

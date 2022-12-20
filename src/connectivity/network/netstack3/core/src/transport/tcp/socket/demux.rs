@@ -36,15 +36,15 @@ use crate::{
         seqnum::WindowSize,
         socket::{
             do_send_inner, Acceptor, Connection, ConnectionId, Listener, ListenerId,
-            MaybeClosedConnectionId, MaybeListener, SocketAddr, TcpIpTransportContext,
-            TcpNonSyncContext, TcpSyncContext, TimerId,
+            MaybeClosedConnectionId, MaybeListener, NonSyncContext, SocketAddr,
+            TcpIpTransportContext, TcpSyncContext, TimerId,
         },
         state::{BufferProvider, Closed, Initial, State},
         BufferSizes, Control, KeepAlive, UserError,
     },
 };
 
-impl<C: TcpNonSyncContext> BufferProvider<C::ReceiveBuffer, C::SendBuffer> for C {
+impl<C: NonSyncContext> BufferProvider<C::ReceiveBuffer, C::SendBuffer> for C {
     type ActiveOpen = C::ProvidedBuffers;
 
     type PassiveOpen = C::ReturnedBuffers;
@@ -52,7 +52,7 @@ impl<C: TcpNonSyncContext> BufferProvider<C::ReceiveBuffer, C::SendBuffer> for C
     fn new_passive_open_buffers(
         buffer_sizes: BufferSizes,
     ) -> (C::ReceiveBuffer, C::SendBuffer, Self::PassiveOpen) {
-        <C as TcpNonSyncContext>::new_passive_open_buffers(buffer_sizes)
+        <C as NonSyncContext>::new_passive_open_buffers(buffer_sizes)
     }
 }
 
@@ -60,12 +60,12 @@ impl<I, B, C, SC> BufferIpTransportContext<I, C, SC, B> for TcpIpTransportContex
 where
     I: IpExt,
     B: BufferMut,
-    C: TcpNonSyncContext
+    C: NonSyncContext
         + BufferProvider<
             C::ReceiveBuffer,
             C::SendBuffer,
-            ActiveOpen = <C as TcpNonSyncContext>::ProvidedBuffers,
-            PassiveOpen = <C as TcpNonSyncContext>::ReturnedBuffers,
+            ActiveOpen = <C as NonSyncContext>::ProvidedBuffers,
+            PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
         >,
     SC: TcpSyncContext<I, C>,
 {

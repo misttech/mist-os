@@ -63,7 +63,6 @@ use net_types::ip::{Ipv4, Ipv6};
 
 use crate::{
     device::DeviceId,
-    transport::tcp::socket::TcpNonSyncContext,
     transport::{
         tcp::TcpState,
         udp::{UdpState, UdpStateBuilder},
@@ -83,7 +82,7 @@ impl TransportStateBuilder {
         &mut self.udp
     }
 
-    pub(crate) fn build_with_ctx<C: TcpNonSyncContext + RngContext>(
+    pub(crate) fn build_with_ctx<C: tcp::socket::NonSyncContext + RngContext>(
         self,
         ctx: &mut C,
     ) -> TransportLayerState<C> {
@@ -97,7 +96,7 @@ impl TransportStateBuilder {
 }
 
 /// The state associated with the transport layer.
-pub(crate) struct TransportLayerState<C: TcpNonSyncContext> {
+pub(crate) struct TransportLayerState<C: tcp::socket::NonSyncContext> {
     udpv4: UdpState<Ipv4, DeviceId<C::Instant>>,
     udpv6: UdpState<Ipv6, DeviceId<C::Instant>>,
     tcpv4: TcpState<Ipv4, DeviceId<C::Instant>, C>,

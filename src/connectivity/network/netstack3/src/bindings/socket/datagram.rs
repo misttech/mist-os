@@ -40,7 +40,7 @@ use netstack3_core::{
         SetMulticastMembershipError, SockCreationError,
     },
     sync::Mutex,
-    transport::udp::{self, BufferUdpContext, UdpContext},
+    transport::udp,
     BufferNonSyncContext, Ctx, NonSyncContext, SyncCtx,
 };
 use packet::{Buf, BufferMut, SerializeError};
@@ -115,8 +115,8 @@ impl<I, T: Transport<I>> From<BoundSocketId<I, T>> for SocketId<I, T> {
 /// Mapping from socket IDs to their receive queues.
 ///
 /// Receive queues are shared between the collections here and the tasks
-/// handling socket requests. Since `SocketCollection` implements [`UdpContext`]
-/// and [`BufferUdpContext`], whose trait methods may be called from
+/// handling socket requests. Since `SocketCollection` implements [`udp::NonSyncContext`]
+/// and [`udp::BufferNonSyncContext`], whose trait methods may be called from
 /// within Core in a locked context, once one of the [`MessageQueue`]s is
 /// locked, no calls may be made into [`netstack3_core`]. This prevents
 /// a potential deadlock where Core is waiting for a `MessageQueue` to be
@@ -679,7 +679,7 @@ impl<I: IpExt, B: BufferMut> BufferTransportState<I, B> for Udp {
     }
 }
 
-impl<I: icmp::IcmpIpExt> UdpContext<I> for SocketCollection<I, Udp> {
+impl<I: icmp::IcmpIpExt> udp::NonSyncContext<I> for SocketCollection<I, Udp> {
     fn receive_icmp_error(&mut self, id: udp::BoundId<I>, err: I::ErrorCode) {
         let Self { conns, listeners } = self;
         let id = match &id {
@@ -691,7 +691,7 @@ impl<I: icmp::IcmpIpExt> UdpContext<I> for SocketCollection<I, Udp> {
     }
 }
 
-impl<I: IpExt, B: BufferMut> BufferUdpContext<I, B> for SocketCollection<I, Udp> {
+impl<I: IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B> for SocketCollection<I, Udp> {
     fn receive_udp_from_conn(
         &mut self,
         conn: udp::ConnId<I>,

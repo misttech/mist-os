@@ -22,8 +22,9 @@ use crate::{
     ip::{IpDeviceId, IpExt},
     sync::Mutex,
     transport::tcp::{
+        self,
         seqnum::WindowSize,
-        socket::{isn::IsnGenerator, TcpNonSyncContext, TcpSockets},
+        socket::{isn::IsnGenerator, TcpSockets},
     },
 };
 
@@ -67,12 +68,12 @@ pub(crate) enum UserError {
     ConnectionClosed,
 }
 
-pub(crate) struct TcpState<I: IpExt, D: IpDeviceId, C: TcpNonSyncContext> {
+pub(crate) struct TcpState<I: IpExt, D: IpDeviceId, C: tcp::socket::NonSyncContext> {
     pub(crate) isn_generator: IsnGenerator<C::Instant>,
     pub(crate) sockets: Mutex<TcpSockets<I, D, C>>,
 }
 
-impl<I: IpExt, D: IpDeviceId, C: TcpNonSyncContext> TcpState<I, D, C> {
+impl<I: IpExt, D: IpDeviceId, C: tcp::socket::NonSyncContext> TcpState<I, D, C> {
     pub(crate) fn new(now: C::Instant, rng: &mut impl RngCore) -> Self {
         Self {
             isn_generator: IsnGenerator::new(now, rng),

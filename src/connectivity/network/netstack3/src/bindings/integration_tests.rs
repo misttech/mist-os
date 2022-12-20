@@ -31,11 +31,8 @@ use netstack3_core::{
         IpExt,
     },
     transport::{
-        tcp::{
-            socket::{ListenerId, TcpNonSyncContext},
-            BufferSizes,
-        },
-        udp::{self, BufferUdpContext, UdpContext},
+        tcp::{self, socket::ListenerId, BufferSizes},
+        udp,
     },
     Ctx, NonSyncContext, TimerId,
 };
@@ -184,7 +181,7 @@ impl InstantContext for TestNonSyncCtx {
     }
 }
 
-impl TcpNonSyncContext for TestNonSyncCtx {
+impl tcp::socket::NonSyncContext for TestNonSyncCtx {
     type ReceiveBuffer = stream::ReceiveBufferWithZirconSocket;
     type SendBuffer = stream::SendBufferWithZirconSocket;
     type ReturnedBuffers = stream::PeerZirconSocketAndWatcher;
@@ -245,13 +242,13 @@ impl<T: 'static + Send> EventContext<T> for TestNonSyncCtx {
     fn on_event(&mut self, _event: T) {}
 }
 
-impl<I: SocketCollectionIpExt<Udp> + IcmpIpExt> UdpContext<I> for TestNonSyncCtx {
+impl<I: SocketCollectionIpExt<Udp> + IcmpIpExt> udp::NonSyncContext<I> for TestNonSyncCtx {
     fn receive_icmp_error(&mut self, id: udp::BoundId<I>, err: I::ErrorCode) {
-        UdpContext::receive_icmp_error(&mut self.ctx, id, err)
+        udp::NonSyncContext::receive_icmp_error(&mut self.ctx, id, err)
     }
 }
 
-impl<I: SocketCollectionIpExt<Udp> + IpExt, B: BufferMut> BufferUdpContext<I, B>
+impl<I: SocketCollectionIpExt<Udp> + IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B>
     for TestNonSyncCtx
 {
     fn receive_udp_from_conn(

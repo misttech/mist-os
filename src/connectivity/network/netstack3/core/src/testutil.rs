@@ -30,8 +30,8 @@ use crate::{
         IpLayerEvent, SendIpPacketMeta,
     },
     transport::{
-        tcp::{buffer::RingBuffer, socket::TcpNonSyncContext, BufferSizes},
-        udp::{BufferUdpContext, UdpContext},
+        tcp::{buffer::RingBuffer, socket::NonSyncContext, BufferSizes},
+        udp,
     },
     Ctx, StackStateBuilder, SyncCtx, TimerId,
 };
@@ -119,7 +119,7 @@ pub(crate) type FakeNonSyncCtx = crate::context::testutil::FakeNonSyncCtx<
     FakeNonSyncCtxState,
 >;
 
-impl TcpNonSyncContext for FakeNonSyncCtx {
+impl NonSyncContext for FakeNonSyncCtx {
     type ReceiveBuffer = RingBuffer;
 
     type SendBuffer = RingBuffer;
@@ -668,9 +668,9 @@ impl FakeNonSyncCtx {
     }
 }
 
-impl<I: IcmpIpExt> UdpContext<I> for FakeNonSyncCtx {}
+impl<I: IcmpIpExt> udp::NonSyncContext<I> for FakeNonSyncCtx {}
 
-impl<I: crate::ip::IpExt, B: BufferMut> BufferUdpContext<I, B> for FakeNonSyncCtx {}
+impl<I: crate::ip::IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B> for FakeNonSyncCtx {}
 
 impl<I: IcmpIpExt> IcmpContext<I> for FakeNonSyncCtx {
     fn receive_icmp_error(&mut self, _conn: IcmpConnId<I>, _seq_num: u16, _err: I::ErrorCode) {

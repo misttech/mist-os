@@ -75,7 +75,7 @@ use netstack3_core::{
         },
         icmp, IpExt,
     },
-    transport::udp::{self, BufferUdpContext, UdpContext},
+    transport::udp,
     Ctx, NonSyncContext, SyncCtx, TimerId,
 };
 
@@ -419,7 +419,7 @@ where
     }
 }
 
-impl<I> UdpContext<I> for BindingsNonSyncCtxImpl
+impl<I> udp::NonSyncContext<I> for BindingsNonSyncCtxImpl
 where
     I: socket::datagram::SocketCollectionIpExt<socket::datagram::Udp> + icmp::IcmpIpExt,
 {
@@ -428,7 +428,7 @@ where
     }
 }
 
-impl<I, B: BufferMut> BufferUdpContext<I, B> for BindingsNonSyncCtxImpl
+impl<I, B: BufferMut> udp::BufferNonSyncContext<I, B> for BindingsNonSyncCtxImpl
 where
     I: socket::datagram::SocketCollectionIpExt<socket::datagram::Udp> + IpExt,
 {
