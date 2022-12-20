@@ -15,16 +15,11 @@ ffx_plugin("ffx_audio_play") {
 
   deps = [
     "//sdk/fidl/fuchsia.audio.ffxdaemon:fuchsia.audio.ffxdaemon_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
-    "//sdk/fidl/fuchsia.media.audio:fuchsia.media.audio_rust",
     "//src/developer/ffx/lib/errors:lib",
-    "//src/developer/ffx/plugins/audio/utils:audio-utils",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:blocking",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:hound",
-    "//third_party/rust_crates:tokio",
   ]
 
   args_sources = [ "src/args.rs" ]

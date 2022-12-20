@@ -9,7 +9,6 @@ fidl("fuchsia.audio.ffxdaemon") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.media",
-    "//sdk/fidl/fuchsia.media.audio",
     "//zircon/vdso/zx",
   ]
 }

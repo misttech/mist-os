@@ -5,10 +5,9 @@
 use {
     anyhow::{Error, Result},
     errors::ffx_bail,
-    fidl_fuchsia_audio_ffxdaemon::*,
     fidl_fuchsia_media::AudioSampleFormat,
-    hound::{WavReader, WavSpec},
-    std::{cmp, convert::From, str::FromStr, time::Duration},
+    hound::WavSpec,
+    std::{convert::From, str::FromStr, time::Duration},
 };
 
 pub const DURATION_REGEX: &'static str = r"^(\d+)(h|m|s|ms)$";
@@ -48,32 +47,9 @@ pub fn wav_spec_to_sample_format(spec: WavSpec) -> AudioSampleFormat {
     }
 }
 
-pub fn packets_per_second(spec: WavSpec) -> u32 {
-    let output_format = AudioOutputFormat::from(spec);
-    let vmo_size_bytes = spec.sample_rate * output_format.bytes_per_frame();
-    (vmo_size_bytes as f64 / MAX_AUDIO_BUFFER_BYTES as f64).ceil() as u32
-}
-
 pub fn bytes_per_frame(spec: WavSpec) -> u32 {
     let output_format = AudioOutputFormat::from(spec);
     output_format.bytes_per_frame()
-}
-
-pub fn packets_per_file<R>(reader: &WavReader<R>) -> u64
-where
-    R: std::io::Read,
-{
-    // TODO(camlloyd): For infinite files, we need to add a custom reader of the
-    // WAVE format chunk since WavReader cannot be constructed from such a header.
-    let num_samples_in_file = reader.len() as u64;
-    let output_format = AudioOutputFormat::from(reader.spec());
-    let num_bytes_in_file = num_samples_in_file * output_format.bytes_per_sample() as u64;
-    let buffer_size_bytes =
-        output_format.sample_rate as u64 * output_format.bytes_per_frame() as u64;
-
-    let bytes_per_packet = cmp::min(buffer_size_bytes / 2, MAX_AUDIO_BUFFER_BYTES as u64);
-
-    (num_bytes_in_file as f64 / bytes_per_packet as f64).ceil() as u64
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -135,7 +111,7 @@ impl FromStr for AudioOutputFormat {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum CommandSampleType {
     Uint8,
     Int16,
@@ -201,6 +177,17 @@ impl From<&AudioOutputFormat> for AudioSampleFormat {
             CommandSampleType::Int16 => AudioSampleFormat::Signed16,
             CommandSampleType::Int32 => AudioSampleFormat::Signed24In32,
             CommandSampleType::Float32 => AudioSampleFormat::Float,
+        }
+    }
+}
+
+impl From<CommandSampleType> for fidl_fuchsia_audio::SampleType {
+    fn from(item: CommandSampleType) -> fidl_fuchsia_audio::SampleType {
+        match item {
+            CommandSampleType::Uint8 => fidl_fuchsia_audio::SampleType::Uint8,
+            CommandSampleType::Int16 => fidl_fuchsia_audio::SampleType::Int16,
+            CommandSampleType::Int32 => fidl_fuchsia_audio::SampleType::Int32,
+            CommandSampleType::Float32 => fidl_fuchsia_audio::SampleType::Float32,
         }
     }
 }
