@@ -1,1 +1,7 @@
-mbrunson@google.com
+include /src/sys/component_manager/OWNERS
+
+lukenicholson@google.com
+yaneury@google.com
+caslyn@google.com
+
+# COMPONENT: ProcessFramework>bootfs
