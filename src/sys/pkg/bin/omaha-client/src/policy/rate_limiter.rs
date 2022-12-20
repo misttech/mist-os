@@ -43,13 +43,13 @@ impl UpdateCheckRateLimiter {
     pub fn should_rate_limit(&self, current_time: Instant) -> bool {
         if let Some(check_time) = self.recent_update_check_times.get(MAX_CHECKS_IN_SHORT_PERIOD - 1)
         {
-            if *check_time > current_time - SHORT_PERIOD_DURATION {
+            if *check_time > current_time.checked_sub(SHORT_PERIOD_DURATION).unwrap() {
                 return true;
             }
         }
         if let Some(check_time) = self.recent_update_check_times.get(MAX_CHECKS_IN_LONG_PERIOD - 1)
         {
-            if *check_time > current_time - LONG_PERIOD_DURATION {
+            if *check_time > current_time.checked_sub(LONG_PERIOD_DURATION).unwrap() {
                 return true;
             }
         }
@@ -72,7 +72,7 @@ mod tests {
         let now = Instant::now();
         let recent_update_check_times = [1, 10, 20, 30, 60, 100, 150, 200, 250, 299, 1000]
             .iter()
-            .map(|&i| now - Duration::from_secs(i))
+            .map(|&i| now.checked_sub(Duration::from_secs(i)).unwrap())
             .collect();
         assert!(UpdateCheckRateLimiter::with_recent_update_check_times(recent_update_check_times)
             .should_rate_limit(now));
@@ -87,7 +87,7 @@ mod tests {
             4500, 5000, 5500, 6000, 6200, 6400, 6600, 6800, 7000, 7050, 7100, 7150, 7199,
         ]
         .iter()
-        .map(|&i| now - Duration::from_secs(i))
+        .map(|&i| now.checked_sub(Duration::from_secs(i)).unwrap())
         .collect();
         assert!(UpdateCheckRateLimiter::with_recent_update_check_times(recent_update_check_times)
             .should_rate_limit(now));
@@ -102,7 +102,7 @@ mod tests {
             4500, 5000, 5500, 6000, 6200, 6400, 6600, 6800, 7000, 7050, 7100, 7150, 7201,
         ]
         .iter()
-        .map(|&i| now - Duration::from_secs(i))
+        .map(|&i| now.checked_sub(Duration::from_secs(i)).unwrap())
         .collect();
         assert!(!UpdateCheckRateLimiter::with_recent_update_check_times(recent_update_check_times)
             .should_rate_limit(now));

@@ -1294,7 +1294,7 @@ mod tests {
         //  - the recent update check interval is shorter than the short period limit
         let recent_update_check_times = [1, 10, 20, 30, 60, 100, 150, 200, 250, 299, 1000]
             .iter()
-            .map(|&i| now.mono - Duration::from_secs(i))
+            .map(|&i| now.mono.checked_sub(Duration::from_secs(i)).unwrap())
             .collect();
         let policy_data = UpdateCheckAllowedPolicyDataBuilder::new(now)
             .recent_update_check_times(recent_update_check_times)

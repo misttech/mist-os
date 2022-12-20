@@ -221,7 +221,7 @@ impl DeviceStorage {
                         // The time of the last flush. Initialized to MIN_FLUSH_INTERVAL_MS before the
                         // current time so that the first flush always goes through, no matter the
                         // timing.
-                        let mut last_flush: Instant = Instant::now() - MIN_FLUSH_DURATION;
+                        let mut last_flush: Instant = Instant::now().checked_sub(MIN_FLUSH_DURATION).unwrap();
 
                         // Timer for flush cooldown. OptionFuture allows us to wait on the future even
                         // if it's None.
