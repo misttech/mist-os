@@ -859,6 +859,7 @@ where
                     SrpServerState::Disabled => None,
                     _ => Some(ot.srp_server_get_port()),
                 },
+                address_mode: Some(ot.srp_server_get_address_mode().into_ext()),
                 ..SrpServerInfo::EMPTY
             }),
             dnssd_counters: Some(ot.dnssd_get_counters().into_ext()),

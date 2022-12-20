@@ -144,27 +144,34 @@ type DnssdCounters = table {
     7: resolved_by_srp uint32;
 };
 
-/// SRP server operational states.
-type SrpServerState = strict enum {
-    /// The server is disabled.
-    DISABLED = 1;
-    /// The server is enabled and running.
-    RUNNING = 2;
-    /// The server is enabled, but stopped.
-    STOPPED = 3;
-};
-
 /// State information about the SRP server.
 type SrpServerInfo = table {
     /// The operational state of the SRP server.
     ///
     /// Required.
-    1: state SrpServerState;
+    1: state @generated_name("SrpServerState") strict enum {
+        /// The server is disabled.
+        DISABLED = 1;
+        /// The server is enabled and running.
+        RUNNING = 2;
+        /// The server is enabled, but stopped.
+        STOPPED = 3;
+    };
 
     /// The port the SRP server is listening to.
     ///
     /// Optional. The port may be omitted when `state` is `DISABLED`.
     2: port uint16;
+
+    /// The address mode of the SRP server.
+    ///
+    /// Required.
+    3: address_mode @generated_name("SrpServerAddressMode") strict enum {
+        /// Thread network data is published as unicast addresses.
+        UNICAST = 1;
+        /// Thread network data is published as anycast addresses.
+        ANYCAST = 2;
+    };
 };
 
 /// LoWPAN Interface Telemetry Information.

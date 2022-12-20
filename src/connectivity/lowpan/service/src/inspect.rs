@@ -806,6 +806,10 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                                 if let Some(y) = x.port {
                                     srp_server_info_child.record_uint("port", y.into())
                                 }
+                                if let Some(y) = x.address_mode {
+                                    srp_server_info_child
+                                        .record_string("address_mode", format!("{:?}", y))
+                                }
                             });
                         }
                     }

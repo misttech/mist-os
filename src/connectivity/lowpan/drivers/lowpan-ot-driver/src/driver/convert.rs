@@ -48,6 +48,15 @@ impl FromExt<ot::SrpServerState> for SrpServerState {
     }
 }
 
+impl FromExt<ot::SrpServerAddressMode> for SrpServerAddressMode {
+    fn from_ext(x: ot::SrpServerAddressMode) -> Self {
+        match x {
+            ot::SrpServerAddressMode::Unicast => SrpServerAddressMode::Unicast,
+            ot::SrpServerAddressMode::Anycast => SrpServerAddressMode::Anycast,
+        }
+    }
+}
+
 impl FromExt<ot::BorderRouterConfig> for OnMeshPrefix {
     fn from_ext(x: ot::BorderRouterConfig) -> Self {
         OnMeshPrefix {

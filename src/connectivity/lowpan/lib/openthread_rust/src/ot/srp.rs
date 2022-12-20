@@ -52,6 +52,22 @@ pub enum SrpServerState {
     Stopped = OT_SRP_SERVER_STATE_STOPPED as isize,
 }
 
+/// Represents the SRP server address mode.
+///
+/// Functional equivalent of
+/// [`otsys::otSrpServerAddressMode`](crate::otsys::otSrpServerAddressMode).
+#[derive(Debug, Copy, Clone, Eq, Ord, PartialOrd, PartialEq, num_derive::FromPrimitive)]
+#[allow(missing_docs)]
+pub enum SrpServerAddressMode {
+    /// Functional equivalent of
+    /// [`otsys::otSrpServerAddressMode_OT_SRP_SERVER_ADDRESS_MODE_UNICAST`](crate::otsys::otSrpServerAddressMode_OT_SRP_SERVER_ADDRESS_MODE_UNICAST).
+    Unicast = OT_SRP_SERVER_ADDRESS_MODE_UNICAST as isize,
+
+    /// Functional equivalent of
+    /// [`otsys::otSrpServerAddressMode_OT_SRP_SERVER_ADDRESS_MODE_ANYCAST`](crate::otsys::otSrpServerAddressMode_OT_SRP_SERVER_ADDRESS_MODE_ANYCAST).
+    Anycast = OT_SRP_SERVER_ADDRESS_MODE_ANYCAST as isize,
+}
+
 /// Iterates over the available SRP server hosts. See [`SrpServer::srp_server_get_hosts`].
 pub struct SrpServerHostIterator<'a, T: SrpServer> {
     prev: Option<&'a SrpServerHost>,
@@ -372,6 +388,10 @@ impl Drop for SrpServerServiceUpdateId {
 /// [1]: https://openthread.io/reference/group/api-srp
 pub trait SrpServer {
     /// Functional equivalent of
+    /// [`otsys::otSrpServerGetAddressMode`](crate::otsys::otSrpServerGetAddressMode).
+    fn srp_server_get_address_mode(&self) -> SrpServerAddressMode;
+
+    /// Functional equivalent of
     /// [`otsys::otSrpServerGetState`](crate::otsys::otSrpServerGetState).
     fn srp_server_get_state(&self) -> SrpServerState;
 
@@ -424,6 +444,10 @@ pub trait SrpServer {
 }
 
 impl<T: SrpServer + Boxable> SrpServer for ot::Box<T> {
+    fn srp_server_get_address_mode(&self) -> SrpServerAddressMode {
+        self.as_ref().srp_server_get_address_mode()
+    }
+
     fn srp_server_get_state(&self) -> SrpServerState {
         self.as_ref().srp_server_get_state()
     }
@@ -476,6 +500,12 @@ impl<T: SrpServer + Boxable> SrpServer for ot::Box<T> {
 }
 
 impl SrpServer for Instance {
+    fn srp_server_get_address_mode(&self) -> SrpServerAddressMode {
+        unsafe {
+            SrpServerAddressMode::from_u32(otSrpServerGetAddressMode(self.as_ot_ptr())).unwrap()
+        }
+    }
+
     fn srp_server_get_state(&self) -> SrpServerState {
         unsafe { SrpServerState::from_u32(otSrpServerGetState(self.as_ot_ptr())).unwrap() }
     }
