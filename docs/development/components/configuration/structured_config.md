@@ -25,9 +25,7 @@ GN label into the `fuchsia_component` rule.
 
 ## Declare configuration schema
 
-You must declare a configuration schema in a component's manifest. Structured config supports
-booleans, integers, strings and vectors of these types. The [CML reference doc][cml-ref-doc]
-describes the complete syntax for a config schema.
+You must declare a configuration schema in a component's manifest:
 
 ```json5
 {
@@ -35,6 +33,19 @@ describes the complete syntax for a config schema.
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/config/rust/meta/config_example.cml" region_tag="config" %}
 }
 ```
+
+Structured config supports the following types:
+
+* `bool`
+* `uint8`, `int8`
+* `uint16`, `int16`
+* `uint32`, `int32`
+* `uint64`, `int64`
+* `string` (requires `max_size` property)
+* `vector` (requires `element` and `max_count` properties)
+
+See the [CML reference doc][cml-ref-doc] for the complete syntax for a config
+schema.
 
 Once your component has a configuration schema, you must define values for the
 declared fields, either using Software Assembly or GN.
