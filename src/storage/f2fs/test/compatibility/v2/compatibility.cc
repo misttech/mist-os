@@ -11,10 +11,27 @@ std::string ConvertModeString(mode_t mode) {
   return ss.str();
 }
 
+std::string EscapedFilename(std::string_view filename) {
+  std::set<char> special_character = {'`', '\"', '\\', '$'};
+
+  std::string ret = "\"";
+
+  for (size_t i = 0; i < filename.length(); ++i) {
+    if (special_character.find(filename[i]) != special_character.end()) {
+      ret.push_back('\\');
+    }
+    ret.push_back(filename[i]);
+  }
+
+  ret.push_back('\"');
+
+  return ret;
+}
+
 bool LinuxTestFile::IsValid() {
   std::string result;
-  linux_operator_->ExecuteWithAssert(
-      {"[ -e ", linux_operator_->ConvertPath(filename_), " ]; echo $?"}, &result);
+  linux_operator_->ExecuteWithAssert({"set +H;[ -e", EscapedFilename(filename_), "]; echo $?"},
+                                     &result);
   return result == "0" || result == "0\n";
 }
 
@@ -28,19 +45,83 @@ ssize_t LinuxTestFile::Write(const void* buf, size_t count) {
     hex_string.append(substring);
 
     if (i > 0 && i % 500 == 0) {
-      linux_operator_->ExecuteWithAssert({"echo", "-en",
-                                          std::string("\"").append(hex_string).append("\""), ">>",
-                                          linux_operator_->ConvertPath(filename_)});
+      linux_operator_->ExecuteWithAssert(
+          {"echo", "-en", std::string("\"").append(hex_string).append("\""), ">>", filename_});
       hex_string.clear();
     }
   }
 
-  linux_operator_->ExecuteWithAssert({"echo", "-en",
-                                      std::string("\"").append(hex_string).append("\""), ">>",
-                                      linux_operator_->ConvertPath(filename_)});
-  linux_operator_->ExecuteWithAssert({"ls -al", linux_operator_->ConvertPath(filename_)});
+  linux_operator_->ExecuteWithAssert(
+      {"echo", "-en", std::string("\"").append(hex_string).append("\""), ">>", filename_});
+  linux_operator_->ExecuteWithAssert({"ls -al", filename_});
 
   return count;
+}
+
+int LinuxTestFile::Fchmod(mode_t mode) {
+  std::string result;
+  linux_operator_->ExecuteWithAssert({"chmod", ConvertModeString(mode), filename_}, &result);
+
+  if (result.length() > 0) {
+    return -1;
+  }
+
+  return 0;
+}
+
+int LinuxTestFile::Fstat(struct stat& file_stat) {
+  std::string result;
+  linux_operator_->ExecuteWithAssert({"stat", "-c", "\"%i %f %h %s %Z %Y %b\"", filename_},
+                                     &result);
+
+  std::vector<std::string> tokens;
+  std::stringstream ss(result);
+  std::string token;
+  while (getline(ss, token, ' ')) {
+    tokens.push_back(token);
+  }
+
+  file_stat.st_ino = std::stoul(tokens[0]);
+  {
+    std::stringstream ss;
+    ss << std::hex << tokens[1];
+    ss >> file_stat.st_mode;
+  }
+  file_stat.st_nlink = std::stoul(tokens[2]);
+  file_stat.st_size = std::stol(tokens[3]);
+  file_stat.st_ctime = std::stoul(tokens[4]);
+  file_stat.st_mtime = std::stoul(tokens[5]);
+  file_stat.st_blocks = std::stol(tokens[6]);
+
+  return 0;
+}
+
+int LinuxTestFile::Ftruncate(off_t len) {
+  std::string result;
+  linux_operator_->ExecuteWithAssert({"truncate", "-s", std::to_string(len), filename_}, &result);
+  return result.length() == 0 ? 0 : -1;
+}
+
+void LinuxTestFile::WritePattern(size_t block_count) {
+  char buffer[kBlockSize];
+  for (uint32_t i = 0; i < block_count; ++i) {
+    memset(buffer, 0, sizeof(buffer));
+    std::string pattern = std::to_string(i);
+    pattern.copy(buffer, pattern.length());
+
+    ASSERT_EQ(Write(buffer, sizeof(buffer)), static_cast<ssize_t>(sizeof(buffer)));
+  }
+}
+
+void LinuxTestFile::VerifyPattern(size_t block_count) {
+  for (uint32_t i = 0; i < block_count; ++i) {
+    std::string result;
+    linux_operator_->ExecuteWithAssert(
+        {"od -An -j", std::to_string(i * kBlockSize), "-N",
+         std::to_string(std::to_string(i).length()), "-c", filename_, "| tr -d ' \\n'"},
+        &result);
+    ASSERT_EQ(result, std::to_string(i));
+  }
 }
 
 ssize_t FuchsiaTestFile::Read(void* buf, size_t count) {
@@ -75,6 +156,56 @@ ssize_t FuchsiaTestFile::Write(const void* buf, size_t count) {
   offset_ += ret;
 
   return ret;
+}
+
+int FuchsiaTestFile::Fstat(struct stat& file_stat) {
+  fs::VnodeAttributes attr;
+  if (zx_status_t status = vnode_->GetAttributes(&attr); status != ZX_OK) {
+    return -EIO;
+  }
+
+  file_stat.st_ino = attr.inode;
+  file_stat.st_mode = static_cast<mode_t>(attr.mode);
+  file_stat.st_nlink = attr.link_count;
+  file_stat.st_size = attr.content_size;
+  file_stat.st_ctim.tv_sec = attr.creation_time / ZX_SEC(1);
+  file_stat.st_ctim.tv_nsec = attr.creation_time % ZX_SEC(1);
+  file_stat.st_mtim.tv_sec = attr.modification_time / ZX_SEC(1);
+  file_stat.st_mtim.tv_nsec = attr.modification_time % ZX_SEC(1);
+  file_stat.st_blocks = (vnode_->GetBlocks())
+                        << vnode_->fs()->GetSuperblockInfo().GetLogSectorsPerBlock();
+
+  return 0;
+}
+
+int FuchsiaTestFile::Ftruncate(off_t len) {
+  if (!vnode_->IsReg()) {
+    return -ENOTSUP;
+  }
+
+  File* file = static_cast<File*>(vnode_.get());
+  if (zx_status_t status = file->Truncate(len); status != ZX_OK) {
+    return -EIO;
+  }
+
+  return 0;
+}
+
+void FuchsiaTestFile::WritePattern(size_t block_count) {
+  char buffer[kBlockSize];
+  for (uint32_t i = 0; i < block_count; ++i) {
+    std::memset(buffer, 0, kBlockSize);
+    strcpy(buffer, std::to_string(i).c_str());
+    ASSERT_EQ(Write(buffer, sizeof(buffer)), static_cast<ssize_t>(sizeof(buffer)));
+  }
+}
+
+void FuchsiaTestFile::VerifyPattern(size_t block_count) {
+  char buffer[kBlockSize];
+  for (uint32_t i = 0; i < block_count; ++i) {
+    ASSERT_EQ(Read(buffer, sizeof(buffer)), static_cast<ssize_t>(sizeof(buffer)));
+    ASSERT_EQ(std::string(buffer), std::to_string(i));
+  }
 }
 
 zx_status_t LinuxOperator::Execute(const std::vector<std::string>& argv, std::string* result) {
@@ -122,12 +253,12 @@ std::unique_ptr<TestFile> LinuxOperator::Open(std::string_view path, int flags, 
     if (flags & O_DIRECTORY) {
       Mkdir(path, mode);
     } else {
-      ExecuteWithAssert({"touch", ConvertPath(path)});
-      ExecuteWithAssert({"chmod", ConvertModeString(mode), ConvertPath(path)});
+      ExecuteWithAssert({"set +H;touch", EscapedFilename(ConvertPath(path)), ";chmod ",
+                         ConvertModeString(mode), EscapedFilename(ConvertPath(path))});
     }
   }
 
-  return std::unique_ptr<TestFile>(new LinuxTestFile(path, this));
+  return std::unique_ptr<TestFile>(new LinuxTestFile(ConvertPath(path), this));
 }
 
 void LinuxOperator::Rename(std::string_view oldpath, std::string_view newpath) {

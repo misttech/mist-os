@@ -42,40 +42,87 @@ group("tests") {
   data_deps = guest_packages
 }
 
-test("f2fs-compatibility-test-v2") {
+test_sources = [
+  "v2/compatibility.cc",
+  "v2/compatibility.h",
+  "v2/file_backed_block_device.cc",
+  "v2/file_backed_block_device.h",
+]
+
+test_deps = [
+  "//sdk/lib/sys/inspect/cpp",
+  "//src/storage/f2fs:f2fs",
+  "//src/virtualization/tests/lib",
+  "//src/virtualization/tests/lib:test_main",
+  "//third_party/googletest:gtest",
+]
+
+test("f2fs-dir-compatibility-test-v2") {
   testonly = true
 
-  sources = [
-    "v2/compatibility.cc",
-    "v2/compatibility.h",
-    "v2/dir.cc",
-    "v2/file.cc",
-    "v2/file_backed_block_device.cc",
-    "v2/file_backed_block_device.h",
-    "v2/mkfs_fsck_test.cc",
-  ]
+  sources = [ "v2/dir.cc" ] + test_sources
 
-  deps = [
-    "//sdk/lib/sys/inspect/cpp",
-    "//src/storage/f2fs:f2fs",
-    "//src/virtualization/tests/lib",
-    "//src/virtualization/tests/lib:test_main",
-    "//third_party/googletest:gtest",
-  ]
+  deps = test_deps
 }
 
-fuchsia_test_component("f2fs-compatibility-test-v2-cmp") {
-  component_name = "f2fs-compatibility-test-v2-cmp"
-  deps = [
-           ":f2fs-compatibility-test-v2",
-           "//src/virtualization/tests:test_images",
-         ] + guest_packages
-  manifest = "v2/f2fs_compatibility.cml"
+test("f2fs-file-attr-compatibility-test-v2") {
+  testonly = true
+
+  sources = [ "v2/file_attr.cc" ] + test_sources
+
+  deps = test_deps
+}
+
+test("f2fs-file-rw-compatibility-test-v2") {
+  testonly = true
+
+  sources = [ "v2/file_rw.cc" ] + test_sources
+
+  deps = test_deps
+}
+
+test("f2fs-mkfs-fsck-compatibility-test-v2") {
+  testonly = true
+
+  sources = [ "v2/mkfs_fsck_test.cc" ] + test_sources
+
+  deps = test_deps
+}
+
+component_deps = [ "//src/virtualization/tests:test_images" ] + guest_packages
+
+fuchsia_test_component("f2fs-dir-compatibility-test-v2-cmp") {
+  component_name = "f2fs-dir-compatibility-test-v2-cmp"
+  deps = [ ":f2fs-dir-compatibility-test-v2" ] + component_deps
+  manifest = "v2/f2fs_dir_compatibility.cml"
+}
+
+fuchsia_test_component("f2fs-file-attr-compatibility-test-v2-cmp") {
+  component_name = "f2fs-file-attr-compatibility-test-v2-cmp"
+  deps = [ ":f2fs-file-attr-compatibility-test-v2" ] + component_deps
+  manifest = "v2/f2fs_file_attr_compatibility.cml"
+}
+
+fuchsia_test_component("f2fs-file-rw-compatibility-test-v2-cmp") {
+  component_name = "f2fs-file-rw-compatibility-test-v2-cmp"
+  deps = [ ":f2fs-file-rw-compatibility-test-v2" ] + component_deps
+  manifest = "v2/f2fs_file_rw_compatibility.cml"
+}
+
+fuchsia_test_component("f2fs-mkfs-fsck-compatibility-test-v2-cmp") {
+  component_name = "f2fs-mkfs-fsck-compatibility-test-v2-cmp"
+  deps = [ ":f2fs-mkfs-fsck-compatibility-test-v2" ] + component_deps
+  manifest = "v2/f2fs_mkfs_fsck_compatibility.cml"
 }
 
 fuchsia_test_package("f2fs-compatibility-test-v2-pkg") {
   package_name = "f2fs-compatibility-test-v2-pkg"
-  test_components = [ ":f2fs-compatibility-test-v2-cmp" ]
+  test_components = [
+    ":f2fs-dir-compatibility-test-v2-cmp",
+    ":f2fs-file-attr-compatibility-test-v2-cmp",
+    ":f2fs-file-rw-compatibility-test-v2-cmp",
+    ":f2fs-mkfs-fsck-compatibility-test-v2-cmp",
+  ]
   test_specs = {
     environments = guest_envs
     log_settings = {
