@@ -444,22 +444,6 @@ func (ep *endpoint) GetPeerName(fidl.Context) (socket.BaseNetworkSocketGetPeerNa
 	}), nil
 }
 
-// TODO(https://fxbug.dev/87656): Remove after ABI transition.
-func (ep *endpoint) GetTimestampDeprecated(fidl.Context) (socket.BaseSocketGetTimestampDeprecatedResult, error) {
-	ep.mu.RLock()
-	value := ep.mu.sockOptTimestamp
-	ep.mu.RUnlock()
-	return socket.BaseSocketGetTimestampDeprecatedResultWithResponse(socket.BaseSocketGetTimestampDeprecatedResponse{Value: value}), nil
-}
-
-// TODO(https://fxbug.dev/87656): Remove after ABI transition.
-func (ep *endpointWithMutators) SetTimestampDeprecated(_ fidl.Context, value socket.TimestampOption) (socket.BaseSocketSetTimestampDeprecatedResult, error) {
-	ep.ep.mu.Lock()
-	ep.ep.mu.sockOptTimestamp = value
-	ep.ep.mu.Unlock()
-	return socket.BaseSocketSetTimestampDeprecatedResultWithResponse(socket.BaseSocketSetTimestampDeprecatedResponse{}), nil
-}
-
 func (ep *endpoint) GetTimestamp(fidl.Context) (socket.BaseSocketGetTimestampResult, error) {
 	ep.mu.RLock()
 	value := ep.mu.sockOptTimestamp
@@ -2515,22 +2499,6 @@ func (s *datagramSocketImpl) Shutdown(ctx fidl.Context, how socket.ShutdownMode)
 // FIDL calls accessing or modifying the set of requested control messages. Modifying calls
 // must invalidate any clients that depend upon the (now-outdated) cache.
 
-// TODO(https://fxbug.dev/87656): Remove after ABI transition.
-func (s *datagramSocketImpl) GetTimestampDeprecated(fidl.Context) (socket.BaseSocketGetTimestampDeprecatedResult, error) {
-	s.sharedState.cmsgCacheMu.Lock()
-	defer s.sharedState.cmsgCacheMu.Unlock()
-	return socket.BaseSocketGetTimestampDeprecatedResultWithResponse(socket.BaseSocketGetTimestampDeprecatedResponse{Value: s.sharedState.cmsgCacheMu.cmsgCache.timestamp}), nil
-}
-
-// TODO(https://fxbug.dev/87656): Remove after ABI transition.
-func (s *datagramSocketImpl) SetTimestampDeprecated(ctx fidl.Context, value socket.TimestampOption) (socket.BaseSocketSetTimestampDeprecatedResult, error) {
-	s.sharedState.cmsgCacheMu.Lock()
-	defer s.sharedState.cmsgCacheMu.Unlock()
-	s.sharedState.cmsgCacheMu.cmsgCache.timestamp = value
-	s.sharedState.cmsgCacheMu.cmsgCache.reset()
-	return socket.BaseSocketSetTimestampDeprecatedResultWithResponse(socket.BaseSocketSetTimestampDeprecatedResponse{}), nil
-}
-
 func (s *datagramSocketImpl) GetTimestamp(fidl.Context) (socket.BaseSocketGetTimestampResult, error) {
 	s.sharedState.cmsgCacheMu.Lock()
 	defer s.sharedState.cmsgCacheMu.Unlock()
@@ -2815,25 +2783,10 @@ func (s *synchronousDatagramSocket) socketControlMessagesToFIDL(cmsg tcpip.Recei
 	s.mu.RUnlock()
 
 	var controlData socket.SocketRecvControlData
-
-	// TODO(https://fxbug.dev/87656): Remove after ABI transition.
-	switch sockOptTimestamp {
-	case socket.TimestampOptionDisabled:
-	case socket.TimestampOptionNanosecond:
-		controlData.SetTimestampDeprecated2(socket.TimestampDeprecatedWithNanoseconds(cmsg.Timestamp.UnixNano()))
-		controlData.SetTimestampDeprecated(socket.TimestampDeprecatedWithNanoseconds(cmsg.Timestamp.UnixNano()))
-	case socket.TimestampOptionMicrosecond:
-		controlData.SetTimestampDeprecated2(socket.TimestampDeprecatedWithMicroseconds(cmsg.Timestamp.UnixMicro()))
-		controlData.SetTimestampDeprecated(socket.TimestampDeprecatedWithMicroseconds(cmsg.Timestamp.UnixMicro()))
-	default:
-		panic(fmt.Sprintf("unknown timestamp option: %d", sockOptTimestamp))
-	}
-
 	controlData.SetTimestamp(socket.Timestamp{
 		Nanoseconds: cmsg.Timestamp.UnixNano(),
 		Requested:   sockOptTimestamp,
 	})
-
 	return controlData
 }
 

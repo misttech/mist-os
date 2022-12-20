@@ -1777,18 +1777,7 @@ where
             fposix_socket::SynchronousDatagramSocketRequest::GetTimestamp { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
-            fposix_socket::SynchronousDatagramSocketRequest::GetTimestampDeprecated {
-                responder,
-            } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
-            }
             fposix_socket::SynchronousDatagramSocketRequest::SetTimestamp {
-                value: _,
-                responder,
-            } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
-            }
-            fposix_socket::SynchronousDatagramSocketRequest::SetTimestampDeprecated {
                 value: _,
                 responder,
             } => {

@@ -969,12 +969,6 @@ where
             fposix_socket::StreamSocketRequest::GetBindToDevice { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
-            fposix_socket::StreamSocketRequest::SetTimestampDeprecated { value: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
-            }
-            fposix_socket::StreamSocketRequest::GetTimestampDeprecated { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
-            }
             fposix_socket::StreamSocketRequest::SetTimestamp { value: _, responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
