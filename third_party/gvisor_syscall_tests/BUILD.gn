@@ -584,6 +584,7 @@ syscall_test_suite(tcp_test_label) {
   test_specs = {
     timeout_secs = 600
   }
+  run_in_cq_with_ns3 = true
 }
 
 group("tests") {

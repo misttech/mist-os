@@ -65,11 +65,6 @@
                 "AllInetTests/TcpSocketTest.GetSocketAcceptConnNonListener/*",
                 "AllInetTests/TcpSocketTest.SendUnblocksOnSendBufferIncrease/*",
 
-                // Expect failure for tests that set the TCP_NODELAY socket option.
-                "NonBlockingTCPSockets/NonBlockingSocketPairTest.ReadNothingAvailable/[2367]",
-                "NonBlockingTCPSockets/NonBlockingSocketPairTest.RecvNothingAvailable/[2367]",
-                "NonBlockingTCPSockets/NonBlockingSocketPairTest.RecvMsgNothingAvailable/[2367]",
-
                 // These tests fail because we don't support dual-stack socket yet.
                 "AllTCPSockets/TCPSocketPairTest.TCPKeepidleDefault/*",
                 "AllTCPSockets/TCPSocketPairTest.TCPKeepintvlDefault/*",
