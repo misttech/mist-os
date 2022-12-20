@@ -140,8 +140,10 @@ impl<I: Instant> CongestionControl<I> {
     pub(super) fn on_ack(&mut self, bytes_acked: NonZeroU32, now: I, rtt: Duration) {
         let Self { params, algorithm, fast_recovery } = self;
         // Exit fast recovery since there is an ACK that acknowledges new data.
-        if let Some(_fast_recovery) = fast_recovery.take() {
-            algorithm.on_loss_recovered(params);
+        if let Some(fast_recovery) = fast_recovery.take() {
+            if fast_recovery.dup_acks.get() >= DUP_ACK_THRESHOLD {
+                algorithm.on_loss_recovered(params);
+            }
         };
         algorithm.on_ack(params, bytes_acked, now, rtt);
     }
@@ -271,5 +273,30 @@ impl FastRecovery {
                 params.cwnd += params.mss;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use core::{num::NonZeroU32, time::Duration};
+
+    use super::*;
+    use crate::context::testutil::FakeInstant;
+
+    #[test]
+    fn no_recovery_before_reaching_threshold() {
+        let mut congestion_control = CongestionControl::cubic();
+        let old_cwnd = congestion_control.params.cwnd;
+        assert_eq!(congestion_control.params.ssthresh, u32::MAX);
+        congestion_control.on_dup_ack(SeqNum::new(0));
+        congestion_control.on_ack(
+            NonZeroU32::new(1).unwrap(),
+            FakeInstant::from(Duration::from_secs(0)),
+            Duration::from_secs(1),
+        );
+        // We have only received one duplicate ack, receiving a new ACK should
+        // not mean "loss recovery" - we should not bump our cwnd to initial
+        // ssthresh (u32::MAX) and then overflow.
+        assert_eq!(old_cwnd + 1, congestion_control.params.cwnd);
     }
 }
