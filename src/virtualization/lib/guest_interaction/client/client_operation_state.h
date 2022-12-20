@@ -5,7 +5,7 @@
 #ifndef SRC_VIRTUALIZATION_LIB_GUEST_INTERACTION_CLIENT_CLIENT_OPERATION_STATE_H_
 #define SRC_VIRTUALIZATION_LIB_GUEST_INTERACTION_CLIENT_CLIENT_OPERATION_STATE_H_
 
-#include <fuchsia/netemul/guest/cpp/fidl.h>
+#include <fuchsia/virtualization/guest/interaction/cpp/fidl.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
@@ -230,10 +230,11 @@ class PutCallData final : public CallData {
   grpc::Status finish_status_;
 };
 
-class ListenerInterface : fuchsia::netemul::guest::CommandListener {
+class ListenerInterface : fuchsia::virtualization::guest::interaction::CommandListener {
  public:
-  ListenerInterface(fidl::InterfaceRequest<fuchsia::netemul::guest::CommandListener> req,
-                    async_dispatcher_t* dispatcher)
+  ListenerInterface(
+      fidl::InterfaceRequest<fuchsia::virtualization::guest::interaction::CommandListener> req,
+      async_dispatcher_t* dispatcher)
       : binding_(this, std::move(req), dispatcher) {}
 
   void OnStarted(zx_status_t status) { binding_.events().OnStarted(status); }
@@ -243,7 +244,7 @@ class ListenerInterface : fuchsia::netemul::guest::CommandListener {
   }
 
  private:
-  fidl::Binding<fuchsia::netemul::guest::CommandListener> binding_;
+  fidl::Binding<fuchsia::virtualization::guest::interaction::CommandListener> binding_;
 };
 
 // Pump incoming stdin into the child process managed by the guest service.

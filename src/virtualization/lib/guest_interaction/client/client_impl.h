@@ -76,10 +76,11 @@ class ClientImpl {
     call_data->writer_->StartCall(call_data);
   }
 
-  void Exec(const std::string& command, const std::map<std::string, std::string>& env_vars,
-            zx::socket std_in, zx::socket std_out, zx::socket std_err,
-            fidl::InterfaceRequest<fuchsia::netemul::guest::CommandListener> req,
-            async_dispatcher_t* dispatcher) {
+  void Exec(
+      const std::string& command, const std::map<std::string, std::string>& env_vars,
+      zx::socket std_in, zx::socket std_out, zx::socket std_err,
+      fidl::InterfaceRequest<fuchsia::virtualization::guest::interaction::CommandListener> req,
+      async_dispatcher_t* dispatcher) {
     // Convert the provided zx::sockets into FDs.
     auto convert = [](zx::socket socket) {
       fbl::unique_fd fd;

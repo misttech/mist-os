@@ -1,7 +1,7 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-library fuchsia.netemul.guest;
+library fuchsia.virtualization.guest.interaction;
 
 using fuchsia.io;
 using zx;
@@ -11,14 +11,14 @@ const DEFAULT_REALM string = "gis_default";
 
 /// Enables discovery of guest VM's for control in tests.
 @discoverable
-protocol GuestDiscovery {
+protocol Discovery {
     /// Finds the guest VM specified by realm name/guest name pair and connects to it to enable
     /// file transfers and execution of commands.  If `realm_name` is null, `DEFAULT_REALM` is
     /// used instead.
     GetGuest(resource struct {
         realm_name string:<GUEST_INTERACTION_MAX_LENGTH, optional>;
         guest_name string:GUEST_INTERACTION_MAX_LENGTH;
-        guest server_end:GuestInteraction;
+        guest server_end:Interaction;
     });
 };
 
@@ -42,7 +42,7 @@ protocol CommandListener {
     });
 };
 
-protocol GuestInteraction {
+protocol Interaction {
     /// Take a local file from the Fuchsia host and transfer it to a destination
     /// location on the guest under test.
     PutFile(resource struct {

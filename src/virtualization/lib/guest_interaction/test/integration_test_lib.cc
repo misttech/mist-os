@@ -8,13 +8,13 @@
 #include <fuchsia/logger/cpp/fidl.h>
 #include <fuchsia/net/stack/cpp/fidl.h>
 #include <fuchsia/net/virtualization/cpp/fidl.h>
-#include <fuchsia/netemul/guest/cpp/fidl.h>
 #include <fuchsia/netstack/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/sysinfo/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/virtualization/cpp/fidl.h>
+#include <fuchsia/virtualization/guest/interaction/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/sys/cpp/file_descriptor.h>
 #include <lib/syslog/cpp/macros.h>

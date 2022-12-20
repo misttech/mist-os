@@ -56,7 +56,7 @@ source_set("client_lib") {
   ]
   public_deps = [
     ":common",
-    ":fuchsia.netemul.guest_hlcpp",
+    ":fuchsia.virtualization.guest.interaction_hlcpp",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
@@ -104,7 +104,7 @@ source_set("integration_test_lib") {
     "//src/virtualization/tests/lib:fake_netstack",
   ]
   deps = [
-    ":fuchsia.netemul.guest_hlcpp",
+    ":fuchsia.virtualization.guest.interaction_hlcpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_hlcpp",
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_hlcpp",
     "//sdk/fidl/fuchsia.netstack:fuchsia.netstack_hlcpp",
@@ -119,7 +119,7 @@ executable("client_operation_test") {
   sources = [ "test/client_operation_test.cc" ]
   deps = [
     ":client_lib",
-    ":fuchsia.netemul.guest_hlcpp",
+    ":fuchsia.virtualization.guest.interaction_hlcpp",
     ":operation_test_lib",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl",
@@ -210,7 +210,7 @@ executable("server_daemon_test") {
 
   deps = [
     ":common",
-    ":fuchsia.netemul.guest_hlcpp",
+    ":fuchsia.virtualization.guest.interaction_hlcpp",
     ":integration_test_lib",
     ":platform_interface_posix",
     "//sdk/lib/fdio",
@@ -227,9 +227,9 @@ executable("server_daemon_test") {
   configs += [ "//build/config:all_source" ]
 }
 
-fidl("fuchsia.netemul.guest") {
+fidl("fuchsia.virtualization.guest.interaction") {
   sdk_category = "internal"
-  sources = [ "fidl/fuchsia.netemul.guest_interaction.fidl" ]
+  sources = [ "fidl/guest_interaction.fidl" ]
   public_deps = [ "//sdk/fidl/fuchsia.io" ]
 }
 

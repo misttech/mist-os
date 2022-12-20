@@ -20,7 +20,6 @@
 #include "src/virtualization/lib/guest_interaction/client/client_impl.h"
 #include "src/virtualization/lib/guest_interaction/common.h"
 #include "src/virtualization/lib/guest_interaction/test/integration_test_lib.h"
-#include "src/virtualization/tests/lib/guest_console.h"
 
 namespace {
 
@@ -122,7 +121,7 @@ TEST_F(GuestInteractionTest, GrpcExecScriptTest) {
   std::optional<zx_status_t> exec_terminated;
   int32_t ret_code = -1;
 
-  fuchsia::netemul::guest::CommandListenerPtr listener;
+  fuchsia::virtualization::guest::interaction::CommandListenerPtr listener;
   listener.events().OnStarted = [&](zx_status_t status) {
     exec_started = status;
     if (status == ZX_OK) {

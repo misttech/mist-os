@@ -553,7 +553,7 @@ TEST_F(AsyncEndToEndTest, Client_Exec_ImmediateFailure) {
 
   service_->RequestExec(&srv_ctx, &rw, server_cq_.get(), server_cq_.get(), &srv_ctx);
 
-  fuchsia::netemul::guest::CommandListenerPtr listener;
+  fuchsia::virtualization::guest::interaction::CommandListenerPtr listener;
   listener.events().OnStarted = [&operation_status_done](zx_status_t status) {
     operation_status_done = true;
     EXPECT_STATUS(status, ZX_ERR_INTERNAL);
@@ -653,7 +653,7 @@ TEST_F(AsyncEndToEndTest, Client_ExecRead_Test) {
 
   // Create a service that can accept incoming Exec requests.
   bool operation_status_done = false;
-  fuchsia::netemul::guest::CommandListenerPtr listener;
+  fuchsia::virtualization::guest::interaction::CommandListenerPtr listener;
   listener.events().OnTerminated = [&operation_status_done, kReturnCode](zx_status_t status,
                                                                          int32_t ret_code) {
     operation_status_done = true;
