@@ -29,43 +29,37 @@ static CHANNEL_PACKAGE_MAP: &str = "channel_package_map.json";
 pub async fn build_current_channel_manager_and_notifier<S: ServiceConnect>(
     service_connector: S,
 ) -> Result<(CurrentChannelManager, CurrentChannelNotifier<S>), anyhow::Error> {
-    let (current_channel, current_realm) = if let (Some(channel), Some(realm)) =
-        lookup_channel_and_realm_from_vbmeta(&service_connector).await.unwrap_or_else(|e| {
+    let current_channel = if let Some(channel) =
+        lookup_channel_from_vbmeta(&service_connector).await.unwrap_or_else(|e| {
             warn!("Failed to read current_channel from vbmeta: {:#}", anyhow!(e));
-            (None, None)
+            None
         }) {
-        (channel, Some(realm))
+        channel
     } else {
-        (String::new(), None)
+        String::new()
     };
 
     Ok((
         CurrentChannelManager::new(current_channel.clone()),
-        CurrentChannelNotifier::new(service_connector, current_channel, current_realm),
+        CurrentChannelNotifier::new(service_connector, current_channel),
     ))
 }
 
 pub struct CurrentChannelNotifier<S = ServiceConnector> {
     service_connector: S,
     channel: String,
-    realm: Option<String>,
 }
 
 impl<S: ServiceConnect> CurrentChannelNotifier<S> {
-    fn new(service_connector: S, channel: String, realm: Option<String>) -> Self {
-        CurrentChannelNotifier { service_connector, channel, realm }
+    fn new(service_connector: S, channel: String) -> Self {
+        CurrentChannelNotifier { service_connector, channel }
     }
 
-    async fn notify_cobalt(
-        service_connector: &S,
-        current_channel: String,
-        current_realm: Option<String>,
-    ) {
+    async fn notify_cobalt(service_connector: &S, current_channel: String) {
         loop {
             let cobalt = Self::connect(service_connector).await;
             let distribution_info = SoftwareDistributionInfo {
                 current_channel: Some(current_channel.clone()),
-                current_realm: current_realm.clone(),
                 ..SoftwareDistributionInfo::EMPTY
             };
 
@@ -102,8 +96,8 @@ impl<S: ServiceConnect> CurrentChannelNotifier<S> {
     }
 
     pub async fn run(self) {
-        let Self { service_connector, channel, realm } = self;
-        Self::notify_cobalt(&service_connector, channel, realm).await;
+        let Self { service_connector, channel } = self;
+        Self::notify_cobalt(&service_connector, channel).await;
     }
 
     async fn connect(service_connector: &S) -> SystemDataUpdaterProxy {
@@ -168,8 +162,7 @@ impl<S: ServiceConnect> TargetChannelManager<S> {
     /// Fetch the target channel from vbmeta, if one is present.
     /// Otherwise, it will set the channel to an empty string.
     pub async fn update(&self) -> Result<(), anyhow::Error> {
-        let (target_channel, _) =
-            lookup_channel_and_realm_from_vbmeta(&self.service_connector).await?;
+        let target_channel = lookup_channel_from_vbmeta(&self.service_connector).await?;
 
         // If the vbmeta has a channel, ensure our target channel matches and return.
         if let Some(channel) = target_channel {
@@ -240,20 +233,14 @@ impl<S: ServiceConnect> TargetChannelManager<S> {
 }
 
 /// Uses Zircon kernel arguments (typically provided by vbmeta) to determine the current channel.
-async fn lookup_channel_and_realm_from_vbmeta(
+async fn lookup_channel_from_vbmeta(
     service_connector: &impl ServiceConnect,
-) -> Result<(Option<String>, Option<String>), anyhow::Error> {
+) -> Result<Option<String>, anyhow::Error> {
     let proxy = service_connector.connect_to_service::<ArgumentsMarker>()?;
-    let options = ["ota_channel", "omaha_app_id"];
-    // Rust doesn't like it if we try to .await? on the same line.
-    let future = proxy.get_strings(&mut options.iter().copied());
-    let results = future.await?;
+    let options = "ota_channel";
+    let result = proxy.get_string(options).await?;
 
-    if results.len() != 2 {
-        return Err(anyhow!("Wrong number of results for get_strings()"));
-    }
-
-    Ok((results[0].clone(), results[1].clone()))
+    Ok(result)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -323,15 +310,14 @@ mod tests {
     fn serve_ota_channel_arguments(
         mut stream: ArgumentsRequestStream,
         channel: Option<&'static str>,
-        realm: Option<&'static str>,
     ) -> fasync::Task<()> {
         fasync::Task::local(async move {
             while let Some(req) = stream.try_next().await.unwrap_or(None) {
                 match req {
-                    ArgumentsRequest::GetStrings { keys, responder } => {
-                        assert_eq!(keys, vec!["ota_channel", "omaha_app_id"]);
-                        let response = [channel, realm];
-                        responder.send(&mut response.iter().copied()).expect("send ok");
+                    ArgumentsRequest::GetString { key, responder } => {
+                        assert_eq!(key, "ota_channel");
+                        let response = channel;
+                        responder.send(response).expect("send ok");
                     }
                     _ => unreachable!(),
                 }
@@ -346,8 +332,8 @@ mod tests {
                 .expect("ns to bind");
 
         let mut fs = ServiceFs::new_local();
-        let channel_and_realm = Arc::new(Mutex::new((None, None)));
-        let chan = channel_and_realm.clone();
+        let channel = Arc::new(Mutex::new(None));
+        let chan = channel.clone();
 
         fs.add_fidl_service(move |mut stream: SystemDataUpdaterRequestStream| {
             let chan = chan.clone();
@@ -359,7 +345,7 @@ mod tests {
                             info,
                             responder,
                         } => {
-                            *chan.lock() = (info.current_channel, info.current_realm);
+                            *chan.lock() = info.current_channel;
                             responder.send(CobaltStatus::Ok).unwrap();
                         }
                     }
@@ -368,7 +354,7 @@ mod tests {
             .detach()
         })
         .add_fidl_service(move |stream: ArgumentsRequestStream| {
-            serve_ota_channel_arguments(stream, Some("stable"), Some("sample-realm")).detach()
+            serve_ota_channel_arguments(stream, Some("stable")).detach()
         })
         .serve_connection(svc_dir)
         .expect("serve_connection");
@@ -378,13 +364,11 @@ mod tests {
 
         assert_eq!(&m.channel, "stable");
         assert_eq!(&c.channel, "stable");
-        assert_eq!(c.realm.as_deref(), Some("sample-realm"));
 
         c.run().await;
 
-        let lock = channel_and_realm.lock();
-        assert_eq!(lock.0.as_deref(), Some("stable"));
-        assert_eq!(lock.1.as_deref(), Some("sample-realm"));
+        let lock = channel.lock();
+        assert_eq!(lock.as_deref(), Some("stable"));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -394,8 +378,8 @@ mod tests {
                 .expect("ns to bind");
 
         let mut fs = ServiceFs::new_local();
-        let channel_and_realm = Arc::new(Mutex::new((None, None)));
-        let chan = channel_and_realm.clone();
+        let channel = Arc::new(Mutex::new(None));
+        let chan = channel.clone();
 
         fs.add_fidl_service(move |mut stream: SystemDataUpdaterRequestStream| {
             let chan = chan.clone();
@@ -407,7 +391,7 @@ mod tests {
                             info,
                             responder,
                         } => {
-                            *chan.lock() = (info.current_channel, info.current_realm);
+                            *chan.lock() = info.current_channel;
                             responder.send(CobaltStatus::Ok).unwrap();
                         }
                     }
@@ -416,7 +400,7 @@ mod tests {
             .detach()
         })
         .add_fidl_service(move |stream: ArgumentsRequestStream| {
-            serve_ota_channel_arguments(stream, None, None).detach()
+            serve_ota_channel_arguments(stream, None).detach()
         })
         .serve_connection(svc_dir)
         .expect("serve_connection");
@@ -426,13 +410,11 @@ mod tests {
 
         assert_eq!(m.channel, "");
         assert_eq!(c.channel, "");
-        assert_eq!(c.realm, None);
 
         c.run().await;
 
-        let lock = channel_and_realm.lock();
-        assert_eq!(lock.0.as_deref(), Some(""));
-        assert_eq!(lock.1.as_deref(), None);
+        let lock = channel.lock();
+        assert_eq!(lock.as_deref(), Some(""));
     }
 
     #[test]
@@ -448,7 +430,6 @@ mod tests {
         struct State {
             mode: Option<FlakeMode>,
             channel: Option<String>,
-            realm: Option<String>,
             connect_count: u64,
             call_count: u64,
         }
@@ -464,7 +445,6 @@ mod tests {
                     state: Arc::new(Mutex::new(State {
                         mode: Some(FlakeMode::ErrorOnConnect),
                         channel: None,
-                        realm: None,
                         connect_count: 0,
                         call_count: 0,
                     })),
@@ -475,9 +455,6 @@ mod tests {
             }
             fn channel(&self) -> Option<String> {
                 self.state.lock().channel.clone()
-            }
-            fn realm(&self) -> Option<String> {
-                self.state.lock().realm.clone()
             }
             fn connect_count(&self) -> u64 {
                 self.state.lock().connect_count
@@ -547,7 +524,6 @@ mod tests {
                                         } => {
                                             state.lock().call_count += 1;
                                             state.lock().channel = info.current_channel;
-                                            state.lock().realm = info.current_realm;
                                             responder.send(CobaltStatus::Ok).unwrap();
                                         }
                                     }
@@ -556,12 +532,8 @@ mod tests {
                                 .detach();
                             }
                             ArgumentsMarker::PROTOCOL_NAME => {
-                                serve_ota_channel_arguments(
-                                    stream.cast_stream(),
-                                    Some("stable"),
-                                    Some("sample-realm"),
-                                )
-                                .detach();
+                                serve_ota_channel_arguments(stream.cast_stream(), Some("stable"))
+                                    .detach();
                             }
                             _ => unimplemented!(),
                         };
@@ -614,7 +586,6 @@ mod tests {
         assert_eq!(connector.connect_count(), 5);
         assert_eq!(connector.call_count(), 2);
         assert_eq!(connector.channel(), Some("stable".to_owned()));
-        assert_eq!(connector.realm(), Some("sample-realm".to_owned()));
 
         std::mem::drop(executor);
         let mut real_executor = fasync::TestExecutor::new().expect("new executor ok");
@@ -719,10 +690,10 @@ mod tests {
             fasync::Task::local(async move {
                 while let Some(req) = stream.try_next().await.unwrap() {
                     match req {
-                        ArgumentsRequest::GetStrings { keys, responder } => {
-                            assert_eq!(keys, vec!["ota_channel", "omaha_app_id"]);
-                            let response = vec![channel.as_deref(), None];
-                            responder.send(&mut response.into_iter()).unwrap();
+                        ArgumentsRequest::GetString { key, responder } => {
+                            assert_eq!(key, "ota_channel");
+                            let response = channel.as_deref();
+                            responder.send(response).unwrap();
                         }
                         _ => unreachable!(),
                     }

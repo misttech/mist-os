@@ -400,12 +400,6 @@
     },
     {
         "kind": "const",
-        "name": "fuchsia.cobalt/MAX_REALM_NAME_LENGTH",
-        "type": "uint32",
-        "value": "256"
-    },
-    {
-        "kind": "const",
         "name": "fuchsia.cobalt/MAX_TIMER_ID_LENGTH",
         "type": "uint32",
         "value": "64"
@@ -442,12 +436,6 @@
         "kind": "table/member",
         "name": "fuchsia.cobalt/SoftwareDistributionInfo.current_channel",
         "ordinal": "1",
-        "type": "string:256"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.cobalt/SoftwareDistributionInfo.current_realm",
-        "ordinal": "2",
         "type": "string:256"
     },
     {

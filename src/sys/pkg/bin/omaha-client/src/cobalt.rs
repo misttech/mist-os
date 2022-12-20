@@ -8,7 +8,6 @@ use fidl_fuchsia_cobalt::{
 };
 use fuchsia_component::client::connect_to_protocol;
 use futures::lock::Mutex;
-use omaha_client::app_set::AppSet as _;
 use std::rc::Rc;
 use tracing::{error, info};
 
@@ -31,11 +30,9 @@ async fn notify_cobalt_current_software_distribution_impl(
     let distribution_info = {
         let app_set = app_set.lock().await;
         let channel = app_set.get_system_current_channel();
-        let app_id = app_set.get_system_app_id();
 
         SoftwareDistributionInfo {
             current_channel: Some(channel.into()),
-            current_realm: Some(app_id.into()),
             ..SoftwareDistributionInfo::EMPTY
         }
     };
@@ -77,7 +74,6 @@ mod tests {
                     responder,
                 })) => {
                     assert_eq!(info.current_channel.unwrap(), "current-channel");
-                    assert_eq!(info.current_realm.unwrap(), "id");
                     responder.send(fidl_fuchsia_cobalt::Status::Ok).unwrap();
                 }
                 err => panic!("Err in request handler: {:?}", err),

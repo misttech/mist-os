@@ -99,11 +99,10 @@ TEST_F(SystemDataUpdaterImplTests, SetSoftwareDistributionInfo) {
   EXPECT_EQ(channel(), "<unset>");
   EXPECT_THAT(InspectHierarchy(),
               AllOf(NodeMatches(NameMatches("root")),
-                    ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
-                        NameMatches("system_data"),
-                        PropertyList(UnorderedElementsAre(IntIs("fidl_calls", 0),
-                                                          StringIs("channel", "<unset>"),
-                                                          StringIs("realm", "<unset>")))))))));
+                    ChildrenMatch(UnorderedElementsAre(NodeMatches(
+                        AllOf(NameMatches("system_data"),
+                              PropertyList(UnorderedElementsAre(
+                                  IntIs("fidl_calls", 0), StringIs("channel", "<unset>")))))))));
 
   SoftwareDistributionInfo info = SoftwareDistributionInfo();
   system_data_updater->SetSoftwareDistributionInfo(std::move(info), [](FuchsiaStatus s) {});
@@ -112,11 +111,10 @@ TEST_F(SystemDataUpdaterImplTests, SetSoftwareDistributionInfo) {
   EXPECT_EQ(channel(), "<unset>");
   EXPECT_THAT(InspectHierarchy(),
               AllOf(NodeMatches(NameMatches("root")),
-                    ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
-                        NameMatches("system_data"),
-                        PropertyList(UnorderedElementsAre(IntIs("fidl_calls", 1),
-                                                          StringIs("channel", "<unset>"),
-                                                          StringIs("realm", "<unset>")))))))));
+                    ChildrenMatch(UnorderedElementsAre(NodeMatches(
+                        AllOf(NameMatches("system_data"),
+                              PropertyList(UnorderedElementsAre(
+                                  IntIs("fidl_calls", 1), StringIs("channel", "<unset>")))))))));
 
   info = SoftwareDistributionInfo();
   info.set_current_channel("fishfood_release");
@@ -128,9 +126,8 @@ TEST_F(SystemDataUpdaterImplTests, SetSoftwareDistributionInfo) {
               AllOf(NodeMatches(NameMatches("root")),
                     ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
                         NameMatches("system_data"),
-                        PropertyList(UnorderedElementsAre(IntIs("fidl_calls", 2),
-                                                          StringIs("channel", "fishfood_release"),
-                                                          StringIs("realm", "<unset>")))))))));
+                        PropertyList(UnorderedElementsAre(
+                            IntIs("fidl_calls", 2), StringIs("channel", "fishfood_release")))))))));
 
   // Set one software distribution field without overriding the other.
   info = SoftwareDistributionInfo();
@@ -143,9 +140,8 @@ TEST_F(SystemDataUpdaterImplTests, SetSoftwareDistributionInfo) {
               AllOf(NodeMatches(NameMatches("root")),
                     ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
                         NameMatches("system_data"),
-                        PropertyList(UnorderedElementsAre(IntIs("fidl_calls", 3),
-                                                          StringIs("channel", "test_channel"),
-                                                          StringIs("realm", "<unset>")))))))));
+                        PropertyList(UnorderedElementsAre(
+                            IntIs("fidl_calls", 3), StringIs("channel", "test_channel")))))))));
 }
 
 namespace {
@@ -168,11 +164,10 @@ TEST(SystemDataUpdaterImpl, TestSoftwareDistributionInfoPersistence) {
   EXPECT_EQ(system_data->system_profile().channel(), "<unset>");
   EXPECT_THAT(inspect::ReadFromVmo(inspector.DuplicateVmo()).take_value(),
               AllOf(NodeMatches(NameMatches("root")),
-                    ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
-                        NameMatches("system_data"),
-                        PropertyList(UnorderedElementsAre(IntIs("fidl_calls", 0),
-                                                          StringIs("channel", "<unset>"),
-                                                          StringIs("realm", "<unset>")))))))));
+                    ChildrenMatch(UnorderedElementsAre(NodeMatches(
+                        AllOf(NameMatches("system_data"),
+                              PropertyList(UnorderedElementsAre(
+                                  IntIs("fidl_calls", 0), StringIs("channel", "<unset>")))))))));
 
   SoftwareDistributionInfo info = SoftwareDistributionInfo();
   info.set_current_channel("fishfood_release");
@@ -182,9 +177,8 @@ TEST(SystemDataUpdaterImpl, TestSoftwareDistributionInfoPersistence) {
               AllOf(NodeMatches(NameMatches("root")),
                     ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
                         NameMatches("system_data"),
-                        PropertyList(UnorderedElementsAre(IntIs("fidl_calls", 1),
-                                                          StringIs("channel", "fishfood_release"),
-                                                          StringIs("realm", "<unset>")))))))));
+                        PropertyList(UnorderedElementsAre(
+                            IntIs("fidl_calls", 1), StringIs("channel", "fishfood_release")))))))));
 
   // Test restoring data.
   inspector = inspect::Inspector();
@@ -195,9 +189,8 @@ TEST(SystemDataUpdaterImpl, TestSoftwareDistributionInfoPersistence) {
               AllOf(NodeMatches(NameMatches("root")),
                     ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
                         NameMatches("system_data"),
-                        PropertyList(UnorderedElementsAre(IntIs("fidl_calls", 0),
-                                                          StringIs("channel", "fishfood_release"),
-                                                          StringIs("realm", "<unset>")))))))));
+                        PropertyList(UnorderedElementsAre(
+                            IntIs("fidl_calls", 0), StringIs("channel", "fishfood_release")))))))));
 
   // Test default behavior with no data.
   updater->ClearData();
@@ -207,11 +200,10 @@ TEST(SystemDataUpdaterImpl, TestSoftwareDistributionInfoPersistence) {
   EXPECT_EQ(system_data->system_profile().channel(), "<unset>");
   EXPECT_THAT(inspect::ReadFromVmo(inspector.DuplicateVmo()).take_value(),
               AllOf(NodeMatches(NameMatches("root")),
-                    ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
-                        NameMatches("system_data"),
-                        PropertyList(UnorderedElementsAre(IntIs("fidl_calls", 0),
-                                                          StringIs("channel", "<unset>"),
-                                                          StringIs("realm", "<unset>")))))))));
+                    ChildrenMatch(UnorderedElementsAre(NodeMatches(
+                        AllOf(NameMatches("system_data"),
+                              PropertyList(UnorderedElementsAre(
+                                  IntIs("fidl_calls", 0), StringIs("channel", "<unset>")))))))));
 }
 
 }  // namespace cobalt

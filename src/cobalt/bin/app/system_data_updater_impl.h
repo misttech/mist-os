@@ -58,7 +58,6 @@ class SystemDataUpdaterImpl : public fuchsia::cobalt::SystemDataUpdater {
   inspect::Node inspect_node_;
   inspect::IntProperty num_calls_;
   inspect::StringProperty channel_;
-  inspect::StringProperty realm_;
 
   encoder::SystemDataInterface* system_data_;  // Not owned.
   std::string cache_file_name_prefix_;

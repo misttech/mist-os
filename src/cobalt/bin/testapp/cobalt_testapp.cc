@@ -150,7 +150,6 @@ component_testing::ScopedChild CobaltTestApp::Connect(const std::string &variant
   fuchsia::cobalt::Status status = fuchsia::cobalt::Status::INTERNAL_ERROR;
   fuchsia::cobalt::SoftwareDistributionInfo info;
   info.set_current_channel("devhost");
-  info.set_current_realm("");
   system_data_updater_->SetSoftwareDistributionInfo(std::move(info), &status);
   FX_CHECK(status == fuchsia::cobalt::Status::OK) << "Unable to set software distribution info";
 

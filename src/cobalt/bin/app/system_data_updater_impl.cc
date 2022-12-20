@@ -14,7 +14,6 @@ namespace cobalt {
 using FuchsiaStatus = fuchsia::cobalt::Status;
 
 constexpr char kChannelCacheFilenameSuffix[] = "last_reported_channel";
-constexpr char kRealmCacheFilenameSuffix[] = "last_reported_realm";
 
 SystemDataUpdaterImpl::SystemDataUpdaterImpl(inspect::Node inspect_node,
                                              encoder::SystemDataInterface* system_data,
@@ -24,7 +23,6 @@ SystemDataUpdaterImpl::SystemDataUpdaterImpl(inspect::Node inspect_node,
       cache_file_name_prefix_(cache_file_name_prefix) {
   num_calls_ = inspect_node_.CreateInt("fidl_calls", 0);
   channel_ = inspect_node_.CreateString("channel", system_data_->channel());
-  realm_ = inspect_node_.CreateString("realm", system_data_->realm());
   RestoreData();
 }
 
@@ -34,17 +32,9 @@ void SystemDataUpdaterImpl::RestoreData() {
     system_data_->SetChannel(d);
     channel_.Set(system_data_->channel());
   }
-  d = Restore(kRealmCacheFilenameSuffix);
-  if (!d.empty()) {
-    system_data_->SetRealm(d);
-    realm_.Set(system_data_->realm());
-  }
 }
 
-void SystemDataUpdaterImpl::ClearData() {
-  DeleteData(kChannelCacheFilenameSuffix);
-  DeleteData(kRealmCacheFilenameSuffix);
-}
+void SystemDataUpdaterImpl::ClearData() { DeleteData(kChannelCacheFilenameSuffix); }
 
 std::string SystemDataUpdaterImpl::Restore(const std::string& suffix) {
   std::ifstream file(cache_file_name_prefix_ + suffix);
@@ -78,13 +68,6 @@ void SystemDataUpdaterImpl::SetSoftwareDistributionInfo(
   num_calls_.Add(1);
   system_data::SoftwareDistributionInfo info;
 
-  if (current_info.has_current_realm()) {
-    const std::string& realm = current_info.current_realm();
-    Persist(kRealmCacheFilenameSuffix, realm);
-    FX_LOGS(INFO) << "Setting realm to `" << realm << "`";
-    info.realm = realm;
-  }
-
   if (current_info.has_current_channel()) {
     const std::string& channel = current_info.current_channel();
     Persist(kChannelCacheFilenameSuffix, channel);
@@ -94,7 +77,6 @@ void SystemDataUpdaterImpl::SetSoftwareDistributionInfo(
 
   system_data_->SetSoftwareDistributionInfo(info);
   channel_.Set(system_data_->channel());
-  realm_.Set(system_data_->realm());
   callback(FuchsiaStatus::OK);
 }  // namespace cobalt
 
