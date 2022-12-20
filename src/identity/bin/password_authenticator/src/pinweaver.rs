@@ -91,10 +91,10 @@ fn compute_mix_secret(password: &str, high_entropy_secret: &Key) -> Key {
     key
 }
 
-/// Computes the account key, given the mix_secret (which takes both the user's password and the
+/// Computes a key, given the mix_secret (which takes both the user's password and the
 /// high-entropy secret as input) and a set of ScryptParams.  This ensures the computation still
 /// requires some amount of CPU cost, memory cost, and is salted per-user.
-fn compute_account_key(mix_secret: &Key, params: &ScryptParams) -> Result<Key, ScryptError> {
+fn compute_key(mix_secret: &Key, params: &ScryptParams) -> Result<Key, ScryptError> {
     params.scrypt(mix_secret)
 }
 
@@ -318,14 +318,12 @@ where
         // compute mix_secret = HMAC-SHA256(password, he_secret)
         let mix_secret = compute_mix_secret(password, &high_entropy_secret);
 
-        // compute account_key = scrypt(mix_secret, salt, N, p, r)
-        let account_key: Key = compute_account_key(&mix_secret, &self.scrypt_params)
+        // compute key = scrypt(mix_secret, salt, N, p, r)
+        let key: Key = compute_key(&mix_secret, &self.scrypt_params)
             .map_err(|_| KeyEnrollmentError::ParamsError)?;
 
-        // return account_key
-        // TODO(fxb/116904): change account_key variable name.
         Ok(EnrolledKey::<PinweaverParams> {
-            key: account_key,
+            key,
             enrollment_data: PinweaverParams {
                 scrypt_params: self.scrypt_params,
                 credential_label: label,
@@ -380,12 +378,11 @@ where
         // compute mix_secret = HMAC-SHA256(password, he_secret)
         let mix_secret = compute_mix_secret(password, &high_entropy_secret);
 
-        // compute account_key = scrypt(mix_secret, salt, N, p, r)
-        let account_key: Key =
-            compute_account_key(&mix_secret, &self.pinweaver_params.scrypt_params)
-                .map_err(|_| KeyRetrievalError::ParamsError)?;
+        // compute key = scrypt(mix_secret, salt, N, p, r)
+        let key: Key = compute_key(&mix_secret, &self.pinweaver_params.scrypt_params)
+            .map_err(|_| KeyRetrievalError::ParamsError)?;
 
-        Ok(account_key)
+        Ok(key)
     }
 }
 
@@ -682,7 +679,7 @@ pub const TEST_PINWEAVER_MIX_SECRET: [u8; KEY_LEN] = [
 ];
 /// Derived from TEST_PINWEAVER_MIX_SECRET and TEST_SCRYPT_PARAMS
 #[cfg(test)]
-pub const TEST_PINWEAVER_ACCOUNT_KEY: [u8; KEY_LEN] = [
+pub const TEST_PINWEAVER_KEY: [u8; KEY_LEN] = [
     228, 50, 47, 112, 78, 137, 56, 116, 50, 180, 30, 230, 55, 132, 33, 117, 119, 187, 221, 250, 73,
     193, 216, 194, 37, 177, 70, 45, 209, 216, 49, 110,
 ];
@@ -729,9 +726,8 @@ mod test {
         let mix_secret = compute_mix_secret(TEST_SCRYPT_PASSWORD, &TEST_PINWEAVER_HE_SECRET);
         assert_eq!(mix_secret, TEST_PINWEAVER_MIX_SECRET);
 
-        let account_key =
-            compute_account_key(&mix_secret, &TEST_SCRYPT_PARAMS).expect("compute account key");
-        assert_eq!(account_key, TEST_PINWEAVER_ACCOUNT_KEY);
+        let key = compute_key(&mix_secret, &TEST_SCRYPT_PARAMS).expect("compute account key");
+        assert_eq!(key, TEST_PINWEAVER_KEY);
     }
 
     #[fuchsia::test]
@@ -744,9 +740,9 @@ mod test {
             PinweaverParams { scrypt_params: TEST_SCRYPT_PARAMS, credential_label: label },
             Arc::new(Mutex::new(mcm)),
         );
-        let account_key_retrieved =
+        let key_retrieved =
             pw_retriever.retrieve_key(TEST_SCRYPT_PASSWORD).await.expect("key should be found");
-        assert_eq!(account_key_retrieved, TEST_PINWEAVER_ACCOUNT_KEY);
+        assert_eq!(key_retrieved, TEST_PINWEAVER_KEY);
     }
 
     #[fuchsia::test]
@@ -786,7 +782,7 @@ mod test {
         let mcm = MockCredManager::new_with_creds(creds.clone());
         let mut pw_enroller = PinweaverKeyEnroller::new(Arc::new(Mutex::new(mcm)));
         let enrolled_key = pw_enroller.enroll_key(TEST_SCRYPT_PASSWORD).await.expect("enroll");
-        let account_key = enrolled_key.key;
+        let key = enrolled_key.key;
         let enrollment_data = enrolled_key.enrollment_data;
 
         // Retrieve the key, and verify it matches.
@@ -794,7 +790,7 @@ mod test {
         let pw_retriever = PinweaverKeyRetriever::new(enrollment_data, Arc::new(Mutex::new(mcm2)));
         let key_retrieved =
             pw_retriever.retrieve_key(TEST_SCRYPT_PASSWORD).await.expect("retrieve");
-        assert_eq!(key_retrieved, account_key);
+        assert_eq!(key_retrieved, key);
 
         // Remove the key.
         let remove_res = pw_enroller.remove_key(enrollment_data).await;

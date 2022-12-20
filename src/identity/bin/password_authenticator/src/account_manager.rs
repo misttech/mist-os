@@ -780,9 +780,8 @@ mod test {
                 AccountMetadata, AccountMetadataStoreError,
             },
             pinweaver::{
-                CredManager, MockCredManagerProvider, TEST_PINWEAVER_ACCOUNT_KEY,
-                TEST_PINWEAVER_CREDENTIAL_LABEL, TEST_PINWEAVER_HE_SECRET,
-                TEST_PINWEAVER_LE_SECRET,
+                CredManager, MockCredManagerProvider, TEST_PINWEAVER_CREDENTIAL_LABEL,
+                TEST_PINWEAVER_HE_SECRET, TEST_PINWEAVER_KEY, TEST_PINWEAVER_LE_SECRET,
             },
             scrypt::{TEST_SCRYPT_KEY, TEST_SCRYPT_PASSWORD},
         },
@@ -1101,7 +1100,7 @@ mod test {
         assert_eq!(label, TEST_PINWEAVER_CREDENTIAL_LABEL);
         let storage_manager_factory = || {
             let disk_manager = MockDiskManager::new()
-                .with_partition(make_formatted_account_partition(TEST_PINWEAVER_ACCOUNT_KEY));
+                .with_partition(make_formatted_account_partition(TEST_PINWEAVER_KEY));
             make_storage_manager(disk_manager)
         };
         let account_manager = AccountManager::new(
@@ -1136,7 +1135,7 @@ mod test {
         assert_eq!(label, TEST_PINWEAVER_CREDENTIAL_LABEL);
         let storage_manager_factory = || {
             let disk_manager = MockDiskManager::new()
-                .with_partition(make_formatted_account_partition(TEST_PINWEAVER_ACCOUNT_KEY));
+                .with_partition(make_formatted_account_partition(TEST_PINWEAVER_KEY));
             make_storage_manager(disk_manager)
         };
         let account_manager = AccountManager::new(
@@ -1731,7 +1730,7 @@ mod test {
             .retrieve_user_key(&TEST_PINWEAVER_METADATA, TEST_SCRYPT_PASSWORD)
             .await
             .expect("retrieve key (pinweaver)");
-        assert_eq!(key, TEST_PINWEAVER_ACCOUNT_KEY);
+        assert_eq!(key, TEST_PINWEAVER_KEY);
     }
 
     #[fuchsia::test]
@@ -1873,7 +1872,7 @@ mod test {
         let cred_manager_provider = MockCredManagerProvider::new();
         let storage_manager_factory = || {
             let disk_manager = MockDiskManager::new()
-                .with_partition(make_formatted_account_partition(TEST_PINWEAVER_ACCOUNT_KEY));
+                .with_partition(make_formatted_account_partition(TEST_PINWEAVER_KEY));
             make_storage_manager(disk_manager)
         };
         let account_manager = AccountManager::new(
