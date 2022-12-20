@@ -74,7 +74,43 @@ VmObjectPaged::~VmObjectPaged() {
   AssertHeld(hierarchy_state_ptr_->lock_ref());
   hierarchy_state_ptr_->IncrementHierarchyGenerationCountLocked();
 
-  cow_pages_locked()->set_paged_backlink_locked(nullptr);
+  // Only clear the backlink if we are not a reference. A reference does not "own" the VmCowPages,
+  // so in the typical case, the VmCowPages will not have its backlink set to a reference. There
+  // does exist an edge case where the backlink can be a reference, which is handled by the else
+  // block below.
+  if (!is_reference()) {
+    cow_pages_locked()->set_paged_backlink_locked(nullptr);
+  } else {
+    // If this is a reference, we need to remove it from the original (parent) VMO's reference list.
+    VmObjectPaged* root_ref = cow_pages_locked()->get_paged_backlink_locked();
+    DEBUG_ASSERT(root_ref);
+    if (likely(root_ref != this)) {
+      VmObjectPaged* removed = root_ref->reference_list_.erase(*this);
+      DEBUG_ASSERT(removed == this);
+    } else {
+      // It is possible for the backlink to point to |this| if the original parent went away at some
+      // point and the rest of the reference list had to be re-homed to |this|, and the backlink set
+      // to |this|.
+      // The VmCowPages was pointing to us, so clear the backlink. The backlink will get reset below
+      // if other references remain.
+      cow_pages_locked()->set_paged_backlink_locked(nullptr);
+    }
+  }
+
+  // If this VMO had references, pick one of the references as the paged backlink from the shared
+  // VmCowPages. Also, move the remainder of the reference list to the chosen reference. Note that
+  // we're only moving the reference list over without adding the references to the children list;
+  // we do not want these references to be counted as children of the chosen VMO. We simply want a
+  // safe way to propagate mapping updates and VmCowPages changes on hidden node addition.
+  if (!reference_list_.is_empty()) {
+    // We should only be attempting to reset the backlink if the owner is going away and has reset
+    // the backlink above.
+    DEBUG_ASSERT(cow_pages_locked()->get_paged_backlink_locked() == nullptr);
+    VmObjectPaged* paged_backlink = reference_list_.pop_front();
+    cow_pages_locked()->set_paged_backlink_locked(paged_backlink);
+    paged_backlink->reference_list_.splice(paged_backlink->reference_list_.end(), reference_list_);
+  }
+  DEBUG_ASSERT(reference_list_.is_empty());
 
   // Re-home all our children with any parent that we have.
   while (!children_list_.is_empty()) {
@@ -539,6 +575,100 @@ zx_status_t VmObjectPaged::CreateChildSlice(uint64_t offset, uint64_t size, bool
   return ZX_OK;
 }
 
+zx_status_t VmObjectPaged::CreateChildReference(Resizability resizable, uint64_t offset,
+                                                uint64_t size, bool copy_name,
+                                                fbl::RefPtr<VmObject>* child_vmo) {
+  LTRACEF("vmo %p offset %#" PRIx64 " size %#" PRIx64 "\n", this, offset, size);
+
+  canary_.Assert();
+
+  // A reference spans the entirety of the parent. The specified range has no meaning, require it
+  // to be zero.
+  if (offset != 0 || size != 0) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  // Not supported for contiguous VMOs. Can use slices instead as contiguous VMOs are non-resizable
+  // and support slices.
+  if (is_contiguous()) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  if (resizable == Resizability::Resizable) {
+    // Cannot create a resizable reference from a non-resizable VMO.
+    if (!is_resizable()) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+  }
+
+  uint32_t options = kReference;
+  if (can_block_on_page_requests()) {
+    options |= kCanBlockOnPageRequests;
+  }
+
+  // Reference inherits resizability from parent.
+  if (is_resizable()) {
+    options |= kResizable;
+  }
+
+  fbl::AllocChecker ac;
+  auto vmo = fbl::AdoptRef<VmObjectPaged>(new (&ac) VmObjectPaged(options, hierarchy_state_ptr_));
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  bool notify_one_child;
+  {
+    Guard<CriticalMutex> guard{lock()};
+    AssertHeld(vmo->lock_ref());
+
+    // We know that we are not contiguous so we should not be uncached either.
+    if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
+      return ZX_ERR_BAD_STATE;
+    }
+    DEBUG_ASSERT(vmo->cache_policy_ == ARCH_MMU_FLAG_CACHED);
+
+    // Reference shares the same VmCowPages as the parent.
+    auto cow_pages = fbl::RefPtr<VmCowPages>(this->cow_pages_locked());
+    // Link up the cow pages and our parent/children. Both child notification and inserting into
+    // the globals list has to happen outside the lock.
+    vmo->cow_pages_ = ktl::move(cow_pages);
+
+    vmo->parent_ = this;
+    notify_one_child = AddChildLocked(vmo.get());
+
+    // Also insert into the reference list. The reference should only be inserted in the list of the
+    // object that the cow_pages_locked() has the backlink to, i.e. the notional "owner" of the
+    // VmCowPages.
+    // As a consequence of this, in the case of nested references, the reference relationship can
+    // look different from the parent->child relationship, which instead mirrors the child creation
+    // calls as specified by the user (this is true for all child types).
+    VmObjectPaged* paged_owner = cow_pages_locked()->get_paged_backlink_locked();
+    DEBUG_ASSERT(paged_owner);
+    // If this object is not a reference, the |paged_owner| we computed should be the same as
+    // |this|.
+    DEBUG_ASSERT(is_reference() || paged_owner == this);
+    AssertHeld(paged_owner->lock_ref());
+    paged_owner->reference_list_.push_back(vmo.get());
+
+    if (copy_name) {
+      vmo->name_ = name_;
+    }
+    IncrementHierarchyGenerationCountLocked();
+  }
+
+  // Add to the global list now that fully initialized.
+  vmo->AddToGlobalList();
+
+  if (notify_one_child) {
+    NotifyOneChild();
+  }
+
+  *child_vmo = ktl::move(vmo);
+
+  return ZX_OK;
+}
+
 zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, uint64_t offset,
                                        uint64_t size, bool copy_name,
                                        fbl::RefPtr<VmObject>* child_vmo) {
@@ -586,6 +716,7 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
     if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
       return ZX_ERR_BAD_STATE;
     }
+    DEBUG_ASSERT(vmo->cache_policy_ == ARCH_MMU_FLAG_CACHED);
 
     status = cow_pages_locked()->CreateCloneLocked(type, offset, size, &clone_cow_pages);
     if (status != ZX_OK) {
@@ -658,6 +789,15 @@ VmObject::AttributionCounts VmObjectPaged::AttributedPagesInRangeLocked(uint64_t
   }
 
   vmo_attribution_queries.Add(1);
+
+  // A reference never has pages attributed to it. It points to the parent's VmCowPages, and we need
+  // to hold the invariant that every page is attributed to a single VMO.
+  //
+  // TODO(fxb/117886): Consider attributing pages to the current VmCowPages backlink for the case
+  // where the parent has gone away.
+  if (is_reference()) {
+    return AttributionCounts{};
+  }
 
   uint64_t gen_count;
   bool update_cached_attribution = false;
@@ -1673,13 +1813,27 @@ zx_status_t VmObjectPaged::SetMappingCachePolicy(const uint32_t cache_policy) {
   if (cow_pages_locked()->pinned_page_count_locked() > 0) {
     return ZX_ERR_BAD_STATE;
   }
+
   if (!mapping_list_.is_empty()) {
     return ZX_ERR_BAD_STATE;
   }
+
   if (!children_list_.is_empty()) {
     return ZX_ERR_BAD_STATE;
   }
   if (parent_) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  // Forbid if there are references, or if this object is a reference itself. We do not want cache
+  // policies to diverge across references. Note that this check is required in addition to the
+  // children_list_ and parent_ check, because it is possible for a non-reference parent to go away,
+  // which will trigger the election of a reference as the new owner for the remaining
+  // reference_list_, and also reset the parent_.
+  if (!reference_list_.is_empty()) {
+    return ZX_ERR_BAD_STATE;
+  }
+  if (is_reference()) {
     return ZX_ERR_BAD_STATE;
   }
 
@@ -1722,6 +1876,14 @@ void VmObjectPaged::RangeChangeUpdateLocked(uint64_t offset, uint64_t len, Range
     } else {
       panic("Unknown RangeChangeOp %d\n", static_cast<int>(op));
     }
+  }
+
+  // Propagate the change to reference children as well.
+  for (auto& ref : reference_list_) {
+    AssertHeld(ref.lock_ref());
+    // Use the same offset and len. References span the entirety of the parent VMO and hence share
+    // all offsets.
+    ref.RangeChangeUpdateLocked(offset, len, op);
   }
 }
 

@@ -213,11 +213,12 @@ class VmCowPages final : public VmHierarchyBase,
   // See description on |pinned_page_count_| for meaning.
   uint64_t pinned_page_count_locked() const TA_REQ(lock()) { return pinned_page_count_; }
 
-  // Sets the VmObjectPaged backlink for this copy-on-write node. This object has no tracking of
-  // mappings, but understands that they exist. When it manipulates pages in a way that could effect
-  // mappings it uses the backlink to notify the VmObjectPaged.
-  // Currently it is assumed that all nodes always have backlinks with the 1:1 hierarchy mapping.
+  // Sets the VmObjectPaged backlink for this copy-on-write node.
+  // Currently it is assumed that all nodes always have backlinks with the 1:1 hierarchy mapping,
+  // unless this is a hidden node.
   void set_paged_backlink_locked(VmObjectPaged* ref) TA_REQ(lock()) { paged_ref_ = ref; }
+
+  VmObjectPaged* get_paged_backlink_locked() const TA_REQ(lock()) { return paged_ref_; }
 
   uint64_t HeapAllocationBytesLocked() const TA_REQ(lock()) {
     return page_list_.HeapAllocationBytes();
@@ -1261,8 +1262,13 @@ class VmCowPages final : public VmHierarchyBase,
   uint64_t range_change_offset_ TA_GUARDED(lock());
   uint64_t range_change_len_ TA_GUARDED(lock());
 
-  // optional reference back to a VmObjectPaged so that we can perform mapping updates. This is a
-  // raw pointer to avoid circular references, the VmObjectPaged destructor needs to update it.
+  // Reference back to a VmObjectPaged, which should be valid at all times after creation, unless
+  // this is a hidden node. We use this in places where we have access to the VmCowPages and
+  // need to look up the "owning" VmObjectPaged for some information, e.g. when deduping zero pages,
+  // for performing mapping updates, for inserting references to the reference list.
+  //
+  // This is a raw pointer to avoid circular references, the VmObjectPaged destructor needs to
+  // update it.
   VmObjectPaged* paged_ref_ TA_GUARDED(lock()) = nullptr;
 
   // Non-null if this is a discardable VMO.

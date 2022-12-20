@@ -37,6 +37,7 @@ class VmObjectPaged final : public VmObject {
   static constexpr uint32_t kSlice = (1u << 3);
   static constexpr uint32_t kDiscardable = (1u << 4);
   static constexpr uint32_t kAlwaysPinned = (1u << 5);
+  static constexpr uint32_t kReference = (1u << 6);
   static constexpr uint32_t kCanBlockOnPageRequests = (1u << 31);
 
   static zx_status_t Create(uint32_t pmm_alloc_flags, uint32_t options, uint64_t size,
@@ -94,6 +95,7 @@ class VmObjectPaged final : public VmObject {
     return parent_ ? ChildType::kCowClone : ChildType::kNotChild;
   }
   bool is_slice() const { return options_ & kSlice; }
+  bool is_reference() const { return (options_ & kReference); }
   uint64_t parent_user_id() const override {
     Guard<CriticalMutex> guard{lock()};
     if (parent_) {
@@ -221,6 +223,9 @@ class VmObjectPaged final : public VmObject {
   zx_status_t CreateChildSlice(uint64_t offset, uint64_t size, bool copy_name,
                                fbl::RefPtr<VmObject>* child_vmo) override;
 
+  zx_status_t CreateChildReference(Resizability resizable, uint64_t offset, uint64_t size,
+                                   bool copy_name, fbl::RefPtr<VmObject>* child_vmo) override;
+
   // Returns whether or not zero pages can be safely deduped from this VMO. Zero pages cannot be
   // deduped if the VMO is in use for kernel mappings, or if the pages cannot be accessed from the
   // physmap due to not being cached.
@@ -278,6 +283,15 @@ class VmObjectPaged final : public VmObject {
     DEBUG_ASSERT(cow_pages);
     fbl::RefPtr<VmCowPages> ret = ktl::move(cow_pages_);
     cow_pages_ = ktl::move(cow_pages);
+    // Update the VmCowPages for all reference children as well.
+    for (auto& ref : reference_list_) {
+      AssertHeld(ref.lock_ref());
+      fbl::RefPtr<VmCowPages> const cow = ref.SetCowPagesReferenceLocked(cow_pages_);
+      // Validate that the reference that was replaced was the same as the one we're going to
+      // return. This ensures that we can safely drop |cow| here without triggering the
+      // destructor.
+      DEBUG_ASSERT(cow.get() == ret.get());
+    }
     return ret;
   }
 
@@ -352,6 +366,19 @@ class VmObjectPaged final : public VmObject {
   // members
   const uint32_t options_;
   uint32_t cache_policy_ TA_GUARDED(lock()) = ARCH_MMU_FLAG_CACHED;
+
+  using ReferenceListNodeState = fbl::DoublyLinkedListNodeState<VmObjectPaged*>;
+  struct ReferenceListTraits {
+    static ReferenceListNodeState& node_state(VmObjectPaged& vmo) {
+      return vmo.reference_list_node_state_;
+    }
+  };
+  friend struct ReferenceListTraits;
+  ReferenceListNodeState reference_list_node_state_;
+  using ReferenceList = fbl::DoublyLinkedListCustomTraits<VmObjectPaged*, ReferenceListTraits>;
+
+  // list of every reference child
+  ReferenceList reference_list_ TA_GUARDED(lock());
 
   // parent pointer (may be null). This is a raw pointer as we have no need to hold our parent alive
   // once they want to go away.

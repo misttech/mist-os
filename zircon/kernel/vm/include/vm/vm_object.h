@@ -549,6 +549,11 @@ class VmObject : public VmHierarchyBase,
     return ZX_ERR_NOT_SUPPORTED;
   }
 
+  virtual zx_status_t CreateChildReference(Resizability resizable, uint64_t offset, uint64_t size,
+                                           bool copy_name, fbl::RefPtr<VmObject>* child_vmo) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
   enum ChildType { kNotChild, kCowClone, kSlice };
   virtual ChildType child_type() const = 0;
 
