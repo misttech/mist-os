@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.hardware.dsp/cpp/wire.h>
 #include <getopt.h>
+#include <lib/component/incoming/cpp/service_client.h>
 #include <lib/fdio/fdio.h>
 #include <lib/fdio/unsafe.h>
 #include <stdio.h>
@@ -21,7 +22,7 @@ using DspClient = fidl::WireSyncClient<fuchsia_hardware_dsp::DspDevice>;
 
 class DspClientHelper {
  public:
-  DspClientHelper(DspClient client) : client_(std::move(client)) {}
+  explicit DspClientHelper(DspClient client) : client_(std::move(client)) {}
   zx_status_t Start();
   zx_status_t Stop();
   zx_status_t Load(fidl::StringView fw_name);
@@ -68,33 +69,19 @@ zx_status_t DspClientHelper::Stop() {
 }
 
 int main(int argc, char** argv) {
-  zx_status_t status = ZX_OK;
   if (argc < 3) {
     showUsage(argv[0]);
-    return ZX_ERR_INVALID_ARGS;
+    return -1;
   }
 
-  int fd = open(argv[1], O_RDWR);
-  if (fd < 0) {
-    fprintf(stderr, "%s: %s\n", argv[1], strerror(errno));
-    return ZX_ERR_BAD_PATH;
+  zx::result device = component::Connect<fuchsia_hardware_dsp::DspDevice>(argv[1]);
+  if (device.is_error()) {
+    fprintf(stderr, "%s: %s\n", argv[1], device.status_string());
+    return -1;
   }
 
-  fbl::unique_fd device(fd);
-  if (!device.is_valid()) {
-    fprintf(stderr, "Failed to open mailbox device: %s\n", strerror(errno));
-    return ZX_ERR_NOT_FOUND;
-  }
-
-  fidl::ClientEnd<fuchsia_hardware_dsp::DspDevice> client_end;
-  zx_status_t st =
-      fdio_get_service_handle(device.release(), client_end.channel().reset_and_get_address());
-  if (st != ZX_OK) {
-    fprintf(stderr, "Failed to get service handle: %s\n", zx_status_get_string(st));
-    return ZX_ERR_BAD_HANDLE;
-  }
-  DspClient client(std::move(client_end));
-  DspClientHelper* dsp_client = new DspClientHelper(std::move(client));
+  DspClient client(std::move(device.value()));
+  DspClientHelper dsp_client(std::move(client));
 
   static const struct option opts[] = {
       {"start", no_argument, nullptr, 's'},
@@ -102,36 +89,35 @@ int main(int argc, char** argv) {
       {"load", required_argument, nullptr, 'l'},
       {"help", no_argument, nullptr, 'h'},
   };
-  char* fw_name = nullptr;
 
   for (int opt; (opt = getopt_long(argc, argv, "", opts, nullptr)) != -1;) {
     switch (opt) {
       case 's':
-        status = dsp_client->Start();
-        if (status != ZX_OK) {
+        if (zx_status_t status = dsp_client.Start(); status != ZX_OK) {
           fprintf(stderr, "DSP start failed: %s\n", zx_status_get_string(status));
+          return -1;
         }
         break;
 
       case 'q':
-        status = dsp_client->Stop();
-        if (status != ZX_OK) {
+        if (zx_status_t status = dsp_client.Stop(); status != ZX_OK) {
           fprintf(stderr, "DSP stop failed: %s\n", zx_status_get_string(status));
+          return -1;
         }
         break;
 
-      case 'l':
-        fw_name = strdup(optarg);
-        if (fw_name) {
-          status = dsp_client->Load(fidl::StringView::FromExternal(fw_name, strlen(fw_name)));
-          if (status != ZX_OK) {
-            fprintf(stderr, "DSP load firmware failed: %s\n", zx_status_get_string(status));
-          }
-        } else {
+      case 'l': {
+        char* fw_name = optarg;
+        if (!fw_name) {
           fprintf(stderr, "The firmware name is empty\n");
-          status = ZX_ERR_INVALID_ARGS;
+          return -1;
         }
-        break;
+        if (zx_status_t status = dsp_client.Load(fidl::StringView::FromExternal(fw_name));
+            status != ZX_OK) {
+          fprintf(stderr, "DSP load firmware failed: %s\n", zx_status_get_string(status));
+          return -1;
+        }
+      } break;
 
       case 'h':
         showUsage(argv[0]);
@@ -139,12 +125,9 @@ int main(int argc, char** argv) {
 
       default:
         showUsage(argv[0]);
-        status = ZX_ERR_INVALID_ARGS;
-        break;
+        return -1;
     }
   }
 
-  free(fw_name);
-  close(fd);
-  return status;
+  return 0;
 }

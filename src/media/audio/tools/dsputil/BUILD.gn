@@ -9,8 +9,8 @@ executable("bin") {
   sources = [ "dsputil.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.dsp:fuchsia.hardware.dsp_cpp_wire",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
