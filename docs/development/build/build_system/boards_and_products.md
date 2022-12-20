@@ -16,10 +16,10 @@ are defined below.
 
 ## Boards
 
-A board defines the architecture that the build produces for, as well as key
-features of the device upon which the build is intended to run. This
-configuration includes what drivers are included, and may also influence
-device specific kernel parameters.
+A [board](/docs/glossary/README.md#board) defines the architecture that the
+build produces for, as well as key features of the device upon which the
+build is intended to run. This configuration affects what drivers are
+included, and may also influence device-specific kernel parameters.
 
 The available boards can be listed using `fx list-boards`.
 

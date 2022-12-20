@@ -54,16 +54,16 @@ was written previously for the driver framework version 1 (DFv1).
 
 ## Board driver and USB devices
 
-While drivers are often bound to devices, some drivers are bound to boards
-(such as PCI and ACPI) that may have multiple devices connected to them,
-both statically and dynamically.
+While drivers are often bound to devices, some drivers are bound to
+[boards](/docs/glossary/README.md#board) (such as PCI and ACPI) that may
+have multiple devices connected to them, both statically and dynamically.
 
-Upon the initial binding to a node, a board driver (such as `acpi`) parses
-a binary blob passed from the system (which can be ACPI bytecode or a compiled
-device tree) and informs the driver manager of the static set of devices
-connected on the board. These devices get bound to drivers through the normal
-binding process orchestrated by the driver index.  From this point, these
-drivers (that are bound to the child nodes of the board driver) dynamically
+Upon the initial binding to a node, a [board driver](/docs/glossary/README.md#board-driver)
+(such as `acpi`) parses a binary blob passed from the system (which can be
+ACPI bytecode or a compiled device tree) and informs the driver manager of the
+static set of devices connected on the board. These devices get bound to drivers
+through the normal binding process orchestrated by the driver index.  From this point,
+these drivers (that are bound to the child nodes of the board driver) dynamically
 query the hardware for additional information. From this information, the
 drivers may discover new devices to be added to the topology. This process
 occurs recursively as more devices are discovered and introduced to the

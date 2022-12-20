@@ -8,8 +8,8 @@ this page may only be specific to the Fuchsia source checkout
 Most system on chip (SoC) board rely on explicitly enumerated hardware
 resources, rather than discovery mechanisms like ACPI that are common on
 workstations, servers, or laptops. To add support for an SoC's display
-controller, you will need to modify the board driver to expose hardware
-resources that your display driver can use. See
+controller, you will need to modify the [board driver](/docs/glossary/README.md#board-driver)
+to expose hardware resources that your display driver can use. See
 [amlogic-display.cc][amlogic-display] for an example. Most devices need some
 combination of the following:
 

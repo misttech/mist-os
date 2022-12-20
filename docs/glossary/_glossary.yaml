@@ -83,6 +83,40 @@
   related_guides: [""]
   area: ["Component Framework"]
 
+- term: "Board"
+  short_description: "A board is a complete computer hardware platform with a CPU,
+  memory, peripherals, and so on."
+  full_description: "A board is a complete computer hardware platform with a CPU,
+  memory, peripherals, and so on. It defines the architecture that the build produces
+  for, and key features of the device upon which the build is intended to run. This
+  configuration affects what <a href=\"/docs/glossary#driver\">drivers</a> are
+  included, and may also influence device-specific kernel parameters."
+  see_also: [
+    "<a href=\"/docs/glossary#board-driver\">Board driver</a>",
+    "<a href=\"/docs/development/build/build_system/boards_and_products#boards\">Boards</a>",
+    "<a href=\"/docs/contribute/governance/rfcs/0111_fuchsia_hardware_specifications\">RFC-0111: Initial Fuchsia hardware platform specifications</a>"
+  ]
+  related_guides: [""]
+  area: ["System", "Devices"]
+
+- term: "Board driver"
+  short_description: "A board driver is a specialized <a href=\"/docs/glossary#driver\">driver</a>
+  that contains the platform-specific information needed by the
+  <a href=\"/docs/glossary#platform-bus\">platform bus</a> and controls what other
+  drivers will be loaded by the platform bus."
+  full_description: "A board driver is a specialized <a href=\"/docs/glossary#driver\">driver</a>
+  that contains the platform-specific information needed by the
+  <a href=\"/docs/glossary#platform-bus\">platform bus</a> and controls what other
+  drivers will be loaded by the platform bus. The board driver is the first driver
+  loaded and parented by the platform bus."
+  see_also: [
+    "<a href=\"/docs/glossary#board\">Board</a>",
+    "<a href=\"/src/devices/board/drivers/\">//src/devices/board/drivers</a>",
+    "<a href=\"/docs/development/drivers/concepts/device_driver_model/platform-bus\">Platform Bus</a>"
+  ]
+  related_guides: [""]
+  area: ["System", "Devices"]
+
 - term: "bootfs"
   short_description: "The boot filesystem that contains the files needed early in the boot process."
   full_description: "The bootfs RAM disk contains the files needed early in the boot process when no
@@ -105,14 +139,14 @@
   area: ["System", "Zircon"]
 
 - term: "Bringup"
-  short_description: "The process of getting Fuchsia to run on a new board."
+  short_description: "The process of getting Fuchsia to run on a new <a href=\"/docs/glossary#board\">board</a>."
   full_description: "Bringup is the catchall term for all of the engineering work related to
-  getting Fuchsia to run on a new board. A board is a complete computer hardware platform with
-  a CPU, memory, peripherals, and so on. The term \"bringup\" should not be used for situations
-  where Fuchsia support for the board already exists. For example, flashing a Fuchsia image onto
-  a VIM3 is not bringup. The original engineering work of implementing the drivers and so on so
-  that Fuchsia can run on the VIM3 is bringup."
+  getting Fuchsia to run on a new <a href=\"/docs/glossary#board\">board</a>. The term \"bringup\"
+  should not be used for situations where Fuchsia support for the board already exists. For example,
+  flashing a Fuchsia image onto a VIM3 is not bringup. The original engineering work of implementing
+  the drivers and so on so that Fuchsia can run on the VIM3 is bringup."
   see_also: [
+    "<a href=\"/docs/glossary#board\">Board</a>",
     "<a href=\"/docs/development/build/build_system/bringup\">Bringup Product Definition</a>",
     "<a href=\"/docs/development/boards/bringup\"><Adding support for new boards/a>",
     "<a href=\"/docs/contribute/governance/rfcs/0111_fuchsia_hardware_specifications#document-definitions\">\"Board\" definition</a>",
