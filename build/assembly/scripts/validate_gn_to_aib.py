@@ -108,6 +108,14 @@ def cli_args():
         help=
         "An optional flag which when provided will use the latest historical build artifacts stored\
         in the 'latest' directory of the tmp dir.")
+
+    parser.add_argument(
+        "--clean",
+        required=False,
+        action="store_true",
+        default=False,
+        help="An optional flag which when provided forces a clean build.")
+
     args = parser.parse_args()
 
     return args
@@ -262,10 +270,11 @@ def _diff_dicts(old, new, path: List):
 
 
 def attempt_clean_build(
-        outdir_iac, stored_iac_path, latest_iac_path, commit_hash):
+        outdir_iac, stored_iac_path, latest_iac_path, commit_hash, clean=False):
     if not stored_iac_path.exists():
         with stash_uncommitted():
-            subprocess.run(["fx", "clean"])
+            if clean:
+                subprocess.run(["fx", "clean"])
             subprocess.run(["fx", "build"])
             # Creates a copy of the image assembly config in the tmp dir for the given HEAD commit
             # hash if one doesn't already exist.
@@ -319,7 +328,8 @@ def main():
     if args.use_latest:
         prev_iac = latest_iac_path
     else:
-        attempt_clean_build(outdir_iac, prev_iac, latest_iac_path, commit_hash)
+        attempt_clean_build(
+            outdir_iac, prev_iac, latest_iac_path, commit_hash, args.clean)
 
     if not _uncommitted_changes():
         sys.exit(
