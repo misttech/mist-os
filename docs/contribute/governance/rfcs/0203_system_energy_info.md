@@ -189,7 +189,7 @@ value is unspecified.
 
 `ZX_ERR_NOT_SUPPORTED`
 
-- The processor is not a [supported x86-64 processor](https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0073_x86_64_platform_requirement?hl=en).
+- The processor is not a [supported x86-64 processor](https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0073_x86_64_platform_requirement).
 - The processor is a supported x86-64 processor, but the `Energy Status` MSR of
   the specified domain is not available on this processor.
 - The processor is a supported x86-64 processor and  the `Energy Status` MSR of
