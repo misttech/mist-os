@@ -1326,7 +1326,6 @@ async fn test_tcp_socket<N: Netstack, E: netemul::Endpoint>(name: &str) {
 }
 
 #[netstack_test]
-#[ignore]
 async fn tcp_sendbuf_size<I: net_types::ip::Ip + TestIpExt, N: Netstack, E: netemul::Endpoint>(
     name: &str,
 ) {
