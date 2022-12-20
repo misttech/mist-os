@@ -97,6 +97,9 @@ assembly_input_bundle("common_minimal") {
 
     # Security
     "//src/security/bin/root_ssl_certificates",
+
+    # Activity
+    "//src/sys/activity",
   ]
 
   bootfs_files = [

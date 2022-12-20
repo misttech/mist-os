@@ -28,7 +28,6 @@ legacy_base_package_labels += [
   "//src/graphics/bin/vulkan_loader",
   "//src/identity/bin:account_system",
   "//src/media/audio/drivers/configurator:package",
-  "//src/sys/activity",
   "//third_party/openssh-portable:openssh-tools",
 ]
 

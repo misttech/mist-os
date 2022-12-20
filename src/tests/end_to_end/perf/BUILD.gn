@@ -270,7 +270,6 @@ group("package_deps") {
     "//src/ui/examples:flatland-examples",
 
     # These are used by input_latency_benchmarks.
-    "//src/sys/activity",
     "//src/ui/bin/input-pipeline:component-for-test",
 
     # These are used by storage_benchmarks_test
