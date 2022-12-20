@@ -654,15 +654,11 @@ void EventRing::HandlePortStatusChangeInterrupt() {
 }
 
 zx_status_t EventRing::HandleCommandCompletionInterrupt() {
-  auto completion_event = static_cast<CommandCompletionEvent*>(erdp_virt_);
-  if (completion_event->CompletionCode() != CommandCompletionEvent::Success) {
-    zxlogf(WARNING, "Received command completion event with completion code: %u",
-           completion_event->CompletionCode());
-    return ZX_OK;
-  }
-
+  // We do not expect to receive command completion events with invalid TRB pointers, so we always
+  // check the pointer against the command ring pending TRB queue. Section 6.4.2.2 states that not
+  // all command completion events have valid TRB pointers, but it's not clear in what case that
+  // would actually occur.
   TRB* trb = command_ring_->PhysToVirt(erdp_virt_->ptr);
-  // Advance dequeue pointer
   std::unique_ptr<TRBContext> context;
   zx_status_t status = command_ring_->CompleteTRB(trb, &context);
   if (status != ZX_OK) {
@@ -671,13 +667,14 @@ zx_status_t EventRing::HandleCommandCompletionInterrupt() {
     return ZX_ERR_BAD_STATE;
   }
 
-  if (completion_event->CompletionCode() == CommandCompletionEvent::SlotNotEnabledError) {
-    return ZX_OK;
+  auto completion_event = static_cast<CommandCompletionEvent*>(erdp_virt_);
+  if (completion_event->CompletionCode() != CommandCompletionEvent::Success) {
+    // Log all failing commands for now. As error handling is added to the command callbacks, this
+    // can be reduced.
+    zxlogf(WARNING, "Received command completion event with completion code: %u",
+           completion_event->CompletionCode());
   }
 
-  // Invoke the callback to pre-process the command first.
-  // The command MAY mutate the state of the completion event.
-  // It is important that it be called prior to further processing of the event.
   if (context->completer.has_value()) {
     context->completer.value().complete_ok(completion_event);
   }

@@ -34,6 +34,7 @@
 #include <fbl/alloc_checker.h>
 #include <usb/usb-request.h>
 
+#include "src/devices/usb/drivers/xhci/registers.h"
 #include "src/devices/usb/drivers/xhci/usb_xhci_bind.h"
 #include "src/devices/usb/drivers/xhci/xhci-context.h"
 #include "src/devices/usb/drivers/xhci/xhci-enumeration.h"
@@ -519,6 +520,8 @@ fpromise::promise<void, zx_status_t> UsbXhci::ConfigureHubAsync(uint32_t device_
       .and_then([=](TRB*& trb) -> fpromise::promise<void, zx_status_t> {
         auto completion = reinterpret_cast<CommandCompletionEvent*>(trb);
         if (completion->CompletionCode() != CommandCompletionEvent::Success) {
+          zxlogf(ERROR, "Failed to configure endpoint: CompletionCode() == %u",
+                 completion->CompletionCode());
           return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO);
         }
         if (speed != USB_SPEED_SUPER) {
@@ -1272,12 +1275,17 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciEnableEndpoint(
               return fpromise::error(result.error());
             }
             auto completion = static_cast<CommandCompletionEvent*>(result.value());
-            bool success = completion->CompletionCode() == CommandCompletionEvent::Success;
-            if (success) {
-              free_buffers.cancel();
-            } else {
+            if (completion->CompletionCode() == CommandCompletionEvent::BandwidthError) {
+              // TODO(fxbug.dev/117713): We could handle this by implementing bandwidth negotiation
+              // (see Section 4.16.1). For now just return an error to the client.
+              return fpromise::error(ZX_ERR_NO_RESOURCES);
+            }
+            if (completion->CompletionCode() != CommandCompletionEvent::Success) {
+              zxlogf(ERROR, "Failed to configure endpoint: CompletionCode() == %u",
+                     completion->CompletionCode());
               return fpromise::error(ZX_ERR_IO);
             }
+            free_buffers.cancel();
             return fpromise::ok();
           })
       .box();
@@ -1316,8 +1324,9 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciDisableEndpoint(
               return fpromise::error(ZX_ERR_BAD_STATE);
             }
             auto completion = reinterpret_cast<CommandCompletionEvent*>(result.value());
-            bool success = completion->CompletionCode() == CommandCompletionEvent::Success;
-            if (!success) {
+            if (completion->CompletionCode() != CommandCompletionEvent::Success) {
+              zxlogf(ERROR, "Failed to configure endpoint: CompletionCode() == %u",
+                     completion->CompletionCode());
               return fpromise::error(ZX_ERR_BAD_STATE);
             }
             auto endpoint_context = reinterpret_cast<EndpointContext*>(
