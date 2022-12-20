@@ -99,8 +99,8 @@ class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
   }
 
  private:
-  mutable DECLARE_CRITICAL_MUTEX(VmHierarchyState) lock_;
   bool running_delete_ TA_GUARDED(lock_) = false;
+  mutable DECLARE_CRITICAL_MUTEX(VmHierarchyState) lock_;
   fbl::SinglyLinkedListCustomTraits<fbl::RefPtr<VmHierarchyBase>, internal::DeferredDeleteTraits>
       delete_list_ TA_GUARDED(lock_);
 
