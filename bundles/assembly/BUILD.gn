@@ -93,7 +93,9 @@ assembly_input_bundle("common_minimal") {
     # Other
     "//src/developer/memory/monitor",
     "//src/sys/stash:pkg",
+
     "//src/sys/time/timekeeper",
+    "//src/sys/time/httpsdate_time_source:httpsdate-time-source",
 
     # Security
     "//src/security/bin/root_ssl_certificates",
