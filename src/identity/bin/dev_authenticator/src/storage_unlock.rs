@@ -11,25 +11,23 @@ use {
     fuchsia_runtime::duplicate_utc_clock_handle,
     fuchsia_zircon::{self as zx, Clock},
     futures::prelude::*,
+    identity_common::{EnrollmentData, PrekeyMaterial},
     lazy_static::lazy_static,
     tracing::warn,
 };
 
-type EnrollmentData = Vec<u8>;
-type PrekeyMaterial = Vec<u8>;
-
 lazy_static! {
     /// The enrollment data always reported by this authenticator.
-    static ref FIXED_ENROLLMENT_DATA: Vec<u8> = vec![0, 1, 2];
+    static ref FIXED_ENROLLMENT_DATA: EnrollmentData = EnrollmentData(vec![0, 1, 2]);
 
     /// The magic prekey material corresponding to a successful authentication
     /// attempt with the account system. This constant is copied to
     /// the account_handler implementation and needs to stay in sync.
-    static ref MAGIC_PREKEY: Vec<u8>  = vec![77; 32];
+    static ref MAGIC_PREKEY: PrekeyMaterial = PrekeyMaterial(vec![77; 32]);
 
     /// Valid prekey material but is not the magic prekey. Should be used to
     /// generate authentication failures.
-    static ref NOT_MAGIC_PREKEY: Vec<u8> = vec![80; 32];
+    static ref NOT_MAGIC_PREKEY: PrekeyMaterial = PrekeyMaterial(vec![80; 32]);
 }
 
 /// Determines the behavior of the authenticator.
@@ -142,7 +140,7 @@ impl StorageUnlockMechanism {
             timestamp: self.read_clock().map(|time| time.into_nanos()),
             enrollment_id: Some(id),
             updated_enrollment_data: None,
-            prekey_material: Some(prekey_material),
+            prekey_material: Some(prekey_material.to_vec()),
             ..AttemptedEvent::EMPTY
         })
     }
@@ -151,10 +149,10 @@ impl StorageUnlockMechanism {
     async fn enroll(
         &self,
         interaction: InteractionProtocolServerEnd,
-    ) -> Result<(EnrollmentData, PrekeyMaterial), ApiError> {
+    ) -> Result<(Vec<u8>, Vec<u8>), ApiError> {
         match interaction {
             InteractionProtocolServerEnd::Test(_) => {
-                Ok((FIXED_ENROLLMENT_DATA.clone(), MAGIC_PREKEY.clone()))
+                Ok((FIXED_ENROLLMENT_DATA.to_vec(), MAGIC_PREKEY.to_vec()))
             }
             _ => {
                 warn!("Unsupported InteractionProtocolServerEnd: Only Test is supported");
@@ -262,7 +260,7 @@ mod test {
 
             assert_eq!(enrollment_id, Some(TEST_ENROLLMENT_ID));
             assert!(updated_enrollment_data.is_none());
-            assert_eq!(prekey_material, Some(MAGIC_PREKEY.clone()));
+            assert_eq!(prekey_material.as_ref(), Some(MAGIC_PREKEY.as_ref()));
             Ok(())
         })
         .await
@@ -275,7 +273,7 @@ mod test {
                 proxy.enroll(&mut create_test_interaction_protocol()).await?.unwrap();
 
             let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enrollment_data.clone() };
-            assert_eq!(enrollment_prekey, MAGIC_PREKEY.clone());
+            assert_eq!(enrollment_prekey, MAGIC_PREKEY.0);
 
             let AttemptedEvent { enrollment_id, updated_enrollment_data, prekey_material, .. } =
                 proxy
@@ -286,7 +284,7 @@ mod test {
                     .await?
                     .unwrap();
 
-            assert_ne!(prekey_material, Some(MAGIC_PREKEY.clone()));
+            assert_ne!(prekey_material.as_ref(), Some(MAGIC_PREKEY.as_ref()));
             assert!(updated_enrollment_data.is_none());
             assert_eq!(enrollment_id, Some(TEST_ENROLLMENT_ID));
             Ok(())
@@ -301,7 +299,7 @@ mod test {
                 proxy.enroll(&mut create_test_interaction_protocol()).await?.unwrap();
 
             let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enrollment_data.clone() };
-            assert_eq!(enrollment_prekey, MAGIC_PREKEY.clone());
+            assert_eq!(enrollment_prekey, MAGIC_PREKEY.0);
 
             let (test_proxy, mut test_ipse) = create_test_interaction_proxy_and_server_end();
             std::mem::drop(test_proxy); // Drop test_proxy without calling SetSuccess().
@@ -327,7 +325,7 @@ mod test {
                 proxy.enroll(&mut create_test_interaction_protocol()).await?.unwrap();
 
             let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enrollment_data.clone() };
-            assert_eq!(enrollment_prekey, MAGIC_PREKEY.clone());
+            assert_eq!(enrollment_prekey, MAGIC_PREKEY.0);
 
             let (_test_proxy, mut test_ipse) = create_test_interaction_proxy_and_server_end();
 
@@ -388,7 +386,7 @@ mod test {
 
             assert_eq!(enrollment_id, Some(TEST_ENROLLMENT_ID));
             assert!(updated_enrollment_data.is_none());
-            assert_eq!(prekey_material, Some(MAGIC_PREKEY.clone()));
+            assert_eq!(prekey_material.as_ref(), Some(MAGIC_PREKEY.as_ref()));
             Ok(())
         })
         .await
@@ -407,7 +405,7 @@ mod test {
                 proxy.enroll(&mut create_test_interaction_protocol()).await?.unwrap();
 
             let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enrollment_data.clone() };
-            assert_eq!(enrollment_prekey, MAGIC_PREKEY.clone());
+            assert_eq!(enrollment_prekey, MAGIC_PREKEY.0);
 
             // Fail authentication since it only supports Test IPSE.
             assert_eq!(

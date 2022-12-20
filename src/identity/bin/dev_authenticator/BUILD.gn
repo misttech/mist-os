@@ -12,6 +12,7 @@ rustc_binary("bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.identity.authentication:fuchsia.identity.authentication_rust",
+    "//src/identity/lib/identity_common",
     "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
