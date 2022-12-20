@@ -685,6 +685,9 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                         if let Some(x) = telemetry_data.rcp_version {
                             inspector.root().record_string("rcp_version", x);
                         }
+                        if let Some(x) = telemetry_data.rssi {
+                            inspector.root().record_int("rssi", x.into());
+                        }
                         if let Some(x) = telemetry_data.thread_border_routing_counters {
                             inspector.root().record_child(
                                 "border_routing_counters",
