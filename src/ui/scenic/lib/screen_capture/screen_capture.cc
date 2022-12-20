@@ -50,10 +50,17 @@ ScreenCapture::ScreenCapture(
       buffer_collection_importers_(buffer_collection_importers),
       renderer_(std::move(renderer)),
       get_renderables_(std::move(get_renderables)) {
-  binding_.set_error_handler([this](zx_status_t status) { ClearImages(); });
+  binding_.set_error_handler([this](zx_status_t status) {
+    FX_LOGS(ERROR) << "ScreenCapture: Clearing images due to status: "
+                   << zx_status_get_string(status);
+    ClearImages();
+  });
 }
 
-ScreenCapture::~ScreenCapture() { ClearImages(); }
+ScreenCapture::~ScreenCapture() {
+  FX_LOGS(ERROR) << "ScreenCapture::Dtor: Clearing images.";
+  ClearImages();
+}
 
 void ScreenCapture::Configure(ScreenCaptureConfig args, ConfigureCallback callback) {
   // Check for missing args.
@@ -121,7 +128,9 @@ void ScreenCapture::Configure(ScreenCaptureConfig args, ConfigureCallback callba
     available_buffers_.push_back(i);
   }
   // Everything was successful!
-  FX_LOGS(INFO) << "ScreenCapture::Configure: Configuration was successful.";
+  FX_LOGS(INFO)
+      << "ScreenCapture::Configure: Configuration was successful with available buffer count: "
+      << available_buffers_.size();
   callback(fpromise::ok());
 }
 
