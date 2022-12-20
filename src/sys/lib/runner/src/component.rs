@@ -44,6 +44,11 @@ pub trait Controllable {
     /// not stopped quickly enough, kill will be called. The amount of time
     /// `stop` is allowed may vary based on a variety of factors.
     fn stop<'a>(&mut self) -> BoxFuture<'a, ()>;
+
+    /// Perform any teardown tasks before closing the controller channel.
+    fn teardown<'a>(&mut self) -> BoxFuture<'a, ()> {
+        async {}.boxed()
+    }
 }
 
 /// Holds information about the component that allows the controller to
@@ -148,6 +153,13 @@ impl<C: Controllable> Controller<C> {
                 },
             }
         };
+
+        // Before closing the controller channel, perform teardown tasks if the runner configured
+        // them. This will only run if the component was not killed (otherwise `controllable` is
+        // `None`).
+        if let Some(mut controllable) = self.controllable.take() {
+            controllable.teardown().await;
+        }
 
         self.request_stream.control_handle().shutdown_with_epitaph(result_code.into());
 
@@ -502,10 +514,11 @@ mod tests {
         fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc, fuchsia_async as fasync,
         fuchsia_runtime::{HandleInfo, HandleType},
         fuchsia_zircon::{self as zx, HandleBased},
-        futures::{future::BoxFuture, prelude::*},
+        futures::{future::BoxFuture, poll, prelude::*},
         std::{
             boxed::Box,
             convert::{TryFrom, TryInto},
+            pin::Pin,
             task::Poll,
         },
     };
@@ -518,6 +531,8 @@ mod tests {
         pub onkill: Option<K>,
 
         pub onstop: Option<J>,
+
+        pub onteardown: Option<BoxFuture<'static, ()>>,
     }
 
     #[async_trait]
@@ -535,9 +550,13 @@ mod tests {
             let func = self.onstop.take().unwrap();
             async move { func() }.boxed()
         }
+
+        fn teardown<'a>(&mut self) -> BoxFuture<'a, ()> {
+            self.onteardown.take().unwrap()
+        }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_kill_component() -> Result<(), Error> {
         let (sender, recv) = futures::channel::oneshot::channel::<()>();
         let (epitaph_tx, epitaph_rx) = futures::channel::oneshot::channel::<ChannelEpitaph>();
@@ -550,6 +569,7 @@ mod tests {
                 let _ = epitaph_tx.send(CHANNEL_EPITAPH.try_into().unwrap());
             }),
             onstop: Some(|| {}),
+            onteardown: Some(async {}.boxed()),
         };
 
         let (controller, client_proxy) = create_controller_and_proxy(fake_component)?;
@@ -573,9 +593,11 @@ mod tests {
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_stop_component() -> Result<(), Error> {
         let (sender, recv) = futures::channel::oneshot::channel::<()>();
+        let (teardown_signal_tx, teardown_signal_rx) = futures::channel::oneshot::channel::<()>();
+        let (teardown_fence_tx, teardown_fence_rx) = futures::channel::oneshot::channel::<()>();
         let (epitaph_tx, epitaph_rx) = futures::channel::oneshot::channel::<ChannelEpitaph>();
         const CHANNEL_EPITAPH: zx::Status = zx::Status::OK;
 
@@ -585,6 +607,13 @@ mod tests {
                 let _ = epitaph_tx.send(CHANNEL_EPITAPH.try_into().unwrap());
             }),
             onkill: Some(move || {}),
+            onteardown: Some(
+                async move {
+                    teardown_signal_tx.send(()).unwrap();
+                    teardown_fence_rx.await.unwrap();
+                }
+                .boxed(),
+            ),
         };
 
         let (controller, client_proxy) = create_controller_and_proxy(fake_component)?;
@@ -593,23 +622,33 @@ mod tests {
 
         let epitaph_receiver = Box::pin(async move { epitaph_rx.await.unwrap() });
 
-        // This should return after stop call
-        controller.serve(epitaph_receiver).await.expect("should not fail");
+        // This should return once the channel is closed, that is after stop and teardown
+        let controller_serve = fasync::Task::spawn(controller.serve(epitaph_receiver));
 
         // This means stop was called
         recv.await?;
 
-        // Check the epitaph on teh controller channel, this should match what
+        // Teardown should be called
+        teardown_signal_rx.await?;
+
+        // Teardown is blocked. Verify there's no epitaph on the channel yet, then unblock it.
+        let mut client_stream = client_proxy.take_event_stream();
+        let mut client_stream_fut = client_stream.try_next();
+        assert_matches!(poll!(Pin::new(&mut client_stream_fut)), Poll::Pending);
+        teardown_fence_tx.send(()).unwrap();
+        controller_serve.await.unwrap();
+
+        // Check the epitaph on the controller channel, this should match what
         // is sent by `epitaph_tx`
         assert_matches!(
-            client_proxy.take_event_stream().try_next().await,
+            client_stream_fut.await,
             Err(fidl::Error::ClientChannelClosed { status, .. }) if status == CHANNEL_EPITAPH
         );
 
         Ok(())
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_stop_then_kill() -> Result<(), Error> {
         let mut exec = fasync::TestExecutor::new().unwrap();
         let (sender, mut recv) = futures::channel::oneshot::channel::<()>();
@@ -624,6 +663,7 @@ mod tests {
             onkill: Some(move || {
                 let _ = epitaph_tx.send(CHANNEL_EPITAPH.try_into().unwrap());
             }),
+            onteardown: Some(async {}.boxed()),
         };
 
         let (controller, client_proxy) = create_controller_and_proxy(fake_component)?;
@@ -795,7 +835,7 @@ mod tests {
             Ok(())
         }
 
-        #[fasync::run_singlethreaded(test)]
+        #[fuchsia::test]
         async fn missing_pkg() -> Result<(), Error> {
             let (launcher_proxy, _server_end) = create_proxy::<fproc::LauncherMarker>()?;
             let ns = setup_empty_namespace()?;
@@ -823,7 +863,7 @@ mod tests {
             Ok(())
         }
 
-        #[fasync::run_singlethreaded(test)]
+        #[fuchsia::test]
         async fn invalid_executable() -> Result<(), Error> {
             let (launcher_proxy, _server_end) = create_proxy::<fproc::LauncherMarker>()?;
             let ns = setup_namespace(true, vec![])?;
@@ -851,7 +891,7 @@ mod tests {
             Ok(())
         }
 
-        #[fasync::run_singlethreaded(test)]
+        #[fuchsia::test]
         async fn invalid_pkg() -> Result<(), Error> {
             let (launcher_proxy, _server_end) = create_proxy::<fproc::LauncherMarker>()?;
             let ns = setup_namespace(false, vec!["/pkg"])?;
@@ -879,7 +919,7 @@ mod tests {
             Ok(())
         }
 
-        #[fasync::run_singlethreaded(test)]
+        #[fuchsia::test]
         async fn default_args() -> Result<(), Error> {
             let (launcher_proxy, recv) = start_launcher()?;
 

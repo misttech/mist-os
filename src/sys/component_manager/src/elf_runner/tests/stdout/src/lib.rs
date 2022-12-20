@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use {
+    assert_matches::assert_matches,
     diagnostics_data::{Data, Logs, Severity},
     diagnostics_reader::ArchiveReader,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io::DirectoryMarker,
+    fidl_fuchsia_component as fcomponent,
     fuchsia_async::{Duration, TestExecutor, Timer},
-    fuchsia_component::client,
+    fuchsia_component_test::ScopedInstance,
+    futures::StreamExt,
     test_case::test_case,
 };
 
@@ -56,30 +56,11 @@ fn launch_component_and_check_messages(url: &str, moniker: &str, expected_messag
 
 async fn test_inner(url: &str, moniker: &str, expected: Expected) {
     // start the child in our collection
-    let realm = client::realm().expect("failed to connect to fuchsia.component.Realm");
-
-    let mut collection_ref = fdecl::CollectionRef { name: COLLECTION_NAME.to_owned() };
-    let child_decl = fdecl::Child {
-        name: Some(moniker.to_owned()),
-        url: Some(url.to_owned()),
-        startup: Some(fdecl::StartupMode::Lazy),
-        environment: None,
-        ..fdecl::Child::EMPTY
-    };
-    realm
-        .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
-        .await
-        .expect("Failed to make FIDL call")
-        .expect("Failed to create child");
-    let mut child_ref =
-        fdecl::ChildRef { name: moniker.to_owned(), collection: Some(COLLECTION_NAME.to_owned()) };
-    let (exposed_dir, server_end) = create_proxy::<DirectoryMarker>().unwrap();
-    realm
-        .open_exposed_dir(&mut child_ref, server_end)
-        .await
-        .expect("failed to make FIDL call")
-        .expect("failed to open exposed dir of child");
-    client::connect_to_protocol_at_dir_root::<fcomponent::BinderMarker>(&exposed_dir).unwrap();
+    let mut instance =
+        ScopedInstance::new_with_name(moniker.into(), COLLECTION_NAME.into(), url.into())
+            .await
+            .unwrap();
+    let binder = instance.connect_to_protocol_at_exposed_dir::<fcomponent::BinderMarker>().unwrap();
     let full_moniker = &format!("{}:{}", COLLECTION_NAME, moniker);
 
     // wait a little to increase chances we detect extra messages we don't want
@@ -94,6 +75,16 @@ async fn test_inner(url: &str, moniker: &str, expected: Expected) {
     } else {
         expected.len()
     };
+
+    // Wait for component to exit
+    let mut binder_stream = binder.take_event_stream();
+    assert_matches!(binder_stream.next().await, None);
+
+    // destroy the instance to ensure all its logs have been delivered to archivist
+    let waiter = instance.take_destroy_waiter();
+    drop(instance);
+    waiter.await.unwrap();
+
     // read log messages
     let mut messages = ArchiveReader::new()
         .select_all_for_moniker(full_moniker) // only return logs for this puppet

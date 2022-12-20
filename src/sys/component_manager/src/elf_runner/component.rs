@@ -9,7 +9,7 @@ use {
     fidl_fuchsia_process_lifecycle::LifecycleProxy,
     fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, AsHandleRef, Job, Process, Task},
-    futures::future::{BoxFuture, FutureExt},
+    futures::future::{join_all, BoxFuture, FutureExt},
     runner::component::Controllable,
     std::sync::Arc,
     tracing::{error, warn},
@@ -40,7 +40,9 @@ pub struct ElfComponent {
     /// Any tasks spawned to serve this component. For example, stdout and stderr
     /// listeners are Task objects that live for the duration of the component's
     /// lifetime.
-    _tasks: Vec<fasync::Task<()>>,
+    ///
+    /// Stop will block on these to complete.
+    tasks: Option<Vec<fasync::Task<()>>>,
 
     /// URL with which the component was launched.
     component_url: String,
@@ -62,7 +64,7 @@ impl ElfComponent {
             process: Some(Arc::new(process)),
             lifecycle_channel,
             main_process_critical,
-            _tasks: tasks,
+            tasks: Some(tasks),
             component_url,
         }
     }
@@ -171,6 +173,14 @@ impl Controllable for ElfComponent {
             });
             async {}.boxed()
         }
+    }
+
+    fn teardown<'a>(&mut self) -> BoxFuture<'a, ()> {
+        let tasks = self.tasks.take().unwrap_or_default();
+        async move {
+            join_all(tasks).await;
+        }
+        .boxed()
     }
 }
 
