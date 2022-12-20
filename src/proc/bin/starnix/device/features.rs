@@ -12,7 +12,7 @@ use crate::types::*;
 /// such as Wayland, should be enabled on a per-component basis. We run this when we first
 /// make the Galaxy. When we start the component, we run the run_component_features
 /// function.
-pub fn run_features<'a>(entries: &'a Vec<String>, current_task: &CurrentTask) -> Result<(), Errno> {
+pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result<(), Errno> {
     for entry in entries {
         match entry.as_str() {
             // Wayland is enabled on a per-component basis and so skipped here.

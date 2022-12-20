@@ -41,10 +41,10 @@ pub(crate) mod registration {
     impl Registrar {
         /// Brings up the communication by supplying the subset of needed inputs to the particular
         /// [Registrar].
-        pub fn register<'a>(
+        pub fn register(
             self,
             job_seeder: &Seeder,
-            service_dir: &mut ServiceFsDir<'_, ServiceObj<'a, ()>>,
+            service_dir: &mut ServiceFsDir<'_, ServiceObj<'_, ()>>,
         ) {
             match self {
                 Registrar::Fidl(register_fn) => {
@@ -76,10 +76,10 @@ pub(crate) mod registration {
             &self.dependencies
         }
 
-        pub(crate) fn register<'a>(
+        pub(crate) fn register(
             self,
             job_seeder: &Seeder,
-            service_dir: &mut ServiceFsDir<'_, ServiceObj<'a, ()>>,
+            service_dir: &mut ServiceFsDir<'_, ServiceObj<'_, ()>>,
         ) {
             self.registrar.register(job_seeder, service_dir);
         }

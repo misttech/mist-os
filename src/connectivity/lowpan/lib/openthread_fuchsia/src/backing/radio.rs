@@ -26,10 +26,10 @@ impl PlatformBacking {
         self.ot_to_rcp_sender.borrow_mut().send(buffer.to_vec()).expect("ot_to_rcp_sender::send");
     }
 
-    fn on_recv_wait_spinel_frame_from_rcp<'a>(
+    fn on_recv_wait_spinel_frame_from_rcp(
         &self,
         _instance: Option<&ot::Instance>,
-        buffer: &'a mut [u8],
+        buffer: &mut [u8],
         duration: Duration,
     ) -> usize {
         #[no_mangle]

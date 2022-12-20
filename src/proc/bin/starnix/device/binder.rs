@@ -941,10 +941,10 @@ struct ThreadPool(BTreeMap<pid_t, Arc<BinderThread>>);
 impl ThreadPool {
     /// Finds the first available binder thread that is registered with the driver, is not in the
     /// middle of a transaction, and has no work to do.
-    fn find_available_thread<'a, F>(
-        &'a self,
+    fn find_available_thread<F>(
+        &self,
         filter: F,
-    ) -> Option<RwLockUpgradableReadGuard<'a, BinderThreadState>>
+    ) -> Option<RwLockUpgradableReadGuard<'_, BinderThreadState>>
     where
         F: Fn(&BinderThreadState) -> bool,
     {
@@ -2180,12 +2180,12 @@ impl BinderDriver {
 
     /// Consumes one command from the userspace binder_write_read buffer and handles it.
     /// This method will never block.
-    fn handle_thread_write<'a>(
+    fn handle_thread_write(
         &self,
         current_task: &dyn RunningBinderTask,
         binder_proc: &Arc<BinderProcess>,
         binder_thread: &Arc<BinderThread>,
-        cursor: &mut UserMemoryCursor<'a>,
+        cursor: &mut UserMemoryCursor<'_>,
     ) -> Result<(), Errno> {
         let command = cursor.read_object::<binder_driver_command_protocol>()?;
         let result = match command {
