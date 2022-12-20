@@ -2622,9 +2622,9 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_stopping_dhcpv6_with_down_lookup_admin() -> Result<(), anyhow::Error> {
+    async fn test_stopping_dhcpv6_with_down_lookup_admin() {
         let (mut netcfg, ServerEnds { lookup_admin, mut dhcpv6_client_provider }) =
-            test_netcfg().context("error creating test netcfg")?;
+            test_netcfg().expect("error creating test netcfg");
         let mut dns_watchers = DnsServerWatchers::empty();
 
         // Mock a new interface being discovered by NetCfg (we only need to make NetCfg aware of a
@@ -2658,8 +2658,7 @@ mod tests {
                 &mut virtualization::Stub,
             )
             .await
-            .context("error handling interface added event with interface up and sockaddr1")
-            .map_err::<anyhow::Error, _>(Into::into)?;
+            .expect("error handling interface added event with interface up and sockaddr1");
         let _: fnet_dhcpv6::ClientRequestStream = check_new_dhcpv6_client(
             &mut dhcpv6_client_provider,
             INTERFACE_ID,
@@ -2668,7 +2667,7 @@ mod tests {
             &mut dns_watchers,
         )
         .await
-        .context("error checking for new client with sockaddr1")?;
+        .expect("error checking for new client with sockaddr1");
 
         // Drop the server-end of the lookup admin to simulate a down lookup admin service.
         let () = std::mem::drop(lookup_admin);
@@ -2681,14 +2680,14 @@ mod tests {
             Some(ipv6addrs(None)),
         )
         .await
-        .context("error handling interface changed event with sockaddr1 removed")?;
+        .expect("error handling interface changed event with sockaddr1 removed");
 
         // Another update without any link-local IPv6 addresses should do nothing
         // since the DHCPv6 client was already stopped.
         let () =
             handle_interface_changed_event(&mut netcfg, &mut dns_watchers, None, Some(Vec::new()))
                 .await
-                .context("error handling interface changed event with sockaddr1 removed")?;
+                .expect("error handling interface changed event with sockaddr1 removed");
 
         // Update interface with a link-local address to create a new DHCPv6 client.
         let () = handle_interface_changed_event(
@@ -2698,7 +2697,7 @@ mod tests {
             Some(ipv6addrs(Some(LINK_LOCAL_SOCKADDR1))),
         )
         .await
-        .context("error handling interface changed event with sockaddr1 removed")?;
+        .expect("error handling interface changed event with sockaddr1 removed");
         let _: fnet_dhcpv6::ClientRequestStream = check_new_dhcpv6_client(
             &mut dhcpv6_client_provider,
             INTERFACE_ID,
@@ -2707,21 +2706,21 @@ mod tests {
             &mut dns_watchers,
         )
         .await
-        .context("error checking for new client with sockaddr1")?;
+        .expect("error checking for new client with sockaddr1");
 
         // Update offline status to down to stop DHCPv6 client.
         let () = handle_interface_changed_event(&mut netcfg, &mut dns_watchers, Some(false), None)
             .await
-            .context("error handling interface changed event with sockaddr1 removed")?;
+            .expect("error handling interface changed event with sockaddr1 removed");
 
         // Update interface with new addresses but leave offline status as down.
         handle_interface_changed_event(&mut netcfg, &mut dns_watchers, None, Some(ipv6addrs(None)))
             .await
-            .context("error handling interface changed event with sockaddr1 removed")
+            .expect("error handling interface changed event with sockaddr1 removed")
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_dhcpv6() -> Result<(), anyhow::Error> {
+    async fn test_dhcpv6() {
         /// Waits for a `SetDnsServers` request with the specified servers.
         async fn run_lookup_admin_once(
             server: &mut fnet_name::LookupAdminRequestStream,
@@ -2731,7 +2730,7 @@ mod tests {
                 .try_next()
                 .await
                 .context("error getting next lookup admin request")?
-                .ok_or(anyhow::anyhow!("expected lookup admin request"))?;
+                .context("expected lookup admin request")?;
             if let fnet_name::LookupAdminRequest::SetDnsServers { servers, responder } = req {
                 if expected_servers != &servers {
                     return Err(anyhow::anyhow!(
@@ -2746,7 +2745,7 @@ mod tests {
             }
         }
 
-        let (mut netcfg, mut servers) = test_netcfg().context("error creating test netcfg")?;
+        let (mut netcfg, mut servers) = test_netcfg().expect("error creating test netcfg");
         let mut dns_watchers = DnsServerWatchers::empty();
 
         // Mock a fake DNS update from the netstack.
@@ -2768,7 +2767,7 @@ mod tests {
                 .map(|r| r.context("error running lookup admin")),
         )
         .await
-        .context("error setting netstack DNS servers")?;
+        .expect("error setting netstack DNS servers");
 
         // Mock a new interface being discovered by NetCfg (we only need to make NetCfg aware of a
         // NIC with ID `INTERFACE_ID` to test DHCPv6).
@@ -2801,8 +2800,7 @@ mod tests {
                 &mut virtualization::Stub,
             )
             .await
-            .context("error handling interface added event with interface up and sockaddr1")
-            .map_err::<anyhow::Error, _>(Into::into)?;
+            .expect("error handling interface added event with interface up and sockaddr1");
         let mut client_server = check_new_dhcpv6_client(
             &mut servers.dhcpv6_client_provider,
             INTERFACE_ID,
@@ -2811,7 +2809,7 @@ mod tests {
             &mut dns_watchers,
         )
         .await
-        .context("error checking for new client with sockaddr1")?;
+        .expect("error checking for new client with sockaddr1");
 
         // Mock a fake DNS update from the DHCPv6 client.
         let ((), ()) = future::try_join(
@@ -2834,7 +2832,7 @@ mod tests {
                 .map(|r| r.context("error running lookup admin")),
         )
         .await
-        .context("error setting dhcpv6 DNS servers")?;
+        .expect("error setting dhcpv6 DNS servers");
 
         // Not having any more link local IPv6 addresses should terminate the client.
         let ((), ()) = future::try_join(
@@ -2849,7 +2847,7 @@ mod tests {
                 .map(|r| r.context("error running lookup admin")),
         )
         .await
-        .context("error handling client termination due to empty addresses")?;
+        .expect("error handling client termination due to empty addresses");
         assert!(!dns_watchers.contains_key(&DHCPV6_DNS_SOURCE), "should not have a watcher");
         assert_matches::assert_matches!(client_server.try_next().await, Ok(None));
 
@@ -2862,7 +2860,7 @@ mod tests {
             Some(ipv6addrs(Some(LINK_LOCAL_SOCKADDR2))),
         )
         .await
-        .context("error handling netstack event with sockaddr2 added")?;
+        .expect("error handling netstack event with sockaddr2 added");
         let mut client_server = check_new_dhcpv6_client(
             &mut servers.dhcpv6_client_provider,
             INTERFACE_ID,
@@ -2871,7 +2869,7 @@ mod tests {
             &mut dns_watchers,
         )
         .await
-        .context("error checking for new client with sockaddr2")?;
+        .expect("error checking for new client with sockaddr2");
 
         // Interface being down should terminate the client.
         let ((), ()) = future::try_join(
@@ -2886,7 +2884,7 @@ mod tests {
                 .map(|r| r.context("error running lookup admin")),
         )
         .await
-        .context("error handling client termination due to interface down")?;
+        .expect("error handling client termination due to interface down");
         assert!(!dns_watchers.contains_key(&DHCPV6_DNS_SOURCE), "should not have a watcher");
         assert_matches::assert_matches!(client_server.try_next().await, Ok(None));
 
@@ -2899,7 +2897,7 @@ mod tests {
             None,
         )
         .await
-        .context("error handling interface up event")?;
+        .expect("error handling interface up event");
         let mut client_server = check_new_dhcpv6_client(
             &mut servers.dhcpv6_client_provider,
             INTERFACE_ID,
@@ -2908,7 +2906,7 @@ mod tests {
             &mut dns_watchers,
         )
         .await
-        .context("error checking for new client with sockaddr2 after interface up again")?;
+        .expect("error checking for new client with sockaddr2 after interface up again");
 
         // Should start a new DHCPv6 client when we get an interface changed event that shows the
         // interface as up with a new link-local address.
@@ -2928,7 +2926,7 @@ mod tests {
                 .map(|r| r.context("error running lookup admin")),
         )
         .await
-        .context("error handling client termination due to address change")?;
+        .expect("error handling client termination due to address change");
         assert_matches::assert_matches!(client_server.try_next().await, Ok(None));
         let _client_server: fnet_dhcpv6::ClientRequestStream = check_new_dhcpv6_client(
             &mut servers.dhcpv6_client_provider,
@@ -2938,7 +2936,7 @@ mod tests {
             &mut dns_watchers,
         )
         .await
-        .context("error checking for new client with sockaddr1 after address change")?;
+        .expect("error checking for new client with sockaddr1 after address change");
 
         // Complete the DNS server watcher then start a new one.
         let ((), ()) = future::try_join(
@@ -2949,7 +2947,7 @@ mod tests {
                 .map(|r| r.context("error running lookup admin")),
         )
         .await
-        .context("error handling DNS server watcher completion")?;
+        .expect("error handling DNS server watcher completion");
         assert!(!dns_watchers.contains_key(&DHCPV6_DNS_SOURCE), "should not have a watcher");
         let () = handle_interface_changed_event(
             &mut netcfg,
@@ -2958,7 +2956,7 @@ mod tests {
             Some(ipv6addrs(Some(LINK_LOCAL_SOCKADDR2))),
         )
         .await
-        .context("error handling interface change event with sockaddr2 replacing sockaddr1")?;
+        .expect("error handling interface change event with sockaddr2 replacing sockaddr1");
         let mut client_server = check_new_dhcpv6_client(
             &mut servers.dhcpv6_client_provider,
             INTERFACE_ID,
@@ -2967,7 +2965,7 @@ mod tests {
             &mut dns_watchers,
         )
         .await
-        .context("error checking for new client with sockaddr2 after completing dns watcher")?;
+        .expect("error checking for new client with sockaddr2 after completing dns watcher");
 
         // An event that indicates the interface is removed should stop the client.
         let ((), ()) = future::try_join(
@@ -2983,12 +2981,10 @@ mod tests {
                 .map(|r| r.context("error running lookup admin")),
         )
         .await
-        .context("error handling client termination due to interface removal")?;
+        .expect("error handling client termination due to interface removal");
         assert!(!dns_watchers.contains_key(&DHCPV6_DNS_SOURCE), "should not have a watcher");
         assert_matches::assert_matches!(client_server.try_next().await, Ok(None));
         assert!(!netcfg.interface_states.contains_key(&INTERFACE_ID));
-
-        Ok(())
     }
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
