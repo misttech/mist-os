@@ -18,9 +18,25 @@ rustc_library("lib") {
     "//third_party/rust_crates:tracing",
   ]
 
-  test_deps = [ "//src/lib/fuchsia-async" ]
+  test_deps = [
+    "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:tempfile",
+  ]
 
   sources = [ "src/lib.rs" ]
+
+  inputs = [
+    "test_data/core-sdk-root/host_arm64/gen/tools/symbol-index/symbol_index_sdk.meta.json",
+    "test_data/core-sdk-root/sdk/manifest/core",
+    "test_data/core-sdk-root/host_x64/gen/src/developer/ffx/plugins/assembly/sdk.meta.json",
+    "test_data/core-sdk-root/host_x64/gen/src/developer/debug/zxdb/zxdb_sdk.meta.json",
+    "test_data/core-sdk-root/host_x64/gen/tools/symbol-index/symbol_index_sdk_legacy.meta.json",
+    "test_data/core-sdk-root/host_x64/gen/tools/symbol-index/symbol_index_sdk.meta.json",
+    "test_data/release-sdk-root/fidl/fuchsia.data/meta.json",
+    "test_data/release-sdk-root/ffx_tools/x64/ffx-assembly-meta.json",
+    "test_data/release-sdk-root/meta/manifest.json",
+    "test_data/release-sdk-root/tools/zxdb-meta.json",
+  ]
 }
 
 group("tests") {

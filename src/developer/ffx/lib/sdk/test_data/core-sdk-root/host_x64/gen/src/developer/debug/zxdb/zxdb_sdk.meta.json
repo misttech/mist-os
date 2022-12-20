@@ -1,0 +1,8 @@
+{
+    "files": [
+        "tools/x64/zxdb"
+    ],
+    "name": "zxdb",
+    "root": "tools",
+    "type": "host_tool"
+}
