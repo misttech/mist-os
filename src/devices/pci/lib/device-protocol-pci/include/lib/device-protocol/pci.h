@@ -32,20 +32,26 @@ class MmioBuffer;
 
 namespace ddk {
 
-// This class wraps the Banjo-generated ddk::PciProtocolClient which contains the client
-// implementation for the fuchsia.hardware.pci.Pci protocol. This is temporary
-// while we migrate the PCI protocol from Banjo to FIDL. Eventually this class
-// will go away. See fxbug.dev/99914 for details.
+// This class wraps a FIDL client for the fuchsia.hardware.pci/Device protocol. Its interface is
+// largely compatible with the legacy Banjo PCI protocol for easy migration. It also includes a
+// number of non-FIDL helper methods.
 class Pci {
  public:
   static constexpr char kFragmentName[] = "pci";
   Pci() = default;
 
+  // Construct a PCI client by connecting to the parent's PCI protocol.
+  //
+  // This is for drivers that bind directly to a PCI node. For drivers that bind to a PCI composite,
+  // use `FromFragment` instead.
+  //
+  // Check `is_valid()` after calling to check for proper initialization. This can fail if the
+  // parent does not expose a FIDL PCI interface.
   explicit Pci(zx_device_t* parent) {
     zx::channel local, remote;
     ZX_ASSERT(zx::channel::create(0, &local, &remote) == ZX_OK);
-    zx_status_t status =
-        device_connect_fidl_protocol(parent, "fuchsia.hardware.pci.Device", remote.release());
+    zx_status_t status = device_connect_fidl_protocol(
+        parent, fidl::DiscoverableProtocolName<fuchsia_hardware_pci::Device>, remote.release());
 
     if (status == ZX_OK) {
       client_ =
@@ -74,8 +80,8 @@ class Pci {
   Pci(Pci&& other) = default;
   Pci& operator=(Pci&& other) = default;
 
-  // Check Pci.is_valid() (on the PciProtocolClient) after calling to check for proper
-  // initialization. This can fail if the composite device does not expose the "pci" interface.
+  // Check `is_valid()` after calling to check for proper initialization. This can fail if the
+  // composite device does not expose a FIDL PCI interface.
   static Pci FromFragment(zx_device_t* parent) { return Pci(parent, kFragmentName); }
 
   ~Pci() = default;
