@@ -11,7 +11,7 @@ ComponentInspector::ComponentInspector(component::OutgoingDirectory& out,
                                        async_dispatcher_t* dispatcher, Inspector inspector,
                                        TreeHandlerSettings settings)
     : inspector_(inspector) {
-  auto status = out.AddProtocolAt<fuchsia_inspect::Tree>(
+  auto status = out.AddUnmanagedProtocolAt<fuchsia_inspect::Tree>(
       "diagnostics", [dispatcher, inspector = std::move(inspector), settings = std::move(settings)](
                          fidl::ServerEnd<fuchsia_inspect::Tree> server_end) {
         TreeServer::StartSelfManagedServer(std::move(inspector), std::move(settings), dispatcher,

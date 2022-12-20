@@ -104,12 +104,12 @@ zx::result<> OutgoingDirectory::ServeFromStartupInfo() {
   return Serve(std::move(directory_request));
 }
 
-zx::result<> OutgoingDirectory::AddProtocol(AnyHandler handler, cpp17::string_view name) {
-  return AddProtocolAt(std::move(handler), kServiceDirectoryWithNoSlash, name);
+zx::result<> OutgoingDirectory::AddUnmanagedProtocol(AnyHandler handler, cpp17::string_view name) {
+  return AddUnmanagedProtocolAt(std::move(handler), kServiceDirectoryWithNoSlash, name);
 }
 
-zx::result<> OutgoingDirectory::AddProtocolAt(AnyHandler handler, cpp17::string_view path,
-                                              cpp17::string_view name) {
+zx::result<> OutgoingDirectory::AddUnmanagedProtocolAt(AnyHandler handler, cpp17::string_view path,
+                                                       cpp17::string_view name) {
   std::lock_guard guard(inner().checker_);
 
   // More thorough path validation is done in |svc_add_service|.
@@ -189,7 +189,7 @@ zx::result<> OutgoingDirectory::AddService(ServiceInstanceHandler handler,
 
   std::string basepath = MakePath(service, instance);
   for (auto& [member_name, member_handler] : handlers) {
-    zx::result<> status = AddProtocolAt(std::move(member_handler), basepath, member_name);
+    zx::result<> status = AddUnmanagedProtocolAt(std::move(member_handler), basepath, member_name);
     if (status.is_error()) {
       // If we encounter an error with any of the instance members, scrub entire
       // directory entry.

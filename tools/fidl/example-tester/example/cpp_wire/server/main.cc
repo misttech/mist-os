@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
   }
 
   // Register a handler for components trying to connect to fuchsia.examples.Simple.
-  result = outgoing.AddProtocol<test_exampletester::Simple>(
+  result = outgoing.AddUnmanagedProtocol<test_exampletester::Simple>(
       [dispatcher](fidl::ServerEnd<test_exampletester::Simple> server_end) {
         // Create an instance of our SimpleImpl that destroys itself when the connection closes.
         new SimpleImpl(dispatcher, std::move(server_end));

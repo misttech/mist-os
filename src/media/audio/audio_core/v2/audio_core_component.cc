@@ -86,9 +86,10 @@ std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> MakeGraphCli
 // Servers from `shared/` use an older style of API. This function bridges the older style.
 template <typename ProtocolT, typename HandlerT>
 void PublishHandler(component::OutgoingDirectory& outgoing, HandlerT handler) {
-  auto result = outgoing.AddProtocol<ProtocolT>([handler = std::move(handler)](auto server_end) {
-    handler(fidl::NaturalToHLCPP(std::move(server_end)));
-  });
+  auto result =
+      outgoing.AddUnmanagedProtocol<ProtocolT>([handler = std::move(handler)](auto server_end) {
+        handler(fidl::NaturalToHLCPP(std::move(server_end)));
+      });
   if (!result.is_ok()) {
     FX_PLOGS(FATAL, result.error_value()) << "Failed to publish service";
   }
@@ -98,7 +99,7 @@ void PublishHandler(component::OutgoingDirectory& outgoing, HandlerT handler) {
 template <typename ProtocolT>
 void PublishProtocol(component::OutgoingDirectory& outgoing,
                      fit::function<void(fidl::ServerEnd<ProtocolT>)> handler) {
-  auto result = outgoing.AddProtocol<ProtocolT>(
+  auto result = outgoing.AddUnmanagedProtocol<ProtocolT>(
       [handler = std::move(handler)](auto server_end) { handler(std::move(server_end)); });
   if (!result.is_ok()) {
     FX_PLOGS(FATAL, result.error_value()) << "Failed to publish service";

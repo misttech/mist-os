@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
 
   // Register a handler for components trying to connect to fuchsia.examples.Simple. Each such
   // connection is naively proxied to the server component.
-  result = outgoing.AddProtocol<test_exampletester::Simple>(
+  result = outgoing.AddUnmanagedProtocol<test_exampletester::Simple>(
       [dispatcher, &client](fidl::ServerEnd<test_exampletester::Simple> server_end) {
         new SimpleImpl(dispatcher, std::move(server_end), std::move(client));
       });

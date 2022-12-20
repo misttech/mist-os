@@ -653,33 +653,34 @@ TEST_F(OutgoingDirectoryTest, AddProtocolAtFailsIfEntryExists) {
   constexpr std::string_view kProtocolName = "fuchsia.example.Echo";
 
   component::AnyHandler handler = [](zx::channel request) {};
-  ASSERT_EQ(
-      GetOutgoingDirectory()
-          ->AddProtocolAt(std::move(handler), /*path=*/kSvcDirectoryPath, /*name=*/kProtocolName)
-          .status_value(),
-      ZX_OK);
+  ASSERT_EQ(GetOutgoingDirectory()
+                ->AddUnmanagedProtocolAt(std::move(handler), /*path=*/kSvcDirectoryPath,
+                                         /*name=*/kProtocolName)
+                .status_value(),
+            ZX_OK);
 
   component::AnyHandler another_handler = [](zx::channel request) {};
   EXPECT_EQ(GetOutgoingDirectory()
-                ->AddProtocolAt(std::move(another_handler), /*path=*/kSvcDirectoryPath,
-                                /*name=*/kProtocolName)
+                ->AddUnmanagedProtocolAt(std::move(another_handler), /*path=*/kSvcDirectoryPath,
+                                         /*name=*/kProtocolName)
                 .status_value(),
             ZX_ERR_ALREADY_EXISTS);
 }
 
 TEST_F(OutgoingDirectoryTest, AddProtocolAtFailsIfNameIsEmpty) {
   component::AnyHandler handler = [](zx::channel request) {};
-  EXPECT_EQ(GetOutgoingDirectory()
-                ->AddProtocolAt(std::move(handler), /*path=*/kSvcDirectoryPath, /*name=*/"")
-                .status_value(),
-            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(
+      GetOutgoingDirectory()
+          ->AddUnmanagedProtocolAt(std::move(handler), /*path=*/kSvcDirectoryPath, /*name=*/"")
+          .status_value(),
+      ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(OutgoingDirectoryTest, AddProtocolAtFailsIfDirectoryIsEmpty) {
   component::AnyHandler handler = [](zx::channel request) {};
   EXPECT_EQ(GetOutgoingDirectory()
-                ->AddProtocolAt(/*handler=*/std::move(handler), /*path=*/"",
-                                /*name=*/"fuchsia.examples.Echo")
+                ->AddUnmanagedProtocolAt(/*handler=*/std::move(handler), /*path=*/"",
+                                         /*name=*/"fuchsia.examples.Echo")
                 .status_value(),
             ZX_ERR_INVALID_ARGS);
 }

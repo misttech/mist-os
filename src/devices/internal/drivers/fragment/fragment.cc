@@ -56,7 +56,7 @@ zx_status_t Fragment::Bind(void* ctx, zx_device_t* parent) {
     return endpoints.status_value();
   }
   {
-    zx::result result = dev->outgoing_->AddProtocol(
+    zx::result result = dev->outgoing_->AddUnmanagedProtocol(
         [dev = dev.get()](zx::channel server) {
           dev->rpc_channel_ = std::move(server);
           dev->rpc_wait_.set_object(dev->rpc_channel_.get());

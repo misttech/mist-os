@@ -139,7 +139,7 @@ int main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
-  auto status = outgoing_directory.AddProtocol<fuchsia_fs_startup::Startup>(
+  auto status = outgoing_directory.AddUnmanagedProtocol<fuchsia_fs_startup::Startup>(
       [dispatcher, &memfs_handler](fidl::ServerEnd<fuchsia_fs_startup::Startup> server_end) {
         auto server = new StartupImpl(memfs_handler);
         fidl::BindServer(
@@ -152,7 +152,7 @@ int main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
-  status = outgoing_directory.AddProtocol<fuchsia_fs::Admin>(
+  status = outgoing_directory.AddUnmanagedProtocol<fuchsia_fs::Admin>(
       [dispatcher, &memfs_handler](fidl::ServerEnd<fuchsia_fs::Admin> server_end) {
         auto server = new AdminImpl(memfs_handler);
         fidl::BindServer(dispatcher, std::move(server_end), server,

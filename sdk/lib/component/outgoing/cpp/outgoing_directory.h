@@ -148,16 +148,17 @@ class OutgoingDirectory final {
   // with the same |name|. Users of this method should manage teardown of
   // all active connections.
   template <typename Protocol>
-  zx::result<> AddProtocol(TypedHandler<Protocol> handler,
-                           cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+  zx::result<> AddUnmanagedProtocol(
+      TypedHandler<Protocol> handler,
+      cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
     static_assert(fidl::IsProtocol<Protocol>(), "Type of |Protocol| must be FIDL protocol");
 
-    return AddProtocolAt<Protocol>(kServiceDirectoryWithNoSlash, std::move(handler), name);
+    return AddUnmanagedProtocolAt<Protocol>(kServiceDirectoryWithNoSlash, std::move(handler), name);
   }
 
   // Same as above but is untyped. This method is generally discouraged but
   // is made available if a generic handler needs to be provided.
-  zx::result<> AddProtocol(AnyHandler handler, cpp17::string_view name);
+  zx::result<> AddUnmanagedProtocol(AnyHandler handler, cpp17::string_view name);
 
   // Same as |AddProtocol| but allows setting the parent directory in
   // which the protocol will be installed.
@@ -171,7 +172,7 @@ class OutgoingDirectory final {
     }
 
     ServerImpl* server_reference = impl.get();
-    zx::result<> result = AddProtocolAt<Protocol>(
+    zx::result<> result = AddUnmanagedProtocolAt<Protocol>(
         path,
         [dispatcher = inner().dispatcher_, impl = std::move(impl),
          unbind_protocol_callbacks = &inner().unbind_protocol_callbacks_,
@@ -196,8 +197,9 @@ class OutgoingDirectory final {
   // Same as |AddProtocol| but uses a typed handler and allows the usage of
   // setting the parent directory in which the protocol will be installed.
   template <typename Protocol>
-  zx::result<> AddProtocolAt(cpp17::string_view path, TypedHandler<Protocol> handler,
-                             cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+  zx::result<> AddUnmanagedProtocolAt(
+      cpp17::string_view path, TypedHandler<Protocol> handler,
+      cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
     static_assert(fidl::IsProtocol<Protocol>(), "Type of |Protocol| must be FIDL protocol");
 
     auto bridge_func = [handler = std::move(handler)](zx::channel request) {
@@ -205,12 +207,13 @@ class OutgoingDirectory final {
       (void)handler(std::move(server_end));
     };
 
-    return AddProtocolAt(std::move(bridge_func), path, name);
+    return AddUnmanagedProtocolAt(std::move(bridge_func), path, name);
   }
 
   // Same as |AddProtocol| but is untyped and allows the usage of setting the
   // parent directory in which the protocol will be installed.
-  zx::result<> AddProtocolAt(AnyHandler handler, cpp17::string_view path, cpp17::string_view name);
+  zx::result<> AddUnmanagedProtocolAt(AnyHandler handler, cpp17::string_view path,
+                                      cpp17::string_view name);
 
   // Adds an instance of a FIDL Service.
   //
@@ -389,13 +392,20 @@ class OutgoingDirectory final {
       return zx::make_result(ZX_ERR_INVALID_ARGS);
     }
 
-    return AddProtocol<Protocol>(
+    return AddUnmanagedProtocol<Protocol>(
         [dispatcher = inner().dispatcher_, impl](fidl::ServerEnd<Protocol> request) {
           // This object is safe to drop. Server will still begin to operate
           // past its lifetime.
           auto _server = fidl::BindServer(dispatcher, std::move(request), impl);
         },
         name);
+  }
+
+  // This method signature is DEPRECATED. Use |AddUnmanagedProtocol| instead.
+  template <typename Protocol>
+  zx::result<> AddProtocol(TypedHandler<Protocol> handler,
+                           cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+    return AddUnmanagedProtocol<Protocol>(std::move(handler), name);
   }
 
   // This method signature is DEPRECATED. Use |AddProtocol| instead.
@@ -421,7 +431,7 @@ class OutgoingDirectory final {
       return zx::make_result(ZX_ERR_INVALID_ARGS);
     }
 
-    return AddProtocolAt<Protocol>(
+    return AddUnmanagedProtocolAt<Protocol>(
         path,
         [dispatcher = inner().dispatcher_, impl,
          unbind_protocol_callbacks = &inner().unbind_protocol_callbacks_,
@@ -435,6 +445,13 @@ class OutgoingDirectory final {
           AppendUnbindConnectionCallback(unbind_protocol_callbacks, name, std::move(cb));
         },
         name);
+  }
+
+  // This method signature is DEPRECATED. Use |AddUnmanagedProtocolAt| instead.
+  template <typename Protocol>
+  zx::result<> AddProtocolAt(cpp17::string_view path, TypedHandler<Protocol> handler,
+                             cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+    return AddUnmanagedProtocolAt(path, std::move(handler), name);
   }
 
  private:

@@ -68,7 +68,7 @@ zx_status_t I2cChild::CreateAndAddDevice(
     return endpoints.status_value();
   }
 
-  auto result = dev->outgoing_dir_.AddProtocol<fidl_i2c::Device>(
+  auto result = dev->outgoing_dir_.AddUnmanagedProtocol<fidl_i2c::Device>(
       [dev = dev.get()](fidl::ServerEnd<fidl_i2c::Device> request) mutable {
         dev->Bind(std::move(request));
       });

@@ -50,7 +50,7 @@ zx_status_t AdbFileSync::StartService(adb_file_sync_config::Config config) {
   component::OutgoingDirectory outgoing =
       component::OutgoingDirectory(file_sync->loop_.dispatcher());
 
-  auto result = outgoing.AddProtocol<fuchsia_hardware_adb::Provider>(
+  auto result = outgoing.AddUnmanagedProtocol<fuchsia_hardware_adb::Provider>(
       [file_sync_ptr =
            file_sync.get()](fidl::ServerEnd<fuchsia_hardware_adb::Provider> server_end) {
         file_sync_ptr->binding_ref_.emplace(fidl::BindServer(file_sync_ptr->loop_.dispatcher(),

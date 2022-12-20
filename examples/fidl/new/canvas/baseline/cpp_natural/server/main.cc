@@ -154,7 +154,7 @@ int main(int argc, char** argv) {
   }
 
   // Register a handler for components trying to connect to |examples.canvas.baseline.Instance|.
-  result = outgoing.AddProtocol<examples_canvas_baseline::Instance>(
+  result = outgoing.AddUnmanagedProtocol<examples_canvas_baseline::Instance>(
       [dispatcher](fidl::ServerEnd<examples_canvas_baseline::Instance> server_end) {
         // Create an instance of our InstanceImpl that destroys itself when the connection closes.
         new InstanceImpl(dispatcher, std::move(server_end));

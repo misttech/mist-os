@@ -73,7 +73,7 @@ int main(int argc, const char** argv) {
     FX_LOGS(ERROR) << "Failed to serve outgoing directory: " << result.status_string();
     return -1;
   }
-  result = outgoing.AddProtocol<fuchsia_examples::Echo>(
+  result = outgoing.AddUnmanagedProtocol<fuchsia_examples::Echo>(
       [dispatcher](fidl::ServerEnd<fuchsia_examples::Echo> server_end) {
         FX_LOGS(INFO) << "Incoming connection for "
                       << fidl::DiscoverableProtocolName<fuchsia_examples::Echo>;

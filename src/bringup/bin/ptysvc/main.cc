@@ -23,7 +23,7 @@ int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
 
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());
-  if (zx::result status = outgoing.AddProtocol<fuchsia_hardware_pty::Device>(
+  if (zx::result status = outgoing.AddUnmanagedProtocol<fuchsia_hardware_pty::Device>(
           [dispatcher =
                loop.dispatcher()](fidl::ServerEnd<fuchsia_hardware_pty::Device> server_end) {
             zx::result args = PtyServer::Args::Create();

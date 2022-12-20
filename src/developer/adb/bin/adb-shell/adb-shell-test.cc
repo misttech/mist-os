@@ -114,14 +114,14 @@ class AdbShellTest : public zxtest::Test {
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_EQ(ZX_OK, endpoints.status_value());
     ASSERT_EQ(ZX_OK, incoming_
-                         ->AddProtocol<fuchsia_dash::Launcher>(
+                         ->AddUnmanagedProtocol<fuchsia_dash::Launcher>(
                              [&, dispatcher = svc_loop_.dispatcher()](
                                  fidl::ServerEnd<fuchsia_dash::Launcher> server_end) {
                                fake_dash_launcher_.BindServer(dispatcher, std::move(server_end));
                              })
                          .status_value());
     ASSERT_EQ(ZX_OK, incoming_
-                         ->AddProtocol<fuchsia_sys2::LifecycleController>(
+                         ->AddUnmanagedProtocol<fuchsia_sys2::LifecycleController>(
                              [&, dispatcher = svc_loop_.dispatcher()](
                                  fidl::ServerEnd<fuchsia_sys2::LifecycleController> server_end) {
                                fake_lifecycle_controller_.BindServer(dispatcher,

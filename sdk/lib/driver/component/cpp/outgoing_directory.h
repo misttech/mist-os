@@ -104,7 +104,7 @@ class OutgoingDirectory final {
       }
 
       zx::result<> status =
-          component_outgoing_dir_.AddProtocolAt(std::move(handler), basepath, member_name);
+          component_outgoing_dir_.AddUnmanagedProtocolAt(std::move(handler), basepath, member_name);
       if (status.is_error()) {
         return status;
       }

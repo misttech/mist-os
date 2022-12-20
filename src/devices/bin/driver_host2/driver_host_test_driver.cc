@@ -47,8 +47,8 @@ class TestDriver {
     }
 
     // Setup the outgoing service.
-    auto status =
-        outgoing_.AddProtocol<ftest::Outgoing>([](fidl::ServerEnd<ftest::Outgoing> request) {
+    auto status = outgoing_.AddUnmanagedProtocol<ftest::Outgoing>(
+        [](fidl::ServerEnd<ftest::Outgoing> request) {
           fidl_epitaph_write(request.channel().get(), ZX_ERR_STOP);
         });
     if (status.is_error()) {

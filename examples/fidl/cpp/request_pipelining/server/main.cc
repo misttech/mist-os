@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
     return -1;
   }
 
-  result = outgoing.AddProtocol<fuchsia_examples::EchoLauncher>(
+  result = outgoing.AddUnmanagedProtocol<fuchsia_examples::EchoLauncher>(
       [dispatcher](fidl::ServerEnd<fuchsia_examples::EchoLauncher> server_end) {
         FX_LOGS(INFO) << "Incoming connection for "
                       << fidl::DiscoverableProtocolName<fuchsia_examples::EchoLauncher>;

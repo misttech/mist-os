@@ -186,7 +186,7 @@ void SpiChild::DdkRelease() { delete this; }
 
 SpiFidlChild::SpiFidlChild(zx_device_t* parent, SpiChild* spi, async_dispatcher_t* dispatcher)
     : SpiFidlChildType(parent), spi_(spi), outgoing_(dispatcher) {
-  zx::result status = outgoing_.AddProtocol<fuchsia_hardware_spi::Device>(
+  zx::result status = outgoing_.AddUnmanagedProtocol<fuchsia_hardware_spi::Device>(
       [spi = spi_, dispatcher](fidl::ServerEnd<fuchsia_hardware_spi::Device> server_end) {
         spi->Bind(dispatcher, std::move(server_end));
       });

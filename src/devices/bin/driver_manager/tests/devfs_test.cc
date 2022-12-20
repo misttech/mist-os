@@ -219,7 +219,7 @@ TEST(Devfs, ExportWatcher_Export) {
   auto outgoing = component::OutgoingDirectory(loop.dispatcher());
   zx::channel service_channel;
   auto handler = [&service_channel](zx::channel server) { service_channel = std::move(server); };
-  ASSERT_EQ(outgoing.AddProtocol(std::move(handler), "test").status_value(), ZX_OK);
+  ASSERT_EQ(outgoing.AddUnmanagedProtocol(std::move(handler), "test").status_value(), ZX_OK);
 
   // Export the svc/test.
   auto endpoints = fidl::CreateEndpoints<fio::Directory>();
@@ -286,7 +286,7 @@ TEST(Devfs, ExportWatcher_Export_Invisible) {
   auto outgoing = component::OutgoingDirectory(loop.dispatcher());
   zx::channel service_channel;
   auto handler = [&service_channel](zx::channel server) { service_channel = std::move(server); };
-  ASSERT_EQ(outgoing.AddProtocol(std::move(handler), "test").status_value(), ZX_OK);
+  ASSERT_EQ(outgoing.AddUnmanagedProtocol(std::move(handler), "test").status_value(), ZX_OK);
 
   // Export the svc/test.
   auto endpoints = fidl::CreateEndpoints<fio::Directory>();

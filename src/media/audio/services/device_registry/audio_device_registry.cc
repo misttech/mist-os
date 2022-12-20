@@ -179,7 +179,7 @@ void AudioDeviceRegistry::NotifyRegistriesOfDeviceRemoval(uint64_t removed_devic
 zx_status_t AudioDeviceRegistry::RegisterAndServeOutgoing() {
   ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods);
 
-  auto status = outgoing_.AddProtocol<fuchsia_audio_device::Provider>(
+  auto status = outgoing_.AddUnmanagedProtocol<fuchsia_audio_device::Provider>(
       [this](fidl::ServerEnd<fuchsia_audio_device::Provider> server_end) mutable {
         ADR_LOG_OBJECT(kLogProviderServerMethods)
             << "Incoming connection for fuchsia.audio.device.Provider";
@@ -193,7 +193,7 @@ zx_status_t AudioDeviceRegistry::RegisterAndServeOutgoing() {
     return status.status_value();
   }
 
-  status = outgoing_.AddProtocol<fuchsia_audio_device::Registry>(
+  status = outgoing_.AddUnmanagedProtocol<fuchsia_audio_device::Registry>(
       [this](fidl::ServerEnd<fuchsia_audio_device::Registry> server_end) mutable {
         ADR_LOG_OBJECT(kLogRegistryServerMethods)
             << "Incoming connection for fuchsia.audio.device.Registry";
@@ -206,7 +206,7 @@ zx_status_t AudioDeviceRegistry::RegisterAndServeOutgoing() {
     return status.status_value();
   }
 
-  status = outgoing_.AddProtocol<fuchsia_audio_device::ControlCreator>(
+  status = outgoing_.AddUnmanagedProtocol<fuchsia_audio_device::ControlCreator>(
       [this](fidl::ServerEnd<fuchsia_audio_device::ControlCreator> server_end) mutable {
         ADR_LOG_OBJECT(kLogControlCreatorServerMethods)
             << "Incoming connection for fuchsia.audio.device.ControlCreator";

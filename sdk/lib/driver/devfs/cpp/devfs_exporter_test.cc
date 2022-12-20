@@ -107,8 +107,8 @@ TEST_F(DevfsExporterTest, Create) {
   svc_binding2.Bind(svc->server.TakeChannel(), dispatcher());
 
   auto outgoing = component::OutgoingDirectory(dispatcher());
-  auto status =
-      outgoing.AddProtocol<flogger::LogSink>([](fidl::ServerEnd<flogger::LogSink> request) {});
+  auto status = outgoing.AddUnmanagedProtocol<flogger::LogSink>(
+      [](fidl::ServerEnd<flogger::LogSink> request) {});
 
   ASSERT_EQ(ZX_OK, status.status_value());
 
@@ -172,8 +172,8 @@ TEST_F(DevfsExporterTest, Create_ServiceFailure) {
   svc_binding2.Bind(svc->server.TakeChannel(), dispatcher());
 
   auto outgoing = component::OutgoingDirectory(dispatcher());
-  auto status =
-      outgoing.AddProtocol<flogger::LogSink>([](fidl::ServerEnd<flogger::LogSink> request) {});
+  auto status = outgoing.AddUnmanagedProtocol<flogger::LogSink>(
+      [](fidl::ServerEnd<flogger::LogSink> request) {});
   ASSERT_EQ(ZX_OK, status.status_value());
 
   auto svc_client = ServeSvcDir(outgoing);

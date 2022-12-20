@@ -376,7 +376,7 @@ int RunDfv1(DriverManagerParams driver_manager_params,
     zx::result devfs_client = coordinator.devfs().Connect(vfs);
     ZX_ASSERT_MSG(devfs_client.is_ok(), "%s", devfs_client.status_string());
 
-    const zx::result result = outgoing.AddProtocol<fuchsia_device_manager::DeviceWatcher>(
+    const zx::result result = outgoing.AddUnmanagedProtocol<fuchsia_device_manager::DeviceWatcher>(
         [devfs_client = std::move(devfs_client.value()), dispatcher = loader_loop.dispatcher()](
             fidl::ServerEnd<fuchsia_device_manager::DeviceWatcher> request) {
           // Move off the main loop, which is also serving devfs.

@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
   }
 
   // Register a handler for components trying to connect to fuchsia.examples.Echo.
-  result = outgoing.AddProtocol<fuchsia_examples::Echo>(
+  result = outgoing.AddUnmanagedProtocol<fuchsia_examples::Echo>(
       [dispatcher](fidl::ServerEnd<fuchsia_examples::Echo> server_end) {
         FX_LOGS(INFO) << "Incoming connection for "
                       << fidl::DiscoverableProtocolName<fuchsia_examples::Echo>;

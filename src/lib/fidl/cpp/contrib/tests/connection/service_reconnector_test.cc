@@ -127,7 +127,7 @@ class ServiceReconnectorTest : public gtest::TestLoopFixture {
         std::make_unique<component::OutgoingDirectory>(component::OutgoingDirectory(dispatcher()));
     ASSERT_EQ(ZX_OK,
               outgoing_directory_
-                  ->AddProtocol<test_protocol_connector::SimpleProtocol>(
+                  ->AddUnmanagedProtocol<test_protocol_connector::SimpleProtocol>(
                       [this](fidl::ServerEnd<test_protocol_connector::SimpleProtocol> request) {
                         server_bindings_.push_back(fidl::BindServer(
                             dispatcher(), std::move(request), protocol_impl_.get()));

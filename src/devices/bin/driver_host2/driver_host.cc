@@ -51,7 +51,7 @@ zx::result<> DriverHost::PublishDriverHost(component::OutgoingDirectory& outgoin
   const auto service = [this](fidl::ServerEnd<fdh::DriverHost> request) {
     fidl::BindServer(loop_.dispatcher(), std::move(request), this);
   };
-  auto status = outgoing_directory.AddProtocol<fdh::DriverHost>(std::move(service));
+  auto status = outgoing_directory.AddUnmanagedProtocol<fdh::DriverHost>(std::move(service));
   if (status.is_error()) {
     FX_SLOG(ERROR, "Failed to add directory entry",
             KV("name", fidl::DiscoverableProtocolName<fdh::DriverHost>),

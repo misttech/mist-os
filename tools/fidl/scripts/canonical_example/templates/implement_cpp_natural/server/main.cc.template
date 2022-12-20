@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
   }
 
   // Register a handler for components trying to connect to |${protocol_pascal_case}|.
-  result = outgoing.AddProtocol<examples_${series_flat_case}_${variant_flat_case}::${protocol_pascal_case}>(
+  result = outgoing.AddUnmanagedProtocol<examples_${series_flat_case}_${variant_flat_case}::${protocol_pascal_case}>(
       [dispatcher](fidl::ServerEnd<examples_${series_flat_case}_${variant_flat_case}::${protocol_pascal_case}> server_end) {
         // Create an instance of our ${protocol_pascal_case}Impl that destroys itself when the connection closes.
         new ${protocol_pascal_case}Impl(dispatcher, std::move(server_end));

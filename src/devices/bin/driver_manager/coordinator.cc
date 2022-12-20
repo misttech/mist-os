@@ -1029,7 +1029,7 @@ void Coordinator::PublishDriverDevelopmentService(component::OutgoingDirectory& 
                             info.FormatDescription().c_str());
                      });
   };
-  auto result = outgoing.AddProtocol<fdd::DriverDevelopment>(driver_dev);
+  auto result = outgoing.AddUnmanagedProtocol<fdd::DriverDevelopment>(driver_dev);
   ZX_ASSERT(result.is_ok());
 }
 

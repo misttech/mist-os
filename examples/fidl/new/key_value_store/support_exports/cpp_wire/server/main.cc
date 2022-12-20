@@ -167,7 +167,7 @@ int main(int argc, char** argv) {
   }
 
   // Register a handler for components trying to connect to |Store|.
-  result = outgoing.AddProtocol<examples_keyvaluestore_supportexports::Store>(
+  result = outgoing.AddUnmanagedProtocol<examples_keyvaluestore_supportexports::Store>(
       [dispatcher](fidl::ServerEnd<examples_keyvaluestore_supportexports::Store> server_end) {
         // Create an instance of our StoreImpl that destroys itself when the connection closes.
         new StoreImpl(dispatcher, std::move(server_end));

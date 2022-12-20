@@ -192,7 +192,7 @@ class ServiceHubConnectorTest : public gtest::TestLoopFixture {
         std::make_unique<component::OutgoingDirectory>(component::OutgoingDirectory(dispatcher()));
     ASSERT_EQ(ZX_OK,
               outgoing_directory_
-                  ->AddProtocol<test_protocol_connector::ProtocolFactory>(
+                  ->AddUnmanagedProtocol<test_protocol_connector::ProtocolFactory>(
                       [this](fidl::ServerEnd<test_protocol_connector::ProtocolFactory> request) {
                         FX_LOGS(INFO) << "Binding attempted!";
                         server_bindings_.push_back(fidl::BindServer(

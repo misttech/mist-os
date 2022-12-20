@@ -161,7 +161,7 @@ int main(int argc, char** argv) {
 
   // Register a handler for components trying to connect to
   // |examples.canvas.addlinemetered.Instance|.
-  result = outgoing.AddProtocol<examples_canvas_addlinemetered::Instance>(
+  result = outgoing.AddUnmanagedProtocol<examples_canvas_addlinemetered::Instance>(
       [dispatcher](fidl::ServerEnd<examples_canvas_addlinemetered::Instance> server_end) {
         // Create an instance of our InstanceImpl that destroys itself when the connection closes.
         new InstanceImpl(dispatcher, std::move(server_end));
