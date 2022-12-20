@@ -503,4 +503,42 @@ TEST(VmoSliceTestCase, DeepHierarchy) {
   vmo.reset();
 }
 
+TEST(VmoSliceTestCase, AttributedCounts) {
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
+
+  // Write a non-zero value so it is not deduped by the zero scanner.
+  const uint32_t val = 42;
+  ASSERT_OK(vmo.write(&val, 0, sizeof(val)));
+
+  zx::vmo slice;
+  ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SLICE, 0, zx_system_get_page_size(), &slice));
+
+  // Slice can read the parent.
+  uint32_t data;
+  ASSERT_OK(slice.read(&data, 0, sizeof(data)));
+  EXPECT_EQ(val, data);
+
+  // Committed pages are attributed to the parent.
+  zx_info_vmo_t info;
+  ASSERT_OK(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
+  EXPECT_EQ(zx_system_get_page_size(), info.committed_bytes);
+
+  // Committed pages are not attributed to the slice.
+  ASSERT_OK(slice.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
+  EXPECT_EQ(0u, info.committed_bytes);
+
+  // Drop the parent handle.
+  vmo.reset();
+
+  // Committed pages are still not attributed to the slice.
+  ASSERT_OK(slice.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
+  EXPECT_EQ(0u, info.committed_bytes);
+
+  // Slice can read the parent's pages though.
+  data = 0;
+  ASSERT_OK(slice.read(&data, 0, sizeof(data)));
+  EXPECT_EQ(val, data);
+}
+
 }  // namespace
