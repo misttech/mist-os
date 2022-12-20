@@ -11,12 +11,13 @@ mod interface;
 mod virtualization;
 
 use ::dhcpv4::protocol::FromFidlExt as _;
-use std::collections::{hash_map::Entry, HashMap, HashSet};
-use std::fs;
-use std::io;
-use std::path;
-use std::pin::Pin;
-use std::str::FromStr;
+use std::{
+    boxed::Box,
+    collections::{hash_map::Entry, HashMap, HashSet},
+    fs, io, path,
+    pin::Pin,
+    str::FromStr,
+};
 
 use fidl::endpoints::{RequestStream as _, Responder as _};
 use fidl_fuchsia_io as fio;
@@ -41,10 +42,10 @@ use fuchsia_zircon::{self as zx, DurationNum as _};
 
 use anyhow::{anyhow, Context as _};
 use async_trait::async_trait;
-use async_utils::stream::TryFlattenUnorderedExt as _;
+use async_utils::stream::{TryFlattenUnorderedExt as _, WithTag as _};
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource, DEFAULT_DNS_PORT};
 use fuchsia_fs::OpenFlags;
-use futures::{StreamExt as _, TryFutureExt as _, TryStreamExt as _};
+use futures::{stream::BoxStream, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::fidl_ip_v4;
 use net_types::ip::IpAddress as _;
 use serde::Deserialize;
@@ -111,10 +112,7 @@ const MAX_ADD_DEVICE_ATTEMPTS: u8 = 3;
 /// are started or stopped.
 type DnsServerWatchers<'a> = async_utils::stream::StreamMap<
     DnsServersUpdateSource,
-    futures::stream::BoxStream<
-        'a,
-        (DnsServersUpdateSource, Result<Vec<fnet_name::DnsServer_>, anyhow::Error>),
-    >,
+    BoxStream<'a, (DnsServersUpdateSource, Result<Vec<fnet_name::DnsServer_>, fidl::Error>)>,
 >;
 
 /// Defines log levels.
@@ -593,12 +591,18 @@ fn start_dhcpv6_client(
         todo!("http://fxbug.dev/117848: Support pretty-printing configured prefix");
     }
 
-    let () = dhcpv6::start_client(
+    let source = DnsServersUpdateSource::Dhcpv6 { interface_id: *id };
+    assert!(
+        !watchers.contains_key(&source),
+        "interface with id={} already has a DHCPv6 client",
+        id
+    );
+
+    let dns_servers_stream = dhcpv6::start_client(
         dhcpv6_client_provider,
         *id,
         sockaddr,
         pd_config.clone(),
-        watchers,
     )
         .with_context(|| {
             format!(
@@ -609,6 +613,12 @@ fn start_dhcpv6_client(
                 pd_config,
             )
         })?;
+    if let Some(o) = watchers.insert(source, dns_servers_stream.tagged(source).boxed()) {
+        let _: Pin<Box<BoxStream<'_, _>>> = o;
+
+        unreachable!("DNS server watchers must not contain key {:?}", source);
+    }
+
     info!(
         "started DHCPv6 client on host interface {} (id={}) w/ sockaddr {} and PD config {:?}",
         name,
@@ -833,7 +843,6 @@ impl<'a> NetCfg<'a> {
             DnsServersUpdateSource::Netstack,
             dns_server_watcher,
         )
-        .map(move |(s, r)| (s, r.context("error getting next Netstack DNS server update event")))
         .boxed();
 
         let dns_watchers = DnsServerWatchers::empty();
@@ -895,7 +904,7 @@ impl<'a> NetCfg<'a> {
             DnsWatcherResult(
                 Option<(
                     dns_server_watcher::DnsServersUpdateSource,
-                    Result<Vec<fnet_name::DnsServer_>, anyhow::Error>,
+                    Result<Vec<fnet_name::DnsServer_>, fidl::Error>,
                 )>,
             ),
             RequestStream(Option<RequestStream>),

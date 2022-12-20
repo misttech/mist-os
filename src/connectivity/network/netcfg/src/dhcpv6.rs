@@ -7,10 +7,9 @@ use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
 use fidl_fuchsia_net_name as fnet_name;
 
 use anyhow::Context as _;
-use async_utils::stream::WithTag as _;
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource};
 use futures::future::TryFutureExt as _;
-use futures::stream::StreamExt as _;
+use futures::stream::Stream;
 
 use crate::errors::{self, ContextExt as _};
 use crate::{dns, DnsServerWatchers};
@@ -21,16 +20,7 @@ pub(super) fn start_client(
     interface_id: u64,
     sockaddr: fnet::Ipv6SocketAddress,
     prefix_delegation_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
-    watchers: &mut DnsServerWatchers<'_>,
-) -> Result<(), errors::Error> {
-    let source = DnsServersUpdateSource::Dhcpv6 { interface_id };
-    if watchers.contains_key(&source) {
-        return Err(errors::Error::Fatal(anyhow::anyhow!(
-            "interface with id={} already has a DHCPv6 client",
-            interface_id
-        )));
-    }
-
+) -> Result<impl Stream<Item = Result<Vec<fnet_name::DnsServer_>, fidl::Error>>, errors::Error> {
     let params = fnet_dhcpv6::NewClientParams {
         interface_id: Some(interface_id),
         address: Some(sockaddr),
@@ -55,27 +45,11 @@ pub(super) fn start_client(
         .context("error creating new DHCPv6 client")
         .map_err(errors::Error::NonFatal)?;
 
-    let stream = futures::stream::try_unfold(client, move |proxy| {
+    let dns_servers_stream = futures::stream::try_unfold(client, move |proxy| {
         proxy.watch_servers().map_ok(move |s| Some((s, proxy)))
-    })
-    .map(move |r| {
-        r.with_context(|| {
-            format!(
-                "error getting next event from DHCPv6 DNS server watcher for interface ID = {}",
-                interface_id
-            )
-        })
-    })
-    .tagged(source);
+    });
 
-    if watchers.insert(source, stream.boxed()).is_some() {
-        return Err(errors::Error::Fatal(anyhow::anyhow!(
-            "interface with id={} should not have a DHCPv6 client",
-            interface_id
-        )));
-    }
-
-    Ok(())
+    Ok(dns_servers_stream)
 }
 
 /// Stops the DHCPv6 client running on the specified host interface.
