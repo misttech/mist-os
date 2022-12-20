@@ -9,26 +9,29 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/result.h>
 
+#include <fbl/no_destructor.h>
+
 template <class T>
 zx::result<typename fidl::WireSyncClient<T>>& get_client() {
-  static zx::result<typename fidl::WireSyncClient<T>> client;
-  static std::once_flag once;
+  // We can't destroy |client| at static destruction time as some multithreaded programs call exit()
+  // from one thread while other threads are calling in to fdio functions either directly or
+  // indirectly through libc. Destroying |client| in this scenario would result in crashes on those
+  // threads. See https://fxbug.dev/117875 for details.
+  static fbl::NoDestructor<zx::result<typename fidl::WireSyncClient<T>>> client =
+      fbl::NoDestructor([]() -> zx::result<typename fidl::WireSyncClient<T>> {
+        auto endpoints = fidl::CreateEndpoints<T>();
+        if (endpoints.is_error()) {
+          return endpoints.take_error();
+        }
+        zx_status_t status = fdio_service_connect_by_name(fidl::DiscoverableProtocolName<T>,
+                                                          endpoints->server.channel().release());
+        if (status != ZX_OK) {
+          return zx::error(status);
+        }
+        return zx::ok(fidl::WireSyncClient(std::move(endpoints->client)));
+      }());
 
-  std::call_once(once, [&]() {
-    client = [&]() -> zx::result<typename fidl::WireSyncClient<T>> {
-      auto endpoints = fidl::CreateEndpoints<T>();
-      if (endpoints.is_error()) {
-        return endpoints.take_error();
-      }
-      zx_status_t status = fdio_service_connect_by_name(fidl::DiscoverableProtocolName<T>,
-                                                        endpoints->server.channel().release());
-      if (status != ZX_OK) {
-        return zx::error(status);
-      }
-      return zx::ok(fidl::WireSyncClient(std::move(endpoints->client)));
-    }();
-  });
-  return client;
+  return *client;
 }
 
 #endif  // LIB_FDIO_GET_CLIENT_H_

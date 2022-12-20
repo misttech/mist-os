@@ -7,6 +7,7 @@
 #include <lib/fdio/directory.h>
 
 #include <fbl/auto_lock.h>
+#include <fbl/no_destructor.h>
 
 #include "sdk/lib/fdio/directory_internal.h"
 #include "sdk/lib/fdio/fdio_unistd.h"
@@ -36,25 +37,28 @@ zx_status_t fdio_service_connect_at(zx_handle_t dir, const char* path, zx_handle
 
 __EXPORT
 zx_status_t fdio_service_connect_by_name(const char* name, zx_handle_t request) {
-  static zx::channel service_root;
-
-  {
-    static std::once_flag once;
-    static zx_status_t status;
-    std::call_once(once, [&]() {
-      zx::channel request;
-      status = zx::channel::create(0, &service_root, &request);
-      if (status != ZX_OK) {
-        return;
-      }
-      status = fdio_service_connect("/svc", request.release());
-    });
+  // We can't destroy |service_root| at static destruction time as some multithreaded programs call
+  // exit() from one thread while other threads are calling in to fdio functions. Destroying
+  // |service_root| in this scenario would result in crashes on those threads. See
+  // https://fxbug.dev/117875 for details.
+  static fbl::NoDestructor<zx::result<zx::channel>> service_root = []() -> zx::result<zx::channel> {
+    zx::channel client, request;
+    zx_status_t status = zx::channel::create(0, &client, &request);
     if (status != ZX_OK) {
-      return status;
+      return zx::error(status);
     }
+    status = fdio_service_connect("/svc", request.release());
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    return zx::ok(std::move(client));
+  }();
+
+  if (service_root->is_error()) {
+    return service_root->status_value();
   }
 
-  return fdio_service_connect_at(service_root.get(), name, request);
+  return fdio_service_connect_at((*service_root)->get(), name, request);
 }
 
 __EXPORT
