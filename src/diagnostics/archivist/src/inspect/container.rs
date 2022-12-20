@@ -174,7 +174,7 @@ pub struct PopulatedInspectDataContainer {
     pub snapshot: SnapshotData,
     /// Optional hierarchy matcher. If unset, the reader is running
     /// in all-access mode, meaning no matching or filtering is required.
-    pub inspect_matcher: Option<InspectHierarchyMatcher>,
+    pub inspect_matcher: Option<Arc<InspectHierarchyMatcher>>,
 }
 
 enum Status {
@@ -271,7 +271,7 @@ pub struct UnpopulatedInspectDataContainer {
     pub component_diagnostics_proxy: fio::DirectoryProxy,
     /// Optional hierarchy matcher. If unset, the reader is running
     /// in all-access mode, meaning no matching or filtering is required.
-    pub inspect_matcher: Option<InspectHierarchyMatcher>,
+    pub inspect_matcher: Option<Arc<InspectHierarchyMatcher>>,
 }
 
 impl UnpopulatedInspectDataContainer {

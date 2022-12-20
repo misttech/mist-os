@@ -123,7 +123,7 @@ impl ReaderServer {
 
     fn filter_single_components_snapshot(
         snapshot_data: SnapshotData,
-        static_matcher: Option<InspectHierarchyMatcher>,
+        static_matcher: Option<Arc<InspectHierarchyMatcher>>,
         client_matcher: Option<InspectHierarchyMatcher>,
         moniker: &str,
         parent_trace_id: ftrace::Id,

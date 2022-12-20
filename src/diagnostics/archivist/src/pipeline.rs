@@ -11,7 +11,7 @@ use {
     fidl::prelude::*,
     fidl_fuchsia_diagnostics::{self, ArchiveAccessorMarker, Selector},
     fuchsia_inspect as inspect,
-    std::{collections::HashMap, convert::TryInto, ops::Deref, path::Path},
+    std::{collections::HashMap, convert::TryInto, ops::Deref, path::Path, sync::Arc},
 };
 
 struct PipelineParameters {
@@ -187,7 +187,7 @@ pub struct PipelineMutableState {
     static_selectors: Option<Vec<Selector>>,
 
     /// A hierarchy matcher for any selector present in the static selectors.
-    moniker_to_static_matcher_map: HashMap<ImmutableString, InspectHierarchyMatcher>,
+    moniker_to_static_matcher_map: HashMap<ImmutableString, Arc<InspectHierarchyMatcher>>,
 }
 
 impl Deref for Pipeline {
@@ -216,8 +216,10 @@ impl PipelineMutableState {
                 [] => {}
                 populated_vec => {
                     let hierarchy_matcher = (populated_vec).try_into()?;
-                    self.moniker_to_static_matcher_map
-                        .insert(relative_moniker.join("/").into_boxed_str(), hierarchy_matcher);
+                    self.moniker_to_static_matcher_map.insert(
+                        relative_moniker.join("/").into_boxed_str(),
+                        Arc::new(hierarchy_matcher),
+                    );
                 }
             }
         }
@@ -226,7 +228,7 @@ impl PipelineMutableState {
 
     pub fn static_selectors_matchers(
         &self,
-    ) -> Option<&HashMap<ImmutableString, InspectHierarchyMatcher>> {
+    ) -> Option<&HashMap<ImmutableString, Arc<InspectHierarchyMatcher>>> {
         if self.static_selectors.is_some() {
             return Some(&self.moniker_to_static_matcher_map);
         }

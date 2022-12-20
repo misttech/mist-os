@@ -58,7 +58,9 @@ impl InspectRepository {
     pub async fn fetch_inspect_data(
         &self,
         component_selectors: &Option<Vec<Selector>>,
-        moniker_to_static_matcher_map: Option<&HashMap<ImmutableString, InspectHierarchyMatcher>>,
+        moniker_to_static_matcher_map: Option<
+            &HashMap<ImmutableString, Arc<InspectHierarchyMatcher>>,
+        >,
     ) -> Vec<UnpopulatedInspectDataContainer> {
         self.inner
             .read()
@@ -196,7 +198,9 @@ impl InspectRepositoryInner {
     fn fetch_inspect_data(
         &self,
         component_selectors: &Option<Vec<Selector>>,
-        moniker_to_static_matcher_map: Option<&HashMap<ImmutableString, InspectHierarchyMatcher>>,
+        moniker_to_static_matcher_map: Option<
+            &HashMap<ImmutableString, Arc<InspectHierarchyMatcher>>,
+        >,
     ) -> Vec<UnpopulatedInspectDataContainer> {
         self.diagnostics_directories
             .iter()
@@ -209,7 +213,7 @@ impl InspectRepositoryInner {
                 let optional_hierarchy_matcher = match moniker_to_static_matcher_map {
                     Some(map) => {
                         match map.get(identity.relative_moniker.join("/").as_str()) {
-                            Some(inspect_matcher) => Some(inspect_matcher),
+                            Some(inspect_matcher) => Some(inspect_matcher.clone()),
                             // Return early if there were static selectors, and none were for this
                             // moniker.
                             None => return None,
@@ -240,7 +244,7 @@ impl InspectRepositoryInner {
                     .map(|directory| UnpopulatedInspectDataContainer {
                         identity: identity.clone(),
                         component_diagnostics_proxy: directory,
-                        inspect_matcher: optional_hierarchy_matcher.cloned(),
+                        inspect_matcher: optional_hierarchy_matcher,
                     })
             })
             .collect()

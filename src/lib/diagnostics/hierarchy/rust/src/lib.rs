@@ -650,7 +650,6 @@ where
 ///     on a DiagnosticsHierarchy. NOTE: Their order is aligned with the vector of Regexes that created
 ///     the component_node_selector RegexSet, since each property selector is associated with
 ///     a particular node path selector.
-#[derive(Clone)]
 pub struct InspectHierarchyMatcher {
     /// RegexSet encoding all the node path selectors for
     /// inspect hierarchies under this component's out directory.
