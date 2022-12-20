@@ -2,76 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl::endpoints::Proxy as _,
-    fidl_fuchsia_io as fio,
-    std::sync::Arc,
-};
+use anyhow::Error;
 
 /// Represents the sandboxed package cache.
 pub struct Cache {
-    pkg_cache_proxy: fidl_fuchsia_pkg::PackageCacheProxy,
-    _space_manager_proxy: fidl_fuchsia_space::ManagerProxy,
-    svc_dir_proxy: fio::DirectoryProxy,
+    _pkg_cache_proxy: fidl_fuchsia_pkg::PackageCacheProxy,
 }
 
 impl Cache {
-    /// Construct a new `Cache` object with pre-created proxies to package cache, space manager, and
-    /// a `directory_proxy_with_access_to_pkg_cache`. This last argument is expected to be a
-    /// `DirectoryProxy` to a `/svc` directory which has fuchsia.pkg.PackageCache in its namespace.
-    /// This is required because the CFv1-based `AppBuilder` which constructs pkg-resolver and
-    /// system-updater on top of this `Cache` object needs a directory proxy to a svc directory, not
-    /// a proxy to an individual service.
-    //
-    // TODO(fxbug.dev/104919): delete directory_proxy_with_access_to_pkg_cache once v1 components
-    // no longer require it.
+    /// Construct a new `Cache` object with pre-created proxies to package cache, and space
+    /// manager.
     pub fn new_with_proxies(
         pkg_cache_proxy: fidl_fuchsia_pkg::PackageCacheProxy,
-        space_manager_proxy: fidl_fuchsia_space::ManagerProxy,
-        directory_proxy_with_access_to_pkg_cache: fio::DirectoryProxy,
     ) -> Result<Self, Error> {
-        Ok(Self {
-            pkg_cache_proxy,
-            _space_manager_proxy: space_manager_proxy,
-            svc_dir_proxy: directory_proxy_with_access_to_pkg_cache,
-        })
+        Ok(Self { _pkg_cache_proxy: pkg_cache_proxy })
     }
 
     /// Construct a new `Cache` object using capabilities available in the namespace of the component
     /// calling this function. Should be the default in production usage, as these capabilities
     /// should be statically routed (i.e. from `pkg-recovery.cml`).
     pub fn new() -> Result<Self, Error> {
-        let svc_dir_proxy = fuchsia_component::client::clone_namespace_svc()
-            .context("error cloning svc directory")?;
-
         Ok(Self {
-            pkg_cache_proxy: fuchsia_component::client::connect_to_protocol::<
+            _pkg_cache_proxy: fuchsia_component::client::connect_to_protocol::<
                 fidl_fuchsia_pkg::PackageCacheMarker,
             >()?,
-            _space_manager_proxy: fuchsia_component::client::connect_to_protocol::<
-                fidl_fuchsia_space::ManagerMarker,
-            >()?,
-            svc_dir_proxy,
         })
     }
 
     /// Get a proxy to an instance of fuchsia.pkg.PackageCache.
+    #[cfg(test)]
     pub fn package_cache_proxy(&self) -> Result<fidl_fuchsia_pkg::PackageCacheProxy, Error> {
-        Ok(self.pkg_cache_proxy.clone())
-    }
-
-    /// Get access to a /svc directory with access to fuchsia.pkg.PackageCache. Required in order to
-    /// use `AppBuilder` to construct v1 components with access to PackageCache.
-    // TODO(fxbug.dev/104919): delete
-    pub fn directory_request(
-        &self,
-    ) -> Result<Arc<fidl::endpoints::ClientEnd<fio::DirectoryMarker>>, Error> {
-        let clone = fuchsia_fs::directory::clone_no_describe(&self.svc_dir_proxy, None)?;
-        // TODO(https://fxbug.dev/108786): Use Proxy::into_client_end when available.
-        Ok(std::sync::Arc::new(
-            clone.into_channel().expect("proxy into channel").into_zx_channel().into(),
-        ))
+        Ok(self._pkg_cache_proxy.clone())
     }
 }
 
@@ -79,7 +40,9 @@ impl Cache {
 pub(crate) mod for_tests {
     use {
         super::*,
+        anyhow::{Context as _, Error},
         blobfs_ramdisk::BlobfsRamdisk,
+        fidl_fuchsia_io as fio,
         fuchsia_component_test::{
             Capability, ChildOptions, ChildRef, RealmBuilder, RealmInstance, Ref, Route,
         },
@@ -88,7 +51,6 @@ pub(crate) mod for_tests {
         vfs::directory::entry::DirectoryEntry,
     };
 
-    /// This wraps the `Cache` to reduce test boilerplate.
     pub struct CacheForTest {
         pub blobfs: blobfs_ramdisk::BlobfsRamdisk,
         pub cache: Arc<Cache>,
@@ -202,24 +164,8 @@ pub(crate) mod for_tests {
                 .root
                 .connect_to_protocol_at_exposed_dir::<fidl_fuchsia_pkg::PackageCacheMarker>()
                 .expect("connect to pkg cache");
-            let space_manager_proxy = realm_instance
-                .root
-                .connect_to_protocol_at_exposed_dir::<fidl_fuchsia_space::ManagerMarker>()
-                .expect("connect to space manager");
 
-            let (cache_clone, remote) =
-                fidl::endpoints::create_endpoints::<fio::DirectoryMarker>()?;
-            realm_instance
-                .root
-                .get_exposed_dir()
-                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, remote.into_channel().into())?;
-
-            let cache = Cache::new_with_proxies(
-                pkg_cache_proxy,
-                space_manager_proxy,
-                cache_clone.into_proxy()?,
-            )
-            .unwrap();
+            let cache = Cache::new_with_proxies(pkg_cache_proxy).unwrap();
 
             Ok(CacheForTest { blobfs, cache: Arc::new(cache) })
         }
@@ -244,18 +190,5 @@ mod tests {
         let proxy = cache.cache.package_cache_proxy().unwrap();
 
         assert_eq!(proxy.sync().await.unwrap(), Ok(()));
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    pub async fn test_cache_handles_gc() {
-        let realm_builder = RealmBuilder::new().await.unwrap();
-        let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.expect("starting blobfs");
-        let _cache_ref =
-            CacheForTest::realm_setup(&realm_builder, &blobfs).await.expect("setting up realm");
-        let realm_instance = realm_builder.build().await.unwrap();
-        let cache = CacheForTest::new(&realm_instance, blobfs).await.expect("launching cache");
-        let proxy = cache.cache._space_manager_proxy.clone();
-
-        assert_eq!(proxy.gc().await.unwrap(), Ok(()));
     }
 }
