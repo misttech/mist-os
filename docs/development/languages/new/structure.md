@@ -152,11 +152,11 @@ itself has no knowledge of FIDL. For example, most support libraries contain a
 on channels. The generated code can then be restricted to serialization,
 deserialization, and dispatch.
 
- * [C](/sdk/lib/fidl_base)
- * [C++](/sdk/lib/fidl/cpp/)
- * [Rust](/src/lib/fidl/rust/fidl)
- * [Dart](https://fuchsia.googlesource.com/topaz/+/HEAD/public/dart/fidl/)
- * [Go](https://fuchsia.googlesource.com/third_party/go/+/HEAD/src/syscall/zx/fidl/)
+* [C](/sdk/lib/fidl_base)
+* [C++](/sdk/lib/fidl/cpp/)
+* [Rust](/src/lib/fidl/rust/fidl)
+* [Dart](/sdk/dart/fidl/)
+* [Go](https://fuchsia.googlesource.com/third_party/go/+/HEAD/src/syscall/zx/fidl/)
 
 ## POSIX-style IO
 
