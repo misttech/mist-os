@@ -132,9 +132,8 @@ class OutgoingDirectory final {
   // See sample use cases in test case(s) located at
   // //sdk/lib/component/tests/outgoing_directory_test.cc
   template <typename Protocol, typename ServerImpl>
-  zx::result<ServerImpl*> AddProtocol(
-      std::unique_ptr<ServerImpl> impl,
-      cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+  zx::result<> AddProtocol(std::unique_ptr<ServerImpl> impl,
+                           cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
     return AddProtocolAt<Protocol>(kServiceDirectoryWithNoSlash, std::move(impl), name);
   }
 
@@ -163,16 +162,14 @@ class OutgoingDirectory final {
   // Same as |AddProtocol| but allows setting the parent directory in
   // which the protocol will be installed.
   template <typename Protocol, typename ServerImpl>
-  zx::result<ServerImpl*> AddProtocolAt(
-      cpp17::string_view path, std::unique_ptr<ServerImpl> impl,
-      cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+  zx::result<> AddProtocolAt(cpp17::string_view path, std::unique_ptr<ServerImpl> impl,
+                             cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
     static_assert(fidl::IsProtocol<Protocol>(), "Type of |Protocol| must be FIDL protocol");
     if (impl == nullptr || inner().dispatcher_ == nullptr) {
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
 
-    ServerImpl* server_reference = impl.get();
-    zx::result<> result = AddUnmanagedProtocolAt<Protocol>(
+    return AddUnmanagedProtocolAt<Protocol>(
         path,
         [dispatcher = inner().dispatcher_, impl = std::move(impl),
          unbind_protocol_callbacks = &inner().unbind_protocol_callbacks_,
@@ -186,12 +183,6 @@ class OutgoingDirectory final {
           AppendUnbindConnectionCallback(unbind_protocol_callbacks, name, std::move(cb));
         },
         name);
-
-    if (result.is_error()) {
-      return zx::error(result.error_value());
-    }
-
-    return zx::ok(server_reference);
   }
 
   // Same as |AddProtocol| but uses a typed handler and allows the usage of
