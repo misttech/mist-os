@@ -206,7 +206,7 @@ even if CTS coverage never reaches 100% of the platform surface.
 [acts]: https://android.googlesource.com/platform/tools/test/connectivity/+/HEAD/acts
 [archiveaccessor]: https://fuchsia.dev/reference/fidl/fuchsia.diagnostics#ArchiveAccessor
 [build-info]: /docs/development/build/build_information.md
-[build-info-old]: https://fuchsia.googlesource.com/fuchsia/+/1b21e5d7b36df3f5dde647684dd321f1aee21372/docs/development/build/build_information.md
+[build-info-old]: https://cs.opensource.google/fuchsia/fuchsia/+/1b21e5d7b36df3f5dde647684dd321f1aee21372:docs/development/build/build_information.md
 [capabilities]: /docs/concepts/components/v2/capabilities/README.md
 [cf-intro]: /docs/concepts/components/v2/introduction.md
 [cfv2-migration]: /docs/contribute/open_projects/components/migration.md
