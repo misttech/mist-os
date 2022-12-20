@@ -197,8 +197,8 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                                             RepositoryStorageType::Persistent,
                                         );
                                     }
-                                    let r = repo_manager.add(repo.into()).await?;
-                                    r
+                                    
+                                    repo_manager.add(repo.into()).await?
                                 }
                                 RepoConfigFormat::Version2 => {
                                     let mut repo: RepositoryConfig = serde_json::from_reader(
@@ -218,8 +218,8 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                                             .repo_storage_type(RepositoryStorageType::Persistent)
                                             .build();
                                     }
-                                    let r = repo_manager.add(repo.into()).await?;
-                                    r
+                                    
+                                    repo_manager.add(repo.into()).await?
                                 }
                             };
 
@@ -246,8 +246,8 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                                             RepositoryStorageType::Persistent,
                                         );
                                     }
-                                    let r = repo_manager.add(repo.into()).await?;
-                                    r
+                                    
+                                    repo_manager.add(repo.into()).await?
                                 }
                                 RepoConfigFormat::Version2 => {
                                     let mut repo: RepositoryConfig = serde_json::from_slice(&res)?;
@@ -265,8 +265,8 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                                             .repo_storage_type(RepositoryStorageType::Persistent)
                                             .build();
                                     }
-                                    let r = repo_manager.add(repo.into()).await?;
-                                    r
+                                    
+                                    repo_manager.add(repo.into()).await?
                                 }
                             };
                             let () = res.map_err(zx::Status::from_raw)?;
