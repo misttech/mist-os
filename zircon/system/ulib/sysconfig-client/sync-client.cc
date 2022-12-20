@@ -820,7 +820,7 @@ zx_status_t SyncClientAbrWearLeveling::FlushAppendAbrMetadata(const sysconfig_he
   auto abr_start = static_cast<const uint8_t*>(mapper.start()) + header->abr_metadata.offset;
 
   // Find an empty page to write
-  int64_t page_write_index;
+  uint64_t page_write_index;
   if (!find_empty_page_for_wear_leveling(header, abr_start, kAstroPageSize, &page_write_index)) {
     return ZX_ERR_INTERNAL;
   }

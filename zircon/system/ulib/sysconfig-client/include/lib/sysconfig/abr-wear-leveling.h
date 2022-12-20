@@ -66,7 +66,7 @@ void find_latest_abr_metadata_page(const struct sysconfig_header *header, const 
  */
 bool find_empty_page_for_wear_leveling(const struct sysconfig_header *header,
                                        const uint8_t *abr_subpart, uint64_t page_size,
-                                       int64_t *out);
+                                       uint64_t *out);
 
 /**
  * Set the magic field of the given abr_metadata_ext struct.
