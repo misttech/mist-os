@@ -4,6 +4,7 @@
 
 use {
     anyhow::Error,
+    chrono::NaiveDateTime,
     fidl::endpoints::create_proxy,
     fidl_fuchsia_factory::MiscFactoryStoreProviderProxy,
     fidl_fuchsia_hwinfo,
@@ -36,6 +37,8 @@ const NAND_STORAGE_KEY: &str = "nand";
 const EMMC_STORAGE_KEY: &str = "emmc";
 const MICROPHONE_KEY: &str = "mic";
 const AUDIO_AMPLIFIER_KEY: &str = "amp";
+// CONFIG VALUE FORMAT STRS
+const BUILD_DATE_FORMAT_STR: &str = "%Y-%m-%dT%H:%M:%S";
 
 async fn read_factory_file(
     path: &str,
@@ -217,6 +220,7 @@ impl ProductInfo {
             let pair: Vec<_> = config.splitn(2, "=").collect();
             let key = pair[0];
             let value = pair[1];
+            let mut filtered_value = value.to_string();
             match key {
                 SKU_KEY => {
                     self.sku = Some(value.to_owned());
@@ -229,6 +233,14 @@ impl ProductInfo {
                 }
                 BUILD_DATE_KEY => {
                     self.build_date = Some(value.to_owned());
+                    filtered_value = NaiveDateTime::parse_from_str(
+                        self.build_date.as_ref().unwrap(),
+                        BUILD_DATE_FORMAT_STR,
+                    )
+                    .map_or_else(
+                        |_| "invalid_format".to_string(),
+                        |datetime| format!("{}", datetime.date().format("%Y-%m-%d")),
+                    );
                 }
                 BUILD_NAME_KEY => {
                     self.build_name = Some(value.to_owned());
@@ -258,7 +270,7 @@ impl ProductInfo {
                     fx_log_warn!("hw.txt dictionary values {} - {}", key, value.to_owned());
                 }
             }
-            fx_log_warn!("hw.txt line: {}", config);
+            fx_log_warn!("hw.txt line: {}={}", key, filtered_value);
         }
         Ok(())
     }
