@@ -644,7 +644,7 @@ impl ComponentInstance {
                 match *state {
                     InstanceState::Resolved(ref s) => s.decl.clone(),
                     InstanceState::Destroyed => {
-                        return Err(ModelError::instance_not_found(self.abs_moniker.clone()));
+                        return Err(ModelError::instance_destroyed(self.abs_moniker.clone()));
                     }
                     _ => {
                         panic!("resolve_runner: not resolved")
@@ -1077,7 +1077,7 @@ impl ComponentInstance {
                 Ok(())
             }
             InstanceState::Destroyed => {
-                Err(ModelError::instance_not_found(self.abs_moniker.clone()))
+                Err(ModelError::instance_destroyed(self.abs_moniker.clone()))
             }
             _ => {
                 panic!("Component must be resolved or destroyed before using this function")
@@ -1112,7 +1112,7 @@ impl ComponentInstance {
                     })
                     .collect(),
                 InstanceState::Destroyed => {
-                    return Err(ModelError::instance_not_found(self.abs_moniker.clone()));
+                    return Err(ModelError::instance_destroyed(self.abs_moniker.clone()));
                 }
                 InstanceState::New | InstanceState::Unresolved => {
                     panic!("start: not resolved")

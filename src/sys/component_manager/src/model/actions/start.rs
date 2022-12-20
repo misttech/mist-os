@@ -200,7 +200,7 @@ pub fn should_return_early(
     match component {
         InstanceState::New | InstanceState::Unresolved | InstanceState::Resolved(_) => {}
         InstanceState::Destroyed => {
-            return Some(Err(ModelError::instance_not_found(abs_moniker.clone())));
+            return Some(Err(ModelError::instance_destroyed(abs_moniker.clone())));
         }
     }
     if execution.is_shut_down() {
@@ -320,7 +320,6 @@ mod tests {
         cm_rust_testing::{ChildDeclBuilder, ComponentDeclBuilder},
         fidl_fuchsia_sys2 as fsys, fuchsia, fuchsia_zircon as zx,
         moniker::AbsoluteMoniker,
-        routing::error::ComponentInstanceError,
         routing::resolving::ComponentAddress,
         std::sync::{Arc, Weak},
     };
@@ -488,9 +487,7 @@ mod tests {
         assert!(should_return_early(&InstanceState::Unresolved, &es, &m).is_none());
         assert_matches!(
             should_return_early(&InstanceState::Destroyed, &es, &m),
-            Some(Err(ModelError::ComponentInstanceError {
-                err: ComponentInstanceError::InstanceNotFound { moniker: _ }
-            }))
+            Some(Err(ModelError::InstanceDestroyed { moniker: _ }))
         );
         let (_, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
         let decl = ComponentDeclBuilder::new().add_lazy_child("bar").build();

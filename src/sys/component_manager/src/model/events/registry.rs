@@ -351,7 +351,7 @@ impl EventRegistry {
                 }
                 InstanceState::Resolved(ref s) => s.decl().clone(),
                 InstanceState::Destroyed => {
-                    return Err(ModelError::instance_not_found(target_moniker.clone()));
+                    return Err(ModelError::instance_destroyed(target_moniker.clone()));
                 }
             }
         };
@@ -392,7 +392,7 @@ impl EventRegistry {
                 }
                 InstanceState::Resolved(ref s) => s.decl().clone(),
                 InstanceState::Destroyed => {
-                    return Err(ModelError::instance_not_found(target_moniker.clone()));
+                    return Err(ModelError::instance_destroyed(target_moniker.clone()));
                 }
             }
         };

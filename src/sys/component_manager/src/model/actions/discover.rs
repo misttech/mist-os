@@ -42,7 +42,7 @@ async fn do_discover(component: &Arc<ComponentInstance>) -> Result<(), ModelErro
             InstanceState::Unresolved => true,
             InstanceState::Resolved(_) => true,
             InstanceState::Destroyed => {
-                return Err(ModelError::instance_not_found(component.abs_moniker.clone()));
+                return Err(ModelError::instance_destroyed(component.abs_moniker.clone()));
             }
         }
     };

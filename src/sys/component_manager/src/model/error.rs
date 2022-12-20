@@ -27,6 +27,8 @@ pub enum ModelError {
     InstanceAlreadyExists { moniker: AbsoluteMoniker, child: ChildMoniker },
     #[error("component instance with moniker {} has shut down", moniker)]
     InstanceShutDown { moniker: AbsoluteMoniker },
+    #[error("component instance with moniker {} is being destroyed", moniker)]
+    InstanceDestroyed { moniker: AbsoluteMoniker },
     #[error("component collection not found with name {}", name)]
     CollectionNotFound { name: String },
     #[error("collection {} does not allow dynamic offers", collection_name)]
@@ -171,6 +173,10 @@ impl ModelError {
 
     pub fn instance_shut_down(moniker: AbsoluteMoniker) -> ModelError {
         ModelError::InstanceShutDown { moniker }
+    }
+
+    pub fn instance_destroyed(moniker: AbsoluteMoniker) -> ModelError {
+        ModelError::InstanceDestroyed { moniker }
     }
 
     pub fn instance_not_found(moniker: AbsoluteMoniker) -> ModelError {

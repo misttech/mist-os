@@ -59,7 +59,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Mod
                 InstanceState::Unresolved => true,
                 InstanceState::Resolved(_) => false,
                 InstanceState::Destroyed => {
-                    return Err(ModelError::instance_not_found(component.abs_moniker.clone()));
+                    return Err(ModelError::instance_destroyed(component.abs_moniker.clone()));
                 }
             }
         };
@@ -85,7 +85,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Mod
                         panic!("Component was marked Resolved during Resolve action?");
                     }
                     InstanceState::Destroyed => {
-                        return Err(ModelError::instance_not_found(component.abs_moniker.clone()));
+                        return Err(ModelError::instance_destroyed(component.abs_moniker.clone()));
                     }
                     InstanceState::New | InstanceState::Unresolved => {}
                 }
