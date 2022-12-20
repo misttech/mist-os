@@ -238,7 +238,7 @@ zx_status_t Device::CreateComposite(
     str_props[i] = composite_str_props[i];
   }
 
-  fbl::RefPtr<Device> real_parent = composite.primary_fragment()->bound_device();
+  fbl::RefPtr<Device> real_parent = composite.GetPrimaryFragment()->bound_device();
   // If our parent is a proxy, for the purpose of devfs, we need to work with
   // *its* parent which is the device that it is proxying.
   if (real_parent->flags & DEV_CTX_PROXY) {
