@@ -9,8 +9,10 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <fidl/fuchsia.hardware.skipblock/cpp/wire.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
 #include <lib/cksum.h>
+#include <lib/component/incoming/cpp/service_client.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/watcher.h>
@@ -76,25 +78,19 @@ zx_status_t FindSysconfigPartition(const fbl::unique_fd& devfs_root,
     if (event != WATCH_EVENT_ADD_FILE) {
       return ZX_OK;
     }
-    if ((strcmp(filename, ".") == 0) || strcmp(filename, "..") == 0) {
+    if (std::string_view{filename} == ".") {
       return ZX_OK;
-    }
-
-    zx::channel local, remote;
-    zx_status_t status = zx::channel::create(0, &local, &remote);
-    if (status != ZX_OK) {
-      return status;
     }
 
     fdio_cpp::UnownedFdioCaller caller(dirfd);
-    status = fdio_service_connect_at(caller.borrow_channel(), filename, remote.release());
-    if (status != ZX_OK) {
-      return ZX_OK;
+    zx::result client = component::ConnectAt<skipblock::SkipBlock>(caller.directory(), filename);
+    if (client.is_error()) {
+      return client.error_value();
     }
-    fidl::WireSyncClient<skipblock::SkipBlock> skip_block(std::move(local));
-    auto result = skip_block->GetPartitionInfo();
-    status = result.ok() ? result.value().status : result.status();
-    if (status != ZX_OK) {
+    fidl::WireSyncClient<skipblock::SkipBlock> skip_block(std::move(client.value()));
+    const fidl::WireResult result = skip_block->GetPartitionInfo();
+    if (zx_status_t status = result.ok() ? result.value().status : result.status();
+        status != ZX_OK) {
       return ZX_OK;
     }
     const auto& response = result.value();
@@ -130,7 +126,8 @@ zx_status_t CheckIfAstro(const fbl::unique_fd& devfs_root) {
   if (!caller) {
     return ZX_ERR_IO;
   }
-  auto result = fidl::WireCall<fuchsia_sysinfo::SysInfo>(caller.channel())->GetBoardName();
+  const fidl::WireResult result =
+      fidl::WireCall(caller.borrow_as<fuchsia_sysinfo::SysInfo>())->GetBoardName();
   zx_status_t status = result.ok() ? result.value().status : result.status();
   if (status != ZX_OK) {
     return status;
@@ -140,22 +137,6 @@ zx_status_t CheckIfAstro(const fbl::unique_fd& devfs_root) {
   }
 
   return ZX_ERR_NOT_SUPPORTED;
-}
-
-// <memory> should be the starting address of a sysconfig_header structure.
-// Since header is located at page 0, it can also be the starting address of the partition.
-// If the header in the memory is not valid, it will return the default header provided by the
-// caller.
-std::unique_ptr<sysconfig_header> ParseHeader(const void* memory,
-                                              const sysconfig_header& default_header) {
-  auto ret = std::make_unique<sysconfig_header>();
-  memcpy(ret.get(), memory, sizeof(sysconfig_header));
-  if (!sysconfig_header_valid(ret.get(), kAstroPageSize, kAstroSysconfigPartitionSize)) {
-    fprintf(stderr, "ParseHeader: Falling back to default header.\n");
-    memcpy(ret.get(), &default_header, sizeof(sysconfig_header));
-  }
-
-  return ret;
 }
 
 sysconfig_subpartition GetSubpartitionInfo(const sysconfig_header& header,
@@ -180,7 +161,7 @@ struct PartitionTypeAndInfo {
   uint64_t offset;
   uint64_t size;
 
-  PartitionTypeAndInfo() {}
+  PartitionTypeAndInfo() = default;
 
   // Why not use a sysconfig_subpartition member?
   // Because sysconfig_subpartition is declared with "packed" attribute. This has been seen
@@ -344,36 +325,35 @@ zx_status_t SyncClient::Create(const fbl::unique_fd& devfs_root, std::optional<S
   return ZX_OK;
 }
 
-const sysconfig_header* SyncClient::GetHeader(zx_status_t* status_out) {
-  if (header_) {
-    return header_.get();
-  }
-
-  if (auto status = LoadFromStorage(); status != ZX_OK) {
-    fprintf(stderr, "ReadHeader: Failed to read header from storage. %s.\n",
-            zx_status_get_string(status));
-    if (status_out) {
-      *status_out = status;
+zx::result<std::reference_wrapper<const sysconfig_header>> SyncClient::GetHeader() {
+  if (!header_.has_value()) {
+    if (zx_status_t status = LoadFromStorage(); status != ZX_OK) {
+      fprintf(stderr, "ReadHeader: Failed to read header from storage. %s.\n",
+              zx_status_get_string(status));
+      return zx::error(status);
     }
-    return nullptr;
-  }
 
-  header_ = ParseHeader(read_mapper_.start(), kLegacyLayout);
-  return header_.get();
+    sysconfig_header& header = header_.emplace();
+    memcpy(&header, read_mapper_.start(), sizeof(sysconfig_header));
+    if (!sysconfig_header_valid(&header, kAstroPageSize, kAstroSysconfigPartitionSize)) {
+      fprintf(stderr, "GetHeader: Falling back to default header.\n");
+      memcpy(&header, &kLegacyLayout, sizeof(sysconfig_header));
+    }
+  }
+  return zx::ok(std::reference_wrapper(header_.value()));
 }
 
 zx_status_t SyncClient::WritePartition(PartitionType partition, const zx::vmo& vmo,
                                        zx_off_t vmo_offset) {
-  const sysconfig_header* header;
-  zx_status_t status;
-  if ((header = GetHeader(&status)) == nullptr) {
+  zx::result header = GetHeader();
+  if (header.is_error()) {
     // In case there is actually a valid header in the storage, but just that we fail to read due to
     // transient error, refuse to perform any write to avoid compromising the partition, bootloader
     // etc.
     fprintf(stderr,
             "WritePartition: error while reading for header. Refuse to perform any write. %s\n",
-            zx_status_get_string(status));
-    return status;
+            header.status_string());
+    return header.error_value();
   }
 
   auto partition_info = GetSubpartitionInfo(*header, partition);
@@ -431,12 +411,10 @@ zx_status_t SyncClient::InitializeReadMapper() {
 
 zx_status_t SyncClient::ReadPartition(PartitionType partition, const zx::vmo& vmo,
                                       zx_off_t vmo_offset) {
-  const sysconfig_header* header;
-  zx_status_t status;
-  if ((header = GetHeader(&status)) == nullptr) {
-    fprintf(stderr, "ReadPartition: error while reading for header. %s\n",
-            zx_status_get_string(status));
-    return status;
+  zx::result header = GetHeader();
+  if (header.is_error()) {
+    fprintf(stderr, "ReadPartition: error while reading for header. %s\n", header.status_string());
+    return header.error_value();
   }
 
   auto partition_info = GetSubpartitionInfo(*header, partition);
@@ -481,77 +459,74 @@ zx_status_t SyncClient::LoadFromStorage() {
 }
 
 zx_status_t SyncClient::GetPartitionSize(PartitionType partition, size_t* out) {
-  const sysconfig_header* header;
-  zx_status_t status;
-  if ((header = GetHeader(&status)) == nullptr) {
+  zx::result header = GetHeader();
+  if (header.is_error()) {
     fprintf(stderr, "GetPartitionSize: error while reading for header. %s\n",
-            zx_status_get_string(status));
-    return status;
+            header.status_string());
+    return header.error_value();
   }
   *out = GetSubpartitionInfo(*header, partition).size;
   return ZX_OK;
 }
 
 zx_status_t SyncClient::GetPartitionOffset(PartitionType partition, size_t* out) {
-  const sysconfig_header* header;
-  zx_status_t status;
-  if ((header = GetHeader(&status)) == nullptr) {
+  zx::result header = GetHeader();
+  if (header.is_error()) {
     fprintf(stderr, "GetPartitionOffset: error while reading for header. %s\n",
-            zx_status_get_string(status));
-    return status;
+            header.status_string());
+    return header.error_value();
   }
   *out = GetSubpartitionInfo(*header, partition).offset;
   return ZX_OK;
 }
 
-zx_status_t SyncClient::UpdateLayout(const sysconfig_header& target_header) {
-  zx_status_t status_get_header;
-  auto current_header = GetHeader(&status_get_header);
-  if (current_header == nullptr) {
-    fprintf(stderr, "UpdateLayout: Failed to read current header. %s\n",
-            zx_status_get_string(status_get_header));
-    return status_get_header;
+zx_status_t SyncClient::UpdateLayout(sysconfig_header target_header) {
+  zx::result result = GetHeader();
+  if (result.is_error()) {
+    fprintf(stderr, "UpdateLayout: Failed to read current result. %s\n", result.status_string());
+    return result.error_value();
   }
+  const sysconfig_header& header = result.value();
 
-  if (sysconfig_header_equal(&target_header, current_header)) {
+  if (sysconfig_header_equal(&target_header, &header)) {
     fprintf(stderr,
             "UpdateLayout: Already organized according to the specified layout. Skipping.\n");
     return ZX_OK;
   }
 
-  sysconfig_header header = target_header;
-  update_sysconfig_header_magic_and_crc(&header);
+  update_sysconfig_header_magic_and_crc(&target_header);
 
   // Refuse to update to an invalid header in the first place
-  if (!sysconfig_header_valid(&header, kAstroPageSize, kAstroSysconfigPartitionSize)) {
+  if (!sysconfig_header_valid(&target_header, kAstroPageSize, kAstroSysconfigPartitionSize)) {
     fprintf(stderr, "UpdateLayout: Header is invalid. Refuse to update\n");
     return ZX_ERR_INVALID_ARGS;
   }
 
   // Read the entire partition in to read_mapper_
-  if (auto status = LoadFromStorage(); status != ZX_OK) {
+  if (zx_status_t status = LoadFromStorage(); status != ZX_OK) {
     fprintf(stderr, "UpdateLayout: Failed to load from storage. %s\n",
             zx_status_get_string(status));
     return status;
   }
 
-  UpdateSysconfigLayout(read_mapper_.start(), read_mapper_.size(), *current_header, target_header);
+  UpdateSysconfigLayout(read_mapper_.start(), read_mapper_.size(), header, target_header);
 
   // Write the header, if it is not the legacy one.
-  zx_status_t status_write;
-  if (!sysconfig_header_equal(&header, &kLegacyLayout) &&
-      (status_write = read_mapper_.vmo().write(&header, 0, sizeof(header))) != ZX_OK) {
-    fprintf(stderr, "failed to write header to vmo. %s\n", zx_status_get_string(status_write));
-    return status_write;
+  if (!sysconfig_header_equal(&target_header, &kLegacyLayout)) {
+    if (zx_status_t status = read_mapper_.vmo().write(&header, 0, sizeof(header));
+        status != ZX_OK) {
+      fprintf(stderr, "failed to write header to vmo. %s\n", zx_status_get_string(status));
+      return status;
+    }
   }
 
-  if (auto status = Write(0, kAstroSysconfigPartitionSize, read_mapper_.vmo(), 0);
+  if (zx_status_t status = Write(0, kAstroSysconfigPartitionSize, read_mapper_.vmo(), 0);
       status != ZX_OK) {
     fprintf(stderr, "UpdateLayout: failed to write to storage. %s\n", zx_status_get_string(status));
     return status;
   }
 
-  header_ = std::make_unique<sysconfig_header>(header);
+  header_ = target_header;
   return ZX_OK;
 }
 
@@ -678,12 +653,11 @@ zx_status_t SyncClientBuffered::Flush() {
 
 zx_status_t SyncClientBuffered::GetSubpartitionCacheAddrSize(PartitionType partition,
                                                              uint8_t** start, size_t* size) {
-  zx_status_t status_get_header;
-  auto header = client_.GetHeader(&status_get_header);
-  if (!header) {
-    return status_get_header;
+  zx::result header = client_.GetHeader();
+  if (header.is_error()) {
+    return header.error_value();
   }
-  auto info = GetSubpartitionInfo(*header, partition);
+  auto info = GetSubpartitionInfo(header.value(), partition);
   *start = static_cast<uint8_t*>(cache_.start()) + info.offset;
   *size = info.size;
   return ZX_OK;
@@ -698,7 +672,7 @@ const uint8_t* SyncClientBuffered::GetCacheBuffer(PartitionType partition) {
   return start;
 }
 
-zx_status_t SyncClientBuffered::UpdateLayout(const sysconfig_header& target_header) {
+zx_status_t SyncClientBuffered::UpdateLayout(sysconfig_header target_header) {
   if (auto status = Flush(); status != ZX_OK) {
     return status;
   }
@@ -748,21 +722,20 @@ zx_status_t SyncClientAbrWearLeveling::ReadLatestAbrMetadataFromStorage(const zx
 }
 
 zx_status_t SyncClientAbrWearLeveling::FindLatestAbrMetadataFromStorage(abr_metadata_ext* out) {
-  zx_status_t status_get_header;
-  auto header = client_.GetHeader(&status_get_header);
-  if (header == nullptr) {
-    return status_get_header;
+  zx::result result = client_.GetHeader();
+  if (result.is_error()) {
+    return result.error_value();
   }
+  const sysconfig_header& header = result.value();
 
   if (auto status = client_.LoadFromStorage(); status != ZX_OK) {
     return status;
   }
-  auto abr_start =
-      static_cast<uint8_t*>(client_.read_mapper_.start()) + header->abr_metadata.offset;
+  auto abr_start = static_cast<uint8_t*>(client_.read_mapper_.start()) + header.abr_metadata.offset;
 
   ZX_ASSERT(out != nullptr);
-  if (layout_support_wear_leveling(header, kAstroPageSize)) {
-    find_latest_abr_metadata_page(header, abr_start, kAstroPageSize, out);
+  if (layout_support_wear_leveling(&header, kAstroPageSize)) {
+    find_latest_abr_metadata_page(&header, abr_start, kAstroPageSize, out);
   } else {
     memcpy(out, abr_start, sizeof(abr_metadata_ext));
   }
@@ -775,21 +748,21 @@ zx_status_t SyncClientAbrWearLeveling::Flush() {
     return ZX_OK;
   }
 
-  zx_status_t status_get_header;
-  auto header = client_.GetHeader(&status_get_header);
-  if (!header) {
-    return status_get_header;
+  zx::result result = client_.GetHeader();
+  if (result.is_error()) {
+    return result.error_value();
   }
+  const sysconfig_header& header = result.value();
 
-  if (!layout_support_wear_leveling(header, kAstroPageSize)) {
+  if (!layout_support_wear_leveling(&header, kAstroPageSize)) {
     return SyncClientBuffered::Flush();
   }
 
   // Try if we can only perform an abr metadata append.
-  if (FlushAppendAbrMetadata(header) != ZX_OK) {
+  if (FlushAppendAbrMetadata(&header) != ZX_OK) {
     // If appending is not applicable, flush all valid cached data to memory.
     // An erase will be introduced.
-    if (auto status = FlushReset(header); status != ZX_OK) {
+    if (auto status = FlushReset(&header); status != ZX_OK) {
       return status;
     }
   }

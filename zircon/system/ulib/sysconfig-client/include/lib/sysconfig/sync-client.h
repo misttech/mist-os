@@ -72,7 +72,7 @@ class __EXPORT SyncClient {
   // layout is changed afterwards by some other instance of SyncClient, it will not be aware of it.
   // Thus make sure that you only effectively update layout in a state where no other SyncClient is
   // created and in use.
-  zx_status_t UpdateLayout(const sysconfig_header& target_header);
+  zx_status_t UpdateLayout(sysconfig_header target_header);
 
   // No copy.
   SyncClient(const SyncClient&) = delete;
@@ -80,11 +80,11 @@ class __EXPORT SyncClient {
 
   SyncClient(SyncClient&&) = default;
   SyncClient& operator=(SyncClient&&) = default;
-  // TODO(fxbug.dev/47505): Swap the return and output argument.
-  const sysconfig_header* GetHeader(zx_status_t* status_out = nullptr);
+
+  zx::result<std::reference_wrapper<const sysconfig_header>> GetHeader();
 
  private:
-  SyncClient(fidl::WireSyncClient<fuchsia_hardware_skipblock::SkipBlock> skip_block)
+  explicit SyncClient(fidl::WireSyncClient<fuchsia_hardware_skipblock::SkipBlock> skip_block)
       : skip_block_(std::move(skip_block)) {}
 
   zx_status_t InitializeReadMapper();
@@ -103,7 +103,7 @@ class __EXPORT SyncClient {
   fzl::OwnedVmoMapper read_mapper_;
 
   // Once loaded from storage, the header will be cached here
-  std::unique_ptr<sysconfig_header> header_;
+  std::optional<sysconfig_header> header_;
 
   // The friend declaration here is mainly for allowing SynClientBuffered to re-use internal
   // resources such as read_mapper_, without having to expose them, change access modifier or
@@ -120,7 +120,7 @@ class SyncClientBuffered {
  public:
   using PartitionType = SyncClient::PartitionType;
 
-  SyncClientBuffered(::sysconfig::SyncClient client) : client_(std::move(client)) {}
+  explicit SyncClientBuffered(::sysconfig::SyncClient client) : client_(std::move(client)) {}
 
   virtual ~SyncClientBuffered() = default;
 
@@ -146,7 +146,7 @@ class SyncClientBuffered {
   SyncClientBuffered(SyncClientBuffered&&) = default;
   SyncClientBuffered& operator=(SyncClientBuffered&&) = default;
 
-  zx_status_t UpdateLayout(const sysconfig_header& target_header);
+  zx_status_t UpdateLayout(sysconfig_header target_header);
 
  protected:
   enum CacheBitMask {
@@ -184,8 +184,8 @@ class SyncClientAbrWearLeveling : public SyncClientBuffered {
  public:
   using PartitionType = SyncClient::PartitionType;
 
-  SyncClientAbrWearLeveling(::sysconfig::SyncClient client)
-      : SyncClientBuffered(std::move(client)), erase_count_(0) {}
+  explicit SyncClientAbrWearLeveling(::sysconfig::SyncClient client)
+      : SyncClientBuffered(std::move(client)) {}
 
   // No copy.
   SyncClientAbrWearLeveling(const SyncClientAbrWearLeveling&) = delete;
@@ -213,7 +213,7 @@ class SyncClientAbrWearLeveling : public SyncClientBuffered {
   zx_status_t FlushAppendAbrMetadata(const sysconfig_header* header);
   zx_status_t FlushReset(const sysconfig_header* header);
   // For test purpose
-  uint32_t erase_count_;
+  uint32_t erase_count_ = 0;
 };
 
 }  // namespace sysconfig
