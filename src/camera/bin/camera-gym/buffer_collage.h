@@ -65,8 +65,8 @@ struct CollectionView {
 // only be called from the loop's thread.
 class BufferCollage : public fuchsia::ui::app::ViewProvider {
  public:
-  static constexpr uint32_t kShowDescription    = 0x00000001;  // On/off for description
-  static constexpr uint32_t kShowMagnifyBoxes   = 0x00000002;  // On/off for magnify boxes
+  static constexpr uint32_t kShowDescription = 0x00000001;   // On/off for description
+  static constexpr uint32_t kShowMagnifyBoxes = 0x00000002;  // On/off for magnify boxes
 
   static constexpr uint32_t kShowStateCycleMask = 0x00000003;  // All bits used
 
@@ -186,6 +186,9 @@ class BufferCollage : public fuchsia::ui::app::ViewProvider {
   void OnScenicError(zx_status_t status);
   void OnScenicEvent(std::vector<fuchsia::ui::scenic::Event> events);
 
+  // Handles fuchsia::ui::pointer::TouchSource events.
+  void OnTouchEvents(std::vector<fuchsia::ui::pointer::TouchEvent> events);
+
   // |fuchsia::ui::app::ViewProvider|
   void CreateView(zx::eventpair view_token,
                   fidl::InterfaceRequest<fuchsia::sys::ServiceProvider> incoming_services,
@@ -221,6 +224,7 @@ class BufferCollage : public fuchsia::ui::app::ViewProvider {
   fit::closure stop_callback_;
   std::unique_ptr<scenic::Session> session_;
   std::unique_ptr<scenic::View> view_;
+  fuchsia::ui::pointer::TouchSourcePtr touch_source_;
   fidl::Binding<fuchsia::ui::app::ViewProvider> view_provider_binding_;
   std::optional<fuchsia::ui::gfx::BoundingBox> view_extents_;
   std::map<uint32_t, CollectionView> collection_views_;

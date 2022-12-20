@@ -129,12 +129,17 @@ fpromise::result<std::unique_ptr<BufferCollage>, zx_status_t> BufferCollage::Cre
   collage->stop_callback_ = std::move(stop_callback);
 
   // Create a scenic session and set its event handlers.
-  collage->session_ =
-      std::make_unique<scenic::Session>(collage->scenic_.get(), collage->loop_.dispatcher());
+  {
+    fuchsia::ui::scenic::SessionEndpoints endpoints;
+    endpoints.set_touch_source(collage->touch_source_.NewRequest());
+    collage->session_ = std::make_unique<scenic::Session>(
+        collage->scenic_.get(), std::move(endpoints), collage->loop_.dispatcher());
+  }
   collage->session_->set_error_handler(
       fit::bind_member(collage.get(), &BufferCollage::OnScenicError));
   collage->session_->set_event_handler(
       fit::bind_member(collage.get(), &BufferCollage::OnScenicEvent));
+  collage->touch_source_->Watch({}, fit::bind_member(collage.get(), &BufferCollage::OnTouchEvents));
 
   // Start a thread and begin processing messages.
   status = collage->loop_.StartThread("BufferCollage Loop");
@@ -835,12 +840,29 @@ void BufferCollage::OnScenicEvent(std::vector<fuchsia::ui::scenic::Event> events
       }
       UpdateLayout();
     }
-    if (event.is_input() && event.input().is_pointer() &&
-        event.input().pointer().phase == fuchsia::ui::input::PointerEventPhase::UP) {
+  }
+}
+
+void BufferCollage::OnTouchEvents(std::vector<fuchsia::ui::pointer::TouchEvent> events) {
+  std::vector<fuchsia::ui::pointer::TouchResponse> responses;
+  for (auto& event : events) {
+    if (event.has_pointer_sample() &&
+        event.pointer_sample().phase() == fuchsia::ui::pointer::EventPhase::REMOVE) {
       show_state_ = (show_state_ + 1) & kShowStateCycleMask;
       UpdateLayout();
     }
+
+    if (event.has_pointer_sample()) {
+      fuchsia::ui::pointer::TouchResponse response;
+      response.set_response_type(fuchsia::ui::pointer::TouchResponseType::YES);
+      responses.emplace_back(std::move(response));
+    } else {
+      // Add empty response for non-pointer event.
+      responses.emplace_back();
+    }
   }
+
+  touch_source_->Watch(std::move(responses), fit::bind_member(this, &BufferCollage::OnTouchEvents));
 }
 
 void BufferCollage::CreateView(
