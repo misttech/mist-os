@@ -524,6 +524,14 @@ enum SendTimer<I: Instant> {
     /// A keep-alive timer can only be installed when the connection is idle,
     /// i.e., the connection must not have any outstanding data.
     KeepAlive(KeepAliveTimer<I>),
+    /// A zero window probe timer is installed when the receiver advertises a
+    /// zero window but we have data to send. RFC 9293 Section 3.8.6.1 suggests
+    /// that:
+    ///   The transmitting host SHOULD send the first zero-window probe when a
+    ///   zero window has existed for the retransmission timeout period, and
+    ///   SHOULD increase exponentially the interval between successive probes.
+    /// So we choose a retransmission timer as its implementation.
+    ZeroWindowProbe(RetransTimer<I>),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -546,7 +554,8 @@ impl<I: Instant> SendTimer<I> {
     fn expiry(&self) -> I {
         match self {
             SendTimer::Retrans(RetransTimer { at, rto: _ })
-            | SendTimer::KeepAlive(KeepAliveTimer { at, already_sent: _ }) => *at,
+            | SendTimer::KeepAlive(KeepAliveTimer { at, already_sent: _ })
+            | SendTimer::ZeroWindowProbe(RetransTimer { at, rto: _ }) => *at,
         }
     }
 }
@@ -605,7 +614,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             Some(SendTimer::KeepAlive(keep_alive_timer)) => {
                 !keep_alive.enabled || keep_alive_timer.already_sent < keep_alive.count.get()
             }
-            Some(SendTimer::Retrans(_)) | None => true,
+            Some(SendTimer::Retrans(_)) | Some(SendTimer::ZeroWindowProbe(_)) | None => true,
         }
     }
 
@@ -620,7 +629,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
     ) -> Option<Segment<SendPayload<'_>>> {
         let Self {
             nxt: snd_nxt,
-            max,
+            max: snd_max,
             una: snd_una,
             wnd: snd_wnd,
             buffer,
@@ -631,6 +640,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             timer,
             congestion_control,
         } = self;
+        let mut zero_window_probe = false;
         match timer {
             Some(SendTimer::Retrans(retrans_timer)) => {
                 if retrans_timer.at <= now {
@@ -648,6 +658,17 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                     *snd_nxt = *snd_una;
                     retrans_timer.backoff(now);
                     congestion_control.on_retransmission_timeout();
+                }
+            }
+            Some(SendTimer::ZeroWindowProbe(retrans_timer)) => {
+                debug_assert!(buffer.len() > 0 || FIN_QUEUED);
+                if retrans_timer.at <= now {
+                    zero_window_probe = true;
+                    *snd_nxt = *snd_una;
+                    // Per RFC 9293 Section 3.8.6.1:
+                    //   [...] SHOULD increase exponentially the interval
+                    //   between successive probes.
+                    retrans_timer.backoff(now);
                 }
             }
             Some(SendTimer::KeepAlive(KeepAliveTimer { at, already_sent })) => {
@@ -693,11 +714,16 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             .unwrap_or(WindowSize::MAX.into());
 
         // We can only send the minimum of the open window and the bytes that
-        // are available.
-        let can_send = open_window.min(available).min(mss);
+        // are available, additionally, if in zero window probe mode, allow at
+        // least one byte past the limit to be sent.
+        let can_send = open_window.min(available).min(mss).max(u32::from(zero_window_probe));
         if can_send == 0 {
             if available == 0 && offset == 0 && timer.is_none() && keep_alive.enabled {
                 *timer = Some(SendTimer::KeepAlive(KeepAliveTimer::idle(now, keep_alive)));
+            }
+            if available != 0 && offset == 0 && timer.is_none() && *snd_wnd == WindowSize::ZERO {
+                *timer =
+                    Some(SendTimer::ZeroWindowProbe(RetransTimer::new(now, rtt_estimator.rto())))
             }
             return None;
         }
@@ -739,8 +765,8 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         if seq_max.after(*snd_nxt) {
             *snd_nxt = seq_max;
         }
-        if seq_max.after(*max) {
-            *max = seq_max;
+        if seq_max.after(*snd_max) {
+            *snd_max = seq_max;
         }
         // Per https://tools.ietf.org/html/rfc6298#section-5:
         //   (5.1) Every time a packet containing data is sent (including a
@@ -748,7 +774,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         //         running so that it will expire after RTO seconds (for the
         //         current value of RTO).
         match timer {
-            Some(SendTimer::Retrans(_)) => {}
+            Some(SendTimer::Retrans(_)) | Some(SendTimer::ZeroWindowProbe(_)) => {}
             Some(SendTimer::KeepAlive(_)) | None => {
                 *timer = Some(SendTimer::Retrans(RetransTimer::new(now, rtt_estimator.rto())))
             }
@@ -800,6 +826,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                     retrans_timer.rearm(now);
                 }
             }
+            Some(SendTimer::ZeroWindowProbe(_)) => {}
         }
         // Note: we rewind SND.NXT to SND.UNA on retransmission; if
         // `seg_ack` is after `snd.max`, it means the segment acks
@@ -854,6 +881,11 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 *snd_wnd = seg_wnd;
                 *snd_wl1 = seg_seq;
                 *snd_wl2 = seg_ack;
+                if seg_wnd != WindowSize::ZERO
+                    && matches!(timer, Some(SendTimer::ZeroWindowProbe(_)))
+                {
+                    *timer = None;
+                }
             }
             // If the incoming segment acks the sequence number that we used
             // for RTT estimate, feed the sample to the estimator.
@@ -3721,5 +3753,99 @@ mod test {
             true => with_poll_send_result::<true>(f),
             false => with_poll_send_result::<false>(f),
         }
+    }
+
+    #[test]
+    fn zero_window_probe() {
+        let mut clock = FakeInstantCtx::default();
+        let mut send_buffer = RingBuffer::new(BUFFER_SIZE);
+        assert_eq!(send_buffer.enqueue_data(TEST_BYTES), 5);
+        // Set up the state machine to start with Established.
+        let mut state = State::Established(Established {
+            snd: Send {
+                nxt: ISS_1 + 1,
+                max: ISS_1 + 1,
+                una: ISS_1 + 1,
+                wnd: WindowSize::ZERO,
+                buffer: send_buffer.clone(),
+                wl1: ISS_2,
+                wl2: ISS_1,
+                last_seq_ts: None,
+                rtt_estimator: Estimator::default(),
+                timer: None,
+                congestion_control: CongestionControl::cubic(),
+            },
+            rcv: Recv {
+                buffer: RingBuffer::new(BUFFER_SIZE),
+                assembler: Assembler::new(ISS_2 + 1),
+            },
+        });
+        assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now()), None);
+        assert_eq!(
+            state.poll_send_at(),
+            Some(clock.now().checked_add(Estimator::RTO_INIT).unwrap())
+        );
+
+        // Send the first probe after first RTO.
+        clock.sleep(Estimator::RTO_INIT);
+        assert_eq!(
+            state.poll_send_with_default_options(u32::MAX, clock.now()),
+            Some(Segment::data(
+                ISS_1 + 1,
+                ISS_2 + 1,
+                WindowSize::new(BUFFER_SIZE).unwrap(),
+                SendPayload::Contiguous(&TEST_BYTES[0..1])
+            ))
+        );
+
+        // The receiver still has a zero window.
+        assert_eq!(
+            state.on_segment_with_default_options::<_, ClientlessBufferProvider>(
+                Segment::ack(ISS_2 + 1, ISS_1 + 1, WindowSize::ZERO),
+                clock.now()
+            ),
+            (None, None)
+        );
+        // The timer should backoff exponentially.
+        assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now()), None);
+        assert_eq!(
+            state.poll_send_at(),
+            Some(clock.now().checked_add(Estimator::RTO_INIT * 2).unwrap())
+        );
+
+        // No probe should be sent before the timeout.
+        clock.sleep(Estimator::RTO_INIT);
+        assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now()), None);
+
+        // Probe sent after the timeout.
+        clock.sleep(Estimator::RTO_INIT);
+        assert_eq!(
+            state.poll_send_with_default_options(u32::MAX, clock.now()),
+            Some(Segment::data(
+                ISS_1 + 1,
+                ISS_2 + 1,
+                WindowSize::new(BUFFER_SIZE).unwrap(),
+                SendPayload::Contiguous(&TEST_BYTES[0..1])
+            ))
+        );
+
+        // The receiver now opens its receive window.
+        assert_eq!(
+            state.on_segment_with_default_options::<_, ClientlessBufferProvider>(
+                Segment::ack(ISS_2 + 1, ISS_1 + 2, WindowSize::DEFAULT),
+                clock.now()
+            ),
+            (None, None)
+        );
+        assert_eq!(state.poll_send_at(), None);
+        assert_eq!(
+            state.poll_send_with_default_options(u32::MAX, clock.now()),
+            Some(Segment::data(
+                ISS_1 + 2,
+                ISS_2 + 1,
+                WindowSize::new(BUFFER_SIZE).unwrap(),
+                SendPayload::Contiguous(&TEST_BYTES[1..])
+            ))
+        );
     }
 }
