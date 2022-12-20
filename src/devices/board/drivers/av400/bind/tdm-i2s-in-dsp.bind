@@ -4,11 +4,21 @@
 
 composite tdm_i2s_in_dsp;
 
+using fuchsia.amlogic.platform;
 using fuchsia.amlogic.platform.a5;
+using fuchsia.platform;
 using fuchsia.dsp;
 using fuchsia.mailbox;
 
-primary node "audio-mailbox" {
+primary node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
+  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A5;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.TDM_USE_DSP;
+  fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 2;
+}
+
+node "audio-mailbox" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.mailbox.BIND_FIDL_PROTOCOL.DEVICE;
 }
 

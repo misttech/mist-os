@@ -97,6 +97,9 @@ zx_status_t AmlDspDevice::DspHwInit(bool use_tdm_dsp_firmware) {
     zxlogf(ERROR, "Failed to dsp start: %s", zx_status_get_string(dsp_start_result.status()));
     return dsp_start_result.status();
   }
+
+  // After testing, the delay is 1.8ms, which can ensure that the firmware is running.
+  zx::nanosleep(zx::deadline_after(zx::usec(1800)));
   return ZX_OK;
 }
 

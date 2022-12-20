@@ -138,11 +138,13 @@ driver_bind_rules("tdm-i2s-out-dsp-bind") {
   header_output = "tdm-i2s-out-dsp-bind.h"
   bind_output = "tdm-i2s-out-dsp-bind.bc"
   deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.codec",
     "//src/devices/bind/fuchsia.dsp",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.mailbox",
+    "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.ti.platform",
   ]
 }
@@ -172,10 +174,13 @@ driver_bind_rules("pdm-i2s-dsp-bind") {
 driver_bind_rules("tdm-i2s-in-dsp-bind") {
   rules = "bind/tdm-i2s-in-dsp.bind"
   header_output = "tdm-i2s-in-dsp-bind.h"
+  bind_output = "tdm-i2s-in-dsp-bind.bc"
   deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.dsp",
     "//src/devices/bind/fuchsia.mailbox",
+    "//src/devices/bind/fuchsia.platform",
   ]
 }
 

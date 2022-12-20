@@ -334,6 +334,25 @@ zx_status_t Av400::AudioInit() {
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('AUDI');
+
+#ifdef TDM_USE_DSP
+  auto result = pbus_.buffer(arena)->AddComposite(
+      fidl::ToWire(fidl_arena, tdm_dev),
+      platform_bus_composite::MakeFidlFragment(fidl_arena, tdm_i2s_out_dsp_fragments,
+                                               std::size(tdm_i2s_out_dsp_fragments)),
+      "pdev");
+  if (!result.ok()) {
+    zxlogf(ERROR, "AddComposite Audio(tdm_dev) request failed: %s",
+           result.FormatDescription().data());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "AddComposite Audio(tdm_dev) failed: %s",
+           zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+
+#else
   auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
       fidl::ToWire(fidl_arena, tdm_dev),
       platform_bus_composite::MakeFidlFragment(fidl_arena, tdm_i2s_fragments,
@@ -349,6 +368,7 @@ zx_status_t Av400::AudioInit() {
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
+#endif
 
   {
     // Config Tdmin Capture Device
@@ -421,15 +441,26 @@ zx_status_t Av400::AudioInit() {
     tdm_dev.metadata() = tdm_metadata;
 
 #ifdef TDM_USE_DSP
-    result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
+    auto result = pbus_.buffer(arena)->AddComposite(
         fidl::ToWire(fidl_arena, tdm_dev),
         platform_bus_composite::MakeFidlFragment(fidl_arena, tdm_i2s_in_dsp_fragments,
                                                  std::size(tdm_i2s_in_dsp_fragments)),
-        {});
+        "pdev");
+    if (!result.ok()) {
+      zxlogf(ERROR, "AddComposite Audio(tdm_dev) request failed: %s",
+             result.FormatDescription().data());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "AddComposite Audio(tdm_dev) failed: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+
 #else
-    result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
+    auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
         fidl::ToWire(fidl_arena, tdm_dev), {}, {});
-#endif
+
     if (!result.ok()) {
       zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Audio(tdm_dev) request failed: %s",
              __func__, result.FormatDescription().data());
@@ -440,6 +471,7 @@ zx_status_t Av400::AudioInit() {
              zx_status_get_string(result->error_value()));
       return result->error_value();
     }
+#endif
   }
 
   {

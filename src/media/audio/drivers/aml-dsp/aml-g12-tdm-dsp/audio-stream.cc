@@ -105,7 +105,14 @@ int AmlG12TdmDspStream::DspBind() {
     zxlogf(ERROR, "failed to create DSP device");
     return ZX_ERR_NO_MEMORY;
   }
-  return ZX_OK;
+
+  // Load DSP firmware that processes TDM audio data.
+  status = audio_dsp_->DspHwInit(true);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "HW DSP initialization failed: %s", zx_status_get_string(status));
+    return status;
+  }
+  return status;
 }
 
 void AmlG12TdmDspStream::InitDaiFormats() {
@@ -580,15 +587,6 @@ zx_status_t AmlG12TdmDspStream::GetBuffer(const audio_proto::RingBufGetBufferReq
   // Make sure that all reads/writes have gone through.
   BarrierBeforeRelease();
 
-  // Load DSP firmware that processes TDM audio data.
-  zx_status_t status = audio_dsp_->DspHwInit(true);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "HW DSP initialization failed: %s", zx_status_get_string(status));
-    return status;
-  }
-  // After testing, the delay is 1.7ms, which can ensure that the firmware is running.
-  zx::nanosleep(zx::deadline_after(zx::usec(1700)));
-
   size_t vmo_size = fbl::round_up<size_t, size_t>(ring_buffer_size, zx_system_get_page_size());
   uint32_t transfer_length =
       frame_size_ * frame_rate_ * static_cast<uint32_t>(kTransferInterval.to_msecs()) / 1000;
@@ -599,7 +597,7 @@ zx_status_t AmlG12TdmDspStream::GetBuffer(const audio_proto::RingBufGetBufferReq
                         .interval = static_cast<uint32_t>(kTransferInterval.to_msecs()),
                         .length = transfer_length};
 
-  status = audio_mailbox_->DspCreateProcessingTask(&addr_info, sizeof(addr_info));
+  zx_status_t status = audio_mailbox_->DspCreateProcessingTask(&addr_info, sizeof(addr_info));
   if (status != ZX_OK) {
     return status;
   }
