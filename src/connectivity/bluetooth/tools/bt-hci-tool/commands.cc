@@ -7,6 +7,7 @@
 #include <endian.h>
 #include <lib/zx/time.h>
 
+#include <cstdint>
 #include <cstring>
 #include <iostream>
 
@@ -839,8 +840,8 @@ bool HandleWritePageScanActivity(const CommandData* cmd_data, const fxl::Command
       std::cout << "  Malformed interval value: " << interval_str << std::endl;
       return false;
     }
-    if (parsed_interval < ::bt::hci_spec::kPageScanIntervalMin ||
-        parsed_interval > ::bt::hci_spec::kPageScanIntervalMax) {
+    if (parsed_interval < static_cast<uint16_t>(::bt::hci_spec::PageScanInterval::MIN) ||
+        parsed_interval > static_cast<uint16_t>(::bt::hci_spec::PageScanInterval::MAX)) {
       std::cout << "  Interval value is out of the allowed range." << std::endl;
       return false;
     }
@@ -859,8 +860,8 @@ bool HandleWritePageScanActivity(const CommandData* cmd_data, const fxl::Command
       std::cout << "  Malformed window value: " << window_str << std::endl;
       return false;
     }
-    if (parsed_window < ::bt::hci_spec::kPageScanWindowMin ||
-        parsed_window > ::bt::hci_spec::kPageScanWindowMax) {
+    if (parsed_window < static_cast<uint16_t>(::bt::hci_spec::PageScanWindow::MIN) ||
+        parsed_window > static_cast<uint16_t>(::bt::hci_spec::PageScanWindow::MAX)) {
       std::cout << "  Window value is out of the allowed range." << std::endl;
       return false;
     }
@@ -872,13 +873,14 @@ bool HandleWritePageScanActivity(const CommandData* cmd_data, const fxl::Command
     page_scan_window = parsed_window;
   }
 
-  constexpr size_t kPayloadSize = sizeof(::bt::hci_spec::WritePageScanActivityCommandParams);
-  auto packet = ::bt::hci::CommandPacket::New(::bt::hci_spec::kWritePageScanActivity, kPayloadSize);
-  auto params = packet->mutable_payload<::bt::hci_spec::WritePageScanActivityCommandParams>();
-  params->page_scan_interval = page_scan_interval;
-  params->page_scan_window = page_scan_window;
+  auto write_activity =
+      ::bt::hci::EmbossCommandPacket::New<::bt::hci_spec::WritePageScanActivityCommandWriter>(
+          ::bt::hci_spec::kWritePageScanActivity);
+  auto activity_params = write_activity.view_t();
+  activity_params.page_scan_interval().Write(page_scan_interval);
+  activity_params.page_scan_window().Write(page_scan_window);
 
-  auto id = SendCompleteCommand(cmd_data, std::move(packet), std::move(complete_cb));
+  auto id = SendCompleteCommand(cmd_data, std::move(write_activity), std::move(complete_cb));
 
   std::cout << "  Sent HCI_Write_Page_Scan_Activity (id=" << id << ")" << std::endl;
 
