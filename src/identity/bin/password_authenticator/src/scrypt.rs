@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::anyhow;
-
 use {
     crate::{
-        account_metadata::AuthenticatorMetadata,
+        account_metadata::{AuthenticatorMetadata, ScryptOnlyMetadata},
         keys::{
             EnrolledKey, Key, KeyEnrollment, KeyEnrollmentError, KeyRetrieval, KeyRetrievalError,
             KEY_LEN,
         },
         password_interaction::{ValidationError, Validator},
     },
+    anyhow::anyhow,
     async_trait::async_trait,
     fuchsia_zircon as zx,
     identity_common::PrekeyMaterial,
@@ -135,6 +134,36 @@ impl Validator<(AuthenticatorMetadata, PrekeyMaterial)> for EnrollScryptValidato
     }
 }
 
+/// Implements the scrypt key retrieval function for authenticating
+/// and validating a password.
+pub struct AuthenticateScryptValidator {
+    metadata: ScryptOnlyMetadata,
+}
+
+impl AuthenticateScryptValidator {
+    /// Instantiates a new AuthenticateScryptValidator with a given metadata.
+    pub fn new(metadata: ScryptOnlyMetadata) -> Self {
+        AuthenticateScryptValidator { metadata }
+    }
+}
+
+#[async_trait]
+impl Validator<PrekeyMaterial> for AuthenticateScryptValidator {
+    async fn validate(&self, password: &str) -> Result<PrekeyMaterial, ValidationError> {
+        let key_source = ScryptKeySource::from(ScryptParams::from(self.metadata));
+        key_source.retrieve_key(password).await.map(|key| PrekeyMaterial(key.into())).map_err(
+            |err| {
+                // Return an InternalError because we can calculate the prekey material for
+                // any input but we do not know whether the input is correct.
+                ValidationError::InternalError(anyhow!(
+                    "scrypt key authentication failed: {:?}",
+                    err
+                ))
+            },
+        )
+    }
+}
+
 // A well-known set of (weak) params & salt, password, and corresponding key for tests, to avoid
 // spending excessive CPU time doing expensive key derivations.
 #[cfg(test)]
@@ -222,6 +251,45 @@ mod test {
         assert_eq!(scrypt_meta.r, 8);
         assert_eq!(scrypt_meta.p, 1);
 
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_authenticator_validator() -> Result<()> {
+        let enroll_validator = EnrollScryptValidator {};
+        let (meta_data, enroll_prekey) =
+            enroll_validator.validate(TEST_SCRYPT_PASSWORD).await.unwrap();
+        assert_eq!(enroll_prekey.0.len(), KEY_LEN);
+
+        let enroll_scrypt_meta = if let AuthenticatorMetadata::ScryptOnly(s) = meta_data {
+            s
+        } else {
+            return Err(anyhow!("wrong authenticator metadata type"));
+        };
+
+        let authenticate_validator = AuthenticateScryptValidator::new(enroll_scrypt_meta);
+        let authenticate_prekey =
+            authenticate_validator.validate(TEST_SCRYPT_PASSWORD).await.unwrap();
+        assert_eq!(enroll_prekey, authenticate_prekey);
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_authenticator_validator_different_passwords() -> Result<()> {
+        let enroll_validator = EnrollScryptValidator {};
+        let (meta_data, enroll_prekey) =
+            enroll_validator.validate(TEST_SCRYPT_PASSWORD).await.unwrap();
+        assert_eq!(enroll_prekey.0.len(), KEY_LEN);
+
+        let enroll_scrypt_meta = if let AuthenticatorMetadata::ScryptOnly(s) = meta_data {
+            s
+        } else {
+            return Err(anyhow!("wrong authenticator metadata type"));
+        };
+
+        let authenticate_validator = AuthenticateScryptValidator::new(enroll_scrypt_meta);
+        let authenticate_prekey = authenticate_validator.validate("wrong password").await.unwrap();
+        assert_ne!(enroll_prekey, authenticate_prekey);
         Ok(())
     }
 }

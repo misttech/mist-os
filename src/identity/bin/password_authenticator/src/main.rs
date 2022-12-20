@@ -18,24 +18,26 @@ mod scrypt;
 mod state;
 mod storage_unlock_mechanism;
 
-use anyhow::{anyhow, Context, Error};
-use fidl::endpoints::RequestStream;
-use fidl_fuchsia_identity_account::AccountManagerRequestStream;
-use fidl_fuchsia_identity_authentication::StorageUnlockMechanismRequestStream;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_process_lifecycle::LifecycleRequestStream;
-use fuchsia_async as fasync;
-use fuchsia_component::server::ServiceFs;
-use fuchsia_fs::directory::open_in_namespace;
-use fuchsia_runtime::{self as fruntime, HandleInfo, HandleType};
-use futures::StreamExt;
-use std::sync::Arc;
-use storage_manager::minfs::{disk::DevDiskManager, StorageManager as MinfsStorageManager};
-use tracing::{error, info};
-
-use crate::{
-    account_manager::AccountManager, account_metadata::DataDirAccountMetadataStore,
-    pinweaver::EnvCredManagerProvider, storage_unlock_mechanism::StorageUnlockMechanism,
+use {
+    crate::{
+        account_manager::AccountManager, account_metadata::DataDirAccountMetadataStore,
+        pinweaver::EnvCredManagerProvider, storage_unlock_mechanism::StorageUnlockMechanism,
+    },
+    anyhow::{anyhow, Context, Error},
+    fidl::endpoints::RequestStream,
+    fidl_fuchsia_identity_account::AccountManagerRequestStream,
+    fidl_fuchsia_identity_authentication::StorageUnlockMechanismRequestStream,
+    fidl_fuchsia_io as fio,
+    fidl_fuchsia_process_lifecycle::LifecycleRequestStream,
+    fuchsia_async as fasync,
+    fuchsia_component::server::ServiceFs,
+    fuchsia_fs::directory::open_in_namespace,
+    fuchsia_runtime::{self as fruntime, duplicate_utc_clock_handle, HandleInfo, HandleType},
+    fuchsia_zircon as zx,
+    futures::StreamExt,
+    std::sync::Arc,
+    storage_manager::minfs::{disk::DevDiskManager, StorageManager as MinfsStorageManager},
+    tracing::{error, info},
 };
 
 /// PasswordAuthenticator config, populated from a build-time generated
@@ -101,8 +103,11 @@ async fn main() -> Result<(), Error> {
     // EnvCredManagerProvider is stateless and not shared.
     let cred_manager_provider = EnvCredManagerProvider {};
 
+    let clock = duplicate_utc_clock_handle(zx::Rights::SAME_RIGHTS)
+        .expect("Failed to duplicate UTC clock handle.");
+
     let storage_unlock_mechanism =
-        Arc::new(StorageUnlockMechanism::new(config, cred_manager_provider));
+        Arc::new(StorageUnlockMechanism::new(config, cred_manager_provider, clock));
 
     let mut fs = ServiceFs::new();
     fs.dir("svc").add_fidl_service(Services::AccountManager);

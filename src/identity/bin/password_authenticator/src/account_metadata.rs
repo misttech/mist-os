@@ -4,9 +4,12 @@
 
 use {
     crate::{account_manager::AccountId, pinweaver::PinweaverParams, scrypt::ScryptParams, Config},
+    anyhow::{anyhow, Result},
     async_trait::async_trait,
-    fidl_fuchsia_identity_account as faccount, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    identity_common::StagedFile,
+    fidl_fuchsia_identity_account as faccount,
+    fidl_fuchsia_identity_authentication::Enrollment,
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    identity_common::{EnrollmentData, StagedFile},
     serde::{Deserialize, Serialize},
     std::str::FromStr,
 };
@@ -118,6 +121,19 @@ impl From<PinweaverMetadata> for PinweaverParams {
     fn from(item: PinweaverMetadata) -> PinweaverParams {
         item.pinweaver_params
     }
+}
+
+/// Deserializes Enrollment Data into AuthenticatorMetadata.
+pub fn translate_from_enrollment(serialized: &Enrollment) -> Result<AuthenticatorMetadata> {
+    serde_json::from_slice::<AuthenticatorMetadata>(&serialized.data)
+        .map_err(|e| anyhow!("error while deserializing enrollment data: {:?}", e))
+}
+
+/// Serialize AuthenticatorMetadata into EnrollmentData.
+pub fn translate_to_enrollment(metadata: AuthenticatorMetadata) -> Result<EnrollmentData> {
+    let data = serde_json::to_vec(&metadata)
+        .map_err(|e| anyhow!("error while serializing metadata: {:?}", e))?;
+    Ok(EnrollmentData(data))
 }
 
 /// The data stored at /data/accounts/${ACCOUNT_ID} will have this shape, JSON-serialized.
@@ -360,6 +376,16 @@ pub mod test {
     // This is invalid; it's missing the required authenticator_metadata key.
     // We'll check that we fail to load it.
     const INVALID_METADATA: &[u8] = br#"{"name": "Display Name"}"#;
+
+    const SCRYPT_ENROLLMENT_DATA_GOLDEN: [u8; 131] = [
+        123, 34, 116, 121, 112, 101, 34, 58, 34, 83, 99, 114, 121, 112, 116, 79, 110, 108, 121, 34,
+        44, 34, 115, 99, 114, 121, 112, 116, 95, 112, 97, 114, 97, 109, 115, 34, 58, 123, 34, 115,
+        97, 108, 116, 34, 58, 91, 50, 48, 50, 44, 50, 54, 44, 49, 54, 53, 44, 49, 48, 50, 44, 50,
+        49, 50, 44, 49, 49, 51, 44, 49, 49, 52, 44, 54, 48, 44, 49, 48, 54, 44, 49, 50, 49, 44, 49,
+        56, 51, 44, 49, 51, 51, 44, 51, 54, 44, 49, 54, 54, 44, 49, 50, 55, 44, 49, 52, 54, 93, 44,
+        34, 108, 111, 103, 95, 110, 34, 58, 56, 44, 34, 114, 34, 58, 56, 44, 34, 112, 34, 58, 49,
+        125, 125,
+    ];
 
     lazy_static! {
         pub static ref TEST_SCRYPT_METADATA: AccountMetadata =
@@ -688,5 +714,22 @@ pub mod test {
         let dirents = fuchsia_fs::directory::readdir(&dir2).await.expect("readdir 2");
         assert_eq!(dirents.len(), 1);
         assert_eq!(dirents[0].name, "1");
+    }
+
+    #[fuchsia::test]
+    fn test_translate_enrollment_roundtrip() -> Result<()> {
+        let scrypt_meta = AuthenticatorMetadata::ScryptOnly(ScryptOnlyMetadata {
+            scrypt_params: TEST_SCRYPT_PARAMS,
+        });
+
+        let enrollment_data = translate_to_enrollment(scrypt_meta)?;
+        assert_eq!(enrollment_data.0, SCRYPT_ENROLLMENT_DATA_GOLDEN);
+
+        let enrollment = Enrollment { id: 1, data: enrollment_data.0 };
+
+        let auth_data = translate_from_enrollment(&enrollment)?;
+        assert_eq!(auth_data, scrypt_meta);
+
+        Ok(())
     }
 }

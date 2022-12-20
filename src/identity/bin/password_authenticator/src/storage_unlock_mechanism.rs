@@ -4,20 +4,24 @@
 
 use {
     crate::{
-        account_metadata::AuthenticatorMetadata,
+        account_metadata::{
+            translate_from_enrollment, translate_to_enrollment, AuthenticatorMetadata,
+        },
         password_interaction::{PasswordInteractionHandler, Validator},
         pinweaver::{CredManagerProvider, EnrollPinweaverValidator},
-        scrypt::EnrollScryptValidator,
+        scrypt::{AuthenticateScryptValidator, EnrollScryptValidator},
         Config,
     },
     anyhow::anyhow,
     fidl_fuchsia_identity_authentication::{
         AttemptedEvent, Enrollment, Error as ApiError, InteractionProtocolServerEnd,
-        StorageUnlockMechanismRequest, StorageUnlockMechanismRequestStream,
+        PasswordInteractionRequestStream, StorageUnlockMechanismRequest,
+        StorageUnlockMechanismRequestStream,
     },
+    fuchsia_zircon::Clock,
     futures::TryStreamExt,
     identity_common::{EnrollmentData, PrekeyMaterial},
-    tracing::log::error,
+    tracing::log::{error, warn},
 };
 
 /// A struct to handle authentication and enrollment requests.
@@ -27,6 +31,7 @@ where
 {
     config: Config,
     cred_manager_provider: CMP,
+    clock: Clock,
 }
 
 impl<CMP> StorageUnlockMechanism<CMP>
@@ -34,8 +39,16 @@ where
     CMP: CredManagerProvider + 'static,
 {
     /// Instantiate a new StorageUnlockMechanism.
-    pub fn new(config: Config, cred_manager_provider: CMP) -> Self {
-        Self { config, cred_manager_provider }
+    pub fn new(config: Config, cred_manager_provider: CMP, clock: Clock) -> Self {
+        Self { config, cred_manager_provider, clock }
+    }
+
+    /// Returns the time in the clock object, or None if time has not yet started.
+    fn read_clock(&self) -> Option<fuchsia_zircon::Time> {
+        match (self.clock.read(), self.clock.get_details()) {
+            (Ok(time), Ok(details)) if time > details.backstop => Some(time),
+            _ => None,
+        }
     }
 
     /// Serially process a stream of incoming StorageUnlockMechanism FIDL requests.
@@ -58,10 +71,26 @@ where
     ) -> Result<(), fidl::Error> {
         match request {
             StorageUnlockMechanismRequest::Authenticate { interaction, enrollments, responder } => {
-                responder.send(&mut self.authenticate(interaction, enrollments))
+                let stream = match Self::stream_from_ipse(interaction) {
+                    Ok(stream) => stream,
+                    Err(e) => {
+                        return responder.send(&mut Err(e));
+                    }
+                };
+                match self.authenticate(stream, enrollments).await {
+                    Ok(attempted_event) => responder.send(&mut Ok(attempted_event)),
+                    Err(e) => responder.send(&mut Err(e)),
+                }
             }
             StorageUnlockMechanismRequest::Enroll { interaction, responder } => {
-                match self.enroll(interaction).await {
+                let stream = match Self::stream_from_ipse(interaction) {
+                    Ok(stream) => stream,
+                    Err(e) => {
+                        return responder.send(&mut Err(e));
+                    }
+                };
+
+                match self.enroll(stream).await {
                     Ok((enrollment_data, prekey)) => {
                         responder.send(&mut Ok((enrollment_data.0, prekey.0)))
                     }
@@ -71,17 +100,67 @@ where
         }
     }
 
-    fn authenticate(
+    fn stream_from_ipse(
+        ipse: InteractionProtocolServerEnd,
+    ) -> Result<PasswordInteractionRequestStream, ApiError> {
+        let server_end = if let InteractionProtocolServerEnd::Password(server_end) = ipse {
+            server_end
+        } else {
+            return Err(ApiError::InvalidRequest);
+        };
+
+        server_end.into_stream().map_err(|_| ApiError::Resource)
+    }
+
+    async fn authenticate(
         &self,
-        _interaction: InteractionProtocolServerEnd,
-        _enrollments: Vec<Enrollment>,
+        stream: PasswordInteractionRequestStream,
+        enrollments: Vec<Enrollment>,
     ) -> Result<AttemptedEvent, ApiError> {
-        unimplemented!()
+        // TODO(fxb/117412): Currently we only have one enrollment. When there are more,
+        // change this constraint!
+        if enrollments.len() != 1 {
+            warn!("Error: Too many enrollments");
+            return Err(ApiError::InvalidDataFormat);
+        }
+
+        let enrollment = &enrollments[0];
+
+        let authenticator_data =
+            translate_from_enrollment(enrollment).map_err(|_| ApiError::InvalidDataFormat)?;
+
+        let validator: Box<dyn Validator<PrekeyMaterial>> = match authenticator_data {
+            AuthenticatorMetadata::Pinweaver(_) => {
+                // TODO(fxb/116491): Implement this match arm.
+                return Err(ApiError::UnsupportedOperation);
+            }
+
+            AuthenticatorMetadata::ScryptOnly(s) => {
+                if !self.config.allow_scrypt {
+                    warn!("Enrollment used scrypt which is not supported by the current configuration");
+                    return Err(ApiError::InvalidDataFormat);
+                }
+                Box::new(AuthenticateScryptValidator::new(s))
+            }
+        };
+
+        let key = PasswordInteractionHandler::new(validator)
+            .await
+            .handle_password_interaction_request_stream(stream)
+            .await?;
+
+        Ok(AttemptedEvent {
+            timestamp: self.read_clock().map(|time| time.into_nanos()),
+            enrollment_id: Some(enrollment.id),
+            updated_enrollment_data: None,
+            prekey_material: Some(key.0),
+            ..AttemptedEvent::EMPTY
+        })
     }
 
     async fn enroll(
         &self,
-        interaction: InteractionProtocolServerEnd,
+        stream: PasswordInteractionRequestStream,
     ) -> Result<(EnrollmentData, PrekeyMaterial), ApiError> {
         let validator: Box<dyn Validator<(AuthenticatorMetadata, PrekeyMaterial)>> = if self
             .config
@@ -94,20 +173,12 @@ where
             Box::new(EnrollScryptValidator {})
         };
 
-        let server_end = if let InteractionProtocolServerEnd::Password(server_end) = interaction {
-            server_end
-        } else {
-            return Err(ApiError::InvalidRequest);
-        };
-
-        let stream = server_end.into_stream().map_err(|_| ApiError::Resource)?;
         let (metadata, key) = PasswordInteractionHandler::new(validator)
             .await
             .handle_password_interaction_request_stream(stream)
             .await?;
-
         let enrollment_data =
-            EnrollmentData(serde_json::to_vec(&metadata).map_err(|_| ApiError::InvalidDataFormat)?);
+            translate_to_enrollment(metadata).map_err(|_| ApiError::InvalidDataFormat)?;
         Ok((enrollment_data, key))
     }
 }
@@ -117,16 +188,18 @@ mod test {
     use {
         super::*,
         crate::{
+            account_metadata::ScryptOnlyMetadata,
             keys::KEY_LEN,
             pinweaver::{
                 MockCredManager, MockCredManagerProvider, PinweaverParams,
                 TEST_PINWEAVER_CREDENTIAL_LABEL, TEST_PINWEAVER_LE_SECRET,
             },
-            scrypt::TEST_SCRYPT_PASSWORD,
+            scrypt::{TEST_SCRYPT_PARAMS, TEST_SCRYPT_PASSWORD},
         },
         anyhow::Result,
         assert_matches::assert_matches,
         fidl_fuchsia_identity_authentication::{PasswordInteractionMarker, TestInteractionMarker},
+        fuchsia_zircon as zx,
         futures::StreamExt,
     };
 
@@ -136,19 +209,38 @@ mod test {
     const SCRYPT_ONLY_CONFIG: Config = Config { allow_scrypt: true, allow_pinweaver: false };
     const PINWEAVER_ONLY_CONFIG: Config = Config { allow_scrypt: false, allow_pinweaver: true };
 
+    const TEST_ENROLLMENT_ID: u64 = 0x99;
+
+    fn create_storage_unlock_with_default(
+        config: Config,
+    ) -> StorageUnlockMechanism<MockCredManagerProvider> {
+        create_storage_unlock_with_custom_cmp(config, MockCredManagerProvider::new())
+    }
+
+    fn create_storage_unlock_with_custom_cmp(
+        config: Config,
+        cmp: MockCredManagerProvider,
+    ) -> StorageUnlockMechanism<MockCredManagerProvider> {
+        let clock = zx::Clock::create(zx::ClockOpts::empty(), None).unwrap();
+        StorageUnlockMechanism::new(config, cmp, clock)
+    }
+
     async fn pinweaver_success_case(config: Config) -> Result<()> {
         let mcm = MockCredManager::new_expect_le_secret(&TEST_PINWEAVER_LE_SECRET);
         let initial_creds = mcm.get_number_of_creds();
         let cred_manager_provider = MockCredManagerProvider::new_with_cred_manager(mcm.clone());
-        let storage_unlock_mechanism = StorageUnlockMechanism::new(config, cred_manager_provider);
+        let storage_unlock_mechanism =
+            create_storage_unlock_with_custom_cmp(config, cred_manager_provider);
         let (client, interaction_server) =
             fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
 
         let _ = client.into_proxy().unwrap().set_password(TEST_SCRYPT_PASSWORD).unwrap();
+        let enroll_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Password(interaction_server),
+        )
+        .unwrap();
 
-        let result = storage_unlock_mechanism
-            .enroll(InteractionProtocolServerEnd::Password(interaction_server))
-            .await;
+        let result = storage_unlock_mechanism.enroll(enroll_stream).await;
         assert!(result.is_ok());
         let (enrollment_data, prekey) = result.unwrap();
         assert_eq!(prekey.0.len(), KEY_LEN);
@@ -174,31 +266,212 @@ mod test {
     }
 
     #[fuchsia::test]
-    #[should_panic(expected = "not implemented")]
-    async fn test_authenticate_not_implemented() {
-        let cred_manager_provider = MockCredManagerProvider::new();
-        let storage_unlock_mechanism =
-            StorageUnlockMechanism::new(DEFAULT_CONFIG, cred_manager_provider);
-        let (_, interaction_server) =
-            fidl::endpoints::create_endpoints::<TestInteractionMarker>().unwrap();
+    async fn test_authenticate_scrypt() {
+        let storage_unlock_mechanism = create_storage_unlock_with_default(SCRYPT_ONLY_CONFIG);
 
-        let _ = storage_unlock_mechanism
-            .authenticate(InteractionProtocolServerEnd::Test(interaction_server), vec![]);
+        let meta = AuthenticatorMetadata::ScryptOnly(ScryptOnlyMetadata {
+            scrypt_params: TEST_SCRYPT_PARAMS,
+        });
+        let data = serde_json::to_vec(&meta).unwrap();
+
+        let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: data.clone() };
+
+        let (client, auth_interaction_server) =
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+
+        let _ = client.into_proxy().unwrap().set_password("password").unwrap();
+        let auth_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Password(auth_interaction_server),
+        )
+        .unwrap();
+
+        let attempted_event =
+            storage_unlock_mechanism.authenticate(auth_stream, vec![enrollment]).await.unwrap();
+
+        assert_eq!(attempted_event.enrollment_id, Some(TEST_ENROLLMENT_ID));
+        assert_eq!(attempted_event.updated_enrollment_data, None);
+        assert_eq!(attempted_event.timestamp, None);
     }
 
     #[fuchsia::test]
-    async fn test_enroll_scrypt() {
-        let cred_manager_provider = MockCredManagerProvider::new();
+    async fn test_authenticate_scrypt_with_custom_clock() {
+        let backstop = zx::Time::from_nanos(5500);
+        let clock =
+            zx::Clock::create(zx::ClockOpts::AUTO_START | zx::ClockOpts::MONOTONIC, Some(backstop))
+                .unwrap();
         let storage_unlock_mechanism =
-            StorageUnlockMechanism::new(SCRYPT_ONLY_CONFIG, cred_manager_provider);
+            StorageUnlockMechanism::new(SCRYPT_ONLY_CONFIG, MockCredManagerProvider::new(), clock);
+
+        let meta = AuthenticatorMetadata::ScryptOnly(ScryptOnlyMetadata {
+            scrypt_params: TEST_SCRYPT_PARAMS,
+        });
+        let data = serde_json::to_vec(&meta).unwrap();
+
+        let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: data.clone() };
+
+        let (client, auth_interaction_server) =
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+
+        let _ = client.into_proxy().unwrap().set_password("password").unwrap();
+        let auth_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Password(auth_interaction_server),
+        )
+        .unwrap();
+
+        let attempted_event =
+            storage_unlock_mechanism.authenticate(auth_stream, vec![enrollment]).await.unwrap();
+
+        assert_eq!(attempted_event.enrollment_id, Some(TEST_ENROLLMENT_ID));
+        assert_eq!(attempted_event.updated_enrollment_data, None);
+        assert!(attempted_event.timestamp.unwrap() > backstop.into_nanos());
+    }
+
+    #[fuchsia::test]
+    async fn test_enroll_scrypt_authenticate_pinweaver_error() {
+        let enroll_storage_unlock_mechanism =
+            create_storage_unlock_with_default(SCRYPT_ONLY_CONFIG);
         let (client, interaction_server) =
             fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
 
         let _ = client.into_proxy().unwrap().set_password("password").unwrap();
+        let enroll_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Password(interaction_server),
+        )
+        .unwrap();
 
-        let result = storage_unlock_mechanism
-            .enroll(InteractionProtocolServerEnd::Password(interaction_server))
-            .await;
+        let (enroll_data, _) = enroll_storage_unlock_mechanism.enroll(enroll_stream).await.unwrap();
+
+        let (client, auth_interaction_server) =
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+        let _ = client.into_proxy().unwrap().set_password("password").unwrap();
+
+        let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enroll_data.0 };
+        let auth_storage_unlock_mechanism =
+            create_storage_unlock_with_default(PINWEAVER_ONLY_CONFIG);
+        let auth_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Password(auth_interaction_server),
+        )
+        .unwrap();
+
+        let result =
+            auth_storage_unlock_mechanism.authenticate(auth_stream, vec![enrollment]).await;
+        assert_eq!(result, Err(ApiError::InvalidDataFormat));
+    }
+
+    #[fuchsia::test]
+    async fn test_enroll_scrypt_authenticate_both_config() {
+        let enroll_storage_unlock_mechanism =
+            create_storage_unlock_with_default(SCRYPT_ONLY_CONFIG);
+        let (client, interaction_server) =
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+
+        let _ = client.into_proxy().unwrap().set_password("password").unwrap();
+        let enroll_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Password(interaction_server),
+        )
+        .unwrap();
+
+        let (enroll_data, enroll_key) =
+            enroll_storage_unlock_mechanism.enroll(enroll_stream).await.unwrap();
+
+        let (client, auth_interaction_server) =
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+        let _ = client.into_proxy().unwrap().set_password("password").unwrap();
+
+        let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enroll_data.0 };
+        let auth_storage_unlock_mechanism = create_storage_unlock_with_default(DEFAULT_CONFIG);
+
+        let auth_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Password(auth_interaction_server),
+        )
+        .unwrap();
+
+        let attempted_event = auth_storage_unlock_mechanism
+            .authenticate(auth_stream, vec![enrollment])
+            .await
+            .unwrap();
+        assert_eq!(attempted_event.enrollment_id, Some(TEST_ENROLLMENT_ID));
+        assert_eq!(attempted_event.updated_enrollment_data, None);
+        assert_eq!(attempted_event.prekey_material, Some(enroll_key.0));
+    }
+
+    #[fuchsia::test]
+    async fn test_scrypt_roundtrip() {
+        let storage_unlock_mechanism = create_storage_unlock_with_default(SCRYPT_ONLY_CONFIG);
+        let (client, interaction_server) =
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+
+        let _ = client.into_proxy().unwrap().set_password(TEST_SCRYPT_PASSWORD).unwrap();
+        let stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Password(interaction_server),
+        )
+        .unwrap();
+
+        let (enroll_data, enroll_key) = storage_unlock_mechanism.enroll(stream).await.unwrap();
+
+        let (client, auth_interaction_server) =
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+        let _ = client.into_proxy().unwrap().set_password(TEST_SCRYPT_PASSWORD).unwrap();
+        let auth_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Password(auth_interaction_server),
+        )
+        .unwrap();
+
+        let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enroll_data.0 };
+
+        let attempted_event =
+            storage_unlock_mechanism.authenticate(auth_stream, vec![enrollment]).await.unwrap();
+
+        assert_eq!(attempted_event.enrollment_id, Some(TEST_ENROLLMENT_ID));
+        assert_eq!(attempted_event.updated_enrollment_data, None);
+        assert_eq!(attempted_event.prekey_material, Some(enroll_key.0));
+    }
+
+    #[fuchsia::test]
+    async fn test_scrypt_roundtrip_different_passwords() {
+        let storage_unlock_mechanism = create_storage_unlock_with_default(SCRYPT_ONLY_CONFIG);
+        let (client, interaction_server) =
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+
+        let _ = client.into_proxy().unwrap().set_password("password").unwrap();
+        let stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Password(interaction_server),
+        )
+        .unwrap();
+
+        let (enroll_data, enroll_key) = storage_unlock_mechanism.enroll(stream).await.unwrap();
+
+        let (client, auth_interaction_server) =
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+        let _ = client.into_proxy().unwrap().set_password("wrong password").unwrap();
+
+        let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enroll_data.0 };
+        let auth_stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Password(auth_interaction_server),
+        )
+        .unwrap();
+
+        let attempted_event =
+            storage_unlock_mechanism.authenticate(auth_stream, vec![enrollment]).await.unwrap();
+
+        assert_eq!(attempted_event.enrollment_id, Some(TEST_ENROLLMENT_ID));
+        assert_eq!(attempted_event.updated_enrollment_data, None);
+        assert_ne!(attempted_event.prekey_material, Some(enroll_key.0));
+    }
+
+    #[fuchsia::test]
+    async fn test_enroll_scrypt() {
+        let storage_unlock_mechanism = create_storage_unlock_with_default(SCRYPT_ONLY_CONFIG);
+        let (client, interaction_server) =
+            fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
+
+        let _ = client.into_proxy().unwrap().set_password("password").unwrap();
+        let stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Password(interaction_server),
+        )
+        .unwrap();
+
+        let result = storage_unlock_mechanism.enroll(stream).await;
         assert!(result.is_ok());
     }
 
@@ -212,16 +485,19 @@ mod test {
         let mcm = MockCredManager::new_fail_enrollment();
         let cred_manager_provider = MockCredManagerProvider::new_with_cred_manager(mcm);
         let storage_unlock_mechanism =
-            StorageUnlockMechanism::new(PINWEAVER_ONLY_CONFIG, cred_manager_provider);
+            create_storage_unlock_with_custom_cmp(PINWEAVER_ONLY_CONFIG, cred_manager_provider);
         let (client, interaction_server) =
             fidl::endpoints::create_endpoints::<PasswordInteractionMarker>().unwrap();
 
         let password_proxy = client.into_proxy().unwrap();
         let _ = password_proxy.set_password(TEST_SCRYPT_PASSWORD).unwrap();
 
-        let result = storage_unlock_mechanism
-            .enroll(InteractionProtocolServerEnd::Password(interaction_server))
-            .await;
+        let stream = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Password(interaction_server),
+        )
+        .unwrap();
+
+        let result = storage_unlock_mechanism.enroll(stream).await;
         assert_matches!(result, Err(ApiError::Resource));
         assert_matches!(
             password_proxy.take_event_stream().next().await.unwrap(),
@@ -236,17 +512,14 @@ mod test {
 
     #[fuchsia::test]
     async fn test_enroll_incorrect_ipse() {
-        let cred_manager_provider = MockCredManagerProvider::new();
-        let storage_unlock_mechanism =
-            StorageUnlockMechanism::new(SCRYPT_ONLY_CONFIG, cred_manager_provider);
         let (client, interaction_server) =
             fidl::endpoints::create_endpoints::<TestInteractionMarker>().unwrap();
 
         let _ = client.into_proxy().unwrap().set_success().unwrap();
+        let result = StorageUnlockMechanism::<MockCredManagerProvider>::stream_from_ipse(
+            InteractionProtocolServerEnd::Test(interaction_server),
+        );
 
-        let result = storage_unlock_mechanism
-            .enroll(InteractionProtocolServerEnd::Test(interaction_server))
-            .await;
-        assert_eq!(result, Err(ApiError::InvalidRequest));
+        assert!(result.is_err());
     }
 }
