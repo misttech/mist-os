@@ -4,6 +4,7 @@
 
 //! Custom error types for the netstack.
 
+use net_types::ip::{GenericOverIp, Ip};
 use packet_formats::error::*;
 use thiserror::Error;
 
@@ -78,7 +79,7 @@ impl From<NotFoundError> for NetstackError {
 }
 
 /// Error type for errors common to local addresses.
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, PartialEq, GenericOverIp)]
 pub enum LocalAddressError {
     /// Cannot bind to address.
     #[error("can't bind to address")]
@@ -105,7 +106,7 @@ pub enum LocalAddressError {
 }
 
 /// Indicates a problem related to an address with a zone.
-#[derive(Copy, Clone, Debug, Error, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Error, Eq, PartialEq, GenericOverIp)]
 pub enum ZonedAddressError {
     /// The address scope requires a zone but didn't have one.
     #[error("the address requires a zone but didn't have one")]

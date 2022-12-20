@@ -53,7 +53,7 @@ use crate::{
         id_map_collection::IdMapCollectionKey,
         socketmap::{IterShadows as _, SocketMap, Tagged},
     },
-    error::ExistsError,
+    error::{ExistsError, LocalAddressError},
     ip::{
         socket::{
             BufferIpSocketHandler as _, DefaultSendOptions, IpSock, IpSockCreationError,
@@ -615,7 +615,7 @@ pub(crate) trait TcpSocketHandler<I: Ip, C: TcpNonSyncContext>:
         id: UnboundId<I>,
         local_ip: I::Addr,
         port: Option<NonZeroU16>,
-    ) -> Result<BoundId<I>, BindError>;
+    ) -> Result<BoundId<I>, LocalAddressError>;
 
     fn listen(&mut self, _ctx: &mut C, id: BoundId<I>, backlog: NonZeroUsize) -> ListenerId<I>;
 
@@ -697,7 +697,7 @@ impl<I: IpExt, C: TcpNonSyncContext, SC: TcpSyncContext<I, C>> TcpSocketHandler<
         id: UnboundId<I>,
         local_ip: I::Addr,
         port: Option<NonZeroU16>,
-    ) -> Result<BoundId<I>, BindError> {
+    ) -> Result<BoundId<I>, LocalAddressError> {
         // TODO(https://fxbug.dev/104300): Check if local_ip is a unicast address.
         self.with_ip_transport_ctx_and_tcp_sockets_mut(
             |ip_transport_ctx, TcpSockets { port_alloc, inactive, socketmap }| {
@@ -706,7 +706,7 @@ impl<I: IpExt, C: TcpNonSyncContext, SC: TcpSyncContext<I, C>> TcpSocketHandler<
                         Some(port) => {
                             NonZeroU16::new(port).expect("ephemeral ports must be non-zero")
                         }
-                        None => return Err(BindError::NoPort),
+                        None => return Err(LocalAddressError::FailedToAllocateLocalPort),
                     },
                     Some(port) => port,
                 };
@@ -714,7 +714,7 @@ impl<I: IpExt, C: TcpNonSyncContext, SC: TcpSyncContext<I, C>> TcpSocketHandler<
                 let local_ip = SpecifiedAddr::new(local_ip);
                 if let Some(ip) = local_ip {
                     if ip_transport_ctx.get_devices_with_assigned_addr(ip).next().is_none() {
-                        return Err(BindError::NoLocalAddr);
+                        return Err(LocalAddressError::AddressMismatch);
                     }
                 }
 
@@ -743,7 +743,9 @@ impl<I: IpExt, C: TcpNonSyncContext, SC: TcpSyncContext<I, C>> TcpSocketHandler<
                         let MaybeListenerId(x, marker) = entry.id();
                         BoundId(x, marker)
                     })
-                    .map_err(|_: (InsertError, MaybeListener<_, _>, ())| BindError::Conflict)?;
+                    .map_err(|_: (InsertError, MaybeListener<_, _>, ())| {
+                        LocalAddressError::AddressInUse
+                    })?;
                 let _: Unbound<_> = inactive_entry.remove();
                 Ok(bound)
             },
@@ -1392,18 +1394,6 @@ where
     )
 }
 
-/// Possible errors for the bind operation.
-#[derive(Debug, GenericOverIp)]
-#[cfg_attr(test, derive(Eq, PartialEq))]
-pub enum BindError {
-    /// The local address does not belong to us.
-    NoLocalAddr,
-    /// Cannot allocate a port for the local address.
-    NoPort,
-    /// The address that is intended to be bound on is already in use.
-    Conflict,
-}
-
 /// Binds an unbound socket to a local socket address.
 pub fn bind<I, C>(
     mut sync_ctx: &SyncCtx<C>,
@@ -1411,7 +1401,7 @@ pub fn bind<I, C>(
     id: UnboundId<I>,
     local_ip: I::Addr,
     port: Option<NonZeroU16>,
-) -> Result<BoundId<I>, BindError>
+) -> Result<BoundId<I>, LocalAddressError>
 where
     I: IpExt,
     C: NonSyncContext,
@@ -2520,7 +2510,7 @@ mod tests {
                 conflict_addr,
                 Some(PORT_1)
             ),
-            Err(BindError::Conflict)
+            Err(LocalAddressError::AddressInUse)
         );
         let _b2 = TcpSocketHandler::bind(
             &mut sync_ctx,
@@ -2533,10 +2523,11 @@ mod tests {
     }
     #[ip_test]
     #[test_case(nonzero!(u16::MAX), Ok(nonzero!(u16::MAX)); "ephemeral available")]
-    #[test_case(nonzero!(100u16), Err(BindError::NoPort); "no ephemeral available")]
+    #[test_case(nonzero!(100u16), Err(LocalAddressError::FailedToAllocateLocalPort);
+                "no ephemeral available")]
     fn bind_picked_port_all_others_taken<I: Ip + TcpTestIpExt>(
         available_port: NonZeroU16,
-        expected_result: Result<NonZeroU16, BindError>,
+        expected_result: Result<NonZeroU16, LocalAddressError>,
     ) {
         set_logger_for_test();
         let TcpCtx { mut sync_ctx, mut non_sync_ctx } =
@@ -2594,7 +2585,7 @@ mod tests {
                 *I::FAKE_CONFIG.remote_ip,
                 None
             ),
-            Err(BindError::NoLocalAddr)
+            Err(LocalAddressError::AddressMismatch)
         );
 
         sync_ctx.with_tcp_sockets(|sockets| {
@@ -2709,7 +2700,7 @@ mod tests {
                 I::UNSPECIFIED_ADDRESS,
                 Some(LOCAL_PORT)
             ),
-            Err(BindError::Conflict)
+            Err(LocalAddressError::AddressInUse)
         );
 
         // Once `s` is bound to a different device, though, it no longer
@@ -3001,7 +2992,7 @@ mod tests {
                     *I::FAKE_CONFIG.local_ip,
                     Some(PORT_1),
                 ),
-                Err(BindError::Conflict)
+                Err(LocalAddressError::AddressInUse)
             );
             // Bring the already-shutdown listener back to listener again.
             let _: ListenerId<_> = TcpSocketHandler::listen(

@@ -1817,14 +1817,11 @@ pub fn set_listener_udp_device<I: IpExt, C: NonSyncContext>(
         (IpInvariant((&mut sync_ctx, ctx, device_id)), id),
         |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
             UdpSocketHandler::<Ipv4, _>::set_listener_udp_device(sync_ctx, ctx, id, device_id)
-                .map_err(IpInvariant)
         },
         |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
             UdpSocketHandler::<Ipv6, _>::set_listener_udp_device(sync_ctx, ctx, id, device_id)
-                .map_err(IpInvariant)
         },
     )
-    .map_err(|IpInvariant(a)| a)
 }
 
 /// Sets the device the specified connected socket is bound to.
@@ -2232,14 +2229,11 @@ pub fn listen_udp<I: IpExt, C: NonSyncContext>(
         (IpInvariant((&mut sync_ctx, ctx, port)), id, addr),
         |(IpInvariant((sync_ctx, ctx, port)), id, addr)| {
             UdpSocketHandler::<Ipv4, _>::listen_udp(sync_ctx, ctx, id, addr, port)
-                .map_err(IpInvariant)
         },
         |(IpInvariant((sync_ctx, ctx, port)), id, addr)| {
             UdpSocketHandler::<Ipv6, _>::listen_udp(sync_ctx, ctx, id, addr, port)
-                .map_err(IpInvariant)
         },
     )
-    .map_err(|IpInvariant(a)| a)
 }
 
 /// Removes a previously registered UDP listener.

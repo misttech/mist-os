@@ -40,9 +40,9 @@ use netstack3_core::{
             get_bound_info, get_connection_info, get_listener_info, listen, remove_bound,
             remove_unbound, set_bound_device, set_connection_device, set_listener_device,
             set_send_buffer_size, set_unbound_device, shutdown_conn, shutdown_listener,
-            with_keep_alive, with_keep_alive_mut, AcceptError, BindError, BoundId, BoundInfo,
-            ConnectError, ConnectionId, ConnectionInfo, ListenerId, NoConnection, SocketAddr,
-            TcpNonSyncContext, UnboundId,
+            with_keep_alive, with_keep_alive_mut, AcceptError, BoundId, BoundInfo, ConnectError,
+            ConnectionId, ConnectionInfo, ListenerId, NoConnection, SocketAddr, TcpNonSyncContext,
+            UnboundId,
         },
         state::Takeable,
         BufferSizes, KeepAlive,
@@ -455,16 +455,6 @@ impl IntoErrno for AcceptError {
     fn into_errno(self) -> fposix::Errno {
         match self {
             AcceptError::WouldBlock => fposix::Errno::Eagain,
-        }
-    }
-}
-
-impl IntoErrno for BindError {
-    fn into_errno(self) -> fposix::Errno {
-        match self {
-            BindError::NoLocalAddr => fposix::Errno::Eaddrnotavail,
-            BindError::NoPort => fposix::Errno::Eaddrinuse,
-            BindError::Conflict => fposix::Errno::Eaddrinuse,
         }
     }
 }
