@@ -38,7 +38,7 @@ bool IsCaptureSupported(const fuchsia::hardware::display::ControllerSyncPtr& dis
 uint64_t ImportImageForCapture(
     const fuchsia::hardware::display::ControllerSyncPtr& display_controller,
     const fuchsia::hardware::display::ImageConfig& image_config,
-    allocation::GlobalBufferCollectionId buffer_collection_id, uint64_t vmo_idx);
+    allocation::GlobalBufferCollectionId buffer_collection_id, uint32_t vmo_idx);
 
 }  // namespace scenic_impl
 

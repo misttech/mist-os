@@ -3871,8 +3871,8 @@ TEST_F(FlatlandTest, CreateImageSetsDefaults) {
   // Default destination rect should be same as size.
   auto matrix_kv = uber_struct->local_matrices.find(image_handle);
   EXPECT_NE(matrix_kv, uber_struct->local_matrices.end());
-  EXPECT_EQ(sample_region_kv->second.width, kWidth);
-  EXPECT_EQ(sample_region_kv->second.height, kHeight);
+  EXPECT_EQ(sample_region_kv->second.width, static_cast<float>(kWidth));
+  EXPECT_EQ(sample_region_kv->second.height, static_cast<float>(kHeight));
 }
 
 TEST_F(FlatlandTest, SetImageOpacityTestCases) {
@@ -3963,7 +3963,7 @@ TEST_F(FlatlandTest, SetImageOpacityTestCases) {
     flatland->CreateTransform(kTransformId);
     flatland->SetRootTransform(kTransformId);
     flatland->SetContent(kTransformId, kId);
-    flatland->SetImageOpacity(kId, 0.7);
+    flatland->SetImageOpacity(kId, 0.7f);
     PRESENT(flatland, true);
   }
 }
@@ -4068,7 +4068,7 @@ TEST_F(FlatlandTest, CreateFilledRectErrorTest) {
     {
       std::shared_ptr<Flatland> flatland = CreateFlatland();
       flatland->CreateFilledRect(kId2);
-      flatland->SetSolidFill(kId2, {0.7, 0.3, 0.9, 0.4}, {20, 30});
+      flatland->SetSolidFill(kId2, {0.7f, 0.3f, 0.9f, 0.4f}, {20, 30});
       PRESENT(flatland, true);
     }
   }

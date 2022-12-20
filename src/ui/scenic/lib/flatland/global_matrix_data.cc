@@ -18,7 +18,9 @@
 namespace flatland {
 
 const ImageSampleRegion kInvalidSampleRegion = {-1.f, -1.f, -1.f - 1.f};
-const TransformClipRegion kUnclippedRegion = {-INT_MAX / 2, -INT_MAX / 2, INT_MAX, INT_MAX};
+const TransformClipRegion kUnclippedRegion = {
+    -std::numeric_limits<int32_t>::max() / 2, -std::numeric_limits<int32_t>::max() / 2,
+    std::numeric_limits<int32_t>::max(), std::numeric_limits<int32_t>::max()};
 
 namespace {
 
@@ -29,13 +31,13 @@ bool Overlap(const TransformClipRegion& clip, const glm::vec2& origin, const glm
   if (clip.x == kUnclippedRegion.x && clip.y == kUnclippedRegion.y &&
       clip.width == kUnclippedRegion.width && clip.height == kUnclippedRegion.height)
     return true;
-  if (origin.x > clip.x + clip.width)
+  if (origin.x > static_cast<float>(clip.x + clip.width))
     return false;
-  if (origin.x + extent.x < clip.x)
+  if (origin.x + static_cast<float>(extent.x) < static_cast<float>(clip.x))
     return false;
-  if (origin.y > clip.y + clip.height)
+  if (origin.y > static_cast<float>(clip.y + clip.height))
     return false;
-  if (origin.y + extent.y < clip.y)
+  if (origin.y + static_cast<float>(extent.y) < static_cast<float>(clip.y))
     return false;
   return true;
 }
@@ -189,11 +191,15 @@ ImageRect CreateImageRect(const glm::mat3& matrix, const TransformClipRegion& cl
   }
 
   // The rectangle was clipped, so we also have to clip the UV coordinates.
-  auto rlerp = [](float a, float b, float t) -> int { return std::round(a + t * (b - a)); };
-  float x_lerp = glm::clamp((clipped_origin.x - origin.x) / extent.x, 0.f, 1.f);
-  float y_lerp = glm::clamp((clipped_origin.y - origin.y) / extent.y, 0.f, 1.f);
-  float w_lerp = glm::clamp((clipped_origin.x + clipped_extent.x - origin.x) / extent.x, 0.f, 1.f);
-  float h_lerp = glm::clamp((clipped_origin.y + clipped_extent.y - origin.y) / extent.y, 0.f, 1.f);
+  const auto rlerp = [](int a, int b, float t) -> int {
+    return a + static_cast<int>(std::round(t * static_cast<float>(b - a)));
+  };
+  const float x_lerp = glm::clamp((clipped_origin.x - origin.x) / extent.x, 0.f, 1.f);
+  const float y_lerp = glm::clamp((clipped_origin.y - origin.y) / extent.y, 0.f, 1.f);
+  const float w_lerp =
+      glm::clamp((clipped_origin.x + clipped_extent.x - origin.x) / extent.x, 0.f, 1.f);
+  const float h_lerp =
+      glm::clamp((clipped_origin.y + clipped_extent.y - origin.y) / extent.y, 0.f, 1.f);
 
   // The clipped region, the new origin and the new extent already account for orientation. However,
   // this is not the case for the texel UVs. If the rectangle was rotated by 90 or 270, then the
@@ -455,7 +461,7 @@ GlobalRectangleVector ComputeGlobalRectangles(
 
   rectangles.reserve(matrices.size());
 
-  const uint32_t num = matrices.size();
+  const uint32_t num = static_cast<uint32_t>(matrices.size());
   for (uint32_t i = 0; i < num; i++) {
     const auto& matrix = matrices[i];
     const auto& clip = clip_regions[i];
@@ -463,8 +469,8 @@ GlobalRectangleVector ComputeGlobalRectangles(
     const auto& image = images[i];
 
     {
-      auto w = image.width;
-      auto h = image.height;
+      const auto w = static_cast<float>(image.width);
+      const auto h = static_cast<float>(image.height);
 
       if (w > 0 && h > 0) {
         FX_DCHECK(sample.x >= 0 && (sample.x + sample.width) <= w);
@@ -487,8 +493,6 @@ void CullRectangles(GlobalRectangleVector* rectangles_in_out, GlobalImageVector*
                     uint64_t display_width, uint64_t display_height) {
   FX_DCHECK(rectangles_in_out && images_in_out);
   FX_DCHECK(rectangles_in_out->size() == images_in_out->size());
-  unsigned length = rectangles_in_out->size();
-
   auto is_occluder = [display_width, display_height](
                          const ImageRect& rectangle,
                          const allocation::ImageMetadata& image) -> bool {
@@ -497,12 +501,13 @@ void CullRectangles(GlobalRectangleVector* rectangles_in_out, GlobalImageVector*
 
     // If the rect is full screen (or larger), and opaque, clear the output vectors.
     return (is_opaque && rectangle.origin.x <= 0 && rectangle.origin.y <= 0 &&
-            rectangle.extent.x >= display_width && rectangle.extent.y >= display_height);
+            rectangle.extent.x >= static_cast<float>(display_width) &&
+            rectangle.extent.y >= static_cast<float>(display_height));
   };
 
   // Find the index of the last occluder.
-  unsigned i = 0, occluder_index = 0;
-  for (; i < length; i++) {
+  size_t occluder_index = 0;
+  for (size_t i = 0; i < rectangles_in_out->size(); i++) {
     if (is_occluder((*rectangles_in_out)[i], (*images_in_out)[i])) {
       occluder_index = i;
     }
@@ -511,29 +516,28 @@ void CullRectangles(GlobalRectangleVector* rectangles_in_out, GlobalImageVector*
   // Move all of the remaining renderable data into the output vectors. Entries get erased
   // if they occur before the last occluder index, or if the rectangle at that entry is empty.
   {
-    auto is_rect_empty = [](const ImageRect& rect) {
+    const auto is_rect_empty = [](const ImageRect& rect) {
       return rect.extent.x <= 0.f && rect.extent.y <= 0.f;
     };
 
-    unsigned index = 0;
     images_in_out->erase(
         std::remove_if(images_in_out->begin(), images_in_out->end(),
-                       [&index, &occluder_index, &is_rect_empty,
-                        &rectangles_in_out](const allocation::ImageMetadata& image) {
+                       [index = static_cast<size_t>(0), occluder_index, &is_rect_empty,
+                        &rectangles_in_out](const allocation::ImageMetadata& image) mutable {
                          auto curr_index = index++;
                          return curr_index < occluder_index ||
                                 is_rect_empty((*rectangles_in_out)[curr_index]);
                        }),
         images_in_out->end());
 
-    index = 0;
-    rectangles_in_out->erase(
-        std::remove_if(rectangles_in_out->begin(), rectangles_in_out->end(),
-                       [&index, &occluder_index, &is_rect_empty](const ImageRect& rect) {
-                         auto curr_index = index++;
-                         return curr_index < occluder_index || is_rect_empty(rect);
-                       }),
-        rectangles_in_out->end());
+    rectangles_in_out->erase(std::remove_if(rectangles_in_out->begin(), rectangles_in_out->end(),
+                                            [index = static_cast<size_t>(0), occluder_index,
+                                             &is_rect_empty](const ImageRect& rect) mutable {
+                                              auto curr_index = index++;
+                                              return curr_index < occluder_index ||
+                                                     is_rect_empty(rect);
+                                            }),
+                             rectangles_in_out->end());
   }
 }
 

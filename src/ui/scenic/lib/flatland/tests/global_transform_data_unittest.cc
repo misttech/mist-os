@@ -900,10 +900,12 @@ TEST(ImageRectTest, MultipleParentTest) {
     EXPECT_EQ(clip_vector[2].height, kClipRegion.height);
 
     // The second one should be magnified by the scale factor.
-    EXPECT_EQ(clip_vector[4].x, kScale * kClipRegion.x);
-    EXPECT_EQ(clip_vector[4].y, kScale * kClipRegion.y);
-    EXPECT_EQ(clip_vector[4].width, kScale * kClipRegion.width);
-    EXPECT_EQ(clip_vector[4].height, kScale * kClipRegion.height);
+    EXPECT_EQ(static_cast<float>(clip_vector[4].x), kScale * static_cast<float>(kClipRegion.x));
+    EXPECT_EQ(static_cast<float>(clip_vector[4].y), kScale * static_cast<float>(kClipRegion.y));
+    EXPECT_EQ(static_cast<float>(clip_vector[4].width),
+              kScale * static_cast<float>(kClipRegion.width));
+    EXPECT_EQ(static_cast<float>(clip_vector[4].height),
+              kScale * static_cast<float>(kClipRegion.height));
   }
 
   // Each entry for the doubly parented node should have different hit regions.
@@ -945,8 +947,8 @@ TEST(GlobalImageDataTest, ImageMetadataColorTest) {
 
   // Set the uberstruct image color values.
   auto uber_struct = std::make_unique<UberStruct>();
-  std::array<float, 4> color_a = {0.5, 0.2, 0.75, 0.8};
-  std::array<float, 4> color_b = {0.9, 0.6, 0.4, 0.3};
+  std::array<float, 4> color_a = {0.5f, 0.2f, 0.75f, 0.8f};
+  std::array<float, 4> color_b = {0.9f, 0.6f, 0.4f, 0.3f};
 
   // Explicitly make sure identifier is invalid id to simulate SolidFill rects.
   uber_struct->images[{1, 0}] = {.identifier = allocation::kInvalidImageId,
@@ -1122,10 +1124,10 @@ TEST(GlobalTransformClipTest, NoOverlapClipRegions) {
   for (uint64_t i = 0; i < global_clip_regions.size(); i++) {
     const auto& a = global_clip_regions[i];
     const auto& b = expected_clip_regions[i];
-    EXPECT_FLOAT_EQ(a.x, b.x);
-    EXPECT_FLOAT_EQ(a.y, b.y);
-    EXPECT_FLOAT_EQ(a.width, b.width);
-    EXPECT_FLOAT_EQ(a.height, b.height);
+    EXPECT_EQ(a.x, b.x);
+    EXPECT_EQ(a.y, b.y);
+    EXPECT_EQ(a.width, b.width);
+    EXPECT_EQ(a.height, b.height);
   }
 
   // Now translate the child transform, to (-200, -300). Since the clip region's region is specified
@@ -1141,10 +1143,10 @@ TEST(GlobalTransformClipTest, NoOverlapClipRegions) {
   for (uint64_t i = 0; i < global_clip_regions.size(); i++) {
     const auto& a = global_clip_regions[i];
     const auto& b = expected_clip_regions[i];
-    EXPECT_FLOAT_EQ(a.x, b.x);
-    EXPECT_FLOAT_EQ(a.y, b.y);
-    EXPECT_FLOAT_EQ(a.width, b.width);
-    EXPECT_FLOAT_EQ(a.height, b.height);
+    EXPECT_EQ(a.x, b.x);
+    EXPECT_EQ(a.y, b.y);
+    EXPECT_EQ(a.width, b.width);
+    EXPECT_EQ(a.height, b.height);
   }
 }
 
@@ -1176,9 +1178,9 @@ TEST(GlobalTransformClipTest, ScaleAndRotate90DegreesTest) {
   EXPECT_EQ(global_clip_regions.size(), expected_clip_regions.size());
   const auto& a = global_clip_regions[0];
   const auto& b = expected_clip_regions[0];
-  EXPECT_FLOAT_EQ(a.x, b.x);
-  EXPECT_FLOAT_EQ(a.y, b.y);
-  EXPECT_FLOAT_EQ(a.width, b.width);
+  EXPECT_EQ(a.x, b.x);
+  EXPECT_EQ(a.y, b.y);
+  EXPECT_EQ(a.width, b.width);
 }
 
 TEST(GlobalTransformClipTest, ScaleAndRotate180DegreesTest) {
@@ -1207,9 +1209,9 @@ TEST(GlobalTransformClipTest, ScaleAndRotate180DegreesTest) {
   EXPECT_EQ(global_clip_regions.size(), expected_clip_regions.size());
   const auto& a = global_clip_regions[0];
   const auto& b = expected_clip_regions[0];
-  EXPECT_FLOAT_EQ(a.x, b.x);
-  EXPECT_FLOAT_EQ(a.y, b.y);
-  EXPECT_FLOAT_EQ(a.width, b.width);
+  EXPECT_EQ(a.x, b.x);
+  EXPECT_EQ(a.y, b.y);
+  EXPECT_EQ(a.width, b.width);
 }
 
 TEST(GlobalTransformClipTest, ScaleAndRotate270DegreesTest) {
@@ -1238,9 +1240,9 @@ TEST(GlobalTransformClipTest, ScaleAndRotate270DegreesTest) {
   EXPECT_EQ(global_clip_regions.size(), expected_clip_regions.size());
   const auto& a = global_clip_regions[0];
   const auto& b = expected_clip_regions[0];
-  EXPECT_FLOAT_EQ(a.x, b.x);
-  EXPECT_FLOAT_EQ(a.y, b.y);
-  EXPECT_FLOAT_EQ(a.width, b.width);
+  EXPECT_EQ(a.x, b.x);
+  EXPECT_EQ(a.y, b.y);
+  EXPECT_EQ(a.width, b.width);
 }
 
 // Test a more complicated scenario with multiple transforms, each with its own
@@ -1288,10 +1290,10 @@ TEST(GlobalTransformClipTest, ComplicatedGraphClipRegions) {
   for (uint64_t i = 0; i < global_clip_regions.size(); i++) {
     const auto& a = global_clip_regions[i];
     const auto& b = expected_clip_regions[i];
-    EXPECT_FLOAT_EQ(a.x, b.x);
-    EXPECT_FLOAT_EQ(a.y, b.y);
-    EXPECT_FLOAT_EQ(a.width, b.width);
-    EXPECT_FLOAT_EQ(a.height, b.height);
+    EXPECT_EQ(a.x, b.x);
+    EXPECT_EQ(a.y, b.y);
+    EXPECT_EQ(a.width, b.width);
+    EXPECT_EQ(a.height, b.height);
   }
 }
 

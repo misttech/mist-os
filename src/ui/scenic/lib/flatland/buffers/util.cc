@@ -40,7 +40,8 @@ void SetClientConstraintsAndWaitForAllocated(
   constraints.usage = usage;
   constraints.min_buffer_count = image_count;
 
-  constraints.image_format_constraints_count = 1 + additional_format_modifiers.size();
+  constraints.image_format_constraints_count =
+      1 + static_cast<uint32_t>(additional_format_modifiers.size());
   for (size_t i = 0; i < constraints.image_format_constraints_count; i++) {
     auto& image_constraints = constraints.image_format_constraints[i];
     image_constraints.color_spaces_count = 1;

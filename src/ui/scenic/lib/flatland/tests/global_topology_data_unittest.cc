@@ -333,11 +333,11 @@ TEST(GlobalTopologyDataTest, HitTest_OneView) {
 
   auto hit_tester = GenerateHitTester(uber_structs, links, kLinkInstanceId, {1, 0}, {});
 
-  // Recall that the valid bounds are (0,0) to (1,1). Use 0.125 to reach precisely 1.
+  // Recall that the valid bounds are (0,0) to (1,1). Use 0.125f to reach precisely 1.
 
   // Perform several in-bounds hit tests.
-  for (float x = 0; x <= kWidth; x += 0.125) {
-    for (float y = 0; y <= kHeight; y += 0.125) {
+  for (float x = 0; x <= kWidth; x += 0.125f) {
+    for (float y = 0; y <= kHeight; y += 0.125f) {
       auto result = hit_tester(view_ref1_koid, {x, y}, true);
       ASSERT_EQ(result.hits.size(), 1u);
       EXPECT_EQ(result.hits[0], view_ref1_koid);
@@ -429,10 +429,10 @@ TEST(GlobalTopologyDataTest, InfiniteHitRegion) {
   auto hit_tester = GenerateHitTester(uber_structs, links, kLinkInstanceId, view_1_local_root,
                                       {{view_2_local_root, viewport_for_2}});
 
-  // Recall that the valid bounds are (0,0) to (1,1). Use 0.125 to reach precisely 1.
+  // Recall that the valid bounds are (0,0) to (1,1). Use 0.125f to reach precisely 1.
   // Perform several in-bounds hit tests.
-  for (float x = 0; x <= kWidth; x += 0.125) {
-    for (float y = 0; y <= kHeight; y += 0.125) {
+  for (float x = 0; x <= kWidth; x += 0.125f) {
+    for (float y = 0; y <= kHeight; y += 0.125f) {
       auto result = hit_tester(view_ref1_koid, {x, y}, true);
       ASSERT_EQ(result.hits.size(), 1u) << " at location (" << x << ", " << y << ")";
       EXPECT_EQ(result.hits[0], view_ref2_koid);
@@ -504,8 +504,8 @@ TEST(GlobalTopologyDataTest, HitTest_SemanticVisibility) {
 
   auto hit_tester = GenerateHitTester(uber_structs, links, kLinkInstanceId, {1, 0}, {});
 
-  for (float x = 0; x <= kWidth; x += 0.125) {
-    for (float y = 0; y <= kHeight; y += 0.125) {
+  for (float x = 0; x <= kWidth; x += 0.125f) {
+    for (float y = 0; y <= kHeight; y += 0.125f) {
       auto default_result = hit_tester(view_ref1_koid, {x, y}, false);
       auto semantic_result = hit_tester(view_ref1_koid, {x, y}, true);
 
@@ -584,12 +584,12 @@ TEST(GlobalTopologyDataTest, HitTest_TwoOverlappingViews) {
   MakeLink(links, 2);  // 0:2 - 2:0
   auto hit_tester = GenerateHitTester(uber_structs, links, kLinkInstanceId, {1, 0}, {});
 
-  // Recall that the valid bounds are (0,0) to (1,1). Use 0.125 to reach precisely 1.
+  // Recall that the valid bounds are (0,0) to (1,1). Use 0.125f to reach precisely 1.
 
   // Perform several in-bounds hit tests on the region of just the parent.
   // To hit *just* the parent, we must avoid the boundary line of the child!
-  for (float x = 0; x < kParentWidth - kChildWidth; x += 0.125) {
-    for (float y = 0; y <= kHeight; y += 0.125) {
+  for (float x = 0; x < kParentWidth - kChildWidth; x += 0.125f) {
+    for (float y = 0; y <= kHeight; y += 0.125f) {
       {
         // Hit test with ViewRef 1 as the root.
         auto result = hit_tester(view_ref_parent_koid, {x, y}, true);
@@ -605,8 +605,8 @@ TEST(GlobalTopologyDataTest, HitTest_TwoOverlappingViews) {
   }
 
   // Perform several in-bounds hit tests on the region of both parent and child.
-  for (float x = 1; x <= kParentWidth; x += 0.125) {
-    for (float y = 0; y <= kHeight; y += 0.125) {
+  for (float x = 1; x <= kParentWidth; x += 0.125f) {
+    for (float y = 0; y <= kHeight; y += 0.125f) {
       {
         // Hit test with ViewRef 1 as the root.
         auto result = hit_tester(view_ref_parent_koid, {x, y}, true);
@@ -693,11 +693,11 @@ TEST(GlobalTopologyDataTest, HitTest_AnonymousView) {
   MakeLink(links, 3);  // 0:3 - 3:0
   auto hit_tester = GenerateHitTester(uber_structs, links, kLinkInstanceId, {1, 0}, {});
 
-  // Recall that the valid bounds are (0,0) to (1,1). Use 0.125 to reach precisely 1.
+  // Recall that the valid bounds are (0,0) to (1,1). Use 0.125f to reach precisely 1.
 
   // Perform several in-bounds hit tests.
-  for (float x = 0; x <= kWidth; x += 0.125) {
-    for (float y = 0; y <= kHeight; y += 0.125) {
+  for (float x = 0; x <= kWidth; x += 0.125f) {
+    for (float y = 0; y <= kHeight; y += 0.125f) {
       // Hit test with ViewRef 1 as the root.
       auto result = hit_tester(view_ref1_koid, {x, y}, true);
       ASSERT_EQ(result.hits.size(), 1u);
@@ -770,8 +770,8 @@ TEST(GlobalTopologyDataTest, HitTest_SandwichTest) {
   auto hit_tester = GenerateHitTester(uber_structs, links, kLinkInstanceId, {1, 0}, {});
 
   // Perform several in-bounds hit tests in the "sandwich" region.
-  for (float x = 2; x <= 3; x += 0.125) {
-    for (float y = 0; y <= kHeight; y += 0.125) {
+  for (float x = 2; x <= 3; x += 0.125f) {
+    for (float y = 0; y <= kHeight; y += 0.125f) {
       auto result = hit_tester(view_ref1_koid, {x, y}, true);
       ASSERT_EQ(result.hits.size(), 3u);
       EXPECT_EQ(result.hits[0], view_ref1_koid);
@@ -1009,8 +1009,8 @@ TEST(GlobalTopologyDataTest, HitTest_ClippedandRotatedChild) {
   auto hit_tester = GenerateHitTester(uber_structs, links, kLinkInstanceId, {1, 0}, {});
 
   // Start negative and go beyond the bounds of the parent to ensure correct clipping.
-  for (float x = -10; x <= 2 * static_cast<float>(kParentWidth); x += 0.125) {
-    for (float y = -10; y <= 2 * static_cast<float>(kParentHeight); y += 0.125) {
+  for (float x = -10; x <= 2 * static_cast<float>(kParentWidth); x += 0.125f) {
+    for (float y = -10; y <= 2 * static_cast<float>(kParentHeight); y += 0.125f) {
       auto result = hit_tester(view_ref_parent_koid, {x, y}, true);
 
       if (utils::RectFContainsPoint(
@@ -1142,8 +1142,8 @@ TEST(GlobalTopologyDataTest, HitTest_NonRelevantClipRegions) {
   MakeLink(links, 2);  // 0:2 - 2:0
   auto hit_tester = GenerateHitTester(uber_structs, links, kLinkInstanceId, {1, 0}, {});
 
-  for (float x = 0; x <= static_cast<float>(P0_clip.width); x += 0.125) {
-    for (float y = 0; y <= static_cast<float>(P0_clip.height); y += 0.125) {
+  for (float x = 0; x <= static_cast<float>(P0_clip.width); x += 0.125f) {
+    for (float y = 0; y <= static_cast<float>(P0_clip.height); y += 0.125f) {
       auto result = hit_tester(view_ref_parent_koid, {x, y}, true);
 
       // The last (parent) elem should *always* exist, regardless of the child's clip bounds.
@@ -1454,8 +1454,9 @@ TEST(GlobalTopologyDataTest, ViewTreeSnapshot) {
     const auto& node2 = view_tree.at(view_ref2_koid);
     EXPECT_EQ(node2.parent, view_ref1_koid);
     EXPECT_TRUE(node2.children.empty());
-    EXPECT_THAT(node2.bounding_box.min, testing::ElementsAre(0, 0));
-    EXPECT_THAT(node2.bounding_box.max, testing::ElementsAre(kWidth, kHeight));
+    EXPECT_THAT(node2.bounding_box.min, testing::ElementsAre(0.f, 0.f));
+    EXPECT_THAT(node2.bounding_box.max,
+                testing::ElementsAre(static_cast<float>(kWidth), static_cast<float>(kHeight)));
     EXPECT_EQ(node2.debug_name, "test_instance_2");
   }
 

@@ -1000,7 +1000,7 @@ void Flatland::SetImageSampleRegion(ContentId image_id, RectF rect) {
     return;
   }
 
-  auto content_kv = content_handles_.find(image_id.value);
+  const auto content_kv = content_handles_.find(image_id.value);
   if (content_kv == content_handles_.end()) {
     error_reporter_->ERROR() << "SetImageSampleRegion called with non-existent image_id "
                              << image_id.value;
@@ -1008,7 +1008,7 @@ void Flatland::SetImageSampleRegion(ContentId image_id, RectF rect) {
     return;
   }
 
-  auto image_kv = image_metadatas_.find(content_kv->second);
+  const auto image_kv = image_metadatas_.find(content_kv->second);
   if (image_kv == image_metadatas_.end()) {
     error_reporter_->ERROR() << "SetImageSampleRegion called on non-image content.";
     ReportBadOperationError();
@@ -1016,13 +1016,17 @@ void Flatland::SetImageSampleRegion(ContentId image_id, RectF rect) {
   }
 
   // The provided sample region needs to be within the bounds of the image.
-  auto metadata = image_kv->second;
-  if (rect.x < 0.f || rect.x > metadata.width || rect.width < 0.f ||
-      (rect.x + rect.width) > metadata.width || rect.y < 0.f || rect.y > metadata.height ||
-      rect.height < 0.f || (rect.y + rect.height) > metadata.height) {
-    error_reporter_->ERROR() << "SetImageSampleRegion rect out of bounds for image.";
-    ReportBadOperationError();
-    return;
+  {
+    const auto& metadata = image_kv->second;
+    const auto image_width = static_cast<float>(metadata.width);
+    const auto image_height = static_cast<float>(metadata.height);
+    if (rect.x < 0.f || rect.x > image_width || rect.width < 0.f ||
+        (rect.x + rect.width) > image_width || rect.y < 0.f || rect.y > image_height ||
+        rect.height < 0.f || (rect.y + rect.height) > image_height) {
+      error_reporter_->ERROR() << "SetImageSampleRegion rect out of bounds for image.";
+      ReportBadOperationError();
+      return;
+    }
   }
 
   image_sample_regions_[content_kv->second] = rect;

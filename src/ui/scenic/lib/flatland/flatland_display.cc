@@ -96,10 +96,12 @@ void FlatlandDisplay::SetContent(ViewportCreationToken token,
   ViewportProperties properties;
   {
     // To calculate the logical size, we need to divide the physical pixel size by the DPR.
-    fuchsia::math::SizeU size;
-    size.width = display_->width_in_px() / device_pixel_ratio.x;
-    size.height = display_->height_in_px() / device_pixel_ratio.y;
-    properties.set_logical_size(size);
+    properties.set_logical_size({
+        .width = static_cast<uint32_t>(static_cast<float>(display_->width_in_px()) /
+                                       device_pixel_ratio.x),
+        .height = static_cast<uint32_t>(static_cast<float>(display_->height_in_px()) /
+                                        device_pixel_ratio.y),
+    });
     properties.set_inset({0, 0, 0, 0});
   }
 

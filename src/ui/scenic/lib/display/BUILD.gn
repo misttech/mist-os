@@ -46,9 +46,6 @@ source_set("display") {
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/trace",
   ]
-
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 # Temporary: put into its own source_set so that it is easy to remove all
