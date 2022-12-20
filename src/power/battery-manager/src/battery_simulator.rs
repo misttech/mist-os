@@ -10,6 +10,11 @@ use {
     std::sync::{Arc, Weak},
 };
 
+fn get_current_time() -> Option<i64> {
+    let t = fuchsia_runtime::utc_time();
+    Some((t.into_nanos() / 1000) as i64)
+}
+
 // SimulatedBatteryInfoSource is another source of BatteryInfo for the
 // BatteryManager. This BatteryInfo is modified through FIDL calls
 pub(crate) struct SimulatedBatteryInfoSource {
@@ -33,6 +38,7 @@ impl SimulatedBatteryInfoSource {
     async fn set_battery_percentage(&self, level_percent: f32) -> Result<(), Error> {
         let mut battery_info = self.battery_info.lock().await;
         battery_info.level_percent = Some(level_percent);
+        battery_info.timestamp = get_current_time();
         drop(battery_info);
         self.notify_battery_info_changed().await?;
         Ok(())
@@ -41,6 +47,7 @@ impl SimulatedBatteryInfoSource {
     async fn set_charge_source(&self, charge_source: fpower::ChargeSource) -> Result<(), Error> {
         let mut battery_info = self.battery_info.lock().await;
         battery_info.charge_source = Some(charge_source);
+        battery_info.timestamp = get_current_time();
         drop(battery_info);
         self.notify_battery_info_changed().await?;
         Ok(())
@@ -49,6 +56,7 @@ impl SimulatedBatteryInfoSource {
     async fn set_level_status(&self, level_status: fpower::LevelStatus) -> Result<(), Error> {
         let mut battery_info = self.battery_info.lock().await;
         battery_info.level_status = Some(level_status);
+        battery_info.timestamp = get_current_time();
         drop(battery_info);
         self.notify_battery_info_changed().await?;
         Ok(())
@@ -57,6 +65,7 @@ impl SimulatedBatteryInfoSource {
     async fn set_charge_status(&self, charge_status: fpower::ChargeStatus) -> Result<(), Error> {
         let mut battery_info = self.battery_info.lock().await;
         battery_info.charge_status = Some(charge_status);
+        battery_info.timestamp = get_current_time();
         drop(battery_info);
         self.notify_battery_info_changed().await?;
         Ok(())
@@ -65,6 +74,7 @@ impl SimulatedBatteryInfoSource {
     async fn set_battery_status(&self, battery_status: fpower::BatteryStatus) -> Result<(), Error> {
         let mut battery_info = self.battery_info.lock().await;
         battery_info.status = Some(battery_status);
+        battery_info.timestamp = get_current_time();
         drop(battery_info);
         self.notify_battery_info_changed().await?;
         Ok(())
@@ -81,6 +91,7 @@ impl SimulatedBatteryInfoSource {
         } else {
             battery_info.time_remaining = Some(fpower::TimeRemaining::Indeterminate(time));
         }
+        battery_info.timestamp = get_current_time();
         drop(battery_info);
         self.notify_battery_info_changed().await?;
         Ok(())
