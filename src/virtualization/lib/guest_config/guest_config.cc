@@ -333,6 +333,15 @@ std::unordered_map<std::string, std::unique_ptr<OptionHandler>> GetAllOptionHand
                    std::make_unique<BoolOptionHandler>(&GuestConfig::mutable_virtio_sound_input));
   handlers.emplace("virtio-vsock",
                    std::make_unique<BoolOptionHandler>(&GuestConfig::mutable_virtio_vsock));
+  handlers.emplace("virtio-mem",
+                   std::make_unique<BoolOptionHandler>(&GuestConfig::mutable_virtio_mem));
+  handlers.emplace("virtio-mem-block-size", std::make_unique<MemorySizeOptionHandler>(
+                                                &GuestConfig::mutable_virtio_mem_block_size));
+  handlers.emplace("virtio-mem-region-size", std::make_unique<MemorySizeOptionHandler>(
+                                                 &GuestConfig::mutable_virtio_mem_region_size));
+  handlers.emplace(
+      "virtio-mem-region-alignment",
+      std::make_unique<MemorySizeOptionHandler>(&GuestConfig::mutable_virtio_mem_region_alignment));
   return handlers;
 }
 

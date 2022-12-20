@@ -65,6 +65,9 @@ guest_package("termina_guest") {
   virtio_sound = true
   virtio_sound_input = false
   virtio_vsock = true
+  virtio_mem_block_size = "4M"
+  virtio_mem_region_size = "16G"
+  virtio_mem_region_alignment = "128M"
 
   deps = [
     ":kernel",

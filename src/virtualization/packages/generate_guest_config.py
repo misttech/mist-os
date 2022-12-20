@@ -20,6 +20,24 @@ def main():
     parser.add_argument('--ramdisk', help='Path to initial RAM disk')
     parser.add_argument('--zircon', help='Path to Zircon kernel')
     parser.add_argument(
+        '--virtio-mem-block-size',
+        dest='virtio-mem-block-size',
+        help='Virtio mem pluggable block size')
+    parser.add_argument(
+        '--virtio-mem-region-size',
+        dest='virtio-mem-region-size',
+        help='Virtio mem pluggable region size')
+    parser.add_argument(
+        '--virtio-mem-region-alignment',
+        dest='virtio-mem-region-alignment',
+        help='Virtio mem pluggable region alignment')
+    parser.add_argument(
+        '--virtio-mem',
+        dest='virtio-mem',
+        action='store_const',
+        const=True,
+        help='Enable the virtio mem device')
+    parser.add_argument(
         '--default-net',
         dest='default-net',
         action='store_const',

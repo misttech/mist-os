@@ -99,6 +99,24 @@ template("guest_package") {
         invoker.memory,
       ]
     }
+    if (defined(invoker.virtio_mem_block_size)) {
+      args += [
+        "--virtio-mem-block-size",
+        invoker.virtio_mem_block_size,
+      ]
+    }
+    if (defined(invoker.virtio_mem_region_size)) {
+      args += [
+        "--virtio-mem-region-size",
+        invoker.virtio_mem_region_size,
+      ]
+    }
+    if (defined(invoker.virtio_mem_region_alignment)) {
+      args += [
+        "--virtio-mem-region-alignment",
+        invoker.virtio_mem_region_alignment,
+      ]
+    }
     if (defined(invoker.default_net) && invoker.default_net) {
       args += [ "--default-net" ]
     }
