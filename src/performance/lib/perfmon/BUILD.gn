@@ -64,10 +64,10 @@ static_library("perfmon") {
       "//zircon/system/ulib/zx",
     ]
   } else {
-    if (host_cpu == "arm64") {
+    if (current_cpu == "arm64") {
       sources += [ "arm64-events.cc" ]
     }
-    if (host_cpu == "x64") {
+    if (current_cpu == "x64") {
       sources += [ "intel-events.cc" ]
     }
   }
