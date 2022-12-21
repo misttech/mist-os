@@ -71,12 +71,17 @@ import("//build/config.gni")
 #         [string] the minimum required version for this package, in
 #         "1.2.3.4"-style notation.
 #         The string can also be a path like "//path/to/VERSION", which will be
-#         read and parsed as version number.
+#         read and parsed as version number, this path MUST also be specified in
+#         `inputs` for hermeticity.
 #         If there is a fallback version of the eager package in a build, this
 #         version MUST match the fallback version.
 #
 #       cache_fallback (optional)
 #         [bool] if fallback to the version in cache packages is allowed.
+#
+#   inputs
+#     [list of string] paths to additional input file to the config, see
+#     minimum_required_version for more detail.
 #
 #   data_deps (optional)
 #   deps (optional)
@@ -97,6 +102,9 @@ template("eager_package_config") {
   compiled_action(eager_package_config_script_label) {
     tool = "//src/sys/pkg/scripts/gen_eager_package_config"
     inputs = invoker.sources + [ invoker.key_config ]
+    if (defined(invoker.inputs)) {
+      inputs += invoker.inputs
+    }
     outputs = [
       omaha_client_config_path,
       pkg_resolver_config_path,
