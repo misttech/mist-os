@@ -27,7 +27,6 @@
 
 #include "src/lib/storage/vfs/cpp/managed_vfs.h"
 #include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
-#include "src/lib/storage/vfs/cpp/vfs.h"
 #include "src/lib/storage/vfs/cpp/vfs_types.h"
 #include "src/lib/storage/vfs/cpp/vnode.h"
 
@@ -35,13 +34,13 @@ namespace {
 
 class FdCountVnode : public fs::Vnode {
  public:
-  FdCountVnode() {}
-  virtual ~FdCountVnode() {
+  FdCountVnode() = default;
+  ~FdCountVnode() override {
     std::lock_guard lock(mutex_);
     EXPECT_EQ(0, open_count());
   }
 
-  int fds() const {
+  size_t fds() const {
     std::lock_guard lock(mutex_);
     return open_count();
   }
@@ -50,7 +49,7 @@ class FdCountVnode : public fs::Vnode {
 
   zx_status_t GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
                                      [[maybe_unused]] fs::Rights rights,
-                                     fs::VnodeRepresentation* info) {
+                                     fs::VnodeRepresentation* info) override {
     *info = fs::VnodeRepresentation::Connector();
     return ZX_OK;
   }
@@ -60,38 +59,32 @@ class FdCountVnode : public fs::Vnode {
 
 class AsyncTearDownVnode : public FdCountVnode {
  public:
-  AsyncTearDownVnode(sync_completion_t* completions, zx_status_t status_for_sync = ZX_OK)
-      : callback_(nullptr), completions_(completions), status_for_sync_(status_for_sync) {}
+  explicit AsyncTearDownVnode(sync_completion_t* completions, zx_status_t status_for_sync = ZX_OK)
+      : completions_(completions), status_for_sync_(status_for_sync) {}
 
-  ~AsyncTearDownVnode() {
+  ~AsyncTearDownVnode() override {
     // C) Tear down the Vnode.
     EXPECT_EQ(0, fds());
     sync_completion_signal(&completions_[2]);
+    if (thread_.has_value()) {
+      thread_.value().join();
+    }
   }
 
  private:
   void Sync(fs::Vnode::SyncCallback callback) final {
-    callback_ = std::move(callback);
-    std::thread thrd(&AsyncTearDownVnode::SyncThread, this);
-    thrd.detach();
-  }
-
-  static void SyncThread(AsyncTearDownVnode* arg) {
-    fs::Vnode::SyncCallback callback;
-    zx_status_t status_for_sync;
-    {
-      fbl::RefPtr<AsyncTearDownVnode> vn = fbl::RefPtr(arg);
-      status_for_sync = vn->status_for_sync_;
+    thread_.emplace([vn = fbl::RefPtr(this), callback = std::move(callback)]() mutable {
+      zx_status_t status_for_sync = vn->status_for_sync_;
       // A) Identify when the sync has started being processed.
       sync_completion_signal(&vn->completions_[0]);
       // B) Wait until the connection has been closed.
       sync_completion_wait(&vn->completions_[1], ZX_TIME_INFINITE);
-      callback = std::move(vn->callback_);
-    }
-    callback(status_for_sync);
+      vn = nullptr;
+      callback(status_for_sync);
+    });
   }
 
-  fs::Vnode::SyncCallback callback_;
+  std::optional<std::thread> thread_;
   sync_completion_t* completions_;
   zx_status_t status_for_sync_;
 };
@@ -104,7 +97,7 @@ void SendSync(fidl::UnownedClientEnd<fuchsia_io::Node> client) {
       encoded(&request);
   ASSERT_OK(encoded.status());
   encoded.GetOutgoingMessage().set_txid(5);
-  encoded.Write(zx::unowned_channel(client.handle()));
+  encoded.Write(client.handle());
   ASSERT_OK(encoded.status());
 }
 
@@ -148,10 +141,10 @@ void CommonTestUnpostedTeardown(zx_status_t status_for_sync) {
   sync_completion_t* vnode_destroyed = &completions[2];
   sync_completion_t shutdown_done;
   vfs->Shutdown([&vnode_destroyed, &shutdown_done](zx_status_t status) {
-    ASSERT_OK(status);
+    EXPECT_OK(status);
     // C) Issue an explicit shutdown, check that the Vnode has
     // already torn down.
-    ASSERT_OK(sync_completion_wait(vnode_destroyed, ZX_SEC(0)));
+    EXPECT_OK(sync_completion_wait(vnode_destroyed, ZX_SEC(0)));
     sync_completion_signal(&shutdown_done);
   });
   ASSERT_OK(sync_completion_wait(&shutdown_done, ZX_SEC(3)));
@@ -178,10 +171,10 @@ void CommonTestPostedTeardown(zx_status_t status_for_sync) {
   sync_completion_t shutdown_done;
   ASSERT_OK(async::PostTask(loop.dispatcher(), [&]() {
     vfs->Shutdown([&vnode_destroyed, &shutdown_done](zx_status_t status) {
-      ASSERT_OK(status);
+      EXPECT_OK(status);
       // C) Issue an explicit shutdown, check that the Vnode has
       // already torn down.
-      ASSERT_OK(sync_completion_wait(vnode_destroyed, ZX_SEC(0)));
+      EXPECT_OK(sync_completion_wait(vnode_destroyed, ZX_SEC(0)));
       sync_completion_signal(&shutdown_done);
     });
   }));
@@ -212,9 +205,9 @@ TEST(Teardown, TeardownDeleteThis) {
   sync_completion_t shutdown_done;
   fs::ManagedVfs* raw_vfs = vfs.release();
   raw_vfs->Shutdown([&raw_vfs, &vnode_destroyed, &shutdown_done](zx_status_t status) {
-    ZX_ASSERT(status == ZX_OK);
+    EXPECT_OK(status);
     // C) Issue an explicit shutdown, check that the Vnode has already torn down.
-    ZX_ASSERT(sync_completion_wait(vnode_destroyed, ZX_SEC(0)) == ZX_OK);
+    EXPECT_OK(sync_completion_wait(vnode_destroyed, ZX_SEC(0)));
     delete raw_vfs;
     sync_completion_signal(&shutdown_done);
   });
@@ -233,16 +226,16 @@ TEST(Teardown, TeardownSlowAsyncCallback) {
   sync_completion_t* vnode_destroyed = &completions[2];
   sync_completion_t shutdown_done;
   vfs->Shutdown([&vnode_destroyed, &shutdown_done](zx_status_t status) {
-    ZX_ASSERT(status == ZX_OK);
+    EXPECT_OK(status);
     // C) Issue an explicit shutdown, check that the Vnode has already torn down.
     //
     // Note: Will not be invoked until (B) completes.
-    ZX_ASSERT(sync_completion_wait(vnode_destroyed, ZX_SEC(0)) == ZX_OK);
+    EXPECT_OK(sync_completion_wait(vnode_destroyed, ZX_SEC(0)));
     sync_completion_signal(&shutdown_done);
   });
 
   // Shutdown should be waiting for our sync to finish.
-  ASSERT_EQ(ZX_ERR_TIMED_OUT, sync_completion_wait(&shutdown_done, ZX_MSEC(10)));
+  ASSERT_STATUS(sync_completion_wait(&shutdown_done, ZX_MSEC(10)), ZX_ERR_TIMED_OUT);
 
   // B) Let sync complete.
   sync_completion_signal(&completions[1]);
@@ -286,16 +279,16 @@ TEST(Teardown, TeardownSlowClone) {
   sync_completion_t* vnode_destroyed = &completions[2];
   sync_completion_t shutdown_done;
   vfs->Shutdown([&vnode_destroyed, &shutdown_done](zx_status_t status) {
-    ZX_ASSERT(status == ZX_OK);
+    EXPECT_OK(status);
     // C) Issue an explicit shutdown, check that the Vnode has already torn down.
     //
     // Note: Will not be invoked until (B) completes.
-    ZX_ASSERT(sync_completion_wait(vnode_destroyed, ZX_SEC(0)) == ZX_OK);
+    EXPECT_OK(sync_completion_wait(vnode_destroyed, ZX_SEC(0)));
     sync_completion_signal(&shutdown_done);
   });
 
   // Shutdown should be waiting for our sync to finish.
-  ASSERT_EQ(ZX_ERR_TIMED_OUT, sync_completion_wait(&shutdown_done, ZX_MSEC(10)));
+  ASSERT_STATUS(sync_completion_wait(&shutdown_done, ZX_MSEC(10)), ZX_ERR_TIMED_OUT);
 
   // B) Let sync complete. This should result in a successful termination of the filesystem, even
   // with the pending clone request.
