@@ -6,17 +6,16 @@
 #![allow(unused_variables, unused_imports, dead_code)]
 
 use {
-    anyhow::{anyhow, Error},
+    anyhow::Error,
     fidl::endpoints::{ClientEnd, ProtocolMarker, ServerEnd},
-    fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_io as fio,
+    fidl_fuchsia_io as fio,
     fidl_fuchsia_virtualization::{
         BlockFormat, BlockMode, BlockSpec, GuestConfig, KernelType, MAX_BLOCK_DEVICE_ID,
     },
-    fuchsia_fs::{directory, file, OpenFlags},
+    fuchsia_fs::{file, OpenFlags},
     fuchsia_zircon as zx,
     serde::{de, Deserialize},
     static_assertions as sa,
-    std::{any, cmp, str::FromStr},
 };
 
 // Memory is specified by a string containing either a plain u64 value in bytes, or a u64
@@ -182,17 +181,69 @@ pub fn parse_config(data: &str) -> Result<GuestConfig, Error> {
     })
 }
 
-pub fn merge_configs(base: GuestConfig, overrides: GuestConfig) -> GuestConfig {
-    // Merge two configs, with the overrides being applied on top of the base config. Non-repeated
-    // fields should be overwritten, and repeated fields should be appended. See the C++
-    // MergeConfigs for an example.
-    // TODO(fxbug.dev/115695): Implement this function and remove this comment.
-    unimplemented!();
+// Merge two configs, with the overrides being applied on top of the base config. Non-repeated
+// fields should be overwritten, and repeated fields should be appended.
+pub fn merge_configs(mut base: GuestConfig, overrides: GuestConfig) -> GuestConfig {
+    fn append_field<T>(base: Option<Vec<T>>, over: Option<Vec<T>>) -> Option<Vec<T>> {
+        match (base, over) {
+            (Some(mut b), Some(o)) => {
+                b.extend(o);
+                Some(b)
+            }
+            (Some(b), None) => Some(b),
+            (None, Some(o)) => Some(o),
+            (None, None) => None,
+        }
+    }
+    fn override_field<T>(base: Option<T>, over: Option<T>) -> Option<T> {
+        over.or(base)
+    }
+
+    // Apply fun to each listed field of base and override and assign the result to base's field
+    // of the same name.
+    macro_rules! merge_fields {
+        ($fun:expr, $f:ident, $($fs:ident),+) => {
+            merge_fields!($fun, $f);
+            merge_fields!($fun, $($fs),+ )
+        };
+        ($fun:expr, $field:ident) => {
+            base.$field = $fun(base.$field, overrides.$field)
+        };
+    }
+    macro_rules! append_fields { ($($fs:ident),+) => { merge_fields!(append_field, $($fs),+) }}
+    macro_rules! override_fields { ($($fs:ident),+) => { merge_fields!(override_field, $($fs),+) }}
+
+    override_fields!(
+        kernel_type,
+        kernel,
+        ramdisk,
+        dtb_overlay,
+        cmdline,
+        cpus,
+        guest_memory,
+        wayland_device,
+        magma_device,
+        default_net,
+        virtio_balloon,
+        virtio_console,
+        virtio_gpu,
+        virtio_rng,
+        virtio_vsock,
+        virtio_sound,
+        virtio_sound_input,
+        virtio_mem,
+        virtio_mem_block_size,
+        virtio_mem_region_size,
+        virtio_mem_region_alignment
+    );
+    append_fields!(cmdline_add, block_devices, net_devices, vsock_listeners);
+
+    base
 }
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fidl::endpoints::Proxy, std::path::PathBuf, tempfile::tempdir};
+    use {super::*, std::path::PathBuf, tempfile::tempdir};
 
     // Empty strings are an error.
     #[fuchsia::test]
@@ -216,7 +267,7 @@ mod tests {
     #[fuchsia::test]
     async fn parse_block_spec_error() {
         let invalid = "meow";
-        assert!(parse_block_spec("filesystem.img,ro,{invalid}").is_err());
+        assert!(parse_block_spec(&format!("filesystem.img,ro,{invalid}")).is_err());
     }
 
     // Read contents of file attached to blockspec to string.
@@ -322,14 +373,52 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn merge_simple_configs() {
+    async fn merge_simple_configs() -> Result<(), Error> {
         // Merge two configs without repeated fields.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
+        let tmpdir = tempdir().unwrap();
+        let kernel = "kernel.img";
+        file::open_in_namespace(
+            tmpdir.path().join(kernel).to_str().unwrap(),
+            OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
+        )?;
+
+        let cfgbase = GuestConfig {
+            kernel_type: Some(KernelType::Zircon),
+            cmdline: Some("root=/dev/vda rw systemd.log_target=kmsg".to_string()),
+            default_net: Some(false),
+            guest_memory: Some(4294967296),
+            ..GuestConfig::EMPTY
+        };
+        let cfgoverride = GuestConfig {
+            default_net: Some(true),
+            guest_memory: Some(65536),
+            kernel: Some(open_as_client_end::<fio::FileMarker>(
+                tmpdir.path().join(kernel).to_str().unwrap(),
+            )?),
+            ..GuestConfig::EMPTY
+        };
+
+        let cfgmerge = merge_configs(cfgbase, cfgoverride);
+
+        assert_eq!(cfgmerge.kernel_type, Some(KernelType::Zircon));
+        assert!(cfgmerge.kernel.is_some());
+        assert_eq!(&cfgmerge.cmdline.unwrap(), "root=/dev/vda rw systemd.log_target=kmsg");
+        assert_eq!(cfgmerge.default_net, Some(true));
+        assert_eq!(cfgmerge.guest_memory, Some(65536));
+
+        Ok(())
     }
 
     #[fuchsia::test]
     async fn merge_configs_with_arrays() {
         // Merge two configs with repeated fields appended.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
+        let mut args1 = Vec::from(["cmdline", "args"].map(String::from));
+        let args2 = Vec::from(["and", "more", "args"].map(String::from));
+        let cfgbase = GuestConfig { cmdline_add: Some(args1.clone()), ..GuestConfig::EMPTY };
+        let cfgoverride = GuestConfig { cmdline_add: Some(args2.clone()), ..GuestConfig::EMPTY };
+
+        let cfgmerge = merge_configs(cfgbase, cfgoverride);
+        args1.extend(args2);
+        assert_eq!(cfgmerge.cmdline_add, Some(args1));
     }
 }

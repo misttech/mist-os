@@ -26,7 +26,6 @@ rustc_binary("guest_manager_bin") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
