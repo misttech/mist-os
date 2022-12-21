@@ -1,0 +1,60 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+
+group("conformance") {
+  testonly = true
+  deps = [ ":touch-conformance-test" ]
+}
+
+executable("touch-validator-bin") {
+  testonly = true
+  sources = [ "touch-validator.cc" ]
+  output_name = "touch-validator"
+  deps = [
+    "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_hlcpp",
+    "//sdk/fidl/fuchsia.ui.test.context:fuchsia.ui.test.context_hlcpp",
+    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_hlcpp",
+    "//sdk/lib/sys/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
+    "//third_party/googletest:gtest",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+  ]
+}
+
+fuchsia_component("touch-validator") {
+  testonly = true
+  manifest = "meta/touch-validator.cml"
+  deps = [ ":touch-validator-bin" ]
+}
+
+fuchsia_test_component("touch-conformance-test-component") {
+  testonly = true
+  component_name = "touch-conformance-test"
+  manifest = "meta/touch-conformance-test.cml"
+}
+
+fuchsia_test_package("touch-conformance-test") {
+  test_components = [ ":touch-conformance-test-component" ]
+  deps = [
+    ":touch-validator",
+    "//src/ui/testing/context:ui-context-factory-component",
+  ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+    environments = [
+      {
+        dimensions = {
+          # Ensure the device has Vulkan.
+          device_type = "AEMU"
+        }
+      },
+    ]
+  }
+}

@@ -5,13 +5,13 @@
 use {
     anyhow::Error,
     fidl::endpoints::create_proxy,
-    fidl_fuchsia_element::GraphicalPresenterMarker,
     fidl_fuchsia_logger::LogSinkMarker,
     fidl_fuchsia_scheduler::ProfileProviderMarker,
     fidl_fuchsia_sysmem::AllocatorMarker,
     fidl_fuchsia_tracing_provider::RegistryMarker,
     fidl_fuchsia_ui_composition::FlatlandMarker,
     fidl_fuchsia_ui_display_singleton::InfoMarker,
+    fidl_fuchsia_ui_input3::KeyboardMarker,
     fidl_fuchsia_ui_test_conformance as ui_conformance,
     fidl_fuchsia_ui_test_context as ui_test_context, fidl_fuchsia_ui_test_input as ui_input,
     fidl_fuchsia_ui_test_scene as test_scene,
@@ -22,14 +22,15 @@ use {
     futures::{StreamExt, TryStreamExt},
 };
 
+// TODO(fxbug.dev/117852): Use subpackages here.
 const TEST_UI_STACK: &str = "ui";
 const TEST_UI_STACK_URL: &str = "#meta/test-ui-stack.cm";
 const PUPPET_UNDER_TEST_FACTORY: &str = "puppet-under-test-factory";
-const PUPPET_UNDER_TEST_FACTORY_URL: &str = "#meta/puppet-under-test-factory.cm";
-const PUPPET_UNDER_TEST_FACTORY_SERVICE: &str = "puppet-under-test-factory";
+const PUPPET_UNDER_TEST_FACTORY_URL: &str = "#meta/ui-puppet.cm";
+const PUPPET_UNDER_TEST_FACTORY_SERVICE: &str = "puppet-under-test-factory-service";
 const AUXILIARY_PUPPET_FACTORY: &str = "auxiliary-puppet-factory";
-const AUXILIARY_PUPPET_FACTORY_URL: &str = "#meta/auxiliary-puppet-factory.cm";
-const AUXILIARY_PUPPET_FACTORY_SERVICE: &str = "auxiliary-puppet-factory";
+const AUXILIARY_PUPPET_FACTORY_URL: &str = "#meta/ui-puppet.cm";
+const AUXILIARY_PUPPET_FACTORY_SERVICE: &str = "auxiliary-puppet-factory-service";
 
 #[fuchsia::main(logging_tags = ["ui_launcher"])]
 async fn main() -> Result<(), Error> {
@@ -114,7 +115,11 @@ async fn run_context_server(
                     .send(&mut root_view_token_pair.view_creation_token)
                     .expect("failed to respond to `GetRootViewToken`");
             }
-            ui_test_context::ContextRequest::ConnectToPuppetUnderTest { payload, .. } => {
+            ui_test_context::ContextRequest::ConnectToPuppetUnderTest {
+                payload,
+                responder,
+                ..
+            } => {
                 assert!(!connected_to_puppet_under_test);
                 connected_to_puppet_under_test = true;
                 let (puppet_factory_proxy, puppet_factory_server) =
@@ -131,8 +136,13 @@ async fn run_context_server(
                     .create(payload)
                     .await
                     .expect("failed to create puppet-under-test instance");
+                responder.send().expect("failed to respond to ConnectToPuppetUnderTest request");
             }
-            ui_test_context::ContextRequest::ConnectToAuxiliaryPuppet { payload, .. } => {
+            ui_test_context::ContextRequest::ConnectToAuxiliaryPuppet {
+                payload,
+                responder,
+                ..
+            } => {
                 let (puppet_factory_proxy, puppet_factory_server) =
                     create_proxy::<ui_conformance::PuppetFactoryMarker>()
                         .expect("failed to open puppet factory channel");
@@ -147,6 +157,7 @@ async fn run_context_server(
                     .create(payload)
                     .await
                     .expect("failed to create auxilliary puppet instance");
+                responder.send().expect("failed to respond to ConnectToAuxiliaryPuppet request");
             }
             ui_test_context::ContextRequest::ConnectToFlatland { server_end, .. } => {
                 puppet_realm
@@ -219,6 +230,7 @@ async fn assemble_puppet_realm() -> RealmInstance {
         .add_route(
             Route::new()
                 .capability(Capability::protocol::<FlatlandMarker>())
+                .capability(Capability::protocol::<KeyboardMarker>())
                 .from(Ref::child(TEST_UI_STACK))
                 .to(Ref::child(PUPPET_UNDER_TEST_FACTORY))
                 .to(Ref::child(AUXILIARY_PUPPET_FACTORY)),
@@ -258,7 +270,7 @@ async fn assemble_puppet_realm() -> RealmInstance {
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol::<GraphicalPresenterMarker>())
+                .capability(Capability::protocol::<test_scene::ControllerMarker>())
                 .capability(Capability::protocol::<FlatlandMarker>())
                 .capability(Capability::protocol::<InfoMarker>())
                 .capability(Capability::protocol::<ui_input::RegistryMarker>())

@@ -4,6 +4,7 @@
 
 use {
     crate::presentation_loop,
+    async_utils::hanging_get::client::HangingGetStream,
     euclid::{Point2D, Transform2D},
     fidl::endpoints::{create_proxy, create_request_stream},
     fidl_fuchsia_math as fmath, fidl_fuchsia_ui_composition as ui_comp,
@@ -160,31 +161,14 @@ impl View {
             .expect("failed to set root transform");
         request_present(&presentation_sender).await;
 
-        let (logical_size, device_pixel_ratio) = match parent_viewport_watcher.get_layout().await {
-            Err(_) => {
-                panic!("error from parent viewport watcher on get_layout");
-            }
-            Ok(ui_comp::LayoutInfo { logical_size, device_pixel_ratio, .. }) => {
-                let logical_size = match logical_size {
-                    Some(logical_size) => logical_size,
-                    None => panic!("no logical_size in LayoutInfo"),
-                };
-                let device_pixel_ratio = match device_pixel_ratio {
-                    Some(device_pixel_ratio) => device_pixel_ratio.x,
-                    None => panic!("no device_pixel_ratio in LayoutInfo"),
-                };
-                (logical_size, device_pixel_ratio)
-            }
-        };
-
         let this = Rc::new(RefCell::new(Self {
             flatland,
             view_event_listener: OnceCell::new(),
             presentation_sender,
             id_generator,
             root_transform_id,
-            logical_size,
-            device_pixel_ratio,
+            logical_size: fmath::SizeU { width: 0, height: 0 },
+            device_pixel_ratio: 1.0,
             connected_to_display: false,
             touch_watcher_task: OnceCell::new(),
             view_parameters: None,
@@ -196,9 +180,11 @@ impl View {
             keyboard_input_listener,
         }));
 
+        let (view_initialized_sender, view_initialized_receiver) = oneshot::channel::<()>();
         let view_events_task = fasync::Task::local(Self::listen_for_view_events(
             this.clone(),
             parent_viewport_watcher,
+            view_initialized_sender,
         ));
         this.borrow_mut()
             .view_event_listener
@@ -227,7 +213,16 @@ impl View {
             .set(keyboard_task)
             .expect("set keyboard watcher task more than once");
 
+        // Wait for view to be initialized.
+        _ = view_initialized_receiver.await.expect("failed to receive 'view initialized' signal");
+
         this
+    }
+
+    /// Returns true if the parent viewport is connected to the display AND we've received non-zero
+    /// layout info.
+    fn is_initialized(&self) -> bool {
+        self.connected_to_display && self.logical_size.width > 0 && self.logical_size.height > 0
     }
 
     /// Polls continuously for events reported to the view (parent viewport updates,
@@ -235,30 +230,38 @@ impl View {
     async fn listen_for_view_events(
         this: Rc<RefCell<Self>>,
         parent_viewport_watcher: ui_comp::ParentViewportWatcherProxy,
+        view_initialized_sender: oneshot::Sender<()>,
     ) {
+        let mut view_initialized_sender = Some(view_initialized_sender);
+
+        let mut layout_info_stream = HangingGetStream::new(
+            parent_viewport_watcher.clone(),
+            ui_comp::ParentViewportWatcherProxy::get_layout,
+        );
+        let mut status_stream = HangingGetStream::new(
+            parent_viewport_watcher,
+            ui_comp::ParentViewportWatcherProxy::get_status,
+        );
+
         loop {
             futures::select! {
-                maybe_parent_status = parent_viewport_watcher.get_status() => {
-                    match maybe_parent_status {
-                        Err(_) => {
-                            panic!("error from parent viewport watcher on get_status");
-                        }
-                        Ok(parent_status) => {
-                            info!("received parent status update");
-                            this.borrow_mut().update_parent_status(parent_status);
-                        }
-                    }
+                parent_status = status_stream.select_next_some() => {
+                    info!("received parent status update");
+                    this.borrow_mut().update_parent_status(parent_status.expect("missing parent status"));
                 }
-                maybe_layout_info = parent_viewport_watcher.get_layout() => {
-                    match maybe_layout_info {
-                        Err(_) => {
-                            panic!("error from parent viewport watcher on get_layout");
-                        }
-                        Ok(ui_comp::LayoutInfo { logical_size, device_pixel_ratio, .. }) => {
-                            this.borrow_mut().update_view_parameters(logical_size, device_pixel_ratio);
-                        }
-                    }
+                layout_info = layout_info_stream.select_next_some() => {
+                    let layout_info = layout_info.expect("missing layout info");
+                    this.borrow_mut().update_view_parameters(layout_info.logical_size, layout_info.device_pixel_ratio);
                 }
+            }
+
+            // If the view has become initialized, ping the `view_is_initialized` channel.
+            if view_initialized_sender.is_some() && this.borrow().is_initialized() {
+                view_initialized_sender
+                    .take()
+                    .expect("failed to take view initialized sender")
+                    .send(())
+                    .expect("failed to declare view initialized");
             }
         }
     }

@@ -48,7 +48,9 @@ protocol Context {
     /// Each test must have exactly one such instance, so calling
     /// `ConnectToPuppetUnderTest` more than once will cause the server
     /// to crash.
-    ConnectToPuppetUnderTest(fuchsia.ui.test.conformance.PuppetCreationArgs);
+    ///
+    /// Returns when the puppet under test is fully initialized.
+    ConnectToPuppetUnderTest(fuchsia.ui.test.conformance.PuppetCreationArgs) -> ();
 
     /// Connects to an instance of a generic puppet implementation, which
     /// NOT considered to be "under test".
@@ -66,7 +68,9 @@ protocol Context {
     /// implements the entire puppet API; in other words, it will never
     /// return fuchsia.ui.test.conformance.Result:UNSUPPORTED from any
     /// method.
-    ConnectToAuxiliaryPuppet(fuchsia.ui.test.conformance.PuppetCreationArgs);
+    ///
+    /// Returns when the auxiliary puppet instance is fully initialized.
+    ConnectToAuxiliaryPuppet(fuchsia.ui.test.conformance.PuppetCreationArgs) -> ();
 
     /// Enables tests to interact with the graphics compositor.
     ConnectToFlatland(resource struct {

@@ -1,0 +1,50 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "sys/testing/system-test.shard.cml" ],
+    children: [
+        {
+            name: "context-factory",
+            url: "#meta/ui-context-factory.cm",
+        },
+    ],
+    capabilities: [
+        {
+            protocol: [ "fuchsia.test.Suite" ],
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.logger.LogSink",
+                "fuchsia.tracing.provider.Registry",
+            ],
+            from: "parent",
+            to: [
+                "#context-factory",
+                "#validator",
+            ],
+        },
+        {
+            protocol: [
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.vulkan.loader.Loader",
+            ],
+            from: "parent",
+            to: "#context-factory",
+        },
+        {
+            protocol: [ "fuchsia.ui.test.context.Factory" ],
+            from: "#context-factory",
+            to: "#validator",
+        },
+    ],
+    expose: [
+        {
+            protocol: [ "fuchsia.test.Suite" ],
+            from: "#validator",
+        },
+    ],
+}
