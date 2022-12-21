@@ -23,7 +23,7 @@ rustc_binary("bin") {
     "//third_party/rust_crates:getopts",
     "//third_party/rust_crates:num",
     "//third_party/rust_crates:parking_lot",
-    "//third_party/rust_crates/compat/rustyline",
+    "//third_party/rust_crates:rustyline",
   ]
 
   test_deps = [

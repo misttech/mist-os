@@ -1,0 +1,24 @@
+* What is this crate used for?
+Various 'readline' use cases throughout Fuchsia.
+
+* Are there any use restrictions? i.e. only for development hosts
+No
+
+* What differs from upstream? Include a changelog if feasible.
+
+This previously existed under //third_party/rust_crates/mirrors/rustyline,
+a [separate fuchsia repository](https://fuchsia.googlesource.com/third_party/rust-mirrors/rustyline/).
+
+Note: The old repo no longer be used, but must continue to exist (in read-only form) or else
+we will break the ability to sync back to previous Fuchsia builds.
+
+* Are there any restrictions to how it should be rolled?
+No.
+
+* Is there anything else which makes this dependency "special"?
+The dependency itself is not special, but the rationale for it being here may be worthwhile mentioning.
+
+This was moved from a separate repo to an in-tree "forks/" so that build dependencies could be updated along
+with required code changes. Previously BUILD.gn was stored in-tree (//third_party/rust_crates/compat/rustyline/BUILD.gn)
+which made it non-trivial to update both atomically.
+
