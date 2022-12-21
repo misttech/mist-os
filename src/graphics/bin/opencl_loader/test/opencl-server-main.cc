@@ -17,10 +17,8 @@
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/remote_dir.h"
 #include "src/lib/storage/vfs/cpp/service.h"
 #include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
-#include "src/lib/storage/vfs/cpp/vfs.h"
 #include "src/lib/storage/vfs/cpp/vfs_types.h"
 
 class FakeMagmaDevice : public fuchsia::gpu::magma::testing::CombinedDevice_TestBase {
@@ -73,21 +71,10 @@ class LifecycleHandler : public fuchsia::process::lifecycle::Lifecycle {
   fidl::BindingSet<fuchsia::process::lifecycle::Lifecycle> bindings_;
 };
 
-// Serve /pkg as the outgoing directory.
 int main(int argc, const char* const* argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   LifecycleHandler handler(&loop);
   fxl::SetLogSettingsFromCommandLine(fxl::CommandLineFromArgcArgv(argc, argv));
-  fidl::InterfaceHandle<fuchsia::io::Directory> pkg_dir;
-  zx_status_t status;
-  status = fdio_open("/pkg",
-                     static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE |
-                                           fuchsia::io::OpenFlags::RIGHT_EXECUTABLE),
-                     pkg_dir.NewRequest().TakeChannel().release());
-  if (status != ZX_OK) {
-    FX_PLOGST(FATAL, nullptr, status) << "Failed to open package";
-    return -1;
-  }
 
   // Use fs:: instead of vfs:: because vfs doesn't support executable directories.
   fs::SynchronousVfs vfs(loop.dispatcher());
@@ -107,12 +94,11 @@ int main(int argc, const char* const* argv) {
   auto dev_dir = fbl::MakeRefCounted<fs::PseudoDir>();
   root->AddEntry("dev", dev_gpu_dir);
 
-  zx::channel dir_request = zx::channel(zx_take_startup_handle(PA_DIRECTORY_REQUEST));
-  auto options = fs::VnodeConnectionOptions::ReadExec();
-  options.rights.write = 1;
-  status = vfs.Serve(root, std::move(dir_request), options);
-
-  if (status != ZX_OK) {
+  fidl::ServerEnd<fuchsia_io::Directory> dir_request{
+      zx::channel(zx_take_startup_handle(PA_DIRECTORY_REQUEST))};
+  if (zx_status_t status =
+          vfs.ServeDirectory(root, std::move(dir_request), fs::Rights::ReadWrite());
+      status != ZX_OK) {
     FX_PLOGST(FATAL, nullptr, status) << "Failed to serve outgoing.";
     return -1;
   }

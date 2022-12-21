@@ -4,9 +4,8 @@
 
 #include "src/graphics/bin/opencl_loader/magma_device.h"
 
+#include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
-#include <lib/fdio/io.h>
-#include <lib/fdio/unsafe.h>
 #include <lib/fit/thread_checker.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -26,27 +25,14 @@ bool MagmaDevice::Initialize(int dir_fd, const std::string& name, inspect::Node*
   node() = parent->CreateChild("magma-" + name);
   icd_list_.Initialize(&node());
   auto pending_action_token = app()->GetPendingActionToken();
-  fdio_t* dir_fdio = fdio_unsafe_fd_to_io(dir_fd);
-  if (!dir_fdio) {
-    FX_LOGS(ERROR) << "Failed to get fdio_t";
-    return false;
-  }
-  zx_handle_t dir_handle;
-  dir_handle = fdio_unsafe_borrow_channel(dir_fdio);
-  if (!dir_handle) {
-    FX_LOGS(ERROR) << "Failed to borrow channel";
-    return false;
-  }
 
-  zx_status_t status;
-  status = fdio_open_at(dir_handle, name.c_str(),
-                        static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE),
-                        device_.NewRequest().TakeChannel().release());
+  fdio_cpp::UnownedFdioCaller caller(dir_fd);
+  zx_status_t status = fdio_service_connect_at(caller.directory().channel()->get(), name.c_str(),
+                                               device_.NewRequest().TakeChannel().release());
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to connect to service";
     return false;
   }
-  fdio_unsafe_release(dir_fdio);
   device_.set_error_handler([this](zx_status_t status) {
     // Deletes |this|.
     app()->RemoveDevice(this);

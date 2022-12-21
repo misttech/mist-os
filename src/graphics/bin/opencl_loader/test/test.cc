@@ -8,16 +8,16 @@
 #include <fuchsia/opencl/loader/cpp/fidl.h>
 #include <fuchsia/sys2/cpp/fidl.h>
 #include <lib/fdio/directory.h>
+#include <lib/fdio/namespace.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/zx/vmo.h>
+#include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <filesystem>
 
 #include <gtest/gtest.h>
-
-#include "lib/fdio/namespace.h"
 
 // This is the first and only ICD loaded, so it should have a "0-" prepended.
 const char* kIcdFilename = "0-libopencl_fake.so";
@@ -103,8 +103,8 @@ TEST(OpenclLoader, DeviceFs) {
   EXPECT_EQ(ZX_OK, fdio_service_connect_at(dir.channel().get(), "class/gpu/000",
                                            device_ptr.NewRequest().TakeChannel().release()));
   fuchsia::gpu::magma::Device_Query_Result query_result;
-  EXPECT_EQ(ZX_OK, device_ptr->Query(fuchsia::gpu::magma::QueryId(0), &query_result));
-  ASSERT_TRUE(query_result.is_response());
+  ASSERT_EQ(ZX_OK, device_ptr->Query(fuchsia::gpu::magma::QueryId(0), &query_result));
+  ASSERT_TRUE(query_result.is_response()) << zx_status_get_string(query_result.err());
   ASSERT_TRUE(query_result.response().is_simple_result());
   EXPECT_EQ(5u, query_result.response().simple_result());
 }
@@ -150,16 +150,17 @@ TEST(OpenclLoader, ManifestFs) {
 
 TEST(OpenclLoader, DebugFilesystems) {
   fuchsia::opencl::loader::LoaderSyncPtr loader;
-  EXPECT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.opencl.loader.Loader",
+  ASSERT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.opencl.loader.Loader",
                                         loader.NewRequest().TakeChannel().release()));
   ForceWaitForIdle(loader);
 
   fuchsia::sys2::RealmQuerySyncPtr query;
-  EXPECT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.sys2.RealmQuery",
+  ASSERT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.sys2.RealmQuery",
                                         query.NewRequest().TakeChannel().release()));
 
   fuchsia::sys2::RealmQuery_GetInstanceDirectories_Result result;
-  EXPECT_EQ(ZX_OK, query->GetInstanceDirectories("./opencl_loader", &result));
+  ASSERT_EQ(ZX_OK, query->GetInstanceDirectories("./opencl_loader", &result));
+  ASSERT_TRUE(result.is_response()) << result.err();
 
   fdio_ns_t* ns;
   fdio_ns_get_installed(&ns);

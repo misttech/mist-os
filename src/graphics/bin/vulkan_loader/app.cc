@@ -14,7 +14,6 @@
 #include "src/graphics/bin/vulkan_loader/icd_component.h"
 #include "src/graphics/bin/vulkan_loader/magma_device.h"
 #include "src/lib/storage/vfs/cpp/remote_dir.h"
-#include "src/lib/storage/vfs/cpp/service.h"
 
 LoaderApp::LoaderApp(sys::ComponentContext* context, async_dispatcher_t* dispatcher)
     : context_(context),
@@ -29,7 +28,7 @@ LoaderApp::LoaderApp(sys::ComponentContext* context, async_dispatcher_t* dispatc
   icds_node_ = inspector_.root().CreateChild("icds");
   manifest_fs_root_node_ = fbl::MakeRefCounted<fs::PseudoDir>();
 }
-LoaderApp::~LoaderApp() {}
+LoaderApp::~LoaderApp() = default;
 
 zx_status_t LoaderApp::InitDeviceFs() {
   device_root_node_ = fbl::MakeRefCounted<fs::PseudoDir>();
@@ -58,12 +57,11 @@ zx_status_t LoaderApp::InitDeviceFs() {
   }
 
   zx::channel client, server;
-  zx_status_t status = zx::channel::create(0, &client, &server);
-  if (status != ZX_OK) {
+  if (zx_status_t status = zx::channel::create(0, &client, &server); status != ZX_OK) {
     return status;
   }
   auto devfs_out = std::make_unique<vfs::RemoteDir>(std::move(client));
-  if ((status = ServeDeviceFs(std::move(server))) != ZX_OK) {
+  if (zx_status_t status = ServeDeviceFs(std::move(server)); status != ZX_OK) {
     return status;
   }
   context_->outgoing()->debug_dir()->AddEntry("device-fs", std::move(devfs_out));
@@ -71,23 +69,24 @@ zx_status_t LoaderApp::InitDeviceFs() {
 }
 
 zx_status_t LoaderApp::ServeDeviceFs(zx::channel dir_request) {
-  auto options = fs::VnodeConnectionOptions::ReadWrite();
-  return device_fs_.Serve(device_root_node_, std::move(dir_request), options);
+  return device_fs_.ServeDirectory(device_root_node_,
+                                   fidl::ServerEnd<fuchsia_io::Directory>{std::move(dir_request)},
+                                   fs::Rights::ReadWrite());
 }
 
 zx_status_t LoaderApp::ServeManifestFs(zx::channel dir_request) {
-  auto options = fs::VnodeConnectionOptions::ReadWrite();
-  return manifest_fs_.Serve(manifest_fs_root_node_, std::move(dir_request), options);
+  return manifest_fs_.ServeDirectory(manifest_fs_root_node_,
+                                     fidl::ServerEnd<fuchsia_io::Directory>{std::move(dir_request)},
+                                     fs::Rights::ReadWrite());
 }
 
 zx_status_t LoaderApp::InitManifestFs() {
   zx::channel client, server;
-  zx_status_t status = zx::channel::create(0, &client, &server);
-  if (status != ZX_OK) {
+  if (zx_status_t status = zx::channel::create(0, &client, &server); status != ZX_OK) {
     return status;
   }
   auto devfs_out = std::make_unique<vfs::RemoteDir>(std::move(client));
-  if ((status = ServeManifestFs(std::move(server))) != ZX_OK) {
+  if (zx_status_t status = ServeManifestFs(std::move(server)); status != ZX_OK) {
     return status;
   }
   context_->outgoing()->debug_dir()->AddEntry("manifest-fs", std::move(devfs_out));
@@ -99,7 +98,7 @@ zx_status_t LoaderApp::InitDeviceWatcher() {
   auto gpu_watcher_token = GetPendingActionToken();
   gpu_watcher_ = fsl::DeviceWatcher::CreateWithIdleCallback(
       "/dev/class/gpu",
-      [this](int dir_fd, const std::string filename) {
+      [this](int dir_fd, const std::string& filename) {
         if (filename == ".") {
           return;
         }
@@ -116,7 +115,7 @@ zx_status_t LoaderApp::InitDeviceWatcher() {
   auto goldfish_watcher_token = GetPendingActionToken();
   goldfish_watcher_ = fsl::DeviceWatcher::CreateWithIdleCallback(
       "/dev/class/goldfish-pipe",
-      [this](int dir_fd, const std::string filename) {
+      [this](int dir_fd, const std::string& filename) {
         if (filename == ".") {
           return;
         }
@@ -142,12 +141,13 @@ void LoaderApp::RemoveDevice(GpuDevice* device) {
   devices_.erase(it, devices_.end());
 }
 
-std::shared_ptr<IcdComponent> LoaderApp::CreateIcdComponent(std::string component_url) {
+std::shared_ptr<IcdComponent> LoaderApp::CreateIcdComponent(const std::string& component_url) {
   FIT_DCHECK_IS_THREAD_VALID(main_thread_);
   if (icd_components_.find(component_url) != icd_components_.end())
     return icd_components_[component_url];
-  icd_components_[component_url] = IcdComponent::Create(context_, this, &icds_node_, component_url);
-  return icd_components_[component_url];
+  auto [it, inserted] = icd_components_.emplace(
+      component_url, IcdComponent::Create(context_, this, &icds_node_, component_url));
+  return it->second;
 }
 
 void LoaderApp::NotifyIcdsChanged() {

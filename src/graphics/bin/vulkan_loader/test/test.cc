@@ -8,6 +8,7 @@
 #include <fuchsia/sys2/cpp/fidl.h>
 #include <fuchsia/vulkan/loader/cpp/fidl.h>
 #include <lib/fdio/directory.h>
+#include <lib/fdio/namespace.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/zx/vmo.h>
@@ -17,8 +18,6 @@
 #include <filesystem>
 
 #include <gtest/gtest.h>
-
-#include "lib/fdio/namespace.h"
 
 // This is the first and only ICD loaded, so it should have a "0-" prepended.
 const char* kIcdFilename = "0-libvulkan_fake.so";
@@ -92,20 +91,20 @@ TEST(VulkanLoader, VmosIndependent) {
 
 TEST(VulkanLoader, DeviceFs) {
   fuchsia::vulkan::loader::LoaderSyncPtr loader;
-  EXPECT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.vulkan.loader.Loader",
+  ASSERT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.vulkan.loader.Loader",
                                         loader.NewRequest().TakeChannel().release()));
 
   fidl::InterfaceHandle<fuchsia::io::Directory> dir;
-  EXPECT_EQ(ZX_OK, loader->ConnectToDeviceFs(dir.NewRequest().TakeChannel()));
+  ASSERT_EQ(ZX_OK, loader->ConnectToDeviceFs(dir.NewRequest().TakeChannel()));
 
   ForceWaitForIdle(loader);
 
   fuchsia::gpu::magma::DeviceSyncPtr device_ptr;
-  EXPECT_EQ(ZX_OK, fdio_service_connect_at(dir.channel().get(), "class/gpu/000",
+  ASSERT_EQ(ZX_OK, fdio_service_connect_at(dir.channel().get(), "class/gpu/000",
                                            device_ptr.NewRequest().TakeChannel().release()));
   fuchsia::gpu::magma::Device_Query_Result query_result;
-  EXPECT_EQ(ZX_OK, device_ptr->Query(fuchsia::gpu::magma::QueryId(0), &query_result));
-  ASSERT_TRUE(query_result.is_response());
+  ASSERT_EQ(ZX_OK, device_ptr->Query(fuchsia::gpu::magma::QueryId(0), &query_result));
+  ASSERT_TRUE(query_result.is_response()) << zx_status_get_string(query_result.err());
   ASSERT_TRUE(query_result.response().is_simple_result());
   EXPECT_EQ(5u, query_result.response().simple_result());
 }

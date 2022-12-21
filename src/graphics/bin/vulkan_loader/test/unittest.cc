@@ -13,13 +13,13 @@
 #include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
 #include <lib/fidl/cpp/binding_set.h>
+#include <lib/fidl/cpp/interface_handle.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/zx/vmo.h>
 
 #include <gtest/gtest.h>
 
-#include "lib/fidl/cpp/interface_handle.h"
 #include "src/graphics/bin/vulkan_loader/app.h"
 #include "src/graphics/bin/vulkan_loader/goldfish_device.h"
 #include "src/graphics/bin/vulkan_loader/icd_component.h"
@@ -74,13 +74,12 @@ TEST_F(LoaderUnittest, MagmaDevice) {
   fidl::InterfaceHandle<fuchsia::io::Directory> pkg_dir;
   async::Loop vfs_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   vfs_loop.StartThread("vfs-loop");
-  root.Serve(fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE,
-             pkg_dir.NewRequest().TakeChannel(), vfs_loop.dispatcher());
+  root.Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, pkg_dir.NewRequest().TakeChannel(),
+             vfs_loop.dispatcher());
 
-  fdio_t* dir_fdio;
-  EXPECT_EQ(ZX_OK, fdio_create(pkg_dir.TakeChannel().release(), &dir_fdio));
-  int dir_fd = fdio_bind_to_fd(dir_fdio, -1, 0);
-  auto device = MagmaDevice::Create(&app, dir_fd, kDeviceNodeName, &inspector.GetRoot());
+  fbl::unique_fd dir_fd;
+  EXPECT_EQ(ZX_OK, fdio_fd_create(pkg_dir.TakeChannel().release(), dir_fd.reset_and_get_address()));
+  auto device = MagmaDevice::Create(&app, dir_fd.get(), kDeviceNodeName, &inspector.GetRoot());
   EXPECT_TRUE(device);
   auto device_ptr = device.get();
 
@@ -94,8 +93,6 @@ TEST_F(LoaderUnittest, MagmaDevice) {
   async::PostTask(vfs_loop.dispatcher(), [&magma_device]() { magma_device.CloseAll(); });
   RunLoopUntil([&app]() { return app.device_count() == 0; });
   EXPECT_EQ(0u, app.device_count());
-
-  close(dir_fd);
 }
 
 class FakeGoldfishDevice : public fuchsia::hardware::goldfish::testing::PipeDevice_TestBase {
@@ -141,8 +138,8 @@ TEST_F(LoaderUnittest, GoldfishDevice) {
   fidl::InterfaceHandle<fuchsia::io::Directory> pkg_dir;
   async::Loop vfs_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   vfs_loop.StartThread("vfs-loop");
-  root.Serve(fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE,
-             pkg_dir.NewRequest().TakeChannel(), vfs_loop.dispatcher());
+  root.Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, pkg_dir.NewRequest().TakeChannel(),
+             vfs_loop.dispatcher());
 
   fbl::unique_fd dir_fd;
   ASSERT_EQ(ZX_OK, fdio_fd_create(pkg_dir.TakeChannel().release(), dir_fd.reset_and_get_address()));
@@ -303,8 +300,10 @@ TEST_F(LoaderUnittest, MagmaDependencyInjection) {
         return ZX_OK;
       }));
   fidl::InterfaceHandle<fuchsia::io::Directory> gpu_dir;
-  auto options = fs::VnodeConnectionOptions::ReadWrite();
-  EXPECT_EQ(ZX_OK, vfs.Serve(root, gpu_dir.NewRequest().TakeChannel(), options));
+  EXPECT_EQ(ZX_OK,
+            vfs.ServeDirectory(
+                root, fidl::ServerEnd<fuchsia_io::Directory>{gpu_dir.NewRequest().TakeChannel()},
+                fs::Rights::ReadWrite()));
 
   fdio_ns_t* ns;
   EXPECT_EQ(ZX_OK, fdio_ns_get_installed(&ns));

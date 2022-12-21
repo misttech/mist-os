@@ -17,14 +17,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "src/lib/fxl/command_line.h"
-#include "src/lib/fxl/log_settings_command_line.h"
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/pseudo_file.h"
 #include "src/lib/storage/vfs/cpp/remote_dir.h"
-#include "src/lib/storage/vfs/cpp/service.h"
 #include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
-#include "src/lib/storage/vfs/cpp/vfs.h"
 #include "src/lib/storage/vfs/cpp/vfs_types.h"
 
 class ComponentControllerImpl : public fuchsia::component::runner::ComponentController {
@@ -38,10 +33,8 @@ class ComponentControllerImpl : public fuchsia::component::runner::ComponentCont
         fidl::ClientEnd<fuchsia_io::Directory>(pkg_directory.TakeChannel()));
     root->AddEntry("pkg", remote);
 
-    zx::channel dir_request = directory_request.TakeChannel();
-    auto options = fs::VnodeConnectionOptions::ReadExec();
-    options.rights.write = 1;
-    return vfs_.Serve(root, std::move(dir_request), options);
+    fidl::ServerEnd<fuchsia_io::Directory> dir_request{directory_request.TakeChannel()};
+    return vfs_.ServeDirectory(root, std::move(dir_request), fs::Rights::All());
   }
 
   void Add(std::unique_ptr<ComponentControllerImpl> controller,

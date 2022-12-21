@@ -7,9 +7,6 @@
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <lib/component/incoming/cpp/service_client.h>
 #include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/directory.h>
-#include <lib/fdio/io.h>
-#include <lib/fdio/unsafe.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/graphics/bin/vulkan_loader/app.h"

@@ -66,7 +66,7 @@ class LoaderApp {
   zx_status_t ServeDeviceFs(zx::channel dir_request);
   zx_status_t ServeManifestFs(zx::channel dir_request);
 
-  std::shared_ptr<IcdComponent> CreateIcdComponent(std::string component_url);
+  std::shared_ptr<IcdComponent> CreateIcdComponent(const std::string& component_url);
 
   void AddDevice(std::unique_ptr<GpuDevice> device) { devices_.push_back(std::move(device)); }
   void RemoveDevice(GpuDevice* device);
