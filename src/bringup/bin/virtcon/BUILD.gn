@@ -12,7 +12,17 @@ import("//src/bringup/bin/virtcon/virtcon_args.gni")
 group("bootfs") {
   deps = [
     ":bin",
+    ":boot_animation",
+    ":font",
     ":meta",
+  ]
+}
+
+group("extra_fonts") {
+  deps = [
+    ":bold_font",
+    ":bold_italic_font",
+    ":italic_font",
   ]
 }
 
@@ -63,47 +73,27 @@ rustc_library("lib") {
 }
 
 resource("font") {
-  sources = [ virtcon_font_path ]
+  sources = [ "//prebuilt/third_party/fonts/robotomono/RobotoMono-Regular.ttf" ]
   outputs = [ "data/font.ttf" ]
 }
 
-if (virtcon_bold_font_path != "") {
-  resource("bold_font") {
-    sources = [ virtcon_bold_font_path ]
-    outputs = [ "data/bold-font.ttf" ]
-  }
+resource("bold_font") {
+  sources = [ "//prebuilt/third_party/fonts/robotomono/RobotoMono-Bold.ttf" ]
+  outputs = [ "data/bold-font.ttf" ]
 }
 
-if (virtcon_italic_font_path != "") {
-  resource("italic_font") {
-    sources = [ virtcon_italic_font_path ]
-    outputs = [ "data/italic-font.ttf" ]
-  }
+resource("italic_font") {
+  sources = [ "//prebuilt/third_party/fonts/robotomono/RobotoMono-Italic.ttf" ]
+  outputs = [ "data/italic-font.ttf" ]
 }
 
-if (virtcon_bold_italic_font_path != "") {
-  resource("bold_italic_font") {
-    sources = [ virtcon_bold_italic_font_path ]
-    outputs = [ "data/bold-italic-font.ttf" ]
-  }
+resource("bold_italic_font") {
+  sources =
+      [ "//prebuilt/third_party/fonts/robotomono/RobotoMono-BoldItalic.ttf" ]
+  outputs = [ "data/bold-italic-font.ttf" ]
 }
 
-if (virtcon_fallback_font_paths != []) {
-  resource_group("fallback_fonts") {
-    files = []
-    suffix = 1
-    foreach(path, virtcon_fallback_font_paths) {
-      files += [
-        {
-          source = path
-          dest = "data/fallback-font-$suffix.ttf"
-        },
-      ]
-      suffix += 1
-    }
-  }
-}
-
+# NOTE:  The contents of this resource is controlled by product gni files!
 resource("boot_animation") {
   sources = [ virtcon_boot_animation_path ]
   outputs = [ "data/boot-animation.riv" ]
@@ -115,8 +105,6 @@ rustc_binary("bin") {
   source_root = "src/main.rs"
   sources = [ "src/main.rs" ]
   deps = [
-    ":boot_animation",
-    ":font",
     ":lib",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//src/lib/fuchsia-async",
@@ -126,23 +114,6 @@ rustc_binary("bin") {
     "//src/sys/lib/stdout-to-debuglog/rust",
     "//third_party/rust_crates:anyhow",
   ]
-
-  if (virtcon_bold_font_path != "") {
-    deps += [ ":bold_font" ]
-  }
-
-  if (virtcon_italic_font_path != "") {
-    deps += [ ":italic_font" ]
-  }
-
-  if (virtcon_bold_italic_font_path != "") {
-    deps += [ ":bold_italic_font" ]
-  }
-
-  if (virtcon_fallback_font_paths != []) {
-    deps += [ ":fallback_fonts" ]
-  }
-
   configs += [ "//build/config/rust:bootfs" ]
 }
 

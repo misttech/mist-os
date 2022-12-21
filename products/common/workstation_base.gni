@@ -85,12 +85,7 @@ product_bootfs_labels += [
 ]
 
 # Add bold and italic Virtcon fonts.
-virtcon_bold_font_path =
-    "//prebuilt/third_party/fonts/robotomono/RobotoMono-Bold.ttf"
-virtcon_italic_font_path =
-    "//prebuilt/third_party/fonts/robotomono/RobotoMono-Italic.ttf"
-virtcon_bold_italic_font_path =
-    "//prebuilt/third_party/fonts/robotomono/RobotoMono-BoldItalic.ttf"
+product_bootfs_labels += [ "//src/bringup/bin/virtcon:extra_fonts" ]
 
 # Include Fxfs in the build so that it's available for enablement at runtime.
 product_bootfs_labels += [
