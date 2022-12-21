@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![allow(warnings)] // TODO(fxbug.dev/117900)
+
 //! Typesafe wrappers around writing blobs to blobfs.
 
 use {
@@ -285,6 +287,7 @@ impl Drop for BlobCloser {
         if !self.closed {
             // Dropped without waiting on close. We can at least send the close request here, but
             // there could be a race with another attempt to open the blob.
+            // #[allow(clippy::let_underscore_future)] // TODO(fxbug.dev/117900)
             let _ = self.proxy.close();
         }
     }

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![allow(warnings)] // TODO(fxbug.dev/117901)
+
 use {
     crate::fxfs::log_and_map_err::LogThen,
     anyhow::{anyhow, Error},
@@ -199,6 +201,7 @@ impl CryptKeeper {
 impl Drop for CryptKeeper {
     // When CryptKeeper is dropped, attempt to destroy it.
     fn drop(&mut self) {
+        // #[allow(clippy::let_underscore_future)] // TODO(fxbug.dev/117901)
         let _ = self.destroy();
     }
 }

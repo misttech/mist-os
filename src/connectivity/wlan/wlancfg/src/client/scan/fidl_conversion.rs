@@ -1,6 +1,7 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+#![allow(warnings)] // TODO(fxbug.dev/117902)
 
 use {
     crate::client::types,
@@ -509,6 +510,7 @@ mod tests {
         let send_fut = send_scan_results_over_fidl(iter_server, &fidl_scan_results);
         pin_mut!(send_fut);
 
+        // #[allow(clippy::let_underscore_future)] // TODO(fxbug.dev/117902)
         let _ = iter.get_next();
 
         assert_variant!(exec.run_until_stalled(&mut send_fut), Poll::Ready(Err(_)));
