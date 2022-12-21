@@ -15,8 +15,7 @@ namespace nvme {
 // NVM Express Base Specification 2.0, section 5.17, "Identify command"
 class IdentifySubmission : public Submission {
  public:
-  static constexpr uint8_t kOpcode = 0x06;
-  IdentifySubmission() : Submission(kOpcode) {}
+  IdentifySubmission() : Submission(AdminCommandOpcode::kIdentify) {}
   enum IdentifyCns {
     kIdentifyNamespace = 0,
     kIdentifyController = 1,

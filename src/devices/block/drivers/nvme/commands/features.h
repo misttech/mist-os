@@ -49,14 +49,14 @@ enum Feature {
 // |SetFeaturesSubmission| is the base class for all "set feature" submissions.
 class SetFeaturesSubmission : public Submission {
  public:
-  static constexpr uint8_t kOpcode = 0x09;
-
   DEF_SUBBIT(dword10, 31, save);
   DEF_ENUM_SUBFIELD(dword10, Feature, 7, 0, feature_id);
 
   DEF_SUBFIELD(dword14, 6, 0, uuid_index);
 
-  explicit SetFeaturesSubmission(Feature feature) : Submission(kOpcode) { set_feature_id(feature); }
+  explicit SetFeaturesSubmission(Feature feature) : Submission(AdminCommandOpcode::kSetFeatures) {
+    set_feature_id(feature);
+  }
 };
 
 // NVM Express Base Specification 2.0, section 5.27.1.5 "Number of Queues".
@@ -107,6 +107,34 @@ class SetIoQueueCountCompletion : public Completion {
   }
 
   uint32_t num_submission_queues() const { return num_submission_queues_minus_one() + 1; }
+};
+
+// |GetFeaturesSubmission| is the base class for all "get feature" submissions.
+class GetFeaturesSubmission : public Submission {
+ private:
+  DEF_SUBFIELD(dword10, 10, 8, select);
+  DEF_ENUM_SUBFIELD(dword10, Feature, 7, 0, feature_id);
+  DEF_SUBFIELD(dword14, 6, 0, uuid_index);
+
+ public:
+  explicit GetFeaturesSubmission(Feature feature) : Submission(AdminCommandOpcode::kGetFeatures) {
+    set_feature_id(feature);
+  }
+};
+
+// NVM Express Base Specification 2.0, section 5.27.1.4 "Volatile Write Cache".
+class GetVolatileWriteCacheSubmission : public GetFeaturesSubmission {
+ public:
+  GetVolatileWriteCacheSubmission() : GetFeaturesSubmission(Feature::kFeatureVolatileWriteCache) {}
+};
+
+class GetVolatileWriteCacheCompletion : public Completion {
+ private:
+  // If the cache is enabled, 1 is returned. If it is disabled, 0 is returned.
+  DEF_SUBBIT(command[0], 0, volatile_write_cache_enable);
+
+ public:
+  bool get_volatile_write_cache_enabled() const { return volatile_write_cache_enable(); }
 };
 
 }  // namespace nvme

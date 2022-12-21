@@ -9,6 +9,40 @@
 
 namespace nvme {
 
+// NVM Express Base Specification 2.0c, section 5 "Admin Command Set".
+enum AdminCommandOpcode {
+  kDeleteIoSubmissionQueue = 0x00,
+  kCreateIoSubmissionQueue = 0x01,
+  kGetLogPage = 0x02,
+  kDeleteIoCompletionQueue = 0x04,
+  kCreateIoCompletionQueue = 0x05,
+  kIdentify = 0x06,
+  kAbort = 0x08,
+  kSetFeatures = 0x09,
+  kGetFeatures = 0x0A,
+  kAsynchronousEventRequest = 0x0C,
+  kNamespaceManagement = 0x0D,
+  kFirmwareCommit = 0x10,
+  kFirmwareImageDownload = 0x11,
+  kDeviceSelftest = 0x14,
+  kNamespaceAttachment = 0x15,
+  kKeepAlive = 0x18,
+  kDirectiveSend = 0x19,
+  kDirectiveReceive = 0x1A,
+  kVirtualizationManagement = 0x1C,
+  kNVMeMISend = 0x1D,
+  kNVMeMIReceive = 0x1E,
+  kCapacityManagement = 0x20,
+  kLockdown = 0x24,
+  kDoorbellBufferConfig = 0x7C,
+  kFabricsCommands = 0x7F,
+  kFormatNVM = 0x80,
+  kSecuritySend = 0x81,
+  kSecurityReceive = 0x82,
+  kSanitize = 0x84,
+  kGetLBAStatus = 0x86,
+};
+
 // NVM Express base specification 2.0, section 3.3.3.1, "Submission Queue Entry"
 struct Submission {
   template <typename U>
@@ -102,6 +136,13 @@ enum GenericStatus {
 
 // NVM Express base specification 2.0, section 3.3.3.2, "Common Completion Queue Entry"
 struct Completion {
+  template <typename U>
+  constexpr U& GetCompletion() {
+    static_assert(std::is_base_of<Completion, U>::value);
+    static_assert(sizeof(U) == sizeof(Completion));
+    return *reinterpret_cast<U*>(this);
+  }
+
   uint32_t command[2];
   uint32_t dwords[2];
 

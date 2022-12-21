@@ -222,6 +222,7 @@ static void PopulateControllerInspect(const IdentifyController& identify,
                                       uint32_t max_data_transfer_bytes,
                                       uint16_t atomic_write_unit_normal,
                                       uint16_t atomic_write_unit_power_fail,
+                                      bool volatile_write_cache_enabled,
                                       inspect::Inspector* inspect) {
   auto controller = inspect->GetRoot().CreateChild("controller");
   auto model_number = std::string(identify.model_number, sizeof(identify.model_number));
@@ -248,7 +249,8 @@ static void PopulateControllerInspect(const IdentifyController& identify,
   controller.CreateInt("host_buffer_preferred_pages", identify.hmpre, inspect);
   controller.CreateInt("capacity_total", identify.tnvmcap[0], inspect);
   controller.CreateInt("capacity_unalloc", identify.unvmcap[0], inspect);
-  controller.CreateBool("volatile_write_cache", identify.vwc & 1, inspect);
+  controller.CreateBool("volatile_write_cache_present", identify.vwc & 1, inspect);
+  controller.CreateBool("volatile_write_cache_enabled", volatile_write_cache_enabled, inspect);
   controller.CreateInt("atomic_write_unit_normal_blocks", atomic_write_unit_normal, inspect);
   controller.CreateInt("atomic_write_unit_power_fail_blocks", atomic_write_unit_power_fail,
                        inspect);
@@ -407,8 +409,29 @@ zx_status_t Nvme::Init() {
   atomic_write_unit_normal_ = identify->atomic_write_unit_normal + 1;
   atomic_write_unit_power_fail_ = identify->atomic_write_unit_power_fail + 1;
 
+  // Get 'Volatile Write Cache Enable' feature.
+  GetVolatileWriteCacheSubmission get_vwc_enable;
+  status = DoAdminCommandSync(get_vwc_enable);
+  {
+    auto& completion = admin_result_.GetCompletion<GetVolatileWriteCacheCompletion>();
+    if (status != ZX_OK) {
+      if (completion.status_code() != GenericStatus::kInvalidField) {
+        zxlogf(ERROR, "Failed to get 'Volatile Write Cache' feature: %s",
+               zx_status_get_string(status));
+        return status;
+      }
+      zxlogf(DEBUG, "Volatile write cache is not present");
+      volatile_write_cache_enabled_ = false;
+    } else {
+      volatile_write_cache_enabled_ = completion.get_volatile_write_cache_enabled();
+      zxlogf(DEBUG, "Volatile write cache is %s",
+             volatile_write_cache_enabled_ ? "enabled" : "disabled");
+    }
+  }
+
   PopulateControllerInspect(*identify, max_data_transfer_bytes_, atomic_write_unit_normal_,
-                            atomic_write_unit_power_fail_, &inspect_);
+                            atomic_write_unit_power_fail_, volatile_write_cache_enabled_,
+                            &inspect_);
 
   // Set feature (number of queues) to 1 IO submission queue and 1 IO completion queue.
   SetIoQueueCountSubmission set_queue_count;
@@ -418,14 +441,16 @@ zx_status_t Nvme::Init() {
     zxlogf(ERROR, "Failed to set feature (number of queues): %s", zx_status_get_string(status));
     return status;
   }
-  auto result = static_cast<SetIoQueueCountCompletion*>(&admin_result_);
-  if (result->num_submission_queues() < 1) {
-    zxlogf(ERROR, "Unexpected IO submission queue count: %u", result->num_submission_queues());
-    return ZX_ERR_IO;
-  }
-  if (result->num_completion_queues() < 1) {
-    zxlogf(ERROR, "Unexpected IO completion queue count: %u", result->num_completion_queues());
-    return ZX_ERR_IO;
+  {
+    auto& completion = admin_result_.GetCompletion<SetIoQueueCountCompletion>();
+    if (completion.num_submission_queues() < 1) {
+      zxlogf(ERROR, "Unexpected IO submission queue count: %u", completion.num_submission_queues());
+      return ZX_ERR_IO;
+    }
+    if (completion.num_completion_queues() < 1) {
+      zxlogf(ERROR, "Unexpected IO completion queue count: %u", completion.num_completion_queues());
+      return ZX_ERR_IO;
+    }
   }
 
   // Create IO completion queue.

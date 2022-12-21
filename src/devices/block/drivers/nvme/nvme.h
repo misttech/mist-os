@@ -44,6 +44,7 @@ class Nvme : public DeviceType {
 
   QueuePair* io_queue() const { return io_queue_.get(); }
   uint32_t max_data_transfer_bytes() const { return max_data_transfer_bytes_; }
+  bool volatile_write_cache_enabled() const { return volatile_write_cache_enabled_; }
   uint16_t atomic_write_unit_normal() const { return atomic_write_unit_normal_; }
   uint16_t atomic_write_unit_power_fail() const { return atomic_write_unit_power_fail_; }
 
@@ -74,6 +75,10 @@ class Nvme : public DeviceType {
   bool irq_thread_started_ = false;
 
   uint32_t max_data_transfer_bytes_;
+  // This flag indicates whether the volatile write cache of the device is enabled. It can only be
+  // enabled if the volatile write cache is supported.
+  bool volatile_write_cache_enabled_ = false;
+
   uint16_t atomic_write_unit_normal_;
   uint16_t atomic_write_unit_power_fail_;
 

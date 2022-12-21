@@ -13,8 +13,7 @@ namespace nvme {
 
 class CreateIoCompletionQueueSubmission : public Submission {
  public:
-  static constexpr uint8_t kOpcode = 0x05;
-  CreateIoCompletionQueueSubmission() : Submission(kOpcode) {}
+  CreateIoCompletionQueueSubmission() : Submission(AdminCommandOpcode::kCreateIoCompletionQueue) {}
 
   DEF_SUBFIELD(dword10, 31, 16, queue_size);
   DEF_SUBFIELD(dword10, 15, 0, queue_id);
@@ -26,8 +25,7 @@ class CreateIoCompletionQueueSubmission : public Submission {
 
 class CreateIoSubmissionQueueSubmission : public Submission {
  public:
-  static constexpr uint8_t kOpcode = 0x01;
-  CreateIoSubmissionQueueSubmission() : Submission(kOpcode) {}
+  CreateIoSubmissionQueueSubmission() : Submission(AdminCommandOpcode::kCreateIoSubmissionQueue) {}
 
   DEF_SUBFIELD(dword10, 31, 16, queue_size);
   DEF_SUBFIELD(dword10, 15, 0, queue_id);
@@ -38,12 +36,11 @@ class CreateIoSubmissionQueueSubmission : public Submission {
   DEF_SUBBIT(dword11, 0, contiguous);
 };
 
-class DeleteIoQueueSubmission : public Submission {
+class DeleteIoQueue : public Submission {
  public:
-  static constexpr uint8_t kCompletionOpcode = 0x04;
-  static constexpr uint8_t kSubmissionOpcode = 0x00;
-  explicit DeleteIoQueueSubmission(bool is_completion)
-      : Submission(is_completion ? kCompletionOpcode : kSubmissionOpcode) {}
+  explicit DeleteIoQueue(bool is_completion)
+      : Submission(is_completion ? AdminCommandOpcode::kDeleteIoCompletionQueue
+                                 : AdminCommandOpcode::kDeleteIoSubmissionQueue) {}
 
   DEF_SUBFIELD(dword10, 15, 0, queue_id);
 };
