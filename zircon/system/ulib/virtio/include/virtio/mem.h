@@ -29,44 +29,18 @@
 
 __BEGIN_CDECLS
 
-typedef struct virtio_mem_req_plug {
-  uint64_t addr;
-  uint16_t nb_blocks;
-  uint16_t padding[3];
-} __PACKED virtio_mem_req_plug_t;
-
-typedef struct virtio_mem_req_unplug {
-  uint64_t addr;
-  uint16_t nb_blocks;
-  uint16_t padding[3];
-} __PACKED virtio_mem_req_unplug_t;
-
-typedef struct virtio_mem_req_state {
-  uint64_t addr;
-  uint16_t nb_blocks;
-  uint16_t padding[3];
-} __PACKED virtio_mem_req_state_t;
-
 typedef struct virtio_mem_req {
   uint16_t type;
   uint16_t padding[3];
-  union {
-    struct virtio_mem_req_plug plug;
-    struct virtio_mem_req_unplug unplug;
-    struct virtio_mem_req_state state;
-  } u;
+  uint64_t addr;
+  uint16_t nb_blocks;
+  uint16_t padding2[3];
 } __PACKED virtio_mem_req_t;
-
-typedef struct virtio_mem_resp_state {
-  uint16_t type;
-} __PACKED virtio_mem_resp_state_t;
 
 typedef struct virtio_mem_resp {
   uint16_t type;
   uint16_t padding[3];
-  union {
-    struct virtio_mem_resp_state state;
-  } u;
+  uint16_t state_type;
 } __PACKED virtio_mem_resp_t;
 
 typedef struct virtio_mem_config {

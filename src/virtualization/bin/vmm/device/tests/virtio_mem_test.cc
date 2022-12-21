@@ -9,6 +9,8 @@
 #include <lib/zircon-internal/align.h>
 #include <threads.h>
 
+#include <virtio/mem.h>
+
 #include "src/virtualization/bin/vmm/device/tests/test_with_device.h"
 #include "src/virtualization/bin/vmm/device/tests/virtio_queue_fake.h"
 
@@ -57,12 +59,12 @@ class VirtioMemTest : public TestWithDevice {
 
     fuchsia::virtualization::hardware::StartInfo start_info;
     size_t vmo_size = guest_request_queue_.end();
-    uint64_t region_addr = ZX_ALIGN(vmo_size, 128 * 1024 * 1024);
-    vmo_size = region_addr + kRegionSize;
+    region_addr_ = ZX_ALIGN(vmo_size, 128 * 1024 * 1024);
+    vmo_size = region_addr_ + kRegionSize;
     zx_status_t status = MakeStartInfo(vmo_size, &start_info);
     ASSERT_EQ(ZX_OK, status);
 
-    status = mem_->Start(std::move(start_info), region_addr, kPluggedBlockSize, kRegionSize);
+    status = mem_->Start(std::move(start_info), region_addr_, kPluggedBlockSize, kRegionSize);
     ASSERT_EQ(ZX_OK, status);
 
     // Configure device queues.
@@ -79,8 +81,106 @@ class VirtioMemTest : public TestWithDevice {
   T InspectValue(std::string value_name) {
     return GetInspect("realm_builder\\:" + realm_->GetChildName() + "/" + kComponentName + ":root",
                       kComponentName)
-        .GetByPath({"root", kComponentName, std::move(value_name)})
+        .GetByPath({"root", std::move(value_name)})
         .Get<T>();
+  }
+
+  void WaitForPluggedSizeEqual(uint64_t val) {
+    while (val != InspectValue<uint64_t>("plugged_size_bytes")) {
+      zx::nanosleep(zx::deadline_after(zx::msec(100)));
+    }
+  }
+
+  void Plug(uint64_t addr, uint16_t num_blocks,
+            uint16_t expected_response_type = VIRTIO_MEM_RESP_ACK) {
+    uint64_t prev_plugged_size_bytes = InspectValue<uint64_t>("plugged_size_bytes");
+    virtio_mem_req_t req = {.type = VIRTIO_MEM_REQ_PLUG, .addr = addr, .nb_blocks = num_blocks};
+    virtio_mem_resp_t* resp;
+
+    zx_status_t status = DescriptorChainBuilder(guest_request_queue_)
+                             .AppendReadableDescriptor(&req, sizeof(req))
+                             .AppendWritableDescriptor(&resp, sizeof(*resp))
+                             .Build();
+    EXPECT_EQ(ZX_OK, status);
+    status = mem_->NotifyQueue(0);
+    EXPECT_EQ(ZX_OK, status);
+    status = WaitOnInterrupt();
+    EXPECT_EQ(ZX_OK, status);
+    EXPECT_EQ(expected_response_type, resp->type);
+    uint64_t expected_plugged_size;
+    if (expected_response_type == VIRTIO_MEM_RESP_ACK) {
+      expected_plugged_size = prev_plugged_size_bytes + kPluggedBlockSize * num_blocks;
+    } else {
+      expected_plugged_size = prev_plugged_size_bytes;
+    }
+    WaitForPluggedSizeEqual(expected_plugged_size);
+  }
+
+  void Unplug(uint64_t addr, uint16_t num_blocks,
+              uint16_t expected_response_type = VIRTIO_MEM_RESP_ACK) {
+    uint64_t prev_plugged_size_bytes = InspectValue<uint64_t>("plugged_size_bytes");
+    virtio_mem_req_t req = {.type = VIRTIO_MEM_REQ_UNPLUG, .addr = addr, .nb_blocks = num_blocks};
+    virtio_mem_resp_t* resp;
+
+    zx_status_t status = DescriptorChainBuilder(guest_request_queue_)
+                             .AppendReadableDescriptor(&req, sizeof(req))
+                             .AppendWritableDescriptor(&resp, sizeof(*resp))
+                             .Build();
+    EXPECT_EQ(ZX_OK, status);
+    status = mem_->NotifyQueue(0);
+    EXPECT_EQ(ZX_OK, status);
+    status = WaitOnInterrupt();
+    EXPECT_EQ(ZX_OK, status);
+
+    EXPECT_EQ(expected_response_type, resp->type);
+    uint64_t expected_plugged_size;
+    if (expected_response_type == VIRTIO_MEM_RESP_ACK) {
+      EXPECT_GT(prev_plugged_size_bytes, num_blocks * kPluggedBlockSize);
+      expected_plugged_size = prev_plugged_size_bytes - kPluggedBlockSize * num_blocks;
+    } else {
+      expected_plugged_size = prev_plugged_size_bytes;
+    }
+    WaitForPluggedSizeEqual(expected_plugged_size);
+  }
+
+  void UnplugAll() {
+    virtio_mem_req_t req = {.type = VIRTIO_MEM_REQ_UNPLUG_ALL};
+    virtio_mem_resp_t* resp;
+
+    zx_status_t status = DescriptorChainBuilder(guest_request_queue_)
+                             .AppendReadableDescriptor(&req, sizeof(req))
+                             .AppendWritableDescriptor(&resp, sizeof(*resp))
+                             .Build();
+    EXPECT_EQ(ZX_OK, status);
+    status = mem_->NotifyQueue(0);
+    EXPECT_EQ(ZX_OK, status);
+    status = WaitOnInterrupt();
+    EXPECT_EQ(ZX_OK, status);
+
+    EXPECT_EQ(VIRTIO_MEM_RESP_ACK, resp->type);
+    EXPECT_EQ(0u, InspectValue<uint64_t>("plugged_size_bytes"));
+  }
+
+  uint16_t GetState(uint64_t addr, uint16_t num_blocks,
+                    uint16_t expected_response_type = VIRTIO_MEM_RESP_ACK) {
+    virtio_mem_req_t req = {.type = VIRTIO_MEM_REQ_STATE, .addr = addr, .nb_blocks = num_blocks};
+    virtio_mem_resp_t* resp;
+
+    zx_status_t status = DescriptorChainBuilder(guest_request_queue_)
+                             .AppendReadableDescriptor(&req, sizeof(req))
+                             .AppendWritableDescriptor(&resp, sizeof(*resp))
+                             .Build();
+    EXPECT_EQ(ZX_OK, status);
+    status = mem_->NotifyQueue(0);
+    EXPECT_EQ(ZX_OK, status);
+    status = WaitOnInterrupt();
+    EXPECT_EQ(ZX_OK, status);
+
+    EXPECT_EQ(expected_response_type, resp->type);
+    if (expected_response_type == VIRTIO_MEM_RESP_ACK) {
+      return resp->state_type;
+    }
+    return expected_response_type;
   }
 
  public:
@@ -90,6 +190,68 @@ class VirtioMemTest : public TestWithDevice {
   VirtioQueueFake guest_request_queue_;
   using TestWithDevice::WaitOnInterrupt;
   std::unique_ptr<component_testing::RealmRoot> realm_;
+  uint64_t region_addr_ = 0;
 };
 
-TEST_F(VirtioMemTest, Placeholder) {}
+TEST_F(VirtioMemTest, PlugAndUnplugSuccess) {
+  EXPECT_EQ(InspectValue<uint64_t>("plugged_size_bytes"), 0u);
+
+  Plug(region_addr_, 7);
+  EXPECT_EQ(VIRTIO_MEM_STATE_PLUGGED, GetState(region_addr_ + 1 * kPluggedBlockSize, 1));
+  EXPECT_EQ(VIRTIO_MEM_STATE_MIXED, GetState(region_addr_ + 1 * kPluggedBlockSize, 7));
+  EXPECT_EQ(VIRTIO_MEM_STATE_UNPLUGGED, GetState(region_addr_ + 7 * kPluggedBlockSize, 1));
+  Plug(region_addr_ + 31 * kPluggedBlockSize, 3);
+  EXPECT_EQ(VIRTIO_MEM_STATE_MIXED, GetState(region_addr_, 34));
+  EXPECT_EQ(VIRTIO_MEM_STATE_PLUGGED, GetState(region_addr_ + 31 * kPluggedBlockSize, 3));
+  EXPECT_EQ(VIRTIO_MEM_STATE_PLUGGED, GetState(region_addr_ + 32 * kPluggedBlockSize, 2));
+  EXPECT_EQ(VIRTIO_MEM_STATE_PLUGGED, GetState(region_addr_ + 33 * kPluggedBlockSize, 1));
+  EXPECT_EQ(VIRTIO_MEM_STATE_PLUGGED, GetState(region_addr_ + 31 * kPluggedBlockSize, 1));
+  Unplug(region_addr_ + 32 * kPluggedBlockSize, 1);
+  EXPECT_EQ(VIRTIO_MEM_STATE_MIXED, GetState(region_addr_ + 31 * kPluggedBlockSize, 3));
+  EXPECT_EQ(VIRTIO_MEM_STATE_PLUGGED, GetState(region_addr_ + 31 * kPluggedBlockSize, 1));
+  EXPECT_EQ(VIRTIO_MEM_STATE_PLUGGED, GetState(region_addr_ + 33 * kPluggedBlockSize, 1));
+  Unplug(region_addr_ + 5 * kPluggedBlockSize, 2);
+  Unplug(region_addr_, 5);
+  EXPECT_EQ(VIRTIO_MEM_STATE_UNPLUGGED, GetState(region_addr_ + 1 * kPluggedBlockSize, 2));
+  Plug(region_addr_ + 1 * kPluggedBlockSize, 2);
+  EXPECT_EQ(VIRTIO_MEM_STATE_PLUGGED, GetState(region_addr_ + 1 * kPluggedBlockSize, 2));
+  UnplugAll();
+  EXPECT_EQ(VIRTIO_MEM_STATE_UNPLUGGED, GetState(region_addr_, kRegionSize / kPluggedBlockSize));
+  Plug(region_addr_, 1);
+  EXPECT_EQ(VIRTIO_MEM_STATE_PLUGGED, GetState(region_addr_, 1));
+  EXPECT_EQ(VIRTIO_MEM_STATE_UNPLUGGED, GetState(region_addr_ + 1 * kPluggedBlockSize, 2));
+  EXPECT_EQ(VIRTIO_MEM_STATE_UNPLUGGED, GetState(region_addr_ + 3 * kPluggedBlockSize, 1));
+  UnplugAll();
+  EXPECT_EQ(VIRTIO_MEM_STATE_UNPLUGGED, GetState(region_addr_, kRegionSize / kPluggedBlockSize));
+  Plug(region_addr_ + kRegionSize - kPluggedBlockSize, 1);
+  EXPECT_EQ(VIRTIO_MEM_STATE_MIXED, GetState(region_addr_, kRegionSize / kPluggedBlockSize));
+  EXPECT_EQ(VIRTIO_MEM_STATE_PLUGGED, GetState(region_addr_ + kRegionSize - kPluggedBlockSize, 1));
+  EXPECT_EQ(VIRTIO_MEM_STATE_UNPLUGGED,
+            GetState(region_addr_, kRegionSize / kPluggedBlockSize - 1));
+}
+
+TEST_F(VirtioMemTest, PlugAndUnplugErrors) {
+  // TODO(fxbug.dev/100514): Find a way to suppress error logging from the virtio_mem component just
+  // for this test out of bounds plugs
+  Plug(region_addr_ + kRegionSize - kPluggedBlockSize, 2, VIRTIO_MEM_RESP_ERROR);
+  Plug(region_addr_, kRegionSize / kPluggedBlockSize + 1, VIRTIO_MEM_RESP_ERROR);
+  Plug(region_addr_ - kPluggedBlockSize, 1, VIRTIO_MEM_RESP_ERROR);
+  // attempt to unplug non-plugged memory
+  Unplug(region_addr_ + kPluggedBlockSize, 5, VIRTIO_MEM_RESP_ERROR);
+  // double plug
+  Plug(region_addr_ + kPluggedBlockSize, 5);
+  Plug(region_addr_ + kPluggedBlockSize * 3, 1, VIRTIO_MEM_RESP_ERROR);
+  Unplug(region_addr_ + kPluggedBlockSize * 3, 2);
+  // double unplug
+  Unplug(region_addr_ + kPluggedBlockSize * 3, 1, VIRTIO_MEM_RESP_ERROR);
+
+  UnplugAll();
+  // this block was unplugged by unplug_all
+  Unplug(region_addr_ + kPluggedBlockSize, 1, VIRTIO_MEM_RESP_ERROR);
+  // repeated unplug all is always successful
+  UnplugAll();
+
+  EXPECT_EQ(VIRTIO_MEM_RESP_ERROR,
+            GetState(region_addr_, kRegionSize / kPluggedBlockSize + 1, VIRTIO_MEM_RESP_ERROR));
+  EXPECT_EQ(VIRTIO_MEM_RESP_ERROR, GetState(region_addr_ - 10, 1, VIRTIO_MEM_RESP_ERROR));
+}
