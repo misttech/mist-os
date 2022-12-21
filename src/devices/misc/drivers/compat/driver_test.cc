@@ -61,23 +61,41 @@ zx::vmo GetVmo(std::string_view path) {
   return std::move(response.value()->vmo);
 }
 
-class TestNode : public fidl::testing::WireTestBase<fdf::Node> {
+class TestNode : public std::enable_shared_from_this<TestNode>,
+                 public fidl::WireServer<fuchsia_driver_framework::NodeController>,
+                 public fidl::WireServer<fuchsia_driver_framework::Node> {
  public:
-  bool HasChildren() const { return !controllers_.empty() || !nodes_.empty(); }
+  static std::shared_ptr<TestNode> Create(async_dispatcher_t* dispatcher, std::string name) {
+    return std::shared_ptr<TestNode>(new TestNode(dispatcher, std::move(name)));
+  }
+
+  std::vector<std::shared_ptr<TestNode>>& children() { return children_; }
 
  private:
+  TestNode(async_dispatcher_t* dispatcher, std::string name)
+      : dispatcher_(dispatcher), name_(std::move(name)) {}
+
   void AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) override {
-    controllers_.push_back(std::move(request->controller));
-    nodes_.push_back(std::move(request->node));
+    std::shared_ptr node = TestNode::Create(dispatcher_, std::string(request->args.name().get()));
+    node->controller_binding_ =
+        fidl::BindServer<fdf::NodeController, fidl::WireServer<fdf::NodeController>>(
+            dispatcher_, std::move(request->controller), shared_from_this());
+    if (request->node) {
+      node->node_binding_ = fidl::BindServer<fdf::Node, fidl::WireServer<fdf::Node>>(
+          dispatcher_, std::move(request->node), shared_from_this());
+    }
+    children_.push_back(std::move(node));
     completer.ReplySuccess();
   }
 
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    printf("Not implemented: Node::%s\n", name.data());
-  }
+  void Remove(RemoveCompleter::Sync& completer) override {}
 
-  std::vector<fidl::ServerEnd<fdf::NodeController>> controllers_;
-  std::vector<fidl::ServerEnd<fdf::Node>> nodes_;
+  std::optional<fidl::ServerBindingRef<fdf::Node>> node_binding_;
+  std::optional<fidl::ServerBindingRef<fdf::NodeController>> controller_binding_;
+
+  async_dispatcher_t* dispatcher_;
+  std::string name_;
+  std::vector<std::shared_ptr<TestNode>> children_;
 };
 
 class TestRootResource : public fidl::testing::WireTestBase<fboot::RootResource> {
@@ -298,7 +316,7 @@ class TestLogSink : public fidl::testing::WireTestBase<flogger::LogSink> {
 
 class DriverTest : public gtest::DriverTestLoopFixture {
  protected:
-  TestNode& node() { return node_; }
+  std::shared_ptr<TestNode>& node() { return node_; }
   TestFile& compat_file() { return compat_file_; }
 
   void SetUp() override {
@@ -310,6 +328,8 @@ class DriverTest : public gtest::DriverTestLoopFixture {
     arguments["driver.foo"] = "true";
     arguments["clock.backstop"] = "0";
     boot_args_ = mock_boot_arguments::Server(std::move(arguments));
+
+    node_ = TestNode::Create(dispatcher(), "root");
   }
 
   void TearDown() override {
@@ -335,7 +355,8 @@ class DriverTest : public gtest::DriverTestLoopFixture {
     EXPECT_TRUE(compat_service_endpoints.is_ok());
 
     // Setup the node.
-    fidl::BindServer(dispatcher(), std::move(node_endpoints->server), &node_);
+    fidl::BindServer<fdf::Node, fidl::WireServer<fdf::Node>>(
+        dispatcher(), std::move(node_endpoints->server), node_);
 
     // Setup and bind "/pkg" directory.
     compat_file_.SetVmo(GetVmo("/pkg/driver/compat.so"));
@@ -475,10 +496,10 @@ class DriverTest : public gtest::DriverTestLoopFixture {
   }
 
   void WaitForChildDeviceAdded() {
-    while (!node().HasChildren()) {
+    while (node()->children().empty()) {
       RunUntilDispatchersIdle();
     }
-    EXPECT_TRUE(node().HasChildren());
+    EXPECT_FALSE(node()->children().empty());
   }
 
   async_dispatcher_t* dispatcher() { return test_loop_.dispatcher(); }
@@ -486,7 +507,7 @@ class DriverTest : public gtest::DriverTestLoopFixture {
   TestProfileProvider profile_provider_;
 
  private:
-  TestNode node_;
+  std::shared_ptr<TestNode> node_;
   TestRootResource root_resource_;
   mock_boot_arguments::Server boot_args_;
   TestItems items_;
@@ -573,7 +594,7 @@ TEST_F(DriverTest, Start_MissingBindAndCreate) {
 
   // Verify that v1_test.so has not added a child device.
   RunUntilDispatchersIdle();
-  EXPECT_FALSE(node().HasChildren());
+  EXPECT_TRUE(node()->children().empty());
 
   // Verify that v1_test.so has not set a context.
   EXPECT_EQ(nullptr, driver->Context());
@@ -652,7 +673,7 @@ TEST_F(DriverTest, Start_GetBackingMemory) {
 
   // Verify that v1_test.so has not added a child device.
   RunUntilDispatchersIdle();
-  EXPECT_FALSE(node().HasChildren());
+  EXPECT_TRUE(node()->children().empty());
 
   // Verify that v1_test.so has not set a context.
   EXPECT_EQ(nullptr, driver->Context());
@@ -678,7 +699,7 @@ TEST_F(DriverTest, Start_BindFailed) {
   }
 
   // Verify that v1_test.so has not added a child device.
-  EXPECT_FALSE(node().HasChildren());
+  EXPECT_TRUE(node()->children().empty());
 
   {
     const std::lock_guard<std::mutex> lock(v1_test->lock);
@@ -712,7 +733,7 @@ TEST_F(DriverTest, LoadFirwmareAsync) {
   ASSERT_NE(nullptr, v1_test.get());
 
   // Verify that v1_test.so has not added a child device.
-  EXPECT_FALSE(node().HasChildren());
+  EXPECT_TRUE(node()->children().empty());
 
   bool was_called = false;
 
