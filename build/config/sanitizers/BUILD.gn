@@ -286,16 +286,6 @@ sanitizer_default_options("tsan_default_options") {
 variant("hwasan") {
   common_flags = [ "-fsanitize=hwaddress" ]
 
-  cflags = [
-    # TODO(fxbug.dev/57112): Temporarily disable instrumenting globals for now.
-    # Tagging on globals affects taking offsets of vtables in the relative-
-    # vtables ABI and results in a linker error. Once we finalize how we want
-    # to handle this case, we should come back and re-enable global
-    # instrumentation.
-    "-mllvm",
-    "-hwasan-globals=0",
-  ]
-
   # TODO(phosek): use runtime.json instead of invoking Clang.
   if (is_fuchsia) {
     extension = ".so"
