@@ -6,6 +6,7 @@
 
 #include <fuchsia/math/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 
 #include <optional>
 
@@ -303,6 +304,7 @@ ViewTreeData ComputeViewTree(
     const std::vector<glm::mat3>& global_matrix_vector,
     const std::unordered_map<TransformHandle, TransformHandle>&
         link_child_to_parent_transform_map) {
+  TRACE_DURATION("gfx", "flatland::ComputeViewTree");
   ViewTreeData output;
   for (size_t i = root_index; i < topology_vector.size(); ++i) {
     const auto& transform_handle = topology_vector.at(i);
@@ -362,6 +364,7 @@ namespace flatland {
 GlobalTopologyData GlobalTopologyData::ComputeGlobalTopologyData(
     const UberStruct::InstanceMap& uber_structs, const LinkTopologyMap& links,
     TransformHandle::InstanceId link_instance_id, TransformHandle root) {
+  TRACE_DURATION("gfx", "flatland::ComputeGlobalTopologyData");
   // There should never be an UberStruct for the |link_instance_id|.
   FX_DCHECK(uber_structs.find(link_instance_id) == uber_structs.end());
 
@@ -582,6 +585,7 @@ view_tree::SubtreeSnapshot GlobalTopologyData::GenerateViewTreeSnapshot(
     const std::vector<glm::mat3>& global_matrix_vector,
     const std::unordered_map<TransformHandle, TransformHandle>&
         link_child_to_parent_transform_map) {
+  TRACE_DURATION("gfx", "flatland::GenerateViewTreeSnapshot");
   const auto root_values = FindRoot(data.topology_vector, data.view_refs);
   if (!root_values.has_value()) {
     // No root -> Empty ViewTree.

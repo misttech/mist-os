@@ -15,6 +15,7 @@
 #include "src/ui/scenic/lib/utils/logging.h"
 
 // TODO(fxbug.dev/77414): for hacky invocation of OnVsync() at the end of RenderScheduledFrame().
+#include <lib/trace/event.h>
 #include <lib/zx/time.h>
 
 #include <sstream>
@@ -70,6 +71,7 @@ void Engine::InitializeInspectObjects() {
 void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_time,
                                   const FlatlandDisplay& display,
                                   scheduling::FrameRenderer::FramePresentedCallback callback) {
+  TRACE_DURATION("gfx", "flatland::Engine::RenderScheduledFrame");
   // NOTE: This is a temporary situation; soon FlatlandDisplay will be the only way to connect
   // content to a display.
   FX_CHECK(frame_number == last_rendered_frame_ + 1);
@@ -128,6 +130,7 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
 
 view_tree::SubtreeSnapshot Engine::GenerateViewTreeSnapshot(
     const TransformHandle& root_transform) const {
+  TRACE_DURATION("gfx", "flatland::Engine::GenerateViewTreeSnapshot");
   // TODO(fxbug.dev/82814): Stop generating the GlobalTopologyData twice. It's wasted work and a
   // synchronization hazard.
   const auto uber_struct_snapshot = uber_struct_system_->Snapshot();

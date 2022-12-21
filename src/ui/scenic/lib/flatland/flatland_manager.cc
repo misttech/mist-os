@@ -206,6 +206,7 @@ void FlatlandManager::CreateFlatlandDisplay(
 scheduling::SessionUpdater::UpdateResults FlatlandManager::UpdateSessions(
     const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update,
     uint64_t trace_id) {
+  TRACE_DURATION("gfx", "flatland::UpdateSessions");
   CheckIsOnMainThread();
 
   auto results = uber_struct_system_->UpdateSessions(sessions_to_update);
@@ -238,6 +239,7 @@ scheduling::SessionUpdater::UpdateResults FlatlandManager::UpdateSessions(
 }
 
 void FlatlandManager::OnCpuWorkDone() {
+  TRACE_DURATION("gfx", "flatland::OnCpuWorkDone");
   CheckIsOnMainThread();
 
   // Get 8 frames of data, which we then pass onto all Flatland instances that had updates this
@@ -306,6 +308,7 @@ size_t FlatlandManager::GetSessionCount() const { return flatland_instances_.siz
 void FlatlandManager::SendPresentCredits(FlatlandInstance* instance,
                                          uint32_t present_credits_returned,
                                          Flatland::FuturePresentationInfos presentation_infos) {
+  TRACE_DURATION("gfx", "flatland::SendPresentCredits");
   CheckIsOnMainThread();
 
   // The Flatland impl must be accessed on the thread it is bound to; post a task to that thread.
