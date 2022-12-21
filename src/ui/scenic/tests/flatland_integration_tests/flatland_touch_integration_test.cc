@@ -1503,4 +1503,139 @@ TEST_F(FlatlandTouchIntegrationTest, HitTested_ViewDisconnectedAfterWinning_Shou
   EXPECT_TRUE(child_events.empty());
 }
 
+// This test mimics how a11y implements magnification, injects tap events and checks if the pointer
+// events are transformed correctly. The test exercises the following view topology:-
+//  root_view
+//      |
+//  parent_view(a11y view)
+//      |
+//  child_view
+// The parent view acts as the a11y view and applies scale and translation to the child view to
+// mimic magnification.
+TEST_F(FlatlandTouchIntegrationTest, MagnificationTest) {
+  // Set up the parent_view and connect it to the root_view.
+  fuchsia::ui::composition::FlatlandPtr parent_session =
+      realm_->Connect<fuchsia::ui::composition::Flatland>();
+  fuchsia::ui::views::ViewRef parent_view_ref;
+  {
+    auto [view_token, viewport_creation_token] = scenic::ViewCreationTokenPair::New();
+    fidl::InterfacePtr<fuchsia::ui::composition::ParentViewportWatcher> parent_viewport_watcher;
+
+    auto identity = scenic::NewViewIdentityOnCreation();
+    fidl::Clone(identity.view_ref, &parent_view_ref);
+
+    parent_session->CreateView2(std::move(view_token), std::move(identity), {},
+                                parent_viewport_watcher.NewRequest());
+
+    const fuchsia::ui::composition::TransformId kTransformId = {2};
+    parent_session->CreateTransform(kRootTransform);
+    parent_session->SetRootTransform(kRootTransform);
+    ConnectChildView(root_session_, std::move(viewport_creation_token), FullscreenSize(),
+                     kTransformId, kRootContentId);
+  }
+
+  // Set up the child_view and connect it to the parent_view.
+  fuchsia::ui::composition::FlatlandPtr child_session =
+      realm_->Connect<fuchsia::ui::composition::Flatland>();
+
+  // Set up the touch source channel for the child_view so that it can listen to the pointer events.
+  fuchsia::ui::pointer::TouchSourcePtr child_touch_source;
+  fuchsia::ui::views::ViewRef child_view_ref;
+  const fuchsia::ui::composition::TransformId child_transform = {2};
+
+  {
+    auto [view_token, viewport_creation_token] = scenic::ViewCreationTokenPair::New();
+    fidl::InterfacePtr<fuchsia::ui::composition::ParentViewportWatcher> parent_viewport_watcher;
+
+    auto identity = scenic::NewViewIdentityOnCreation();
+    fidl::Clone(identity.view_ref, &child_view_ref);
+
+    fuchsia::ui::composition::ViewBoundProtocols protocols;
+    protocols.set_touch_source(child_touch_source.NewRequest());
+
+    child_session->CreateView2(std::move(view_token), std::move(identity), std::move(protocols),
+                               parent_viewport_watcher.NewRequest());
+    child_session->CreateTransform(kRootTransform);
+    child_session->SetRootTransform(kRootTransform);
+    BlockingPresent(child_session);
+
+    ConnectChildView(parent_session, std::move(viewport_creation_token), FullscreenSize(),
+                     child_transform, kRootContentId);
+  }
+
+  // parent_view applies scale and translation to the child_view to mimic magnification.
+  const float scale_x = 2.f, scale_y = 2.f;
+  const int32_t translation_x = static_cast<int32_t>(display_width_) / 2,
+                translation_y = static_cast<int32_t>(display_height_) / 2;
+  parent_session->SetScale(child_transform, {scale_x, scale_y});
+  parent_session->SetTranslation(child_transform, {translation_x, translation_y});
+  BlockingPresent(parent_session);
+
+  // Listen for input events.
+  std::vector<TouchEvent> child_events;
+  StartWatchLoop(child_touch_source, child_events);
+
+  // Scene is now set up, send in the input. Inject tap events on the four corners of the display.
+  RegisterInjector(fidl::Clone(root_view_ref_), fidl::Clone(child_view_ref));
+
+  Inject(0, 0, fupi_EventPhase::ADD);
+  Inject(0, display_height_, fupi_EventPhase::CHANGE);
+  Inject(display_width_, 0, fupi_EventPhase::CHANGE);
+  Inject(display_width_, display_height_, fupi_EventPhase::REMOVE);
+
+  // child_view should receive all the input events.
+  RunLoopUntil([&child_events] { return child_events.size() == 4u; });
+
+  ASSERT_TRUE(child_events[0].has_view_parameters());
+  auto viewport_to_view_transform = child_events[0].view_parameters().viewport_to_view_transform;
+
+  // As we had scaled the child_view with a factor of 2 and translated it by
+  // (display_width_/2,display_height_/2), the tap event injected at coordinates (0,0) would be
+  // transformed to (-display_width_/4,-display_height_/4).
+  {
+    const auto& event = child_events[0];
+    const auto expected_phase = EventPhase::ADD;
+    const auto expected_x = (0 - static_cast<float>(translation_x)) / scale_x;
+    const auto expected_y = (0 - static_cast<float>(translation_y)) / scale_y;
+    EXPECT_EQ_POINTER(event.pointer_sample(), viewport_to_view_transform, expected_phase,
+                      expected_x, expected_y);
+  }
+
+  // As we had scaled the child_view with a factor of 2 and translated it by
+  // (display_width_/2,display_height_/2), the tap event injected at coordinates (0,display_height_)
+  // would be transformed to (-display_width_/4,display_height_/4).
+  {
+    const auto& event = child_events[1];
+    const auto expected_phase = EventPhase::CHANGE;
+    const auto expected_x = (0 - static_cast<float>(translation_x)) / scale_x;
+    const auto expected_y = (display_height_ - static_cast<float>(translation_y)) / scale_y;
+    EXPECT_EQ_POINTER(event.pointer_sample(), viewport_to_view_transform, expected_phase,
+                      expected_x, expected_y);
+  }
+
+  // As we had scaled the child_view with a factor of 2 and translated it by
+  // (display_width_/2,display_height_/2), the tap event injected at coordinates (display_width_,0)
+  // would be transformed to (display_width_/4,-display_height_/4).
+  {
+    const auto& event = child_events[2];
+    const auto expected_phase = EventPhase::CHANGE;
+    const auto expected_x = (display_width_ - static_cast<float>(translation_x)) / scale_x;
+    const auto expected_y = (0 - static_cast<float>(translation_y)) / scale_y;
+    EXPECT_EQ_POINTER(event.pointer_sample(), viewport_to_view_transform, expected_phase,
+                      expected_x, expected_y);
+  }
+
+  // As we had scaled the child_view with a factor of 2 and translated it by
+  // (display_width_/2,display_height_/2), the tap event injected at coordinates
+  // (display_width_,display_height_) would be transformed to (display_width_/4,display_height_/4).
+  {
+    const auto& event = child_events[3];
+    const auto expected_phase = EventPhase::REMOVE;
+    const auto expected_x = (display_width_ - static_cast<float>(translation_x)) / scale_x;
+    const auto expected_y = (display_height_ - static_cast<float>(translation_y)) / scale_y;
+    EXPECT_EQ_POINTER(event.pointer_sample(), viewport_to_view_transform, expected_phase,
+                      expected_x, expected_y);
+  }
+}
+
 }  // namespace integration_tests
