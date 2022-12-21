@@ -2585,19 +2585,6 @@ mod tests {
                     }
                   },
                   {
-                    "event_stream_deprecated": "my_stream",
-                    "subscriptions": [
-                        {
-                           "event": "started",
-                        },
-                        {
-                            "event": "stopped",
-                        },
-                        {
-                            "event": "launched",
-                        }]
-                  },
-                  {
                    "event_stream": ["started", "stopped", "running"],
                    "scope":["#test"],
                    "path":"/svc/testpath",

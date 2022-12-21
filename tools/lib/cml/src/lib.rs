@@ -73,7 +73,6 @@ pub enum CapabilityId {
     Runner(Name),
     Resolver(Name),
     Event(Name),
-    EventStreamDeprecated(Name),
     EventStream(Path),
 }
 
@@ -110,7 +109,6 @@ impl CapabilityId {
             CapabilityId::Runner(_) => "runner",
             CapabilityId::Resolver(_) => "resolver",
             CapabilityId::Event(_) => "event",
-            CapabilityId::EventStreamDeprecated(_) => "event_stream_deprecated",
             CapabilityId::EventStream(_) => "event_stream",
         }
     }
@@ -180,8 +178,6 @@ impl CapabilityId {
                     .map(|event: &Name| CapabilityId::Event(event.clone()))
                     .collect()),
             };
-        } else if let Some(name) = use_.event_stream_deprecated() {
-            return Ok(vec![CapabilityId::EventStreamDeprecated(name)]);
         } else if let Some(_) = use_.event_stream() {
             if let Some(path) = use_.path() {
                 return Ok(vec![CapabilityId::EventStream(path.clone())]);
@@ -447,7 +443,6 @@ impl fmt::Display for CapabilityId {
             | CapabilityId::UsedProtocol(p)
             | CapabilityId::UsedDirectory(p)
             | CapabilityId::UsedStorage(p) => p.as_str(),
-            CapabilityId::EventStreamDeprecated(p) => p.as_str(),
             CapabilityId::EventStream(p) => p.as_str(),
             CapabilityId::Protocol(p) | CapabilityId::Directory(p) => p.as_str(),
         };
