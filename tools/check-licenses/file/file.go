@@ -5,6 +5,7 @@
 package file
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -18,6 +19,11 @@ type File struct {
 	URL     string      `json:"url"`
 	Data    []*FileData `json:"data"`
 	Text    []byte
+
+	// SPDX fields for referencing this file content
+	// in the SPDX output file.
+	SPDXName string `json:"SPDXName"`
+	SPDXID   string `json:"SPDXID"`
 }
 
 // Order implements sort.Interface for []*File based on the AbsPath field.
@@ -87,6 +93,10 @@ func NewFile(path string, ft FileType, project string) (*File, error) {
 		Data:    data,
 		Text:    content,
 	}
+
+	f.SPDXName = fmt.Sprintf("%s - %s", project, f.Name)
+	f.SPDXID = fmt.Sprintf("LicenseRef-file-%06d", SPDXID_INDEX)
+	SPDXID_INDEX = SPDXID_INDEX + 1
 
 	AllFiles[path] = f
 	return f, nil

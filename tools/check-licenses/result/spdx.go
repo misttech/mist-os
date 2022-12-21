@@ -78,13 +78,9 @@ func generateSPDXDoc(name string, projects []*project.Project, root *project.Pro
 			// For now, let's keep those license texts together in one single
 			// OtherLicense SPDX object.
 			if strings.Contains(p.Root, "prebuilt") {
-				// SPDX Identifiers are supposed to only contain letters, numbers,
-				// "." and "-" characters. Replace underscores and slashes here.
-				id := strings.ReplaceAll(l.RelPath, "/", "-")
-				id = strings.ReplaceAll(id, "_", "-")
 				ol := &spdx.OtherLicense{
-					LicenseName:       fmt.Sprintf("License for %s", p.Root),
-					LicenseIdentifier: fmt.Sprintf("LicenseRef-%s", id),
+					LicenseName:       l.SPDXName,
+					LicenseIdentifier: l.SPDXID,
 					ExtractedText:     string(l.Text),
 					LicenseCrossReferences: []string{
 						l.URL,

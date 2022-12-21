@@ -7,6 +7,7 @@ package project
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	spdx_builder "github.com/spdx/tools-golang/builder/builder2v2"
 	spdx_common "github.com/spdx/tools-golang/spdx/common"
@@ -70,13 +71,20 @@ func (p *Project) setSPDXFields() error {
 	// Multiple files for a given project.
 	for i, l := range p.LicenseFile {
 		statement := "("
-		// Multiple license texts in a given license file.
-		for j, data := range l.Data {
-			statement = fmt.Sprintf("%s%s", statement, data.SPDXID)
-			if j < len(l.Data)-1 {
-				statement = fmt.Sprintf("%s AND ", statement)
+
+		// Note: We cannot easily find upstream URL links for a single NOTICE file.
+		if strings.Contains(p.Root, "prebuilt") {
+			statement = fmt.Sprintf("%s%s", statement, l.SPDXID)
+		} else {
+			// Multiple license texts in a given license file.
+			for j, data := range l.Data {
+				statement = fmt.Sprintf("%s%s", statement, data.SPDXID)
+				if j < len(l.Data)-1 {
+					statement = fmt.Sprintf("%s AND ", statement)
+				}
 			}
 		}
+
 		statement = fmt.Sprintf("%s)", statement)
 		if len(l.Data) > 1 {
 			plusVal("Multiple texts in a single file", fmt.Sprintf("%s,%s,%v", p.Root, filepath.Base(l.RelPath), len(l.Data)))

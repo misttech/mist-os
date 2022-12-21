@@ -146,21 +146,18 @@ func NewFileData(path string, relPath string, content []byte, filetype FileType,
 		}
 	}
 
-	for index, d := range data {
+	for _, d := range data {
 		for _, r := range Config.Replacements {
 			d.Data = bytes.ReplaceAll(d.Data, []byte(r.Replace), []byte(r.With))
 		}
 
-		d.SPDXName = d.LibraryName
-		if d.LibraryName != project && d.LibraryName != "" {
-			d.SPDXName = fmt.Sprintf("%s > %s", project, d.LibraryName)
+		if d.LibraryName == "" {
+			d.LibraryName = project
 		}
 
-		// SPDX Identifiers are supposed to only contain letters, numbers,
-		// "." and "-" characters. Replace underscores and slashes here.
-		id := strings.ReplaceAll(relPath, "/", "-")
-		id = strings.ReplaceAll(id, "_", "-")
-		d.SPDXID = fmt.Sprintf("LicenseRef-%s-%d", id, index)
+		d.SPDXName = fmt.Sprintf("%s", d.LibraryName)
+		d.SPDXID = fmt.Sprintf("LicenseRef-filedata-%06d", SPDXID_INDEX)
+		SPDXID_INDEX = SPDXID_INDEX + 1
 	}
 	return data, nil
 }

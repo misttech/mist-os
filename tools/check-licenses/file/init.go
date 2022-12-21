@@ -9,8 +9,11 @@ import (
 	"regexp"
 )
 
-var AllFiles map[string]*File
-var urlRegex *regexp.Regexp
+var (
+	AllFiles     map[string]*File
+	urlRegex     *regexp.Regexp
+	SPDXID_INDEX int
+)
 
 func init() {
 	AllFiles = make(map[string]*File, 0)
