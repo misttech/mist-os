@@ -60,6 +60,11 @@ class Pinecrest : public ddk::Device<Pinecrest> {
   thrd_t thread_;
 };
 
+enum {
+  MACADDR_WIFI = 0,
+  MACADDR_BLUETOOTH = 1,
+};
+
 }  // namespace board_pinecrest
 
 #endif  // SRC_DEVICES_BOARD_DRIVERS_PINECREST_PINECREST_H_

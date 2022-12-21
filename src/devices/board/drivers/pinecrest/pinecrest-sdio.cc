@@ -68,6 +68,13 @@ zx_status_t Pinecrest::SdioInit() {
       }},
   };
 
+  static const std::vector<fpbus::BootMetadata> sd_emmc_boot_metadata{
+      {{
+          .zbi_type = DEVICE_METADATA_MAC_ADDRESS,
+          .zbi_extra = MACADDR_BLUETOOTH,
+      }},
+  };
+
   fpbus::Node sdio_dev;
   sdio_dev.name() = "pinecrest-sdio";
   sdio_dev.vid() = PDEV_VID_SYNAPTICS;
@@ -77,6 +84,7 @@ zx_status_t Pinecrest::SdioInit() {
   sdio_dev.mmio() = sdio_mmios;
   sdio_dev.bti() = sdio_btis;
   sdio_dev.metadata() = sd_emmc_metadata;
+  sdio_dev.boot_metadata() = sd_emmc_boot_metadata;
 
   // Configure eMMC-SD soc pads.
   if (((status = gpio_impl_.SetAltFunction(58, 1)) != ZX_OK) ||  // SD0_CLK
