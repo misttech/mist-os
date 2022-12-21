@@ -215,7 +215,7 @@ compiled_action("uefi-disk") {
       # switched over to using it (or taking it as an argument).
       files.old_blobfs_path,
     ]
-    deps += [ "//src/storage/bin/fvm:fvm(//build/toolchain:host_x64)" ]
+    deps += [ "//src/storage/bin/fvm:fvm($host_toolchain)" ]
   }
 
   args += [ rebase_path(uefi_disk_path) ]
