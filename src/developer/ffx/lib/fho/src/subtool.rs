@@ -135,7 +135,7 @@ impl<T: FfxTool> ToolRunner for FhoTool<T> {
                 let hoist_cache_dir = std::fs::create_dir_all(&cache_path)
                     .and_then(|_| tempfile::tempdir_in(&cache_path))
                     .with_user_message(|| format!(
-                        "Could not create hoist cache root in {}. Do you have permission to write to its parent?", 
+                        "Could not create hoist cache root in {}. Do you have permission to write to its parent?",
                         cache_path.display()
                     ))?;
                 let build_info = self.suite.context.build_info();
@@ -452,7 +452,8 @@ mod tests {
     // This keeps the macros from having compiler errors.
     use crate as fho;
     use crate::testing::*;
-    use crate::FhoVersion;
+    use crate::FhoDetails;
+    use crate::Only;
     use argh::FromArgs;
     use async_trait::async_trait;
     use ffx_writer::Writer;
@@ -545,7 +546,7 @@ mod tests {
                 name: "fake".to_owned(),
                 description: "fake command".to_owned(),
                 requires_fho: 0,
-                fho_details: FhoVersion::FhoVersion0 {},
+                fho_details: FhoDetails::FhoVersion0 { version: Only },
             }
         );
     }

@@ -34,15 +34,21 @@ rustc_library("lib") {
     "//third_party/rust_crates:tempfile",
   ]
 
-  test_deps = [ "//src/lib/fuchsia-async" ]
+  test_deps = [
+    "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:valico",
+  ]
 
   sources = [
     "src/adapters.rs",
     "src/lib.rs",
+    "src/metadata.rs",
     "src/search.rs",
     "src/subtool.rs",
     "src/testing.rs",
   ]
+
+  inputs = [ "schema/fho_metadata.json" ]
 }
 
 group("tests") {

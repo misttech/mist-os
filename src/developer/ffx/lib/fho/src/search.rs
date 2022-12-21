@@ -15,7 +15,7 @@ use std::{
     process::ExitStatus,
 };
 
-use crate::{FhoToolMetadata, FhoVersion};
+use crate::{FhoDetails, FhoToolMetadata, Only};
 
 /// Path information about a subtool
 #[derive(Clone)]
@@ -133,10 +133,10 @@ impl FhoToolMetadata {
     /// Whether or not this library is capable of running the subtool based on its
     /// metadata (ie. the minimum fho version is met). Returns the version enum value
     /// we can run it at.
-    fn is_supported(&self) -> Option<FhoVersion> {
+    fn is_supported(&self) -> Option<FhoDetails> {
         // Currently we only support fho version 0.
         if self.requires_fho == 0 {
-            Some(FhoVersion::FhoVersion0 {})
+            Some(FhoDetails::FhoVersion0 { version: Only })
         } else {
             None
         }
@@ -310,7 +310,7 @@ mod tests {
             name: "invalid-metadata".to_owned(),
             description: "A tool with invalid metadata!".to_owned(),
             requires_fho: u16::MAX,
-            fho_details: FhoVersion::FhoVersion0 {},
+            fho_details: FhoDetails::FhoVersion0 { version: Only },
         };
         let subtool = create_mock_subtool(tempdir.path(), name, Valid(metadata.clone()));
         assert_eq!(
