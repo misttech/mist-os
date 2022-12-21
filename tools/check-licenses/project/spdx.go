@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	spdx_builder "github.com/spdx/tools-golang/builder/builder2v2"
 	spdx_common "github.com/spdx/tools-golang/spdx/common"
 	spdx "github.com/spdx/tools-golang/spdx/v2_2"
 	spdx_utils "github.com/spdx/tools-golang/utils"
@@ -17,33 +16,23 @@ import (
 
 // Create an spdx.Package struct that matches the given project struct.
 func (p *Project) setSPDXFields() error {
-	// Use the SPDX builder function to generate an empty SPDX struct.
-	// Skip all file and folder processing for now.
-	ignore := []string{
-		"**",  // Skip all files for now.
-		"**/", // Skip all folders for now.
-	}
 	files := make([]*spdx.File, 0)
-	pkg, err := spdx_builder.BuildPackageSection2_2(p.Name, p.Root, ignore)
+	code, err := spdx_utils.GetVerificationCode2_2(files, "")
 	if err != nil {
-		// If the builder fails to create a pkg object, create one manually.
-		code, err2 := spdx_utils.GetVerificationCode2_2(files, "")
-		if err2 != nil {
-			return fmt.Errorf("failed to create SPDX pkg using builder [%v] and manually [%w]", err, err2)
-		}
+		return fmt.Errorf("failed to create SPDX pkg manually [%w]", err)
+	}
 
-		pkg = &spdx.Package{
-			PackageName:                 p.Name,
-			PackageSPDXIdentifier:       spdx_common.ElementID(fmt.Sprintf("Package-%s", p.Name)),
-			PackageDownloadLocation:     "NOASSERTION",
-			FilesAnalyzed:               true,
-			IsFilesAnalyzedTagPresent:   true,
-			PackageVerificationCode:     code,
-			PackageLicenseConcluded:     "NOASSERTION",
-			PackageLicenseInfoFromFiles: []string{},
-			PackageLicenseDeclared:      "NOASSERTION",
-			PackageCopyrightText:        "NOASSERTION",
-		}
+	pkg := &spdx.Package{
+		PackageName:                 p.Name,
+		PackageSPDXIdentifier:       spdx_common.ElementID(fmt.Sprintf("Package-%s", p.Name)),
+		PackageDownloadLocation:     "NOASSERTION",
+		FilesAnalyzed:               true,
+		IsFilesAnalyzedTagPresent:   true,
+		PackageVerificationCode:     code,
+		PackageLicenseConcluded:     "NOASSERTION",
+		PackageLicenseInfoFromFiles: []string{},
+		PackageLicenseDeclared:      "NOASSERTION",
+		PackageCopyrightText:        "NOASSERTION",
 	}
 
 	// Initialize these fields to make the online validator happy.
