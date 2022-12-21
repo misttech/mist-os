@@ -45,34 +45,25 @@ constexpr StackType kUnsafe = {"kernel-unsafe-stack", DEFAULT_STACK_SIZE};
 constexpr StackType kShadowCall = {"kernel-shadow-call-stack", ZX_PAGE_SIZE};
 #endif
 
-// Allocates and maps a kernel stack with one page of padding before and after the mapping.
-zx_status_t allocate_map(const StackType& type, KernelStack::Mapping* map) {
+constexpr size_t kStackPaddingSize = PAGE_SIZE;
+
+// Takes a portion of the VMO and maps a kernel stack with one page of padding before and after the
+// mapping.
+zx_status_t map(const StackType& type, fbl::RefPtr<VmObjectPaged>& vmo, uint64_t* offset,
+                KernelStack::Mapping* map) {
   LTRACEF("allocating %s\n", type.name);
 
   // assert that this mapping hasn't already be created
-  DEBUG_ASSERT(map->base_ == 0);
-  DEBUG_ASSERT(map->size_ == 0);
+  DEBUG_ASSERT(!map->vmar_);
 
   // get a handle to the root vmar
   auto vmar = VmAspace::kernel_aspace()->RootVmar()->as_vm_address_region();
   DEBUG_ASSERT(!!vmar);
 
-  // Create a VMO for our stack
-  fbl::RefPtr<VmObjectPaged> stack_vmo;
-  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kAlwaysPinned,
-                                             type.size, &stack_vmo);
-  if (status != ZX_OK) {
-    TRACEF("error allocating %s for thread\n", type.name);
-    return status;
-  }
-  stack_vmo->set_name(type.name, strlen(type.name));
-
   // create a vmar with enough padding for a page before and after the stack
-  const size_t padding_size = PAGE_SIZE;
-
   fbl::RefPtr<VmAddressRegion> kstack_vmar;
-  status = vmar->CreateSubVmar(
-      0, 2 * padding_size + type.size, 0,
+  zx_status_t status = vmar->CreateSubVmar(
+      0, 2 * kStackPaddingSize + type.size, 0,
       VMAR_FLAG_CAN_MAP_SPECIFIC | VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE, type.name,
       &kstack_vmar);
   if (status != ZX_OK) {
@@ -85,11 +76,11 @@ zx_status_t allocate_map(const StackType& type, KernelStack::Mapping* map) {
 
   LTRACEF("%s vmar at %#" PRIxPTR "\n", type.name, kstack_vmar->base());
 
-  // create a mapping offset padding_size into the vmar we created
+  // create a mapping offset kStackPaddingSize into the vmar we created
   fbl::RefPtr<VmMapping> kstack_mapping;
-  status = kstack_vmar->CreateVmMapping(
-      padding_size, type.size, 0, VMAR_FLAG_SPECIFIC, ktl::move(stack_vmo), 0,
-      ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, type.name, &kstack_mapping);
+  status = kstack_vmar->CreateVmMapping(kStackPaddingSize, type.size, 0, VMAR_FLAG_SPECIFIC, vmo,
+                                        *offset, ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
+                                        type.name, &kstack_mapping);
   if (status != ZX_OK) {
     return status;
   }
@@ -109,31 +100,71 @@ zx_status_t allocate_map(const StackType& type, KernelStack::Mapping* map) {
 
   // save the relevant bits
   map->vmar_ = ktl::move(kstack_vmar);
-  map->base_ = kstack_mapping->base();
-  map->size_ = type.size;
+
+  // Increase the offset to claim this portion of the VMO.
+  *offset += type.size;
 
   return ZX_OK;
 }
 
 }  // namespace
 
+vaddr_t KernelStack::Mapping::base() const {
+  // The actual stack mapping starts after the padding.
+  return vmar_ ? vmar_->base() + kStackPaddingSize : 0;
+}
+
+size_t KernelStack::Mapping::size() const {
+  // Remove the padding from the vmar to get the actual stack size.
+  return vmar_ ? vmar_->size() - kStackPaddingSize * 2 : 0;
+}
+
 zx_status_t KernelStack::Init() {
-  zx_status_t status = allocate_map(kSafe, &main_map_);
+  // Determine the total VMO size we needed for all stacks.
+  size_t vmo_size = kSafe.size;
+#if __has_feature(safe_stack)
+  vmo_size += kUnsafe.size;
+#endif
+
+#if __has_feature(shadow_call_stack)
+  vmo_size += kShadowCall.size;
+#endif
+
+  // Create a VMO for our stacks. Although multiple stacks will be allocated from adjacent blocks of
+  // the VMO, they are only referenced by their virtual mapping addresses, and so there is no
+  // possibility of over or under run of any stack trampling an adjacent one, they will just fault
+  // on the guard regions around the mappings. Similarly the mapping location of each stack is
+  // randomized independently, so allocating out of the same VMO provides no correlation to the
+  // mapped addresses.
+  // Using a single VMO reduces bookkeeping memory overhead with no downside, since all stacks have
+  // exactly the same lifetime.
+  fbl::RefPtr<VmObjectPaged> stack_vmo;
+  zx_status_t status =
+      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kAlwaysPinned, vmo_size, &stack_vmo);
+  if (status != ZX_OK) {
+    LTRACEF("error allocating kernel stacks for thread\n");
+    return status;
+  }
+  constexpr const char kKernelStackName[] = "kernel-stack";
+  stack_vmo->set_name(kKernelStackName, sizeof(kKernelStackName) - 1);
+
+  uint64_t vmo_offset = 0;
+  status = map(kSafe, stack_vmo, &vmo_offset, &main_map_);
   if (status != ZX_OK) {
     return status;
   }
 
 #if __has_feature(safe_stack)
-  DEBUG_ASSERT(unsafe_map_.base_ == 0);
-  status = allocate_map(kUnsafe, &unsafe_map_);
+  DEBUG_ASSERT(!unsafe_map_.vmar_);
+  status = map(kUnsafe, stack_vmo, &vmo_offset, &unsafe_map_);
   if (status != ZX_OK) {
     return status;
   }
 #endif
 
 #if __has_feature(shadow_call_stack)
-  DEBUG_ASSERT(shadow_call_map_.base_ == 0);
-  status = allocate_map(kShadowCall, &shadow_call_map_);
+  DEBUG_ASSERT(!shadow_call_map_.vmar_);
+  status = map(kShadowCall, stack_vmo, &vmo_offset, &shadow_call_map_);
   if (status != ZX_OK) {
     return status;
   }
@@ -143,8 +174,8 @@ zx_status_t KernelStack::Init() {
 
 void KernelStack::DumpInfo(int debug_level) {
   auto map_dump = [debug_level](const KernelStack::Mapping& map, const char* tag) {
-    dprintf(debug_level, "\t%s base %#" PRIxPTR ", size %#zx, vmar %p\n", tag, map.base_, map.size_,
-            map.vmar_.get());
+    dprintf(debug_level, "\t%s base %#" PRIxPTR ", size %#zx, vmar %p\n", tag, map.base(),
+            map.size(), map.vmar_.get());
   };
 
   map_dump(main_map_, "stack");
@@ -169,8 +200,6 @@ zx_status_t KernelStack::Teardown() {
       return status;
     }
     main_map_.vmar_.reset();
-    main_map_.base_ = 0;
-    main_map_.size_ = 0;
     vm_kernel_stack_bytes.Add(-static_cast<int64_t>(kSafe.size));
   }
 #if __has_feature(safe_stack)
@@ -181,8 +210,6 @@ zx_status_t KernelStack::Teardown() {
       return status;
     }
     unsafe_map_.vmar_.reset();
-    unsafe_map_.base_ = 0;
-    unsafe_map_.size_ = 0;
     vm_kernel_stack_bytes.Add(-static_cast<int64_t>(kUnsafe.size));
   }
 #endif
@@ -194,8 +221,6 @@ zx_status_t KernelStack::Teardown() {
       return status;
     }
     shadow_call_map_.vmar_.reset();
-    shadow_call_map_.base_ = 0;
-    shadow_call_map_.size_ = 0;
     vm_kernel_stack_bytes.Add(-static_cast<int64_t>(kShadowCall.size));
   }
 #endif
