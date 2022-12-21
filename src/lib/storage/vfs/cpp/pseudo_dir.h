@@ -120,16 +120,12 @@ class PseudoDir : public Vnode {
 
  protected:
   // Creates a directory which is initially empty.
-  explicit PseudoDir(bool has_dot_entry = true);
+  PseudoDir();
 
   // Destroys the directory and releases the nodes it contains.
   ~PseudoDir() override;
 
  private:
-  // TODO(https://fxbug.dev/110485): Remove this when devfs watchers can handle
-  // "." appearing in /dev/class/*/.
-  const bool has_dot_entry_;
-
   uint64_t next_node_id_ __TA_GUARDED(mutex_) = kDotId + 1;
   EntryByIdMap entries_by_id_ __TA_GUARDED(mutex_);
   EntryByNameMap entries_by_name_ __TA_GUARDED(mutex_);

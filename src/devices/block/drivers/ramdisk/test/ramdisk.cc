@@ -506,32 +506,36 @@ TEST(RamdiskTests, RamdiskTestFilesystem) {
 
   auto cb = [](int dirfd, int event, const char* fn, void* cookie) {
     watcher_args_t* args = static_cast<watcher_args_t*>(cookie);
-    if (event == WATCH_EVENT_ADD_FILE) {
-      fdio_cpp::UnownedFdioCaller caller(dirfd);
-      zx::result channel =
-          component::ConnectAt<fuchsia_hardware_block_partition::Partition>(caller.directory(), fn);
-      if (channel.is_error()) {
-        return channel.status_value();
-      }
-
-      const fidl::WireResult result = fidl::WireCall(channel.value())->GetName();
-      if (!result.ok()) {
-        return result.status();
-      }
-      const fidl::WireResponse response = result.value();
-      if (zx_status_t status = response.status; status != ZX_OK) {
-        return status;
-      }
-      if (response.name.get() == args->expected_name) {
-        // Found a device under /dev/class/block/XYZ with the name of the
-        // ramdisk we originally created.
-        strncat(args->blockpath, fn, sizeof(blockpath) - (strlen(args->blockpath) + 1));
-        args->filename = fbl::String(fn);
-        args->found = true;
-        return ZX_ERR_STOP;
-      }
+    if (event != WATCH_EVENT_ADD_FILE) {
+      return ZX_OK;
     }
-    return ZX_OK;
+    if (std::string_view{fn} == ".") {
+      return ZX_OK;
+    }
+    fdio_cpp::UnownedFdioCaller caller(dirfd);
+    zx::result channel =
+        component::ConnectAt<fuchsia_hardware_block_partition::Partition>(caller.directory(), fn);
+    if (channel.is_error()) {
+      return channel.status_value();
+    }
+
+    const fidl::WireResult result = fidl::WireCall(channel.value())->GetName();
+    if (!result.ok()) {
+      return result.status();
+    }
+    const fidl::WireResponse response = result.value();
+    if (zx_status_t status = response.status; status != ZX_OK) {
+      return status;
+    }
+    if (response.name.get() != args->expected_name) {
+      return ZX_OK;
+    }
+    // Found a device under /dev/class/block/XYZ with the name of the
+    // ramdisk we originally created.
+    strncat(args->blockpath, fn, sizeof(blockpath) - (strlen(args->blockpath) + 1));
+    args->filename = fbl::String(fn);
+    args->found = true;
+    return ZX_ERR_STOP;
   };
 
   zx_time_t deadline = zx_deadline_after(ZX_SEC(3));

@@ -189,10 +189,7 @@ class PseudoDir : public fs::PseudoDir {
       unpublished;
 
  private:
-  PseudoDir() : fs::PseudoDir(false) {}
   bool IsSkipRightsEnforcementDevfsOnlyDoNotUse() const final { return false; }
-
-  friend fbl::internal::MakeRefCountedHelper<PseudoDir>;
 };
 
 // Represents an entry in the /dev/class directory. A thin wrapper around
@@ -244,8 +241,8 @@ class DevfsDevice {
 class Devfs {
  public:
   // `root` must outlive `this`.
-  Devfs(std::optional<Devnode>& root,
-        std::optional<fidl::ClientEnd<fuchsia_io::Directory>> diagnostics = {});
+  explicit Devfs(std::optional<Devnode>& root,
+                 std::optional<fidl::ClientEnd<fuchsia_io::Directory>> diagnostics = {});
 
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Connect(fs::FuchsiaVfs& vfs);
 
