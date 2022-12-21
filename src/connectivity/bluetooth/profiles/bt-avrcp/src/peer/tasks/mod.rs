@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    anyhow::format_err,
     fuchsia_async as fasync,
     fuchsia_async::DurationExt,
     fuchsia_zircon as zx,
@@ -23,6 +24,44 @@ mod notification_stream;
 use crate::packets::Error as PacketError;
 use crate::peer::*;
 use crate::types::PeerError as Error;
+
+// TODO(fxbug.dev/105464): consider calling this function on available players
+// changed notification event instead of on browse connection setup completion.
+async fn record_player_capabilities(peer: Arc<RwLock<RemotePeer>>) -> Result<(), Error> {
+    if peer.read().target_descriptor.is_none() {
+        return Ok(());
+    }
+    trace!("Recording player capabilities for target peer {:?}", peer.read().id());
+    let command = GetFolderItemsCommand::new_media_player_list(0, 9);
+    let mut payload = vec![0; command.encoded_len()];
+    let _ = command.encode(&mut payload[..])?;
+    let pdu_id = PduId::GetFolderItems;
+    let cmd_buf = BrowsePreamble::new(u8::from(&pdu_id), payload.to_vec());
+
+    let resp_buf: Vec<u8> =
+        { send_browsing_command_internal(peer.clone(), u8::from(&pdu_id), cmd_buf).await? };
+    let response = GetFolderItemsResponse::decode(&resp_buf[..])?;
+    match response {
+        GetFolderItemsResponse::Failure(status) => {
+            error!("GetFolderItems command failed: {:?}", status);
+            return Err(Error::CommandFailed);
+        }
+        GetFolderItemsResponse::Success(r) => {
+            let players = r
+                .item_list()
+                .into_iter()
+                .map(|i| fidl_fuchsia_bluetooth_avrcp::MediaPlayerItem::try_from(i))
+                .collect::<Result<
+                    Vec<fidl_fuchsia_bluetooth_avrcp::MediaPlayerItem>,
+                    fidl_fuchsia_bluetooth_avrcp::BrowseControllerError,
+                >>()
+                .map_err(|e| format_err!("Failed to convert to FIDL media player item {:?}", e))?;
+            let peer_guard = peer.write();
+            peer_guard.inspect.metrics().target_player_features(peer_guard.id(), players);
+        }
+    };
+    Ok(())
+}
 
 /// Processes incoming commands from the control stream and dispatches them to the control command
 /// handler. This is started only when we have a connection and when we have either a target or
@@ -262,6 +301,15 @@ fn start_browse_stream_processing_task(peer: Arc<RwLock<RemotePeer>>) -> fasync:
     fasync::Task::spawn(process_browse_stream(peer).map(|_| ()))
 }
 
+/// Spawns a task that records metrics related to a peer.
+fn run_metrics_logging_task(peer: Arc<RwLock<RemotePeer>>) -> fasync::Task<()> {
+    fasync::Task::spawn(async move {
+        if let Err(e) = record_player_capabilities(peer).await {
+            trace!("failed to record player capabilities: {:?}", e);
+        }
+    })
+}
+
 /// State observer task around a remote peer. Takes a change stream from the remote peer that wakes
 /// the task whenever some state has changed on the peer. Swaps tasks such as making outgoing
 /// connections, processing the incoming control messages, and registering for notifications on the
@@ -278,6 +326,7 @@ pub(super) async fn state_watcher(peer: Arc<RwLock<RemotePeer>>) {
 
     let mut control_channel_task: Option<fasync::Task<()>> = None;
     let mut browse_channel_task: Option<fasync::Task<()>> = None;
+    let mut post_browse_setup_task: Option<fasync::Task<()>> = None;
     let mut notification_poll_task: Option<fasync::Task<()>> = None;
 
     while let Some(_) = change_stream.next().await {
@@ -290,9 +339,12 @@ pub(super) async fn state_watcher(peer: Arc<RwLock<RemotePeer>>) {
 
         // The old tasks need to be cleaned up. Potentially terminate the channel
         // processing tasks and the notification processing task.
-        // Reset the `cancel_tasks` flag so that we don't fall into a loop of
-        // constantly clearing the tasks.
+        // Reset the `cancel_{browse|control}_task` flags so that we don't fall
+        // into a loop of constantly clearing the tasks.
         if peer_guard.cancel_browse_task {
+            if post_browse_setup_task.take().is_some() {
+                trace!("state_watcher: clearing previous post browse setup task.");
+            }
             if browse_channel_task.take().is_some() {
                 trace!("state_watcher: clearing previous browse channel task.");
             }
@@ -364,6 +416,9 @@ pub(super) async fn state_watcher(peer: Arc<RwLock<RemotePeer>>) {
                 }
                 // We always use the newest Browse connection.
                 browse_channel_task = Some(start_browse_stream_processing_task(peer.clone()));
+
+                // Run metrics logging task after browse connection is set up.
+                post_browse_setup_task = Some(run_metrics_logging_task(peer.clone()));
             }
         }
     }
@@ -375,6 +430,7 @@ pub(super) async fn state_watcher(peer: Arc<RwLock<RemotePeer>>) {
 
     // Stop processing state changes on the browse channel.
     // This needs to happen before stopping the control channel.
+    drop(post_browse_setup_task.take());
     drop(browse_channel_task.take());
 
     // Stop processing state changes on the control channel.

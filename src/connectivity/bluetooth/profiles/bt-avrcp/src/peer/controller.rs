@@ -588,6 +588,23 @@ pub(crate) mod tests {
         (controller, remote_avc_peer, remote_avctp_peer)
     }
 
+    // There are some browse commands that are sent out post peer-setup.
+    // Verify that those browse commands were successfully sent out and send
+    // out a mock response.
+    fn expect_initial_browse_command(
+        exec: &mut fasync::TestExecutor,
+        command_stream: &mut AvctpCommandStream,
+    ) {
+        // Expect get folder items command with media player scope.
+        let command = get_next_avctp_command(exec, command_stream);
+        let params = decode_avctp_command(&command, PduId::GetFolderItems);
+        let cmd =
+            GetFolderItemsCommand::decode(&params).expect("should have received valid command");
+        assert_matches!(cmd.scope(), Scope::MediaPlayerList);
+        let mock_resp = GetFolderItemsResponse::new_success(1, vec![]);
+        send_avctp_response(PduId::GetFolderItems, &mock_resp, &command);
+    }
+
     fn verify_avc_command(
         exec: &mut fuchsia_async::TestExecutor,
         command_stream: &mut bt_avctp::AvcCommandStream,
@@ -608,6 +625,7 @@ pub(crate) mod tests {
 
         let (controller, _remote_avc_peer, remote_avctp_peer) = set_up();
         let mut avctp_cmd_stream = remote_avctp_peer.take_command_stream();
+        expect_initial_browse_command(&mut exec, &mut avctp_cmd_stream);
 
         // Test GetNowPlayingItems, which should fail since browsed player isn't set.
         let get_now_playing_fut = controller.get_now_playing_items(
@@ -682,6 +700,8 @@ pub(crate) mod tests {
 
         let (controller, _remote_avc_peer, remote_avctp_peer) = set_up();
         let mut avctp_cmd_stream = remote_avctp_peer.take_command_stream();
+        expect_initial_browse_command(&mut exec, &mut avctp_cmd_stream);
+
         set_browsed_player(&mut exec, &controller, &mut avctp_cmd_stream);
 
         let move_into_dir_fut = controller.change_directory(Some(2));
@@ -712,6 +732,7 @@ pub(crate) mod tests {
         let (controller, remote_avc_peer, remote_avctp_peer) = set_up();
         let mut avctp_cmd_stream = remote_avctp_peer.take_command_stream();
         let mut avc_cmd_stream = remote_avc_peer.take_command_stream();
+        expect_initial_browse_command(&mut exec, &mut avctp_cmd_stream);
         set_browsed_player(&mut exec, &controller, &mut avctp_cmd_stream);
         verify_avc_command(&mut exec, &mut avc_cmd_stream, PduId::GetCapabilities);
 
