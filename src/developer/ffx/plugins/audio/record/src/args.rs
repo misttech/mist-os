@@ -64,7 +64,6 @@ pub struct CaptureCommand {
     pub mute: bool,
 }
 
-// denote whether usage was loopback, pass to audiocapturer
 fn str_to_usage(src: &str) -> Result<AudioCaptureUsageExtended, String> {
     match src.to_uppercase().as_str() {
         "BACKGROUND" => Ok(AudioCaptureUsageExtended::Background(AudioCaptureUsage::Background)),
@@ -75,9 +74,11 @@ fn str_to_usage(src: &str) -> Result<AudioCaptureUsageExtended, String> {
         "COMMUNICATION" => {
             Ok(AudioCaptureUsageExtended::Communication(AudioCaptureUsage::Communication))
         }
-        // add loopback as an option
         "LOOPBACK" => Ok(AudioCaptureUsageExtended::Loopback),
-        _ => Err(String::from("Couldn't parse usage.")),
+        _ => Err(String::from(
+            "Couldn't parse usage. Expected one of: 
+        BACKGROUND, FOREGROUND, SYSTEM-AGENT, COMMUNICATION, or LOOPBACK",
+        )),
     }
 }
 
