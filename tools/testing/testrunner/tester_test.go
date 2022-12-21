@@ -604,15 +604,8 @@ func TestSSHTester(t *testing.T) {
 			runSnapshot: true,
 		},
 		{
-			name:        "get data sinks for v1 tests",
-			runErrs:     []error{nil},
-			useRuntests: true,
-		},
-		{
-			name:        "get data sinks for v2 tests",
-			runErrs:     []error{nil},
-			useRuntests: true,
-			runV2:       true,
+			name:    "get data sinks for tests",
+			runErrs: []error{nil},
 		},
 		{
 			name:           "test timeout",
@@ -645,13 +638,10 @@ func TestSSHTester(t *testing.T) {
 			wantReconnCalls := len(c.reconErrs)
 			wantRunCalls := len(c.runErrs)
 			test := testsharder.Test{
-				Test:         build.Test{PackageURL: "fuchsia-pkg://foo"},
+				Test:         build.Test{PackageURL: "fuchsia-pkg://foo#meta/bar.cm"},
 				Runs:         1,
 				RunAlgorithm: testsharder.StopOnSuccess,
 				Timeout:      time.Second,
-			}
-			if c.runV2 {
-				test.Test = build.Test{PackageURL: "fuchsia-pkg://foo#meta/bar.cm"}
 			}
 			testResult, err := tester.Test(context.Background(), test, io.Discard, io.Discard, "unused-out-dir")
 			expectedResult := runtests.TestSuccess
@@ -1123,44 +1113,7 @@ func TestCommandForTest(t *testing.T) {
 					PackageURL: "fuchsia-pkg://example.com/test.cmx",
 				},
 			},
-			expected: []string{"run-test-component", "fuchsia-pkg://example.com/test.cmx"},
-		},
-		{
-			name:        "components v1 timeout",
-			useRuntests: false,
-			test: testsharder.Test{
-				Test: build.Test{
-					Path:       "/path/to/test",
-					PackageURL: "fuchsia-pkg://example.com/test.cmx",
-				},
-			},
-			timeout:  time.Second,
-			expected: []string{"run-test-component", "--timeout=1", "fuchsia-pkg://example.com/test.cmx"},
-		},
-		{
-			name:        "components v1 max severity",
-			useRuntests: false,
-			test: testsharder.Test{
-				Test: build.Test{
-					Path:        "/path/to/test",
-					PackageURL:  "fuchsia-pkg://example.com/test.cmx",
-					LogSettings: build.LogSettings{MaxSeverity: "ERROR"},
-				},
-			},
-			timeout:  time.Second,
-			expected: []string{"run-test-component", "--max-log-severity=ERROR", "--timeout=1", "fuchsia-pkg://example.com/test.cmx"},
-		},
-		{
-			name:        "components v1 realm label",
-			useRuntests: false,
-			test: testsharder.Test{
-				Test: build.Test{
-					Path:       "/path/to/test",
-					PackageURL: "fuchsia-pkg://example.com/test.cmx",
-				},
-				RealmLabel: "testrealm",
-			},
-			expected: []string{"run-test-component", "--realm-label", "testrealm", "fuchsia-pkg://example.com/test.cmx"},
+			wantErr: true,
 		},
 		{
 			name:        "components v2",

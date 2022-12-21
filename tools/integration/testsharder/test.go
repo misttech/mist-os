@@ -35,7 +35,7 @@ type Test struct {
 	// RunAlgorithm determines how `Runs` will be used to run the test.
 	RunAlgorithm RunAlgorithm `json:"run_algorithm,omitempty"`
 
-	// RealmLabel is an optional arg passed to run-test-component to specify a
+	// RealmLabel is an optional arg passed to runtests to specify a
 	// realm.
 	RealmLabel string `json:"realm_label,omitempty"`
 

@@ -59,8 +59,7 @@ environment variable. (These environment variables are generally set by
 botanist when it invokes testrunner as a subprocess.)
 
 testrunner executes most Fuchsia tests by running
-`run-test-suite <package_url>` or `run-test-component <package_url>`,
-depending on the format of the test's `package_url` field.
+`run-test-suite <package_url>`.
 
 ### Serial
 

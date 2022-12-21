@@ -38,7 +38,7 @@ func main() {
 	flag.StringVar(&flags.NsjailPath, "nsjail", "", "Optional path to an NsJail binary to use for linux host test sandboxing.")
 	flag.StringVar(&flags.NsjailRoot, "nsjail-root", "", "Path to the directory to use as the NsJail root directory")
 	flag.StringVar(&flags.LocalWD, "C", "", "Working directory of local testing subprocesses; if unset the current working directory will be used.")
-	flag.BoolVar(&flags.UseRuntests, "use-runtests", false, "Whether to default to running fuchsia tests with runtests; if false, run_test_component will be used.")
+	flag.BoolVar(&flags.UseRuntests, "use-runtests", false, "Whether to default to running fuchsia tests with runtests; if false, run_test_suite will be used.")
 	flag.StringVar(&flags.SnapshotFile, "snapshot-output", "", "The output filename for the snapshot. This will be created in the output directory.")
 	flag.Var(&flags.LogLevel, "level", "Output verbosity, can be fatal, error, warning, info, debug or trace.")
 	flag.BoolVar(&flags.PrefetchPackages, "prefetch-packages", false, "Prefetch any test packages in the background.")

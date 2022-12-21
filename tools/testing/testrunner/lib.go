@@ -55,7 +55,7 @@ type TestrunnerFlags struct {
 	NsjailRoot string
 
 	// Whether to use runtests when executing tests on fuchsia. If false, the
-	// default will be run_test_component.
+	// default will be run_test_suite.
 	UseRuntests bool
 
 	// The output filename for the snapshot. This will be created in the outDir.

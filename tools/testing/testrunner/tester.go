@@ -54,12 +54,10 @@ const (
 	dataOutputDirEarlyBoot = "/tmp/test_manager:0/data"
 
 	// Various tools for running tests.
-	runtestsName         = "runtests"
-	runTestComponentName = "run-test-component"
-	runTestSuiteName     = "run-test-suite"
+	runtestsName     = "runtests"
+	runTestSuiteName = "run-test-suite"
 
-	// Returned by both run-test-component and run-test-suite to indicate the
-	// test timed out.
+	// Returned by run-test-suite to indicate the test timed out.
 	timeoutExitCode = 21
 
 	// Printed to the serial console when ready to accept user input.
@@ -1469,19 +1467,7 @@ func commandForTest(test *testsharder.Test, useRuntests bool, remoteOutputDir st
 				command = append(command, "--timeout", fmt.Sprintf("%d", int64(timeout.Seconds())))
 			}
 		} else {
-			command = []string{runTestComponentName}
-			if test.LogSettings.MaxSeverity != "" {
-				command = append(command, fmt.Sprintf("--max-log-severity=%s", test.LogSettings.MaxSeverity))
-			}
-
-			if timeout > 0 {
-				command = append(command, fmt.Sprintf("--timeout=%d", int64(timeout.Seconds())))
-			}
-
-			// run-test-component supports realm-label but run-test-suite does not
-			if test.RealmLabel != "" {
-				command = append(command, "--realm-label", test.RealmLabel)
-			}
+			return nil, fmt.Errorf("CFv1 tests are no longer supported: %q", test.PackageURL)
 		}
 		command = append(command, test.PackageURL)
 	} else {
