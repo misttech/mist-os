@@ -549,6 +549,18 @@ protocol Graph {
     }) error zx.status;
 
     /// Starts a consumer or a producer at a specified time.
+    ///
+    /// When a call to this method succeeds, the response is typically sent when
+    /// the operation actually occurs (that is, when it was scheduled to occur),
+    /// but may complete sooner. When a call to this method fails, the response
+    /// is sent when the failure is detected.
+    ///
+    /// If this method is called, and `when` specifies a time in the past, the
+    /// stream timeline is started as soon as possible.
+    ///
+    /// If a `Start` or `Stop` request is received when a previous `Start` or
+    /// `Stop` request is pending, the connection is closed. This request can be
+    /// canceled using the `CancelStartOrStop` method.
     Start(table {
         /// ID of the consumer or producer node.
         ///
@@ -587,6 +599,21 @@ protocol Graph {
     }) error StartError;
 
     /// Stops a consumer or a producer at a specified time.
+    ///
+    /// When a call to this method succeeds, the response is typically sent when
+    /// the operation actually occurs (that is, when it was scheduled to occur),
+    /// but may complete sooner. When a call to this method fails, the response
+    /// is sent when the failure is detected.
+    ///
+    /// If this method is called when the stream timeline is stopped, the call
+    /// fails immediately with an `ALREADY_STOPPED` error.
+    ///
+    /// Otherwise, if this method is called, and `when` specifies a time in the
+    /// past, the stream timeline is stopped as soon as possible.
+    ///
+    /// If a `Start` or `Stop` request is received when a previous `Start` or
+    /// `Stop` request is pending, the connection is closed. This request can be
+    /// canceled using the `CancelStartOrStop` method.
     Stop(table {
         /// ID of the consumer or producer node.
         ///
@@ -618,6 +645,14 @@ protocol Graph {
         /// Required.
         4: packet_timestamp int64;
     }) error StopError;
+
+    /// Cancels the previously-received `Start` or `Stop` request if it is still
+    /// pending. Cancel requests race with the pending operations they are
+    /// intended to cancel. The response to the request to be canceled indicates
+    /// the outcome of the race. In typical usage, a `CancelStartOrStop` request
+    /// should be followed in short order by a `Stop` or `Start` request so that
+    /// the state of the service is known.
+    CancelStartOrStop();
 
     /// Reports a producer's lead time. In output pipelines, a producer's lead
     /// time defines how early an audio frame must be received in order for that

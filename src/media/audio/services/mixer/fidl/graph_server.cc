@@ -1284,6 +1284,12 @@ void GraphServer::Stop(StopRequestView request, StopCompleter::Sync& completer) 
   }
 }
 
+void GraphServer::CancelStartOrStop(CancelStartOrStopCompleter::Sync& completer) {
+  TRACE_DURATION("audio", "Graph:::CancelStartOrStop");
+  ScopedThreadChecker checker(thread().checker());
+  FX_LOGS(FATAL) << "not implemented";
+}
+
 void GraphServer::BindProducerLeadTimeWatcher(
     BindProducerLeadTimeWatcherRequestView request,
     BindProducerLeadTimeWatcherCompleter::Sync& completer) {
