@@ -237,8 +237,8 @@ zx_status_t DeviceManager::RemoveDevice(const fbl::RefPtr<Device>& dev, bool for
     return ZX_ERR_BAD_STATE;
   }
 
-  LOGF(INFO, "Removing device %p '%s' parent=%p", dev.get(), dev->name().data(),
-       dev->parent().get());
+  LOGF(INFO, "Removing device %p '%s' parent=%p, coordinator marking device as dead", dev.get(),
+       dev->name().data(), dev->parent().get());
   dev->set_state(Device::State::kDead);
 
   // remove from devfs, preventing further OPEN attempts

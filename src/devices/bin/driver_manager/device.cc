@@ -719,7 +719,8 @@ void Device::SendCompleteRemove(RemoveCompletion& completion) {
           return;
         }
         auto* response = result.Unwrap();
-        LOGF(INFO, "Removed device %p '%s': %s", dev.get(), dev->name().data(),
+        LOGF(INFO, "Remove task completing - Driver host has removed device %p '%s': %s", dev.get(),
+             dev->name().data(),
              zx_status_get_string(response->is_error() ? response->error_value() : ZX_OK));
         dev->CompleteRemove();
       });

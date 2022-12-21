@@ -123,8 +123,10 @@ void UnbindTask::ScheduleUnbindChildren() {
 }
 
 void UnbindTask::Run() {
-  LOGF(INFO, "Running unbind task for device %p '%s', do_unbind %d", device_.get(),
-       device_->name().data(), do_unbind_);
+  LOGF(
+      INFO,
+      "Running unbind task for device %p '%s', do_unbind %d - requesting driver host to unbind device",
+      device_.get(), device_->name().data(), do_unbind_);
 
   if (device_->state() == Device::State::kInitializing) {
     auto init_task = device_->GetActiveInit();
@@ -194,7 +196,8 @@ fbl::RefPtr<RemoveTask> RemoveTask::Create(fbl::RefPtr<Device> device, Completio
 }
 
 void RemoveTask::Run() {
-  LOGF(INFO, "Running remove task for device %p '%s'", device_.get(), device_->name().data());
+  LOGF(INFO, "Running remove task for device %p '%s' - requesting driver host to remove device",
+       device_.get(), device_->name().data());
   Device::RemoveCompletion completion = ExtendLifetimeWith([this](zx_status_t status) {
     // If this remove task failed, force remove all devices from the driver_host.
     bool failed_remove = status != ZX_OK && status != ZX_ERR_UNAVAILABLE;
