@@ -11,6 +11,8 @@
 #include <lib/driver/devfs/cpp/connector.h>
 #include <zircon/errors.h>
 
+#include <unordered_map>
+
 namespace {
 
 // Connect to parent device node using fuchsia.driver.compat.Service
@@ -46,24 +48,23 @@ namespace demo_number {
 
 const std::string kDriverName = "demo_number";
 
-// FIDL server implementation for the `fuchsia.hardware.demo/Demo` protocol.
-class DemoNumberServer : public fidl::Server<fuchsia_hardware_demo::Demo> {
+// This class manages a single connection for the `fuchsia.hardware.demo/Demo` protocol.
+class DemoNumberConnection : public fidl::Server<fuchsia_hardware_demo::Demo> {
  public:
-  DemoNumberServer(driver::Logger* logger) : logger_(logger) {}
+  using OnUnbindFn = fit::function<void(fidl::UnbindInfo)>;
 
+  DemoNumberConnection(async_dispatcher_t* dispatcher,
+                       fidl::ServerEnd<fuchsia_hardware_demo::Demo> server, OnUnbindFn on_unbind)
+      : binding_(dispatcher, std::move(server), this, std::move(on_unbind)) {}
+
+ private:
   void GetNumber(GetNumberCompleter::Sync& completer) override {
     completer.Reply(current_number);
     current_number += 1;
   }
 
-  // This method is called when a server connection is torn down.
-  void OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<fuchsia_hardware_demo::Demo> server_end) {
-    FDF_LOGL(INFO, (*logger_), "Client connection unbound: %s", info.status_string());
-  }
-
- private:
   uint32_t current_number = 0;
-  driver::Logger* logger_;
+  const fidl::ServerBinding<fuchsia_hardware_demo::Demo> binding_;
 };
 
 // This class represents the driver instance.
@@ -122,14 +123,24 @@ class DemoNumber : public driver::DriverBase {
   void Stop() override { FDF_LOG(INFO, "Driver unloaded: %s", kDriverName.c_str()); }
 
  private:
+  // Bind a connection request to a DemoNumberConnection.
   void Connect(fidl::ServerEnd<fuchsia_hardware_demo::Demo> request) {
-    // Bind each connection request to a fuchsia.hardware.demo/Demo server instance.
-    auto demo_impl = std::make_unique<DemoNumberServer>(&logger());
-    fidl::BindServer(dispatcher(), std::move(request), std::move(demo_impl),
-                     std::mem_fn(&DemoNumberServer::OnUnbound));
+    const zx_handle_t key = request.channel().get();
+    auto [it, inserted] = servers_.try_emplace(
+        key, dispatcher(), std::move(request), [this, key](fidl::UnbindInfo info) {
+          FDF_LOG(INFO, "Client connection unbound: %s", info.FormatDescription().c_str());
+          size_t erase_count = servers_.erase(key);
+          // TODO(fxbug.dev/118019): Use FATAL log when its supported.
+          ZX_ASSERT_MSG(erase_count == 1,
+                        "Failed to erase connection with key: %d, erased %ld connections", key,
+                        erase_count);
+        });
+    // TODO(fxbug.dev/118019): Use FATAL log when its supported.
+    ZX_ASSERT_MSG(inserted, "Failed to insert connection with key: %d", key);
   }
 
   driver_devfs::Connector<fuchsia_hardware_demo::Demo> devfs_connector_;
+  std::unordered_map<zx_handle_t, DemoNumberConnection> servers_;
 };
 
 }  // namespace demo_number
