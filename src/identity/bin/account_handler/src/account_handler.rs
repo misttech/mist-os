@@ -86,11 +86,8 @@ where
     /// An account has not yet been created or loaded.
     Uninitialized,
 
-    /// The account is locked.
-    Locked { pre_auth_state: PreAuthState },
-
-    /// The account is currently loaded and is available.
-    Initialized { account: Arc<Account<SM>>, pre_auth_state: PreAuthState },
+    /// The account is initialized, and is either locked or unlocked.
+    Initialized { lock_state: LockState<SM>, pre_auth_state: PreAuthState },
 
     /// There is no account present, and initialization is not possible.
     Finished,
@@ -101,11 +98,37 @@ where
     SM: StorageManager,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = match *self {
+        let name = match self {
             Lifecycle::Uninitialized { .. } => "Uninitialized",
-            Lifecycle::Locked { .. } => "Locked",
-            Lifecycle::Initialized { .. } => "Initialized",
+            Lifecycle::Initialized { lock_state: l, .. } => {
+                return l.fmt(f);
+            }
             Lifecycle::Finished => "Finished",
+        };
+        write!(f, "{name}")
+    }
+}
+
+/// The states of an initialized AccountHandler.
+enum LockState<SM>
+where
+    SM: StorageManager,
+{
+    /// The account is locked.
+    Locked,
+
+    /// The account is currently loaded and is available.
+    Unlocked { account: Arc<Account<SM>> },
+}
+
+impl<SM> fmt::Debug for LockState<SM>
+where
+    SM: StorageManager,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            LockState::Locked => "Locked",
+            LockState::Unlocked { .. } => "Unlocked",
         };
         write!(f, "{name}")
     }
@@ -269,8 +292,11 @@ where
                     )?;
 
                 let pre_auth_state_bytes: Vec<u8> = (&pre_auth_state).try_into()?;
-                *state_lock = Lifecycle::Initialized { account: Arc::new(account), pre_auth_state };
-                self.inspect.lifecycle.set("initialized");
+                *state_lock = Lifecycle::Initialized {
+                    lock_state: LockState::Unlocked { account: Arc::new(account) },
+                    pre_auth_state,
+                };
+                self.inspect.lifecycle.set("unlocked");
                 Ok(pre_auth_state_bytes)
             }
             ref invalid_state => {
@@ -293,7 +319,8 @@ where
                 let pre_auth_state = PreAuthState::try_from(pre_auth_state_bytes)?;
                 self.inspect.set_account_id(*pre_auth_state.account_id());
 
-                *state_lock = Lifecycle::Locked { pre_auth_state };
+                *state_lock =
+                    Lifecycle::Initialized { lock_state: LockState::Locked, pre_auth_state };
 
                 self.inspect.lifecycle.set("locked");
                 Ok(())
@@ -317,11 +344,17 @@ where
     ) -> Result<Option<Vec<u8>>, ApiError> {
         let mut state_lock = self.state.lock().await;
         match &*state_lock {
-            Lifecycle::Initialized { .. } => {
-                info!("UnlockAccount was called in the Initialized state, quietly succeeding.");
+            Lifecycle::Initialized { lock_state: LockState::Unlocked { .. }, .. } => {
+                info!(
+                    "UnlockAccount was called in the Initialized::Unlocked state, quietly \
+                    succeeding."
+                );
                 Ok(None)
             }
-            Lifecycle::Locked { pre_auth_state: pre_auth_state_ref } => {
+            Lifecycle::Initialized {
+                lock_state: LockState::Locked,
+                pre_auth_state: pre_auth_state_ref,
+            } => {
                 let (prekey_material, maybe_updated_enrollment_state) = Self::authenticate(
                     self.is_interaction_enabled,
                     &pre_auth_state_ref.enrollment_state,
@@ -367,8 +400,11 @@ where
                         (&pre_auth_state).try_into()
                     })
                     .transpose()?;
-                *state_lock = Lifecycle::Initialized { account: Arc::new(account), pre_auth_state };
-                self.inspect.lifecycle.set("initialized");
+                *state_lock = Lifecycle::Initialized {
+                    lock_state: LockState::Unlocked { account: Arc::new(account) },
+                    pre_auth_state,
+                };
+                self.inspect.lifecycle.set("unlocked");
                 Ok(pre_auth_state_bytes)
             }
             ref invalid_state => {
@@ -404,7 +440,7 @@ where
 
         self.inspect.lifecycle.set("finished");
         match old_lifecycle {
-            Lifecycle::Locked { .. } => {
+            Lifecycle::Initialized { lock_state: LockState::Locked {}, .. } => {
                 self.storage_manager.lock().await.destroy().await.map_err(|err| {
                     warn!("remove_account failed to destroy StorageManager: {:?}", err);
                     ApiError::Resource
@@ -415,7 +451,7 @@ where
                 info!("Deleted account");
                 Ok(())
             }
-            Lifecycle::Initialized { account, .. } => {
+            Lifecycle::Initialized { lock_state: LockState::Unlocked { account, .. }, .. } => {
                 self.storage_manager.lock().await.destroy().await.map_err(|err| {
                     warn!("remove_account failed to destroy StorageManager: {:?}", err);
                     ApiError::Resource
@@ -455,9 +491,11 @@ where
         account_server_end: ServerEnd<AccountMarker>,
     ) -> Result<(), ApiError> {
         let account_arc = match &*self.state.lock().await {
-            Lifecycle::Initialized { account, .. } => Arc::clone(account),
+            Lifecycle::Initialized { lock_state: LockState::Unlocked { account, .. }, .. } => {
+                Arc::clone(account)
+            }
             _ => {
-                warn!("AccountHandler is not initialized");
+                warn!("AccountHandler is not unlocked");
                 return Err(ApiError::FailedPrecondition);
             }
         };
@@ -491,9 +529,11 @@ where
             let mut state_lock = self.state.lock().await;
             std::mem::replace(&mut *state_lock, Lifecycle::Finished)
         };
-        if let Lifecycle::Initialized { account, .. } = old_state {
+        if let Lifecycle::Initialized { lock_state: LockState::Unlocked { account, .. }, .. } =
+            old_state
+        {
             if account.task_group().cancel().await.is_err() {
-                warn!("Task group cancelled but account is still initialized");
+                warn!("Task group cancelled but account is still unlocked");
             }
         }
     }
@@ -770,23 +810,31 @@ where
         inspect: Arc<inspect::AccountHandler>,
     ) -> Result<Option<Vec<u8>>, AccountManagerError> {
         let mut state_lock = state.lock().await;
-        match &*state_lock {
-            Lifecycle::Locked { .. } => {
-                info!("A lock operation was attempted in the locked state, quietly succeeding.");
-                Ok(None)
-            }
-            Lifecycle::Initialized { account, pre_auth_state } => {
-                let () = storage_manager.lock().await.lock_storage().await.map_err(|err| {
-                    warn!("LockAccount failed to lock StorageManager: {:?}", err);
-                    AccountManagerError::new(ApiError::Internal).with_cause(err)
-                })?;
-                let _ = account.task_group().cancel().await; // Ignore AlreadyCancelled error
+        match &mut *state_lock {
+            Lifecycle::Initialized { ref mut lock_state, .. } => {
+                match lock_state {
+                    LockState::Locked {} => {
+                        info!(
+                            "A lock operation was attempted in the locked state, quietly \
+                            succeeding."
+                        );
+                        Ok(None)
+                    }
+                    LockState::Unlocked { account } => {
+                        let () =
+                            storage_manager.lock().await.lock_storage().await.map_err(|err| {
+                                warn!("LockAccount failed to lock StorageManager: {:?}", err);
+                                AccountManagerError::new(ApiError::Internal).with_cause(err)
+                            })?;
 
-                // TODO(apsbhatia): Explore better alternatives to avoid cloning here.
-                let new_state = Lifecycle::Locked { pre_auth_state: pre_auth_state.clone() };
-                *state_lock = new_state;
-                inspect.lifecycle.set("locked");
-                Ok(None) // Pre-auth state remains the same so don't return it.
+                        // Ignore AlreadyCancelled error
+                        let _ = account.task_group().cancel().await;
+
+                        *lock_state = LockState::Locked;
+                        inspect.lifecycle.set("locked");
+                        Ok(None) // Pre-auth state remains the same so don't return it.
+                    }
+                }
             }
             ref invalid_state => Err(AccountManagerError::new(ApiError::FailedPrecondition)
                 .with_cause(format_err!(
@@ -1056,7 +1104,7 @@ mod tests {
 
                         assert_data_tree!(inspector, root: {
                             account_handler: contains {
-                                lifecycle: "initialized",
+                                lifecycle: "unlocked",
                                 account: contains {
                                     open_client_channels: 1u64,
                                 },
@@ -1100,7 +1148,7 @@ mod tests {
                     proxy.create_account(create_account_request(TEST_ACCOUNT_ID_UINT)).await??;
                     assert_data_tree!(inspector, root: {
                         account_handler: contains {
-                            lifecycle: "initialized",
+                            lifecycle: "unlocked",
                         }
                     });
                     Ok(())
@@ -1129,7 +1177,7 @@ mod tests {
                         .await??;
                     assert_data_tree!(inspector, root: {
                         account_handler: contains {
-                            lifecycle: "initialized",
+                            lifecycle: "unlocked",
                         }
                     });
                     Ok(())
@@ -1211,7 +1259,7 @@ mod tests {
                         assert_data_tree!(inspector, root: {
                             account_handler: {
                                 account_id: TEST_ACCOUNT_ID_UINT,
-                                lifecycle: "initialized",
+                                lifecycle: "unlocked",
                                 account: {
                                     open_client_channels: 0u64,
                                 },
@@ -1523,7 +1571,7 @@ mod tests {
                     // The state remains initialized
                     assert_data_tree!(inspector, root: {
                         account_handler: contains {
-                            lifecycle: "initialized",
+                            lifecycle: "unlocked",
                         }
                     });
                     Ok(())
