@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, Context as _, Result},
+    anyhow::{Context as _, Result},
     argh::FromArgs,
     fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy},
     fuchsia_async as fasync,
@@ -68,6 +68,7 @@ struct Args {
 
 #[fasync::run_singlethreaded]
 async fn main() -> Result<()> {
+    diagnostics_log::init!(&["remote_control_runner"]);
     let args: Args = argh::from_env();
 
     // Ensure the invoking version of ffx supports compatibility checks.
@@ -77,11 +78,11 @@ async fn main() -> Result<()> {
     };
 
     if daemon_abi_revision != 0 && !COMPATIBLE_ABIS.contains(&daemon_abi_revision) {
-        let error = format!(
+        let warning = format!(
             "ffx revision {:#X} is not compatible with the target. The target is compatible with ABIs [ {:#X}, {:#X} ]",
             daemon_abi_revision, COMPATIBLE_ABIS[0], COMPATIBLE_ABIS[1]
         );
-        return Err(anyhow!(error));
+        tracing::warn!("{}", warning);
     }
 
     let rcs_proxy = connect_to_protocol::<RemoteControlMarker>()?;

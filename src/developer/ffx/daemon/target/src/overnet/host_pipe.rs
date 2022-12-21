@@ -115,9 +115,7 @@ impl HostPipeChild {
     ) -> Result<(Option<HostAddr>, HostPipeChild)> {
         std::env::set_var(
             "FFX_DAEMON_ABI_REVISION",
-            // TODO(fxb/117872): Update this to an ABI revision from API level
-            // 11 once enough time has elapsed.
-            "17110537485609514211",
+            version_history::LATEST_VERSION.abi_revision.0.to_string(),
         );
         let id_string = format!("{}", id);
         let mut args = vec![
@@ -426,8 +424,8 @@ mod test {
     use super::*;
     use addr::TargetAddr;
     use assert_matches::assert_matches;
-    use std::str::FromStr;
     use std::rc::Rc;
+    use std::str::FromStr;
 
     const ERR_CTX: &'static str = "running fake host-pipe command for test";
 
