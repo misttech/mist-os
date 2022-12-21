@@ -172,9 +172,9 @@ class LibpcapPacketTest : public LibpcapTest {
     LibpcapTest::TearDown();
   }
 
-  void Send() { ASSERT_NO_FATAL_FAILURE(Send(udp_)); }
+  void SendThenRecv() { ASSERT_NO_FATAL_FAILURE(SendThenRecv(udp_)); }
 
-  void Send(const fbl::unique_fd &dst) {
+  void SendThenRecv(const fbl::unique_fd &dst) {
     sockaddr_in dst_addr;
     ASSERT_NO_FATAL_FAILURE(LoadSockaddr(dst, dst_addr));
 
@@ -184,18 +184,10 @@ class LibpcapPacketTest : public LibpcapTest {
         << strerror(errno);
 
     // Tests assume that the datagram has been delivered once this method returns, but Fuchsia
-    // doesn't guarantee synchronous local delivery. Poll at the destination fd to bridge this
-    // gap.
-    constexpr int kTimeout = 10000;
-    pollfd pfd = {
-        .fd = dst.get(),
-        .events = POLLIN,
-    };
-    const int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
-    ASSERT_GE(n, 0) << strerror(errno);
-    EXPECT_EQ(n, 1);
-    ASSERT_EQ(pfd.revents & POLLIN, POLLIN)
-        << "expect pfd.revents contains POLLIN, found: " << pfd.revents;
+    // doesn't guarantee synchronous local delivery. Read from the destination fd in order
+    // to bridge this gap.
+    uint8_t buf[1];
+    ASSERT_EQ(read(dst.get(), buf, sizeof(buf)), 0) << strerror(errno);
   }
 
   void PcapDispatch(uint8_t pkttype, int max_packets, int expected_packets,
@@ -282,10 +274,10 @@ TEST_F(LibpcapPacketTest, BlockingModes) {
   ASSERT_NO_FATAL_FAILURE(TestSetNonblockAndActivate(pcap_handle(), kTimeoutMs, ebuf()));
 
   auto send_and_dispatch_checks = [&]() {
-    ASSERT_NO_FATAL_FAILURE(Send());
+    ASSERT_NO_FATAL_FAILURE(SendThenRecv());
     ASSERT_NO_FATAL_FAILURE(
         PcapDispatch(PACKET_HOST, 1 /* max_packets */, 1 /* expected_packets */));
-    ASSERT_NO_FATAL_FAILURE(Send());
+    ASSERT_NO_FATAL_FAILURE(SendThenRecv());
     ASSERT_NO_FATAL_FAILURE(
         PcapDispatch(PACKET_HOST, 2 /* max_packets */, 1 /* expected_packets */));
   };
@@ -342,13 +334,13 @@ TEST_F(LibpcapPacketTest, Filter) {
   ASSERT_NO_FATAL_FAILURE(LoadSockaddr(nonfiltered_dst, nonfiltered_dstaddr));
 
   // Send a packet to some other port and expect not to receive the packet.
-  ASSERT_NO_FATAL_FAILURE(Send(nonfiltered_dst));
+  ASSERT_NO_FATAL_FAILURE(SendThenRecv(nonfiltered_dst));
   ASSERT_NO_FATAL_FAILURE(
       PcapDispatch(PACKET_HOST, 1 /* max_packets */, 0 /* expected_packets */,
                    ntohs(nonfiltered_dstaddr.sin_port) /* expected_dst_port */));
 
   // Send a packet to the filtered port and expect to receive the packet.
-  ASSERT_NO_FATAL_FAILURE(Send(filtered_dst));
+  ASSERT_NO_FATAL_FAILURE(SendThenRecv(filtered_dst));
   ASSERT_NO_FATAL_FAILURE(PcapDispatch(PACKET_HOST, 2 /* max_packets */, 1 /* expected_packets */,
                                        filtered_port /* expected_dst_port */));
 }
@@ -367,7 +359,7 @@ TEST_P(LibpcapPacketDirectionTest, FilterTest) {
       << pcap_statustostr(res) << "; pcap error: " << pcap_geterr(pcap_handle());
 
   // We only wrote one packet so we should only read one packet.
-  ASSERT_NO_FATAL_FAILURE(Send());
+  ASSERT_NO_FATAL_FAILURE(SendThenRecv());
   ASSERT_NO_FATAL_FAILURE(PcapDispatch(pkttype, 2 /* max_packets */, 1 /* expected_packets */));
 }
 
