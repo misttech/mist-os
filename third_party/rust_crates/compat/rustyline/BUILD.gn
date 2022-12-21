@@ -1,0 +1,54 @@
+# Copyright 2018 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# This file is currently a stopgap for building on Fuchsia
+# contact bwb@google.com if you are running into problems with
+# how it is mirrored
+
+import("//build/rust/rustc_library.gni")
+
+rustc_library("rustyline") {
+  name = "rustyline"
+  edition = "2015"
+  source_root = "//third_party/rust_crates/mirrors/rustyline/src/lib.rs"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+  deps = [
+    "//third_party/rust_crates:libc",
+    "//third_party/rust_crates:log",
+    "//third_party/rust_crates:memchr",
+    "//third_party/rust_crates:unicode-segmentation",
+    "//third_party/rust_crates:unicode-width",
+    "//third_party/rust_crates:utf8parse",
+  ]
+
+  if (current_os == "fuchsia") {
+    deps += [ "//src/lib/zircon/rust:fuchsia-zircon" ]
+  } else {
+    deps += [ "//third_party/rust_crates:nix" ]
+  }
+
+  sources = [
+    "//third_party/rust_crates/mirrors/rustyline/src/completion.rs",
+    "//third_party/rust_crates/mirrors/rustyline/src/config.rs",
+    "//third_party/rust_crates/mirrors/rustyline/src/edit.rs",
+    "//third_party/rust_crates/mirrors/rustyline/src/error.rs",
+    "//third_party/rust_crates/mirrors/rustyline/src/highlight.rs",
+    "//third_party/rust_crates/mirrors/rustyline/src/hint.rs",
+    "//third_party/rust_crates/mirrors/rustyline/src/history.rs",
+    "//third_party/rust_crates/mirrors/rustyline/src/keymap.rs",
+    "//third_party/rust_crates/mirrors/rustyline/src/keys.rs",
+    "//third_party/rust_crates/mirrors/rustyline/src/kill_ring.rs",
+    "//third_party/rust_crates/mirrors/rustyline/src/lib.rs",
+    "//third_party/rust_crates/mirrors/rustyline/src/line_buffer.rs",
+    "//third_party/rust_crates/mirrors/rustyline/src/tty/mod.rs",
+    "//third_party/rust_crates/mirrors/rustyline/src/undo.rs",
+  ]
+
+  if (current_os == "fuchsia") {
+    sources +=
+        [ "//third_party/rust_crates/mirrors/rustyline/src/tty/fuchsia.rs" ]
+  } else {
+    sources += [ "//third_party/rust_crates/mirrors/rustyline/src/tty/unix.rs" ]
+  }
+}

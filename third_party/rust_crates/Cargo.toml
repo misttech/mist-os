@@ -182,7 +182,6 @@ ring = "0.16"
 rustc-demangle = "0.1.16"
 rustc-hash = "1.0.1"
 rustls = { version = "0.19.1", features = ["dangerous_configuration"] }
-rustyline = "2.1.0"
 schemars = { version = "0.8", features = ["chrono", "preserve_order"] }
 scopeguard = "1.1.0"
 scrypt = "0.8.0"
@@ -368,7 +367,6 @@ pulldown-cmark = { path = "forks/pulldown-cmark" }
 # FIXME(87798): We can unfork to 0.19.1 once we've updated hyper to 0.14.x, and
 # tokio to 1.x.
 rustls = { path = "forks/rustls" }
-rustyline = { path = "forks/rustyline" }
 security-framework = { path = "forks/security-framework" }
 tracing-core = { path = "forks/tracing-core" }
 type_hash_core = { path = "forks/type_hash/core" }
@@ -593,11 +591,6 @@ deps = [ "//third_party/rust_crates/compat/ring:ring-core" ]
 
 [gn.package.ryu."1.0.3"]
 rustflags = ["--cfg=integer128", "--cfg=must_use_return", "--cfg=maybe_uninit"]
-
-[gn.package.rustyline."2.1.0".platform."cfg(target_os = \"fuchsia\")"]
-deps = [
-  "//src/lib/zircon/rust:fuchsia-zircon"
-]
 
 [gn.package.proc-macro-nested."0.1.7"]
 rustflags = []
