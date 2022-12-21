@@ -6,7 +6,10 @@ import("//products/common/core.gni")
 
 core_realm_package_name = "core-terminal"
 
-product_bootfs_labels += [ "//bundles/drivers:usb-peripheral-stack" ]
+product_bootfs_labels += [
+  "//bundles/drivers:usb-peripheral-stack",
+  "//src/sys/component_manager:component_manager_bootfs_config",
+]
 
 core_realm_shards += [
   "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",

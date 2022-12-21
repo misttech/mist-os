@@ -29,10 +29,6 @@ product_bootfs_labels += [
   "//products/kernel_cmdline:netsvc.disable--false",
 ]
 
-# Component manager configuration.
-product_bootfs_labels +=
-    [ "//src/sys/component_manager:component_manager_bootfs_config" ]
-
 meta_package_labels = []
 
 base_driver_package_labels = []

@@ -9,7 +9,10 @@ import("//src/sys/appmgr/appmgr.gni")
 legacy_base_package_labels += appmgr_base_packages
 core_realm_shards += appmgr_core_shards
 
-product_bootfs_labels += [ "//bundles/drivers:usb-peripheral-stack" ]
+product_bootfs_labels += [
+  "//bundles/drivers:usb-peripheral-stack",
+  "//src/sys/component_manager:component_manager_bootfs_config",
+]
 
 core_realm_shards += [
   "//src/intl/intl_services:intl_services_small_shard",
