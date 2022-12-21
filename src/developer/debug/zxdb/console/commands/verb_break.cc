@@ -287,18 +287,7 @@ void RunVerbBreak(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
   // Scope.
   settings.scope = ExecutionScopeForCommand(cmd);
 
-  // Breakpoint condition.
-  std::string args = cmd.args()[0];
-  if (size_t if_pos = args.find(" if "); if_pos != std::string::npos) {
-    // Take out the literal " if" to get the actual expression.
-    std::string condition_input = args.substr(if_pos + 3);
-    args.erase(if_pos);
-    std::string_view condition = fxl::TrimString(condition_input, " ");
-
-    settings.condition = condition;
-  }
-
-  if (cmd.args().empty() || args.empty()) {
+  if (cmd.args().empty()) {
     // Creating a breakpoint with no location implicitly uses the current frame's current
     // location.
     if (!cmd.frame()) {
@@ -323,6 +312,17 @@ void RunVerbBreak(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
     breakpoint->SetSettings(settings);
     OutputCreatedMessage(breakpoint, cmd_context);
     return;
+  }
+
+  // Breakpoint condition.
+  std::string args = cmd.args()[0];
+  if (size_t if_pos = args.find(" if "); if_pos != std::string::npos) {
+    // Take out the literal " if" to get the actual expression.
+    std::string condition_input = args.substr(if_pos + 3);
+    args.erase(if_pos);
+    std::string_view condition = fxl::TrimString(condition_input, " ");
+
+    settings.condition = condition;
   }
 
   // Parse the given input location in args[0]. This may require async evaluation.
