@@ -53,7 +53,6 @@ if (is_fuchsia) {
 
     bootfs_labels = [
       ":root",
-      "//build/info:bootfs",
       "//build/input:recovery_bootfs",
       "//bundles:bootstrap",
       "//bundles:debugging",
@@ -273,7 +272,6 @@ if (is_fuchsia) {
     bootfs_labels = []
     bootfs_labels = [
       ":root",
-      "//build/info:bootfs",
       "//build/input:recovery_bootfs",
       "//bundles:bootstrap",
       "//bundles/drivers:bootstrap",
@@ -331,7 +329,6 @@ if (is_fuchsia) {
 
     bootfs_labels = [
       ":root",
-      "//build/info:bootfs",
       "//build/input:recovery_bootfs",
       "//bundles:bootstrap",
       "//bundles/drivers:bootstrap",

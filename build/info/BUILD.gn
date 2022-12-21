@@ -66,9 +66,7 @@ if (is_fuchsia) {
     deps = [ ":build-info-resources" ]
   }
 
-  resource("bootfs") {
-    sources = [ build_info_files.minimum_utc_stamp ]
-    outputs = [ "config/build_info/minimum_utc_stamp" ]
-    deps = [ ":latest-commit-date" ]
+  # TODO(fxbug.dev/117940): remove usages of this target and delete it.
+  group("bootfs") {
   }
 }

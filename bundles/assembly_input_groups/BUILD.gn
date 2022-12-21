@@ -149,7 +149,6 @@ assembly_input_groups("fx") {
 # Base set of packages to get basic features of component runtime running.
 assembly_input_groups("bootstrap") {
   bootfs_labels = [
-    "//build/info:bootfs",
     "//bundles:bootstrap",
     "//bundles/drivers:bootstrap",
     "//src/sys/component_manager:component_manager_bootfs_config",
