@@ -412,13 +412,8 @@ async fn bind_action_sequence() {
     .await;
     let events =
         vec![EventType::Discovered.into(), EventType::Resolved.into(), EventType::Started.into()];
-    let mut event_source = builtin_environment
-        .lock()
-        .await
-        .event_source_factory
-        .create_for_above_root()
-        .await
-        .expect("create event source");
+    let mut event_source =
+        builtin_environment.lock().await.event_source_factory.create_for_above_root();
     let mut event_stream = event_source
         .subscribe(events.into_iter().map(|event| EventSubscription::new(event)).collect())
         .await

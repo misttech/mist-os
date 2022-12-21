@@ -36,8 +36,8 @@ pub struct EventSourceV2 {
 }
 
 impl EventSourceV2 {
-    pub async fn new(v1: EventSource, name: CapabilityName) -> Result<Self, ModelError> {
-        Ok(Self { v1, name })
+    pub fn new(v1: EventSource, name: CapabilityName) -> Self {
+        Self { v1, name }
     }
 
     /// Subscribes to events provided in the `events` vector.
@@ -129,21 +129,21 @@ pub struct EventSource {
 }
 
 impl EventSource {
-    pub async fn new(
+    pub fn new(
         subscriber: ExtendedMoniker,
         model: Weak<Model>,
         registry: Weak<EventRegistry>,
         stream_provider: Weak<EventStreamProvider>,
-    ) -> Result<Self, ModelError> {
-        Ok(Self { model, registry, stream_provider, subscriber })
+    ) -> Self {
+        Self { model, registry, stream_provider, subscriber }
     }
 
-    pub async fn new_for_above_root(
+    pub fn new_for_above_root(
         model: Weak<Model>,
         registry: Weak<EventRegistry>,
         stream_provider: Weak<EventStreamProvider>,
-    ) -> Result<Self, ModelError> {
-        Self::new(ExtendedMoniker::ComponentManager, model, registry, stream_provider).await
+    ) -> Self {
+        Self::new(ExtendedMoniker::ComponentManager, model, registry, stream_provider)
     }
 
     /// Subscribes to events provided in the `requests` vector.

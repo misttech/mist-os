@@ -2630,12 +2630,8 @@ pub mod tests {
         let test =
             RoutingTest::new("root", vec![("root", ComponentDeclBuilder::new().build())]).await;
 
-        let mut event_source = test
-            .builtin_environment
-            .event_source_factory
-            .create_for_above_root()
-            .await
-            .expect("create event source");
+        let mut event_source =
+            test.builtin_environment.event_source_factory.create_for_above_root();
         let mut event_stream = event_source
             .subscribe(
                 vec![
@@ -2687,14 +2683,8 @@ pub mod tests {
         ];
         let test = ActionsTest::new("root", components, None).await;
 
-        let mut event_source = test
-            .builtin_environment
-            .lock()
-            .await
-            .event_source_factory
-            .create_for_above_root()
-            .await
-            .expect("failed creating event source");
+        let mut event_source =
+            test.builtin_environment.lock().await.event_source_factory.create_for_above_root();
         let mut stop_event_stream = event_source
             .subscribe(vec![EventSubscription::new(EventType::Stopped.into())])
             .await

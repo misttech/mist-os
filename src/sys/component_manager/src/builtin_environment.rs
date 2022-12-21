@@ -982,7 +982,7 @@ impl BuiltinEnvironment {
         // If component manager is in debug mode, create an event source scoped at the
         // root and offer it via ServiceFs to the outside world.
         if self.debug {
-            let event_source_v2 = self.event_source_factory.create_v2_for_above_root().await?;
+            let event_source_v2 = self.event_source_factory.create_v2_for_above_root();
 
             service_fs.dir("svc").add_fidl_service(move |stream| {
                 let mut event_source_v2 = event_source_v2.clone();

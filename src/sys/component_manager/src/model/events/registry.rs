@@ -290,7 +290,7 @@ impl EventRegistry {
 
     // TODO(fxbug.dev/48510): get rid of this
     /// Sends the event to all dispatchers and waits to be unblocked by all
-    async fn dispatch(&self, event: &ComponentEvent) -> Result<(), ModelError> {
+    async fn dispatch(&self, event: &ComponentEvent) {
         // Copy the senders so we don't hold onto the sender map lock
         // If we didn't do this, it is possible to deadlock while holding onto this lock.
         // For example,
@@ -313,7 +313,7 @@ impl EventRegistry {
                 strong_dispatchers
             } else {
                 // There were no senders for this event. Do nothing.
-                return Ok(());
+                return;
             }
         };
 
@@ -325,8 +325,6 @@ impl EventRegistry {
             // events.
             let _ = dispatcher.dispatch(event).await;
         }
-
-        Ok(())
     }
 
     /// Routes a list of events to a specified moniker.
@@ -523,7 +521,8 @@ impl EventRegistry {
 #[async_trait]
 impl Hook for EventRegistry {
     async fn on(self: Arc<Self>, event: &ComponentEvent) -> Result<(), ModelError> {
-        self.dispatch(event).await
+        self.dispatch(event).await;
+        Ok(())
     }
 }
 
@@ -546,9 +545,7 @@ mod tests {
         moniker::AbsoluteMoniker,
     };
 
-    async fn dispatch_capability_requested_event(
-        registry: &EventRegistry,
-    ) -> Result<(), ModelError> {
+    async fn dispatch_capability_requested_event(registry: &EventRegistry) {
         let (_, capability_server_end) = zx::Channel::create().unwrap();
         let capability_server_end = Arc::new(Mutex::new(Some(capability_server_end)));
         let event = ComponentEvent::new_for_test(
@@ -560,16 +557,16 @@ mod tests {
                 capability: capability_server_end,
             },
         );
-        registry.dispatch(&event).await
+        registry.dispatch(&event).await;
     }
 
-    async fn dispatch_fake_event(registry: &EventRegistry) -> Result<(), ModelError> {
+    async fn dispatch_fake_event(registry: &EventRegistry) {
         let event = ComponentEvent::new_for_test(
             AbsoluteMoniker::root(),
             "fuchsia-pkg://root",
             EventPayload::Discovered,
         );
-        registry.dispatch(&event).await
+        registry.dispatch(&event).await;
     }
 
     #[fuchsia::test]
@@ -599,7 +596,7 @@ mod tests {
 
         assert_eq!(2, event_registry.dispatchers_per_event_type(EventType::Discovered).await);
 
-        dispatch_fake_event(&event_registry).await.unwrap();
+        dispatch_fake_event(&event_registry).await;
 
         // Verify that both EventStreams receive the event.
         assert!(event_stream_a.next().await.is_some());
@@ -611,14 +608,14 @@ mod tests {
         // EventRegistry won't drop EventDispatchers until an event is dispatched.
         assert_eq!(2, event_registry.dispatchers_per_event_type(EventType::Discovered).await);
 
-        dispatch_fake_event(&event_registry).await.unwrap();
+        dispatch_fake_event(&event_registry).await;
 
         assert!(event_stream_b.next().await.is_some());
         assert_eq!(1, event_registry.dispatchers_per_event_type(EventType::Discovered).await);
 
         drop(event_stream_b);
 
-        dispatch_fake_event(&event_registry).await.unwrap();
+        dispatch_fake_event(&event_registry).await;
         assert_eq!(0, event_registry.dispatchers_per_event_type(EventType::Discovered).await);
     }
 
@@ -658,7 +655,7 @@ mod tests {
             event_registry.dispatchers_per_event_type(EventType::CapabilityRequested).await
         );
 
-        dispatch_capability_requested_event(&event_registry).await.unwrap();
+        dispatch_capability_requested_event(&event_registry).await;
 
         let event_a = event_stream_a.next().await.map(|(event, _)| event.event).unwrap();
 

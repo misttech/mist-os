@@ -65,37 +65,31 @@ impl EventSourceFactory {
     }
 
     /// Creates an event source for an above-root subscriber.
-    pub async fn create_for_above_root(&self) -> Result<EventSource, ModelError> {
+    pub fn create_for_above_root(&self) -> EventSource {
         EventSource::new_for_above_root(
             self.model.clone(),
             self.event_registry.clone(),
             self.event_stream_provider.clone(),
         )
-        .await
     }
 
     /// Creates a `EventSource` for the given `subscriber`.
-    pub async fn create(&self, subscriber: AbsoluteMoniker) -> Result<EventSource, ModelError> {
+    pub fn create(&self, subscriber: AbsoluteMoniker) -> EventSource {
         EventSource::new(
             ExtendedMoniker::ComponentInstance(subscriber),
             self.model.clone(),
             self.event_registry.clone(),
             self.event_stream_provider.clone(),
         )
-        .await
     }
 
     /// Creates a `EventSource` for the given `subscriber`.
-    pub async fn create_v2(
-        &self,
-        subscriber: AbsoluteMoniker,
-        name: CapabilityName,
-    ) -> Result<EventSourceV2, ModelError> {
-        EventSourceV2::new(self.create(subscriber).await?, name).await
+    pub fn create_v2(&self, subscriber: AbsoluteMoniker, name: CapabilityName) -> EventSourceV2 {
+        EventSourceV2::new(self.create(subscriber), name)
     }
 
-    pub async fn create_v2_for_above_root(&self) -> Result<EventSourceV2, ModelError> {
-        EventSourceV2::new(self.create_for_above_root().await?, CapabilityName::from("")).await
+    pub fn create_v2_for_above_root(&self) -> EventSourceV2 {
+        EventSourceV2::new(self.create_for_above_root(), CapabilityName::from(""))
     }
 
     /// Returns an EventSource. An EventSource holds an InstancedAbsoluteMoniker that
@@ -105,24 +99,24 @@ impl EventSourceFactory {
         capability_decl: &InternalCapability,
         target_moniker: AbsoluteMoniker,
         capability: Option<Box<dyn CapabilityProvider>>,
-    ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
+    ) -> Option<Box<dyn CapabilityProvider>> {
         match capability_decl {
             InternalCapability::EventStream(name) => {
-                let event_source = self.create_v2(target_moniker, name.clone()).await?;
-                return Ok(Some(Box::new(event_source)));
+                let event_source = self.create_v2(target_moniker, name.clone());
+                return Some(Box::new(event_source));
             }
             _ => {}
         }
-        Ok(capability)
+        capability
     }
 }
 
 #[async_trait]
 impl Hook for EventSourceFactory {
     async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
-        let target_moniker = event
-            .target_moniker
-            .unwrap_instance_moniker_or(ModelError::UnexpectedComponentManagerMoniker)?;
+        let ExtendedMoniker::ComponentInstance(target_moniker) = &event.target_moniker else {
+            return Ok(());
+        };
         match &event.payload {
             EventPayload::CapabilityRouted {
                 source: CapabilitySource::Builtin { capability, .. },
@@ -135,7 +129,7 @@ impl Hook for EventSourceFactory {
                         target_moniker.clone(),
                         capability_provider.take(),
                     )
-                    .await?;
+                    .await;
             }
             EventPayload::CapabilityRouted {
                 source: CapabilitySource::Framework { capability, .. },
@@ -148,7 +142,7 @@ impl Hook for EventSourceFactory {
                         target_moniker.clone(),
                         capability_provider.take(),
                     )
-                    .await?;
+                    .await;
             }
             _ => {}
         }

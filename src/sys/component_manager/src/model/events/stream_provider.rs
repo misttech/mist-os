@@ -20,6 +20,7 @@ use {
         collections::HashMap,
         sync::{Arc, Weak},
     },
+    tracing::warn,
 };
 
 /// V2 variant of EventStreamAttachment
@@ -149,17 +150,13 @@ impl EventStreamProvider {
         return None;
     }
 
-    async fn on_component_destroyed(
-        self: &Arc<Self>,
-        target_moniker: &AbsoluteMoniker,
-    ) -> Result<(), ModelError> {
+    async fn on_component_destroyed(self: &Arc<Self>, target_moniker: &AbsoluteMoniker) {
         let mut state = self.state.lock().await;
         // Remove all event streams associated with the `target_moniker` component.
         state.streams_v2.remove(&ExtendedMoniker::ComponentInstance(target_moniker.clone()));
         state
             .subscription_component_lookup
             .remove(&ExtendedMoniker::ComponentInstance(target_moniker.clone()));
-        Ok(())
     }
 
     async fn try_route_v2_events(
@@ -209,7 +206,7 @@ impl EventStreamProvider {
             for use_decl in &decl.uses {
                 match use_decl {
                     UseDecl::EventStreamDeprecated(UseEventStreamDeprecatedDecl { .. }) => {
-                        return Err(ModelError::unsupported("v1 events are unsupported"));
+                        unreachable!("v1 events are now gone");
                     }
                     _ => {}
                 }
@@ -230,10 +227,12 @@ impl Hook for EventStreamProvider {
             .unwrap_instance_moniker_or(ModelError::UnexpectedComponentManagerMoniker)?;
         match &event.payload {
             EventPayload::Destroyed => {
-                self.on_component_destroyed(target_moniker).await?;
+                self.on_component_destroyed(target_moniker).await;
             }
             EventPayload::Resolved { decl, .. } => {
-                self.on_component_resolved(target_moniker, decl).await?;
+                self.on_component_resolved(target_moniker, decl)
+                    .await
+                    .unwrap_or_else(|err| warn!(%err, "Error handling component resolved"));
             }
             _ => {}
         }
