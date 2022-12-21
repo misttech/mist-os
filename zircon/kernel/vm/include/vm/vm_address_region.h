@@ -93,8 +93,8 @@ class LazyPageRequest;
 //
 // All VmAddressRegion and VmMapping state is protected by the aspace lock.
 class VmAddressRegionOrMapping
-    : public fbl::RefCounted<VmAddressRegionOrMapping>,
-      public fbl::WAVLTreeContainable<fbl::RefPtr<VmAddressRegionOrMapping>> {
+    : public fbl::WAVLTreeContainable<fbl::RefPtr<VmAddressRegionOrMapping>>,
+      public fbl::RefCounted<VmAddressRegionOrMapping> {
  public:
   // If a VMO-mapping, unmap all pages and remove dependency on vm object it has a ref to.
   // Otherwise recursively destroy child VMARs and transition to the DEAD state.
@@ -160,7 +160,7 @@ class VmAddressRegionOrMapping
     return fbl::WAVLTreeContainable<fbl::RefPtr<VmAddressRegionOrMapping>>::InContainer();
   }
 
-  enum class LifeCycleState {
+  enum class LifeCycleState : uint8_t {
     // Initial state: if NOT_READY, then do not invoke Destroy() in the
     // destructor
     NOT_READY,
@@ -213,12 +213,12 @@ class VmAddressRegionOrMapping
   // fields are invalid.
   LifeCycleState state_ TA_GUARDED(lock()) = LifeCycleState::ALIVE;
 
+  // flags from VMAR creation time
+  const uint32_t flags_;
+
   // address/size within the container address space
   vaddr_t base_;
   size_t size_;
-
-  // flags from VMAR creation time
-  const uint32_t flags_;
 
   // pointer back to our member address space.  The aspace's lock is used
   // to serialize all modifications.
@@ -1018,6 +1018,13 @@ class VmMapping final : public VmAddressRegionOrMapping,
     return state_;
   }
 
+  // used to detect recursions through the vmo fault path
+  bool currently_faulting_ TA_GUARDED(object_->lock()) = false;
+
+  // Whether this mapping may be merged with other adjacent mappings. A mergeable mapping is just a
+  // region that can be represented by any VmMapping object, not specifically this one.
+  Mergeable mergeable_ TA_GUARDED(lock()) = Mergeable::NO;
+
   // pointer and region of the object we are mapping
   fbl::RefPtr<VmObject> object_ TA_GUARDED(aspace_->lock());
   // This can be read with either lock hold, but requires both locks to write it.
@@ -1037,13 +1044,6 @@ class VmMapping final : public VmAddressRegionOrMapping,
       TA_REQ(object_->lock()) __TA_NO_THREAD_SAFETY_ANALYSIS {
     return protection_ranges_;
   }
-
-  // used to detect recursions through the vmo fault path
-  bool currently_faulting_ TA_GUARDED(object_->lock()) = false;
-
-  // Whether this mapping may be merged with other adjacent mappings. A mergeable mapping is just a
-  // region that can be represented by any VmMapping object, not specifically this one.
-  Mergeable mergeable_ TA_GUARDED(lock()) = Mergeable::NO;
 
   // Tracks the last cached page attribution count for the vmo range we are mapping.
   // Only used when |object_| is a VmObjectPaged.

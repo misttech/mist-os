@@ -23,9 +23,9 @@ VmAddressRegionOrMapping::VmAddressRegionOrMapping(vaddr_t base, size_t size, ui
                                                    bool is_mapping)
     : is_mapping_(is_mapping),
       state_(LifeCycleState::NOT_READY),
+      flags_(flags),
       base_(base),
       size_(size),
-      flags_(flags),
       aspace_(aspace),
       parent_(parent) {
   LTRACEF("%p\n", this);

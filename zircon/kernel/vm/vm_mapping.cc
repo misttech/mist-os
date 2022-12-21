@@ -45,10 +45,10 @@ VmMapping::VmMapping(VmAddressRegion& parent, vaddr_t base, size_t size, uint32_
                      fbl::RefPtr<VmObject> vmo, uint64_t vmo_offset,
                      MappingProtectionRanges&& ranges, Mergeable mergeable)
     : VmAddressRegionOrMapping(base, size, vmar_flags, parent.aspace_.get(), &parent, true),
+      mergeable_(mergeable),
       object_(ktl::move(vmo)),
       object_offset_(vmo_offset),
-      protection_ranges_(ktl::move(ranges)),
-      mergeable_(mergeable) {
+      protection_ranges_(ktl::move(ranges)) {
   LTRACEF("%p aspace %p base %#" PRIxPTR " size %#zx offset %#" PRIx64 "\n", this, aspace_.get(),
           base_, size_, vmo_offset);
 }
