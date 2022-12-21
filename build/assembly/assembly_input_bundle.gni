@@ -79,12 +79,12 @@ import("//build/python/python_action.gni")
 #      ]
 #
 #  config_data_labels [optional]
-#    [list, GN abels] A list of GN labels of config_data_for_assembly() targets
+#    [list, GN labels] A list of GN labels of config_data_for_assembly() targets
 #    to include in the config_data provided by this AIB.
 #
 #    Note: These are direct labels for specific targets, not deps to walk for
-#    metadata.  If the target isn't a package target, it will cause an error
-#    like:
+#    metadata.  If the target isn't a config_data_for_assembly() target, it will
+#    cause an error like:
 #      "no dependency provides the input <package_name>/config_data_entry.json"
 #
 #  config_data [optional]
