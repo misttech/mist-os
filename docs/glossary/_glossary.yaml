@@ -511,6 +511,16 @@
   related_guides: [""]
   area: ["System", "Component Framework"]
 
+- term: "Dispatcher"
+  short_description: "A dispatcher, assigned to a driver, coordinates and performs asynchronous
+  operations for the driver."
+  full_description: "A dispatcher mainly handles two tasks: it schedules asynchronous work to
+  run on threads in a driver host and it actually runs the work on those threads
+  on behalf of a driver."
+  see_also: [""]
+  related_guides: ["<a href=\"/docs/concepts/drivers/driver-dispatcher-and-threads.md\">Driver dispatcher and threads</a>"]
+  area: ["System", "Devices"]
+
 - term: "Driver"
   short_description: "A driver is a dynamic shared library that enables and
   controls one or more <a href=\"/docs/glossary#node\">nodes</a>."
