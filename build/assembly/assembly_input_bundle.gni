@@ -78,6 +78,15 @@ import("//build/python/python_action.gni")
 #        }
 #      ]
 #
+#  config_data_labels [optional]
+#    [list, GN abels] A list of GN labels of config_data_for_assembly() targets
+#    to include in the config_data provided by this AIB.
+#
+#    Note: These are direct labels for specific targets, not deps to walk for
+#    metadata.  If the target isn't a package target, it will cause an error
+#    like:
+#      "no dependency provides the input <package_name>/config_data_entry.json"
+#
 #  config_data [optional]
 #    [list, scopes] A list of scopes, defining each config_data associated with
 #    a given package, and the source, label, and destination required to add it
@@ -301,6 +310,29 @@ template("assembly_input_bundle") {
     ]
 
     creation_inputs += [ files.bootfs_files ]
+  }
+
+  # Convert the list of config_data_labels into a set of config_data_entry.json
+  # files that are inputs that define config data entry scopes.
+  if (defined(invoker.config_data_labels)) {
+    _config_data_entries = []
+
+    foreach(entry_label, invoker.config_data_labels) {
+      # Assume this is a GN-label to a config_data_for_assembly()
+      # instantiation, which is similar to packages.
+      _entry_out_dir = get_label_info(entry_label, "target_out_dir")
+      _entry_name = get_label_info(entry_label, "name")
+      _entry_file = "${_entry_out_dir}/${_entry_name}/config_data_entry.json"
+      _config_data_entries += [ _entry_file ]
+
+      creation_args += [
+        "--config-data-list",
+        rebase_path(_entry_file, root_build_dir),
+      ]
+    }
+
+    creation_deps += invoker.config_data_labels
+    creation_inputs += _config_data_entries
   }
 
   # Splits config_data inputs from the invoker into:

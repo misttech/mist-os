@@ -39,7 +39,10 @@ def create_bundle(args: argparse.Namespace) -> None:
         add_driver_list_from_file(aib_creator, args.drivers_pkg_list)
 
     if args.config_data_list:
-        add_config_data_entries_from_file(aib_creator, args.config_data_list)
+        for config_data_entry_file in args.config_data_list:
+            with open(config_data_entry_file) as config_data_entry:
+                add_config_data_entries_from_file(
+                    aib_creator, config_data_entry)
 
     if args.bootfs_files_list:
         add_bootfs_files_from_list(aib_creator, args.bootfs_files_list)
@@ -383,8 +386,10 @@ def main():
         help="Path to write a FINI manifest of the contents of the AIB")
     bundle_creation_parser.add_argument(
         "--config-data-list",
-        type=argparse.FileType('r'),
-        help="Path to a json file of config-data entries")
+        action="append",
+        help=
+        "Path to a json file of config-data entries, may be specified multiple times"
+    )
     bundle_creation_parser.add_argument(
         "--bootfs-files-list",
         type=argparse.FileType('r'),
