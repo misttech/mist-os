@@ -4,21 +4,15 @@
 
 import("//build/go/go_library.gni")
 
-go_library("c") {
-  visibility = [ "../*" ]
+go_library("zircon_ifs") {
+  visibility = [ "//zircon/tools/zither/*" ]
 
   sources = [
-    "c.go",
-    "templates/alias.tmpl",
-    "templates/bits.tmpl",
-    "templates/const.tmpl",
-    "templates/enum.tmpl",
     "templates/file.tmpl",
-    "templates/handle.tmpl",
-    "templates/struct.tmpl",
+    "zircon_ifs.go",
   ]
   deps = [
-    "..:common",
     "//tools/fidl/lib/fidlgen",
+    "//zircon/tools/zither:common",
   ]
 }

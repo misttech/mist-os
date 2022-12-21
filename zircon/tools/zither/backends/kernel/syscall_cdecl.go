@@ -10,7 +10,7 @@ import (
 	"text/template"
 
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither"
-	"go.fuchsia.dev/fuchsia/zircon/tools/zither/c"
+	"go.fuchsia.dev/fuchsia/zircon/tools/zither/backends/c"
 )
 
 const syscallCDeclTemplate = `

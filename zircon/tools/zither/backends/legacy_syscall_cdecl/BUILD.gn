@@ -5,14 +5,14 @@
 import("//build/go/go_library.gni")
 
 go_library("legacy_syscall_cdecl") {
-  visibility = [ "../*" ]
+  visibility = [ "//zircon/tools/zither/*" ]
   sources = [
     "legacy_syscall_cdecl.go",
     "templates/cdecls.tmpl",
   ]
   deps = [
-    "..:common",
-    "../kernel",
     "//tools/fidl/lib/fidlgen",
+    "//zircon/tools/zither:common",
+    "//zircon/tools/zither/backends/kernel",
   ]
 }

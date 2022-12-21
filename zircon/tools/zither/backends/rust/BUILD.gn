@@ -4,22 +4,21 @@
 
 import("//build/go/go_library.gni")
 
-go_library("golang") {
-  visibility = [ "../*" ]
-
+go_library("rust") {
+  visibility = [ "//zircon/tools/zither/*" ]
   sources = [
-    "golang.go",
+    "rust.go",
     "templates/alias.tmpl",
     "templates/bits.tmpl",
     "templates/const.tmpl",
+    "templates/crate_root.tmpl",
     "templates/enum.tmpl",
     "templates/file.tmpl",
     "templates/handle.tmpl",
     "templates/struct.tmpl",
   ]
-
   deps = [
-    "..:common",
     "//tools/fidl/lib/fidlgen",
+    "//zircon/tools/zither:common",
   ]
 }

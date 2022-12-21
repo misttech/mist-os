@@ -5,7 +5,7 @@
 import("//build/go/go_library.gni")
 
 go_library("go_runtime") {
-  visibility = [ "../*" ]
+  visibility = [ "//zircon/tools/zither/*" ]
   sources = [
     "go_runtime.go",
     "templates/syscalls_fuchsia.go.tmpl",
@@ -16,8 +16,8 @@ go_library("go_runtime") {
     "templates/vdsocalls_fuchsia_arm64.s.tmpl",
   ]
   deps = [
-    "..:common",
-    "../golang",
     "//tools/fidl/lib/fidlgen",
+    "//zircon/tools/zither:common",
+    "//zircon/tools/zither/backends/golang",
   ]
 }

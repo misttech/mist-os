@@ -14,7 +14,7 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither"
-	"go.fuchsia.dev/fuchsia/zircon/tools/zither/golang"
+	"go.fuchsia.dev/fuchsia/zircon/tools/zither/backends/golang"
 )
 
 //go:embed templates/*

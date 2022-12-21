@@ -5,7 +5,7 @@
 import("//build/go/go_library.gni")
 
 go_library("asm") {
-  visibility = [ "../*" ]
+  visibility = [ "//zircon/tools/zither/*" ]
 
   sources = [
     "asm.go",
@@ -16,7 +16,7 @@ go_library("asm") {
     "templates/struct.tmpl",
   ]
   deps = [
-    "..:common",
     "//tools/fidl/lib/fidlgen",
+    "//zircon/tools/zither:common",
   ]
 }
