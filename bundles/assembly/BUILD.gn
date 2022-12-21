@@ -102,7 +102,6 @@ assembly_input_bundle("common_minimal") {
     "//src/diagnostics/kcounter:diagnostics-kcounter",
 
     # Other
-    "//src/developer/memory/monitor",
     "//src/sys/stash:pkg",
 
     "//src/sys/time/timekeeper",
@@ -113,6 +112,10 @@ assembly_input_bundle("common_minimal") {
 
     # Activity
     "//src/sys/activity",
+
+    # Developer
+    "//src/developer/forensics:pkg",
+    "//src/developer/memory/monitor",
   ]
 
   bootfs_files = [

@@ -46,9 +46,6 @@ legacy_base_package_labels += [
   "//src/sys/core:core_component_id_index",
 
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
-  "//src/developer/forensics:pkg",
-
-  # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
   "//src/diagnostics/sampler",
 
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
