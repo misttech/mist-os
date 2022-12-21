@@ -140,7 +140,7 @@ struct HitTestingData {
   const GlobalTopologyData::ParentIndexVector parent_indices;
   const std::unordered_map<flatland::TransformHandle, flatland::TransformHandle> root_transforms;
   const GlobalTopologyData::ViewRefMap view_refs;
-  const GlobalTopologyData::HitRegions hit_regions;
+  const flatland::HitRegions hit_regions;
   const std::vector<flatland::TransformClipRegion> global_clip_regions;
 };
 
@@ -391,14 +391,9 @@ GlobalTopologyData GlobalTopologyData::ComputeGlobalTopologyData(
   };
   std::vector<ParentChildIterator> parent_counts;
 
-  TopologyVector topology_vector;
-  ChildCountVector child_counts;
-  ParentIndexVector parent_indices;
-  std::unordered_set<TransformHandle> live_transforms;
-  ViewRefMap view_refs;
-  std::unordered_map<TransformHandle, TransformHandle> root_transforms;
-  std::unordered_map<TransformHandle, std::string> debug_names;
-  std::unordered_map<TransformHandle, TransformClipRegion> clip_regions;
+  GlobalTopologyData output;
+  auto& [topology_vector, child_counts, parent_indices, live_transforms, view_refs, root_transforms,
+         debug_names, clip_regions] = output;
 
   // For the root of each local topology (i.e. the View), save the ViewRef, whether they're
   // currently attached to the scene or not.
@@ -570,18 +565,12 @@ GlobalTopologyData GlobalTopologyData::ComputeGlobalTopologyData(
            (parent_counts.size() == 1 && parent_counts.back().children_left == 0));
 #endif
 
-  return {.topology_vector = std::move(topology_vector),
-          .child_counts = std::move(child_counts),
-          .parent_indices = std::move(parent_indices),
-          .live_handles = std::move(live_transforms),
-          .view_refs = std::move(view_refs),
-          .root_transforms = std::move(root_transforms),
-          .debug_names = std::move(debug_names),
-          .clip_regions = std::move(clip_regions)};
+  return output;
 }
 
 view_tree::SubtreeSnapshot GlobalTopologyData::GenerateViewTreeSnapshot(
-    const GlobalTopologyData& data, const std::vector<TransformClipRegion>& global_clip_regions,
+    const GlobalTopologyData& data, HitRegions hit_regions,
+    std::vector<TransformClipRegion> global_clip_regions,
     const std::vector<glm::mat3>& global_matrix_vector,
     const std::unordered_map<TransformHandle, TransformHandle>&
         link_child_to_parent_transform_map) {
@@ -591,14 +580,19 @@ view_tree::SubtreeSnapshot GlobalTopologyData::GenerateViewTreeSnapshot(
     // No root -> Empty ViewTree.
     return {};
   }
+
+  view_tree::SubtreeSnapshot output;
+  auto& [root, view_tree, unconnected_views, hit_tester, _] = output;
+
   const auto [root_index, root_koid] = root_values.value();
-  auto [view_tree, implicitly_anonymous_views] =
+  root = root_koid;
+  auto [view_tree_temp, implicitly_anonymous_views] =
       ComputeViewTree(root_koid, root_index, data.topology_vector, data.parent_indices,
                       data.view_refs, data.debug_names, data.clip_regions, global_matrix_vector,
                       link_child_to_parent_transform_map);
+  view_tree = std::move(view_tree_temp);
 
   // Unconnected_views = all non-anonymous views (those with ViewRefs) not in the ViewTree.
-  std::unordered_set<zx_koid_t> unconnected_views;
   for (const auto& [_, view_ref] : data.view_refs) {
     if (view_ref != nullptr) {
       const zx_koid_t koid = utils::ExtractKoid(*view_ref);
@@ -621,24 +615,18 @@ view_tree::SubtreeSnapshot GlobalTopologyData::GenerateViewTreeSnapshot(
   // important that it contains no references to live data. This means the hit testing closure must
   // contain only plain values or data with value semantics like shared_ptr<const>, to ensure that
   // it's safe to call from any thread.
-  const auto hit_tester =
-      [hit_test_data = HitTestingData{
-           .transforms = data.topology_vector,
-           .parent_indices = data.parent_indices,
-           .root_transforms = data.root_transforms,
-           .view_refs = std::move(named_view_refs),
-           .hit_regions = data.hit_regions,
-           .global_clip_regions = global_clip_regions,
-       }](zx_koid_t start_node, glm::vec2 world_point, bool is_semantic_hit_test) {
-        return HitTest(hit_test_data, start_node, world_point, is_semantic_hit_test);
-      };
+  hit_tester = [hit_test_data = HitTestingData{
+                    .transforms = data.topology_vector,
+                    .parent_indices = data.parent_indices,
+                    .root_transforms = data.root_transforms,
+                    .view_refs = std::move(named_view_refs),
+                    .hit_regions = std::move(hit_regions),
+                    .global_clip_regions = std::move(global_clip_regions),
+                }](zx_koid_t start_node, glm::vec2 world_point, bool is_semantic_hit_test) {
+    return HitTest(hit_test_data, start_node, world_point, is_semantic_hit_test);
+  };
 
-  return view_tree::SubtreeSnapshot{.root = root_koid,
-                                    .view_tree = std::move(view_tree),
-                                    .unconnected_views = std::move(unconnected_views),
-                                    .hit_tester = std::move(hit_tester),
-                                    // We do not currently support other compositors as subtrees.
-                                    .tree_boundaries = {}};
+  return output;
 }
 
 }  // namespace flatland

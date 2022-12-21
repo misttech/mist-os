@@ -77,6 +77,8 @@ class Engine {
   std::shared_ptr<flatland::UberStructSystem> uber_struct_system_;
   std::shared_ptr<flatland::LinkSystem> link_system_;
 
+  flatland::GlobalTopologyData last_global_topology_data_ = {};
+
   uint64_t last_rendered_frame_ = 0;
 
   // TODO(fxbug.dev/76640): hack so that we can call DisplayCompositor::AddDisplay() when we first

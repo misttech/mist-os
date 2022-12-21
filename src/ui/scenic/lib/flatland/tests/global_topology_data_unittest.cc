@@ -65,17 +65,18 @@ view_tree::SubtreeSnapshot GenerateSnapshot(
     const UberStruct::InstanceMap& uber_structs, const GlobalTopologyData::LinkTopologyMap& links,
     TransformHandle::InstanceId link_instance_id, TransformHandle root,
     const std::unordered_map<TransformHandle, TransformHandle> link_child_to_parent_transform_map) {
-  auto gtd =
+  const auto gtd =
       GlobalTopologyData::ComputeGlobalTopologyData(uber_structs, links, kLinkInstanceId, {1, 0});
   CHECK_GLOBAL_TOPOLOGY_DATA(gtd, 0u);
 
   const auto matrix_vector =
       flatland::ComputeGlobalMatrices(gtd.topology_vector, gtd.parent_indices, uber_structs);
-  const auto global_clip_regions = ComputeGlobalTransformClipRegions(
+  auto global_clip_regions = ComputeGlobalTransformClipRegions(
       gtd.topology_vector, gtd.parent_indices, matrix_vector, uber_structs);
-  gtd.hit_regions =
+  auto hit_regions =
       ComputeGlobalHitRegions(gtd.topology_vector, gtd.parent_indices, matrix_vector, uber_structs);
-  return GlobalTopologyData::GenerateViewTreeSnapshot(gtd, global_clip_regions, matrix_vector,
+  return GlobalTopologyData::GenerateViewTreeSnapshot(gtd, std::move(hit_regions),
+                                                      std::move(global_clip_regions), matrix_vector,
                                                       link_child_to_parent_transform_map);
 }
 

@@ -17,6 +17,9 @@ namespace flatland {
 // A vector of indices that reference global vectors, such as the global topology vector.
 using GlobalIndexVector = std::vector<size_t>;
 
+// HitRegions for each TransformHandle.
+using HitRegions = std::unordered_map<TransformHandle, std::vector<flatland::HitRegion>>;
+
 struct GlobalTopologyData {
   // The LinkSystem stores topology links as a key-value pair of TransformHandles. This type alias
   // is declared because while this map is created by the LinkSystem, it is only ever consumed
@@ -54,10 +57,6 @@ struct GlobalTopologyData {
   // Map of TransformHandle to its local root TransformHandle. Needed for hit testing.
   std::unordered_map<TransformHandle, TransformHandle> root_transforms;
 
-  // HitRegions for each TransformHandle.
-  using HitRegions = std::unordered_map<TransformHandle, std::vector<flatland::HitRegion>>;
-  HitRegions hit_regions;
-
   // Debug name for each transform handle, if present.
   std::unordered_map<TransformHandle, std::string> debug_names;
 
@@ -85,7 +84,8 @@ struct GlobalTopologyData {
                                                       TransformHandle root);
 
   static view_tree::SubtreeSnapshot GenerateViewTreeSnapshot(
-      const GlobalTopologyData& data, const std::vector<TransformClipRegion>& global_clip_regions,
+      const GlobalTopologyData& data, HitRegions hit_regions,
+      std::vector<TransformClipRegion> global_clip_regions,
       const std::vector<glm::mat3>& global_matrix_vector,
       // Acquired from |LinkSystem::GetLinkChildToParentTransformMap|. Used to get the
       // TransformHandle of the parent end of a Link using the child's TransformHandle, in order to

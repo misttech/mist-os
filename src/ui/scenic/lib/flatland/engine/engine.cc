@@ -121,6 +121,8 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
   CullRectangles(&scene_state.image_rectangles, &scene_state.images, hw_display->width_in_px(),
                  hw_display->height_in_px());
 
+  last_global_topology_data_ = std::move(scene_state.topology_data);
+
   flatland_compositor_->RenderFrame(frame_number, presentation_time,
                                     {{.rectangles = std::move(scene_state.image_rectangles),
                                       .images = std::move(scene_state.images),
@@ -131,26 +133,22 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
 view_tree::SubtreeSnapshot Engine::GenerateViewTreeSnapshot(
     const TransformHandle& root_transform) const {
   TRACE_DURATION("gfx", "flatland::Engine::GenerateViewTreeSnapshot");
-  // TODO(fxbug.dev/82814): Stop generating the GlobalTopologyData twice. It's wasted work and a
-  // synchronization hazard.
   const auto uber_struct_snapshot = uber_struct_system_->Snapshot();
-  const auto links = link_system_->GetResolvedTopologyLinks();
   const auto link_child_to_parent_transform_map = link_system_->GetLinkChildToParentTransformMap();
-  const auto link_system_id = link_system_->GetInstanceId();
-  auto topology_data = GlobalTopologyData::ComputeGlobalTopologyData(
-      uber_struct_snapshot, links, link_system_id, root_transform);
+  const auto& topology_data = last_global_topology_data_;
 
   const auto matrix_vector = ComputeGlobalMatrices(
       topology_data.topology_vector, topology_data.parent_indices, uber_struct_snapshot);
-  const auto global_clip_regions =
+  auto global_clip_regions =
       ComputeGlobalTransformClipRegions(topology_data.topology_vector, topology_data.parent_indices,
                                         matrix_vector, uber_struct_snapshot);
-  topology_data.hit_regions =
+  auto hit_regions =
       ComputeGlobalHitRegions(topology_data.topology_vector, topology_data.parent_indices,
                               matrix_vector, uber_struct_snapshot);
 
   return flatland::GlobalTopologyData::GenerateViewTreeSnapshot(
-      topology_data, global_clip_regions, matrix_vector, link_child_to_parent_transform_map);
+      topology_data, std::move(hit_regions), std::move(global_clip_regions), matrix_vector,
+      link_child_to_parent_transform_map);
 }
 
 // TODO(fxbug.dev/81842) If we put Screenshot on its own thread, we should make this call thread
