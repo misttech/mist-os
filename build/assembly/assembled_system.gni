@@ -175,6 +175,13 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #       cmdline_deps = [...]
 #     }
 #
+#   core_realm_definition [optional]
+#     [label] The GN label of a `core_realm_definition()` template
+#
+#   core_package_name [optional]
+#     [string] Name of the core package. Required when core_realm_definition
+#     is provided.
+#
 # Board parameters:
 #
 #   assembly_blob_layout_format (default: "compact")
@@ -851,8 +858,6 @@ template("assembled_system") {
                            [
                              "testonly",
                              "visibility",
-                             "core_package_name",
-                             "core_realm_definition",
                            ])
     image_assembly_label = ":${namespace}"
     bundles_dir = files.outdir
@@ -861,6 +866,20 @@ template("assembled_system") {
                      invoker.create_legacy_aib_package
     create_package_archive = defined(invoker.create_legacy_aib_archive) &&
                              invoker.create_legacy_aib_archive
+
+    # The core realm is part of the base packages. Do not generate
+    # the core realm if we are not generating an FVM
+    if (defined(invoker.core_realm_definition) &&
+        defined(invoker.core_package_name) && generate_fvm) {
+      core_realm_definition = invoker.core_realm_definition
+      core_package_name = invoker.core_package_name
+    } else {
+      not_needed(invoker,
+                 [
+                   "core_realm_definition",
+                   "core_package_name",
+                 ])
+    }
 
     base_driver_packages = _base_driver_packages
     if (include_shell_commands) {
