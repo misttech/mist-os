@@ -220,13 +220,6 @@ fuchsia::sysmem::PixelFormat GetPixelFormat(fuchsia::sysmem::BufferCollectionSyn
   return buffer_collection_info.settings.image_format_constraints.pixel_format;
 }
 
-// TODO(fxbug.dev/85601): Remove after YUV buffers can be imported to display. We filter YUV
-// images out of display path.
-bool IsYUV(const fuchsia::sysmem::PixelFormat& format) {
-  return format.type == fuchsia::sysmem::PixelFormatType::NV12 ||
-         format.type == fuchsia::sysmem::PixelFormatType::I420;
-}
-
 // Consumes |token| and if its allocation is compatible with the display returns its pixel format.
 // Otherwise returns std::nullopt.
 // TODO(fxbug.dev/71344): Just return a bool after we don't need the pixel format anymore.
@@ -237,11 +230,6 @@ std::optional<fuchsia::sysmem::PixelFormat> DetermineDisplaySupportFor(
   const bool image_supports_display = CheckBuffersAllocated(token);
   if (image_supports_display) {
     result = GetPixelFormat(token);
-    // TODO(fxbug.dev/85601): Remove after YUV buffers can be imported to display. We filter YUV
-    // images out of display path.
-    if (IsYUV(result.value())) {
-      result = std::nullopt;
-    }
   }
 
   token->Close();
