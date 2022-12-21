@@ -8,7 +8,7 @@ use {
         object_store::{
             allocator::{Allocator, SimpleAllocator},
             graveyard::Graveyard,
-            journal::{JournalCheckpoint, SuperBlockHeader},
+            journal::{Journal, JournalCheckpoint, SuperBlockHeader},
             object_manager::ObjectManager,
             transaction::{
                 self, LockKey, LockManager, MetadataReservation, ReadGuard, Transaction,
@@ -67,6 +67,10 @@ impl Filesystem for FakeFilesystem {
 
     fn object_manager(&self) -> &Arc<ObjectManager> {
         &self.object_manager
+    }
+
+    fn journal(&self) -> &Journal {
+        unimplemented!();
     }
 
     async fn sync(&self, options: SyncOptions<'_>) -> Result<(), Error> {

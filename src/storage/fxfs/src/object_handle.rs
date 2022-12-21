@@ -9,10 +9,6 @@ use {
     storage_device::buffer::{Buffer, BufferRef, MutableBufferRef},
 };
 
-mod bootstrap;
-
-pub use bootstrap::BootstrapObjectHandle;
-
 // Some places use Default and assume that zero is an invalid object ID, so this cannot be changed
 // easily.
 pub const INVALID_OBJECT_ID: u64 = 0;

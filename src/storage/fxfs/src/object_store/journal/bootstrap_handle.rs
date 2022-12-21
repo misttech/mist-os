@@ -6,6 +6,7 @@ use {
     crate::{
         log::*,
         object_handle::{ObjectHandle, ReadObjectHandle},
+        object_store::journal::JournalHandle,
         range::RangeExt,
     },
     anyhow::Error,
@@ -62,34 +63,6 @@ impl BootstrapObjectHandle {
             size: 0,
             trace: AtomicBool::new(false),
         }
-    }
-
-    pub fn push_extent(&mut self, r: Range<u64>) {
-        self.size += r.length().unwrap();
-        self.extents.push(r);
-    }
-
-    // Discard any extents whose logical offset succeeds |offset|.
-    pub fn discard_extents(&mut self, discard_offset: u64) {
-        let mut offset = self.start_offset + self.size;
-        let mut num = 0;
-        while let Some(extent) = self.extents.last() {
-            let length = extent.length().unwrap();
-            offset = offset.checked_sub(length).unwrap();
-            if offset < discard_offset {
-                break;
-            }
-            self.size -= length;
-            self.extents.pop();
-            num += 1;
-        }
-        if self.trace.load(Ordering::Relaxed) {
-            info!(count = num, offset = discard_offset, "JH: Discarded extents");
-        }
-    }
-
-    pub fn start_offset(&self) -> u64 {
-        self.start_offset
     }
 }
 
@@ -153,5 +126,34 @@ impl ReadObjectHandle for BootstrapObjectHandle {
             file_offset += extent_len;
         }
         Ok(len)
+    }
+}
+
+impl JournalHandle for BootstrapObjectHandle {
+    fn start_offset(&self) -> Option<u64> {
+        Some(self.start_offset)
+    }
+
+    fn push_extent(&mut self, device_range: Range<u64>) {
+        self.size += device_range.length().unwrap();
+        self.extents.push(device_range);
+    }
+
+    fn discard_extents(&mut self, discard_offset: u64) {
+        let mut offset = self.start_offset + self.size;
+        let mut num = 0;
+        while let Some(extent) = self.extents.last() {
+            let length = extent.length().unwrap();
+            offset = offset.checked_sub(length).unwrap();
+            if offset < discard_offset {
+                break;
+            }
+            self.size -= length;
+            self.extents.pop();
+            num += 1;
+        }
+        if self.trace.load(Ordering::Relaxed) {
+            info!(count = num, offset = discard_offset, "JH: Discarded extents");
+        }
     }
 }

@@ -104,7 +104,7 @@ impl RootVolume {
             self.filesystem.object_manager().store(store_object_id).ok_or(FxfsError::NotFound)?;
         store.set_trace(self.filesystem.trace());
         if let Some(crypt) = crypt {
-            store.unlock(crypt).await?;
+            store.unlock(crypt).await.context("Failed to unlock volume")?;
         } else if store.is_locked() {
             bail!(FxfsError::AccessDenied);
         }

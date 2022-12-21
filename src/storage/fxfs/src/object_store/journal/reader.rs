@@ -9,7 +9,7 @@ use {
         object_store::journal::{JournalCheckpoint, RESET_XOR},
         serialized_types::{Version, Versioned, VersionedLatest},
     },
-    anyhow::{bail, Error},
+    anyhow::{bail, Context, Error},
     byteorder::{ByteOrder, LittleEndian},
 };
 
@@ -18,6 +18,7 @@ use {
 /// preceding block as an input to the next block so that merely copying a block to a different
 /// location will cause a checksum failure.  The serialization of a single record *must* fit within
 /// a single block.
+// TODO(fxbug.dev/118015): This doesn't need to be generic.
 pub struct JournalReader<OH: ObjectHandle> {
     // The handle of the journal file that we are reading.
     handle: OH,
@@ -129,7 +130,15 @@ impl<OH: ReadObjectHandle> JournalReader<OH> {
                     self.consume(self.buf_range.end - self.buf_range.start);
                     self.buf_range = self.buf.len() - self.block_size as usize
                         ..self.buf.len() - std::mem::size_of::<Checksum>();
-                    return Ok(ReadResult::Reset);
+                    let (version, to_consume) = {
+                        let mut cursor = std::io::Cursor::new(self.buffer());
+                        let version = Version::deserialize_from(&mut cursor)
+                            .context("Failed to deserialize version")?;
+                        (version, cursor.position() as usize)
+                    };
+                    self.version = version.clone();
+                    self.consume(to_consume);
+                    return Ok(ReadResult::Reset(version));
                 } else if let Some(io_error) = e.downcast_ref::<std::io::Error>() {
                     if io_error.kind() == std::io::ErrorKind::UnexpectedEof && self.bad_checksum {
                         return Ok(ReadResult::ChecksumMismatch);
@@ -187,6 +196,12 @@ impl<OH: ReadObjectHandle> JournalReader<OH> {
                         // block.  We don't adjust buf_range until the reset has been processed, but
                         // we do push the checksum.
                         self.found_reset = true;
+                        // We need to adjust the last pushed checksum since it could possibly be
+                        // for checkpoints later (see Self::journal_file_checkpoint), and
+                        // checkpoints should always use the correct seed.
+                        if let Some(checksum) = self.checksums.last_mut() {
+                            *checksum ^= RESET_XOR;
+                        }
                         self.checksums.push(stored_checksum);
                         self.read_offset += bs as u64;
                         return Ok(());
@@ -238,7 +253,7 @@ impl<OH: ReadObjectHandle> JournalReader<OH> {
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum ReadResult<T> {
-    Reset,
+    Reset(Version),
     Some(T),
     ChecksumMismatch,
 }
@@ -254,7 +269,7 @@ mod tests {
             object_store::journal::{
                 writer::JournalWriter, Checksum, JournalCheckpoint, RESET_XOR,
             },
-            serialized_types::{VersionedLatest, LATEST_VERSION},
+            serialized_types::{Version, VersionedLatest, LATEST_VERSION},
             testing::fake_object::{FakeObject, FakeObjectHandle},
         },
         std::{io::Write, sync::Arc},
@@ -426,14 +441,18 @@ mod tests {
         );
 
         let mut writer = JournalWriter::new(TEST_BLOCK_SIZE as usize, 0);
+        let new_version = Version { minor: LATEST_VERSION.minor + 1, ..LATEST_VERSION };
         writer.seek(JournalCheckpoint {
             file_offset: TEST_BLOCK_SIZE,
             checksum: reader.last_read_checksum() ^ RESET_XOR,
-            version: LATEST_VERSION,
+            version: new_version,
         });
+        new_version.serialize_into(&mut writer).expect("write version failed");
         writer.write_record(&13u32);
         let checkpoint = writer.journal_file_checkpoint();
         writer.write_record(&78u32);
+        writer.pad_to_block().expect("pad_to_block failed");
+        writer.write_record(&90u32);
         writer.pad_to_block().expect("pad_to_block failed");
         let (offset, buf) = writer.take_buffer(&handle).unwrap();
         handle.write_or_append(Some(offset), buf.as_ref()).await.expect("overwrite failed");
@@ -441,22 +460,28 @@ mod tests {
         let mut reader = JournalReader::new(
             FakeObjectHandle::new(object.clone()),
             TEST_BLOCK_SIZE,
-            &JournalCheckpoint { version: LATEST_VERSION, ..JournalCheckpoint::default() },
+            &JournalCheckpoint { version: new_version, ..JournalCheckpoint::default() },
         );
         assert_eq!(reader.deserialize().await.expect("deserialize failed"), ReadResult::Some(4u32));
         assert_eq!(reader.deserialize().await.expect("deserialize failed"), ReadResult::Some(7u32));
         reader.skip_to_end_of_block();
         assert_eq!(
             reader.deserialize::<u32>().await.expect("deserialize failed"),
-            ReadResult::Reset,
+            ReadResult::Reset(new_version),
         );
         assert_eq!(
             reader.deserialize().await.expect("deserialize failed"),
             ReadResult::Some(13u32)
         );
+        assert_eq!(reader.journal_file_checkpoint(), checkpoint);
         assert_eq!(
             reader.deserialize().await.expect("deserialize failed"),
             ReadResult::Some(78u32)
+        );
+        reader.skip_to_end_of_block();
+        assert_eq!(
+            reader.deserialize().await.expect("deserialize failed"),
+            ReadResult::Some(90u32)
         );
 
         // Make sure a reader can start from the middle of a reset block.
@@ -465,6 +490,11 @@ mod tests {
         assert_eq!(
             reader.deserialize().await.expect("deserialize failed"),
             ReadResult::Some(78u32)
+        );
+        reader.skip_to_end_of_block();
+        assert_eq!(
+            reader.deserialize().await.expect("deserialize failed"),
+            ReadResult::Some(90u32)
         );
     }
 

@@ -21,18 +21,20 @@ use {
             object_record::{ObjectKey, ObjectValue},
             store_object_handle::DirectWriter,
             transaction::{AssociatedObject, LockKey, Mutation},
-            tree, AssocObj, CachingObjectHandle, HandleOptions, ObjectStore, Options, StoreInfo,
-            MAX_ENCRYPTED_MUTATIONS_SIZE,
+            tree, AssocObj, CachingObjectHandle, EncryptedMutations, HandleOptions, LockState,
+            ObjectStore, Options, StoreInfo, MAX_ENCRYPTED_MUTATIONS_SIZE,
         },
         serialized_types::{Version, VersionedLatest},
         trace_duration,
     },
+    anyhow::Context,
     anyhow::Error,
     async_trait::async_trait,
     once_cell::sync::OnceCell,
     std::sync::atomic::Ordering,
 };
 
+#[derive(Debug)]
 pub enum Reason {
     /// Journal memory or space pressure.
     Journal,
@@ -160,7 +162,7 @@ impl ObjectStore {
 
         let mut old_encrypted_mutations_object_id = INVALID_OBJECT_ID;
 
-        let store_is_locked = self.lock_state.lock().unwrap().encrypted_mutations().is_some();
+        let store_is_locked = matches!(&*self.lock_state.lock().unwrap(), LockState::Locked);
         let (old_layers, new_layers) = if store_is_locked {
             // The store is locked so we need to either write our encrypted mutations to a new file,
             // or append them to an existing one.
@@ -188,14 +190,17 @@ impl ObjectStore {
             };
             transaction.commit().await?;
 
-            // Append the encrypted mutations.
+            // Append the encrypted mutations, which need to be read from the journal.
+            // This assumes that the journal has no buffered mutations for this store (see
+            // Self::lock).
+            let journaled = filesystem
+                .journal()
+                .read_transactions_for_object(self.store_object_id)
+                .await
+                .context("Failed to read encrypted mutations from journal")?;
             let mut buffer = handle.allocate_buffer(MAX_ENCRYPTED_MUTATIONS_SIZE);
             let mut cursor = std::io::Cursor::new(buffer.as_mut_slice());
-            self.lock_state
-                .lock()
-                .unwrap()
-                .encrypted_mutations()
-                .unwrap()
+            EncryptedMutations::from_replayed_mutations(self.store_object_id, journaled)
                 .serialize_with_version(&mut cursor)?;
             let len = cursor.position() as usize;
             handle
@@ -301,6 +306,7 @@ impl ObjectStore {
                 old_layer_count = old_layers.len(),
                 new_layer_count = new_layers.as_ref().map(|v| v.len()).unwrap_or(0),
                 total_layer_size,
+                ?new_store_info,
                 "OS: compacting"
             );
         }
@@ -314,9 +320,6 @@ impl ObjectStore {
 
                 if let Some(layers) = new_layers {
                     self.tree.set_layers(layers);
-                }
-                if let Some(m) = self.lock_state.lock().unwrap().encrypted_mutations_mut() {
-                    std::mem::take(m);
                 }
             })
             .await?;

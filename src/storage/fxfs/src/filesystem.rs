@@ -111,6 +111,9 @@ pub trait Filesystem: TransactionHandler {
     /// Returns the object manager for the filesystem.
     fn object_manager(&self) -> &Arc<ObjectManager>;
 
+    /// Returns the journal for the filesystem.
+    fn journal(&self) -> &Journal;
+
     /// Flushes buffered data to the underlying device.
     async fn sync(&self, options: SyncOptions<'_>) -> Result<(), Error>;
 
@@ -192,6 +195,12 @@ pub trait JournalingObject: Send + Sync {
 
 #[derive(Default)]
 pub struct SyncOptions<'a> {
+    /// If set, the journal will be flushed, as well as the underlying block device.  This is much
+    /// more expensive, but ensures the contents of the journal are persisted (which also acts as a
+    /// barrier, ensuring all previous journal writes are observable by future operations).
+    /// Note that when this is not set, the journal is *not* synchronously flushed by the sync call,
+    /// and it will return before the journal flush completes.  In other words, some journal
+    /// mutations may still be buffered in memory after this call returns.
     pub flush_device: bool,
 
     // A precondition that is evaluated whilst a lock is held that determines whether or not the
@@ -555,6 +564,10 @@ impl Filesystem for FxFilesystem {
 
     fn object_manager(&self) -> &Arc<ObjectManager> {
         &self.objects
+    }
+
+    fn journal(&self) -> &Journal {
+        &self.journal
     }
 
     async fn sync(&self, options: SyncOptions<'_>) -> Result<(), Error> {

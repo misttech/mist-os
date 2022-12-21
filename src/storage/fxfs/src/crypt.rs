@@ -300,10 +300,14 @@ pub mod insecure {
             aead::{Aead, NewAead},
             Aes256GcmSiv, Key, Nonce,
         },
-        anyhow::{anyhow, Context, Error},
+        anyhow::{anyhow, bail, Context, Error},
         async_trait::async_trait,
         rand::{rngs::StdRng, RngCore, SeedableRng},
-        std::{collections::HashMap, convert::TryInto},
+        std::{
+            collections::HashMap,
+            convert::TryInto,
+            sync::atomic::{AtomicBool, Ordering},
+        },
     };
 
     pub const DATA_KEY: [u8; 32] = [
@@ -324,6 +328,7 @@ pub mod insecure {
         ciphers: HashMap<u64, Aes256GcmSiv>,
         active_data_key: Option<u64>,
         active_metadata_key: Option<u64>,
+        shutdown: AtomicBool,
     }
     impl InsecureCrypt {
         pub fn new() -> Self {
@@ -334,6 +339,11 @@ pub mod insecure {
             this.active_metadata_key = Some(1);
             this
         }
+
+        /// Simulates a crypt instance prematurely terminating.  All requests will fail.
+        pub fn shutdown(&self) {
+            self.shutdown.store(true, Ordering::Relaxed);
+        }
     }
 
     #[async_trait]
@@ -343,6 +353,9 @@ pub mod insecure {
             owner: u64,
             purpose: KeyPurpose,
         ) -> Result<(WrappedKey, UnwrappedKey), Error> {
+            if self.shutdown.load(Ordering::Relaxed) {
+                bail!("Crypt was shut down");
+            }
             let wrapping_key_id = match purpose {
                 KeyPurpose::Data => self.active_data_key.as_ref(),
                 KeyPurpose::Metadata => self.active_metadata_key.as_ref(),
@@ -371,6 +384,9 @@ pub mod insecure {
             wrapped_key: &WrappedKey,
             owner: u64,
         ) -> Result<UnwrappedKey, Error> {
+            if self.shutdown.load(Ordering::Relaxed) {
+                bail!("Crypt was shut down");
+            }
             let cipher =
                 self.ciphers.get(&wrapped_key.wrapping_key_id).ok_or(anyhow!("cipher fail"))?;
             let mut nonce = Nonce::default();

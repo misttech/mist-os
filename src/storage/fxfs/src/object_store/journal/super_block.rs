@@ -30,13 +30,13 @@ use {
         log::*,
         lsm_tree::{types::MutableLayer, LSMTree, LayerSet},
         metrics::{traits::Metric as _, UintMetric},
-        object_handle::BootstrapObjectHandle,
         object_store::{
             allocator::Reservation,
             journal::{
+                bootstrap_handle::BootstrapObjectHandle,
                 reader::{JournalReader, ReadResult},
                 writer::JournalWriter,
-                JournalCheckpoint,
+                JournalCheckpoint, JournalHandle as _,
             },
             object_record::{ObjectItem, ObjectItemV5},
             transaction::{AssocObj, Options},
@@ -586,7 +586,7 @@ impl RecordReader {
     pub async fn next_item(&mut self) -> Result<SuperBlockRecord, Error> {
         loop {
             match self.reader.deserialize().await? {
-                ReadResult::Reset => bail!("Unexpected reset"),
+                ReadResult::Reset(_) => bail!("Unexpected reset"),
                 ReadResult::ChecksumMismatch => bail!("Checksum mismatch"),
                 ReadResult::Some(SuperBlockRecord::Extent(extent)) => {
                     ensure!(extent.is_valid(), FxfsError::Inconsistent);

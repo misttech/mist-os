@@ -16,6 +16,7 @@
 //! at which point the mount can continue and the journal will be extended from that point with
 //! further mutations as required.
 
+mod bootstrap_handle;
 mod checksum_list;
 mod reader;
 pub mod super_block;
@@ -28,12 +29,13 @@ use {
         errors::FxfsError,
         filesystem::{ApplyContext, ApplyMode, Filesystem, SyncOptions},
         log::*,
-        object_handle::{BootstrapObjectHandle, ObjectHandle},
+        object_handle::{ObjectHandle as _, ReadObjectHandle},
         object_store::{
             allocator::{Allocator, SimpleAllocator},
             extent_record::{Checksums, ExtentKey, ExtentValue, DEFAULT_DATA_ATTRIBUTE_ID},
             graveyard::Graveyard,
             journal::{
+                bootstrap_handle::BootstrapObjectHandle,
                 checksum_list::ChecksumList,
                 reader::{JournalReader, ReadResult},
                 super_block::{SuperBlockInstance, SuperBlockManager},
@@ -63,7 +65,8 @@ use {
     std::{
         clone::Clone,
         collections::HashMap,
-        ops::Bound,
+        convert::AsRef,
+        ops::{Bound, Range},
         sync::{
             atomic::{AtomicBool, Ordering},
             Arc, Mutex,
@@ -240,6 +243,49 @@ pub struct JournalOptions {
 impl Default for JournalOptions {
     fn default() -> Self {
         JournalOptions { reclaim_size: DEFAULT_RECLAIM_SIZE }
+    }
+}
+
+struct JournaledTransactions {
+    transactions: Vec<JournaledTransaction>,
+    // Maps from owner_object_id to offset at which it was deleted. Required for checksum
+    // validation.
+    marked_for_deletion: HashMap<u64, u64>,
+    device_flushed_offset: u64,
+}
+
+#[derive(Debug)]
+pub struct JournaledTransaction {
+    pub checkpoint: JournalCheckpoint,
+    // List of (store_object_id, mutation).
+    pub mutations: Vec<(u64, Mutation)>,
+    pub end_offset: u64,
+}
+
+/// Handles for journal-like objects have some additional functionality to manage their extents,
+/// since during replay we need to add extents as we find them.
+trait JournalHandle: ReadObjectHandle {
+    /// The offset at which the journal stream starts.  Used only for validating extents (which will
+    /// be skipped if None is returned).
+    fn start_offset(&self) -> Option<u64>;
+    /// Adds an extent to the current end of the journal stream.
+    fn push_extent(&mut self, devic_range: Range<u64>);
+    /// Discards all extents whose logical offset succeeds |discard_offset|.
+    fn discard_extents(&mut self, discard_offset: u64);
+}
+
+// Provide a stub implementation for StoreObjectHandle so we can use it in
+// Journal::read_transactions.  Manual extent management is a NOP (which is OK since presumably the
+// StoreObjectHandle already knows where its extents live).
+impl<S: AsRef<ObjectStore> + Send + Sync + 'static> JournalHandle for StoreObjectHandle<S> {
+    fn start_offset(&self) -> Option<u64> {
+        None
+    }
+    fn push_extent(&mut self, _device_range: Range<u64>) {
+        // NOP
+    }
+    fn discard_extents(&mut self, _discard_offset: u64) {
+        // NOP
     }
 }
 
@@ -508,171 +554,17 @@ impl Journal {
                 iter.advance().await.context("Failed to advance root parent store iterator")?;
             }
         }
+
         let mut reader =
             JournalReader::new(handle, self.block_size(), &super_block.journal_checkpoint);
-        let mut transactions = Vec::new();
-        let mut current_transaction = None;
-        let mut device_flushed_offset = super_block.super_block_journal_file_offset;
-        // Maps from owner_object_id to offset at which it was deleted. Required for checksum
-        // validation.
-        let mut marked_for_deletion: HashMap<u64, u64> = HashMap::new();
-        loop {
-            // Cache the checkpoint before we deserialize a record.
-            let checkpoint = reader.journal_file_checkpoint();
-            let result =
-                reader.deserialize().await.context("Failed to deserialize journal record")?;
-            match result {
-                ReadResult::Reset => {
-                    let version;
-                    reader.consume({
-                        let mut cursor = std::io::Cursor::new(reader.buffer());
-                        version = Version::deserialize_from(&mut cursor)
-                            .context("Failed to deserialize version")?;
-                        cursor.position() as usize
-                    });
-                    reader.set_version(version);
-                    if current_transaction.is_some() {
-                        current_transaction = None;
-                        transactions.pop();
-                    }
-                    let offset = reader.journal_file_checkpoint().file_offset;
-                    if offset > device_flushed_offset {
-                        device_flushed_offset = offset;
-                    }
-                }
-                ReadResult::Some(record) => {
-                    match record {
-                        JournalRecord::EndBlock => {
-                            reader.skip_to_end_of_block();
-                        }
-                        JournalRecord::Mutation { object_id, mutation } => {
-                            let current_transaction = match current_transaction.as_mut() {
-                                None => {
-                                    transactions.push((checkpoint, Vec::new(), 0));
-                                    current_transaction = transactions.last_mut();
-                                    current_transaction.as_mut().unwrap()
-                                }
-                                Some(transaction) => transaction,
-                            };
-                            // If this mutation doesn't need to be applied, don't bother adding it
-                            // to the transaction.
-                            if self.should_apply(object_id, &current_transaction.0) {
-                                current_transaction.1.push((object_id, mutation));
-                            }
-                        }
-                        JournalRecord::Commit => {
-                            if let Some((_checkpoint, mutations, ref mut end_offset)) =
-                                current_transaction.take()
-                            {
-                                for (object_id, mutation) in mutations {
-                                    // Snoop the mutations for any that might apply to the journal
-                                    // file so that we can pass them to the reader so that it can
-                                    // read the journal file.
-                                    if *object_id == super_block.root_parent_store_object_id {
-                                        if let Mutation::ObjectStore(ObjectStoreMutation {
-                                            item:
-                                                Item {
-                                                    key:
-                                                        ObjectKey {
-                                                            object_id,
-                                                            data:
-                                                                ObjectKeyData::Attribute(
-                                                                    DEFAULT_DATA_ATTRIBUTE_ID,
-                                                                    AttributeKey::Extent(
-                                                                        ExtentKey { range },
-                                                                    ),
-                                                                ),
-                                                            ..
-                                                        },
-                                                    value:
-                                                        ObjectValue::Extent(ExtentValue::Some {
-                                                            device_offset,
-                                                            ..
-                                                        }),
-                                                    ..
-                                                },
-                                            ..
-                                        }) = mutation
-                                        {
-                                            let handle = &mut reader.handle();
-                                            if *object_id != handle.object_id() {
-                                                continue;
-                                            }
-                                            if range.start
-                                                != handle.start_offset() + handle.get_size()
-                                            {
-                                                bail!(anyhow!(FxfsError::Inconsistent).context(
-                                                    format!(
-                                                        "Unexpected journal extent {:?} -> {}, \
-                                                        expected start: {}",
-                                                        range,
-                                                        device_offset,
-                                                        handle.get_size()
-                                                    )
-                                                ));
-                                            }
-                                            handle.push_extent(
-                                                *device_offset
-                                                    ..*device_offset
-                                                        + range
-                                                            .length()
-                                                            .context("Invalid extent")?,
-                                            );
-                                        }
-                                    }
-                                    // If a MarkForDeletion mutation is found, we want to skip
-                                    // checksum validation of prior writes.
-                                    if let Mutation::Allocator(
-                                        AllocatorMutation::MarkForDeletion(owner_object_id),
-                                    ) = mutation
-                                    {
-                                        marked_for_deletion.insert(
-                                            *owner_object_id,
-                                            reader.journal_file_checkpoint().file_offset,
-                                        );
-                                    }
-                                }
-                                *end_offset = reader.journal_file_checkpoint().file_offset;
-                            }
-                        }
-                        JournalRecord::Discard(offset) => {
-                            if let Some(transaction) = current_transaction.as_ref() {
-                                if transaction.0.file_offset < offset {
-                                    // Odd, but OK.
-                                    continue;
-                                }
-                            }
-                            current_transaction = None;
-                            while let Some(transaction) = transactions.last() {
-                                if transaction.0.file_offset < offset {
-                                    break;
-                                }
-                                transactions.pop();
-                            }
-                            reader.handle().discard_extents(offset);
-                        }
-                        JournalRecord::DidFlushDevice(offset) => {
-                            if offset > device_flushed_offset {
-                                device_flushed_offset = offset;
-                            }
-                        }
-                    }
-                }
-                // This is expected when we reach the end of the journal stream.
-                ReadResult::ChecksumMismatch => break,
-            }
-        }
-
-        // Discard any uncommitted transaction.
-        if current_transaction.is_some() {
-            transactions.pop();
-        }
+        let JournaledTransactions { transactions, marked_for_deletion, device_flushed_offset } =
+            self.read_transactions(&mut reader, None).await?;
 
         // Validate all the mutations.
         let mut checksum_list = ChecksumList::new(device_flushed_offset);
         let mut valid_to = reader.journal_file_checkpoint().file_offset;
         let device_size = device.size();
-        'bad_replay: for (checkpoint, mutations, _) in &transactions {
+        'bad_replay: for JournaledTransaction { checkpoint, mutations, .. } in &transactions {
             for (object_id, mutation) in mutations {
                 if !self.validate_mutation(&mutation, block_size, device_size) {
                     info!(?mutation, "Stopping replay at bad mutation");
@@ -701,7 +593,7 @@ impl Journal {
             // Loop used here in place of for {} else {}
             #[allow(clippy::never_loop)]
             'outer: loop {
-                for (checkpoint, mutations, end_offset) in transactions {
+                for JournaledTransaction { checkpoint, mutations, end_offset } in transactions {
                     if checkpoint.file_offset >= valid_to {
                         break 'outer checkpoint;
                     }
@@ -747,14 +639,13 @@ impl Journal {
             ))?;
             let _ = self.handle.set(handle);
             let mut inner = self.inner.lock().unwrap();
-            let mut reader_checkpoint = reader.journal_file_checkpoint();
+            let mut writer_checkpoint = reader.journal_file_checkpoint();
             // Reset the stream to indicate that we've remounted the journal.
-            reader_checkpoint.checksum ^= RESET_XOR;
-            reader_checkpoint.version = LATEST_VERSION;
-            inner.device_flushed_offset = device_flushed_offset;
-            let mut writer_checkpoint = reader_checkpoint.clone();
+            writer_checkpoint.checksum ^= RESET_XOR;
+            writer_checkpoint.version = LATEST_VERSION;
             writer_checkpoint.file_offset =
                 round_up(writer_checkpoint.file_offset, BLOCK_SIZE).unwrap();
+            inner.device_flushed_offset = device_flushed_offset;
             inner.flushed_offset = writer_checkpoint.file_offset;
             inner.writer.seek(writer_checkpoint);
             inner.output_reset_version = true;
@@ -778,6 +669,178 @@ impl Journal {
             info!(checkpoint = reader.journal_file_checkpoint().file_offset, "replay complete");
         }
         Ok(())
+    }
+
+    async fn read_transactions<H: JournalHandle>(
+        &self,
+        reader: &mut JournalReader<H>,
+        end_offset: Option<u64>,
+    ) -> Result<JournaledTransactions, Error> {
+        let mut transactions = Vec::new();
+        let mut marked_for_deletion: HashMap<u64, u64> = HashMap::new();
+        let (mut device_flushed_offset, root_parent_store_object_id) = {
+            let super_block = &self.inner.lock().unwrap().super_block_header;
+            (super_block.super_block_journal_file_offset, super_block.root_parent_store_object_id)
+        };
+        let mut current_transaction = None;
+        loop {
+            // Cache the checkpoint before we deserialize a record.
+            let checkpoint = reader.journal_file_checkpoint();
+            if let Some(end_offset) = end_offset {
+                if checkpoint.file_offset >= end_offset {
+                    break;
+                }
+            }
+            let result =
+                reader.deserialize().await.context("Failed to deserialize journal record")?;
+            match result {
+                ReadResult::Reset(_) => {
+                    if current_transaction.is_some() {
+                        current_transaction = None;
+                        transactions.pop();
+                    }
+                    let offset = reader.journal_file_checkpoint().file_offset;
+                    if offset > device_flushed_offset {
+                        device_flushed_offset = offset;
+                    }
+                }
+                ReadResult::Some(record) => {
+                    match record {
+                        JournalRecord::EndBlock => {
+                            reader.skip_to_end_of_block();
+                        }
+                        JournalRecord::Mutation { object_id, mutation } => {
+                            let current_transaction = match current_transaction.as_mut() {
+                                None => {
+                                    transactions.push(JournaledTransaction {
+                                        checkpoint,
+                                        mutations: Vec::new(),
+                                        end_offset: 0,
+                                    });
+                                    current_transaction = transactions.last_mut();
+                                    current_transaction.as_mut().unwrap()
+                                }
+                                Some(transaction) => transaction,
+                            };
+                            // If this mutation doesn't need to be applied, don't bother adding it
+                            // to the transaction.
+                            if self.should_apply(object_id, &current_transaction.checkpoint) {
+                                current_transaction.mutations.push((object_id, mutation));
+                            }
+                        }
+                        JournalRecord::Commit => {
+                            if let Some(JournaledTransaction {
+                                checkpoint: _,
+                                mutations,
+                                ref mut end_offset,
+                            }) = current_transaction.take()
+                            {
+                                for (store_object_id, mutation) in mutations {
+                                    // Snoop the mutations for any that might apply to the journal
+                                    // file so that we can pass them to the reader so that it can
+                                    // read the journal file.
+                                    if *store_object_id == root_parent_store_object_id {
+                                        if let Mutation::ObjectStore(ObjectStoreMutation {
+                                            item:
+                                                Item {
+                                                    key:
+                                                        ObjectKey {
+                                                            object_id,
+                                                            data:
+                                                                ObjectKeyData::Attribute(
+                                                                    DEFAULT_DATA_ATTRIBUTE_ID,
+                                                                    AttributeKey::Extent(
+                                                                        ExtentKey { range },
+                                                                    ),
+                                                                ),
+                                                            ..
+                                                        },
+                                                    value:
+                                                        ObjectValue::Extent(ExtentValue::Some {
+                                                            device_offset,
+                                                            ..
+                                                        }),
+                                                    ..
+                                                },
+                                            ..
+                                        }) = mutation
+                                        {
+                                            // Add the journal extents we find on the way to our
+                                            // reader.
+                                            let handle = reader.handle();
+                                            if *object_id != handle.object_id() {
+                                                continue;
+                                            }
+                                            if let Some(start_offset) = handle.start_offset() {
+                                                if range.start != start_offset + handle.get_size() {
+                                                    bail!(anyhow!(FxfsError::Inconsistent)
+                                                        .context(format!(
+                                                            "Unexpected journal extent {:?} -> {}, \
+                                                            expected start: {}",
+                                                            range,
+                                                            device_offset,
+                                                            handle.get_size()
+                                                        )));
+                                                }
+                                            }
+                                            handle.push_extent(
+                                                *device_offset
+                                                    ..*device_offset
+                                                        + range
+                                                            .length()
+                                                            .context("Invalid extent")?,
+                                            );
+                                        }
+                                    }
+                                    // If a MarkForDeletion mutation is found, we want to skip
+                                    // checksum validation of prior writes.
+                                    if let Mutation::Allocator(
+                                        AllocatorMutation::MarkForDeletion(owner_object_id),
+                                    ) = mutation
+                                    {
+                                        marked_for_deletion.insert(
+                                            *owner_object_id,
+                                            reader.journal_file_checkpoint().file_offset,
+                                        );
+                                    }
+                                }
+                                *end_offset = reader.journal_file_checkpoint().file_offset;
+                            }
+                        }
+                        JournalRecord::Discard(offset) => {
+                            if let Some(transaction) = current_transaction.as_ref() {
+                                if transaction.checkpoint.file_offset < offset {
+                                    // Odd, but OK.
+                                    continue;
+                                }
+                            }
+                            current_transaction = None;
+                            while let Some(transaction) = transactions.last() {
+                                if transaction.checkpoint.file_offset < offset {
+                                    break;
+                                }
+                                transactions.pop();
+                            }
+                            reader.handle().discard_extents(offset);
+                        }
+                        JournalRecord::DidFlushDevice(offset) => {
+                            if offset > device_flushed_offset {
+                                device_flushed_offset = offset;
+                            }
+                        }
+                    }
+                }
+                // This is expected when we reach the end of the journal stream.
+                ReadResult::ChecksumMismatch => break,
+            }
+        }
+
+        // Discard any uncommitted transaction.
+        if current_transaction.is_some() {
+            transactions.pop();
+        }
+
+        Ok(JournaledTransactions { transactions, marked_for_deletion, device_flushed_offset })
     }
 
     /// Creates an empty filesystem with the minimum viable objects (including a root parent and
@@ -894,6 +957,39 @@ impl Journal {
         SuperBlockHeader::shred(super_block_b_handle).await
     }
 
+    /// Takes a snapshot of all journaled transactions which affect |object_id| since its last
+    /// flush.
+    /// The caller is responsible for locking; it must ensure that the journal is not trimmed during
+    /// this call.  For example, a Flush lock could be held on the object in question (assuming that
+    /// object has data to flush and is registered with ObjectManager).
+    pub async fn read_transactions_for_object(
+        &self,
+        object_id: u64,
+    ) -> Result<Vec<JournaledTransaction>, Error> {
+        let handle = self.handle.get().expect("No journal handle");
+        // Reopen the handle since JournalReader needs an owned handle.
+        let handle = ObjectStore::open_object(
+            handle.owner(),
+            handle.object_id(),
+            journal_handle_options(),
+            handle.store().crypt().as_ref().map(Arc::as_ref),
+        )
+        .await?;
+
+        let checkpoint = match self.objects.journal_checkpoint(object_id) {
+            Some(checkpoint) => checkpoint,
+            None => return Ok(vec![]),
+        };
+        let mut reader = JournalReader::new(handle, self.block_size(), &checkpoint);
+        // Record the current end offset and only read to there, so we don't accidentally read any
+        // partially flushed blocks.
+        let end_offset = self.inner.lock().unwrap().flushed_offset;
+        self.read_transactions(&mut reader, Some(end_offset)).await.map(|mut r| {
+            r.transactions.retain(|t| t.mutations.iter().any(|(oid, _)| *oid == object_id));
+            r.transactions
+        })
+    }
+
     /// Commits a transaction.  This is not thread safe; the caller must take appropriate locks.
     pub async fn commit(&self, transaction: &mut Transaction<'_>) -> Result<u64, Error> {
         if transaction.is_empty() {
@@ -914,6 +1010,10 @@ impl Journal {
 
             // If this is the first write after a RESET, we need to output version first.
             if std::mem::take(&mut inner.output_reset_version) {
+                info!(
+                    "Writing reset version at {}",
+                    inner.writer.journal_file_checkpoint().file_offset
+                );
                 LATEST_VERSION.serialize_into(&mut inner.writer)?;
             }
 
@@ -1351,6 +1451,9 @@ pub struct Writer<'a>(u64, &'a mut JournalWriter);
 impl Writer<'_> {
     pub fn write(&mut self, mutation: Mutation) {
         self.1.write_record(&JournalRecord::Mutation { object_id: self.0, mutation });
+    }
+    pub fn journal_file_checkpoint(&self) -> JournalCheckpoint {
+        self.1.journal_file_checkpoint()
     }
 }
 

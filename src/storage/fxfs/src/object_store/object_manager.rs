@@ -577,6 +577,17 @@ impl ObjectManager {
         (offsets, min_checkpoint.cloned())
     }
 
+    /// Returns the checkpoint into the journal that the object depends on, or None if the object
+    /// has no journaled updates.
+    pub fn journal_checkpoint(&self, object_id: u64) -> Option<JournalCheckpoint> {
+        self.inner
+            .read()
+            .unwrap()
+            .journal_checkpoints
+            .get(&object_id)
+            .map(|checkpoints| checkpoints.earliest().clone())
+    }
+
     /// Returns true if the object identified by `object_id` is known to have updates recorded in
     /// the journal that the object depends upon.
     pub fn needs_flush(&self, object_id: u64) -> bool {
