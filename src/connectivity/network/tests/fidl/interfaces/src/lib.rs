@@ -524,6 +524,7 @@ async fn test_close_data_race<N: Netstack, E: netemul::Endpoint>(name: &str) {
 
         // Keep sending data until writing to the socket fails.
         let io_fut = async {
+            let mut write_wait_interval = fuchsia_zircon::Duration::from_micros(10);
             loop {
                 match sock
                     .send_to(&[1u8, 2, 3, 4], std::net::SocketAddr::new(MCAST_ADDR, 1234))
@@ -546,12 +547,12 @@ async fn test_close_data_race<N: Netstack, E: netemul::Endpoint>(name: &str) {
                     .await
                     .expect("send frame on fake_ep");
 
-                // Wait on a short timer to avoid too much log noise when
-                // running the test.
-                let () = fuchsia_async::Timer::new(fuchsia_async::Time::after(
-                    fuchsia_zircon::Duration::from_micros(10),
-                ))
-                .await;
+                // Wait on a short timer with an exponential backoff to reduce log noise
+                // when running the test (which can cause timeouts due to slowness in
+                // the logging framework).
+                let () = fuchsia_async::Timer::new(fuchsia_async::Time::after(write_wait_interval))
+                    .await;
+                write_wait_interval = write_wait_interval * 2;
             }
         };
 

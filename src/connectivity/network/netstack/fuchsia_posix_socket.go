@@ -1487,11 +1487,11 @@ func (eps *endpointWithSocket) handleEndpointWriteError(err tcpip.Error, transPr
 			_ = syslog.DebugTf("zx_socket_set_disposition", "%p: disposition=0, disposition_peer=ZX_SOCKET_DISPOSITION_WRITE_DISABLED", eps)
 		}
 		return true
-	case *tcpip.ErrNetworkUnreachable:
-		// This error can be returned when we attempt to write to an interface
-		// that has been removed. Since this error is not propagated to the
-		// client and can occur in normal usage, log a warning instead of an
-		// error.
+	case *tcpip.ErrNetworkUnreachable, *tcpip.ErrInvalidEndpointState:
+		// These errors can be returned when we attempt to write to an interface
+		// that has been removed, or is in the process of removal. Since this
+		// error is not propagated to the client and can occur in normal usage,
+		// log a warning instead of an error.
 		_ = syslog.Warnf("%s Endpoint.Write(): %s", transProtoToString(transProto), err)
 		return false
 	default:
