@@ -465,6 +465,8 @@ async fn test_down_close_race<N: Netstack, E: netemul::Endpoint>(name: &str) {
 
 /// Tests races between data traffic and closing a device.
 #[netstack_test]
+// TODO(https://fxbug.dev/117966): re-enable once this test is not flaky.
+#[ignore]
 async fn test_close_data_race<N: Netstack, E: netemul::Endpoint>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let net = sandbox.create_network("net").await.expect("create network");
