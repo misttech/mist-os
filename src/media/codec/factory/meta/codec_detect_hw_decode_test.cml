@@ -21,13 +21,13 @@
         {
             directory: "dev-mediacodec",
             from: "parent",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/media-codec",
         },
         {
             directory: "dev-gpu",
             from: "parent",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/gpu",
         },
     ],

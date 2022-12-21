@@ -11,12 +11,12 @@
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/vfs/cpp/remote_dir.h>
 
+#include <gtest/gtest.h>
+
 #include "sdk/lib/fidl/cpp/binding_set.h"
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/remote_dir.h"
 #include "src/lib/storage/vfs/cpp/service.h"
 #include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
-#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
 // NOLINTNEXTLINE
 using namespace component_testing;
@@ -132,32 +132,41 @@ class Integration : public testing::Test {
 
   void InitializeRoutes(RealmBuilder& builder) {
     builder.AddChild(kCodecFactoryName, "#meta/codec_factory.cm");
-    builder.AddRoute(Route{.capabilities = {Protocol{"fuchsia.logger.LogSink"}},
-                           .source = ParentRef(),
-                           .targets = {ChildRef{kCodecFactoryName}}});
-    builder.AddRoute(Route{.capabilities = {Protocol{"fuchsia.mediacodec.CodecFactory"}},
-                           .source = ChildRef{kCodecFactoryName},
-                           .targets = {ParentRef()}});
+    builder.AddRoute(Route{
+        .capabilities = {Protocol{"fuchsia.logger.LogSink"}},
+        .source = ParentRef(),
+        .targets = {ChildRef{kCodecFactoryName}},
+    });
+    builder.AddRoute(Route{
+        .capabilities = {Protocol{"fuchsia.mediacodec.CodecFactory"}},
+        .source = ChildRef{kCodecFactoryName},
+        .targets = {ParentRef()},
+    });
     builder.AddLocalChild(kMockGpuName, &mock_gpu_);
     builder.AddLocalChild(kSysInfoName, &mock_sys_info_);
-    builder.AddRoute(Route{.capabilities = {Protocol{"fuchsia.sysinfo.SysInfo"}},
-                           .source = ChildRef{kSysInfoName},
-                           .targets = {ChildRef{kCodecFactoryName}}});
-    auto dir_rights = fuchsia::io::Operations::CONNECT | fuchsia::io::Operations::READ_BYTES |
-                      fuchsia::io::Operations::WRITE_BYTES | fuchsia::io::Operations::ENUMERATE |
-                      fuchsia::io::Operations::TRAVERSE | fuchsia::io::Operations::GET_ATTRIBUTES |
-                      fuchsia::io::Operations::MODIFY_DIRECTORY |
-                      fuchsia::io::Operations::UPDATE_ATTRIBUTES;
+    builder.AddRoute(Route{
+        .capabilities = {Protocol{"fuchsia.sysinfo.SysInfo"}},
+        .source = ChildRef{kSysInfoName},
+        .targets = {ChildRef{kCodecFactoryName}},
+    });
 
     builder.AddRoute(Route{
-        .capabilities = {Directory{.name = "dev-gpu", .rights = dir_rights, .path = "/dev-gpu"}},
+        .capabilities =
+            {
+                Directory{
+                    .name = "dev-gpu",
+                    .rights = fuchsia::io::R_STAR_DIR,
+                    .path = "/dev-gpu",
+                },
+                Directory{
+                    .name = "dev-mediacodec",
+                    .rights = fuchsia::io::R_STAR_DIR,
+                    .path = "/dev-mediacodec",
+                },
+            },
         .source = ChildRef{kMockGpuName},
-        .targets = {ChildRef{kCodecFactoryName}}});
-    builder.AddRoute(
-        Route{.capabilities = {Directory{
-                  .name = "dev-mediacodec", .rights = dir_rights, .path = "/dev-mediacodec"}},
-              .source = ChildRef{kMockGpuName},
-              .targets = {ChildRef{kCodecFactoryName}}});
+        .targets = {ChildRef{kCodecFactoryName}},
+    });
   }
 
   async::Loop loop_{&kAsyncLoopConfigAttachToCurrentThread};

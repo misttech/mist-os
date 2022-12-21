@@ -8,20 +8,26 @@
         "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
     ],
+    children: [
+        {
+            name: "tee_manager",
+            url: "#meta/tee_manager.cm",
+        },
+    ],
     use: [
         {
             directory: "dev-mediacodec",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/media-codec",
         },
         {
             directory: "dev-securemem",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/securemem",
         },
         {
             directory: "dev-sysmem",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/sysmem",
         },
         {
@@ -40,12 +46,6 @@
                 "fuchsia.tee.DeviceInfo",
             ],
             from: "#tee_manager",
-        },
-    ],
-    children: [
-        {
-            name: "tee_manager",
-            url: "#meta/tee_manager.cm",
         },
     ],
     offer: [

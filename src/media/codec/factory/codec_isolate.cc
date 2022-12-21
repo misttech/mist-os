@@ -11,6 +11,8 @@
 #include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <utility>
+
 #include "src/lib/fxl/strings/string_printf.h"
 
 std::string GetCollectionFromIsolate(IsolateType type) {
@@ -34,7 +36,7 @@ void ForwardToIsolate(std::string component_url, IsolateType type,
   zx_cprng_draw(&rand_num, sizeof rand_num);
   std::string msg = fxl::StringPrintf("isolate-%" PRIu64 "", rand_num);
   isolate.set_name(msg);
-  isolate.set_url(component_url);
+  isolate.set_url(std::move(component_url));
   isolate.set_startup(fuchsia::component::decl::StartupMode::LAZY);
   isolate.set_on_terminate(fuchsia::component::decl::OnTerminate::NONE);
 

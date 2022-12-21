@@ -23,13 +23,13 @@
             directory: "dev-mediacodec",
             from: "parent",
             to: "#codec-factory",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
         {
             directory: "dev-gpu",
             from: "parent",
             to: "#codec-factory",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
     ],
     facets: {

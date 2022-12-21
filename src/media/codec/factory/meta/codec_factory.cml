@@ -32,12 +32,12 @@
     use: [
         {
             directory: "dev-mediacodec",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/media-codec",
         },
         {
             directory: "dev-gpu",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/gpu",
         },
         {
