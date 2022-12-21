@@ -545,6 +545,7 @@ def main():
             host_os=build_config['host_os'],
             host_tag=build_config['host_tag'],
             host_tag_alt=build_config['host_tag_alt'],
+            ninja_output_dir=os.path.relpath(gn_output_dir, workspace_dir),
         )
         generated.add_file(
             'workspace/WORKSPACE.bazel',

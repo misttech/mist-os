@@ -174,14 +174,14 @@ rules_fuchsia_deps()
 
 fuchsia_sdk_repository(
     name = "fuchsia_sdk",
-    local_paths = ["../../../../sdk/exported/core"],
+    local_paths = ["{ninja_output_dir}/sdk/exported/core"],
     local_sdk_version_file = "//:fuchsia_sdk_hash",
 )
 
 fuchsia_sdk_repository(
     name = "internal_sdk",
     parent_sdk = "@fuchsia_sdk",
-    local_paths = ["../../../../sdk/exported/platform"],
+    local_paths = ["{ninja_output_dir}/sdk/exported/platform"],
     local_sdk_version_file = "//:internal_sdk_hash",
 )
 
