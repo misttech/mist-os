@@ -347,6 +347,27 @@ TEST_F(QueueTest, ReportingPolicyChangedToDoNotFileAndDelete_DuringUploadFromSto
   EXPECT_FALSE(queue_->Contains(*report_id));
 }
 
+TEST_F(QueueTest, ReportingPolicyChangedToArchive_ArchivesReports) {
+  SetUpQueue({kUploadSuccessful});
+  reporting_policy_watcher_.Set(ReportingPolicy::kUpload);
+
+  // Add a second report while |report_id| is being uploaded. This will keep |report_id2| in the
+  // Queue, letting us test that a change to |kArchive| results in |report_id2| being moved to the
+  // report store.
+  const auto report_id = AddNewReport(/*is_hourly_report=*/false);
+  const auto report_id2 = AddNewReport(/*is_hourly_report=*/false);
+
+  ASSERT_TRUE(report_id);
+  ASSERT_TRUE(report_id2);
+  EXPECT_TRUE(queue_->Contains(*report_id));
+  EXPECT_TRUE(queue_->Contains(*report_id2));
+  EXPECT_FALSE(report_store_->GetReportStore().Contains(*report_id2));
+
+  reporting_policy_watcher_.Set(ReportingPolicy::kArchive);
+  EXPECT_FALSE(queue_->Contains(*report_id2));
+  EXPECT_TRUE(report_store_->GetReportStore().Contains(*report_id2));
+}
+
 TEST_F(QueueTest, Upload) {
   SetUpQueue({kUploadSuccessful, kUploadFailed, kUploadSuccessful, kUploadFailed});
 

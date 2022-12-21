@@ -319,8 +319,7 @@ void Queue::Retire(const PendingReport pending_report, const Queue::RetireReason
   auto tags = tags_->Get(pending_report.report_id);
   switch (reason) {
     case RetireReason::kArchive:
-      FX_LOGST(INFO, tags)
-          << "Archiving local report. Located under /tmp/reports or /cache/reports";
+      FX_LOGST(INFO, tags) << "Archived local report. Located under /tmp/reports or /cache/reports";
       metrics_.Retire(pending_report, reason, server_report_id);
       // Don't clean up resources if the report is being archived.
       return;
@@ -483,8 +482,9 @@ void Queue::WatchReportingPolicy(ReportingPolicyWatcher* watcher) {
         UnblockAllEveryFifteenMinutes();
         break;
       case ReportingPolicy::kArchive:
-        // The reporting policy shouldn't change to Archive outside of tests.
-        unblock_all_every_fifteen_minutes_task_.Cancel();
+        // The reporting policy shouldn't change to Archive outside of tests. Moreover, once the
+        // reporting policy is Archive it should never change to another value mid-boot.
+        StopUploading();
         break;
       case ReportingPolicy::kUndecided:
         BlockAll();
