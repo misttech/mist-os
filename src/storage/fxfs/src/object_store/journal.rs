@@ -264,7 +264,7 @@ pub struct JournaledTransaction {
 
 /// Handles for journal-like objects have some additional functionality to manage their extents,
 /// since during replay we need to add extents as we find them.
-trait JournalHandle: ReadObjectHandle {
+pub trait JournalHandle: ReadObjectHandle {
     /// The offset at which the journal stream starts.  Used only for validating extents (which will
     /// be skipped if None is returned).
     fn start_offset(&self) -> Option<u64>;
@@ -671,9 +671,9 @@ impl Journal {
         Ok(())
     }
 
-    async fn read_transactions<H: JournalHandle>(
+    async fn read_transactions(
         &self,
-        reader: &mut JournalReader<H>,
+        reader: &mut JournalReader,
         end_offset: Option<u64>,
     ) -> Result<JournaledTransactions, Error> {
         let mut transactions = Vec::new();

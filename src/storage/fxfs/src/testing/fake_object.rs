@@ -8,6 +8,7 @@ use {
             GetProperties, ObjectHandle, ObjectProperties, ReadObjectHandle, WriteObjectHandle,
         },
         object_store::{
+            journal::JournalHandle,
             transaction::{
                 LockKey, LockManager, MetadataReservation, Options, ReadGuard, Transaction,
                 TransactionHandler, TransactionLocks, WriteGuard,
@@ -20,6 +21,7 @@ use {
     std::{
         cmp::min,
         convert::TryInto,
+        ops::Range,
         sync::{Arc, Mutex},
         vec::Vec,
     },
@@ -189,5 +191,17 @@ impl WriteObjectHandle for FakeObjectHandle {
 
     async fn flush(&self) -> Result<(), Error> {
         Ok(())
+    }
+}
+
+impl JournalHandle for FakeObjectHandle {
+    fn start_offset(&self) -> Option<u64> {
+        None
+    }
+    fn push_extent(&mut self, _device_range: Range<u64>) {
+        // NOP
+    }
+    fn discard_extents(&mut self, _discard_offset: u64) {
+        // NOP
     }
 }

@@ -579,7 +579,7 @@ impl<'a, S: AsRef<ObjectStore> + Send + Sync + 'static> SuperBlockWriter<'a, S> 
 }
 
 pub struct RecordReader {
-    reader: JournalReader<BootstrapObjectHandle>,
+    reader: JournalReader,
 }
 
 impl RecordReader {

@@ -5,8 +5,7 @@
 use {
     crate::{
         checksum::{fletcher64, Checksum},
-        object_handle::{ObjectHandle, ReadObjectHandle},
-        object_store::journal::{JournalCheckpoint, RESET_XOR},
+        object_store::journal::{JournalCheckpoint, JournalHandle, RESET_XOR},
         serialized_types::{Version, Versioned, VersionedLatest},
     },
     anyhow::{bail, Context, Error},
@@ -18,10 +17,9 @@ use {
 /// preceding block as an input to the next block so that merely copying a block to a different
 /// location will cause a checksum failure.  The serialization of a single record *must* fit within
 /// a single block.
-// TODO(fxbug.dev/118015): This doesn't need to be generic.
-pub struct JournalReader<OH: ObjectHandle> {
+pub struct JournalReader {
     // The handle of the journal file that we are reading.
-    handle: OH,
+    handle: Box<dyn JournalHandle>,
 
     // The block size for the journal file.
     block_size: u64,
@@ -55,10 +53,14 @@ pub struct JournalReader<OH: ObjectHandle> {
     first_read: bool,
 }
 
-impl<OH: ReadObjectHandle> JournalReader<OH> {
-    pub(super) fn new(handle: OH, block_size: u64, checkpoint: &JournalCheckpoint) -> Self {
+impl JournalReader {
+    pub(super) fn new(
+        handle: impl JournalHandle,
+        block_size: u64,
+        checkpoint: &JournalCheckpoint,
+    ) -> Self {
         JournalReader {
-            handle,
+            handle: Box::new(handle),
             block_size,
             buf: Vec::new(),
             buf_range: 0..0,
@@ -102,8 +104,8 @@ impl<OH: ReadObjectHandle> JournalReader<OH> {
         }
     }
 
-    pub fn handle(&mut self) -> &mut OH {
-        &mut self.handle
+    pub fn handle(&mut self) -> &mut dyn JournalHandle {
+        self.handle.as_mut()
     }
 
     /// Tries to deserialize a record of type T from the journal stream.  It might return
