@@ -15,8 +15,8 @@
 
 use crate::event::{self, source::Event as SourceEvent, Event};
 use crate::job::source::{self, Error};
+use crate::job::PinStream;
 use crate::job::{self, Job, Payload};
-use crate::job::{execution, PinStream};
 use crate::message::base::MessengerType;
 use crate::service::{self, message};
 use crate::trace;
@@ -51,8 +51,7 @@ pub(crate) struct Manager {
     source_id_generator: source::IdGenerator,
     /// A Sender used to communicate back to the [Manager] that the execution of a [Job] has
     /// completed.
-    execution_completion_sender:
-        futures::channel::mpsc::UnboundedSender<(source::Id, job::Info, execution::Details)>,
+    execution_completion_sender: futures::channel::mpsc::UnboundedSender<(source::Id, job::Info)>,
     /// A [delegate](message::Delegate) used to generate the necessary messaging components for
     /// [Jobs](Job) to use.
     message_hub_delegate: message::Delegate,
@@ -74,7 +73,7 @@ impl Manager {
 
         // Create a channel for execution tasks to communicate when a Job has been completed.
         let (execution_completion_sender, execution_completion_receiver) =
-            futures::channel::mpsc::unbounded::<(source::Id, job::Info, execution::Details)>();
+            futures::channel::mpsc::unbounded::<(source::Id, job::Info)>();
 
         // Capture the top-level receptor's signature so it can be passed back
         // to the caller for sending new sources.
@@ -108,9 +107,9 @@ impl Manager {
                         trace!(id, "process_source_event");
                         manager.process_source_event(source_event).await;
                     },
-                    (source_id, job_info, details) = execution_fuse.select_next_some() => {
+                    (source_id, job_info) = execution_fuse.select_next_some() => {
                         trace!(id, "process_completed_execution");
-                        manager.process_completed_execution(source_id, job_info, details, id).await;
+                        manager.process_completed_execution(source_id, job_info, id).await;
                     },
                     (job_info, stream) = manager.job_futures.select_next_some() => {
                         trace!(id, "process_job");
@@ -133,7 +132,6 @@ impl Manager {
         &mut self,
         source_id: source::Id,
         job_info: job::Info,
-        _execution_details: execution::Details,
         id: ftrace::Id,
     ) {
         // Fetch the source and inform it that its child Job has completed.
@@ -157,10 +155,8 @@ impl Manager {
             let _ = source_handler
                 .execute_next(
                     &mut self.message_hub_delegate,
-                    move |job_info, details| {
-                        if let Err(error) =
-                            execution_tx.unbounded_send((source_id, job_info, details))
-                        {
+                    move |job_info| {
+                        if let Err(error) = execution_tx.unbounded_send((source_id, job_info)) {
                             panic!("Failed to send message. error: {error:?}");
                         };
                     },

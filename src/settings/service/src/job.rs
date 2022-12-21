@@ -19,7 +19,6 @@
 //! associates and maintains any supporting data for jobs, such as caches.
 //!
 //! [Jobs]: Job
-use crate::clock::now;
 use crate::payload_convert;
 use crate::service::message;
 use crate::trace;
@@ -326,7 +325,7 @@ impl Info {
     /// Prepares the components necessary for a [Job] to execute and then returns a future to
     /// execute the [Job] workload with them. These components include a messenger for communicating
     /// with the system and the store associated with the [Job's](Job) group if applicable.
-    async fn prepare_execution<F: FnOnce(Self, execution::Details) + Send + 'static>(
+    async fn prepare_execution<F: FnOnce(Self) + Send + 'static>(
         mut self,
         delegate: &mut message::Delegate,
         stores: &mut StoreHandleMapping,
@@ -348,7 +347,6 @@ impl Info {
         async move {
             let id = fuchsia_trace::Id::new();
             trace!(id, "job execution");
-            let start = now();
             let mut state = State::Executing;
             std::mem::swap(&mut state, &mut self.state);
 
@@ -360,7 +358,7 @@ impl Info {
                 } else {
                     State::Executed
                 };
-                callback(self, execution::Details { start_time: start, end_time: now() });
+                callback(self);
             } else {
                 panic!("job not in the ready state");
             }
@@ -371,7 +369,6 @@ impl Info {
 pub(super) mod execution {
     use super::Signature;
     use crate::job;
-    use fuchsia_zircon as zx;
     use futures::channel::oneshot;
     use std::collections::{HashMap, VecDeque};
 
@@ -476,18 +473,6 @@ pub(super) mod execution {
                 }
             }
         }
-    }
-
-    /// [Details] represent the final result of an execution.
-    pub(super) struct Details {
-        /// The time at which the job execution started.
-        // TODO(fxbug.dev/77068): Remove this attribute.
-        #[allow(dead_code)]
-        pub start_time: zx::Time,
-        /// The time at which the job execution ended.
-        // TODO(fxbug.dev/77068): Remove this attribute.
-        #[allow(dead_code)]
-        pub end_time: zx::Time,
     }
 }
 
