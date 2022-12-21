@@ -11,6 +11,7 @@ use {
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
     futures::StreamExt,
     std::time::Duration,
+    tracing::info,
 };
 
 enum IncomingRequest {
@@ -65,7 +66,9 @@ async fn main() -> anyhow::Result<()> {
         use_driver_framework_v2: Some(true),
         ..fdt::RealmArgs::EMPTY
     };
+    info!("about to start driver test realm");
     realm.driver_test_realm_start(args).await?;
+    info!("started driver test realm");
 
     let puppet = connect_to_puppet(realm.root.get_exposed_dir()).await?;
     let receiver_config = puppet.get_config().await?;

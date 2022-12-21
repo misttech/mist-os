@@ -111,7 +111,6 @@ template("component_manager") {
     "src/builtin/vmex_resource.rs",
     "src/builtin_environment.rs",
     "src/capability.rs",
-    "src/collection.rs",
     "src/constants.rs",
     "src/diagnostics/cpu/component_stats.rs",
     "src/diagnostics/cpu/component_tree_stats.rs",

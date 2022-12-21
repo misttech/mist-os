@@ -37,7 +37,6 @@ use {
             time::{create_utc_clock, UtcTimeMaintainer},
             vmex_resource::VmexResource,
         },
-        collection::CollectionCapabilityHost,
         diagnostics::{cpu::ComponentTreeStats, startup::ComponentEarlyStartupTimeStats},
         directory_ready_notifier::DirectoryReadyNotifier,
         elf_runner::ElfRunner,
@@ -399,7 +398,6 @@ pub struct BuiltinEnvironment {
 
     pub binder_capability_host: Arc<BinderCapabilityHost>,
     pub realm_capability_host: Arc<RealmCapabilityHost>,
-    pub collection_capability_host: Arc<CollectionCapabilityHost>,
     pub storage_admin_capability_host: Arc<StorageAdmin>,
     pub hub: Option<Arc<Hub>>,
     pub realm_explorer: Option<Arc<RealmExplorer>>,
@@ -774,11 +772,6 @@ impl BuiltinEnvironment {
         let binder_capability_host = Arc::new(BinderCapabilityHost::new(Arc::downgrade(&model)));
         model.root().hooks.install(binder_capability_host.hooks()).await;
 
-        // Set up the provider of capabilities that originate from collections.
-        let collection_capability_host =
-            Arc::new(CollectionCapabilityHost::new(Arc::downgrade(&model)));
-        model.root().hooks.install(collection_capability_host.hooks()).await;
-
         // Set up the storage admin protocol
         let storage_admin_capability_host = Arc::new(StorageAdmin::new(Arc::downgrade(&model)));
         model.root().hooks.install(storage_admin_capability_host.hooks()).await;
@@ -916,7 +909,6 @@ impl BuiltinEnvironment {
             utc_time_maintainer,
             binder_capability_host,
             realm_capability_host,
-            collection_capability_host,
             storage_admin_capability_host,
             hub,
             realm_explorer,

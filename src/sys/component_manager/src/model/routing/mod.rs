@@ -14,12 +14,18 @@ use {
     crate::{
         capability::{CapabilityProvider, CapabilitySource},
         model::{
-            component::{ComponentInstance, ExtendedInstance, WeakComponentInstance},
+            component::{ComponentInstance, ExtendedInstance, StartReason, WeakComponentInstance},
             error::ModelError,
             hooks::{Event, EventPayload},
             routing::{
-                providers::{DefaultComponentCapabilityProvider, NamespaceCapabilityProvider},
-                service::{AggregateServiceDirectoryProvider, FilteredServiceProvider},
+                providers::{
+                    DefaultComponentCapabilityProvider, DirectoryEntryCapabilityProvider,
+                    NamespaceCapabilityProvider,
+                },
+                service::{
+                    AggregateServiceDirectoryProvider, CollectionServiceDirectory,
+                    CollectionServiceRoute, FilteredServiceProvider,
+                },
             },
             storage,
         },
@@ -253,16 +259,74 @@ async fn get_default_provider(
         }
         CapabilitySource::Aggregate { capability_provider, component, .. } => Ok(Some(Box::new(
             AggregateServiceDirectoryProvider::create(
+                component.clone(),
                 target,
-                &component.upgrade()?,
                 capability_provider.clone(),
             )
             .await?,
         ))),
+        CapabilitySource::Collection {
+            capability,
+            component,
+            aggregate_capability_provider,
+            collection_name,
+        } => {
+            let source_component_instance = component.upgrade()?;
+
+            let route = CollectionServiceRoute {
+                source_moniker: source_component_instance.abs_moniker.clone(),
+                collection_name: collection_name.clone(),
+                service_name: capability.source_name().clone(),
+            };
+
+            source_component_instance
+                .start(&StartReason::AccessCapability {
+                    target: target.abs_moniker.clone(),
+                    name: capability.source_name().clone(),
+                })
+                .await?;
+
+            // If there is an existing collection service directory, provide it.
+            {
+                let state = source_component_instance.lock_resolved_state().await?;
+                if let Some(service_dir) = state.collection_services.get(&route) {
+                    let provider = DirectoryEntryCapabilityProvider {
+                        execution_scope: state.execution_scope().clone(),
+                        entry: service_dir.dir_entry().await,
+                    };
+                    return Ok(Some(Box::new(provider)));
+                }
+            }
+
+            // Otherwise, create one. This must be done while the component ResolvedInstanceState
+            // is unlocked because the AggregateCapabilityProvider uses locked state.
+            let service_dir = Arc::new(CollectionServiceDirectory::new(
+                component.clone(),
+                route.clone(),
+                aggregate_capability_provider.clone_boxed(),
+            ));
+
+            source_component_instance.hooks.install(service_dir.hooks()).await;
+
+            let provider = {
+                let mut state = source_component_instance.lock_resolved_state().await?;
+                let execution_scope = state.execution_scope().clone();
+                let entry = service_dir.dir_entry().await;
+
+                state.collection_services.insert(route, service_dir.clone());
+
+                DirectoryEntryCapabilityProvider { execution_scope, entry }
+            };
+
+            // Populate the service dir with service entries from children that may have been started before the service
+            // capability had been routed from the collection.
+            service_dir.add_entries_from_children().await?;
+
+            Ok(Some(Box::new(provider)))
+        }
         CapabilitySource::Framework { .. }
         | CapabilitySource::Capability { .. }
-        | CapabilitySource::Builtin { .. }
-        | CapabilitySource::Collection { .. } => {
+        | CapabilitySource::Builtin { .. } => {
             // There is no default provider for a framework or builtin capability
             Ok(None)
         }
@@ -274,7 +338,7 @@ async fn get_default_provider(
 ///
 /// See [`fidl_fuchsia_io::Directory::Open`] for how the `flags`, `open_mode`, `relative_path`,
 /// and `server_chan` parameters are used in the open call.
-async fn open_capability_at_source(open_request: OpenRequest<'_>) -> Result<(), ModelError> {
+pub async fn open_capability_at_source(open_request: OpenRequest<'_>) -> Result<(), ModelError> {
     let OpenRequest { flags, open_mode, relative_path, source, target, server_chan } = open_request;
 
     let capability_provider =

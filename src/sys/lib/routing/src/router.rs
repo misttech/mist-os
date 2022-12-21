@@ -581,7 +581,7 @@ where
                 Ok(CapabilitySourceInterface::<C>::Collection {
                     capability: AggregateCapability::Service(offer_decl.source_name().clone()),
                     component: collection_component.as_weak(),
-                    capability_provider: Box::new(CollectionCapabilityProvider {
+                    aggregate_capability_provider: Box::new(CollectionCapabilityProvider {
                         router: self,
                         collection_name: collection_name.clone(),
                         collection_component: collection_component.as_weak(),
@@ -746,7 +746,7 @@ where
             ) => Ok(CapabilitySourceInterface::<C>::Collection {
                 capability: AggregateCapability::Service(expose_decl.source_name().clone()),
                 component: collection_component.as_weak(),
-                capability_provider: Box::new(CollectionCapabilityProvider {
+                aggregate_capability_provider: Box::new(CollectionCapabilityProvider {
                     router: self,
                     collection_name: collection_name.clone(),
                     collection_component: collection_component.as_weak(),

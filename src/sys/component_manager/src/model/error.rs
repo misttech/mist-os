@@ -164,6 +164,8 @@ pub enum ModelError {
         #[from]
         err: StructuredConfigError,
     },
+    #[error("timed out after {:?}", duration)]
+    Timeout { duration: zx::Duration },
 }
 
 impl ModelError {
@@ -254,6 +256,10 @@ impl ModelError {
         ModelError::StreamCreationError { err }
     }
 
+    pub fn timeout(duration: zx::Duration) -> ModelError {
+        ModelError::Timeout { duration }
+    }
+
     pub fn as_zx_status(&self) -> zx::Status {
         match self {
             ModelError::RoutingError { err } => err.as_zx_status(),
@@ -262,6 +268,7 @@ impl ModelError {
                 err: ComponentInstanceError::InstanceNotFound { .. },
             } => zx::Status::NOT_FOUND,
             ModelError::Unsupported { .. } => zx::Status::NOT_SUPPORTED,
+            ModelError::Timeout { .. } => zx::Status::TIMED_OUT,
             // Any other type of error is not expected.
             _ => zx::Status::INTERNAL,
         }

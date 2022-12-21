@@ -5,7 +5,7 @@
 use {
     crate::{component_id_index::ComponentIdIndexError, policy::PolicyError},
     clonable_error::ClonableError,
-    cm_rust::CapabilityName,
+    cm_rust::{CapabilityName, CapabilityTypeName},
     fidl_fuchsia_component as fcomponent, fuchsia_zircon_status as zx,
     moniker::{AbsoluteMoniker, ChildMoniker, MonikerError},
     thiserror::Error,
@@ -420,6 +420,9 @@ pub enum RoutingError {
     #[error("Routing a capability from an unsupported source type: {}.", source_type)]
     UnsupportedRouteSource { source_type: String },
 
+    #[error("Routing a capability of an unsupported type: {}", type_name)]
+    UnsupportedCapabilityType { type_name: CapabilityTypeName },
+
     #[error(transparent)]
     ComponentInstanceError(#[from] ComponentInstanceError),
 
@@ -649,6 +652,10 @@ impl RoutingError {
 
     pub fn unsupported_route_source(source: impl Into<String>) -> Self {
         Self::UnsupportedRouteSource { source_type: source.into() }
+    }
+
+    pub fn unsupported_capability_type(type_name: impl Into<CapabilityTypeName>) -> Self {
+        Self::UnsupportedCapabilityType { type_name: type_name.into() }
     }
 }
 

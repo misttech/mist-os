@@ -16,7 +16,6 @@ pub mod framework;
 pub mod model;
 pub mod startup;
 
-pub(crate) mod collection;
 pub(crate) mod directory_ready_notifier;
 pub(crate) mod root_stop_notifier;
 

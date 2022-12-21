@@ -16,8 +16,9 @@ use {
         namespace::{populate_and_get_logsink_decl, IncomingNamespace},
         ns_dir::NamespaceDir,
         routing::{
-            self, route_and_open_capability, OpenOptions, OpenResourceError, OpenRunnerOptions,
-            RouteRequest, RoutingError,
+            self, route_and_open_capability,
+            service::{CollectionServiceDirectory, CollectionServiceRoute},
+            OpenOptions, OpenResourceError, OpenRunnerOptions, RouteRequest, RoutingError,
         },
     },
     ::routing::{
@@ -1467,6 +1468,8 @@ pub struct ResolvedInstanceState {
     /// relative to this component (for example, a component in a subpackage).
     /// If `None`, the resolver cannot resolve relative path component URLs.
     context_to_resolve_children: Option<ComponentResolutionContext>,
+    /// Service directories aggregated from children in this component's collection.
+    pub collection_services: HashMap<CollectionServiceRoute, Arc<CollectionServiceDirectory>>,
 }
 
 impl ResolvedInstanceState {
@@ -1502,6 +1505,7 @@ impl ResolvedInstanceState {
             dynamic_offers: vec![],
             address,
             context_to_resolve_children,
+            collection_services: HashMap::new(),
         };
         state.add_static_children(component, &decl).await?;
         Ok(state)

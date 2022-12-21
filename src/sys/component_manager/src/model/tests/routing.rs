@@ -2659,22 +2659,23 @@ async fn list_service_instances_from_collection() {
     let (source, _route) = route_capability(RouteRequest::UseService(use_decl), &client_component)
         .await
         .expect("failed to route service");
-    let capability_provider = match source {
-        RouteSource::Service(CapabilitySource::Collection { capability_provider, .. }) => {
-            capability_provider
-        }
+    let aggregate_capability_provider = match source {
+        RouteSource::Service(CapabilitySource::Collection {
+            aggregate_capability_provider,
+            ..
+        }) => aggregate_capability_provider,
         _ => panic!("bad capability source"),
     };
 
     // Check that only the instances that expose the service are listed.
     let instances: HashSet<String> =
-        capability_provider.list_instances().await.unwrap().into_iter().collect();
+        aggregate_capability_provider.list_instances().await.unwrap().into_iter().collect();
     assert_eq!(instances.len(), 2);
     assert!(instances.contains("service_child_a"));
     assert!(instances.contains("service_child_b"));
 
     // Try routing to one of the instances.
-    let source = capability_provider
+    let source = aggregate_capability_provider
         .route_instance("service_child_a")
         .await
         .expect("failed to route to child");
@@ -2809,8 +2810,14 @@ async fn use_service_from_sibling_collection() {
     // Populate the collection with dynamic children.
     test.create_dynamic_child(vec!["c"].into(), "coll", ChildDeclBuilder::new_lazy_child("foo"))
         .await;
+    test.start_instance_and_wait_start(&vec!["c", "coll:foo"].into())
+        .await
+        .expect("failed to start `foo`");
     test.create_dynamic_child(vec!["c"].into(), "coll", ChildDeclBuilder::new_lazy_child("bar"))
         .await;
+    test.start_instance_and_wait_start(&vec!["c", "coll:bar"].into())
+        .await
+        .expect("failed to start `bar`");
     test.create_dynamic_child(vec!["c"].into(), "coll", ChildDeclBuilder::new_lazy_child("baz"))
         .await;
 

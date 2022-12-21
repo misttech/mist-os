@@ -66,9 +66,9 @@ pub enum CapabilitySourceInterface<C: ComponentInstanceInterface> {
     /// This capability is an aggregate of capabilities provided by components in a collection.
     Collection {
         capability: AggregateCapability,
-        capability_provider: Box<dyn AggregateCapabilityProvider<C>>,
-        collection_name: String,
         component: WeakComponentInstanceInterface<C>,
+        aggregate_capability_provider: Box<dyn AggregateCapabilityProvider<C>>,
+        collection_name: String,
     },
     Aggregate {
         capability: AggregateCapability,
@@ -217,7 +217,7 @@ impl<C: ComponentInstanceInterface> PartialEq for StorageCapabilitySource<C> {
 pub trait AggregateCapabilityProvider<C: ComponentInstanceInterface>: Send + Sync {
     /// Lists the instances of the capability.
     ///
-    /// This is an opaque identifier that is only meaningful for a subsequent
+    /// The instance is an opaque identifier that is only meaningful for a subsequent
     /// call to `route_instance`.
     async fn list_instances(&self) -> Result<Vec<String>, RoutingError>;
 
@@ -559,7 +559,7 @@ impl EnvironmentCapability {
 
 /// Describes a capability provided by component manager that is an aggregation
 /// of multiple instances of a capability.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AggregateCapability {
     Service(CapabilityName),
 }
