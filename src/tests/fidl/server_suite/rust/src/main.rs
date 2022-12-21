@@ -376,25 +376,6 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                             // TODO(fxbug.dev/99738): Rust bindings should reject V1 wire format.
                             false
                         }
-                        Test::BadDecodeByteOverflowFlagSetOnSmallMessage
-                        | Test::BadDecodeByteOverflowFlagUnsetOnLargeMessage
-                        | Test::BadDecodeLargeMessageInfoOmitted
-                        | Test::BadDecodeLargeMessageInfoTooSmall
-                        | Test::BadDecodeLargeMessageInfoTooLarge
-                        | Test::BadDecodeLargeMessageInfoTopHalfUnzeroed
-                        | Test::BadDecodeLargeMessageInfoByteCountIsZero
-                        | Test::BadDecodeLargeMessageInfoByteCountBelowMinimum
-                        | Test::BadDecodeLargeMessageNoHandles
-                        | Test::BadDecodeLargeMessageTooFewHandles
-                        | Test::BadDecodeLargeMessage64Handles
-                        | Test::BadDecodeLargeMessageLastHandleNotVmo
-                        | Test::BadDecodeLargeMessageLastHandleInsufficientRights
-                        | Test::BadDecodeLargeMessageVmoTooSmall
-                        | Test::BadDecodeLargeMessageInfoByteCountTooSmall
-                        | Test::BadDecodeLargeMessageInfoByteCountTooLarge => {
-                            // TODO(fxbug.dev/114259): Implement large messages for Rust.
-                            false
-                        }
                         _ => true,
                     };
                     responder.send(enabled)?;

@@ -894,6 +894,16 @@ pub trait Encodable: LayoutObject {
 
 assert_obj_safe!(Encodable);
 
+/// The exact rights an overflow buffer VMO should have - no more, no less.
+#[cfg(target_os = "fuchsia")]
+pub const LARGE_MESSAGE_VMO_RIGHTS: Rights = Rights::from_bits_truncate(
+    Rights::GET_PROPERTY.bits()
+        | Rights::READ.bits()
+        | Rights::TRANSFER.bits()
+        | Rights::WAIT.bits()
+        | Rights::INSPECT.bits(),
+);
+
 /// An inlinable function that checks the if the message that was just encoded is larger than the
 /// overflowing limit (64KiB in the case of zx channel), and splits it into a control plane and data
 /// plane: the control plane is just the header of the original encoded message and a newly minted
@@ -930,11 +940,7 @@ pub fn maybe_overflowing_after_encode(
             _write_handles.push(HandleDisposition {
                 handle_op: HandleOp::Move(take_handle(&mut vmo)),
                 object_type: ObjectType::VMO,
-                rights: Rights::GET_PROPERTY
-                    | Rights::READ
-                    | Rights::TRANSFER
-                    | Rights::WAIT
-                    | Rights::INSPECT,
+                rights: LARGE_MESSAGE_VMO_RIGHTS,
                 result: Status::OK,
             });
 
@@ -988,33 +994,37 @@ pub fn maybe_overflowing_decode<D: Decodable>(
                 Some(handle_info) => handle_info,
                 None => return Err(Error::LargeMessageMissingHandles),
             };
-
-            // TODO(fxbug.dev/114259): temporarily make the `LargeMessageInfo` struct optional while
-            // transitioning. After the transition to the RFC-compliant implementation is complete,
-            // the `.is_empty()` check must be removed.
-            if !(body_bytes.is_empty() || body_bytes.len() == mem::size_of::<LargeMessageInfo>()) {
+            if vmo_handle_info.object_type != ObjectType::VMO
+                || vmo_handle_info.rights != LARGE_MESSAGE_VMO_RIGHTS
+            {
+                return Err(Error::LargeMessageInvalidOverflowBufferHandle);
+            }
+            if body_bytes.len() != mem::size_of::<LargeMessageInfo>() {
                 return Err(Error::LargeMessageInfoMissized { size: body_bytes.len() });
             }
 
+            const MAX_MSG_BYTES: usize = fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize;
+            let header_size = mem::size_of::<TransactionHeader>();
+            let mut large_message_info = LargeMessageInfo::new_empty();
+            let ctx = Context { wire_format_version: WireFormatVersion::V1 };
+            Decoder::decode_with_context(&ctx, &body_bytes, &mut [], &mut large_message_info)?;
+
+            let msg_byte_count = large_message_info.msg_byte_count as usize;
+            if large_message_info.flags != 0 || large_message_info.reserved != 0 {
+                return Err(Error::LargeMessageInfoMalformed);
+            }
+            if msg_byte_count <= MAX_MSG_BYTES - header_size {
+                return Err(Error::LargeMessageTooSmall { size: msg_byte_count });
+            }
+
             // Make a syscall to get the actual size of the VMO.
-            //
-            // TODO(fxbug.dev/114259): We'll use the `LargeMessageInfo` struct to get the size in
-            // the future, but while transitioning from the prototype impl to the RFC-compliant one
-            // this is the safer setup.
             let vmo = fuchsia_zircon::Vmo::from(vmo_handle_info.handle);
-            let size = vmo
-                .get_content_size()
-                .map_err(|status| Error::LargeMessageCouldNotReadVmo { status })?;
             let mut overflow_bytes = Vec::new();
 
-            // TODO(fxbug.dev/114259): Is this actually safe? Since we are now trusting
-            // `LargeMessageInfo` to have the correct number of bytes, could an attacker do
-            // something naughty if they put an incorrect value there? Maybe better to just zero
-            // defensively.
-            //
-            // Safety: The call to `vmo.read` below writes exactly `size` bytes on success.
+            // Safety: The call to `vmo.read` below writes exactly `msg_byte_count` bytes on
+            // success.
             unsafe {
-                resize_vec_no_zeroing(&mut overflow_bytes, size as usize);
+                resize_vec_no_zeroing(&mut overflow_bytes, msg_byte_count);
             }
 
             vmo.read(&mut overflow_bytes, 0)

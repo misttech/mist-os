@@ -4,6 +4,7 @@
 
 #include "fidl/fidl.serversuite/cpp/natural_types.h"
 #include "lib/fidl/cpp/unified_messaging.h"
+#include "lib/fit/function.h"
 #include "src/tests/fidl/server_suite/harness/harness.h"
 #include "src/tests/fidl/server_suite/harness/ordinals.h"
 
@@ -15,10 +16,10 @@ namespace server_suite {
 namespace {
 
 const uint32_t kVectorHeaderSize = 16;
+const uint32_t kVmoPageSize = 4096;
 const uint32_t kUnionOrdinalAndEnvelopeSize = 16;
 const uint32_t kDefaultElementsCount = kHandleCarryingElementsCount - 1;
-const zx_rights_t kExpectedOverflowBufferRights =
-    ZX_RIGHT_GET_PROPERTY | ZX_RIGHT_READ | ZX_RIGHT_TRANSFER | ZX_RIGHT_WAIT | ZX_RIGHT_INSPECT;
+const zx_rights_t kExpectedOverflowBufferRights = kOverflowBufferRights;
 const zx_handle_info_t kExpectedOverflowBufferHandleInfo = zx_handle_info_t{
     .type = ZX_OBJ_TYPE_VMO,
     .rights = kExpectedOverflowBufferRights,
@@ -44,22 +45,38 @@ struct Expected {
   std::optional<Bytes> vmo_bytes;
 };
 
+struct OutgoingLargeMessage {
+  Bytes channel_bytes;
+  Bytes vmo_bytes;
+  HandleDispositions handles;
+};
+
+// A pair of types that pass in a large message before it is about to be sent, allowing its encoded
+// bytes to be "corrupted" in arbitrary ways.
+struct CorruptibleLargeMessage {
+  Bytes header;
+  Bytes large_message_info;
+  Bytes payload;
+  HandleDispositions handles;
+};
+using MessageCorrupter = fit::function<void(CorruptibleLargeMessage*)>;
+
 // Because |UnboundedMaybeLargeResource| is used so widely, and needs to have many parts (handles,
 // VMO-stored data, etc) assembled just so in a variety of configurations (small/large with 0, 63,
 // or 64 handles, plus all manner of mis-encodings), this helper struct keeps track of all of the
 // bookkeeping necessary when building an |UnboundedMaybeLargeResource| of a certain shape.
 class UnboundedMaybeLargeResourceWriter {
  public:
-  enum class HandlePresence {
-    kAbsent = 0,
-    kPresent = 1,
-  };
-
-  using ByteVectorSize = size_t;
   UnboundedMaybeLargeResourceWriter(UnboundedMaybeLargeResourceWriter&&) = default;
   UnboundedMaybeLargeResourceWriter& operator=(UnboundedMaybeLargeResourceWriter&&) = default;
   UnboundedMaybeLargeResourceWriter(const UnboundedMaybeLargeResourceWriter&) = delete;
   UnboundedMaybeLargeResourceWriter& operator=(const UnboundedMaybeLargeResourceWriter&) = delete;
+
+  using ByteVectorSize = size_t;
+  enum class HandlePresence {
+    kAbsent = 0,
+    kPresent = 1,
+  };
 
   // The first argument, |num_filled|, is a pair that specifies the number of entries in the
   // |elements| array that should be set to non-empty vectors, with the other number in the pair
@@ -119,13 +136,48 @@ class UnboundedMaybeLargeResourceWriter {
     WriteSmallMessage(client, header, populate_unset_handles, out_expected);
   }
 
-  void WriteLargeMessageForDecode(Channel& client, Bytes header) {
-    WriteLargeMessage(client, header);
+  // The last |corrupter| argument allows us to mess with the message bytes, to test |BadDecode*|
+  // cases. The default argument is a no-op corrupter - that is, one that does not corrupt a message
+  // at all. Useful to test decoding of "good" messages, while also ensuring that the corrupter
+  // works as expected (rather than always producing bad data, thereby not actually testing all of
+  // the "bad" decode cases).
+  void WriteLargeMessageForDecode(
+      Channel& client, Bytes header, MessageCorrupter corrupter = [](CorruptibleLargeMessage*) {}) {
+    WriteCorruptibleLargeMessage(client, header, std::move(corrupter));
   }
 
   void WriteLargeMessageForEncode(Channel& client, Bytes header, Bytes populate_unset_handles,
                                   Expected* out_expected) {
     WriteLargeMessage(client, header, populate_unset_handles, out_expected);
+  }
+
+  // Identical to |WriteLargeMessageForDecode()|, except it returns the about-to-be-sent message
+  // instead of calling |.write_with_overflow()| for you. Useful for when we want to alter (corrupt)
+  // the fully encoded and ready to be written data before sending over the |client_end|. When using
+  // this method, the overflow buffer VMO must be built and added to the |handles| list manually
+  // before sending.
+  OutgoingLargeMessage PrepareLargeMessage(
+      Bytes header, MessageCorrupter corrupter = [](CorruptibleLargeMessage*) {}) {
+    Bytes payload = BuildPayload();
+    ZX_ASSERT_MSG(sizeof(fidl_message_header_t) + payload.size() > ZX_CHANNEL_MAX_MSG_BYTES,
+                  "attempted to write small message using large message writer");
+
+    CorruptibleLargeMessage corruptible = {
+        .header = std::move(header),
+        .large_message_info = aligned_large_message_info(payload.size()),
+        .payload = std::move(payload),
+        .handles = BuildHandleDispositions(),
+    };
+    ZX_ASSERT_MSG(corruptible.handles.size() <= 63,
+                  "can only send a maximum of 63 harness-defined handles");
+
+    corrupter(&corruptible);
+    return {
+        .channel_bytes =
+            Bytes({std::move(corruptible.header), std::move(corruptible.large_message_info)}),
+        .vmo_bytes = std::move(corruptible.payload),
+        .handles = std::move(corruptible.handles),
+    };
   }
 
  private:
@@ -134,9 +186,8 @@ class UnboundedMaybeLargeResourceWriter {
     // Add the inline portions of each |element| entry.
     for (size_t i = 0; i < kHandleCarryingElementsCount; i++) {
       payload_bytes.push_back(
-          {vector_header(byte_vector_sizes[i]),
-           handles[i] == HandlePresence::kPresent ? handle_present() : handle_absent(),
-           padding(4)});
+          {handles[i] == HandlePresence::kPresent ? handle_present() : handle_absent(), padding(4),
+           vector_header(byte_vector_sizes[i])});
     }
 
     // Now do all out of line portions as well.
@@ -160,6 +211,7 @@ class UnboundedMaybeLargeResourceWriter {
         zx::event event;
         zx::event::create(0, &event);
         dispositions.push_back(zx_handle_disposition_t{
+            .operation = ZX_HANDLE_OP_MOVE,
             .handle = event.release(),
             .type = ZX_OBJ_TYPE_EVENT,
             .rights = ZX_DEFAULT_EVENT_RIGHTS,
@@ -201,8 +253,8 @@ class UnboundedMaybeLargeResourceWriter {
     ASSERT_OK(client.write(bytes_in, BuildHandleDispositions()));
   }
 
-  void WriteLargeMessage(Channel& client, Bytes header, Bytes populate_unset_handles = Bytes(),
-                         Expected* out_expected = nullptr) {
+  void WriteLargeMessage(Channel& client, Bytes header, Bytes populate_unset_handles,
+                         Expected* out_expected) {
     Bytes payload = BuildPayload();
     ZX_ASSERT_MSG(sizeof(fidl_message_header_t) + payload.size() > ZX_CHANNEL_MAX_MSG_BYTES,
                   "attempted to write small message using large message writer");
@@ -226,6 +278,20 @@ class UnboundedMaybeLargeResourceWriter {
     Bytes vmo_bytes_in = Bytes({populate_unset_handles, payload});
     ASSERT_OK(
         client.write_with_overflow(channel_bytes_in, vmo_bytes_in, BuildHandleDispositions()));
+  }
+
+  // Provides a lambda to alter the message bytes in specific way in the service of |BadDecode*|
+  // tests. The way this works: first we create all of the pieces of a "correct" large message for
+  // this instance, then we pass those to the lambda, allowing one or more of those components to be
+  // corrupted in some interesting way before we send them off.
+  //
+  // This method must only be when sending messages using the `DecodeUnboundedMaybeLargeResource`
+  // FIDL method - `EncodeUnboundedMaybeLargeResource` has an extra field, and must be built using
+  // `WriteLargeMessage` instead.
+  void WriteCorruptibleLargeMessage(Channel& client, Bytes header, MessageCorrupter corrupter) {
+    OutgoingLargeMessage out = PrepareLargeMessage(std::move(header), std::move(corrupter));
+    ASSERT_OK(client.write_with_overflow(std::move(out.channel_bytes), std::move(out.vmo_bytes),
+                                         std::move(out.handles)));
   }
 
   std::array<ByteVectorSize, kHandleCarryingElementsCount> byte_vector_sizes;
@@ -385,6 +451,288 @@ LARGE_MESSAGE_SERVER_TEST(GoodDecodeUnknownLargeMessage) {
 }
 
 // ////////////////////////////////////////////////////////////////////////
+// Bad decode tests
+// ////////////////////////////////////////////////////////////////////////
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeByteOverflowFlagSetOnSmallMessage) {
+  auto writer = UnboundedMaybeLargeResourceWriter::SmallMessageAnd64Handles();
+
+  // The `kStrictMethodAndByteOverflow` flag here is incorrect - there is no overflow buffer.
+  writer.WriteSmallMessageForDecode(
+      client_end(),
+      header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow));
+
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeByteOverflowFlagUnsetOnLargeMessage) {
+  auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd63Handles();
+
+  // The `kStrictMethod` flag here is incorrect - the `byte_overflow` flag should be set too.
+  writer.WriteLargeMessageForDecode(client_end(),
+                                    header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource,
+                                           fidl::MessageDynamicFlags::kStrictMethod));
+
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeLargeMessageInfoOmitted) {
+  auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd63Handles();
+
+  // Corrupter lambda removes entire `large_message_info`.
+  writer.WriteLargeMessageForDecode(
+      client_end(),
+      header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow),
+      [](CorruptibleLargeMessage* corruptible) { corruptible->large_message_info = Bytes(); });
+
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeLargeMessageInfoTooSmall) {
+  auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd63Handles();
+
+  // Corrupter lambda removes top half of `large_message_info`.
+  writer.WriteLargeMessageForDecode(
+      client_end(),
+      header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow),
+      [](CorruptibleLargeMessage* corruptible) {
+        auto large_message_info_bytes = corruptible->large_message_info.as_vec();
+        corruptible->large_message_info =
+            Bytes(large_message_info_bytes.begin() + 8, large_message_info_bytes.end());
+      });
+
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeLargeMessageInfoTooLarge) {
+  auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd63Handles();
+
+  // Corrupter lambda adds trailing zeroes to `large_message_info`.
+  writer.WriteLargeMessageForDecode(
+      client_end(),
+      header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow),
+      [](CorruptibleLargeMessage* corruptible) {
+        corruptible->large_message_info = Bytes({corruptible->large_message_info, u64(0)});
+      });
+
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeLargeMessageInfoTopHalfUnzeroed) {
+  auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd63Handles();
+
+  // Corrupter lambda swaps in non-zero data at the first byte of `large_message_info`.
+  writer.WriteLargeMessageForDecode(
+      client_end(),
+      header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow),
+      [](CorruptibleLargeMessage* corruptible) { *(corruptible->large_message_info.data()) = 1; });
+
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeLargeMessageInfoByteCountIsZero) {
+  auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd63Handles();
+
+  // Corrupter lambda sets the `msg_byte_count` of the `large_message_info` to 0, and truncates the
+  // payload to match.
+  writer.WriteLargeMessageForDecode(
+      client_end(),
+      header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow),
+      [](CorruptibleLargeMessage* corruptible) {
+        corruptible->large_message_info = Bytes({u64(0), u64(0)});
+        corruptible->payload = Bytes();
+      });
+
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeLargeMessageInfoByteCountBelowMinimum) {
+  auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd63Handles();
+
+  // Corrupter lambda sets the `msg_byte_count` of the `large_message_info` to 65520, the largest
+  // possible "too small" value that is still 8-byte aligned. It also truncates the payload to
+  // match.
+  writer.WriteLargeMessageForDecode(
+      client_end(),
+      header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow),
+      [](CorruptibleLargeMessage* corruptible) {
+        uint64_t truncated_size = ZX_CHANNEL_MAX_MSG_BYTES - sizeof(fidl_message_header_t);
+        std::vector<uint8_t>& payload_data = corruptible->payload.as_vec();
+        corruptible->large_message_info = Bytes({u64(0), u64(truncated_size)});
+        corruptible->payload = Bytes(payload_data.begin(), payload_data.begin() + truncated_size);
+      });
+
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeLargeMessageInfoByteCountTooSmall) {
+  auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd63Handles();
+
+  // Corrupter lambda sets the `msg_byte_count` of the `large_message_info` to be 8 bytes too small.
+  writer.WriteLargeMessageForDecode(
+      client_end(),
+      header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow),
+      [](CorruptibleLargeMessage* corruptible) {
+        corruptible->large_message_info =
+            Bytes({u64(0), u64(corruptible->payload.size() - FIDL_ALIGNMENT)});
+      });
+
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeLargeMessageInfoByteCountTooLarge) {
+  auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd63Handles();
+
+  // Corrupter lambda sets the `msg_byte_count` of the `large_message_info` to be 8 bytes too large.
+  writer.WriteLargeMessageForDecode(
+      client_end(),
+      header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow),
+      [](CorruptibleLargeMessage* corruptible) {
+        corruptible->large_message_info =
+            Bytes({u64(0), u64(corruptible->payload.size() + FIDL_ALIGNMENT)});
+      });
+
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeLargeMessageNoHandles) {
+  auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd0Handles();
+  OutgoingLargeMessage out = writer.PrepareLargeMessage(
+      header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow));
+
+  // We deliberately "forget" to attach the overflow buffer VMO's handle to the outgoing handle
+  // list.
+  ASSERT_OK(client_end().write_overflow_vmo(out.vmo_bytes, out.handles));
+  client_end().write(out.channel_bytes, HandleDispositions());
+
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeLargeMessageTooFewHandles) {
+  auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd63Handles();
+  OutgoingLargeMessage out = writer.PrepareLargeMessage(
+      header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow));
+
+  // Simulate the overflow buffer handle overwriting the last handle, rather than appending to the
+  // list.
+  out.handles.pop_back();
+  ASSERT_OK(client_end().write_overflow_vmo(out.vmo_bytes, out.handles));
+  ASSERT_OK(client_end().write(out.channel_bytes, out.handles));
+
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeLargeMessage64Handles) {
+  auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd63Handles();
+  OutgoingLargeMessage out = writer.PrepareLargeMessage(
+      header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow));
+
+  // Simulate 64 handles somehow getting attached to a large message by overwriting the overflow
+  // buffer handle with a non-VMO handle.
+  zx::event event;
+  zx::event::create(0, &event);
+  out.handles.push_back(zx_handle_disposition_t{
+      .operation = ZX_HANDLE_OP_MOVE,
+      .handle = event.release(),
+      .type = ZX_OBJ_TYPE_EVENT,
+      .rights = ZX_DEFAULT_EVENT_RIGHTS,
+  });
+  ASSERT_OK(client_end().write(out.channel_bytes, out.handles));
+
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeLargeMessageLastHandleNotVmo) {
+  auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd63Handles();
+  OutgoingLargeMessage out = writer.PrepareLargeMessage(
+      header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow));
+
+  // Swap the last two handles, to simulate an invalid handle in the final position.
+  ASSERT_OK(client_end().write_overflow_vmo(out.vmo_bytes, out.handles));
+  zx_handle_disposition_t vmo_handle = out.handles.back();
+  out.handles.pop_back();
+  out.handles.insert(out.handles.end() - 1, vmo_handle);
+  ASSERT_OK(client_end().write(out.channel_bytes, out.handles));
+
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeLargeMessageLastHandleInsufficientRights) {
+  auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd63Handles();
+  OutgoingLargeMessage out = writer.PrepareLargeMessage(
+      header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow));
+
+  // Disabling the |ZX_RIGHT_INSPECT| is done on purpose, because this doesn't prevent functionality
+  // of the normal course of large message exchange, but is still a required right that is useful in
+  // other (debugging) contexts, and is per spec required.
+  zx::vmo vmo;
+  zx::vmo::create(out.vmo_bytes.size(), 0, &vmo);
+  ASSERT_OK(vmo.write(out.vmo_bytes.data(), 0, out.vmo_bytes.size()));
+  out.handles.push_back(zx_handle_disposition_t{
+      .operation = ZX_HANDLE_OP_MOVE,
+      .handle = vmo.release(),
+      .type = ZX_OBJ_TYPE_VMO,
+      .rights = kOverflowBufferRights & !ZX_RIGHT_INSPECT,
+  });
+  ASSERT_OK(client_end().write(out.channel_bytes, out.handles));
+
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeLargeMessageLastHandleExcessiveRights) {
+  auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd63Handles();
+  OutgoingLargeMessage out = writer.PrepareLargeMessage(
+      header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow));
+
+  // Add the |ZX_RIGHT_WRITE| to corrupt the handle rights.
+  zx::vmo vmo;
+  zx::vmo::create(out.vmo_bytes.size(), 0, &vmo);
+  ASSERT_OK(vmo.write(out.vmo_bytes.data(), 0, out.vmo_bytes.size()));
+  out.handles.push_back(zx_handle_disposition_t{
+      .operation = ZX_HANDLE_OP_MOVE,
+      .handle = vmo.release(),
+      .type = ZX_OBJ_TYPE_VMO,
+      .rights = kOverflowBufferRights | ZX_RIGHT_WRITE,
+  });
+  ASSERT_OK(client_end().write(out.channel_bytes, out.handles));
+
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeLargeMessageVmoTooSmall) {
+  auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd63Handles();
+  OutgoingLargeMessage out = writer.PrepareLargeMessage(
+      header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow));
+
+  // Make the VMO smaller than the `msg_byte_count` indicates. Because the underlying "size" of a
+  // VMO is rounded up to the memory page size of the system (4096 bytes), to do this properly, we
+  // must make it more than one memory page smaller. Otherwise, the "removed" memory may just get
+  // zeroed, instead of fully truncated, as the VMO is expanded to fill the last page.
+  out.vmo_bytes.as_vec().resize(out.vmo_bytes.size() - kVmoPageSize - FIDL_ALIGNMENT);
+  ASSERT_OK(client_end().write_overflow_vmo(out.vmo_bytes, out.handles));
+  ASSERT_OK(client_end().write(out.channel_bytes, out.handles));
+
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+// ////////////////////////////////////////////////////////////////////////
 // Good encode tests
 // ////////////////////////////////////////////////////////////////////////
 
@@ -538,7 +886,5 @@ LARGE_MESSAGE_SERVER_TEST(BadEncode64HandleLargeMessage) {
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
 }
-
-// TODO(fxbug.dev/114259): Write remaining tests for encoding/decoding large messages.
 
 }  // namespace server_suite

@@ -106,23 +106,23 @@ type UnboundedMaybeLargeValue = struct {
 // and large-message-with-63-handles should encode/decode successfully, while
 // large-message-with-64-handles should not.
 //
+// +     8      (handle + padding)
 //      16      (vector header)
 //    1000      (bytes specified by `FIRST_63_ELEMENTS_BYTE_VECTOR_SIZE`)
-// +     8      (handle + padding)
 // ------------
 //    1024
 // *    63      (first 63 array entries are identical)
 // ------------
 //   64512
-// +    16      (64th vector header)
 // +     8      (64th handle + padding)
+// +    16      (64th vector header)
 // ------------
 //   64536
 // +   ???      (64th struct's byte vector size, set to 984/985 to make the message small/large)
 type UnboundedMaybeLargeResource = resource struct {
     elements array< resource struct {
-        bytes vector<byte>:FIRST_63_ELEMENTS_BYTE_VECTOR_SIZE;
         handle zx.handle:optional;
+        bytes vector<byte>:FIRST_63_ELEMENTS_BYTE_VECTOR_SIZE;
     }, HANDLE_CARRYING_ELEMENTS_COUNT>;
 };
 
@@ -141,9 +141,9 @@ const HANDLE_CARRYING_ELEMENTS_COUNT uint32 = 64;
 const FIRST_63_ELEMENTS_BYTE_VECTOR_SIZE uint32 = 1000;
 
 // While at the limit this should be set to 984 to create the "largest possible small message",
-// because we send an extra 8-byte argument (the 8-byte `populated_unset_handles` boolean) when
-// passing the type that consumes this constant in for encode testing, it's much easier if we
-// decrease this number by that amount to ensure that the "largeness" of the incoming message is the
-// same as the outgoing.
+// because we send an extra 8-byte argument (the padding-to-8-bytes `populated_unset_handles`
+// boolean) when passing the type that consumes this constant in for encode testing, it's much
+// easier if we decrease this number by that amount to ensure that the "largeness" of the incoming
+// message is the same as that of the outgoing.
 const SMALL_LAST_ELEMENT_BYTE_VECTOR_SIZE uint32 = 976;
 const LARGE_LAST_ELEMENT_BYTE_VECTOR_SIZE uint32 = 985;

@@ -30,6 +30,9 @@ using HandleInfos = std::vector<zx_handle_info_t>;
 // value.
 static const zx_txid_t kTxidNotKnown = 0;
 
+const zx_rights_t kOverflowBufferRights =
+    ZX_RIGHT_GET_PROPERTY | ZX_RIGHT_READ | ZX_RIGHT_TRANSFER | ZX_RIGHT_WAIT | ZX_RIGHT_INSPECT;
+
 class Channel {
  public:
   Channel() = default;
@@ -37,6 +40,22 @@ class Channel {
   Channel& operator=(Channel&&) = default;
 
   explicit Channel(zx::channel channel) : channel_(std::move(channel)) {}
+
+  // Create a VMO, write to it, then append the handle representing that VMO to the passed in handle
+  // list.
+  static zx_status_t write_overflow_vmo(const Bytes& overflow_bytes,
+                                        HandleDispositions& handle_dispositions) {
+    zx::vmo vmo;
+    zx::vmo::create(overflow_bytes.size(), 0, &vmo);
+    zx_status_t status = vmo.write(overflow_bytes.data(), 0, overflow_bytes.size());
+    handle_dispositions.push_back(zx_handle_disposition_t{
+        .operation = ZX_HANDLE_OP_MOVE,
+        .handle = vmo.release(),
+        .type = ZX_OBJ_TYPE_VMO,
+        .rights = kOverflowBufferRights,
+    });
+    return status;
+  }
 
   zx_status_t write_with_overflow(const Bytes& channel_bytes, const Bytes& overflow_bytes,
                                   HandleDispositions handle_dispositions = {}) {
@@ -46,15 +65,10 @@ class Channel {
                   "overflow bytes must be 8-byte aligned");
     ZX_ASSERT_MSG(handle_dispositions.size() < 64, "cannot pass more than 63 handles here");
 
-    // Create a VMO, write to it, then append the handle representing that VMO to the handle array.
-    zx::vmo vmo;
-    zx::vmo::create(overflow_bytes.size(), 0, &vmo);
-    vmo.write(overflow_bytes.data(), 0, overflow_bytes.size());
-    handle_dispositions.push_back(zx_handle_disposition_t{
-        .handle = vmo.release(),
-        .type = ZX_OBJ_TYPE_VMO,
-        .rights = ZX_RIGHTS_BASIC | ZX_RIGHT_GET_PROPERTY | ZX_RIGHT_READ,
-    });
+    zx_status_t status = write_overflow_vmo(overflow_bytes, handle_dispositions);
+    if (status != ZX_OK) {
+      return status;
+    }
 
     return channel_.write_etc(0, channel_bytes.data(), static_cast<uint32_t>(channel_bytes.size()),
                               const_cast<zx_handle_disposition_t*>(handle_dispositions.data()),
@@ -101,8 +115,11 @@ class Channel {
       std::cerr << "read_and_check_with_overflow: last handle is not VMO, is :"
                 << overflow_buffer_handle.type << std::endl;
     }
-
-    // TODO(fxbug.dev/114259): check for proper rights as well.
+    if (overflow_buffer_handle.rights != kOverflowBufferRights) {
+      status = ZX_ERR_BAD_STATE;
+      std::cerr << "read_and_check_with_overflow: handle rights are incorrect, bit array value is :"
+                << overflow_buffer_handle.rights << std::endl;
+    }
     if (expected_vmo.size() != overflow_size) {
       status = ZX_ERR_INVALID_ARGS;
       std::cerr << "read_and_check_with_overflow: num expected bytes: " << expected_vmo.size()

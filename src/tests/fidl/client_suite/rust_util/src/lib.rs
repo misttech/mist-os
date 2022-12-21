@@ -14,8 +14,10 @@ pub fn classify_error(error: fidl::Error) -> FidlErrorKind {
         | fidl::Error::Invalid
         | fidl::Error::OutOfRange
         | fidl::Error::LargeMessageMissingHandles
+        | fidl::Error::LargeMessageInvalidOverflowBufferHandle
         | fidl::Error::LargeMessageCouldNotReadVmo { .. }
         | fidl::Error::LargeMessageInfoMissized { .. }
+        | fidl::Error::LargeMessageInfoMalformed
         | fidl::Error::ExtraBytes
         | fidl::Error::ExtraHandles
         | fidl::Error::NonZeroPadding { .. }

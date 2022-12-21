@@ -55,14 +55,25 @@ pub enum Error {
     #[error("Large FIDL messages must have at least 1 handle pointing to the overflow VMO.")]
     LargeMessageMissingHandles,
 
-    // TODO(fxbug.dev/114259): Support for 16 OR 32 bytes is temporary while we migrate from the
-    // prototype implementation (which had no `LargeMessageInfo` struct after the header in the
-    // control plane) to the RFC-compliant one (which does).
-    //
-    /// Large FIDL messages must have either 16 or 32 bytes in the control plane message.
-    #[error("Large FIDL messages must have either 16 or 32 bytes in the control plane message.")]
+    /// Large FIDL messages must have properly formed overflow buffer handles.
+    #[error("Large FIDL messages must have properly formed overflow buffer handles.")]
+    LargeMessageInvalidOverflowBufferHandle,
+
+    /// Large FIDL messages must have a well-formed 16-byte info struct
+    #[error("Large FIDL messages must have a well-formed 16-byte info struct.")]
     LargeMessageInfoMissized {
         /// Observed size of the `LargeMessageInfo` struct.
+        size: usize,
+    },
+
+    /// Large FIDL messages must have a properly formed info struct.
+    #[error("Large FIDL messages must have a properly formed info struct.")]
+    LargeMessageInfoMalformed,
+
+    /// Large FIDL messages must be greater than 65520 bytes.
+    #[error("Large FIDL messages must be greater than 65520 bytes.")]
+    LargeMessageTooSmall {
+        /// Observed size in the `LargeMessageInfo` struct.
         size: usize,
     },
 
