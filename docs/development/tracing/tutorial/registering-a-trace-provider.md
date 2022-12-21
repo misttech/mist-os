@@ -83,6 +83,15 @@ For example:
   }
   ```
 
+* {Rust}
+
+  ```rust
+  fn main() {
+      fuchsia_trace_provider::trace_provider_create_with_fdio();
+      // ...
+  }
+  ```
+
 ## Give the trace manager component access {#give-trace-manager-component-access}
 
 In the component manifest file (a `.cml` file) of your component, you must
