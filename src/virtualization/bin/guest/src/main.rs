@@ -92,5 +92,10 @@ async fn main() -> Result<(), Error> {
             .await
             .map(|exit_code| std::process::exit(exit_code))
         }
+        SubCommands::Mem(mem_args) => {
+            let output = guest_cli::mem::handle_mem(&services, mem_args).await?;
+            println!("{}", output);
+            Ok(())
+        }
     }
 }

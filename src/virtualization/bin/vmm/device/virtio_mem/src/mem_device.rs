@@ -251,7 +251,7 @@ impl<B: MemBackend> MemDevice<B> {
                     request.ty.get(),
                     request.addr.get(),
                     request.nb_blocks.get(),
-                    self.plugged_size_bytes,
+                    self.plugged_size_bytes.get().ok(),
                 );
                 write_response(
                     chain,

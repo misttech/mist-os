@@ -50,6 +50,7 @@ rustc_library("guest_cli") {
     "src/launch.rs",
     "src/lib.rs",
     "src/list.rs",
+    "src/mem.rs",
     "src/platform/fuchsia.rs",
     "src/platform/host.rs",
     "src/platform/mod.rs",

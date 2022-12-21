@@ -12,6 +12,7 @@ ffx_plugin("ffx_guest") {
     "attach:ffx_guest_attach",
     "launch:ffx_guest_launch",
     "list:ffx_guest_list",
+    "mem:ffx_guest_mem",
     "stop:ffx_guest_stop",
     "vsockperf:ffx_guest_vsockperf",
     "wipe:ffx_guest_wipe",

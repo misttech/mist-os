@@ -109,6 +109,45 @@ pub enum SubCommands {
     Vsh(VshArgs),
     VsockPerf(crate::vsockperf_args::VsockPerfArgs),
     Wipe(crate::wipe_args::WipeArgs),
+    Mem(crate::mem_args::MemArgs),
+}
+
+pub mod mem_args {
+    use super::*;
+    /// Interact with the guest virtio-mem. Usage: guest mem sub-command [ request-plugged or stats]
+    #[derive(FromArgs, Debug, PartialEq)]
+    #[argh(subcommand, name = "mem")]
+    #[cfg_attr(not(target_os = "fuchsia"), ffx_command())]
+    pub struct MemArgs {
+        #[argh(subcommand)]
+        pub mem_cmd: MemCommands,
+    }
+    #[derive(FromArgs, PartialEq, Debug)]
+    #[argh(subcommand)]
+    pub enum MemCommands {
+        RequestPluggedMem(RequestPluggedMem),
+        StatsMem(StatsMem),
+    }
+
+    #[derive(FromArgs, PartialEq, Debug)]
+    /// Modify the requested amount of the dynamically plugged memory. Usage: guest mem request-plugged guest-type size
+    #[argh(subcommand, name = "request-plugged")]
+    pub struct RequestPluggedMem {
+        #[argh(positional)]
+        /// type of the guest
+        pub guest_type: GuestType,
+        #[argh(positional)]
+        /// target amount of memory to be dynamically plugged
+        pub size: u64,
+    }
+    #[derive(FromArgs, PartialEq, Debug)]
+    /// See the stats of a guest's virtio-mem. Usage: guest mem stats guest-type
+    #[argh(subcommand, name = "stats")]
+    pub struct StatsMem {
+        #[argh(positional)]
+        /// type of the guest
+        pub guest_type: GuestType,
+    }
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -253,6 +292,18 @@ pub mod launch_args {
         /// enable virtio-vsock
         #[argh(option)]
         pub virtio_vsock: Option<bool>,
+        /// enable virtio-mem to allow dynamically (un)plug memory to the guest
+        #[argh(option)]
+        pub virtio_mem: Option<bool>,
+        /// virtio-mem pluggable region size
+        #[argh(option)]
+        pub virtio_mem_region_size: Option<u64>,
+        /// virtio-mem pluggable region alignment
+        #[argh(option)]
+        pub virtio_mem_region_alignment: Option<u64>,
+        /// virtio-mem pluggable blocksize
+        #[argh(option)]
+        pub virtio_mem_block_size: Option<u64>,
         /// detach from a guest allowing it to run in the background
         #[argh(switch, short = 'd')]
         pub detach: bool,

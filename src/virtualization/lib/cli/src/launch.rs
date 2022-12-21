@@ -88,6 +88,10 @@ fn parse_vmm_args(arguments: &arguments::launch_args::LaunchArgs) -> GuestConfig
     guest_config.virtio_sound = arguments.virtio_sound;
     guest_config.virtio_sound_input = arguments.virtio_sound_input;
     guest_config.virtio_vsock = arguments.virtio_vsock;
+    guest_config.virtio_mem = arguments.virtio_mem;
+    guest_config.virtio_mem_region_size = arguments.virtio_mem_region_size;
+    guest_config.virtio_mem_region_alignment = arguments.virtio_mem_region_alignment;
+    guest_config.virtio_mem_block_size = arguments.virtio_mem_block_size;
 
     guest_config
 }
