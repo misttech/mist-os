@@ -34,7 +34,7 @@ class ComponentControllerImpl : public fuchsia::component::runner::ComponentCont
     root->AddEntry("pkg", remote);
 
     fidl::ServerEnd<fuchsia_io::Directory> dir_request{directory_request.TakeChannel()};
-    return vfs_.ServeDirectory(root, std::move(dir_request), fs::Rights::All());
+    return vfs_.ServeDirectory(root, std::move(dir_request), fs::Rights::ReadExec());
   }
 
   void Add(std::unique_ptr<ComponentControllerImpl> controller,
