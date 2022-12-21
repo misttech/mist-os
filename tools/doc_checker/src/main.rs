@@ -314,6 +314,8 @@ mod test {
                 "in-tree link to /docs/missing-image.png could not be found at \"doc_checker_test_data/docs/missing-image.png\""),
             DocCheckError::new(4, PathBuf::from("doc_checker_test_data/docs/second.md"),
                 "Invalid link http://{}.com/markdown : invalid uri character"),
+            DocCheckError::new(18, PathBuf::from("doc_checker_test_data/docs/second.md"),
+                "Cannot normalize /docs/../../missing.md, references parent beyond root."),
             DocCheckError::new(1, PathBuf::from("doc_checker_test_data/docs/unused/_toc.yaml"),
                 "in-tree link to /docs/unused could not be found at \"doc_checker_test_data/docs/unused\" or  \"doc_checker_test_data/docs/unused/README.md\""),
             DocCheckError::new(0, PathBuf::from("doc_checker_test_data/docs/cycle/_toc.yaml"),

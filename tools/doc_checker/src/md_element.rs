@@ -100,46 +100,42 @@ impl<'a> Element<'a> {
     pub fn get_links(&self) -> Option<Vec<&Element<'a>>> {
         match self {
             Element::Block(_, elements, _) => {
-                let links = elements
-                    .iter()
-                    .filter(|e| {
-                        matches!(e, Element::Link(_, _, _, _, _) | Element::Image(_, _, _, _, _))
-                    })
-                    .collect();
-                Some(links)
+                let links: Vec<&Element<'a>> =
+                    elements.iter().filter_map(|e| e.get_links()).flatten().collect();
+                if !links.is_empty() {
+                    Some(links)
+                } else {
+                    None
+                }
             }
             Element::Code(_, _) => None,
             Element::CodeBlock(_, elements, _) => {
-                let links = elements
-                    .iter()
-                    .filter(|e| {
-                        matches!(e, Element::Link(_, _, _, _, _) | Element::Image(_, _, _, _, _))
-                    })
-                    .collect();
-                Some(links)
+                let links: Vec<&Element<'a>> =
+                    elements.iter().filter_map(|e| e.get_links()).flatten().collect();
+                if !links.is_empty() {
+                    Some(links)
+                } else {
+                    None
+                }
             }
             Element::FootnoteReference(_, _) => None,
             Element::HardBreak(_) => None,
             Element::Html(_, _) => None,
             Element::Image(_, _, _, elements, _) => {
-                let mut links: Vec<&Element<'_>> = elements
-                    .iter()
-                    .filter(|e| {
-                        matches!(e, Element::Link(_, _, _, _, _) | Element::Image(_, _, _, _, _))
-                    })
-                    .collect();
+                let mut links: Vec<&Element<'_>> =
+                    elements.iter().filter_map(|e| e.get_links()).flatten().collect();
                 links.push(self);
                 Some(links)
             }
             Element::Link(_, _, _, _, _) => Some(vec![self]),
             Element::List(_, elements, _) => {
-                let links = elements
-                    .iter()
-                    .filter(|e| {
-                        matches!(e, Element::Link(_, _, _, _, _) | Element::Image(_, _, _, _, _))
-                    })
-                    .collect();
-                Some(links)
+                let links: Vec<&Element<'a>> =
+                    elements.iter().filter_map(|e| e.get_links()).flatten().collect();
+                if !links.is_empty() {
+                    Some(links)
+                } else {
+                    None
+                }
             }
             Element::Rule(_) => None,
             Element::SoftBreak(_) => None,
@@ -171,5 +167,121 @@ impl<'a> Iterator for DocContext<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.parser.next().map(|event| parser::element_from_event(event, self))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::Element::{Link, Text};
+    use super::*;
+    use anyhow::Result;
+    use pulldown_cmark::CowStr::Borrowed;
+    use pulldown_cmark::LinkType::Inline;
+
+    #[test]
+    fn test_get_links() -> Result<()> {
+        let test_data: Vec<(DocContext<'static>, Option<Vec<Element<'static>>>)> = vec![
+        (
+            DocContext::new(
+                PathBuf::from("/docs/README.md"),
+                "This has no links",
+            ),
+            None
+        ),
+        (
+            DocContext::new(
+                PathBuf::from("/docs/README.md"),
+                r#"codeblock has no links
+
+```sh
+This is an example [link](https://somewhere.com)
+```
+"#,
+            ),
+            None
+        ),
+        (
+            DocContext::new(
+                PathBuf::from("/docs/README.md"),
+                "This is a line to [something](/docs/something.md)",
+            ),
+            Some(vec![
+                Link(Inline, Borrowed("/docs/something.md"), Borrowed(""),
+                 vec![Text(Borrowed("something"), DocLine { line_num: 1, file_name: "/docs/README.md".into() })],
+                 DocLine { line_num: 1, file_name: "/docs/README.md".into() })
+            ])
+        ),
+        (
+            DocContext::new(
+                PathBuf::from("/docs/README.md"),
+                "This is a multiline\n paragraph. This is a line to [something](/docs/something.md)",
+            ),
+            Some(vec![
+                Link(Inline, Borrowed("/docs/something.md"), Borrowed(""),
+                 vec![Text(Borrowed("something"), DocLine { line_num: 2, file_name: "/docs/README.md".into() })],
+                 DocLine { line_num: 2, file_name: "/docs/README.md".into() })
+            ])
+        ),
+        (
+            DocContext::new(
+                PathBuf::from("/docs/README.md"),
+                r#"list item
+* one item
+* one with [something](/docs/in-list-item.md)
+
+                "#
+            ),
+            Some(vec![
+                Link(Inline, Borrowed("/docs/in-list-item.md"), Borrowed(""),
+                vec![Text(Borrowed("something"), DocLine { line_num: 4, file_name: "/docs/README.md".into() })],
+                DocLine { line_num: 4, file_name: "/docs/README.md".into() })
+            ])
+        ),
+        (
+            DocContext::new(
+                PathBuf::from("/docs/README.md"),
+                r#"list item
+* one item
+
+    In a paragraph one with [something](/docs/in-list-item-pp.md)
+* item two
+                "#
+            ),
+            Some(vec![
+                Link(Inline, Borrowed("/docs/in-list-item-pp.md"), Borrowed(""),
+                vec![Text(Borrowed("something"), DocLine { line_num: 5, file_name: "/docs/README.md".into() })],
+                DocLine { line_num: 5, file_name: "/docs/README.md".into() })
+            ])
+        ),
+        ];
+
+        for (ctx, expected_links) in test_data {
+            // Collect all the links from the markdown fragment.
+            let elements = ctx.collect::<Vec<Element<'_>>>();
+            let actual_links: Vec<&Element<'_>> =
+                elements.iter().filter_map(|e| e.get_links()).flatten().collect();
+            if !actual_links.is_empty() {
+                if let Some(ref expected_list) = expected_links {
+                    let mut expected_iter = expected_list.iter();
+                    for actual in actual_links {
+                        if let Some(expected) = expected_iter.next() {
+                            assert_eq!(actual, expected);
+                        } else {
+                            panic!("Got unexpected link returned: {:?}", actual);
+                        }
+                    }
+                    let unused_links: Vec<&Element<'_>> = expected_iter.collect();
+                    if !unused_links.is_empty() {
+                        panic!("Expected more links: {:?}", unused_links);
+                    }
+                } else {
+                    panic!("Got unexpected links (expected is None): {:?}", actual_links);
+                }
+            } else if expected_links.is_some() {
+                panic!("No links, but expected {:?}", expected_links);
+            }
+        }
+
+        Ok(())
     }
 }
