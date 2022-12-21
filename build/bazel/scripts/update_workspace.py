@@ -501,8 +501,8 @@ def main():
             bazel_launcher))
 
     if maybe_regenerate_ninja(gn_output_dir, ninja_binary):
-        log('Re-generating Ninja build plan!')
-        subprocess.run([ninja_binary, '-C', gn_output_dir, 'build.ninja'])
+        log('Re-generating Ninja build plan and incrementally rebuilding Bazel main workspace (to make sure all dependencies are up-to-date)!')
+        subprocess.run([ninja_binary, '-C', gn_output_dir, 'build.ninja', 'bazel_workspace'])
     else:
         log2('Ninja build plan up to date.')
 
