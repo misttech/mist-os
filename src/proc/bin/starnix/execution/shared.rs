@@ -22,7 +22,7 @@ use crate::fs::*;
 use crate::logging::log_trace;
 use crate::mm::{DesiredAddress, MappingOptions, PAGE_SIZE};
 use crate::mm::{MemoryAccessorExt, MemoryManager};
-use crate::signals::dequeue_signal;
+use crate::signals::{dequeue_signal, SignalInfo};
 use crate::syscalls::{
     decls::{Syscall, SyscallDecl},
     table::dispatch_syscall,
@@ -384,6 +384,14 @@ pub fn block_while_stopped(current_task: &CurrentTask) {
         }
         // Result is not needed, as this is not in a syscall.
         let _: Result<(), Errno> = waiter.wait(current_task);
+    }
+}
+
+pub fn signal_for_exception(exception: &zx::sys::zx_exception_info_t) -> Option<SignalInfo> {
+    match exception.type_ {
+        zx::sys::ZX_EXCP_FATAL_PAGE_FAULT => Some(SignalInfo::default(SIGSEGV)),
+        zx::sys::ZX_EXCP_SW_BREAKPOINT => Some(SignalInfo::default(SIGTRAP)),
+        _ => None,
     }
 }
 

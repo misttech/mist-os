@@ -124,32 +124,33 @@ fn run_exception_loop(
 
         let syscall_decl = SyscallDecl::from_number(report.context.synth_data as u64);
 
-        match info.type_ {
-            ZX_EXCP_POLICY_ERROR
-                if report.context.synth_code == ZX_EXCP_POLICY_CODE_BAD_SYSCALL =>
-            {
-                if let Some(new_error_context) = execute_syscall(current_task, syscall_decl) {
-                    error_context = Some(new_error_context);
+        if info.type_ == ZX_EXCP_POLICY_ERROR
+            && report.context.synth_code == ZX_EXCP_POLICY_CODE_BAD_SYSCALL
+        {
+            if let Some(new_error_context) = execute_syscall(current_task, syscall_decl) {
+                error_context = Some(new_error_context);
+            }
+        } else {
+            match signal_for_exception(&info) {
+                Some(signal) => {
+                    if info.type_ == ZX_EXCP_FATAL_PAGE_FAULT {
+                        #[cfg(target_arch = "x86_64")]
+                        let fault_addr = unsafe { report.context.arch.x86_64.cr2 };
+                        log_trace!(
+                            current_task,
+                            "page fault, ip={:#x}, sp={:#x}, fault={:#x}",
+                            current_task.registers.rip,
+                            current_task.registers.rsp,
+                            fault_addr
+                        );
+                    }
+                    force_signal(current_task, signal);
                 }
-            }
-
-            ZX_EXCP_FATAL_PAGE_FAULT => {
-                #[cfg(target_arch = "x86_64")]
-                let fault_addr = unsafe { report.context.arch.x86_64.cr2 };
-                log_trace!(
-                    current_task,
-                    "page fault, ip={:#x}, sp={:#x}, fault={:#x}",
-                    current_task.registers.rip,
-                    current_task.registers.rsp,
-                    fault_addr
-                );
-                force_signal(current_task, SignalInfo::default(SIGSEGV));
-            }
-
-            _ => {
-                log_warn!(current_task, "unhandled exception. info={:?} report.header={:?} synth_code={:?} synth_data={:?}", info, report.header, report.context.synth_code, report.context.synth_data);
-                exception.set_exception_state(&ZX_EXCEPTION_STATE_TRY_NEXT)?;
-                continue;
+                None => {
+                    log_warn!(current_task, "unhandled exception. info={:?} report.header={:?} synth_code={:?} synth_data={:?}", info, report.header, report.context.synth_code, report.context.synth_data);
+                    exception.set_exception_state(&ZX_EXCEPTION_STATE_TRY_NEXT)?;
+                    continue;
+                }
             }
         }
 

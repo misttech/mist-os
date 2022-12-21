@@ -11,7 +11,8 @@ use fuchsia_zircon::{AsHandleRef, Task as zxTask};
 use std::sync::Arc;
 
 use super::shared::{
-    as_exception_info, execute_syscall, process_completed_syscall, read_channel_sync, TaskInfo,
+    as_exception_info, execute_syscall, process_completed_syscall, read_channel_sync,
+    signal_for_exception, TaskInfo,
 };
 use crate::logging::{log_error, log_trace, log_warn, set_zx_name};
 use crate::mm::MemoryManager;
@@ -215,8 +216,8 @@ fn handle_exceptions(task: Arc<Task>, exception_channel: zx::Channel) {
             assert!(buffer.n_handles() == 1);
             let exception = zx::Exception::from(buffer.take_handle(0).unwrap());
 
-            match info.type_ {
-                zx::sys::ZX_EXCP_FATAL_PAGE_FAULT => {
+            match signal_for_exception(&info) {
+                Some(signal) => {
                     // TODO: Verify that the rip is actually in restricted code.
                     let thread = exception.get_thread().unwrap();
 
@@ -226,8 +227,7 @@ fn handle_exceptions(task: Arc<Task>, exception_channel: zx::Channel) {
                     // TODO: Should this be 0, does it matter?
                     registers.rflags = 0;
 
-                    let siginfo = SignalInfo::default(SIGSEGV);
-                    deliver_signal(&task, siginfo, &mut registers);
+                    deliver_signal(&task, signal, &mut registers);
 
                     if task.read().exit_status.is_some() {
                         log_trace!(
@@ -261,7 +261,7 @@ fn handle_exceptions(task: Arc<Task>, exception_channel: zx::Channel) {
                             .unwrap();
                     }
                 }
-                _ => {
+                None => {
                     log_error!(task, "Unhandled exception {:?}", info);
                     exception
                         .set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_THREAD_EXIT)
