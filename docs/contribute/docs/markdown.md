@@ -856,7 +856,7 @@ on a single line:
 {% verbatim %}[id]: https://{{example_url}}/  "Optional Title Here"{% endverbatim %}
 ```
 
-### External links
+### External links {#external-links}
 
 You can alert readers that a link will lead to an external site by adding
 `{: .external}` to the syntax. For example:
@@ -866,6 +866,49 @@ See the [official documentation](https://my_external_website){: .external} for d
 ```
 
 Links to Fuchsia source code or to Fuchsia changes are not external links.
+
+### Link syntax
+
+Regardless of the way you create a markdown link in your content, you can link to various
+types of content from Fuchsia.dev:
+
+* Content that is created by contributors that exists in the [`//docs` directory][cs-docs] of the Fuchsia source tree.
+ 
+  Example: This is a link to
+  [`//docs/get-started/learn-fuchsia.md`](https://cs.opensource.google/fuchsia/fuchsia/+/main:docs/get-started/learn-fuchsia.md):
+
+  Note: You should always use a full filename including the file extension.
+  
+  ```
+  [Learn Fuchsia](/docs/get-started/learn-fuchsia.md)
+  ```
+
+* Content that is automatically generated such as [fuchsia.dev/reference](https://fuchsia.dev/reference) which does not
+  exist in the Fuchsia source tree.
+
+  Example: This is a link to the
+  [`fuchsia.bluetooth`](https://fuchsia.dev/reference/fidl/fuchsia.bluetooth) generated API reference documentation:
+
+  Note: Notice how the URL path does not include `docs/` or `fuchsia-src/`. This indicates
+  that this content is generated.
+  
+  ```
+  [`fuchsia.bluetooth`](https://fuchsia.dev/reference/fidl/fuchsia.bluetooth)
+  ```
+  
+  Fuchsia also has non-generated reference content that exists in the
+  [`//docs/reference/` directory][cs-ref-docs].
+  This type of content can be linked using the Fuchsia source tree content syntax.
+
+* Links to a URL. These types of links must be marked as [External](#external-links).
+
+  Example: This is a link to [`google.com`](https://google.com):
+
+  Note: You should always use a full filename including the file extension.
+  
+  ```
+  [`google.com`](https://google.com){: .external}
+  ```
 
 ## Lists
 
@@ -1261,3 +1304,5 @@ in the example below:
 [python-regex-doc]: https://docs.python.org/2/library/re.html
 [mathjax]: https://docs.mathjax.org/en/v2.7-latest/index.html
 [latex-guide]: https://en.wikibooks.org/wiki/LaTeX/Mathematics
+[cs-docs]: https://cs.opensource.google/fuchsia/fuchsia/+/main:docs/
+[cs-ref-docs]: https://cs.opensource.google/fuchsia/fuchsia/+/main:docs/reference/
