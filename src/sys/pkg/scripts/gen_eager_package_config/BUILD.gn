@@ -19,11 +19,16 @@ if (is_host) {
       "//src/sys/pkg/lib/eager-package-config",
       "//src/sys/pkg/lib/omaha-client",
       "//src/sys/pkg/lib/version",
+      "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
       "//third_party/rust_crates:serde",
     ]
 
-    test_deps = [ "//third_party/rust_crates:serde_json" ]
+    test_deps = [
+      "//third_party/rust_crates:assert_matches",
+      "//third_party/rust_crates:serde_json",
+      "//third_party/rust_crates:tempfile",
+    ]
 
     sources = [ "src/lib.rs" ]
   }

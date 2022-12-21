@@ -5,6 +5,7 @@
 #![warn(clippy::all)]
 
 use {
+    anyhow::Context as _,
     argh::FromArgs,
     channel_config::{ChannelConfig, ChannelConfigs},
     eager_package_config::omaha_client::EagerPackageConfig as OmahaConfig,
@@ -15,7 +16,7 @@ use {
     eager_package_config::pkg_resolver::EagerPackageConfigs as ResolverConfigs,
     fuchsia_url::UnpinnedAbsolutePackageUrl,
     omaha_client::cup_ecdsa::PublicKeys,
-    serde::{Deserialize, Serialize},
+    serde::{Deserialize, Deserializer, Serialize, Serializer},
     std::collections::{BTreeMap, HashSet},
     version::Version,
 };
@@ -51,6 +52,61 @@ struct Realm {
     channels: Vec<String>,
 }
 
+#[derive(Debug, Eq, PartialEq)]
+enum VersionOrPath {
+    Version(Version),
+    // Path to a file containing the version, must start with "//".
+    Path(String),
+}
+
+impl VersionOrPath {
+    fn into_version_or_read(self) -> Result<Version, anyhow::Error> {
+        match self {
+            VersionOrPath::Version(v) => Ok(v),
+            VersionOrPath::Path(p) => {
+                // path starts with "//", and current dir is the build dir.
+                let relative_path = format!("../../{}", &p[2..]);
+                Ok(std::fs::read_to_string(&relative_path)
+                    .with_context(|| format!("reading '{relative_path}' file"))?
+                    .trim()
+                    .parse()?)
+            }
+        }
+    }
+}
+
+impl From<[u32; 4]> for VersionOrPath {
+    fn from(v: [u32; 4]) -> Self {
+        VersionOrPath::Version(v.into())
+    }
+}
+
+impl Serialize for VersionOrPath {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            VersionOrPath::Version(v) => v.serialize(serializer),
+            VersionOrPath::Path(p) => p.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for VersionOrPath {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if s.starts_with("//") {
+            Ok(VersionOrPath::Path(s))
+        } else {
+            s.parse().map(VersionOrPath::Version).map_err(serde::de::Error::custom)
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct InputConfig {
     /// The URL of the package.
@@ -67,7 +123,7 @@ pub struct InputConfig {
     /// The URL of the Omaha server.
     service_url: String,
     /// The minimum required version of the package.
-    minimum_required_version: Version,
+    minimum_required_version: VersionOrPath,
     cache_fallback: Option<bool>,
 }
 
@@ -128,13 +184,13 @@ pub fn generate_omaha_client_config(
 }
 
 pub fn generate_pkg_resolver_config(
-    configs: &[InputConfig],
+    configs: Vec<InputConfig>,
     key_config: &PublicKeysByServiceUrl,
 ) -> ResolverConfigs {
     let packages: Vec<_> = configs
-        .iter()
+        .into_iter()
         .map(|i| ResolverConfig {
-            url: i.url.clone(),
+            url: i.url,
             executable: i.executable.unwrap_or(false),
             public_keys: key_config
                 .get(&i.service_url)
@@ -142,7 +198,10 @@ pub fn generate_pkg_resolver_config(
                     panic!("could not find service_url {:?} in key_config map", i.service_url)
                 })
                 .clone(),
-            minimum_required_version: i.minimum_required_version,
+            minimum_required_version: i
+                .minimum_required_version
+                .into_version_or_read()
+                .expect("read minimum version"),
             cache_fallback: i.cache_fallback.unwrap_or(true),
         })
         .collect();
@@ -250,6 +309,8 @@ pub mod test_support {
 mod tests {
     use super::*;
     use crate::test_support;
+    use assert_matches::assert_matches;
+    use serde_json::json;
 
     #[test]
     fn test_generate_omaha_client_config_empty() {
@@ -453,7 +514,51 @@ mod tests {
             minimum_required_version: [1, 2, 3, 4].into(),
             cache_fallback: Some(false),
         }];
-        let pkg_resolver_config = generate_pkg_resolver_config(&configs, &key_config);
+        let pkg_resolver_config = generate_pkg_resolver_config(configs, &key_config);
+        let expected = r#"{
+            "packages":[
+                {
+                    "url": "fuchsia-pkg://example.com/package_service_1",
+                    "public_keys": {
+                        "latest": {
+                            "key": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEHKz/tV8vLO/YnYnrN0smgRUkUoAt\n7qCZFgaBN9g5z3/EgaREkjBNfvZqwRe+/oOo0I8VXytS+fYY3URwKQSODw==\n-----END PUBLIC KEY-----\n",
+                            "id": 42
+                        },
+                        "historical": []
+                    },
+                    "minimum_required_version": "1.2.3.4",
+                    "cache_fallback": false
+                }
+            ]
+        }"#;
+        test_support::compare_ignoring_whitespace(
+            &serde_json::to_string_pretty(&pkg_resolver_config).unwrap(),
+            expected,
+        );
+    }
+
+    #[test]
+    fn test_generate_pkg_resolver_config_minimum_version_path() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let version_dir = temp_dir.path().join("path/to");
+        std::fs::create_dir_all(&version_dir).unwrap();
+        std::fs::write(version_dir.join("version"), "1.2.3.4").unwrap();
+        let build_dir = temp_dir.path().join("out/default");
+        std::fs::create_dir_all(&build_dir).unwrap();
+        std::env::set_current_dir(build_dir).unwrap();
+
+        let key_config = test_support::make_key_config_for_test();
+        let configs = vec![InputConfig {
+            url: "fuchsia-pkg://example.com/package_service_1".parse().unwrap(),
+            default_channel: Some("stable".to_string()),
+            flavor: None,
+            executable: None,
+            realms: vec![],
+            service_url: "https://example.com".to_string(),
+            minimum_required_version: VersionOrPath::Path("//path/to/version".into()),
+            cache_fallback: Some(false),
+        }];
+        let pkg_resolver_config = generate_pkg_resolver_config(configs, &key_config);
         let expected = r#"{
             "packages":[
                 {
@@ -505,6 +610,34 @@ mod tests {
                 cache_fallback: None,
             },
         ];
-        let _ = generate_pkg_resolver_config(&configs, &key_config);
+        let _ = generate_pkg_resolver_config(configs, &key_config);
+    }
+
+    #[test]
+    fn test_serialize_version_or_path() {
+        assert_eq!(
+            serde_json::to_value(&VersionOrPath::Version([1, 2, 3, 4].into())).unwrap(),
+            json!("1.2.3.4")
+        );
+        assert_eq!(serde_json::to_value(&VersionOrPath::Path("//v".into())).unwrap(), json!("//v"));
+    }
+
+    #[test]
+    fn test_deserialize_version_or_path() {
+        assert_eq!(
+            serde_json::from_value::<VersionOrPath>(json!("1.2.3.4")).unwrap(),
+            VersionOrPath::Version([1, 2, 3, 4].into())
+        );
+        assert_eq!(
+            serde_json::from_value::<VersionOrPath>(json!("//v")).unwrap(),
+            VersionOrPath::Path("//v".into())
+        );
+        assert_eq!(
+            serde_json::from_value::<VersionOrPath>(json!("//a/b/c")).unwrap(),
+            VersionOrPath::Path("//a/b/c".into())
+        );
+        assert_matches!(serde_json::from_value::<VersionOrPath>(json!("/v")), Err(_));
+        assert_matches!(serde_json::from_value::<VersionOrPath>(json!("v")), Err(_));
+        assert_matches!(serde_json::from_value::<VersionOrPath>(json!("1.2.3.4.5")), Err(_));
     }
 }

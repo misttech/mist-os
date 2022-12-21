@@ -24,7 +24,7 @@ fn main_inner(args: &Args) -> Result<(), anyhow::Error> {
         .collect();
 
     let omaha_client_config = generate_omaha_client_config(&input_configs, &key_config);
-    let pkg_resolver_config = generate_pkg_resolver_config(&input_configs, &key_config);
+    let pkg_resolver_config = generate_pkg_resolver_config(input_configs, &key_config);
 
     serde_json::to_writer(&File::create(&args.out_omaha_client_config)?, &omaha_client_config)?;
     serde_json::to_writer(&File::create(&args.out_pkg_resolver_config)?, &pkg_resolver_config)?;

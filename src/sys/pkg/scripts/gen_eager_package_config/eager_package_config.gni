@@ -69,8 +69,11 @@ import("//build/config.gni")
 #
 #       minimum_required_version (required)
 #         [string] the minimum required version for this package, in
-#         "1.2.3.4"-style notation. If there is a fallback version of the eager
-#         package in a build, this version MUST match the fallback version.
+#         "1.2.3.4"-style notation.
+#         The string can also be a path like "//path/to/VERSION", which will be
+#         read and parsed as version number.
+#         If there is a fallback version of the eager package in a build, this
+#         version MUST match the fallback version.
 #
 #       cache_fallback (optional)
 #         [bool] if fallback to the version in cache packages is allowed.
