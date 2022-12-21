@@ -95,7 +95,7 @@ template("eager_package_config") {
   eager_package_config_script_label =
       "${target_name}_eager_package_config_script"
   compiled_action(eager_package_config_script_label) {
-    tool = "//src/sys/pkg/scripts/gen_eager_package_config:bin"
+    tool = "//src/sys/pkg/scripts/gen_eager_package_config"
     inputs = invoker.sources + [ invoker.key_config ]
     outputs = [
       omaha_client_config_path,
