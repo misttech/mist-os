@@ -41,21 +41,13 @@ Orientation GetNewOrientation(Orientation screen_capture_rotation, Orientation p
 
 namespace screen_capture {
 
-ScreenCapture::ScreenCapture(
-    fidl::InterfaceRequest<fuchsia::ui::composition::ScreenCapture> request,
-    const vector<std::shared_ptr<allocation::BufferCollectionImporter>>&
-        buffer_collection_importers,
-    std::shared_ptr<flatland::Renderer> renderer, GetRenderables get_renderables)
-    : binding_(this, std::move(request)),
-      buffer_collection_importers_(buffer_collection_importers),
+ScreenCapture::ScreenCapture(const vector<std::shared_ptr<allocation::BufferCollectionImporter>>&
+                                 buffer_collection_importers,
+                             std::shared_ptr<flatland::Renderer> renderer,
+                             GetRenderables get_renderables)
+    : buffer_collection_importers_(buffer_collection_importers),
       renderer_(std::move(renderer)),
-      get_renderables_(std::move(get_renderables)) {
-  binding_.set_error_handler([this](zx_status_t status) {
-    FX_LOGS(ERROR) << "ScreenCapture: Clearing images due to status: "
-                   << zx_status_get_string(status);
-    ClearImages();
-  });
-}
+      get_renderables_(std::move(get_renderables)) {}
 
 ScreenCapture::~ScreenCapture() {
   FX_LOGS(ERROR) << "ScreenCapture::Dtor: Clearing images.";

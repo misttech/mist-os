@@ -39,7 +39,7 @@ class FlatlandScreenshotTest : public gtest::RealLoopFixture,
     screenshot_importers.push_back(importer_);
 
     screen_capturer_ = std::make_unique<screen_capture::ScreenCapture>(
-        screen_capture_ptr_.NewRequest(), screenshot_importers, renderer_,
+        screenshot_importers, renderer_,
         /*get_renderables=*/[](auto...) {
           return std::make_pair<std::vector<flatland::ImageRect>,
                                 std::vector<allocation::ImageMetadata>>({}, {});
@@ -76,7 +76,6 @@ class FlatlandScreenshotTest : public gtest::RealLoopFixture,
 
   std::shared_ptr<allocation::Allocator> flatland_allocator_;
 
-  fuchsia::ui::composition::ScreenCapturePtr screen_capture_ptr_;
   std::unique_ptr<screen_capture::ScreenCapture> screen_capturer_;
 };
 

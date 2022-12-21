@@ -84,10 +84,9 @@ class ScreenCaptureTest : public gtest::TestLoopFixture {
 };
 
 TEST_F(ScreenCaptureTest, ConfigureSingleImporterSuccess) {
-  fuchsia::ui::composition::ScreenCapturePtr screencapturer;
   std::vector<std::shared_ptr<BufferCollectionImporter>> screen_capture_importers;
   screen_capture_importers.push_back(buffer_collection_importer_);
-  screen_capture::ScreenCapture sc(screencapturer.NewRequest(), screen_capture_importers, nullptr,
+  screen_capture::ScreenCapture sc(screen_capture_importers, nullptr,
                                    [this]() { return this->GetRenderables(); });
 
   allocation::BufferCollectionImportExportTokens ref_pair =
@@ -113,10 +112,9 @@ TEST_F(ScreenCaptureTest, ConfigureSingleImporterSuccess) {
 }
 
 TEST_F(ScreenCaptureTest, ConfigureSingleImporterFailure) {
-  fuchsia::ui::composition::ScreenCapturePtr screencapturer;
   std::vector<std::shared_ptr<BufferCollectionImporter>> screen_capture_importers;
   screen_capture_importers.push_back(buffer_collection_importer_);
-  screen_capture::ScreenCapture sc(screencapturer.NewRequest(), screen_capture_importers, nullptr,
+  screen_capture::ScreenCapture sc(screen_capture_importers, nullptr,
                                    [this]() { return this->GetRenderables(); });
 
   allocation::BufferCollectionImportExportTokens ref_pair =
@@ -139,7 +137,6 @@ TEST_F(ScreenCaptureTest, ConfigureSingleImporterFailure) {
 }
 
 TEST_F(ScreenCaptureTest, ConfigureMultipleImportersSuccess) {
-  fuchsia::ui::composition::ScreenCapturePtr screencapturer;
   std::vector<std::shared_ptr<BufferCollectionImporter>> screen_capture_importers;
 
   auto mock_buffer_collection_importer2 = new allocation::MockBufferCollectionImporter();
@@ -148,7 +145,7 @@ TEST_F(ScreenCaptureTest, ConfigureMultipleImportersSuccess) {
 
   screen_capture_importers.push_back(buffer_collection_importer_);
   screen_capture_importers.push_back(buffer_collection_importer2);
-  screen_capture::ScreenCapture sc(screencapturer.NewRequest(), screen_capture_importers, nullptr,
+  screen_capture::ScreenCapture sc(screen_capture_importers, nullptr,
                                    [this]() { return this->GetRenderables(); });
 
   allocation::BufferCollectionImportExportTokens ref_pair =
@@ -177,7 +174,6 @@ TEST_F(ScreenCaptureTest, ConfigureMultipleImportersSuccess) {
 }
 
 TEST_F(ScreenCaptureTest, ConfigureMultipleImportersImportFailure) {
-  fuchsia::ui::composition::ScreenCapturePtr screencapturer;
   std::vector<std::shared_ptr<BufferCollectionImporter>> screen_capture_importers;
 
   auto mock_buffer_collection_importer2 = new allocation::MockBufferCollectionImporter();
@@ -186,7 +182,7 @@ TEST_F(ScreenCaptureTest, ConfigureMultipleImportersImportFailure) {
 
   screen_capture_importers.push_back(buffer_collection_importer_);
   screen_capture_importers.push_back(buffer_collection_importer2);
-  screen_capture::ScreenCapture sc(screencapturer.NewRequest(), screen_capture_importers, nullptr,
+  screen_capture::ScreenCapture sc(screen_capture_importers, nullptr,
                                    [this]() { return this->GetRenderables(); });
 
   allocation::BufferCollectionImportExportTokens ref_pair =
@@ -221,9 +217,7 @@ TEST_F(ScreenCaptureTest, ConfigureMultipleImportersImportFailure) {
 }
 
 TEST_F(ScreenCaptureTest, ConfigureWithMissingArguments) {
-  fuchsia::ui::composition::ScreenCapturePtr screencapturer;
-  screen_capture::ScreenCapture sc(screencapturer.NewRequest(), {}, nullptr,
-                                   [this]() { return this->GetRenderables(); });
+  screen_capture::ScreenCapture sc({}, nullptr, [this]() { return this->GetRenderables(); });
   sc.Configure({}, [](fpromise::result<void, ScreenCaptureError> result) {
     EXPECT_TRUE(result.is_error());
     EXPECT_EQ(result.error(), ScreenCaptureError::MISSING_ARGS);
@@ -232,10 +226,9 @@ TEST_F(ScreenCaptureTest, ConfigureWithMissingArguments) {
 }
 
 TEST_F(ScreenCaptureTest, ConfigureNoBuffers) {
-  fuchsia::ui::composition::ScreenCapturePtr screencapturer;
   std::vector<std::shared_ptr<BufferCollectionImporter>> screen_capture_importers;
   screen_capture_importers.push_back(buffer_collection_importer_);
-  screen_capture::ScreenCapture sc(screencapturer.NewRequest(), screen_capture_importers, nullptr,
+  screen_capture::ScreenCapture sc(screen_capture_importers, nullptr,
                                    [this]() { return this->GetRenderables(); });
 
   allocation::BufferCollectionImportExportTokens ref_pair =
@@ -256,10 +249,9 @@ TEST_F(ScreenCaptureTest, ConfigureNoBuffers) {
 }
 
 TEST_F(ScreenCaptureTest, ConfigureTwice) {
-  fuchsia::ui::composition::ScreenCapturePtr screencapturer;
   std::vector<std::shared_ptr<BufferCollectionImporter>> screen_capture_importers;
   screen_capture_importers.push_back(buffer_collection_importer_);
-  screen_capture::ScreenCapture sc(screencapturer.NewRequest(), screen_capture_importers, renderer_,
+  screen_capture::ScreenCapture sc(screen_capture_importers, renderer_,
                                    [this]() { return this->GetRenderables(); });
 
   // Configure a buffer collection with two (2) VMOs to render into for GetNextFrame().
@@ -332,10 +324,9 @@ TEST_F(ScreenCaptureTest, ConfigureTwice) {
 }
 
 TEST_F(ScreenCaptureTest, GetNextFrameNoBuffers) {
-  fuchsia::ui::composition::ScreenCapturePtr screencapturer;
   std::vector<std::shared_ptr<BufferCollectionImporter>> screen_capture_importers;
   screen_capture_importers.push_back(buffer_collection_importer_);
-  screen_capture::ScreenCapture sc(screencapturer.NewRequest(), screen_capture_importers, nullptr,
+  screen_capture::ScreenCapture sc(screen_capture_importers, nullptr,
                                    [this]() { return this->GetRenderables(); });
 
   // Request a frame without configuring the buffers.
@@ -345,10 +336,9 @@ TEST_F(ScreenCaptureTest, GetNextFrameNoBuffers) {
 }
 
 TEST_F(ScreenCaptureTest, GetNextFrameSuccess) {
-  fuchsia::ui::composition::ScreenCapturePtr screencapturer;
   std::vector<std::shared_ptr<BufferCollectionImporter>> screen_capture_importers;
   screen_capture_importers.push_back(buffer_collection_importer_);
-  screen_capture::ScreenCapture sc(screencapturer.NewRequest(), screen_capture_importers, renderer_,
+  screen_capture::ScreenCapture sc(screen_capture_importers, renderer_,
                                    [this]() { return this->GetRenderables(); });
 
   allocation::BufferCollectionImportExportTokens ref_pair =
@@ -380,10 +370,9 @@ TEST_F(ScreenCaptureTest, GetNextFrameSuccess) {
 }
 
 TEST_F(ScreenCaptureTest, GetNextFrameBufferFullError) {
-  fuchsia::ui::composition::ScreenCapturePtr screencapturer;
   std::vector<std::shared_ptr<BufferCollectionImporter>> screen_capture_importers;
   screen_capture_importers.push_back(buffer_collection_importer_);
-  screen_capture::ScreenCapture sc(screencapturer.NewRequest(), screen_capture_importers, renderer_,
+  screen_capture::ScreenCapture sc(screen_capture_importers, renderer_,
                                    [this]() { return this->GetRenderables(); });
 
   allocation::BufferCollectionImportExportTokens ref_pair =
@@ -421,10 +410,9 @@ TEST_F(ScreenCaptureTest, GetNextFrameBufferFullError) {
 }
 
 TEST_F(ScreenCaptureTest, GetNextFrameMultipleBuffers) {
-  fuchsia::ui::composition::ScreenCapturePtr screencapturer;
   std::vector<std::shared_ptr<BufferCollectionImporter>> screen_capture_importers;
   screen_capture_importers.push_back(buffer_collection_importer_);
-  screen_capture::ScreenCapture sc(screencapturer.NewRequest(), screen_capture_importers, renderer_,
+  screen_capture::ScreenCapture sc(screen_capture_importers, renderer_,
                                    [this]() { return this->GetRenderables(); });
 
   allocation::BufferCollectionImportExportTokens ref_pair =
@@ -465,10 +453,9 @@ TEST_F(ScreenCaptureTest, GetNextFrameMultipleBuffers) {
 }
 
 TEST_F(ScreenCaptureTest, GetNextFrameMissingArgs) {
-  fuchsia::ui::composition::ScreenCapturePtr screencapturer;
   std::vector<std::shared_ptr<BufferCollectionImporter>> screen_capture_importers;
   screen_capture_importers.push_back(buffer_collection_importer_);
-  screen_capture::ScreenCapture sc(screencapturer.NewRequest(), screen_capture_importers, nullptr,
+  screen_capture::ScreenCapture sc(screen_capture_importers, nullptr,
                                    [this]() { return this->GetRenderables(); });
 
   allocation::BufferCollectionImportExportTokens ref_pair =
@@ -507,10 +494,9 @@ TEST_F(ScreenCaptureTest, GetNextFrameMissingArgs) {
 }
 
 TEST_F(ScreenCaptureTest, ReleaseAvailableFrame) {
-  fuchsia::ui::composition::ScreenCapturePtr screencapturer;
   std::vector<std::shared_ptr<BufferCollectionImporter>> screen_capture_importers;
   screen_capture_importers.push_back(buffer_collection_importer_);
-  screen_capture::ScreenCapture sc(screencapturer.NewRequest(), screen_capture_importers, renderer_,
+  screen_capture::ScreenCapture sc(screen_capture_importers, renderer_,
                                    [this]() { return this->GetRenderables(); });
 
   allocation::BufferCollectionImportExportTokens ref_pair =
@@ -547,10 +533,9 @@ TEST_F(ScreenCaptureTest, ReleaseAvailableFrame) {
 }
 
 TEST_F(ScreenCaptureTest, ReleaseOutOfRangeFrame) {
-  fuchsia::ui::composition::ScreenCapturePtr screencapturer;
   std::vector<std::shared_ptr<BufferCollectionImporter>> screen_capture_importers;
   screen_capture_importers.push_back(buffer_collection_importer_);
-  screen_capture::ScreenCapture sc(screencapturer.NewRequest(), screen_capture_importers, renderer_,
+  screen_capture::ScreenCapture sc(screen_capture_importers, renderer_,
                                    [this]() { return this->GetRenderables(); });
 
   allocation::BufferCollectionImportExportTokens ref_pair =
@@ -590,10 +575,9 @@ TEST_F(ScreenCaptureTest, ReleaseOutOfRangeFrame) {
 TEST_F(ScreenCaptureTest, ReleaseFrameFromFullBuffer) {
   const uint32_t kNumBuffers = 3;
   const uint32_t kFreedBufferId = 1;
-  fuchsia::ui::composition::ScreenCapturePtr screencapturer;
   std::vector<std::shared_ptr<BufferCollectionImporter>> screen_capture_importers;
   screen_capture_importers.push_back(buffer_collection_importer_);
-  screen_capture::ScreenCapture sc(screencapturer.NewRequest(), screen_capture_importers, renderer_,
+  screen_capture::ScreenCapture sc(screen_capture_importers, renderer_,
                                    [this]() { return this->GetRenderables(); });
 
   allocation::BufferCollectionImportExportTokens ref_pair =

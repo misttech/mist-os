@@ -26,8 +26,7 @@ class ScreenCapture : public fuchsia::ui::composition::ScreenCapture {
       const std::vector<flatland::ImageRect>& rects, fuchsia::ui::composition::Rotation rotation,
       uint32_t image_width, uint32_t image_height);
 
-  ScreenCapture(fidl::InterfaceRequest<fuchsia::ui::composition::ScreenCapture> request,
-                const std::vector<std::shared_ptr<allocation::BufferCollectionImporter>>&
+  ScreenCapture(const std::vector<std::shared_ptr<allocation::BufferCollectionImporter>>&
                     buffer_collection_importers,
                 std::shared_ptr<flatland::Renderer> renderer, GetRenderables get_renderables);
 
@@ -46,8 +45,6 @@ class ScreenCapture : public fuchsia::ui::composition::ScreenCapture {
 
   // Clients cannot use zero as an Image ID.
   static constexpr int64_t kInvalidId = 0;
-
-  fidl::Binding<fuchsia::ui::composition::ScreenCapture> binding_;
 
   std::vector<std::shared_ptr<allocation::BufferCollectionImporter>> buffer_collection_importers_;
 

@@ -6,7 +6,7 @@
 #define SRC_UI_SCENIC_LIB_SCREEN_CAPTURE_SCREEN_CAPTURE_MANAGER_H_
 
 #include <fuchsia/ui/composition/cpp/fidl.h>
-#include <lib/fidl/cpp/binding.h>
+#include <lib/fidl/cpp/binding_set.h>
 
 #include <unordered_map>
 
@@ -37,9 +37,8 @@ class ScreenCaptureManager {
   std::shared_ptr<flatland::FlatlandManager> flatland_manager_;
   std::vector<std::shared_ptr<allocation::BufferCollectionImporter>> buffer_collection_importers_;
 
-  ClientId next_client_id_ = 1;
-
-  std::unordered_map<ClientId, std::unique_ptr<ScreenCapture>> screen_capture_clients_;
+  fidl::BindingSet<fuchsia::ui::composition::ScreenCapture, std::unique_ptr<ScreenCapture>>
+      bindings_;
 };
 
 }  // namespace screen_capture

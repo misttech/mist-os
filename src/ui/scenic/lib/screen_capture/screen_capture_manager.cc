@@ -29,20 +29,19 @@ ScreenCaptureManager::ScreenCaptureManager(
 
 void ScreenCaptureManager::CreateClient(
     fidl::InterfaceRequest<fuchsia::ui::composition::ScreenCapture> request) {
-  const auto id = next_client_id_++;
+  bindings_.AddBinding(std::make_unique<ScreenCapture>(
+                           buffer_collection_importers_, renderer_,
+                           [this]() {
+                             FX_DCHECK(flatland_manager_);
+                             FX_DCHECK(engine_);
 
-  std::unique_ptr<ScreenCapture> screen_capture = std::make_unique<ScreenCapture>(
-      std::move(request), buffer_collection_importers_, renderer_, [this]() {
-        FX_DCHECK(flatland_manager_);
-        FX_DCHECK(engine_);
+                             auto display =
+                                 flatland_manager_->GetPrimaryFlatlandDisplayForRendering();
+                             FX_DCHECK(display);
 
-        auto display = flatland_manager_->GetPrimaryFlatlandDisplayForRendering();
-        FX_DCHECK(display);
-
-        return engine_->GetRenderables(*display);
-      });
-
-  screen_capture_clients_[id] = std::move(screen_capture);
+                             return engine_->GetRenderables(*display);
+                           }),
+                       std::move(request));
 }
 
 }  // namespace screen_capture

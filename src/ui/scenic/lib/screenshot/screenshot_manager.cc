@@ -32,12 +32,8 @@ ScreenshotManager::ScreenshotManager(
 void ScreenshotManager::CreateBinding(
     fidl::InterfaceRequest<fuchsia::ui::composition::Screenshot> request) {
   if (use_flatland_) {
-    // Create the ScreenCapture instance that will do the heavy lifting.
-    fidl::InterfacePtr<fuchsia::ui::composition::ScreenCapture> screen_capture_ptr;
-
     std::unique_ptr<ScreenCapture> screen_capture = std::make_unique<ScreenCapture>(
-        screen_capture_ptr.NewRequest(), buffer_collection_importers_, renderer_,
-        [this]() { return get_renderables_(); });
+        buffer_collection_importers_, renderer_, [this]() { return get_renderables_(); });
 
     bindings_.AddBinding(
         std::make_unique<screenshot::FlatlandScreenshot>(
