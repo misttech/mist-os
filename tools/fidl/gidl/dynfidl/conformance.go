@@ -12,10 +12,10 @@ import (
 	"strings"
 	"text/template"
 
-	gidlconfig "go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
-	gidllibrust "go.fuchsia.dev/fuchsia/tools/fidl/gidl/librust"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/librust"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
@@ -34,8 +34,8 @@ type encodeSuccessCase struct {
 	Name, Value, Bytes string
 }
 
-func GenerateConformanceTests(gidl gidlir.All, fidl fidlgen.Root, config gidlconfig.GeneratorConfig) ([]byte, error) {
-	schema := gidlmixer.BuildSchema(fidl)
+func GenerateConformanceTests(gidl ir.All, fidl fidlgen.Root, config config.GeneratorConfig) ([]byte, error) {
+	schema := mixer.BuildSchema(fidl)
 
 	// dynfidl only supports encode tests (it's an encoder)
 	encodeSuccessCases, err := encodeSuccessCases(gidl.EncodeSuccess, schema)
@@ -51,7 +51,7 @@ func GenerateConformanceTests(gidl gidlir.All, fidl fidlgen.Root, config gidlcon
 	return buf.Bytes(), err
 }
 
-func encodeSuccessCases(gidlEncodeSuccesses []gidlir.EncodeSuccess, schema gidlmixer.Schema) ([]encodeSuccessCase, error) {
+func encodeSuccessCases(gidlEncodeSuccesses []ir.EncodeSuccess, schema mixer.Schema) ([]encodeSuccessCase, error) {
 	var encodeSuccessCases []encodeSuccessCase
 	for _, encodeSuccess := range gidlEncodeSuccesses {
 		decl, err := schema.ExtractDeclarationEncodeSuccess(encodeSuccess.Value, encodeSuccess.HandleDefs)
@@ -67,7 +67,7 @@ func encodeSuccessCases(gidlEncodeSuccesses []gidlir.EncodeSuccess, schema gidlm
 			encodeSuccessCases = append(encodeSuccessCases, encodeSuccessCase{
 				Name:  name,
 				Value: visited.ValueStr,
-				Bytes: gidllibrust.BuildBytes(encoding.Bytes),
+				Bytes: librust.BuildBytes(encoding.Bytes),
 			})
 		}
 	}
@@ -75,13 +75,13 @@ func encodeSuccessCases(gidlEncodeSuccesses []gidlir.EncodeSuccess, schema gidlm
 }
 
 // check whether dynfidl supports the layout specified by the decl
-func isSupported(decl gidlmixer.Declaration) bool {
+func isSupported(decl mixer.Declaration) bool {
 	if decl.IsNullable() {
 		return false
 	}
 
 	switch decl := decl.(type) {
-	case *gidlmixer.StructDecl:
+	case *mixer.StructDecl:
 		if decl.IsResourceType() {
 			return false
 		}
@@ -91,9 +91,9 @@ func isSupported(decl gidlmixer.Declaration) bool {
 			}
 		}
 		return true
-	case *gidlmixer.ArrayDecl, *gidlmixer.BitsDecl, *gidlmixer.BoolDecl, *gidlmixer.EnumDecl,
-		*gidlmixer.FloatDecl, *gidlmixer.HandleDecl, *gidlmixer.IntegerDecl, *gidlmixer.StringDecl,
-		*gidlmixer.TableDecl, *gidlmixer.UnionDecl, *gidlmixer.VectorDecl:
+	case *mixer.ArrayDecl, *mixer.BitsDecl, *mixer.BoolDecl, *mixer.EnumDecl,
+		*mixer.FloatDecl, *mixer.HandleDecl, *mixer.IntegerDecl, *mixer.StringDecl,
+		*mixer.TableDecl, *mixer.UnionDecl, *mixer.VectorDecl:
 		return false
 	default:
 		panic(fmt.Sprint("unrecognized type %s", decl))
@@ -101,18 +101,18 @@ func isSupported(decl gidlmixer.Declaration) bool {
 }
 
 // check whether dynfidl supports the layout specified by the decl as the field of a struct
-func isSupportedStructField(decl gidlmixer.Declaration) bool {
+func isSupportedStructField(decl mixer.Declaration) bool {
 	if decl.IsNullable() {
 		return false
 	}
 
 	switch decl := decl.(type) {
-	case *gidlmixer.BoolDecl, *gidlmixer.IntegerDecl, *gidlmixer.StringDecl:
+	case *mixer.BoolDecl, *mixer.IntegerDecl, *mixer.StringDecl:
 		return true
-	case *gidlmixer.VectorDecl:
+	case *mixer.VectorDecl:
 		return isSupportedVectorElement(decl.Elem())
-	case *gidlmixer.ArrayDecl, *gidlmixer.BitsDecl, *gidlmixer.EnumDecl, *gidlmixer.FloatDecl,
-		*gidlmixer.HandleDecl, *gidlmixer.StructDecl, *gidlmixer.TableDecl, *gidlmixer.UnionDecl:
+	case *mixer.ArrayDecl, *mixer.BitsDecl, *mixer.EnumDecl, *mixer.FloatDecl,
+		*mixer.HandleDecl, *mixer.StructDecl, *mixer.TableDecl, *mixer.UnionDecl:
 		return false
 	default:
 		panic(fmt.Sprintf("unrecognized type %s", decl))
@@ -120,18 +120,18 @@ func isSupportedStructField(decl gidlmixer.Declaration) bool {
 }
 
 // check whether dynfidl supports the layout specified by the decl as an element in a vector
-func isSupportedVectorElement(decl gidlmixer.Declaration) bool {
+func isSupportedVectorElement(decl mixer.Declaration) bool {
 	if decl.IsNullable() {
 		return false
 	}
 
 	switch decl := decl.(type) {
-	case *gidlmixer.BoolDecl, *gidlmixer.IntegerDecl, *gidlmixer.StringDecl:
+	case *mixer.BoolDecl, *mixer.IntegerDecl, *mixer.StringDecl:
 		return true
-	case *gidlmixer.VectorDecl:
+	case *mixer.VectorDecl:
 		// dynfidl only supports vectors-of-vectors-of-bytes
 		switch decl := decl.Elem().(type) {
-		case gidlmixer.PrimitiveDeclaration:
+		case mixer.PrimitiveDeclaration:
 			switch decl.Subtype() {
 			case fidlgen.Uint8:
 				return true
@@ -141,8 +141,8 @@ func isSupportedVectorElement(decl gidlmixer.Declaration) bool {
 		default:
 			return false
 		}
-	case *gidlmixer.ArrayDecl, *gidlmixer.BitsDecl, *gidlmixer.EnumDecl, *gidlmixer.FloatDecl,
-		*gidlmixer.HandleDecl, *gidlmixer.StructDecl, *gidlmixer.TableDecl, *gidlmixer.UnionDecl:
+	case *mixer.ArrayDecl, *mixer.BitsDecl, *mixer.EnumDecl, *mixer.FloatDecl,
+		*mixer.HandleDecl, *mixer.StructDecl, *mixer.TableDecl, *mixer.UnionDecl:
 		return false
 	default:
 		panic(fmt.Sprintf("unrecognized type %s", decl))
@@ -179,7 +179,7 @@ func (v outerVariant) String() string {
 
 // panics on any values which aren't supported by dynfidl
 // should be guarded by a call to `isSupported`
-func visit(value gidlir.Value, decl gidlmixer.Declaration) visitResult {
+func visit(value ir.Value, decl mixer.Declaration) visitResult {
 	switch value := value.(type) {
 	case bool:
 		return visitResult{
@@ -188,7 +188,7 @@ func visit(value gidlir.Value, decl gidlmixer.Declaration) visitResult {
 			InnerEnumAndVariant: "BasicField::Bool",
 		}
 	case int64, uint64, float64:
-		suffix, basicOuterVariant := primitiveTypeName(decl.(gidlmixer.PrimitiveDeclaration).Subtype())
+		suffix, basicOuterVariant := primitiveTypeName(decl.(mixer.PrimitiveDeclaration).Subtype())
 		return visitResult{
 			ValueStr:            fmt.Sprintf("%v%s", value, suffix),
 			OuterVariant:        basicVariant,
@@ -199,15 +199,15 @@ func visit(value gidlir.Value, decl gidlmixer.Declaration) visitResult {
 		if fidlgen.PrintableASCII(value) {
 			valueStr = fmt.Sprintf("String::from(%q).into_bytes()", value)
 		} else {
-			valueStr = fmt.Sprintf("b\"%s\".to_vec()", gidllibrust.EscapeStr(value))
+			valueStr = fmt.Sprintf("b\"%s\".to_vec()", librust.EscapeStr(value))
 		}
 		return visitResult{
 			ValueStr:            valueStr,
 			OuterVariant:        vectorVariant,
 			InnerEnumAndVariant: "VectorField::UInt8Vector",
 		}
-	case gidlir.Record:
-		decl := decl.(*gidlmixer.StructDecl)
+	case ir.Record:
+		decl := decl.(*mixer.StructDecl)
 		valueStr := "Structure::default()"
 		for _, field := range value.Fields {
 			fieldResult := visit(field.Value, decl.Field(field.Key.Name))
@@ -222,8 +222,8 @@ func visit(value gidlir.Value, decl gidlmixer.Declaration) visitResult {
 			OuterVariant:        unsupportedVariant,
 			InnerEnumAndVariant: "UNUSED",
 		}
-	case []gidlir.Value:
-		elemDecl := decl.(*gidlmixer.VectorDecl).Elem()
+	case []ir.Value:
+		elemDecl := decl.(*mixer.VectorDecl).Elem()
 		var elements []string
 		for _, item := range value {
 			visited := visit(item, elemDecl)
@@ -233,10 +233,10 @@ func visit(value gidlir.Value, decl gidlmixer.Declaration) visitResult {
 
 		var innerEnumAndVariant string
 		switch decl := elemDecl.(type) {
-		case gidlmixer.PrimitiveDeclaration:
+		case mixer.PrimitiveDeclaration:
 			_, basicOuterVariant := primitiveTypeName(decl.Subtype())
 			innerEnumAndVariant = fmt.Sprintf("VectorField::%sVector", basicOuterVariant)
-		case *gidlmixer.StringDecl, *gidlmixer.VectorDecl:
+		case *mixer.StringDecl, *mixer.VectorDecl:
 			// vectors are only supported as vector elements if they're vector<uint8>
 			// let rustc error if we're wrong about that assumption
 			innerEnumAndVariant = "VectorField::UInt8VectorVector"

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"text/template"
 
-	gidlconfig "go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
@@ -48,8 +48,8 @@ type decodeFailureCase struct {
 }
 
 // Generate generates dart tests.
-func GenerateConformanceTests(gidl gidlir.All, fidl fidlgen.Root, config gidlconfig.GeneratorConfig) ([]byte, error) {
-	schema := gidlmixer.BuildSchema(fidl)
+func GenerateConformanceTests(gidl ir.All, fidl fidlgen.Root, config config.GeneratorConfig) ([]byte, error) {
+	schema := mixer.BuildSchema(fidl)
 	encodeSuccessCases, err := encodeSuccessCases(gidl.EncodeSuccess, schema)
 	if err != nil {
 		return nil, err
@@ -76,7 +76,7 @@ func GenerateConformanceTests(gidl gidlir.All, fidl fidlgen.Root, config gidlcon
 	return buf.Bytes(), err
 }
 
-func encodeSuccessCases(gidlEncodeSuccesses []gidlir.EncodeSuccess, schema gidlmixer.Schema) ([]encodeSuccessCase, error) {
+func encodeSuccessCases(gidlEncodeSuccesses []ir.EncodeSuccess, schema mixer.Schema) ([]encodeSuccessCase, error) {
 	var encodeSuccessCases []encodeSuccessCase
 	for _, encodeSuccess := range gidlEncodeSuccesses {
 		decl, err := schema.ExtractDeclarationEncodeSuccess(encodeSuccess.Value, encodeSuccess.HandleDefs)
@@ -96,14 +96,14 @@ func encodeSuccessCases(gidlEncodeSuccesses []gidlir.EncodeSuccess, schema gidlm
 				ValueType:   valueType,
 				Bytes:       buildBytes(encoding.Bytes),
 				HandleDefs:  buildHandleDefs(encodeSuccess.HandleDefs),
-				Handles:     toDartIntList(gidlir.GetHandlesFromHandleDispositions(encoding.HandleDispositions)),
+				Handles:     toDartIntList(ir.GetHandlesFromHandleDispositions(encoding.HandleDispositions)),
 			})
 		}
 	}
 	return encodeSuccessCases, nil
 }
 
-func decodeSuccessCases(gidlDecodeSuccesses []gidlir.DecodeSuccess, schema gidlmixer.Schema) ([]decodeSuccessCase, error) {
+func decodeSuccessCases(gidlDecodeSuccesses []ir.DecodeSuccess, schema mixer.Schema) ([]decodeSuccessCase, error) {
 	var decodeSuccessCases []decodeSuccessCase
 	for _, decodeSuccess := range gidlDecodeSuccesses {
 		decl, err := schema.ExtractDeclaration(decodeSuccess.Value, decodeSuccess.HandleDefs)
@@ -124,7 +124,7 @@ func decodeSuccessCases(gidlDecodeSuccesses []gidlir.DecodeSuccess, schema gidlm
 				Bytes:      buildBytes(encoding.Bytes),
 				HandleDefs: buildHandleDefs(decodeSuccess.HandleDefs),
 				Handles:    toDartIntList(encoding.Handles),
-				UnusedHandles: toDartIntList(gidlir.GetUnusedHandles(decodeSuccess.Value,
+				UnusedHandles: toDartIntList(ir.GetUnusedHandles(decodeSuccess.Value,
 					encoding.Handles)),
 			})
 		}
@@ -132,7 +132,7 @@ func decodeSuccessCases(gidlDecodeSuccesses []gidlir.DecodeSuccess, schema gidlm
 	return decodeSuccessCases, nil
 }
 
-func encodeFailureCases(gidlEncodeFailures []gidlir.EncodeFailure, schema gidlmixer.Schema) ([]encodeFailureCase, error) {
+func encodeFailureCases(gidlEncodeFailures []ir.EncodeFailure, schema mixer.Schema) ([]encodeFailureCase, error) {
 	var encodeFailureCases []encodeFailureCase
 	for _, encodeFailure := range gidlEncodeFailures {
 		decl, err := schema.ExtractDeclarationUnsafe(encodeFailure.Value)
@@ -159,7 +159,7 @@ func encodeFailureCases(gidlEncodeFailures []gidlir.EncodeFailure, schema gidlmi
 	return encodeFailureCases, nil
 }
 
-func decodeFailureCases(gidlDecodeFailures []gidlir.DecodeFailure, schema gidlmixer.Schema) ([]decodeFailureCase, error) {
+func decodeFailureCases(gidlDecodeFailures []ir.DecodeFailure, schema mixer.Schema) ([]decodeFailureCase, error) {
 	var decodeFailureCases []decodeFailureCase
 	for _, decodeFailure := range gidlDecodeFailures {
 		_, err := schema.ExtractDeclarationByName(decodeFailure.Type)
@@ -189,11 +189,11 @@ func decodeFailureCases(gidlDecodeFailures []gidlir.DecodeFailure, schema gidlmi
 	return decodeFailureCases, nil
 }
 
-var supportedWireFormats = []gidlir.WireFormat{
-	gidlir.V2WireFormat,
+var supportedWireFormats = []ir.WireFormat{
+	ir.V2WireFormat,
 }
 
-func wireFormatSupported(wireFormat gidlir.WireFormat) bool {
+func wireFormatSupported(wireFormat ir.WireFormat) bool {
 	for _, wf := range supportedWireFormats {
 		if wireFormat == wf {
 			return true
@@ -202,15 +202,15 @@ func wireFormatSupported(wireFormat gidlir.WireFormat) bool {
 	return false
 }
 
-func testCaseName(baseName string, wireFormat gidlir.WireFormat) string {
+func testCaseName(baseName string, wireFormat ir.WireFormat) string {
 	return fidlgen.SingleQuote(fmt.Sprintf("%s_%s", baseName, wireFormat))
 }
 
-func encoderName(wireFormat gidlir.WireFormat) string {
+func encoderName(wireFormat ir.WireFormat) string {
 	return fmt.Sprintf("Encoders.%s", wireFormat)
 }
 
-func wireFormatName(wireFormat gidlir.WireFormat) string {
+func wireFormatName(wireFormat ir.WireFormat) string {
 	return fmt.Sprintf("fidl.WireFormat.%s", wireFormat)
 }
 
@@ -247,7 +247,7 @@ func toDartStr(value string) string {
 	return buf.String()
 }
 
-func toDartIntList(handles []gidlir.Handle) string {
+func toDartIntList(handles []ir.Handle) string {
 	var builder strings.Builder
 	builder.WriteString("[\n")
 	for i, handle := range handles {
@@ -263,43 +263,43 @@ func toDartIntList(handles []gidlir.Handle) string {
 }
 
 // Dart error codes are defined in sdk/dart/fidl/lib/src/error.dart.
-var dartErrorCodeNames = map[gidlir.ErrorCode]string{
-	gidlir.CountExceedsLimit:                  "fidlCountExceedsLimit",
-	gidlir.EnvelopeBytesExceedMessageLength:   "unknown",
-	gidlir.EnvelopeHandlesExceedMessageLength: "unknown",
-	gidlir.ExceededMaxOutOfLineDepth:          "fidlExceededMaxOutOfLineDepth",
-	gidlir.IncorrectHandleType:                "fidlIncorrectHandleType",
-	gidlir.InvalidBoolean:                     "fidlInvalidBoolean",
-	gidlir.InvalidEmptyStruct:                 "fidlInvalidPaddingByte",
-	gidlir.InvalidInlineBitInEnvelope:         "fidlInvalidInlineBitInEnvelope",
-	gidlir.InvalidInlineMarkerInEnvelope:      "fidlInvalidInlineMarkerInEnvelope",
-	gidlir.InvalidNumBytesInEnvelope:          "fidlInvalidNumBytesInEnvelope",
-	gidlir.InvalidNumHandlesInEnvelope:        "fidlInvalidNumHandlesInEnvelope",
-	gidlir.InvalidPaddingByte:                 "fidlInvalidPaddingByte",
-	gidlir.InvalidPresenceIndicator:           "fidlInvalidPresenceIndicator",
-	gidlir.MissingRequiredHandleRights:        "fidlMissingRequiredHandleRights",
-	gidlir.NonEmptyStringWithNullBody:         "fidlNonEmptyStringWithNullBody",
-	gidlir.NonEmptyVectorWithNullBody:         "fidlNonEmptyVectorWithNullBody",
-	gidlir.NonNullableTypeWithNullValue:       "fidlNonNullableTypeWithNullValue",
-	gidlir.NonResourceUnknownHandles:          "fidlNonResourceHandle",
-	gidlir.StrictBitsUnknownBit:               "fidlInvalidBit",
-	gidlir.StrictEnumUnknownValue:             "fidlInvalidEnumValue",
-	gidlir.StrictUnionUnknownField:            "fidlStrictUnionUnknownField",
-	gidlir.StringCountExceeds32BitLimit:       "fidlStringTooLong",
-	gidlir.StringNotUtf8:                      "unknown",
-	gidlir.StringTooLong:                      "fidlStringTooLong",
-	gidlir.TableCountExceeds32BitLimit:        "fidlCountExceedsLimit",
-	gidlir.TooFewBytes:                        "fidlTooFewBytes",
-	gidlir.TooFewBytesInPrimaryObject:         "fidlTooFewBytes",
-	gidlir.TooFewHandles:                      "fidlTooFewHandles",
-	gidlir.TooManyBytesInMessage:              "fidlTooManyBytes",
-	gidlir.TooManyHandlesInMessage:            "fidlTooManyHandles",
-	gidlir.UnionFieldNotSet:                   "unknown",
-	gidlir.UnexpectedOrdinal:                  "fidlCountExceedsLimit",
-	gidlir.VectorCountExceeds32BitLimit:       "fidlCountExceedsLimit",
+var dartErrorCodeNames = map[ir.ErrorCode]string{
+	ir.CountExceedsLimit:                  "fidlCountExceedsLimit",
+	ir.EnvelopeBytesExceedMessageLength:   "unknown",
+	ir.EnvelopeHandlesExceedMessageLength: "unknown",
+	ir.ExceededMaxOutOfLineDepth:          "fidlExceededMaxOutOfLineDepth",
+	ir.IncorrectHandleType:                "fidlIncorrectHandleType",
+	ir.InvalidBoolean:                     "fidlInvalidBoolean",
+	ir.InvalidEmptyStruct:                 "fidlInvalidPaddingByte",
+	ir.InvalidInlineBitInEnvelope:         "fidlInvalidInlineBitInEnvelope",
+	ir.InvalidInlineMarkerInEnvelope:      "fidlInvalidInlineMarkerInEnvelope",
+	ir.InvalidNumBytesInEnvelope:          "fidlInvalidNumBytesInEnvelope",
+	ir.InvalidNumHandlesInEnvelope:        "fidlInvalidNumHandlesInEnvelope",
+	ir.InvalidPaddingByte:                 "fidlInvalidPaddingByte",
+	ir.InvalidPresenceIndicator:           "fidlInvalidPresenceIndicator",
+	ir.MissingRequiredHandleRights:        "fidlMissingRequiredHandleRights",
+	ir.NonEmptyStringWithNullBody:         "fidlNonEmptyStringWithNullBody",
+	ir.NonEmptyVectorWithNullBody:         "fidlNonEmptyVectorWithNullBody",
+	ir.NonNullableTypeWithNullValue:       "fidlNonNullableTypeWithNullValue",
+	ir.NonResourceUnknownHandles:          "fidlNonResourceHandle",
+	ir.StrictBitsUnknownBit:               "fidlInvalidBit",
+	ir.StrictEnumUnknownValue:             "fidlInvalidEnumValue",
+	ir.StrictUnionUnknownField:            "fidlStrictUnionUnknownField",
+	ir.StringCountExceeds32BitLimit:       "fidlStringTooLong",
+	ir.StringNotUtf8:                      "unknown",
+	ir.StringTooLong:                      "fidlStringTooLong",
+	ir.TableCountExceeds32BitLimit:        "fidlCountExceedsLimit",
+	ir.TooFewBytes:                        "fidlTooFewBytes",
+	ir.TooFewBytesInPrimaryObject:         "fidlTooFewBytes",
+	ir.TooFewHandles:                      "fidlTooFewHandles",
+	ir.TooManyBytesInMessage:              "fidlTooManyBytes",
+	ir.TooManyHandlesInMessage:            "fidlTooManyHandles",
+	ir.UnionFieldNotSet:                   "unknown",
+	ir.UnexpectedOrdinal:                  "fidlCountExceedsLimit",
+	ir.VectorCountExceeds32BitLimit:       "fidlCountExceedsLimit",
 }
 
-func dartErrorCode(code gidlir.ErrorCode) (string, error) {
+func dartErrorCode(code ir.ErrorCode) (string, error) {
 	if str, ok := dartErrorCodeNames[code]; ok {
 		return fmt.Sprintf("fidl.FidlErrorCode.%s", str), nil
 	}

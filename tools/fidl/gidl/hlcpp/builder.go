@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
@@ -37,7 +37,7 @@ func escapeStr(value string) string {
 	return buf.String()
 }
 
-func buildHandleDef(def gidlir.HandleDef) string {
+func buildHandleDef(def ir.HandleDef) string {
 	switch def.Subtype {
 	case fidlgen.HandleSubtypeChannel:
 		return fmt.Sprintf("fidl::test::util::CreateChannel(%d)", def.Rights)
@@ -59,7 +59,7 @@ func handleType(subtype fidlgen.HandleSubtype) string {
 	}
 }
 
-func BuildHandleDefs(defs []gidlir.HandleDef) string {
+func BuildHandleDefs(defs []ir.HandleDef) string {
 	if len(defs) == 0 {
 		return ""
 	}
@@ -74,7 +74,7 @@ func BuildHandleDefs(defs []gidlir.HandleDef) string {
 	return builder.String()
 }
 
-func BuildHandleInfoDefs(defs []gidlir.HandleDef) string {
+func BuildHandleInfoDefs(defs []ir.HandleDef) string {
 	if len(defs) == 0 {
 		return ""
 	}
@@ -111,11 +111,11 @@ func (b *cppValueBuilder) newVar() string {
 	return fmt.Sprintf("v%d", b.varidx)
 }
 
-func (b *cppValueBuilder) adoptHandle(decl gidlmixer.Declaration, value gidlir.HandleWithRights) string {
+func (b *cppValueBuilder) adoptHandle(decl mixer.Declaration, value ir.HandleWithRights) string {
 	return fmt.Sprintf("%s(handle_defs[%d]%s)", typeName(decl), value.Handle, b.handleExtractOp)
 }
 
-func (b *cppValueBuilder) visit(value gidlir.Value, decl gidlmixer.Declaration) string {
+func (b *cppValueBuilder) visit(value ir.Value, decl mixer.Declaration) string {
 	switch value := value.(type) {
 	case bool:
 		return fmt.Sprintf("%t", value)
@@ -125,25 +125,25 @@ func (b *cppValueBuilder) visit(value gidlir.Value, decl gidlmixer.Declaration) 
 			intString = "-9223372036854775807ll - 1"
 		}
 		switch decl := decl.(type) {
-		case *gidlmixer.IntegerDecl:
+		case *mixer.IntegerDecl:
 			return intString
-		case *gidlmixer.BitsDecl:
+		case *mixer.BitsDecl:
 			return fmt.Sprintf("%s(%s)", typeName(decl), intString)
-		case *gidlmixer.EnumDecl:
+		case *mixer.EnumDecl:
 			return fmt.Sprintf("%s(%s)", typeName(decl), intString)
 		}
 	case uint64:
 		switch decl := decl.(type) {
-		case *gidlmixer.IntegerDecl:
+		case *mixer.IntegerDecl:
 			return fmt.Sprintf("%dull", value)
-		case *gidlmixer.BitsDecl:
+		case *mixer.BitsDecl:
 			return fmt.Sprintf("%s(%dull)", typeName(decl), value)
-		case *gidlmixer.EnumDecl:
+		case *mixer.EnumDecl:
 			return fmt.Sprintf("%s(%dull)", typeName(decl), value)
 		}
 	case float64:
 		switch decl := decl.(type) {
-		case *gidlmixer.FloatDecl:
+		case *mixer.FloatDecl:
 			switch decl.Subtype() {
 			case fidlgen.Float32:
 				s := fmt.Sprintf("%g", value)
@@ -156,8 +156,8 @@ func (b *cppValueBuilder) visit(value gidlir.Value, decl gidlmixer.Declaration) 
 				return fmt.Sprintf("%g", value)
 			}
 		}
-	case gidlir.RawFloat:
-		switch decl.(*gidlmixer.FloatDecl).Subtype() {
+	case ir.RawFloat:
+		switch decl.(*mixer.FloatDecl).Subtype() {
 		case fidlgen.Float32:
 			return fmt.Sprintf("([] { uint32_t u = %#b; float f; memcpy(&f, &u, 4); return f; })()", value)
 		case fidlgen.Float64:
@@ -165,22 +165,22 @@ func (b *cppValueBuilder) visit(value gidlir.Value, decl gidlmixer.Declaration) 
 		}
 	case string:
 		return fmt.Sprintf("%s(%s, %d)", typeName(decl), escapeStr(value), len(value))
-	case gidlir.HandleWithRights:
+	case ir.HandleWithRights:
 		switch decl := decl.(type) {
-		case *gidlmixer.HandleDecl:
+		case *mixer.HandleDecl:
 			return b.adoptHandle(decl, value)
-		case *gidlmixer.ClientEndDecl:
+		case *mixer.ClientEndDecl:
 			return fmt.Sprintf("%s(%s)", typeName(decl), b.adoptHandle(decl.UnderlyingHandleDecl(), value))
-		case *gidlmixer.ServerEndDecl:
+		case *mixer.ServerEndDecl:
 			return fmt.Sprintf("%s(%s)", typeName(decl), b.adoptHandle(decl.UnderlyingHandleDecl(), value))
 		}
-	case gidlir.Record:
-		return b.visitRecord(value, decl.(gidlmixer.RecordDeclaration))
-	case []gidlir.Value:
+	case ir.Record:
+		return b.visitRecord(value, decl.(mixer.RecordDeclaration))
+	case []ir.Value:
 		switch decl := decl.(type) {
-		case *gidlmixer.ArrayDecl:
+		case *mixer.ArrayDecl:
 			return b.visitArray(value, decl)
-		case *gidlmixer.VectorDecl:
+		case *mixer.VectorDecl:
 			return b.visitVector(value, decl)
 		}
 	case nil:
@@ -189,7 +189,7 @@ func (b *cppValueBuilder) visit(value gidlir.Value, decl gidlmixer.Declaration) 
 	panic(fmt.Sprintf("not implemented: %T", value))
 }
 
-func (b *cppValueBuilder) visitRecord(value gidlir.Record, decl gidlmixer.RecordDeclaration) string {
+func (b *cppValueBuilder) visitRecord(value ir.Record, decl mixer.RecordDeclaration) string {
 	containerVar := b.newVar()
 	nullable := decl.IsNullable()
 	if nullable {
@@ -199,7 +199,7 @@ func (b *cppValueBuilder) visitRecord(value gidlir.Record, decl gidlmixer.Record
 		b.Builder.WriteString(fmt.Sprintf("%s %s;\n", typeName(decl), containerVar))
 	}
 
-	_, isTable := decl.(*gidlmixer.TableDecl)
+	_, isTable := decl.(*mixer.TableDecl)
 	for _, field := range value.Fields {
 		accessor := "."
 		if nullable {
@@ -211,7 +211,7 @@ func (b *cppValueBuilder) visitRecord(value gidlir.Record, decl gidlmixer.Record
 			if isTable {
 				panic("unknown table fields not supported for HLCPP")
 			}
-			unknownData := field.Value.(gidlir.UnknownData)
+			unknownData := field.Value.(ir.UnknownData)
 			if decl.IsResourceType() {
 				b.Builder.WriteString(fmt.Sprintf(
 					"%s%sSetUnknownData(static_cast<fidl_xunion_tag_t>(%dlu), %s, %s);\n",
@@ -228,7 +228,7 @@ func (b *cppValueBuilder) visitRecord(value gidlir.Record, decl gidlmixer.Record
 		fieldVar := b.visit(field.Value, decl.Field(field.Key.Name))
 
 		switch decl.(type) {
-		case *gidlmixer.StructDecl:
+		case *mixer.StructDecl:
 			b.Builder.WriteString(fmt.Sprintf(
 				"%s%s%s = %s;\n", containerVar, accessor, field.Key.Name, fieldVar))
 		default:
@@ -239,7 +239,7 @@ func (b *cppValueBuilder) visitRecord(value gidlir.Record, decl gidlmixer.Record
 	return fmt.Sprintf("std::move(%s)", containerVar)
 }
 
-func (b *cppValueBuilder) visitArray(value []gidlir.Value, decl *gidlmixer.ArrayDecl) string {
+func (b *cppValueBuilder) visitArray(value []ir.Value, decl *mixer.ArrayDecl) string {
 	var elements []string
 	elemDecl := decl.Elem()
 	for _, item := range value {
@@ -250,13 +250,13 @@ func (b *cppValueBuilder) visitArray(value []gidlir.Value, decl *gidlmixer.Array
 		typeName(decl), strings.Join(elements, ", "))
 }
 
-func (b *cppValueBuilder) visitVector(value []gidlir.Value, decl *gidlmixer.VectorDecl) string {
+func (b *cppValueBuilder) visitVector(value []ir.Value, decl *mixer.VectorDecl) string {
 	elemDecl := decl.Elem()
 	var elements []string
 	for _, item := range value {
 		elements = append(elements, b.visit(item, elemDecl))
 	}
-	if _, ok := elemDecl.(gidlmixer.PrimitiveDeclaration); ok {
+	if _, ok := elemDecl.(mixer.PrimitiveDeclaration); ok {
 		// Populate the vector using aggregate initialization.
 		if decl.IsNullable() {
 			return fmt.Sprintf("%s{{%s}}", typeName(decl), strings.Join(elements, ", "))
@@ -280,23 +280,23 @@ func (b *cppValueBuilder) visitVector(value []gidlir.Value, decl *gidlmixer.Vect
 	return fmt.Sprintf("std::move(%s)", vectorVar)
 }
 
-func typeName(decl gidlmixer.Declaration) string {
+func typeName(decl mixer.Declaration) string {
 	switch decl := decl.(type) {
-	case gidlmixer.PrimitiveDeclaration:
+	case mixer.PrimitiveDeclaration:
 		return primitiveTypeName(decl.Subtype())
-	case *gidlmixer.StringDecl:
+	case *mixer.StringDecl:
 		if decl.IsNullable() {
 			return "::fidl::StringPtr"
 		}
 		return "std::string"
-	case *gidlmixer.ArrayDecl:
+	case *mixer.ArrayDecl:
 		return fmt.Sprintf("std::array<%s, %d>", typeName(decl.Elem()), decl.Size())
-	case *gidlmixer.VectorDecl:
+	case *mixer.VectorDecl:
 		if decl.IsNullable() {
 			return fmt.Sprintf("::fidl::VectorPtr<%s>", typeName(decl.Elem()))
 		}
 		return fmt.Sprintf("std::vector<%s>", typeName(decl.Elem()))
-	case *gidlmixer.HandleDecl:
+	case *mixer.HandleDecl:
 		switch decl.Subtype() {
 		case fidlgen.HandleSubtypeNone:
 			return "zx::handle"
@@ -307,11 +307,11 @@ func typeName(decl gidlmixer.Declaration) string {
 		default:
 			panic(fmt.Sprintf("Handle subtype not supported %s", decl.Subtype()))
 		}
-	case *gidlmixer.ClientEndDecl:
+	case *mixer.ClientEndDecl:
 		return fmt.Sprintf("fidl::InterfaceHandle<%s>", endpointDeclName(decl))
-	case *gidlmixer.ServerEndDecl:
+	case *mixer.ServerEndDecl:
 		return fmt.Sprintf("fidl::InterfaceRequest<%s>", endpointDeclName(decl))
-	case gidlmixer.NamedDeclaration:
+	case mixer.NamedDeclaration:
 		if decl.IsNullable() {
 			return fmt.Sprintf("std::unique_ptr<%s>", declName(decl))
 		}
@@ -321,13 +321,13 @@ func typeName(decl gidlmixer.Declaration) string {
 	}
 }
 
-func declName(decl gidlmixer.NamedDeclaration) string {
+func declName(decl mixer.NamedDeclaration) string {
 	parts := strings.Split(decl.Name(), "/")
 	library_parts := strings.Split(parts[0], ".")
 	return strings.Join(append(library_parts, parts[1]), "::")
 }
 
-func endpointDeclName(decl gidlmixer.EndpointDeclaration) string {
+func endpointDeclName(decl mixer.EndpointDeclaration) string {
 	parts := strings.Split(decl.ProtocolName(), "/")
 	library_parts := strings.Split(parts[0], ".")
 	return strings.Join(append(library_parts, parts[1]), "::")
@@ -362,7 +362,7 @@ func BuildBytes(bytes []byte) string {
 	return builder.String()
 }
 
-func buildRawHandleImpl(handles []gidlir.Handle, handleType, handleExtractOp string) string {
+func buildRawHandleImpl(handles []ir.Handle, handleType, handleExtractOp string) string {
 	if len(handles) == 0 {
 		return fmt.Sprintf("std::vector<%s>{}", handleType)
 	}
@@ -378,19 +378,19 @@ func buildRawHandleImpl(handles []gidlir.Handle, handleType, handleExtractOp str
 	return builder.String()
 }
 
-func BuildRawHandles(handles []gidlir.Handle) string {
+func BuildRawHandles(handles []ir.Handle) string {
 	return buildRawHandleImpl(handles, "zx_handle_t", "")
 }
 
-func BuildRawHandlesFromHandleInfos(handles []gidlir.Handle) string {
+func BuildRawHandlesFromHandleInfos(handles []ir.Handle) string {
 	return buildRawHandleImpl(handles, "zx_handle_t", ".handle")
 }
 
-func BuildRawHandleInfos(handles []gidlir.Handle) string {
+func BuildRawHandleInfos(handles []ir.Handle) string {
 	return buildRawHandleImpl(handles, "zx_handle_info_t", "")
 }
 
-func BuildRawHandleDispositions(handle_dispositions []gidlir.HandleDisposition) string {
+func BuildRawHandleDispositions(handle_dispositions []ir.HandleDisposition) string {
 	if len(handle_dispositions) == 0 {
 		return fmt.Sprintf("std::vector<zx_handle_disposition_t>{}")
 	}
@@ -410,7 +410,7 @@ func BuildRawHandleDispositions(handle_dispositions []gidlir.HandleDisposition) 
 	return builder.String()
 }
 
-func buildHandles(handles []gidlir.Handle, handleExtractOp string) string {
+func buildHandles(handles []ir.Handle, handleExtractOp string) string {
 	if len(handles) == 0 {
 		return "std::vector<zx::handle>{}"
 	}

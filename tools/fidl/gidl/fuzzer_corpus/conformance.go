@@ -12,8 +12,8 @@ import (
 	"fmt"
 	"path"
 
-	gidlconfig "go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
@@ -42,29 +42,29 @@ func prependHeader(body []byte) []byte {
 	return append(header, body...)
 }
 
-func getEncoding(encodings []gidlir.Encoding) (gidlir.Encoding, bool) {
+func getEncoding(encodings []ir.Encoding) (ir.Encoding, bool) {
 	for _, encoding := range encodings {
 		// Only supported encoding wire format: v2.
-		if encoding.WireFormat == gidlir.V2WireFormat {
+		if encoding.WireFormat == ir.V2WireFormat {
 			return encoding, true
 		}
 	}
 
-	return gidlir.Encoding{}, false
+	return ir.Encoding{}, false
 }
 
-func getHandleDispositionEncoding(encodings []gidlir.HandleDispositionEncoding) (gidlir.HandleDispositionEncoding, bool) {
+func getHandleDispositionEncoding(encodings []ir.HandleDispositionEncoding) (ir.HandleDispositionEncoding, bool) {
 	for _, encoding := range encodings {
 		// Only supported encoding wire format: v2.
-		if encoding.WireFormat == gidlir.V2WireFormat {
+		if encoding.WireFormat == ir.V2WireFormat {
 			return encoding, true
 		}
 	}
 
-	return gidlir.HandleDispositionEncoding{}, false
+	return ir.HandleDispositionEncoding{}, false
 }
 
-func getHandleObjectTypes(handles []gidlir.Handle, defs []gidlir.HandleDef) []fidlgen.ObjectType {
+func getHandleObjectTypes(handles []ir.Handle, defs []ir.HandleDef) []fidlgen.ObjectType {
 	var objectTypes []fidlgen.ObjectType
 	for _, h := range handles {
 		objectTypes = append(objectTypes, fidlgen.ObjectTypeFromHandleSubtype(defs[h].Subtype))
@@ -72,7 +72,7 @@ func getHandleObjectTypes(handles []gidlir.Handle, defs []gidlir.HandleDef) []fi
 	return objectTypes
 }
 
-func convertEncodeSuccesses(gtcs []gidlir.EncodeSuccess) []testCase {
+func convertEncodeSuccesses(gtcs []ir.EncodeSuccess) []testCase {
 	var tcs []testCase
 	for _, gtc := range gtcs {
 		encoding, ok := getHandleDispositionEncoding(gtc.Encodings)
@@ -80,7 +80,7 @@ func convertEncodeSuccesses(gtcs []gidlir.EncodeSuccess) []testCase {
 			continue
 		}
 
-		objectTypes := getHandleObjectTypes(gidlir.GetHandlesFromHandleDispositions(encoding.HandleDispositions), gtc.HandleDefs)
+		objectTypes := getHandleObjectTypes(ir.GetHandlesFromHandleDispositions(encoding.HandleDispositions), gtc.HandleDefs)
 
 		tcs = append(tcs, testCase{
 			name:        fmt.Sprintf("EncodeSuccess_%s", gtc.Name),
@@ -97,7 +97,7 @@ func convertEncodeSuccesses(gtcs []gidlir.EncodeSuccess) []testCase {
 	return tcs
 }
 
-func convertDecodeSuccesses(gtcs []gidlir.DecodeSuccess) (tcs []testCase) {
+func convertDecodeSuccesses(gtcs []ir.DecodeSuccess) (tcs []testCase) {
 	for _, gtc := range gtcs {
 		encoding, ok := getEncoding(gtc.Encodings)
 		if !ok {
@@ -121,7 +121,7 @@ func convertDecodeSuccesses(gtcs []gidlir.DecodeSuccess) (tcs []testCase) {
 	return tcs
 }
 
-func convertDecodeFailures(gtcs []gidlir.DecodeFailure) (tcs []testCase) {
+func convertDecodeFailures(gtcs []ir.DecodeFailure) (tcs []testCase) {
 	for _, gtc := range gtcs {
 		encoding, ok := getEncoding(gtc.Encodings)
 		if !ok {
@@ -176,7 +176,7 @@ func writeTestCase(hostDir string, packageDataDir string, tc testCase) (distribu
 	}, err
 }
 
-func GenerateConformanceTests(gidl gidlir.All, _ fidlgen.Root, config gidlconfig.GeneratorConfig) ([]byte, error) {
+func GenerateConformanceTests(gidl ir.All, _ fidlgen.Root, config config.GeneratorConfig) ([]byte, error) {
 	if config.FuzzerCorpusHostDir == "" {
 		return nil, errors.New("Must specify --fuzzer-corpus-host-dir when generating fuzzer_corpus")
 	}

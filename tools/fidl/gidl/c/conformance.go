@@ -10,11 +10,11 @@ import (
 	"fmt"
 	"text/template"
 
-	gidlconfig "go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
 	libhlcpp "go.fuchsia.dev/fuchsia/tools/fidl/gidl/hlcpp"
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
 	libllcpp "go.fuchsia.dev/fuchsia/tools/fidl/gidl/llcpp/lib"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
@@ -49,8 +49,8 @@ type decodeFailureCase struct {
 }
 
 // Generate generates C tests.
-func GenerateConformanceTests(gidl gidlir.All, fidl fidlgen.Root, config gidlconfig.GeneratorConfig) ([]byte, error) {
-	schema := gidlmixer.BuildSchema(fidl)
+func GenerateConformanceTests(gidl ir.All, fidl fidlgen.Root, config config.GeneratorConfig) ([]byte, error) {
+	schema := mixer.BuildSchema(fidl)
 	encodeSuccessCases, err := encodeSuccessCases(gidl.EncodeSuccess, schema)
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func GenerateConformanceTests(gidl gidlir.All, fidl fidlgen.Root, config gidlcon
 	return buf.Bytes(), err
 }
 
-func encodeSuccessCases(gidlEncodeSuccesses []gidlir.EncodeSuccess, schema gidlmixer.Schema) ([]encodeSuccessCase, error) {
+func encodeSuccessCases(gidlEncodeSuccesses []ir.EncodeSuccess, schema mixer.Schema) ([]encodeSuccessCase, error) {
 	var encodeSuccessCases []encodeSuccessCase
 	for _, encodeSuccess := range gidlEncodeSuccesses {
 		decl, err := schema.ExtractDeclarationEncodeSuccess(encodeSuccess.Value, encodeSuccess.HandleDefs)
@@ -105,7 +105,7 @@ func encodeSuccessCases(gidlEncodeSuccesses []gidlir.EncodeSuccess, schema gidlm
 	return encodeSuccessCases, nil
 }
 
-func decodeSuccessCases(gidlDecodeSuccesses []gidlir.DecodeSuccess, schema gidlmixer.Schema) ([]decodeSuccessCase, error) {
+func decodeSuccessCases(gidlDecodeSuccesses []ir.DecodeSuccess, schema mixer.Schema) ([]decodeSuccessCase, error) {
 	var decodeSuccessCases []decodeSuccessCase
 	for _, decodeSuccess := range gidlDecodeSuccesses {
 		decl, err := schema.ExtractDeclaration(decodeSuccess.Value, decodeSuccess.HandleDefs)
@@ -131,7 +131,7 @@ func decodeSuccessCases(gidlDecodeSuccesses []gidlir.DecodeSuccess, schema gidlm
 				HandleKoidVectorName: handleKoidVectorName,
 				ValueBuild:           valueBuild,
 				ValueVar:             valueVar,
-				ValueType:            libllcpp.ConformanceType(gidlir.TypeFromValue(decodeSuccess.Value)),
+				ValueType:            libllcpp.ConformanceType(ir.TypeFromValue(decodeSuccess.Value)),
 				Equality:             equality,
 				Bytes:                libhlcpp.BuildBytes(encoding.Bytes),
 				Handles:              libhlcpp.BuildRawHandleInfos(encoding.Handles),
@@ -143,7 +143,7 @@ func decodeSuccessCases(gidlDecodeSuccesses []gidlir.DecodeSuccess, schema gidlm
 	return decodeSuccessCases, nil
 }
 
-func decodeFailureCases(gidlDecodeFailurees []gidlir.DecodeFailure, schema gidlmixer.Schema) ([]decodeFailureCase, error) {
+func decodeFailureCases(gidlDecodeFailurees []ir.DecodeFailure, schema mixer.Schema) ([]decodeFailureCase, error) {
 	var decodeFailureCases []decodeFailureCase
 	for _, decodeFailure := range gidlDecodeFailurees {
 		decl, err := schema.ExtractDeclarationByName(decodeFailure.Type)
@@ -176,45 +176,45 @@ func decodeFailureCases(gidlDecodeFailurees []gidlir.DecodeFailure, schema gidlm
 	return decodeFailureCases, nil
 }
 
-func wireFormatSupported(wireFormat gidlir.WireFormat) bool {
-	return wireFormat == gidlir.V2WireFormat
+func wireFormatSupported(wireFormat ir.WireFormat) bool {
+	return wireFormat == ir.V2WireFormat
 }
 
-func testCaseName(baseName string, wireFormat gidlir.WireFormat) string {
+func testCaseName(baseName string, wireFormat ir.WireFormat) string {
 	return fmt.Sprintf("%s_%s", baseName, fidlgen.ToUpperCamelCase(wireFormat.String()))
 }
 
-func wireFormatName(wireFormat gidlir.WireFormat) string {
+func wireFormatName(wireFormat ir.WireFormat) string {
 	return fmt.Sprintf("FIDL_WIRE_FORMAT_VERSION_%s", fidlgen.ToUpperCamelCase(wireFormat.String()))
 }
 
-func containsUnionOrTable(decl gidlmixer.Declaration) bool {
+func containsUnionOrTable(decl mixer.Declaration) bool {
 	return containsUnionOrTableInternal(decl, 0)
 }
 
-func containsUnionOrTableInternal(decl gidlmixer.Declaration, depth int) bool {
+func containsUnionOrTableInternal(decl mixer.Declaration, depth int) bool {
 	if depth > 32 {
 		return false
 	}
 	switch decl := decl.(type) {
-	case *gidlmixer.TableDecl, *gidlmixer.UnionDecl:
+	case *mixer.TableDecl, *mixer.UnionDecl:
 		return true
-	case *gidlmixer.StructDecl:
+	case *mixer.StructDecl:
 		for _, fieldName := range decl.FieldNames() {
 			if containsUnionOrTableInternal(decl.Field(fieldName), depth+1) {
 				return true
 			}
 		}
 		return false
-	case gidlmixer.ListDeclaration:
+	case mixer.ListDeclaration:
 		return containsUnionOrTableInternal(decl.Elem(), depth+1)
 	default:
 		return false
 	}
 }
 
-func cErrorCode(code gidlir.ErrorCode) string {
-	if code == gidlir.TooFewBytesInPrimaryObject {
+func cErrorCode(code ir.ErrorCode) string {
+	if code == ir.TooFewBytesInPrimaryObject {
 		return "ZX_ERR_BUFFER_TOO_SMALL"
 	}
 	// TODO(fxbug.dev/35381) Implement different codes for different FIDL error cases.

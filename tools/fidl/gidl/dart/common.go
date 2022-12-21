@@ -9,12 +9,12 @@ import (
 	"strconv"
 	"strings"
 
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
-func buildHandleDefs(defs []gidlir.HandleDef) string {
+func buildHandleDefs(defs []ir.HandleDef) string {
 	if len(defs) == 0 {
 		return ""
 	}
@@ -37,7 +37,7 @@ func buildHandleDefs(defs []gidlir.HandleDef) string {
 	return builder.String()
 }
 
-func buildHandleValues(handles []gidlir.Handle) string {
+func buildHandleValues(handles []ir.Handle) string {
 	var builder strings.Builder
 	builder.WriteString("[\n")
 	for _, h := range handles {
@@ -47,14 +47,14 @@ func buildHandleValues(handles []gidlir.Handle) string {
 	return builder.String()
 }
 
-func buildUnknownTableData(fields []gidlir.Field) string {
+func buildUnknownTableData(fields []ir.Field) string {
 	if len(fields) == 0 {
 		return "null"
 	}
 	var builder strings.Builder
 	builder.WriteString("{\n")
 	for _, field := range fields {
-		unknownData := field.Value.(gidlir.UnknownData)
+		unknownData := field.Value.(ir.UnknownData)
 		builder.WriteString(fmt.Sprintf(
 			"%d: fidl.UnknownRawData(\n%s,\n%s\n),",
 			field.Key.UnknownOrdinal,
@@ -65,19 +65,19 @@ func buildUnknownTableData(fields []gidlir.Field) string {
 	return builder.String()
 }
 
-func visit(value gidlir.Value, decl gidlmixer.Declaration) string {
+func visit(value ir.Value, decl mixer.Declaration) string {
 	switch value := value.(type) {
 	case bool:
 		return strconv.FormatBool(value)
 	case int64, uint64, float64:
 		switch decl := decl.(type) {
-		case *gidlmixer.IntegerDecl, *gidlmixer.FloatDecl:
+		case *mixer.IntegerDecl, *mixer.FloatDecl:
 			return fmt.Sprintf("%#v", value)
-		case gidlmixer.NamedDeclaration:
+		case mixer.NamedDeclaration:
 			return fmt.Sprintf("%s.ctor(%#v)", typeName(decl), value)
 		}
-	case gidlir.RawFloat:
-		switch decl.(*gidlmixer.FloatDecl).Subtype() {
+	case ir.RawFloat:
+		switch decl.(*mixer.FloatDecl).Subtype() {
 		case fidlgen.Float32:
 			return fmt.Sprintf("Uint32List.fromList([%#x]).buffer.asByteData().getFloat32(0, Endian.host)", value)
 		case fidlgen.Float64:
@@ -85,9 +85,9 @@ func visit(value gidlir.Value, decl gidlmixer.Declaration) string {
 		}
 	case string:
 		return toDartStr(value)
-	case gidlir.HandleWithRights:
+	case ir.HandleWithRights:
 		rawHandle := buildHandleValue(value.Handle)
-		handleDecl := decl.(*gidlmixer.HandleDecl)
+		handleDecl := decl.(*mixer.HandleDecl)
 		switch handleDecl.Subtype() {
 		case fidlgen.HandleSubtypeNone:
 			return rawHandle
@@ -99,25 +99,25 @@ func visit(value gidlir.Value, decl gidlmixer.Declaration) string {
 		default:
 			panic(fmt.Sprintf("unknown handle subtype: %v", handleDecl.Subtype()))
 		}
-	case gidlir.Record:
+	case ir.Record:
 		switch decl := decl.(type) {
-		case *gidlmixer.StructDecl:
+		case *mixer.StructDecl:
 			return onRecord(value, decl)
-		case *gidlmixer.TableDecl:
+		case *mixer.TableDecl:
 			return onRecord(value, decl)
-		case *gidlmixer.UnionDecl:
+		case *mixer.UnionDecl:
 			return onUnion(value, decl)
 		}
-	case []gidlir.Value:
+	case []ir.Value:
 		switch decl := decl.(type) {
-		case *gidlmixer.ArrayDecl:
+		case *mixer.ArrayDecl:
 			return onList(value, decl)
-		case *gidlmixer.VectorDecl:
+		case *mixer.VectorDecl:
 			return onList(value, decl)
 		}
 	case nil:
 		if !decl.IsNullable() {
-			if _, ok := decl.(*gidlmixer.HandleDecl); ok {
+			if _, ok := decl.(*mixer.HandleDecl); ok {
 				return "Handle.invalid()"
 			}
 			panic(fmt.Sprintf("got nil for non-nullable type: %T", decl))
@@ -127,9 +127,9 @@ func visit(value gidlir.Value, decl gidlmixer.Declaration) string {
 	panic(fmt.Sprintf("not implemented: %T", value))
 }
 
-func onRecord(value gidlir.Record, decl gidlmixer.RecordDeclaration) string {
+func onRecord(value ir.Record, decl mixer.RecordDeclaration) string {
 	var args []string
-	var unknownTableFields []gidlir.Field
+	var unknownTableFields []ir.Field
 	for _, field := range value.Fields {
 		if field.Key.IsUnknown() {
 			unknownTableFields = append(unknownTableFields, field)
@@ -145,10 +145,10 @@ func onRecord(value gidlir.Record, decl gidlmixer.RecordDeclaration) string {
 	return fmt.Sprintf("%s(%s)", fidlgen.ToUpperCamelCase(value.Name), strings.Join(args, ", "))
 }
 
-func onUnion(value gidlir.Record, decl *gidlmixer.UnionDecl) string {
+func onUnion(value ir.Record, decl *mixer.UnionDecl) string {
 	for _, field := range value.Fields {
 		if field.Key.IsUnknown() {
-			unknownData := field.Value.(gidlir.UnknownData)
+			unknownData := field.Value.(ir.UnknownData)
 			return fmt.Sprintf(
 				"%s.with$UnknownData(%d, fidl.UnknownRawData(%s, %s))",
 				value.Name,
@@ -163,29 +163,29 @@ func onUnion(value gidlir.Record, decl *gidlmixer.UnionDecl) string {
 	panic("unions must have a value set")
 }
 
-func onList(value []gidlir.Value, decl gidlmixer.ListDeclaration) string {
+func onList(value []ir.Value, decl mixer.ListDeclaration) string {
 	var elements []string
 	elemDecl := decl.Elem()
 	for _, item := range value {
 		elements = append(elements, visit(item, elemDecl))
 	}
-	if integerDecl, ok := elemDecl.(*gidlmixer.IntegerDecl); ok {
+	if integerDecl, ok := elemDecl.(*mixer.IntegerDecl); ok {
 		typeName := fidlgen.ToUpperCamelCase(string(integerDecl.Subtype()))
 		return fmt.Sprintf("%sList.fromList([%s])", typeName, strings.Join(elements, ", "))
 	}
-	if floatDecl, ok := elemDecl.(*gidlmixer.FloatDecl); ok {
+	if floatDecl, ok := elemDecl.(*mixer.FloatDecl); ok {
 		typeName := fidlgen.ToUpperCamelCase(string(floatDecl.Subtype()))
 		return fmt.Sprintf("%sList.fromList([%s])", typeName, strings.Join(elements, ", "))
 	}
 	return fmt.Sprintf("[%s]", strings.Join(elements, ", "))
 }
 
-func typeName(decl gidlmixer.NamedDeclaration) string {
+func typeName(decl mixer.NamedDeclaration) string {
 	parts := strings.Split(decl.Name(), "/")
 	lastPart := parts[len(parts)-1]
 	return dartTypeName(lastPart)
 }
 
-func buildHandleValue(handle gidlir.Handle) string {
+func buildHandleValue(handle ir.Handle) string {
 	return fmt.Sprintf("handles[%d]", handle)
 }

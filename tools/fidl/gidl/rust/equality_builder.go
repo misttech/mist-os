@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"strings"
 
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
-func buildEqualityCheck(actualExpr string, expectedValue gidlir.Value, decl gidlmixer.Declaration) string {
+func buildEqualityCheck(actualExpr string, expectedValue ir.Value, decl mixer.Declaration) string {
 	if canAssertEq(expectedValue) {
 		// Asserting on the entire value is a special case because otherwise
 		// there are errors about comparing T and &T.
@@ -25,24 +25,24 @@ func buildEqualityCheck(actualExpr string, expectedValue gidlir.Value, decl gidl
 }
 
 // Returns true if the value can be tested with a single `assert_eq!`.
-func canAssertEq(value gidlir.Value) bool {
+func canAssertEq(value ir.Value) bool {
 	switch value := value.(type) {
 	case nil, string, bool, int64, uint64, float64:
 		return true
-	case gidlir.RawFloat:
+	case ir.RawFloat:
 		return false
-	case gidlir.HandleWithRights:
+	case ir.HandleWithRights:
 		return false
-	case gidlir.UnknownData:
+	case ir.UnknownData:
 		return false
-	case []gidlir.Value:
+	case []ir.Value:
 		for _, elem := range value {
 			if !canAssertEq(elem) {
 				return false
 			}
 		}
 		return true
-	case gidlir.Record:
+	case ir.Record:
 		for _, field := range value.Fields {
 			if !canAssertEq(field.Value) {
 				return false
@@ -62,7 +62,7 @@ func (b *equalityCheckBuilder) write(format string, args ...interface{}) {
 	b.WriteRune('\n')
 }
 
-func (b *equalityCheckBuilder) visit(expr string, value gidlir.Value, decl gidlmixer.Declaration) {
+func (b *equalityCheckBuilder) visit(expr string, value ir.Value, decl mixer.Declaration) {
 	if canAssertEq(value) {
 		b.write("assert_eq!(%s, %s);", expr, visit(value, decl))
 		return
@@ -70,15 +70,15 @@ func (b *equalityCheckBuilder) visit(expr string, value gidlir.Value, decl gidlm
 	if decl.IsNullable() {
 		// Unwrap the Option<...>.
 		expr = fmt.Sprintf("%s.as_ref().unwrap()", expr)
-		if _, ok := value.(gidlir.Record); ok {
+		if _, ok := value.(ir.Record); ok {
 			// Unwrap again for Option<Box<...>>.
 			expr = fmt.Sprintf("%s.as_ref()", expr)
 		}
 	}
 	switch value := value.(type) {
-	case gidlir.RawFloat:
+	case ir.RawFloat:
 		b.write("assert_eq!(%s.to_bits(), 0x%x)", expr, value)
-	case gidlir.HandleWithRights:
+	case ir.HandleWithRights:
 		assertType := ""
 		if value.Type != fidlgen.ObjectTypeNone {
 			assertType = fmt.Sprintf("assert_eq!(info.object_type, %d);", value.Type)
@@ -97,25 +97,25 @@ match %s.basic_info() {
 	Err(e) => panic!("handle basic_info failed: {}", e),
 }
 `, expr, value.Handle, assertType, assertRights)
-	case []gidlir.Value:
-		elemDecl := decl.(gidlmixer.ListDeclaration).Elem()
+	case []ir.Value:
+		elemDecl := decl.(mixer.ListDeclaration).Elem()
 		for i, elem := range value {
 			b.visit(fmt.Sprintf("%s[%d]", expr, i), elem, elemDecl)
 		}
-	case gidlir.Record:
+	case ir.Record:
 		switch decl := decl.(type) {
-		case *gidlmixer.StructDecl:
+		case *mixer.StructDecl:
 			for _, field := range value.Fields {
 				b.visit(fmt.Sprintf("%s.%s", expr, field.Key.Name), field.Value, decl.Field(field.Key.Name))
 			}
-		case *gidlmixer.TableDecl:
+		case *mixer.TableDecl:
 			for _, field := range value.Fields {
 				b.visit(fmt.Sprintf("%s.%s.as_ref().unwrap()", expr, field.Key.Name), field.Value, decl.Field(field.Key.Name))
 			}
-		case *gidlmixer.UnionDecl:
+		case *mixer.UnionDecl:
 			field := value.Fields[0]
 			if field.Key.IsUnknown() {
-				unknownData := field.Value.(gidlir.UnknownData)
+				unknownData := field.Value.(ir.UnknownData)
 				if unknownData.HasData() {
 					panic(fmt.Sprintf("union %s: unknown ordinal %d: Rust cannot construct union with unknown bytes/handles",
 						decl.Name(), field.Key.UnknownOrdinal))

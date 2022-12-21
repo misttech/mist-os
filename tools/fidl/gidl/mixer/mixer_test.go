@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
@@ -60,8 +60,8 @@ func checkStruct(t *testing.T, decl *StructDecl, expectedName string, expectedNu
 	}
 }
 
-func defaultMetadataForHandle(h gidlir.Handle) gidlir.HandleWithRights {
-	return gidlir.HandleWithRights{
+func defaultMetadataForHandle(h ir.Handle) ir.HandleWithRights {
+	return ir.HandleWithRights{
 		Handle: h,
 		Type:   fidlgen.ObjectTypeNone,
 		Rights: fidlgen.HandleRightsSameRights,
@@ -106,10 +106,10 @@ func TestLookupDeclByTypeSuccess(t *testing.T) {
 }
 
 func TestExtractDeclarationSuccess(t *testing.T) {
-	value := gidlir.Record{
+	value := ir.Record{
 		Name: "ExampleStruct",
-		Fields: []gidlir.Field{
-			{Key: gidlir.FieldKey{Name: "s"}, Value: "foo"},
+		Fields: []ir.Field{
+			{Key: ir.FieldKey{Name: "s"}, Value: "foo"},
 		},
 	}
 	decl, err := testSchema(t).ExtractDeclaration(value, nil)
@@ -120,9 +120,9 @@ func TestExtractDeclarationSuccess(t *testing.T) {
 }
 
 func TestExtractDeclarationNotDefined(t *testing.T) {
-	value := gidlir.Record{
+	value := ir.Record{
 		Name:   "ThisIsNotAStruct",
-		Fields: []gidlir.Field{},
+		Fields: []ir.Field{},
 	}
 	decl, err := testSchema(t).ExtractDeclaration(value, nil)
 	if err == nil {
@@ -134,10 +134,10 @@ func TestExtractDeclarationNotDefined(t *testing.T) {
 }
 
 func TestExtractDeclarationDoesNotConform(t *testing.T) {
-	value := gidlir.Record{
+	value := ir.Record{
 		Name: "ExampleStruct",
-		Fields: []gidlir.Field{
-			{Key: gidlir.FieldKey{Name: "ThisIsNotAField"}, Value: "foo"},
+		Fields: []ir.Field{
+			{Key: ir.FieldKey{Name: "ThisIsNotAField"}, Value: "foo"},
 		},
 	}
 	decl, err := testSchema(t).ExtractDeclaration(value, nil)
@@ -150,15 +150,15 @@ func TestExtractDeclarationDoesNotConform(t *testing.T) {
 }
 
 func TestExtractDeclarationWrongHandleTypeFailure(t *testing.T) {
-	value := gidlir.Record{
+	value := ir.Record{
 		Name: "ExampleHandleStruct",
-		Fields: []gidlir.Field{
+		Fields: []ir.Field{
 			{
-				Key: gidlir.FieldKey{
+				Key: ir.FieldKey{
 					Name:           "channel",
 					UnknownOrdinal: 1,
 				},
-				Value: gidlir.HandleWithRights{
+				Value: ir.HandleWithRights{
 					Handle: 0,
 					Type:   fidlgen.ObjectTypeChannel,
 					Rights: fidlgen.HandleRightsDuplicate,
@@ -166,7 +166,7 @@ func TestExtractDeclarationWrongHandleTypeFailure(t *testing.T) {
 			},
 		},
 	}
-	handleDefs := []gidlir.HandleDef{
+	handleDefs := []ir.HandleDef{
 		{
 			Subtype: fidlgen.HandleSubtypeFifo,
 			Rights:  fidlgen.HandleRightsTransfer,
@@ -182,15 +182,15 @@ func TestExtractDeclarationWrongHandleTypeFailure(t *testing.T) {
 }
 
 func TestExtractDeclarationEncodeSuccessWrongHandleTypeSuccess(t *testing.T) {
-	value := gidlir.Record{
+	value := ir.Record{
 		Name: "ExampleHandleStruct",
-		Fields: []gidlir.Field{
+		Fields: []ir.Field{
 			{
-				Key: gidlir.FieldKey{
+				Key: ir.FieldKey{
 					Name:           "channel",
 					UnknownOrdinal: 1,
 				},
-				Value: gidlir.HandleWithRights{
+				Value: ir.HandleWithRights{
 					Handle: 0,
 					Type:   fidlgen.ObjectTypeChannel,
 					Rights: fidlgen.HandleRightsDuplicate,
@@ -198,7 +198,7 @@ func TestExtractDeclarationEncodeSuccessWrongHandleTypeSuccess(t *testing.T) {
 			},
 		},
 	}
-	handleDefs := []gidlir.HandleDef{
+	handleDefs := []ir.HandleDef{
 		{
 			Subtype: fidlgen.HandleSubtypeFifo,
 			Rights:  fidlgen.HandleRightsTransfer,
@@ -212,10 +212,10 @@ func TestExtractDeclarationEncodeSuccessWrongHandleTypeSuccess(t *testing.T) {
 }
 
 func TestExtractDeclarationUnsafeSuccess(t *testing.T) {
-	value := gidlir.Record{
+	value := ir.Record{
 		Name: "ExampleStruct",
-		Fields: []gidlir.Field{
-			{Key: gidlir.FieldKey{Name: "ThisIsNotAField"}, Value: "foo"},
+		Fields: []ir.Field{
+			{Key: ir.FieldKey{Name: "ThisIsNotAField"}, Value: "foo"},
 		},
 	}
 	decl, err := testSchema(t).ExtractDeclarationUnsafe(value)
@@ -235,19 +235,19 @@ func TestExtractDeclarationByNameSuccess(t *testing.T) {
 
 // conformTest describes a test case for the Declaration.conforms method.
 type conformTest interface {
-	value() gidlir.Value
+	value() ir.Value
 }
 
 type conformOk struct {
-	val gidlir.Value
+	val ir.Value
 }
 type conformFail struct {
-	val          gidlir.Value
+	val          ir.Value
 	errSubstring string
 }
 
-func (c conformOk) value() gidlir.Value   { return c.val }
-func (c conformFail) value() gidlir.Value { return c.val }
+func (c conformOk) value() ir.Value   { return c.val }
+func (c conformFail) value() ir.Value { return c.val }
 
 // checkConforms is a helper function to test the Declaration.conforms method.
 func checkConforms(t *testing.T, ctx context, decl Declaration, tests []conformTest) {
@@ -330,7 +330,7 @@ func TestFloatDeclConforms(t *testing.T) {
 		conformOk{0.0},
 		conformOk{1.5},
 		conformOk{-1.0},
-		conformOk{gidlir.RawFloat(0)},
+		conformOk{ir.RawFloat(0)},
 		conformFail{nil, "expecting float64"},
 		conformFail{float32(0.0), "expecting float64"},
 		conformFail{0, "expecting float64"},
@@ -341,14 +341,14 @@ func TestFloatDeclConforms(t *testing.T) {
 	}
 	tests32 := []conformTest{
 		conformOk{math.MaxFloat32},
-		conformOk{gidlir.RawFloat(math.Float32bits(float32(math.Inf(1))))},
-		conformOk{gidlir.RawFloat(math.Float32bits(float32(math.NaN())))},
-		conformFail{gidlir.RawFloat(0x1122334455), "out of range"},
+		conformOk{ir.RawFloat(math.Float32bits(float32(math.Inf(1))))},
+		conformOk{ir.RawFloat(math.Float32bits(float32(math.NaN())))},
+		conformFail{ir.RawFloat(0x1122334455), "out of range"},
 	}
 	tests64 := []conformTest{
 		conformOk{math.MaxFloat64},
-		conformOk{gidlir.RawFloat(math.Float64bits(math.Inf(1)))},
-		conformOk{gidlir.RawFloat(math.Float64bits(math.NaN()))},
+		conformOk{ir.RawFloat(math.Float64bits(math.Inf(1)))},
+		conformOk{ir.RawFloat(math.Float64bits(math.NaN()))},
 	}
 	checkConforms(t, context{}, &FloatDecl{subtype: fidlgen.Float32}, append(tests, tests32...))
 	checkConforms(t, context{}, &FloatDecl{subtype: fidlgen.Float64}, append(tests, tests64...))
@@ -422,7 +422,7 @@ func TestHandleDeclConforms(t *testing.T) {
 	// The FIDL type `handle` is compatible with all subtypes.
 	checkConforms(t,
 		context{
-			handleDefs: []gidlir.HandleDef{
+			handleDefs: []ir.HandleDef{
 				{Subtype: fidlgen.HandleSubtypeEvent}, // #0
 				{Subtype: fidlgen.HandleSubtypePort},  // #1
 				{Subtype: fidlgen.HandleSubtypeEvent}, // #2
@@ -455,7 +455,7 @@ func TestHandleDeclConforms(t *testing.T) {
 	// The FIDL type `handle<event>` requires an event.
 	checkConforms(t,
 		context{
-			handleDefs: []gidlir.HandleDef{
+			handleDefs: []ir.HandleDef{
 				{Subtype: fidlgen.HandleSubtypeEvent}, // #0
 				{Subtype: fidlgen.HandleSubtypePort},  // #1
 				{Subtype: fidlgen.HandleSubtypeEvent}, // #2
@@ -489,7 +489,7 @@ func TestHandleDeclConforms(t *testing.T) {
 	// The FIDL type `handle<port>?` requires an event or nil.
 	checkConforms(t,
 		context{
-			handleDefs: []gidlir.HandleDef{
+			handleDefs: []ir.HandleDef{
 				{Subtype: fidlgen.HandleSubtypeEvent}, // #0
 				{Subtype: fidlgen.HandleSubtypePort},  // #1
 				{Subtype: fidlgen.HandleSubtypeEvent}, // #2
@@ -530,7 +530,7 @@ func TestProtocolEndpointConforms(t *testing.T) {
 	structDecl := decl.(*StructDecl)
 	checkConforms(t,
 		context{
-			handleDefs: []gidlir.HandleDef{
+			handleDefs: []ir.HandleDef{
 				{Subtype: fidlgen.HandleSubtypeChannel}, // #0
 				{Subtype: fidlgen.HandleSubtypeChannel}, // #1
 				{Subtype: fidlgen.HandleSubtypeChannel}, // #2
@@ -539,46 +539,46 @@ func TestProtocolEndpointConforms(t *testing.T) {
 		},
 		structDecl,
 		[]conformTest{
-			conformOk{gidlir.Record{
+			conformOk{ir.Record{
 				Name: "ExampleEndpointStruct",
-				Fields: []gidlir.Field{
+				Fields: []ir.Field{
 					{
-						Key: gidlir.FieldKey{
+						Key: ir.FieldKey{
 							Name: "client_end",
 						},
 						Value: defaultMetadataForHandle(0),
 					},
 					{
-						Key: gidlir.FieldKey{
+						Key: ir.FieldKey{
 							Name: "optional_client_end",
 						},
 						Value: defaultMetadataForHandle(1),
 					},
 					{
-						Key: gidlir.FieldKey{
+						Key: ir.FieldKey{
 							Name: "server_end",
 						},
 						Value: defaultMetadataForHandle(2),
 					},
 					{
-						Key: gidlir.FieldKey{
+						Key: ir.FieldKey{
 							Name: "optional_server_end",
 						},
 						Value: defaultMetadataForHandle(3),
 					},
 				},
 			}},
-			conformOk{gidlir.Record{
+			conformOk{ir.Record{
 				Name: "ExampleEndpointStruct",
-				Fields: []gidlir.Field{
+				Fields: []ir.Field{
 					{
-						Key: gidlir.FieldKey{
+						Key: ir.FieldKey{
 							Name: "client_end",
 						},
 						Value: defaultMetadataForHandle(0),
 					},
 					{
-						Key: gidlir.FieldKey{
+						Key: ir.FieldKey{
 							Name: "server_end",
 						},
 						Value: defaultMetadataForHandle(2),
@@ -586,11 +586,11 @@ func TestProtocolEndpointConforms(t *testing.T) {
 				},
 			}},
 			conformFail{
-				gidlir.Record{
+				ir.Record{
 					Name: "ExampleEndpointStruct",
-					Fields: []gidlir.Field{
+					Fields: []ir.Field{
 						{
-							Key: gidlir.FieldKey{
+							Key: ir.FieldKey{
 								Name: "client_end",
 							},
 							Value: defaultMetadataForHandle(0),
@@ -602,7 +602,7 @@ func TestProtocolEndpointConforms(t *testing.T) {
 	)
 	checkConforms(t,
 		context{
-			handleDefs: []gidlir.HandleDef{
+			handleDefs: []ir.HandleDef{
 				{Subtype: fidlgen.HandleSubtypeChannel}, // #0
 				{Subtype: fidlgen.HandleSubtypeChannel}, // #1
 				{Subtype: fidlgen.HandleSubtypeEvent},   // #2
@@ -611,17 +611,17 @@ func TestProtocolEndpointConforms(t *testing.T) {
 		},
 		structDecl,
 		[]conformTest{
-			conformFail{gidlir.Record{
+			conformFail{ir.Record{
 				Name: "ExampleEndpointStruct",
-				Fields: []gidlir.Field{
+				Fields: []ir.Field{
 					{
-						Key: gidlir.FieldKey{
+						Key: ir.FieldKey{
 							Name: "client_end",
 						},
 						Value: defaultMetadataForHandle(0),
 					},
 					{
-						Key: gidlir.FieldKey{
+						Key: ir.FieldKey{
 							Name: "server_end",
 						},
 						Value: defaultMetadataForHandle(2),
@@ -760,22 +760,22 @@ func TestStructDeclConformsNonNullable(t *testing.T) {
 		context{},
 		structDecl,
 		[]conformTest{
-			conformOk{gidlir.Record{
+			conformOk{ir.Record{
 				Name: "ExampleStruct",
-				Fields: []gidlir.Field{
-					{Key: gidlir.FieldKey{Name: "s"}, Value: "foo"},
+				Fields: []ir.Field{
+					{Key: ir.FieldKey{Name: "s"}, Value: "foo"},
 				},
 			}},
-			conformFail{gidlir.Record{
+			conformFail{ir.Record{
 				Name: "ExampleStruct",
-				Fields: []gidlir.Field{
-					{Key: gidlir.FieldKey{Name: "DefinitelyNotS"}, Value: "foo"},
+				Fields: []ir.Field{
+					{Key: ir.FieldKey{Name: "DefinitelyNotS"}, Value: "foo"},
 				},
 			}, "field DefinitelyNotS: unknown"},
-			conformFail{gidlir.Record{
+			conformFail{ir.Record{
 				Name: "DefinitelyNotExampleStruct",
-				Fields: []gidlir.Field{
-					{Key: gidlir.FieldKey{Name: "s"}, Value: "foo"},
+				Fields: []ir.Field{
+					{Key: ir.FieldKey{Name: "s"}, Value: "foo"},
 				},
 			}, "expecting struct test.mixer/ExampleStruct"},
 			conformFail{nil, "expecting non-null struct"},
@@ -795,10 +795,10 @@ func TestStructDeclConformsNullable(t *testing.T) {
 		context{},
 		structDecl,
 		[]conformTest{
-			conformOk{gidlir.Record{
+			conformOk{ir.Record{
 				Name: "ExampleStruct",
-				Fields: []gidlir.Field{
-					{Key: gidlir.FieldKey{Name: "s"}, Value: "foo"},
+				Fields: []ir.Field{
+					{Key: ir.FieldKey{Name: "s"}, Value: "foo"},
 				},
 			}},
 			conformOk{nil},
@@ -816,52 +816,52 @@ func TestTableDeclConforms(t *testing.T) {
 		context{},
 		tableDecl,
 		[]conformTest{
-			conformOk{gidlir.Record{
+			conformOk{ir.Record{
 				Name: "ExampleTable",
-				Fields: []gidlir.Field{
-					{Key: gidlir.FieldKey{Name: "s"}, Value: "foo"},
+				Fields: []ir.Field{
+					{Key: ir.FieldKey{Name: "s"}, Value: "foo"},
 				},
 			}},
-			conformOk{gidlir.Record{
+			conformOk{ir.Record{
 				Name: "ExampleTable",
-				Fields: []gidlir.Field{
+				Fields: []ir.Field{
 					{
 						// 2 is a reserved field
-						Key:   gidlir.FieldKey{UnknownOrdinal: 2},
-						Value: gidlir.UnknownData{},
+						Key:   ir.FieldKey{UnknownOrdinal: 2},
+						Value: ir.UnknownData{},
 					},
 				},
 			}},
-			conformOk{gidlir.Record{
+			conformOk{ir.Record{
 				Name: "ExampleTable",
-				Fields: []gidlir.Field{
+				Fields: []ir.Field{
 					{
 						// 3 is an unknown field
-						Key:   gidlir.FieldKey{UnknownOrdinal: 3},
-						Value: gidlir.UnknownData{},
+						Key:   ir.FieldKey{UnknownOrdinal: 3},
+						Value: ir.UnknownData{},
 					},
 				},
 			}},
-			conformFail{gidlir.Record{
+			conformFail{ir.Record{
 				Name: "ExampleTable",
-				Fields: []gidlir.Field{
+				Fields: []ir.Field{
 					{
 						// 1 is a known field
-						Key:   gidlir.FieldKey{UnknownOrdinal: 1},
-						Value: gidlir.UnknownData{},
+						Key:   ir.FieldKey{UnknownOrdinal: 1},
+						Value: ir.UnknownData{},
 					},
 				},
 			}, "field name must be used rather than ordinal 1"},
-			conformFail{gidlir.Record{
+			conformFail{ir.Record{
 				Name: "ExampleTable",
-				Fields: []gidlir.Field{
-					{Key: gidlir.FieldKey{Name: "DefinitelyNotS"}, Value: "foo"},
+				Fields: []ir.Field{
+					{Key: ir.FieldKey{Name: "DefinitelyNotS"}, Value: "foo"},
 				},
 			}, "field DefinitelyNotS: unknown"},
-			conformFail{gidlir.Record{
+			conformFail{ir.Record{
 				Name: "DefinitelyNotExampleTable",
-				Fields: []gidlir.Field{
-					{Key: gidlir.FieldKey{Name: "s"}, Value: "foo"},
+				Fields: []ir.Field{
+					{Key: ir.FieldKey{Name: "s"}, Value: "foo"},
 				},
 			}, "expecting table test.mixer/ExampleTable"},
 			conformFail{nil, "expecting non-null table"},
@@ -881,39 +881,39 @@ func TestFlexibleUnionDeclConformsNonNullable(t *testing.T) {
 		context{},
 		unionDecl,
 		[]conformTest{
-			conformOk{gidlir.Record{
+			conformOk{ir.Record{
 				Name: "ExampleFlexibleUnion",
-				Fields: []gidlir.Field{
-					{Key: gidlir.FieldKey{Name: "s"}, Value: "foo"},
+				Fields: []ir.Field{
+					{Key: ir.FieldKey{Name: "s"}, Value: "foo"},
 				},
 			}},
-			conformOk{gidlir.Record{
+			conformOk{ir.Record{
 				Name: "ExampleFlexibleUnion",
-				Fields: []gidlir.Field{
+				Fields: []ir.Field{
 					{
-						Key:   gidlir.FieldKey{UnknownOrdinal: 2},
-						Value: gidlir.UnknownData{},
+						Key:   ir.FieldKey{UnknownOrdinal: 2},
+						Value: ir.UnknownData{},
 					},
 				},
 			}},
-			conformFail{gidlir.Record{
+			conformFail{ir.Record{
 				Name: "ExampleFlexibleUnion",
-				Fields: []gidlir.Field{
-					{Key: gidlir.FieldKey{Name: "DefinitelyNotS"}, Value: "foo"},
+				Fields: []ir.Field{
+					{Key: ir.FieldKey{Name: "DefinitelyNotS"}, Value: "foo"},
 				},
 			}, "field DefinitelyNotS: unknown"},
-			conformFail{gidlir.Record{
+			conformFail{ir.Record{
 				Name: "DefinitelyNotExampleFlexibleUnion",
-				Fields: []gidlir.Field{
-					{Key: gidlir.FieldKey{Name: "s"}, Value: "foo"},
+				Fields: []ir.Field{
+					{Key: ir.FieldKey{Name: "s"}, Value: "foo"},
 				},
 			}, "expecting union test.mixer/ExampleFlexibleUnion"},
-			conformFail{gidlir.Record{
+			conformFail{ir.Record{
 				Name: "ExampleFlexibleUnion",
-				Fields: []gidlir.Field{
+				Fields: []ir.Field{
 					{
-						Key:   gidlir.FieldKey{UnknownOrdinal: 1},
-						Value: gidlir.UnknownData{},
+						Key:   ir.FieldKey{UnknownOrdinal: 1},
+						Value: ir.UnknownData{},
 					},
 				},
 			}, "field name must be used rather than ordinal 1"},
@@ -934,10 +934,10 @@ func TestUnionDeclConformsNullable(t *testing.T) {
 		context{},
 		unionDecl,
 		[]conformTest{
-			conformOk{gidlir.Record{
+			conformOk{ir.Record{
 				Name: "ExampleFlexibleUnion",
-				Fields: []gidlir.Field{
-					{Key: gidlir.FieldKey{Name: "s"}, Value: "foo"},
+				Fields: []ir.Field{
+					{Key: ir.FieldKey{Name: "s"}, Value: "foo"},
 				},
 			}},
 			conformOk{nil},
@@ -955,12 +955,12 @@ func TestStrictUnionConforms(t *testing.T) {
 		context{},
 		unionDecl,
 		[]conformTest{
-			conformFail{gidlir.Record{
+			conformFail{ir.Record{
 				Name: "ExampleStrictUnion",
-				Fields: []gidlir.Field{
+				Fields: []ir.Field{
 					{
-						Key:   gidlir.FieldKey{UnknownOrdinal: 2},
-						Value: gidlir.UnknownData{},
+						Key:   ir.FieldKey{UnknownOrdinal: 2},
+						Value: ir.UnknownData{},
 					},
 				},
 			}, "cannot use unknown ordinal in a strict union"},
@@ -984,12 +984,12 @@ func TestArrayDeclConforms(t *testing.T) {
 			},
 		},
 		[]conformTest{
-			conformOk{[]gidlir.Value{uint64(1), uint64(2)}},
-			conformFail{[]gidlir.Value{}, "expecting 2 elements"},
-			conformFail{[]gidlir.Value{uint64(1)}, "expecting 2 elements"},
-			conformFail{[]gidlir.Value{uint64(1), uint64(1), uint64(1)}, "expecting 2 elements"},
-			conformFail{[]gidlir.Value{"a", "b"}, "[0]: expecting int64 or uint64"},
-			conformFail{[]gidlir.Value{nil, nil}, "[0]: expecting int64 or uint64"},
+			conformOk{[]ir.Value{uint64(1), uint64(2)}},
+			conformFail{[]ir.Value{}, "expecting 2 elements"},
+			conformFail{[]ir.Value{uint64(1)}, "expecting 2 elements"},
+			conformFail{[]ir.Value{uint64(1), uint64(1), uint64(1)}, "expecting 2 elements"},
+			conformFail{[]ir.Value{"a", "b"}, "[0]: expecting int64 or uint64"},
+			conformFail{[]ir.Value{nil, nil}, "[0]: expecting int64 or uint64"},
 		},
 	)
 }
@@ -1010,12 +1010,12 @@ func TestVectorDeclConforms(t *testing.T) {
 			},
 		},
 		[]conformTest{
-			conformOk{[]gidlir.Value{}},
-			conformOk{[]gidlir.Value{uint64(1)}},
-			conformOk{[]gidlir.Value{uint64(1), uint64(2)}},
-			conformFail{[]gidlir.Value{uint64(1), uint64(1), uint64(1)}, "expecting at most 2 elements"},
-			conformFail{[]gidlir.Value{"a", "b"}, "[0]: expecting int64 or uint64"},
-			conformFail{[]gidlir.Value{nil, nil}, "[0]: expecting int64 or uint64"},
+			conformOk{[]ir.Value{}},
+			conformOk{[]ir.Value{uint64(1)}},
+			conformOk{[]ir.Value{uint64(1), uint64(2)}},
+			conformFail{[]ir.Value{uint64(1), uint64(1), uint64(1)}, "expecting at most 2 elements"},
+			conformFail{[]ir.Value{"a", "b"}, "[0]: expecting int64 or uint64"},
+			conformFail{[]ir.Value{nil, nil}, "[0]: expecting int64 or uint64"},
 		},
 	)
 }
@@ -1023,7 +1023,7 @@ func TestVectorDeclConforms(t *testing.T) {
 func TestVectorDeclConformsWithHandles(t *testing.T) {
 	checkConforms(t,
 		context{
-			handleDefs: []gidlir.HandleDef{
+			handleDefs: []ir.HandleDef{
 				{Subtype: fidlgen.HandleSubtypeEvent},
 				{Subtype: fidlgen.HandleSubtypeEvent},
 			},
@@ -1039,24 +1039,24 @@ func TestVectorDeclConformsWithHandles(t *testing.T) {
 			},
 		},
 		[]conformTest{
-			conformOk{[]gidlir.Value{}},
-			conformOk{[]gidlir.Value{defaultMetadataForHandle(0)}},
-			conformOk{[]gidlir.Value{
+			conformOk{[]ir.Value{}},
+			conformOk{[]ir.Value{defaultMetadataForHandle(0)}},
+			conformOk{[]ir.Value{
 				defaultMetadataForHandle(0),
 				defaultMetadataForHandle(1),
 			}},
-			conformOk{[]gidlir.Value{
+			conformOk{[]ir.Value{
 				defaultMetadataForHandle(1),
 				defaultMetadataForHandle(0),
 			}},
 			// The parser is responsible for ensuring handles are used exactly
 			// once, not the mixer, so this passes.
-			conformOk{[]gidlir.Value{
+			conformOk{[]ir.Value{
 				defaultMetadataForHandle(0),
 				defaultMetadataForHandle(0),
 			}},
-			conformFail{[]gidlir.Value{uint64(0)}, "[0]: expecting handle"},
-			conformFail{[]gidlir.Value{nil}, "[0]: expecting non-null handle"},
+			conformFail{[]ir.Value{uint64(0)}, "[0]: expecting handle"},
+			conformFail{[]ir.Value{nil}, "[0]: expecting non-null handle"},
 		},
 	)
 }

@@ -9,12 +9,12 @@ import (
 	"strconv"
 	"strings"
 
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
-func BuildValueUnowned(value gidlir.Value, decl gidlmixer.Declaration, handleRepr HandleRepr) (string, string) {
+func BuildValueUnowned(value ir.Value, decl mixer.Declaration, handleRepr HandleRepr) (string, string) {
 	var builder unownedBuilder
 	builder.handleRepr = handleRepr
 	valueVar := builder.visit(value, decl)
@@ -53,14 +53,14 @@ func primitiveTypeName(subtype fidlgen.PrimitiveSubtype) string {
 	}
 }
 
-func (b *unownedBuilder) adoptHandle(decl gidlmixer.Declaration, value gidlir.HandleWithRights) string {
+func (b *unownedBuilder) adoptHandle(decl mixer.Declaration, value ir.HandleWithRights) string {
 	if b.handleRepr == HandleReprDisposition || b.handleRepr == HandleReprInfo {
 		return fmt.Sprintf("%s(handle_defs[%d].handle)", typeName(decl), value.Handle)
 	}
 	return fmt.Sprintf("%s(handle_defs[%d])", typeName(decl), value.Handle)
 }
 
-func (b *unownedBuilder) visit(value gidlir.Value, decl gidlmixer.Declaration) string {
+func (b *unownedBuilder) visit(value ir.Value, decl mixer.Declaration) string {
 	switch value := value.(type) {
 	case bool:
 		return fmt.Sprintf("%t", value)
@@ -73,7 +73,7 @@ func (b *unownedBuilder) visit(value gidlir.Value, decl gidlmixer.Declaration) s
 		return fmt.Sprintf("%s(%dll)", typeName(decl), value)
 	case float64:
 		switch decl := decl.(type) {
-		case *gidlmixer.FloatDecl:
+		case *mixer.FloatDecl:
 			switch decl.Subtype() {
 			case fidlgen.Float32:
 				s := fmt.Sprintf("%g", value)
@@ -85,8 +85,8 @@ func (b *unownedBuilder) visit(value gidlir.Value, decl gidlmixer.Declaration) s
 				return fmt.Sprintf("%g", value)
 			}
 		}
-	case gidlir.RawFloat:
-		switch decl.(*gidlmixer.FloatDecl).Subtype() {
+	case ir.RawFloat:
+		switch decl.(*mixer.FloatDecl).Subtype() {
 		case fidlgen.Float32:
 			return fmt.Sprintf("([] { uint32_t u = %#b; float f; memcpy(&f, &u, sizeof(float)); return f; })()", value)
 		case fidlgen.Float64:
@@ -94,29 +94,29 @@ func (b *unownedBuilder) visit(value gidlir.Value, decl gidlmixer.Declaration) s
 		}
 	case string:
 		return fmt.Sprintf("fidl::StringView(%s)", strconv.Quote(value))
-	case gidlir.HandleWithRights:
+	case ir.HandleWithRights:
 		switch decl := decl.(type) {
-		case *gidlmixer.HandleDecl:
+		case *mixer.HandleDecl:
 			return b.adoptHandle(decl, value)
-		case *gidlmixer.ClientEndDecl:
+		case *mixer.ClientEndDecl:
 			return fmt.Sprintf("%s(%s)", typeName(decl), b.adoptHandle(decl.UnderlyingHandleDecl(), value))
-		case *gidlmixer.ServerEndDecl:
+		case *mixer.ServerEndDecl:
 			return fmt.Sprintf("%s(%s)", typeName(decl), b.adoptHandle(decl.UnderlyingHandleDecl(), value))
 		}
-	case gidlir.Record:
+	case ir.Record:
 		switch decl := decl.(type) {
-		case *gidlmixer.StructDecl:
+		case *mixer.StructDecl:
 			return b.visitStruct(value, decl)
-		case *gidlmixer.TableDecl:
+		case *mixer.TableDecl:
 			return b.visitTable(value, decl)
-		case *gidlmixer.UnionDecl:
+		case *mixer.UnionDecl:
 			return b.visitUnion(value, decl)
 		}
-	case []gidlir.Value:
+	case []ir.Value:
 		switch decl := decl.(type) {
-		case *gidlmixer.ArrayDecl:
+		case *mixer.ArrayDecl:
 			return b.visitArray(value, decl)
-		case *gidlmixer.VectorDecl:
+		case *mixer.VectorDecl:
 			return b.visitVector(value, decl)
 		}
 	case nil:
@@ -125,7 +125,7 @@ func (b *unownedBuilder) visit(value gidlir.Value, decl gidlmixer.Declaration) s
 	panic(fmt.Sprintf("not implemented: %T", value))
 }
 
-func (b *unownedBuilder) visitStruct(value gidlir.Record, decl *gidlmixer.StructDecl) string {
+func (b *unownedBuilder) visitStruct(value ir.Record, decl *mixer.StructDecl) string {
 	containerVar := b.newVar()
 	b.write(
 		"%s %s{};\n", declName(decl), containerVar)
@@ -152,7 +152,7 @@ func (b *unownedBuilder) visitStruct(value gidlir.Record, decl *gidlmixer.Struct
 	return fmt.Sprintf("std::move(%s)", result)
 }
 
-func (b *unownedBuilder) visitTable(value gidlir.Record, decl *gidlmixer.TableDecl) string {
+func (b *unownedBuilder) visitTable(value ir.Record, decl *mixer.TableDecl) string {
 	frameVar := b.newVar()
 
 	b.write(
@@ -183,7 +183,7 @@ func (b *unownedBuilder) visitTable(value gidlir.Record, decl *gidlmixer.TableDe
 	return fmt.Sprintf("std::move(%s)", tableVar)
 }
 
-func (b *unownedBuilder) visitUnion(value gidlir.Record, decl *gidlmixer.UnionDecl) string {
+func (b *unownedBuilder) visitUnion(value ir.Record, decl *mixer.UnionDecl) string {
 	containerVar := b.newVar()
 
 	for _, field := range value.Fields {
@@ -205,7 +205,7 @@ func (b *unownedBuilder) visitUnion(value gidlir.Record, decl *gidlmixer.UnionDe
 	return fmt.Sprintf("std::move(%s)", containerVar)
 }
 
-func (b *unownedBuilder) buildListItems(value []gidlir.Value, decl gidlmixer.ListDeclaration) []string {
+func (b *unownedBuilder) buildListItems(value []ir.Value, decl mixer.ListDeclaration) []string {
 	var elements []string
 	elemDecl := decl.Elem()
 	for _, item := range value {
@@ -214,7 +214,7 @@ func (b *unownedBuilder) buildListItems(value []gidlir.Value, decl gidlmixer.Lis
 	return elements
 }
 
-func (b *unownedBuilder) visitArray(value []gidlir.Value, decl *gidlmixer.ArrayDecl) string {
+func (b *unownedBuilder) visitArray(value []ir.Value, decl *mixer.ArrayDecl) string {
 	elements := b.buildListItems(value, decl)
 	sliceVar := b.newVar()
 	b.write("FIDL_ALIGNDECL auto %s = %s{%s};\n",
@@ -222,7 +222,7 @@ func (b *unownedBuilder) visitArray(value []gidlir.Value, decl *gidlmixer.ArrayD
 	return sliceVar
 }
 
-func (b *unownedBuilder) visitVector(value []gidlir.Value, decl *gidlmixer.VectorDecl) string {
+func (b *unownedBuilder) visitVector(value []ir.Value, decl *mixer.VectorDecl) string {
 	if len(value) == 0 {
 		sliceVar := b.newVar()
 		b.write("auto %s = %s();\n",

@@ -14,8 +14,8 @@ import (
 	"strings"
 	"text/template"
 
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
@@ -53,7 +53,7 @@ func buildBytes(bytes []byte) string {
 	return builder.String()
 }
 
-func buildHandleDefs(defs []gidlir.HandleDef) string {
+func buildHandleDefs(defs []ir.HandleDef) string {
 	if len(defs) == 0 {
 		return ""
 	}
@@ -67,7 +67,7 @@ func buildHandleDefs(defs []gidlir.HandleDef) string {
 			subtype = "zx.ObjTypeChannel"
 			// Always use real rights instead of a "same rights" placeholder.
 			if rights == fidlgen.HandleRightsSameRights {
-				r, ok := gidlir.HandleRightsByName("channel_default")
+				r, ok := ir.HandleRightsByName("channel_default")
 				if !ok {
 					panic("channel_default should be a supported rights name")
 				}
@@ -77,7 +77,7 @@ func buildHandleDefs(defs []gidlir.HandleDef) string {
 			subtype = "zx.ObjTypeEvent"
 			// Always use real rights instead of a "same rights" placeholder.
 			if rights == fidlgen.HandleRightsSameRights {
-				r, ok := gidlir.HandleRightsByName("event_default")
+				r, ok := ir.HandleRightsByName("event_default")
 				if !ok {
 					panic("event_default should be a supported rights name")
 				}
@@ -99,7 +99,7 @@ func buildHandleDefs(defs []gidlir.HandleDef) string {
 	return builder.String()
 }
 
-func buildHandleInfos(handles []gidlir.Handle) string {
+func buildHandleInfos(handles []ir.Handle) string {
 	if len(handles) == 0 {
 		return "nil"
 	}
@@ -113,7 +113,7 @@ func buildHandleInfos(handles []gidlir.Handle) string {
 	return builder.String()
 }
 
-func buildHandleDispositions(handleDispositions []gidlir.HandleDisposition) string {
+func buildHandleDispositions(handleDispositions []ir.HandleDisposition) string {
 	if len(handleDispositions) == 0 {
 		return "nil"
 	}
@@ -134,14 +134,14 @@ func buildHandleDispositions(handleDispositions []gidlir.HandleDisposition) stri
 	return builder.String()
 }
 
-func buildUnknownData(data gidlir.UnknownData) string {
+func buildUnknownData(data ir.UnknownData) string {
 	return fmt.Sprintf(
 		"fidl.UnknownData{\nBytes: %s, \nHandles: %s,\n}",
 		buildBytes(data.Bytes),
 		buildHandleInfos(data.Handles))
 }
 
-func buildUnknownDataMap(fields []gidlir.Field) string {
+func buildUnknownDataMap(fields []ir.Field) string {
 	if len(fields) == 0 {
 		return "nil"
 	}
@@ -151,23 +151,23 @@ func buildUnknownDataMap(fields []gidlir.Field) string {
 		builder.WriteString(fmt.Sprintf(
 			"%d: %s,",
 			field.Key.UnknownOrdinal,
-			buildUnknownData(field.Value.(gidlir.UnknownData))))
+			buildUnknownData(field.Value.(ir.UnknownData))))
 	}
 	builder.WriteString("}")
 	return builder.String()
 }
 
-func visit(value gidlir.Value, decl gidlmixer.Declaration) string {
+func visit(value ir.Value, decl mixer.Declaration) string {
 	switch value := value.(type) {
 	case bool, int64, uint64, float64:
 		switch decl := decl.(type) {
-		case gidlmixer.PrimitiveDeclaration:
+		case mixer.PrimitiveDeclaration:
 			return fmt.Sprintf("%#v", value)
-		case *gidlmixer.BitsDecl, *gidlmixer.EnumDecl:
+		case *mixer.BitsDecl, *mixer.EnumDecl:
 			return fmt.Sprintf("%s(%d)", typeLiteral(decl), value)
 		}
-	case gidlir.RawFloat:
-		switch decl.(*gidlmixer.FloatDecl).Subtype() {
+	case ir.RawFloat:
+		switch decl.(*mixer.FloatDecl).Subtype() {
 		case fidlgen.Float32:
 			return fmt.Sprintf("math.Float32frombits(%#b)", value)
 		case fidlgen.Float64:
@@ -180,14 +180,14 @@ func visit(value gidlir.Value, decl gidlmixer.Declaration) string {
 			return fmt.Sprintf("&[]string{%q}[0]", value)
 		}
 		return strconv.Quote(value)
-	case gidlir.HandleWithRights:
+	case ir.HandleWithRights:
 		rawHandle := fmt.Sprintf("handles[%d]", value.Handle)
 		switch decl := decl.(type) {
-		case *gidlmixer.ClientEndDecl:
+		case *mixer.ClientEndDecl:
 			return fmt.Sprintf("%s{Channel: zx.Channel(%s)}", endpointDeclName(decl), rawHandle)
-		case *gidlmixer.ServerEndDecl:
+		case *mixer.ServerEndDecl:
 			return fmt.Sprintf("%s{Channel: zx.Channel(%s)}", endpointDeclName(decl), rawHandle)
-		case *gidlmixer.HandleDecl:
+		case *mixer.HandleDecl:
 			switch decl.Subtype() {
 			case fidlgen.HandleSubtypeNone:
 				return rawHandle
@@ -199,16 +199,16 @@ func visit(value gidlir.Value, decl gidlmixer.Declaration) string {
 				panic(fmt.Sprintf("Handle subtype not supported %s", decl.Subtype()))
 			}
 		}
-	case gidlir.Record:
-		if decl, ok := decl.(gidlmixer.RecordDeclaration); ok {
+	case ir.Record:
+		if decl, ok := decl.(mixer.RecordDeclaration); ok {
 			return onRecord(value, decl)
 		}
-	case []gidlir.Value:
-		if decl, ok := decl.(gidlmixer.ListDeclaration); ok {
+	case []ir.Value:
+		if decl, ok := decl.(mixer.ListDeclaration); ok {
 			return onList(value, decl)
 		}
 	case nil:
-		if _, ok := decl.(*gidlmixer.HandleDecl); ok {
+		if _, ok := decl.(*mixer.HandleDecl); ok {
 			return "zx.HandleInvalid"
 		}
 		if !decl.IsNullable() {
@@ -219,9 +219,9 @@ func visit(value gidlir.Value, decl gidlmixer.Declaration) string {
 	panic(fmt.Sprintf("not implemented: %T", value))
 }
 
-func onRecord(value gidlir.Record, decl gidlmixer.RecordDeclaration) string {
+func onRecord(value ir.Record, decl mixer.RecordDeclaration) string {
 	var fields []string
-	if decl, ok := decl.(*gidlmixer.UnionDecl); ok && len(value.Fields) >= 1 {
+	if decl, ok := decl.(*mixer.UnionDecl); ok && len(value.Fields) >= 1 {
 		field := value.Fields[0]
 		fullName := declName(decl)
 		var tagValue string
@@ -236,15 +236,15 @@ func onRecord(value gidlir.Record, decl gidlmixer.RecordDeclaration) string {
 		fields = append(fields,
 			fmt.Sprintf("I_%sTag: %s", unqualifiedName, tagValue))
 	}
-	_, isTable := decl.(*gidlmixer.TableDecl)
-	var unknownTableFields []gidlir.Field
+	_, isTable := decl.(*mixer.TableDecl)
+	var unknownTableFields []ir.Field
 	for _, field := range value.Fields {
 		if field.Key.IsUnknown() {
 			if isTable {
 				unknownTableFields = append(unknownTableFields, field)
 			} else {
 				fields = append(fields,
-					fmt.Sprintf("I_unknownData: %s", buildUnknownData(field.Value.(gidlir.UnknownData))))
+					fmt.Sprintf("I_unknownData: %s", buildUnknownData(field.Value.(ir.UnknownData))))
 			}
 			continue
 		}
@@ -267,7 +267,7 @@ func onRecord(value gidlir.Record, decl gidlmixer.RecordDeclaration) string {
 	return fmt.Sprintf("%s{\n%s,\n}", typeLiteral(decl), strings.Join(fields, ",\n"))
 }
 
-func onList(value []gidlir.Value, decl gidlmixer.ListDeclaration) string {
+func onList(value []ir.Value, decl mixer.ListDeclaration) string {
 	elemDecl := decl.Elem()
 	var elements []string
 	for _, item := range value {
@@ -280,31 +280,31 @@ func onList(value []gidlir.Value, decl gidlmixer.ListDeclaration) string {
 	return fmt.Sprintf("%s{\n%s,\n}", typeLiteral(decl), strings.Join(elements, ",\n"))
 }
 
-func typeName(decl gidlmixer.Declaration) string {
+func typeName(decl mixer.Declaration) string {
 	return typeNameHelper(decl, "*")
 }
 
-func typeLiteral(decl gidlmixer.Declaration) string {
+func typeLiteral(decl mixer.Declaration) string {
 	return typeNameHelper(decl, "&")
 }
 
-func typeNameHelper(decl gidlmixer.Declaration, pointerPrefix string) string {
+func typeNameHelper(decl mixer.Declaration, pointerPrefix string) string {
 	if !decl.IsNullable() {
 		pointerPrefix = ""
 	}
 
 	switch decl := decl.(type) {
-	case gidlmixer.PrimitiveDeclaration:
+	case mixer.PrimitiveDeclaration:
 		return string(decl.Subtype())
-	case gidlmixer.NamedDeclaration:
+	case mixer.NamedDeclaration:
 		return pointerPrefix + declName(decl)
-	case *gidlmixer.StringDecl:
+	case *mixer.StringDecl:
 		return pointerPrefix + "string"
-	case *gidlmixer.ArrayDecl:
+	case *mixer.ArrayDecl:
 		return fmt.Sprintf("[%d]%s", decl.Size(), typeName(decl.Elem()))
-	case *gidlmixer.VectorDecl:
+	case *mixer.VectorDecl:
 		return fmt.Sprintf("%s[]%s", pointerPrefix, typeName(decl.Elem()))
-	case *gidlmixer.HandleDecl:
+	case *mixer.HandleDecl:
 		switch decl.Subtype() {
 		case fidlgen.HandleSubtypeNone:
 			return "zx.Handle"
@@ -320,15 +320,15 @@ func typeNameHelper(decl gidlmixer.Declaration, pointerPrefix string) string {
 	}
 }
 
-func declName(decl gidlmixer.NamedDeclaration) string {
+func declName(decl mixer.NamedDeclaration) string {
 	return identifierName(decl.Name())
 }
 
-func endpointDeclName(decl gidlmixer.EndpointDeclaration) string {
+func endpointDeclName(decl mixer.EndpointDeclaration) string {
 	switch decl.(type) {
-	case *gidlmixer.ClientEndDecl:
+	case *mixer.ClientEndDecl:
 		return fmt.Sprintf("%sWithCtxInterface", identifierName(decl.ProtocolName()))
-	case *gidlmixer.ServerEndDecl:
+	case *mixer.ServerEndDecl:
 		return fmt.Sprintf("%sWithCtxInterfaceRequest", identifierName(decl.ProtocolName()))
 	default:
 		panic(fmt.Sprintf("unhandled case %T", decl))
@@ -344,44 +344,44 @@ func identifierName(qualifiedName string) string {
 }
 
 // Go errors are defined in third_party/go/src/syscall/zx/fidl/errors.go.
-var goErrorCodeNames = map[gidlir.ErrorCode]string{
-	gidlir.EnvelopeBytesExceedMessageLength:   "ErrPayloadTooSmall",
-	gidlir.EnvelopeHandlesExceedMessageLength: "ErrTooManyHandles",
-	gidlir.ExceededMaxOutOfLineDepth:          "ErrExceededMaxOutOfLineDepth",
-	gidlir.IncorrectHandleType:                "ErrIncorrectHandleType",
-	gidlir.InvalidBoolean:                     "ErrInvalidBoolValue",
-	gidlir.InvalidEmptyStruct:                 "ErrInvalidEmptyStruct",
-	gidlir.InvalidInlineBitInEnvelope:         "ErrInvalidInlineBitValueInEnvelope",
-	gidlir.InvalidInlineMarkerInEnvelope:      "ErrBadInlineIndicatorEncoding",
-	gidlir.InvalidNumBytesInEnvelope:          "ErrInvalidNumBytesInEnvelope",
-	gidlir.InvalidNumHandlesInEnvelope:        "ErrInvalidNumHandlesInEnvelope",
-	gidlir.InvalidPaddingByte:                 "ErrNonZeroPadding",
-	gidlir.InvalidPresenceIndicator:           "ErrBadRefEncoding",
-	gidlir.InvalidHandlePresenceIndicator:     "ErrBadHandleEncoding",
-	gidlir.MissingRequiredHandleRights:        "ErrMissingRequiredHandleRights",
-	gidlir.NonEmptyStringWithNullBody:         "ErrUnexpectedNullRef",
-	gidlir.NonEmptyVectorWithNullBody:         "ErrUnexpectedNullRef",
-	gidlir.NonNullableTypeWithNullValue:       "ErrUnexpectedNullRef",
-	gidlir.NonResourceUnknownHandles:          "ErrValueTypeHandles",
-	gidlir.StrictBitsUnknownBit:               "ErrInvalidBitsValue",
-	gidlir.StrictEnumUnknownValue:             "ErrInvalidEnumValue",
-	gidlir.StrictUnionUnknownField:            "ErrInvalidXUnionTag",
-	gidlir.StringCountExceeds32BitLimit:       "ErrStringTooLong",
-	gidlir.StringNotUtf8:                      "ErrStringNotUTF8",
-	gidlir.StringTooLong:                      "ErrStringTooLong",
-	gidlir.TableCountExceeds32BitLimit:        "ErrUnexpectedOrdinal",
-	gidlir.TooFewBytes:                        "ErrPayloadTooSmall",
-	gidlir.TooFewBytesInPrimaryObject:         "ErrPayloadTooSmall",
-	gidlir.TooFewHandles:                      "ErrNotEnoughHandles",
-	gidlir.TooManyBytesInMessage:              "ErrTooManyBytesInMessage",
-	gidlir.TooManyHandlesInMessage:            "ErrTooManyHandles",
-	gidlir.UnionFieldNotSet:                   "ErrInvalidXUnionTag",
-	gidlir.CountExceedsLimit:                  "ErrVectorTooLong",
-	gidlir.UnexpectedOrdinal:                  "ErrUnexpectedOrdinal",
-	gidlir.VectorCountExceeds32BitLimit:       "ErrVectorTooLong",
+var goErrorCodeNames = map[ir.ErrorCode]string{
+	ir.EnvelopeBytesExceedMessageLength:   "ErrPayloadTooSmall",
+	ir.EnvelopeHandlesExceedMessageLength: "ErrTooManyHandles",
+	ir.ExceededMaxOutOfLineDepth:          "ErrExceededMaxOutOfLineDepth",
+	ir.IncorrectHandleType:                "ErrIncorrectHandleType",
+	ir.InvalidBoolean:                     "ErrInvalidBoolValue",
+	ir.InvalidEmptyStruct:                 "ErrInvalidEmptyStruct",
+	ir.InvalidInlineBitInEnvelope:         "ErrInvalidInlineBitValueInEnvelope",
+	ir.InvalidInlineMarkerInEnvelope:      "ErrBadInlineIndicatorEncoding",
+	ir.InvalidNumBytesInEnvelope:          "ErrInvalidNumBytesInEnvelope",
+	ir.InvalidNumHandlesInEnvelope:        "ErrInvalidNumHandlesInEnvelope",
+	ir.InvalidPaddingByte:                 "ErrNonZeroPadding",
+	ir.InvalidPresenceIndicator:           "ErrBadRefEncoding",
+	ir.InvalidHandlePresenceIndicator:     "ErrBadHandleEncoding",
+	ir.MissingRequiredHandleRights:        "ErrMissingRequiredHandleRights",
+	ir.NonEmptyStringWithNullBody:         "ErrUnexpectedNullRef",
+	ir.NonEmptyVectorWithNullBody:         "ErrUnexpectedNullRef",
+	ir.NonNullableTypeWithNullValue:       "ErrUnexpectedNullRef",
+	ir.NonResourceUnknownHandles:          "ErrValueTypeHandles",
+	ir.StrictBitsUnknownBit:               "ErrInvalidBitsValue",
+	ir.StrictEnumUnknownValue:             "ErrInvalidEnumValue",
+	ir.StrictUnionUnknownField:            "ErrInvalidXUnionTag",
+	ir.StringCountExceeds32BitLimit:       "ErrStringTooLong",
+	ir.StringNotUtf8:                      "ErrStringNotUTF8",
+	ir.StringTooLong:                      "ErrStringTooLong",
+	ir.TableCountExceeds32BitLimit:        "ErrUnexpectedOrdinal",
+	ir.TooFewBytes:                        "ErrPayloadTooSmall",
+	ir.TooFewBytesInPrimaryObject:         "ErrPayloadTooSmall",
+	ir.TooFewHandles:                      "ErrNotEnoughHandles",
+	ir.TooManyBytesInMessage:              "ErrTooManyBytesInMessage",
+	ir.TooManyHandlesInMessage:            "ErrTooManyHandles",
+	ir.UnionFieldNotSet:                   "ErrInvalidXUnionTag",
+	ir.CountExceedsLimit:                  "ErrVectorTooLong",
+	ir.UnexpectedOrdinal:                  "ErrUnexpectedOrdinal",
+	ir.VectorCountExceeds32BitLimit:       "ErrVectorTooLong",
 }
 
-func goErrorCode(code gidlir.ErrorCode) (string, error) {
+func goErrorCode(code ir.ErrorCode) (string, error) {
 	if str, ok := goErrorCodeNames[code]; ok {
 		return fmt.Sprintf("fidl.%s", str), nil
 	}

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"text/template"
 
-	gidlconfig "go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
@@ -24,7 +24,7 @@ var (
 	measureTapeTmpl = template.Must(template.New("measureTapeTmpl").Parse(measureTapeTmplText))
 )
 
-const measureTapeWireFormat = gidlir.V2WireFormat
+const measureTapeWireFormat = ir.V2WireFormat
 
 type measureTapeTmplInput struct {
 	MeasureTapeTestCases []measureTapeTestCase
@@ -35,9 +35,9 @@ type measureTapeTestCase struct {
 	NumBytes, NumHandles             int
 }
 
-func GenerateMeasureTapeTests(gidl gidlir.All, fidl fidlgen.Root, config gidlconfig.GeneratorConfig) ([]byte, error) {
+func GenerateMeasureTapeTests(gidl ir.All, fidl fidlgen.Root, config config.GeneratorConfig) ([]byte, error) {
 	var tmplInput measureTapeTmplInput
-	schema := gidlmixer.BuildSchema(fidl)
+	schema := mixer.BuildSchema(fidl)
 	allowedTypes := map[string]struct{}{}
 	for _, name := range config.FilterTypes {
 		if !strings.HasPrefix(name, "test.conformance/") {
@@ -47,7 +47,7 @@ func GenerateMeasureTapeTests(gidl gidlir.All, fidl fidlgen.Root, config gidlcon
 		allowedTypes[typeName] = struct{}{}
 	}
 	for _, encodeSuccess := range gidl.EncodeSuccess {
-		valueTypeName := gidlir.TypeFromValue(encodeSuccess.Value)
+		valueTypeName := ir.TypeFromValue(encodeSuccess.Value)
 		if _, ok := allowedTypes[valueTypeName]; !ok {
 			continue
 		}

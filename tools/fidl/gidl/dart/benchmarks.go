@@ -11,9 +11,9 @@ import (
 	"strings"
 	"text/template"
 
-	gidlconfig "go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
@@ -34,8 +34,8 @@ type benchmark struct {
 }
 
 // GenerateBenchmarks generates Dart benchmarks.
-func GenerateBenchmarks(gidl gidlir.All, fidl fidlgen.Root, config gidlconfig.GeneratorConfig) ([]byte, error) {
-	schema := gidlmixer.BuildSchema(fidl)
+func GenerateBenchmarks(gidl ir.All, fidl fidlgen.Root, config config.GeneratorConfig) ([]byte, error) {
+	schema := mixer.BuildSchema(fidl)
 	var benchmarks []benchmark
 	usesHandles := false
 	for _, gidlBenchmark := range gidl.Benchmark {

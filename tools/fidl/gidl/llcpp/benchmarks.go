@@ -11,11 +11,11 @@ import (
 	"strings"
 	"text/template"
 
-	gidlconfig "go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
 	libhlcpp "go.fuchsia.dev/fuchsia/tools/fidl/gidl/hlcpp"
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
 	libllcpp "go.fuchsia.dev/fuchsia/tools/fidl/gidl/llcpp/lib"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
@@ -40,8 +40,8 @@ type benchmarkTmplInput struct {
 }
 
 // Generate generates Low-Level C++ benchmarks.
-func GenerateBenchmarks(gidl gidlir.All, fidl fidlgen.Root, config gidlconfig.GeneratorConfig) ([]byte, error) {
-	schema := gidlmixer.BuildSchema(fidl)
+func GenerateBenchmarks(gidl ir.All, fidl fidlgen.Root, config config.GeneratorConfig) ([]byte, error) {
+	schema := mixer.BuildSchema(fidl)
 	tmplInput := benchmarkTmplInput{
 		FidlLibrary: libraryName(config.CppBenchmarksFidlLibrary),
 		FidlInclude: libraryInclude(config.CppBenchmarksFidlLibrary),
@@ -79,12 +79,12 @@ func libraryName(librarySuffix string) string {
 	return fmt.Sprintf("test_benchmarkfidl%s", strings.ReplaceAll(librarySuffix, " ", ""))
 }
 
-func benchmarkTypeFromValue(librarySuffix string, value gidlir.Value) string {
-	return fmt.Sprintf("%s::wire::%s", libraryName(librarySuffix), gidlir.TypeFromValue(value))
+func benchmarkTypeFromValue(librarySuffix string, value ir.Value) string {
+	return fmt.Sprintf("%s::wire::%s", libraryName(librarySuffix), ir.TypeFromValue(value))
 }
 
-func benchmarkProtocolFromValue(librarySuffix string, value gidlir.Value) string {
-	return fmt.Sprintf("%s::%s", libraryName(librarySuffix), gidlir.TypeFromValue(value))
+func benchmarkProtocolFromValue(librarySuffix string, value ir.Value) string {
+	return fmt.Sprintf("%s::%s", libraryName(librarySuffix), ir.TypeFromValue(value))
 }
 
 func benchmarkName(gidlName string) string {

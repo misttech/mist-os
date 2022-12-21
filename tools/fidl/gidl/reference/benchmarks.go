@@ -12,10 +12,10 @@ import (
 	"strings"
 	"text/template"
 
-	gidlconfig "go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
 	libllcpp "go.fuchsia.dev/fuchsia/tools/fidl/gidl/llcpp/lib"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
@@ -35,8 +35,8 @@ type benchmarkTmplInput struct {
 	Benchmarks []benchmark
 }
 
-func GenerateBenchmarks(gidl gidlir.All, fidl fidlgen.Root, config gidlconfig.GeneratorConfig) ([]byte, error) {
-	schema := gidlmixer.BuildSchema(fidl)
+func GenerateBenchmarks(gidl ir.All, fidl fidlgen.Root, config config.GeneratorConfig) ([]byte, error) {
+	schema := mixer.BuildSchema(fidl)
 	tmplInput := benchmarkTmplInput{}
 	for _, gidlBenchmark := range gidl.Benchmark {
 		decl, err := schema.ExtractDeclaration(gidlBenchmark.Value, gidlBenchmark.HandleDefs)
@@ -59,8 +59,8 @@ func GenerateBenchmarks(gidl gidlir.All, fidl fidlgen.Root, config gidlconfig.Ge
 	return buf.Bytes(), nil
 }
 
-func llcppBenchmarkType(value gidlir.Value) string {
-	return fmt.Sprintf("test_benchmarkfidl::wire::%s", gidlir.TypeFromValue(value))
+func llcppBenchmarkType(value ir.Value) string {
+	return fmt.Sprintf("test_benchmarkfidl::wire::%s", ir.TypeFromValue(value))
 }
 
 func benchmarkName(gidlName string) string {

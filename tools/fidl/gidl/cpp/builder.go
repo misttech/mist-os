@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"strings"
 
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
-	gidlutil "go.fuchsia.dev/fuchsia/tools/fidl/gidl/util"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/util"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
@@ -23,7 +23,7 @@ const (
 	HandleReprRaw
 )
 
-func BuildValue(value gidlir.Value, decl gidlmixer.Declaration, handleRepr handleRepr) (string, string) {
+func BuildValue(value ir.Value, decl mixer.Declaration, handleRepr handleRepr) (string, string) {
 	builder := builder{
 		handleRepr: handleRepr,
 	}
@@ -62,14 +62,14 @@ func (b *builder) construct(typename string, isPointer bool, fmtStr string, args
 	return fmt.Sprintf("std::make_unique<%s>(%s)", typename, val)
 }
 
-func (b *builder) adoptHandle(decl gidlmixer.Declaration, value gidlir.HandleWithRights) string {
+func (b *builder) adoptHandle(decl mixer.Declaration, value ir.HandleWithRights) string {
 	if b.handleRepr == handleReprDisposition || b.handleRepr == handleReprInfo {
 		return fmt.Sprintf("%s(handle_defs[%d].handle)", typeName(decl), value.Handle)
 	}
 	return fmt.Sprintf("%s(handle_defs[%d])", typeName(decl), value.Handle)
 }
 
-func formatPrimitive(value gidlir.Value) string {
+func formatPrimitive(value ir.Value) string {
 	switch value := value.(type) {
 	case int64:
 		if value == -9223372036854775808 {
@@ -84,10 +84,10 @@ func formatPrimitive(value gidlir.Value) string {
 	panic(fmt.Sprintf("unknown primitive type %T", value))
 }
 
-func (a *builder) visit(value gidlir.Value, decl gidlmixer.Declaration) string {
+func (a *builder) visit(value ir.Value, decl mixer.Declaration) string {
 	// std::optional is used to represent nullability for strings and vectors.
-	_, isString := decl.(*gidlmixer.StringDecl)
-	_, isVector := decl.(*gidlmixer.VectorDecl)
+	_, isString := decl.(*mixer.StringDecl)
+	_, isVector := decl.(*mixer.VectorDecl)
 	isPointer := (decl.IsNullable() && !isString && !isVector)
 
 	switch value := value.(type) {
@@ -95,13 +95,13 @@ func (a *builder) visit(value gidlir.Value, decl gidlmixer.Declaration) string {
 		return a.construct(typeName(decl), isPointer, "%t", value)
 	case int64, uint64, float64:
 		switch decl := decl.(type) {
-		case gidlmixer.PrimitiveDeclaration, *gidlmixer.EnumDecl:
+		case mixer.PrimitiveDeclaration, *mixer.EnumDecl:
 			return a.construct(typeName(decl), isPointer, formatPrimitive(value))
-		case *gidlmixer.BitsDecl:
+		case *mixer.BitsDecl:
 			return fmt.Sprintf("static_cast<%s>(%s)", declName(decl), formatPrimitive(value))
 		}
-	case gidlir.RawFloat:
-		switch decl.(*gidlmixer.FloatDecl).Subtype() {
+	case ir.RawFloat:
+		switch decl.(*mixer.FloatDecl).Subtype() {
 		case fidlgen.Float32:
 			return fmt.Sprintf("([] { uint32_t u = %#b; float f; memcpy(&f, &u, sizeof(float)); return f; })()", value)
 		case fidlgen.Float64:
@@ -109,29 +109,29 @@ func (a *builder) visit(value gidlir.Value, decl gidlmixer.Declaration) string {
 		}
 	case string:
 		return a.construct(typeNameIgnoreNullable(decl), isPointer, "%q, %d", value, len(value))
-	case gidlir.HandleWithRights:
+	case ir.HandleWithRights:
 		switch decl := decl.(type) {
-		case *gidlmixer.HandleDecl:
+		case *mixer.HandleDecl:
 			return a.adoptHandle(decl, value)
-		case *gidlmixer.ClientEndDecl:
+		case *mixer.ClientEndDecl:
 			return fmt.Sprintf("%s(%s)", typeName(decl), a.adoptHandle(decl.UnderlyingHandleDecl(), value))
-		case *gidlmixer.ServerEndDecl:
+		case *mixer.ServerEndDecl:
 			return fmt.Sprintf("%s(%s)", typeName(decl), a.adoptHandle(decl.UnderlyingHandleDecl(), value))
 		}
-	case gidlir.Record:
+	case ir.Record:
 		switch decl := decl.(type) {
-		case *gidlmixer.StructDecl:
+		case *mixer.StructDecl:
 			return a.visitStructOrTable(value, decl, isPointer)
-		case *gidlmixer.TableDecl:
+		case *mixer.TableDecl:
 			return a.visitStructOrTable(value, decl, isPointer)
-		case *gidlmixer.UnionDecl:
+		case *mixer.UnionDecl:
 			return a.visitUnion(value, decl, isPointer)
 		}
-	case []gidlir.Value:
+	case []ir.Value:
 		switch decl := decl.(type) {
-		case *gidlmixer.ArrayDecl:
+		case *mixer.ArrayDecl:
 			return a.visitArray(value, decl, isPointer)
-		case *gidlmixer.VectorDecl:
+		case *mixer.VectorDecl:
 			return a.visitVector(value, decl, isPointer)
 		}
 	case nil:
@@ -140,7 +140,7 @@ func (a *builder) visit(value gidlir.Value, decl gidlmixer.Declaration) string {
 	panic(fmt.Sprintf("not implemented: %T", value))
 }
 
-func (b *builder) visitStructOrTable(value gidlir.Record, decl gidlmixer.RecordDeclaration, isPointer bool) string {
+func (b *builder) visitStructOrTable(value ir.Record, decl mixer.RecordDeclaration, isPointer bool) string {
 	s := b.newVar()
 	structRaw := fmt.Sprintf("%s{::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}}", typeNameIgnoreNullable(decl))
 	var op string
@@ -160,7 +160,7 @@ func (b *builder) visitStructOrTable(value gidlir.Record, decl gidlmixer.RecordD
 	return fmt.Sprintf("std::move(%s)", s)
 }
 
-func (a *builder) visitUnion(value gidlir.Record, decl *gidlmixer.UnionDecl, isPointer bool) string {
+func (a *builder) visitUnion(value ir.Record, decl *mixer.UnionDecl, isPointer bool) string {
 	if len(value.Fields) == 0 {
 		return a.assignNew(typeNameIgnoreNullable(decl), isPointer, "")
 	}
@@ -176,7 +176,7 @@ func (a *builder) visitUnion(value gidlir.Record, decl *gidlmixer.UnionDecl, isP
 	return fmt.Sprintf("std::move(%s)", varName)
 }
 
-func (a *builder) visitArray(value []gidlir.Value, decl *gidlmixer.ArrayDecl, isPointer bool) string {
+func (a *builder) visitArray(value []ir.Value, decl *mixer.ArrayDecl, isPointer bool) string {
 	array := a.assignNew(typeNameIgnoreNullable(decl), isPointer, "::fidl::internal::DefaultConstructPossiblyInvalidObject<%s>::Make()", typeNameIgnoreNullable(decl))
 	op := ""
 	if isPointer {
@@ -189,7 +189,7 @@ func (a *builder) visitArray(value []gidlir.Value, decl *gidlmixer.ArrayDecl, is
 	return fmt.Sprintf("std::move(%s)", array)
 }
 
-func (a *builder) visitVector(value []gidlir.Value, decl *gidlmixer.VectorDecl, isPointer bool) string {
+func (a *builder) visitVector(value []ir.Value, decl *mixer.VectorDecl, isPointer bool) string {
 	vector := a.assignNew(typeName(decl), isPointer, "")
 	if decl.IsNullable() {
 		a.write("%s.emplace();\n", vector)
@@ -199,13 +199,13 @@ func (a *builder) visitVector(value []gidlir.Value, decl *gidlmixer.VectorDecl, 
 	}
 	// Special case unsigned integer vectors, because clang otherwise has issues with large vectors on arm.
 	// This uses pattern matching so only a subset of byte vectors that fit the pattern (repeating sequence) will be optimized.
-	if elemDecl, ok := decl.Elem().(gidlmixer.PrimitiveDeclaration); ok && elemDecl.Subtype() == fidlgen.Uint8 {
+	if elemDecl, ok := decl.Elem().(mixer.PrimitiveDeclaration); ok && elemDecl.Subtype() == fidlgen.Uint8 {
 		var uintValues []uint64
 		for _, v := range value {
 			uintValues = append(uintValues, v.(uint64))
 		}
 		// For simplicity, only support sizes that are multiples of the period.
-		if period, ok := gidlutil.FindRepeatingPeriod(uintValues); ok && len(value)%period == 0 {
+		if period, ok := util.FindRepeatingPeriod(uintValues); ok && len(value)%period == 0 {
 			if decl.IsNullable() {
 				a.write("%s.value().resize(%d);\n", vector, len(value))
 			} else {
@@ -238,33 +238,33 @@ memcpy(%[1]s.data() + offset, %[1]s.data(), %[2]d);
 	return fmt.Sprintf("std::move(%s)", vector)
 }
 
-func typeNameImpl(decl gidlmixer.Declaration, ignoreNullable bool) string {
+func typeNameImpl(decl mixer.Declaration, ignoreNullable bool) string {
 	switch decl := decl.(type) {
-	case gidlmixer.PrimitiveDeclaration:
+	case mixer.PrimitiveDeclaration:
 		return primitiveTypeName(decl.Subtype())
-	case *gidlmixer.StringDecl:
+	case *mixer.StringDecl:
 		if !ignoreNullable && decl.IsNullable() {
 			return "std::optional<std::string>"
 		}
 		return "std::string"
-	case *gidlmixer.StructDecl:
+	case *mixer.StructDecl:
 		if !ignoreNullable && decl.IsNullable() {
 			return fmt.Sprintf("fidl::Box<%s>", declName(decl))
 		}
 		return declName(decl)
-	case *gidlmixer.UnionDecl:
+	case *mixer.UnionDecl:
 		if !ignoreNullable && decl.IsNullable() {
 			return fmt.Sprintf("fidl::Box<%s>", declName(decl))
 		}
 		return declName(decl)
-	case *gidlmixer.ArrayDecl:
+	case *mixer.ArrayDecl:
 		return fmt.Sprintf("std::array<%s, %d>", typeName(decl.Elem()), decl.Size())
-	case *gidlmixer.VectorDecl:
+	case *mixer.VectorDecl:
 		if !ignoreNullable && decl.IsNullable() {
 			return fmt.Sprintf("std::optional<std::vector<%s>>", typeName(decl.Elem()))
 		}
 		return fmt.Sprintf("std::vector<%s>", typeName(decl.Elem()))
-	case *gidlmixer.HandleDecl:
+	case *mixer.HandleDecl:
 		switch decl.Subtype() {
 		case fidlgen.HandleSubtypeNone:
 			return "zx::handle"
@@ -275,31 +275,31 @@ func typeNameImpl(decl gidlmixer.Declaration, ignoreNullable bool) string {
 		default:
 			panic(fmt.Sprintf("Handle subtype not supported %s", decl.Subtype()))
 		}
-	case *gidlmixer.ClientEndDecl:
+	case *mixer.ClientEndDecl:
 		return fmt.Sprintf("fidl::ClientEnd<%s>", EndpointDeclName(decl))
-	case *gidlmixer.ServerEndDecl:
+	case *mixer.ServerEndDecl:
 		return fmt.Sprintf("fidl::ServerEnd<%s>", EndpointDeclName(decl))
-	case gidlmixer.NamedDeclaration:
+	case mixer.NamedDeclaration:
 		return declName(decl)
 	default:
 		panic("unhandled case")
 	}
 }
 
-func typeName(decl gidlmixer.Declaration) string {
+func typeName(decl mixer.Declaration) string {
 	return typeNameImpl(decl, false)
 }
 
-func typeNameIgnoreNullable(decl gidlmixer.Declaration) string {
+func typeNameIgnoreNullable(decl mixer.Declaration) string {
 	return typeNameImpl(decl, true)
 }
 
-func declName(decl gidlmixer.NamedDeclaration) string {
+func declName(decl mixer.NamedDeclaration) string {
 	parts := strings.SplitN(decl.Name(), "/", 2)
 	return fmt.Sprintf("%s::%s", strings.ReplaceAll(parts[0], ".", "_"), fidlgen.ToUpperCamelCase(parts[1]))
 }
 
-func EndpointDeclName(decl gidlmixer.EndpointDeclaration) string {
+func EndpointDeclName(decl mixer.EndpointDeclaration) string {
 	parts := strings.SplitN(decl.ProtocolName(), "/", 2)
 	return fmt.Sprintf("%s::%s", strings.ReplaceAll(parts[0], ".", "_"), fidlgen.ToUpperCamelCase(parts[1]))
 }

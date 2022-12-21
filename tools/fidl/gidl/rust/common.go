@@ -9,13 +9,13 @@ import (
 	"strconv"
 	"strings"
 
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
-	gidllibrust "go.fuchsia.dev/fuchsia/tools/fidl/gidl/librust"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/librust"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
-func buildHandleDefs(defs []gidlir.HandleDef) string {
+func buildHandleDefs(defs []ir.HandleDef) string {
 	if len(defs) == 0 {
 		return ""
 	}
@@ -35,7 +35,7 @@ HandleDef{
 	return builder.String()
 }
 
-func buildHandles(handles []gidlir.Handle) string {
+func buildHandles(handles []ir.Handle) string {
 	var builder strings.Builder
 	builder.WriteString("[\n")
 	for i, h := range handles {
@@ -48,7 +48,7 @@ func buildHandles(handles []gidlir.Handle) string {
 	return builder.String()
 }
 
-func buildHandleValues(handles []gidlir.Handle) string {
+func buildHandleValues(handles []ir.Handle) string {
 	var builder strings.Builder
 	builder.WriteString("vec![\n")
 	for _, h := range handles {
@@ -58,7 +58,7 @@ func buildHandleValues(handles []gidlir.Handle) string {
 	return builder.String()
 }
 
-func buildRawHandleDispositions(handleDispositions []gidlir.HandleDisposition) string {
+func buildRawHandleDispositions(handleDispositions []ir.HandleDisposition) string {
 	var builder strings.Builder
 	builder.WriteString("[")
 	for _, hd := range handleDispositions {
@@ -75,7 +75,7 @@ zx_types::zx_handle_disposition_t {
 	return builder.String()
 }
 
-func buildRawHandles(handleDispositions []gidlir.HandleDisposition) string {
+func buildRawHandles(handleDispositions []ir.HandleDisposition) string {
 	var builder strings.Builder
 	builder.WriteString("[")
 	for _, hd := range handleDispositions {
@@ -85,16 +85,16 @@ func buildRawHandles(handleDispositions []gidlir.HandleDisposition) string {
 	return builder.String()
 }
 
-func visit(value gidlir.Value, decl gidlmixer.Declaration) string {
+func visit(value ir.Value, decl mixer.Declaration) string {
 	switch value := value.(type) {
 	case bool:
 		return strconv.FormatBool(value)
 	case int64, uint64, float64:
 		switch decl := decl.(type) {
-		case gidlmixer.PrimitiveDeclaration:
+		case mixer.PrimitiveDeclaration:
 			suffix := primitiveTypeName(decl.Subtype())
 			return fmt.Sprintf("%v%s", value, suffix)
-		case *gidlmixer.BitsDecl:
+		case *mixer.BitsDecl:
 			primitive := visit(value, &decl.Underlying)
 			if decl.IsFlexible() {
 				return fmt.Sprintf("%s::from_bits_allow_unknown(%v)", declName(decl), primitive)
@@ -104,15 +104,15 @@ func visit(value gidlir.Value, decl gidlmixer.Declaration) string {
 			// from_bits(...).unwrap() in success cases, since all this would do
 			// is move validation from the bindings to GIDL.
 			return fmt.Sprintf("unsafe { %s::from_bits_unchecked(%v) }", declName(decl), primitive)
-		case *gidlmixer.EnumDecl:
+		case *mixer.EnumDecl:
 			primitive := visit(value, &decl.Underlying)
 			if decl.IsFlexible() {
 				return fmt.Sprintf("%s::from_primitive_allow_unknown(%v)", declName(decl), primitive)
 			}
 			return fmt.Sprintf("%s::from_primitive(%v).unwrap()", declName(decl), primitive)
 		}
-	case gidlir.RawFloat:
-		switch decl.(*gidlmixer.FloatDecl).Subtype() {
+	case ir.RawFloat:
+		switch decl.(*mixer.FloatDecl).Subtype() {
 		case fidlgen.Float32:
 			return fmt.Sprintf("f32::from_bits(%#b)", value)
 		case fidlgen.Float64:
@@ -123,31 +123,31 @@ func visit(value gidlir.Value, decl gidlmixer.Declaration) string {
 		if fidlgen.PrintableASCII(value) {
 			expr = fmt.Sprintf("String::from(%q)", value)
 		} else {
-			expr = fmt.Sprintf("std::str::from_utf8(b\"%s\").unwrap().to_string()", gidllibrust.EscapeStr(value))
+			expr = fmt.Sprintf("std::str::from_utf8(b\"%s\").unwrap().to_string()", librust.EscapeStr(value))
 		}
 		return wrapNullable(decl, expr)
-	case gidlir.HandleWithRights:
+	case ir.HandleWithRights:
 		expr := buildHandleValue(value.Handle)
 		return wrapNullable(decl, expr)
-	case gidlir.Record:
+	case ir.Record:
 		switch decl := decl.(type) {
-		case *gidlmixer.StructDecl:
+		case *mixer.StructDecl:
 			return onStruct(value, decl)
-		case *gidlmixer.TableDecl:
+		case *mixer.TableDecl:
 			return onTable(value, decl)
-		case *gidlmixer.UnionDecl:
+		case *mixer.UnionDecl:
 			return onUnion(value, decl)
 		}
-	case []gidlir.Value:
+	case []ir.Value:
 		switch decl := decl.(type) {
-		case *gidlmixer.ArrayDecl:
+		case *mixer.ArrayDecl:
 			return onList(value, decl)
-		case *gidlmixer.VectorDecl:
+		case *mixer.VectorDecl:
 			return onList(value, decl)
 		}
 	case nil:
 		if !decl.IsNullable() {
-			if _, ok := decl.(*gidlmixer.HandleDecl); ok {
+			if _, ok := decl.(*mixer.HandleDecl); ok {
 				return "Handle::invalid()"
 			}
 			panic(fmt.Sprintf("got nil for non-nullable type: %T", decl))
@@ -157,7 +157,7 @@ func visit(value gidlir.Value, decl gidlmixer.Declaration) string {
 	panic(fmt.Sprintf("not implemented: %T", value))
 }
 
-func declName(decl gidlmixer.NamedDeclaration) string {
+func declName(decl mixer.NamedDeclaration) string {
 	return identifierName(decl.Name())
 }
 
@@ -211,22 +211,22 @@ func handleTypeName(subtype fidlgen.HandleSubtype) string {
 	}
 }
 
-func wrapNullable(decl gidlmixer.Declaration, valueStr string) string {
+func wrapNullable(decl mixer.Declaration, valueStr string) string {
 	if !decl.IsNullable() {
 		return valueStr
 	}
 	switch decl.(type) {
-	case *gidlmixer.ArrayDecl, *gidlmixer.VectorDecl, *gidlmixer.StringDecl, *gidlmixer.HandleDecl, *gidlmixer.ClientEndDecl, *gidlmixer.ServerEndDecl:
+	case *mixer.ArrayDecl, *mixer.VectorDecl, *mixer.StringDecl, *mixer.HandleDecl, *mixer.ClientEndDecl, *mixer.ServerEndDecl:
 		return fmt.Sprintf("Some(%s)", valueStr)
-	case *gidlmixer.StructDecl, *gidlmixer.UnionDecl:
+	case *mixer.StructDecl, *mixer.UnionDecl:
 		return fmt.Sprintf("Some(Box::new(%s))", valueStr)
-	case *gidlmixer.BoolDecl, *gidlmixer.IntegerDecl, *gidlmixer.FloatDecl, *gidlmixer.TableDecl:
+	case *mixer.BoolDecl, *mixer.IntegerDecl, *mixer.FloatDecl, *mixer.TableDecl:
 		panic(fmt.Sprintf("decl %v should not be nullable", decl))
 	}
 	panic(fmt.Sprintf("unexpected decl %v", decl))
 }
 
-func onStruct(value gidlir.Record, decl *gidlmixer.StructDecl) string {
+func onStruct(value ir.Record, decl *mixer.StructDecl) string {
 	var structFields []string
 	providedKeys := make(map[string]struct{}, len(value.Fields))
 	for _, field := range value.Fields {
@@ -248,7 +248,7 @@ func onStruct(value gidlir.Record, decl *gidlmixer.StructDecl) string {
 	return wrapNullable(decl, valueStr)
 }
 
-func onTable(value gidlir.Record, decl *gidlmixer.TableDecl) string {
+func onTable(value ir.Record, decl *mixer.TableDecl) string {
 	var tableFields []string
 	for _, field := range value.Fields {
 		if field.Key.IsUnknown() {
@@ -265,14 +265,14 @@ func onTable(value gidlir.Record, decl *gidlmixer.TableDecl) string {
 	return wrapNullable(decl, valueStr)
 }
 
-func onUnion(value gidlir.Record, decl *gidlmixer.UnionDecl) string {
+func onUnion(value ir.Record, decl *mixer.UnionDecl) string {
 	if len(value.Fields) != 1 {
 		panic(fmt.Sprintf("union has %d fields, expected 1", len(value.Fields)))
 	}
 	field := value.Fields[0]
 	var valueStr string
 	if field.Key.IsUnknown() {
-		unknownData := field.Value.(gidlir.UnknownData)
+		unknownData := field.Value.(ir.UnknownData)
 		if unknownData.HasData() {
 			panic(fmt.Sprintf("union %s: unknown ordinal %d: Rust cannot construct union with unknown bytes/handles",
 				decl.Name(), field.Key.UnknownOrdinal))
@@ -306,7 +306,7 @@ func onUnion(value gidlir.Record, decl *gidlmixer.UnionDecl) string {
 	return wrapNullable(decl, valueStr)
 }
 
-func onList(value []gidlir.Value, decl gidlmixer.ListDeclaration) string {
+func onList(value []ir.Value, decl mixer.ListDeclaration) string {
 	var elements []string
 	elemDecl := decl.Elem()
 	for _, item := range value {
@@ -315,9 +315,9 @@ func onList(value []gidlir.Value, decl gidlmixer.ListDeclaration) string {
 	elementsStr := strings.Join(elements, ", ")
 	var valueStr string
 	switch decl.(type) {
-	case *gidlmixer.ArrayDecl:
+	case *mixer.ArrayDecl:
 		valueStr = fmt.Sprintf("[%s]", elementsStr)
-	case *gidlmixer.VectorDecl:
+	case *mixer.VectorDecl:
 		valueStr = fmt.Sprintf("vec![%s]", elementsStr)
 	default:
 		panic(fmt.Sprintf("unexpected decl %v", decl))
@@ -325,6 +325,6 @@ func onList(value []gidlir.Value, decl gidlmixer.ListDeclaration) string {
 	return wrapNullable(decl, valueStr)
 }
 
-func buildHandleValue(handle gidlir.Handle) string {
+func buildHandleValue(handle ir.Handle) string {
 	return fmt.Sprintf("copy_handle(&handle_defs[%d])", handle)
 }

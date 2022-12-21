@@ -9,13 +9,13 @@ import (
 	"strconv"
 	"strings"
 
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
-	gidlutil "go.fuchsia.dev/fuchsia/tools/fidl/gidl/util"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/util"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
-func BuildValueAllocator(allocatorVar string, value gidlir.Value, decl gidlmixer.Declaration, handleRepr HandleRepr) (string, string) {
+func BuildValueAllocator(allocatorVar string, value ir.Value, decl mixer.Declaration, handleRepr HandleRepr) (string, string) {
 	var builder allocatorBuilder
 	builder.allocatorVar = allocatorVar
 	builder.handleRepr = handleRepr
@@ -55,14 +55,14 @@ func (a *allocatorBuilder) construct(typename string, isPointer bool, fmtStr str
 	return fmt.Sprintf("fidl::ObjectView<%s>(%s, %s)", typename, a.allocatorVar, val)
 }
 
-func (a *allocatorBuilder) adoptHandle(decl gidlmixer.Declaration, value gidlir.HandleWithRights) string {
+func (a *allocatorBuilder) adoptHandle(decl mixer.Declaration, value ir.HandleWithRights) string {
 	if a.handleRepr == HandleReprDisposition || a.handleRepr == HandleReprInfo {
 		return fmt.Sprintf("%s(handle_defs[%d].handle)", typeName(decl), value.Handle)
 	}
 	return fmt.Sprintf("%s(handle_defs[%d])", typeName(decl), value.Handle)
 }
 
-func formatPrimitive(value gidlir.Value) string {
+func formatPrimitive(value ir.Value) string {
 	switch value := value.(type) {
 	case int64:
 		if value == -9223372036854775808 {
@@ -77,11 +77,11 @@ func formatPrimitive(value gidlir.Value) string {
 	panic("Unreachable")
 }
 
-func (a *allocatorBuilder) visit(value gidlir.Value, decl gidlmixer.Declaration) string {
+func (a *allocatorBuilder) visit(value ir.Value, decl mixer.Declaration) string {
 	// StringView and VectorView in wire types represent nullability within the object rather than as
 	// as pointer to the object.
-	_, isString := decl.(*gidlmixer.StringDecl)
-	_, isVector := decl.(*gidlmixer.VectorDecl)
+	_, isString := decl.(*mixer.StringDecl)
+	_, isVector := decl.(*mixer.VectorDecl)
 	isPointer := (decl.IsNullable() && !isString && !isVector)
 
 	switch value := value.(type) {
@@ -89,13 +89,13 @@ func (a *allocatorBuilder) visit(value gidlir.Value, decl gidlmixer.Declaration)
 		return a.construct(typeName(decl), isPointer, "%t", value)
 	case int64, uint64, float64:
 		switch decl := decl.(type) {
-		case gidlmixer.PrimitiveDeclaration, *gidlmixer.EnumDecl:
+		case mixer.PrimitiveDeclaration, *mixer.EnumDecl:
 			return a.construct(typeName(decl), isPointer, formatPrimitive(value))
-		case *gidlmixer.BitsDecl:
+		case *mixer.BitsDecl:
 			return fmt.Sprintf("static_cast<%s>(%s)", declName(decl), formatPrimitive(value))
 		}
-	case gidlir.RawFloat:
-		switch decl.(*gidlmixer.FloatDecl).Subtype() {
+	case ir.RawFloat:
+		switch decl.(*mixer.FloatDecl).Subtype() {
 		case fidlgen.Float32:
 			return fmt.Sprintf("([] { uint32_t u = %#b; float f; memcpy(&f, &u, sizeof(float)); return f; })()", value)
 		case fidlgen.Float64:
@@ -107,29 +107,29 @@ func (a *allocatorBuilder) visit(value gidlir.Value, decl gidlmixer.Declaration)
 			return strconv.Quote(value)
 		}
 		return a.construct(typeNameIgnoreNullable(decl), isPointer, "%q", value)
-	case gidlir.HandleWithRights:
+	case ir.HandleWithRights:
 		switch decl := decl.(type) {
-		case *gidlmixer.HandleDecl:
+		case *mixer.HandleDecl:
 			return a.adoptHandle(decl, value)
-		case *gidlmixer.ClientEndDecl:
+		case *mixer.ClientEndDecl:
 			return fmt.Sprintf("%s(%s)", typeName(decl), a.adoptHandle(decl.UnderlyingHandleDecl(), value))
-		case *gidlmixer.ServerEndDecl:
+		case *mixer.ServerEndDecl:
 			return fmt.Sprintf("%s(%s)", typeName(decl), a.adoptHandle(decl.UnderlyingHandleDecl(), value))
 		}
-	case gidlir.Record:
+	case ir.Record:
 		switch decl := decl.(type) {
-		case *gidlmixer.StructDecl:
+		case *mixer.StructDecl:
 			return a.visitStruct(value, decl, isPointer)
-		case *gidlmixer.TableDecl:
+		case *mixer.TableDecl:
 			return a.visitTable(value, decl, isPointer)
-		case *gidlmixer.UnionDecl:
+		case *mixer.UnionDecl:
 			return a.visitUnion(value, decl, isPointer)
 		}
-	case []gidlir.Value:
+	case []ir.Value:
 		switch decl := decl.(type) {
-		case *gidlmixer.ArrayDecl:
+		case *mixer.ArrayDecl:
 			return a.visitArray(value, decl, isPointer)
-		case *gidlmixer.VectorDecl:
+		case *mixer.VectorDecl:
 			return a.visitVector(value, decl, isPointer)
 		}
 	case nil:
@@ -138,7 +138,7 @@ func (a *allocatorBuilder) visit(value gidlir.Value, decl gidlmixer.Declaration)
 	panic(fmt.Sprintf("not implemented: %T", value))
 }
 
-func (a *allocatorBuilder) visitStruct(value gidlir.Record, decl *gidlmixer.StructDecl, isPointer bool) string {
+func (a *allocatorBuilder) visitStruct(value ir.Record, decl *mixer.StructDecl, isPointer bool) string {
 	s := a.newVar()
 	structRaw := fmt.Sprintf("%s{}", typeNameIgnoreNullable(decl))
 	var op string
@@ -158,7 +158,7 @@ func (a *allocatorBuilder) visitStruct(value gidlir.Record, decl *gidlmixer.Stru
 	return fmt.Sprintf("std::move(%s)", s)
 }
 
-func (a *allocatorBuilder) visitTable(value gidlir.Record, decl *gidlmixer.TableDecl, isPointer bool) string {
+func (a *allocatorBuilder) visitTable(value ir.Record, decl *mixer.TableDecl, isPointer bool) string {
 	t := a.assignNew(declName(decl), isPointer, "%s", a.allocatorVar)
 	op := "."
 	if isPointer {
@@ -182,7 +182,7 @@ func (a *allocatorBuilder) visitTable(value gidlir.Record, decl *gidlmixer.Table
 	return fmt.Sprintf("std::move(%s)", t)
 }
 
-func (a *allocatorBuilder) visitUnion(value gidlir.Record, decl *gidlmixer.UnionDecl, isPointer bool) string {
+func (a *allocatorBuilder) visitUnion(value ir.Record, decl *mixer.UnionDecl, isPointer bool) string {
 	s := a.newVar()
 	unionRaw := a.assignNew(typeNameIgnoreNullable(decl), false, "")
 	if isPointer {
@@ -209,7 +209,7 @@ func (a *allocatorBuilder) visitUnion(value gidlir.Record, decl *gidlmixer.Union
 	return fmt.Sprintf("std::move(%s)", s)
 }
 
-func (a *allocatorBuilder) visitArray(value []gidlir.Value, decl *gidlmixer.ArrayDecl, isPointer bool) string {
+func (a *allocatorBuilder) visitArray(value []ir.Value, decl *mixer.ArrayDecl, isPointer bool) string {
 	array := a.assignNew(typeNameIgnoreNullable(decl), isPointer, "")
 	op := ""
 	if isPointer {
@@ -222,20 +222,20 @@ func (a *allocatorBuilder) visitArray(value []gidlir.Value, decl *gidlmixer.Arra
 	return fmt.Sprintf("std::move(%s)", array)
 }
 
-func (a *allocatorBuilder) visitVector(value []gidlir.Value, decl *gidlmixer.VectorDecl, isPointer bool) string {
+func (a *allocatorBuilder) visitVector(value []ir.Value, decl *mixer.VectorDecl, isPointer bool) string {
 	vector := a.assignNew(typeName(decl), isPointer, "%s, %d", a.allocatorVar, len(value))
 	if len(value) == 0 {
 		return fmt.Sprintf("std::move(%s)", vector)
 	}
 	// Special case unsigned integer vectors, because clang otherwise has issues with large vectors on arm.
 	// This uses pattern matching so only a subset of byte vectors that fit the pattern (repeating sequence) will be optimized.
-	if elemDecl, ok := decl.Elem().(gidlmixer.PrimitiveDeclaration); ok && elemDecl.Subtype() == fidlgen.Uint8 {
+	if elemDecl, ok := decl.Elem().(mixer.PrimitiveDeclaration); ok && elemDecl.Subtype() == fidlgen.Uint8 {
 		var uintValues []uint64
 		for _, v := range value {
 			uintValues = append(uintValues, v.(uint64))
 		}
 		// For simplicity, only support sizes that are multiples of the period.
-		if period, ok := gidlutil.FindRepeatingPeriod(uintValues); ok && len(value)%period == 0 {
+		if period, ok := util.FindRepeatingPeriod(uintValues); ok && len(value)%period == 0 {
 			for i := 0; i < period; i++ {
 				elem := a.visit(value[i], decl.Elem())
 				a.write("%s[%d] = %s;\n", vector, i, elem)

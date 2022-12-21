@@ -9,7 +9,7 @@ import (
 	"math"
 	"strconv"
 
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
@@ -25,7 +25,7 @@ type Declaration interface {
 	IsInlinableInEnvelope() bool
 
 	// conforms verifies that the value conforms to this declaration.
-	conforms(value gidlir.Value, ctx context) error
+	conforms(value ir.Value, ctx context) error
 }
 
 // Assert that wrappers conform to the Declaration interface.
@@ -50,7 +50,7 @@ var _ = []Declaration{
 // conforms to a declaration.
 type context struct {
 	// Handle definitions in scope, used for HandleDecl conformance.
-	handleDefs []gidlir.HandleDef
+	handleDefs []ir.HandleDef
 
 	// If true, handle types are ignored in conforms(). This allows us to
 	// express EncodeSuccess tests with incorrect handle types (which pass
@@ -169,7 +169,7 @@ func (decl *BoolDecl) Subtype() fidlgen.PrimitiveSubtype {
 	return fidlgen.Bool
 }
 
-func (decl *BoolDecl) conforms(value gidlir.Value, _ context) error {
+func (decl *BoolDecl) conforms(value ir.Value, _ context) error {
 	switch value.(type) {
 	default:
 		return fmt.Errorf("expecting bool, found %T (%v)", value, value)
@@ -198,7 +198,7 @@ func (decl *IntegerDecl) Subtype() fidlgen.PrimitiveSubtype {
 	return decl.subtype
 }
 
-func (decl *IntegerDecl) conforms(value gidlir.Value, _ context) error {
+func (decl *IntegerDecl) conforms(value ir.Value, _ context) error {
 	switch value := value.(type) {
 	default:
 		return fmt.Errorf("expecting int64 or uint64, found %T (%v)", value, value)
@@ -234,7 +234,7 @@ func (decl *FloatDecl) Subtype() fidlgen.PrimitiveSubtype {
 	return decl.subtype
 }
 
-func (decl *FloatDecl) conforms(value gidlir.Value, _ context) error {
+func (decl *FloatDecl) conforms(value ir.Value, _ context) error {
 	switch value := value.(type) {
 	default:
 		return fmt.Errorf("expecting float64, found %T (%s)", value, value)
@@ -246,7 +246,7 @@ func (decl *FloatDecl) conforms(value gidlir.Value, _ context) error {
 			return fmt.Errorf("must use raw_float for infinity: %v", value)
 		}
 		return nil
-	case gidlir.RawFloat:
+	case ir.RawFloat:
 		if decl.subtype == fidlgen.Float32 && value > math.MaxUint32 {
 			return fmt.Errorf("raw_float out of range for float32: %v", value)
 		}
@@ -264,7 +264,7 @@ func (decl *StringDecl) IsNullable() bool {
 	return decl.nullable
 }
 
-func (decl *StringDecl) conforms(value gidlir.Value, _ context) error {
+func (decl *StringDecl) conforms(value ir.Value, _ context) error {
 	switch value := value.(type) {
 	default:
 		return fmt.Errorf("expecting string, found %T (%v)", value, value)
@@ -301,11 +301,11 @@ func (decl *HandleDecl) IsNullable() bool {
 	return decl.nullable
 }
 
-func (decl *HandleDecl) conforms(value gidlir.Value, ctx context) error {
+func (decl *HandleDecl) conforms(value ir.Value, ctx context) error {
 	switch value := value.(type) {
 	default:
 		return fmt.Errorf("expecting handle, found %T (%v)", value, value)
-	case gidlir.HandleWithRights:
+	case ir.HandleWithRights:
 		if v := int(value.Handle); v < 0 || v >= len(ctx.handleDefs) {
 			return fmt.Errorf("handle #%d out of range", value.Handle)
 		}
@@ -348,7 +348,7 @@ func (decl *ClientEndDecl) UnderlyingHandleDecl() *HandleDecl {
 	}
 }
 
-func (decl *ClientEndDecl) conforms(value gidlir.Value, ctx context) error {
+func (decl *ClientEndDecl) conforms(value ir.Value, ctx context) error {
 	return decl.UnderlyingHandleDecl().conforms(value, ctx)
 }
 
@@ -373,7 +373,7 @@ func (decl *ServerEndDecl) UnderlyingHandleDecl() *HandleDecl {
 	}
 }
 
-func (decl *ServerEndDecl) conforms(value gidlir.Value, ctx context) error {
+func (decl *ServerEndDecl) conforms(value ir.Value, ctx context) error {
 	return decl.UnderlyingHandleDecl().conforms(value, ctx)
 }
 
@@ -395,7 +395,7 @@ func (decl *BitsDecl) IsFlexible() bool {
 	return decl.bitsDecl.IsFlexible()
 }
 
-func (decl *BitsDecl) conforms(value gidlir.Value, ctx context) error {
+func (decl *BitsDecl) conforms(value ir.Value, ctx context) error {
 	err := decl.Underlying.conforms(value, ctx)
 	if err != nil {
 		return err
@@ -434,7 +434,7 @@ func (decl *EnumDecl) IsFlexible() bool {
 	return decl.enumDecl.IsFlexible()
 }
 
-func (decl *EnumDecl) conforms(value gidlir.Value, ctx context) error {
+func (decl *EnumDecl) conforms(value ir.Value, ctx context) error {
 	err := decl.Underlying.conforms(value, ctx)
 	if err != nil {
 		return err
@@ -499,14 +499,14 @@ func (decl *StructDecl) Field(name string) Declaration {
 }
 
 // recordConforms is a helper function for implementing Declarations.conforms on
-// types that expect a gidlir.Record value. It takes the kind ("struct", etc.),
+// types that expect a ir.Record value. It takes the kind ("struct", etc.),
 // expected identifier, schema, and nullability, and returns the record or an
 // error. It can also return (nil, nil) when value is nil and nullable is true.
-func recordConforms(value gidlir.Value, kind string, decl NamedDeclaration, schema Schema) (*gidlir.Record, error) {
+func recordConforms(value ir.Value, kind string, decl NamedDeclaration, schema Schema) (*ir.Record, error) {
 	switch value := value.(type) {
 	default:
 		return nil, fmt.Errorf("expecting %s, found %T (%v)", kind, value, value)
-	case gidlir.Record:
+	case ir.Record:
 		if name := schema.qualifyName(value.Name); name != decl.Name() {
 			return nil, fmt.Errorf("expecting %s %s, found %s", kind, decl.Name(), name)
 		}
@@ -519,7 +519,7 @@ func recordConforms(value gidlir.Value, kind string, decl NamedDeclaration, sche
 	}
 }
 
-func (decl *StructDecl) conforms(value gidlir.Value, ctx context) error {
+func (decl *StructDecl) conforms(value ir.Value, ctx context) error {
 	record, err := recordConforms(value, "struct", decl, decl.schema)
 	if err != nil {
 		return err
@@ -606,7 +606,7 @@ func (decl *TableDecl) fieldByOrdinal(ordinal uint64) (Declaration, bool) {
 	return nil, false
 }
 
-func (decl *TableDecl) conforms(value gidlir.Value, ctx context) error {
+func (decl *TableDecl) conforms(value ir.Value, ctx context) error {
 	record, err := recordConforms(value, "table", decl, decl.schema)
 	if err != nil {
 		return err
@@ -687,7 +687,7 @@ func (decl *UnionDecl) fieldByOrdinal(ordinal uint64) (Declaration, bool) {
 	return nil, false
 }
 
-func (decl *UnionDecl) conforms(value gidlir.Value, ctx context) error {
+func (decl *UnionDecl) conforms(value ir.Value, ctx context) error {
 	record, err := recordConforms(value, "union", decl, decl.schema)
 	if err != nil {
 		return err
@@ -741,11 +741,11 @@ func (decl *ArrayDecl) Size() int {
 	return *decl.typ.ElementCount
 }
 
-func (decl *ArrayDecl) conforms(value gidlir.Value, ctx context) error {
+func (decl *ArrayDecl) conforms(value ir.Value, ctx context) error {
 	switch value := value.(type) {
 	default:
 		return fmt.Errorf("expecting array, found %T (%v)", value, value)
-	case []gidlir.Value:
+	case []ir.Value:
 		if len(value) != decl.Size() {
 			return fmt.Errorf("expecting %d elements, got %d", decl.Size(), len(value))
 		}
@@ -786,11 +786,11 @@ func (decl *VectorDecl) MaxSize() (int, bool) {
 	return 0, false
 }
 
-func (decl *VectorDecl) conforms(value gidlir.Value, ctx context) error {
+func (decl *VectorDecl) conforms(value ir.Value, ctx context) error {
 	switch value := value.(type) {
 	default:
 		return fmt.Errorf("expecting vector, found %T (%v)", value, value)
-	case []gidlir.Value:
+	case []ir.Value:
 		if maxSize, ok := decl.MaxSize(); ok && len(value) > maxSize {
 			return fmt.Errorf("expecting at most %d elements, got %d", maxSize, len(value))
 		}
@@ -858,7 +858,7 @@ func BuildSchema(fidl fidlgen.Root) Schema {
 // ExtractDeclaration extract the top-level declaration for the provided value,
 // and ensures the value conforms to the schema. It also takes a list of handle
 // definitions in scope, which can be nil if there are no handles.
-func (s Schema) ExtractDeclaration(value gidlir.Record, handleDefs []gidlir.HandleDef) (*StructDecl, error) {
+func (s Schema) ExtractDeclaration(value ir.Record, handleDefs []ir.HandleDef) (*StructDecl, error) {
 	decl, err := s.ExtractDeclarationUnsafe(value)
 	if err != nil {
 		return nil, err
@@ -873,7 +873,7 @@ func (s Schema) ExtractDeclaration(value gidlir.Record, handleDefs []gidlir.Hand
 // provided value, and ensures the value conforms to the schema based on the
 // rules for EncodeSuccess. It also takes a list of handle definitions in
 // scope, which can be nil if there are no handles.
-func (s Schema) ExtractDeclarationEncodeSuccess(value gidlir.Record, handleDefs []gidlir.HandleDef) (*StructDecl, error) {
+func (s Schema) ExtractDeclarationEncodeSuccess(value ir.Record, handleDefs []ir.HandleDef) (*StructDecl, error) {
 	decl, err := s.ExtractDeclarationUnsafe(value)
 	if err != nil {
 		return nil, err
@@ -887,7 +887,7 @@ func (s Schema) ExtractDeclarationEncodeSuccess(value gidlir.Record, handleDefs 
 // ExtractDeclarationUnsafe extracts the top-level declaration for the provided
 // value, but does not ensure the value conforms to the schema. This is used in
 // cases where conformance is too strict (e.g. failure cases).
-func (s Schema) ExtractDeclarationUnsafe(value gidlir.Record) (*StructDecl, error) {
+func (s Schema) ExtractDeclarationUnsafe(value ir.Record) (*StructDecl, error) {
 	return s.ExtractDeclarationByName(value.Name)
 }
 

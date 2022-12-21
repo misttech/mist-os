@@ -12,12 +12,12 @@ import (
 	"strings"
 
 	libhlcpp "go.fuchsia.dev/fuchsia/tools/fidl/gidl/hlcpp"
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
-func buildEqualityCheck(actualExpr string, expectedValue gidlir.Value, decl gidlmixer.Declaration, handleKoidVectorName string) string {
+func buildEqualityCheck(actualExpr string, expectedValue ir.Value, decl mixer.Declaration, handleKoidVectorName string) string {
 	builder := equalityCheckBuilder{
 		handleKoidVectorName: handleKoidVectorName,
 	}
@@ -80,22 +80,22 @@ func (b *equalityCheckBuilder) assertPresent(value string) {
 	b.write("ASSERT_TRUE(%s.has_value());\n", value)
 }
 
-func (b *equalityCheckBuilder) visit(actualExpr string, expectedValue gidlir.Value, decl gidlmixer.Declaration) {
+func (b *equalityCheckBuilder) visit(actualExpr string, expectedValue ir.Value, decl mixer.Declaration) {
 	switch expectedValue := expectedValue.(type) {
 	case bool:
 		b.assertEquals(actualExpr, b.construct(typeName(decl), "%t", expectedValue))
 		return
 	case int64, uint64, float64:
 		switch decl := decl.(type) {
-		case gidlmixer.PrimitiveDeclaration, *gidlmixer.EnumDecl:
+		case mixer.PrimitiveDeclaration, *mixer.EnumDecl:
 			b.assertEquals(actualExpr, b.construct(typeName(decl), formatPrimitive(expectedValue)))
 			return
-		case *gidlmixer.BitsDecl:
+		case *mixer.BitsDecl:
 			b.assertEquals(actualExpr, fmt.Sprintf("static_cast<%s>(%s)", declName(decl), formatPrimitive(expectedValue)))
 			return
 		}
-	case gidlir.RawFloat:
-		switch decl.(*gidlmixer.FloatDecl).Subtype() {
+	case ir.RawFloat:
+		switch decl.(*mixer.FloatDecl).Subtype() {
 		case fidlgen.Float32:
 			b.assertEquals(actualExpr, fmt.Sprintf("([] { uint32_t u = %#b; float f; memcpy(&f, &u, sizeof(float)); return f; })()", expectedValue))
 			return
@@ -111,48 +111,48 @@ func (b *equalityCheckBuilder) visit(actualExpr string, expectedValue gidlir.Val
 		}
 		b.assertStringEquals(dereferencedActual, escapeStr(expectedValue))
 		return
-	case gidlir.HandleWithRights:
+	case ir.HandleWithRights:
 		switch decl := decl.(type) {
-		case *gidlmixer.HandleDecl:
+		case *mixer.HandleDecl:
 			b.visitHandle(actualExpr, expectedValue, decl, ownedHandle)
 			return
-		case *gidlmixer.ClientEndDecl:
+		case *mixer.ClientEndDecl:
 			b.visitClientEnd(actualExpr, expectedValue, decl)
 			return
-		case *gidlmixer.ServerEndDecl:
+		case *mixer.ServerEndDecl:
 			b.visitServerEnd(actualExpr, expectedValue, decl)
 			return
 		}
-	case gidlir.Record:
+	case ir.Record:
 		switch decl := decl.(type) {
-		case *gidlmixer.StructDecl:
+		case *mixer.StructDecl:
 			b.visitStruct(actualExpr, expectedValue, decl)
 			return
-		case *gidlmixer.TableDecl:
+		case *mixer.TableDecl:
 			b.visitTable(actualExpr, expectedValue, decl)
 			return
-		case *gidlmixer.UnionDecl:
+		case *mixer.UnionDecl:
 			b.visitUnion(actualExpr, expectedValue, decl)
 			return
 		}
-	case []gidlir.Value:
-		b.visitList(actualExpr, expectedValue, decl.(gidlmixer.ListDeclaration))
+	case []ir.Value:
+		b.visitList(actualExpr, expectedValue, decl.(mixer.ListDeclaration))
 		return
 	case nil:
 		switch decl.(type) {
-		case *gidlmixer.StringDecl:
+		case *mixer.StringDecl:
 			b.assertFalse(fmt.Sprintf("%s.has_value()", actualExpr))
 			return
-		case *gidlmixer.HandleDecl:
+		case *mixer.HandleDecl:
 			b.assertFalse(fmt.Sprintf("%s.is_valid()", actualExpr))
 			return
-		case *gidlmixer.UnionDecl:
+		case *mixer.UnionDecl:
 			b.assertAbsent(actualExpr)
 			return
-		case *gidlmixer.VectorDecl:
+		case *mixer.VectorDecl:
 			b.assertFalse(fmt.Sprintf("%s.has_value()", actualExpr))
 			return
-		case *gidlmixer.StructDecl:
+		case *mixer.StructDecl:
 			b.assertAbsent(actualExpr)
 			return
 		}
@@ -167,7 +167,7 @@ const (
 	ownedHandle
 )
 
-func (b *equalityCheckBuilder) visitHandle(actualExpr string, expectedValue gidlir.HandleWithRights, decl *gidlmixer.HandleDecl, ownership handleOwnership) {
+func (b *equalityCheckBuilder) visitHandle(actualExpr string, expectedValue ir.HandleWithRights, decl *mixer.HandleDecl, ownership handleOwnership) {
 	actualVar := b.createAndAssignVar(actualExpr)
 	resultVar := b.varSeq.next()
 	var handleValueExpr string
@@ -190,15 +190,15 @@ func (b *equalityCheckBuilder) visitHandle(actualExpr string, expectedValue gidl
   `, resultVar, handleValueExpr, b.handleKoidVectorName, expectedValue.Handle, expectedValue.Type, expectedValue.Rights)
 }
 
-func (b *equalityCheckBuilder) visitClientEnd(actualExpr string, expectedValue gidlir.HandleWithRights, decl *gidlmixer.ClientEndDecl) {
+func (b *equalityCheckBuilder) visitClientEnd(actualExpr string, expectedValue ir.HandleWithRights, decl *mixer.ClientEndDecl) {
 	b.visitHandle(fmt.Sprintf("(%s).handle()", actualExpr), expectedValue, decl.UnderlyingHandleDecl(), unownedHandle)
 }
 
-func (b *equalityCheckBuilder) visitServerEnd(actualExpr string, expectedValue gidlir.HandleWithRights, decl *gidlmixer.ServerEndDecl) {
+func (b *equalityCheckBuilder) visitServerEnd(actualExpr string, expectedValue ir.HandleWithRights, decl *mixer.ServerEndDecl) {
 	b.visitHandle(fmt.Sprintf("(%s).handle()", actualExpr), expectedValue, decl.UnderlyingHandleDecl(), unownedHandle)
 }
 
-func (b *equalityCheckBuilder) visitStruct(actualExpr string, expectedValue gidlir.Record, decl *gidlmixer.StructDecl) {
+func (b *equalityCheckBuilder) visitStruct(actualExpr string, expectedValue ir.Record, decl *mixer.StructDecl) {
 	actualVar := b.createAndAssignVar(actualExpr)
 	op := "."
 	if decl.IsNullable() {
@@ -211,9 +211,9 @@ func (b *equalityCheckBuilder) visitStruct(actualExpr string, expectedValue gidl
 	}
 }
 
-func (b *equalityCheckBuilder) visitTable(actualExpr string, expectedValue gidlir.Record, decl *gidlmixer.TableDecl) {
+func (b *equalityCheckBuilder) visitTable(actualExpr string, expectedValue ir.Record, decl *mixer.TableDecl) {
 	actualVar := b.createAndAssignVar(actualExpr)
-	expectedFieldValues := map[string]gidlir.Value{}
+	expectedFieldValues := map[string]ir.Value{}
 	for _, field := range expectedValue.Fields {
 		if field.Key.IsUnknown() {
 			// Unknowns table members are dropped when decoding in the new C++ bindings.
@@ -233,7 +233,7 @@ func (b *equalityCheckBuilder) visitTable(actualExpr string, expectedValue gidli
 	}
 }
 
-func (b *equalityCheckBuilder) visitUnion(actualExpr string, expectedValue gidlir.Record, decl *gidlmixer.UnionDecl) {
+func (b *equalityCheckBuilder) visitUnion(actualExpr string, expectedValue ir.Record, decl *mixer.UnionDecl) {
 	actualVar := b.createAndAssignVar(actualExpr)
 	op := "."
 	if decl.IsNullable() {
@@ -258,14 +258,14 @@ func (b *equalityCheckBuilder) visitUnion(actualExpr string, expectedValue gidli
 	b.visit(actualFieldExpr, field.Value, decl.Field(field.Key.Name))
 }
 
-func (b *equalityCheckBuilder) visitList(actualExpr string, expectedValue []gidlir.Value, decl gidlmixer.ListDeclaration) {
+func (b *equalityCheckBuilder) visitList(actualExpr string, expectedValue []ir.Value, decl mixer.ListDeclaration) {
 	var actualVar string
 	if decl.IsNullable() {
 		actualVar = b.createAndAssignVar(actualExpr + ".value()")
 	} else {
 		actualVar = b.createAndAssignVar(actualExpr)
 	}
-	if _, ok := decl.(*gidlmixer.VectorDecl); ok {
+	if _, ok := decl.(*mixer.VectorDecl); ok {
 		b.assertEquals(fmt.Sprintf("%s.size()", actualVar), fmt.Sprintf("%d", len(expectedValue)))
 	}
 	for i, item := range expectedValue {
@@ -287,7 +287,7 @@ func (b *equalityCheckBuilder) visitUnknownBytes(actualExpr string, expectedValu
 		b.varSeq.next(), libhlcpp.BuildBytes(expectedValue), actualExpr)
 }
 
-func (b *equalityCheckBuilder) visitUnknownHandles(actualExpr string, expectedValue []gidlir.Handle) {
+func (b *equalityCheckBuilder) visitUnknownHandles(actualExpr string, expectedValue []ir.Handle) {
 	b.write(`
 	std::vector<zx_handle_t> handles%[1]s = %[2]s;
 	ASSERT_EQ(handles%[1]s.size(), %[3]s.size());

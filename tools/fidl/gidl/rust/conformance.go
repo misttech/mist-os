@@ -10,10 +10,10 @@ import (
 	"fmt"
 	"text/template"
 
-	gidlconfig "go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
-	gidllibrust "go.fuchsia.dev/fuchsia/tools/fidl/gidl/librust"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/librust"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
@@ -48,8 +48,8 @@ type decodeFailureCase struct {
 }
 
 // GenerateConformanceTests generates Rust tests.
-func GenerateConformanceTests(gidl gidlir.All, fidl fidlgen.Root, config gidlconfig.GeneratorConfig) ([]byte, error) {
-	schema := gidlmixer.BuildSchema(fidl)
+func GenerateConformanceTests(gidl ir.All, fidl fidlgen.Root, config config.GeneratorConfig) ([]byte, error) {
+	schema := mixer.BuildSchema(fidl)
 	encodeSuccessCases, err := encodeSuccessCases(gidl.EncodeSuccess, schema)
 	if err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func GenerateConformanceTests(gidl gidlir.All, fidl fidlgen.Root, config gidlcon
 	return buf.Bytes(), err
 }
 
-func encodeSuccessCases(gidlEncodeSuccesses []gidlir.EncodeSuccess, schema gidlmixer.Schema) ([]encodeSuccessCase, error) {
+func encodeSuccessCases(gidlEncodeSuccesses []ir.EncodeSuccess, schema mixer.Schema) ([]encodeSuccessCase, error) {
 	var encodeSuccessCases []encodeSuccessCase
 	for _, encodeSuccess := range gidlEncodeSuccesses {
 		decl, err := schema.ExtractDeclarationEncodeSuccess(encodeSuccess.Value, encodeSuccess.HandleDefs)
@@ -94,7 +94,7 @@ func encodeSuccessCases(gidlEncodeSuccesses []gidlir.EncodeSuccess, schema gidlm
 				Context:    encodingContext(encoding.WireFormat),
 				HandleDefs: buildHandleDefs(encodeSuccess.HandleDefs),
 				Value:      value,
-				Bytes:      gidllibrust.BuildBytes(encoding.Bytes),
+				Bytes:      librust.BuildBytes(encoding.Bytes),
 			}
 			if len(newCase.HandleDefs) != 0 {
 				if encodeSuccess.CheckHandleRights {
@@ -109,7 +109,7 @@ func encodeSuccessCases(gidlEncodeSuccesses []gidlir.EncodeSuccess, schema gidlm
 	return encodeSuccessCases, nil
 }
 
-func decodeSuccessCases(gidlDecodeSuccesses []gidlir.DecodeSuccess, schema gidlmixer.Schema) ([]decodeSuccessCase, error) {
+func decodeSuccessCases(gidlDecodeSuccesses []ir.DecodeSuccess, schema mixer.Schema) ([]decodeSuccessCase, error) {
 	var decodeSuccessCases []decodeSuccessCase
 	for _, decodeSuccess := range gidlDecodeSuccesses {
 		decl, err := schema.ExtractDeclaration(decodeSuccess.Value, decodeSuccess.HandleDefs)
@@ -129,7 +129,7 @@ func decodeSuccessCases(gidlDecodeSuccesses []gidlir.DecodeSuccess, schema gidlm
 				HandleDefs:    buildHandleDefs(decodeSuccess.HandleDefs),
 				ValueType:     valueType,
 				ValueVar:      valueVar,
-				Bytes:         gidllibrust.BuildBytes(encoding.Bytes),
+				Bytes:         librust.BuildBytes(encoding.Bytes),
 				Handles:       buildHandles(encoding.Handles),
 				EqualityCheck: equalityCheck,
 			})
@@ -138,7 +138,7 @@ func decodeSuccessCases(gidlDecodeSuccesses []gidlir.DecodeSuccess, schema gidlm
 	return decodeSuccessCases, nil
 }
 
-func encodeFailureCases(gidlEncodeFailures []gidlir.EncodeFailure, schema gidlmixer.Schema) ([]encodeFailureCase, error) {
+func encodeFailureCases(gidlEncodeFailures []ir.EncodeFailure, schema mixer.Schema) ([]encodeFailureCase, error) {
 	var encodeFailureCases []encodeFailureCase
 	for _, encodeFailure := range gidlEncodeFailures {
 		decl, err := schema.ExtractDeclarationUnsafe(encodeFailure.Value)
@@ -164,7 +164,7 @@ func encodeFailureCases(gidlEncodeFailures []gidlir.EncodeFailure, schema gidlmi
 	return encodeFailureCases, nil
 }
 
-func decodeFailureCases(gidlDecodeFailures []gidlir.DecodeFailure, schema gidlmixer.Schema) ([]decodeFailureCase, error) {
+func decodeFailureCases(gidlDecodeFailures []ir.DecodeFailure, schema mixer.Schema) ([]decodeFailureCase, error) {
 	var decodeFailureCases []decodeFailureCase
 	for _, decodeFailure := range gidlDecodeFailures {
 		decl, err := schema.ExtractDeclarationByName(decodeFailure.Type)
@@ -185,7 +185,7 @@ func decodeFailureCases(gidlDecodeFailures []gidlir.DecodeFailure, schema gidlmi
 				Context:    encodingContext(encoding.WireFormat),
 				HandleDefs: buildHandleDefs(decodeFailure.HandleDefs),
 				ValueType:  valueType,
-				Bytes:      gidllibrust.BuildBytes(encoding.Bytes),
+				Bytes:      librust.BuildBytes(encoding.Bytes),
 				Handles:    buildHandles(encoding.Handles),
 				ErrorCode:  errorCode,
 			})
@@ -194,16 +194,16 @@ func decodeFailureCases(gidlDecodeFailures []gidlir.DecodeFailure, schema gidlmi
 	return decodeFailureCases, nil
 }
 
-func testCaseName(baseName string, wireFormat gidlir.WireFormat) string {
+func testCaseName(baseName string, wireFormat ir.WireFormat) string {
 	return fidlgen.ToSnakeCase(fmt.Sprintf("%s_%s", baseName, wireFormat))
 }
 
-var supportedWireFormats = []gidlir.WireFormat{
-	gidlir.V1WireFormat,
-	gidlir.V2WireFormat,
+var supportedWireFormats = []ir.WireFormat{
+	ir.V1WireFormat,
+	ir.V2WireFormat,
 }
 
-func wireFormatSupported(wireFormat gidlir.WireFormat) bool {
+func wireFormatSupported(wireFormat ir.WireFormat) bool {
 	for _, wf := range supportedWireFormats {
 		if wireFormat == wf {
 			return true
@@ -212,11 +212,11 @@ func wireFormatSupported(wireFormat gidlir.WireFormat) bool {
 	return false
 }
 
-func encodingContext(wireFormat gidlir.WireFormat) string {
+func encodingContext(wireFormat ir.WireFormat) string {
 	switch wireFormat {
-	case gidlir.V1WireFormat:
+	case ir.V1WireFormat:
 		return "_V1_CONTEXT"
-	case gidlir.V2WireFormat:
+	case ir.V2WireFormat:
 		return "_V2_CONTEXT"
 	default:
 		panic(fmt.Sprintf("unexpected wire format %v", wireFormat))
@@ -224,45 +224,45 @@ func encodingContext(wireFormat gidlir.WireFormat) string {
 }
 
 // Rust errors are defined in src/lib/fidl/rust/fidl/src/error.rs.
-var rustErrorCodeNames = map[gidlir.ErrorCode]string{
-	gidlir.CountExceedsLimit:                  "OutOfRange",
-	gidlir.EnvelopeBytesExceedMessageLength:   "InvalidNumBytesInEnvelope",
-	gidlir.EnvelopeHandlesExceedMessageLength: "InvalidNumHandlesInEnvelope",
-	gidlir.ExceededMaxOutOfLineDepth:          "MaxRecursionDepth",
-	gidlir.FlexibleUnionUnknownField:          "UnknownUnionTag",
-	gidlir.IncorrectHandleType:                "IncorrectHandleSubtype",
-	gidlir.InvalidBoolean:                     "InvalidBoolean",
-	gidlir.InvalidEmptyStruct:                 "Invalid",
-	gidlir.InvalidHandlePresenceIndicator:     "InvalidPresenceIndicator",
-	gidlir.InvalidInlineBitInEnvelope:         "InvalidInlineBitInEnvelope",
-	gidlir.InvalidInlineMarkerInEnvelope:      "InvalidInlineMarkerInEnvelope",
-	gidlir.InvalidNumBytesInEnvelope:          "InvalidNumBytesInEnvelope",
-	gidlir.InvalidNumHandlesInEnvelope:        "InvalidNumHandlesInEnvelope",
-	gidlir.InvalidPaddingByte:                 "NonZeroPadding",
-	gidlir.InvalidPresenceIndicator:           "InvalidPresenceIndicator",
-	gidlir.MissingRequiredHandleRights:        "MissingExpectedHandleRights",
-	gidlir.NonEmptyStringWithNullBody:         "UnexpectedNullRef",
-	gidlir.NonEmptyVectorWithNullBody:         "UnexpectedNullRef",
-	gidlir.NonNullableTypeWithNullValue:       "NotNullable",
-	gidlir.NonResourceUnknownHandles:          "CannotStoreUnknownHandles",
-	gidlir.StrictBitsUnknownBit:               "InvalidBitsValue",
-	gidlir.StrictEnumUnknownValue:             "InvalidEnumValue",
-	gidlir.StrictUnionUnknownField:            "UnknownUnionTag",
-	gidlir.StringCountExceeds32BitLimit:       "OutOfRange",
-	gidlir.StringNotUtf8:                      "Utf8Error",
-	gidlir.StringTooLong:                      "OutOfRange",
-	gidlir.TableCountExceeds32BitLimit:        "OutOfRange",
-	gidlir.TooFewBytes:                        "OutOfRange",
-	gidlir.TooFewBytesInPrimaryObject:         "OutOfRange",
-	gidlir.TooFewHandles:                      "OutOfRange",
-	gidlir.TooManyBytesInMessage:              "ExtraBytes",
-	gidlir.TooManyHandlesInMessage:            "ExtraHandles",
-	gidlir.UnexpectedOrdinal:                  "OutOfRange",
-	gidlir.UnionFieldNotSet:                   "UnknownUnionTag",
-	gidlir.VectorCountExceeds32BitLimit:       "OutOfRange",
+var rustErrorCodeNames = map[ir.ErrorCode]string{
+	ir.CountExceedsLimit:                  "OutOfRange",
+	ir.EnvelopeBytesExceedMessageLength:   "InvalidNumBytesInEnvelope",
+	ir.EnvelopeHandlesExceedMessageLength: "InvalidNumHandlesInEnvelope",
+	ir.ExceededMaxOutOfLineDepth:          "MaxRecursionDepth",
+	ir.FlexibleUnionUnknownField:          "UnknownUnionTag",
+	ir.IncorrectHandleType:                "IncorrectHandleSubtype",
+	ir.InvalidBoolean:                     "InvalidBoolean",
+	ir.InvalidEmptyStruct:                 "Invalid",
+	ir.InvalidHandlePresenceIndicator:     "InvalidPresenceIndicator",
+	ir.InvalidInlineBitInEnvelope:         "InvalidInlineBitInEnvelope",
+	ir.InvalidInlineMarkerInEnvelope:      "InvalidInlineMarkerInEnvelope",
+	ir.InvalidNumBytesInEnvelope:          "InvalidNumBytesInEnvelope",
+	ir.InvalidNumHandlesInEnvelope:        "InvalidNumHandlesInEnvelope",
+	ir.InvalidPaddingByte:                 "NonZeroPadding",
+	ir.InvalidPresenceIndicator:           "InvalidPresenceIndicator",
+	ir.MissingRequiredHandleRights:        "MissingExpectedHandleRights",
+	ir.NonEmptyStringWithNullBody:         "UnexpectedNullRef",
+	ir.NonEmptyVectorWithNullBody:         "UnexpectedNullRef",
+	ir.NonNullableTypeWithNullValue:       "NotNullable",
+	ir.NonResourceUnknownHandles:          "CannotStoreUnknownHandles",
+	ir.StrictBitsUnknownBit:               "InvalidBitsValue",
+	ir.StrictEnumUnknownValue:             "InvalidEnumValue",
+	ir.StrictUnionUnknownField:            "UnknownUnionTag",
+	ir.StringCountExceeds32BitLimit:       "OutOfRange",
+	ir.StringNotUtf8:                      "Utf8Error",
+	ir.StringTooLong:                      "OutOfRange",
+	ir.TableCountExceeds32BitLimit:        "OutOfRange",
+	ir.TooFewBytes:                        "OutOfRange",
+	ir.TooFewBytesInPrimaryObject:         "OutOfRange",
+	ir.TooFewHandles:                      "OutOfRange",
+	ir.TooManyBytesInMessage:              "ExtraBytes",
+	ir.TooManyHandlesInMessage:            "ExtraHandles",
+	ir.UnexpectedOrdinal:                  "OutOfRange",
+	ir.UnionFieldNotSet:                   "UnknownUnionTag",
+	ir.VectorCountExceeds32BitLimit:       "OutOfRange",
 }
 
-func rustErrorCode(code gidlir.ErrorCode) (string, error) {
+func rustErrorCode(code ir.ErrorCode) (string, error) {
 	if str, ok := rustErrorCodeNames[code]; ok {
 		return fmt.Sprintf("Error::%s", str), nil
 	}

@@ -13,22 +13,22 @@ import (
 	"sort"
 	"strings"
 
-	gidlc "go.fuchsia.dev/fuchsia/tools/fidl/gidl/c"
-	gidlconfig "go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
-	gidlcpp "go.fuchsia.dev/fuchsia/tools/fidl/gidl/cpp"
-	gidldart "go.fuchsia.dev/fuchsia/tools/fidl/gidl/dart"
-	gidldrivercpp "go.fuchsia.dev/fuchsia/tools/fidl/gidl/driver_cpp"
-	gidldriverllcpp "go.fuchsia.dev/fuchsia/tools/fidl/gidl/driver_llcpp"
-	gidldynfidl "go.fuchsia.dev/fuchsia/tools/fidl/gidl/dynfidl"
-	gidlcorpus "go.fuchsia.dev/fuchsia/tools/fidl/gidl/fuzzer_corpus"
-	gidlgolang "go.fuchsia.dev/fuchsia/tools/fidl/gidl/golang"
-	gidlhlcpp "go.fuchsia.dev/fuchsia/tools/fidl/gidl/hlcpp"
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
-	gidlllcpp "go.fuchsia.dev/fuchsia/tools/fidl/gidl/llcpp"
-	gidlparser "go.fuchsia.dev/fuchsia/tools/fidl/gidl/parser"
-	gidlreference "go.fuchsia.dev/fuchsia/tools/fidl/gidl/reference"
-	gidlrust "go.fuchsia.dev/fuchsia/tools/fidl/gidl/rust"
-	gidlwalker "go.fuchsia.dev/fuchsia/tools/fidl/gidl/walker"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/c"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/cpp"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/dart"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/driver_cpp"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/driver_llcpp"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/dynfidl"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/fuzzer_corpus"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/golang"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/hlcpp"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/llcpp"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/parser"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/reference"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/rust"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/walker"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
@@ -37,35 +37,35 @@ import (
 // added as a suffix to the name of the file before the extension
 // (e.g. my_file.go -> my_file_test_name.go).
 // The first file is the "main output file".
-type Generator func(gidlir.All, fidlgen.Root, gidlconfig.GeneratorConfig) ([]byte, error)
+type Generator func(ir.All, fidlgen.Root, config.GeneratorConfig) ([]byte, error)
 
 var conformanceGenerators = map[string]Generator{
-	"c":             gidlc.GenerateConformanceTests,
-	"dynfidl":       gidldynfidl.GenerateConformanceTests,
-	"go":            gidlgolang.GenerateConformanceTests,
-	"cpp":           gidlcpp.GenerateConformanceTests,
-	"llcpp":         gidlllcpp.GenerateConformanceTests,
-	"hlcpp":         gidlhlcpp.GenerateConformanceTests,
-	"dart":          gidldart.GenerateConformanceTests,
-	"rust":          gidlrust.GenerateConformanceTests,
-	"fuzzer_corpus": gidlcorpus.GenerateConformanceTests,
+	"c":             c.GenerateConformanceTests,
+	"dynfidl":       dynfidl.GenerateConformanceTests,
+	"go":            golang.GenerateConformanceTests,
+	"cpp":           cpp.GenerateConformanceTests,
+	"llcpp":         llcpp.GenerateConformanceTests,
+	"hlcpp":         hlcpp.GenerateConformanceTests,
+	"dart":          dart.GenerateConformanceTests,
+	"rust":          rust.GenerateConformanceTests,
+	"fuzzer_corpus": fuzzer_corpus.GenerateConformanceTests,
 }
 
 var benchmarkGenerators = map[string]Generator{
-	"go":           gidlgolang.GenerateBenchmarks,
-	"cpp":          gidlcpp.GenerateBenchmarks,
-	"llcpp":        gidlllcpp.GenerateBenchmarks,
-	"hlcpp":        gidlhlcpp.GenerateBenchmarks,
-	"rust":         gidlrust.GenerateBenchmarks,
-	"dart":         gidldart.GenerateBenchmarks,
-	"reference":    gidlreference.GenerateBenchmarks,
-	"walker":       gidlwalker.GenerateBenchmarks,
-	"driver_cpp":   gidldrivercpp.GenerateBenchmarks,
-	"driver_llcpp": gidldriverllcpp.GenerateBenchmarks,
+	"go":           golang.GenerateBenchmarks,
+	"cpp":          cpp.GenerateBenchmarks,
+	"llcpp":        llcpp.GenerateBenchmarks,
+	"hlcpp":        hlcpp.GenerateBenchmarks,
+	"rust":         rust.GenerateBenchmarks,
+	"dart":         dart.GenerateBenchmarks,
+	"reference":    reference.GenerateBenchmarks,
+	"walker":       walker.GenerateBenchmarks,
+	"driver_cpp":   driver_cpp.GenerateBenchmarks,
+	"driver_llcpp": driver_llcpp.GenerateBenchmarks,
 }
 
 var measureTapeGenerators = map[string]Generator{
-	"rust": gidlrust.GenerateMeasureTapeTests,
+	"rust": rust.GenerateMeasureTapeTests,
 }
 
 var allGenerators = map[string]map[string]Generator{
@@ -98,9 +98,9 @@ var allLanguages = func() []string {
 	return list
 }()
 
-var allWireFormats = []gidlir.WireFormat{
-	gidlir.V1WireFormat,
-	gidlir.V2WireFormat,
+var allWireFormats = []ir.WireFormat{
+	ir.V1WireFormat,
+	ir.V2WireFormat,
 }
 
 type listOfStrings []string
@@ -150,16 +150,16 @@ var flags = GIDLFlags{
 	FilterTypes: nil,
 }
 
-func parseGidlIr(filename string) gidlir.All {
+func parseGidlIr(filename string) ir.All {
 	f, err := os.Open(filename)
 	if err != nil {
 		panic(err)
 	}
-	config := gidlparser.Config{
+	config := parser.Config{
 		Languages:   allLanguages,
 		WireFormats: allWireFormats,
 	}
-	result, err := gidlparser.NewParser(filename, f, config).Parse()
+	result, err := parser.NewParser(filename, f, config).Parse()
 	if err != nil {
 		panic(err)
 	}
@@ -187,7 +187,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var config gidlconfig.GeneratorConfig
+	var config config.GeneratorConfig
 	if *flags.RustBenchmarksFidlLibrary != "" {
 		config.RustBenchmarksFidlLibrary = *flags.RustBenchmarksFidlLibrary
 	}
@@ -202,25 +202,25 @@ func main() {
 	}
 	config.FilterTypes = []string(flags.FilterTypes)
 
-	ir := parseFidlJSONIr(*flags.JSONPath)
+	root := parseFidlJSONIr(*flags.JSONPath)
 
-	var parsedGidlFiles []gidlir.All
+	var parsedGidlFiles []ir.All
 	for _, path := range flag.Args() {
 		parsedGidlFiles = append(parsedGidlFiles, parseGidlIr(path))
 	}
-	gidl := gidlir.FilterByBinding(gidlir.Merge(parsedGidlFiles), *flags.Language)
+	gidl := ir.FilterByBinding(ir.Merge(parsedGidlFiles), *flags.Language)
 
 	// For simplicity, we do not allow FIDL that GIDL depends on to have
 	// dependent libraries, with the exception of zx. This makes it much simpler
 	// to have everything in the IR, and avoid cross-references.
 
-	if len(ir.Libraries) == 1 && ir.Libraries[0].Name == "zx" {
-		ir.Libraries = make([]fidlgen.Library, 0)
+	if len(root.Libraries) == 1 && root.Libraries[0].Name == "zx" {
+		root.Libraries = make([]fidlgen.Library, 0)
 	}
 
-	if len(ir.Libraries) != 0 {
+	if len(root.Libraries) != 0 {
 		var libs []string
-		for _, l := range ir.Libraries {
+		for _, l := range root.Libraries {
 			libs = append(libs, string(l.Name))
 		}
 		panic(fmt.Sprintf(
@@ -233,7 +233,7 @@ func main() {
 		panic("must specify --language")
 	}
 
-	gidlir.ValidateAllType(gidl, *flags.Type)
+	ir.ValidateAllType(gidl, *flags.Type)
 	generatorMap, ok := allGenerators[*flags.Type]
 	if !ok {
 		panic(fmt.Sprintf("unknown generator type: %s", *flags.Type))
@@ -243,7 +243,7 @@ func main() {
 		log.Fatalf("unknown language for %s: %s", *flags.Type, language)
 	}
 
-	mainFile, err := generator(gidl, ir, config)
+	mainFile, err := generator(gidl, root, config)
 	if err != nil {
 		log.Fatal(err)
 	}

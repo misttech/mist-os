@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"text/template"
 
-	gidlconfig "go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
-	gidlir "go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
-	gidlmixer "go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/config"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/ir"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/mixer"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
@@ -50,8 +50,8 @@ type decodeFailureCase struct {
 }
 
 // GenerateConformanceTests generates Go tests.
-func GenerateConformanceTests(gidl gidlir.All, fidl fidlgen.Root, config gidlconfig.GeneratorConfig) ([]byte, error) {
-	schema := gidlmixer.BuildSchema(fidl)
+func GenerateConformanceTests(gidl ir.All, fidl fidlgen.Root, config config.GeneratorConfig) ([]byte, error) {
+	schema := mixer.BuildSchema(fidl)
 	encodeSuccessCases, err := encodeSuccessCases(gidl.EncodeSuccess, schema)
 	if err != nil {
 		return nil, err
@@ -79,18 +79,18 @@ func GenerateConformanceTests(gidl gidlir.All, fidl fidlgen.Root, config gidlcon
 	return buf.Bytes(), err
 }
 
-func marshalerContext(wireFormat gidlir.WireFormat) string {
+func marshalerContext(wireFormat ir.WireFormat) string {
 	switch wireFormat {
-	case gidlir.V1WireFormat:
+	case ir.V1WireFormat:
 		return `fidl.MarshalerContext{UseV2WireFormat: false}`
-	case gidlir.V2WireFormat:
+	case ir.V2WireFormat:
 		return `fidl.MarshalerContext{UseV2WireFormat: true}`
 	default:
 		panic(fmt.Sprintf("unexpected wire format %v", wireFormat))
 	}
 }
 
-func encodeSuccessCases(gidlEncodeSuccesses []gidlir.EncodeSuccess, schema gidlmixer.Schema) ([]encodeSuccessCase, error) {
+func encodeSuccessCases(gidlEncodeSuccesses []ir.EncodeSuccess, schema mixer.Schema) ([]encodeSuccessCase, error) {
 	var encodeSuccessCases []encodeSuccessCase
 	for _, encodeSuccess := range gidlEncodeSuccesses {
 		decl, err := schema.ExtractDeclarationEncodeSuccess(encodeSuccess.Value, encodeSuccess.HandleDefs)
@@ -116,7 +116,7 @@ func encodeSuccessCases(gidlEncodeSuccesses []gidlir.EncodeSuccess, schema gidlm
 	return encodeSuccessCases, nil
 }
 
-func decodeSuccessCases(gidlDecodeSuccesses []gidlir.DecodeSuccess, schema gidlmixer.Schema) ([]decodeSuccessCase, error) {
+func decodeSuccessCases(gidlDecodeSuccesses []ir.DecodeSuccess, schema mixer.Schema) ([]decodeSuccessCase, error) {
 	var decodeSuccessCases []decodeSuccessCase
 	for _, decodeSuccess := range gidlDecodeSuccesses {
 		decl, err := schema.ExtractDeclaration(decodeSuccess.Value, decodeSuccess.HandleDefs)
@@ -146,7 +146,7 @@ func decodeSuccessCases(gidlDecodeSuccesses []gidlir.DecodeSuccess, schema gidlm
 	return decodeSuccessCases, nil
 }
 
-func encodeFailureCases(gidlEncodeFailures []gidlir.EncodeFailure, schema gidlmixer.Schema) ([]encodeFailureCase, error) {
+func encodeFailureCases(gidlEncodeFailures []ir.EncodeFailure, schema mixer.Schema) ([]encodeFailureCase, error) {
 	var encodeFailureCases []encodeFailureCase
 	for _, encodeFailure := range gidlEncodeFailures {
 		decl, err := schema.ExtractDeclarationUnsafe(encodeFailure.Value)
@@ -171,7 +171,7 @@ func encodeFailureCases(gidlEncodeFailures []gidlir.EncodeFailure, schema gidlmi
 	return encodeFailureCases, nil
 }
 
-func decodeFailureCases(gidlDecodeFailures []gidlir.DecodeFailure, schema gidlmixer.Schema) ([]decodeFailureCase, error) {
+func decodeFailureCases(gidlDecodeFailures []ir.DecodeFailure, schema mixer.Schema) ([]decodeFailureCase, error) {
 	var decodeFailureCases []decodeFailureCase
 	for _, decodeFailure := range gidlDecodeFailures {
 		decl, err := schema.ExtractDeclarationByName(decodeFailure.Type)
@@ -201,11 +201,11 @@ func decodeFailureCases(gidlDecodeFailures []gidlir.DecodeFailure, schema gidlmi
 	return decodeFailureCases, nil
 }
 
-var supportedWireFormats = []gidlir.WireFormat{
-	gidlir.V2WireFormat,
+var supportedWireFormats = []ir.WireFormat{
+	ir.V2WireFormat,
 }
 
-func wireFormatSupported(wireFormat gidlir.WireFormat) bool {
+func wireFormatSupported(wireFormat ir.WireFormat) bool {
 	for _, wf := range supportedWireFormats {
 		if wireFormat == wf {
 			return true
@@ -214,6 +214,6 @@ func wireFormatSupported(wireFormat gidlir.WireFormat) bool {
 	return false
 }
 
-func testCaseName(baseName string, wireFormat gidlir.WireFormat) string {
+func testCaseName(baseName string, wireFormat ir.WireFormat) string {
 	return strconv.Quote(fmt.Sprintf("%s_%s", baseName, wireFormat))
 }
