@@ -161,7 +161,7 @@ mod tests {
             "fuchsia-pkg://root",
             EventPayload::CapabilityRouted { source, capability_provider: provider.clone() },
         );
-        hooks.dispatch(&event).await?;
+        hooks.dispatch(&event).await;
 
         let (client, mut server) = zx::Channel::create()?;
         let task_scope = TaskScope::new();

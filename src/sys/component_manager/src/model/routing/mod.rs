@@ -357,7 +357,7 @@ pub async fn open_capability_at_source(open_request: OpenRequest<'_>) -> Result<
             );
 
             // Get a capability provider from the tree
-            target.hooks.dispatch(&event).await?;
+            target.hooks.dispatch(&event).await;
 
             let provider = mutexed_provider.lock().await.take();
             provider

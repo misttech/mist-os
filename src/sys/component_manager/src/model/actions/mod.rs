@@ -198,6 +198,20 @@ impl ActionSet {
         self.rep.contains_key(key)
     }
 
+    #[cfg(test)]
+    pub fn mock_result<O>(&mut self, key: ActionKey, result: O)
+    where
+        O: Send + Sync + Clone + Debug + 'static,
+    {
+        let notifier = ActionNotifier::new(async move { result }.boxed());
+        self.rep.insert(key, Box::new(notifier));
+    }
+
+    #[cfg(test)]
+    pub fn remove_notifier(&mut self, key: ActionKey) {
+        self.rep.remove(&key).expect("No notifier found with that key");
+    }
+
     /// Registers an action in the set, returning when the action is finished (which may represent
     /// a task that's already running for this action).
     pub async fn register<A>(component: Arc<ComponentInstance>, action: A) -> A::Output

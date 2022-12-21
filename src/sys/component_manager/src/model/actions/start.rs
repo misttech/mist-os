@@ -123,7 +123,7 @@ async fn do_start(
                     },
                     pending_runtime.timestamp,
                 ))
-                .await?;
+                .await;
             component
                 .hooks
                 .dispatch(&Event::new_with_timestamp(
@@ -134,7 +134,7 @@ async fn do_start(
                     },
                     pending_runtime.timestamp,
                 ))
-                .await?;
+                .await;
             (start_context, pending_runtime)
         }
         Err(e) => {
@@ -161,7 +161,7 @@ async fn do_start(
             component
                 .hooks
                 .dispatch(&Event::new(component, EventPayload::Stopped { status: zx::Status::OK }))
-                .await?;
+                .await;
         }
     };
     res

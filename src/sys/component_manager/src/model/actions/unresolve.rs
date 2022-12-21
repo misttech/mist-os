@@ -122,7 +122,8 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), ModelErr
     component.lock_execution().await.reset_shut_down();
 
     let event = Event::new(&component, EventPayload::Unresolved);
-    component.hooks.dispatch(&event).await
+    component.hooks.dispatch(&event).await;
+    Ok(())
 }
 
 #[cfg(test)]

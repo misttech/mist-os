@@ -175,7 +175,7 @@ mod tests {
                     capability_provider: provider_result.clone(),
                 },
             ))
-            .await?;
+            .await;
         let provider = provider_result.lock().await.take().expect("did not get runner cap");
 
         // Open a connection to the provider.

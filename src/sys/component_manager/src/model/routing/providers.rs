@@ -62,7 +62,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                     capability: capability.clone(),
                 },
             );
-            source.hooks.dispatch(&event).await?;
+            source.hooks.dispatch(&event).await;
             Result::<Arc<ComponentInstance>, ModelError>::Ok(source)
         }
         .await;

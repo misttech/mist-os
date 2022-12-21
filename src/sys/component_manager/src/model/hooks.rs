@@ -24,6 +24,7 @@ use {
         fmt,
         sync::{Arc, Weak},
     },
+    tracing::warn,
 };
 
 /// Defines the `EventType` enum as well as its implementation.
@@ -472,7 +473,7 @@ impl Hooks {
         }
     }
 
-    pub async fn dispatch(&self, event: &Event) -> Result<(), ModelError> {
+    pub async fn dispatch(&self, event: &Event) {
         let strong_hooks = {
             let mut hooks_map = self.hooks_map.lock().await;
             if let Some(hooks) = hooks_map.get_mut(&event.event_type()) {
@@ -493,9 +494,10 @@ impl Hooks {
             }
         };
         for hook in strong_hooks {
-            hook.on(event).await?;
+            if let Err(err) = hook.on(event).await {
+                warn!(%err, %event, "Hook produced error for event");
+            }
         }
-        Ok(())
     }
 }
 

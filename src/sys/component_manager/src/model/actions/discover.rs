@@ -50,7 +50,7 @@ async fn do_discover(component: &Arc<ComponentInstance>) -> Result<(), ModelErro
         return Ok(());
     }
     let event = Event::new(&component, EventPayload::Discovered);
-    component.hooks.dispatch(&event).await?;
+    component.hooks.dispatch(&event).await;
     {
         let mut state = component.lock_state().await;
         assert!(

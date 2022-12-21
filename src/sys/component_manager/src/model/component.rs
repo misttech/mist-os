@@ -862,7 +862,7 @@ impl ComponentInstance {
         self.destroy_dynamic_children().await?;
         if was_running {
             let event = Event::new(self, EventPayload::Stopped { status: stop_result });
-            self.hooks.dispatch(&event).await?;
+            self.hooks.dispatch(&event).await;
         }
         if let ExtendedInstance::Component(parent) = self.try_get_parent()? {
             parent

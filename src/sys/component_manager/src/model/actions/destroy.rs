@@ -129,7 +129,7 @@ pub mod tests {
             },
             component::{Component, StartReason},
             events::{registry::EventSubscription, stream::EventStream},
-            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
+            hooks::EventType,
             testing::{
                 test_helpers::{
                     component_decl_with_test_runner, execution_is_shut_down, get_incarnation_id,
@@ -144,10 +144,9 @@ pub mod tests {
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
         fuchsia_zircon as zx,
         futures::{channel::mpsc, lock::Mutex, StreamExt},
-        moniker::{AbsoluteMoniker, ChildMoniker},
+        moniker::ChildMoniker,
         std::fmt::Debug,
         std::sync::atomic::Ordering,
-        std::sync::Weak,
     };
 
     #[fuchsia::test]
@@ -775,47 +774,6 @@ pub mod tests {
     /// `a` fails to destroy the first time, but succeeds the second time.
     #[fuchsia::test]
     async fn destroy_error() {
-        struct DestroyErrorHook {
-            moniker: AbsoluteMoniker,
-        }
-
-        impl DestroyErrorHook {
-            fn new(moniker: AbsoluteMoniker) -> Self {
-                Self { moniker }
-            }
-
-            fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
-                vec![HooksRegistration::new(
-                    "DestroyErrorHook",
-                    vec![EventType::Destroyed],
-                    Arc::downgrade(self) as Weak<dyn Hook>,
-                )]
-            }
-
-            async fn on_destroyed_async(
-                &self,
-                target_moniker: &AbsoluteMoniker,
-            ) -> Result<(), ModelError> {
-                if *target_moniker == self.moniker {
-                    return Err(ModelError::unsupported("ouch"));
-                }
-                Ok(())
-            }
-        }
-
-        #[async_trait]
-        impl Hook for DestroyErrorHook {
-            async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
-                let target_moniker = event
-                    .target_moniker
-                    .unwrap_instance_moniker_or(ModelError::UnexpectedComponentManagerMoniker)?;
-                if let EventPayload::Destroyed = event.payload {
-                    self.on_destroyed_async(target_moniker).await?;
-                }
-                Ok(())
-            }
-        }
-
         let components = vec![
             ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
             ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
@@ -823,11 +781,7 @@ pub mod tests {
             ("c", component_decl_with_test_runner()),
             ("d", component_decl_with_test_runner()),
         ];
-        // The destroy hook is invoked just after the component instance is removed from the
-        // list of children. Therefore, to cause destruction of `a` to fail, fail removal of
-        // `/a/b`.
-        let error_hook = Arc::new(DestroyErrorHook::new(vec!["a", "b"].into()));
-        let test = ActionsTest::new_with_hooks("root", components, None, error_hook.hooks()).await;
+        let test = ActionsTest::new("root", components, None).await;
         let component_root = test.look_up(vec![].into()).await;
         let component_a = test.look_up(vec!["a"].into()).await;
         let component_b = test.look_up(vec!["a", "b"].into()).await;
@@ -844,19 +798,38 @@ pub mod tests {
         assert!(is_executing(&component_c).await);
         assert!(is_executing(&component_d).await);
 
-        // Register delete action on "a", and wait for it. "b"'s component is deleted, but "b"
+        // Mock a failure to delete "d".
+        {
+            let mut actions = component_d.lock_actions().await;
+            actions.mock_result(
+                ActionKey::Destroy,
+                Err(ModelError::unsupported("ouch")) as Result<(), ModelError>,
+            );
+        }
+
+        ActionSet::register(component_b.clone(), DestroyChildAction::new("d".into(), 0))
+            .await
+            .expect_err("d's destroy succeeded unexpectedly");
+
+        // Register delete action on "a", and wait for it. but "d"
         // returns an error so the delete action on "a" does not succeed.
+        //
+        // In this state, "d" is marked destroyed but hasn't been removed from the
+        // children list of "b". "c" is destroyed and has been removed from the children
+        // list of "b".
         ActionSet::register(component_root.clone(), DestroyChildAction::new("a".into(), 0))
             .await
             .expect_err("destroy succeeded unexpectedly");
         assert!(has_child(&component_root, "a").await);
-        assert!(!has_child(&component_a, "b").await);
+        assert!(has_child(&component_a, "b").await);
+        assert!(!has_child(&component_b, "c").await);
+        assert!(has_child(&component_b, "d").await);
         assert!(!is_destroyed(&component_a).await);
-        assert!(is_destroyed(&component_b).await);
+        assert!(!is_destroyed(&component_b).await);
         assert!(is_destroyed(&component_c).await);
-        assert!(is_destroyed(&component_d).await);
+        assert!(!is_destroyed(&component_d).await);
         {
-            let mut events: Vec<_> = test
+            let events: Vec<_> = test
                 .test_hook
                 .lifecycle()
                 .into_iter()
@@ -865,18 +838,17 @@ pub mod tests {
                     _ => false,
                 })
                 .collect();
-            // The leaves could be stopped in any order.
-            let mut first: Vec<_> = events.drain(0..2).collect();
-            first.sort_unstable();
-            let expected: Vec<_> = vec![
-                Lifecycle::Destroy(vec!["a", "b", "c"].into()),
-                Lifecycle::Destroy(vec!["a", "b", "d"].into()),
-            ];
-            assert_eq!(first, expected);
-            assert_eq!(events, vec![Lifecycle::Destroy(vec!["a", "b"].into())]);
+            let expected: Vec<_> = vec![Lifecycle::Destroy(vec!["a", "b", "c"].into())];
+            assert_eq!(events, expected);
         }
 
-        // Register destroy action on "a" again. "b"'s delete succeeds, and "a" is deleted
+        // Remove the mock from "d"
+        {
+            let mut actions = component_d.lock_actions().await;
+            actions.remove_notifier(ActionKey::Destroy);
+        }
+
+        // Register destroy action on "a" again. "d"'s delete succeeds, and "a" is deleted
         // this time.
         ActionSet::register(component_root.clone(), DestroyChildAction::new("a".into(), 0))
             .await

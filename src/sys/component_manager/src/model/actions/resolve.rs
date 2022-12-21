@@ -120,7 +120,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Mod
                         .and_then(|pkg| clone_dir(Some(&pkg.package_dir))),
                 },
             );
-            component.hooks.dispatch(&event).await?;
+            component.hooks.dispatch(&event).await;
             Ok(component_info)
         }
         Err(e) => Err(e),

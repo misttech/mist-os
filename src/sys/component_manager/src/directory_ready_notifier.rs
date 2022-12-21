@@ -24,7 +24,6 @@ use {
         sync::{Arc, Mutex, Weak},
         time::Duration,
     },
-    tracing::warn,
 };
 
 // TODO(fxbug.dev/49198): The out/diagnostics directory propagation for runners includes a retry.
@@ -112,9 +111,7 @@ impl DirectoryReadyNotifier {
         let directory_ready_events =
             self.create_events(Some(outgoing_dir), decl, matching_exposes, target).await;
         for directory_ready_event in directory_ready_events {
-            target.hooks.dispatch(&directory_ready_event).await.unwrap_or_else(|error| {
-                warn!(for_component=%target.abs_moniker, %error, "Couldn't notify directory ready");
-            });
+            target.hooks.dispatch(&directory_ready_event).await;
         }
     }
 

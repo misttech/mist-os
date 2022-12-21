@@ -803,7 +803,6 @@ mod tests {
                 StopAction,
             },
             component::StartReason,
-            hooks::{self, EventPayload, EventType, Hook, HooksRegistration},
             testing::{
                 test_helpers::{
                     component_decl_with_test_runner, default_component_decl,
@@ -812,7 +811,6 @@ mod tests {
                 test_hook::Lifecycle,
             },
         },
-        async_trait::async_trait,
         cm_rust::{
             Availability, CapabilityName, CapabilityPath, ChildDecl, ComponentDecl, DependencyType,
             ExposeDecl, ExposeProtocolDecl, ExposeSource, ExposeTarget, OfferDecl,
@@ -827,7 +825,7 @@ mod tests {
         maplit::{btreeset, hashmap, hashset},
         moniker::{AbsoluteMoniker, ChildMoniker},
         std::collections::{BTreeSet, HashMap},
-        std::{convert::TryFrom, sync::Weak},
+        std::convert::TryFrom,
         test_case::test_case,
     };
 
@@ -4164,50 +4162,9 @@ mod tests {
     ///   / \
     ///  c   d
     ///
-    /// `b` fails to finish shutdown the first time, but succeeds the second time.
+    /// `a` fails to finish shutdown the first time, but succeeds the second time.
     #[fuchsia::test]
     async fn shutdown_error() {
-        struct StopErrorHook {
-            moniker: AbsoluteMoniker,
-        }
-
-        impl StopErrorHook {
-            fn new(moniker: AbsoluteMoniker) -> Self {
-                Self { moniker }
-            }
-
-            fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
-                vec![HooksRegistration::new(
-                    "StopErrorHook",
-                    vec![EventType::Stopped],
-                    Arc::downgrade(self) as Weak<dyn Hook>,
-                )]
-            }
-
-            async fn on_shutdown_instance_async(
-                &self,
-                target_moniker: &AbsoluteMoniker,
-            ) -> Result<(), ModelError> {
-                if *target_moniker == self.moniker {
-                    return Err(ModelError::unsupported("ouch"));
-                }
-                Ok(())
-            }
-        }
-
-        #[async_trait]
-        impl Hook for StopErrorHook {
-            async fn on(self: Arc<Self>, event: &hooks::Event) -> Result<(), ModelError> {
-                let target_moniker = event
-                    .target_moniker
-                    .unwrap_instance_moniker_or(ModelError::UnexpectedComponentManagerMoniker)?;
-                if let EventPayload::Stopped { .. } = event.payload {
-                    self.on_shutdown_instance_async(target_moniker).await?;
-                }
-                Ok(())
-            }
-        }
-
         let components = vec![
             ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
             ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
@@ -4215,8 +4172,7 @@ mod tests {
             ("c", component_decl_with_test_runner()),
             ("d", component_decl_with_test_runner()),
         ];
-        let error_hook = Arc::new(StopErrorHook::new(vec!["a", "b"].into()));
-        let test = ActionsTest::new_with_hooks("root", components, None, error_hook.hooks()).await;
+        let test = ActionsTest::new("root", components, None).await;
         let component_a = test.look_up(vec!["a"].into()).await;
         let component_b = test.look_up(vec!["a", "b"].into()).await;
         let component_c = test.look_up(vec!["a", "b", "c"].into()).await;
@@ -4235,40 +4191,34 @@ mod tests {
         let component_a_info = ComponentInfo::new(component_a).await;
         let component_b_info = ComponentInfo::new(component_b).await;
         let component_c_info = ComponentInfo::new(component_c).await;
-        let component_d_info = ComponentInfo::new(component_d).await;
+        let component_d_info = ComponentInfo::new(component_d.clone()).await;
 
-        // Register shutdown action on "a", and wait for it. "b"'s component shuts down, but "b"
-        // returns an error so "a" does not.
+        // Mock a failure to stop "d".
+        {
+            let mut actions = component_d.lock_actions().await;
+            actions.mock_result(
+                ActionKey::Shutdown,
+                Err(ModelError::unsupported("ouch")) as Result<(), ModelError>,
+            );
+        }
+
+        // Register shutdown action on "a", and wait for it. "d" fails to shutdown, so "a" fails
+        // too. The state of "c" is unknown at this point. The shutdown of stop targets occur
+        // simultaneously. "c" could've shutdown before "d" or it might not have.
         ActionSet::register(component_a_info.component.clone(), ShutdownAction::new())
             .await
             .expect_err("shutdown succeeded unexpectedly");
         component_a_info.check_not_shut_down(&test.runner).await;
-        component_b_info.check_is_shut_down(&test.runner).await;
-        component_c_info.check_is_shut_down(&test.runner).await;
-        component_d_info.check_is_shut_down(&test.runner).await;
+        component_b_info.check_not_shut_down(&test.runner).await;
+        component_d_info.check_not_shut_down(&test.runner).await;
+
+        // Remove the mock from "d"
         {
-            let mut events: Vec<_> = test
-                .test_hook
-                .lifecycle()
-                .into_iter()
-                .filter(|e| match e {
-                    Lifecycle::Stop(_) => true,
-                    _ => false,
-                })
-                .collect();
-            // The leaves could be stopped in any order.
-            let mut first: Vec<_> = events.drain(0..2).collect();
-            first.sort_unstable();
-            let expected: Vec<_> = vec![
-                Lifecycle::Stop(vec!["a", "b", "c"].into()),
-                Lifecycle::Stop(vec!["a", "b", "d"].into()),
-            ];
-            assert_eq!(first, expected);
-            assert_eq!(events, vec![Lifecycle::Stop(vec!["a", "b"].into())],);
+            let mut actions = component_d.lock_actions().await;
+            actions.remove_notifier(ActionKey::Shutdown);
         }
 
-        // Register shutdown action on "a" again. "b"'s shutdown succeeds (it's a no-op), and
-        // "a" is allowed to shut down this time.
+        // Register shutdown action on "a" again which should succeed
         ActionSet::register(component_a_info.component.clone(), ShutdownAction::new())
             .await
             .expect("shutdown failed");

@@ -470,7 +470,7 @@ mod tests {
                 capability_provider: capability_provider.clone(),
             },
         );
-        hooks.dispatch(&event).await?;
+        hooks.dispatch(&event).await;
 
         let capability_provider = capability_provider.lock().await.take();
         let task_scope = TaskScope::new();
