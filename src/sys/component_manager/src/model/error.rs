@@ -16,7 +16,6 @@ use {
     },
     anyhow::Error,
     clonable_error::ClonableError,
-    cm_runner::RunnerError,
     fuchsia_zircon as zx,
     moniker::{AbsoluteMoniker, ChildMoniker, MonikerError},
     std::path::PathBuf,
@@ -108,11 +107,6 @@ pub enum ModelError {
     OpenResourceError {
         #[from]
         err: OpenResourceError,
-    },
-    #[error("Runner error: {}", err)]
-    RunnerError {
-        #[from]
-        err: RunnerError,
     },
     #[error("storage error: {}", err)]
     StorageError {

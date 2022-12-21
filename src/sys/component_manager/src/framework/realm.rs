@@ -222,10 +222,6 @@ impl RealmCapabilityHost {
                         debug!(%error, "failed to resolve child");
                         fcomponent::Error::InstanceCannotResolve
                     }
-                    ModelError::RunnerError { err: error } => {
-                        debug!(%error, "failed to start child");
-                        fcomponent::Error::InstanceCannotStart
-                    }
                     error => {
                         error!(%error, "start() failed");
                         fcomponent::Error::Internal
