@@ -256,8 +256,12 @@ zx_status_t OtRadioDevice::Init() {
   status = device_get_fragment_metadata(parent(), "pdev", DEVICE_METADATA_PRIVATE, &device_id,
                                         sizeof(device_id), &actual);
   if (status != ZX_OK || sizeof(device_id) != actual) {
-    zxlogf(ERROR, "ot-radio: failed to read metadata");
-    return status == ZX_OK ? ZX_ERR_INTERNAL : status;
+    status = device_get_metadata(parent(), DEVICE_METADATA_PRIVATE, &device_id, sizeof(device_id),
+                                 &actual);
+    if (status != ZX_OK || sizeof(device_id) != actual) {
+      zxlogf(ERROR, "ot-radio: failed to read metadata");
+      return status == ZX_OK ? ZX_ERR_INTERNAL : status;
+    }
   }
 
   spinel_framer_ = std::make_unique<ot::SpinelFramer>();

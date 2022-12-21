@@ -158,7 +158,7 @@ zx_status_t Nelson::Spi0Init() {
       fidl::ToWire(fidl_arena, spi_0_dev),
       platform_bus_composite::MakeFidlFragment(fidl_arena, spi_0_fragments,
                                                std::size(spi_0_fragments)),
-      "pdev");
+      "gpio-cs-0");
   if (!result.ok()) {
     zxlogf(ERROR, "%s: AddComposite Spi0(spi_0_dev) request failed: %s", __func__,
            result.FormatDescription().data());

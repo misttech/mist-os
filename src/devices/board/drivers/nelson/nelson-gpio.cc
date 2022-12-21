@@ -72,11 +72,11 @@ static const std::vector<fpbus::Irq> gpio_irqs{
     }},
 };
 
-// GPIOs to expose from generic GPIO driver. Do not expose H bank GPIOs here, as they are managed by
-// the GPIO H device below. The two GPIO devices are not capable of synchronizing accesses to the
-// interrupt registers, so H bank GPIOs that are used for interrupts must be exposed by the main
-// device (only GPIO_SOC_SELINA_IRQ_OUT). All pins can be used in calls from the board driver,
-// regardless of bank.
+// GPIOs to expose from generic GPIO driver. Do not expose C bank or H bank GPIOs here, as they are
+// managed by separate devices below. The three GPIO devices are not capable of synchronizing
+// accesses to the interrupt registers, so C and H bank GPIOs that are used for interrupts must be
+// exposed by the main device (only GPIO_SOC_SELINA_IRQ_OUT and GPIO_TH_SOC_INT). All pins can be
+// used in calls from the board driver, regardless of bank.
 static const gpio_pin_t gpio_pins[] = {
     DECL_GPIO_PIN(GPIO_INRUSH_EN_SOC),
     DECL_GPIO_PIN(GPIO_SOC_I2S_SCLK),
@@ -108,10 +108,10 @@ static const gpio_pin_t gpio_pins[] = {
     DECL_GPIO_PIN(GPIO_SOC_DISP_RST_L),
     DECL_GPIO_PIN(GPIO_SOC_TOUCH_I2C_SDA),
     DECL_GPIO_PIN(GPIO_SOC_TOUCH_I2C_SCL),
-    DECL_GPIO_PIN(GPIO_SOC_SPI_A_MOSI),
-    DECL_GPIO_PIN(GPIO_SOC_SPI_A_MISO),
-    DECL_GPIO_PIN(GPIO_SOC_SPI_A_SS0),
-    DECL_GPIO_PIN(GPIO_SOC_SPI_A_SCLK),
+    // ot-radio is responsible for not making concurrent calls to this GPIO and the GPIO C device
+    // (or other clients of that device, namely SPI0). Calls may be made on the interrupt object
+    // (and interrupts may be received) at any time, as there is no GPIO driver involvement in that
+    // case.
     DECL_GPIO_PIN(GPIO_TH_SOC_INT),
     DECL_GPIO_PIN(GPIO_SOC_TH_INT),
     DECL_GPIO_PIN(GPIO_SOC_WIFI_SDIO_D0),
@@ -134,9 +134,8 @@ static const gpio_pin_t gpio_pins[] = {
     DECL_GPIO_PIN(GPIO_SOC_BT_REG_ON),
     DECL_GPIO_PIN(GPIO_BT_SOC_WAKE),
     DECL_GPIO_PIN(GPIO_SOC_BT_WAKE),
-    // Selina is responsible for not making concurrent calls to this GPIO and the GPIO H device (or
-    // other clients of that device, namely SPI1). Calls may be made on the interrupt object (and
-    // interrupts may be received) at any time, as there is no GPIO driver involvement in that case.
+    // Like above -- Selina is responsible for not making current calls to this GPIO and the GPIO H
+    // device (or SPI1, which is a client of the GPIO H device).
     DECL_GPIO_PIN(GPIO_SOC_SELINA_IRQ_OUT),
     DECL_GPIO_PIN(GPIO_SOC_DEBUG_UARTAO_TX),
     DECL_GPIO_PIN(GPIO_SOC_DEBUG_UARTAO_RX),
@@ -216,6 +215,34 @@ static const fpbus::Node gpio_h_dev = []() {
   return dev;
 }();
 
+static const gpio_pin_t gpio_c_pins[] = {
+    DECL_GPIO_PIN(GPIO_SOC_SPI_A_MISO),
+    DECL_GPIO_PIN(GPIO_SOC_SPI_A_MOSI),
+    DECL_GPIO_PIN(GPIO_SOC_SPI_A_SCLK),
+    DECL_GPIO_PIN(GPIO_SOC_SPI_A_SS0),
+};
+
+static const std::vector<fpbus::Metadata> gpio_c_metadata{
+    {{
+        .type = DEVICE_METADATA_GPIO_PINS,
+        .data = std::vector<uint8_t>(
+            reinterpret_cast<const uint8_t*>(&gpio_c_pins),
+            reinterpret_cast<const uint8_t*>(&gpio_c_pins) + sizeof(gpio_c_pins)),
+    }},
+};
+
+static const fpbus::Node gpio_c_dev = []() {
+  fpbus::Node dev = {};
+  dev.name() = "gpio-c";
+  dev.vid() = PDEV_VID_AMLOGIC;
+  dev.pid() = PDEV_PID_AMLOGIC_S905D3;
+  dev.did() = PDEV_DID_AMLOGIC_GPIO;
+  dev.instance_id() = 2;
+  dev.mmio() = gpio_mmios;
+  dev.metadata() = gpio_c_metadata;
+  return dev;
+}();
+
 zx_status_t Nelson::GpioInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('GPIO');
@@ -253,6 +280,20 @@ zx_status_t Nelson::GpioInit() {
     }
     if (result->is_error()) {
       zxlogf(ERROR, "%s: NodeAdd Gpio(gpio_h_dev) failed: %s", __func__,
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
+
+  {
+    auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, gpio_c_dev));
+    if (!result.ok()) {
+      zxlogf(ERROR, "%s: NodeAdd Gpio(gpio_c_dev) request failed: %s", __func__,
+             result.FormatDescription().data());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "%s: NodeAdd Gpio(gpio_c_dev) failed: %s", __func__,
              zx_status_get_string(result->error_value()));
       return result->error_value();
     }
