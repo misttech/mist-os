@@ -125,10 +125,8 @@ fn rotate_key_from_tee_device(device: Option<&CStr>, info: KeyInfo) -> Result<()
 /// Gets a hardware derived key using the device /dev/class/tee/000. This is useful in early boot
 /// when other services may not be up.
 pub async fn get_hardware_derived_key(info: KeyInfo) -> Result<Vec<u8>, Error> {
-    let dev = fuchsia_fs::directory::open_in_namespace(
-        "/dev",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
-    )?;
+    let dev =
+        fuchsia_fs::directory::open_in_namespace("/dev", fuchsia_fs::OpenFlags::RIGHT_READABLE)?;
     let _ = recursive_wait_and_open_node(&dev, DEV_CLASS_TEE.strip_prefix("/dev/").unwrap())
         .map_err(Error::from)
         .on_timeout(std::time::Duration::from_secs(5), || Err(Error::TeeDeviceWaitTimeout))

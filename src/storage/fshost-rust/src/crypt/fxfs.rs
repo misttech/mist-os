@@ -24,6 +24,8 @@ const LEGACY_METADATA_KEY: Aes256Key = Aes256Key::create([
     0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8, 0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
 ]);
 
+pub const KEY_BAG_FILE: &str = "/unencrypted_volume/keys/fxfs-data";
+
 async fn unwrap_or_create_keys(
     mut keybag: KeyBagManager,
     create: bool,
@@ -120,8 +122,7 @@ async fn unlock_or_init_data_volume<'a>(
         if create {
             std::fs::create_dir("/unencrypted_volume/keys").map_err(|e| anyhow!(e))?;
         }
-        let keybag = KeyBagManager::open(Path::new("/unencrypted_volume/keys/fxfs-data"))
-            .map_err(|e| anyhow!(e))?;
+        let keybag = KeyBagManager::open(Path::new(KEY_BAG_FILE)).map_err(|e| anyhow!(e))?;
 
         let (data_unwrapped, metadata_unwrapped) = unwrap_or_create_keys(keybag, create).await?;
         init_crypt_service(data_unwrapped, metadata_unwrapped).await?;

@@ -16,7 +16,10 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.hardware.power.statecontrol.Admin",
+            protocol: [
+                "fuchsia.fshost.Admin",
+                "fuchsia.hardware.power.statecontrol.Admin",
+            ],
             from: "parent",
             to: "#factory_reset",
         },

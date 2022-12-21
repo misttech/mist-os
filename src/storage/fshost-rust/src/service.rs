@@ -4,21 +4,26 @@
 
 use {
     crate::{
+        crypt::fxfs,
+        debug_log,
         device::{constants, BlockDevice},
         environment::FilesystemLauncher,
+        service::fxfs::KEY_BAG_FILE,
         watcher,
     },
     anyhow::{anyhow, Context, Error},
     fidl::endpoints::RequestStream,
     fidl_fuchsia_fshost as fshost,
+    fidl_fuchsia_hardware_block::BlockMarker,
     fidl_fuchsia_io::OpenFlags,
     fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream},
     fs_management::{
         format::DiskFormat,
-        partition::{open_partition, PartitionMatcher},
+        partition::{find_partition, PartitionMatcher},
         F2fs, Fxfs, Minfs,
     },
     fuchsia_async as fasync,
+    fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_fs::{
         directory::{create_directory_recursive, open_file},
         file::write,
@@ -26,6 +31,7 @@ use {
     fuchsia_runtime::HandleType,
     fuchsia_zircon::{self as zx, Duration},
     futures::{channel::mpsc, StreamExt, TryStreamExt},
+    remote_block_device::{BlockClient, BufferSlice, RemoteBlockClient},
     std::sync::Arc,
     vfs::service,
 };
@@ -43,9 +49,36 @@ impl FshostShutdownResponder {
     }
 }
 
-const OPEN_PARTITION_DURATION: Duration = Duration::from_seconds(10);
+const FIND_PARTITION_DURATION: Duration = Duration::from_seconds(10);
 const DATA_PARTITION_LABEL: &str = "data";
 const LEGACY_DATA_PARTITION_LABEL: &str = "minfs";
+
+fn data_partition_names() -> Vec<String> {
+    vec![DATA_PARTITION_LABEL.to_string(), LEGACY_DATA_PARTITION_LABEL.to_string()]
+}
+
+async fn find_data_partition(config: &fshost_config::Config) -> Result<String, Error> {
+    let fvm_matcher = PartitionMatcher {
+        detected_disk_formats: Some(vec![DiskFormat::Fvm]),
+        ignore_prefix: Some(config.ramdisk_prefix.clone()),
+        ..Default::default()
+    };
+
+    let fvm_path =
+        find_partition(fvm_matcher, FIND_PARTITION_DURATION).await.context("Failed to find FVM")?;
+
+    let data_matcher = PartitionMatcher {
+        type_guids: Some(vec![constants::DATA_TYPE_GUID]),
+        labels: Some(data_partition_names()),
+        parent_device: Some(fvm_path),
+        ignore_if_path_contains: Some("zxcrypt/unsealed".to_string()),
+        ..Default::default()
+    };
+
+    Ok(find_partition(data_matcher, FIND_PARTITION_DURATION)
+        .await
+        .context("Failed to open partition")?)
+}
 
 async fn write_data_file(
     config: &fshost_config::Config,
@@ -73,46 +106,27 @@ async fn write_data_file(
 
     assert_eq!(config.ramdisk_prefix.is_empty(), false);
 
-    let fvm_matcher = PartitionMatcher {
-        detected_disk_formats: Some(vec![DiskFormat::Fvm]),
-        ignore_prefix: Some(config.ramdisk_prefix.clone()),
-        ..Default::default()
-    };
+    let mut partition_path = find_data_partition(config).await?;
 
-    let fvm_path =
-        open_partition(fvm_matcher, OPEN_PARTITION_DURATION).await.context("Failed to find FVM")?;
     let format = match config.data_filesystem_format.as_ref() {
         "fxfs" => DiskFormat::Fxfs,
         "f2fs" => DiskFormat::F2fs,
         "minfs" => DiskFormat::Minfs,
         _ => panic!("unsupported data filesystem format type"),
     };
-    let data_partition_names =
-        vec![DATA_PARTITION_LABEL.to_string(), LEGACY_DATA_PARTITION_LABEL.to_string()];
-
-    let data_matcher = PartitionMatcher {
-        type_guids: Some(vec![constants::DATA_TYPE_GUID]),
-        labels: Some(data_partition_names.clone()),
-        parent_device: Some(fvm_path),
-        ignore_if_path_contains: Some("zxcrypt/unsealed".to_string()),
-        ..Default::default()
-    };
-
-    let mut partition_path = open_partition(data_matcher, OPEN_PARTITION_DURATION)
-        .await
-        .context("Failed to open partition")?;
 
     let mut inside_zxcrypt = false;
+
     if format != DiskFormat::Fxfs && !config.no_zxcrypt {
         let mut zxcrypt_path = partition_path;
         zxcrypt_path.push_str("/zxcrypt/unsealed");
         let zxcrypt_matcher = PartitionMatcher {
             type_guids: Some(vec![constants::DATA_TYPE_GUID]),
-            labels: Some(data_partition_names),
+            labels: Some(data_partition_names()),
             parent_device: Some(zxcrypt_path),
             ..Default::default()
         };
-        partition_path = open_partition(zxcrypt_matcher, OPEN_PARTITION_DURATION)
+        partition_path = find_partition(zxcrypt_matcher, FIND_PARTITION_DURATION)
             .await
             .context("Failed to open zxcrypt partition")?;
         inside_zxcrypt = true;
@@ -157,6 +171,41 @@ async fn write_data_file(
 
     filesystem.shutdown().await?;
     return Ok(());
+}
+
+async fn shred_data_volume(config: &fshost_config::Config) -> Result<(), zx::Status> {
+    if config.data_filesystem_format != "fxfs" {
+        return Err(zx::Status::NOT_SUPPORTED);
+    }
+    // If we expect Fxfs to be live, just erase the key bag.
+    if config.data && !config.fvm_ramdisk {
+        std::fs::remove_file(KEY_BAG_FILE)?;
+
+        debug_log("Erased key bag");
+    } else {
+        // Otherwise we need to find the Fxfs partition and shred it.
+        let partition_path =
+            find_data_partition(config).await.map_err(|_| zx::Status::NOT_FOUND)?;
+
+        let block_client = RemoteBlockClient::new(
+            connect_to_protocol_at_path::<BlockMarker>(&partition_path)
+                .map_err(|_| zx::Status::INTERNAL)?,
+        )
+        .await
+        .map_err(|_| zx::Status::INTERNAL)?;
+
+        // Overwrite both super blocks.  Deliberately use a non-zero value so that we can tell this
+        // has happened if we're debugging.
+        let buf = vec![0x93; std::cmp::min(block_client.block_size() as usize, 4096)];
+        futures::try_join!(
+            block_client.write_at(BufferSlice::Memory(&buf), 0),
+            block_client.write_at(BufferSlice::Memory(&buf), 524_288)
+        )
+        .map_err(|_| zx::Status::IO)?;
+
+        debug_log("Wiped Fxfs super blocks");
+    }
+    Ok(())
 }
 
 /// Make a new vfs service node that implements fuchsia.fshost.Admin
@@ -225,6 +274,25 @@ pub fn fshost_admin(
                                     e
                                 );
                             });
+                    }
+                    Ok(fshost::AdminRequest::ShredDataVolume { responder }) => {
+                        tracing::info!("admin shred data volume called");
+                        let mut res = match shred_data_volume(&config).await {
+                            Ok(()) => Ok(()),
+                            Err(e) => {
+                                debug_log(&format!(
+                                    "admin service: shred_data_volume failed: {:?}",
+                                    e
+                                ));
+                                Err(zx::Status::INTERNAL.into_raw())
+                            }
+                        };
+                        responder.send(&mut res).unwrap_or_else(|e| {
+                            tracing::error!(
+                                "failed to send ShredDataVolume response. error: {:?}",
+                                e
+                            );
+                        });
                     }
                     Err(e) => {
                         tracing::error!("admin server failed: {:?}", e);

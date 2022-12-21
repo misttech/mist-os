@@ -34,6 +34,16 @@ mod service;
 mod volume;
 mod watcher;
 
+// Logs directly to the serial port.  To be used when it's expected that fshost will terminate
+// shortly afterwards since messages via the log subsystem often don't make it.
+fn debug_log(message: &str) {
+    let message = format!("[fshost] {}\n", message);
+    let message = message.as_bytes();
+    unsafe {
+        zx_debug_write(message.as_ptr(), message.len());
+    }
+}
+
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
     let boot_args = BootArgs::new().await;
@@ -113,10 +123,7 @@ async fn main() -> Result<(), Error> {
     // NB There are tests that look for this specific log message.  We write directly to serial
     // because writing via syslog has been found to not reliably make it to serial before shutdown
     // occurs.
-    let data = b"fshost shutdown complete\n";
-    unsafe {
-        zx_debug_write(data.as_ptr(), data.len());
-    }
+    debug_log("fshost shutdown complete");
 
     // 3. Notify whoever asked for a shutdown that it's complete. After this point, it's possible
     //    the fshost process will be terminated externally.

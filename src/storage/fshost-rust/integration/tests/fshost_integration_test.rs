@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use {
+    assert_matches::assert_matches,
     fidl::endpoints::create_proxy,
     fidl_fuchsia_fshost as fshost,
+    fidl_fuchsia_fshost::AdminMarker,
     fidl_fuchsia_hardware_block_partition::Guid,
     fidl_fuchsia_hardware_block_volume::{VolumeAndNodeMarker, VolumeManagerMarker},
     fidl_fuchsia_io as fio,
@@ -14,7 +16,7 @@ use {
     },
     fuchsia_async as fasync,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
-    fuchsia_zircon as zx,
+    fuchsia_zircon::{self as zx, HandleBased},
     futures::FutureExt,
 };
 
@@ -475,4 +477,98 @@ async fn block_watcher_second_pause_fails() {
     // A paused block watcher should fail if paused a second time
     assert_eq!(pauser.pause().await.unwrap(), zx::Status::BAD_STATE.into_raw());
     fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+#[cfg_attr(not(all(feature = "fxfs", feature = "fshost_rust")), ignore)]
+async fn shred_data_volume_when_mounted() {
+    let mut builder = new_builder();
+    builder.with_disk();
+    let fixture = builder.build().await;
+
+    let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
+
+    fuchsia_fs::directory::open_file(&fixture.dir("data"), "test-file", fio::OpenFlags::CREATE)
+        .await
+        .expect("open_file failed");
+
+    let admin = fixture
+        .realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<AdminMarker>()
+        .expect("connect_to_protcol_at_exposed_dir failed");
+
+    admin
+        .shred_data_volume()
+        .await
+        .expect("shred_data_volume FIDL failed")
+        .expect("shred_data_volume failed");
+
+    fixture.tear_down().await;
+
+    let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
+
+    // If we try and open the same test file, it shouldn't exist because the data volume should have
+    // been shredded.
+    assert_matches!(
+        fuchsia_fs::directory::open_file(
+            &fixture.dir("data"),
+            "test-file",
+            fio::OpenFlags::RIGHT_READABLE
+        )
+        .await
+        .expect_err("open_file failed"),
+        fuchsia_fs::node::OpenError::OpenError(zx::Status::NOT_FOUND)
+    );
+}
+
+#[fuchsia::test]
+#[cfg_attr(not(all(feature = "fxfs", feature = "fshost_rust")), ignore)]
+async fn shred_data_volume_from_recovery() {
+    let mut builder = new_builder();
+    builder.with_disk();
+    let fixture = builder.build().await;
+
+    let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
+
+    fuchsia_fs::directory::open_file(&fixture.dir("data"), "test-file", fio::OpenFlags::CREATE)
+        .await
+        .expect("open_file failed");
+
+    fixture.tear_down().await;
+
+    // Launch a version of fshost that will behave like recovery: it won't mount the data volume.
+    let mut builder =
+        new_builder().with_disk_from_vmo(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap());
+    builder.fshost().set_ramdisk_prefix("/nada/zip/zilch").set_fvm_ramdisk();
+    let fixture = builder.build().await;
+
+    let admin = fixture
+        .realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<AdminMarker>()
+        .expect("connect_to_protcol_at_exposed_dir failed");
+
+    admin
+        .shred_data_volume()
+        .await
+        .expect("shred_data_volume FIDL failed")
+        .expect("shred_data_volume failed");
+
+    fixture.tear_down().await;
+
+    let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
+
+    // If we try and open the same test file, it shouldn't exist because the data volume should have
+    // been shredded.
+    assert_matches!(
+        fuchsia_fs::directory::open_file(
+            &fixture.dir("data"),
+            "test-file",
+            fio::OpenFlags::RIGHT_READABLE
+        )
+        .await
+        .expect_err("open_file failed"),
+        fuchsia_fs::node::OpenError::OpenError(zx::Status::NOT_FOUND)
+    );
 }

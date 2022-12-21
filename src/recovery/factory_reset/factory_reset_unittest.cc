@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
+#include <fuchsia/fshost/cpp/fidl_test_base.h>
 #include <fuchsia/hardware/power/statecontrol/cpp/fidl.h>
 #include <fuchsia/hardware/power/statecontrol/cpp/fidl_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -17,6 +18,7 @@
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
 #include <lib/fidl/cpp/binding_set.h>
+#include <lib/fit/defer.h>
 #include <lib/zx/vmo.h>
 #include <zircon/hw/gpt.h>
 
@@ -51,8 +53,7 @@ class MockAdmin : public fuchsia::hardware::power::statecontrol::testing::Admin_
 
  private:
   void NotImplemented_(const std::string& name) override {
-    printf("'%s' was called unexpectedly", name.c_str());
-    ASSERT_TRUE(false);
+    ADD_FAILURE() << "'" << name << "' was called unexpectedly";
   }
 
   void Reboot(fuchsia::hardware::power::statecontrol::RebootReason req,
@@ -65,6 +66,24 @@ class MockAdmin : public fuchsia::hardware::power::statecontrol::testing::Admin_
   }
 
   bool suspend_called_ = false;
+};
+
+class MockFshostAdmin : public fuchsia::fshost::testing::Admin_TestBase {
+ public:
+  bool shred_data_volume_called() const { return shred_data_volume_called_; }
+
+ private:
+  void NotImplemented_(const std::string& name) override {
+    ADD_FAILURE() << "'" << name << "' was called unexpectedly";
+  }
+
+  void ShredDataVolume(ShredDataVolumeCallback callback) override {
+    shred_data_volume_called_ = true;
+    callback(fuchsia::fshost::Admin_ShredDataVolume_Result::WithResponse(
+        fuchsia::fshost::Admin_ShredDataVolume_Response(ZX_OK)));
+  }
+
+  bool shred_data_volume_called_ = false;
 };
 
 class FactoryResetTest : public Test {
@@ -264,6 +283,7 @@ class FactoryResetTest : public Test {
     return device_watcher::RecursiveWaitForFile(devfs_root().get(), path.c_str());
   }
 
+ protected:
   ramdisk_client_t* ramdisk_client_;
   std::string fvm_block_path_;
   IsolatedDevmgr devmgr_;
@@ -283,7 +303,9 @@ TEST_F(FactoryResetTest, CanShredVolume) {
   fidl::InterfacePtr<fuchsia::hardware::power::statecontrol::Admin> admin =
       binding.AddBinding(&mock_admin).Bind();
 
-  factory_reset::FactoryReset reset(devfs_root(), std::move(admin));
+  factory_reset::FactoryReset reset(
+      devfs_root(), std::move(admin),
+      *component::ConnectAt<fuchsia_fshost::Admin>(devmgr_.fshost_svc_dir()));
   WithPartitionHasFormat([](fs_management::DiskFormat format) {
     EXPECT_EQ(format, fs_management::kDiskFormatZxcrypt);
   });
@@ -313,7 +335,9 @@ TEST_F(FactoryResetTest, ShredsVolumeWithInvalidSuperblockIfMagicPresent) {
       binding.AddBinding(&mock_admin).Bind();
 
   // Verify that we re-shred that superblock anyway when we run factory reset.
-  factory_reset::FactoryReset reset(devfs_root(), std::move(admin));
+  factory_reset::FactoryReset reset(
+      devfs_root(), std::move(admin),
+      *component::ConnectAt<fuchsia_fshost::Admin>(devmgr_.fshost_svc_dir()));
   WithPartitionHasFormat([](fs_management::DiskFormat format) {
     EXPECT_EQ(format, fs_management::kDiskFormatZxcrypt);
   });
@@ -337,7 +361,9 @@ TEST_F(FactoryResetTest, DoesntShredUnknownVolumeType) {
   fidl::InterfacePtr<fuchsia::hardware::power::statecontrol::Admin> admin =
       binding.AddBinding(&mock_admin).Bind();
 
-  factory_reset::FactoryReset reset(devfs_root(), std::move(admin));
+  factory_reset::FactoryReset reset(
+      devfs_root(), std::move(admin),
+      *component::ConnectAt<fuchsia_fshost::Admin>(devmgr_.fshost_svc_dir()));
   WithPartitionHasFormat([](fs_management::DiskFormat format) {
     EXPECT_EQ(format, fs_management::kDiskFormatBlobfs);
   });
@@ -365,7 +391,9 @@ TEST_F(FactoryResetTest, ShredsFxfs) {
   fidl::InterfacePtr<fuchsia::hardware::power::statecontrol::Admin> admin =
       binding.AddBinding(&mock_admin).Bind();
 
-  factory_reset::FactoryReset reset(devfs_root(), std::move(admin));
+  factory_reset::FactoryReset reset(
+      devfs_root(), std::move(admin),
+      *component::ConnectAt<fuchsia_fshost::Admin>(devmgr_.fshost_svc_dir()));
   WithPartitionHasFormat(
       [](fs_management::DiskFormat format) { EXPECT_EQ(format, fs_management::kDiskFormatFxfs); });
   zx_status_t status = ZX_ERR_BAD_STATE;
@@ -375,6 +403,43 @@ TEST_F(FactoryResetTest, ShredsFxfs) {
   EXPECT_TRUE(mock_admin.suspend_called());
   WithPartitionHasFormat(
       [](fs_management::DiskFormat format) { EXPECT_NE(format, fs_management::kDiskFormatFxfs); });
+}
+
+TEST_F(FactoryResetTest, ShredUsingFshostMock) {
+  // For now, the fshost component in the test environment does not support the ShredDataVolume
+  // method, so this tests that we actually call that method.  The other tests are all testing that
+  // the fallback behaviour works as intended.
+
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+
+  MockAdmin mock_admin;
+  fidl::BindingSet<fuchsia::hardware::power::statecontrol::Admin> binding;
+  fidl::InterfacePtr<fuchsia::hardware::power::statecontrol::Admin> admin =
+      binding.AddBinding(&mock_admin).Bind();
+
+  // FactoryReset calls fshost synchronously (it's not ideal that we mix sync and async code like
+  // this) which will block the dispatcher, so we have to use a different dispatcher for our mock.
+  async::Loop mock_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  mock_loop.StartThread();
+
+  MockFshostAdmin mock_fshost;
+  fidl::BindingSet<fuchsia::fshost::Admin> fshost_binding;
+
+  auto shutdown = fit::defer([&] { mock_loop.Shutdown(); });
+
+  auto endpoints = *fidl::CreateEndpoints<fuchsia_fshost::Admin>();
+  fshost_binding.AddBinding(
+      &mock_fshost, fidl::InterfaceRequest<fuchsia::fshost::Admin>(endpoints.server.TakeChannel()),
+      mock_loop.dispatcher());
+
+  factory_reset::FactoryReset reset(devfs_root(), std::move(admin), std::move(endpoints.client));
+
+  zx_status_t status = ZX_ERR_BAD_STATE;
+  reset.Reset([&status](zx_status_t s) { status = s; });
+  loop.RunUntilIdle();
+  EXPECT_EQ(status, ZX_OK);
+
+  EXPECT_TRUE(mock_fshost.shred_data_volume_called());
 }
 
 }  // namespace

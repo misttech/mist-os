@@ -30,6 +30,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
+    "//src/lib/storage/block_client/rust:remote-block-device",
     "//src/lib/storage/fs_management/rust:fs_management",
     "//src/lib/storage/fuchsia-watch",
     "//src/lib/storage/key-bag",

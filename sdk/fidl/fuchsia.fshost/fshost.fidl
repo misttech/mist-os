@@ -85,4 +85,8 @@ protocol Admin {
     WipeStorage(resource struct {
         blobfs_root server_end:<fuchsia.io.Directory>;
     }) -> () error zx.status;
+
+    /// Wipes the data volume which will get reinitialised upon next boot.  This is not
+    /// cryptographically secure; the caller should take care to reset hardware keys.
+    ShredDataVolume() -> () error zx.status;
 };

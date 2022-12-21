@@ -40,6 +40,8 @@ class AdminServer final : public fidl::WireServer<fuchsia_fshost::Admin> {
 
   void WipeStorage(WipeStorageRequestView request, WipeStorageCompleter::Sync& completer) override;
 
+  void ShredDataVolume(ShredDataVolumeCompleter::Sync& completer) override;
+
  private:
   zx::result<> WriteDataFileInner(WriteDataFileRequestView request);
 

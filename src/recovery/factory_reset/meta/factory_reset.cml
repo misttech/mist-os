@@ -12,7 +12,10 @@
     ],
     use: [
         {
-            protocol: [ "fuchsia.hardware.power.statecontrol.Admin" ],
+            protocol: [
+                "fuchsia.fshost.Admin",
+                "fuchsia.hardware.power.statecontrol.Admin",
+            ],
         },
         {
             protocol: [

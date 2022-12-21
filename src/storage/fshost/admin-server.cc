@@ -500,4 +500,8 @@ void AdminServer::WipeStorage(WipeStorageRequestView request,
   blobfs->Release();
 }
 
+void AdminServer::ShredDataVolume(ShredDataVolumeCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
 }  // namespace fshost

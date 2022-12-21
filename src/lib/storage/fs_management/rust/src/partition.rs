@@ -42,7 +42,7 @@ const BLOCK_DEV_PATH: &str = "/dev/class/block/";
 /// Waits for a partition to appear on BLOCK_DEV_PATH that
 /// matches the fields in the PartitionMatcher. Returns the
 /// path of the partition if found. Errors after timeout duration.
-pub async fn open_partition(matcher: PartitionMatcher, timeout: Duration) -> Result<String, Error> {
+pub async fn find_partition(matcher: PartitionMatcher, timeout: Duration) -> Result<String, Error> {
     async {
         let mut dev_stream = watch(BLOCK_DEV_PATH).await.context("Watch failed")?;
         while let Some(path_event) = dev_stream.next().await {

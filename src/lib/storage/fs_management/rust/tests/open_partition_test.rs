@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use {
-    fs_management::partition::{open_partition, PartitionMatcher},
+    fs_management::partition::{find_partition, PartitionMatcher},
     fuchsia_zircon::Duration,
     ramdevice_client::RamdiskClient,
 };
 
 #[fuchsia::test]
-async fn open_partition_test() {
+async fn find_partition_test() {
     let _ramdisk = RamdiskClient::create(1024, 1 << 16).await.unwrap();
     let matcher = PartitionMatcher {
         parent_device: Some(String::from("/dev/sys/platform")),
@@ -17,7 +17,7 @@ async fn open_partition_test() {
     };
 
     assert_eq!(
-        open_partition(matcher, Duration::from_seconds(10)).await.unwrap(),
+        find_partition(matcher, Duration::from_seconds(10)).await.unwrap(),
         "/dev/sys/platform/00:00:2d/ramctl/ramdisk-0/block",
     );
 }

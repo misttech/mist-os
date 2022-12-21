@@ -24,9 +24,13 @@ source_set("lib") {
 
     # <factory_reset.h> has #include <fbl/unique_fd.h>
     "//zircon/system/ulib/fbl",
+
+    # <factory_reset.h> has #include <fidl/fuchsia.fshost/cpp.wire.h>
+    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp_wire",
   ]
 
   deps = [
+    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_hlcpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
@@ -49,6 +53,7 @@ executable("bin") {
   deps = []
   public_deps = [
     ":lib",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -101,6 +106,7 @@ test("factory_reset_unittests") {
   deps = [
     ":lib",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
+    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_hlcpp",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_hlcpp",
     "//sdk/lib/component/incoming/cpp",

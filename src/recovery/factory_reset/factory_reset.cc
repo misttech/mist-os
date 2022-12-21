@@ -6,6 +6,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <fidl/fuchsia.fshost/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fuchsia/fs/cpp/fidl.h>
 #include <lib/component/incoming/cpp/service_client.h>
@@ -85,12 +86,25 @@ zx_status_t ShredFxfsDevice(const fidl::ClientEnd<fuchsia_hardware_block::Block>
 }
 
 FactoryReset::FactoryReset(fbl::unique_fd dev_fd,
-                           fuchsia::hardware::power::statecontrol::AdminPtr admin) {
-  dev_fd_ = std::move(dev_fd);
-  admin_ = std::move(admin);
-}
+                           fuchsia::hardware::power::statecontrol::AdminPtr admin,
+                           fidl::ClientEnd<fuchsia_fshost::Admin> fshost_admin)
+    : admin_(std::move(admin)),
+      dev_fd_(std::move(dev_fd)),
+      fshost_admin_(std::move(fshost_admin)) {}
 
 zx_status_t FactoryReset::Shred() const {
+  // First try and shred the data volume using fshost.
+  auto result = fidl::WireCall(fshost_admin_)->ShredDataVolume();
+  if (!result.ok()) {
+    FX_LOGS(WARNING) << "Failed to call ShredDataVolume: " << result.FormatDescription();
+  } else if (result->is_ok()) {
+    FX_LOGS(INFO) << "fshost ShredDataVolume succeeded";
+    return ZX_OK;
+  } else if (result->error_value() != ZX_ERR_NOT_SUPPORTED) {
+    FX_PLOGS(WARNING, result->error_value()) << "fshost ShredDataVolume failed";
+  }
+  // Fall back to shredding all zxcrypt devices and Fxfs volumes...
+
   int fd = openat(dev_fd_.get(), kBlockPath, O_RDONLY);
   if (fd < 0) {
     FX_LOGS(ERROR) << "Error opening " << kBlockPath << ": " << strerror(errno);

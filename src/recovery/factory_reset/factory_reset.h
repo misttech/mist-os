@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FACTORY_RESET_FACTORY_RESET_H
-#define LIB_FACTORY_RESET_FACTORY_RESET_H
+#ifndef SRC_RECOVERY_FACTORY_RESET_FACTORY_RESET_H_
+#define SRC_RECOVERY_FACTORY_RESET_FACTORY_RESET_H_
 
+#include <fidl/fuchsia.fshost/cpp/wire.h>
 #include <fuchsia/hardware/power/statecontrol/cpp/fidl.h>
 #include <fuchsia/recovery/cpp/fidl.h>
 #include <zircon/types.h>
@@ -17,7 +18,8 @@ namespace factory_reset {
 // reboots.
 class FactoryReset : public fuchsia::recovery::FactoryReset {
  public:
-  FactoryReset(fbl::unique_fd dev_fd, fuchsia::hardware::power::statecontrol::AdminPtr admin);
+  FactoryReset(fbl::unique_fd dev_fd, fuchsia::hardware::power::statecontrol::AdminPtr admin,
+               fidl::ClientEnd<fuchsia_fshost::Admin> fshost_admin);
   // Performs the factory reset.
   void Reset(ResetCallback callback) override;
 
@@ -28,8 +30,9 @@ class FactoryReset : public fuchsia::recovery::FactoryReset {
 
   fuchsia::hardware::power::statecontrol::AdminPtr admin_;
   fbl::unique_fd dev_fd_;
+  fidl::ClientEnd<fuchsia_fshost::Admin> fshost_admin_;
 };
 
 }  // namespace factory_reset
 
-#endif  // LIB_FACTORY_RESET_FACTORY_RESET_H
+#endif  // SRC_RECOVERY_FACTORY_RESET_FACTORY_RESET_H_

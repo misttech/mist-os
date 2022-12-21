@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/incoming/cpp/service_client.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/component_context.h>
 #include <unistd.h>
@@ -22,7 +23,8 @@ int main(int argc, const char** argv) {
       sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
   auto admin = context->svc()->Connect<fuchsia::hardware::power::statecontrol::Admin>();
-  factory_reset::FactoryReset factory_reset(std::move(dev_fd), std::move(admin));
+  factory_reset::FactoryReset factory_reset(std::move(dev_fd), std::move(admin),
+                                            *component::Connect<fuchsia_fshost::Admin>());
   fidl::BindingSet<fuchsia::recovery::FactoryReset> bindings;
   context->outgoing()->AddPublicService(bindings.GetHandler(&factory_reset));
   loop.Run();
