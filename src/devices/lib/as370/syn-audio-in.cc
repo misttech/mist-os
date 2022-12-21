@@ -128,6 +128,12 @@ void SynAudioInDevice::ProcessDma(uint32_t index) {
             parameters[index][i]->output_channel, multiplier_shift);
       }
     }
+    // We are done with amount_pdm from the input dma_buffer_current_[index], clean and invalidate
+    // for the next HW DMA write into it.
+    // This is safe because these DMA buffers that get hit by this cache operation are input-only
+    // to the CPU. None of these cache blocks should ever be dirty.
+    dma_buffer_[index].op_range(ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, dma_buffer_current_[index],
+                                amount_pdm, nullptr, 0);
 
     // Increment output (ring buffer) pointer and check for wraparound on the last DMA.
     if (index == kNumberOfDmas - 1) {
@@ -143,11 +149,6 @@ void SynAudioInDevice::ProcessDma(uint32_t index) {
       dma_buffer_current_[index] -= dma_buffer_size_[index];
     }
 
-    // Clean cache for the next input (DMA buffer).
-    auto buffer_to_clean = max_dma_to_process;
-    ZX_ASSERT(dma_buffer_current_[index] + buffer_to_clean <= dma_buffer_size_[index]);
-    dma_buffer_[index].op_range(ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, dma_buffer_current_[index],
-                                buffer_to_clean, nullptr, 0);
     auto after = zx::clock::get_monotonic();
     zxlogf(DEBUG, "audio: %u  decoded 0x%X bytes in %luusecs  into 0x%X bytes  distance 0x%X",
            index, amount_pdm, (after - before).to_usecs(), amount_pcm, distance);
