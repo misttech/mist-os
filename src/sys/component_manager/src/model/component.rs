@@ -39,7 +39,6 @@ use {
     },
     anyhow::format_err,
     async_trait::async_trait,
-    clonable_error::ClonableError,
     cm_moniker::{IncarnationId, InstancedAbsoluteMoniker, InstancedChildMoniker},
     cm_runner::{component_controller::ComponentController, NullRunner, RemoteRunner, Runner},
     cm_rust::{
@@ -72,6 +71,7 @@ use {
         sync::{Arc, Weak},
         time::Duration,
     },
+    thiserror::Error,
     tracing::warn,
     version_history::AbiRevision,
     vfs::{execution_scope::ExecutionScope, path::Path},
@@ -804,10 +804,9 @@ impl ComponentInstance {
                     });
                     let ret =
                         runtime.stop_component(stop_timer, kill_timer).await.map_err(|e| {
-                            ModelError::RunnerCommunicationError {
+                            ModelError::StopComponentError {
                                 moniker: self.abs_moniker.clone(),
-                                operation: "stop".to_string(),
-                                err: ClonableError::from(anyhow::Error::from(e)),
+                                err: e,
                             }
                         })?;
                     if ret.request == StopRequestSuccess::KilledAfterTimeout
@@ -1934,31 +1933,12 @@ pub enum StopRequestSuccess {
     /// could be sent.
     StoppedWithTimeoutRace,
 }
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Error, Clone, PartialEq)]
 pub enum StopComponentError {
+    #[error("error stopping component")]
     SendStopFailed,
+    #[error("error killing component")]
     SendKillFailed,
-}
-
-impl fmt::Display for StopComponentError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::SendKillFailed => write!(f, "failed to send `kill` message"),
-            Self::SendStopFailed => write!(f, "failed to send `stop` message"),
-        }
-    }
-}
-
-impl std::error::Error for StopComponentError {
-    fn description(&self) -> &str {
-        match self {
-            Self::SendKillFailed => "Error killing component",
-            Self::SendStopFailed => "Error stopping component",
-        }
-    }
-    fn cause(&self) -> Option<&dyn std::error::Error> {
-        Some(self)
-    }
 }
 
 impl Runtime {

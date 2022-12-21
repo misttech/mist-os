@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{events::error::EventsError, routing::OpenResourceError, storage::StorageError},
+    crate::model::{
+        component::StopComponentError, events::error::EventsError, routing::OpenResourceError,
+        storage::StorageError,
+    },
     ::routing::{
         component_id_index::ComponentIdIndexError,
         config::AbiRevisionError,
@@ -132,12 +135,11 @@ pub enum ModelError {
         #[source]
         err: fidl::Error,
     },
-    #[error("failed to send {} to runner for component {}", operation, moniker)]
-    RunnerCommunicationError {
+    #[error("failed to stop component {}: {}", moniker, err)]
+    StopComponentError {
         moniker: AbsoluteMoniker,
-        operation: String,
         #[source]
-        err: ClonableError,
+        err: StopComponentError,
     },
     #[error("events error: {}", err)]
     EventsError {
