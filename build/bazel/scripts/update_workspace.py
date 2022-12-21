@@ -625,6 +625,10 @@ block *
     )
     generated.add_file('workspace/platform_mappings', platform_mappings_content)
 
+    platform_version_path = os.path.join(
+        fuchsia_dir, 'build', 'config', 'fuchsia', 'platform_version.json')
+    with open(platform_version_path, 'r') as f:
+        platform_version = json.load(f)
     # Generate the content of .bazelrc
     bazelrc_content = expand_template_file(
         'template.bazelrc',
@@ -634,6 +638,7 @@ block *
         config_file=os.path.join(topdir, 'download_config_file'),
         remote_instance_name=build_config['rbe_instance_name'],
         rbe_project=build_config['rbe_project'],
+        fuchsia_api_level=platform_version['in_development_api_level'],
     )
     if args.use_bzlmod:
         bazelrc_content += '''
