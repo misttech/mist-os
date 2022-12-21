@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::clock::now;
 use crate::message::action_fuse::{ActionFuse, ActionFuseHandle};
 use crate::message::base::{
     Address, Attribution, Message, MessageAction, MessageType, Payload, Role,
@@ -75,8 +74,7 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageBuild
     pub(crate) fn send(self) -> Receptor<P, A, R> {
         let (beacon, receptor) =
             BeaconBuilder::new(self.messenger.clone()).set_timeout(self.timeout).build();
-        self.messenger
-            .transmit(MessageAction::Send(self.payload, self.attribution, now()), Some(beacon));
+        self.messenger.transmit(MessageAction::Send(self.payload, self.attribution), Some(beacon));
 
         if let Some(forwarder) = self.forwarder {
             ActionFuse::defuse(forwarder);

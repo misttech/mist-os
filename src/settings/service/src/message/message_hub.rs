@@ -603,14 +603,14 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageHub<P
         beacon: Option<Beacon<P, A, R>>,
     ) {
         let (mut outgoing_message, _guard) = match action {
-            MessageAction::Send(payload, message_type, timestamp) => {
+            MessageAction::Send(payload, message_type) => {
                 let guard = trace_guard!(
                     id,
 
                     "process request send",
                     "payload" => format!("{payload:?}").as_str()
                 );
-                (Message::new(fingerprint, timestamp, payload, message_type), guard)
+                (Message::new(fingerprint, payload, message_type), guard)
             }
             MessageAction::Forward(forwarded_message) => {
                 let guard = trace_guard!(id, "process request forward");

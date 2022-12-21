@@ -10,8 +10,6 @@ use crate::message::beacon::BeaconBuilder;
 use crate::message::message_builder::MessageBuilder;
 use crate::message::messenger::Messenger;
 use crate::message::receptor::Receptor;
-#[cfg(test)]
-use crate::message::Timestamp;
 
 /// MessageClient provides a subset of Messenger functionality around a specific
 /// delivered message. The client may duplicate/move the MessageClient as
@@ -58,11 +56,6 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageClien
                 }))
                 .build(),
         }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn get_timestamp(&self) -> Timestamp {
-        self.message.get_timestamp()
     }
 
     #[cfg(test)]

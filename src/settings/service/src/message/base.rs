@@ -7,7 +7,6 @@ use crate::message::beacon::Beacon;
 use crate::message::message_client::MessageClient;
 use crate::message::messenger::MessengerClient;
 use crate::message::receptor::Receptor;
-use crate::message::Timestamp;
 use futures::channel::mpsc::UnboundedSender;
 use futures::channel::oneshot::Sender;
 use std::collections::HashSet;
@@ -475,9 +474,6 @@ pub enum Attribution<P: Payload + 'static, A: Address + 'static, R: Role + 'stat
 #[derive(Clone, Debug)]
 pub struct Message<P: Payload + 'static, A: Address + 'static, R: Role + 'static> {
     author: Fingerprint<A>,
-    // TODO(fxbug.dev/84729)
-    #[allow(unused)]
-    timestamp: Timestamp,
     payload: P,
     attribution: Attribution<P, A, R>,
     // The return path is generated while the message is passed from messenger
@@ -492,7 +488,6 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> Message<P, A
     /// Returns a new Message instance. Only the MessageHub can mint new messages.
     pub(super) fn new(
         author: Fingerprint<A>,
-        timestamp: Timestamp,
         payload: P,
         attribution: Attribution<P, A, R>,
     ) -> Message<P, A, R> {
@@ -503,17 +498,12 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> Message<P, A
             return_path.extend(message.get_return_path().iter().cloned());
         }
 
-        Message { author, timestamp, payload, attribution, return_path }
+        Message { author, payload, attribution, return_path }
     }
 
     /// Adds an entity to be notified on any replies.
     pub(super) fn add_participant(&mut self, participant: Beacon<P, A, R>) {
         self.return_path.insert(0, participant);
-    }
-
-    #[cfg(test)]
-    pub(super) fn get_timestamp(&self) -> Timestamp {
-        self.timestamp
     }
 
     /// Returns the Signatures of messengers who have modified this message
@@ -625,7 +615,7 @@ pub(super) enum MessengerAction<P: Payload + 'static, A: Address + 'static, R: R
 #[derive(Debug)]
 pub(super) enum MessageAction<P: Payload + 'static, A: Address + 'static, R: Role + 'static> {
     // A new message sent to the specified audience.
-    Send(P, Attribution<P, A, R>, Timestamp),
+    Send(P, Attribution<P, A, R>),
     // The message has been forwarded by the current holder.
     Forward(Message<P, A, R>),
 }
