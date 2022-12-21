@@ -43,14 +43,24 @@ impl UpdateCheckRateLimiter {
     pub fn should_rate_limit(&self, current_time: Instant) -> bool {
         if let Some(check_time) = self.recent_update_check_times.get(MAX_CHECKS_IN_SHORT_PERIOD - 1)
         {
-            if *check_time > current_time.checked_sub(SHORT_PERIOD_DURATION).unwrap() {
-                return true;
+            match current_time.checked_sub(SHORT_PERIOD_DURATION) {
+                Some(sub_time) => {
+                    if *check_time > sub_time {
+                        return true;
+                    }
+                }
+                None => return true,
             }
         }
         if let Some(check_time) = self.recent_update_check_times.get(MAX_CHECKS_IN_LONG_PERIOD - 1)
         {
-            if *check_time > current_time.checked_sub(LONG_PERIOD_DURATION).unwrap() {
-                return true;
+            match current_time.checked_sub(LONG_PERIOD_DURATION) {
+                Some(sub_time) => {
+                    if *check_time > sub_time {
+                        return true;
+                    }
+                }
+                None => return true,
             }
         }
         false
