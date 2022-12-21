@@ -5,7 +5,6 @@
 use crate::agent::{AgentError, BlueprintHandle, Context, Invocation, Lifespan, Payload};
 use crate::base::SettingType;
 use crate::message::base::{Audience, MessengerType};
-use crate::monitor;
 use crate::policy::PolicyType;
 use crate::service;
 use crate::service_context::ServiceContext;
@@ -25,8 +24,6 @@ pub(crate) struct Authority {
     // Available components
     available_components: HashSet<SettingType>,
     available_policies: HashSet<PolicyType>,
-    // Available resource monitors
-    resource_monitor_actor: Option<monitor::environment::Actor>,
 }
 
 impl Authority {
@@ -34,7 +31,6 @@ impl Authority {
         delegate: service::message::Delegate,
         available_components: HashSet<SettingType>,
         available_policies: HashSet<PolicyType>,
-        resource_monitor_actor: Option<monitor::environment::Actor>,
     ) -> Result<Authority, Error> {
         let (client, _) = delegate
             .create(MessengerType::Unbound)
@@ -47,7 +43,6 @@ impl Authority {
             messenger: client,
             available_components,
             available_policies,
-            resource_monitor_actor,
         })
     }
 
@@ -66,7 +61,6 @@ impl Authority {
                     self.delegate.clone(),
                     self.available_components.clone(),
                     self.available_policies.clone(),
-                    self.resource_monitor_actor.clone(),
                 )
                 .await,
             )
@@ -178,7 +172,7 @@ mod tests {
         }
 
         let delegate = MessageHub::create(None);
-        let mut authority = Authority::create(delegate, HashSet::new(), HashSet::new(), None)
+        let mut authority = Authority::create(delegate, HashSet::new(), HashSet::new())
             .await
             .expect("Should be able to create authority");
         let agent = TestAgentBlueprint;

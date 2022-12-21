@@ -248,7 +248,6 @@ mod tests {
             hub,
             vec![SettingType::Unknown].into_iter().collect(),
             HashSet::new(),
-            None,
         )
         .await
     }

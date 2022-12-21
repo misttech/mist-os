@@ -5,7 +5,6 @@
 use crate::base::SettingType;
 use crate::event;
 use crate::message::base::MessengerType;
-use crate::monitor;
 use crate::payload_convert;
 use crate::policy::PolicyType;
 use crate::service;
@@ -105,10 +104,6 @@ pub struct Context {
 
     /// Indicates available policy types supported by the Settings interfaces.
     pub available_policies: HashSet<PolicyType>,
-
-    /// Used to monitor resources, but it has been turned off.
-    // TODO(fxbug.dev/117894): Investigate if we need to turn on the resource monitor or remove it.
-    pub resource_monitor_actor: Option<monitor::environment::Actor>,
 }
 
 impl Context {
@@ -117,17 +112,9 @@ impl Context {
         delegate: service::message::Delegate,
         available_components: HashSet<SettingType>,
         available_policies: HashSet<PolicyType>,
-        resource_monitor_actor: Option<monitor::environment::Actor>,
     ) -> Self {
         let publisher = event::Publisher::create(&delegate, MessengerType::Unbound).await;
-        Self {
-            receptor,
-            publisher,
-            delegate,
-            available_components,
-            available_policies,
-            resource_monitor_actor,
-        }
+        Self { receptor, publisher, delegate, available_components, available_policies }
     }
 
     /// Generates a new `Messenger` on the service `MessageHub`. Only

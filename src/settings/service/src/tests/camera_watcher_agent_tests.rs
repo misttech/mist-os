@@ -62,8 +62,7 @@ async fn test_camera_agent_proxy() {
     let mut event_receptor = service::build_event_listener(&service_hub).await;
 
     // Create the agent context and agent.
-    let context =
-        Context::new(agent_receptor, service_hub, HashSet::new(), HashSet::new(), None).await;
+    let context = Context::new(agent_receptor, service_hub, HashSet::new(), HashSet::new()).await;
     // Setup the fake services.
     let (service_registry, fake_services) = create_services(true, false).await;
 
@@ -142,7 +141,7 @@ fn test_camera_devices_watcher_timeout() {
 
     // Create the agent context and agent.
     let context_future =
-        Context::new(agent_receptor, service_hub.clone(), HashSet::new(), HashSet::new(), None);
+        Context::new(agent_receptor, service_hub.clone(), HashSet::new(), HashSet::new());
     let context =
         move_executor_forward_and_get(&mut executor, context_future, "Could not create context");
 
@@ -214,8 +213,7 @@ async fn test_camera_agent_delayed_devices() {
     let mut event_receptor = service::build_event_listener(&service_hub).await;
 
     // Create the agent context and agent.
-    let context =
-        Context::new(agent_receptor, service_hub, HashSet::new(), HashSet::new(), None).await;
+    let context = Context::new(agent_receptor, service_hub, HashSet::new(), HashSet::new()).await;
     // Setup the fake services.
     let (service_registry, fake_services) = create_services(false, true).await;
 

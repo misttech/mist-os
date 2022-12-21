@@ -31,7 +31,6 @@ use crate::message::base::role;
 #[cfg(test)]
 use crate::message::base::MessengerType;
 use crate::message::MessageHubDefinition;
-use crate::monitor;
 use crate::policy::{self, PolicyType};
 use crate::storage;
 
@@ -55,9 +54,6 @@ pub(crate) mod message {
     pub(crate) type MessengerType = <MessageHub as MessageHubUtil>::MessengerType;
     pub(crate) type Receptor = <MessageHub as MessageHubUtil>::Receptor;
     pub(crate) type Signature = <MessageHub as MessageHubUtil>::Signature;
-
-    #[cfg(test)]
-    pub(crate) type TargetedMessenger = <MessageHub as MessageHubUtil>::TargetedMessenger;
 }
 
 /// The `Address` enumeration defines a namespace for entities that can be
@@ -95,8 +91,6 @@ pub enum Payload {
     Event(event::Payload),
     /// Job payloads contain information related to new sources of jobs to be executed.
     Job(job::Payload),
-    /// Monitor payloads contain commands and information surrounding resource usage.
-    Monitor(monitor::Payload),
     /// Storage payloads contain read and write requests to storage and their responses.
     Storage(storage::Payload),
     /// This value is reserved for testing purposes.
@@ -134,7 +128,6 @@ pub(crate) trait TryFromWithClient<T>: Sized {
 pub enum Role {
     Policy(policy::Role),
     Event(event::Role),
-    Monitor(monitor::Role),
 }
 
 /// The payload_convert macro helps convert between the domain-specific payloads

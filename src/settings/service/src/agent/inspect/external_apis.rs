@@ -442,7 +442,6 @@ mod tests {
             service::MessageHub::create_hub(),
             HashSet::new(),
             HashSet::new(),
-            None,
         )
         .await
     }

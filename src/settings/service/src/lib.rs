@@ -80,7 +80,6 @@ use crate::job::source::Seeder;
 use crate::keyboard::keyboard_controller::KeyboardController;
 use crate::light::light_controller::LightController;
 use crate::message::MessageHubUtil;
-use crate::monitor::base as monitor_base;
 use crate::night_mode::night_mode_controller::NightModeController;
 use crate::policy::policy_handler;
 use crate::policy::policy_handler_factory_impl::PolicyHandlerFactoryImpl;
@@ -121,7 +120,6 @@ pub mod ingress;
 pub mod inspect;
 pub mod message;
 pub(crate) mod migration;
-pub mod monitor;
 pub mod service_context;
 pub mod storage;
 pub mod trace;
@@ -282,7 +280,6 @@ pub struct EnvironmentBuilder<T: StorageFactory<Storage = DeviceStorage> + Send 
     registrants: Vec<Registrant>,
     settings: Vec<SettingType>,
     handlers: HashMap<SettingType, GenerateHandler>,
-    resource_monitors: Vec<monitor_base::monitor::Generate>,
     setting_proxy_inspect_info: Option<&'static fuchsia_inspect::Node>,
     active_listener_inspect_logger: Option<Arc<Mutex<ListenerInspectLogger>>>,
     storage_dir: Option<DirectoryProxy>,
@@ -305,7 +302,6 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
             handlers: HashMap::new(),
             registrants: vec![],
             settings: vec![],
-            resource_monitors: vec![],
             setting_proxy_inspect_info: None,
             active_listener_inspect_logger: None,
             storage_dir: None,
@@ -392,15 +388,6 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
     /// Appends the supplied [AgentBlueprintHandle]s to the list of agent blueprints.
     pub fn agents(mut self, blueprints: &[AgentBlueprintHandle]) -> EnvironmentBuilder<T> {
         self.agent_blueprints.append(&mut blueprints.to_vec());
-        self
-    }
-
-    /// Adds the specified monitors to the list of resource monitors.
-    pub fn resource_monitors(
-        mut self,
-        monitors: &[monitor_base::monitor::Generate],
-    ) -> EnvironmentBuilder<T> {
-        self.resource_monitors.append(&mut monitors.to_vec());
         self
     }
 
@@ -609,7 +596,6 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
             self.registrants,
             policies,
             agent_blueprints,
-            self.resource_monitors,
             self.event_subscriber_blueprints,
             service_context,
             Arc::new(Mutex::new(handler_factory)),
@@ -880,7 +866,6 @@ async fn create_environment<'a, T, F>(
     registrants: Vec<Registrant>,
     policies: HashSet<PolicyType>,
     agent_blueprints: Vec<AgentBlueprintHandle>,
-    resource_monitor_generators: Vec<monitor_base::monitor::Generate>,
     event_subscriber_blueprints: Vec<event::subscriber::BlueprintHandle>,
     service_context: Arc<ServiceContext>,
     handler_factory: Arc<Mutex<SettingHandlerFactoryImpl>>,
@@ -897,12 +882,6 @@ where
     for blueprint in event_subscriber_blueprints {
         blueprint.create(delegate.clone()).await;
     }
-
-    let monitor_actor = if resource_monitor_generators.is_empty() {
-        None
-    } else {
-        Some(monitor::environment::Builder::new().add_monitors(resource_monitor_generators).build())
-    };
 
     let mut entities = HashSet::new();
 
@@ -933,7 +912,7 @@ where
     }
 
     let mut agent_authority =
-        Authority::create(delegate.clone(), components.clone(), policies, monitor_actor).await?;
+        Authority::create(delegate.clone(), components.clone(), policies).await?;
 
     // TODO(fxbug.dev/96251) Handle registrants with missing dependencies.
     for registrant in registrants {

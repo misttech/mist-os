@@ -145,7 +145,6 @@ async fn test_write_notify() {
         delegate,
         [SettingType::Accessibility].into(),
         HashSet::new(),
-        None,
     )
     .await;
 

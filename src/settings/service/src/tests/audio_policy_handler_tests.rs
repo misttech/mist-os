@@ -96,7 +96,7 @@ impl TestEnvironment {
 
         let components: HashSet<_> = [SettingType::Audio].into();
         let policies: HashSet<_> = [PolicyType::Audio].into();
-        let mut agent_authority = Authority::create(delegate.clone(), components, policies, None)
+        let mut agent_authority = Authority::create(delegate.clone(), components, policies)
             .await
             .expect("failed to create agent authority");
 
