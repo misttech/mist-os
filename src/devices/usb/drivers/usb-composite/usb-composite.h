@@ -8,6 +8,7 @@
 #include <fuchsia/hardware/usb/cpp/banjo.h>
 
 #include <ddktl/device.h>
+#include <ddktl/init-txn.h>
 #include <fbl/array.h>
 #include <fbl/mutex.h>
 #include <fbl/ref_ptr.h>
@@ -18,7 +19,7 @@ namespace usb_composite {
 
 class UsbComposite;
 class UsbInterface;
-using UsbCompositeType = ddk::Device<UsbComposite, ddk::Unbindable>;
+using UsbCompositeType = ddk::Device<UsbComposite, ddk::Initializable, ddk::Unbindable>;
 
 // This class represents a USB composite device and manages creating devmgr devices
 // for multiple USB interfaces.
@@ -29,6 +30,7 @@ class UsbComposite : public UsbCompositeType {
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
   // Device protocol implementation.
+  void DdkInit(ddk::InitTxn txn);
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
 

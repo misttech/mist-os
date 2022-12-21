@@ -27,8 +27,9 @@ zx_status_t UsbComposite::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  // devmgr is now in charge of the device.
-  [[maybe_unused]] auto* dummy = device.release();
+  // Device manager is now in charge of the device.
+  [[maybe_unused]] auto* unowned_device = device.release();
+
   return ZX_OK;
 }
 
@@ -372,6 +373,14 @@ zx_status_t UsbComposite::GetAdditionalDescriptorList(uint8_t last_interface_id,
   return ZX_OK;
 }
 
+void UsbComposite::DdkInit(ddk::InitTxn txn) {
+  zx_status_t status = AddInterfaces();
+  if (status != ZX_OK) {
+    zxlogf(WARNING, "AddInterfaces() = %s", zx_status_get_string(status));
+  }
+  txn.Reply(status);
+}
+
 void UsbComposite::DdkUnbind(ddk::UnbindTxn txn) {
   {
     fbl::AutoLock lock(&lock_);
@@ -420,12 +429,7 @@ zx_status_t UsbComposite::Init() {
   char name[16];
   snprintf(name, sizeof(name), "%03d", usb_.GetDeviceId());
 
-  status = DdkAdd(name, DEVICE_ADD_NON_BINDABLE);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  return AddInterfaces();
+  return DdkAdd(name, DEVICE_ADD_NON_BINDABLE);
 }
 
 static constexpr zx_driver_ops_t driver_ops = []() {

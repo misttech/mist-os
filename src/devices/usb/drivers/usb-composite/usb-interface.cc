@@ -230,8 +230,10 @@ zx_status_t UsbInterface::ConfigureEndpoints(uint8_t interface_id, uint8_t alt_s
       if (old_ep != new_ep) {
         if (old_ep) {
           zx_status_t ret = usb_.EnableEndpoint(old_ep, nullptr, false);
-          if (ret != ZX_OK)
+          if (ret != ZX_OK) {
+            zxlogf(ERROR, "EnableEndpoint failed: %s", zx_status_get_string(ret));
             status = ret;
+          }
         }
         if (new_ep) {
           usb_ss_ep_comp_descriptor_t* ss_comp_desc = nullptr;
@@ -244,6 +246,7 @@ zx_status_t UsbInterface::ConfigureEndpoints(uint8_t interface_id, uint8_t alt_s
           }
           zx_status_t ret = usb_.EnableEndpoint(new_ep, ss_comp_desc, true);
           if (ret != ZX_OK) {
+            zxlogf(ERROR, "EnableEndpoint failed: %s", zx_status_get_string(ret));
             status = ret;
           }
         }
