@@ -263,8 +263,8 @@ func Main() {
 	noOpaqueIID := false
 	flags.BoolVar(&noOpaqueIID, "no-opaque-iids", false, "disable opaque IIDs")
 
-	fastUDP := true
-	flags.BoolVar(&fastUDP, "fast-udp", true, "enable Fast UDP")
+	fastUDP := false
+	flags.BoolVar(&fastUDP, "fast-udp", false, "enable Fast UDP")
 
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		panic(err)
