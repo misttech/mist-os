@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.demo/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
 #include <lib/driver/component/cpp/outgoing_directory.h>
+#include <lib/driver/devfs/cpp/connector.h>
 #include <zircon/errors.h>
 
 namespace {
@@ -37,49 +38,6 @@ zx::result<std::string> GetTopologicalPath(fidl::UnownedClientEnd<fuchsia_io::Di
   }
 
   return zx::ok(result->path());
-}
-
-// Connect to the fuchsia.devices.fs.Exporter protocol
-zx::result<fidl::ClientEnd<fuchsia_device_fs::Exporter>> ConnectToDeviceExporter(
-    fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir) {
-  auto exporter = component::ConnectAt<fuchsia_device_fs::Exporter>(svc_dir);
-  if (exporter.is_error()) {
-    return exporter.take_error();
-  }
-  return exporter;
-}
-
-// Create an exported directory handle using fuchsia.devices.fs.Exporter
-zx::result<fidl::ServerEnd<fuchsia_io::Directory>> ExportDevfsEntry(
-    fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir, std::string service_path,
-    std::string devfs_path, uint32_t protocol_id) {
-  // Connect to the devfs exporter service
-  auto exporter_client = ConnectToDeviceExporter(svc_dir);
-  if (exporter_client.is_error()) {
-    return exporter_client.take_error();
-  }
-  fidl::SyncClient exporter{std::move(exporter_client.value())};
-
-  // Serve a connection for devfs clients
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-
-  // Export the client side of the service connection to devfs
-  auto result =
-      exporter->Export({std::move(endpoints->client), service_path, devfs_path, protocol_id});
-  if (result.is_error()) {
-    const auto& error = result.error_value();
-    if (error.is_framework_error()) {
-      // Error occurred in the FIDL transport
-      return zx::error(error.framework_error().status());
-    } else {
-      // Error response returned by the exporter service
-      return zx::error(error.domain_error());
-    }
-  }
-  return zx::ok(std::move(endpoints->server));
 }
 
 }  // namespace
@@ -112,29 +70,21 @@ class DemoNumberServer : public fidl::Server<fuchsia_hardware_demo::Demo> {
 class DemoNumber : public driver::DriverBase {
  public:
   DemoNumber(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
-      : DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
+      : DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)),
+        devfs_connector_(fit::bind_member<&DemoNumber::Connect>(this)) {}
 
   // Called by the driver framework to initialize the driver instance.
   zx::result<> Start() override {
-    // Add the fuchsia.hardware.demo/Demo protocol to be served as
-    // "/svc/fuchsia.hardware.demo/default/demo"
-    auto demo_handler = [this](fidl::ServerEnd<fuchsia_hardware_demo::Demo> request) -> void {
-      // Bind each connection request to a fuchsia.hardware.demo/Demo server instance.
-      auto demo_impl = std::make_unique<DemoNumberServer>(&logger());
-      fidl::BindServer(dispatcher(), std::move(request), std::move(demo_impl),
-                       std::mem_fn(&DemoNumberServer::OnUnbound));
-    };
-    fuchsia_hardware_demo::Service::InstanceHandler handler({.demo = std::move(demo_handler)});
+    fuchsia_hardware_demo::Service::InstanceHandler handler({
+        .demo = fit::bind_member<&DemoNumber::Connect>(this),
+    });
 
-    auto result =
-        context().outgoing()->AddService<fuchsia_hardware_demo::Service>(std::move(handler));
-    if (result.is_error()) {
+    if (zx::result result =
+            context().outgoing()->AddService<fuchsia_hardware_demo::Service>(std::move(handler));
+        result.is_error()) {
       FDF_SLOG(ERROR, "Failed to add Demo service", KV("status", result.status_string()));
       return result.take_error();
     }
-
-    const std::string service_path = std::string("svc/") + fuchsia_hardware_demo::Service::Name +
-                                     "/" + component::kDefaultInstance + "/demo";
 
     // Construct a devfs path that matches the device nodes topological path
     auto path_result = GetTopologicalPath(context().incoming()->svc_dir());
@@ -145,18 +95,24 @@ class DemoNumber : public driver::DriverBase {
     auto devfs_path = path_result.value().append("/").append(kDriverName);
     FDF_LOG(INFO, "Exporting device to: %s", devfs_path.c_str());
 
-    // Export an entry to devfs for fuchsia.hardware.demo as a generic device
-    auto devfs_dir = ExportDevfsEntry(context().incoming()->svc_dir(), service_path, devfs_path, 0);
-    if (devfs_dir.is_error()) {
-      FDF_SLOG(ERROR, "Failed to export service", KV("status", devfs_dir.status_string()));
-      return devfs_dir.take_error();
+    zx::result connection = context().incoming()->Connect<fuchsia_device_fs::Exporter>();
+    if (connection.is_error()) {
+      return connection.take_error();
     }
+    fidl::WireSyncClient devfs_exporter{std::move(connection.value())};
 
-    // Serve an additional outgoing endpoint for devfs clients
-    auto status = context().outgoing()->Serve(std::move(devfs_dir.value()));
-    if (status.is_error()) {
-      FDF_SLOG(ERROR, "Failed to serve devfs directory", KV("status", status.status_string()));
-      return status.take_error();
+    zx::result connector = devfs_connector_.Bind(dispatcher());
+    if (connector.is_error()) {
+      return connector.take_error();
+    }
+    fidl::WireResult result = devfs_exporter->ExportV2(
+        std::move(connector.value()), fidl::StringView::FromExternal(devfs_path),
+        fidl::StringView(), fuchsia_device_fs::ExportOptions());
+    if (!result.ok()) {
+      return zx::error(result.status());
+    }
+    if (result.value().is_error()) {
+      return result.value().take_error();
     }
 
     return zx::ok();
@@ -164,6 +120,16 @@ class DemoNumber : public driver::DriverBase {
 
   // Called by the driver framework before the driver instance is destroyed.
   void Stop() override { FDF_LOG(INFO, "Driver unloaded: %s", kDriverName.c_str()); }
+
+ private:
+  void Connect(fidl::ServerEnd<fuchsia_hardware_demo::Demo> request) {
+    // Bind each connection request to a fuchsia.hardware.demo/Demo server instance.
+    auto demo_impl = std::make_unique<DemoNumberServer>(&logger());
+    fidl::BindServer(dispatcher(), std::move(request), std::move(demo_impl),
+                     std::mem_fn(&DemoNumberServer::OnUnbound));
+  }
+
+  driver_devfs::Connector<fuchsia_hardware_demo::Demo> devfs_connector_;
 };
 
 }  // namespace demo_number

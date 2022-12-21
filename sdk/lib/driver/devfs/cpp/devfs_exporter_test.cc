@@ -8,6 +8,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver/component/cpp/tests/test_base.h>
+#include <lib/driver/devfs/cpp/connector.h>
 #include <lib/driver/devfs/cpp/exporter.h>
 #include <lib/fidl/cpp/binding.h>
 
@@ -195,4 +196,24 @@ TEST_F(DevfsExporterTest, Create_ServiceFailure) {
                    });
   RunLoopUntilIdle();
   ASSERT_TRUE(finished);
+}
+
+TEST(ConnectorTest, Connect) {
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  fidl::ServerEnd<fuchsia_logger::LogSink> connection;
+
+  driver_devfs::Connector connector = driver_devfs::Connector<fuchsia_logger::LogSink>(
+      [&connection](fidl::ServerEnd<fuchsia_logger::LogSink> server) {
+        connection = std::move(server);
+      });
+  zx::result connector_client = connector.Bind(loop.dispatcher());
+  ASSERT_EQ(ZX_OK, connector_client.status_value());
+
+  fidl::WireClient client{std::move(connector_client.value()), loop.dispatcher()};
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_logger::LogSink>();
+  ASSERT_EQ(ZX_OK, endpoints.status_value());
+  ASSERT_EQ(ZX_OK, client->Connect(endpoints->server.TakeChannel()).status());
+
+  loop.RunUntilIdle();
+  ASSERT_TRUE(connection.is_valid());
 }

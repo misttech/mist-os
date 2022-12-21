@@ -17,6 +17,7 @@ sdk_source_set("cpp") {
   include_base = "//sdk"
 
   sources = [
+    "connector.h",
     "exporter.cc",
     "exporter.h",
   ]
