@@ -43,6 +43,9 @@ if (is_host) {
     }
   } else {
     sdk_noop_atom("aemu_internal") {
+      id = "sdk://tools/$current_cpu/aemu_internal"
+      category = "partner"
+      type = "companion_host_tool"
     }
   }
 
@@ -56,6 +59,9 @@ if (is_host) {
     }
   } else {
     sdk_noop_atom("qemu_internal") {
+      id = "sdk://tools/$current_cpu/qemu_internal"
+      category = "partner"
+      type = "companion_host_tool"
     }
   }
 }
