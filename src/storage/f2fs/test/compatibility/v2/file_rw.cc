@@ -7,7 +7,7 @@
 namespace f2fs {
 namespace {
 
-using FileRWCompatibilityTest = GuestTest<F2fsDebianGuest>;
+using FileRWCompatibilityTest = F2fsGuestTest;
 
 TEST_F(FileRWCompatibilityTest, WriteVerifyLinuxToFuchsia) {
   // TODO(fxbug.dev/115142): larger filesize for slow test

@@ -7,7 +7,7 @@
 namespace f2fs {
 namespace {
 
-using FileAttrCompatibilityTest = GuestTest<F2fsDebianGuest>;
+using FileAttrCompatibilityTest = F2fsGuestTest;
 
 void CompareStat(const struct stat &a, const struct stat &b) {
   EXPECT_EQ(a.st_ino, b.st_ino);

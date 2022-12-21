@@ -225,6 +225,20 @@ std::string LinuxOperator::ConvertPath(std::string_view path) {
   return std::string(path);
 }
 
+void LinuxOperator::CheckF2fsToolsVersion(const int major, const int minor) {
+  std::string result;
+  ExecuteWithAssert({"mkfs.f2fs -V | cut -d' ' -f2 | cut -d'.' -f1"}, &result);
+  int actual_major = std::stoi(result);
+
+  result.clear();
+  ExecuteWithAssert({"mkfs.f2fs -V | cut -d' ' -f2 | cut -d'.' -f2"}, &result);
+  int actual_minor = std::stoi(result);
+
+  if (actual_major < major || (actual_major == major && actual_minor < minor)) {
+    GTEST_SKIP() << "need f2fs-tools version > " << major << "." << minor;
+  }
+}
+
 void LinuxOperator::Mkfs(std::string_view opt) {
   ExecuteWithAssert({"mkfs.f2fs", test_device_, "-f", opt.data()});
 }

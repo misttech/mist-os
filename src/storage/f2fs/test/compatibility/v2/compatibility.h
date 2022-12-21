@@ -143,6 +143,9 @@ class LinuxOperator : public CompatibilityTestOperator {
   void ExecuteWithAssert(const std::vector<std::string>& argv, std::string* result = nullptr);
   std::string ConvertPath(std::string_view path);
 
+  // "dry-run" of fsck needs version at least 1.14
+  void CheckF2fsToolsVersion(const int major = 1, const int minor = 14);
+
  private:
   F2fsDebianGuest* debian_guest_;
   const std::string mount_path_ = "compat_mnt";
@@ -264,6 +267,14 @@ class F2fsDebianGuest : public DebianEnclosedGuest {
 
   std::unique_ptr<LinuxOperator> linux_operator_;
   std::unique_ptr<FuchsiaOperator> fuchsia_operator_;
+};
+
+class F2fsGuestTest : public GuestTest<F2fsDebianGuest> {
+ protected:
+  void SetUp() override {
+    GuestTest<F2fsDebianGuest>::SetUp();
+    GetEnclosedGuest().GetLinuxOperator().CheckF2fsToolsVersion();
+  }
 };
 
 fs::VnodeConnectionOptions ConvertFlag(int flags);

@@ -7,7 +7,7 @@
 namespace f2fs {
 namespace {
 
-using InlineCompatibilityTest = GuestTest<F2fsDebianGuest>;
+using InlineCompatibilityTest = F2fsGuestTest;
 
 TEST_F(InlineCompatibilityTest, InlineDentryLinuxToFuchsia) {
   const std::string inline_dir_path = "/inline";

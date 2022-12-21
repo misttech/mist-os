@@ -7,7 +7,7 @@
 namespace f2fs {
 namespace {
 
-using MkfsFsckCompatibilityTest = GuestTest<F2fsDebianGuest>;
+using MkfsFsckCompatibilityTest = F2fsGuestTest;
 
 TEST_F(MkfsFsckCompatibilityTest, MkfsFsckLinuxToFuchsia) {
   // mkfs on Linux

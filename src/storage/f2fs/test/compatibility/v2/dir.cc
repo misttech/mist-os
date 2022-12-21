@@ -7,7 +7,7 @@
 namespace f2fs {
 namespace {
 
-using DirCompatibilityTest = GuestTest<F2fsDebianGuest>;
+using DirCompatibilityTest = F2fsGuestTest;
 
 TEST_F(DirCompatibilityTest, DirWidthTestLinuxToFuchsia) {
   // Mkdir on Linux
