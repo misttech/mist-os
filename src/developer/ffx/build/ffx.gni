@@ -41,7 +41,7 @@ template("ffx") {
     # overall drag on the graph.
 
     # These options cause it to fail in RBE, due to OOM
-    disable_rbe = true
+    disable_rbe = false
 
     # Since RBE is disabled, this runs locally and is known to require
     # massive memory.  Until RBE is re-enabled for this target,
