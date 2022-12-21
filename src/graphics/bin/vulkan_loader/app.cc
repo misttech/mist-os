@@ -76,7 +76,7 @@ zx_status_t LoaderApp::ServeDeviceFs(zx::channel dir_request) {
 zx_status_t LoaderApp::ServeManifestFs(zx::channel dir_request) {
   return manifest_fs_.ServeDirectory(manifest_fs_root_node_,
                                      fidl::ServerEnd<fuchsia_io::Directory>{std::move(dir_request)},
-                                     fs::Rights::ReadWrite());
+                                     fs::Rights::ReadOnly());
 }
 
 zx_status_t LoaderApp::InitManifestFs() {
