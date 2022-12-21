@@ -1,0 +1,28 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/go/go_library.gni")
+import("//build/go/go_test.gni")
+
+assert(is_host, "GIDL only runs on host")
+
+go_library("mixer") {
+  deps = [
+    "//tools/fidl/gidl/lib/ir",
+    "//tools/fidl/lib/fidlgen",
+  ]
+  sources = [
+    "mixer.go",
+    "mixer_test.go",
+  ]
+}
+
+go_test("gidl_mixer_tests") {
+  library = ":mixer"
+  args = [
+    "--test_data_dir",
+    rebase_path("$root_out_dir/test_data/gidl", root_build_dir),
+  ]
+  non_go_deps = [ "testdata:json_ir" ]
+}

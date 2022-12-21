@@ -59,7 +59,7 @@ template("gidl") {
 
   compiled_action(target_name) {
     testonly = true
-    tool = "//tools/fidl/gidl:gidl"
+    tool = "//tools/fidl/gidl/cmd/gidl"
     args = output_args + [
              "--type",
              invoker.type,

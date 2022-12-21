@@ -2,110 +2,17 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
-import("//build/fidl/fidl.gni")
-import("//build/go/go_binary.gni")
-import("//build/go/go_library.gni")
-import("//build/go/go_test.gni")
 import("//build/host.gni")
-import("//build/rust/rustc_test.gni")
 import("//build/testing/golden_files.gni")
 import("//src/tests/fidl/conformance_suite/gidl-conformance-suite.gni")
 import(
     "//third_party/go/src/syscall/zx/fidl/fidl_test/conformance_test_files.gni")
 import("//tools/fidl/gidl/gidl.gni")
 
-if (is_host) {
-  go_library("main") {
-    deps = [
-      "c",
-      "config",
-      "cpp",
-      "dart",
-      "driver_cpp",
-      "driver_llcpp",
-      "dynfidl",
-      "fuzzer_corpus",
-      "golang",
-      "hlcpp",
-      "ir",
-      "llcpp",
-      "parser",
-      "reference",
-      "rust",
-      "walker",
-      "//tools/fidl/lib/fidlgen",
-    ]
-    sources = [ "main.go" ]
-  }
-
-  go_binary("gidl") {
-    library = ":main"
-  }
-
-  conformance_golden_items = [
-    {
-      language = "go"
-      extension = "go"
-    },
-    {
-      language = "cpp"
-      extension = "cc"
-    },
-    {
-      language = "hlcpp"
-      extension = "cc"
-    },
-    {
-      language = "llcpp"
-      extension = "cc"
-    },
-    {
-      language = "rust"
-      extension = "rs"
-    },
-    {
-      language = "dynfidl"
-      extension = "rs"
-    },
-    {
-      language = "dart"
-      extension = "dart"
-    },
-  ]
-
-  foreach(item, conformance_golden_items) {
-    gidl("${item.language}_goldens") {
-      type = "conformance"
-      language = item.language
-      inputs = conformance_suite_golden_gidl_files
-      fidl = conformance_suite_fidl_target
-      output = "$target_gen_dir/${item.language}_golden.${item.extension}"
-    }
-  }
-
-  golden_files("gidl_golden_tests") {
-    testonly = true
-
-    deps = []
-    comparisons = []
-    foreach(item, conformance_golden_items) {
-      deps += [ ":${item.language}_goldens" ]
-      comparisons += [
-        {
-          golden = "goldens/${item.language}_golden.${item.extension}.golden"
-          candidate =
-              "$target_gen_dir/${item.language}_golden.${item.extension}"
-        },
-      ]
-    }
-  }
-}
-
 install_host_tools("host") {
   deps = [
-    ":gidl",
-    "audit:gidl_audit",
+    "cmd/gidl",
+    "cmd/gidl_audit",
   ]
   outputs = [
     "gidl",
@@ -113,97 +20,71 @@ install_host_tools("host") {
   ]
 }
 
-## Tests for building from an empty GIDL file.
-##
-## This verifies that there won't be build issues if tests are disabled.
-## Previously, when you disabled a test you sometimes had to debug build issues, even in
-## different bindings than the one you are debugging.
+conformance_golden_items = [
+  {
+    language = "go"
+    extension = "go"
+  },
+  {
+    language = "cpp"
+    extension = "cc"
+  },
+  {
+    language = "hlcpp"
+    extension = "cc"
+  },
+  {
+    language = "llcpp"
+    extension = "cc"
+  },
+  {
+    language = "rust"
+    extension = "rs"
+  },
+  {
+    language = "dynfidl"
+    extension = "rs"
+  },
+  {
+    language = "dart"
+    extension = "dart"
+  },
+]
 
-rust_empty_gidl_test_source = "$target_gen_dir/rust/empty_conformance_test.rs"
-
-gidl("rust_empty_gidl_test") {
-  type = "conformance"
-  language = "rust"
-  inputs = [ "//tools/fidl/gidl/empty.gidl" ]
-  fidl = conformance_suite_fidl_target
-  output = rust_empty_gidl_test_source
-}
-
-rustc_test("rust_empty_gidl_test_bin") {
-  output_name = "rust_empty_gidl_tests"
-  edition = "2018"
-  source_root = rust_empty_gidl_test_source
-  deps = [
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fidl/rust/gidl_util",
-    "//src/lib/zircon/rust:fuchsia-zircon-status",
-    "//src/lib/zircon/rust:fuchsia-zircon-types",
-    "//src/tests/fidl/conformance_suite:conformance_fidl_rust",
-    "//third_party/rust_crates:assert_matches",
-  ]
-  non_rust_deps = [ ":rust_empty_gidl_test" ]
-  sources = [ rust_empty_gidl_test_source ]
-}
-
-fuchsia_unittest_package("rust_empty_gidl_tests") {
-  deps = [ ":rust_empty_gidl_test_bin" ]
-}
-
-go_generated_dir = "$target_gen_dir/go"
-go_generated_source = "$go_generated_dir/empty_gidl_test.go"
-
-gidl("go_empty_gidl") {
-  type = "conformance"
-  language = "go"
-  inputs = [ "//tools/fidl/gidl/empty.gidl" ]
-  fidl = conformance_suite_fidl_target
-  output = go_generated_source
-}
-
-copy("go_copy_test_utils") {
-  sources = []
-  foreach(filename, go_conformance_test_files) {
-    sources += [ "//third_party/go/src/syscall/zx/fidl/fidl_test/" + filename ]
+foreach(item, conformance_golden_items) {
+  gidl("${item.language}_goldens") {
+    type = "conformance"
+    language = item.language
+    inputs = conformance_suite_golden_gidl_files
+    fidl = conformance_suite_fidl_target
+    output = "$target_gen_dir/${item.language}_golden.${item.extension}"
   }
-  outputs = [ "${go_generated_dir}/{{source_file_part}}" ]
 }
 
-go_library("go_empty_gidl_tests_library") {
+golden_files("gidl_golden_tests") {
   testonly = true
-  name = "empty_gidl_tests"
-  source_dir = go_generated_dir
 
-  sources = rebase_path(
-          [ go_generated_source ] + get_target_outputs(":go_copy_test_utils"),
-          go_generated_dir)
-
-  non_go_deps = [
-    ":go_copy_test_utils",
-    ":go_empty_gidl",
-  ]
-
-  deps = [ "${conformance_suite_fidl_target}_go(${go_toolchain})" ]
-}
-
-go_test("go_empty_gidl_test_bin") {
-  library = ":go_empty_gidl_tests_library"
-  non_go_deps = [ ":go_empty_gidl" ]
-  use_prebuilt_go = false
-}
-
-fuchsia_unittest_package("go_empty_gidl_tests") {
-  deps = [ ":go_empty_gidl_test_bin" ]
+  deps = []
+  comparisons = []
+  foreach(item, conformance_golden_items) {
+    deps += [ ":${item.language}_goldens" ]
+    comparisons += [
+      {
+        golden = "goldens/${item.language}_golden.${item.extension}.golden"
+        candidate = "$target_gen_dir/${item.language}_golden.${item.extension}"
+      },
+    ]
+  }
 }
 
 group("tests") {
   testonly = true
 
   deps = [
-    ":gidl_golden_tests($host_toolchain)",
-    ":go_empty_gidl_tests",
-    ":rust_empty_gidl_tests",
-    "golang:gidl_golang_test($host_toolchain)",
-    "mixer:gidl_mixer_test($host_toolchain)",
-    "parser:gidl_parser_test($host_toolchain)",
+    ":gidl_golden_tests",
+    "backend/golang:gidl_golang_tests($host_toolchain)",
+    "empty_test:tests",
+    "lib/mixer:gidl_mixer_tests($host_toolchain)",
+    "lib/parser:gidl_parser_tests($host_toolchain)",
   ]
 }
