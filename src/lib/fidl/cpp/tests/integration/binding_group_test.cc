@@ -27,7 +27,7 @@ const size_t kTestNumBindingsPerImpl = 2;
 
 struct TestImpl : fidl::Server<Testable> {
  public:
-  TestImpl(async::Loop* loop) : loop(loop) {}
+  explicit TestImpl(async::Loop* loop) : loop(loop) {}
 
   void Echo(EchoRequest& request, EchoCompleter::Sync& completer) override {
     echo_count_++;
@@ -533,6 +533,59 @@ TEST(BindingGroup, CannotCloseAfterRemove) {
       open_bindings[open_binding.first] = nullptr;
     }
   });
+}
+
+// These classes are used to create a server implementation with multiple
+// inheritance.
+class PlaceholderBase1 {
+ public:
+  virtual void Foo() = 0;
+  int a;
+};
+
+class PlaceholderBase2 {
+ public:
+  virtual void Bar() = 0;
+  int b;
+};
+
+class MultiInheritanceServer : public PlaceholderBase1,
+                               public fidl::Server<fidl_cpp_wire_bindinggroup_test::Foo>,
+                               public fidl::Server<Testable>,
+                               public fidl::WireServer<fidl_cpp_wire_bindinggroup_test::Bar>,
+                               public PlaceholderBase2 {
+ public:
+  MultiInheritanceServer() = default;
+  MultiInheritanceServer(MultiInheritanceServer&& other) = delete;
+  MultiInheritanceServer(const MultiInheritanceServer& other) = delete;
+  MultiInheritanceServer& operator=(MultiInheritanceServer&& other) = delete;
+  MultiInheritanceServer& operator=(const MultiInheritanceServer& other) = delete;
+
+  void Foo() override {}
+  void Bar() override {}
+
+  void Echo(EchoRequest& request, EchoCompleter::Sync& completer) override {
+    completer.Reply(request.str());
+  }
+
+  void Terminate(TerminateCompleter::Sync& completer) override { completer.Close(kTestEpitaph); }
+};
+
+TEST(BindingGroup, DisambiguateMultiProtocolImplementations) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  fidl::ServerBindingGroup<Testable> binding_group;
+  MultiInheritanceServer impl;
+  zx::result endpoints = fidl::CreateEndpoints<Testable>();
+  ASSERT_OK(endpoints.status_value());
+  binding_group.AddBinding(loop.dispatcher(), std::move(endpoints->server), &impl,
+                           fidl::kIgnoreBindingClosure);
+  fidl::Client client(std::move(endpoints->client), loop.dispatcher());
+  client->Echo({"test"}).ThenExactlyOnce([&](fidl::Result<Testable::Echo>& result) {
+    loop.Quit();
+    ASSERT_TRUE(result.is_ok());
+    EXPECT_EQ("test", result->str());
+  });
+  loop.Run();
 }
 
 }  // namespace

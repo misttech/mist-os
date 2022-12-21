@@ -146,9 +146,9 @@ class ServerBindingRef : public internal::ServerBindingRefBase {
   // get exclusive const access to it before passing it to a lambda for further introspection.
   template <typename ServerImpl>
   void AsImpl(fit::function<void(const ServerImpl*)> impl_handler) const {
-    static_assert(std::is_same_v<typename ServerImpl::_EnclosingProtocol, Protocol>);
     if (auto held_binding = ServerBindingRefBase::binding().lock()) {
-      impl_handler(static_cast<const ServerImpl*>(held_binding->interface()));
+      impl_handler(
+          internal::MessageDispatcherToServerImpl<Protocol, ServerImpl>(held_binding->interface()));
     }
   }
 
@@ -500,9 +500,9 @@ class ServerBinding final : public internal::ServerBindingBase<FidlProtocol> {
   // get exclusive const access to it before passing it to a lambda for further introspection.
   template <typename ServerImpl>
   void AsImpl(fit::function<void(const ServerImpl*)> impl_handler) const {
-    static_assert(std::is_same_v<typename ServerImpl::_EnclosingProtocol, FidlProtocol>);
     if (auto held_binding = fidl::internal::BorrowBinding(this->binding().ref()).lock()) {
-      impl_handler(static_cast<const ServerImpl*>(held_binding->interface()));
+      impl_handler(internal::MessageDispatcherToServerImpl<FidlProtocol, ServerImpl>(
+          held_binding->interface()));
     }
   }
 };
@@ -917,7 +917,7 @@ class ServerBindingGroup final {
  private:
   template <typename ServerImpl>
   static constexpr void ProtocolMatchesImplRequirement() {
-    static_assert(std::is_same_v<typename ServerImpl::_EnclosingProtocol, FidlProtocol>);
+    internal::ServerImplToMessageDispatcher<FidlProtocol, ServerImpl>(nullptr);
   }
 
   // Removes all bindings matching a specified |impl*| instance from the main |bindings_| storage,

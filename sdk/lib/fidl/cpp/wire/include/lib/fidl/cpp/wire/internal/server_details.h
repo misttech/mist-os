@@ -253,22 +253,12 @@ ServerBindingRefType<Protocol> BindServerTypeErased(async_dispatcher_t* dispatch
   return binding_ref;
 }
 
-// All overloads of |BindServer| calls into this function.
-// This function exists to support deducing the |OnUnbound| type,
-// and type-erasing the interface and the |on_unbound| handlers, before
-// calling into |BindServerTypeErased|.
-//
-// Note: if you see a compiler error that ends up in this function, that is
-// probably because you passed in an incompatible |on_unbound| handler.
-template <typename Protocol, typename ServerImpl, typename OnUnbound>
-ServerBindingRefType<Protocol> BindServerImpl(
-    async_dispatcher_t* dispatcher, fidl::internal::ServerEndType<Protocol> server_end,
-    ServerImpl* impl, OnUnbound&& on_unbound,
-    ThreadingPolicy threading_policy = ThreadingPolicy::kCreateAndTeardownFromAnyThread) {
+template <typename Protocol, typename ServerImpl>
+constexpr IncomingMessageDispatcher* ServerImplToMessageDispatcher(ServerImpl* impl) {
   using Transport = typename Protocol::Transport;
-  static constexpr const bool kIsWire =
+  constexpr const bool kIsWire =
       std::is_base_of_v<typename Transport::template WireServer<Protocol>, ServerImpl>;
-  static constexpr const bool kIsNatural =
+  constexpr const bool kIsNatural =
       std::is_base_of_v<typename Transport::template Server<Protocol>, ServerImpl>;
 
   static_assert(!(kIsWire && kIsNatural),
@@ -287,22 +277,60 @@ ServerBindingRefType<Protocol> BindServerImpl(
   } else {
     interface = static_cast<typename Transport::template Server<Protocol>*>(impl);
   }
+  return interface;
+}
+
+template <typename Protocol, typename ServerImpl>
+constexpr ServerImpl* MessageDispatcherToServerImpl(IncomingMessageDispatcher* interface) {
+  using Transport = typename Protocol::Transport;
+  constexpr const bool kIsWire =
+      std::is_base_of_v<typename Transport::template WireServer<Protocol>, ServerImpl>;
+  constexpr const bool kIsNatural =
+      std::is_base_of_v<typename Transport::template Server<Protocol>, ServerImpl>;
+
+  static_assert(!(kIsWire && kIsNatural),
+                "|ServerImpl| should not simultaneously implement |WireServer| and |Server|");
+  static_assert(kIsWire || kIsNatural,
+                "|ServerImpl| should implement either |WireServer| or |Server|");
+
+  // Some server implementations inherit from multiple server interfaces, which
+  // leads to multiple base |IncomingMessageDispatcher| classes.
+  // This conditional cast lets us find the right one.
+  // Note: this cast may change the value of the pointer, due to how C++
+  // implements classes with virtual tables.
+  ServerImpl* impl = nullptr;
+  if constexpr (kIsWire) {
+    impl = static_cast<ServerImpl*>(
+        static_cast<typename Transport::template WireServer<Protocol>*>(interface));
+  } else {
+    impl = static_cast<ServerImpl*>(
+        static_cast<typename Transport::template Server<Protocol>*>(interface));
+  }
+  return impl;
+}
+
+// All overloads of |BindServer| calls into this function.
+// This function exists to support deducing the |OnUnbound| type,
+// and type-erasing the interface and the |on_unbound| handlers, before
+// calling into |BindServerTypeErased|.
+//
+// Note: if you see a compiler error that ends up in this function, that is
+// probably because you passed in an incompatible |on_unbound| handler.
+template <typename Protocol, typename ServerImpl, typename OnUnbound>
+ServerBindingRefType<Protocol> BindServerImpl(
+    async_dispatcher_t* dispatcher, fidl::internal::ServerEndType<Protocol> server_end,
+    ServerImpl* impl, OnUnbound&& on_unbound,
+    ThreadingPolicy threading_policy = ThreadingPolicy::kCreateAndTeardownFromAnyThread) {
+  using Transport = typename Protocol::Transport;
+
+  IncomingMessageDispatcher* interface = ServerImplToMessageDispatcher<Protocol>(impl);
 
   return BindServerTypeErased<Protocol>(
       dispatcher, std::move(server_end), interface, threading_policy,
       [on_unbound = std::forward<OnUnbound>(on_unbound)](
           internal::IncomingMessageDispatcher* any_interface, UnbindInfo info,
           AnyTransport channel) mutable {
-        // Note: this cast may change the value of the pointer, due to how C++
-        // implements classes with virtual tables.
-        ServerImpl* impl = nullptr;
-        if constexpr (kIsWire) {
-          impl = static_cast<ServerImpl*>(
-              static_cast<typename Transport::template WireServer<Protocol>*>(any_interface));
-        } else {
-          impl = static_cast<ServerImpl*>(
-              static_cast<typename Transport::template Server<Protocol>*>(any_interface));
-        }
+        ServerImpl* impl = MessageDispatcherToServerImpl<Protocol, ServerImpl>(any_interface);
         on_unbound(impl, info,
                    fidl::internal::ServerEndType<Protocol>(channel.release<Transport>()));
       });
