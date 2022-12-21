@@ -19,6 +19,7 @@ pub(crate) mod prelude {
 use prelude::*;
 
 mod console;
+mod development;
 mod example;
 mod identity;
 mod input;
@@ -125,6 +126,13 @@ pub fn define_configuration(
         &mut builder,
     )
     .context("Configuring the 'session' subsystem")?;
+
+    development::DevelopmentConfig::define_configuration(
+        &context,
+        &config.platform.development_support,
+        &mut builder,
+    )
+    .context("Configuring the 'development' subsystem")?;
 
     Ok(builder.build())
 }

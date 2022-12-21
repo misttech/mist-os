@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/testing/zbi_test_executable.gni")
+import("//build/zbi/kernel_cmdline.gni")
 
 zbi_test_executable("mexec-zbi-test-entry") {
   sources = [ "mexec-zbi-test-entry.cc" ]
@@ -12,6 +13,10 @@ zbi_test_executable("mexec-zbi-test-entry") {
     "//src/bringup/lib/mexec",
     "//src/zircon/testing/standalone-test",
   ]
+}
+
+kernel_cmdline("kernel.enable-debugging-syscalls--true") {
+  args = [ "kernel.enable-debugging-syscalls=true" ]
 }
 
 source_set("zbi-test-entry") {
@@ -28,6 +33,5 @@ source_set("zbi-test-entry") {
     "//zircon/system/ulib/zx",
   ]
 
-  data_deps =
-      [ "//products/kernel_cmdline:kernel.enable-debugging-syscalls--true" ]
+  data_deps = [ ":kernel.enable-debugging-syscalls--true" ]
 }

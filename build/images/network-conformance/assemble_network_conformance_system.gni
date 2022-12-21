@@ -68,14 +68,7 @@ template("assemble_network_conformance_system") {
 
     include_component_id_index = true
     devmgr_config = [ "virtcon.disable=true" ] + zedboot_devmgr_config
-    cmdline = [
-      "console.shell=true",
-      "netsvc.disable=false",
-      "kernel.enable-debugging-syscalls=true",
-      "kernel.enable-serial-syscalls=true",
-      "kernel.serial=legacy",
-      "kernel.halt-on-panic=true",
-    ]
+    cmdline = [ "kernel.halt-on-panic=true" ]
 
     bootfs_labels = [
       ":root",

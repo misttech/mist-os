@@ -32,6 +32,11 @@ group("assembly") {
     # SWD (Software Delivery)
     ":system-update-checker",
     ":omaha-client",
+
+    # Kernel args
+    ":kernel_args_eng",
+    ":kernel_args_user",
+    ":kernel_args_userdebug",
   ]
 }
 
@@ -43,6 +48,7 @@ group("prod_only") {
     ":common_bringup",
     ":common_minimal",
     ":emulator_support",
+    ":kernel_args_user",
   ]
 }
 
@@ -66,6 +72,45 @@ assembly_input_bundle("common_bringup") {
       destination = "config/build_info/minimum_utc_stamp"
       label = "//build/info:latest-commit-date"
     },
+  ]
+}
+
+# All eng build type products will include this Assembly Input Bundle.
+# These kernel args should be refactored so that the AIBs have logical names.
+assembly_input_bundle("kernel_args_eng") {
+  kernel_cmdline = [
+    "console.shell=true",
+    "kernel.enable-debugging-syscalls=true",
+    "kernel.enable-serial-syscalls=true",
+    "netsvc.all-features=true",
+    "netsvc.disable=false",
+  ]
+}
+
+# All userdebug build type products will include this Assembly Input Bundle.
+# These kernel args should be refactored so that the AIBs have logical names.
+assembly_input_bundle("kernel_args_userdebug") {
+  kernel_cmdline = [
+    "console.shell=false",
+    "kernel.enable-debugging-syscalls=false",
+    "kernel.enable-serial-syscalls=output-only",
+    "netsvc.disable=true",
+  ]
+}
+
+# All user build type products will include this Assembly Input Bundle.
+#
+# These are all the default values, so this AIB can be safely removed, but we
+# are keeping it around for now so that we can assert that nothing changed
+# during refactor.
+#
+# These kernel args should be refactored so that the AIBs have logical names.
+assembly_input_bundle("kernel_args_user") {
+  kernel_cmdline = [
+    "console.shell=false",
+    "kernel.enable-debugging-syscalls=false",
+    "kernel.enable-serial-syscalls=false",
+    "netsvc.disable=true",
   ]
 }
 

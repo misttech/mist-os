@@ -27,6 +27,7 @@ assembled_system("zedboot_assembly") {
   include_shell_commands = false
   generate_fvm = false
   fshost_config = board_zedboot_fshost_config
+  allow_eng_platform_bundle_use = true
 
   base_packages = []
 
@@ -36,10 +37,6 @@ assembled_system("zedboot_assembly") {
                   ] + zedboot_devmgr_config
 
   cmdline = [
-    "console.shell=true",
-    "netsvc.disable=false",
-    "kernel.enable-debugging-syscalls=true",
-    "kernel.enable-serial-syscalls=true",
     "virtcon.colorscheme=special",
     "virtcon.dpi=160,240,360,480",
   ]

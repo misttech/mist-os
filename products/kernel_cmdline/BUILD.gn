@@ -4,13 +4,17 @@
 
 import("//build/zbi/kernel_cmdline.gni")
 
+# TODO(fxbug.dev/117758): Remove when this is no longer depended on in product
+# definitions.
 kernel_cmdline("console.shell--true") {
-  args = [ "console.shell=true" ]
+  args = []
   deps = [ "//build/validate:non_production_tag" ]
 }
 
+# TODO(fxbug.dev/117758): Remove when this is no longer depended on in product
+# definitions.
 kernel_cmdline("console.shell--false") {
-  args = [ "console.shell=false" ]
+  args = []
 }
 
 kernel_cmdline("devmgr.enable-ephemeral--true") {
@@ -33,27 +37,35 @@ kernel_cmdline("kernel.bypass-debuglog--true") {
   args = [ "kernel.bypass-debuglog=true" ]
 }
 
+# TODO(fxbug.dev/117758): Remove when this is no longer depended on in product
+# definitions.
 kernel_cmdline("kernel.enable-debugging-syscalls--true") {
-  args = [ "kernel.enable-debugging-syscalls=true" ]
+  args = []
   deps = [ "//build/validate:non_production_tag" ]
 }
 
+# TODO(fxbug.dev/117758): Remove when this is no longer depended on in product
+# definitions.
 kernel_cmdline("kernel.enable-debugging-syscalls--false") {
-  args = [ "kernel.enable-debugging-syscalls=false" ]
+  args = []
 }
 
+# TODO(fxbug.dev/117758): Remove when this is no longer depended on in product
+# definitions.
 kernel_cmdline("kernel.enable-serial-syscalls--true") {
-  args = [ "kernel.enable-serial-syscalls=true" ]
+  args = []
   deps = [ "//build/validate:non_production_tag" ]
 }
 
 kernel_cmdline("kernel.enable-serial-syscalls--output-only") {
-  args = [ "kernel.enable-serial-syscalls=output-only" ]
+  args = []
   deps = [ "//build/validate:non_production_tag" ]
 }
 
+# TODO(fxbug.dev/117758): Remove when this is no longer depended on in product
+# definitions.
 kernel_cmdline("kernel.enable-serial-syscalls--false") {
-  args = [ "kernel.enable-serial-syscalls=false" ]
+  args = []
 }
 
 kernel_cmdline("kernel.halt-on-panic--true") {
@@ -76,18 +88,24 @@ kernel_cmdline("kernel.serial--none") {
   args = [ "kernel.serial=none" ]
 }
 
+# TODO(fxbug.dev/117758): Remove when this is no longer depended on in product
+# definitions.
 kernel_cmdline("netsvc.all-features--true") {
-  args = [ "netsvc.all-features=true" ]
+  args = []
   deps = [ "//build/validate:non_production_tag" ]
 }
 
+# TODO(fxbug.dev/117758): Remove when this is no longer depended on in product
+# definitions.
 kernel_cmdline("netsvc.disable--false") {
-  args = [ "netsvc.disable=false" ]
+  args = []
   deps = [ "//build/validate:non_production_tag" ]
 }
 
+# TODO(fxbug.dev/117758): Remove when this is no longer depended on in product
+# definitions.
 kernel_cmdline("netsvc.disable--true") {
-  args = [ "netsvc.disable=true" ]
+  args = []
 }
 
 kernel_cmdline("virtcon.hide-on-boot") {
