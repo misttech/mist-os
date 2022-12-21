@@ -6,6 +6,10 @@
 #![allow(elided_lifetimes_in_paths)]
 // This is needed for the pseudo_directory nesting in crate::model::tests
 #![recursion_limit = "256"]
+// Printing to stdout and stderr directly is discouraged for component_manager.
+// Instead, the tracing library, e.g. through macros like `info!`, and `error!`,
+// should be used.
+#![cfg_attr(not(test), deny(clippy::print_stdout, clippy::print_stderr,))]
 
 pub mod bootfs;
 pub mod builtin;
