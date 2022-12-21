@@ -5,6 +5,7 @@
 #ifndef LIB_SYSLOG_STRUCTURED_BACKEND_FUCHSIA_SYSLOG_H_
 #define LIB_SYSLOG_STRUCTURED_BACKEND_FUCHSIA_SYSLOG_H_
 
+#include <assert.h>
 #include <stdint.h>
 #include <zircon/compiler.h>
 #include <zircon/syscalls.h>
@@ -32,12 +33,12 @@ typedef int8_t FuchsiaLogSeverity;
 
 // Assert that log levels are in ascending order.
 // Numeric comparison is generally used to determine whether to log.
-static_assert(FUCHSIA_LOG_TRACE < FUCHSIA_LOG_DEBUG);
-static_assert(FUCHSIA_LOG_DEBUG < FUCHSIA_LOG_INFO);
-static_assert(FUCHSIA_LOG_INFO < FUCHSIA_LOG_WARNING);
-static_assert(FUCHSIA_LOG_WARNING < FUCHSIA_LOG_ERROR);
-static_assert(FUCHSIA_LOG_ERROR < FUCHSIA_LOG_FATAL);
-static_assert(FUCHSIA_LOG_FATAL < FUCHSIA_LOG_NONE);
+static_assert(FUCHSIA_LOG_TRACE < FUCHSIA_LOG_DEBUG, "");
+static_assert(FUCHSIA_LOG_DEBUG < FUCHSIA_LOG_INFO, "");
+static_assert(FUCHSIA_LOG_INFO < FUCHSIA_LOG_WARNING, "");
+static_assert(FUCHSIA_LOG_WARNING < FUCHSIA_LOG_ERROR, "");
+static_assert(FUCHSIA_LOG_ERROR < FUCHSIA_LOG_FATAL, "");
+static_assert(FUCHSIA_LOG_FATAL < FUCHSIA_LOG_NONE, "");
 
 // Max size of log buffer
 #define FUCHSIA_SYSLOG_BUFFER_SIZE ((1 << 15) / 8)
