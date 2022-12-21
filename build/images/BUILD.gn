@@ -198,6 +198,8 @@ compiled_action("uefi-disk") {
     "--resize",
     "10000000000",  # 10GB
     "--depfile",
+    "--host-arch",
+    host_cpu,
   ]
 
   depfile = "$uefi_disk_path.d"

@@ -60,6 +60,10 @@ struct TopLevel {
     #[argh(option, default = "Arch::X64")]
     arch: Arch,
 
+    /// the architecture of the host CPU (x64|arm64)
+    #[argh(option, default = "Arch::X64")]
+    host_arch: Arch,
+
     /// path to bootx64.efi
     #[argh(option)]
     bootloader: Option<Utf8PathBuf>,
@@ -338,7 +342,11 @@ fn run(mut args: TopLevel) -> Result<(), Error> {
 
     let search_path = if let Some(build_dir) = &args.fuchsia_build_dir {
         // Use tools from the build directory over $PATH.
-        format!("{}/host_x64:{}", build_dir, std::env::var("PATH").unwrap_or(String::new()))
+        let host_path = match args.host_arch {
+            Arch::X64 => "host_x64",
+            Arch::Arm64 => "host_arm64",
+        };
+        format!("{}/{}:{}", build_dir, host_path, std::env::var("PATH").unwrap_or(String::new()))
     } else {
         String::new()
     };
