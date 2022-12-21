@@ -99,8 +99,7 @@ int main(int argc, const char* const* argv) {
 
   fidl::ServerEnd<fuchsia_io::Directory> dir_request{
       zx::channel(zx_take_startup_handle(PA_DIRECTORY_REQUEST))};
-  if (zx_status_t status =
-          vfs.ServeDirectory(root, std::move(dir_request), fs::Rights::ReadWrite());
+  if (zx_status_t status = vfs.ServeDirectory(root, std::move(dir_request), fs::Rights::ReadOnly());
       status != ZX_OK) {
     FX_PLOGST(FATAL, nullptr, status) << "Failed to serve outgoing.";
     return -1;

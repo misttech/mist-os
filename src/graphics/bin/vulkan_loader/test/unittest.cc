@@ -303,7 +303,7 @@ TEST_F(LoaderUnittest, MagmaDependencyInjection) {
   EXPECT_EQ(ZX_OK,
             vfs.ServeDirectory(
                 root, fidl::ServerEnd<fuchsia_io::Directory>{gpu_dir.NewRequest().TakeChannel()},
-                fs::Rights::ReadWrite()));
+                fs::Rights::ReadOnly()));
 
   fdio_ns_t* ns;
   EXPECT_EQ(ZX_OK, fdio_ns_get_installed(&ns));

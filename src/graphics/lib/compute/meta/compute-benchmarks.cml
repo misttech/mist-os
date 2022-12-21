@@ -19,17 +19,17 @@
         },
         {
             directory: "dev-display-controller",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/display-controller",
         },
         {
             directory: "dev-input",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/input",
         },
         {
             directory: "dev-input-report",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/input-report",
         },
     ],

@@ -12,12 +12,12 @@
             // /dev directory is always empty. It's used for device paths that
             // aren't required by the icd loader.
             directory: "empty",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev",
         },
         {
             directory: "dev-gpu",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev-gpu",
         },
     ],
@@ -25,13 +25,13 @@
         {
             directory: "dev-gpu",
             from: "self",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
         {
             directory: "empty",
             from: "self",
             as: "dev-gpu-dependency-injection",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
     ],
 }

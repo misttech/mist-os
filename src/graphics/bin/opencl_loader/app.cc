@@ -40,10 +40,9 @@ zx_status_t LoaderApp::InitDeviceFs() {
   for (const char* dev_class : kDevClassList) {
     fidl::InterfaceHandle<fuchsia::io::Directory> gpu_dir;
     std::string input_path = std::string("/dev/class/") + dev_class;
-    zx_status_t status = fdio_open(input_path.c_str(),
-                                   static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE |
-                                                         fuchsia::io::OpenFlags::RIGHT_WRITABLE),
-                                   gpu_dir.NewRequest().TakeChannel().release());
+    zx_status_t status =
+        fdio_open(input_path.c_str(), static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE),
+                  gpu_dir.NewRequest().TakeChannel().release());
     if (status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Failed to open " << input_path;
       return status;
@@ -69,7 +68,7 @@ zx_status_t LoaderApp::InitDeviceFs() {
 zx_status_t LoaderApp::ServeDeviceFs(zx::channel dir_request) {
   return device_fs_.ServeDirectory(device_root_node_,
                                    fidl::ServerEnd<fuchsia_io::Directory>{std::move(dir_request)},
-                                   fs::Rights::ReadWrite());
+                                   fs::Rights::ReadOnly());
 }
 
 zx_status_t LoaderApp::ServeManifestFs(zx::channel dir_request) {
