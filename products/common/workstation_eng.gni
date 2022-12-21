@@ -24,10 +24,6 @@ legacy_base_package_labels += [ "//src/developer/ssh-key-manager" ]
 # TODO: Remove this once Scenic supports multiple displays.
 legacy_base_package_labels += [ "//src/sys/tools/stash_ctl" ]
 
-# Used by integration tests to inject v1 networking components.
-legacy_base_package_labels +=
-    [ "//src/connectivity/network:network-legacy-deprecated" ]
-
 # Setting service configuration
 legacy_base_package_labels +=
     [ "//src/settings/config:workstation_eng_interface_config" ]
