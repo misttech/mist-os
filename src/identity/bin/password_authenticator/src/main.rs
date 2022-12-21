@@ -14,6 +14,7 @@ mod account_metadata;
 mod keys;
 mod password_interaction;
 mod pinweaver;
+mod policy;
 mod scrypt;
 mod state;
 mod storage_unlock_mechanism;

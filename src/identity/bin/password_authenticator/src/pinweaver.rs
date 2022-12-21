@@ -10,6 +10,7 @@ use {
             KEY_LEN,
         },
         password_interaction::{ValidationError, Validator},
+        policy,
         scrypt::{ScryptError, ScryptParams},
     },
     anyhow::anyhow,
@@ -416,6 +417,7 @@ where
         &self,
         password: &str,
     ) -> Result<(AuthenticatorMetadata, PrekeyMaterial), ValidationError> {
+        policy::check(password).map_err(ValidationError::PasswordError)?;
         let mut key_source = PinweaverKeyEnroller::new(Arc::clone(&self.cred_manager));
         key_source
             .enroll_key(password)
@@ -837,6 +839,13 @@ mod test {
         assert_eq!(prekey.0.len(), KEY_LEN);
 
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_enrollment_password_too_short() {
+        let validator = EnrollPinweaverValidator::new(MockCredManager::new());
+        let result = validator.validate("short").await;
+        assert_matches!(result, Err(ValidationError::PasswordError(_)));
     }
 
     #[fuchsia::test]

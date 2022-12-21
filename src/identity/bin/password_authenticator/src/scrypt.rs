@@ -10,6 +10,7 @@ use {
             KEY_LEN,
         },
         password_interaction::{ValidationError, Validator},
+        policy,
     },
     anyhow::anyhow,
     async_trait::async_trait,
@@ -120,8 +121,8 @@ impl Validator<(AuthenticatorMetadata, PrekeyMaterial)> for EnrollScryptValidato
         &self,
         password: &str,
     ) -> Result<(AuthenticatorMetadata, PrekeyMaterial), ValidationError> {
+        policy::check(password).map_err(ValidationError::PasswordError)?;
         let mut key_source = ScryptKeySource::new();
-        // TODO(fxb/115762): Add policy checks in a different crate/fn.
         key_source
             .enroll_key(password)
             .await
@@ -194,7 +195,7 @@ pub const FULL_STRENGTH_SCRYPT_PARAMS: ScryptParams =
 
 #[cfg(test)]
 mod test {
-    use {super::*, anyhow::Result, assert_matches::assert_matches};
+    use {super::*, crate::state::PasswordError, anyhow::Result, assert_matches::assert_matches};
 
     #[fuchsia::test]
     async fn test_enroll_key() {
@@ -272,6 +273,13 @@ mod test {
             authenticate_validator.validate(TEST_SCRYPT_PASSWORD).await.unwrap();
         assert_eq!(enroll_prekey, authenticate_prekey);
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_enroll_short_password() {
+        let enroll_validator = EnrollScryptValidator {};
+        let result = enroll_validator.validate("short").await;
+        assert_matches!(result, Err(ValidationError::PasswordError(PasswordError::TooShort(_))));
     }
 
     #[fuchsia::test]

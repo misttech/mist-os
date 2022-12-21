@@ -60,6 +60,7 @@ rustc_binary("bin") {
     "src/main.rs",
     "src/password_interaction.rs",
     "src/pinweaver.rs",
+    "src/policy.rs",
     "src/scrypt.rs",
     "src/state.rs",
     "src/storage_unlock_mechanism.rs",
