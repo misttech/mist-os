@@ -1326,10 +1326,8 @@ async fn test_tcp_socket<N: Netstack, E: netemul::Endpoint>(name: &str) {
 }
 
 #[netstack_test]
-#[ignore]
-async fn tcp_sendbuf_size<I: net_types::ip::Ip + TestIpExt, N: Netstack, E: netemul::Endpoint>(
-    name: &str,
-) {
+async fn tcp_sendbuf_size<I: net_types::ip::Ip + TestIpExt, N: Netstack>(name: &str) {
+    type E = netemul::NetworkDevice;
     tcp_socket_accept_cross_ns::<I, N, N, E, _, _>(name, |mut sender, mut receiver| async move {
         // If the sender supports setting SO_SNDBUF, it should be able to buffer
         // a large amount of data even if the receiver isn't reading.
