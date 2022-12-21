@@ -268,6 +268,12 @@ impl SceneManager for FlatlandSceneManager {
         self.root_flatland.focuser.request_focus(view_ref)
     }
 
+    fn present_root_view(&self) {
+        self.root_flatland_presentation_sender
+            .unbounded_send(PresentationMessage::RequestPresent)
+            .expect("send failed");
+    }
+
     async fn insert_a11y_view(
         &mut self,
         _a11y_view_holder_token: ui_views::ViewHolderToken,

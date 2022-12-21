@@ -239,6 +239,10 @@ impl SceneManager for GfxSceneManager {
         self.focuser.request_focus(view_ref)
     }
 
+    fn present_root_view(&self) {
+        GfxSceneManager::request_present(&self.presentation_sender);
+    }
+
     /// Creates an a11y view holder and attaches it to the scene. This method also deletes the
     /// existing proxy view/viewholder pair, and creates a new proxy view. It then returns the
     /// new proxy view holder token. The a11y manager is responsible for using this token to

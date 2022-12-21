@@ -16,5 +16,6 @@ pub use gfx_scene_manager::GfxSceneManager;
 pub use graphics_utils::ScreenCoordinates;
 pub use graphics_utils::ScreenSize;
 pub use scene_manager::handle_pointer_injector_configuration_setup_request_stream;
+pub use scene_manager::MockSceneManager;
 pub use scene_manager::SceneManager;
 pub use scene_manager::ViewportToken;

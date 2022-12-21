@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use mockall::automock;
 use {
     crate::pointerinjector_config::{
         InjectorViewportChangeFn, InjectorViewportHangingGet, InjectorViewportSpec,
@@ -71,6 +72,7 @@ pub type PresentationReceiver = UnboundedReceiver<PresentationMessage>;
 ///
 /// ```
 #[async_trait]
+#[automock]
 pub trait SceneManager: Send {
     /// Sets the root view for the scene.
     ///
@@ -97,6 +99,9 @@ pub trait SceneManager: Send {
         &self,
         view_ref: &mut ui_views::ViewRef,
     ) -> fidl::client::QueryResponseFut<ui_views::FocuserRequestFocusResult>;
+
+    /// Requests a new frame be presented in the scene.
+    fn present_root_view(&self);
 
     /// Inserts an a11y view into the scene.
     ///

@@ -324,7 +324,8 @@ async fn inner_main() -> Result<(), Error> {
 
     // Create and register a ColorTransformManager.
     let color_converter = connect_to_protocol::<color::ConverterMarker>()?;
-    let color_transform_manager = ColorTransformManager::new(color_converter);
+    let color_transform_manager =
+        ColorTransformManager::new(color_converter, Arc::clone(&scene_manager));
 
     let (color_transform_handler_client, color_transform_handler_server) =
         fidl::endpoints::create_request_stream::<ColorTransformHandlerMarker>()?;

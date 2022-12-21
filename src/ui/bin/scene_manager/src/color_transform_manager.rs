@@ -15,6 +15,7 @@ use {
     fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::lock::Mutex,
     futures::stream::TryStreamExt,
+    scene_management::SceneManager,
     std::sync::Arc,
     tracing::{error, info, warn},
 };
@@ -35,6 +36,8 @@ pub struct ColorTransformManager {
 
     // Used to set color correction on displays, as well as brightness.
     color_converter: fidl_color::ConverterProxy,
+
+    scene_manager: Arc<Mutex<dyn SceneManager>>,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -66,7 +69,10 @@ impl ColorTransformState {
 }
 
 impl ColorTransformManager {
-    pub fn new(color_converter: fidl_color::ConverterProxy) -> Arc<Mutex<Self>> {
+    pub fn new(
+        color_converter: fidl_color::ConverterProxy,
+        scene_manager: Arc<Mutex<dyn SceneManager>>,
+    ) -> Arc<Mutex<Self>> {
         Arc::new(Mutex::new(Self {
             current_color_transform: None,
             current_minimum_rgb: None,
@@ -75,6 +81,7 @@ impl ColorTransformManager {
                 color_correction_mode: ColorCorrectionMode::Disabled,
             },
             color_converter,
+            scene_manager,
         }))
     }
 
@@ -96,6 +103,9 @@ impl ColorTransformManager {
                 error!("Error calling SetMinimumRgb: {}", e);
             }
         }
+
+        let scene_manager = self.scene_manager.lock().await;
+        scene_manager.present_root_view();
     }
 
     /// Sets the color transform matrix in Scenic.
@@ -124,6 +134,9 @@ impl ColorTransformManager {
                 error!("Error calling SetValues: {}", e);
             }
         }
+
+        let scene_manager = self.scene_manager.lock().await;
+        scene_manager.present_root_view();
     }
 
     pub fn handle_color_transform_request_stream(
@@ -248,6 +261,7 @@ mod tests {
         ConversionProperties, ConverterRequest, ConverterRequestStream,
     };
     use fidl_fuchsia_ui_policy::{DisplayBacklightMarker, DisplayBacklightProxy};
+    use scene_management::MockSceneManager;
     use std::collections::VecDeque;
     use std::future;
 
@@ -342,7 +356,7 @@ mod tests {
         }
     }
 
-    fn init() -> (Arc<Mutex<ColorTransformManager>>, MockConverter) {
+    fn init() -> (Arc<Mutex<ColorTransformManager>>, MockConverter, Arc<Mutex<MockSceneManager>>) {
         let (client, server) = create_proxy_and_stream::<fidl_color::ConverterMarker>().unwrap();
 
         let converter = MockConverter::default();
@@ -355,7 +369,12 @@ mod tests {
             .detach();
         }
 
-        (ColorTransformManager::new(client), converter)
+        let mut scene_manager = MockSceneManager::new();
+        scene_manager.expect_present_root_view().return_const(());
+        let scene_manager = Arc::new(Mutex::new(scene_manager));
+        let mock_scene_manager = Arc::clone(&scene_manager);
+
+        (ColorTransformManager::new(client, scene_manager), converter, mock_scene_manager)
     }
 
     fn create_display_backlight_stream(
@@ -394,7 +413,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_backlight() -> Result<()> {
-        let (manager, mut converter) = init();
+        let (manager, mut converter, _) = init();
         let backlight_proxy = create_display_backlight_stream(manager);
 
         backlight_proxy.set_minimum_rgb(20).await?;
@@ -408,7 +427,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_backlight_debounces() -> Result<()> {
-        let (manager, mut converter) = init();
+        let (manager, mut converter, _) = init();
         let backlight_proxy = create_display_backlight_stream(manager);
 
         backlight_proxy.set_minimum_rgb(20).await?;
@@ -428,7 +447,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_color_transform_manager() -> Result<()> {
-        let (manager, mut converter) = init();
+        let (manager, mut converter, _) = init();
         let color_transform_proxy = create_color_transform_stream(Arc::clone(&manager));
 
         color_transform_proxy
@@ -445,7 +464,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_color_transform_manager_debounces() -> Result<()> {
-        let (manager, mut converter) = init();
+        let (manager, mut converter, _) = init();
         let color_transform_proxy = create_color_transform_stream(Arc::clone(&manager));
 
         color_transform_proxy
@@ -474,7 +493,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_color_transform_manager_rejects_bad_requests() -> Result<()> {
-        let (manager, converter) = init();
+        let (manager, converter, _) = init();
         let color_transform_proxy = create_color_transform_stream(Arc::clone(&manager));
 
         color_transform_proxy
@@ -507,7 +526,7 @@ mod tests {
     #[test]
     fn test_color_adjustment_manager() -> Result<()> {
         let mut exec = fasync::TestExecutor::new().unwrap();
-        let (manager, mut converter) = init();
+        let (manager, mut converter, _) = init();
         let color_adjustment_proxy = create_color_adjustment_stream(Arc::clone(&manager));
 
         color_adjustment_proxy.set_color_adjustment(ColorAdjustmentTable {
@@ -527,7 +546,7 @@ mod tests {
     #[test]
     fn test_color_adjustment_manager_rejects_bad_requests() -> Result<()> {
         let mut exec = fasync::TestExecutor::new().unwrap();
-        let (manager, converter) = init();
+        let (manager, converter, _) = init();
         let color_adjustment_proxy = create_color_adjustment_stream(Arc::clone(&manager));
 
         color_adjustment_proxy.set_color_adjustment(ColorAdjustmentTable::EMPTY)?;
@@ -539,7 +558,7 @@ mod tests {
     #[test]
     fn test_color_adjustment_manager_noop_when_a11y_active() -> Result<()> {
         let mut exec = fasync::TestExecutor::new().unwrap();
-        let (manager, mut converter) = init();
+        let (manager, mut converter, _) = init();
         let color_transform_proxy = create_color_transform_stream(Arc::clone(&manager));
         let color_adjustment_proxy = create_color_adjustment_stream(Arc::clone(&manager));
 
@@ -574,6 +593,38 @@ mod tests {
         converter.expect_set_values_sync(&mut exec);
 
         converter.expect_no_requests_sync(&mut exec);
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_presents_frame_when_needed() -> Result<()> {
+        let (manager, mut converter, mock_scene_manager) = init();
+        let color_transform_proxy = create_color_transform_stream(Arc::clone(&manager));
+        let backlight_proxy = create_display_backlight_stream(manager);
+
+        // Calling SetMinimumRgb should trigger a call to scene_manager.present_root_view.
+        {
+            let mut mock_scene_manager = mock_scene_manager.lock().await;
+            mock_scene_manager.checkpoint();
+            mock_scene_manager.expect_present_root_view().times(1).return_const(());
+        }
+
+        backlight_proxy.set_minimum_rgb(20).await?;
+        converter.expect_minimum_rgb().await;
+
+        // Calling SetColorTransformConfiguration should also trigger a call to
+        // scene_manager.present_root_view.
+        {
+            let mut mock_scene_manager = mock_scene_manager.lock().await;
+            mock_scene_manager.checkpoint();
+            mock_scene_manager.expect_present_root_view().times(1).return_const(());
+        }
+
+        color_transform_proxy
+            .set_color_transform_configuration(COLOR_TRANSFORM_CONFIGURATION)
+            .await?;
+        converter.expect_set_values().await;
+
         Ok(())
     }
 }
