@@ -1251,10 +1251,11 @@ class VmCowPages final : public VmHierarchyBase,
   uint64_t range_change_offset_ TA_GUARDED(lock());
   uint64_t range_change_len_ TA_GUARDED(lock());
 
-  // Reference back to a VmObjectPaged, which should be valid at all times after creation, unless
-  // this is a hidden node. We use this in places where we have access to the VmCowPages and
-  // need to look up the "owning" VmObjectPaged for some information, e.g. when deduping zero pages,
-  // for performing mapping updates, for inserting references to the reference list.
+  // Reference back to a VmObjectPaged, which should be valid at all times after creation until the
+  // VmObjectPaged has been destroyed, unless this is a hidden node. We use this in places where we
+  // have access to the VmCowPages and need to look up the "owning" VmObjectPaged for some
+  // information, e.g. when deduping zero pages, for performing cache or mapping updates, for
+  // inserting references to the reference list.
   //
   // This is a raw pointer to avoid circular references, the VmObjectPaged destructor needs to
   // update it.

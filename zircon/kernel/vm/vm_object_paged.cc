@@ -83,6 +83,9 @@ VmObjectPaged::~VmObjectPaged() {
   } else {
     // If this is a reference, we need to remove it from the original (parent) VMO's reference list.
     VmObjectPaged* root_ref = cow_pages_locked()->get_paged_backlink_locked();
+    // The VmCowPages will have a valid backlink, either to the original VmObjectPaged or a
+    // reference VmObjectPaged, as long as there is a reference that is alive. We know that this is
+    // a reference.
     DEBUG_ASSERT(root_ref);
     if (likely(root_ref != this)) {
       VmObjectPaged* removed = root_ref->reference_list_.erase(*this);
@@ -644,6 +647,8 @@ zx_status_t VmObjectPaged::CreateChildReference(Resizability resizable, uint64_t
     // look different from the parent->child relationship, which instead mirrors the child creation
     // calls as specified by the user (this is true for all child types).
     VmObjectPaged* paged_owner = cow_pages_locked()->get_paged_backlink_locked();
+    // The VmCowPages we point to should have a valid backlink, either to us or to our parent (if we
+    // are a reference).
     DEBUG_ASSERT(paged_owner);
     // If this object is not a reference, the |paged_owner| we computed should be the same as
     // |this|.

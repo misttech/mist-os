@@ -420,6 +420,8 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
     return false;
   }
 
+  // The VmObjectPaged could have been destroyed, or this could be a hidden node. Check if the
+  // paged_ref_ is valid first.
   if (paged_ref_) {
     AssertHeld(paged_ref_->lock_ref());
     if (!paged_ref_->CanDedupZeroPagesLocked()) {
@@ -632,18 +634,19 @@ void VmCowPages::CloneParentIntoChildLocked(fbl::RefPtr<VmCowPages>& child) {
   child->page_attribution_user_id_ = page_attribution_user_id_;
   AddChildLocked(child.get(), 0, root_parent_offset_, size_);
 
-  // Time to change the VmCowPages that our paged_ref_ is point to.
-  if (paged_ref_) {
-    child->paged_ref_ = paged_ref_;
-    AssertHeld(paged_ref_->lock_ref());
-    [[maybe_unused]] fbl::RefPtr<VmCowPages> previous =
-        paged_ref_->SetCowPagesReferenceLocked(ktl::move(child));
-    // Validate that we replaced a reference to ourself as we expected, this ensures we can safely
-    // drop the refptr without triggering our own destructor, since we know someone else must be
-    // holding a refptr to us to be in this function.
-    DEBUG_ASSERT(previous.get() == this);
-    paged_ref_ = nullptr;
-  }
+  // Time to change the VmCowPages that our paged_ref_ is pointing to.
+  // We could only have gotten here from a valid VmObjectPaged since we're trying to create a child.
+  // The paged_ref_ should therefore be valid.
+  DEBUG_ASSERT(paged_ref_);
+  child->paged_ref_ = paged_ref_;
+  AssertHeld(paged_ref_->lock_ref());
+  [[maybe_unused]] fbl::RefPtr<VmCowPages> previous =
+      paged_ref_->SetCowPagesReferenceLocked(ktl::move(child));
+  // Validate that we replaced a reference to ourself as we expected, this ensures we can safely
+  // drop the refptr without triggering our own destructor, since we know someone else must be
+  // holding a refptr to us to be in this function.
+  DEBUG_ASSERT(previous.get() == this);
+  paged_ref_ = nullptr;
 }
 
 zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint64_t size,
@@ -2153,9 +2156,17 @@ zx_status_t VmCowPages::PrepareForWriteLocked(uint64_t offset, uint64_t len,
   // Found a contiguous run of pages that need to transition to Dirty. There might be more such
   // pages later in the range, but we will come into this call again for them via another
   // LookupPagesLocked after the waiting caller is unblocked for this range.
-  AssertHeld(paged_ref_->lock_ref());
-  VmoDebugInfo vmo_debug_info = {.vmo_ptr = reinterpret_cast<uintptr_t>(paged_ref_),
-                                 .vmo_id = paged_ref_->user_id_locked()};
+
+  VmoDebugInfo vmo_debug_info{};
+  // We have a page source so this cannot be a hidden node, but the VmObjectPaged could have been
+  // destroyed. We could be looking up a page via a lookup in a child (slice) after the parent
+  // VmObjectPaged has gone away, so paged_ref_ could be null. Let the page source handle any
+  // failures requesting the dirty transition.
+  if (paged_ref_) {
+    AssertHeld(paged_ref_->lock_ref());
+    vmo_debug_info = {.vmo_ptr = reinterpret_cast<uintptr_t>(paged_ref_),
+                      .vmo_id = paged_ref_->user_id_locked()};
+  }
   zx_status_t status = page_source_->RequestDirtyTransition(page_request->get(), start_offset,
                                                             pages_to_dirty_len, vmo_debug_info);
   // The page source will never succeed synchronously.
@@ -2460,11 +2471,8 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
         p = vm_get_zero_page();
       } else {
         // Otherwise request the page from the page source.
-        uint64_t user_id = 0;
-        if (page_owner->paged_ref_) {
-          AssertHeld(page_owner->paged_ref_->lock_ref());
-          user_id = page_owner->paged_ref_->user_id_locked();
-        }
+        // The page owner should have a backing page source that we will request the page from.
+        DEBUG_ASSERT(page_owner->page_source_);
 
         DEBUG_ASSERT(owner_offset < page_owner->supply_zero_offset_);
 
@@ -2502,8 +2510,16 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
           DEBUG_ASSERT(status == ZX_OK);
         }
 
-        VmoDebugInfo vmo_debug_info = {
-            .vmo_ptr = reinterpret_cast<uintptr_t>(page_owner->paged_ref_), .vmo_id = user_id};
+        VmoDebugInfo vmo_debug_info{};
+        // The page owner has a page source so it cannot be a hidden node, but the VmObjectPaged
+        // could have been destroyed. We could be looking up a page via a lookup in a child after
+        // the parent VmObjectPaged has gone away, so paged_ref_ could be null. Let the page source
+        // handle any failures requesting the pages.
+        if (page_owner->paged_ref_) {
+          AssertHeld(page_owner->paged_ref_->lock_ref());
+          vmo_debug_info = {.vmo_ptr = reinterpret_cast<uintptr_t>(page_owner->paged_ref_),
+                            .vmo_id = page_owner->paged_ref_->user_id_locked()};
+        }
 
         zx_status_t status = page_owner->page_source_->GetPages(
             owner_offset, max_request_len, page_request->get(), vmo_debug_info);
@@ -2662,6 +2678,7 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
     // have copy-on-write children of uncached pages. The third case cannot happen, but even if it
     // could with no children and no paged_ref_ the pages cannot actually be referenced so any
     // cache operation is pointless.
+    // The paged_ref_ could be null if the VmObjectPaged has been destroyed.
     if (paged_ref_) {
       AssertHeld(paged_ref_->lock_ref());
       if (paged_ref_->GetMappingCachePolicyLocked() != ARCH_MMU_FLAG_CACHED) {
