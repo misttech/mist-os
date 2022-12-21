@@ -179,6 +179,11 @@ class FuchsiaOperator : public CompatibilityTestOperator {
   std::unique_ptr<TestFile> Open(std::string_view path, int flags, mode_t mode) final;
   void Rename(std::string_view oldpath, std::string_view newpath) final;
 
+  // Maximum number of inline dentry slots
+  uint32_t MaxInlineDentrySlots();
+  // Maximum inline data length in bytes
+  uint32_t MaxInlineDataLength();
+
  private:
   zx::result<std::pair<fbl::RefPtr<fs::Vnode>, std::string>> GetLastDirVnodeAndFileName(
       std::string_view absolute_path);

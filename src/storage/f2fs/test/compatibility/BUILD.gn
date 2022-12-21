@@ -81,6 +81,14 @@ test("f2fs-file-rw-compatibility-test-v2") {
   deps = test_deps
 }
 
+test("f2fs-inline-compatibility-test-v2") {
+  testonly = true
+
+  sources = [ "v2/inline.cc" ] + test_sources
+
+  deps = test_deps
+}
+
 test("f2fs-mkfs-fsck-compatibility-test-v2") {
   testonly = true
 
@@ -109,6 +117,12 @@ fuchsia_test_component("f2fs-file-rw-compatibility-test-v2-cmp") {
   manifest = "v2/f2fs_file_rw_compatibility.cml"
 }
 
+fuchsia_test_component("f2fs-inline-compatibility-test-v2-cmp") {
+  component_name = "f2fs-inline-compatibility-test-v2-cmp"
+  deps = [ ":f2fs-inline-compatibility-test-v2" ] + component_deps
+  manifest = "v2/f2fs_inline_compatibility.cml"
+}
+
 fuchsia_test_component("f2fs-mkfs-fsck-compatibility-test-v2-cmp") {
   component_name = "f2fs-mkfs-fsck-compatibility-test-v2-cmp"
   deps = [ ":f2fs-mkfs-fsck-compatibility-test-v2" ] + component_deps
@@ -121,6 +135,7 @@ fuchsia_test_package("f2fs-compatibility-test-v2-pkg") {
     ":f2fs-dir-compatibility-test-v2-cmp",
     ":f2fs-file-attr-compatibility-test-v2-cmp",
     ":f2fs-file-rw-compatibility-test-v2-cmp",
+    ":f2fs-inline-compatibility-test-v2-cmp",
     ":f2fs-mkfs-fsck-compatibility-test-v2-cmp",
   ]
   test_specs = {

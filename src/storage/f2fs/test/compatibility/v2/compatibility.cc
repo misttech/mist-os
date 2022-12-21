@@ -352,6 +352,39 @@ void FuchsiaOperator::Rename(std::string_view oldpath, std::string_view newpath)
   ASSERT_EQ(oldparent_vn->Rename(newparent_vn, oldchild_name, newchild_name, false, false), ZX_OK);
 }
 
+uint32_t FuchsiaOperator::MaxInlineDentrySlots() {
+  Mkfs();
+  MountOptions options;
+  options.SetValue(options.GetNameView(kOptInlineDentry), 1);
+  Mount(options);
+
+  auto umount = fit::defer([&] { Umount(); });
+
+  // Create inline directory
+  constexpr std::string_view inline_dir_path = "/inline";
+  Mkdir(inline_dir_path, 0755);
+  auto inline_dir = Open(inline_dir_path, O_RDWR, 0644);
+  Dir* raw_ptr =
+      static_cast<Dir*>(static_cast<FuchsiaTestFile*>(inline_dir.get())->GetRawVnodePtr());
+
+  return raw_ptr->MaxInlineDentry();
+}
+
+uint32_t FuchsiaOperator::MaxInlineDataLength() {
+  Mkfs();
+  MountOptions options;
+  options.SetValue(options.GetNameView(kOptInlineData), 1);
+  Mount(options);
+
+  auto umount = fit::defer([&] { Umount(); });
+
+  auto inline_file = Open("/inline", O_RDWR | O_CREAT, 0644);
+  File* raw_ptr =
+      static_cast<File*>(static_cast<FuchsiaTestFile*>(inline_file.get())->GetRawVnodePtr());
+
+  return raw_ptr->MaxInlineData();
+}
+
 zx::result<std::pair<fbl::RefPtr<fs::Vnode>, std::string>>
 FuchsiaOperator::GetLastDirVnodeAndFileName(std::string_view absolute_path) {
   std::filesystem::path path(absolute_path);
