@@ -204,7 +204,7 @@ be visible to Driver Manager. These package labels are also considered to be in 
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:39
+From //products/common/bringup.gni:34
 
 **Overridden from the default:** `[]`
 
@@ -212,7 +212,7 @@ From //BUILD.gn:38
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:39
+From //products/common/bringup.gni:34
 
 **Overridden from the default:** `[]`
 
@@ -1145,19 +1145,19 @@ From //build/config/clang/crash_diagnostics.gni:7
 
 **Current value (from the default):** `"fuchsia"`
 
-From [//third_party/crashpad/build/crashpad_buildconfig.gni:22](https://fuchsia.googlesource.com/third_party/crashpad/+/faa375472df501fd4fc17b8a85184bbaf7b01bb4/build/crashpad_buildconfig.gni#22)
+From [//third_party/crashpad/build/crashpad_buildconfig.gni:22](https://fuchsia.googlesource.com/third_party/crashpad/+/47bbfc762bf06328c89ea4d67913c25d16c28174/build/crashpad_buildconfig.gni#22)
 
 ### crashpad_http_transport_impl
 
 **Current value (from the default):** `"libcurl"`
 
-From [//third_party/crashpad/util/net/tls.gni:21](https://fuchsia.googlesource.com/third_party/crashpad/+/faa375472df501fd4fc17b8a85184bbaf7b01bb4/util/net/tls.gni#21)
+From [//third_party/crashpad/util/net/tls.gni:21](https://fuchsia.googlesource.com/third_party/crashpad/+/47bbfc762bf06328c89ea4d67913c25d16c28174/util/net/tls.gni#21)
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
 **Current value (from the default):** `true`
 
-From [//third_party/crashpad/util/net/tls.gni:30](https://fuchsia.googlesource.com/third_party/crashpad/+/faa375472df501fd4fc17b8a85184bbaf7b01bb4/util/net/tls.gni#30)
+From [//third_party/crashpad/util/net/tls.gni:30](https://fuchsia.googlesource.com/third_party/crashpad/+/47bbfc762bf06328c89ea4d67913c25d16c28174/util/net/tls.gni#30)
 
 ### cts_version
 Name of the CTS version.
@@ -2465,43 +2465,43 @@ From //build/images/args.gni:88
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:195](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#195)
+From [//third_party/perfetto/gn/perfetto.gni:195](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#195)
 
 ### enable_perfetto_fuzzers
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:198](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#198)
+From [//third_party/perfetto/gn/perfetto.gni:198](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#198)
 
 ### enable_perfetto_heapprofd
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:157](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#157)
+From [//third_party/perfetto/gn/perfetto.gni:157](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#157)
 
 ### enable_perfetto_integration_tests
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:193](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#193)
+From [//third_party/perfetto/gn/perfetto.gni:193](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#193)
 
 ### enable_perfetto_ipc
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:150](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#150)
+From [//third_party/perfetto/gn/perfetto.gni:150](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#150)
 
 ### enable_perfetto_llvm_demangle
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:309](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#309)
+From [//third_party/perfetto/gn/perfetto.gni:309](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#309)
 
 ### enable_perfetto_platform_services
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:141](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#141)
+From [//third_party/perfetto/gn/perfetto.gni:141](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#141)
 
 ### enable_perfetto_site
 Allows to build the perfetto.dev website.
@@ -2511,73 +2511,73 @@ rerunning gn.
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:326](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#326)
+From [//third_party/perfetto/gn/perfetto.gni:326](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#326)
 
 ### enable_perfetto_stderr_crash_dump
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:235](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#235)
+From [//third_party/perfetto/gn/perfetto.gni:235](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#235)
 
 ### enable_perfetto_system_consumer
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:251](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#251)
+From [//third_party/perfetto/gn/perfetto.gni:251](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#251)
 
 ### enable_perfetto_tools
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:187](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#187)
+From [//third_party/perfetto/gn/perfetto.gni:187](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#187)
 
 ### enable_perfetto_trace_processor
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:173](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#173)
+From [//third_party/perfetto/gn/perfetto.gni:173](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#173)
 
 ### enable_perfetto_trace_processor_httpd
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:296](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#296)
+From [//third_party/perfetto/gn/perfetto.gni:296](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#296)
 
 ### enable_perfetto_trace_processor_json
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:291](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#291)
+From [//third_party/perfetto/gn/perfetto.gni:291](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#291)
 
 ### enable_perfetto_trace_processor_linenoise
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:285](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#285)
+From [//third_party/perfetto/gn/perfetto.gni:285](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#285)
 
 ### enable_perfetto_trace_processor_percentile
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:280](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#280)
+From [//third_party/perfetto/gn/perfetto.gni:280](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#280)
 
 ### enable_perfetto_trace_processor_sqlite
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:275](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#275)
+From [//third_party/perfetto/gn/perfetto.gni:275](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#275)
 
 ### enable_perfetto_traceconv
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:315](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#315)
+From [//third_party/perfetto/gn/perfetto.gni:315](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#315)
 
 ### enable_perfetto_traced_perf
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:165](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#165)
+From [//third_party/perfetto/gn/perfetto.gni:165](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#165)
 
 ### enable_perfetto_traced_probes
 The traced_probes daemon is very Linux-specific, as it depends on ftrace and
@@ -2590,43 +2590,43 @@ extremely low.
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:267](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#267)
+From [//third_party/perfetto/gn/perfetto.gni:267](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#267)
 
 ### enable_perfetto_ui
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:319](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#319)
+From [//third_party/perfetto/gn/perfetto.gni:319](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#319)
 
 ### enable_perfetto_unittests
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:189](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#189)
+From [//third_party/perfetto/gn/perfetto.gni:189](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#189)
 
 ### enable_perfetto_version_gen
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:204](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#204)
+From [//third_party/perfetto/gn/perfetto.gni:204](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#204)
 
 ### enable_perfetto_watchdog
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:182](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#182)
+From [//third_party/perfetto/gn/perfetto.gni:182](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#182)
 
 ### enable_perfetto_x64_cpu_opt
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:243](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#243)
+From [//third_party/perfetto/gn/perfetto.gni:243](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#243)
 
 ### enable_perfetto_zlib
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:302](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#302)
+From [//third_party/perfetto/gn/perfetto.gni:302](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#302)
 
 ### enable_power_manager_debug
 
@@ -3821,7 +3821,7 @@ All the tools/gen_* scripts set this to true. This is mainly used to locate
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:82](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#82)
+From [//third_party/perfetto/gn/perfetto.gni:82](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#82)
 
 ### is_perfetto_embedder
 This is for override via `gn args` (e.g. for tools/gen_xxx). Embedders
@@ -3830,7 +3830,7 @@ perfetto_build_with_embedder=true in their GN files.
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:87](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#87)
+From [//third_party/perfetto/gn/perfetto.gni:87](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#87)
 
 ### jtrace_enabled
 Please refer to https://fuchsia.dev/fuchsia-src/development/debugging/jtrace
@@ -4088,7 +4088,7 @@ From //build/config/BUILDCONFIG.gn:1332
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:40
+From //products/common/bringup.gni:35
 
 **Overridden from the default:** `[]`
 
@@ -4096,7 +4096,7 @@ From //BUILD.gn:39
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:40
+From //products/common/bringup.gni:35
 
 **Overridden from the default:** `[]`
 
@@ -4106,7 +4106,7 @@ From //BUILD.gn:39
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:43
+From //products/common/bringup.gni:38
 
 **Overridden from the default:** `[]`
 
@@ -4114,7 +4114,7 @@ From //BUILD.gn:47
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:43
+From //products/common/bringup.gni:38
 
 **Overridden from the default:** `[]`
 
@@ -4124,7 +4124,7 @@ From //BUILD.gn:47
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:46
+From //products/common/bringup.gni:41
 
 **Overridden from the default:** `[]`
 
@@ -4132,7 +4132,7 @@ From //BUILD.gn:56
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:46
+From //products/common/bringup.gni:41
 
 **Overridden from the default:** `[]`
 
@@ -4164,7 +4164,7 @@ From //BUILD.gn:73
 
 **Current value for `target_cpu = "arm64"`:** `["//tools/net/device-finder:host", "//build/images/tools:fastboot"]`
 
-From //products/common/bringup.gni:49
+From //products/common/bringup.gni:44
 
 **Overridden from the default:** `[]`
 
@@ -4172,7 +4172,7 @@ From //BUILD.gn:65
 
 **Current value for `target_cpu = "x64"`:** `["//tools/net/device-finder:host", "//build/images/tools:fastboot"]`
 
-From //products/common/bringup.gni:49
+From //products/common/bringup.gni:44
 
 **Overridden from the default:** `[]`
 
@@ -4359,7 +4359,7 @@ they must be separated into their own list.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:37
+From //products/common/bringup.gni:32
 
 **Overridden from the default:** `[]`
 
@@ -4367,7 +4367,7 @@ From //build/images/args.gni:99
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:37
+From //products/common/bringup.gni:32
 
 **Overridden from the default:** `[]`
 
@@ -4443,7 +4443,7 @@ Android. See also comments on PERFETTO_EXPORT_ENTRYPOINT in compiler.h.
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:214](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#214)
+From [//third_party/perfetto/gn/perfetto.gni:214](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#214)
 
 ### msd_arm_enable_all_cores
 Enable all 8 cores, which is faster but emits more heat.
@@ -5034,7 +5034,7 @@ package flavors.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:61
+From //products/common/bringup.gni:56
 
 **Overridden from the default:** `[]`
 
@@ -5042,7 +5042,7 @@ From //build/packages/prebuilt_package_with_flavors.gni:29
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:61
+From //products/common/bringup.gni:56
 
 **Overridden from the default:** `[]`
 
@@ -5094,13 +5094,13 @@ In standalone Android builds and Chromium Android builds, this is false.
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:78](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#78)
+From [//third_party/perfetto/gn/perfetto.gni:78](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#78)
 
 ### perfetto_enable_git_rev_version_header
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:257](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#257)
+From [//third_party/perfetto/gn/perfetto.gni:257](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#257)
 
 ### perfetto_force_dcheck
 Whether DCHECKs should be enabled or not. Values: "on" | "off" | "".
@@ -5114,7 +5114,7 @@ See base/logging.h for the implementation of all this.
 
 **Current value (from the default):** `""`
 
-From [//third_party/perfetto/gn/perfetto.gni:229](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#229)
+From [//third_party/perfetto/gn/perfetto.gni:229](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#229)
 
 ### perfetto_force_dlog
 Whether DLOG should be enabled on debug builds (""), all builds ("on"), or
@@ -5123,7 +5123,7 @@ console.
 
 **Current value (from the default):** `""`
 
-From [//third_party/perfetto/gn/perfetto.gni:219](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#219)
+From [//third_party/perfetto/gn/perfetto.gni:219](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#219)
 
 ### perfetto_use_system_protobuf
 Used by CrOS system builds. Uses the system version of protobuf
@@ -5131,19 +5131,19 @@ from /usr/include instead of the hermetic one.
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:333](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#333)
+From [//third_party/perfetto/gn/perfetto.gni:333](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#333)
 
 ### perfetto_use_system_zlib
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:335](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#335)
+From [//third_party/perfetto/gn/perfetto.gni:335](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#335)
 
 ### perfetto_verbose_logs_enabled
 
 **Current value (from the default):** `true`
 
-From [//third_party/perfetto/gn/perfetto.gni:271](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#271)
+From [//third_party/perfetto/gn/perfetto.gni:271](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#271)
 
 ### persistent_ram_allocation_granularity
 Controls the granularity of allocation of the global pool of persistent RAM.
@@ -5227,17 +5227,17 @@ From //src/graphics/lib/magma/gnbuild/magma.gni:24
 ### product_bootfs_labels
 A list of binary labels to include in ZBIs built for this product.
 
-**Current value for `target_cpu = "arm64"`:** `["//build/info:bootfs", "//bundles:bootstrap", "//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//src/diagnostics/archivist:default-service-config", "//products/kernel_cmdline:console.shell--true", "//products/kernel_cmdline:kernel.enable-debugging-syscalls--true", "//products/kernel_cmdline:kernel.enable-serial-syscalls--true", "//products/kernel_cmdline:netsvc.all-features--true", "//products/kernel_cmdline:netsvc.disable--false", "//src/sys/component_manager:component_manager_bootfs_config", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//bundles:diagnostics-eng"]`
+**Current value for `target_cpu = "arm64"`:** `["//bundles:bootstrap", "//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//src/diagnostics/archivist:default-service-config", "//products/kernel_cmdline:console.shell--true", "//products/kernel_cmdline:kernel.enable-debugging-syscalls--true", "//products/kernel_cmdline:kernel.enable-serial-syscalls--true", "//products/kernel_cmdline:netsvc.all-features--true", "//products/kernel_cmdline:netsvc.disable--false", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//bundles:diagnostics-eng"]`
 
-From //products/bringup.gni:13
+From //products/bringup.gni:14
 
 **Overridden from the default:** `[]`
 
 From //build/product.gni:11
 
-**Current value for `target_cpu = "x64"`:** `["//build/info:bootfs", "//bundles:bootstrap", "//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//src/diagnostics/archivist:default-service-config", "//products/kernel_cmdline:console.shell--true", "//products/kernel_cmdline:kernel.enable-debugging-syscalls--true", "//products/kernel_cmdline:kernel.enable-serial-syscalls--true", "//products/kernel_cmdline:netsvc.all-features--true", "//products/kernel_cmdline:netsvc.disable--false", "//src/sys/component_manager:component_manager_bootfs_config", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//bundles:diagnostics-eng"]`
+**Current value for `target_cpu = "x64"`:** `["//bundles:bootstrap", "//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//src/diagnostics/archivist:default-service-config", "//products/kernel_cmdline:console.shell--true", "//products/kernel_cmdline:kernel.enable-debugging-syscalls--true", "//products/kernel_cmdline:kernel.enable-serial-syscalls--true", "//products/kernel_cmdline:netsvc.all-features--true", "//products/kernel_cmdline:netsvc.disable--false", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//bundles:diagnostics-eng"]`
 
-From //products/bringup.gni:13
+From //products/bringup.gni:14
 
 **Overridden from the default:** `[]`
 
@@ -6718,7 +6718,7 @@ an extension mechanism for SDK bits outside of the main repository.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:63
+From //products/common/bringup.gni:58
 
 **Overridden from the default:** `[]`
 
@@ -6726,7 +6726,7 @@ From //BUILD.gn:89
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:63
+From //products/common/bringup.gni:58
 
 **Overridden from the default:** `[]`
 
@@ -6968,7 +6968,7 @@ Skip buildtools dependency checks (needed for ChromeOS).
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:329](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/c9448577670ba65509b7301dea1f14c6ede5298c/gn/perfetto.gni#329)
+From [//third_party/perfetto/gn/perfetto.gni:329](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/1cb29c1d2443c26ce562ad4fac05ed6c365b97dc/gn/perfetto.gni#329)
 
 ### smp_max_cpus
 
@@ -7663,45 +7663,11 @@ is meant solely for developer debugging.
 
 From //build/images/args.gni:169
 
-### virtcon_bold_font_path
-Path to file to use for bold font
-
-**Current value (from the default):** `""`
-
-From //src/bringup/bin/virtcon/virtcon_args.gni:11
-
-### virtcon_bold_italic_font_path
-Path to file to use for bold italic font
-
-**Current value (from the default):** `""`
-
-From //src/bringup/bin/virtcon/virtcon_args.gni:17
-
 ### virtcon_boot_animation_path
 
 **Current value (from the default):** `"//src/bringup/bin/virtcon/data/boot-animation.riv"`
 
-From //src/bringup/bin/virtcon/virtcon_args.gni:24
-
-### virtcon_fallback_font_paths
-Paths to files to use for fallback fonts
-
-**Current value (from the default):** `[]`
-
-From //src/bringup/bin/virtcon/virtcon_args.gni:20
-
-### virtcon_font_path
-
-**Current value (from the default):** `"//prebuilt/third_party/fonts/robotomono/RobotoMono-Regular.ttf"`
-
 From //src/bringup/bin/virtcon/virtcon_args.gni:8
-
-### virtcon_italic_font_path
-Path to file to use for italic font
-
-**Current value (from the default):** `""`
-
-From //src/bringup/bin/virtcon/virtcon_args.gni:14
 
 ### virtmagma_debug
 Enable verbose logging in virtmagma-related code
