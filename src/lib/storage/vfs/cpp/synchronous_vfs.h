@@ -22,14 +22,18 @@
 
 namespace fs {
 
-// A specialization of |FuchsiaVfs| which tears down all active connections when it is destroyed.
+// A specialization of |FuchsiaVfs| which tears down all active connections on the thread that is
+// performing destruction.
 //
 // This class is NOT thread-safe and it must be used with a single-threaded asynchronous dispatcher.
 //
 // Additionally, this class must only be used with Vnode implementations that do not defer
 // completion of operations.
 //
-// It is safe to shutdown the dispatch loop before destroying the SynchronousVfs object.
+// It is safe and recommended to shutdown the dispatch loop before destroying the SynchronousVfs
+// object. If the dispatch loop is not shutdown there must be no in-flight requests on it for this
+// this object, including handling channel closures, to avoid races with the thread performing
+// destruction.
 class SynchronousVfs : public FuchsiaVfs {
  public:
   SynchronousVfs();
