@@ -329,7 +329,21 @@ void inspector_print_debug_info_impl(FILE* out, zx_handle_t process_handle,
       inspector_print_general_regs(out, &regs, excp_data);
       // Print the common stack part of the thread.
       fprintf(out, "bottom of user stack:\n");
-      inspector_print_memory(out, process->get(), decoded.sp, inspector::kMemoryDumpSize);
+      inspector_print_memory(out, process->get(), decoded.sp, inspector::kMemoryDumpSize,
+                             inspector_print_memory_format::Hex32);
+
+      // Print the bytes "around" the PC to assist in debugging "undefined instruction" exceptions
+      // or other cases where it's helpful to know what instruction was executed.
+      fprintf(out, "memory dump near pc:\n");
+      // Try to capture bytes before and after the PC to ensure we get the full instruction.  Round
+      // down to the nearest multiple of 16, then back it up by 32.
+      zx_vaddr_t dumpAddr = decoded.pc & ~static_cast<zx_vaddr_t>(16);
+      if (dumpAddr >= 32) {
+        dumpAddr -= 32;
+      }
+      constexpr size_t kPcDumpSize = 64;
+      inspector_print_memory(out, process->get(), dumpAddr, kPcDumpSize,
+                             inspector_print_memory_format::Hex8);
 
       fprintf(out, "arch: %s\n", inspector::kArch);
     }

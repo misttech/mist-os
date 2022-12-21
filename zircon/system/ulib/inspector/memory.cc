@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <algorithm>
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <zircon/syscalls.h>
+
+#include <algorithm>
 
 #include <pretty/hexdump.h>
-#include <zircon/syscalls.h>
 
 #include "inspector/inspector.h"
 #include "utils-impl.h"
@@ -20,8 +21,8 @@ static constexpr size_t kMemoryDumpChunkSize = 256;
 static constexpr size_t kHexdumpLineBytes = 16;
 static_assert(kMemoryDumpChunkSize % kHexdumpLineBytes == 0, "");
 
-__EXPORT void inspector_print_memory(FILE* f, zx_handle_t process, zx_vaddr_t start,
-                                     size_t length) {
+__EXPORT void inspector_print_memory(FILE* f, zx_handle_t process, zx_vaddr_t start, size_t length,
+                                     enum inspector_print_memory_format format) {
   uint8_t buf[kMemoryDumpChunkSize];
   size_t bytes_read;
 
@@ -38,7 +39,14 @@ __EXPORT void inspector_print_memory(FILE* f, zx_handle_t process, zx_vaddr_t st
       break;
     }
 
-    hexdump_very_ex(buf, bytes_read, addr, hexdump_stdio_printf, f);
+    switch (format) {
+      case Hex8:
+        hexdump8_very_ex(buf, bytes_read, addr, hexdump_stdio_printf, f);
+        break;
+      case Hex32:
+        hexdump_very_ex(buf, bytes_read, addr, hexdump_stdio_printf, f);
+        break;
+    };
 
     // If we got a short read we're done, no point in continuing.
     if (bytes_read < kMemoryDumpChunkSize)

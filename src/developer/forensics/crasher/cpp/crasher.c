@@ -93,6 +93,19 @@ int undefined(volatile unsigned int* unused) {
   return 0;
 }
 
+int invalid(volatile unsigned int* unused) {
+#if defined(__x86_64__)
+  // rsm
+  __asm__ volatile(".byte 0x0f, 0xaa" ::: "memory");
+#elif defined(__aarch64__)
+  // add xzr, xzr, xzr
+  __asm__ volatile(".inst 0xff031f8b" ::: "memory");
+#else
+#error "need to define undefined for this architecture"
+#endif
+  return 0;
+}
+
 int oom(volatile unsigned int* unused) { return cpp_out_of_mem(); }
 
 int cpp_channel_overflow(volatile unsigned int* unused) { return llcpp_channel_overflow(); }
@@ -284,6 +297,7 @@ command_t commands[] = {
     {"stackov", stack_overflow, "overflow the stack (recursive)"},
     {"stackbuf", stack_buf_overrun, "overrun a buffer on the stack"},
     {"und", undefined, "undefined instruction"},
+    {"invalid", invalid, "invalid instruction"},
     {"nx_run", nx_run, "run in no-execute memory"},
     {"oom", oom, "out of memory c++ death"},
     {"mem", mem, "out of memory"},

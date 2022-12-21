@@ -70,8 +70,12 @@ zx_status_t inspector_read_general_regs(zx_handle_t thread, zx_thread_state_gene
 void inspector_print_general_regs(FILE* f, const zx_thread_state_general_regs_t* regs,
                                   const inspector_excp_data_t* excp_data);
 
+// Hex8 - Print individual bytes, in hex.
+// Hex32 - Print 32-bit words, in hex.
+enum inspector_print_memory_format { Hex8, Hex32 };
 // Print the contents of memory, typically the bottom of a thread's stack.
-void inspector_print_memory(FILE* f, zx_handle_t process, zx_vaddr_t addr, size_t length);
+void inspector_print_memory(FILE* f, zx_handle_t process, zx_vaddr_t addr, size_t length,
+                            enum inspector_print_memory_format format);
 
 // Prints to |out| the debug info (registers, bottom of user stack, dso list, backtrace, etc.) of
 // the given |thread| in |process|. The caller must be holding |thread| either in exception
