@@ -281,7 +281,12 @@ where
                     self.inspect.get_node(),
                 )
                 .await
-                .map_err(|err| err.api_error)?;
+                .map_err(|err| {
+                    warn!("Error creating Account object: {:?}", err);
+                    err.api_error
+                })?;
+
+                info!("CreateAccount: Successfully created new Account object");
 
                 let () =
                     self.storage_manager.lock().await.provision(disk_key.as_ref()).await.map_err(
@@ -291,12 +296,15 @@ where
                         },
                     )?;
 
+                info!("CreateAccount: Successfully provisioned StorageManager instance");
+
                 let pre_auth_state_bytes: Vec<u8> = (&pre_auth_state).try_into()?;
                 *state_lock = Lifecycle::Initialized {
                     lock_state: LockState::Unlocked { account: Arc::new(account) },
                     pre_auth_state,
                 };
                 self.inspect.lifecycle.set("unlocked");
+                info!("CreateAccount operation successfully completed");
                 Ok(pre_auth_state_bytes)
             }
             ref invalid_state => {
