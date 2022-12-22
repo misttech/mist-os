@@ -75,4 +75,10 @@ type ResolverError = strict enum {
     INVALID_MANIFEST = 9;
     /// The component specifies configuration fields but the values were not found.
     CONFIG_VALUES_NOT_FOUND = 10;
+    /// The ABI revision file could not be found.
+    @available(added=12)
+    ABI_REVISION_NOT_FOUND = 11;
+    /// The ABI revision value could not be parsed.
+    @available(added=12)
+    INVALID_ABI_REVISION = 12;
 };

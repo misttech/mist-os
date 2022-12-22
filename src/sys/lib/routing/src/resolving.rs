@@ -647,6 +647,10 @@ pub enum ResolverError {
     ManifestInvalid(#[source] ClonableError),
     #[error("config values file invalid: {0}")]
     ConfigValuesInvalid(#[source] ClonableError),
+    #[error("abi revision not found")]
+    AbiRevisionNotFound,
+    #[error("abi revision invalid: {0}")]
+    AbiRevisionInvalid(#[source] ClonableError),
     #[error("failed to read manifest: {0}")]
     ManifestIo(zx::Status),
     #[error("failed to read config values: {0}")]
@@ -710,6 +714,10 @@ impl ResolverError {
         Self::ConfigValuesInvalid(err.into().into())
     }
 
+    pub fn abi_revision_invalid(err: impl Into<Error>) -> Self {
+        Self::AbiRevisionInvalid(err.into().into())
+    }
+
     pub fn malformed_url(err: impl Into<Error>) -> Self {
         Self::MalformedUrl(err.into().into())
     }
@@ -749,6 +757,10 @@ impl From<fresolution::ResolverError> for ResolverError {
             }
             fresolution::ResolverError::ConfigValuesNotFound => {
                 ResolverError::ConfigValuesIo(zx::Status::NOT_FOUND)
+            }
+            fresolution::ResolverError::AbiRevisionNotFound => ResolverError::AbiRevisionNotFound,
+            fresolution::ResolverError::InvalidAbiRevision => {
+                ResolverError::abi_revision_invalid(RemoteError(err))
             }
         }
     }
