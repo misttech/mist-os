@@ -25,10 +25,6 @@
 
 #include "src/camera/bin/usb_device/device_impl.h"
 
-// Hard coded camera device path!
-// TODO(ernesthua) - Need to dynamically determine the path name!
-std::string camera_path("/dev/class/camera/000");
-
 zx::result<fuchsia::camera::ControlSyncPtr> OpenCamera(zx::channel camera_channel) {
   int fd;
   zx_status_t status = fdio_fd_create(camera_channel.get(), &fd);
