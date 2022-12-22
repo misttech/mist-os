@@ -3,12 +3,15 @@
 // found in the LICENSE file.
 
 #include <lib/fxt/argument.h>
+#include <lib/fxt/interned_string.h>
 #include <lib/fxt/string_ref.h>
 #include <lib/fxt/thread_ref.h>
 
 #include <gtest/gtest.h>
 
 namespace {
+
+using fxt::operator""_intern;
 
 struct ConvertibleToRefId {
   operator fxt::StringRef<fxt::RefType::kId>() const { return fxt::StringRef{1}; }
@@ -25,6 +28,7 @@ struct NotConvertible {};
 TEST(Types, StringRef) {
   [[maybe_unused]] fxt::StringRef ref_id = ConvertibleToRefId{};
   [[maybe_unused]] fxt::StringRef ref_inline = ConvertibleToRefInline{};
+  [[maybe_unused]] fxt::StringRef ref_intern = "test"_intern;
 #if 0 || DOES_NOT_COMPILE
   [[maybe_unused]] fxt::StringRef ref_invalid = NotConvertible{};
 #endif
@@ -62,6 +66,7 @@ TEST(Types, Argument) {
                                                              ConvertibleToRefInline{}};
   [[maybe_unused]] fxt::Argument arg_string_id_inline = {ConvertibleToRefId{},
                                                          ConvertibleToRefInline{}};
+  [[maybe_unused]] fxt::Argument arg_string_intern_intern = {"foo"_intern, "bar"_intern};
 #if 0 || DOES_NOT_COMPILE
   [[maybe_unused]] fxt::Argument arg_null_invalid = {NotConvertible{}};
   [[maybe_unused]] fxt::Argument arg_bool_invalid = {NotConvertible{}, false};

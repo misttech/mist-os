@@ -17,6 +17,7 @@
 
 #include <type_traits>
 
+#include "interned_string.h"
 #include "record_types.h"
 
 namespace fxt {
@@ -39,11 +40,14 @@ class StringRef<RefType::kInline> {
   enum Convert { kConvert };
 
  public:
+  static constexpr size_t kMaxStringLength = InternedString::kMaxStringLength;
+
   template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
   StringRef(const T& value) : StringRef{kConvert, value} {}
 
-  explicit StringRef(const char* string, size_t size = FXT_MAX_STR_LEN)
-      : string_{string}, size_{strnlen(string, size < FXT_MAX_STR_LEN ? size : FXT_MAX_STR_LEN)} {}
+  explicit StringRef(const char* string, size_t size = kMaxStringLength)
+      : string_{string},
+        size_{strnlen(string, size < kMaxStringLength ? size : kMaxStringLength)} {}
 
   StringRef(const StringRef&) = default;
   StringRef& operator=(const StringRef&) = default;
@@ -62,7 +66,6 @@ class StringRef<RefType::kInline> {
  private:
   StringRef(Convert, const StringRef& value) : string_{value.string_}, size_{value.size_} {}
 
-  static const size_t FXT_MAX_STR_LEN = 32000;
   const char* string_;
   size_t size_;
 };
@@ -88,6 +91,8 @@ class StringRef<RefType::kId> {
     ZX_ASSERT_MSG(id < 0x8000, "The msb of a StringRef's id must be 0");
   }
 
+  StringRef(const InternedString& interned_string) : StringRef{interned_string.GetId()} {}
+
   StringRef(const StringRef&) = default;
   StringRef& operator=(const StringRef&) = default;
 
@@ -108,6 +113,8 @@ class StringRef<RefType::kId> {
 
 #if __cplusplus >= 201703L
 StringRef(uint16_t)->StringRef<RefType::kId>;
+
+StringRef(const InternedString&)->StringRef<RefType::kId>;
 
 template <typename T, EnableIfConvertibleToStringRef<T, RefType::kId> = true>
 StringRef(const T&) -> StringRef<RefType::kId>;
