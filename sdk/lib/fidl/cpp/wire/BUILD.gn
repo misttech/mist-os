@@ -90,9 +90,10 @@ sdk_source_set("wire") {
   }
   public += wavl_tree_headers
 
-  private_headers = [ "include/lib/fidl/cpp/wire/internal/transport.h" ]
+  sdk_headers_for_internal_use =
+      [ "include/lib/fidl/cpp/wire/internal/transport.h" ]
   if (is_fuchsia) {
-    private_headers += [
+    sdk_headers_for_internal_use += [
       "include/lib/fidl/cpp/wire/internal/arrow.h",
       "include/lib/fidl/cpp/wire/internal/client_continuation.h",
       "include/lib/fidl/cpp/wire/internal/client_details.h",
@@ -104,13 +105,13 @@ sdk_source_set("wire") {
     ]
   }
   if (is_fuchsia) {
-    private_headers +=
+    sdk_headers_for_internal_use +=
         [ "include/lib/fidl/cpp/wire/internal/transport_channel.h" ]
   } else {
-    private_headers +=
+    sdk_headers_for_internal_use +=
         [ "include/lib/fidl/cpp/wire/internal/transport_channel_host.h" ]
   }
-  private_headers += wavl_tree_headers
+  sdk_headers_for_internal_use += wavl_tree_headers
 
   sources = [
     "arena.cc",

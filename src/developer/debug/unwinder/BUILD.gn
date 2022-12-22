@@ -9,23 +9,23 @@ sdk_source_set("unwinder") {
   build_as_static = true
 
   public = [
+    "dwarf_cfi.h",
+    "dwarf_cfi_parser.h",
+    "dwarf_expr.h",
     "error.h",
     "memory.h",
     "registers.h",
     "unwind.h",
   ]
-  private_headers = [
+  sdk_headers_for_internal_use = [
     "dwarf_cfi.h",
     "dwarf_cfi_parser.h",
     "dwarf_expr.h",
   ]
   sources = [
     "dwarf_cfi.cc",
-    "dwarf_cfi.h",
     "dwarf_cfi_parser.cc",
-    "dwarf_cfi_parser.h",
     "dwarf_expr.cc",
-    "dwarf_expr.h",
     "memory.cc",
     "registers.cc",
     "unwind.cc",
@@ -38,12 +38,12 @@ sdk_source_set("unwinder") {
     deps += [ "//src/developer/debug/shared:elf_h_on_mac" ]
   } else {
     # UnwindLocal() is only available on ELF systems.
-    public += [ "unwind_local.h" ]
-    sources += [
+    public += [
       "third_party/libunwindstack/context.h",
-      "unwind_local.cc",
+      "unwind_local.h",
     ]
-    private_headers += [ "third_party/libunwindstack/context.h" ]
+    sdk_headers_for_internal_use += [ "third_party/libunwindstack/context.h" ]
+    sources += [ "unwind_local.cc" ]
     if (current_cpu == "x64") {
       sources += [ "third_party/libunwindstack/context_x86_64.S" ]
     }

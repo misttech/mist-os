@@ -40,7 +40,7 @@ sdk_source_set("cpp_library") {
     "scoped_child.h",
   ]
 
-  private_headers = [
+  sdk_headers_for_internal_use = [
     "internal/errors.h",
     "internal/local_component_runner.h",
     "internal/mock_runner.h",

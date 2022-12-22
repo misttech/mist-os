@@ -53,11 +53,16 @@ import("//build/sdk/sdk_atom_alias.gni")
 #     only needed for runtime dependencies inherited from private dependencies.
 #     Note that these labels should represent SDK targets.
 #
-#   private_headers (optional)
-#     List of header files that are not intended for direct inclusion by users.
-#     Used to help generate stub files, which do not know apriori that a header
-#     is not to be used.  Define these in addition to deps (i.e. repeat them
-#     if they are already mentioned in 'sources').
+#   sdk_headers_for_internal_use (optional)
+#     Out of the headers specified in `public` or `sources`, some headers are
+#     part of the SDK but not meant for direct inclusion by users, i.e. they are
+#     only transitively included by other public headers. They usually contain
+#     implementation details. Re-specify those headers here.
+#
+#     When enumerating the platform surface area (PlaSA), these headers will
+#     be excluded. See /build/sdk/plasa/plasa_fragment_cc.gni.
+#
+#     See fxbug.dev/117085 for more details about this field.
 
 # The defaults for a sdk_shared_library should match that of a shared_library.
 set_defaults("sdk_shared_library") {
@@ -126,7 +131,7 @@ template("sdk_shared_library") {
                              "category",
                              "include_base",
                              "no_headers",
-                             "private_headers",
+                             "sdk_headers_for_internal_use",
                              "runtime_deps",
                              "sdk_name",
                              "symbols_api",
@@ -305,14 +310,14 @@ template("sdk_shared_library") {
                                "testonly",
                                "all_headers",
                                "all_deps",
-                               "private_headers",
+                               "sdk_headers_for_internal_use",
                              ])
       file_base = sdk_root_path
     }
   } else {
     not_needed([
                  "all_deps",
-                 "private_headers",
+                 "sdk_headers_for_internal_use",
                ])
   }
 

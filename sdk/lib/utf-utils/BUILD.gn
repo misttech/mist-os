@@ -29,7 +29,7 @@ sdk_source_set("utf-utils") {
     "utf-utils.h",
   ]
 
-  private_headers = [
+  sdk_headers_for_internal_use = [
     "internal/arm-neon.h",
     "internal/generic-simd.h",
     "internal/scalar.h",

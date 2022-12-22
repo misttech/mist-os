@@ -78,10 +78,9 @@ import("//build/toolchain/toolchain_environment.gni")
 #     Type: string
 #     Default: target_name
 #
-#   sdk_private_headers
-#     Optional: the list of header files that are not intended for direct
-#     inclusion by users. Such header files are part of the SDK package, but
-#     emit an error if included directly.
+#   sdk_headers_for_internal_use
+#     Optional: This is always forwarded to the corresponding `sdk_*` template.
+#     See `sdk_source_set` for example about its significance.
 #
 #   See source_set() for other parameters.
 #
@@ -98,7 +97,7 @@ template("zx_library") {
 
                # Not all template expansion paths use this variable, don't
                # error out in those paths.
-               "sdk_private_headers",
+               "sdk_headers_for_internal_use",
              ])
 
   if (zircon_toolchain != false) {
@@ -191,8 +190,9 @@ template("zx_library") {
             build_as_static = true
             category = sdk_category
             sdk_name = name
-            if (defined(invoker.sdk_private_headers)) {
-              private_headers = invoker.sdk_private_headers
+            if (defined(invoker.sdk_headers_for_internal_use)) {
+              sdk_headers_for_internal_use =
+                  invoker.sdk_headers_for_internal_use
             }
           }
         } else {
@@ -200,8 +200,9 @@ template("zx_library") {
             category = sdk_category
             sdk_name = name
             build_as_static = true
-            if (defined(invoker.sdk_private_headers)) {
-              private_headers = invoker.sdk_private_headers
+            if (defined(invoker.sdk_headers_for_internal_use)) {
+              sdk_headers_for_internal_use =
+                  invoker.sdk_headers_for_internal_use
             }
           }
         }
@@ -217,8 +218,9 @@ template("zx_library") {
             category = sdk_category
             libcxx_linkage = "static"
             sdk_name = target_name
-            if (defined(invoker.sdk_private_headers)) {
-              private_headers = invoker.sdk_private_headers
+            if (defined(invoker.sdk_headers_for_internal_use)) {
+              sdk_headers_for_internal_use =
+                  invoker.sdk_headers_for_internal_use
             }
           }
         } else {
@@ -226,8 +228,9 @@ template("zx_library") {
             category = sdk_category
             sdk_name = target_name
             libcxx_linkage = "static"
-            if (defined(invoker.sdk_private_headers)) {
-              private_headers = invoker.sdk_private_headers
+            if (defined(invoker.sdk_headers_for_internal_use)) {
+              sdk_headers_for_internal_use =
+                  invoker.sdk_headers_for_internal_use
             }
           }
         }
@@ -244,8 +247,9 @@ template("zx_library") {
             libcxx_linkage = "static"
             sdk_name = target_name
             symbols_api = "//sdk/lib/$target_name/$target_name.ifs"
-            if (defined(invoker.sdk_private_headers)) {
-              private_headers = invoker.sdk_private_headers
+            if (defined(invoker.sdk_headers_for_internal_use)) {
+              sdk_headers_for_internal_use =
+                  invoker.sdk_headers_for_internal_use
             }
           }
         } else {
@@ -253,8 +257,9 @@ template("zx_library") {
             category = sdk_category
             sdk_name = target_name
             libcxx_linkage = "static"
-            if (defined(invoker.sdk_private_headers)) {
-              private_headers = invoker.sdk_private_headers
+            if (defined(invoker.sdk_headers_for_internal_use)) {
+              sdk_headers_for_internal_use =
+                  invoker.sdk_headers_for_internal_use
             }
           }
         }

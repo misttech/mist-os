@@ -24,7 +24,7 @@ import("//build/sdk/plasa/clang_doc.gni")
 #   all_deps
 #     All dependencies to be used in generating the build artifact.
 #
-#   private_headers
+#   sdk_headers_for_internal_use
 #     Headers that should not be included in the stub generation.
 #
 #   file_base
@@ -38,7 +38,7 @@ template("plasa_fragment_cc") {
                            "file_base",
                            "include_base",
                            "main_target_name",
-                           "private_headers",
+                           "sdk_headers_for_internal_use",
                            "source_dir",
                          ])
 
@@ -50,12 +50,12 @@ template("plasa_fragment_cc") {
   # an input into API extraction.
   _stub_cc_target_name = "${main_target_name}_cc_stub"
   _includable_headers = all_headers
-  if (defined(private_headers)) {
+  if (defined(sdk_headers_for_internal_use)) {
     # Some headers published with the SDK library will error out (on purpose)
     # if included directly.  To build an API stub file, we must include all
     # headers except such headers.
-    _includable_headers += private_headers
-    _includable_headers -= private_headers
+    _includable_headers += sdk_headers_for_internal_use
+    _includable_headers -= sdk_headers_for_internal_use
   }
   source_set(_stub_cc_target_name) {
     forward_variables_from(invoker, [ "testonly" ])

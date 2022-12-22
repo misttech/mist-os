@@ -43,12 +43,16 @@ import("//build/sdk/sdk_atom_alias.gni")
 #     only needed for runtime dependencies inherited from private dependencies.
 #     Note that these labels should represent SDK targets.
 #
-#   private_headers (optional)
-#     List of header files that are not intended for direct inclusion by users.
-#     Used to help generate stub files, which do not know apriori that a header
-#     is not to be used.  Define these in addition to deps (i.e. repeat them
-#     if they are already mentioned in 'sources').
+#   sdk_headers_for_internal_use (optional)
+#     Out of the headers specified in `public` or `sources`, some headers are
+#     part of the SDK but not meant for direct inclusion by users, i.e. they are
+#     only transitively included by other public headers. They usually contain
+#     implementation details. Re-specify those headers here.
 #
+#     When enumerating the platform surface area (PlaSA), these headers will
+#     be excluded. See /build/sdk/plasa/plasa_fragment_cc.gni.
+#
+#     See fxbug.dev/117085 for more details about this field.
 
 # The defaults for a sdk_static_library should match that of a shared_library.
 set_defaults("sdk_static_library") {
@@ -128,16 +132,13 @@ template("sdk_static_library") {
                              "api",
                              "category",
                              "include_base",
-                             "private_headers",
+                             "sdk_headers_for_internal_use",
                              "runtime_deps",
                              "sdk_name",
                            ])
 
     if (!defined(sources)) {
       sources = []
-    }
-    if (defined(invoker.private_headers)) {
-      sources += invoker.private_headers
     }
 
     if (defined(visibility)) {
@@ -226,12 +227,9 @@ template("sdk_static_library") {
   if (!no_headers) {
     # Process headers.
     all_headers = []
-    if (defined(invoker.public) || defined(invoker.private_headers)) {
+    if (defined(invoker.public)) {
       if (defined(invoker.public)) {
         all_headers += invoker.public
-      }
-      if (defined(invoker.private_headers)) {
-        all_headers += invoker.private_headers
       }
     } else {
       # If no explicit headers are defined, pick them out from sources.
@@ -305,13 +303,15 @@ template("sdk_static_library") {
       forward_variables_from(invoker,
                              [
                                "all_headers",
-                               "private_headers",
+                               "sdk_headers_for_internal_use",
                                "source_dir",
                                "testonly",
                              ])
       all_deps = build_deps
       file_base = sdk_root_path
     }
+  } else {
+    not_needed(invoker, [ "sdk_headers_for_internal_use" ])
   }
 
   metadata_file = "${target_gen_dir}/${metadata_target_name}.sdk_meta.json"
