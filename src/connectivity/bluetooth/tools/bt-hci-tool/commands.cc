@@ -13,7 +13,6 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/common/advertising_data.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/manufacturer_names.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/gap.h"
 #include "src/connectivity/bluetooth/core/bt-host/hci-spec/util.h"
 #include "src/connectivity/bluetooth/core/bt-host/hci/advertising_report_parser.h"
 #include "src/connectivity/bluetooth/core/bt-host/transport/control_packets.h"
@@ -157,7 +156,7 @@ void DisplayAdvertisingReport(const bt::hci_spec::LEAdvertisingReportData& data,
 
   // Apply the address type filter.
   if (!addr_type_filter.empty()) {
-    FX_DCHECK(addr_type_filter == "public" || addr_type_filter == "random");
+    BT_ASSERT(addr_type_filter == "public" || addr_type_filter == "random");
     if (addr_type_filter == "public" && data.address_type != bt::hci_spec::LEAddressType::kPublic &&
         data.address_type != ::bt::hci_spec::LEAddressType::kPublicIdentity)
       return;
@@ -194,7 +193,7 @@ void DisplayInquiryResult(const bt::hci_spec::InquiryResult& result) {
 
 bool HandleVersionInfo(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                        fit::closure complete_cb) {
-  if (cmd_line.positional_args().size() || cmd_line.options().size()) {
+  if (!cmd_line.positional_args().empty() || !cmd_line.options().empty()) {
     std::cout << "  Usage: version-info" << std::endl;
     return false;
   }
@@ -226,7 +225,7 @@ bool HandleVersionInfo(const CommandData* cmd_data, const fxl::CommandLine& cmd_
 
 bool HandleReset(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                  fit::closure complete_cb) {
-  if (cmd_line.positional_args().size() || cmd_line.options().size()) {
+  if (!cmd_line.positional_args().empty() || !cmd_line.options().empty()) {
     std::cout << "  Usage: reset" << std::endl;
     return false;
   }
@@ -241,7 +240,7 @@ bool HandleReset(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
 
 bool HandleReadBDADDR(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                       fit::closure complete_cb) {
-  if (cmd_line.positional_args().size() || cmd_line.options().size()) {
+  if (!cmd_line.positional_args().empty() || !cmd_line.options().empty()) {
     std::cout << "  Usage: read-bdaddr" << std::endl;
     return false;
   }
@@ -269,7 +268,7 @@ bool HandleReadBDADDR(const CommandData* cmd_data, const fxl::CommandLine& cmd_l
 
 bool HandleReadLocalName(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                          fit::closure complete_cb) {
-  if (cmd_line.positional_args().size() || cmd_line.options().size()) {
+  if (!cmd_line.positional_args().empty() || !cmd_line.options().empty()) {
     std::cout << "  Usage: read-local-name" << std::endl;
     return false;
   }
@@ -297,7 +296,7 @@ bool HandleReadLocalName(const CommandData* cmd_data, const fxl::CommandLine& cm
 
 bool HandleWriteLocalName(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                           fit::closure complete_cb) {
-  if (cmd_line.positional_args().size() != 1 || cmd_line.options().size()) {
+  if (cmd_line.positional_args().size() != 1 || !cmd_line.options().empty()) {
     std::cout << "  Usage: write-local-name <name>" << std::endl;
     return false;
   }
@@ -325,7 +324,7 @@ bool HandleWriteLocalName(const CommandData* cmd_data, const fxl::CommandLine& c
 
 bool HandleSetEventMask(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                         fit::closure complete_cb) {
-  if (cmd_line.positional_args().size() != 1 || cmd_line.options().size()) {
+  if (cmd_line.positional_args().size() != 1 || !cmd_line.options().empty()) {
     std::cout << "  Usage: set-event-mask [hex]" << std::endl;
     return false;
   }
@@ -354,7 +353,7 @@ bool HandleSetEventMask(const CommandData* cmd_data, const fxl::CommandLine& cmd
 
 bool HandleLESetAdvEnable(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                           fit::closure complete_cb) {
-  if (cmd_line.positional_args().size() != 1 || cmd_line.options().size()) {
+  if (cmd_line.positional_args().size() != 1 || !cmd_line.options().empty()) {
     std::cout << "  Usage: set-adv-enable [enable|disable]" << std::endl;
     return false;
   }
@@ -386,7 +385,7 @@ bool HandleLESetAdvEnable(const CommandData* cmd_data, const fxl::CommandLine& c
 
 bool HandleLESetAdvParams(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                           fit::closure complete_cb) {
-  if (cmd_line.positional_args().size()) {
+  if (!cmd_line.positional_args().empty()) {
     std::cout << "  Usage: set-adv-params [--help|--type]" << std::endl;
     return false;
   }
@@ -445,7 +444,7 @@ bool HandleLESetAdvParams(const CommandData* cmd_data, const fxl::CommandLine& c
 
 bool HandleLESetAdvData(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                         fit::closure complete_cb) {
-  if (cmd_line.positional_args().size()) {
+  if (!cmd_line.positional_args().empty()) {
     std::cout << "  Usage: set-adv-data [--help|--name]" << std::endl;
     return false;
   }
@@ -538,7 +537,7 @@ bool HandleLESetScanParams(const CommandData* cmd_data, const fxl::CommandLine& 
 
 bool HandleLEScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                   fit::closure complete_cb) {
-  if (cmd_line.positional_args().size()) {
+  if (!cmd_line.positional_args().empty()) {
     std::cout << "  Usage: set-scan-params "
                  "[--help|--timeout=<t>|--no-dedup|--name-filter]"
               << std::endl;
@@ -595,8 +594,8 @@ bool HandleLEScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
 
   // Event handler to log when we receive advertising reports
   auto le_adv_report_cb = [name_filter, addr_type_filter](const ::bt::hci::EventPacket& event) {
-    FX_DCHECK(event.event_code() == ::bt::hci_spec::kLEMetaEventCode);
-    FX_DCHECK(event.params<::bt::hci_spec::LEMetaEventParams>().subevent_code ==
+    BT_ASSERT(event.event_code() == ::bt::hci_spec::kLEMetaEventCode);
+    BT_ASSERT(event.params<::bt::hci_spec::LEMetaEventParams>().subevent_code ==
               ::bt::hci_spec::kLEAdvertisingReportSubeventCode);
 
     ::bt::hci::AdvertisingReportParser parser(event);
@@ -658,7 +657,7 @@ bool HandleLEScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
 
 bool HandleBRScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                   fit::closure complete_cb) {
-  if (cmd_line.positional_args().size()) {
+  if (!cmd_line.positional_args().empty()) {
     std::cout << "  Usage: scan "
                  "[--help|--timeout=<t>|--filter=<prefix>|--max-responses=<n>]"
               << std::endl;
@@ -711,7 +710,7 @@ bool HandleBRScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
       std::cout << "  Maximum responses must be less than 255." << std::endl;
       return false;
     }
-    max_responses = uint8_t(responses);
+    max_responses = static_cast<uint8_t>(responses);
   }
 
   bt::hci::EmbossCommandPacket packet =
@@ -733,7 +732,7 @@ bool HandleBRScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
 
   // Event handler to log when we receive advertising reports
   auto inquiry_result_cb = [filter](const ::bt::hci::EventPacket& event) {
-    FX_DCHECK(event.event_code() == ::bt::hci_spec::kInquiryResultEventCode);
+    BT_ASSERT(event.event_code() == ::bt::hci_spec::kInquiryResultEventCode);
 
     const auto& result = event.params<::bt::hci_spec::InquiryResultEventParams>();
 
@@ -794,7 +793,7 @@ bool HandleBRScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
 
 bool HandleWritePageScanActivity(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                                  fit::closure complete_cb) {
-  if (cmd_line.positional_args().size()) {
+  if (!cmd_line.positional_args().empty()) {
     std::cout << "  Usage: write-page-scan-activity [--help\n"
                  "                                   |--interval=<interval>\n"
                  "                                   |--window=<window>]"
@@ -889,7 +888,7 @@ bool HandleWritePageScanActivity(const CommandData* cmd_data, const fxl::Command
 
 bool HandleReadPageScanActivity(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                                 fit::closure complete_cb) {
-  if (cmd_line.positional_args().size() || cmd_line.options().size()) {
+  if (!cmd_line.positional_args().empty() || !cmd_line.options().empty()) {
     std::cout << "  Usage: read-page-scan-activity" << std::endl;
     return false;
   }
@@ -918,7 +917,7 @@ bool HandleReadPageScanActivity(const CommandData* cmd_data, const fxl::CommandL
 
 bool HandleWritePageScanType(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                              fit::closure complete_cb) {
-  if (cmd_line.positional_args().size()) {
+  if (!cmd_line.positional_args().empty()) {
     std::cout << "  Usage: write-page-scan-type [--help|--standard|--interlaced]" << std::endl;
     return false;
   }
@@ -958,7 +957,7 @@ bool HandleWritePageScanType(const CommandData* cmd_data, const fxl::CommandLine
 
 bool HandleReadPageScanType(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                             fit::closure complete_cb) {
-  if (cmd_line.positional_args().size() || cmd_line.options().size()) {
+  if (!cmd_line.positional_args().empty() || !cmd_line.options().empty()) {
     std::cout << "  Usage: read-page-scan-type" << std::endl;
     return false;
   }
@@ -1008,11 +1007,13 @@ bool HandleWriteScanEnable(const CommandData* cmd_data, const fxl::CommandLine& 
   }
 
   ::bt::hci_spec::ScanEnableType scan_enable = 0x00;
-  for (std::string positional_arg : cmd_line.positional_args()) {
+  for (const std::string& positional_arg : cmd_line.positional_args()) {
     if (positional_arg == "inquiry") {
-      scan_enable |= (::bt::hci_spec::ScanEnableType)::bt::hci_spec::ScanEnableBit::kInquiry;
+      scan_enable |=
+          static_cast<::bt::hci_spec::ScanEnableType>(::bt::hci_spec::ScanEnableBit::kInquiry);
     } else if (positional_arg == "page") {
-      scan_enable |= (::bt::hci_spec::ScanEnableType)::bt::hci_spec::ScanEnableBit::kPage;
+      scan_enable |=
+          static_cast<::bt::hci_spec::ScanEnableType>(::bt::hci_spec::ScanEnableBit::kPage);
     } else {
       std::cout << "  Unrecognized positional argument: " << positional_arg << std::endl;
       return false;
@@ -1034,7 +1035,7 @@ bool HandleWriteScanEnable(const CommandData* cmd_data, const fxl::CommandLine& 
 
 bool HandleReadScanEnable(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                           fit::closure complete_cb) {
-  if (cmd_line.positional_args().size() || cmd_line.options().size()) {
+  if (!cmd_line.positional_args().empty() || !cmd_line.options().empty()) {
     std::cout << "  Usage: read-scan-enable" << std::endl;
     return false;
   }
@@ -1049,14 +1050,14 @@ bool HandleReadScanEnable(const CommandData* cmd_data, const fxl::CommandLine& c
     }
 
     if (return_params->scan_enable &
-        (::bt::hci_spec::ScanEnableType)::bt::hci_spec::ScanEnableBit::kInquiry) {
+        static_cast<::bt::hci_spec::ScanEnableType>(::bt::hci_spec::ScanEnableBit::kInquiry)) {
       std::cout << "  Inquiry scan: enabled" << std::endl;
     } else {
       std::cout << "  Inquiry scan: disabled" << std::endl;
     }
 
     if (return_params->scan_enable &
-        (::bt::hci_spec::ScanEnableType)::bt::hci_spec::ScanEnableBit::kPage) {
+        static_cast<::bt::hci_spec::ScanEnableType>(::bt::hci_spec::ScanEnableBit::kPage)) {
       std::cout << "  Page scan: enabled" << std::endl;
     } else {
       std::cout << "  Page scan: disabled" << std::endl;
@@ -1076,9 +1077,9 @@ bool HandleReadScanEnable(const CommandData* cmd_data, const fxl::CommandLine& c
 
 void RegisterCommands(const CommandData* cmd_data,
                       ::bluetooth_tools::CommandDispatcher* dispatcher) {
-  FX_DCHECK(dispatcher);
+  BT_ASSERT(dispatcher);
 
-#define BIND(handler) std::bind(&handler, cmd_data, std::placeholders::_1, std::placeholders::_2)
+#define BIND(handler) std::bind(&(handler), cmd_data, std::placeholders::_1, std::placeholders::_2)
 
   dispatcher->RegisterHandler("version-info", "Send HCI_Read_Local_Version_Information",
                               BIND(HandleVersionInfo));
