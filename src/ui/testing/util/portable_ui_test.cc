@@ -190,6 +190,7 @@ void PortableUITest::RegisterTouchScreen() {
   bool touchscreen_registered = false;
   fuchsia::ui::test::input::RegistryRegisterTouchScreenRequest request;
   request.set_device(fake_touchscreen_.NewRequest());
+  request.set_coordinate_unit(fuchsia::ui::test::input::CoordinateUnit::PHYSICAL_PIXELS);
   input_registry_->RegisterTouchScreen(
       std::move(request), [&touchscreen_registered]() { touchscreen_registered = true; });
 

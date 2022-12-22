@@ -132,8 +132,7 @@ constexpr zx::duration kTimeout = zx::min(5);
 // Maximum distance between two physical pixel coordinates so that they are considered equal.
 constexpr float kEpsilon = 0.5f;
 
-constexpr auto kTouchScreenMaxDim = 1000;
-constexpr auto kTouchScreenMinDim = -1000;
+// Number of move events to generate for swipe gestures.
 constexpr auto kMoveEventCount = 5;
 
 // The dimensions of the fake display used in tests. Used in calculating the expected distance
@@ -256,8 +255,8 @@ InjectSwipeParams GetLeftSwipeParams() {
   }
 
   return {.direction = SwipeGesture::LEFT,
-          .begin_x = kTouchScreenMaxDim,
-          .begin_y = 0,
+          .begin_x = kDisplayWidth,
+          .begin_y = kDisplayHeight / 2,
           .expected_events = std::move(expected_events)};
 }
 
@@ -276,8 +275,8 @@ InjectSwipeParams GetRightSwipeParams() {
   }
 
   return {.direction = SwipeGesture::RIGHT,
-          .begin_x = kTouchScreenMinDim,
-          .begin_y = 0,
+          .begin_x = 0,
+          .begin_y = kDisplayHeight / 2,
           .expected_events = std::move(expected_events)};
 }
 
@@ -296,8 +295,8 @@ InjectSwipeParams GetUpwardSwipeParams() {
   }
 
   return {.direction = SwipeGesture::UP,
-          .begin_x = 0,
-          .begin_y = kTouchScreenMaxDim,
+          .begin_x = kDisplayWidth / 2,
+          .begin_y = kDisplayHeight,
           .expected_events = std::move(expected_events)};
 }
 
@@ -316,8 +315,8 @@ InjectSwipeParams GetDownwardSwipeParams() {
   }
 
   return {.direction = SwipeGesture::DOWN,
-          .begin_x = 0,
-          .begin_y = kTouchScreenMinDim,
+          .begin_x = kDisplayWidth / 2,
+          .begin_y = 0,
           .expected_events = std::move(expected_events)};
 }
 
@@ -445,11 +444,11 @@ class TouchInputBase : public ui_testing::PortableUITest,
     switch (tap_location) {
       case TapLocation::kTopLeft:
         // center of top right quadrant -> ends up as center of top left quadrant
-        InjectTap(/* x = */ 500, /* y = */ -500);
+        InjectTap(/* x = */ 3 * display_width_ / 4, /* y = */ display_height_ / 4);
         break;
       case TapLocation::kTopRight:
         // center of bottom right quadrant -> ends up as center of top right quadrant
-        InjectTap(/* x = */ 500, /* y = */ 500);
+        InjectTap(/* x = */ 3 * display_width_ / 4, /* y = */ 3 * display_height_ / 4);
         break;
       default:
         FX_NOTREACHED();
@@ -479,20 +478,17 @@ class TouchInputBase : public ui_testing::PortableUITest,
         FX_NOTREACHED();
     }
 
-    auto touchscreen_width = kTouchScreenMaxDim - kTouchScreenMinDim;
-    auto touchscreen_height = kTouchScreenMaxDim - kTouchScreenMinDim;
-
     fuchsia::ui::test::input::TouchScreenSimulateSwipeRequest swipe_request;
     swipe_request.mutable_start_location()->x = begin_x;
     swipe_request.mutable_start_location()->y = begin_y;
-    swipe_request.mutable_end_location()->x = begin_x + x_dir * touchscreen_width;
-    swipe_request.mutable_end_location()->y = begin_y + y_dir * touchscreen_height;
+    swipe_request.mutable_end_location()->x = begin_x + x_dir * display_width();
+    swipe_request.mutable_end_location()->y = begin_y + y_dir * display_height();
     // Generate move events 50 pixels apart.
     swipe_request.set_move_event_count(kMoveEventCount);
 
     InjectSwipe(/* start_x = */ begin_x, /* start_y = */ begin_y,
-                /* end_x = */ begin_x + x_dir * touchscreen_width,
-                /* end_y = */ begin_y + y_dir * touchscreen_height,
+                /* end_x = */ begin_x + x_dir * display_width(),
+                /* end_y = */ begin_y + y_dir * display_height(),
                 /* move_event_count = */ kMoveEventCount);
   }
 

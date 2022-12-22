@@ -294,10 +294,10 @@ class DynamicHtmlPixelTests : public WebRunnerPixelTest {
     auto touch = std::make_unique<fuchsia::ui::input::TouchscreenReport>();
     switch (tap_location) {
       case TapLocation::kTopLeft:
-        InjectTapWithRetry(/* x = */ -500, /* y = */ -500);
+        InjectTapWithRetry(/* x = */ display_width_ / 4, /* y = */ display_height_ / 4);
         break;
       case TapLocation::kTopRight:
-        InjectTapWithRetry(/* x = */ 500, /* y = */ -500);
+        InjectTapWithRetry(/* x = */ 3 * display_width_ / 4, /* y = */ display_height_ / 4);
         break;
       default:
         FX_NOTREACHED();
