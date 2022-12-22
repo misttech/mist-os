@@ -299,7 +299,9 @@ uint32_t SynDhub::SharedDmaGetBufferPosition(uint32_t channel_id) {
 }
 
 uint32_t SynDhub::SharedDmaGetTransferSize(uint32_t channel_id) {
-  return channel_info_[channel_id].dma_mtus * kMtuSize;
+  // The DMA engine copies at the MTU granularity with delays in between each transfer to account
+  // for the slow drainage to/from the IO device.
+  return kMtuSize;
 }
 
 void SynDhub::StartDma(uint32_t channel_id, bool trigger_interrupt) {

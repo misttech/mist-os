@@ -246,6 +246,12 @@ TEST_F(DhubTest, SizePerNotification) {
   ASSERT_EQ(size_per_notification, 16 * 1024);
 }
 
+TEST_F(DhubTest, TransferSize) {
+  ASSERT_EQ(proto_client().GetTransferSize(DmaId::kDmaIdMa0), 128);
+  ASSERT_EQ(proto_client().GetTransferSize(DmaId::kDmaIdPdmW0), 128);
+  ASSERT_EQ(proto_client().GetTransferSize(DmaId::kDmaIdPdmW1), 128);
+}
+
 }  // namespace as370
 
 // Redefine PDevMakeMmioBufferWeak per the recommendation in pdev.h.
