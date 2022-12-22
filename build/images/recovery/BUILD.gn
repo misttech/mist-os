@@ -11,7 +11,6 @@ import("//build/info/info.gni")
 import("//build/testing/host_test_data.gni")
 import("//src/sys/appmgr/core_shards.gni")
 import("//src/sys/core/build/core.gni")
-import("//src/sys/root/build/root.gni")
 
 if (is_host) {
   host_test_data("test_data") {
@@ -43,7 +42,6 @@ if (is_fuchsia) {
     devmgr_config = [ "virtcon.disable=true" ] + zedboot_devmgr_config
 
     bootfs_labels = [
-      ":root",
       "//build/input:recovery_bootfs",
       "//bundles:bootstrap",
       "//bundles:debugging",
@@ -121,9 +119,6 @@ if (is_fuchsia) {
              "//src/recovery/system:system_recovery_installer_core_shard",
              "//src/sys/process-resolver:core_shard",
            ]
-  }
-
-  root_realm("root") {
   }
 
   recovery_packages = board_recovery_package_labels + [
@@ -261,7 +256,6 @@ if (is_fuchsia) {
 
     bootfs_labels = []
     bootfs_labels = [
-      ":root",
       "//build/input:recovery_bootfs",
       "//bundles:bootstrap",
       "//bundles/drivers:bootstrap",
@@ -317,7 +311,6 @@ if (is_fuchsia) {
     cmdline = []
 
     bootfs_labels = [
-      ":root",
       "//build/input:recovery_bootfs",
       "//bundles:bootstrap",
       "//bundles/drivers:bootstrap",

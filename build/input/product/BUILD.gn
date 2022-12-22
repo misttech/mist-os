@@ -6,7 +6,6 @@ import("//build/product.gni")
 import("//build/security.gni")
 import("//build/security/policies.gni")
 import("//build/security/policies_swd.gni")
-import("//src/sys/root/build/root.gni")
 
 if (is_host) {
   group("host") {
@@ -31,12 +30,9 @@ if (is_host) {
   ## These should only be in the default toolchain.
   assert(current_toolchain == default_toolchain)
 
-  root_realm("root") {
-  }
-
   group("bootfs_labels") {
     testonly = fuchsia_zbi_testonly
-    deps = product_bootfs_labels + [ ":root" ]
+    deps = product_bootfs_labels
   }
 
   group("system_image_deps") {

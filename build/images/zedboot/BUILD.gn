@@ -9,13 +9,9 @@ import("//build/images/custom_signing.gni")
 import("//build/images/vbmeta.gni")
 import("//build/images/vboot/vboot.gni")
 import("//build/images/zedboot/zedboot_args.gni")
-import("//src/sys/root/build/root.gni")
 
 assert(current_toolchain == default_toolchain,
        "//build/images/* are only valid in the Fuchsia toolchain")
-
-root_realm("root") {
-}
 
 # Note: This ZBI output is also used by a script in //scripts/verify_cmdline_params.
 assembled_system("zedboot_assembly") {
@@ -41,7 +37,6 @@ assembled_system("zedboot_assembly") {
   ]
 
   bootfs_labels = [
-    ":root",
     "//build/input:zedboot_bootfs",
 
     "//bundles:bootstrap-zedboot",

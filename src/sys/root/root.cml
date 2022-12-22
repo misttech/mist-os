@@ -13,6 +13,12 @@
             url: "fuchsia-boot:///#meta/startup.cm",
             startup: "eager",
         },
+        {
+            name: "core",
+            url: "fuchsia-pkg://fuchsia.com/core#meta/core.cm",
+            environment: "#core-env",
+            on_terminate: "reboot",
+        },
     ],
     offer: [
         {

@@ -21,43 +21,12 @@ import("//tools/cmc/build/cmc.gni")
 #   testonly
 #   visibility
 template("root_realm") {
-  if (defined(invoker.core_package_name)) {
-    _full_target = get_label_info(":$target_name", "label_with_toolchain")
-    print(
-        "core_package_name has been deprecated, and in the process of being removed: $_full_target")
-    not_needed(invoker, [ "core_package_name" ])
-  }
+  _full_target = get_label_info(":$target_name", "label_with_toolchain")
+  print("root_realm has been deprecated and is being removed: $_full_target")
 
-  core_child_shard_path = "${target_out_dir}/${target_name}-core.cml"
-  write_file(
-      core_child_shard_path,
-      [
-        "{",
-        "    children: [",
-        "        {",
-        "            name: \"core\",",
-        "            url: \"fuchsia-pkg://fuchsia.com/core#meta/core.cm\",",
-        "            environment: \"#core-env\",",
-        "            on_terminate: \"reboot\",",
-        "        },",
-        "    ],",
-        "}",
-      ])
+  not_needed(invoker, "*")
 
-  merged_manifest_target = "${target_name}_merged_manifest"
-  cmc_merge(merged_manifest_target) {
-    forward_variables_from(invoker, [ "testonly" ])
-    visibility = [ ":*" ]
-    output_name = "root.cml"
-    sources = [
-      "//src/sys/root/root-base.shard.cml",
-      core_child_shard_path,
-    ]
-  }
-
-  component_manifest_resources(target_name) {
-    forward_variables_from(invoker, [ "testonly" ])
-    sources = get_target_outputs(":${merged_manifest_target}")
-    deps = [ ":${merged_manifest_target}" ]
+  # Empty, placeholder, group
+  group(target_name) {
   }
 }

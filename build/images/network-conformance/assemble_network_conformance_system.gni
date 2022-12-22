@@ -5,7 +5,6 @@
 import("//build/assembly/assembled_system.gni")
 import("//build/images/zedboot/zedboot_args.gni")
 import("//src/sys/core/build/core.gni")
-import("//src/sys/root/build/root.gni")
 
 # Wraps assembled_system to allow adding internal network-conformance test stubs.
 #
@@ -26,9 +25,6 @@ template("assemble_network_conformance_system") {
 
     restrict_persistent_storage = false
     restrict_core_env_to_base = false
-  }
-
-  root_realm("root") {
   }
 
   assembled_system(target_name) {
@@ -65,7 +61,6 @@ template("assemble_network_conformance_system") {
     cmdline = [ "kernel.halt-on-panic=true" ]
 
     bootfs_labels = [
-      ":root",
       "//build/input:recovery_bootfs",
       "//bundles:bootstrap",
       "//bundles/drivers:bootstrap",

@@ -5,9 +5,6 @@
 import("//build/assembly/assembled_system.gni")
 import("//build/testing/host_test_data.gni")
 import("//src/sys/core/build/core.gni")
-import("//src/sys/root/build/root.gni")
-
-core_name = "core-overnet"
 
 core_realm_definition("core") {
   testonly = true
@@ -16,11 +13,6 @@ core_realm_definition("core") {
     "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",
     "//src/sys/pkg/bin/system-updater:system-updater-core-shard",
   ]
-}
-
-root_realm("root") {
-  core_package_name = core_name
-  testonly = true
 }
 
 assembled_system("overnet") {
@@ -34,7 +26,6 @@ assembled_system("overnet") {
     "//src/sys/pkg/bin/system-update-committer",
   ]
   bootfs_labels = [
-    ":root",
     "//bundles:bootstrap",
     "//bundles:debugging",
     "//bundles/bringup:manual_testing",
@@ -50,7 +41,6 @@ assembled_system("overnet") {
   ]
 
   core_realm_definition = ":core"
-  core_package_name = core_name
 
   ramdisk_fvm_in_zbi = true
   include_component_id_index = true
