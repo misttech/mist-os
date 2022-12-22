@@ -17,13 +17,18 @@ impl Error {
     pub(super) fn accept_non_fatal(self) -> Result<(), anyhow::Error> {
         match self {
             Self::NonFatal(e) => {
-                let l = std::panic::Location::caller();
-                error!("{}:{}: {:?}", l.file(), l.line(), e);
+                accept_error(e);
                 Ok(())
             }
             Self::Fatal(e) => Err(e),
         }
     }
+}
+
+#[track_caller]
+pub(super) fn accept_error(e: anyhow::Error) {
+    let l = std::panic::Location::caller();
+    error!("{}:{}: {:?}", l.file(), l.line(), e);
 }
 
 /// Extension trait similar to [`anyhow::Context`] used for internal types.

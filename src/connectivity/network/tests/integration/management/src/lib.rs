@@ -6,7 +6,7 @@
 
 pub mod virtualization;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, num::NonZeroU16};
 
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcp as fnet_dhcp;
@@ -25,8 +25,8 @@ use futures::{
     future::{FutureExt as _, LocalBoxFuture, TryFutureExt as _},
     stream::{self, StreamExt as _, TryStreamExt as _},
 };
-use net_declare::fidl_ip_v4;
-use net_types::ip as net_types_ip;
+use net_declare::{fidl_ip_v4, net_ip_v6, net_subnet_v6};
+use net_types::{ethernet::Mac, ip as net_types_ip};
 use netstack_testing_common::{
     interfaces,
     realms::{
@@ -36,6 +36,15 @@ use netstack_testing_common::{
     ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
+use packet::{EmptyBuf, InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
+use packet_formats::{
+    ethernet::{EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck},
+    ip::{IpProto, Ipv6Proto},
+    ipv6::Ipv6PacketBuilder,
+    testutil::parse_ip_packet,
+    udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs},
+};
+use packet_formats_dhcp::v6 as dhcpv6;
 use test_case::test_case;
 
 async fn with_netcfg_owned_device<
@@ -43,6 +52,7 @@ async fn with_netcfg_owned_device<
     M: Manager,
     F: for<'a> FnOnce(
         u64,
+        &'a netemul::TestNetwork<'a>,
         &'a fnet_interfaces::StateProxy,
         &'a netemul::TestRealm<'a>,
     ) -> LocalBoxFuture<'a, ()>,
@@ -71,7 +81,8 @@ async fn with_netcfg_owned_device<
         .expect("create netstack realm");
 
     // Add a device to the realm.
-    let endpoint = sandbox.create_endpoint::<E, _>(name).await.expect("create endpoint");
+    let network = sandbox.create_network(name).await.expect("create network");
+    let endpoint = network.create_endpoint::<E, _>(name).await.expect("create endpoint");
     let () = endpoint.set_link_up(true).await.expect("set link up");
     let endpoint_mount_path = E::dev_path("ep");
     let endpoint_mount_path = endpoint_mount_path.as_path();
@@ -95,7 +106,7 @@ async fn with_netcfg_owned_device<
     .await
     .expect("wait for non loopback interface");
 
-    let () = after_interface_up(if_id, &interface_state, &realm).await;
+    let () = after_interface_up(if_id, &network, &interface_state, &realm).await;
 
     // Wait for orderly shutdown of the test realm to complete before allowing
     // test interfaces to be cleaned up.
@@ -114,9 +125,10 @@ async fn test_oir<E: netemul::Endpoint, M: Manager>(name: &str) {
         name,
         ManagerConfig::Empty,
         false, /* with_dhcpv6_client */
-        |_if_id: u64, _: &fnet_interfaces::StateProxy, _: &netemul::TestRealm<'_>| {
-            async {}.boxed_local()
-        },
+        |_if_id: u64,
+         _: &netemul::TestNetwork<'_>,
+         _: &fnet_interfaces::StateProxy,
+         _: &netemul::TestRealm<'_>| async {}.boxed_local(),
     )
     .await
 }
@@ -618,7 +630,7 @@ async fn test_forwarding<E: netemul::Endpoint, M: Manager>(name: &str) {
         name,
         ManagerConfig::Forwarding,
         false, /* with_dhcpv6_client */
-        |if_id, _: &fnet_interfaces::StateProxy, realm| {
+        |if_id, _: &netemul::TestNetwork<'_>, _: &fnet_interfaces::StateProxy, realm| {
             async move {
                 let control = realm
                     .interface_control(if_id)
@@ -880,4 +892,285 @@ async fn test_prefix_provider_double_watch<M: Manager>(name: &str) {
     // even though PEER_CLOSED has already been observed on the channel.
     assert_eq!(prefix_control.on_closed().await, Ok(zx::Signals::CHANNEL_PEER_CLOSED));
     assert!(prefix_control.is_closed());
+}
+
+#[netstack_test]
+async fn test_prefix_provider_full_integration<E: netemul::Endpoint, M: Manager>(name: &str) {
+    const SERVER_ADDR: net_types_ip::Ipv6Addr = net_ip_v6!("fe80::5122");
+    const SERVER_ID: [u8; 3] = [2, 5, 1];
+    const PREFIX: net_types_ip::Subnet<net_types_ip::Ipv6Addr> = net_subnet_v6!("a::/64");
+    const RENEWED_PREFIX: net_types_ip::Subnet<net_types_ip::Ipv6Addr> = net_subnet_v6!("b::/64");
+    const DHCPV6_CLIENT_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(546));
+    const DHCPV6_SERVER_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(547));
+    const INFINITE_TIME_VALUE: u32 = u32::MAX;
+    const ONE_SECOND_TIME_VALUE: u32 = 1;
+    // The DHCPv6 Client always sends IAs with the first IAID starting at 0.
+    const EXPECTED_IAID: dhcpv6::IAID = dhcpv6::IAID::new(0);
+
+    struct Dhcpv6ClientMessage {
+        tx_id: [u8; 3],
+        client_id: Vec<u8>,
+    }
+
+    async fn send_dhcpv6_message(
+        fake_ep: &netemul::TestFakeEndpoint<'_>,
+        client_addr: net_types_ip::Ipv6Addr,
+        prefix: Option<net_types_ip::Subnet<net_types_ip::Ipv6Addr>>,
+        invalidated_prefix: Option<net_types_ip::Subnet<net_types_ip::Ipv6Addr>>,
+        tx_id: [u8; 3],
+        msg_type: dhcpv6::MessageType,
+        client_id: Vec<u8>,
+    ) {
+        let iaprefix_options = prefix
+            .into_iter()
+            .map(|prefix| {
+                dhcpv6::DhcpOption::IaPrefix(dhcpv6::IaPrefixSerializer::new(
+                    INFINITE_TIME_VALUE,
+                    INFINITE_TIME_VALUE,
+                    prefix,
+                    &[],
+                ))
+            })
+            .chain(invalidated_prefix.into_iter().map(|prefix| {
+                dhcpv6::DhcpOption::IaPrefix(dhcpv6::IaPrefixSerializer::new(0, 0, prefix, &[]))
+            }))
+            .collect::<Vec<_>>();
+
+        let options = [
+            dhcpv6::DhcpOption::ServerId(&SERVER_ID),
+            dhcpv6::DhcpOption::ClientId(&client_id),
+            dhcpv6::DhcpOption::IaPd(dhcpv6::IaPdSerializer::new(
+                EXPECTED_IAID,
+                ONE_SECOND_TIME_VALUE,
+                INFINITE_TIME_VALUE,
+                iaprefix_options.as_ref(),
+            )),
+        ]
+        .into_iter()
+        // If this is an Advertise message, include a preference option with
+        // the maximum preference value so that clients stop server discovery
+        // and use this server immediately.
+        .chain(
+            (msg_type == dhcpv6::MessageType::Advertise)
+                .then_some(dhcpv6::DhcpOption::Preference(u8::MAX)),
+        )
+        .collect::<Vec<_>>();
+
+        let buf: packet::Either<EmptyBuf, _> =
+            dhcpv6::MessageBuilder::new(msg_type, tx_id, &options)
+                .into_serializer()
+                .encapsulate(UdpPacketBuilder::new(
+                    SERVER_ADDR,
+                    client_addr,
+                    Some(DHCPV6_SERVER_PORT),
+                    DHCPV6_CLIENT_PORT,
+                ))
+                .encapsulate(Ipv6PacketBuilder::new(
+                    SERVER_ADDR,
+                    client_addr,
+                    64, /* ttl */
+                    Ipv6Proto::Proto(IpProto::Udp),
+                ))
+                .encapsulate(EthernetFrameBuilder::new(
+                    Mac::BROADCAST,
+                    Mac::BROADCAST,
+                    EtherType::Ipv6,
+                ))
+                .serialize_vec_outer()
+                .expect("error serializing dhcpv6 packet");
+
+        let () =
+            fake_ep.write(buf.unwrap_b().as_ref()).await.expect("error sending dhcpv6 message");
+    }
+
+    async fn wait_for_message(
+        fake_ep: &netemul::TestFakeEndpoint<'_>,
+        expected_src_ip: net_types_ip::Ipv6Addr,
+        want_msg_type: dhcpv6::MessageType,
+    ) -> Dhcpv6ClientMessage {
+        let stream = fake_ep
+            .frame_stream()
+            .map(|r| r.expect("error getting OnData event"))
+            .filter_map(|(data, dropped)| {
+                async move {
+                    assert_eq!(dropped, 0);
+                    let mut data = &data[..];
+
+                    let eth = EthernetFrame::parse(&mut data, EthernetFrameLengthCheck::Check)
+                        .expect("error parsing ethernet frame");
+
+                    if eth.ethertype() != Some(EtherType::Ipv6) {
+                        // Ignore non-IPv6 packets.
+                        return None;
+                    }
+
+                    let (mut payload, src_ip, dst_ip, proto, _ttl) =
+                        parse_ip_packet::<net_types_ip::Ipv6>(&data)
+                            .expect("error parsing IPv6 packet");
+                    if src_ip != expected_src_ip {
+                        return None;
+                    }
+
+                    if proto != Ipv6Proto::Proto(IpProto::Udp) {
+                        // Ignore non-UDP packets.
+                        return None;
+                    }
+
+                    let udp = UdpPacket::parse(&mut payload, UdpParseArgs::new(src_ip, dst_ip))
+                        .expect("error parsing ICMPv6 packet");
+                    if udp.src_port() != Some(DHCPV6_CLIENT_PORT)
+                        || udp.dst_port() != DHCPV6_SERVER_PORT
+                    {
+                        // Ignore packets with non-DHCPv6 ports.
+                        return None;
+                    }
+
+                    let dhcpv6 = dhcpv6::Message::parse(&mut payload, ())
+                        .expect("error parsing DHCPv6 message");
+
+                    if dhcpv6.msg_type() != want_msg_type {
+                        return None;
+                    }
+
+                    let mut client_id = None;
+                    let mut saw_ia_pd = false;
+                    for opt in dhcpv6.options() {
+                        match opt {
+                            dhcpv6::ParsedDhcpOption::ClientId(id) => {
+                                assert_eq!(
+                                    core::mem::replace(&mut client_id, Some(id.to_vec())),
+                                    None
+                                )
+                            }
+                            dhcpv6::ParsedDhcpOption::IaPd(iapd) => {
+                                assert_eq!(iapd.iaid(), EXPECTED_IAID.get());
+                                assert!(!saw_ia_pd);
+                                saw_ia_pd = true;
+                            }
+                            _ => {}
+                        }
+                    }
+                    assert!(saw_ia_pd);
+
+                    Some(Dhcpv6ClientMessage {
+                        tx_id: *dhcpv6.transaction_id(),
+                        client_id: client_id.unwrap(),
+                    })
+                }
+            });
+
+        futures::pin_mut!(stream);
+        stream.next().await.expect("expected DHCPv6 message")
+    }
+
+    with_netcfg_owned_device::<E, M, _>(
+        name,
+        ManagerConfig::Dhcpv6,
+        true, /* with_dhcpv6_client */
+        |if_id, network, interface_state, realm| {
+            async move {
+                // Fake endpoint to inject server packets and intercept client packets.
+                let fake_ep = network.create_fake_endpoint().expect("create fake endpoint");
+
+                // Request Prefixes to be acquired.
+                let prefix_provider = realm
+                    .connect_to_protocol::<fnet_dhcpv6::PrefixProviderMarker>()
+                    .expect("connect to fuchsia.net.dhcpv6/PrefixProvider server");
+                let (prefix_control, server_end) =
+                    fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
+                        .expect("create fuchsia.net.dhcpv6/PrefixControl proxy and server end");
+                prefix_provider
+                    .acquire_prefix(
+                        fnet_dhcpv6::AcquirePrefixConfig {
+                            interface_id: Some(if_id),
+                            ..fnet_dhcpv6::AcquirePrefixConfig::EMPTY
+                        },
+                        server_end,
+                    )
+                    .expect("acquire prefix");
+
+                let if_ll_addr = interfaces::wait_for_v6_ll(interface_state, if_id)
+                    .await
+                    .expect("error waiting for link-local address");
+                let fake_ep = &fake_ep;
+
+                // Perform the prefix negotiation.
+                for (expected, send) in [
+                    (dhcpv6::MessageType::Solicit, dhcpv6::MessageType::Advertise),
+                    (dhcpv6::MessageType::Request, dhcpv6::MessageType::Reply),
+                ] {
+                    let Dhcpv6ClientMessage { tx_id, client_id } =
+                        wait_for_message(&fake_ep, if_ll_addr, expected).await;
+                    send_dhcpv6_message(
+                        &fake_ep,
+                        if_ll_addr,
+                        Some(PREFIX),
+                        None,
+                        tx_id,
+                        send,
+                        client_id,
+                    )
+                    .await;
+                }
+                assert_eq!(
+                    prefix_control.watch_prefix().await.expect("error watching prefix"),
+                    fnet_dhcpv6::PrefixEvent::Assigned(fnet_dhcpv6::Prefix {
+                        prefix: fnet::Ipv6AddressWithPrefix {
+                            addr: fnet::Ipv6Address { addr: PREFIX.network().ipv6_bytes() },
+                            prefix_len: PREFIX.prefix(),
+                        },
+                        lifetimes: fnet_dhcpv6::Lifetimes {
+                            valid_until: zx::Time::INFINITE.into_nanos(),
+                            preferred_until: zx::Time::INFINITE.into_nanos(),
+                        },
+                    }),
+                );
+
+                for (new_prefix, old_prefix, res) in [
+                    // Renew the IA with a new prefix and invalidate the old prefix.
+                    (
+                        Some(RENEWED_PREFIX),
+                        Some(PREFIX),
+                        fnet_dhcpv6::PrefixEvent::Assigned(fnet_dhcpv6::Prefix {
+                            prefix: fnet::Ipv6AddressWithPrefix {
+                                addr: fnet::Ipv6Address {
+                                    addr: RENEWED_PREFIX.network().ipv6_bytes(),
+                                },
+                                prefix_len: RENEWED_PREFIX.prefix(),
+                            },
+                            lifetimes: fnet_dhcpv6::Lifetimes {
+                                valid_until: zx::Time::INFINITE.into_nanos(),
+                                preferred_until: zx::Time::INFINITE.into_nanos(),
+                            },
+                        }),
+                    ),
+                    // Invalidate the prefix.
+                    (
+                        None,
+                        Some(RENEWED_PREFIX),
+                        fnet_dhcpv6::PrefixEvent::Unassigned(fnet_dhcpv6::Empty {}),
+                    ),
+                ] {
+                    let Dhcpv6ClientMessage { tx_id, client_id } =
+                        wait_for_message(&fake_ep, if_ll_addr, dhcpv6::MessageType::Renew).await;
+                    send_dhcpv6_message(
+                        &fake_ep,
+                        if_ll_addr,
+                        new_prefix,
+                        old_prefix,
+                        tx_id,
+                        dhcpv6::MessageType::Reply,
+                        client_id,
+                    )
+                    .await;
+                    assert_eq!(
+                        prefix_control.watch_prefix().await.expect("error watching prefix"),
+                        res,
+                    );
+                }
+            }
+            .boxed_local()
+        },
+    )
+    .await;
 }

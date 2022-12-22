@@ -1269,6 +1269,7 @@ impl<'a, B: 'a + ByteSlice> ParsablePacket<B, ()> for Message<'a, B> {
 /// encapsulate any other packets.
 ///
 /// [packet::serialize::InnerPacketBuilder]: https://fuchsia-docs.firebaseapp.com/rust/packet/serialize/trait.InnerPacketBuilder.html
+#[derive(Debug)]
 pub struct MessageBuilder<'a> {
     msg_type: MessageType,
     transaction_id: TransactionId,

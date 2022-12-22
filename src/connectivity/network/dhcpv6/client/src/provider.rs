@@ -9,7 +9,7 @@ use fidl_fuchsia_net_dhcpv6::{
 use futures::{Future, StreamExt as _};
 
 use anyhow::Result;
-use tracing::{error, warn};
+use tracing::warn;
 
 /// Handles client provider requests from the input stream.
 pub(crate) async fn run_client_provider<Fut, F>(
@@ -29,7 +29,9 @@ pub(crate) async fn run_client_provider<Fut, F>(
                     let params_str = format!("{:?}", params);
                     let () =
                         serve_client(params, request).await.unwrap_or_else(|e: anyhow::Error| {
-                            error!("error running client with params {}: {:?}", params_str, e);
+                            // TODO(https://fxbug.dev/118074): Return error through
+                            // a terminal event.
+                            warn!("error running client with params {}: {:?}", params_str, e);
                         });
                 }
                 Err(e) => warn!("client provider request FIDL error: {}", e),

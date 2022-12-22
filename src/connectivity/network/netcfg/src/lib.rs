@@ -52,7 +52,7 @@ use serde::Deserialize;
 use tracing::{debug, error, info, trace, warn};
 
 use self::devices::DeviceInfo;
-use self::errors::ContextExt as _;
+use self::errors::{accept_error, ContextExt as _};
 
 /// Interface metrics.
 ///
@@ -366,9 +366,6 @@ fn should_enable_filter(
 struct InterfaceState {
     // Hold on to control to enforce interface ownership, even if unused.
     control: fidl_fuchsia_net_interfaces_ext::admin::Control,
-    // TODO(https://fxbug.dev/114770): Use the device class when handling
-    // fuchsia.net.dhcpv6/PrefixProvider.AcquirePrefix.
-    #[allow(dead_code)]
     device_class: DeviceClass,
     config: InterfaceConfigState,
 }
@@ -382,8 +379,7 @@ enum InterfaceConfigState {
 
 #[derive(Debug)]
 struct HostInterfaceState {
-    // Present iff a DHCPv6 client is running on this interface.
-    dhcpv6_client_addr: Option<fnet::Ipv6SocketAddress>,
+    dhcpv6_client_state: Option<dhcpv6::ClientState>,
     // The PD configuration to use for the DHCPv6 client on this interface.
     dhcpv6_pd_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
 }
@@ -400,7 +396,7 @@ impl InterfaceState {
         Self {
             control,
             config: InterfaceConfigState::Host(HostInterfaceState {
-                dhcpv6_client_addr: None,
+                dhcpv6_client_state: None,
                 dhcpv6_pd_config,
             }),
             device_class,
@@ -432,12 +428,13 @@ impl InterfaceState {
         properties: &fnet_interfaces_ext::Properties,
         dhcpv6_client_provider: Option<&fnet_dhcpv6::ClientProviderProxy>,
         watchers: &mut DnsServerWatchers<'_>,
+        dhcpv6_prefixes_streams: &mut dhcpv6::PrefixesStreamMap,
     ) -> Result<(), errors::Error> {
         let Self { config, control: _, device_class: _ } = self;
         let fnet_interfaces_ext::Properties { online, .. } = properties;
         match config {
             InterfaceConfigState::Host(HostInterfaceState {
-                dhcpv6_client_addr,
+                dhcpv6_client_state,
                 dhcpv6_pd_config,
             }) => {
                 if !online {
@@ -447,12 +444,14 @@ impl InterfaceState {
                     Some(p) => p,
                     None => return Ok(()),
                 };
-                *dhcpv6_client_addr = start_dhcpv6_client(
+                let sockaddr = start_dhcpv6_client(
                     properties,
                     dhcpv6_client_provider,
                     dhcpv6_pd_config.clone(),
                     watchers,
+                    dhcpv6_prefixes_streams,
                 )?;
+                *dhcpv6_client_state = sockaddr.map(dhcpv6::ClientState::new);
             }
             InterfaceConfigState::WlanAp(WlanApInterfaceState {}) => {}
         }
@@ -491,8 +490,10 @@ pub struct NetCfg<'a> {
 
     forwarded_device_classes: ForwardedDeviceClasses,
 
-    dhcpv6_prefix_provider_handler: Option<dhcpv6::PrefixProviderHandler>,
     allowed_upstream_device_classes: &'a HashSet<DeviceClass>,
+
+    dhcpv6_prefix_provider_handler: Option<dhcpv6::PrefixProviderHandler>,
+    dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap,
 }
 
 /// Returns a [`fnet_name::DnsServer_`] with a static source from a [`std::net::IpAddr`].
@@ -554,6 +555,7 @@ fn start_dhcpv6_client(
     dhcpv6_client_provider: &fnet_dhcpv6::ClientProviderProxy,
     pd_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
     watchers: &mut DnsServerWatchers<'_>,
+    dhcpv6_prefixes_streams: &mut dhcpv6::PrefixesStreamMap,
 ) -> Result<Option<fnet::Ipv6SocketAddress>, errors::Error> {
     if !online {
         return Ok(None);
@@ -593,12 +595,12 @@ fn start_dhcpv6_client(
 
     let source = DnsServersUpdateSource::Dhcpv6 { interface_id: *id };
     assert!(
-        !watchers.contains_key(&source),
+        !watchers.contains_key(&source) && !dhcpv6_prefixes_streams.contains_key(id),
         "interface with id={} already has a DHCPv6 client",
         id
     );
 
-    let dns_servers_stream = dhcpv6::start_client(
+    let (dns_servers_stream, prefixes_stream) = dhcpv6::start_client(
         dhcpv6_client_provider,
         *id,
         sockaddr,
@@ -615,8 +617,11 @@ fn start_dhcpv6_client(
         })?;
     if let Some(o) = watchers.insert(source, dns_servers_stream.tagged(source).boxed()) {
         let _: Pin<Box<BoxStream<'_, _>>> = o;
-
         unreachable!("DNS server watchers must not contain key {:?}", source);
+    }
+    if let Some(o) = dhcpv6_prefixes_streams.insert(*id, prefixes_stream.tagged(*id)) {
+        let _: Pin<Box<dhcpv6::InterfaceIdTaggedPrefixesStream>> = o;
+        unreachable!("DHCPv6 prefixes streams must not contain key {:?}", *id);
     }
 
     info!(
@@ -695,6 +700,7 @@ impl<'a> NetCfg<'a> {
             dns_servers: Default::default(),
             forwarded_device_classes,
             dhcpv6_prefix_provider_handler: None,
+            dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap::empty(),
             allowed_upstream_device_classes,
         })
     }
@@ -756,52 +762,58 @@ impl<'a> NetCfg<'a> {
     ) -> Result<(), anyhow::Error> {
         match source {
             DnsServersUpdateSource::Default => {
-                return Err(anyhow::anyhow!(
-                    "should not have a DNS server watcher for the default source"
-                ));
+                panic!("should not have a DNS server watcher for the default source");
             }
-            DnsServersUpdateSource::Netstack => {}
+            DnsServersUpdateSource::Netstack => Ok(()),
             DnsServersUpdateSource::Dhcpv6 { interface_id } => {
                 let InterfaceState { config, control: _, device_class: _ } = self
                     .interface_states
                     .get_mut(&interface_id)
-                    .ok_or(anyhow::anyhow!("no interface state found for id={}", interface_id))?;
+                    .unwrap_or_else(|| panic!("no interface state found for id={}", interface_id));
 
                 match config {
                     InterfaceConfigState::Host(HostInterfaceState {
-                        dhcpv6_client_addr,
+                        dhcpv6_client_state,
                         dhcpv6_pd_config: _,
                     }) => {
-                        let _: fnet::Ipv6SocketAddress =
-                            dhcpv6_client_addr.take().ok_or(anyhow::anyhow!(
-                                "DHCPv6 was not being performed on host interface with id={}",
-                                interface_id
-                            ))?;
+                        let _: dhcpv6::ClientState =
+                            dhcpv6_client_state.take().unwrap_or_else(|| {
+                                panic!(
+                                    "DHCPv6 was not being performed on host interface with id={}",
+                                    interface_id
+                                )
+                            });
+
+                        // If the DNS server watcher is done, that means the server-end
+                        // of the channel is closed meaning DHCPv6 has been stopped.
+                        // Perform the cleanup for our end of the DHCPv6 client
+                        // (which will update DNS servers) and send an prefix update to any
+                        // blocked watchers of fuchsia.net.dhcpv6/PrefixControl.WatchPrefix.
+                        dhcpv6::stop_client(
+                            &self.lookup_admin,
+                            &mut self.dns_servers,
+                            interface_id,
+                            dns_watchers,
+                            &mut self.dhcpv6_prefixes_streams,
+                        )
+                        .await
+                        .or_else(errors::Error::accept_non_fatal)?;
+
+                        dhcpv6::maybe_send_watch_prefix_response(
+                            &self.interface_states,
+                            &self.allowed_upstream_device_classes,
+                            self.dhcpv6_prefix_provider_handler.as_mut(),
+                        )
                     }
                     InterfaceConfigState::WlanAp(WlanApInterfaceState {}) => {
-                        return Err(anyhow::anyhow!(
+                        panic!(
                             "should not have a DNS watcher for a WLAN AP interface with id={}",
                             interface_id
-                        ));
+                        );
                     }
                 }
             }
         }
-
-        let () = self
-            .update_dns_servers(source, vec![])
-            .await
-            .with_context(|| {
-                format!("error clearing DNS servers for {:?} after completing DNS watcher", source)
-            })
-            .or_else(errors::Error::accept_non_fatal)?;
-
-        // The watcher stream may have already been removed if it was exhausted so we don't
-        // care what the return value is. At the end of this function, it is guaranteed that
-        // `dns_watchers` will not have a stream for `source` anyways.
-        let _: Option<Pin<Box<futures::stream::BoxStream<'_, _>>>> = dns_watchers.remove(&source);
-
-        Ok(())
     }
 
     /// Run the network configuration eventloop.
@@ -912,6 +924,7 @@ impl<'a> NetCfg<'a> {
             Dhcpv6PrefixControlRequest(
                 Option<Result<Option<fnet_dhcpv6::PrefixControlRequest>, fidl::Error>>,
             ),
+            Dhcpv6Prefixes(Option<(u64, Result<Vec<fnet_dhcpv6::Prefix>, fidl::Error>)>),
             VirtualizationEvent(virtualization::Event),
             LifecycleRequest(
                 Result<Option<fidl_fuchsia_process_lifecycle::LifecycleRequest>, fidl::Error>,
@@ -919,14 +932,9 @@ impl<'a> NetCfg<'a> {
         }
         loop {
             let mut dhcpv6_prefix_control_fut = futures::future::OptionFuture::from(
-                self.dhcpv6_prefix_provider_handler.as_mut().map(
-                    |dhcpv6::PrefixProviderHandler {
-                         prefix_control_request_stream,
-                         watch_prefix_responder: _,
-                         preferred_prefix_len: _,
-                         _interface_config,
-                     }| prefix_control_request_stream.try_next(),
-                ),
+                self.dhcpv6_prefix_provider_handler
+                    .as_mut()
+                    .map(dhcpv6::PrefixProviderHandler::try_next_prefix_control_request),
             );
             let event = futures::select! {
                 ethdev_res = ethdev_stream.try_next() => {
@@ -949,6 +957,9 @@ impl<'a> NetCfg<'a> {
                 }
                 dhcpv6_prefix_control_req = dhcpv6_prefix_control_fut => {
                     Event::Dhcpv6PrefixControlRequest(dhcpv6_prefix_control_req)
+                }
+                dhcpv6_prefixes = self.dhcpv6_prefixes_streams.next() => {
+                    Event::Dhcpv6Prefixes(dhcpv6_prefixes)
                 }
                 virt_event = virtualization_events.select_next_some() => {
                     Event::VirtualizationEvent(virt_event)
@@ -1078,9 +1089,19 @@ impl<'a> NetCfg<'a> {
                             self.on_dhcpv6_prefix_control_close(dns_watchers.get_mut()).await;
                         }
                         Ok(Some(fnet_dhcpv6::PrefixControlRequest::WatchPrefix { responder })) => {
-                            self.handle_watch_prefix(responder, dns_watchers.get_mut()).await;
+                            self.handle_watch_prefix(responder, dns_watchers.get_mut())
+                                .await
+                                .context("handle PrefixControl.WatchPrefix")
+                                .unwrap_or_else(accept_error);
                         }
                     }
+                }
+                Event::Dhcpv6Prefixes(prefixes) => {
+                    let (interface_id, res) = prefixes
+                        .context("DHCPv6 watch prefixes stream map can never be exhausted")?;
+                    self.handle_dhcpv6_prefixes(interface_id, res, dns_watchers.get_mut())
+                        .await
+                        .unwrap_or_else(accept_error);
                 }
                 Event::VirtualizationEvent(event) => virtualization_handler
                     .handle_event(event, &mut virtualization_events)
@@ -1136,6 +1157,9 @@ impl<'a> NetCfg<'a> {
             lookup_admin,
             dhcp_server,
             dhcpv6_client_provider,
+            dhcpv6_prefixes_streams,
+            allowed_upstream_device_classes,
+            dhcpv6_prefix_provider_handler,
             ..
         } = self;
         let update_result = interface_properties
@@ -1146,6 +1170,7 @@ impl<'a> NetCfg<'a> {
             watchers,
             dns_servers,
             interface_states,
+            dhcpv6_prefixes_streams,
             lookup_admin,
             dhcp_server,
             dhcpv6_client_provider,
@@ -1153,6 +1178,16 @@ impl<'a> NetCfg<'a> {
         .await
         .context("handle interface update")
         .or_else(errors::Error::accept_non_fatal)?;
+
+        // The interface watcher event may have disabled DHCPv6 on the interface
+        // so respond accordingly.
+        dhcpv6::maybe_send_watch_prefix_response(
+            interface_states,
+            allowed_upstream_device_classes,
+            dhcpv6_prefix_provider_handler.as_mut(),
+        )
+        .context("maybe send PrefixControl.WatchPrefix response")?;
+
         virtualization_handler
             .handle_interface_update_result(&update_result)
             .await
@@ -1168,6 +1203,7 @@ impl<'a> NetCfg<'a> {
         watchers: &mut DnsServerWatchers<'_>,
         dns_servers: &mut DnsServers,
         interface_states: &mut HashMap<u64, InterfaceState>,
+        dhcpv6_prefixes_streams: &mut dhcpv6::PrefixesStreamMap,
         lookup_admin: &fnet_name::LookupAdminProxy,
         dhcp_server: &Option<fnet_dhcp::Server_Proxy>,
         dhcpv6_client_provider: &Option<fnet_dhcpv6::ClientProviderProxy>,
@@ -1176,7 +1212,12 @@ impl<'a> NetCfg<'a> {
             fnet_interfaces_ext::UpdateResult::Added(properties) => {
                 match interface_states.get_mut(&properties.id) {
                     Some(state) => state
-                        .on_discovery(properties, dhcpv6_client_provider.as_ref(), watchers)
+                        .on_discovery(
+                            properties,
+                            dhcpv6_client_provider.as_ref(),
+                            watchers,
+                            dhcpv6_prefixes_streams,
+                        )
                         .await
                         .context("failed to handle interface added event"),
                     // An interface netcfg won't be configuring was added, do nothing.
@@ -1186,7 +1227,12 @@ impl<'a> NetCfg<'a> {
             fnet_interfaces_ext::UpdateResult::Existing(properties) => {
                 match interface_states.get_mut(&properties.id) {
                     Some(state) => state
-                        .on_discovery(properties, dhcpv6_client_provider.as_ref(), watchers)
+                        .on_discovery(
+                            properties,
+                            dhcpv6_client_provider.as_ref(),
+                            watchers,
+                            dhcpv6_prefixes_streams,
+                        )
                         .await
                         .context("failed to handle existing interface event"),
                     // An interface netcfg won't be configuring was discovered, do nothing.
@@ -1206,7 +1252,7 @@ impl<'a> NetCfg<'a> {
                     Some(InterfaceState {
                         config:
                             InterfaceConfigState::Host(HostInterfaceState {
-                                dhcpv6_client_addr,
+                                dhcpv6_client_state,
                                 dhcpv6_pd_config,
                             }),
                         control: _,
@@ -1221,10 +1267,11 @@ impl<'a> NetCfg<'a> {
 
                         // Stop DHCPv6 client if interface went down.
                         if !online {
-                            let sockaddr = match dhcpv6_client_addr.take() {
-                                Some(s) => s,
-                                None => return Ok(()),
-                            };
+                            let dhcpv6::ClientState { sockaddr, prefixes: _ } =
+                                match dhcpv6_client_state.take() {
+                                    Some(s) => s,
+                                    None => return Ok(()),
+                                };
 
                             info!(
                                 "host interface {} (id={}) went down \
@@ -1234,19 +1281,27 @@ impl<'a> NetCfg<'a> {
                                 sockaddr.display_ext(),
                             );
 
-                            return dhcpv6::stop_client(&lookup_admin, dns_servers, *id, watchers)
-                                .await
-                                .with_context(|| {
-                                    format!(
-                                        "error stopping DHCPv6 client on down interface {} (id={})",
-                                        name, id
-                                    )
-                                });
+                            return dhcpv6::stop_client(
+                                &lookup_admin,
+                                dns_servers,
+                                *id,
+                                watchers,
+                                dhcpv6_prefixes_streams,
+                            )
+                            .await
+                            .with_context(|| {
+                                format!(
+                                    "error stopping DHCPv6 client on down interface {} (id={})",
+                                    name, id
+                                )
+                            });
                         }
 
                         // Stop the DHCPv6 client if its address can no longer be found on the
                         // interface.
-                        if let Some(sockaddr) = dhcpv6_client_addr {
+                        if let Some(dhcpv6::ClientState { sockaddr, prefixes: _ }) =
+                            dhcpv6_client_state
+                        {
                             let &mut fnet::Ipv6SocketAddress { address, port: _, zone_index: _ } =
                                 sockaddr;
                             if !addresses.iter().any(
@@ -1258,7 +1313,7 @@ impl<'a> NetCfg<'a> {
                                 },
                             ) {
                                 let sockaddr = *sockaddr;
-                                *dhcpv6_client_addr = None;
+                                *dhcpv6_client_state = None;
 
                                 info!(
                                     "stopping DHCPv6 client on host interface {} (id={}) \
@@ -1269,26 +1324,34 @@ impl<'a> NetCfg<'a> {
                                 );
 
                                 let () =
-                                    dhcpv6::stop_client(&lookup_admin, dns_servers, *id, watchers)
-                                        .await
-                                        .with_context(|| {
-                                            format!(
+                                    dhcpv6::stop_client(
+                                        &lookup_admin,
+                                        dns_servers,
+                                        *id,
+                                        watchers,
+                                        dhcpv6_prefixes_streams,
+                                    )
+                                    .await
+                                    .with_context(|| {
+                                        format!(
                                             "error stopping DHCPv6 client on  interface {} (id={}) \
                                             since sockaddr {} was removed",
                                             name, id, sockaddr.display_ext()
                                         )
-                                        })?;
+                                    })?;
                             }
                         }
 
                         // Start a DHCPv6 client if there isn't one.
-                        if dhcpv6_client_addr.is_none() {
-                            *dhcpv6_client_addr = start_dhcpv6_client(
+                        if dhcpv6_client_state.is_none() {
+                            let sockaddr = start_dhcpv6_client(
                                 current_properties,
                                 &dhcpv6_client_provider,
                                 dhcpv6_pd_config.clone(),
                                 watchers,
+                                dhcpv6_prefixes_streams,
                             )?;
+                            *dhcpv6_client_state = sockaddr.map(dhcpv6::ClientState::new);
                         }
                         Ok(())
                     }
@@ -1343,10 +1406,13 @@ impl<'a> NetCfg<'a> {
                     Some(InterfaceState { config, control: _, device_class: _ }) => {
                         match config {
                             InterfaceConfigState::Host(HostInterfaceState {
-                                mut dhcpv6_client_addr,
+                                mut dhcpv6_client_state,
                                 dhcpv6_pd_config: _,
                             }) => {
-                                let sockaddr = match dhcpv6_client_addr.take() {
+                                let dhcpv6::ClientState {
+                                    sockaddr,
+                                    prefixes: _,
+                                } = match dhcpv6_client_state.take() {
                                     Some(s) => s,
                                     None => return Ok(()),
                                 };
@@ -1364,6 +1430,7 @@ impl<'a> NetCfg<'a> {
                                     dns_servers,
                                     *id,
                                     watchers,
+                                    dhcpv6_prefixes_streams,
                                 )
                                 .await
                                 .with_context(|| {
@@ -1701,7 +1768,8 @@ impl<'a> NetCfg<'a> {
                                  preferred_prefix_len,
                                  prefix_control_request_stream: _,
                                  watch_prefix_responder: _,
-                                 _interface_config,
+                                 interface_config: _,
+                                 current_prefix: _,
                              }| {
                                 preferred_prefix_len.map_or(
                                     fnet_dhcpv6::PrefixDelegationConfig::Empty(fnet_dhcpv6::Empty),
@@ -2033,7 +2101,7 @@ impl<'a> NetCfg<'a> {
                 Some(InterfaceState {
                     config:
                         InterfaceConfigState::Host(HostInterfaceState {
-                            dhcpv6_client_addr: _,
+                            dhcpv6_client_state: _,
                             dhcpv6_pd_config: _,
                         }),
                     control: _,
@@ -2081,12 +2149,16 @@ impl<'a> NetCfg<'a> {
         };
         // Look for all eligible interfaces and start/restart DHCPv6 client as needed.
         for (id, InterfaceState { config, control: _, device_class: _ }) in interface_state_iter {
-            let HostInterfaceState { dhcpv6_client_addr, dhcpv6_pd_config } = match config {
+            let HostInterfaceState { dhcpv6_client_state, dhcpv6_pd_config } = match config {
                 InterfaceConfigState::Host(state) => state,
                 InterfaceConfigState::WlanAp(WlanApInterfaceState {}) => {
                     continue;
                 }
             };
+
+            // Save the config so that future DHCPv6 clients are started with PD.
+            *dhcpv6_pd_config = Some(pd_config.clone());
+
             let properties = if let Some(properties) = self.interface_properties.get(&id) {
                 properties
             } else {
@@ -2098,26 +2170,30 @@ impl<'a> NetCfg<'a> {
                 continue;
             };
 
-            // Save the config so that future DHCPv6 clients are started with PD.
-            *dhcpv6_pd_config = Some(pd_config.clone());
-
             // TODO(https://fxbug.dev/117651): Reload configuration in-place rather than
             // restarting the DHCPv6 client with different configuration.
             // Stop DHCPv6 client if it's running.
-            if dhcpv6_client_addr.take().is_some() {
-                dhcpv6::stop_client(&self.lookup_admin, &mut self.dns_servers, id, dns_watchers)
-                    .await
-                    .context("stopping DHCPv6 client in order to restart with PD")
-                    .or_else(errors::Error::accept_non_fatal)
-                    .expect("stopping DHCPv6 client to restart with PD configured");
+            if let Some::<dhcpv6::ClientState>(_) = dhcpv6_client_state.take() {
+                dhcpv6::stop_client(
+                    &self.lookup_admin,
+                    &mut self.dns_servers,
+                    id,
+                    dns_watchers,
+                    &mut self.dhcpv6_prefixes_streams,
+                )
+                .await
+                .context("stopping DHCPv6 client in order to restart with PD")
+                .or_else(errors::Error::accept_non_fatal)
+                .expect("stopping DHCPv6 client to restart with PD configured");
             }
 
             // Restart DHCPv6 client and configure it to perform PD.
-            *dhcpv6_client_addr = match start_dhcpv6_client(
+            let sockaddr = match start_dhcpv6_client(
                 properties,
                 &dhcpv6_client_provider,
                 Some(pd_config.clone()),
                 dns_watchers,
+                &mut self.dhcpv6_prefixes_streams,
             )
             .context("starting DHCPv6 client with PD")
             {
@@ -2129,13 +2205,15 @@ impl<'a> NetCfg<'a> {
                 Err(errors::Error::Fatal(e)) => {
                     panic!("error restarting DHCPv6 client to perform PD: {:?}", e);
                 }
-            }
+            };
+            *dhcpv6_client_state = sockaddr.map(dhcpv6::ClientState::new);
         }
         self.dhcpv6_prefix_provider_handler = Some(dhcpv6::PrefixProviderHandler {
             prefix_control_request_stream,
             watch_prefix_responder: None,
+            current_prefix: None,
+            interface_config,
             preferred_prefix_len,
-            _interface_config: interface_config,
         });
         Ok(())
     }
@@ -2144,12 +2222,13 @@ impl<'a> NetCfg<'a> {
         &mut self,
         responder: fnet_dhcpv6::PrefixControlWatchPrefixResponder,
         dns_watchers: &mut DnsServerWatchers<'_>,
-    ) {
+    ) -> Result<(), anyhow::Error> {
         let dhcpv6::PrefixProviderHandler {
-            prefix_control_request_stream: _,
             watch_prefix_responder,
+            interface_config: _,
+            prefix_control_request_stream: _,
             preferred_prefix_len: _,
-            _interface_config,
+            current_prefix: _,
         } = self
             .dhcpv6_prefix_provider_handler
             .as_mut()
@@ -2168,10 +2247,15 @@ impl<'a> NetCfg<'a> {
                 Ok(()) => {}
             }
             self.on_dhcpv6_prefix_control_close(dns_watchers).await;
+            Ok(())
         } else {
-            // TODO(https://fxbug.dev/114770): Respond via the responder when a prefix is
-            // acquired.
             *watch_prefix_responder = Some(responder);
+
+            dhcpv6::maybe_send_watch_prefix_response(
+                &self.interface_states,
+                &self.allowed_upstream_device_classes,
+                self.dhcpv6_prefix_provider_handler.as_mut(),
+            )
         }
     }
 
@@ -2185,31 +2269,38 @@ impl<'a> NetCfg<'a> {
         for (id, InterfaceState { config, control: _, device_class: _ }) in
             self.interface_states.iter_mut()
         {
-            let dhcpv6_client_addr = match config {
+            let dhcpv6_client_state = match config {
                 InterfaceConfigState::WlanAp(WlanApInterfaceState {}) => {
                     continue;
                 }
                 InterfaceConfigState::Host(HostInterfaceState {
-                    dhcpv6_client_addr,
+                    dhcpv6_client_state,
                     dhcpv6_pd_config,
                 }) => {
                     if dhcpv6_pd_config.take().is_none() {
                         continue;
                     }
-                    match dhcpv6_client_addr.take() {
-                        Some(_) => dhcpv6_client_addr,
+                    match dhcpv6_client_state.take() {
+                        Some(_) => dhcpv6_client_state,
                         None => continue,
                     }
                 }
             };
+
             // TODO(https://fxbug.dev/117651): Reload configuration in-place rather than
             // restarting the DHCPv6 client with different configuration.
             // Stop DHCPv6 client if it's running.
-            dhcpv6::stop_client(&self.lookup_admin, &mut self.dns_servers, *id, dns_watchers)
-                .await
-                .context("stopping DHCPv6 client in order to restart with PD")
-                .or_else(errors::Error::accept_non_fatal)
-                .expect("stopping DHCPv6 client before restarting without PD");
+            dhcpv6::stop_client(
+                &self.lookup_admin,
+                &mut self.dns_servers,
+                *id,
+                dns_watchers,
+                &mut self.dhcpv6_prefixes_streams,
+            )
+            .await
+            .context("stopping DHCPv6 client in order to restart with PD")
+            .or_else(errors::Error::accept_non_fatal)
+            .expect("stopping DHCPv6 client before restarting without PD");
 
             let properties = self
                 .interface_properties
@@ -2217,20 +2308,81 @@ impl<'a> NetCfg<'a> {
                 .expect(&format!("interface {} has DHCPv6 client but properties unknown", id));
 
             // Restart DHCPv6 client without PD.
-            *dhcpv6_client_addr =
-                match start_dhcpv6_client(properties, &dhcpv6_client_provider, None, dns_watchers)
-                    .context("starting DHCPv6 client with PD")
-                {
-                    Ok(dhcpv6_client_addr) => dhcpv6_client_addr,
-                    Err(errors::Error::NonFatal(e)) => {
-                        warn!("restarting DHCPv6 client to stop PD: {:?}", e);
-                        None
-                    }
-                    Err(e @ errors::Error::Fatal(_)) => {
-                        panic!("restarting DHCPv6 client to stop PD: {:?}", e);
-                    }
+            let sockaddr = match start_dhcpv6_client(
+                properties,
+                &dhcpv6_client_provider,
+                None,
+                dns_watchers,
+                &mut self.dhcpv6_prefixes_streams,
+            )
+            .context("starting DHCPv6 client with PD")
+            {
+                Ok(dhcpv6_client_addr) => dhcpv6_client_addr,
+                Err(errors::Error::NonFatal(e)) => {
+                    warn!("restarting DHCPv6 client to stop PD: {:?}", e);
+                    None
                 }
+                Err(e @ errors::Error::Fatal(_)) => {
+                    panic!("restarting DHCPv6 client to stop PD: {:?}", e);
+                }
+            };
+            *dhcpv6_client_state = sockaddr.map(dhcpv6::ClientState::new);
         }
+    }
+
+    async fn handle_dhcpv6_prefixes(
+        &mut self,
+        interface_id: u64,
+        res: Result<Vec<fnet_dhcpv6::Prefix>, fidl::Error>,
+        dns_watchers: &mut DnsServerWatchers<'_>,
+    ) -> Result<(), anyhow::Error> {
+        let new_prefixes = match res
+            .context("DHCPv6 prefixes stream FIDL error")
+            .and_then(|prefixes| dhcpv6::from_fidl_prefixes(&prefixes))
+        {
+            Err(e) => {
+                warn!(
+                    "DHCPv6 client on interface={} error on watch_prefixes: {:?}",
+                    interface_id, e
+                );
+                dhcpv6::stop_client(
+                    &self.lookup_admin,
+                    &mut self.dns_servers,
+                    interface_id,
+                    dns_watchers,
+                    &mut self.dhcpv6_prefixes_streams,
+                )
+                .await
+                .or_else(errors::Error::accept_non_fatal)?;
+                HashMap::new()
+            }
+            Ok(prefixes_map) => prefixes_map,
+        };
+        let InterfaceState { config, control: _, device_class: _ } = self
+            .interface_states
+            .get_mut(&interface_id)
+            .unwrap_or_else(|| panic!("interface {} not found", interface_id));
+        let dhcpv6::ClientState { prefixes, sockaddr: _ } = match config {
+            InterfaceConfigState::Host(HostInterfaceState {
+                dhcpv6_client_state,
+                dhcpv6_pd_config: _,
+            }) => dhcpv6_client_state.as_mut().unwrap_or_else(|| {
+                panic!("interface {} does not have a running DHCPv6 client", interface_id)
+            }),
+            InterfaceConfigState::WlanAp(wlan_ap_state) => {
+                panic!(
+                    "interface {} expected to be host but is WLAN AP with state {:?}",
+                    interface_id, wlan_ap_state
+                );
+            }
+        };
+        *prefixes = new_prefixes;
+
+        dhcpv6::maybe_send_watch_prefix_response(
+            &self.interface_states,
+            &self.allowed_upstream_device_classes,
+            self.dhcpv6_prefix_provider_handler.as_mut(),
+        )
     }
 }
 
@@ -2419,7 +2571,7 @@ mod tests {
     use assert_matches::assert_matches;
     use futures::future::{self, FutureExt as _, TryFutureExt as _};
     use futures::stream::{FusedStream as _, TryStreamExt as _};
-    use net_declare::{fidl_ip, fidl_ip_v6};
+    use net_declare::{fidl_ip, fidl_ip_v6, fidl_ip_v6_with_prefix};
     use test_case::test_case;
 
     use super::*;
@@ -2514,6 +2666,7 @@ mod tests {
                 forwarded_device_classes: Default::default(),
                 dhcpv6_prefix_provider_handler: Default::default(),
                 allowed_upstream_device_classes: &DEFAULT_ALLOWED_UPSTREAM_DEVICE_CLASSES,
+                dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap::empty(),
             },
             ServerEnds {
                 lookup_admin: lookup_admin_server
@@ -2599,7 +2752,7 @@ mod tests {
     ) -> Result<fnet_dhcpv6::ClientRequestStream, anyhow::Error> {
         let evt =
             server.try_next().await.context("error getting next dhcpv6 client provider event")?;
-        let client_server =
+        let mut client_server =
             match evt.ok_or(anyhow::anyhow!("expected dhcpv6 client provider request"))? {
                 fnet_dhcpv6::ClientProviderRequest::NewClient {
                     params,
@@ -2627,6 +2780,8 @@ mod tests {
                 }
             };
         assert!(dns_watchers.contains_key(&DHCPV6_DNS_SOURCE), "should have a watcher");
+        // NetCfg always keeps the server hydrated with a pending hanging-get.
+        expect_watch_prefixes(&mut client_server).await;
         Ok(client_server)
     }
 
@@ -2726,6 +2881,16 @@ mod tests {
         handle_interface_changed_event(&mut netcfg, &mut dns_watchers, None, Some(ipv6addrs(None)))
             .await
             .expect("error handling interface changed event with sockaddr1 removed")
+    }
+
+    async fn expect_watch_prefixes(client_server: &mut fnet_dhcpv6::ClientRequestStream) {
+        assert_matches::assert_matches!(
+            client_server.try_next().now_or_never(),
+            Some(Ok(Some(fnet_dhcpv6::ClientRequest::WatchPrefixes { responder }))) => {
+                responder.drop_without_shutdown();
+            },
+            "expect a watch_prefixes call immediately"
+        )
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -2951,7 +3116,8 @@ mod tests {
         let ((), ()) = future::try_join(
             netcfg
                 .handle_dns_server_watcher_done(DHCPV6_DNS_SOURCE, &mut dns_watchers)
-                .map(|r| r.context("error handling completion of dns server watcher")),
+                .map(|r| r.context("error handling completion of dns server watcher"))
+                .map_err(Into::into),
             run_lookup_admin_once(&mut servers.lookup_admin, &netstack_servers)
                 .map(|r| r.context("error running lookup admin")),
         )
@@ -3155,7 +3321,7 @@ mod tests {
                         kind,
                     }
                 )
-                .is_none(),);
+                .is_none());
         }
 
         async fn assert_dhcpv6_clients_stopped(
@@ -3190,7 +3356,7 @@ mod tests {
                         // because that will result in us blocking forever on
                         // the next event (since the DHCPv6 client did not close
                         // so the stream is still open and blocked).
-                        assert_matches!(req_stream.try_next().now_or_never(), None);
+                        assert_matches!(req_stream.try_next().now_or_never(), None, "interface_id={:?}, kind={:?}, id={:?}", interface_id, kind, id);
                         assert!(!req_stream.is_terminated());
                     }
                     None
@@ -3208,54 +3374,116 @@ mod tests {
             dhcpv6_client_provider_request_stream
                 .map(|res| res.expect("DHCPv6 ClientProvider request stream error"))
                 .take(count)
-                .map(
+                .then(
                     |fnet_dhcpv6::ClientProviderRequest::NewClient {
                          params:
                              fnet_dhcpv6::NewClientParams { interface_id, address: _, config, .. },
                          request,
                          control_handle: _,
-                     }| {
-                        let interface_id = interface_id
-                            .expect("interface ID missing in new DHCPv6 client request");
-                        let TestInterfaceState {
-                            _control_server_end,
-                            dhcpv6_client_request_stream,
-                            kind: _,
-                        } = interface_states
-                            .get_mut(&interface_id)
-                            .expect(&format!("interface {} must be present in map", interface_id));
-                        assert!(std::mem::replace(
-                            dhcpv6_client_request_stream,
-                            Some(
-                                request
-                                    .into_stream()
-                                    .expect("fuchsia.net.dhcpv6/Client into_stream"),
-                            ),
-                        )
-                        .is_none());
-
-                        assert_eq!(
-                            config,
-                            Some(fnet_dhcpv6::ClientConfig {
-                                information_config: Some(fnet_dhcpv6::InformationConfig {
-                                    dns_servers: Some(true),
-                                    ..fnet_dhcpv6::InformationConfig::EMPTY
-                                }),
-                                prefix_delegation_config: want_pd_config.clone(),
-                                ..fnet_dhcpv6::ClientConfig::EMPTY
-                            })
-                        );
-                        interface_id
+                     }| async move {
+                        let mut new_stream =
+                            request.into_stream().expect("fuchsia.net.dhcpv6/Client into_stream");
+                        // NetCfg always keeps the server hydrated with a pending hanging-get.
+                        expect_watch_prefixes(&mut new_stream).await;
+                        (interface_id, config, new_stream)
                     },
                 )
+                .map(|(interface_id, config, new_stream)| {
+                    let interface_id =
+                        interface_id.expect("interface ID missing in new DHCPv6 client request");
+                    let TestInterfaceState {
+                        _control_server_end,
+                        dhcpv6_client_request_stream,
+                        kind: _,
+                    } = interface_states
+                        .get_mut(&interface_id)
+                        .expect(&format!("interface {} must be present in map", interface_id));
+                    assert!(
+                        std::mem::replace(dhcpv6_client_request_stream, Some(new_stream)).is_none()
+                    );
+
+                    assert_eq!(
+                        config,
+                        Some(fnet_dhcpv6::ClientConfig {
+                            information_config: Some(fnet_dhcpv6::InformationConfig {
+                                dns_servers: Some(true),
+                                ..fnet_dhcpv6::InformationConfig::EMPTY
+                            }),
+                            prefix_delegation_config: want_pd_config.clone(),
+                            ..fnet_dhcpv6::ClientConfig::EMPTY
+                        })
+                    );
+                    interface_id
+                })
                 .collect()
                 .await
         }
 
+        async fn handle_watch_prefix_with_fake(
+            netcfg: &mut NetCfg<'_>,
+            dns_watchers: &mut DnsServerWatchers<'_>,
+            interface_id: u64,
+            fake_prefixes: Vec<fnet_dhcpv6::Prefix>,
+            // Used to test handling PrefixControl.WatchPrefix & Client.WatchPrefixes
+            // events in different orders.
+            handle_dhcpv6_prefixes_before_watch_prefix: bool,
+        ) {
+            let responder = netcfg
+                .dhcpv6_prefix_provider_handler
+                .as_mut()
+                .map(dhcpv6::PrefixProviderHandler::try_next_prefix_control_request)
+                .expect("DHCPv6 prefix provider handler must be present")
+                .await
+                .expect("prefix provider request")
+                .expect("PrefixProvider request stream exhausted")
+                .into_watch_prefix()
+                .expect("request not WatchPrefix");
+
+            async fn handle_dhcpv6_prefixes(
+                netcfg: &mut NetCfg<'_>,
+                dns_watchers: &mut DnsServerWatchers<'_>,
+                interface_id: u64,
+                fake_prefixes: Vec<fnet_dhcpv6::Prefix>,
+            ) {
+                netcfg
+                    .handle_dhcpv6_prefixes(interface_id, Ok(fake_prefixes), dns_watchers)
+                    .await
+                    .expect("handle DHCPv6 prefixes")
+            }
+
+            async fn handle_watch_prefix(
+                netcfg: &mut NetCfg<'_>,
+                dns_watchers: &mut DnsServerWatchers<'_>,
+                responder: fnet_dhcpv6::PrefixControlWatchPrefixResponder,
+            ) {
+                netcfg
+                    .handle_watch_prefix(responder, dns_watchers)
+                    .await
+                    .expect("handle watch prefix")
+            }
+
+            if handle_dhcpv6_prefixes_before_watch_prefix {
+                handle_dhcpv6_prefixes(netcfg, dns_watchers, interface_id, fake_prefixes).await;
+                handle_watch_prefix(netcfg, dns_watchers, responder).await;
+            } else {
+                handle_watch_prefix(netcfg, dns_watchers, responder).await;
+                handle_dhcpv6_prefixes(netcfg, dns_watchers, interface_id, fake_prefixes).await;
+            }
+        }
+
         // Making an AcquirePrefix call should trigger restarting DHCPv6 w/ PD.
-        let (_prefix_control, server_end) =
+        let (prefix_control, server_end) =
             fidl::endpoints::create_proxy::<fnet_dhcpv6::PrefixControlMarker>()
                 .expect("create fuchsia.net.dhcpv6/PrefixControl endpoints");
+        let mut lookup_admin_fut = lookup_admin_request_stream
+            .try_for_each(|req| {
+                let (_, responder): (Vec<fnet::SocketAddress>, _) =
+                    req.into_set_dns_servers().expect("request must be SetDnsServers");
+                responder.send(&mut Ok(())).expect("send SetDnsServers response");
+                futures::future::ok(())
+            })
+            .fuse();
+
         {
             let acquire_prefix_fut = netcfg.handle_dhcpv6_acquire_prefix(
                 fnet_dhcpv6::AcquirePrefixConfig {
@@ -3266,14 +3494,6 @@ mod tests {
                 server_end,
                 &mut dns_watchers,
             );
-            let mut lookup_admin_fut = lookup_admin_request_stream
-                .try_for_each(|req| {
-                    let (_, responder): (Vec<fnet::SocketAddress>, _) =
-                        req.into_set_dns_servers().expect("request must be SetDnsServers");
-                    responder.send(&mut Ok(())).expect("send SetDnsServers response");
-                    futures::future::ok(())
-                })
-                .fuse();
             futures::select! {
                 res = acquire_prefix_fut.fuse() => {
                     res.expect("acquire DHCPv6 prefix")
@@ -3296,12 +3516,83 @@ mod tests {
             )
             .await;
             assert_eq!(started, stopped);
+
+            // Yield a prefix to the PrefixControl.
+            let prefix = fnet_dhcpv6::Prefix {
+                prefix: fidl_ip_v6_with_prefix!("abcd::/64"),
+                lifetimes: fnet_dhcpv6::Lifetimes { valid_until: 123, preferred_until: 456 },
+            };
+            let any_eligible_interface = *started.iter().next().expect(
+                "must have configured DHCPv6 client to perform PD on at least one interface",
+            );
+            let (watch_prefix_res, ()) = futures::future::join(
+                prefix_control.watch_prefix(),
+                handle_watch_prefix_with_fake(
+                    &mut netcfg,
+                    &mut dns_watchers,
+                    any_eligible_interface,
+                    vec![prefix.clone()],
+                    true, /* handle_dhcpv6_prefixes_before_watch_prefix */
+                ),
+            )
+            .await;
+            assert_matches!(watch_prefix_res, Ok(fnet_dhcpv6::PrefixEvent::Assigned(got_prefix)) => {
+                assert_eq!(got_prefix, prefix);
+            });
+
+            // Yield a different prefix from what was yielded before.
+            let renewed_prefix = fnet_dhcpv6::Prefix {
+                lifetimes: fnet_dhcpv6::Lifetimes {
+                    valid_until: 123_123,
+                    preferred_until: 456_456,
+                },
+                ..prefix
+            };
+            let (watch_prefix_res, ()) = futures::future::join(
+                prefix_control.watch_prefix(),
+                handle_watch_prefix_with_fake(
+                    &mut netcfg,
+                    &mut dns_watchers,
+                    any_eligible_interface,
+                    vec![renewed_prefix.clone()],
+                    false, /* handle_dhcpv6_prefixes_before_watch_prefix */
+                ),
+            )
+            .await;
+            assert_matches!(watch_prefix_res, Ok(fnet_dhcpv6::PrefixEvent::Assigned(
+                got_prefix,
+            )) => {
+                assert_eq!(got_prefix, renewed_prefix);
+            });
+            let (watch_prefix_res, ()) = futures::future::join(
+                prefix_control.watch_prefix(),
+                handle_watch_prefix_with_fake(
+                    &mut netcfg,
+                    &mut dns_watchers,
+                    any_eligible_interface,
+                    vec![],
+                    true, /* handle_dhcpv6_prefixes_before_watch_prefix */
+                ),
+            )
+            .await;
+            assert_matches!(
+                watch_prefix_res,
+                Ok(fnet_dhcpv6::PrefixEvent::Unassigned(fnet_dhcpv6::Empty))
+            );
         }
 
         // Closing the PrefixControl should trigger clients running DHCPv6-PD to
         // be restarted.
         {
-            netcfg.on_dhcpv6_prefix_control_close(&mut dns_watchers).await;
+            futures::select! {
+                () = netcfg.on_dhcpv6_prefix_control_close(&mut dns_watchers).fuse() => {},
+                res = lookup_admin_fut => {
+                    panic!(
+                        "fuchsia.net.name/LookupAdmin request stream exhausted unexpectedly: {:?}",
+                        res,
+                    )
+                },
+            }
             let stopped = assert_dhcpv6_clients_stopped(&mut interface_states, interface_id).await;
             let started = assert_dhcpv6_clients_started(
                 stopped.len(),
