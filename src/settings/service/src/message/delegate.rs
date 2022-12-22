@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::message::base::{
-    role, Address, CreateMessengerResult, MessengerAction, MessengerActionSender, MessengerType,
-    Payload, Role, Signature,
+    Address, CreateMessengerResult, MessengerAction, MessengerActionSender, MessengerType, Payload,
+    Role, Signature,
 };
 #[cfg(test)]
 use crate::message::base::{MessageError, MessengerPresenceResult};
@@ -14,34 +14,12 @@ use crate::message::messenger::Builder;
 /// to create new messengers.
 #[derive(Clone)]
 pub struct Delegate<P: Payload + 'static, A: Address + 'static, R: Role + 'static> {
-    // TODO(fxbug.dev/84729)
-    #[allow(unused)]
-    role_action_tx: role::ActionSender<R>,
     messenger_action_tx: MessengerActionSender<P, A, R>,
 }
 
 impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> Delegate<P, A, R> {
-    pub(super) fn new(
-        action_tx: MessengerActionSender<P, A, R>,
-        role_action_tx: role::ActionSender<R>,
-    ) -> Delegate<P, A, R> {
-        Delegate { messenger_action_tx: action_tx, role_action_tx }
-    }
-
-    /// This method is soft-deprecated for now.
-    // #[deprecated(note = "Please use messenger_builder instead")]
-    #[cfg(test)]
-    pub(crate) async fn create_role(&self) -> Result<role::Signature<R>, role::Error> {
-        let (tx, rx) =
-            futures::channel::oneshot::channel::<Result<role::Response<R>, role::Error>>();
-
-        self.role_action_tx
-            .unbounded_send(role::Action::Create(tx))
-            .map_err(|_| role::Error::CommunicationError)?;
-
-        rx.await.unwrap_or(Err(role::Error::CommunicationError)).map(|result| match result {
-            role::Response::Role(signature) => signature,
-        })
+    pub(super) fn new(action_tx: MessengerActionSender<P, A, R>) -> Delegate<P, A, R> {
+        Delegate { messenger_action_tx: action_tx }
     }
 
     /// Returns a builder for constructing a new messenger.

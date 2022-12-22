@@ -103,7 +103,7 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageHub<P
 
         // A channel used by the MessageHub to listen to requests for
         // role-related actions.
-        let (role_tx, mut role_rx) = futures::channel::mpsc::unbounded::<role::Action<R>>();
+        let (_, mut role_rx) = futures::channel::mpsc::unbounded::<role::Action<R>>();
 
         let (exit_tx, mut exit_rx) = futures::channel::mpsc::unbounded::<()>();
 
@@ -175,7 +175,7 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageHub<P
         })
         .detach();
 
-        Delegate::new(messenger_tx, role_tx)
+        Delegate::new(messenger_tx)
     }
 
     fn check_exit(&self) {

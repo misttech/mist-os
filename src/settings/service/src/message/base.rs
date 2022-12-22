@@ -74,7 +74,6 @@ pub enum MessageEvent<P: Payload + 'static, A: Address + 'static, R: Role + 'sta
 /// to.
 pub mod role {
     use super::Role;
-    use futures::channel::mpsc::UnboundedSender;
     use futures::channel::oneshot::Sender;
 
     /// An enumeration of role-related actions that can be requested upon the
@@ -84,9 +83,6 @@ pub mod role {
         /// Creates an anonymous Role at runtime.
         Create(ResultSender<R>),
     }
-
-    /// A sender given to MessageHub clients to relay role-related requests.
-    pub(in crate::message) type ActionSender<R> = UnboundedSender<Action<R>>;
 
     /// A sender passed along with some [`Action`] types in order to send back a
     /// response.

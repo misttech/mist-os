@@ -1334,38 +1334,6 @@ async fn test_roles_audience() {
     }
 }
 
-#[fuchsia_async::run_until_stalled(test)]
-async fn test_anonymous_roles() {
-    // Prepare a message hub.
-    let delegate = test::MessageHub::create_hub();
-
-    // Create anonymous role.
-    let role = delegate.create_role().await.expect("Role should be returned");
-
-    // Create messenger who participates in role.
-    let (_, mut role_receptor) = delegate
-        .messenger_builder(MessengerType::Unbound)
-        .add_role(role)
-        .build()
-        .await
-        .expect("recipient messenger should be created");
-
-    // Create messenger to send a message to the given participant.
-    let (sender, _) = delegate
-        .messenger_builder(MessengerType::Unbound)
-        .build()
-        .await
-        .expect("sending messenger should be created");
-
-    // Send messages to role.
-    let message = TestMessage::Bar;
-    let audience = Audience::Role(role);
-    sender.message(message, audience).send().ack();
-
-    // Verify payload received by role member.
-    verify_payload(message, &mut role_receptor, None).await;
-}
-
 // Ensures targeted messengers deliver payload to intended audience.
 #[fuchsia_async::run_until_stalled(test)]
 async fn test_targeted_messenger_client() {
