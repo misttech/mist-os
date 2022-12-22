@@ -198,7 +198,7 @@ def main():
         if test.zbi:
             cmd += ["-z", test.zbi["path"]]
         if test.efi:
-            cmd += ["--uefi", test.efi["path"]]
+            cmd += ["--uefi", "-D", test.efi["path"]]
 
     for arg in args.cmdline:
         cmd += ["-c", arg]

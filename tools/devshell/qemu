@@ -60,7 +60,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/fvm.s
 
 build_flag=true
 ZBI_IMAGE=
-UEFI_IMG=
+UEFI=0
 PKG_TARGET=
 run_zircon_args=()
 while [[ $# -gt 0 ]]; do
@@ -82,8 +82,7 @@ while [[ $# -gt 0 ]]; do
       ZBI_IMAGE="$1"
       ;;
     --uefi)
-      shift
-      UEFI_IMG="$1"
+      UEFI=1
       ;;
     --)
       # Stop processing args if we hit a "--" argument.
@@ -124,8 +123,8 @@ if [[ ! -d "${imgdir}" ]]; then
 fi
 CLEANUP_LIST+=("$imgdir")
 
-if [[ -n $UEFI_IMG ]]; then
-  args+=("--uefi=${UEFI_IMG}")
+if (( $UEFI )); then
+  args+=(--uefi)
 else
   KERNEL_IMAGE="$(fx-command-run list-build-artifacts --type kernel --name qemu-kernel images)"
   build_targets+=( "${KERNEL_IMAGE}" )
@@ -156,7 +155,7 @@ if [[ -n "${fvm_source}" ]]; then
   fvm_tool="$(fx-command-run host-tool --print fvm)"
   fvm_raw="${imgdir}/fvm_raw.blk"
   fx-fvm-extend-image "${fvm_tool}" "${FUCHSIA_BUILD_DIR}/${fvm_source}" "${fvm_raw}" "${IMAGE_SIZE}"
-  args+=(-d -D "${fvm_raw}" --diskfmt=raw)
+  args+=(-D "${fvm_raw}" --diskfmt=raw)
 fi
 
 if [[ -z "${PKG_TARGET}" ]]; then

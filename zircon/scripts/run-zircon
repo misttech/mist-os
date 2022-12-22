@@ -36,10 +36,14 @@ function HELP {
     echo "--debugger           : Enable gdb stub and wait for connection"
     echo "--gic=<version>      : use GIC 2, 3, or max supported. default is max"
     echo "--no-serial          : Disable writing out to the guest's serial port"
-    echo "--uefi=<image>       : Specify a UEFI filesystem or disk image, which entails booting"
-    echo "                       through UEFI. If -d is set, then this image will be placed in an"
-    echo "                       emulated disk of type --disktype; else, a USB drive. This option"
-    echo "                       is mutually exclusive with -t and -z."
+    echo "--uefi               : Boot QEMU through UEFI. With this setting, one of -t or -D must be"
+    echo "                       supplied: if -t is supplied, then that value is assumed to be a"
+    echo "                       UEFI executable; else, the value under -D is assumbed to be a "
+    echo "                       bootable, UEFI FAT filesystem or disk image. In the second case,"
+    echo "                       if --disktype is unset, the image is specified as the contents of"
+    echo "                       a USB disk drive. -z may be passed alongside -t to specify a"
+    echo "                       ramdisk that the UEFI boot application should in turn boot;"
+    echo "                       however, no UEFI such boot shims are yet supported."
     echo "--vnc=<display>      : use vnc based display"
     echo "--wavfile=<file>     : When audio host_drv == wav, output to the specified WAV file"
     echo "-h for help"
@@ -79,7 +83,6 @@ ARCH=
 AUDIO=
 AUDIO_WAVFILE="/tmp/qemu.wav"
 DEBUGGER=0
-DISK=0
 DISKFILE=
 DISKTYPE=
 DISKFMT="raw"
@@ -90,7 +93,7 @@ DO_KVM=
 MEMSIZE=$MEMSIZE_DEFAULT
 NET=0
 QEMUDIR=
-UEFI_IMG=
+UEFI=0
 UPSCRIPT=no
 VNC=
 VIRTIO=1
@@ -190,11 +193,10 @@ function append-disk-args {
     ARGS+="$extra_args"
 }
 
-while getopts "a:c:dD:gHI:km:nNq:s:t::u:Vz:h-:" FLAG; do
+while getopts "a:c:D:gHI:km:nNq:s:t::u:Vz:h-:" FLAG; do
     case $FLAG in
         a) ARCH=$OPTARG;;
         c) OPT_CMDLINE+="$OPTARG ";;
-        d) DISK=1;;
         D) DISKFILE="$(abspath "$OPTARG")";;
         g) GRAPHICS=1;;
         H)
@@ -261,7 +263,7 @@ while getopts "a:c:dD:gHI:km:nNq:s:t::u:Vz:h-:" FLAG; do
             hvf) DO_HVF=1;;
             no-virtio) VIRTIO=0;;
             virtio) VIRTIO=1;;
-            uefi=*) UEFI_IMG="$(abspath "${OPTARG#*=}")";;
+            uefi) UEFI=1;;
             *)
                 echo unrecognized long option "$OPTARG"
                 HELP
@@ -278,12 +280,39 @@ if [[ -z $ARCH ]]; then
     HELP
 fi
 
-if [[ -z $DISKTYPE ]]; then
-    if (( $VIRTIO )); then
-        DISKTYPE=virtio
-    else
-        DISKTYPE=ahci
+if [[ -z "$QEMU_KERNEL" ]]; then
+  if (( $UEFI )); then
+    if [[ -z "$DISKFILE" ]]; then
+        echo "with --uefi, one of -t or -D must be set"
+        HELP
     fi
+  else
+    echo "-t switch is mandatory if --uefi is unset"
+    HELP
+  fi
+
+  if [[ -n "$OPT_CMDLINE" ]]; then
+      echo "-c cannot be set without -t"
+      HELP
+  fi
+fi
+
+if (( $UEFI )) && [[ -z "$QEMU_KERNEL" ]]; then
+  readonly UEFI_DISK_BOOT=1
+else
+  readonly UEFI_DISK_BOOT=0
+fi
+
+# Fall back to disk type defaults if left unspecified with a provided emulated
+# disk file.
+if [[ -n "$DISKFILE" ]] && [[ -z "$DISKTYPE" ]]; then
+  if (( $UEFI_DISK_BOOT )); then
+    DISKTYPE="usb"
+  elif (( $VIRTIO )); then
+    DISKTYPE="virtio"
+  else
+    DISKTYPE="ahci"
+  fi
 fi
 
 # by default use the qemu binary located in the fuchsia //prebuilt
@@ -293,58 +322,43 @@ if [[ -z $QEMUDIR && -d "$DIR/../prebuilt/downloads/qemu/bin" ]]; then
     QEMUDIR="$DIR/../prebuilt/downloads/qemu/bin/"
 fi
 
-readonly EDK2DIR="$DIR/../../prebuilt/third_party/edk2/qemu-${ARCH}"
-case $ARCH in
-  x64)
-  readonly UEFI_FIRMWARE="${EDK2DIR}/OVMF.fd"
-  readonly UEFI_VARS="${EDK2DIR}/OVMF_VARS.fd"
-  ;;
-  arm64)
-  readonly UEFI_FIRMWARE="${EDK2DIR}/QEMU_EFI.fd"
-  readonly UEFI_VARS="${EDK2DIR}/QEMU_VARS.fd"
-  ;;
-esac
-
-if [[ -n "$UEFI_IMG" ]]; then
-  if [[ -n "$QEMU_INITRD" ]]; then
-      echo "-z and --uefi are mutually exclusive"
-      HELP
-  fi
-
-  if [[ -n "$QEMU_KERNEL" ]]; then
-      echo "-t and --uefi are mutually exclusive"
-      HELP
-  fi
-
-  if [[ -n "$OPT_CMDLINE" ]]; then
-      echo "-c and --uefi are mutually exclusive"
-      HELP
-  fi
+if (( $UEFI )); then
+  readonly EDK2DIR="$DIR/../../prebuilt/third_party/edk2/qemu-${ARCH}"
+  case $ARCH in
+    x64)
+    readonly UEFI_FIRMWARE="${EDK2DIR}/OVMF_CODE.fd"
+    readonly UEFI_VARS="${EDK2DIR}/OVMF_VARS.fd"
+    ;;
+    arm64)
+    readonly UEFI_FIRMWARE="${EDK2DIR}/QEMU_EFI.fd"
+    readonly UEFI_VARS="${EDK2DIR}/QEMU_VARS.fd"
+    ;;
+  esac
 
   ARGS+=" -drive if=pflash,format=raw,readonly=on,file=${UEFI_FIRMWARE}"
   # The UEFI variable store. Without 'snapshot=true' this file would need to be
   # writable and state would persist across invocations; with it, the image
   # will be copy-on-write and state should persist across reboots.
   ARGS+=" -drive if=pflash,format=raw,snapshot=true,file=${UEFI_VARS}"
+fi
 
-  # `bootindex=0` ensures that this is the highest priority boot option.
-  if (( $DISK )); then
-      readonly UEFI_MEDIA_TYPE="${DISKTYPE}"
-  else
-      readonly UEFI_MEDIA_TYPE="usb"
-  fi
-  append-disk-args "${UEFI_MEDIA_TYPE}" "${UEFI_IMG}" raw uefi ",bootindex=0"
-else
-  if [[ -z "$QEMU_INITRD" ]]; then
-      echo "-z switch is mandatory if --uefi is unset"
-      HELP
-  fi
+if [[ -n "$QEMU_KERNEL" ]]; then
+  ARGS+=" -kernel $QEMU_KERNEL"
+fi
 
-  if [[ -z "$QEMU_KERNEL" ]]; then
-      echo "-t switch is mandatory if --uefi is unset"
-      HELP
+if [[ -n "$QEMU_INITRD" ]]; then
+  ARGS+=" -initrd $QEMU_INITRD"
+fi
+
+if [[ -n $DISKFILE ]]; then
+  NAME="mydisk"
+  EXTRA_ARGS=""
+  if (( $UEFI_DISK_BOOT )); then
+    NAME="uefi"
+    # `bootindex=0` ensures that this is the highest priority boot option.
+    EXTRA_ARGS=",bootindex=0"
   fi
-  ARGS+="-kernel $QEMU_KERNEL -initrd $QEMU_INITRD"
+  append-disk-args "${DISKTYPE}" "${DISKFILE}" "${DISKFMT}" "${NAME}"
 fi
 
 # construct the args for qemu
@@ -369,11 +383,6 @@ else
         ARGS+=" -device virtio-gpu-pci"
     fi
 fi
-
-if (( $DISK )) && [[ ! -z $DISKFILE ]]; then
-  append-disk-args "${DISKTYPE}" "${DISKFILE}" "${DISKFMT}" mydisk
-fi
-
 
 for ahcifile in ${AHCI[@]}; do
     ARGS+=" -drive file=${ahcifile},format=raw,if=none,id=ahcidisk${AHCI_NUM}"
@@ -560,9 +569,9 @@ set -x
 
 # TODO(joshuaseaton): this and other command-line building logic above can be
 # tidied up in having $ARGS be an array.
-if [[ -z $UEFI_IMG ]]; then
-    echo CMDLINE: $CMDLINE
-    exec $QEMU $ARGS -append "$CMDLINE" "$@"
-else
+if (( $UEFI_DISK_BOOT )); then
     exec $QEMU $ARGS "$@"
+else
+    echo "CMDLINE: $CMDLINE"
+    exec $QEMU $ARGS -append "$CMDLINE" "$@"
 fi
