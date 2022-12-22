@@ -11,6 +11,9 @@
 
 #include <ngunwind/fuchsia.h>
 #include <ngunwind/libunwind.h>
+#include <unwindstack/Unwinder.h>
+#include <unwindstack/fuchsia/MemoryFuchsia.h>
+#include <unwindstack/fuchsia/RegsFuchsia.h>
 
 #include "src/developer/debug/debug_agent/arch.h"
 #include "src/developer/debug/debug_agent/general_registers.h"
@@ -18,9 +21,6 @@
 #include "src/developer/debug/debug_agent/process_handle.h"
 #include "src/developer/debug/debug_agent/thread_handle.h"
 #include "src/developer/debug/ipc/unwinder_support.h"
-#include "src/developer/debug/third_party/libunwindstack/fuchsia/MemoryFuchsia.h"
-#include "src/developer/debug/third_party/libunwindstack/fuchsia/RegsFuchsia.h"
-#include "src/developer/debug/third_party/libunwindstack/include/unwindstack/Unwinder.h"
 #include "src/developer/debug/unwinder/fuchsia.h"
 #include "src/developer/debug/unwinder/unwind.h"
 

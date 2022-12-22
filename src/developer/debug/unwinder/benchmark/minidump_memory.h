@@ -8,7 +8,8 @@
 #include <cstdint>
 #include <memory>
 
-#include "src/developer/debug/third_party/libunwindstack/include/unwindstack/Memory.h"
+#include <unwindstack/Memory.h>
+
 #include "src/developer/debug/unwinder/memory.h"
 #include "third_party/crashpad/snapshot/minidump/process_snapshot_minidump.h"
 

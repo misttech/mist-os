@@ -25,6 +25,7 @@ sdk_source_set("shared") {
     "largest_less_or_equal.h",
     "message_loop.cc",
     "message_loop.h",
+    "platform_message_loop.h",
     "regex.cc",
     "regex.h",
     "register_id.h",

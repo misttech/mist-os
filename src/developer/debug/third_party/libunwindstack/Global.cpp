@@ -26,7 +26,7 @@
 #include <unwindstack/Memory.h>
 
 #ifdef FUCHSIA
-#include "src/developer/debug/third_party/libunwindstack/fuchsia/fuchsia_basename.h"
+#include <unwindstack/fuchsia/fuchsia_basename.h>
 #endif
 
 namespace unwindstack {

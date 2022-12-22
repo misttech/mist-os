@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/debug/third_party/libunwindstack/fuchsia/RegsFuchsia.h"
-
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/debug.h>
 
 #include "unwindstack/Elf.h"
 #include "unwindstack/MachineX86_64.h"
 #include "unwindstack/Memory.h"
+#include "unwindstack/fuchsia/RegsFuchsia.h"
 
 namespace unwindstack {
 
@@ -20,8 +19,7 @@ constexpr uint16_t kUnwindStackRegCount = X86_64_REG_LAST;
 }  // namespace
 
 RegsFuchsia::RegsFuchsia()
-    : RegsImpl<uint64_t>(kUnwindStackRegCount,
-                         Location(LOCATION_SP_OFFSET, -8)) {}
+    : RegsImpl<uint64_t>(kUnwindStackRegCount, Location(LOCATION_SP_OFFSET, -8)) {}
 
 RegsFuchsia::~RegsFuchsia() = default;
 
@@ -51,8 +49,8 @@ void RegsFuchsia::Set(const zx_thread_state_general_regs& input) {
 
 zx_status_t RegsFuchsia::Read(zx_handle_t thread) {
   zx_thread_state_general_regs thread_regs;
-  zx_status_t status = zx_thread_read_state(
-      thread, ZX_THREAD_STATE_GENERAL_REGS, &thread_regs, sizeof(thread_regs));
+  zx_status_t status =
+      zx_thread_read_state(thread, ZX_THREAD_STATE_GENERAL_REGS, &thread_regs, sizeof(thread_regs));
   if (status != ZX_OK)
     return status;
   Set(thread_regs);
@@ -69,8 +67,7 @@ uint64_t RegsFuchsia::GetPcAdjustment(uint64_t rel_pc, Elf* elf) {
 bool RegsFuchsia::SetPcFromReturnAddress(Memory* process_memory) {
   // Attempt to get the return address from the top of the stack.
   uint64_t new_pc;
-  if (!process_memory->ReadFully(regs_[X86_64_REG_SP], &new_pc,
-                                 sizeof(new_pc)) ||
+  if (!process_memory->ReadFully(regs_[X86_64_REG_SP], &new_pc, sizeof(new_pc)) ||
       new_pc == regs_[X86_64_REG_PC]) {
     return false;
   }
@@ -79,14 +76,12 @@ bool RegsFuchsia::SetPcFromReturnAddress(Memory* process_memory) {
   return true;
 }
 
-bool RegsFuchsia::StepIfSignalHandler(uint64_t rel_pc, Elf* elf,
-                                      Memory* process_memory) {
+bool RegsFuchsia::StepIfSignalHandler(uint64_t rel_pc, Elf* elf, Memory* process_memory) {
   // TODO(brettw) Figure out if we need to implement this.
   return false;
 }
 
-void RegsFuchsia::IterateRegisters(
-    std::function<void(const char*, uint64_t)> fn) {
+void RegsFuchsia::IterateRegisters(std::function<void(const char*, uint64_t)> fn) {
   fn("rax", regs_[X86_64_REG_RAX]);
   fn("rbx", regs_[X86_64_REG_RBX]);
   fn("rcx", regs_[X86_64_REG_RCX]);

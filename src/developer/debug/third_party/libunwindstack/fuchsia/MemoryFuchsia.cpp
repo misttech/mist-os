@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/debug/third_party/libunwindstack/fuchsia/MemoryFuchsia.h"
+#include "unwindstack/fuchsia/MemoryFuchsia.h"
 
 #include <errno.h>
 #include <zircon/syscalls.h>
@@ -13,8 +13,7 @@ MemoryFuchsia::MemoryFuchsia(zx_handle_t process) : process_(process) {}
 
 size_t MemoryFuchsia::Read(uint64_t addr, void* dst, size_t size) {
   size_t actual = 0;
-  zx_status_t status =
-      zx_process_read_memory(process_, addr, dst, size, &actual);
+  zx_status_t status = zx_process_read_memory(process_, addr, dst, size, &actual);
   if (status != ZX_OK) {
     // Calling code expects errno to be set on failure.
     errno = EFAULT;
@@ -56,8 +55,8 @@ bool Memory::ReadString(uint64_t addr, std::string* string, uint64_t max_read) {
   return false;
 }
 
-MemoryRange::MemoryRange(const std::shared_ptr<Memory>& memory, uint64_t begin,
-                         uint64_t length, uint64_t offset)
+MemoryRange::MemoryRange(const std::shared_ptr<Memory>& memory, uint64_t begin, uint64_t length,
+                         uint64_t offset)
     : memory_(memory), begin_(begin), length_(length), offset_(offset) {}
 
 size_t MemoryRange::Read(uint64_t addr, void* dst, size_t size) {
@@ -70,8 +69,7 @@ size_t MemoryRange::Read(uint64_t addr, void* dst, size_t size) {
     return 0;
   }
 
-  uint64_t read_length =
-      std::min(static_cast<uint64_t>(size), length_ - read_offset);
+  uint64_t read_length = std::min(static_cast<uint64_t>(size), length_ - read_offset);
   uint64_t read_addr;
   if (__builtin_add_overflow(read_offset, begin_, &read_addr)) {
     return 0;

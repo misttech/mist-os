@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/debug/third_party/libunwindstack/fuchsia/RegsFuchsia.h"
-
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/debug.h>
 
@@ -11,6 +9,7 @@
 #include "unwindstack/MachineArm64.h"
 #include "unwindstack/MachineX86_64.h"
 #include "unwindstack/Memory.h"
+#include "unwindstack/fuchsia/RegsFuchsia.h"
 
 namespace unwindstack {
 
@@ -21,8 +20,7 @@ constexpr uint16_t kUnwindStackRegCount = ARM64_REG_LAST;
 }  // namespace
 
 RegsFuchsia::RegsFuchsia()
-    : RegsImpl<uint64_t>(kUnwindStackRegCount,
-                         Location(LOCATION_SP_OFFSET, -8)) {}
+    : RegsImpl<uint64_t>(kUnwindStackRegCount, Location(LOCATION_SP_OFFSET, -8)) {}
 
 RegsFuchsia::~RegsFuchsia() = default;
 
@@ -68,8 +66,8 @@ void RegsFuchsia::Set(const zx_thread_state_general_regs& input) {
 
 zx_status_t RegsFuchsia::Read(zx_handle_t thread) {
   zx_thread_state_general_regs thread_regs;
-  zx_status_t status = zx_thread_read_state(
-      thread, ZX_THREAD_STATE_GENERAL_REGS, &thread_regs, sizeof(thread_regs));
+  zx_status_t status =
+      zx_thread_read_state(thread, ZX_THREAD_STATE_GENERAL_REGS, &thread_regs, sizeof(thread_regs));
   if (status != ZX_OK)
     return status;
 
@@ -94,14 +92,12 @@ bool RegsFuchsia::SetPcFromReturnAddress(Memory* process_memory) {
   return true;
 }
 
-bool RegsFuchsia::StepIfSignalHandler(uint64_t rel_pc, Elf* elf,
-                                      Memory* process_memory) {
+bool RegsFuchsia::StepIfSignalHandler(uint64_t rel_pc, Elf* elf, Memory* process_memory) {
   // TODO(brettw) Figure out if we need to implement this.
   return false;
 }
 
-void RegsFuchsia::IterateRegisters(
-    std::function<void(const char*, uint64_t)> fn) {
+void RegsFuchsia::IterateRegisters(std::function<void(const char*, uint64_t)> fn) {
   if (IsDefined(ARM64_REG_R0))
     fn("x0", regs_[ARM64_REG_R0]);
   if (IsDefined(ARM64_REG_R1))

@@ -25,7 +25,6 @@
 #include <algorithm>
 
 #include <android-base/stringprintf.h>
-
 #include <unwindstack/Elf.h>
 #include <unwindstack/JitDebug.h>
 #include <unwindstack/MapInfo.h>
@@ -37,7 +36,7 @@
 #endif
 
 #ifdef FUCHSIA
-#include "src/developer/debug/third_party/libunwindstack/fuchsia/fuchsia_basename.h"
+#include <unwindstack/fuchsia/fuchsia_basename.h>
 #endif
 
 namespace unwindstack {

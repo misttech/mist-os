@@ -4,11 +4,12 @@
 
 #include "src/developer/debug/unwinder/benchmark/libunwindstack.h"
 
+#include <unwindstack/UcontextArm64.h>
+#include <unwindstack/UcontextX86_64.h>
+#include <unwindstack/Unwinder.h>
+
 #include "lib/syslog/cpp/macros.h"
 #include "snapshot/thread_snapshot.h"
-#include "src/developer/debug/third_party/libunwindstack/include/unwindstack/UcontextArm64.h"
-#include "src/developer/debug/third_party/libunwindstack/include/unwindstack/UcontextX86_64.h"
-#include "src/developer/debug/third_party/libunwindstack/include/unwindstack/Unwinder.h"
 
 namespace benchmark {
 
