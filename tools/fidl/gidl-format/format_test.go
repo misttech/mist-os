@@ -213,6 +213,58 @@ encode_success("EncodeHandleTypeAndRightsComeFromFIDL") {
 }
 `,
 	},
+
+	{
+		input: `
+encode_failure("foo") {
+    value = MyStruct {
+        u: decode ( {
+    type = MyUnion,
+        bytes = {v1 = [] }
+        	} )
+    },
+    err = SOME_ERROR,
+}
+`,
+		output: `
+encode_failure("foo") {
+    value = MyStruct{
+        u: decode({
+            type = MyUnion,
+            bytes = {v1 = []},
+        }),
+    },
+    err = SOME_ERROR,
+}
+`,
+	},
+
+	{
+		input: `
+encode_failure("foo") {
+    value = MyStruct {
+        u: decode ( {
+    type = MyUnion,
+        bytes = {v1 = [] }
+        	}
+	)
+    },
+    err = SOME_ERROR,
+}
+`,
+		output: `
+encode_failure("foo") {
+    value = MyStruct{
+        u: decode({
+            type = MyUnion,
+            bytes = {v1 = []},
+        },
+        ),
+    },
+    err = SOME_ERROR,
+}
+`,
+	},
 }
 
 func TestFormat(t *testing.T) {

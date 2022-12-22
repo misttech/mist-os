@@ -1812,13 +1812,13 @@ success("Sandwich9Case1") {
         before: 0x0201,
         the_union: UnionWithVectorOfVectors{
             v: [[
-                    StructSize3Align1{
-                        three_bytes: [0x10, 0x11, 0x12],
-                    },
-                    StructSize3Align1{
-                        three_bytes: [0x13, 0x14, 0x15],
-                    },
-                ]],
+                StructSize3Align1{
+                    three_bytes: [0x10, 0x11, 0x12],
+                },
+                StructSize3Align1{
+                    three_bytes: [0x13, 0x14, 0x15],
+                },
+            ]],
         },
         after: 0x1211,
     },

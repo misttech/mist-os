@@ -21,8 +21,24 @@ type formatter struct {
 	scanner.Scanner
 	enabled bool
 	err     error
-	// Stack of open brackets that have not yet been closed.
-	brackets []rune
+
+	// Stack of open brackets that have not yet been closed, grouped by line.
+	// Here is an example of how it changes while processing "(\n\n[()\n])":
+	//
+	//     Char  Stack                    Note
+	//     ----  -----------------------  --------------------------------------
+	//           {{}}                     Start with a single empty group
+	//     '('   {{ '(' }}                Push open bracket onto last group
+	//     '\n'  {{ '(' }, {}}            On newline, start a new group
+	//     '\n'  {{ '(' }, {}}            ... unless the last is already empty
+	//     '['   {{ '(' }, { '[' }}
+	//     '('   {{ '(' }, { '[', '(' }}  Push again onto the same group
+	//     ')'   {{ '(' }, { '[' }}       On close bracket, pop the open bracket
+	//     '\n'  {{ '(' }, { '[' }, {}}
+	//     ']'   {{ '(' }, {}}            ... pop empty group first if present
+	//     ')'   {{}}
+	//
+	brackets [][]rune
 }
 
 // format formats GIDL syntax from src to dst.
@@ -36,6 +52,7 @@ func format(dst io.StringWriter, src io.Reader, filename string) error {
 	f.Error = func(s *scanner.Scanner, msg string) {
 		f.fail(msg)
 	}
+	f.brackets = [][]rune{nil}
 	f.enable()
 	f.write(dst)
 	return f.err
@@ -114,13 +131,7 @@ func (f *formatter) write(dst io.StringWriter) {
 		}
 		// Add whitespace before the token.
 		if prev == 0 || wroteNewline {
-			depth := len(f.brackets)
-			// At the start of a line, a close bracket should dedent itself, but
-			// an open bracket should not indent itself.
-			if isOpenBracket(tok) {
-				depth--
-			}
-			dst.WriteString(strings.Repeat(" ", indentWidth*depth))
+			dst.WriteString(strings.Repeat(" ", (len(f.brackets)-1)*indentWidth))
 		} else if needSpaceBetween(prev, tok, enclosingBracket) {
 			dst.WriteString(" ")
 		}
@@ -134,27 +145,46 @@ func (f *formatter) write(dst io.StringWriter) {
 	}
 }
 
+func (f *formatter) hasEmptyBrackets() bool {
+	return len(f.brackets[len(f.brackets)-1]) == 0
+}
+
 func (f *formatter) innermostBracket() rune {
-	if len(f.brackets) == 0 {
-		return 0
+	var group []rune
+	if f.hasEmptyBrackets() {
+		if len(f.brackets) == 1 {
+			// No innermost bracket exists.
+			return 0
+		}
+		group = f.brackets[len(f.brackets)-2]
+	} else {
+		group = f.brackets[len(f.brackets)-1]
 	}
-	return f.brackets[len(f.brackets)-1]
+	return group[len(group)-1]
 }
 
 func (f *formatter) updateBrackets(tok rune) bool {
-	if isOpenBracket(tok) {
-		f.brackets = append(f.brackets, tok)
+	if tok == '\n' {
+		if !f.hasEmptyBrackets() {
+			f.brackets = append(f.brackets, nil)
+		}
+	} else if isOpenBracket(tok) {
+		f.brackets[len(f.brackets)-1] = append(f.brackets[len(f.brackets)-1], tok)
 	} else if isCloseBracket(tok) {
+		if f.hasEmptyBrackets() {
+			f.brackets = f.brackets[:len(f.brackets)-1]
+		}
 		if len(f.brackets) == 0 {
 			f.fail("extraenous closing bracket '%c'", tok)
 			return false
 		}
-		var open rune
-		open, f.brackets = f.brackets[len(f.brackets)-1], f.brackets[:len(f.brackets)-1]
-		if tok != closeBracket(open) {
-			f.fail("mismatched closing bracket '%c' (expected '%c')", tok, closeBracket(open))
+		group := f.brackets[len(f.brackets)-1]
+		expected := closeBracket(group[len(group)-1])
+		if tok != expected {
+			f.fail("mismatched closing bracket '%c' (expected '%c')", tok, expected)
 			return false
 		}
+		f.brackets[len(f.brackets)-1] = group[:len(group)-1]
 	}
 	return true
 }
