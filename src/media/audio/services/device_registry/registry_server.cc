@@ -20,6 +20,7 @@
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/logging.h"
+#include "src/media/audio/services/device_registry/observer_server.h"
 
 namespace media_audio {
 
@@ -195,7 +196,8 @@ void RegistryServer::CreateObserver(CreateObserverRequest& request,
 
   // TODO(fxbug.dev/117199): Decide when we proactively call GetHealthState, if at all.
 
-  // (next CL) use observer_server and matching_device to create an Observer protocol server.
+  auto observer =
+      parent_->CreateObserverServer(std::move(*request.observer_server()), matching_device);
 
   completer.Reply(fit::success(fuchsia_audio_device::RegistryCreateObserverResponse{}));
 }

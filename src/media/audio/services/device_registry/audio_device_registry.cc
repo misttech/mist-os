@@ -19,6 +19,7 @@
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/device_detector.h"
 #include "src/media/audio/services/device_registry/logging.h"
+#include "src/media/audio/services/device_registry/observer_server.h"
 #include "src/media/audio/services/device_registry/provider_server.h"
 #include "src/media/audio/services/device_registry/registry_server.h"
 
@@ -245,6 +246,16 @@ std::shared_ptr<ControlCreatorServer> AudioDeviceRegistry::CreateControlCreatorS
   ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods || kLogControlCreatorServerMethods);
 
   return ControlCreatorServer::Create(thread_, std::move(server_end), shared_from_this());
+}
+
+std::shared_ptr<ObserverServer> AudioDeviceRegistry::CreateObserverServer(
+    fidl::ServerEnd<fuchsia_audio_device::Observer> server_end,
+    std::shared_ptr<Device> observed_device) {
+  ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods || kLogObserverServerMethods);
+
+  auto observer = ObserverServer::Create(thread_, std::move(server_end), observed_device);
+  observed_device->AddObserver(observer);
+  return observer;
 }
 
 }  // namespace media_audio

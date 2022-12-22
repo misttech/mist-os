@@ -27,9 +27,11 @@
 #include <unordered_set>
 
 #include "src/media/audio/lib/clock/clock.h"
+#include "src/media/audio/services/common/vector_of_weak_ptr.h"
 #include "src/media/audio/services/device_registry/basic_types.h"
 #include "src/media/audio/services/device_registry/device_presence_watcher.h"
 #include "src/media/audio/services/device_registry/logging.h"
+#include "src/media/audio/services/device_registry/observer_notify.h"
 
 namespace media_audio {
 
@@ -49,8 +51,11 @@ class Device : public std::enable_shared_from_this<Device>,
   // `info` is only populated once the device is initialized.
   const std::optional<fuchsia_audio_device::Info>& info() const { return device_info_; }
   zx::result<zx::clock> GetReadOnlyClock() const;
+  bool AddObserver(std::shared_ptr<ObserverNotify> observer_to_add);
 
   void Initialize();
+
+  void ForEachObserver(fit::function<void(std::shared_ptr<ObserverNotify>)> action);
 
   bool SetControl();
   bool DropControl();
@@ -244,6 +249,9 @@ class Device : public std::enable_shared_from_this<Device>,
   std::shared_ptr<Clock> device_clock_;
   std::vector<fuchsia_audio_device::PcmFormatSet> permitted_formats_;
 
+  // Members related to being observed.
+  VectorOfWeakPtr<ObserverNotify> observers_;
+
   // Members related to being controlled.
   // This will be replaced by a std::weak_ptr<ControlNotify> subsequent CL.
   bool is_controlled_ = false;
@@ -255,7 +263,7 @@ class Device : public std::enable_shared_from_this<Device>,
   fit::callback<void(RingBufferInfo)> create_ring_buffer_callback_;
   // TODO(fxbug.dev/117829): Consider using media_audio::Format internally.
   fuchsia_audio::Format vmo_format_;
-  zx::vmo ring_buffer_vmo_;  // Temporary, until moved to the caller. Will be eliminated.
+  zx::vmo ring_buffer_vmo_;
 
   // TODO(fxbug.dev/117828): consider using an optional<struct> to minimize separate optionals.
   std::optional<fuchsia_hardware_audio::RingBufferProperties> ring_buffer_properties_;

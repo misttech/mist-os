@@ -12,7 +12,7 @@ namespace media_audio {
 
 class DeviceWarningTest : public DeviceTestBase {};
 
-// Test cases for non-compliant drivers? (e.g. min_gain_db > max_gain_db)
+// TODO(fxbug.dev/117826): test behavior with non-compliant drivers (e.g. min_gain > max_gain).
 
 TEST_F(DeviceWarningTest, DeviceUnhealthy) {
   fake_driver_->set_health_state(false);
@@ -111,8 +111,24 @@ TEST_F(DeviceWarningTest, NoMatchForSupportedDriverFormatForClientFormat) {
   ExpectNoFormatMatch(device_, fuchsia_audio::SampleType::kFloat64, 2, 48000);
 }
 
-// TODO: CreateRingBufferConnection with bad format.
+TEST_F(DeviceWarningTest, CannotAddSameObserverTwice) {
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+  ASSERT_TRUE(AddObserver(device_));
 
-// TODO: RetrieveVmo size too large; min_frames too large
+  EXPECT_FALSE(AddObserver(device_));
+}
+
+TEST_F(DeviceWarningTest, CannotObserveUnhealthyDevice) {
+  fake_driver_->set_health_state(false);
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(HasError(device_));
+
+  EXPECT_FALSE(AddObserver(device_));
+}
+
+// TODO(fxbug.dev/117826): CreateRingBuffer with bad format.
+
+// TODO(fxbug.dev/117826): GetVmo size too large; min_frames too large
 
 }  // namespace media_audio

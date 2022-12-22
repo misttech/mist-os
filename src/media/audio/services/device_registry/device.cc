@@ -26,6 +26,7 @@
 #include "src/media/audio/lib/clock/real_clock.h"
 #include "src/media/audio/services/device_registry/device_presence_watcher.h"
 #include "src/media/audio/services/device_registry/logging.h"
+#include "src/media/audio/services/device_registry/observer_notify.h"
 #include "src/media/audio/services/device_registry/validate.h"
 
 namespace media_audio {
@@ -115,15 +116,14 @@ void Device::RingBufferErrorHandler::on_fidl_error(fidl::UnbindInfo error) {
   ADR_LOG_OBJECT(kLogRingBufferFidlResponses || kLogDeviceState) << "(RingBuffer)";
 
   if (device_->state_ == State::Error) {
-    FX_LOGS(WARNING) << __func__ << ": device already has an error; no device state to unwind";
-    ADR_LOG_OBJECT(kLogRingBufferFidlResponses);
+    ADR_WARN_OBJECT() << "device already has an error; no device state to unwind";
     return;
   }
 
   // If driver encountered a significant error, then move the entire Device to Error state.
   // Consider eliminating 'is_dispatcher_shutdown' here.
   if (!error.is_peer_closed() && !error.is_dispatcher_shutdown() && !error.is_user_initiated()) {
-    ADR_WARN_OBJECT() << "RingBuffer disconnected" << error.FormatDescription();
+    ADR_WARN_OBJECT() << "RingBuffer disconnected: " << error.FormatDescription();
     device_->OnError(error.status());
   } else {
     ADR_LOG_OBJECT(kLogRingBufferFidlResponses)
@@ -140,16 +140,25 @@ void Device::OnRemoval() {
   } else if (state_ != State::DeviceInitializing) {
     --Device::initialized_count_;
 
-    // Notify clients so they can unwind.
     DeviceDroppedRingBuffer();
     // In next CL, we will notify ControlNotify of DeviceIsRemoved as well.
     DropControl();  // Probably unneeded (Device is going away) but makes unwind "complete".
+    ForEachObserver([](auto obs) { obs->DeviceIsRemoved(); });
   }
   LogObjectCounts();
 
   // Regardless of whether device was pending / operational / unhealthy, notify the state watcher.
   if (std::shared_ptr<DevicePresenceWatcher> pw = presence_watcher_.lock()) {
     pw->DeviceIsRemoved(shared_from_this());
+  }
+}
+
+void Device::ForEachObserver(fit::function<void(std::shared_ptr<ObserverNotify>)> action) {
+  ADR_LOG_OBJECT(kLogNotifyMethods);
+  for (auto weak_it = observers_.begin(); weak_it < observers_.end(); ++weak_it) {
+    if (auto observer = weak_it->lock()) {
+      action(observer);
+    }
   }
 }
 
@@ -166,9 +175,9 @@ void Device::OnError(zx_status_t error) {
   if (state_ != State::DeviceInitializing) {
     --Device::initialized_count_;
 
-    // Notify clients so they can unwind.
     DeviceDroppedRingBuffer();
     DropControl();
+    ForEachObserver([](auto obs) { obs->DeviceHasError(); });
   }
   ++Device::unhealthy_count_;
   SetError(error);
@@ -212,7 +221,7 @@ void Device::OnInitializationResponse() {
 }
 
 bool Device::SetControl() {
-  ADR_LOG_OBJECT(kLogDeviceState);
+  ADR_LOG_OBJECT(kLogDeviceState || kLogNotifyMethods);
   FX_CHECK(state_ != State::DeviceInitializing);
 
   if (state_ == State::Error) {
@@ -241,15 +250,48 @@ bool Device::SetControl() {
 }
 
 bool Device::DropControl() {
-  ADR_LOG_OBJECT(kLogDeviceMethods);
+  ADR_LOG_OBJECT(kLogDeviceMethods || kLogNotifyMethods);
   FX_CHECK(state_ != State::DeviceInitializing);
 
   if (!is_controlled_) {
-    ADR_LOG_OBJECT(kLogDeviceMethods) << "already not controlled";
+    ADR_LOG_OBJECT(kLogNotifyMethods) << "already not controlled";
     return false;
   }
 
   is_controlled_ = false;
+  LogObjectCounts();
+
+  SetState(State::DeviceInitialized);
+  return true;
+}
+
+bool Device::AddObserver(std::shared_ptr<ObserverNotify> observer_to_add) {
+  ADR_LOG_OBJECT(kLogDeviceMethods || kLogNotifyMethods) << " (" << observer_to_add << ")";
+
+  FX_CHECK(state_ != State::DeviceInitializing);
+
+  if (state_ == State::Error) {
+    FX_LOGS(WARNING) << "Device(" << this << ")::" << __func__ << ": unhealthy, cannot be observed";
+    return false;
+  }
+  for (auto weak_it = observers_.begin(); weak_it < observers_.end(); ++weak_it) {
+    if (auto observer = weak_it->lock()) {
+      if (observer == observer_to_add) {
+        FX_LOGS(WARNING) << "Device(" << this << ")::AddObserver: observer cannot be re-added";
+        return false;
+      }
+    }
+  }
+  observers_.push_back(observer_to_add);
+
+  observer_to_add->GainStateChanged({{.gain_db = *gain_state_->gain_db(),
+                                      .muted = gain_state_->muted().value_or(false),
+                                      .agc_enabled = gain_state_->agc_enabled().value_or(false)}});
+  observer_to_add->PlugStateChanged(*plug_state_->plugged()
+                                        ? fuchsia_audio_device::PlugState::kPlugged
+                                        : fuchsia_audio_device::PlugState::kUnplugged,
+                                    zx::time(*plug_state_->plug_state_time()));
+
   LogObjectCounts();
 
   SetState(State::DeviceInitialized);
@@ -451,7 +493,13 @@ void Device::RetrieveGainState() {
           OnInitializationResponse();
         } else {
           ADR_LOG_CLASS(kLogStreamConfigFidlResponses) << "WatchGainState received update";
-          // In next CL, we will notify Observers here.
+          ForEachObserver([gain_state = *gain_state_](auto obs) {
+            obs->GainStateChanged({{
+                .gain_db = *gain_state.gain_db(),
+                .muted = gain_state.muted().value_or(false),
+                .agc_enabled = gain_state.agc_enabled().value_or(false),
+            }});
+          });
         }
         // Kick off the next watch.
         RetrieveGainState();
@@ -489,7 +537,12 @@ void Device::RetrievePlugState() {
           OnInitializationResponse();
         } else {
           ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchPlugState received update";
-          // In next CL, we will notify Observers here.
+          ForEachObserver([plug_state = *plug_state_](auto obs) {
+            obs->PlugStateChanged(plug_state.plugged().value_or(true)
+                                      ? fuchsia_audio_device::PlugState::kPlugged
+                                      : fuchsia_audio_device::PlugState::kUnplugged,
+                                  zx::time(*plug_state.plug_state_time()));
+          });
         }
         // Kick off the next watch.
         RetrievePlugState();

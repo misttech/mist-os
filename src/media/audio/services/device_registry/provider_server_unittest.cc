@@ -25,6 +25,24 @@ class ProviderServerTest : public AudioDeviceRegistryServerTestBase {
   }
 };
 
+TEST_F(ProviderServerTest, CleanClientDrop) {
+  auto provider_wrapper = CreateProviderServer();
+  EXPECT_EQ(ProviderServer::count(), 1u);
+
+  provider_wrapper->client() = fidl::Client<fuchsia_audio_device::Provider>();
+  RunLoopUntilIdle();
+  EXPECT_TRUE(provider_wrapper->server().WaitForShutdown(zx::sec(1)));
+}
+
+TEST_F(ProviderServerTest, CleanServerShutdown) {
+  auto provider_wrapper = CreateProviderServer();
+  EXPECT_EQ(ProviderServer::count(), 1u);
+
+  provider_wrapper->server().Shutdown();
+  RunLoopUntilIdle();
+  EXPECT_TRUE(provider_wrapper->server().WaitForShutdown(zx::sec(1)));
+}
+
 TEST_F(ProviderServerTest, AddDeviceThatOutlivesProvider) {
   auto provider_wrapper = CreateProviderServer();
   EXPECT_EQ(ProviderServer::count(), 1u);

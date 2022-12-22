@@ -24,6 +24,7 @@
 namespace media_audio {
 
 class ControlCreatorServer;
+class ObserverServer;
 class ProviderServer;
 class RegistryServer;
 
@@ -72,6 +73,11 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
   // ControlCreator support
   std::shared_ptr<ControlCreatorServer> CreateControlCreatorServer(
       fidl::ServerEnd<fuchsia_audio_device::ControlCreator> server_end);
+
+  // Observer support
+  std::shared_ptr<ObserverServer> CreateObserverServer(
+      fidl::ServerEnd<fuchsia_audio_device::Observer> server_end,
+      std::shared_ptr<Device> observed_device);
 
  private:
   static inline const std::string_view kClassName = "AudioDeviceRegistry";

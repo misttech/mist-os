@@ -49,6 +49,7 @@ executable("device_registry_unittests_bin") {
     "control_creator_server_unittest.cc",
     "device_detector_unittest.cc",
     "device_unittest.cc",
+    "observer_server_unittest.cc",
     "provider_server_unittest.cc",
     "registry_server_unittest.cc",
   ]
@@ -67,6 +68,7 @@ executable("device_registry_warning_unittests_bin") {
     "audio_device_registry_warning_unittest.cc",
     "control_creator_server_warning_unittest.cc",
     "device_warning_unittest.cc",
+    "observer_server_warning_unittest.cc",
     "provider_server_warning_unittest.cc",
     "registry_server_warning_unittest.cc",
   ]
@@ -89,6 +91,9 @@ source_set("device_registry_lib") {
     "device_presence_watcher.h",
     "logging.cc",
     "logging.h",
+    "observer_notify.h",
+    "observer_server.cc",
+    "observer_server.h",
     "provider_server.cc",
     "provider_server.h",
     "registry_server.cc",

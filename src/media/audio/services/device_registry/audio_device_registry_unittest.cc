@@ -27,4 +27,21 @@ TEST_F(AudioDeviceRegistryTest, DeviceInitialization) {
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 }
 
+// TODO(fxbug.dev/117826): StreamConfigDisconnect test, after added and healthy
+
+TEST_F(AudioDeviceRegistryTest, FindDeviceByTokenId) {
+  auto fake_driver = CreateFakeDriver();
+  auto stream_config_client =
+      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
+  AddDeviceForDetection("test output", fuchsia_audio_device::DeviceType::kOutput,
+                        std::move(stream_config_client));
+
+  RunLoopUntilIdle();
+  EXPECT_EQ(adr_service_->devices().size(), 1u);
+  auto token_id = adr_service_->devices().begin()->get()->token_id();
+
+  EXPECT_EQ(adr_service_->FindDeviceByTokenId(token_id).first,
+            AudioDeviceRegistry::DevicePresence::Active);
+}
+
 }  // namespace media_audio

@@ -36,6 +36,7 @@ class DeviceTest : public DeviceTestBase {
   }
 };
 
+// Validate that a fake driver with default values is initialized successfully.
 TEST_F(DeviceTest, Initialization) {
   InitializeDeviceForFakeDriver();
   EXPECT_TRUE(InInitializedState(device_));
@@ -50,6 +51,7 @@ TEST_F(DeviceTest, Initialization) {
   fake_device_presence_watcher_.reset();
 }
 
+// Validate that a driver's dropping the StreamConfig causes a DeviceIsRemoved notification.
 TEST_F(DeviceTest, StreamConfigDisconnect) {
   InitializeDeviceForFakeDriver();
   ASSERT_TRUE(InInitializedState(device_));
@@ -72,6 +74,7 @@ TEST_F(DeviceTest, StreamConfigDisconnect) {
   EXPECT_EQ(fake_device_presence_watcher_->on_removal_from_ready_count(), 1u);
 }
 
+// Validate that a GetHealthState response of an empty struct is considered "healthy".
 TEST_F(DeviceTest, EmptyHealthResponse) {
   fake_driver_->set_health_state(std::nullopt);
   InitializeDeviceForFakeDriver();
@@ -170,40 +173,52 @@ TEST_F(DeviceTest, SupportedDriverFormatForClientFormat) {
   EXPECT_EQ(valid_bits, 20u);
 }
 
-// This tests the driver's ability to inform its ControlNotify of initial gain state.
+// This tests the driver's ability to inform its ObserverNotify of initial gain state.
 TEST_F(DeviceTest, InitialGainState) {
   InitializeDeviceForFakeDriver();
   ASSERT_TRUE(InInitializedState(device_));
-  ASSERT_TRUE(SetControl(device_));
+  ASSERT_TRUE(AddObserver(device_));
 
   RunLoopUntilIdle();
   auto gain_state = DeviceGainState(device_);
   EXPECT_EQ(*gain_state.gain_db(), 0.0f);
   EXPECT_FALSE(*gain_state.muted());
   EXPECT_FALSE(*gain_state.agc_enabled());
+  ASSERT_TRUE(notify_->gain_state()) << "ObserverNotify was not notified of initial gain state";
+  ASSERT_TRUE(notify_->gain_state()->gain_db());
+  EXPECT_EQ(*notify_->gain_state()->gain_db(), 0.0f);
+  EXPECT_FALSE(notify_->gain_state()->muted().value_or(false));
+  EXPECT_FALSE(notify_->gain_state()->agc_enabled().value_or(false));
 }
 
-// This tests the driver's ability to inform its ControlNotify of initial plug state.
+// This tests the driver's ability to inform its ObserverNotify of initial plug state.
 TEST_F(DeviceTest, InitialPlugState) {
   InitializeDeviceForFakeDriver();
   ASSERT_TRUE(InInitializedState(device_));
-  ASSERT_TRUE(SetControl(device_));
+  ASSERT_TRUE(AddObserver(device_));
 
   RunLoopUntilIdle();
   EXPECT_TRUE(DevicePluggedState(device_));
+  ASSERT_TRUE(notify_->plug_state());
+  EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify_->plug_state()->second, zx::time(0));
 }
 
 // This tests the driver's ability to originate gain changes, such as from hardware buttons.
 TEST_F(DeviceTest, DynamicGainUpdate) {
   InitializeDeviceForFakeDriver();
   ASSERT_TRUE(InInitializedState(device_));
-  ASSERT_TRUE(SetControl(device_));
+  ASSERT_TRUE(AddObserver(device_));
 
   RunLoopUntilIdle();
   auto gain_state = DeviceGainState(device_);
   EXPECT_EQ(*gain_state.gain_db(), 0.0f);
   EXPECT_FALSE(*gain_state.muted());
   EXPECT_FALSE(*gain_state.agc_enabled());
+  EXPECT_EQ(*notify_->gain_state()->gain_db(), 0.0f);
+  EXPECT_FALSE(notify_->gain_state()->muted().value_or(false));
+  EXPECT_FALSE(notify_->gain_state()->agc_enabled().value_or(false));
+  notify_->gain_state().reset();
 
   constexpr float kNewGainDb = -2.0f;
   fake_driver_->InjectGainChange({{
@@ -217,20 +232,42 @@ TEST_F(DeviceTest, DynamicGainUpdate) {
   EXPECT_EQ(*gain_state.gain_db(), kNewGainDb);
   EXPECT_TRUE(*gain_state.muted());
   EXPECT_TRUE(*gain_state.agc_enabled());
+
+  ASSERT_TRUE(notify_->gain_state());
+  ASSERT_TRUE(notify_->gain_state()->gain_db());
+  ASSERT_TRUE(notify_->gain_state()->muted());
+  ASSERT_TRUE(notify_->gain_state()->agc_enabled());
+  EXPECT_EQ(*notify_->gain_state()->gain_db(), kNewGainDb);
+  EXPECT_TRUE(*notify_->gain_state()->muted());
+  EXPECT_TRUE(*notify_->gain_state()->agc_enabled());
 }
 
 TEST_F(DeviceTest, DynamicPlugUpdate) {
   InitializeDeviceForFakeDriver();
   ASSERT_TRUE(InInitializedState(device_));
-  ASSERT_TRUE(SetControl(device_));
+  ASSERT_TRUE(AddObserver(device_));
 
   RunLoopUntilIdle();
   EXPECT_TRUE(DevicePluggedState(device_));
+  ASSERT_TRUE(notify_->plug_state());
+  EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify_->plug_state()->second, zx::time(0));
+  notify_->plug_state().reset();
 
   auto unplug_time = zx::clock::get_monotonic();
   fake_driver_->InjectPlugChange(false, unplug_time);
   RunLoopUntilIdle();
   EXPECT_FALSE(DevicePluggedState(device_));
+  ASSERT_TRUE(notify_->plug_state());
+  EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kUnplugged);
+  EXPECT_EQ(notify_->plug_state()->second, unplug_time);
+}
+
+TEST_F(DeviceTest, Observer) {
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+
+  EXPECT_TRUE(AddObserver(device_));
 }
 
 TEST_F(DeviceTest, Control) {
@@ -246,12 +283,18 @@ TEST_F(DeviceTest, SetGain) {
   InitializeDeviceForFakeDriver();
   ASSERT_TRUE(InInitializedState(device_));
   ASSERT_TRUE(SetControl(device_));
+  ASSERT_TRUE(AddObserver(device_));
 
   RunLoopUntilIdle();
   auto gain_state = DeviceGainState(device_);
   EXPECT_EQ(*gain_state.gain_db(), 0.0f);
   EXPECT_FALSE(*gain_state.muted());
   EXPECT_FALSE(*gain_state.agc_enabled());
+  ASSERT_TRUE(notify_->gain_state()) << "ObserverNotify was not notified of initial gain state";
+  EXPECT_EQ(*notify_->gain_state()->gain_db(), 0.0f);
+  EXPECT_FALSE(notify_->gain_state()->muted().value_or(false));
+  EXPECT_FALSE(notify_->gain_state()->agc_enabled().value_or(false));
+  notify_->gain_state().reset();
 
   constexpr float kNewGainDb = -2.0f;
   EXPECT_TRUE(SetDeviceGain({{
@@ -265,8 +308,15 @@ TEST_F(DeviceTest, SetGain) {
   EXPECT_EQ(*gain_state.gain_db(), kNewGainDb);
   EXPECT_TRUE(*gain_state.muted());
   EXPECT_TRUE(*gain_state.agc_enabled());
+
+  ASSERT_TRUE(notify_->gain_state() && notify_->gain_state()->gain_db() &&
+              notify_->gain_state()->muted() && notify_->gain_state()->agc_enabled());
+  EXPECT_EQ(*notify_->gain_state()->gain_db(), kNewGainDb);
+  EXPECT_TRUE(notify_->gain_state()->muted().value_or(false));        // Must be present and true.
+  EXPECT_TRUE(notify_->gain_state()->agc_enabled().value_or(false));  // Must be present and true.
 }
 
+// Validate that Device can open the driver's RingBuffer FIDL channel.
 TEST_F(DeviceTest, RingBufferCreation) {
   InitializeDeviceForFakeDriver();
   ASSERT_TRUE(InInitializedState(device_));
@@ -366,7 +416,7 @@ TEST_F(DeviceTest, BasicStartAndStop) {
   StopAndExpectValid();
 }
 
-TEST_F(DeviceTest, InitialDelayInfo) {
+TEST_F(DeviceTest, InitialDelayReceivedDuringCreateRingBuffer) {
   InitializeDeviceForFakeDriver();
   fake_driver_->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device_));

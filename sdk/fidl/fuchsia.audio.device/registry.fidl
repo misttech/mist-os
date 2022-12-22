@@ -314,9 +314,6 @@ type RegistryCreateObserverError = flexible enum {
 /// `Observer` is associated with an initialized audio device. An audio device
 /// may be observed by multiple `Observer` instances.
 protocol Observer {
-    /// Query current driver/device health with `Observer/GetHealthState`.
-    compose fuchsia.hardware.audio.Health;
-
     /// Query the device's available processing topologies and individual
     /// elements, and watch for changes to those elements.
     compose fuchsia.hardware.audio.signalprocessing.Reader;

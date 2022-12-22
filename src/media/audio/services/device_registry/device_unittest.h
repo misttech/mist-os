@@ -23,6 +23,7 @@
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/media/audio/lib/clock/clock.h"
 #include "src/media/audio/services/device_registry/device.h"
+#include "src/media/audio/services/device_registry/observer_notify.h"
 #include "src/media/audio/services/device_registry/testing/fake_audio_driver.h"
 #include "src/media/audio/services/device_registry/testing/fake_device_presence_watcher.h"
 
@@ -32,6 +33,7 @@ namespace media_audio {
 class DeviceTestBase : public gtest::TestLoopFixture {
  public:
   void SetUp() override {
+    notify_ = std::make_shared<NotifyStub>();
     zx::channel server_end, client_end;
     ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
 
@@ -80,6 +82,44 @@ class DeviceTestBase : public gtest::TestLoopFixture {
   fuchsia_hardware_audio::GainState DeviceGainState(std::shared_ptr<Device> device) {
     return *device->gain_state_;
   }
+  class NotifyStub : public std::enable_shared_from_this<NotifyStub>, public ObserverNotify {
+   public:
+    virtual ~NotifyStub() = default;
+
+    bool AddObserver(std::shared_ptr<Device> device) {
+      return device->AddObserver(shared_from_this());
+    }
+    bool SetControl(std::shared_ptr<Device> device) { return device->SetControl(); }
+    bool DropControl(std::shared_ptr<Device> device) { return device->DropControl(); }
+
+    // ObserverNotify
+    //
+    void DeviceIsRemoved() final { FX_LOGS(INFO) << __func__ << " **********"; }
+    void DeviceHasError() final { FX_LOGS(INFO) << __func__ << " **********"; }
+    void GainStateChanged(const fuchsia_audio_device::GainState& new_gain_state) final {
+      gain_state_ = new_gain_state;
+    }
+    void PlugStateChanged(const fuchsia_audio_device::PlugState& new_plug_state,
+                          zx::time plug_change_time) final {
+      plug_state_ = std::make_pair(new_plug_state, plug_change_time);
+    }
+
+    const std::optional<fuchsia_audio_device::GainState>& gain_state() const { return gain_state_; }
+    const std::optional<std::pair<fuchsia_audio_device::PlugState, zx::time>>& plug_state() const {
+      return plug_state_;
+    }
+    const std::optional<fuchsia_audio_device::DelayInfo>& delay_info() const { return delay_info_; }
+    std::optional<fuchsia_audio_device::GainState>& gain_state() { return gain_state_; }
+    std::optional<std::pair<fuchsia_audio_device::PlugState, zx::time>>& plug_state() {
+      return plug_state_;
+    }
+    std::optional<fuchsia_audio_device::DelayInfo>& delay_info() { return delay_info_; }
+
+   private:
+    std::optional<fuchsia_audio_device::GainState> gain_state_;
+    std::optional<std::pair<fuchsia_audio_device::PlugState, zx::time>> plug_state_;
+    std::optional<fuchsia_audio_device::DelayInfo> delay_info_;
+  };
 
   static uint8_t ExpectFormatMatch(std::shared_ptr<Device> device,
                                    fuchsia_audio::SampleType sample_type, uint32_t channel_count,
@@ -112,12 +152,16 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     EXPECT_FALSE(match);
   }
 
+  // A consolidated notify recipient for tests (ObserverNotify, and in future CL, ControlNotify).
+  std::shared_ptr<NotifyStub> notify() { return notify_; }
+
   bool SetDeviceGain(fuchsia_hardware_audio::GainState new_state) {
     return device_->SetGain(new_state);
   }
 
-  bool SetControl(std::shared_ptr<Device> device) { return device->SetControl(); }
-  bool DropControl(std::shared_ptr<Device> device) { return device->DropControl(); }
+  bool AddObserver(std::shared_ptr<Device> device) { return notify()->AddObserver(device); }
+  bool SetControl(std::shared_ptr<Device> device) { return notify()->SetControl(device); }
+  bool DropControl(std::shared_ptr<Device> device) { return notify()->DropControl(device); }
 
   void ConnectToRingBufferAndExpectValidClient() {
     ASSERT_TRUE(device_->ConnectRingBufferFidl({{
@@ -223,6 +267,7 @@ class DeviceTestBase : public gtest::TestLoopFixture {
 
   std::optional<fuchsia_hardware_audio::RingBufferProperties> ring_buffer_props_;
 
+  std::shared_ptr<NotifyStub> notify_;
   std::optional<fuchsia_audio_device::GainState> gain_state_;
   std::optional<std::pair<fuchsia_audio_device::PlugState, zx::time>> plug_state_;
   std::optional<fuchsia_hardware_audio::DelayInfo> delay_info_;

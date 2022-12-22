@@ -22,6 +22,7 @@
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
 #include "src/media/audio/services/device_registry/control_creator_server.h"
 #include "src/media/audio/services/device_registry/device.h"
+#include "src/media/audio/services/device_registry/observer_server.h"
 #include "src/media/audio/services/device_registry/provider_server.h"
 #include "src/media/audio/services/device_registry/registry_server.h"
 #include "src/media/audio/services/device_registry/testing/fake_audio_driver.h"
