@@ -57,6 +57,15 @@ import("//build/python/python_action.gni")
 #    like:
 #      "no dependency provides the input <package_name>/package_manifest.json"
 #
+#  bootfs_files_labels [optional]
+#    [list, GN labels] A list of GN labels of bootfs_files_for_assembly()
+#    targets to include in bootfs_files provided by this AIB.
+#
+#    Note: These are direct labels for specific targets, not deps to walk for
+#    metadata. If the target isn't a bootfs_files_for_assembly target, it will
+#    cause an error like:
+#      "no dependency provides the input <package_name>/bootfs_files.json"
+#
 #  bootfs_files [optional]
 #    [list, scopes] A list of scopes, defining each bootfs_file and the source,
 #    label, and destination required to add it in bootfs using assembly.
@@ -333,6 +342,29 @@ template("assembly_input_bundle") {
 
     creation_deps += invoker.config_data_labels
     creation_inputs += _config_data_entries
+  }
+
+  # Convert the list of bootfs_files_labels into a set of bootfs_files.json
+  # files that are inputs that define bootfs file entry scopes.
+  if (defined(invoker.bootfs_files_labels)) {
+    _bootfs_files = []
+
+    foreach(entry_label, invoker.bootfs_files_labels) {
+      # Assume this is a GN-label to a bootfs_files_for_assembly()
+      # instantiation, which is similar to packages.
+      _entry_out_dir = get_label_info(entry_label, "target_out_dir")
+      _entry_name = get_label_info(entry_label, "name")
+      _entry_file = "${_entry_out_dir}/${_entry_name}/bootfs_files.json"
+      _bootfs_files += [ _entry_file ]
+
+      creation_args += [
+        "--bootfs-files-list",
+        rebase_path(_entry_file, root_build_dir),
+      ]
+    }
+
+    creation_deps += invoker.bootfs_files_labels
+    creation_inputs += _bootfs_files
   }
 
   # Splits config_data inputs from the invoker into:

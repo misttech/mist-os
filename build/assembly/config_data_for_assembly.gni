@@ -88,7 +88,7 @@ template("config_data_for_assembly") {
         !defined(invoker.public_deps),
         "The config_data_for_assembly() template does not support dependencies")
 
-    assert(!defined(invoker.visibilty),
+    assert(!defined(invoker.visibility),
            "The config_data_for_assembly() template sets its own visibility")
 
     # The generated file that describes the files to add to config_data

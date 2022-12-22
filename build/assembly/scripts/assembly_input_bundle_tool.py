@@ -45,7 +45,9 @@ def create_bundle(args: argparse.Namespace) -> None:
                     aib_creator, config_data_entry)
 
     if args.bootfs_files_list:
-        add_bootfs_files_from_list(aib_creator, args.bootfs_files_list)
+        for bootfs_files_entry_file in args.bootfs_files_list:
+            with open(bootfs_files_entry_file) as bootfs_files_entry:
+                add_bootfs_files_from_list(aib_creator, bootfs_files_entry)
 
     if args.kernel_cmdline:
         add_kernel_cmdline_from_file(aib_creator, args.kernel_cmdline)
@@ -392,8 +394,10 @@ def main():
     )
     bundle_creation_parser.add_argument(
         "--bootfs-files-list",
-        type=argparse.FileType('r'),
-        help="Path to a json file of bootfs-file entries")
+        action="append",
+        help=
+        "Path to a json file of bootfs-file entries, may be specified multiple times"
+    )
 
     bundle_creation_parser.set_defaults(handler=create_bundle)
 

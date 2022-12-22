@@ -1,0 +1,65 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/dist/distribution_manifest.gni")
+
+# Define a set of files that should be placed in BootFS.
+#
+# NOTE:  This template specifically defines bootfs files for inclusion
+# with the platform Assembly Input Bundles.
+#
+# NOTE: It CAN ONLY be used as a dependency of a platform AIB.  It CANNOT be
+# used as a dependency of any binary, package, or group.
+#
+# NOTE: Eventually, this template will be replaced with fuchsia_package once all
+# the bootfs files have moved to packages.
+#
+# Params:
+#
+#   files (optional)
+#     [list of scopes] List of GN scopes that declare both a source of a file in
+#     the source tree or build and a destination for BootFS.
+#       {
+#         source = "path/on/host.txt"
+#         destination = "path/in/bootfs.txt"
+#       }
+#
+#   As normal:
+#     testonly
+#
+#   NOTE: Visibility is restricted to `//bundles/assembly/*`, and cannot be
+#   overridden.
+template("bootfs_files_for_assembly") {
+  generated_file(target_name) {
+    # Intentionally, do not forward data_deps, because resource.gni adds
+    # data_deps to the distribution_entries_barrier, and we would like to
+    # prevent transitive dependencies.
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                           ])
+
+    assert(!defined(invoker.visibility),
+           "The bootfs_files_for_assembly() template sets its own visibility")
+
+    # The targets created by this template can only be used with assembly input
+    # bundles.
+    visibility = [ "//bundles/assembly/*" ]
+
+    metadata = {
+      distribution_entries_barrier = []
+    }
+    data_keys = [ "distribution_entries" ]
+
+    # Prevent transitive dependencies on other resources or libraries.
+    walk_keys = [
+      "distribution_entries_barrier",
+      "link_output_barrier",
+    ]
+
+    outputs = [ "${target_out_dir}/${target_name}/bootfs_files.json" ]
+    output_conversion = "json"
+  }
+}
