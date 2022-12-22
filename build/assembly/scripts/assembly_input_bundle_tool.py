@@ -157,8 +157,11 @@ def add_bootfs_files_from_list(aib_creator: AIBCreator, bootfs_files):
     """
     _bootfs_files = _read_json_file(bootfs_files)
     for entry in _bootfs_files:
-        aib_creator.bootfs_files.add(
-            FileEntry(entry['source'], entry['destination']))
+        # Not all distribution manifests have the source and destination pairs.
+        # For an example see: dart_kernel.gni
+        if 'source' in entry and 'destination' in entry:
+            aib_creator.bootfs_files.add(
+                FileEntry(entry['source'], entry['destination']))
 
 
 def _read_json_file(pkg_list_file):

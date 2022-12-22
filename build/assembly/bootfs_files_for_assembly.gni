@@ -17,16 +17,8 @@ import("//build/dist/distribution_manifest.gni")
 #
 # Params:
 #
-#   files (optional)
-#     [list of scopes] List of GN scopes that declare both a source of a file in
-#     the source tree or build and a destination for BootFS.
-#       {
-#         source = "path/on/host.txt"
-#         destination = "path/in/bootfs.txt"
-#       }
-#
 #   As normal:
-#     testonly
+#     deps, testonly
 #
 #   NOTE: Visibility is restricted to `//bundles/assembly/*`, and cannot be
 #   overridden.
