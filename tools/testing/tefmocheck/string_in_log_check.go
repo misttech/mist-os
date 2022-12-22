@@ -276,6 +276,8 @@ func fuchsiaLogChecks() []FailureModeCheck {
 		{startString: "RUN   TestPmmCheckerOopsAndPanic", endString: ": TestPmmCheckerOopsAndPanic"},
 		{startString: "RUN   TestKernelLockupDetectorFatalCriticalSection", endString: ": TestKernelLockupDetectorFatalCriticalSection"},
 		{startString: "RUN   TestKernelLockupDetectorFatalHeartbeat", endString: ": TestKernelLockupDetectorFatalHeartbeat"},
+		// Kernel out-of-memory test "OOMHard" may report valid OOPS that should not reflect a test failure.
+		{startString: "RUN   TestOOMHard", endString: ": TestOOMHard"},
 	}
 	// These are rather generic. New checks should probably go above here so that they run before these.
 	allLogTypes := []logType{serialLogType, swarmingOutputType, syslogType}
