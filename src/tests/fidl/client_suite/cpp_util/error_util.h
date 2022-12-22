@@ -20,6 +20,9 @@ fidl_clientsuite::FidlErrorKind ClassifyError(const fidl::Status& status) {
     case fidl::Reason::kEncodeError:
       return fidl_clientsuite::FidlErrorKind::kOtherError;
     case fidl::Reason::kUnexpectedMessage:
+      if (status.lossy_description() == ::fidl::internal::kErrorInvalidHeader) {
+        return fidl_clientsuite::FidlErrorKind::kDecodingError;
+      }
       return fidl_clientsuite::FidlErrorKind::kUnexpectedMessage;
     case fidl::Reason::kPeerClosed:
       return fidl_clientsuite::FidlErrorKind::kChannelPeerClosed;

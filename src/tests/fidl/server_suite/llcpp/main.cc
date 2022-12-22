@@ -9,6 +9,8 @@
 
 #include <iostream>
 
+#include "src/tests/fidl/server_suite/cpp_util/error_util.h"
+
 class ClosedTargetServer : public fidl::WireServer<fidl_serversuite::ClosedTarget> {
  public:
   explicit ClosedTargetServer(fidl::ClientEnd<fidl_serversuite::Reporter> reporter)
@@ -114,6 +116,13 @@ class ClosedTargetServer : public fidl::WireServer<fidl_serversuite::ClosedTarge
     completer.Reply(fidl::VectorView<zx::event>::FromExternal(handles));
   }
 
+  void OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<fidl_serversuite::ClosedTarget>) {
+    if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() && !info.is_peer_closed()) {
+      std::cout << "ClosedTarget unbound with error: " << info.FormatDescription() << std::endl;
+    }
+    (void)reporter_->WillTeardown(servertest_util::ClassifyError(info));
+  }
+
  private:
   fidl::WireSyncClient<fidl_serversuite::Reporter> reporter_;
 };
@@ -128,6 +137,13 @@ class AjarTargetServer : public fidl::WireServer<fidl_serversuite::AjarTarget> {
     auto result = reporter_->ReceivedUnknownMethod(
         metadata.method_ordinal, fidl_serversuite::wire::UnknownMethodType::kOneWay);
     ZX_ASSERT(result.ok());
+  }
+
+  void OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<fidl_serversuite::AjarTarget>) {
+    if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() && !info.is_peer_closed()) {
+      std::cout << "AjarTarget unbound with error: " << info.FormatDescription() << std::endl;
+    }
+    (void)reporter_->WillTeardown(servertest_util::ClassifyError(info));
   }
 
  private:
@@ -247,6 +263,13 @@ class OpenTargetServer : public fidl::WireServer<fidl_serversuite::OpenTarget> {
     binding_ref_ = std::move(binding_ref);
   }
 
+  void OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<fidl_serversuite::OpenTarget>) {
+    if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() && !info.is_peer_closed()) {
+      std::cout << "OpenTarget unbound with error: " << info.FormatDescription() << std::endl;
+    }
+    (void)reporter_->WillTeardown(servertest_util::ClassifyError(info));
+  }
+
  private:
   fidl::WireSyncClient<fidl_serversuite::Reporter> reporter_;
   std::optional<fidl::ServerBindingRef<fidl_serversuite::OpenTarget>> binding_ref_;
@@ -323,6 +346,10 @@ class RunnerServer : public fidl::WireServer<fidl_serversuite::Runner> {
     completer.Reply(is_enabled);
   }
 
+  void IsTeardownReasonSupported(IsTeardownReasonSupportedCompleter::Sync& completer) override {
+    completer.Reply(true);
+  }
+
   void Start(StartRequestView request, StartCompleter::Sync& completer) override {
     std::cout << "Runner.Start()" << std::endl;
 
@@ -330,42 +357,22 @@ class RunnerServer : public fidl::WireServer<fidl_serversuite::Runner> {
       case ::fidl_serversuite::wire::AnyTarget::Tag::kClosedTarget: {
         auto target_server = std::make_unique<ClosedTargetServer>(std::move(request->reporter));
         fidl::BindServer(dispatcher_, std::move(request->target.closed_target()),
-                         std::move(target_server), [](auto*, fidl::UnbindInfo info, auto) {
-                           if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() &&
-                               !info.is_peer_closed()) {
-                             std::cout
-                                 << "ClosedTarget unbound with error: " << info.FormatDescription()
-                                 << std::endl;
-                           }
-                         });
+                         std::move(target_server), std::mem_fn(&ClosedTargetServer::OnUnbound));
         completer.Reply();
         break;
       }
       case ::fidl_serversuite::wire::AnyTarget::Tag::kAjarTarget: {
         auto target_server = std::make_unique<AjarTargetServer>(std::move(request->reporter));
         fidl::BindServer(dispatcher_, std::move(request->target.ajar_target()),
-                         std::move(target_server), [](auto*, fidl::UnbindInfo info, auto) {
-                           if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() &&
-                               !info.is_peer_closed()) {
-                             std::cout
-                                 << "AjarTarget unbound with error: " << info.FormatDescription()
-                                 << std::endl;
-                           }
-                         });
+                         std::move(target_server), std::mem_fn(&AjarTargetServer::OnUnbound));
         completer.Reply();
         break;
       }
       case ::fidl_serversuite::wire::AnyTarget::Tag::kOpenTarget: {
         auto target_server = std::make_shared<OpenTargetServer>(std::move(request->reporter));
-        auto binding_ref = fidl::BindServer(
-            dispatcher_, std::move(request->target.open_target()), target_server,
-            [](auto*, fidl::UnbindInfo info, auto) {
-              if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() &&
-                  !info.is_peer_closed()) {
-                std::cout << "OpenTarget unbound with error: " << info.FormatDescription()
-                          << std::endl;
-              }
-            });
+        auto binding_ref =
+            fidl::BindServer(dispatcher_, std::move(request->target.open_target()), target_server,
+                             std::mem_fn(&OpenTargetServer::OnUnbound));
         // This is thread safe because the new server runs in the same
         // dispatcher thread as the request to start it.
         target_server->set_binding_ref(std::move(binding_ref));

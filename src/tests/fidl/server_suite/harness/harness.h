@@ -18,6 +18,12 @@
 
 #define WAIT_UNTIL_EXT(ext, condition) ASSERT_TRUE((ext)->_wait_until(condition));
 
+#define EXPECT_TEARDOWN_REASON(reason)     \
+  do {                                     \
+    SCOPED_TRACE("Check teardown reason"); \
+    _check_teardown_reason(reason);        \
+  } while (false);
+
 // Defines a new server test. Relies on gtest under the hood.
 // Tests must use upper camel case names and be defined in the |Test| enum in
 // serversuite.test.fidl.
@@ -70,6 +76,11 @@ class Reporter : public fidl::Server<fidl_serversuite::Reporter> {
     return event_encoding_failed_;
   }
 
+  void WillTeardown(WillTeardownRequest& request, WillTeardownCompleter::Sync& completer) override;
+  std::optional<fidl_serversuite::TeardownReason> teardown_reason() const {
+    return teardown_reason_;
+  }
+
  private:
   bool received_one_way_no_payload_ = false;
   std::optional<fidl_serversuite::UnknownMethodInfo> unknown_method_info_;
@@ -77,6 +88,7 @@ class Reporter : public fidl::Server<fidl_serversuite::Reporter> {
   bool received_flexible_one_way_ = false;
   std::optional<fidl_serversuite::EncodingFailureInfo> reply_encoding_failed_;
   std::optional<fidl_serversuite::EncodingFailureInfo> event_encoding_failed_;
+  std::optional<fidl_serversuite::TeardownReason> teardown_reason_;
 };
 
 class ServerTest : private ::loop_fixture::RealLoop, public ::testing::Test {
@@ -98,8 +110,25 @@ class ServerTest : private ::loop_fixture::RealLoop, public ::testing::Test {
     return RunLoopWithTimeoutOrUntil(std::move(condition), kTimeoutDuration);
   }
 
+  // Use EXPECT_TEARDOWN_REASON instead of calling |_check_teardown_reason| directly.
+  void _check_teardown_reason(fidl_serversuite::TeardownReason reason) {
+    if (!reporter().teardown_reason().has_value()) {
+      ADD_FAILURE() << "Did not get a teardown reason";
+      return;
+    }
+    if (is_teardown_reason_supported()) {
+      EXPECT_EQ(reason, reporter().teardown_reason().value());
+    } else {
+      EXPECT_EQ(fidl_serversuite::TeardownReason::kOther, reporter().teardown_reason().value());
+    }
+  }
+
+  bool is_teardown_reason_supported() const { return is_teardown_reason_supported_; }
+
  private:
   fidl_serversuite::Test test_;
+
+  bool is_teardown_reason_supported_ = false;
 
   fidl_serversuite::AnyTarget::Tag target_type_;
 

@@ -34,6 +34,13 @@ void Reporter::EventEncodingFailed(EventEncodingFailedRequest& request,
                                    EventEncodingFailedCompleter::Sync& completer) {
   event_encoding_failed_ = std::move(request);
 }
+void Reporter::WillTeardown(WillTeardownRequest& request, WillTeardownCompleter::Sync& completer) {
+  if (teardown_reason_.has_value()) {
+    ADD_FAILURE() << "The server under test should not report more than one teardown reason.";
+    return;
+  }
+  teardown_reason_.emplace(request.reason());
+}
 
 void ServerTest::SetUp() {
   auto runner_service = component::Connect<fidl_serversuite::Runner>();
@@ -50,6 +57,10 @@ void ServerTest::SetUp() {
     GTEST_SKIP() << "(test skipped by binding server)";
     return;
   }
+
+  auto is_teardown_reason_supported = runner_->IsTeardownReasonSupported();
+  ASSERT_TRUE(is_teardown_reason_supported.is_ok()) << is_teardown_reason_supported.error_value();
+  is_teardown_reason_supported_ = is_teardown_reason_supported.value().is_supported();
 
   // Create Reporter, which will allow the binding server to report test progress.
   auto reporter_endpoints = fidl::CreateEndpoints<fidl_serversuite::Reporter>();

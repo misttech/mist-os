@@ -23,6 +23,50 @@ use {
 const EXPECT_STRICT_ONE_WAY: &'static str = "failed to report strict one way request";
 const EXPECT_REPLY_FAILED: &'static str = "failed to send reply";
 
+fn get_teardown_reason(error: Error) -> fidl_fidl_serversuite::TeardownReason {
+    use fidl_fidl_serversuite::TeardownReason;
+    let error: Result<fidl::Error, anyhow::Error> = error.downcast();
+    match error {
+        Ok(error) => match error {
+            fidl::Error::InvalidBoolean
+            | fidl::Error::InvalidHeader
+            | fidl::Error::IncompatibleMagicNumber(_)
+            | fidl::Error::Invalid
+            | fidl::Error::OutOfRange
+            | fidl::Error::LargeMessageMissingHandles
+            | fidl::Error::LargeMessageCouldNotReadVmo { .. }
+            | fidl::Error::LargeMessageInfoMissized { .. }
+            | fidl::Error::ExtraBytes
+            | fidl::Error::ExtraHandles
+            | fidl::Error::NonZeroPadding { .. }
+            | fidl::Error::MaxRecursionDepth
+            | fidl::Error::NotNullable
+            | fidl::Error::UnexpectedNullRef
+            | fidl::Error::Utf8Error
+            | fidl::Error::InvalidBitsValue
+            | fidl::Error::InvalidEnumValue
+            | fidl::Error::UnknownUnionTag
+            | fidl::Error::InvalidPresenceIndicator
+            | fidl::Error::InvalidInlineBitInEnvelope
+            | fidl::Error::InvalidInlineMarkerInEnvelope
+            | fidl::Error::InvalidNumBytesInEnvelope
+            | fidl::Error::InvalidHostHandle
+            | fidl::Error::IncorrectHandleSubtype { .. }
+            | fidl::Error::MissingExpectedHandleRights { .. }
+            | fidl::Error::CannotStoreUnknownHandles => TeardownReason::DecodingError,
+            fidl::Error::UnknownOrdinal { .. }
+            | fidl::Error::InvalidResponseTxid
+            | fidl::Error::UnexpectedSyncResponse => TeardownReason::UnexpectedMessage,
+            fidl::Error::UnsupportedMethod { .. } => {
+                panic!("UnsupportedMethod should not be seen on server side")
+            }
+            fidl::Error::ClientChannelClosed { .. } => TeardownReason::ChannelPeerClosed,
+            _ => TeardownReason::Other,
+        },
+        Err(_) => TeardownReason::Other,
+    }
+}
+
 async fn run_closed_target_server(
     server_end: ServerEnd<ClosedTargetMarker>,
     reporter_proxy: &ReporterProxy,
@@ -380,6 +424,9 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                     };
                     responder.send(enabled)?;
                 }
+                RunnerRequest::IsTeardownReasonSupported { responder } => {
+                    responder.send(true)?;
+                }
                 RunnerRequest::Start { reporter, target, responder } => {
                     println!("Runner.Start() called");
                     let reporter_proxy: &ReporterProxy = &reporter.into_proxy()?;
@@ -389,27 +436,35 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                             run_closed_target_server(server_end, reporter_proxy)
                                 .await
                                 .unwrap_or_else(|e| {
-                                    println!("closed target server failed {:?}", e)
+                                    println!("closed target server failed {:?}", e);
+                                    _ = reporter_proxy.will_teardown(get_teardown_reason(e));
                                 });
                         }
                         AnyTarget::AjarTarget(server_end) => {
                             responder.send().expect("sending response failed");
                             run_ajar_target_server(server_end, reporter_proxy)
                                 .await
-                                .unwrap_or_else(|e| println!("ajar target server failed {:?}", e));
+                                .unwrap_or_else(|e| {
+                                    println!("ajar target server failed {:?}", e);
+                                    _ = reporter_proxy.will_teardown(get_teardown_reason(e));
+                                });
                         }
                         AnyTarget::OpenTarget(server_end) => {
                             responder.send().expect("sending response failed");
                             run_open_target_server(server_end, reporter_proxy)
                                 .await
-                                .unwrap_or_else(|e| println!("open target server failed {:?}", e));
+                                .unwrap_or_else(|e| {
+                                    println!("open target server failed {:?}", e);
+                                    _ = reporter_proxy.will_teardown(get_teardown_reason(e));
+                                });
                         }
                         AnyTarget::LargeMessageTarget(server_end) => {
                             responder.send().expect("sending response failed");
                             run_large_message_target_server(server_end, reporter_proxy)
                                 .await
                                 .unwrap_or_else(|e| {
-                                    println!("large message target server failed {:?}", e)
+                                    println!("large message target server failed {:?}", e);
+                                    _ = reporter_proxy.will_teardown(get_teardown_reason(e));
                                 });
                         }
                     }

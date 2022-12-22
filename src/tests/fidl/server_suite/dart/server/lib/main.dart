@@ -30,7 +30,13 @@ serversuite.UnknownMethodType convertUnknownMethodType(
 class ClosedTargetImpl extends ClosedTarget {
   ClosedTargetImpl({ReporterProxy reporter, ClosedTargetBinding binding})
       : _reporter = reporter,
-        _binding = binding;
+        _binding = binding {
+    _binding.whenClosed.then((_) {
+      try {
+        _reporter.willTeardown(serversuite.TeardownReason.other);
+      } catch (e) {}
+    });
+  }
 
   final ReporterProxy _reporter;
   final ClosedTargetBinding _binding;
@@ -104,9 +110,18 @@ class ClosedTargetImpl extends ClosedTarget {
 }
 
 class AjarTargetImpl extends AjarTargetServer {
-  AjarTargetImpl({ReporterProxy reporter}) : _reporter = reporter;
+  AjarTargetImpl({ReporterProxy reporter, AjarTargetBinding binding})
+      : _reporter = reporter,
+        _binding = binding {
+    _binding.whenClosed.then((_) {
+      try {
+        _reporter.willTeardown(serversuite.TeardownReason.other);
+      } catch (e) {}
+    });
+  }
 
   final ReporterProxy _reporter;
+  final AjarTargetBinding _binding;
 
   Future<void> $unknownMethod(UnknownMethodMetadata metadata) async {
     await _reporter.receivedUnknownMethod(
@@ -115,9 +130,18 @@ class AjarTargetImpl extends AjarTargetServer {
 }
 
 class OpenTargetImpl extends OpenTargetServer {
-  OpenTargetImpl({ReporterProxy reporter}) : _reporter = reporter;
+  OpenTargetImpl({ReporterProxy reporter, OpenTargetBinding binding})
+      : _reporter = reporter,
+        _binding = binding {
+    _binding.whenClosed.then((_) {
+      try {
+        _reporter.willTeardown(serversuite.TeardownReason.other);
+      } catch (e) {}
+    });
+  }
 
   final ReporterProxy _reporter;
+  final OpenTargetBinding _binding;
   final StreamController<void> _strictEvent = StreamController.broadcast();
   final StreamController<void> _flexibleEvent = StreamController.broadcast();
 
@@ -286,6 +310,10 @@ class RunnerImpl extends Runner {
     }
   }
 
+  Future<bool> isTeardownReasonSupported() async {
+    return false;
+  }
+
   Future<void> start(
       InterfaceHandle<Reporter> reporterHandle, AnyTarget target) async {
     var reporter = ReporterProxy();
@@ -296,11 +324,11 @@ class RunnerImpl extends Runner {
       binding.bind(server, target.closedTarget);
     } else if (target.ajarTarget != null) {
       var binding = AjarTargetBinding();
-      var server = AjarTargetImpl(reporter: reporter);
+      var server = AjarTargetImpl(reporter: reporter, binding: binding);
       binding.bind(server, target.ajarTarget);
     } else if (target.openTarget != null) {
       var binding = OpenTargetBinding();
-      var server = OpenTargetImpl(reporter: reporter);
+      var server = OpenTargetImpl(reporter: reporter, binding: binding);
       binding.bind(server, target.openTarget);
     } else if (target.largeMessageTarget != null) {
       // TODO(fxbug.dev/114261): Test decoding large messages.

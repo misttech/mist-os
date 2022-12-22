@@ -31,14 +31,15 @@ type FidlErrorKind = strict enum {
     // being tested here, so all those errors can broadly be globbed together
     // here.
     OTHER_ERROR = 1;
-    // Any error encountered during decoding or the reply.
+    // Any error encountered during decoding and event or an reply. In
+    // particular, transactional message headers may also fail to decode.
     DECODING_ERROR = 2;
     // Errors due to the channel being closed by the peer.
     CHANNEL_PEER_CLOSED = 3;
     // Flexible methods receiving unknown interaction responses.
     UNKNOWN_METHOD = 4;
-    // Unknown strict method or unknown flexible method on a protocol that
-    // doesn't allow it.
+    // The client received an unknown strict event or unknown flexible event on
+    // a protocol that doesn't allow it.
     UNEXPECTED_MESSAGE = 5;
 };
 

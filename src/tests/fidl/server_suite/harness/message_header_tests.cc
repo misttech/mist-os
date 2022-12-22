@@ -18,6 +18,8 @@ CLOSED_SERVER_TEST(OneWayWithNonZeroTxid) {
 
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  WAIT_UNTIL([this] { return reporter().teardown_reason().has_value(); });
+  EXPECT_TEARDOWN_REASON(fidl_serversuite::TeardownReason::kUnexpectedMessage);
 }
 
 // Check that the channel is closed when a new two-way request with a zero txid is received.
@@ -27,6 +29,8 @@ CLOSED_SERVER_TEST(TwoWayNoPayloadWithZeroTxid) {
 
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  WAIT_UNTIL([this] { return reporter().teardown_reason().has_value(); });
+  EXPECT_TEARDOWN_REASON(fidl_serversuite::TeardownReason::kUnexpectedMessage);
 }
 
 // Check that the server closes the channel when unknown ordinals are received.
@@ -36,6 +40,8 @@ CLOSED_SERVER_TEST(UnknownOrdinalCausesClose) {
 
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  WAIT_UNTIL([this] { return reporter().teardown_reason().has_value(); });
+  EXPECT_TEARDOWN_REASON(fidl_serversuite::TeardownReason::kUnexpectedMessage);
 }
 
 // Check that the server closes the channel when an unknown magic number is received.
@@ -50,6 +56,8 @@ CLOSED_SERVER_TEST(BadMagicNumberCausesClose) {
 
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  WAIT_UNTIL([this] { return reporter().teardown_reason().has_value(); });
+  EXPECT_TEARDOWN_REASON(fidl_serversuite::TeardownReason::kDecodingError);
 }
 
 // Check that the server closes the channel when unknown at rest flags are received.

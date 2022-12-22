@@ -225,8 +225,12 @@ func (*runnerImpl) IsTestEnabled(_ fidl.Context, test serversuite.Test) (bool, e
 	return isEnabled(test), nil
 }
 
+func (*runnerImpl) IsTeardownReasonSupported(_ fidl.Context) (bool, error) {
+	return false, nil
+}
+
 func (*runnerImpl) Start(
-	_ fidl.Context,
+	ctx fidl.Context,
 	reporter serversuite.ReporterWithCtxInterface,
 	target serversuite.AnyTarget) error {
 
@@ -249,6 +253,7 @@ func (*runnerImpl) Start(
 			OnError: func(err error) {
 				// Failures are expected as part of tests.
 				log.Printf("serversuite.ClosedTarget errored: %s", err)
+				reporter.WillTeardown(ctx, serversuite.TeardownReasonOther)
 			},
 		})
 	}()

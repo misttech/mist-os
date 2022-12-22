@@ -112,7 +112,12 @@ class ClosedTargetServer : public fidl::serversuite::ClosedTarget {
     callback(std::move(handles));
   }
 
-  void set_binding(fidl::Binding<fidl::serversuite::ClosedTarget>* binding) { binding_ = binding; }
+  void set_binding(fidl::Binding<fidl::serversuite::ClosedTarget>* binding) {
+    binding_ = binding;
+    binding_->set_error_handler([this](zx_status_t status) {
+      reporter_->WillTeardown(fidl::serversuite::TeardownReason::OTHER);
+    });
+  }
 
  private:
   fidl::InterfacePtr<fidl::serversuite::Reporter> reporter_;
@@ -124,6 +129,13 @@ class AjarTargetServer : public fidl::serversuite::AjarTarget {
   explicit AjarTargetServer(fidl::InterfacePtr<fidl::serversuite::Reporter> reporter)
       : reporter_(std::move(reporter)) {}
 
+  void set_binding(fidl::Binding<fidl::serversuite::AjarTarget>* binding) {
+    binding_ = binding;
+    binding_->set_error_handler([this](zx_status_t status) {
+      reporter_->WillTeardown(fidl::serversuite::TeardownReason::OTHER);
+    });
+  }
+
  protected:
   void handle_unknown_method(uint64_t ordinal) override {
     reporter_->ReceivedUnknownMethod(ordinal, fidl::serversuite::UnknownMethodType::ONE_WAY);
@@ -131,6 +143,7 @@ class AjarTargetServer : public fidl::serversuite::AjarTarget {
 
  private:
   fidl::InterfacePtr<fidl::serversuite::Reporter> reporter_;
+  fidl::Binding<fidl::serversuite::AjarTarget>* binding_ = nullptr;
 };
 
 class OpenTargetServer : public fidl::serversuite::OpenTarget {
@@ -226,6 +239,13 @@ class OpenTargetServer : public fidl::serversuite::OpenTarget {
     }
   }
 
+  void set_binding(fidl::Binding<fidl::serversuite::OpenTarget>* binding) {
+    binding_ = binding;
+    binding_->set_error_handler([this](zx_status_t status) {
+      reporter_->WillTeardown(fidl::serversuite::TeardownReason::OTHER);
+    });
+  }
+
  protected:
   void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
     auto unknown_method_type = method_has_response ? fidl::serversuite::UnknownMethodType::TWO_WAY
@@ -235,6 +255,7 @@ class OpenTargetServer : public fidl::serversuite::OpenTarget {
 
  private:
   fidl::InterfacePtr<fidl::serversuite::Reporter> reporter_;
+  fidl::Binding<fidl::serversuite::OpenTarget>* binding_ = nullptr;
   fidl::serversuite::OpenTarget_EventSender* event_sender_ = nullptr;
 };
 
@@ -317,6 +338,10 @@ class RunnerServer : public fidl::serversuite::Runner {
     }
   }
 
+  void IsTeardownReasonSupported(IsTeardownReasonSupportedCallback callback) override {
+    callback(false);
+  }
+
   void Start(fidl::InterfaceHandle<fidl::serversuite::Reporter> reporter,
              fidl::serversuite::AnyTarget target, StartCallback callback) override {
     if (target.is_closed_target()) {
@@ -331,12 +356,15 @@ class RunnerServer : public fidl::serversuite::Runner {
       ajar_target_server_ = std::make_unique<AjarTargetServer>(reporter.Bind());
       ajar_target_binding_ =
           std::make_unique<fidl::Binding<fidl::serversuite::AjarTarget>>(ajar_target_server_.get());
+      ajar_target_server_->set_binding(ajar_target_binding_.get());
+
       ajar_target_binding_->Bind(std::move(target.ajar_target()), dispatcher_);
       callback();
     } else if (target.is_open_target()) {
       open_target_server_ = std::make_unique<OpenTargetServer>(reporter.Bind());
       open_target_binding_ =
           std::make_unique<fidl::Binding<fidl::serversuite::OpenTarget>>(open_target_server_.get());
+      open_target_server_->set_binding(open_target_binding_.get());
       open_target_server_->set_event_sender(&open_target_binding_->events());
 
       open_target_binding_->Bind(std::move(target.open_target()), dispatcher_);
