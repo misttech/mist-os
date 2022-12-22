@@ -272,3 +272,29 @@ assembly_input_bundle("system-update-checker") {
 
 assembly_input_bundle("omaha-client") {
 }
+
+assembly_input_bundle("wlan_base") {
+  base_packages = [
+    "//src/connectivity/location/regulatory_region",
+    "//src/connectivity/wlan/drivers/wlanphy:wlanphy_dfv2",
+    "//src/connectivity/wlan/wlancfg",
+    "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-legacy-wlanstack",
+  ]
+}
+
+assembly_input_bundle("wlan_legacy_privacy_support") {
+  base_packages =
+      [ "//src/connectivity/wlan/wlanstack:wlanstack-legacy-privacy" ]
+}
+
+assembly_input_bundle("wlan_contemporary_privacy_only_support") {
+  base_packages = [ "//src/connectivity/wlan/wlanstack" ]
+}
+
+assembly_input_bundle("wlan_fullmac_support") {
+  base_packages = [ "//src/connectivity/wlan/drivers/wlanif" ]
+}
+
+assembly_input_bundle("wlan_softmac_support") {
+  base_packages = [ "//src/connectivity/wlan/drivers/wlansoftmac" ]
+}
