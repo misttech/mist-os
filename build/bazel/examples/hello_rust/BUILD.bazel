@@ -82,7 +82,8 @@ fuchsia_test_package(
     visibility = ["//visibility:public"],
 )
 
-rust_doc(
-    name = "hello_rust_doc",
-    crate = ":hello_rust_native",
-)
+# TODO(fxbug.dev/118195): fix and uncomment below.
+#rust_doc(
+#    name = "hello_rust_doc",
+#    crate = ":hello_rust_native",
+#)
