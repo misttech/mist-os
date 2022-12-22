@@ -5,14 +5,15 @@ library fuchsia.hardware.block.volume;
 
 using zx;
 
-/// VolumeManagerInfo describes the properties of the volume manager and not each individual volume.
+/// `VolumeManagerInfo` describes the properties of the volume manager and not
+/// each individual volume.
 @for_deprecated_c_bindings
 type VolumeManagerInfo = struct {
     /// Size of a single slice, in bytes.
     slice_size uint64;
 
-    /// Number of slices the volume manager is able use right now. This counts the
-    /// allocated_slice_count plus the number of available slices.
+    /// Number of slices the volume manager is able to use right now. This
+    /// counts the `assigned_slice_count` plus the number of available slices.
     slice_count uint64;
 
     /// Number of slices currently assigned to partitions.
@@ -43,7 +44,7 @@ type VolumeInfo = struct {
     slice_limit uint64;
 };
 
-/// Describes an region within a Volume. Both units are in "slices".
+/// Describes a region within a Volume. Both units are in "slices".
 type SliceExtent = struct {
     offset uint64;
     length uint64;
@@ -69,14 +70,14 @@ protocol BlockVolume {
         status zx.status;
     });
 
-    /// Shrinks a virtual Partition.
+    /// Shrinks a virtual partition.
     Shrink(struct {
         extent SliceExtent;
     }) -> (struct {
         status zx.status;
     });
 
-    // Returns the information about the volume manager 
+    /// Returns the information about the volume manager.
     GetInfo() -> (struct {
         status zx.status;
         manager VolumeManagerInfo;
