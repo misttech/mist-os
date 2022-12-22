@@ -180,9 +180,10 @@ fuchsia_sdk_repository(
 
 fuchsia_sdk_repository(
     name = "internal_sdk",
-    parent_sdk = "@fuchsia_sdk",
     local_paths = ["{ninja_output_dir}/sdk/exported/platform"],
     local_sdk_version_file = "//:internal_sdk_hash",
+    parent_sdk = "@fuchsia_sdk",
+    parent_sdk_local_paths = ["{ninja_output_dir}/sdk/exported/core"],
 )
 
 register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
