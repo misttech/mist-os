@@ -70,9 +70,7 @@ pub struct MessengerClient<
     R: Role + 'static = default::Role,
 > {
     messenger: Messenger<P, A, R>,
-    // TODO(fxbug.dev/84729)
-    #[allow(unused)]
-    fuse: ActionFuseHandle,
+    _fuse: ActionFuseHandle, // Handle that maintains scoped messenger cleanup
 }
 
 impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessengerClient<P, A, R> {
@@ -80,7 +78,7 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessengerCli
         messenger: Messenger<P, A, R>,
         fuse: ActionFuseHandle,
     ) -> MessengerClient<P, A, R> {
-        MessengerClient { messenger, fuse }
+        MessengerClient { messenger, _fuse: fuse }
     }
 
     /// Creates a MessageBuilder for a new message with the specified payload
