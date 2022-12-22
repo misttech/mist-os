@@ -37,6 +37,8 @@ SynAudioOutDevice::SynAudioOutDevice(ddk::MmioBuffer mmio_avio_global, ddk::Mmio
 
 zx_status_t SynAudioOutDevice::Init() { return ZX_OK; }
 
+uint32_t SynAudioOutDevice::fifo_depth() const { return dma_.GetTransferSize(DmaId::kDmaIdMa0); }
+
 uint32_t SynAudioOutDevice::GetRingPosition() { return dma_.GetBufferPosition(DmaId::kDmaIdMa0); }
 
 zx_status_t SynAudioOutDevice::GetBuffer(size_t size, zx::vmo* buffer) {

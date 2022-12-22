@@ -112,4 +112,10 @@ TEST_F(SynAudioOutTest, Shutdown) {
   device().Shutdown();
 }
 
+TEST_F(SynAudioOutTest, FifoDepth) {
+  // Report the transfer size as FIFO depth.
+  dma().ExpectGetTransferSize(123, DmaId::kDmaIdMa0);
+  ASSERT_EQ(device().fifo_depth(), 123);
+}
+
 }  // namespace audio

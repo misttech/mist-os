@@ -41,12 +41,10 @@ class SynAudioOutDevice {
   // Stops clocking data and quiets output signals.
   void Shutdown();
 
-  uint32_t fifo_depth() const { return kFifoDepth; }
+  uint32_t fifo_depth() const;
   zx_status_t GetBuffer(size_t size, zx::vmo* buffer);
 
  private:
-  static constexpr uint32_t kFifoDepth = 1024;  // in bytes.
-
   SynAudioOutDevice(ddk::MmioBuffer mmio_avio_global, ddk::MmioBuffer mmio_i2s,
                     ddk::SharedDmaProtocolClient dma);
   zx_status_t Init();
