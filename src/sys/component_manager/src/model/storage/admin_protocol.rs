@@ -351,6 +351,10 @@ impl StorageAdmin {
                     };
                     responder.send(&mut response)?
                 }
+                fsys::StorageAdminRequest::GetStatus { responder } => responder
+                    .send_no_shutdown_on_err(&mut Result::Err(fsys::StatusError::Unsupported))?,
+                fsys::StorageAdminRequest::DeleteAllStorageContents { responder } => responder
+                    .send_no_shutdown_on_err(&mut Result::Err(fsys::DeletionError::Unsupported))?,
             }
         }
         Ok(())
