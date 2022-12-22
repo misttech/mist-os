@@ -113,3 +113,31 @@ group("account_handler") {
     ":account_handler_persistent",
   ]
 }
+
+# Test-only config values and packages.
+
+fuchsia_structured_config_values("ephemeral-test-config") {
+  cm_label = ":manifest"
+  values_source = "configs/ephemeral-test.json5"
+}
+
+fuchsia_structured_config_values("persistent-test-config") {
+  cm_label = ":manifest"
+  values_source = "configs/persistent-test.json5"
+}
+
+fuchsia_package("account_handler_persistent_for_test") {
+  deps = [
+    ":component",
+    ":persistent-config",
+    "//src/storage/bin/minfs",
+  ]
+}
+
+fuchsia_package("account_handler_ephemeral_for_test") {
+  deps = [
+    ":component",
+    ":ephemeral-config",
+    "//src/storage/bin/minfs",
+  ]
+}

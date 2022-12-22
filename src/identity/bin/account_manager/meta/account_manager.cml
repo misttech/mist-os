@@ -66,4 +66,17 @@
             from: "self",
         },
     ],
+    config: {
+        /// The url used to launch new persistent AccountHandler component instances.
+        account_handler_persistent_url: {
+            type: "string",
+            max_size: 4096,
+        },
+
+        /// The url used to launch new ephemeral AccountHandler component instances.
+        account_handler_ephemeral_url: {
+            type: "string",
+            max_size: 4096,
+        },
+    },
 }

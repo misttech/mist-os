@@ -40,8 +40,8 @@
     facets: {
         "fuchsia.test": {
             "deprecated-allowed-packages": [
-                "account_handler_ephemeral",
-                "account_handler_persistent",
+                "account_handler_ephemeral_for_test",
+                "account_handler_persistent_for_test",
             ],
         },
     },

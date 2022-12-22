@@ -4,6 +4,7 @@
 
 use {
     account_common::{AccountId, AccountManagerError, ResultExt},
+    account_manager_structured_config::Config,
     anyhow::Context,
     async_trait::async_trait,
     core::fmt::Debug,
@@ -17,24 +18,6 @@ use {
     std::fmt,
     tracing::{info, warn},
 };
-
-/// The url used to launch new AccountHandler component instances.
-///
-/// Note that account_handler and account_manager are packaged together in
-/// the integration test and in production so the same relative URL works
-/// in both cases. In the future, we could use structured configuration to
-/// set the account_handler url to allow more flexibility in packaging.
-const ACCOUNT_HANDLER_URL: &str =
-    "fuchsia-pkg://fuchsia.com/account_handler_persistent#meta/account_handler.cm";
-
-/// The url used to launch new ephemeral AccountHandler component instances.
-///
-/// Note that account_handler and account_manager are packaged together in
-/// the integration test and in production so the same relative URL works
-/// in both cases. In the future, we could use structured configuration to
-/// set the account_handler url to allow more flexibility in packaging.
-const ACCOUNT_HANDLER_EPHEMERAL_URL: &str =
-    "fuchsia-pkg://fuchsia.com/account_handler_ephemeral#meta/account_handler.cm";
 
 /// The collection where we spawn new AccountHandler component instances.
 const ACCOUNT_HANDLER_COLLECTION_NAME: &str = "account_handlers";
@@ -91,12 +74,13 @@ impl fmt::Debug for AccountHandlerConnectionImpl {
 #[async_trait]
 impl AccountHandlerConnection for AccountHandlerConnectionImpl {
     async fn new(account_id: AccountId, lifetime: Lifetime) -> Result<Self, AccountManagerError> {
+        let config = Config::take_from_startup_handle();
         let account_handler_url = if lifetime == Lifetime::Ephemeral {
             info!("Launching new ephemeral AccountHandler instance");
-            ACCOUNT_HANDLER_EPHEMERAL_URL
+            config.account_handler_ephemeral_url
         } else {
             info!("Launching new persistent AccountHandler instance");
-            ACCOUNT_HANDLER_URL
+            config.account_handler_persistent_url
         };
 
         // We append account id to the account_prefix to get a unique instance
@@ -113,7 +97,7 @@ impl AccountHandlerConnection for AccountHandlerConnectionImpl {
 
         let child_decl = Child {
             name: Some(account_handler_name.clone()),
-            url: Some(account_handler_url.to_string()),
+            url: Some(account_handler_url),
             startup: Some(StartupMode::Lazy),
             ..Child::EMPTY
         };

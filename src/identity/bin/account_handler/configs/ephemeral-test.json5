@@ -1,0 +1,6 @@
+{
+    available_mechanisms: [],
+    is_ephemeral: true,
+    is_interaction_enabled: true,
+    storage_manager: "MINFS",
+}

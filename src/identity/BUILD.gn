@@ -27,7 +27,8 @@ group("tests") {
     #
     # TODO(http://fxbug.dev/115592): Remove this dependency when the integration
     # tests are once again hermetic.
-    "//src/identity/bin/account_handler",
+    "//src/identity/bin/account_handler:account_handler_ephemeral_for_test",
+    "//src/identity/bin/account_handler:account_handler_persistent_for_test",
   ]
 }
 

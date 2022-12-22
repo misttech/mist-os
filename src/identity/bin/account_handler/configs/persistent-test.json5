@@ -1,0 +1,8 @@
+{
+    available_mechanisms: [
+        "TEST",
+    ],
+    is_ephemeral: false,
+    is_interaction_enabled: true,
+    storage_manager: "MINFS",
+}
