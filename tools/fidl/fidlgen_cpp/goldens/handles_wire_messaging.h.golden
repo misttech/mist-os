@@ -144,7 +144,7 @@ class ::fidl::WireServer<::test_handles::SomeProtocol> : public ::fidl::internal
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_handles::SomeProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_handles::SomeProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_handles::SomeProtocol>;
 
   // |bind_handler| returns a handler that binds incoming connections to this
   // server implementation.

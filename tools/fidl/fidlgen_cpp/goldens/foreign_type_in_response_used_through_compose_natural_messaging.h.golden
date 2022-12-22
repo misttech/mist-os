@@ -152,7 +152,7 @@ class ::fidl::Server<::test_foreigntypeinresponseusedthroughcompose::Top> : publ
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_foreigntypeinresponseusedthroughcompose::Top;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_foreigntypeinresponseusedthroughcompose::Top>)>;
+  using Handler = fidl::ProtocolHandler<::test_foreigntypeinresponseusedthroughcompose::Top>;
 
   using GetFooCompleter = ::fidl::internal::NaturalCompleter<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo>;
 

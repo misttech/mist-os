@@ -394,7 +394,7 @@ class ::fdf::WireServer<::test_drivertwoway::TwoWay> : public ::fidl::internal::
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_drivertwoway::TwoWay;
 
-  using Handler = fit::function<void(::fdf::ServerEnd<::test_drivertwoway::TwoWay>)>;
+  using Handler = fidl::ProtocolHandler<::test_drivertwoway::TwoWay>;
 
   using AddCompleter = ::fidl::internal::WireCompleter<::test_drivertwoway::TwoWay::Add>;
   using AddRequestView = ::test_drivertwoway::wire::TwoWayAddRequest*;

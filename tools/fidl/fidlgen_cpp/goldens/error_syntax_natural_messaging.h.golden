@@ -226,7 +226,7 @@ class ::fidl::Server<::test_errorsyntax::ExampleUseOfErrorSyntax> : public ::fid
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_errorsyntax::ExampleUseOfErrorSyntax;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>)>;
+  using Handler = fidl::ProtocolHandler<::test_errorsyntax::ExampleUseOfErrorSyntax>;
 
   using ComposedCallWhichMayFailRequest = ::fidl::Request<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>;
   using ComposedCallWhichMayFailCompleter = ::fidl::internal::NaturalCompleter<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>;

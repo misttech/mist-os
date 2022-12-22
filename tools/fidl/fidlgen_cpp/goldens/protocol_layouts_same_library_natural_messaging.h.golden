@@ -388,7 +388,7 @@ class ::fidl::Server<::test_protocollayoutssamelibrary::ComposedProtocol> : publ
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_protocollayoutssamelibrary::ComposedProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_protocollayoutssamelibrary::ComposedProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_protocollayoutssamelibrary::ComposedProtocol>;
 
   using OneWayAnonComposedRequest = ::fidl::Request<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed>;
   using OneWayAnonComposedCompleter = ::fidl::internal::NaturalCompleter<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed>;
@@ -1086,7 +1086,7 @@ class ::fidl::Server<::test_protocollayoutssamelibrary::MainProtocol> : public :
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_protocollayoutssamelibrary::MainProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_protocollayoutssamelibrary::MainProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_protocollayoutssamelibrary::MainProtocol>;
 
   using OneWayAnonComposedRequest = ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed>;
   using OneWayAnonComposedCompleter = ::fidl::internal::NaturalCompleter<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed>;

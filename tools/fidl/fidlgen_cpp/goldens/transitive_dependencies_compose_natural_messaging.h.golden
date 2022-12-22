@@ -152,7 +152,7 @@ class ::fidl::Server<::test_transitivedependenciescompose::Top> : public ::fidl:
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_transitivedependenciescompose::Top;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_transitivedependenciescompose::Top>)>;
+  using Handler = fidl::ProtocolHandler<::test_transitivedependenciescompose::Top>;
 
   using GetFooCompleter = ::fidl::internal::NaturalCompleter<::test_transitivedependenciescompose::Top::GetFoo>;
 

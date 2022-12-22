@@ -153,7 +153,7 @@ class ::fidl::Server<::test_nullable::SimpleProtocol> : public ::fidl::internal:
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_nullable::SimpleProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_nullable::SimpleProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_nullable::SimpleProtocol>;
 
   using AddRequest = ::fidl::Request<::test_nullable::SimpleProtocol::Add>;
   using AddCompleter = ::fidl::internal::NaturalCompleter<::test_nullable::SimpleProtocol::Add>;

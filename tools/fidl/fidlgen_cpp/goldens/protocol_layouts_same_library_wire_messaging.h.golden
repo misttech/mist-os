@@ -2273,7 +2273,7 @@ class ::fidl::WireServer<::test_protocollayoutssamelibrary::ComposedProtocol> : 
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_protocollayoutssamelibrary::ComposedProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_protocollayoutssamelibrary::ComposedProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_protocollayoutssamelibrary::ComposedProtocol>;
 
 
     using OneWayAnonComposedCompleter = ::fidl::internal::WireCompleter<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed>;
@@ -6674,7 +6674,7 @@ class ::fidl::WireServer<::test_protocollayoutssamelibrary::MainProtocol> : publ
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_protocollayoutssamelibrary::MainProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_protocollayoutssamelibrary::MainProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_protocollayoutssamelibrary::MainProtocol>;
 
 
     using OneWayAnonComposedCompleter = ::fidl::internal::WireCompleter<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed>;

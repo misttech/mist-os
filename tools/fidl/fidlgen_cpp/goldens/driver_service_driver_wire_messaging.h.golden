@@ -102,7 +102,7 @@ class ::fdf::WireServer<::test_driverservice::SomeDriverProtocol> : public ::fid
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_driverservice::SomeDriverProtocol;
 
-  using Handler = fit::function<void(::fdf::ServerEnd<::test_driverservice::SomeDriverProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_driverservice::SomeDriverProtocol>;
 
   // |bind_handler| returns a handler that binds incoming connections to this
   // server implementation.

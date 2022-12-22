@@ -651,7 +651,7 @@ class ::fidl::Server<::test_protocolpayloads::MainProtocol> : public ::fidl::int
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_protocolpayloads::MainProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_protocolpayloads::MainProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_protocolpayloads::MainProtocol>;
 
   using OneWayComposedRequest = ::fidl::Request<::test_protocolpayloads::MainProtocol::OneWayComposed>;
   using OneWayComposedCompleter = ::fidl::internal::NaturalCompleter<::test_protocolpayloads::MainProtocol::OneWayComposed>;

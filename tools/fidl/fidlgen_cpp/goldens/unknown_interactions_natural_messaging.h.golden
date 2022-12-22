@@ -1543,7 +1543,7 @@ class ::fidl::Server<::test_unknowninteractions::UnknownInteractionsProtocol> : 
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_unknowninteractions::UnknownInteractionsProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_unknowninteractions::UnknownInteractionsProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsProtocol>;
 
 
   using StrictOneWayCompleter = ::fidl::internal::NaturalCompleter<::test_unknowninteractions::UnknownInteractionsProtocol::StrictOneWay>;
@@ -2708,7 +2708,7 @@ class ::fidl::Server<::test_unknowninteractions::UnknownInteractionsAjarProtocol
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_unknowninteractions::UnknownInteractionsAjarProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_unknowninteractions::UnknownInteractionsAjarProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsAjarProtocol>;
 
 
   using StrictOneWayCompleter = ::fidl::internal::NaturalCompleter<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictOneWay>;
@@ -3616,7 +3616,7 @@ class ::fidl::Server<::test_unknowninteractions::UnknownInteractionsClosedProtoc
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_unknowninteractions::UnknownInteractionsClosedProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_unknowninteractions::UnknownInteractionsClosedProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsClosedProtocol>;
 
 
   using StrictOneWayCompleter = ::fidl::internal::NaturalCompleter<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictOneWay>;

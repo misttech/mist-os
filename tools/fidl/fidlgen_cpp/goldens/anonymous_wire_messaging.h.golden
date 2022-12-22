@@ -480,7 +480,7 @@ class ::fidl::WireServer<::test_anonymous::SomeProtocol> : public ::fidl::intern
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_anonymous::SomeProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_anonymous::SomeProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_anonymous::SomeProtocol>;
 
   using SomeMethodCompleter = ::fidl::internal::WireCompleter<::test_anonymous::SomeProtocol::SomeMethod>;
   using SomeMethodRequestView = ::test_anonymous::wire::SomeProtocolSomeMethodRequest*;

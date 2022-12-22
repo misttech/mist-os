@@ -121,7 +121,7 @@ class ::fidl::Server<::test_placementofattributes::ExampleProtocol> : public ::f
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_placementofattributes::ExampleProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_placementofattributes::ExampleProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_placementofattributes::ExampleProtocol>;
 
   using MethodRequest = ::fidl::Request<::test_placementofattributes::ExampleProtocol::Method>;
   using MethodCompleter = ::fidl::internal::NaturalCompleter<::test_placementofattributes::ExampleProtocol::Method>;

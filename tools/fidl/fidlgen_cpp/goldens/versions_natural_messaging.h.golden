@@ -106,7 +106,7 @@ class ::fidl::Server<::test_versions::OtherProtocol> : public ::fidl::internal::
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_versions::OtherProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_versions::OtherProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_versions::OtherProtocol>;
 
   // |bind_handler| returns a handler that binds incoming connections to this
   // server implementation.
@@ -241,7 +241,7 @@ class ::fidl::Server<::test_versions::Protocol> : public ::fidl::internal::Incom
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_versions::Protocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_versions::Protocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_versions::Protocol>;
 
   using FooCompleter = ::fidl::internal::NaturalCompleter<::test_versions::Protocol::Foo>;
 

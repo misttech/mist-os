@@ -28,7 +28,7 @@ class {{ .WireServer }} : public ::fidl::internal::IncomingMessageDispatcher
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = {{ . }};
 
-  using Handler = fit::function<void({{ .ServerEnd }})>;
+  using Handler = fidl::ProtocolHandler<{{ . }}>;
 
 {{ "" }}
   {{- range .Methods }}
@@ -104,7 +104,7 @@ class {{ .NaturalServer }} : public ::fidl::internal::IncomingMessageDispatcher
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = {{ .Wire }};
 
-  using Handler = fit::function<void({{ .ServerEnd }})>;
+  using Handler = fidl::ProtocolHandler<{{ .Wire }}>;
 
 {{ "" }}
   {{- range .ClientMethods }}

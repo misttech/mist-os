@@ -68,7 +68,7 @@ class ::fdf::Server<::test_driveroneway::OneWay> : public ::fidl::internal::Inco
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_driveroneway::OneWay;
 
-  using Handler = fit::function<void(::fdf::ServerEnd<::test_driveroneway::OneWay>)>;
+  using Handler = fidl::ProtocolHandler<::test_driveroneway::OneWay>;
 
   using SendRequest = ::fidl::Request<::test_driveroneway::OneWay::Send>;
   using SendCompleter = ::fidl::internal::NaturalCompleter<::test_driveroneway::OneWay::Send>;

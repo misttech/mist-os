@@ -143,7 +143,7 @@ class ::fidl::Server<::test_doccomments::Interface> : public ::fidl::internal::I
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_doccomments::Interface;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_doccomments::Interface>)>;
+  using Handler = fidl::ProtocolHandler<::test_doccomments::Interface>;
 
   using MethodCompleter = ::fidl::internal::NaturalCompleter<::test_doccomments::Interface::Method>;
 

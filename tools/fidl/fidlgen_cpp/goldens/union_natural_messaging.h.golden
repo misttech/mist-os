@@ -190,7 +190,7 @@ class ::fidl::Server<::test_union::TestProtocol> : public ::fidl::internal::Inco
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_union::TestProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_union::TestProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_union::TestProtocol>;
 
   using StrictXUnionHenceResponseMayBeStackAllocatedCompleter = ::fidl::internal::NaturalCompleter<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated>;
 

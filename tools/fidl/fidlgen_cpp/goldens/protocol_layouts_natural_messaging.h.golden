@@ -796,7 +796,7 @@ class ::fidl::Server<::test_protocollayouts::MainProtocol> : public ::fidl::inte
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_protocollayouts::MainProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_protocollayouts::MainProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_protocollayouts::MainProtocol>;
 
   using OneWayAnonComposedRequest = ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayAnonComposed>;
   using OneWayAnonComposedCompleter = ::fidl::internal::NaturalCompleter<::test_protocollayouts::MainProtocol::OneWayAnonComposed>;

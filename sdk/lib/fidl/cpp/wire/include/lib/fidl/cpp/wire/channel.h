@@ -13,6 +13,7 @@
 #include <lib/fidl/cpp/wire/internal/transport.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fidl/cpp/wire/server.h>
+#include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl/cpp/wire/wire_messaging.h>
 #include <lib/zx/result.h>
@@ -821,8 +822,9 @@ class ServerBindingGroup final {
   // Returns an |ServerImpl::Handler| that binds the incoming |ServerEnd| to the passed in |impl|.
   // All bindings will use the same |CloseHandler|.
   template <typename ServerImpl, typename CloseHandler>
-  typename ServerImpl::Handler CreateHandler(ServerImpl* impl, async_dispatcher_t* dispatcher,
-                                             CloseHandler&& close_handler) {
+  fidl::ProtocolHandler<FidlProtocol> CreateHandler(ServerImpl* impl,
+                                                    async_dispatcher_t* dispatcher,
+                                                    CloseHandler&& close_handler) {
     ProtocolMatchesImplRequirement<ServerImpl>();
     return [this, impl, dispatcher, close_handler = std::forward<CloseHandler>(close_handler)](
                fidl::internal::ServerEndType<FidlProtocol> server_end) {

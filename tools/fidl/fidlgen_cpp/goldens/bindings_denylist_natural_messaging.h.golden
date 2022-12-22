@@ -107,7 +107,7 @@ class ::fidl::Server<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> : public ::f
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_bindingsdenylist::OnlyLibfuzzerAndDeps;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>)>;
+  using Handler = fidl::ProtocolHandler<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>;
 
   // |bind_handler| returns a handler that binds incoming connections to this
   // server implementation.
@@ -234,7 +234,7 @@ class ::fidl::Server<::test_bindingsdenylist::OnlyCppAndDeps> : public ::fidl::i
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_bindingsdenylist::OnlyCppAndDeps;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_bindingsdenylist::OnlyCppAndDeps>)>;
+  using Handler = fidl::ProtocolHandler<::test_bindingsdenylist::OnlyCppAndDeps>;
 
   // |bind_handler| returns a handler that binds incoming connections to this
   // server implementation.
@@ -656,7 +656,7 @@ class ::fidl::Server<::test_bindingsdenylist::DenyEachBinding> : public ::fidl::
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_bindingsdenylist::DenyEachBinding;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_bindingsdenylist::DenyEachBinding>)>;
+  using Handler = fidl::ProtocolHandler<::test_bindingsdenylist::DenyEachBinding>;
 
   using OnlyDenyDartRequest = ::fidl::Request<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart>;
   using OnlyDenyDartCompleter = ::fidl::internal::NaturalCompleter<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart>;
@@ -813,7 +813,7 @@ class ::fidl::Server<::test_bindingsdenylist::Allowed> : public ::fidl::internal
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_bindingsdenylist::Allowed;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_bindingsdenylist::Allowed>)>;
+  using Handler = fidl::ProtocolHandler<::test_bindingsdenylist::Allowed>;
 
   // |bind_handler| returns a handler that binds incoming connections to this
   // server implementation.
@@ -957,7 +957,7 @@ class ::fidl::Server<::test_bindingsdenylist::ImportsSameNameContext> : public :
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_bindingsdenylist::ImportsSameNameContext;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_bindingsdenylist::ImportsSameNameContext>)>;
+  using Handler = fidl::ProtocolHandler<::test_bindingsdenylist::ImportsSameNameContext>;
 
   using UnattributedCompleter = ::fidl::internal::NaturalCompleter<::test_bindingsdenylist::ImportsSameNameContext::Unattributed>;
 

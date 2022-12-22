@@ -167,7 +167,7 @@ class ::fidl::Server<::test_anonymous::SomeProtocol> : public ::fidl::internal::
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_anonymous::SomeProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_anonymous::SomeProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_anonymous::SomeProtocol>;
 
   using SomeMethodRequest = ::fidl::Request<::test_anonymous::SomeProtocol::SomeMethod>;
   using SomeMethodCompleter = ::fidl::internal::NaturalCompleter<::test_anonymous::SomeProtocol::SomeMethod>;

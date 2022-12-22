@@ -167,7 +167,7 @@ class ::fidl::Server<::test_error::Example> : public ::fidl::internal::IncomingM
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_error::Example;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_error::Example>)>;
+  using Handler = fidl::ProtocolHandler<::test_error::Example>;
 
   using FooRequest = ::fidl::Request<::test_error::Example::Foo>;
   using FooCompleter = ::fidl::internal::NaturalCompleter<::test_error::Example::Foo>;

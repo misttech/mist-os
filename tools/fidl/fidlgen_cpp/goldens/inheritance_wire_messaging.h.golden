@@ -474,7 +474,7 @@ class ::fidl::WireServer<::test_inheritance::Super> : public ::fidl::internal::I
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_inheritance::Super;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_inheritance::Super>)>;
+  using Handler = fidl::ProtocolHandler<::test_inheritance::Super>;
 
   using FooCompleter = ::fidl::internal::WireCompleter<::test_inheritance::Super::Foo>;
   using FooRequestView = ::test_inheritance::wire::SuperFooRequest*;
@@ -953,7 +953,7 @@ class ::fidl::WireServer<::test_inheritance::Sub> : public ::fidl::internal::Inc
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_inheritance::Sub;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_inheritance::Sub>)>;
+  using Handler = fidl::ProtocolHandler<::test_inheritance::Sub>;
 
   using FooCompleter = ::fidl::internal::WireCompleter<::test_inheritance::Sub::Foo>;
   using FooRequestView = ::test_inheritance::wire::SuperFooRequest*;

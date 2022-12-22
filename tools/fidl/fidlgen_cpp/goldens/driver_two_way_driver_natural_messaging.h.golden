@@ -100,7 +100,7 @@ class ::fdf::Server<::test_drivertwoway::TwoWay> : public ::fidl::internal::Inco
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_drivertwoway::TwoWay;
 
-  using Handler = fit::function<void(::fdf::ServerEnd<::test_drivertwoway::TwoWay>)>;
+  using Handler = fidl::ProtocolHandler<::test_drivertwoway::TwoWay>;
 
   using AddRequest = ::fidl::Request<::test_drivertwoway::TwoWay::Add>;
   using AddCompleter = ::fidl::internal::NaturalCompleter<::test_drivertwoway::TwoWay::Add>;

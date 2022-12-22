@@ -813,7 +813,7 @@ class ::fidl::WireServer<::test_errorsyntax::ExampleUseOfErrorSyntax> : public :
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_errorsyntax::ExampleUseOfErrorSyntax;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>)>;
+  using Handler = fidl::ProtocolHandler<::test_errorsyntax::ExampleUseOfErrorSyntax>;
 
   using ComposedCallWhichMayFailCompleter = ::fidl::internal::WireCompleter<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>;
   using ComposedCallWhichMayFailRequestView = ::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest*;

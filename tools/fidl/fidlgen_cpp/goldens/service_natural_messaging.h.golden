@@ -112,7 +112,7 @@ class ::fidl::Server<::test_service::FirstProtocol> : public ::fidl::internal::I
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_service::FirstProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_service::FirstProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_service::FirstProtocol>;
 
   using MethodOnFirstCompleter = ::fidl::internal::NaturalCompleter<::test_service::FirstProtocol::MethodOnFirst>;
 
@@ -252,7 +252,7 @@ class ::fidl::Server<::test_service::SecondProtocol> : public ::fidl::internal::
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_service::SecondProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_service::SecondProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_service::SecondProtocol>;
 
   using MethodOnSecondCompleter = ::fidl::internal::NaturalCompleter<::test_service::SecondProtocol::MethodOnSecond>;
 

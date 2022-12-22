@@ -23,6 +23,9 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 
+template <typename Protocol>
+using ProtocolHandler = fit::function<void(fidl::internal::ServerEndType<Protocol>)>;
+
 // Class used by generated FIDL code for adding protocol members to a Service instance.
 template <class Transport>
 class ServiceInstanceHandler {
@@ -34,7 +37,7 @@ class ServiceInstanceHandler {
   // For example, if |Protocol| is spoken over Zircon channels, the handler takes a
   // |fidl::ServerEnd<Protocol>|.
   template <typename Protocol>
-  using MemberHandler = fit::function<void(fidl::internal::ServerEndType<Protocol>)>;
+  using MemberHandler = ProtocolHandler<Protocol>;
 
   // User-defined action for handling a connection attempt to any
   // member FIDL protocol.

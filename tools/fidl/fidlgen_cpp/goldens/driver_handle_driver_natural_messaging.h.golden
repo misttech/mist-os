@@ -55,7 +55,7 @@ class ::fdf::Server<::test_driverhandle::DriverProtocol> : public ::fidl::intern
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_driverhandle::DriverProtocol;
 
-  using Handler = fit::function<void(::fdf::ServerEnd<::test_driverhandle::DriverProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_driverhandle::DriverProtocol>;
 
   // |bind_handler| returns a handler that binds incoming connections to this
   // server implementation.
@@ -150,7 +150,7 @@ class ::fdf::Server<::test_driverhandle::HandlesInProtocol> : public ::fidl::int
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_driverhandle::HandlesInProtocol;
 
-  using Handler = fit::function<void(::fdf::ServerEnd<::test_driverhandle::HandlesInProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_driverhandle::HandlesInProtocol>;
 
   using SendHandlesRequest = ::fidl::Request<::test_driverhandle::HandlesInProtocol::SendHandles>;
   using SendHandlesCompleter = ::fidl::internal::NaturalCompleter<::test_driverhandle::HandlesInProtocol::SendHandles>;

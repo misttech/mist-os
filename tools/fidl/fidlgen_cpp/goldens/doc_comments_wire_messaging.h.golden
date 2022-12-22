@@ -356,7 +356,7 @@ class ::fidl::WireServer<::test_doccomments::Interface> : public ::fidl::interna
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_doccomments::Interface;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_doccomments::Interface>)>;
+  using Handler = fidl::ProtocolHandler<::test_doccomments::Interface>;
 
   using MethodCompleter = ::fidl::internal::WireCompleter<::test_doccomments::Interface::Method>;
 

@@ -769,7 +769,7 @@ class ::fidl::WireServer<::test_union::TestProtocol> : public ::fidl::internal::
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_union::TestProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_union::TestProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_union::TestProtocol>;
 
   using StrictXUnionHenceResponseMayBeStackAllocatedCompleter = ::fidl::internal::WireCompleter<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated>;
 

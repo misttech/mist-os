@@ -479,7 +479,7 @@ class ::fidl::WireServer<::test_error::Example> : public ::fidl::internal::Incom
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_error::Example;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_error::Example>)>;
+  using Handler = fidl::ProtocolHandler<::test_error::Example>;
 
   using FooCompleter = ::fidl::internal::WireCompleter<::test_error::Example::Foo>;
   using FooRequestView = ::test_error::wire::ExampleFooRequest*;

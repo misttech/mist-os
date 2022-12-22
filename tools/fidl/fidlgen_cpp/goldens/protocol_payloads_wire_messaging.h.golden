@@ -4387,7 +4387,7 @@ class ::fidl::WireServer<::test_protocolpayloads::MainProtocol> : public ::fidl:
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_protocolpayloads::MainProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_protocolpayloads::MainProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_protocolpayloads::MainProtocol>;
 
 
     using OneWayComposedCompleter = ::fidl::internal::WireCompleter<::test_protocolpayloads::MainProtocol::OneWayComposed>;

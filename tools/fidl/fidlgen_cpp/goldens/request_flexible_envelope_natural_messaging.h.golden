@@ -197,7 +197,7 @@ class ::fidl::Server<::test_requestflexibleenvelope::Protocol> : public ::fidl::
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_requestflexibleenvelope::Protocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_requestflexibleenvelope::Protocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_requestflexibleenvelope::Protocol>;
 
   using RequestStrictResponseFlexibleRequest = ::fidl::Request<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>;
   using RequestStrictResponseFlexibleCompleter = ::fidl::internal::NaturalCompleter<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>;

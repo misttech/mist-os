@@ -215,7 +215,7 @@ class ::fdf::WireServer<::test_driveroneway::OneWay> : public ::fidl::internal::
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_driveroneway::OneWay;
 
-  using Handler = fit::function<void(::fdf::ServerEnd<::test_driveroneway::OneWay>)>;
+  using Handler = fidl::ProtocolHandler<::test_driveroneway::OneWay>;
 
   using SendCompleter = ::fidl::internal::WireCompleter<::test_driveroneway::OneWay::Send>;
   using SendRequestView = ::test_driveroneway::wire::OneWaySendRequest*;

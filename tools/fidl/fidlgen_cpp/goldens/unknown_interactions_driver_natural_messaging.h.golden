@@ -824,7 +824,7 @@ class ::fdf::Server<::test_unknowninteractions::UnknownInteractionsDriverProtoco
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_unknowninteractions::UnknownInteractionsDriverProtocol;
 
-  using Handler = fit::function<void(::fdf::ServerEnd<::test_unknowninteractions::UnknownInteractionsDriverProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsDriverProtocol>;
 
   using StrictOneWayCompleter = ::fidl::internal::NaturalCompleter<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictOneWay>;
 
@@ -1370,7 +1370,7 @@ class ::fdf::Server<::test_unknowninteractions::UnknownInteractionsAjarDriverPro
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol;
 
-  using Handler = fit::function<void(::fdf::ServerEnd<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>;
 
   using StrictOneWayCompleter = ::fidl::internal::NaturalCompleter<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictOneWay>;
 
@@ -1866,7 +1866,7 @@ class ::fdf::Server<::test_unknowninteractions::UnknownInteractionsClosedDriverP
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol;
 
-  using Handler = fit::function<void(::fdf::ServerEnd<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>;
 
   using StrictOneWayCompleter = ::fidl::internal::NaturalCompleter<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictOneWay>;
 

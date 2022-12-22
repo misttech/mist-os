@@ -186,7 +186,7 @@ class ::fidl::WireServer<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> : public
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_bindingsdenylist::OnlyLibfuzzerAndDeps;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>)>;
+  using Handler = fidl::ProtocolHandler<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>;
 
 
 
@@ -355,7 +355,7 @@ class ::fidl::WireServer<::test_bindingsdenylist::OnlyCppAndDeps> : public ::fid
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_bindingsdenylist::OnlyCppAndDeps;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_bindingsdenylist::OnlyCppAndDeps>)>;
+  using Handler = fidl::ProtocolHandler<::test_bindingsdenylist::OnlyCppAndDeps>;
 
 
 
@@ -2304,7 +2304,7 @@ class ::fidl::WireServer<::test_bindingsdenylist::DenyEachBinding> : public ::fi
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_bindingsdenylist::DenyEachBinding;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_bindingsdenylist::DenyEachBinding>)>;
+  using Handler = fidl::ProtocolHandler<::test_bindingsdenylist::DenyEachBinding>;
 
 
     using OnlyDenyDartCompleter = ::fidl::internal::WireCompleter<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart>;
@@ -2513,7 +2513,7 @@ class ::fidl::WireServer<::test_bindingsdenylist::Allowed> : public ::fidl::inte
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_bindingsdenylist::Allowed;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_bindingsdenylist::Allowed>)>;
+  using Handler = fidl::ProtocolHandler<::test_bindingsdenylist::Allowed>;
 
 
 
@@ -2951,7 +2951,7 @@ class ::fidl::WireServer<::test_bindingsdenylist::ImportsSameNameContext> : publ
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_bindingsdenylist::ImportsSameNameContext;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_bindingsdenylist::ImportsSameNameContext>)>;
+  using Handler = fidl::ProtocolHandler<::test_bindingsdenylist::ImportsSameNameContext>;
 
 
     using UnattributedCompleter = ::fidl::internal::WireCompleter<::test_bindingsdenylist::ImportsSameNameContext::Unattributed>;

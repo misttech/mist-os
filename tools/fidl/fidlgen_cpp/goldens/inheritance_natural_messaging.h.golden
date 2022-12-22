@@ -153,7 +153,7 @@ class ::fidl::Server<::test_inheritance::Super> : public ::fidl::internal::Incom
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_inheritance::Super;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_inheritance::Super>)>;
+  using Handler = fidl::ProtocolHandler<::test_inheritance::Super>;
 
   using FooRequest = ::fidl::Request<::test_inheritance::Super::Foo>;
   using FooCompleter = ::fidl::internal::NaturalCompleter<::test_inheritance::Super::Foo>;
@@ -325,7 +325,7 @@ class ::fidl::Server<::test_inheritance::Sub> : public ::fidl::internal::Incomin
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_inheritance::Sub;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_inheritance::Sub>)>;
+  using Handler = fidl::ProtocolHandler<::test_inheritance::Sub>;
 
   using FooRequest = ::fidl::Request<::test_inheritance::Sub::Foo>;
   using FooCompleter = ::fidl::internal::NaturalCompleter<::test_inheritance::Sub::Foo>;

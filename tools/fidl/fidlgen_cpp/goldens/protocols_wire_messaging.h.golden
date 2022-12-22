@@ -1900,7 +1900,7 @@ class ::fidl::WireServer<::test_protocols::WithAndWithoutRequestResponse> : publ
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_protocols::WithAndWithoutRequestResponse;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_protocols::WithAndWithoutRequestResponse>)>;
+  using Handler = fidl::ProtocolHandler<::test_protocols::WithAndWithoutRequestResponse>;
 
 
     using NoRequestNoResponseCompleter = ::fidl::internal::WireCompleter<::test_protocols::WithAndWithoutRequestResponse::NoRequestNoResponse>;
@@ -3491,7 +3491,7 @@ class ::fidl::WireServer<::test_protocols::WithErrorSyntax> : public ::fidl::int
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_protocols::WithErrorSyntax;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_protocols::WithErrorSyntax>)>;
+  using Handler = fidl::ProtocolHandler<::test_protocols::WithErrorSyntax>;
 
 
     using ResponseAsStructCompleter = ::fidl::internal::WireCompleter<::test_protocols::WithErrorSyntax::ResponseAsStruct>;
@@ -4940,7 +4940,7 @@ class ::fidl::WireServer<::test_protocols::ChannelProtocol> : public ::fidl::int
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_protocols::ChannelProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_protocols::ChannelProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_protocols::ChannelProtocol>;
 
 
     using MethodACompleter = ::fidl::internal::WireCompleter<::test_protocols::ChannelProtocol::MethodA>;
@@ -5746,7 +5746,7 @@ class ::fidl::WireServer<::test_protocols::Transitional> : public ::fidl::intern
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_protocols::Transitional;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_protocols::Transitional>)>;
+  using Handler = fidl::ProtocolHandler<::test_protocols::Transitional>;
 
 
     using RequestCompleter = ::fidl::internal::WireCompleter<::test_protocols::Transitional::Request>;
@@ -6066,7 +6066,7 @@ class ::fidl::WireServer<::test_protocols::DiscoverableProtocol> : public ::fidl
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_protocols::DiscoverableProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_protocols::DiscoverableProtocol>;
 
 
     using MethodCompleter = ::fidl::internal::WireCompleter<::test_protocols::DiscoverableProtocol::Method>;
@@ -6242,7 +6242,7 @@ class ::fidl::WireServer<::test_protocols::AnotherDiscoverableProtocol> : public
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_protocols::AnotherDiscoverableProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_protocols::AnotherDiscoverableProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_protocols::AnotherDiscoverableProtocol>;
 
 
 
@@ -7044,7 +7044,7 @@ class ::fidl::WireServer<::test_protocols::HandleRightsProtocol> : public ::fidl
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_protocols::HandleRightsProtocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_protocols::HandleRightsProtocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_protocols::HandleRightsProtocol>;
 
 
     using NoResponseMethodCompleter = ::fidl::internal::WireCompleter<::test_protocols::HandleRightsProtocol::NoResponseMethod>;
@@ -8342,7 +8342,7 @@ class ::fidl::WireServer<::test_protocols::WithProtocolEnds> : public ::fidl::in
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_protocols::WithProtocolEnds;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_protocols::WithProtocolEnds>)>;
+  using Handler = fidl::ProtocolHandler<::test_protocols::WithProtocolEnds>;
 
 
     using ClientEndsCompleter = ::fidl::internal::WireCompleter<::test_protocols::WithProtocolEnds::ClientEnds>;
@@ -8699,7 +8699,7 @@ class ::fidl::WireServer<::test_protocols::ManyParameters> : public ::fidl::inte
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_protocols::ManyParameters;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_protocols::ManyParameters>)>;
+  using Handler = fidl::ProtocolHandler<::test_protocols::ManyParameters>;
 
 
     using FifteenCompleter = ::fidl::internal::WireCompleter<::test_protocols::ManyParameters::Fifteen>;
@@ -9226,7 +9226,7 @@ class ::fidl::WireServer<::test_protocols::MethodWithUnion> : public ::fidl::int
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_protocols::MethodWithUnion;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_protocols::MethodWithUnion>)>;
+  using Handler = fidl::ProtocolHandler<::test_protocols::MethodWithUnion>;
 
 
     using UnionMethodCompleter = ::fidl::internal::WireCompleter<::test_protocols::MethodWithUnion::UnionMethod>;

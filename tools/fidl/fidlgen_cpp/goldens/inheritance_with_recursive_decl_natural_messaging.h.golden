@@ -120,7 +120,7 @@ class ::fidl::Server<::test_inheritancewithrecursivedecl::Parent> : public ::fid
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_inheritancewithrecursivedecl::Parent;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>)>;
+  using Handler = fidl::ProtocolHandler<::test_inheritancewithrecursivedecl::Parent>;
 
   using FirstRequest = ::fidl::Request<::test_inheritancewithrecursivedecl::Parent::First>;
   using FirstCompleter = ::fidl::internal::NaturalCompleter<::test_inheritancewithrecursivedecl::Parent::First>;
@@ -281,7 +281,7 @@ class ::fidl::Server<::test_inheritancewithrecursivedecl::Child> : public ::fidl
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_inheritancewithrecursivedecl::Child;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Child>)>;
+  using Handler = fidl::ProtocolHandler<::test_inheritancewithrecursivedecl::Child>;
 
   using FirstRequest = ::fidl::Request<::test_inheritancewithrecursivedecl::Child::First>;
   using FirstCompleter = ::fidl::internal::NaturalCompleter<::test_inheritancewithrecursivedecl::Child::First>;

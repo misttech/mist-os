@@ -799,7 +799,7 @@ class ::fidl::WireServer<::test_requestflexibleenvelope::Protocol> : public ::fi
   // The FIDL protocol type that is implemented by this server.
   using _EnclosingProtocol = ::test_requestflexibleenvelope::Protocol;
 
-  using Handler = fit::function<void(::fidl::ServerEnd<::test_requestflexibleenvelope::Protocol>)>;
+  using Handler = fidl::ProtocolHandler<::test_requestflexibleenvelope::Protocol>;
 
   using RequestStrictResponseFlexibleCompleter = ::fidl::internal::WireCompleter<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>;
   using RequestStrictResponseFlexibleRequestView = ::test_requestflexibleenvelope::wire::ProtocolRequestStrictResponseFlexibleRequest*;
