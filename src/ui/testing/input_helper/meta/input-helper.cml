@@ -18,6 +18,7 @@
                 "fuchsia.input.injection.InputDeviceRegistry",
                 "fuchsia.logger.LogSink",
                 "fuchsia.tracing.provider.Registry",
+                "fuchsia.ui.display.singleton.Info",
             ],
         },
     ],

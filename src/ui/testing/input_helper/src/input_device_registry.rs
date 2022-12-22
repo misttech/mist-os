@@ -34,7 +34,13 @@ impl InputDeviceRegistry {
     /// A `input_device::InputDevice`, which can be used to send events to the
     /// `fuchsia.input.report.InputDevice` that has been registered with the
     /// `fuchsia.input.injection.InputDeviceRegistry` service.
-    pub fn add_touchscreen_device(&mut self) -> Result<InputDevice, Error> {
+    pub fn add_touchscreen_device(
+        &mut self,
+        min_x: i64,
+        max_x: i64,
+        min_y: i64,
+        max_y: i64,
+    ) -> Result<InputDevice, Error> {
         const MAX_CONTACTS: u32 = 255;
         self.add_device(DeviceDescriptor {
             touch: Some(TouchDescriptor {
@@ -42,19 +48,19 @@ impl InputDeviceRegistry {
                     contacts: Some(
                         std::iter::repeat(ContactInputDescriptor {
                             position_x: Some(Axis {
-                                range: Range { min: -1000, max: 1000 },
+                                range: Range { min: min_x, max: max_x },
                                 unit: Unit { type_: UnitType::Other, exponent: 0 },
                             }),
                             position_y: Some(Axis {
-                                range: Range { min: -1000, max: 1000 },
+                                range: Range { min: min_y, max: max_y },
                                 unit: Unit { type_: UnitType::Other, exponent: 0 },
                             }),
                             contact_width: Some(Axis {
-                                range: Range { min: -1000, max: 1000 },
+                                range: Range { min: min_x, max: max_x },
                                 unit: Unit { type_: UnitType::Other, exponent: 0 },
                             }),
                             contact_height: Some(Axis {
-                                range: Range { min: -1000, max: 1000 },
+                                range: Range { min: min_y, max: max_y },
                                 unit: Unit { type_: UnitType::Other, exponent: 0 },
                             }),
                             ..ContactInputDescriptor::EMPTY

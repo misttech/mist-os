@@ -9,14 +9,15 @@ use {
         ConsumerControlInputReport, ContactInputReport, DeviceInfo, InputReport,
         KeyboardInputReport, MouseInputReport, TouchInputReport,
     },
-    fidl_fuchsia_math as math,
+    fidl_fuchsia_math as math, fidl_fuchsia_ui_display_singleton as display_info,
     fidl_fuchsia_ui_input::KeyboardReport,
     fidl_fuchsia_ui_test_input::{
-        KeyboardRequest, KeyboardRequestStream, MediaButtonsDeviceRequest,
+        CoordinateUnit, KeyboardRequest, KeyboardRequestStream, MediaButtonsDeviceRequest,
         MediaButtonsDeviceRequestStream, MouseRequest, MouseRequestStream, RegistryRequest,
         RegistryRequestStream, TouchScreenRequest, TouchScreenRequestStream,
     },
     fuchsia_async as fasync,
+    fuchsia_component::client::connect_to_protocol,
     futures::StreamExt,
     keymaps::{
         inverse_keymap::{InverseKeymap, Shift},
@@ -132,21 +133,31 @@ pub async fn handle_registry_request_stream(
         match request {
             Ok(RegistryRequest::RegisterTouchScreen { payload, responder, .. }) => {
                 info!("register touchscreen");
+                let device =
+                    payload.device.expect("no touchscreen device provided in registration request");
+                let (min_x, max_x, min_y, max_y) = match payload.coordinate_unit {
+                    Some(CoordinateUnit::PhysicalPixels) => {
+                        let display_info_proxy = connect_to_protocol::<display_info::InfoMarker>()
+                            .expect("failed to connect to display info service");
+                        let display_dimensions = display_info_proxy
+                            .get_metrics()
+                            .await
+                            .expect("failed to get display metrics")
+                            .extent_in_px
+                            .expect("display metrics missing extent in px");
+                        (0, display_dimensions.width as i64, 0, display_dimensions.height as i64)
+                    }
+                    _ => (-1000, 1000, -1000, 1000),
+                };
 
-                if let Some(device) = payload.device {
-                    let touchscreen_device = registry
-                        .add_touchscreen_device()
-                        .expect("failed to create fake touchscreen device");
+                let touchscreen_device = registry
+                    .add_touchscreen_device(min_x, max_x, min_y, max_y)
+                    .expect("failed to create fake touchscreen device");
 
-                    handle_touchscreen_request_stream(
-                        touchscreen_device,
-                        device
-                            .into_stream()
-                            .expect("failed to convert touchscreen device to stream"),
-                    );
-                } else {
-                    error!("no touchscreen device provided in registration request");
-                }
+                handle_touchscreen_request_stream(
+                    touchscreen_device,
+                    device.into_stream().expect("failed to convert touchscreen device to stream"),
+                );
 
                 responder.send().expect("Failed to respond to RegisterTouchScreen request");
             }

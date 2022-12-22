@@ -38,6 +38,11 @@
                 "#input-synthesis",
             ],
         },
+        {
+            protocol: [ "fuchsia.ui.display.singleton.Info" ],
+            from: "#scenic",
+            to: [ "#input-helper" ],
+        },
     ],
     expose: [
         {
