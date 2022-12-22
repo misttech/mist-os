@@ -5,6 +5,7 @@
 #ifndef SRC_DEVELOPER_DEBUG_ZXDB_SYMBOLS_TEMPLATE_PARAMETER_H_
 #define SRC_DEVELOPER_DEBUG_ZXDB_SYMBOLS_TEMPLATE_PARAMETER_H_
 
+#include "src/developer/debug/zxdb/symbols/const_value.h"
 #include "src/developer/debug/zxdb/symbols/symbol.h"
 
 namespace zxdb {
@@ -28,9 +29,11 @@ class TemplateParameter : public Symbol {
   //   template<typename T, int i>
   //
   // The first parameter will be !is_value() with a name "T" and a type() of whatever it was
-  // instantiated with. And the second will be is_valud() with a name "i", a type() "int", and
+  // instantiated with. And the second will be is_value() with a name "i", a type() "int", and
   // a value of whatever the value was.
-  bool is_value() const { return is_value_; }
+  bool is_value() const { return const_value_.has_value(); }
+  const ConstValue& const_value() const { return const_value_; }
+  void set_const_value(ConstValue value) { const_value_ = std::move(value); }
 
   // Symbol public overrides:
   const std::string& GetAssignedName() const override;
@@ -51,7 +54,7 @@ class TemplateParameter : public Symbol {
 
   std::string name_;
   LazySymbol type_;
-  bool is_value_ = false;
+  ConstValue const_value_;
 };
 
 }  // namespace zxdb

@@ -74,11 +74,22 @@ inferior("async_rust") {
   ]
 }
 
+inferior("simplified_templates") {
+  sources = [ "template_types.cc" ]
+
+  # Never optimize this since we are relying on the variables to be present.
+  cflags = [
+    "-gsimple-template-names",
+    "-fno-inline-functions",
+  ]
+}
+
 fuchsia_package("zxdb_e2e_inferiors") {
   deps = [
     ":async_rust",
     ":inlined_crasher",
     ":loop",
+    ":simplified_templates",
     ":step_plt",
     ":wait_for_debugger",
   ]

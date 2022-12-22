@@ -6,6 +6,8 @@
 
 #include <algorithm>
 
+#include <llvm/BinaryFormat/Dwarf.h>
+
 #include "llvm/DebugInfo/DWARF/DWARFContext.h"
 #include "llvm/DebugInfo/DWARF/DWARFDataExtractor.h"
 #include "llvm/DebugInfo/DWARF/DWARFDebugInfoEntry.h"
@@ -999,13 +1001,20 @@ fxl::RefPtr<Symbol> DwarfSymbolFactory::DecodeTemplateParameter(const llvm::DWAR
   llvm::DWARFDie type;
   decoder.AddReference(llvm::dwarf::DW_AT_type, &type);
 
-  // DW_TAG_template_value_parameter ones will also have a value if we need it in the future.
+  // Account for DW_TAG_template_value_parameter. This will change the behavior to print the value
+  // of the template parameter for things like template <int i> struct Foo {};.
+  ConstValue const_value;
+  decoder.AddConstValue(llvm::dwarf::DW_AT_const_value, &const_value);
 
   if (!decoder.Decode(die) || !name || !type)
     return fxl::MakeRefCounted<Symbol>();
 
-  return fxl::MakeRefCounted<TemplateParameter>(*name, MakeLazy(type),
-                                                tag == DwarfTag::kTemplateValueParameter);
+  fxl::RefPtr<TemplateParameter> result = fxl::MakeRefCounted<TemplateParameter>(
+      *name, MakeLazy(type), tag == DwarfTag::kTemplateValueParameter);
+
+  result->set_const_value(std::move(const_value));
+
+  return result;
 }
 
 // Clang and GCC use "unspecified" types to encode "decltype(nullptr)". When used as a variable this
