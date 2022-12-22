@@ -429,6 +429,14 @@ impl IfaceManagerService {
         connect_request: ConnectAttemptRequest,
         network_selector: Arc<NetworkSelector>,
     ) -> Result<(), Error> {
+        // Check to see if client connections are enabled.
+        {
+            let phy_manager = self.phy_manager.lock().await;
+            if !phy_manager.client_connections_enabled() {
+                return Err(format_err!("client connections are not enabled"));
+            }
+        }
+
         // Check if already connected to requested network
         if self.clients.iter().any(|client| match &client.config {
             Some(config) => config == &connect_request.network,
@@ -2430,6 +2438,64 @@ mod tests {
         // Call connect on the IfaceManager
         let selection = create_connect_selection(&TEST_SSID, TEST_PASSWORD);
         let connect_fut = iface_manager.connect(selection);
+
+        // Verify that the request to connect results in an error.
+        pin_mut!(connect_fut);
+        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(_)));
+    }
+
+    /// Tests the case where connect is called, but client connections are disabled.
+    #[fuchsia::test]
+    fn test_connect_while_connections_disabled() {
+        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+
+        // Create a PhyManager with no knowledge of any client ifaces.
+        let test_values = test_setup(&mut exec);
+        let phy_manager = Arc::new(Mutex::new(FakePhyManager {
+            create_iface_ok: true,
+            destroy_iface_ok: true,
+            set_country_ok: true,
+            wpa3_iface: None,
+            country_code: None,
+            client_connections_enabled: false,
+            client_ifaces: vec![],
+            defects: vec![],
+        }));
+
+        // Create the IfaceManager
+        let mut iface_manager = IfaceManagerService::new(
+            phy_manager,
+            test_values.client_update_sender,
+            test_values.ap_update_sender,
+            test_values.monitor_service_proxy,
+            test_values.saved_networks.clone(),
+            test_values.telemetry_sender,
+            test_values.stats_sender,
+            test_values.defect_sender,
+        );
+
+        // Create a NetworkSelector
+        let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
+        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let selector = Arc::new(NetworkSelector::new(
+            test_values.saved_networks,
+            test_values.scan_requester.clone(),
+            create_wlan_hasher(),
+            inspect::Inspector::new().root().create_child("network_selector"),
+            persistence_req_sender,
+            TelemetrySender::new(telemetry_sender),
+        ));
+
+        // Construct the connect request.
+        let connect_selection = create_connect_selection(&TEST_SSID, TEST_PASSWORD);
+        let request = ConnectAttemptRequest::new(
+            connect_selection.target.network,
+            connect_selection.target.credential,
+            client_types::ConnectReason::FidlConnectRequest,
+        );
+
+        // Attempt to handle a connect request.
+        let connect_fut = iface_manager.handle_connect_request(request, selector);
 
         // Verify that the request to connect results in an error.
         pin_mut!(connect_fut);
