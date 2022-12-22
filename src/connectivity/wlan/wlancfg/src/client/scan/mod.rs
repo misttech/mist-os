@@ -22,7 +22,7 @@ use {
         future::{Fuse, FusedFuture, FutureExt},
         lock::Mutex,
         pin_mut, select,
-        stream::StreamExt,
+        stream::{FuturesUnordered, StreamExt},
     },
     itertools::Itertools,
     log::{debug, error, info, warn},
@@ -113,9 +113,11 @@ pub async fn serve_scanning_loop(
     iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
     saved_networks_manager: Arc<dyn SavedNetworksManagerApi>,
     telemetry_sender: TelemetrySender,
+    location_sensor_updater: impl ScanResultUpdate,
     mut scan_request_channel: mpsc::Receiver<ApiScanRequest>,
 ) -> Result<(), Error> {
     let mut queue = queue::RequestQueue::new();
+    let mut location_sensor_updates = FuturesUnordered::new();
     // Use `Fuse::terminated()` to create an already-terminated future
     // which may be instantiated later.
     let ongoing_scan = Fuse::terminated();
@@ -127,7 +129,6 @@ pub async fn serve_scanning_loop(
             next_sme_req,
             iface_manager.clone(),
             saved_networks_manager.clone(),
-            LocationSensorUpdater { wpa3_supported: true },
             telemetry_sender.clone(),
         )
         .fuse(),
@@ -150,10 +151,22 @@ pub async fn serve_scanning_loop(
                 }
             },
             (completed_sme_request, scan_results) = ongoing_scan => {
+                // Send scan results to Location
+                if let Ok(ref results) = scan_results {
+                    location_sensor_updates.push(location_sensor_updater
+                        .update_scan_results(results.clone())
+                        .on_timeout(zx::Duration::from_seconds(SCAN_CONSUMER_MAX_SECONDS_ALLOWED), || {
+                            error!("Timed out waiting for location sensor to get results");
+                            ()
+                        })
+                    );
+                }
+                // Send scan results to requesters
                 queue.handle_completed_sme_scan(completed_sme_request, scan_results);
                 // Get the next (if any) request from the queue
                 ongoing_scan.set(transform_next_sme_req(queue.get_next_sme_request()));
             },
+            () = location_sensor_updates.select_next_some() => {},
             complete => {
                 // all futures are terminated
                 warn!("Unexpectedly reached end of scanning loop");
@@ -168,7 +181,7 @@ pub async fn serve_scanning_loop(
 /// Allows for consumption of updated scan results.
 #[async_trait]
 pub trait ScanResultUpdate: Sync + Send {
-    async fn update_scan_results(&mut self, scan_results: Vec<types::ScanResult>);
+    async fn update_scan_results(&self, scan_results: Vec<types::ScanResult>);
 }
 
 /// Requests a new SME scan and returns the results.
@@ -222,7 +235,6 @@ async fn perform_scan(
     scan_request: fidl_sme::ScanRequest,
     iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
     saved_networks_manager: Arc<dyn SavedNetworksManagerApi>,
-    mut location_sensor_updater: impl ScanResultUpdate,
     telemetry_sender: TelemetrySender,
 ) -> (fidl_sme::ScanRequest, Result<Vec<types::ScanResult>, types::ScanError>) {
     let mut bss_by_network: HashMap<SmeNetworkIdentifier, Vec<types::Bss>> = HashMap::new();
@@ -273,20 +285,6 @@ async fn perform_scan(
     }
 
     let scan_results = network_bss_map_to_scan_result(bss_by_network);
-
-    // Send scan results to Location, but include a timeout so that a stalled consumer doesn't
-    // stop us from reaching the `return Ok(scan_results)` at the end of this function.
-    // TODO(fxbug.dev/73821): the timeout mechanism is temporary, once the scan manager is
-    // implemented with its own event loop, we can send these results to the consumers in a
-    // separate task, without blocking the return.
-    location_sensor_updater
-        .update_scan_results(scan_results.clone())
-        .on_timeout(zx::Duration::from_seconds(SCAN_CONSUMER_MAX_SECONDS_ALLOWED), || {
-            error!("Timed out waiting for consumers of scan results");
-            ()
-        })
-        .await;
-
     (scan_request, Ok(scan_results))
 }
 
@@ -308,12 +306,10 @@ async fn record_scan_results(
 
 /// The location sensor module uses scan results to help determine the
 /// device's location, for use by the Emergency Location Provider.
-struct LocationSensorUpdater {
-    pub wpa3_supported: bool,
-}
+pub struct LocationSensorUpdater {}
 #[async_trait]
 impl ScanResultUpdate for LocationSensorUpdater {
-    async fn update_scan_results(&mut self, scan_results: Vec<types::ScanResult>) {
+    async fn update_scan_results(&self, scan_results: Vec<types::ScanResult>) {
         async fn send_results(scan_results: Vec<fidl_policy::ScanResult>) -> Result<(), Error> {
             // Get an output iterator
             let (iter, server) =
@@ -332,8 +328,9 @@ impl ScanResultUpdate for LocationSensorUpdater {
             fidl_conversion::send_scan_results_over_fidl(server, &scan_results).await
         }
 
-        let scan_results =
-            fidl_conversion::scan_result_to_policy_scan_result(&scan_results, self.wpa3_supported);
+        // Set "wpa3_supported: true" such that scan results are not artificially modified to hide
+        // WPA3 networks.
+        let scan_results = fidl_conversion::scan_result_to_policy_scan_result(&scan_results, true);
         // Filter out any errors and just log a message.
         // No error recovery, we'll just try again next time a scan result comes in.
         if let Err(e) = send_results(scan_results).await {
@@ -460,6 +457,7 @@ mod tests {
         fuchsia_zircon as zx,
         futures::{
             channel::{mpsc, oneshot},
+            future,
             lock::Mutex,
             task::Poll,
         },
@@ -593,16 +591,27 @@ mod tests {
 
     struct MockScanResultConsumer {
         scan_results: Arc<Mutex<Option<Vec<types::ScanResult>>>>,
+        stalled: Arc<Mutex<bool>>,
     }
     impl MockScanResultConsumer {
-        fn new() -> (Self, Arc<Mutex<Option<Vec<types::ScanResult>>>>) {
+        #[allow(clippy::type_complexity)]
+        fn new() -> (Self, Arc<Mutex<Option<Vec<types::ScanResult>>>>, Arc<Mutex<bool>>) {
             let scan_results = Arc::new(Mutex::new(None));
-            (Self { scan_results: Arc::clone(&scan_results) }, scan_results)
+            let stalled = Arc::new(Mutex::new(false));
+            (
+                Self { scan_results: scan_results.clone(), stalled: stalled.clone() },
+                scan_results,
+                stalled,
+            )
         }
     }
     #[async_trait]
     impl ScanResultUpdate for MockScanResultConsumer {
-        async fn update_scan_results(&mut self, scan_results: Vec<types::ScanResult>) {
+        async fn update_scan_results(&self, scan_results: Vec<types::ScanResult>) {
+            if *self.stalled.lock().await {
+                let () = future::pending().await;
+                unreachable!();
+            }
             let mut guard = self.scan_results.lock().await;
             *guard = Some(scan_results);
         }
@@ -869,19 +878,13 @@ mod tests {
     fn basic_scan() {
         let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
         let (client, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
-        let (location_sensor, location_sensor_results) = MockScanResultConsumer::new();
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, mut telemetry_receiver) = create_telemetry_sender_and_receiver();
 
         // Issue request to scan.
         let sme_scan = passive_sme_req();
-        let scan_fut = perform_scan(
-            sme_scan.clone(),
-            client,
-            saved_networks_manager,
-            location_sensor,
-            telemetry_sender,
-        );
+        let scan_fut =
+            perform_scan(sme_scan.clone(), client, saved_networks_manager, telemetry_sender);
         pin_mut!(scan_fut);
 
         // Progress scan handler forward so that it will respond to the iterator get next request.
@@ -906,12 +909,6 @@ mod tests {
             assert_eq!(results.unwrap(), internal_aps);
         });
 
-        // Check scan consumer got results
-        assert_eq!(
-            *exec.run_singlethreaded(location_sensor_results.lock()),
-            Some(internal_aps.clone())
-        );
-
         // Since the scanning process went off without a hitch, there should not be any defect
         // metrics logged.
         assert_variant!(telemetry_receiver.try_next(), Ok(None));
@@ -921,7 +918,6 @@ mod tests {
     fn empty_scan_results() {
         let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
         let (client, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
-        let (location_sensor, location_sensor_results) = MockScanResultConsumer::new();
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, mut telemetry_receiver) = create_telemetry_sender_and_receiver();
 
@@ -931,7 +927,6 @@ mod tests {
             sme_scan.clone(),
             client.clone(),
             saved_networks_manager,
-            location_sensor,
             telemetry_sender,
         );
         pin_mut!(scan_fut);
@@ -956,9 +951,6 @@ mod tests {
             assert!(results.unwrap().is_empty());
         });
 
-        // Check scan consumer got results
-        assert_eq!(*exec.run_singlethreaded(location_sensor_results.lock()), Some(vec![]));
-
         // Verify that an empty scan result has been logged
         assert_variant!(
             telemetry_receiver.try_next(),
@@ -979,7 +971,6 @@ mod tests {
     fn scan_updates_hidden_network_probabilities(passive: bool) {
         let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
         let (client, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
-        let (location_sensor, _) = MockScanResultConsumer::new();
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
 
@@ -1025,7 +1016,6 @@ mod tests {
             sme_scan.clone(),
             client,
             saved_networks_manager.clone(),
-            location_sensor,
             telemetry_sender,
         );
         pin_mut!(scan_fut);
@@ -1217,7 +1207,6 @@ mod tests {
     ) {
         let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
         let (client, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
-        let (location_sensor, location_sensor_results) = MockScanResultConsumer::new();
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
 
@@ -1227,7 +1216,6 @@ mod tests {
             sme_scan.clone(),
             client.clone(),
             saved_networks_manager,
-            location_sensor,
             telemetry_sender,
         );
         pin_mut!(scan_fut);
@@ -1248,9 +1236,6 @@ mod tests {
             assert_eq!(results, Err(policy_failure_mode));
         });
 
-        // Check scan consumer have no results
-        assert_eq!(*exec.run_singlethreaded(location_sensor_results.lock()), None);
-
         // A defect should have been logged on the IfaceManager.
         let logged_defects = get_fake_defects(&mut exec, client);
         let expected_defects = vec![expected_defect];
@@ -1264,7 +1249,6 @@ mod tests {
     fn scan_error_retries_once(error_code: fidl_sme::ScanErrorCode, retry_succeeds: bool) {
         let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
         let (client, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
-        let (location_sensor, location_sensor_results) = MockScanResultConsumer::new();
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
 
@@ -1274,7 +1258,6 @@ mod tests {
             sme_scan.clone(),
             client.clone(),
             saved_networks_manager,
-            location_sensor,
             telemetry_sender,
         );
         pin_mut!(scan_fut);
@@ -1344,9 +1327,6 @@ mod tests {
                 assert_eq!(results, Err(types::ScanError::Cancelled));
             });
 
-            // Check scan consumer have no results
-            assert_eq!(*exec.run_singlethreaded(location_sensor_results.lock()), None);
-
             // Verify that both defects were logged.
             let logged_defects = get_fake_defects(&mut exec, client);
             let expected_defects = vec![
@@ -1361,19 +1341,13 @@ mod tests {
     fn scan_returns_error_on_timeout() {
         let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
         let (client, _sme_stream) = exec.run_singlethreaded(create_iface_manager());
-        let (location_sensor, location_sensor_results) = MockScanResultConsumer::new();
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
 
         // Issue request to scan.
         let sme_scan = passive_sme_req();
-        let scan_fut = perform_scan(
-            sme_scan.clone(),
-            client,
-            saved_networks_manager,
-            location_sensor,
-            telemetry_sender,
-        );
+        let scan_fut =
+            perform_scan(sme_scan.clone(), client, saved_networks_manager, telemetry_sender);
         pin_mut!(scan_fut);
 
         // Progress scan handler forward so that it will respond to the iterator get next request.
@@ -1387,7 +1361,6 @@ mod tests {
             assert_eq!(req, sme_scan);
             assert_eq!(results, Err(types::ScanError::GeneralError));
         });
-        assert_eq!(*exec.run_singlethreaded(location_sensor_results.lock()), None);
     }
 
     #[test_case(fidl_sme::ScanErrorCode::NotSupported, ScanIssue::ScanFailure)]
@@ -1463,12 +1436,14 @@ mod tests {
         let (iface_mgr, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
+        let (location_sensor, _, _) = MockScanResultConsumer::new();
         let (scan_request_sender, scan_request_receiver) = mpsc::channel(100);
         let scan_requester = Arc::new(ScanRequester { sender: scan_request_sender });
         let scanning_loop = serve_scanning_loop(
             iface_mgr.clone(),
             saved_networks_manager.clone(),
             telemetry_sender,
+            location_sensor,
             scan_request_receiver,
         );
         pin_mut!(scanning_loop);
@@ -1546,12 +1521,14 @@ mod tests {
         let (iface_mgr, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
+        let (location_sensor, _, _) = MockScanResultConsumer::new();
         let (scan_request_sender, scan_request_receiver) = mpsc::channel(100);
         let scan_requester = Arc::new(ScanRequester { sender: scan_request_sender });
         let scanning_loop = serve_scanning_loop(
             iface_mgr.clone(),
             saved_networks_manager.clone(),
             telemetry_sender,
+            location_sensor,
             scan_request_receiver,
         );
         pin_mut!(scanning_loop);
@@ -1627,5 +1604,125 @@ mod tests {
 
         // There should be no other SME requests in the queue
         assert_variant!(exec.run_until_stalled(&mut sme_stream.next()), Poll::Pending);
+    }
+
+    #[fuchsia::test]
+    fn scanning_loop_sends_results_to_requester_and_location_sensor() {
+        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let (iface_mgr, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
+        let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
+        let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
+        let (location_sensor, location_sensor_results, _) = MockScanResultConsumer::new();
+        let (scan_request_sender, scan_request_receiver) = mpsc::channel(100);
+        let scan_requester = Arc::new(ScanRequester { sender: scan_request_sender });
+        let scanning_loop = serve_scanning_loop(
+            iface_mgr.clone(),
+            saved_networks_manager.clone(),
+            telemetry_sender,
+            location_sensor,
+            scan_request_receiver,
+        );
+        pin_mut!(scanning_loop);
+
+        // Issue request to scan.
+        let scan_req_fut = scan_requester.perform_scan(ScanReason::BssSelection, vec![], vec![]);
+        pin_mut!(scan_req_fut);
+        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // Send back scan results
+        assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req: _, responder }))) => {
+                let mut results = Ok(vec![generate_random_sme_scan_result(), generate_random_sme_scan_result()]);
+                responder.send(&mut results).expect("failed to send scan error");
+            }
+        );
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // The scan request future should complete.
+        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Ready(Ok(results)) => {
+            assert_eq!(results.len(), 2);
+        });
+
+        // Check location sensor got results
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_variant!(
+            &*exec.run_singlethreaded(location_sensor_results.lock()),
+            Some(ref results) => {
+                assert_eq!(results.len(), 2);
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    fn scanning_loop_location_sensor_timeout_works() {
+        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let (iface_mgr, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
+        let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
+        let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
+        let (location_sensor, location_sensor_results, location_sensor_stalled) =
+            MockScanResultConsumer::new();
+        let (scan_request_sender, scan_request_receiver) = mpsc::channel(100);
+        let scan_requester = Arc::new(ScanRequester { sender: scan_request_sender });
+        let scanning_loop = serve_scanning_loop(
+            iface_mgr.clone(),
+            saved_networks_manager.clone(),
+            telemetry_sender,
+            location_sensor,
+            scan_request_receiver,
+        );
+        pin_mut!(scanning_loop);
+
+        // Make location sensor stalled
+        *(exec.run_singlethreaded(location_sensor_stalled.lock())) = true;
+
+        // Issue request to scan.
+        let scan_req_fut = scan_requester.perform_scan(ScanReason::BssSelection, vec![], vec![]);
+        pin_mut!(scan_req_fut);
+        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // Send back scan results
+        assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req: _, responder }))) => {
+                let mut results = Ok(vec![generate_random_sme_scan_result(), generate_random_sme_scan_result()]);
+                responder.send(&mut results).expect("failed to send scan error");
+            }
+        );
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // Check location sensor didn't get any results
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_variant!(&*exec.run_singlethreaded(location_sensor_results.lock()), None);
+
+        // Make location sensor *not* stalled
+        *(exec.run_singlethreaded(location_sensor_stalled.lock())) = false;
+
+        // Issue another request to scan.
+        let scan_req_fut = scan_requester.perform_scan(ScanReason::BssSelection, vec![], vec![]);
+        pin_mut!(scan_req_fut);
+        assert_variant!(exec.run_until_stalled(&mut scan_req_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // Send back scan results
+        assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req: _, responder }))) => {
+                let mut results = Ok(vec![generate_random_sme_scan_result(), generate_random_sme_scan_result()]);
+                responder.send(&mut results).expect("failed to send scan error");
+            }
+        );
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+
+        // Check location sensor got results
+        assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
+        assert_variant!(
+            &*exec.run_singlethreaded(location_sensor_results.lock()),
+            Some(ref results) => {
+                assert_eq!(results.len(), 2);
+            }
+        );
     }
 }
