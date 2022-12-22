@@ -509,11 +509,11 @@ mod tests {
         let send_fut = send_scan_results_over_fidl(iter_server, &fidl_scan_results);
         pin_mut!(send_fut);
 
-        #[allow(unknown_lints)]
-        #[allow(clippy::let_underscore_future)] // TODO(fxbug.dev/117902)
-        let _ = iter.get_next();
+        let mut output_iter_fut = iter.get_next();
 
         assert_variant!(exec.run_until_stalled(&mut send_fut), Poll::Ready(Err(_)));
+
+        assert_variant!(exec.run_until_stalled(&mut output_iter_fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]

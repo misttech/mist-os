@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#[allow(deprecated)] // Necessary for AsciiExt usage from clap args_enum macro
 use anyhow::{format_err, Error};
 use clap::arg_enum;
 use eui48::MacAddress;

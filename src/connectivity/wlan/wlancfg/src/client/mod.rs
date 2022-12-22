@@ -499,9 +499,6 @@ mod tests {
 
     struct FakeIfaceManager {
         pub sme_proxy: fidl_fuchsia_wlan_sme::ClientSmeProxy,
-        // TODO(fxbug.dev/77068): Remove this attribute.
-        #[allow(dead_code)]
-        pub client_connections_enabled: bool,
         pub disconnected_ifaces: Vec<u16>,
         command_sender: mpsc::Sender<IfaceManagerRequest>,
         pub wpa3_capable: bool,
@@ -516,7 +513,6 @@ mod tests {
         ) -> Self {
             FakeIfaceManager {
                 sme_proxy: proxy,
-                client_connections_enabled: false,
                 disconnected_ifaces: Vec::new(),
                 command_sender: command_sender,
                 wpa3_capable: true,
@@ -531,7 +527,6 @@ mod tests {
         ) -> Self {
             FakeIfaceManager {
                 sme_proxy: proxy,
-                client_connections_enabled: false,
                 disconnected_ifaces: Vec::new(),
                 command_sender: command_sender,
                 wpa3_capable: false,
@@ -593,7 +588,6 @@ mod tests {
             _reason: client_types::DisconnectReason,
         ) -> Result<(), Error> {
             if self.stop_client_connections_succeeds {
-                self.client_connections_enabled = false;
                 Ok(())
             } else {
                 Err(format_err!("stop client connections failed"))
@@ -602,7 +596,6 @@ mod tests {
 
         async fn start_client_connections(&mut self) -> Result<(), Error> {
             if self.start_client_connections_succeeds {
-                self.client_connections_enabled = true;
                 Ok(())
             } else {
                 Err(format_err!("start client connections failed"))
