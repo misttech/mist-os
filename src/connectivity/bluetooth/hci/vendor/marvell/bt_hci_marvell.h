@@ -29,8 +29,12 @@ using BtHciMarvellType =
 
 class BtHciMarvell : public BtHciMarvellType, public ddk::BtHciProtocol<BtHciMarvell> {
  public:
-  BtHciMarvell(zx_device_t* parent, const ddk::SdioProtocolClient& sdio)
-      : BtHciMarvellType(parent), sdio_(sdio) {}
+  BtHciMarvell(zx_device_t* parent, const ddk::SdioProtocolClient& sdio, zx::port port)
+      : BtHciMarvellType(parent),
+        sdio_(sdio),
+        sdio_interrupt_key_(interrupt_key_mgr_.CreateKey()),
+        stop_thread_key_(interrupt_key_mgr_.CreateKey()),
+        port_(std::move(port)) {}
   virtual ~BtHciMarvell() = default;
 
   // Allocate a new instance of the driver and register with the driver manager
@@ -59,6 +63,9 @@ class BtHciMarvell : public BtHciMarvellType, public ddk::BtHciProtocol<BtHciMar
   // Load firmware (or wait for notification that firmware has been loaded by another driver)
   zx_status_t LoadFirmware();
 
+  zx_status_t EnableHostInterrupts();
+  zx_status_t DisableHostInterrupts();
+
   // Bytewide SDIO operations
   zx_status_t Read8(uint32_t addr, uint8_t* out_value);
   zx_status_t Read16(uint32_t addr, uint16_t* out_value);
@@ -78,10 +85,25 @@ class BtHciMarvell : public BtHciMarvellType, public ddk::BtHciProtocol<BtHciMar
                           ControllerChannelId write_id, const char* name);
 
   const ddk::SdioProtocolClient sdio_;
+
+  // Initialized once (during Init()) and then never written to again.
+  zx::interrupt sdio_int_;
+
   fbl::Mutex mutex_;
+
+  // Tracks all currently-allocated interrupt keys
+  InterruptKeyAllocator interrupt_key_mgr_ TA_GUARDED(mutex_);
+
+  // Keys for event handler messages
+  const uint64_t sdio_interrupt_key_;
+  const uint64_t stop_thread_key_;
 
   // Keeps track of all open communication channels with the host
   HostChannelManager channel_mgr_ TA_GUARDED(mutex_);
+
+  // All events (from the controller and from the host) will be sent through this port, which will
+  // wake up our event handler loop.
+  zx::port port_;
 
   // The oracle of all values that are device-specific
   std::unique_ptr<DeviceOracle> device_oracle_;

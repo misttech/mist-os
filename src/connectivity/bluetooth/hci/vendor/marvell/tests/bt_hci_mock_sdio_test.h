@@ -41,13 +41,23 @@ class BtHciMockSdioTest : public zxtest::Test {
     const sdio_protocol_t* sdio_proto = mock_sdio_device_.GetProto();
     fake_parent_->AddProtocol(ZX_PROTOCOL_SDIO, sdio_proto->ops, sdio_proto->ctx);
 
-    // Verify basic device initialization
+    // Prepare for hardware info query
     sdio_hw_info_t hw_info;
     hw_info.func_hw_info.product_id = kSimProductId;
+    mock_sdio_device_.ExpectGetDevHwInfo(ZX_OK, hw_info);
+
+    // Create a virtual interrupt (and duplicate) for use by the driver
+    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &sdio_interrupt_));
+    zx::interrupt interrupt_dup;
+    ASSERT_OK(sdio_interrupt_.duplicate(ZX_RIGHT_SAME_RIGHTS, &interrupt_dup));
+    mock_sdio_device_.ExpectGetInBandIntr(ZX_OK, std::move(interrupt_dup));
+
+    // Enable bus
+    mock_sdio_device_.ExpectEnableFn(ZX_OK);
+
+    // Set block size
     uint16_t expected_block_size = device_oracle_->GetSdioBlockSize();
-    mock_sdio_device_.ExpectGetDevHwInfo(ZX_OK, hw_info)
-        .ExpectEnableFn(ZX_OK)
-        .ExpectUpdateBlockSize(ZX_OK, expected_block_size, /* deflt */ false);
+    mock_sdio_device_.ExpectUpdateBlockSize(ZX_OK, expected_block_size, /* deflt */ false);
 
     // Expect a read from the firmware status registers
     uint32_t fw_status_addr = device_oracle_->GetRegAddrFirmwareStatus();
@@ -87,6 +97,8 @@ class BtHciMockSdioTest : public zxtest::Test {
     mock_sdio_device_.ExpectDoRwByte(ZX_OK, /* write */ true, misc_cfg_addr,
                                      /* write_byte */ misc_cfg_value, /* out_read_byte */ 0);
 
+    ExpectEnableInterrupts();
+
     // Create our driver instance, which should bind to the SDIO mock
     ASSERT_EQ(ZX_OK, BtHciMarvell::Bind(/* ctx */ nullptr, fake_parent_.get()));
 
@@ -124,6 +136,21 @@ class BtHciMockSdioTest : public zxtest::Test {
     ASSERT_EQ(ZX_OK, dut_->InitReplyCallStatus());
   }
 
+  void ExpectEnableInterrupts() {
+    // Check that the interrupt mask bits are set as expected
+    uint32_t intr_mask_addr = device_oracle_->GetRegAddrInterruptMask();
+    uint8_t intr_mask_value = 0;
+    mock_sdio_device_.ExpectDoRwByte(ZX_OK, /* write */ false, intr_mask_addr, /* write_byte */ 0,
+                                     /* out_read_byte */ intr_mask_value);
+    intr_mask_value &= ~(kInterruptMaskReadyToSend | kInterruptMaskPacketAvailable);
+    intr_mask_value |= (kInterruptMaskReadyToSend | kInterruptMaskPacketAvailable);
+    mock_sdio_device_.ExpectDoRwByte(ZX_OK, /* write */ true, intr_mask_addr,
+                                     /* write_byte */ intr_mask_value, /* out_read_byte */ 0);
+
+    // Verify that SDIO interrupts are re-enabled
+    mock_sdio_device_.ExpectEnableFnIntr(ZX_OK);
+  }
+
   void UnbindAndRelease() {
     // Flag our mock device for removal
     device_async_remove(dut_);
@@ -144,6 +171,7 @@ class BtHciMockSdioTest : public zxtest::Test {
  private:
   std::unique_ptr<DeviceOracle> device_oracle_;
   MockDevice* dut_;
+  zx::interrupt sdio_interrupt_;
 };
 
 }  // namespace bt_hci_marvell

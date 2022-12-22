@@ -45,10 +45,28 @@ uint32_t DeviceOracle::GetRegAddrFirmwareStatus() const {
   return 0;
 }
 
+uint32_t DeviceOracle::GetRegAddrInterruptMask() const {
+  switch (device_type_) {
+    case DeviceType::k88W8987:
+      return 0x08;
+  }
+  ZX_PANIC("Internal error: device type not properly set");
+  return 0;
+}
+
 uint32_t DeviceOracle::GetRegAddrInterruptRsr() const {
   switch (device_type_) {
     case DeviceType::k88W8987:
       return 0x04;
+  }
+  ZX_PANIC("Internal error: device type not properly set");
+  return 0;
+}
+
+uint32_t DeviceOracle::GetRegAddrInterruptStatus() const {
+  switch (device_type_) {
+    case DeviceType::k88W8987:
+      return 0x0c;
   }
   ZX_PANIC("Internal error: device type not properly set");
   return 0;

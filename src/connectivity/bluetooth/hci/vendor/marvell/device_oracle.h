@@ -27,6 +27,13 @@ constexpr uint8_t kRsrClearOnReadValue = 0x3f;
 constexpr uint8_t kMiscCfgAutoReenableMask = 0x10;
 constexpr uint8_t kMiscCfgAutoReenableValue = 0x10;
 
+// These are the bits in the interrupt mask register that we use
+constexpr uint8_t kInterruptMaskAllBits = 0x03;
+// Interrupt we receive when the card is ready to process another packet
+constexpr uint8_t kInterruptMaskReadyToSend = 0x02;
+// Interrupt we receive when the card is sending us a packet
+constexpr uint8_t kInterruptMaskPacketAvailable = 0x01;
+
 // A DeviceOracle provides functions to retrieve values that are specific to a product.
 class DeviceOracle {
  public:
@@ -37,7 +44,9 @@ class DeviceOracle {
 
   uint16_t GetSdioBlockSize() const;
   uint32_t GetRegAddrFirmwareStatus() const;
+  uint32_t GetRegAddrInterruptMask() const;
   uint32_t GetRegAddrInterruptRsr() const;
+  uint32_t GetRegAddrInterruptStatus() const;
   uint32_t GetRegAddrIoportAddr() const;
   uint32_t GetRegAddrMiscCfg() const;
 

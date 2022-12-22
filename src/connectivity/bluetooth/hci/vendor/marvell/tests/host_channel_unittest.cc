@@ -16,7 +16,8 @@ TEST_F(HostChannelTest, BasicOperation) {
   zx::channel ch;
   zx::unowned<zx::channel> ch_dup = ch.borrow();
   HostChannel host_channel(std::move(ch), ControllerChannelId::kChannelAclData,
-                           ControllerChannelId::kChannelVendor, "random");
+                           ControllerChannelId::kChannelVendor, /* interrupt_key */ 0x1234,
+                           "random");
   EXPECT_EQ(host_channel.channel(), *ch_dup);
   EXPECT_EQ(host_channel.read_id(), ControllerChannelId::kChannelAclData);
   EXPECT_EQ(host_channel.write_id(), ControllerChannelId::kChannelVendor);

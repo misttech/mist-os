@@ -9,6 +9,7 @@
 #include <list>
 
 #include "src/connectivity/bluetooth/hci/vendor/marvell/host_channel.h"
+#include "src/connectivity/bluetooth/hci/vendor/marvell/interrupt_key_allocator.h"
 
 namespace bt_hci_marvell {
 
@@ -20,16 +21,21 @@ class HostChannelManager {
  public:
   // Add a new channel and associated information. Failure conditions:
   // - A channel already exists with the specified write_id
+  // - A channel already exists with the specified interrupt_key
   // On failure, nullptr is returned
   // On success, a pointer to the new HostChannel is returned
   const HostChannel* AddChannel(zx::channel channel, ControllerChannelId read_id,
-                                ControllerChannelId write_id, const char* name);
+                                ControllerChannelId write_id, uint64_t interrupt_key,
+                                const char* name);
 
   // Remove the channel with the specified write_id, if such a channel exists.
   void RemoveChannel(ControllerChannelId write_id);
 
   // Find the channel with the specified write_id. Returns nullptr if no such channel exists.
   const HostChannel* HostChannelFromWriteId(ControllerChannelId write_id) const;
+
+  // Find the channel with the specified interrupt key. Returns nullptr if no such channel exists.
+  const HostChannel* HostChannelFromInterruptKey(uint64_t key) const;
 
   // AddChannel() and RemoveChannel() should not be called in by a |fn| passed to ForEveryChannel().
   void ForEveryChannel(std::function<void(const HostChannel*)> fn) const;

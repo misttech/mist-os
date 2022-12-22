@@ -13,6 +13,7 @@ _tests = [
   "driver-channel",
   "host-channel",
   "host-channel-manager",
+  "interrupt-key-allocator",
   "lifecycle",
   "device-oracle",
 ]
@@ -65,6 +66,16 @@ executable("host-channel-tests") {
   testonly = true
   output_name = "bt-hci-marvell-host-channel-tests"
   sources = [ "host_channel_unittest.cc" ]
+  deps = [
+    "//src/connectivity/bluetooth/hci/vendor/marvell:common",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+executable("interrupt-key-allocator-tests") {
+  testonly = true
+  output_name = "bt-hci-marvell-interrupt-key-allocator-tests"
+  sources = [ "interrupt_key_allocator_unittest.cc" ]
   deps = [
     "//src/connectivity/bluetooth/hci/vendor/marvell:common",
     "//zircon/system/ulib/zxtest",

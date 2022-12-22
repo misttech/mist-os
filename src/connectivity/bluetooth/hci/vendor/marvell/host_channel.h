@@ -25,13 +25,18 @@ enum class ControllerChannelId {
 class HostChannel {
  public:
   HostChannel(zx::channel channel, ControllerChannelId read_id, ControllerChannelId write_id,
-              const char* name)
-      : channel_(std::move(channel)), read_id_(read_id), write_id_(write_id), name_(name) {}
+              uint64_t interrupt_key, const char* name)
+      : channel_(std::move(channel)),
+        read_id_(read_id),
+        write_id_(write_id),
+        interrupt_key_(interrupt_key),
+        name_(name) {}
 
   // Simple accessors
   const zx::channel& channel() const { return channel_; }
   ControllerChannelId read_id() const { return read_id_; }
   ControllerChannelId write_id() const { return write_id_; }
+  uint64_t interrupt_key() const { return interrupt_key_; }
   const char* name() const { return name_; }
 
  private:
@@ -43,6 +48,9 @@ class HostChannel {
 
   // When we receive frames with this ID in the header, they should be written to this channel
   ControllerChannelId write_id_;
+
+  // This uniquely identifies the source of an interrupt
+  uint64_t interrupt_key_;
 
   // Human-readable name
   const char* name_;

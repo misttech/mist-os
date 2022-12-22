@@ -4,22 +4,35 @@
 
 #include "host_channel_manager.h"
 
+#include <inttypes.h>
 #include <lib/ddk/debug.h>
 #include <zircon/assert.h>
 
 namespace bt_hci_marvell {
 
 const HostChannel* HostChannelManager::AddChannel(zx::channel channel, ControllerChannelId read_id,
-                                                  ControllerChannelId write_id, const char* name) {
+                                                  ControllerChannelId write_id,
+                                                  uint64_t interrupt_key, const char* name) {
   // We don't support a forwarding a single packet to multiple channels, so if we already have a
   // channel open with this write id, we can't create another
-  if (HostChannelFromWriteId(write_id)) {
-    zxlogf(ERROR, "Failed to allocate HostChannel - id %d already allocated", write_id);
+  const HostChannel* existing_host_channel = HostChannelFromWriteId(write_id);
+  if (existing_host_channel != nullptr) {
+    zxlogf(ERROR, "Failed to allocate HostChannel - id %d already allocated to %s channel",
+           write_id, existing_host_channel->name());
     return nullptr;
   }
 
-  auto iter =
-      open_channels_.emplace(open_channels_.end(), std::move(channel), read_id, write_id, name);
+  // Interrupt keys should also be unique across all open channels.
+  existing_host_channel = HostChannelFromInterruptKey(interrupt_key);
+  if (existing_host_channel != nullptr) {
+    zxlogf(ERROR,
+           "Failed to allocate HostChannel - key %" PRIu64 "is already allocated to %s channel",
+           interrupt_key, existing_host_channel->name());
+    return nullptr;
+  }
+
+  auto iter = open_channels_.emplace(open_channels_.end(), std::move(channel), read_id, write_id,
+                                     interrupt_key, name);
   return &(*iter);
 }
 
@@ -38,7 +51,15 @@ const HostChannel* HostChannelManager::HostChannelFromWriteId(ControllerChannelI
   return nullptr;
 }
 
-// Apply a function to every channel
+const HostChannel* HostChannelManager::HostChannelFromInterruptKey(uint64_t key) const {
+  for (const HostChannel& host_channel : open_channels_) {
+    if (host_channel.interrupt_key() == key) {
+      return &host_channel;
+    }
+  }
+  return nullptr;
+}
+
 void HostChannelManager::ForEveryChannel(std::function<void(const HostChannel*)> fn) const {
   for (const HostChannel& host_channel : open_channels_) {
     fn(&host_channel);

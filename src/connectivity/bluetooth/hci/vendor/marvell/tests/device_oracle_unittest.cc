@@ -27,7 +27,9 @@ TEST_F(DeviceOracleTest, DeviceType88W8987) {
   std::unique_ptr<DeviceOracle> oracle = std::move(result.value());
   EXPECT_EQ(oracle->GetSdioBlockSize(), 64);
   EXPECT_EQ(oracle->GetRegAddrFirmwareStatus(), 0xe8);
+  EXPECT_EQ(oracle->GetRegAddrInterruptMask(), 0x08);
   EXPECT_EQ(oracle->GetRegAddrInterruptRsr(), 0x04);
+  EXPECT_EQ(oracle->GetRegAddrInterruptStatus(), 0x0c);
   EXPECT_EQ(oracle->GetRegAddrIoportAddr(), 0xe4);
   EXPECT_EQ(oracle->GetRegAddrMiscCfg(), 0xd8);
 }

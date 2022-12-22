@@ -23,9 +23,16 @@ zx_status_t BtHciMarvell::Bind(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_RESOURCES;
   }
 
+  zx::port port;
+  status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &port);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: Failed to create port", __FILE__);
+    return status;
+  }
+
   // Allocate our driver instance
   fbl::AllocChecker ac;
-  std::unique_ptr<BtHciMarvell> device(new (&ac) BtHciMarvell(parent, sdio));
+  std::unique_ptr<BtHciMarvell> device(new (&ac) BtHciMarvell(parent, sdio, std::move(port)));
   if (!ac.check()) {
     zxlogf(ERROR, "BtHciMarvell alloc failed");
     return ZX_ERR_NO_MEMORY;
@@ -82,6 +89,17 @@ zx_status_t BtHciMarvell::Init() {
   }
   device_oracle_ = std::move(result.value());
 
+  if ((status = sdio_.GetInBandIntr(&sdio_int_)) != ZX_OK) {
+    zxlogf(ERROR, "Failed to get SDIO interrupt: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  // Associate SDIO interrupts with the port so that interrupts will post events to the port's queue
+  if ((status = sdio_int_.bind(port_, sdio_interrupt_key_, 0)) != ZX_OK) {
+    zxlogf(ERROR, "Failed to bind interrupt to port: %s", zx_status_get_string(status));
+    return status;
+  }
+
   if ((status = sdio_.EnableFn()) != ZX_OK) {
     zxlogf(ERROR, "Failed to enable SDIO function: %s", zx_status_get_string(status));
     return status;
@@ -117,6 +135,11 @@ zx_status_t BtHciMarvell::Init() {
   uint32_t misc_cfg_reg_addr = device_oracle_->GetRegAddrMiscCfg();
   if ((status = ModifyBits(misc_cfg_reg_addr, kMiscCfgAutoReenableMask,
                            kMiscCfgAutoReenableValue)) != ZX_OK) {
+    return status;
+  }
+
+  if ((status = EnableHostInterrupts()) != ZX_OK) {
+    zxlogf(ERROR, "Failed to enable host interrupts: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -205,6 +228,35 @@ zx_status_t BtHciMarvell::ModifyBits(uint32_t addr, uint8_t mask, uint8_t new_va
   return Write8(addr, reg_contents);
 }
 
+zx_status_t BtHciMarvell::EnableHostInterrupts() {
+  zx_status_t status = ModifyBits(device_oracle_->GetRegAddrInterruptMask(), kInterruptMaskAllBits,
+                                  kInterruptMaskReadyToSend | kInterruptMaskPacketAvailable);
+  if (status != ZX_OK) {
+    // Failure diagnostics are provided by the lower-level SDIO read/write functions
+    return status;
+  }
+  if ((status = sdio_.EnableFnIntr()) != ZX_OK) {
+    zxlogf(ERROR, "Failed to enable function interrupt: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  return ZX_OK;
+}
+
+zx_status_t BtHciMarvell::DisableHostInterrupts() {
+  zx_status_t status = ModifyBits(device_oracle_->GetRegAddrInterruptMask(), kInterruptMaskAllBits,
+                                  /* new_value */ 0);
+  if (status != ZX_OK) {
+    // Failure diagnostics are provided by the lower-level SDIO read/write functions
+    return status;
+  }
+  if ((status = sdio_.DisableFnIntr()) != ZX_OK) {
+    zxlogf(ERROR, "Failed to disable function interrupt: %s", zx_status_get_string(status));
+    return status;
+  }
+  return ZX_OK;
+}
+
 void BtHciMarvell::DdkUnbind(ddk::UnbindTxn txn) { txn.Reply(); }
 
 void BtHciMarvell::DdkRelease() { delete this; }
@@ -223,10 +275,12 @@ zx_status_t BtHciMarvell::OpenChannel(zx::channel in_channel, ControllerChannelI
                                       ControllerChannelId write_id, const char* name) {
   fbl::AutoLock lock(&mutex_);
 
+  uint64_t port_key = interrupt_key_mgr_.CreateKey();
   const HostChannel* new_channel_ref =
-      channel_mgr_.AddChannel(std::move(in_channel), read_id, write_id, name);
+      channel_mgr_.AddChannel(std::move(in_channel), read_id, write_id, port_key, name);
   if (!new_channel_ref) {
     zxlogf(ERROR, "Failed to open %s channel", name);
+    interrupt_key_mgr_.RemoveKey(port_key);
     return ZX_ERR_INTERNAL;
   }
 
