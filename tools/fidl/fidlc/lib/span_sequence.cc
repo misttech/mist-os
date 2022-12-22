@@ -344,12 +344,14 @@ std::optional<SpanSequence::Kind> DivisibleSpanSequence::Print(
       MaybeIndentLine(wrapped_indentation, child->GetOutdentation(), out);
       last_printed_kind =
           child->Print(max_col_width, last_printed_kind, indentation, wrapped, indents, out);
-      if (i < last.value_or(0)) {
-        *out += "\n";
-      }
-      if (i == 0 && !wrapped) {
-        wrapped = true;
-        wrapped_indentation += kWrappedIndentation;
+      if (last_printed_kind == SpanSequence::Kind::kToken) {
+        if (i < last.value_or(0)) {
+          *out += "\n";
+        }
+        if (!wrapped) {
+          wrapped = true;
+          wrapped_indentation += kWrappedIndentation;
+        }
       }
     }
 

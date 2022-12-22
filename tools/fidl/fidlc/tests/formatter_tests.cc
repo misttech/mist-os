@@ -4205,6 +4205,29 @@ using baz.qux; // C4
   ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
 }
 
+// Regression test for fxbug.dev/107841.
+TEST(NewFormatterTests, CommentsOnOverflowing) {
+  // ---------------40---------------- |
+  std::string unformatted = R"FIDL(
+library example;
+
+// Comment
+using dependency as import_abcdefghijklm;
+)FIDL";
+
+  // ---------------40---------------- |
+  std::string formatted = R"FIDL(
+library example;
+
+// Comment
+using dependency
+        as import_abcdefghijklm;
+)FIDL";
+
+  ASSERT_STREQ(formatted, Format(unformatted));
+  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+}
+
 TEST(NewFormatterTests, CommentsMultiline) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(

@@ -716,13 +716,9 @@ protocol DatagramSocket {
     }) error fuchsia.posix.Errno;
 };
 
+// TODO(https://fxbug.dev/105608): Use a generated constant.
 const SYNCHRONOUS_DATAGRAM_SOCKET_PROTOCOL_NAME string
         = "fuchsia.posix.socket/SynchronousDatagramSocket";
-
-// TODO(https://fxbug.dev/105608): Use a generated constant.
-//
-// TODO(https://fxbug.dev/107841): Move this comment _above_ the constant when
-// the FIDL formatter doesn't misbehave.
 
 /// A synchronous datagram socket.
 ///
