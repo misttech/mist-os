@@ -4,11 +4,11 @@
 
 use {
     crate::model::{
-        addable_directory::AddableDirectory, component::WeakComponentInstance, error::ModelError,
+        component::WeakComponentInstance, error::VfsError, mutable_directory::MutableDirectory,
     },
     cm_rust::{CapabilityPath, ComponentDecl, ExposeDecl, UseDecl},
-    moniker::AbsoluteMoniker,
     std::collections::HashMap,
+    std::sync::Arc,
     vfs::directory::immutable::simple as pfs,
     vfs::remote::{remote_boxed, RoutingFn},
 };
@@ -52,19 +52,15 @@ impl DirTree {
     }
 
     /// Installs the directory tree into `root_dir`.
-    pub fn install<'entries>(
-        self,
-        moniker: &AbsoluteMoniker,
-        root_dir: &mut impl AddableDirectory,
-    ) -> Result<(), ModelError> {
+    pub fn install<'entries>(self, root_dir: &mut Arc<pfs::Simple>) -> Result<(), VfsError> {
         for (name, subtree) in self.directory_nodes {
             let mut subdir = pfs::simple();
-            subtree.install(moniker, &mut subdir)?;
-            root_dir.add_node(&name, subdir, moniker)?;
+            subtree.install(&mut subdir)?;
+            root_dir.add_node(&name, subdir)?;
         }
         for (name, route_fn) in self.broker_nodes {
             let node = remote_boxed(route_fn);
-            root_dir.add_node(&name, node, moniker)?;
+            root_dir.add_node(&name, node)?;
         }
         Ok(())
     }
@@ -186,7 +182,7 @@ mod tests {
 
         // Convert the tree to a directory.
         let mut in_dir = pfs::simple();
-        tree.install(&root.abs_moniker, &mut in_dir).expect("Unable to build pseudodirectory");
+        tree.install(&mut in_dir).expect("Unable to build pseudodirectory");
 
         // Ensure that we can't create a file if the permission is read-only
         let (data_dir, data_server) = zx::Channel::create();
@@ -258,7 +254,7 @@ mod tests {
 
         // Convert the tree to a directory.
         let mut in_dir = pfs::simple();
-        tree.install(&root.abs_moniker, &mut in_dir).expect("Unable to build pseudodirectory");
+        tree.install(&mut in_dir).expect("Unable to build pseudodirectory");
         let (in_dir_client, in_dir_server) = zx::Channel::create();
         in_dir.open(
             ExecutionScope::new(),
@@ -336,7 +332,7 @@ mod tests {
 
         // Convert the tree to a directory.
         let mut expose_dir = pfs::simple();
-        tree.install(&root.abs_moniker, &mut expose_dir).expect("Unable to build pseudodirectory");
+        tree.install(&mut expose_dir).expect("Unable to build pseudodirectory");
         let (expose_dir_client, expose_dir_server) = zx::Channel::create();
         expose_dir.open(
             ExecutionScope::new(),

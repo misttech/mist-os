@@ -6,11 +6,11 @@ use {
     crate::{
         capability::{CapabilityProvider, CapabilitySource},
         model::{
-            addable_directory::AddableDirectoryWithResult,
             component::WeakComponentInstance,
             dir_tree::DirTree,
             error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration, RuntimeInfo},
+            mutable_directory::MutableDirectory,
             routing_fns::{route_expose_fn, route_use_fn},
         },
     },
@@ -165,7 +165,9 @@ impl Hub {
 
         // Add a children directory.
         let children = pfs::simple();
-        instance.add_node("children", children.clone(), moniker)?;
+        instance
+            .add_node("children", children.clone())
+            .map_err(|err| ModelError::HubDirError { moniker: moniker.clone(), err })?;
 
         let mut rng = rand::thread_rng();
         let instance_uuid: u128 = rng.gen();
@@ -211,11 +213,13 @@ impl Hub {
         if let (Some(child_moniker), Some(parent_moniker)) = (moniker.leaf(), moniker.parent()) {
             match instance_map.get_mut(&parent_moniker) {
                 Some(instance) => {
-                    instance.children_directory.add_node(
-                        &Hub::child_dir_name(child_moniker.as_str(), uuid),
-                        controlled.clone(),
-                        moniker,
-                    )?;
+                    instance
+                        .children_directory
+                        .add_node(
+                            &Hub::child_dir_name(child_moniker.as_str(), uuid),
+                            controlled.clone(),
+                        )
+                        .map_err(|err| ModelError::HubDirError { moniker: moniker.clone(), err })?;
                 }
                 None => {
                     // TODO(fxbug.dev/89503): Investigate event ordering between
@@ -250,17 +254,27 @@ impl Hub {
         // Add the `namespace` directory
         let tree = DirTree::build_from_uses(route_use_fn, target.clone(), &component_decl);
         let mut ns_dir = pfs::simple();
-        tree.install(target_moniker, &mut ns_dir)?;
+        tree.install(&mut ns_dir)
+            .map_err(|err| ModelError::HubDirError { moniker: target_moniker.clone(), err })?;
         if let Some(pkg_dir) = clone_dir(pkg_dir) {
-            ns_dir.add_node("pkg", remote_dir(pkg_dir), target_moniker)?;
+            ns_dir
+                .add_node("pkg", remote_dir(pkg_dir))
+                .map_err(|err| ModelError::HubDirError { moniker: target_moniker.clone(), err })?;
         }
-        instance.directory.add_node("ns", ns_dir, target_moniker)?;
+        instance
+            .directory
+            .add_node("ns", ns_dir)
+            .map_err(|err| ModelError::HubDirError { moniker: target_moniker.clone(), err })?;
 
         // Add the `exposed` directory
         let tree = DirTree::build_from_exposes(route_expose_fn, target.clone(), &component_decl);
         let mut expose_dir = pfs::simple();
-        tree.install(target_moniker, &mut expose_dir)?;
-        instance.directory.add_node("exposed", expose_dir, target_moniker)?;
+        tree.install(&mut expose_dir)
+            .map_err(|err| ModelError::HubDirError { moniker: target_moniker.clone(), err })?;
+        instance
+            .directory
+            .add_node("exposed", expose_dir)
+            .map_err(|err| ModelError::HubDirError { moniker: target_moniker.clone(), err })?;
 
         instance.is_resolved = true;
 
@@ -284,12 +298,18 @@ impl Hub {
 
         // Add the `out` dir, if it exists
         if let Some(out_dir) = clone_dir(runtime.outgoing_dir.as_ref()) {
-            instance.directory.add_node("out", remote_dir(out_dir), target_moniker)?;
+            instance
+                .directory
+                .add_node("out", remote_dir(out_dir))
+                .map_err(|err| ModelError::HubDirError { moniker: target_moniker.clone(), err })?;
         }
 
         // Add the `runtime` dir, if it exists
         if let Some(runtime_dir) = clone_dir(runtime.runtime_dir.as_ref()) {
-            instance.directory.add_node("runtime", remote_dir(runtime_dir), target_moniker)?;
+            instance
+                .directory
+                .add_node("runtime", remote_dir(runtime_dir))
+                .map_err(|err| ModelError::HubDirError { moniker: target_moniker.clone(), err })?;
         }
 
         instance.is_running = true;
@@ -320,8 +340,13 @@ impl Hub {
             if instance.is_resolved {
                 // Remove `exposed` and `ns`.
                 // `out` and `runtime` would have already been removed on stop.
-                instance.directory.remove_node("exposed")?;
-                instance.directory.remove_node("ns")?;
+                instance.directory.remove_node("exposed").map_err(|err| {
+                    ModelError::HubDirError { moniker: target_moniker.clone(), err }
+                })?;
+                instance.directory.remove_node("ns").map_err(|err| ModelError::HubDirError {
+                    moniker: target_moniker.clone(),
+                    err,
+                })?;
                 instance.is_resolved = false;
             }
         }
@@ -335,8 +360,14 @@ impl Hub {
             .ok_or(ModelError::instance_not_found(target_moniker.clone()))?;
 
         // Remove `out` and `runtime` if they exist.
-        instance.directory.remove_node("out")?;
-        instance.directory.remove_node("runtime")?;
+        instance
+            .directory
+            .remove_node("out")
+            .map_err(|err| ModelError::HubDirError { moniker: target_moniker.clone(), err })?;
+        instance
+            .directory
+            .remove_node("runtime")
+            .map_err(|err| ModelError::HubDirError { moniker: target_moniker.clone(), err })?;
         instance.is_running = false;
         Ok(())
     }
@@ -364,12 +395,12 @@ impl Hub {
             None => return Ok(()),
         };
 
-        parent_instance.children_directory.remove_node(&child_entry)?.ok_or_else(|| {
+        parent_instance.children_directory.remove_node(&child_entry).map_err(|err| {
             warn!(
                 "child directory {} in parent instance {} was already removed or never added",
                 child_entry, parent_moniker
             );
-            ModelError::remove_entry_error(child_entry)
+            ModelError::HubDirError { moniker: target_moniker.clone(), err }
         })?;
         instance_map
             .remove(&target_moniker)

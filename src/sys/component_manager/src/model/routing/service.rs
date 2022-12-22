@@ -9,6 +9,7 @@ use {
             component::{ComponentInstance, WeakComponentInstance},
             error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
+            mutable_directory::MutableDirectory,
             routing::{open_capability_at_source, CapabilitySource, OpenRequest, RoutingError},
         },
     },
@@ -38,7 +39,6 @@ use {
             dirents_sink,
             entry::{DirectoryEntry, EntryInfo},
             entry_container::{Directory, DirectoryWatcher},
-            helper::DirectlyMutable,
             immutable::connection::io1::ImmutableConnection,
             immutable::lazy as lazy_immutable_dir,
             immutable::simple::{simple as simple_immutable_dir, Simple as SimpleImmutableDir},
@@ -777,10 +777,9 @@ impl CollectionServiceDirectory {
                     service_instance: dirent.name.to_string(),
                     parent: self.parent.clone(),
                 });
-            inner
-                .dir
-                .add_entry(name.clone(), entry.clone())
-                .map_err(|_| ModelError::add_entry_error(target.abs_moniker.clone(), name))?;
+            inner.dir.add_node(&name, entry.clone()).map_err(|err| {
+                ModelError::CollectionServiceDirError { moniker: target.abs_moniker.clone(), err }
+            })?;
             inner.entries.push(entry);
         }
         Ok(())
@@ -844,10 +843,12 @@ impl CollectionServiceDirectory {
             let mut inner = self.inner.lock().await;
             for entry in &inner.entries {
                 if entry.source_component_name == *target_name {
-                    inner
-                        .dir
-                        .remove_entry(&entry.name, false)
-                        .map_err(|_| ModelError::remove_entry_error(&entry.name))?;
+                    inner.dir.remove_node(&entry.name).map_err(|err| {
+                        ModelError::CollectionServiceDirError {
+                            moniker: target_moniker.clone(),
+                            err,
+                        }
+                    })?;
                 }
             }
             inner.entries.retain(|entry| entry.source_component_name != *target_name);

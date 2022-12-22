@@ -118,10 +118,34 @@ pub enum ModelError {
         #[from]
         err: ComponentInstanceError,
     },
-    #[error("failed to add entry {} to {}", entry_name, moniker)]
-    AddEntryError { moniker: AbsoluteMoniker, entry_name: String },
-    #[error("failed to remove entry {}", entry_name)]
-    RemoveEntryError { entry_name: String },
+    #[error("error in expose dir VFS for component {moniker}: {err}")]
+    ExposeDirError {
+        moniker: AbsoluteMoniker,
+
+        #[source]
+        err: VfsError,
+    },
+    #[error("error in namespace dir VFS for component {moniker}: {err}")]
+    NamespaceDirError {
+        moniker: AbsoluteMoniker,
+
+        #[source]
+        err: VfsError,
+    },
+    #[error("error in hub dir VFS for component {moniker}: {err}")]
+    HubDirError {
+        moniker: AbsoluteMoniker,
+
+        #[source]
+        err: VfsError,
+    },
+    #[error("error in collection service dir VFS for component {moniker}: {err}")]
+    CollectionServiceDirError {
+        moniker: AbsoluteMoniker,
+
+        #[source]
+        err: VfsError,
+    },
     #[error("failed to open directory '{}' for component '{}'", relative_path, moniker)]
     OpenDirectoryError { moniker: AbsoluteMoniker, relative_path: String },
     #[error("failed to create stream from channel")]
@@ -233,14 +257,6 @@ impl ModelError {
         ModelError::ModelNotAvailable
     }
 
-    pub fn add_entry_error(moniker: AbsoluteMoniker, entry_name: impl Into<String>) -> ModelError {
-        ModelError::AddEntryError { moniker, entry_name: entry_name.into() }
-    }
-
-    pub fn remove_entry_error(entry_name: impl Into<String>) -> ModelError {
-        ModelError::RemoveEntryError { entry_name: entry_name.into() }
-    }
-
     pub fn open_directory_error(
         moniker: AbsoluteMoniker,
         relative_path: impl Into<String>,
@@ -281,4 +297,12 @@ pub enum StructuredConfigError {
     VmoCreateFailed(#[source] zx::Status),
     #[error("couldn't write to vmo: {_0}")]
     VmoWriteFailed(#[source] zx::Status),
+}
+
+#[derive(Clone, Debug, Error)]
+pub enum VfsError {
+    #[error("failed to add node \"{name}\": {status}")]
+    AddNodeError { name: String, status: zx::Status },
+    #[error("failed to remove node \"{name}\": {status}")]
+    RemoveNodeError { name: String, status: zx::Status },
 }

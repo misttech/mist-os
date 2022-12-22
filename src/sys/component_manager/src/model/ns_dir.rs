@@ -4,8 +4,8 @@
 
 use {
     crate::model::{
-        addable_directory::AddableDirectoryWithResult, component::WeakComponentInstance,
-        dir_tree::DirTree, error::ModelError, routing_fns::route_use_fn,
+        component::WeakComponentInstance, dir_tree::DirTree, error::ModelError,
+        mutable_directory::MutableDirectory, routing_fns::route_use_fn,
     },
     cm_rust::ComponentDecl,
     fidl::endpoints::ServerEnd,
@@ -38,10 +38,15 @@ impl NamespaceDir {
     ) -> Result<Self, ModelError> {
         let mut dir = pfs::simple();
         let tree = DirTree::build_from_uses(route_use_fn, component.clone(), &decl);
-        tree.install(&component.abs_moniker, &mut dir)?;
+        tree.install(&mut dir).map_err(|err| ModelError::NamespaceDirError {
+            moniker: component.abs_moniker.clone(),
+            err,
+        })?;
 
         if let Some(pkg_dir) = pkg_dir {
-            dir.add_node("pkg", remote_dir(pkg_dir), &component.abs_moniker)?;
+            dir.add_node("pkg", remote_dir(pkg_dir)).map_err(|err| {
+                ModelError::NamespaceDirError { moniker: component.abs_moniker.clone(), err }
+            })?;
         }
 
         Ok(NamespaceDir { root_dir: dir, execution_scope: scope })
