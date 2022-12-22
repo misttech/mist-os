@@ -96,7 +96,6 @@ if (is_fuchsia) {
     # Needed for scrutiny to find things for the component model.
     include_component_id_index = true
     core_realm_definition = ":core_realm"
-    core_package_name = core_realm_package_name
   }
 
   generated_partitions_config("partitions_config") {

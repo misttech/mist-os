@@ -15,8 +15,6 @@ import("//src/sys/root/build/root.gni")
 #     Additional package labels to include in the `base_packages` passed to `assembled_system`.
 #
 template("assemble_network_conformance_system") {
-  core_name = "core-${target_name}"
-
   core_realm_definition("core") {
     testonly = true
 
@@ -31,9 +29,6 @@ template("assemble_network_conformance_system") {
   }
 
   root_realm("root") {
-    testonly = true
-
-    core_package_name = core_name
   }
 
   assembled_system(target_name) {
@@ -61,7 +56,6 @@ template("assemble_network_conformance_system") {
     base_packages += invoker.additional_base_packages
 
     core_realm_definition = ":core"
-    core_package_name = core_name
 
     generate_fvm = !bootfs_only
     ramdisk_fvm_in_zbi = true

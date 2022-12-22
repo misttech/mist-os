@@ -15,7 +15,6 @@ assert(current_toolchain == default_toolchain,
        "//build/images/* are only valid in the Fuchsia toolchain")
 
 root_realm("root") {
-  core_package_name = "core-invalid"
 }
 
 # Note: This ZBI output is also used by a script in //scripts/verify_cmdline_params.

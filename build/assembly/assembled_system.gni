@@ -178,10 +178,6 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #   core_realm_definition [optional]
 #     [label] The GN label of a `core_realm_definition()` template
 #
-#   core_package_name [optional]
-#     [string] Name of the core package. Required when core_realm_definition
-#     is provided.
-#
 # Board parameters:
 #
 #   assembly_blob_layout_format (default: "compact")
@@ -877,16 +873,15 @@ template("assembled_system") {
 
     # The core realm is part of the base packages. Do not generate
     # the core realm if we are not generating an FVM
-    if (defined(invoker.core_realm_definition) &&
-        defined(invoker.core_package_name) && generate_fvm) {
+    if (defined(invoker.core_realm_definition) && generate_fvm) {
       core_realm_definition = invoker.core_realm_definition
-      core_package_name = invoker.core_package_name
     } else {
-      not_needed(invoker,
-                 [
-                   "core_realm_definition",
-                   "core_package_name",
-                 ])
+      not_needed(invoker, [ "core_realm_definition" ])
+    }
+    if (defined(invoker.core_package_name)) {
+      _full_name = get_label_info(":$target_name", "label_with_toolchain")
+      print("Setting the core realm package is deprecated: $_full_name")
+      not_needed(invoker, [ "core_package_name" ])
     }
 
     base_driver_packages = _base_driver_packages

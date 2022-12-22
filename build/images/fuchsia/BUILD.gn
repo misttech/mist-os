@@ -164,7 +164,6 @@ if (is_fuchsia) {
     ]
 
     core_realm_definition = ":core_realm"
-    core_package_name = core_realm_package_name
 
     # Include the product-defined meta package labels.
     meta_packages = meta_package_labels

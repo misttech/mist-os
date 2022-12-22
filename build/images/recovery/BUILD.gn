@@ -33,14 +33,11 @@ if (is_fuchsia) {
   assert(current_toolchain == default_toolchain,
          "//build/images/* are only valid in the Fuchsia toolchain")
 
-  core_name = "core-recovery"
-
   # Parameters shared between recovery-eng and recovery-installer
   recovery_base = {
     testonly = true
     generate_fvm = !bootfs_only
     ramdisk_fvm_in_zbi = true
-    core_package_name = core_name
 
     include_component_id_index = true
     devmgr_config = [ "virtcon.disable=true" ] + zedboot_devmgr_config
@@ -127,7 +124,6 @@ if (is_fuchsia) {
   }
 
   root_realm("root") {
-    core_package_name = core_name
   }
 
   recovery_packages = board_recovery_package_labels + [
@@ -312,7 +308,6 @@ if (is_fuchsia) {
   assembled_system("recovery-fdr") {
     base_packages = recovery_fdr_packages
     core_realm_definition = ":core"
-    core_package_name = core_name
     generate_fvm = !bootfs_only
     ramdisk_fvm_in_zbi = true
 

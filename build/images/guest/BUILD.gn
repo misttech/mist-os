@@ -6,8 +6,6 @@ import("//build/assembly/assembled_system.gni")
 import("//src/sys/core/build/core.gni")
 import("//src/sys/root/build/root.gni")
 
-core_name = "core-guest"
-
 core_realm_definition("core") {
   testonly = true
   restrict_persistent_storage = false
@@ -19,8 +17,6 @@ core_realm_definition("core") {
 }
 
 root_realm("root") {
-  core_package_name = core_name
-  testonly = true
 }
 
 assembled_system("guest") {
@@ -119,5 +115,4 @@ assembled_system("guest") {
 
   include_component_id_index = true
   core_realm_definition = ":core"
-  core_package_name = core_name
 }
