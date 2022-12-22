@@ -228,6 +228,7 @@ if (is_fuchsia) {
 
   assembled_system("recovery-eng") {
     forward_variables_from(recovery_base, "*")
+    allow_eng_platform_bundle_use = true
     base_packages = recovery_eng_packages
     core_realm_definition = ":core-eng"
   }
