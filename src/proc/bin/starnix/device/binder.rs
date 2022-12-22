@@ -2171,6 +2171,10 @@ impl BinderDriver {
                 not_implemented!(current_task, "binder GET_NODE_INFO_FOR_REF ioctl not supported");
                 error!(EOPNOTSUPP)
             }
+            uapi::BINDER_FREEZE => {
+                not_implemented!(current_task, "binder BINDER_FREEZE ioctl not supported");
+                error!(EOPNOTSUPP)
+            }
             _ => {
                 log_error!(current_task, "binder received unknown ioctl request 0x{:08x}", request);
                 error!(EINVAL)
