@@ -9,7 +9,7 @@
 
 #include <string_view>
 
-namespace driver {
+namespace fdf {
 
 // Deprecated int keys with int values
 inline fuchsia_driver_framework::BindRule MakeBindRule(
@@ -212,6 +212,11 @@ inline fuchsia_driver_framework::BindRule MakeRejectBindRule(const std::string_v
   return MakeBindRule(key, fuchsia_driver_framework::Condition::kReject, values);
 }
 
+}  // namespace fdf
+
+// TODO(fxbug.dev/114875): remove this once migration from driver to fdf is complete.
+namespace driver {
+using namespace fdf;
 }  // namespace driver
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_NODE_GROUP_H_

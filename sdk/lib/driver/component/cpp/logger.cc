@@ -9,7 +9,7 @@
 
 namespace flog = fuchsia_syslog;
 
-namespace driver {
+namespace fdf {
 
 zx_koid_t GetKoid(zx_handle_t handle) {
   zx_info_handle_basic_t info;
@@ -197,4 +197,4 @@ void Logger::logvf(FuchsiaLogSeverity severity, const char* tag, const char* fil
   FlushRecord(buffer, dropped);
 }
 
-}  // namespace driver
+}  // namespace fdf

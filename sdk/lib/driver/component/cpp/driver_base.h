@@ -15,7 +15,7 @@
 #include <lib/driver/record/record.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
-namespace driver {
+namespace fdf {
 
 using DriverStartArgs = fuchsia_driver_framework::DriverStartArgs;
 
@@ -36,10 +36,10 @@ using DriverStartArgs = fuchsia_driver_framework::DriverStartArgs;
 // The following illustrates an example:
 //
 // ```
-// class MyDriver : public driver::DriverBase {
+// class MyDriver : public fdf::DriverBase {
 //  public:
-//   MyDriver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
-//       : driver::DriverBase("my_driver", std::move(start_args), std::move(driver_dispatcher)) {}
+//   MyDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+//       : fdf::DriverBase("my_driver", std::move(start_args), std::move(driver_dispatcher)) {}
 //
 //   zx::result<> Start() override {
 //     context().incoming()->Connect(...);
@@ -176,7 +176,7 @@ template <typename Driver>
 class BasicFactory {
   static_assert(std::is_base_of_v<DriverBase, Driver>, "Driver has to inherit from DriverBase");
   static_assert(std::is_constructible_v<Driver, DriverStartArgs, fdf::UnownedDispatcher>,
-                "Driver must contain a constructor with the signature '(driver::DriverStartArgs, "
+                "Driver must contain a constructor with the signature '(fdf::DriverStartArgs, "
                 "fdf::UnownedDispatcher)' in order to be used with the BasicFactory.");
 
  public:
@@ -208,7 +208,7 @@ class BasicFactory {
 //
 // This illustrates how to use a |Record| with the default |BasicFactory|:
 // ```
-// FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<MyDriver>);
+// FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<MyDriver>);
 // ```
 //
 // This illustrates how to use a |Record| with a custom factory:
@@ -221,7 +221,7 @@ class BasicFactory {
 // };
 // // We must define the record before passing into the macro, otherwise the macro expansion
 // // will think the comma is to pass a second macro argument.
-// using record = driver::Record<MyDriver, CustomFactory>;
+// using record = fdf::Record<MyDriver, CustomFactory>;
 // FUCHSIA_DRIVER_RECORD_CPP_V3(record);
 // ```
 template <typename Driver, typename Factory = BasicFactory<Driver>>
@@ -236,7 +236,7 @@ class Record {
                      zx::result<std::unique_ptr<DriverBase>> (*)(
                          DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)>,
       "CreateDriver must be a public static function with signature "
-      "'zx::result<std::unique_ptr<driver::DriverBase>> (driver::DriverStartArgs start_args, "
+      "'zx::result<std::unique_ptr<fdf::DriverBase>> (fdf::DriverStartArgs start_args, "
       "fdf::UnownedDispatcher driver_dispatcher)'.");
 
  public:
@@ -285,6 +285,11 @@ class Record {
   FUCHSIA_DRIVER_RECORD_V2(.start = record::Start, .prepare_stop = record::PrepareStop, \
                            .stop = record::Stop)
 
+}  // namespace fdf
+
+// TODO(fxbug.dev/114875): remove this once migration from driver to fdf is complete.
+namespace driver {
+using namespace fdf;
 }  // namespace driver
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_DRIVER_BASE_H_

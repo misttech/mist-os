@@ -5,7 +5,7 @@
 #include <lib/driver/component/cpp/handlers.h>
 #include <lib/driver/component/cpp/outgoing_directory.h>
 
-namespace driver {
+namespace fdf {
 
 OutgoingDirectory::OutgoingDirectory(OutgoingDirectory&& other) noexcept
     : component_outgoing_dir_(std::move(other.component_outgoing_dir_)),
@@ -41,4 +41,4 @@ void OutgoingDirectory::RegisterRuntimeToken(zx::channel token, AnyHandler handl
   }
 }
 
-}  // namespace driver
+}  // namespace fdf

@@ -10,8 +10,9 @@
 
 namespace fdh = fuchsia_driver_host;
 namespace frunner = fuchsia_component_runner;
-namespace fdf = fuchsia_driver_framework;
-
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 namespace dfv2 {
 
 zx::result<> SetEncodedConfig(fidl::WireTableBuilder<fdf::wire::DriverStartArgs>& args,

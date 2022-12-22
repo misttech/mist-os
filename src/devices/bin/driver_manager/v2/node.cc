@@ -17,7 +17,9 @@
 
 const std::string kUnboundUrl = "unbound";
 
-namespace fdf = fuchsia_driver_framework;
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 namespace fdecl = fuchsia_component_decl;
 
 namespace dfv2 {

@@ -4,7 +4,7 @@
 
 #include <lib/driver/component/cpp/tests/test_base.h>
 
-namespace driver::testing {
+namespace fdf::testing {
 
 zx::result<Namespace> CreateNamespace(fidl::ClientEnd<fuchsia_io::Directory> client_end) {
   fidl::Arena arena;
@@ -16,4 +16,4 @@ zx::result<Namespace> CreateNamespace(fidl::ClientEnd<fuchsia_io::Directory> cli
   return Namespace::Create(ns_entries);
 }
 
-}  // namespace driver::testing
+}  // namespace fdf::testing

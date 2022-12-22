@@ -4,7 +4,7 @@
 
 #include <lib/driver/component/cpp/namespace.h>
 
-namespace driver {
+namespace fdf {
 
 zx::result<Namespace> Namespace::Create(
     fidl::VectorView<fuchsia_component_runner::wire::ComponentNamespaceEntry>& entries) {
@@ -101,4 +101,4 @@ zx::result<> Namespace::Open(const char* path, fuchsia_io::wire::OpenFlags flags
   return zx::make_result(status);
 }
 
-}  // namespace driver
+}  // namespace fdf

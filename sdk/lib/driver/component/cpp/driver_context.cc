@@ -6,7 +6,7 @@
 
 #include <utility>
 
-namespace driver {
+namespace fdf {
 
 DriverContext::DriverContext(fdf_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
@@ -19,4 +19,4 @@ void DriverContext::InitializeAndServe(
   ZX_ASSERT(outgoing_->Serve(std::move(outgoing_directory_request)).is_ok());
 }
 
-}  // namespace driver
+}  // namespace fdf

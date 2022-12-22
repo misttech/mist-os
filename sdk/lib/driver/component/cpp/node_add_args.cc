@@ -4,7 +4,7 @@
 
 #include <lib/driver/component/cpp/node_add_args.h>
 
-namespace driver {
+namespace fdf {
 
 namespace fcd = fuchsia_component_decl;
 
@@ -44,4 +44,4 @@ fcd::wire::Offer MakeOffer(fidl::AnyArena& arena, std::string_view service_name,
   return fcd::wire::Offer::WithService(arena, offer.Build());
 }
 
-}  // namespace driver
+}  // namespace fdf

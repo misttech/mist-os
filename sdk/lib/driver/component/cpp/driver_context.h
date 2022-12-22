@@ -8,7 +8,7 @@
 #include <lib/driver/component/cpp/namespace.h>
 #include <lib/driver/component/cpp/outgoing_directory.h>
 
-namespace driver {
+namespace fdf {
 
 // |DriverContext| is meant to be used in drivers for easy access to the
 // incoming and outgoing namespace. The interface is very similar to |ComponentContext|.
@@ -40,6 +40,11 @@ class DriverContext final {
   std::shared_ptr<OutgoingDirectory> outgoing_;
 };
 
+}  // namespace fdf
+
+// TODO(fxbug.dev/114875): remove this once migration from driver to fdf is complete.
+namespace driver {
+using namespace fdf;
 }  // namespace driver
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_DRIVER_CONTEXT_H_

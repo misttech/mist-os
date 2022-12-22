@@ -14,7 +14,7 @@
   (logger).logf((FUCHSIA_LOG_##severity), nullptr, __FILE__, __LINE__, msg)
 #define FDF_LOG(severity, msg...) FDF_LOGL(severity, *logger_, msg)
 
-namespace driver {
+namespace fdf {
 
 // Provides a driver's logger.
 class Logger {
@@ -84,6 +84,11 @@ class Logger {
   fidl::WireClient<fuchsia_logger::LogSink> log_sink_;
 };
 
+}  // namespace fdf
+
+// TODO(fxbug.dev/114875): remove this once migration from driver to fdf is complete.
+namespace driver {
+using namespace fdf;
 }  // namespace driver
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_LOGGER_H_

@@ -8,7 +8,7 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl_driver/cpp/transport.h>
 
-namespace driver {
+namespace fdf {
 
 // Callback invoked when a request is made to a FIDL protocol server end.
 using AnyHandler = fit::function<void(typename fidl::internal::DriverTransport::OwnedType)>;
@@ -19,6 +19,11 @@ using TypedHandler = fit::function<void(fidl::internal::ServerEndType<Protocol> 
 
 using ServiceInstanceHandler = fidl::ServiceInstanceHandler<fidl::internal::DriverTransport>;
 
+}  // namespace fdf
+
+// TODO(fxbug.dev/114875): remove this once migration from driver to fdf is complete.
+namespace driver {
+using namespace fdf;
 }  // namespace driver
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_HANDLERS_H_

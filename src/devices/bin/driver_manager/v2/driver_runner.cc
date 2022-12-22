@@ -28,7 +28,9 @@
 #include "src/lib/fxl/strings/join_strings.h"
 #include "src/lib/storage/vfs/cpp/service.h"
 
-namespace fdf = fuchsia_driver_framework;
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}
 namespace fdh = fuchsia_driver_host;
 namespace fdi = fuchsia_driver_index;
 namespace fio = fuchsia_io;

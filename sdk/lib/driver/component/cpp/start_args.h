@@ -12,7 +12,7 @@
 
 #include <vector>
 
-namespace driver {
+namespace fdf {
 
 template <typename T>
 zx::result<T> SymbolValue(const fuchsia_driver_framework::wire::DriverStartArgs& args,
@@ -53,7 +53,7 @@ zx::result<T> SymbolValue(
 template <typename T>
 T GetSymbol(const std::optional<std::vector<fuchsia_driver_framework::NodeSymbol>>& symbols,
             std::string_view name, T default_value = nullptr) {
-  auto value = driver::SymbolValue<T>(symbols, name);
+  auto value = fdf::SymbolValue<T>(symbols, name);
   return value.is_ok() ? *value : default_value;
 }
 
@@ -163,6 +163,11 @@ inline zx::result<fidl::UnownedClientEnd<fuchsia_io::Directory>> NsValue(
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
+}  // namespace fdf
+
+// TODO(fxbug.dev/114875): remove this once migration from driver to fdf is complete.
+namespace driver {
+using namespace fdf;
 }  // namespace driver
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_START_ARGS_H_

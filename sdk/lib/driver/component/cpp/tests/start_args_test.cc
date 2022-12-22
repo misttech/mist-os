@@ -6,8 +6,11 @@
 
 #include <gtest/gtest.h>
 
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
+
 namespace fdata = fuchsia_data;
-namespace fdf = fuchsia_driver_framework;
 namespace frunner = fuchsia_component_runner;
 
 TEST(StartArgsTest, SymbolValueWire) {

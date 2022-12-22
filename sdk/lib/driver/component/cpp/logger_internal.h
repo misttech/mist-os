@@ -7,7 +7,7 @@
 
 #include <lib/driver/component/cpp/logger.h>
 
-namespace driver_internal {
+namespace fdf_internal {
 
 static inline cpp17::optional<cpp17::string_view> FromCString(const char* value) {
   if (value) {
@@ -46,13 +46,13 @@ constexpr bool Not() {
 }
 
 template <typename... LogArgs>
-constexpr driver_internal::Tuplet<LogArgs...> Args(LogArgs... values) {
-  return driver_internal::Tuplet<LogArgs...>(std::make_tuple(values...), sizeof...(values));
+constexpr fdf_internal::Tuplet<LogArgs...> Args(LogArgs... values) {
+  return fdf_internal::Tuplet<LogArgs...>(std::make_tuple(values...), sizeof...(values));
 }
 
 template <typename Key, typename Value>
-constexpr driver_internal::KeyValue<Key, Value> KeyValueInternal(Key key, Value value) {
-  return driver_internal::KeyValue<Key, Value>(key, value);
+constexpr fdf_internal::KeyValue<Key, Value> KeyValueInternal(Key key, Value value) {
+  return fdf_internal::KeyValue<Key, Value>(key, value);
 }
 
 struct EncoderState {
@@ -114,8 +114,8 @@ struct EncoderState {
 template <typename Msg, typename... KeyValuePairs>
 struct LogValue {
   constexpr LogValue(Msg msg, Tuplet<KeyValuePairs...> kvps) : msg(msg), kvps(kvps) {}
-  void LogNew(driver::Logger& logger, FuchsiaLogSeverity severity, const char* file,
-              unsigned int line, const char* condition) const {
+  void LogNew(fdf::Logger& logger, FuchsiaLogSeverity severity, const char* file, unsigned int line,
+              const char* condition) const {
     EncoderState state;
     uint32_t dropped = logger.GetAndResetDropped();
     logger.BeginRecord(state.buffer, severity, FromCString(file), line, FromCString(msg),
@@ -127,23 +127,23 @@ struct LogValue {
   }
 
   Msg msg;
-  driver_internal::Tuplet<KeyValuePairs...> kvps;
+  fdf_internal::Tuplet<KeyValuePairs...> kvps;
 };
 
 template <typename Msg, typename... Args>
-static auto MakeValue(Msg msg, driver_internal::Tuplet<Args...> args) {
+static auto MakeValue(Msg msg, fdf_internal::Tuplet<Args...> args) {
   return LogValue<Msg, Args...>(msg, args);
 }
 
 template <size_t i, size_t size, typename... Values, typename... Tuple,
-          typename std::enable_if<driver_internal::Not<driver_internal::ILessThanSize<i, size>()>(),
+          typename std::enable_if<fdf_internal::Not<fdf_internal::ILessThanSize<i, size>()>(),
                                   int>::type = 0>
 static auto MakeKV(std::tuple<Values...> value, std::tuple<Tuple...> tuple) {
-  return driver_internal::Tuplet<Tuple...>(tuple, size);
+  return fdf_internal::Tuplet<Tuple...>(tuple, size);
 }
 
 template <size_t i, size_t size, typename... Values, typename... Tuple,
-          typename std::enable_if<driver_internal::ILessThanSize<i, size>(), int>::type = 0>
+          typename std::enable_if<fdf_internal::ILessThanSize<i, size>(), int>::type = 0>
 static auto MakeKV(std::tuple<Values...> value, std::tuple<Tuple...> tuple) {
   // Key at index i, value at index i+1
   auto k = std::get<i>(value);
@@ -163,7 +163,7 @@ static auto MakeKV(std::tuple<Args...> args) {
 }
 
 template <typename Msg, typename... Args>
-static void fx_slog(driver::Logger& logger, FuchsiaLogSeverity severity, const char* file, int line,
+static void fx_slog(fdf::Logger& logger, FuchsiaLogSeverity severity, const char* file, int line,
                     Msg msg, Args... args) {
   if (severity < logger.GetSeverity()) {
     return;
@@ -172,6 +172,11 @@ static void fx_slog(driver::Logger& logger, FuchsiaLogSeverity severity, const c
       .LogNew(logger, severity, file, line, nullptr);
 }
 
+}  // namespace fdf_internal
+
+// TODO(fxbug.dev/114875): remove this once migration from driver to fdf is complete.
+namespace driver_internal {
+using namespace fdf_internal;
 }  // namespace driver_internal
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_LOGGER_INTERNAL_H_

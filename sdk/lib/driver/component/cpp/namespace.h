@@ -14,7 +14,7 @@
 #include <lib/fdio/namespace.h>
 #include <lib/fidl_driver/cpp/transport.h>
 
-namespace driver {
+namespace fdf {
 
 namespace internal {
 
@@ -214,6 +214,11 @@ class Namespace {
   fidl::ClientEnd<fuchsia_io::Directory> svc_dir_;
 };
 
+}  // namespace fdf
+
+// TODO(fxbug.dev/114875): remove this once migration from driver to fdf is complete.
+namespace driver {
+using namespace fdf;
 }  // namespace driver
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_NAMESPACE_H_

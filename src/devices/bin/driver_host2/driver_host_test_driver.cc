@@ -10,7 +10,9 @@
 #include <lib/fdio/directory.h>
 #include <lib/fidl/epitaph.h>
 
-namespace fdf = fuchsia_driver_framework;
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 namespace ftest = fuchsia_driverhost_test;
 
 class TestDriver {

@@ -7,7 +7,7 @@
 
 #include <lib/driver/component/cpp/namespace.h>
 
-namespace driver {
+namespace fdf {
 
 // Connects to the |ServiceMember| protocol in the namespace |ns|.
 //
@@ -18,10 +18,15 @@ namespace driver {
 template <typename ServiceMember,
           typename = std::enable_if_t<fidl::IsServiceMemberV<ServiceMember>>>
 zx::result<fidl::internal::ClientEndType<typename ServiceMember::ProtocolType>> Connect(
-    const driver::Namespace& ns, std::string_view instance = component::kDefaultInstance) {
+    const fdf::Namespace& ns, std::string_view instance = component::kDefaultInstance) {
   return ns.Connect<ServiceMember>(instance);
 }
 
+}  // namespace fdf
+
+// TODO(fxbug.dev/114875): remove this once migration from driver to fdf is complete.
+namespace driver {
+using namespace fdf;
 }  // namespace driver
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_SERVICE_CLIENT_H_

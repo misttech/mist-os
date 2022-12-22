@@ -6,7 +6,7 @@
 
 namespace fdfs = fuchsia_device_fs;
 
-namespace driver {
+namespace fdf {
 
 zx::result<DevfsExporter> DevfsExporter::Create(
     const Namespace& ns, async_dispatcher_t* dispatcher,
@@ -86,4 +86,4 @@ void DevfsExporter::Export(std::string_view service_path, std::string_view devfs
       });
 }
 
-}  // namespace driver
+}  // namespace fdf

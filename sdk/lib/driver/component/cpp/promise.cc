@@ -5,7 +5,7 @@
 #include <lib/driver/component/cpp/promise.h>
 #include <lib/fpromise/bridge.h>
 
-namespace driver {
+namespace fdf {
 
 namespace internal {
 fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWithResult(
@@ -44,4 +44,4 @@ fpromise::promise<void, fuchsia_driver_framework::wire::NodeError> AddChild(
   return bridge.consumer.promise();
 }
 
-}  // namespace driver
+}  // namespace fdf

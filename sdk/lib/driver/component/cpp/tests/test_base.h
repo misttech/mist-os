@@ -9,7 +9,7 @@
 #include <lib/driver/component/cpp/namespace.h>
 #include <lib/fpromise/promise.h>
 
-namespace driver::testing {
+namespace fdf::testing {
 
 struct FakeContext : public fpromise::context {
   fpromise::executor* executor() const override { return nullptr; }
@@ -38,6 +38,11 @@ class Directory : public fuchsia::io::testing::Directory_TestBase {
 
 zx::result<Namespace> CreateNamespace(fidl::ClientEnd<fuchsia_io::Directory> client_end);
 
+}  // namespace fdf::testing
+
+// TODO(fxbug.dev/114875): remove this once migration from driver to fdf is complete.
+namespace driver::testing {
+using namespace fdf::testing;
 }  // namespace driver::testing
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_TESTS_TEST_BASE_H_

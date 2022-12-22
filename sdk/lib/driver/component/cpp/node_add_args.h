@@ -14,7 +14,7 @@
 
 #include <string_view>
 
-namespace driver {
+namespace fdf {
 
 fuchsia_component_decl::Offer MakeOffer(std::string_view service_name,
                                         std::string_view instance_name);
@@ -104,6 +104,11 @@ inline fuchsia_driver_framework::wire::NodeProperty MakeProperty(fidl::AnyArena&
       .Build();
 }
 
+}  // namespace fdf
+
+// TODO(fxbug.dev/114875): remove this once migration from driver to fdf is complete.
+namespace driver {
+using namespace fdf;
 }  // namespace driver
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_NODE_ADD_ARGS_H_

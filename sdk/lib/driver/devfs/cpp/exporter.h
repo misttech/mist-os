@@ -9,7 +9,7 @@
 #include <lib/component/incoming/cpp/service_client.h>
 #include <lib/driver/component/cpp/namespace.h>
 
-namespace driver {
+namespace fdf {
 
 // Allows a driver to export a service to devfs.
 class DevfsExporter {
@@ -61,6 +61,11 @@ class DevfsExporter {
   fidl::WireSharedClient<fuchsia_io::Directory> svc_dir_;
 };
 
+}  // namespace fdf
+
+// TODO(fxbug.dev/114875): remove this once migration from driver to fdf is complete.
+namespace driver {
+using namespace fdf;
 }  // namespace driver
 
 #endif  // LIB_DRIVER_DEVFS_CPP_EXPORTER_H_

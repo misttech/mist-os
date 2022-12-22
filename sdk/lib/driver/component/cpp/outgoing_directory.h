@@ -15,7 +15,7 @@
 #include "lib/component/outgoing/cpp/handlers.h"
 #include "lib/fidl/cpp/wire/service_handler.h"
 
-namespace driver {
+namespace fdf {
 
 // The name of the default FIDL Service instance.
 constexpr const std::string_view kDefaultInstance = component::kDefaultInstance;
@@ -61,7 +61,7 @@ class OutgoingDirectory final {
   // where Transport must be either |fidl::internal::ChannelTransport| for |zx::channel|
   // transports, or |fidl::internal::DriverTransport| for |fdf::Channel| transport. Users
   // should not use this method directly and instead should use the specialization
-  // for |component::ServiceInstanceHandler| and |driver::ServiceInstanceHandler|
+  // for |component::ServiceInstanceHandler| and |fdf::ServiceInstanceHandler|
   // instead.
   //
   // # Errors
@@ -88,7 +88,7 @@ class OutgoingDirectory final {
           member_handler(std::move(server_end));
           return;
         };
-      } else if constexpr (std::is_same_v<TransportHandler, driver::ServiceInstanceHandler>) {
+      } else if constexpr (std::is_same_v<TransportHandler, fdf::ServiceInstanceHandler>) {
         handler = [this,
                    member_handler = std::move(member_handler)](zx::channel server_end) mutable {
           ZX_ASSERT(server_end.is_valid());
@@ -114,9 +114,9 @@ class OutgoingDirectory final {
 
   // Same as above but strictly for services using the driver channel transport.
   template <typename Service>
-  zx::result<> AddService(driver::ServiceInstanceHandler handler,
+  zx::result<> AddService(fdf::ServiceInstanceHandler handler,
                           cpp17::string_view instance = kDefaultInstance) {
-    return AddService<driver::ServiceInstanceHandler, Service>(std::move(handler), instance);
+    return AddService<fdf::ServiceInstanceHandler, Service>(std::move(handler), instance);
   }
 
   // Same as above but strictly for services using the Zircon channel transport.
@@ -230,6 +230,11 @@ class OutgoingDirectory final {
   fdf_dispatcher_t* dispatcher_ = nullptr;
 };
 
+}  // namespace fdf
+
+// TODO(fxbug.dev/114875): remove this once migration from driver to fdf is complete.
+namespace driver {
+using namespace fdf;
 }  // namespace driver
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_OUTGOING_DIRECTORY_H_
