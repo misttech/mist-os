@@ -77,10 +77,10 @@ It must be located in the directory pointed by the `${SYSROOT_DIR}` variable.
 SYSROOT_DIR=${HOME}/fuchsia-sysroot/
 ```
 
-To download the latest sysroot, you can use the following:
+To download the sysroot, you can use the following:
 
 ```bash
-cipd install fuchsia/third_party/sysroot/linux latest -root ${SYSROOT_DIR}
+cipd install fuchsia/third_party/sysroot/linux integration -root ${SYSROOT_DIR}
 ```
 
 {% dynamic if user.is_googler %}
@@ -228,7 +228,7 @@ GOMA_DIR=${FUCHSIA_DIR}/prebuilt/third_party/goma/linux-x64/
 
 # Download necessary dependencies
 cipd install fuchsia/sdk/core/linux-amd64 latest -root ${IDK_DIR}
-cipd install fuchsia/third_party/sysroot/linux latest -root ${SYSROOT_DIR}
+cipd install fuchsia/third_party/sysroot/linux integration -root ${SYSROOT_DIR}
 
 # CMake invocation
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
