@@ -2,23 +2,17 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/config_data_for_assembly.gni")
 import("//build/config.gni")
 
 components_file = [ "components.json5" ]
 
 # Install FIRE config into the "sampler" package
 
-config_data("fire_config_component_list") {
+config_data_for_assembly("fire_config_component_list") {
   for_pkg = "sampler"
   sources = components_file
   outputs = [ "fire/fuchsia/{{source_file_part}}" ]
-}
-
-group("fire_config_data") {
-  deps = [
-    ":fire_config_component_list",
-    "//src/diagnostics/config/fire/projects:fire_config_projects",
-  ]
 }
 
 # Validate FIRE config

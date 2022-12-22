@@ -144,6 +144,7 @@ assembly_input_bundle("common_minimal") {
     "//src/diagnostics/log-stats:package",
     "//src/diagnostics/persistence:diagnostics-persistence",
     "//src/diagnostics/kcounter:diagnostics-kcounter",
+    "//src/diagnostics/sampler",
 
     # Other
     "//src/sys/stash:pkg",
@@ -214,6 +215,12 @@ assembly_input_bundle("common_minimal") {
         },
       ]
     },
+  ]
+
+  config_data_labels = [
+    "//src/diagnostics/config/sampler:sampler_config_internal",
+    "//src/diagnostics/config/fire:fire_config_component_list",
+    "//src/diagnostics/config/fire/projects:fire_config_projects",
   ]
 }
 

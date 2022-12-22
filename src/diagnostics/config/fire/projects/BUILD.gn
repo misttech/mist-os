@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/config_data_for_assembly.gni")
 import("//build/config.gni")
 
 # The list of FIRE configuration templates in the current directory. Files that are not listed
@@ -12,7 +13,7 @@ project_files = [
   "crashes.json5",
 ]
 
-config_data("fire_config_projects") {
+config_data_for_assembly("fire_config_projects") {
   for_pkg = "sampler"
   sources = project_files
   outputs = [ "fire/fuchsia/projects/{{source_file_part}}" ]
