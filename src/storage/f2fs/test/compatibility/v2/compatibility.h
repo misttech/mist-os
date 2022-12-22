@@ -143,6 +143,7 @@ class LinuxOperator : public CompatibilityTestOperator {
   void ExecuteWithAssert(const std::vector<std::string>& argv, std::string* result = nullptr);
   std::string ConvertPath(std::string_view path);
 
+  void CheckLinuxVersion(const int major, const int minor);
   // "dry-run" of fsck needs version at least 1.14
   void CheckF2fsToolsVersion(const int major = 1, const int minor = 14);
 

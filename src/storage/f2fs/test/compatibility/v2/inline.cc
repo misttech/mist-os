@@ -10,6 +10,9 @@ namespace {
 using InlineCompatibilityTest = F2fsGuestTest;
 
 TEST_F(InlineCompatibilityTest, InlineDentryLinuxToFuchsia) {
+  // Inline dentry on Linux F2FS is available from v3.17
+  GetEnclosedGuest().GetLinuxOperator().CheckLinuxVersion(3, 17);
+
   const std::string inline_dir_path = "/inline";
   const std::string noninline_dir_path = "/noninline";
 
@@ -104,6 +107,9 @@ TEST_F(InlineCompatibilityTest, InlineDentryLinuxToFuchsia) {
 }
 
 TEST_F(InlineCompatibilityTest, InlineDentryFuchsiaToLinux) {
+  // Inline dentry on Linux F2FS is available from v3.17
+  GetEnclosedGuest().GetLinuxOperator().CheckLinuxVersion(3, 17);
+
   const std::string inline_dir_path = "/inline";
   const std::string noninline_dir_path = "/noninline";
 
@@ -181,6 +187,9 @@ TEST_F(InlineCompatibilityTest, InlineDentryFuchsiaToLinux) {
 }
 
 TEST_F(InlineCompatibilityTest, InlineDataLinuxToFuchsia) {
+  // Inline data on Linux F2FS is available from v3.13
+  GetEnclosedGuest().GetLinuxOperator().CheckLinuxVersion(3, 13);
+
   const std::string inline_file_name = "inline";
 
   const uint32_t data_length = GetEnclosedGuest().GetFuchsiaOperator().MaxInlineDataLength() / 2;
@@ -226,6 +235,9 @@ TEST_F(InlineCompatibilityTest, InlineDataLinuxToFuchsia) {
 }
 
 TEST_F(InlineCompatibilityTest, InlineDataFuchsiaToLinux) {
+  // Inline data on Linux F2FS is available from v3.13
+  GetEnclosedGuest().GetLinuxOperator().CheckLinuxVersion(3, 13);
+
   const std::string inline_file_name = "inline";
 
   const uint32_t data_length = GetEnclosedGuest().GetFuchsiaOperator().MaxInlineDataLength() / 2;
@@ -281,6 +293,9 @@ TEST_F(InlineCompatibilityTest, InlineDataFuchsiaToLinux) {
 }
 
 TEST_F(InlineCompatibilityTest, DataExistFlagLinuxToFuchsia) {
+  // |DataExist| flag on Linux F2FS is available from v3.18
+  GetEnclosedGuest().GetLinuxOperator().CheckLinuxVersion(3, 18);
+
   const std::string filenames[4] = {"alpha", "bravo", "charlie", "delta"};
   const std::string test_string = "hello";
 
@@ -366,6 +381,9 @@ TEST_F(InlineCompatibilityTest, DataExistFlagLinuxToFuchsia) {
 }
 
 TEST_F(InlineCompatibilityTest, DataExistFlagFuchsiaToLinux) {
+  // |DataExist| flag on Linux F2FS is available from v3.18
+  GetEnclosedGuest().GetLinuxOperator().CheckLinuxVersion(3, 18);
+
   const std::string filenames[4] = {"alpha", "bravo", "charlie", "delta"};
   const std::string test_string = "hello";
 
