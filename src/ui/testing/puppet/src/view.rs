@@ -13,8 +13,8 @@ use {
         self as ui_pointer, MouseEvent, TouchEvent, TouchInteractionId, TouchInteractionStatus,
         TouchResponse,
     },
-    fidl_fuchsia_ui_test_input as test_input, fidl_fuchsia_ui_views as ui_views,
-    fuchsia_async as fasync,
+    fidl_fuchsia_ui_test_conformance as ui_conformance, fidl_fuchsia_ui_test_input as test_input,
+    fidl_fuchsia_ui_views as ui_views, fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_scenic as scenic,
     futures::channel::{mpsc, oneshot},
@@ -58,6 +58,15 @@ struct TouchInteraction {
     // Only contains InternalMessage::TouchEvents.
     pending_events: Vec<test_input::TouchInputListenerReportTouchInputRequest>,
     status: Option<ui_pointer::TouchInteractionStatus>,
+}
+
+/// Identifiers required to manipulate embedded view state.
+struct EmbeddedViewIds {
+    /// Flatland `TransformId` for the embedding viewport.
+    transform_id: ui_comp::TransformId,
+
+    /// Flatland `ContentId` for the embedding viewport.
+    content_id: ui_comp::ContentId,
 }
 
 /// Encapsulates capabilities and resources associated with a puppet's view.
@@ -114,6 +123,9 @@ pub(super) struct View {
 
     /// Proxy to forward keyboard events to test.
     keyboard_input_listener: Option<test_input::KeyboardInputListenerProxy>,
+
+    /// Holds a map from user-defined ID to embedded view IDs.
+    embedded_views: HashMap<u64, EmbeddedViewIds>,
 }
 
 impl View {
@@ -178,6 +190,7 @@ impl View {
             mouse_input_listener,
             keyboard_watched_task: OnceCell::new(),
             keyboard_input_listener,
+            embedded_views: HashMap::new(),
         }));
 
         let (view_initialized_sender, view_initialized_receiver) = oneshot::channel::<()>();
@@ -222,6 +235,10 @@ impl View {
     /// Returns true if the parent viewport is connected to the display AND we've received non-zero
     /// layout info.
     fn is_initialized(&self) -> bool {
+        info!(
+            "connected to display = {} logical size = ({}, {})",
+            self.connected_to_display, self.logical_size.width, self.logical_size.height
+        );
         self.connected_to_display && self.logical_size.width > 0 && self.logical_size.height > 0
     }
 
@@ -264,6 +281,96 @@ impl View {
                     .expect("failed to declare view initialized");
             }
         }
+    }
+
+    /// Creates a viewport according to the given `properties`.
+    pub async fn embed_remote_view(
+        &mut self,
+        id: u64,
+        properties: ui_conformance::EmbeddedViewProperties,
+    ) -> ui_views::ViewCreationToken {
+        let view_bounds = properties.bounds.expect("missing embedded view bounds");
+
+        // Create the viewport transform.
+        let mut transform_id =
+            Self::create_transform(self.flatland.clone(), &mut self.id_generator);
+
+        // Create the content id.
+        let mut content_id = self.id_generator.next_content_id();
+
+        // Create the view/viewport token pair.
+        let mut token_pair = scenic::flatland::ViewCreationTokenPair::new()
+            .expect("failed to create view creation token pair");
+
+        // Create the embedding viewport.
+        let (_, child_view_watcher_request) = create_proxy::<ui_comp::ChildViewWatcherMarker>()
+            .expect("failed to create child view watcher channel");
+        self.flatland
+            .create_viewport(
+                &mut content_id,
+                &mut token_pair.viewport_creation_token,
+                ui_comp::ViewportProperties {
+                    logical_size: view_bounds.size,
+                    ..ui_comp::ViewportProperties::EMPTY
+                },
+                child_view_watcher_request,
+            )
+            .expect("failed to create child viewport");
+
+        // Attach the embedding viewport to its transform.
+        self.flatland
+            .set_content(&mut transform_id, &mut content_id)
+            .expect("failed to set viewport content");
+
+        // Position the embedded view.
+        if let Some(mut origin) = view_bounds.origin {
+            self.flatland
+                .set_translation(&mut transform_id, &mut origin)
+                .expect("failed to position embedded view");
+        }
+
+        // Attach the child view to the view's root transform.
+        self.flatland
+            .add_child(&mut self.root_transform_id, &mut transform_id)
+            .expect("failed to attach embedded view to root transform");
+
+        // Present changes.
+        request_present(&self.presentation_sender).await;
+
+        self.embedded_views.insert(id, EmbeddedViewIds { transform_id, content_id });
+
+        token_pair.view_creation_token
+    }
+
+    pub async fn set_embedded_view_properties(
+        &mut self,
+        id: u64,
+        properties: ui_conformance::EmbeddedViewProperties,
+    ) {
+        let view_bounds = properties.bounds.expect("missing embedded view bounds");
+
+        // Get embedded view content + transform IDs.
+        let embedded_view =
+            self.embedded_views.get_mut(&id).expect("no embedded view with specified id");
+
+        // Set viewport properties and translation.
+        self.flatland
+            .set_viewport_properties(
+                &mut embedded_view.content_id,
+                ui_comp::ViewportProperties {
+                    logical_size: view_bounds.size,
+                    ..ui_comp::ViewportProperties::EMPTY
+                },
+            )
+            .expect("failed to set viewport properties");
+        if let Some(mut origin) = view_bounds.origin {
+            self.flatland
+                .set_translation(&mut embedded_view.transform_id, &mut origin)
+                .expect("failed to position embedded view");
+        }
+
+        // Present changes.
+        request_present(&self.presentation_sender).await;
     }
 
     /// Creates a flatland transform and returns its `TransformId`.

@@ -4,8 +4,9 @@
 
 use {
     fidl_fuchsia_ui_test_conformance::{
-        PuppetFactoryCreateResponse, PuppetFactoryRequest, PuppetFactoryRequestStream,
-        PuppetRequestStream, Result_,
+        PuppetEmbedRemoteViewResponse, PuppetFactoryCreateResponse, PuppetFactoryRequest,
+        PuppetFactoryRequestStream, PuppetRequest, PuppetRequestStream,
+        PuppetSetEmbeddedViewPropertiesResponse, Result_,
     },
     futures::TryStreamExt,
     std::{cell::RefCell, rc::Rc},
@@ -15,11 +16,50 @@ use {
 mod presentation_loop;
 mod view;
 
-async fn run_puppet(request_stream: PuppetRequestStream, _puppet_view: Rc<RefCell<view::View>>) {
+async fn run_puppet(request_stream: PuppetRequestStream, puppet_view: Rc<RefCell<view::View>>) {
     info!("Starting puppet instance");
 
     request_stream
-        .try_for_each(|_request| async { Ok(()) })
+        .try_for_each(|request| async {
+            match request {
+                PuppetRequest::EmbedRemoteView { payload, responder, .. } => {
+                    let viewport_id = payload.id.expect("missing viewport id");
+                    let properties = payload.properties.expect("missing embedded view properties");
+
+                    let view_creation_token =
+                        puppet_view.borrow_mut().embed_remote_view(viewport_id, properties).await;
+
+                    responder
+                        .send(PuppetEmbedRemoteViewResponse {
+                            result: Some(Result_::Success),
+                            view_creation_token: Some(view_creation_token),
+                            ..PuppetEmbedRemoteViewResponse::EMPTY
+                        })
+                        .expect("failed to respond to EmbedRemoteView request");
+                }
+                PuppetRequest::SetEmbeddedViewProperties { payload, responder, .. } => {
+                    let viewport_id = payload.id.expect("missing viewport id");
+                    let properties = payload.properties.expect("missing embedded view properties");
+
+                    puppet_view
+                        .borrow_mut()
+                        .set_embedded_view_properties(viewport_id, properties)
+                        .await;
+
+                    responder
+                        .send(PuppetSetEmbeddedViewPropertiesResponse {
+                            result: Some(Result_::Success),
+                            ..PuppetSetEmbeddedViewPropertiesResponse::EMPTY
+                        })
+                        .expect("failed to respond to SetEmbeddedViewProperties request");
+                }
+                _ => {
+                    panic!("unsupported operation");
+                }
+            }
+
+            Ok(())
+        })
         .await
         .expect("failed to serve puppet stream");
 
