@@ -524,4 +524,70 @@ closed protocol protocol {};
 )FIDL");
 }
 
+TEST(FixTests, GoodProtocolModifierFixMethodsWithCompose) {
+  GoodProtocolModifierFix(R"FIDL(library example;
+protocol MyProtocol {
+    compose MyOtherProtocol;
+    OneWay();
+    TwoWay() -> ();
+    strict WithErr() -> () error uint32;
+    flexible -> OnEvent();
+};
+)FIDL",
+                          R"FIDL(library example;
+closed protocol MyProtocol {
+    compose MyOtherProtocol;
+    strict OneWay();
+    strict TwoWay() -> ();
+    strict WithErr() -> () error uint32;
+    flexible -> OnEvent();
+};
+)FIDL");
+}
+
+TEST(FixTests, GoodProtocolModifierFixMethodsWithComposeAndAllPrefixes) {
+  GoodProtocolModifierFix(R"FIDL(library example;
+protocol MyProtocol {
+    compose MyOtherProtocol;
+    // comment
+    /// doc comment
+    @attr
+    OneWay();
+    // comment
+    /// doc comment
+    @attr
+    TwoWay() -> ();
+    // comment
+    /// doc comment
+    @attr
+    WithErr() -> () error uint32;
+    // comment
+    /// doc comment
+    @attr
+    -> OnEvent();
+};
+)FIDL",
+                          R"FIDL(library example;
+closed protocol MyProtocol {
+    compose MyOtherProtocol;
+    // comment
+    /// doc comment
+    @attr
+    strict OneWay();
+    // comment
+    /// doc comment
+    @attr
+    strict TwoWay() -> ();
+    // comment
+    /// doc comment
+    @attr
+    strict WithErr() -> () error uint32;
+    // comment
+    /// doc comment
+    @attr
+    strict -> OnEvent();
+};
+)FIDL");
+}
+
 }  // namespace

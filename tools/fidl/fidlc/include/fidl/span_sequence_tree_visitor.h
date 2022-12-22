@@ -21,8 +21,7 @@ namespace fidl::fmt {
 // from which that raw AST was generated.
 class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
  public:
-  explicit SpanSequenceTreeVisitor(std::string_view file, raw::TokenPointerList tokens)
-      : file_(file), tokens_(std::move(tokens)) {}
+  explicit SpanSequenceTreeVisitor(raw::TokenPointerList tokens) : tokens_(std::move(tokens)) {}
   void OnAliasDeclaration(const std::unique_ptr<raw::AliasDeclaration>& element) override;
   void OnAttributeArg(const std::unique_ptr<raw::AttributeArg>& element) override;
   void OnAttribute(const std::unique_ptr<raw::Attribute>& element) override;
@@ -330,9 +329,6 @@ class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
   // returns it, representing the fully processed SpanSequence tree for the given source file, and
   // exhausting this class.
   std::stack<std::vector<std::unique_ptr<SpanSequence>>> building_;
-
-  // A view into the entire source file being formatted.
-  const std::string_view file_;
 
   // An ordered list of all tokens (including comments) in the source file.
   std::vector<const Token*> tokens_;

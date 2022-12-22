@@ -785,8 +785,7 @@ void SpanSequenceTreeVisitor::OnProtocolDeclaration(
   if (!element->composed_protocols.empty() && !element->methods.empty()) {
     // If the protocol has both methods and compositions, compare the addresses of the first
     // character of the first element of each to determine which is the first child start token.
-    if (element->composed_protocols[0]->start().data().data() <
-        element->methods[0]->start().data().data()) {
+    if (element->composed_protocols[0]->start() < element->methods[0]->start()) {
       first_child_start_token = element->composed_protocols[0]->start();
     } else {
       first_child_start_token = element->methods[0]->start();

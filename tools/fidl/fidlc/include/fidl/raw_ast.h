@@ -64,6 +64,14 @@ class TokenChain {
            &start_.span().source_file() == &end_.span().source_file();
   }
 
+  // This method should not be called on post-transform |TokenChain|s, as it necessarily
+  // pre-supposes that all of the the returned |SourceSpan| is still a valid view into the source,
+  // which may no longer be the case. In particular, the formatter should avoid using this method.
+  //
+  // TODO(fxbug.dev/114357): Find a better way than the above comment to prevent the post-transform
+  // context like the formatter from trying to use this method. This will likely involve specifying
+  // whether or not the underlying |SourceFile| is "mutable", and placing an assert inside this
+  // method to prevent |span()| calls on mutable |SourceFile|s.
   SourceSpan span() const {
     if (!start_.span().valid() || !end_.span().valid()) {
       return SourceSpan();
@@ -74,12 +82,6 @@ class TokenChain {
     const char* end_pos = end_.span().data().data() + end_.span().data().length();
     return SourceSpan(std::string_view(start_pos, end_pos - start_pos),
                       start_.span().source_file());
-  }
-
-  std::string copy_to_str() const {
-    const char* start_pos = start_.span().data().data();
-    const char* end_pos = end_.span().data().data() + end_.span().data().length();
-    return std::string(start_pos, end_pos);
   }
 
   void update_span(const TokenChain& element) {
