@@ -29,7 +29,6 @@ pub trait MessageHubUtil {
     type Delegate;
     type Audience;
     type Messenger;
-    type TargetedMessenger;
     type MessageError;
     type MessageEvent;
     type MessageClient;
@@ -48,7 +47,6 @@ where
     type Delegate = delegate::Delegate<T::Payload, T::Address, T::Role>;
     type Audience = base::Audience<T::Address, T::Role>;
     type Messenger = messenger::MessengerClient<T::Payload, T::Address, T::Role>;
-    type TargetedMessenger = messenger::TargetedMessengerClient<T::Payload, T::Address, T::Role>;
     type MessageError = base::MessageError<T::Address>;
     type MessageEvent = base::MessageEvent<T::Payload, T::Address, T::Role>;
     type MessageClient = message_client::MessageClient<T::Payload, T::Address, T::Role>;

@@ -62,33 +62,6 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> Builder<P, A
     }
 }
 
-/// TargetedMessengerClient is a wrapper around [`MessengerClient`] that limits
-/// the audience of sent messages to a preset target.
-#[derive(Clone, Debug)]
-pub struct TargetedMessengerClient<P: Payload + 'static, A: Address + 'static, R: Role + 'static> {
-    // TODO(fxbug.dev/84729)
-    #[allow(unused)]
-    client: MessengerClient<P, A, R>,
-    // TODO(fxbug.dev/84729)
-    #[allow(unused)]
-    audience: Audience<A, R>,
-}
-
-impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static>
-    TargetedMessengerClient<P, A, R>
-{
-    #[cfg(test)]
-    pub(crate) fn new(client: MessengerClient<P, A, R>, audience: Audience<A, R>) -> Self {
-        Self { client, audience }
-    }
-
-    /// Creates a MessageBuilder for a new message with the specified payload.
-    #[cfg(test)]
-    pub(crate) fn message(&self, payload: P) -> MessageBuilder<P, A, R> {
-        self.client.message(payload, self.audience.clone())
-    }
-}
-
 /// MessengerClient is a wrapper around a messenger with a fuse.
 #[derive(Clone, Debug)]
 pub struct MessengerClient<

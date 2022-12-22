@@ -6,7 +6,6 @@ use crate::message::action_fuse::ActionFuseBuilder;
 use crate::message::base::{
     filter, group, role, Address, Audience, MessageEvent, MessengerType, Payload, Role, Status,
 };
-use crate::message::messenger::TargetedMessengerClient;
 use crate::message::receptor::Receptor;
 use crate::message::MessageHubUtil;
 use crate::tests::message_utils::verify_payload;
@@ -1332,35 +1331,4 @@ async fn test_roles_audience() {
         // be the one sent directly to it, rather than the role.
         verify_payload(message, &mut outside_receptor, None).await;
     }
-}
-
-// Ensures targeted messengers deliver payload to intended audience.
-#[fuchsia_async::run_until_stalled(test)]
-async fn test_targeted_messenger_client() {
-    let test_message = TestMessage::Foo;
-
-    // Prepare a message hub for sender and target.
-    let delegate = test::MessageHub::create_hub();
-
-    // Create target messenger.
-    let (_, mut target_receptor) = delegate
-        .create(MessengerType::Unbound)
-        .await
-        .expect("receiving messenger should be created");
-
-    // Create targeted messenger.
-    let targeted_messenger = TargetedMessengerClient::new(
-        delegate
-            .create(MessengerType::Unbound)
-            .await
-            .expect("sending messenger should be created")
-            .0,
-        Audience::Messenger(target_receptor.get_signature()),
-    );
-
-    // Send message.
-    targeted_messenger.message(test_message).send().ack();
-
-    // Receptor should receive the test message.
-    verify_payload(test_message, &mut target_receptor, None).await;
 }
