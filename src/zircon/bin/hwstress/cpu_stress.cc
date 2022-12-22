@@ -136,8 +136,14 @@ bool StressCpu(StatusLine* status, const CommandLineArgs& args, zx::duration dur
   // tests to have an equal run time. We thus choose an initial test time such
   // that after runtime doubling is applied will cause the test end time to
   // coincide with the end of a full round of tests.
+  //
+  // The exception to this rule is when a single workload is specified. As there
+  // are no other workloads to share time with, only a single iteration will
+  // be run for the entirety of the test duration.
   zx::duration time_per_test;
-  if (finish_time == zx::time::infinite()) {
+  if (workloads.size() == 1) {
+    time_per_test = duration;
+  } else if (finish_time == zx::time::infinite()) {
     time_per_test = zx::msec(100);
   } else {
     // After running through K tests N times, doubling the test time after

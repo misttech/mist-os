@@ -115,6 +115,8 @@ CPU test options:
                          can be determined by using "--workload=list".
                          If not specified, each of the internal
                          workloads will be iterated through repeatedly.
+                         If only one workload is specified, only a single
+                         iteration will run for the requested duration.
   -p, --cpu-cores=<cores>
                          CPU cores to run the test on. A comma separated list
                          of CPU indices. If not specified all the CPUs will be
