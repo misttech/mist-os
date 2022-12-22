@@ -41,17 +41,40 @@ use {
     fuchsia_inspect::Inspector,
     fuchsia_runtime::{self as fruntime, HandleInfo, HandleType},
     futures::StreamExt,
+    lazy_static::lazy_static,
     std::sync::Arc,
     storage_manager::{
         fxfs::{Args as FxfsStorageManagerArgs, Fxfs as FxfsStorageManager},
         minfs::{disk::DevDiskManager, StorageManager as MinfsStorageManager},
-        StorageManager, StorageManagerEnum,
+        StorageManager, StorageManagerEnum, StorageManagerKind,
     },
     tracing::{error, info, warn},
 };
 
 const DATA_DIR: &str = "/data";
 const ACCOUNT_LABEL: &str = "account";
+
+lazy_static! {
+    static ref CONFIG: Config = Config::take_from_startup_handle();
+
+    // Statically initialized config validation for CONFIG. If
+    // config.storage_manager isn't one of {FXFS, MINFS}, it will panic
+    // immediately rather than when get_storage_manager() is called.
+    static ref STORAGE_MANAGER_KIND: StorageManagerKind = {
+        match CONFIG.storage_manager.as_str() {
+            FXFS => StorageManagerKind::Fxfs,
+            MINFS => StorageManagerKind::Minfs,
+            other => {
+                let error = format!(
+                "AccountHandler was configured with invalid argument: storage_manager={other:?}. \
+                See the CML declaration for valid values."
+            );
+                warn!("{}", error);
+                panic!("{}", error);
+            }
+        }
+    };
+}
 
 // These values should match the source of truth in account_handler.cml's
 // config.storage_manager.
@@ -79,31 +102,23 @@ fn get_dev_directory() -> fio::DirectoryProxy {
         .expect("open /dev root for disk manager")
 }
 
-fn get_storage_manager(config: &Config) -> StorageManagerEnum {
-    match config.storage_manager.as_str() {
-        FXFS => StorageManagerEnum::Fxfs(FxfsStorageManager::new(
+fn get_storage_manager() -> StorageManagerEnum {
+    match &*STORAGE_MANAGER_KIND {
+        StorageManagerKind::Fxfs => StorageManagerEnum::Fxfs(FxfsStorageManager::new(
             FxfsStorageManagerArgs::builder()
                 // TODO(https://fxbug.dev/117284): Use the real account name.
                 .volume_label(ACCOUNT_LABEL.to_string())
                 .filesystem_dir(get_dev_directory())
                 .build(),
         )),
-        MINFS => StorageManagerEnum::Minfs(MinfsStorageManager::new(DevDiskManager::new(
-            get_dev_directory(),
-        ))),
-        other => {
-            let error = format!(
-                "AccountHandler was configured with invalid argument: storage_manager={other:?}. \
-                See the CML declaration for valid values."
-            );
-            warn!("{}", error);
-            panic!("{}", error);
-        }
+        StorageManagerKind::Minfs => StorageManagerEnum::Minfs(MinfsStorageManager::new(
+            DevDiskManager::new(get_dev_directory()),
+        )),
     }
 }
 
-fn get_available_mechanisms(config: &Config) -> Vec<Mechanism> {
-    config
+fn get_available_mechanisms() -> Vec<Mechanism> {
+    CONFIG
         .available_mechanisms
         .iter()
         .map(|mechanism| match mechanism.as_str() {
@@ -120,9 +135,7 @@ fn get_available_mechanisms(config: &Config) -> Vec<Mechanism> {
 }
 
 fn main() -> Result<(), Error> {
-    let config = Config::take_from_startup_handle();
-
-    let lifetime = if config.is_ephemeral {
+    let lifetime = if CONFIG.is_ephemeral {
         AccountLifetime::Ephemeral
     } else {
         AccountLifetime::Persistent { account_dir: DATA_DIR.into() }
@@ -140,9 +153,9 @@ fn main() -> Result<(), Error> {
     let account_handler = Arc::new(AccountHandler::new(
         lifetime,
         &inspector,
-        config.is_interaction_enabled,
-        get_available_mechanisms(&config),
-        get_storage_manager(&config),
+        CONFIG.is_interaction_enabled,
+        get_available_mechanisms(),
+        Box::new(|_account_id| get_storage_manager()),
     ));
 
     let _lifecycle_task: fuchsia_async::Task<()> =

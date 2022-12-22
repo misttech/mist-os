@@ -111,6 +111,13 @@ pub enum StorageManagerEnum {
     Minfs(minfs::StorageManager<minfs::disk::DevDiskManager>),
 }
 
+// Enum for representing the kinds of storage managers within the type system.
+// Useful for static config validation.
+pub enum StorageManagerKind {
+    Fxfs,
+    Minfs,
+}
+
 #[async_trait]
 impl StorageManager for StorageManagerEnum {
     type Key = [u8; 32];

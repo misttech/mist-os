@@ -84,10 +84,17 @@ where
     SM: StorageManager,
 {
     /// An account has not yet been created or loaded.
-    Uninitialized,
+    Uninitialized {
+        /// A factory which produces storage managers for this account.
+        storage_manager_factory: Box<dyn Fn(AccountId) -> SM + Send + Sync>,
+    },
 
     /// The account is initialized, and is either locked or unlocked.
-    Initialized { lock_state: LockState<SM>, pre_auth_state: PreAuthState },
+    Initialized {
+        lock_state: LockState<SM>,
+        pre_auth_state: PreAuthState,
+        storage_manager: Arc<Mutex<SM>>,
+    },
 
     /// There is no account present, and initialization is not possible.
     Finished,
@@ -157,9 +164,6 @@ where
 
     /// The available mechanisms which can be used for Authentication.
     mechanisms: Vec<Mechanism>,
-
-    /// The storage manager for this account.
-    storage_manager: Arc<Mutex<SM>>,
 }
 
 impl<SM> AccountHandler<SM>
@@ -172,16 +176,15 @@ where
         inspector: &Inspector,
         is_interaction_enabled: bool,
         mechanisms: Vec<Mechanism>,
-        storage_manager: SM,
+        storage_manager_factory: Box<dyn Fn(AccountId) -> SM + Send + Sync>,
     ) -> AccountHandler<SM> {
         let inspect = Arc::new(inspect::AccountHandler::new(inspector.root(), "uninitialized"));
         Self {
-            state: Arc::new(Mutex::new(Lifecycle::Uninitialized)),
+            state: Arc::new(Mutex::new(Lifecycle::Uninitialized { storage_manager_factory })),
             lifetime,
             inspect,
             is_interaction_enabled,
             mechanisms,
-            storage_manager: Arc::new(Mutex::new(storage_manager)),
         }
     }
 
@@ -255,7 +258,7 @@ where
 
         let mut state_lock = self.state.lock().await;
         match &*state_lock {
-            Lifecycle::Uninitialized => {
+            Lifecycle::Uninitialized { storage_manager_factory } => {
                 let disk_key: GenericArray<u8, U32> = make_random_256_bit_generic_array();
 
                 let enrollment_state = self
@@ -274,9 +277,13 @@ where
                         warn!("Error constructing lock request sender: {:?}", err);
                         err.api_error
                     })?;
+
+                let storage_manager: Arc<Mutex<SM>> =
+                    Arc::new(Mutex::new((storage_manager_factory)(account_id)));
+
                 let account: Account<SM> = Account::create(
                     self.lifetime.clone(),
-                    Arc::clone(&self.storage_manager),
+                    Arc::clone(&storage_manager),
                     sender,
                     self.inspect.get_node(),
                 )
@@ -288,19 +295,19 @@ where
 
                 info!("CreateAccount: Successfully created new Account object");
 
-                let () =
-                    self.storage_manager.lock().await.provision(disk_key.as_ref()).await.map_err(
-                        |err| {
-                            warn!("CreateAccount failed to provision StorageManager: {:?}", err);
-                            ApiError::Resource
-                        },
-                    )?;
+                let () = storage_manager.lock().await.provision(disk_key.as_ref()).await.map_err(
+                    |err| {
+                        warn!("CreateAccount failed to provision StorageManager: {:?}", err);
+                        ApiError::Resource
+                    },
+                )?;
 
                 info!("CreateAccount: Successfully provisioned StorageManager instance");
 
                 let pre_auth_state_bytes: Vec<u8> = (&pre_auth_state).try_into()?;
                 *state_lock = Lifecycle::Initialized {
                     lock_state: LockState::Unlocked { account: Arc::new(account) },
+                    storage_manager,
                     pre_auth_state,
                 };
                 self.inspect.lifecycle.set("unlocked");
@@ -323,12 +330,17 @@ where
         }
         let mut state_lock = self.state.lock().await;
         match &*state_lock {
-            Lifecycle::Uninitialized => {
+            Lifecycle::Uninitialized { storage_manager_factory } => {
                 let pre_auth_state = PreAuthState::try_from(pre_auth_state_bytes)?;
                 self.inspect.set_account_id(*pre_auth_state.account_id());
 
-                *state_lock =
-                    Lifecycle::Initialized { lock_state: LockState::Locked, pre_auth_state };
+                let storage_manager =
+                    Arc::new(Mutex::new((storage_manager_factory)(*pre_auth_state.account_id())));
+                *state_lock = Lifecycle::Initialized {
+                    lock_state: LockState::Locked,
+                    pre_auth_state,
+                    storage_manager,
+                };
 
                 self.inspect.lifecycle.set("locked");
                 Ok(())
@@ -362,6 +374,7 @@ where
             Lifecycle::Initialized {
                 lock_state: LockState::Locked,
                 pre_auth_state: pre_auth_state_ref,
+                storage_manager,
             } => {
                 let (prekey_material, maybe_updated_enrollment_state) = Self::authenticate(
                     self.is_interaction_enabled,
@@ -384,7 +397,7 @@ where
                     })?;
                 let account: Account<SM> = Account::load(
                     self.lifetime.clone(),
-                    Arc::clone(&self.storage_manager),
+                    Arc::clone(storage_manager),
                     sender,
                     self.inspect.get_node(),
                 )
@@ -394,12 +407,11 @@ where
                 let key: [u8; 32] =
                     Self::fetch_key(&prekey_material, &pre_auth_state_ref.enrollment_state)?;
 
-                let () = self.storage_manager.lock().await.unlock_storage(&key).await.map_err(
-                    |err| {
+                let () =
+                    storage_manager.lock().await.unlock_storage(&key).await.map_err(|err| {
                         warn!("UnlockAccount failed to unlock StorageManager: {:?}", err);
                         ApiError::Resource
-                    },
-                )?;
+                    })?;
 
                 let mut pre_auth_state = pre_auth_state_ref.clone();
                 let pre_auth_state_bytes = maybe_updated_enrollment_state
@@ -411,6 +423,7 @@ where
                 *state_lock = Lifecycle::Initialized {
                     lock_state: LockState::Unlocked { account: Arc::new(account) },
                     pre_auth_state,
+                    storage_manager: Arc::clone(storage_manager),
                 };
                 self.inspect.lifecycle.set("unlocked");
                 Ok(pre_auth_state_bytes)
@@ -427,13 +440,7 @@ where
     ///
     /// Optionally returns a serialized PreAuthState if it has changed.
     async fn lock_account(&self) -> Result<Option<Vec<u8>>, ApiError> {
-        Self::lock_now(
-            Arc::clone(&self.state),
-            Arc::clone(&self.storage_manager),
-            Arc::clone(&self.inspect),
-        )
-        .await
-        .map_err(|err| {
+        Self::lock_now(Arc::clone(&self.state), Arc::clone(&self.inspect)).await.map_err(|err| {
             warn!("LockAccount call failed: {:?}", err);
             err.api_error
         })
@@ -448,8 +455,12 @@ where
 
         self.inspect.lifecycle.set("finished");
         match old_lifecycle {
-            Lifecycle::Initialized { lock_state: LockState::Locked {}, .. } => {
-                self.storage_manager.lock().await.destroy().await.map_err(|err| {
+            Lifecycle::Initialized {
+                lock_state: LockState::Locked { .. },
+                storage_manager,
+                ..
+            } => {
+                storage_manager.lock().await.destroy().await.map_err(|err| {
                     warn!("remove_account failed to destroy StorageManager: {:?}", err);
                     ApiError::Resource
                 })?;
@@ -459,8 +470,12 @@ where
                 info!("Deleted account");
                 Ok(())
             }
-            Lifecycle::Initialized { lock_state: LockState::Unlocked { account, .. }, .. } => {
-                self.storage_manager.lock().await.destroy().await.map_err(|err| {
+            Lifecycle::Initialized {
+                lock_state: LockState::Unlocked { account, .. },
+                storage_manager,
+                ..
+            } => {
+                storage_manager.lock().await.destroy().await.map_err(|err| {
                     warn!("remove_account failed to destroy StorageManager: {:?}", err);
                     ApiError::Resource
                 })?;
@@ -783,18 +798,15 @@ where
         }
         // Use weak pointers in order to not interfere with destruction of AccountHandler
         let state_weak = Arc::downgrade(&self.state);
-        let storage_manager_weak = Arc::downgrade(&self.storage_manager);
         let inspect_weak = Arc::downgrade(&self.inspect);
         let (sender, receiver) = lock_request::channel();
         fasync::Task::spawn(async move {
             match receiver.await {
                 Ok(()) => {
-                    if let (Some(state), Some(storage_manager), Some(inspect)) = (
-                        state_weak.upgrade(),
-                        storage_manager_weak.upgrade(),
-                        inspect_weak.upgrade(),
-                    ) {
-                        if let Err(err) = Self::lock_now(state, storage_manager, inspect).await {
+                    if let (Some(state), Some(inspect)) =
+                        (state_weak.upgrade(), inspect_weak.upgrade())
+                    {
+                        if let Err(err) = Self::lock_now(state, inspect).await {
                             warn!("Lock request failure: {:?}", err);
                         }
                     }
@@ -814,12 +826,11 @@ where
     /// Returns a serialized PreAuthState if it's changed.
     async fn lock_now(
         state: Arc<Mutex<Lifecycle<SM>>>,
-        storage_manager: Arc<Mutex<SM>>,
         inspect: Arc<inspect::AccountHandler>,
     ) -> Result<Option<Vec<u8>>, AccountManagerError> {
         let mut state_lock = state.lock().await;
         match &mut *state_lock {
-            Lifecycle::Initialized { ref mut lock_state, .. } => {
+            Lifecycle::Initialized { ref mut lock_state, storage_manager, .. } => {
                 match lock_state {
                     LockState::Locked {} => {
                         info!(
@@ -957,10 +968,13 @@ mod tests {
             &inspector,
             is_interaction_enabled,
             mechanisms,
-            /*storage_manager=*/
-            make_storage_manager(
-                MockDiskManager::new().with_partition(make_formatted_account_partition_any_key()),
-            ),
+            /*storage_manager_factory=*/
+            Box::new(|_| {
+                make_storage_manager(
+                    MockDiskManager::new()
+                        .with_partition(make_formatted_account_partition_any_key()),
+                )
+            }),
         );
         let (proxy, request_stream) = create_proxy_and_stream::<AccountHandlerControlMarker>()
             .expect("Failed to create proxy and stream");
