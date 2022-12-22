@@ -427,8 +427,8 @@ template("clang_toolchain") {
         if (invoker.toolchain_os == "mac") {
           command += " && $strip -Sx \"{{UNSTRIPPED_OUTFILE}}\" -o \"$outfile\""
         } else {
-          # TODO(fxbug.dev/59286): Strip .rustc section from packaged dylibs.
-          command += " && $strip --strip-all --keep-section=.rustc \"{{UNSTRIPPED_OUTFILE}}\" \"$outfile\""
+          command +=
+              " && $strip --strip-all \"{{UNSTRIPPED_OUTFILE}}\" \"$outfile\""
         }
         if (invoker.toolchain_os != "mac" && invoker.toolchain_os != "win") {
           outputs += [ "$outfile.build-id.stamp" ]
@@ -579,7 +579,7 @@ template("clang_toolchain") {
       forward_variables_from(_rust_dylib_common, "*")
 
       description = "RUST {{output}}"
-      default_output_dir = "{{root_out_dir}}/rust-shared"
+      default_output_dir = "{{root_out_dir}}"
       output_prefix = "lib"
     }
 

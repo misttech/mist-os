@@ -415,7 +415,6 @@ if (zircon_toolchain == false) {
       "//build/config:auto_var_init",
       "//build/config:icf",
       "//build/config:thread_safety_annotations",
-      "//build/config/fuchsia:dynamic_rust_standard_library",
       "//build/config/fuchsia:large_rust_stack",
       "//build/config/rust:panic_abort",
       "//build/config/rust:v0_symbol_mangling",
@@ -460,6 +459,10 @@ if (zircon_toolchain == false) {
   # configs are added transitively.
   if (current_os == "fuchsia") {
     default_executable_configs += [ "//build/config/fuchsia:fdio_config" ]
+
+    # TODO(fxbug.dev/57585): Enable this for shared and (non-rlib) static libraries as well.
+    default_executable_configs +=
+        [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
 
     default_executable_deps +=
         [ "//build/config/fuchsia:maybe_scudo_default_options" ]
@@ -2076,7 +2079,6 @@ template("_fuchsia_binary") {
         data_deps += [ "//build/toolchain/runtime:static-libc++-deps" ]
       }
       if (defined(crate_root)) {
-        # TODO(fxbug.dev/57585): Handle this for (non-rlib) static libraries.
         should_add_shared_rust_runtime = false
         dynamic_rust_config =
             [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
@@ -2093,10 +2095,6 @@ template("_fuchsia_binary") {
         }
         if (should_add_shared_rust_runtime) {
           data_deps += [ "//build/toolchain/runtime:shared-rust-libstd-deps" ]
-
-          # libstd depends on fdio and expects it to be available in the linker
-          # search path, so provide it here.
-          deps += [ "//sdk/lib/fdio" ]
         }
       }
 
@@ -2654,10 +2652,8 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
               forward_variables_from(invoker.metadata, "*")
             }
 
-            if (!defined(invoker.crate_type) || invoker.crate_type != "dylib") {
-              # Don't collect rlibs from transitive deps
-              rust_barrier = []
-            }
+            # Don't collect rlibs from transitive deps
+            rust_barrier = []
           }
         }
       }
@@ -2756,9 +2752,6 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
         } else {
           link_output_file = "$output_dir/lib.unstripped/$output_file_name"
         }
-        _link_output_path = rebase_path(link_output_file, root_build_dir)
-        _link_output_dir =
-            rebase_path(get_path_info(link_output_file, "dir"), root_build_dir)
 
         # Note: the manifest-related metadata is added to the builder target as
         # some targets (e.g. drivers) depend on it directly in the builder
@@ -2774,7 +2767,7 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
           }
 
           # Used by link_output_rspfile(), see its documentation for details
-          link_output_path = [ _link_output_path ]
+          link_output_path = [ rebase_path(link_output_file, root_build_dir) ]
           link_output_barrier = []
 
           # Used by the distribution_manifest template.
@@ -2808,14 +2801,8 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
             },
           ]
 
-          if (!defined(invoker.crate_type) || invoker.crate_type != "dylib") {
-            # Don't collect rlibs from transitive deps
-            rust_barrier = []
-          }
-          if (defined(invoker.crate_type)) {
-            rlib = [ "--extern=$crate_name=$_link_output_path" ]
-            searchdir = [ "-Ldependency=$_link_output_dir" ]
-          }
+          # Don't collect rlibs from transitive deps
+          rust_barrier = []
         }
       }
     }
