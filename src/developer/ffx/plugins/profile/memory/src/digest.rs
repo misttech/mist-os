@@ -240,7 +240,7 @@ pub mod processed {
         pub memory: RetainedMemory,
         /// Mapping between VMO group names and the retained memory.
         /// VMO are grouped by name matching. See `rename` for more detail.
-        pub name_to_memory: HashMap<String, RetainedMemory>,
+        pub name_to_vmo_memory: HashMap<String, RetainedMemory>,
         /// Set of vmo koids related to this process.
         pub vmos: HashSet<u64>,
     }
@@ -347,7 +347,7 @@ pub mod processed {
                         koid,
                         name: name.to_string(),
                         memory: RetainedMemory::default(),
-                        name_to_memory: HashMap::new(),
+                        name_to_vmo_memory: HashMap::new(),
                         vmos: HashSet::from_iter(vmos),
                     };
                     if !p.vmos.is_empty() {
@@ -405,7 +405,7 @@ pub mod processed {
                             None => unreachable!(),
                         };
                         let name = rename(name).to_string();
-                        let mut name_sizes = process.name_to_memory.entry(name).or_default();
+                        let mut name_sizes = process.name_to_vmo_memory.entry(name).or_default();
                         name_sizes.vmos.push(*vmo_koid);
                         name_sizes.total += committed_bytes;
                         process.memory.total += committed_bytes;
@@ -536,7 +536,7 @@ mod tests {
                     total: 300,
                     vmos: vec![],
                 },
-                name_to_memory: {
+                name_to_vmo_memory: {
                     let mut result = HashMap::new();
                     result.insert(
                         "vmo1".to_string(),
@@ -564,7 +564,7 @@ mod tests {
                     total: 400,
                     vmos: vec![],
                 },
-                name_to_memory: {
+                name_to_vmo_memory: {
                     let mut result = HashMap::new();
                     result.insert(
                         "vmo1".to_string(),
@@ -602,7 +602,7 @@ mod tests {
                     total: 100,
                     vmos: vec![],
                 },
-                name_to_memory: {
+                name_to_vmo_memory: {
                     let mut result = HashMap::new();
                     result.insert(
                         "vmo3".to_string(),
@@ -630,7 +630,7 @@ mod tests {
                     total: 400,
                     vmos: vec![],
                 },
-                name_to_memory: {
+                name_to_vmo_memory: {
                     let mut result = HashMap::new();
                     result.insert(
                         "vmo2".to_string(),
@@ -790,7 +790,7 @@ mod tests {
                     total: 500,
                     vmos: vec![],
                 },
-                name_to_memory: {
+                name_to_vmo_memory: {
                     let mut result = HashMap::new();
                     result.insert(
                         "blob-xxx".to_string(),
@@ -818,7 +818,7 @@ mod tests {
                     total: 500,
                     vmos: vec![],
                 },
-                name_to_memory: {
+                name_to_vmo_memory: {
                     let mut result = HashMap::new();
                     result.insert(
                         "app.cmx".to_string(),

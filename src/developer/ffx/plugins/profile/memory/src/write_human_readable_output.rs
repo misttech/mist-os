@@ -11,9 +11,30 @@ use {
     digest::processed,
     ffx_writer::Writer,
     humansize::{file_size_opts::BINARY, FileSize},
+    processed::RetainedMemory,
     std::cmp::Reverse,
+    std::collections::HashMap,
     std::io::Write,
 };
+
+// Returns a sorted list of names that match non-empty vmo groups.
+pub fn filter_and_order_vmo_groups_names_for_printing(
+    name_to_vmo_memory: &HashMap<String, RetainedMemory>,
+) -> Vec<&String> {
+    let mut names: Vec<&String> = name_to_vmo_memory.keys().collect();
+    // Filter out names of VMOs that don't use any memory.
+    names.retain(|&name| name_to_vmo_memory.get(name).unwrap().total > 0);
+    // Sort the VMO names along the tuple (private, scaled, name of VMO).
+    names.sort_by(|&a, &b| {
+        let sa = name_to_vmo_memory.get(a).unwrap();
+        let sb = name_to_vmo_memory.get(b).unwrap();
+        // Sort along decreasing memory sizes and increasing lexical order for names.
+        let tuple_1 = (sa.private, sa.scaled, &b);
+        let tuple_2 = (sb.private, sb.scaled, &a);
+        tuple_2.cmp(&tuple_1)
+    });
+    names
+}
 
 /// Print to `w` a human-readable presentation of `processes`.
 fn print_processes_digest(
@@ -36,24 +57,11 @@ fn print_processes_digest(
             size_formatter(process.memory.total)
         )?;
 
-        let names = {
-            let mut names: Vec<&String> = process.name_to_memory.keys().collect();
-            // Filter out names of VMOs that don't use any memory.
-            names.retain(|&name| process.name_to_memory.get(name).unwrap().total > 0);
-            // Sort the VMO names along the tuple (private, scaled, name of VMO).
-            names.sort_by(|&a, &b| {
-                let sa = process.name_to_memory.get(a).unwrap();
-                let sb = process.name_to_memory.get(b).unwrap();
-                // Sort along decreasing memory sizes and increasing lexical order for names.
-                let tuple_1 = (sa.private, sa.scaled, &b);
-                let tuple_2 = (sb.private, sb.scaled, &a);
-                tuple_2.cmp(&tuple_1)
-            });
-            names
-        };
+        let vmo_names = filter_and_order_vmo_groups_names_for_printing(&process.name_to_vmo_memory);
         // Find the longest name. Use that length during formatting to align the column after
         // the name of VMOs.
-        let process_name_trailing_padding = names.iter().map(|name| name.len()).max().unwrap_or(0);
+        let process_name_trailing_padding =
+            vmo_names.iter().map(|vmo_name| vmo_name.len()).max().unwrap_or(0);
         // The spacing between the columns containing sizes.
         // 12 was chosen to accommodate the following worst case: "1234567890 B"
         let padding_between_number_columns = 12;
@@ -69,13 +77,13 @@ fn print_processes_digest(
             p2 = padding_between_number_columns
         )?;
         // Write the actual content of the table of VMOs.
-        for name in names {
-            if let Some(sizes) = process.name_to_memory.get(name) {
+        for vmo_name in vmo_names {
+            if let Some(sizes) = process.name_to_vmo_memory.get(vmo_name) {
                 let extra_info = if sizes.total == sizes.private { "" } else { "(shared)" };
                 writeln!(
                     w,
                     "    {:<p1$} {:>p2$} {:>p2$} {:>p2$} {:>p2$}",
-                    name,
+                    vmo_name,
                     size_formatter(sizes.private),
                     size_formatter(sizes.scaled),
                     size_formatter(sizes.total),
@@ -161,6 +169,35 @@ mod tests {
     use std::collections::HashMap;
     use std::collections::HashSet;
 
+    #[test]
+    fn filter_and_order_vmo_groups_names_for_printing_test() {
+        let map = {
+            let mut map = HashMap::new();
+            map.insert(
+                "xx".to_string(),
+                processed::RetainedMemory { private: 0, scaled: 0, total: 0, vmos: vec![] },
+            );
+            map.insert(
+                "zb".to_string(),
+                processed::RetainedMemory { private: 0, scaled: 10, total: 10, vmos: vec![] },
+            );
+            map.insert(
+                "ab".to_string(),
+                processed::RetainedMemory { private: 0, scaled: 10, total: 10, vmos: vec![] },
+            );
+            map.insert(
+                "zz".to_string(),
+                processed::RetainedMemory { private: 0, scaled: 20, total: 20, vmos: vec![] },
+            );
+            map
+        };
+        let output = filter_and_order_vmo_groups_names_for_printing(&map);
+        // "xx" gets filtered out because it is empty.
+        // "zz" is the biggest, so it's first.
+        // "zb" and "ab" are the same size, so they are ordered alphabetically.
+        pretty_assertions::assert_eq!(output, vec!["zz", "ab", "zb"]);
+    }
+
     fn data_for_test() -> crate::ProfileMemoryOutput {
         ProcessDigest(ProcessesMemoryUsage {
             capture_time: 123,
@@ -168,7 +205,7 @@ mod tests {
                 koid: 4,
                 name: "P".to_string(),
                 memory: RetainedMemory { private: 11, scaled: 22, total: 33, vmos: vec![] },
-                name_to_memory: {
+                name_to_vmo_memory: {
                     let mut result = HashMap::new();
                     result.insert(
                         "vmoC".to_string(),

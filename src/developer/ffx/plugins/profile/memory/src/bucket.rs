@@ -179,7 +179,7 @@ mod tests {
                 koid: process_def.process_koid,
                 name: process_def.process_name.to_string(),
                 memory: RetainedMemory::default(),
-                name_to_memory: HashMap::new(),
+                name_to_vmo_memory: HashMap::new(),
                 vmos: vmo_koids,
             })
         }
