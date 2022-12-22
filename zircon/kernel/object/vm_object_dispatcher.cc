@@ -63,7 +63,8 @@ zx_status_t VmObjectDispatcher::Create(fbl::RefPtr<VmObject> vmo,
   }
 
   new_handle.dispatcher()->vmo()->set_user_id(new_handle.dispatcher()->get_koid());
-  *rights = default_rights();
+  *rights =
+      default_rights() | (new_handle.dispatcher()->vmo()->is_resizable() ? ZX_RIGHT_RESIZE : 0);
   *handle = ktl::move(new_handle);
   return ZX_OK;
 }

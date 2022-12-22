@@ -48,6 +48,8 @@ The following rights will be set on the handle by default:
 
   - **ZX_RIGHT_SET_PROPERTY** - May set its properties using [`zx_object_set_property()`].
 
+  - **ZX_RIGHT_RESIZE** - May be resized. Only set if the **ZX_VMO_RESIZABLE** option was specified.
+
 The *options* field can be 0 or a combination of:
 
   - **ZX_VMO_RESIZABLE** to create a VMO that can change size. Children of a non-resizable VMO can

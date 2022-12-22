@@ -1996,6 +1996,14 @@
               "type": "VariableDeclarationImpl",
               "varType": "int"
             },
+            "RIGHT_RESIZE": {
+              "isConst": true,
+              "isFinal": false,
+              "isLate": false,
+              "name": "RIGHT_RESIZE",
+              "type": "VariableDeclarationImpl",
+              "varType": "int"
+            },
             "RIGHT_SAME_RIGHTS": {
               "isConst": true,
               "isFinal": false,

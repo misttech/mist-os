@@ -32,7 +32,7 @@ will be overwritten with zeros.
 
 ## Rights
 
-*handle* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE**.
+*handle* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE** and **ZX_RIGHT_RESIZE**.
 
 ## Return value
 
@@ -45,7 +45,7 @@ of failure, a negative error value is returned.
 
 **ZX_ERR_WRONG_TYPE**  *handle* is not a VMO handle.
 
-**ZX_ERR_ACCESS_DENIED**  *handle* does not have the **ZX_RIGHT_WRITE** right.
+**ZX_ERR_ACCESS_DENIED**  *handle* does not have the **ZX_RIGHT_WRITE** or **ZX_RIGHT_RESIZE** right.
 
 **ZX_ERR_UNAVAILABLE** The VMO was not created with **ZX_VMO_RESIZABLE**
 or **ZX_VMO_CHILD_RESIZABLE**.

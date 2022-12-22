@@ -141,11 +141,18 @@ zx_status_t sys_vmo_set_size(zx_handle_t handle, uint64_t size) {
 
   // lookup the dispatcher from handle
   fbl::RefPtr<VmObjectDispatcher> vmo;
+  zx_rights_t rights;
   zx_status_t status =
-      up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_WRITE, &vmo);
+      up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_WRITE, &vmo, &rights);
   if (status != ZX_OK)
     return status;
 
+  // VMOs that are not resizable should fail with ZX_ERR_UNAVAILABLE for backwards compatibility,
+  // which will be handled by the SetSize call below. Only validate the RESIZE right if the VMO is
+  // resizable.
+  if (vmo->vmo()->is_resizable() && (rights & ZX_RIGHT_RESIZE) == 0) {
+    return ZX_ERR_ACCESS_DENIED;
+  }
   // do the operation
   return vmo->SetSize(size);
 }
@@ -261,13 +268,20 @@ zx_status_t sys_vmo_create_child(zx_handle_t handle, uint32_t options, uint64_t 
   if (result != ZX_OK)
     return result;
 
-  // Set the rights to the new handle to no greater than the input
-  // handle, and always allow GET/SET_PROPERTY so the user can set ZX_PROP_NAME on the new clone.
-  // Unless it was explicitly requested to be removed, Write can be added to CoW clones at the
+  // Set the rights to the new handle to no greater than the input (parent) handle minus the RESIZE
+  // right, which is added independently based on ZX_VMO_CHILD_RESIZABLE; it is possible for a
+  // non-resizable parent to have a resizable child and vice versa. Always allow GET/SET_PROPERTY so
+  // the user can set ZX_PROP_NAME on the new clone.
+  zx_rights_t rights = (in_rights & ~ZX_RIGHT_RESIZE) |
+                       (options & ZX_VMO_CHILD_RESIZABLE ? ZX_RIGHT_RESIZE : 0) |
+                       ZX_RIGHT_GET_PROPERTY | ZX_RIGHT_SET_PROPERTY;
+
+  // Unless it was explicitly requested to be removed, WRITE can be added to CoW clones at the
   // expense of executability.
-  zx_rights_t rights = in_rights | ZX_RIGHT_GET_PROPERTY | ZX_RIGHT_SET_PROPERTY;
   if (no_write) {
     rights &= ~ZX_RIGHT_WRITE;
+    // NO_WRITE and RESIZABLE cannot be specified together, so we should not have the RESIZE right.
+    DEBUG_ASSERT((rights & ZX_RIGHT_RESIZE) == 0);
   } else if (options & (ZX_VMO_CHILD_SNAPSHOT | ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE)) {
     rights &= ~ZX_RIGHT_EXECUTE;
     rights |= ZX_RIGHT_WRITE;

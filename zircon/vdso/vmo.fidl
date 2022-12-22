@@ -53,6 +53,8 @@ protocol Vmo {
     ///
     ///   - **ZX_RIGHT_SET_PROPERTY** - May set its properties using [`zx_object_set_property()`].
     ///
+    ///   - **ZX_RIGHT_RESIZE** - May be resized. Only set if the **ZX_VMO_RESIZABLE** option was specified.
+    ///
     /// The *options* field can be 0 or a combination of:
     ///
     ///   - **ZX_VMO_RESIZABLE** to create a VMO that can change size. Children of a non-resizable VMO can
@@ -382,7 +384,7 @@ protocol Vmo {
     ///
     /// ## Rights
     ///
-    /// *handle* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE**.
+    /// *handle* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE** and **ZX_RIGHT_RESIZE**.
     ///
     /// ## Return value
     ///
@@ -395,7 +397,7 @@ protocol Vmo {
     ///
     /// **ZX_ERR_WRONG_TYPE**  *handle* is not a VMO handle.
     ///
-    /// **ZX_ERR_ACCESS_DENIED**  *handle* does not have the **ZX_RIGHT_WRITE** right.
+    /// **ZX_ERR_ACCESS_DENIED**  *handle* does not have the **ZX_RIGHT_WRITE** or **ZX_RIGHT_RESIZE** right.
     ///
     /// **ZX_ERR_UNAVAILABLE** The VMO was not created with **ZX_VMO_RESIZABLE**
     /// or **ZX_VMO_CHILD_RESIZABLE**.
@@ -722,6 +724,8 @@ protocol Vmo {
     /// By default the rights of the child handle will be the same as the
     /// original with a few exceptions. See [`zx_vmo_create()`] for a
     /// discussion of the details of each right.
+    ///
+    /// If *options* includes **ZX_VMO_CHILD_RESIZABLE** then **ZX_RIGHT_RESIZE** will be added.
     ///
     /// In all cases if **ZX_VMO_NO_WRITE** is set then **ZX_RIGHT_WRITE** will be removed.
     ///

@@ -60,8 +60,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/rights.fidl",
         "data": "DEFAULT_CHANNEL_RIGHTS",
-        "start_offset": 1342,
-        "end_offset": 1364
+        "start_offset": 1397,
+        "end_offset": 1419
       }
     },
     {
@@ -70,8 +70,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/rights.fidl",
         "data": "DEFAULT_EVENT_RIGHTS",
-        "start_offset": 1485,
-        "end_offset": 1505
+        "start_offset": 1540,
+        "end_offset": 1560
       }
     },
     {
@@ -100,8 +100,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/rights.fidl",
         "data": "RIGHTS_BASIC",
-        "start_offset": 1051,
-        "end_offset": 1063
+        "start_offset": 1106,
+        "end_offset": 1118
       }
     },
     {
@@ -110,8 +110,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/rights.fidl",
         "data": "RIGHTS_IO",
-        "start_offset": 1146,
-        "end_offset": 1155
+        "start_offset": 1201,
+        "end_offset": 1210
       }
     },
     {
@@ -120,8 +120,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/rights.fidl",
         "data": "RIGHTS_POLICY",
-        "start_offset": 1273,
-        "end_offset": 1286
+        "start_offset": 1328,
+        "end_offset": 1341
       }
     },
     {
@@ -130,8 +130,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/rights.fidl",
         "data": "RIGHTS_PROPERTY",
-        "start_offset": 1199,
-        "end_offset": 1214
+        "start_offset": 1254,
+        "end_offset": 1269
       }
     },
     {

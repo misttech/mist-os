@@ -30,6 +30,8 @@ type rights = strict bits : uint32 {
     MANAGE_THREAD = 0x00040000;
     APPLY_PROFILE = 0x00080000;
     MANAGE_SOCKET = 0x00100000;
+    OP_CHILDREN = 0x00200000;
+    RESIZE = 0x00400000;
     SAME_RIGHTS = 0x80000000;
 };
 

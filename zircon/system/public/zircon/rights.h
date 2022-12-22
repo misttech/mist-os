@@ -31,6 +31,7 @@ typedef uint32_t zx_rights_t;
 #define ZX_RIGHT_APPLY_PROFILE ((zx_rights_t)1u << 19)
 #define ZX_RIGHT_MANAGE_SOCKET ((zx_rights_t)1u << 20)
 #define ZX_RIGHT_OP_CHILDREN ((zx_rights_t)1u << 21)
+#define ZX_RIGHT_RESIZE ((zx_rights_t)1u << 22)
 #define ZX_RIGHT_SAME_RIGHTS ((zx_rights_t)1u << 31)
 
 // Convenient names for commonly grouped rights.

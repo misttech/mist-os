@@ -536,6 +536,107 @@ TEST(VmoTestCase, NoResize) {
   EXPECT_OK(status, "handle_close");
 }
 
+// Check that the RESIZE right is set on resizable VMO creation, and required for a resize.
+TEST(VmoTestCase, ResizeRight) {
+  zx::vmo vmo;
+  const size_t len = zx_system_get_page_size() * 4;
+  ASSERT_OK(zx::vmo::create(len, 0, &vmo));
+
+  // A non-resizable VMO does not get the RESIZE right.
+  zx_info_handle_basic_t info;
+  ASSERT_OK(vmo.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+  EXPECT_EQ(info.rights & ZX_RIGHT_RESIZE, 0);
+
+  // Should not be possible to resize the VMO.
+  EXPECT_EQ(ZX_ERR_UNAVAILABLE, vmo.set_size(len + zx_system_get_page_size()));
+  vmo.reset();
+
+  // A resizable VMO gets the RESIZE right.
+  ASSERT_OK(zx::vmo::create(len, ZX_VMO_RESIZABLE, &vmo));
+  ASSERT_OK(vmo.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+  EXPECT_EQ(info.rights & ZX_RIGHT_RESIZE, ZX_RIGHT_RESIZE);
+
+  // Should be possible to resize the VMO.
+  EXPECT_OK(vmo.set_size(len + zx_system_get_page_size()));
+
+  // Remove the RESIZE right. Resizing should fail.
+  zx::vmo vmo_dup;
+  ASSERT_OK(vmo.duplicate(info.rights & ~ZX_RIGHT_RESIZE, &vmo_dup));
+  EXPECT_EQ(ZX_ERR_ACCESS_DENIED, vmo_dup.set_size(zx_system_get_page_size()));
+
+  vmo.reset();
+  vmo_dup.reset();
+
+  // Try the same operations with a pager-backed VMO.
+  zx::pager pager;
+  ASSERT_OK(zx::pager::create(0, &pager));
+  zx::port port;
+  ASSERT_OK(zx::port::create(0, &port));
+  ASSERT_OK(pager.create_vmo(0, port, 0, len, &vmo));
+
+  // A non-resizable VMO does not get the RESIZE right.
+  ASSERT_OK(vmo.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+  EXPECT_EQ(info.rights & ZX_RIGHT_RESIZE, 0);
+
+  // Should not be possible to resize the VMO.
+  EXPECT_EQ(ZX_ERR_UNAVAILABLE, vmo.set_size(len + zx_system_get_page_size()));
+  vmo.reset();
+
+  // A resizable VMO gets the RESIZE right.
+  ASSERT_OK(pager.create_vmo(ZX_VMO_RESIZABLE, port, 0, len, &vmo));
+  ASSERT_OK(vmo.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+  EXPECT_EQ(info.rights & ZX_RIGHT_RESIZE, ZX_RIGHT_RESIZE);
+
+  // Should be possible to resize the VMO.
+  EXPECT_OK(vmo.set_size(len + zx_system_get_page_size()));
+
+  // Remove the RESIZE right. Resizing should fail.
+  ASSERT_OK(vmo.duplicate(info.rights & ~ZX_RIGHT_RESIZE, &vmo_dup));
+  EXPECT_EQ(ZX_ERR_ACCESS_DENIED, vmo_dup.set_size(zx_system_get_page_size()));
+}
+
+// Check that the RESIZE right is set on resizable child creation, and required for a resize.
+TEST(VmoTestCase, ChildResizeRight) {
+  zx::vmo parent;
+  const size_t len = zx_system_get_page_size() * 4;
+  ASSERT_OK(zx::vmo::create(len, 0, &parent));
+
+  uint32_t child_types[] = {ZX_VMO_CHILD_SNAPSHOT, ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE,
+                            ZX_VMO_CHILD_SLICE};
+
+  for (auto child_type : child_types) {
+    zx::vmo vmo;
+    ASSERT_OK(parent.create_child(child_type, 0, len, &vmo));
+
+    // A non-resizable VMO does not get the RESIZE right.
+    zx_info_handle_basic_t info;
+    ASSERT_OK(vmo.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+    EXPECT_EQ(info.rights & ZX_RIGHT_RESIZE, 0);
+
+    // Should not be possible to resize the VMO.
+    EXPECT_EQ(ZX_ERR_UNAVAILABLE, vmo.set_size(len + zx_system_get_page_size()));
+    vmo.reset();
+
+    // Cannot create resizable slices. Skip the rest of the loop.
+    if (child_type == ZX_VMO_CHILD_SLICE) {
+      continue;
+    }
+
+    // A resizable VMO gets the RESIZE right.
+    ASSERT_OK(parent.create_child(child_type | ZX_VMO_CHILD_RESIZABLE, 0, len, &vmo));
+    ASSERT_OK(vmo.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+    EXPECT_EQ(info.rights & ZX_RIGHT_RESIZE, ZX_RIGHT_RESIZE);
+
+    // Should be possible to resize the VMO.
+    EXPECT_OK(vmo.set_size(len + zx_system_get_page_size()));
+
+    // Remove the RESIZE right. Resizing should fail.
+    zx::vmo vmo_dup;
+    ASSERT_OK(vmo.duplicate(info.rights & ~ZX_RIGHT_RESIZE, &vmo_dup));
+    EXPECT_EQ(ZX_ERR_ACCESS_DENIED, vmo_dup.set_size(zx_system_get_page_size()));
+  }
+}
+
 TEST(VmoTestCase, Info) {
   size_t len = zx_system_get_page_size() * 4;
   zx::vmo vmo;

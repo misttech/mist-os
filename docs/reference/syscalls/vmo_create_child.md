@@ -85,6 +85,8 @@ By default the rights of the child handle will be the same as the
 original with a few exceptions. See [`zx_vmo_create()`] for a
 discussion of the details of each right.
 
+If *options* includes **ZX_VMO_CHILD_RESIZABLE** then **ZX_RIGHT_RESIZE** will be added.
+
 In all cases if **ZX_VMO_NO_WRITE** is set then **ZX_RIGHT_WRITE** will be removed.
 
 If *options* is **ZX_VMO_CHILD_SNAPSHOT** or **ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE** and
