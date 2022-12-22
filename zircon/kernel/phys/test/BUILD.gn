@@ -5,11 +5,13 @@
 # https://opensource.org/licenses/MIT
 
 import("//build/dist/generated_resource.gni")
+import("//build/testing/boot_test.gni")
 import("//build/zbi/kernel_cmdline.gni")
 import("//build/zbi/zbi_input.gni")
 import("//src/bringup/lib/mexec/testing/zbi_test.gni")
 import("//zircon/kernel/lib/code-patching/code-patching.gni")
 import("//zircon/kernel/phys/efi/efi_executable.gni")
+import("//zircon/kernel/phys/efi/efi_shell_test.gni")
 import("//zircon/kernel/phys/efi/efi_test.gni")
 import("//zircon/kernel/phys/qemu.gni")
 import("//zircon/kernel/phys/zbi_executable.gni")
@@ -384,11 +386,16 @@ if (current_toolchain != default_toolchain) {
     next_zbi = ":zbi-hello-world-test.zbi"
   }
 
+  efi_shell_test("efi-shell-smoke-test") {
+    contents = [ "echo \"$boot_test_success_string\"" ]
+  }
+
   group("test") {
     testonly = true
     deps = [
       ":backtrace-test",
       ":efi-memory-test",
+      ":efi-shell-smoke-test",
       ":hello-world-test",
       ":phys-unittests",
       ":trampoline-boot-zbi-test",
