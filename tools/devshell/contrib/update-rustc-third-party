@@ -96,7 +96,7 @@ export OWNERS_TMP=$(mktemp -d)
 # preserve OWNERS files
 (cd $VENDOR_DIR; $(preserve_owner_files $OWNERS_TMP))
 
-# this deletes OWNERS and LICENSE files
+# this deletes OWNERS files
 (cd $FUCHSIA_DIR; $PREBUILT_RUST_DIR/bin/cargo vendor \
   --manifest-path $FUCHSIA_DIR/third_party/rust_crates/Cargo.toml \
   --versioned-dirs \
@@ -114,7 +114,7 @@ done
 # for newly-vendored versions
 $(propagate_owner_files $OWNERS_TMP $VENDOR_DIR)
 
-# restore LICENSE* files
+# ensure LICENSE* files exist
 $FUCHSIA_DIR/scripts/rust/check_rust_licenses.py \
   --directory $FUCHSIA_DIR/third_party/rust_crates/vendor
 
