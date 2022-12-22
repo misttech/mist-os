@@ -91,7 +91,7 @@ impl PackageManifestWatcher {
             }
             file_watcher
                 .watch_file(manifest)
-                .with_context(|| format!("setting up file watcher for manifest {:?}", manifest))?;
+                .with_context(|| format!("setting up file watcher for manifest {manifest:?}"))?;
         }
         let watched_list_files = HashMap::new();
         let mut instance = PackageManifestWatcher { watched_list_files, file_watcher };
@@ -103,9 +103,9 @@ impl PackageManifestWatcher {
     fn set_lists<'a>(&mut self, lists: impl Iterator<Item = &'a Utf8PathBuf>) -> Result<()> {
         for list_file_path in lists {
             // If list_file_path is relative, it's assumed it's relative to the current working dir.
-            self.file_watcher.watch_file(list_file_path).with_context(|| {
-                format!("setting up file watcher for list {:?}", list_file_path)
-            })?;
+            self.file_watcher
+                .watch_file(list_file_path)
+                .with_context(|| format!("setting up file watcher for list {list_file_path:?}"))?;
             let package_list_manifest = PackageManifestWatcher::read_list(list_file_path)?;
             let list_parent = list_file_path
                 .parent()
@@ -122,7 +122,7 @@ impl PackageManifestWatcher {
                 // Package manifests are relative to the package manifest list.
                 let manifest_path = list_parent.join(file_path);
                 self.file_watcher.watch_file(&manifest_path).with_context(|| {
-                    format!("setting up file watcher for file {:?}", list_file_path)
+                    format!("setting up file watcher for file {list_file_path:?}")
                 })?;
             }
             self.watched_list_files.entry(list_file_path.into()).or_insert(package_list_manifest);
@@ -136,7 +136,7 @@ impl PackageManifestWatcher {
             format!("opening package list manifest file {}", path.as_std_path().display())
         })?;
         PackageManifestList::from_reader(BufReader::new(file))
-            .with_context(|| format!("reading package list manifest file {}", path))
+            .with_context(|| format!("reading package list manifest file {path}"))
     }
 
     // Handles event from underlying `notify` library.
@@ -371,11 +371,11 @@ mod tests {
     }
 
     fn create_package_manifest(dir: &Utf8Path, i: u32) -> Utf8PathBuf {
-        let package_name = format!("pkg{}", i);
+        let package_name = format!("pkg{i}");
         let pkg_dir = dir.join(&package_name);
         let (_meta_far_path, manifest) =
             test_utils::make_package_manifest(&package_name, pkg_dir.as_std_path(), Vec::new());
-        let manifest_path = pkg_dir.join(format!("{}.manifest", package_name));
+        let manifest_path = pkg_dir.join(format!("{package_name}.manifest"));
         serde_json::to_writer(std::fs::File::create(&manifest_path).unwrap(), &manifest).unwrap();
         manifest_path
     }

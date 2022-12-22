@@ -270,13 +270,13 @@ mod tests {
             // Build some packages to publish.
             let mut manifests = vec![];
             let mut manifest_paths = vec![];
-            for name in (1..=5).map(|i| format!("package{}", i)) {
+            for name in (1..=5).map(|i| format!("package{i}")) {
                 let (pkg_manifest, pkg_manifest_path) = create_manifest(&name, root);
                 manifests.push(pkg_manifest);
                 manifest_paths.push(pkg_manifest_path);
             }
 
-            let list_names = (1..=2).map(|i| format!("list{}.json", i)).collect::<Vec<_>>();
+            let list_names = (1..=2).map(|i| format!("list{i}.json")).collect::<Vec<_>>();
             let list_paths = list_names.iter().map(|name| root.join(name)).collect::<Vec<_>>();
             // Bundle up package3, package4, and package5 into package list manifests.
             let list_parent = list_paths[0].parent().unwrap();
@@ -356,7 +356,7 @@ mod tests {
 
     fn create_manifest(name: &str, root: &Utf8Path) -> (PackageManifest, Utf8PathBuf) {
         let pkg_build_path = root.join(name);
-        let pkg_manifest_path = root.join(format!("{}.json", name));
+        let pkg_manifest_path = root.join(format!("{name}.json"));
 
         let (_, pkg_manifest) =
             test_utils::make_package_manifest(name, pkg_build_path.as_std_path(), Vec::new());
@@ -912,7 +912,7 @@ mod tests {
         let mut publish_fut = Box::pin(repo_incremental_publish(&env.cmd, 10)).fuse();
 
         futures::select! {
-            r = publish_fut => panic!("Incremental publishing exited early: {:?}", r),
+            r = publish_fut => panic!("Incremental publishing exited early: {r:?}"),
             _ = ensure_repo_unlocked(&env.repo_path).fuse() => {},
         }
 
@@ -922,7 +922,7 @@ mod tests {
         update_manifest(&env.manifest_paths[4], &manifest);
 
         futures::select! {
-            r = publish_fut => panic!("Incremental publishing exited early: {:?}", r),
+            r = publish_fut => panic!("Incremental publishing exited early: {r:?}"),
             _ = ensure_repo_unlocked(&env.repo_path).fuse() => {},
         }
 
@@ -938,7 +938,7 @@ mod tests {
         let mut publish_fut = Box::pin(repo_incremental_publish(&env.cmd, 10)).fuse();
 
         futures::select! {
-            r = publish_fut => panic!("Incremental publishing exited early: {:?}", r),
+            r = publish_fut => panic!("Incremental publishing exited early: {r:?}"),
             _ = ensure_repo_unlocked(&env.repo_path).fuse() => {},
         }
 
@@ -946,7 +946,7 @@ mod tests {
         update_file(&env.manifest_paths[4], br#"invalid content"#);
 
         futures::select! {
-            r = publish_fut => panic!("Incremental publishing exited early: {:?}", r),
+            r = publish_fut => panic!("Incremental publishing exited early: {r:?}"),
             _ = ensure_repo_unlocked(&env.repo_path).fuse() => {},
         }
 
