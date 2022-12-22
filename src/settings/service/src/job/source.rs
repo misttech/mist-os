@@ -164,7 +164,6 @@ pub(super) enum State {
 }
 
 /// [Id] provides a unique identifier for a source within its parent space, most often a manager.
-// TODO(fxbug.dev/73541): Explore using generational indices instead.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Id {
     _identifier: usize,

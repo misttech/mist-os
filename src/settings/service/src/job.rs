@@ -257,7 +257,6 @@ impl Job {
 /// [Id] provides a unique identifier for a job within its parent space. Unlike
 /// [Signatures](Signature), All [Job Ids](Id) will be unique per [Job]. [Ids](Id) should never be
 /// directly constructed. An [IdGenerator] should be used instead.
-// TODO(fxbug.dev/73541): Explore using generational indices instead.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub(super) struct Id {
     _identifier: usize,
