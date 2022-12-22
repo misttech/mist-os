@@ -41,6 +41,7 @@ core_realm_shards += [
   "//src/virtualization/bin/guest_manager:debian_core_shard",
   "//src/virtualization/bin/guest_manager:termina_core_shard",
   "//src/virtualization/bin/guest_manager:zircon_core_shard",
+  "//src/sys/cache_manager:core_shard",
 ]
 core_realm_restrict_persistent_storage = false
 
@@ -64,6 +65,9 @@ legacy_base_package_labels += [
   "//src/developer/sshd-host",
   "//src/developer/sshd-host:config",
 ]
+
+# Add the cache storage manager.
+legacy_base_package_labels += [ "//src/sys/cache_manager" ]
 
 # TODO(fxbug.dev/102390): We include this separately from appmgr because if
 # this is excluded when appmgr is removed, it will cause scrutiny errors in
