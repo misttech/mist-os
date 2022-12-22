@@ -70,7 +70,7 @@
   see_also: ["<a href=\"/docs/glossary#driver-binding\">Driver binding</a>"]
   related_guides: ["<a href=\"/docs/development/drivers/concepts/device_driver_model/driver-binding.md\">Driver binding</a>",
                    "<a href=\"/docs/development/drivers/tutorials/bind-rules-tutorial.md\">Bind rules tutorial</a>"]
-  area: ["System", "Devices"]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
 
 - term: "Binding"
   short_description: "In v2 components, a component instance binds to component instances that provided
@@ -163,7 +163,7 @@
   driver for the controller would be a bus driver."
   see_also: [""]
   related_guides: [""]
-  area: ["System", "Devices"]
+  area: ["System", "Devices", "Drivers"]
 
 - term: "Cache directory"
   short_description: "A private directory, that may be cleared by the system at any time, within
@@ -428,7 +428,7 @@
   <a href=\"/docs/glossary#sequential-device-driver\">sequential device driver</a>."
   see_also: [""]
   related_guides: [""]
-  area: ["Devices", "System"]
+  area: ["Devices", "System", "Drivers"]
 
 - term: "Content"
   short_description: "Graphical content containing a bitmap that is attached to a
@@ -457,7 +457,7 @@
   <a href=\"/docs/glossary#banjo\">banjo</a> to service its requests."
   see_also: [""]
   related_guides: [""]
-  area: ["Devices", "System"]
+  area: ["Devices", "System", "Drivers"]
 
 - term: "Core-sdk tarball"
   short_description: "The artifact containing Fuchsia APIs, Fuchsia tools,
@@ -532,7 +532,7 @@
              "<a href=\"/src/devices\">Driver source code</a>",
              "<a href=\"/docs/concepts/drivers/drivers_and_nodes.md\">Driver and nodes</a>"]
   related_guides: [""]
-  area: ["System", "Devices"]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
 
 - term: "Driver binding"
   short_description: "The process where a <a href=\"/docs/glossary#driver\">driver</a> gets
@@ -543,7 +543,7 @@
   see_also: [""]
   related_guides: ["<a href=\"/docs/development/drivers/concepts/device_driver_model/driver-binding.md\">Driver binding</a>",
                    "<a href=\"/docs/development/drivers/tutorials/bind-rules-tutorial.md\">Bind rules tutorial</a>"]
-  area: ["System", "Devices"]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
 
 - term: "Driver host"
   short_description: "A process containing one or more device drivers."
@@ -552,7 +552,7 @@
   security."
   see_also: [""]
   related_guides: [""]
-  area: ["System", "Devices"]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
 
 - term: "Driver manager"
   short_description: "The Driver Manager (formerly devmgr or devcoordinator) is responsible for
@@ -560,7 +560,7 @@
   full_description: ""
   see_also: [""]
   related_guides: [""]
-  area: ["System", "Devices"]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
 
 - term: "Domain object"
   short_description: "The corresponding class or data type in a target language (such as C++) used
@@ -1246,7 +1246,7 @@
   full_description: ""
   see_also: [""]
   related_guides: ["<a href=\"/docs/development/drivers/concepts/device_driver_model/platform-bus.md\">Platform Bus</a>"]
-  area: ["System", "Devices"]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
 
 - term: "Platform source tree"
   short_description: "The open source code hosted on
@@ -1385,7 +1385,7 @@
   full_description: ""
   see_also: [""]
   related_guides: [""]
-  area: ["Devices", "System"]
+  area: ["Devices", "System", "Drivers"]
 
 - term: "Service"
   short_description: "In <a href=\"/docs/glossary#fidl\">FIDL</a>, a service groups
