@@ -8,6 +8,7 @@
 #include <string_view>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostic_types.h"
+#include "tools/fidl/fidlc/include/fidl/fixables.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 

@@ -526,6 +526,7 @@ test("fidlc-test") {
     "resource_tests.cc",
     "resourceness_tests.cc",
     "service_tests.cc",
+    "source_map_generator_tests.cc",
     "source_signature_tests.cc",
     "span_tests.cc",
     "strictness_tests.cc",

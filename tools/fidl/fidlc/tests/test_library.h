@@ -20,6 +20,8 @@
 #include "tools/fidl/fidlc/include/fidl/ordinals.h"
 #include "tools/fidl/fidlc/include/fidl/parser.h"
 #include "tools/fidl/fidlc/include/fidl/source_file.h"
+#include "tools/fidl/fidlc/include/fidl/source_map.h"
+#include "tools/fidl/fidlc/include/fidl/source_map_generator.h"
 #include "tools/fidl/fidlc/include/fidl/tables_generator.h"
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 #include "tools/fidl/fidlc/include/fidl/virtual_source_file.h"
@@ -255,6 +257,12 @@ class TestLibrary final : public SharedInterface {
     auto tables_generator = fidl::TablesGenerator(compilation_.get());
     auto out = tables_generator.Produce();
     return out.str();
+  }
+
+  fidl::SourceMap GenerateSourceMap(std::string_view library_name) {
+    auto source_map_generator =
+        fidl::SourceMapGenerator(LookupLibrary(library_name), experimental_flags());
+    return source_map_generator.Produce();
   }
 
   // Note: We don't provide a convenient library() method because inspecting a
