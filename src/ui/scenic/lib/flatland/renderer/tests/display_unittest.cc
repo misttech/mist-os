@@ -148,7 +148,10 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
       sysmem_allocator_.get(), std::move(tokens.local_token),
       /*image_count*/ 1,
       /*width*/ kWidth,
-      /*height*/ kHeight);
+      /*height*/ kHeight,
+      /*usage*/ flatland::kNoneUsage, fuchsia::sysmem::PixelFormatType::BGRA32,
+      /*memory_constraints*/ std::nullopt,
+      std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
 
   // Have the client wait for buffers allocated so it can populate its information
   // struct with the vmo data.

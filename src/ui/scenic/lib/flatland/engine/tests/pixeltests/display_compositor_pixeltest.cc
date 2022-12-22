@@ -257,7 +257,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     fuchsia::sysmem::BufferCollectionSyncPtr texture_collection =
         CreateBufferCollectionSyncPtrAndSetConstraints(
             sysmem_allocator_.get(), std::move(texture_tokens.local_token), num_vmos, width, height,
-            buffer_usage, pixel_type, memory_constraints);
+            buffer_usage, pixel_type, memory_constraints,
+            std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
 
     // Have the client wait for buffers allocated so it can populate its information
     // struct with the vmo data.

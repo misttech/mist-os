@@ -128,7 +128,8 @@ allocation::GlobalBufferCollectionId SetupBufferCollection(
       /*image_count*/ num_buffers,
       /*width*/ image_width,
       /*height*/ image_height, buffer_usage, fuchsia::sysmem::PixelFormatType::BGRA32,
-      std::make_optional(memory_constraints));
+      std::make_optional(memory_constraints),
+      std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
 
   // Have the client wait for buffers allocated so it can populate its information
   // struct with the vmo data.
@@ -2174,7 +2175,8 @@ VK_TEST_P(VulkanRendererParameterizedYuvTest, YuvTest) {
       sysmem_allocator_.get(), std::move(image_tokens.local_token),
       /*image_count*/ 1,
       /*width*/ kTargetWidth,
-      /*height*/ kTargetHeight, buffer_usage, pixel_format, std::make_optional(memory_constraints));
+      /*height*/ kTargetHeight, buffer_usage, pixel_format, std::make_optional(memory_constraints),
+      std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
 
   // Wait for buffers allocated so it can populate its information struct with the vmo data.
   fuchsia::sysmem::BufferCollectionInfo_2 image_collection_info = {};
@@ -2215,7 +2217,8 @@ VK_TEST_P(VulkanRendererParameterizedYuvTest, YuvTest) {
       /*image_count*/ 1,
       /*width*/ kTargetWidth,
       /*height*/ kTargetHeight, buffer_usage, fuchsia::sysmem::PixelFormatType::BGRA32,
-      std::make_optional(memory_constraints));
+      std::make_optional(memory_constraints),
+      std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
 
   // Wait for buffers allocated so it can populate its information struct with the vmo data.
   fuchsia::sysmem::BufferCollectionInfo_2 render_target_collection_info = {};
@@ -2340,7 +2343,8 @@ VK_TEST_F(VulkanRendererTest, ProtectedMemoryTest) {
       sysmem_allocator_.get(), std::move(image_tokens.local_token),
       /*image_count*/ 1,
       /*width*/ kTargetWidth,
-      /*height*/ kTargetHeight, buffer_usage, pixel_format, std::make_optional(memory_constraints));
+      /*height*/ kTargetHeight, buffer_usage, pixel_format, std::make_optional(memory_constraints),
+      std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
 
   // Wait for buffers allocated so it can populate its information struct with the vmo data.
   fuchsia::sysmem::BufferCollectionInfo_2 image_collection_info = {};
@@ -2382,7 +2386,8 @@ VK_TEST_F(VulkanRendererTest, ProtectedMemoryTest) {
       /*image_count*/ 1,
       /*width*/ kTargetWidth,
       /*height*/ kTargetHeight, buffer_usage, fuchsia::sysmem::PixelFormatType::BGRA32,
-      std::make_optional(memory_constraints));
+      std::make_optional(memory_constraints),
+      std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
 
   // Wait for buffers allocated so it can populate its information struct with the vmo data.
   fuchsia::sysmem::BufferCollectionInfo_2 render_target_collection_info = {};

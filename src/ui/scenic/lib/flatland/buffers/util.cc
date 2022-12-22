@@ -79,7 +79,8 @@ fuchsia::sysmem::BufferCollectionSyncPtr CreateBufferCollectionSyncPtrAndSetCons
     fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
     fuchsia::sysmem::BufferCollectionTokenSyncPtr token, uint32_t image_count, uint32_t width,
     uint32_t height, fuchsia::sysmem::BufferUsage usage, fuchsia::sysmem::PixelFormatType format,
-    std::optional<fuchsia::sysmem::BufferMemoryConstraints> memory_constraints) {
+    std::optional<fuchsia::sysmem::BufferMemoryConstraints> memory_constraints,
+    std::optional<uint64_t> pixel_format_modifier) {
   fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
   zx_status_t status =
       sysmem_allocator->BindSharedCollection(std::move(token), buffer_collection.NewRequest());
@@ -93,6 +94,7 @@ fuchsia::sysmem::BufferCollectionSyncPtr CreateBufferCollectionSyncPtrAndSetCons
   } else {
     constraints.has_buffer_memory_constraints = false;
   }
+
   constraints.usage = usage;
   constraints.min_buffer_count = image_count;
 
@@ -100,8 +102,12 @@ fuchsia::sysmem::BufferCollectionSyncPtr CreateBufferCollectionSyncPtrAndSetCons
   auto& image_constraints = constraints.image_format_constraints[0];
 
   image_constraints.pixel_format.type = format;
-  image_constraints.pixel_format.has_format_modifier = true;
-  image_constraints.pixel_format.format_modifier.value = fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
+
+  image_constraints.pixel_format.has_format_modifier = (pixel_format_modifier != std::nullopt);
+  if (image_constraints.pixel_format.has_format_modifier) {
+    image_constraints.pixel_format.format_modifier.value = *pixel_format_modifier;
+  }
+
   image_constraints.color_spaces_count = 1;
   switch (format) {
     case fuchsia::sysmem::PixelFormatType::BGRA32:

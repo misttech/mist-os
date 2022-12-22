@@ -57,7 +57,8 @@ fuchsia::sysmem::BufferCollectionSyncPtr CreateBufferCollectionSyncPtrAndSetCons
     fuchsia::sysmem::BufferCollectionTokenSyncPtr token, uint32_t image_count = 1,
     uint32_t width = 64, uint32_t height = 32, fuchsia::sysmem::BufferUsage usage = kNoneUsage,
     fuchsia::sysmem::PixelFormatType format = fuchsia::sysmem::PixelFormatType::BGRA32,
-    std::optional<fuchsia::sysmem::BufferMemoryConstraints> memory_constraints = std::nullopt);
+    std::optional<fuchsia::sysmem::BufferMemoryConstraints> memory_constraints = std::nullopt,
+    std::optional<uint64_t> pixel_format_modifier = std::nullopt);
 
 // Maps a sysmem vmo's bytes into host memory that can be accessed via a callback function. The
 // callback provides the caller with a raw pointer to the vmo memory as well as an int for the
