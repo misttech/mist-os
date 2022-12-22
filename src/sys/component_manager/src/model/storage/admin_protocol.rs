@@ -125,6 +125,28 @@ enum DeletionErrorCause {
     FileRequest(fidl::Error),
 }
 
+#[derive(Debug)]
+/// Error values returned by StorageAdminProtocolProvider::get_storage_status
+enum StorageStatusError {
+    /// We encountered an RPC error asking for filesystem info
+    QueryError,
+    /// We asked the Directory provider for information, but they returned
+    /// none, likely the Directory provider is improperly implemented.
+    NoFilesystemInfo,
+    /// We got information from the Directory provider, but it seems invalid.
+    InconsistentInformation,
+}
+
+impl From<StorageStatusError> for fsys::StatusError {
+    fn from(from: StorageStatusError) -> fsys::StatusError {
+        match from {
+            StorageStatusError::InconsistentInformation => fsys::StatusError::ResponseInvalid,
+            StorageStatusError::NoFilesystemInfo => fsys::StatusError::StatusUnknown,
+            StorageStatusError::QueryError => fsys::StatusError::Provider,
+        }
+    }
+}
+
 impl StorageAdminProtocolProvider {
     /// # Arguments
     /// * `storage_decl`: The declaration in the defining `component`'s
@@ -418,8 +440,19 @@ impl StorageAdmin {
                     };
                     responder.send(&mut response)?
                 }
-                fsys::StorageAdminRequest::GetStatus { responder } => responder
-                    .send_no_shutdown_on_err(&mut Result::Err(fsys::StatusError::Unsupported))?,
+                fsys::StorageAdminRequest::GetStatus { responder } => {
+                    if let Ok(storage_root) =
+                        storage::open_storage_root(&storage_capability_source_info).await
+                    {
+                        responder.send_no_shutdown_on_err(
+                            &mut Self::get_storage_status(&storage_root)
+                                .await
+                                .map_err(|e| e.into()),
+                        )?;
+                    } else {
+                        responder.send_no_shutdown_on_err(&mut Err(fsys::StatusError::Provider))?;
+                    }
+                }
                 fsys::StorageAdminRequest::DeleteAllStorageContents { responder } => {
                     // TODO(handle error properly)
                     if let Ok(storage_root) =
@@ -446,6 +479,34 @@ impl StorageAdmin {
             }
         }
         Ok(())
+    }
+
+    async fn get_storage_status(
+        root_storage: &DirectoryProxy,
+    ) -> Result<fsys::StorageStatus, StorageStatusError> {
+        let filesystem_info = match root_storage.query_filesystem().await {
+            Ok((_, Some(fs_info))) => Ok(fs_info),
+            Ok((_, None)) => Err(StorageStatusError::NoFilesystemInfo),
+            Err(_) => Err(StorageStatusError::QueryError),
+        }?;
+
+        // The number of bytes which may be allocated plus the number of bytes which have been
+        // allocated. |total_bytes| is the amount of data (not counting metadata like inode storage)
+        // that minfs has currently allocated from the volume manager, while used_bytes is the amount
+        // of those actually used for current storage.
+        let total_bytes = filesystem_info.free_shared_pool_bytes + filesystem_info.total_bytes;
+        if total_bytes == 0 {
+            return Err(StorageStatusError::InconsistentInformation);
+        }
+        if total_bytes < filesystem_info.used_bytes {
+            return Err(StorageStatusError::InconsistentInformation);
+        }
+
+        Ok(fsys::StorageStatus {
+            total_size: Some(total_bytes),
+            used_size: Some(filesystem_info.used_bytes),
+            ..fsys::StorageStatus::EMPTY
+        })
     }
 
     /// Deletes the contents of all the subdirectories of |root_storage| which
@@ -784,15 +845,23 @@ impl Hook for StorageAdmin {
 mod tests {
     use {
         super::{DirType, StorageAdmin, StorageError},
-        fidl::endpoints,
+        async_trait::async_trait,
+        fidl::endpoints::{self, ServerEnd},
         fidl_fuchsia_io::{self as fio, DirectoryProxy},
         fuchsia_fs as ffs, fuchsia_zircon as zx,
-        std::{path::PathBuf, sync::Arc},
+        std::{fmt::Formatter, path::PathBuf, sync::Arc},
         test_case::test_case,
         vfs::{
             directory::{
-                entry::DirectoryEntry, helper::DirectlyMutable,
-                mutable::connection::io1::MutableConnection, simple::Simple,
+                connection::io1::DerivedConnection,
+                dirents_sink,
+                entry::{DirectoryEntry, EntryInfo},
+                entry_container::{Directory, DirectoryWatcher},
+                helper::DirectlyMutable,
+                immutable::connection::io1::ImmutableConnection,
+                mutable::connection::io1::MutableConnection,
+                simple::Simple,
+                traversal_position::TraversalPosition,
             },
             execution_scope::ExecutionScope,
             file::vmo::asynchronous::read_only_static,
@@ -1286,5 +1355,110 @@ mod tests {
             Err(zx::Status::NOT_FOUND) => {}
             Err(e) => panic!("unexpected error checking for file presence: {:?}", e),
         }
+    }
+
+    struct FakeDir {
+        used: u64,
+        total: u64,
+        scope: ExecutionScope,
+    }
+
+    impl std::fmt::Debug for FakeDir {
+        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+            f.write_fmt(format_args!("used: {}; total: {}", self.used, self.total))
+        }
+    }
+
+    impl DirectoryEntry for FakeDir {
+        fn open(
+            self: Arc<Self>,
+            _scope: ExecutionScope,
+            flags: fio::OpenFlags,
+            _mode: u32,
+            _path: Path,
+            server_end: ServerEnd<fio::NodeMarker>,
+        ) {
+            <ImmutableConnection as DerivedConnection>::create_connection(
+                self.scope.clone(),
+                self.clone(),
+                flags,
+                server_end,
+            );
+        }
+
+        fn entry_info(&self) -> EntryInfo {
+            panic!("not implemented!");
+        }
+    }
+
+    #[async_trait]
+    impl Directory for FakeDir {
+        async fn read_dirents<'a>(
+            &'a self,
+            _pos: &'a TraversalPosition,
+            _sink: Box<dyn dirents_sink::Sink>,
+        ) -> Result<(TraversalPosition, Box<dyn dirents_sink::Sealed>), zx::Status> {
+            Err(zx::Status::INTERNAL)
+        }
+
+        fn register_watcher(
+            self: Arc<Self>,
+            _scope: ExecutionScope,
+            _mask: fio::WatchMask,
+            _watcher: DirectoryWatcher,
+        ) -> Result<(), zx::Status> {
+            Err(zx::Status::INTERNAL)
+        }
+
+        fn unregister_watcher(self: Arc<Self>, _key: usize) {
+            panic!("not implemented!");
+        }
+
+        fn close(&self) -> Result<(), zx::Status> {
+            Err(zx::Status::INTERNAL)
+        }
+
+        fn query_filesystem(&self) -> Result<fio::FilesystemInfo, zx::Status> {
+            Ok(fio::FilesystemInfo {
+                total_bytes: self.total.into(),
+                used_bytes: self.used.into(),
+                total_nodes: 0,
+                used_nodes: 0,
+                free_shared_pool_bytes: 0,
+                fs_id: 0,
+                block_size: 512,
+                max_filename_size: 100,
+                fs_type: 0,
+                padding: 0,
+                name: [0; 32],
+            })
+        }
+        async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+            Err(zx::Status::INTERNAL)
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_get_storage_utilization() {
+        let execution_scope = ExecutionScope::new();
+        let (client, server) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>().unwrap();
+
+        let used = 10;
+        let total = 1000;
+        let fake_dir = Arc::new(FakeDir { used, total, scope: execution_scope.clone() });
+
+        fake_dir.open(
+            execution_scope.clone(),
+            fio::OpenFlags::RIGHT_READABLE,
+            fio::MODE_TYPE_DIRECTORY,
+            Path::dot(),
+            fidl::endpoints::ServerEnd::new(server.into_channel()),
+        );
+
+        let storage_admin = client.into_proxy().unwrap();
+        let status = StorageAdmin::get_storage_status(&storage_admin).await.unwrap();
+
+        assert_eq!(status.used_size.unwrap(), used);
+        assert_eq!(status.total_size.unwrap(), total);
     }
 }
