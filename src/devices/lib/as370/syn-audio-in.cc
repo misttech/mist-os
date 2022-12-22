@@ -20,6 +20,7 @@
 
 namespace {
 constexpr uint64_t kPortDmaNotification = 0x00;
+constexpr uint64_t kPortShutdown = 0x01;
 }  // namespace
 
 std::unique_ptr<SynAudioInDevice> SynAudioInDevice::Create(ddk::MmioBuffer mmio_avio_global,
@@ -34,7 +35,7 @@ std::unique_ptr<SynAudioInDevice> SynAudioInDevice::Create(ddk::MmioBuffer mmio_
 
   auto status = dev->Init();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s could not init %d", __FILE__, status);
+    zxlogf(ERROR, "could not init %s", zx_status_get_string(status));
     return nullptr;
   }
   return dev;
@@ -71,18 +72,15 @@ void SynAudioInDevice::ProcessDma(uint32_t index) {
 
     // Check for usual case, wrap around, or no work to do.
     if (dhub_pos > dma_buffer_current_[index]) {
-      zxlogf(TRACE,
-             "audio: %u  usual  run %u  distance 0x%08X  dhub 0x%08X  curr 0x%08X  pdm 0x%08X\n",
+      zxlogf(TRACE, "%u  usual  run %u  distance 0x%08X  dhub 0x%08X  curr 0x%08X  pdm 0x%08X\n",
              index, run_count, distance, dhub_pos, dma_buffer_current_[index], amount_pdm);
     } else if (dhub_pos < dma_buffer_current_[index]) {
       distance = dma_buffer_current_[index] - dhub_pos;
       amount_pdm = dma_buffer_size_[index] - distance;
-      zxlogf(TRACE,
-             "audio: %u  wrap   run %u  distance 0x%08X  dhub 0x%08X  curr 0x%08X  pdm 0x%08X\n",
+      zxlogf(TRACE, "%u  wrap   run %u  distance 0x%08X  dhub 0x%08X  curr 0x%08X  pdm 0x%08X\n",
              index, run_count, distance, dhub_pos, dma_buffer_current_[index], amount_pdm);
     } else {
-      zxlogf(TRACE,
-             "audio: %u  empty  run %u  distance 0x%08X  dhub 0x%08X  curr 0x%08X  pdm 0x%08X\n",
+      zxlogf(TRACE, "%u  empty  run %u  distance 0x%08X  dhub 0x%08X  curr 0x%08X  pdm 0x%08X\n",
              index, run_count, distance, dhub_pos, dma_buffer_current_[index], amount_pdm);
       return;
     }
@@ -92,13 +90,13 @@ void SynAudioInDevice::ProcessDma(uint32_t index) {
     // Check for overflowing.
     if (distance <= dma_transfer_size) {
       overflows_++;
-      zxlogf(ERROR, "audio: %u  overflows %u", index, overflows_);
+      zxlogf(ERROR, "%u  overflows %u", index, overflows_);
       return;  // We can't keep up.
     }
 
     const uint32_t max_dma_to_process = dma_transfer_size;
     if (amount_pdm > max_dma_to_process) {
-      zxlogf(DEBUG, "audio: %u  PDM data (%u) from dhub is too big (>%u),  overflows %u", index,
+      zxlogf(DEBUG, "%u  PDM data (%u) from dhub is too big (>%u),  overflows %u", index,
              amount_pdm, max_dma_to_process, overflows_);
       amount_pdm = max_dma_to_process;
     }
@@ -118,7 +116,7 @@ void SynAudioInDevice::ProcessDma(uint32_t index) {
     // Either input channel (rising or falled edge PDM capture), unless it is only one channel.
     for (uint32_t i = 0; i < (kNumberOfChannels > 1 ? 2 : 1); ++i) {
       if (parameters[index][i].has_value()) {
-        zxlogf(TRACE, "audio: %u  decoding from 0x%08X  amount 0x%08X  into 0x%08X", index,
+        zxlogf(TRACE, "%u  decoding from 0x%08X  amount 0x%08X  into 0x%08X", index,
                dma_buffer_current_[index], amount_pdm, ring_buffer_current_);
         amount_pcm = cic_filter_->Filter(
             parameters[index][i]->filter_index,
@@ -150,8 +148,8 @@ void SynAudioInDevice::ProcessDma(uint32_t index) {
     }
 
     auto after = zx::clock::get_monotonic();
-    zxlogf(DEBUG, "audio: %u  decoded 0x%X bytes in %luusecs  into 0x%X bytes  distance 0x%X",
-           index, amount_pdm, (after - before).to_usecs(), amount_pcm, distance);
+    zxlogf(DEBUG, "%u  decoded 0x%X bytes in %luusecs  into 0x%X bytes  distance 0x%X", index,
+           amount_pdm, (after - before).to_usecs(), amount_pcm, distance);
   }
 }
 
@@ -160,17 +158,22 @@ int SynAudioInDevice::Thread() {
     zx_port_packet_t packet;
     auto status = port_.wait(zx::time::infinite(), &packet);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "%s port wait failed: %d", __FILE__, status);
+      zxlogf(ERROR, "port wait failed: %s", zx_status_get_string(status));
       return thrd_error;
     }
-    zxlogf(TRACE, "audio: msg on port key %lu", packet.key);
-    if (packet.key == kPortDmaNotification) {
-      if (enabled_) {
-        for (uint32_t i = 0; i < kNumberOfDmas; ++i) {
-          ProcessDma(i);
+    zxlogf(TRACE, "msg on port key %lu", packet.key);
+    if (packet.key == kPortShutdown) {
+      zxlogf(INFO, "Synaptics audio input shutting down");
+      return thrd_success;
+    } else if (packet.key == kPortDmaNotification) {
+      if (packet.key == kPortDmaNotification) {
+        if (enabled_) {
+          for (uint32_t i = 0; i < kNumberOfDmas; ++i) {
+            ProcessDma(i);
+          }
+        } else {
+          zxlogf(TRACE, "DMA already stopped");
         }
-      } else {
-        zxlogf(TRACE, "audio: DMA already stopped");
       }
     }
   }
@@ -179,7 +182,7 @@ int SynAudioInDevice::Thread() {
 zx_status_t SynAudioInDevice::Init() {
   auto status = zx::port::create(0, &port_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s port create failed %d", __FILE__, status);
+    zxlogf(ERROR, "port create failed %s", zx_status_get_string(status));
     return status;
   }
 
@@ -187,7 +190,7 @@ zx_status_t SynAudioInDevice::Init() {
   auto notify_cb = [](void* ctx, dma_state_t state) -> void {
     SynAudioInDevice* thiz = static_cast<SynAudioInDevice*>(ctx);
     zx_port_packet packet = {kPortDmaNotification, ZX_PKT_TYPE_USER, ZX_OK, {}};
-    zxlogf(TRACE, "audio: notification callback with state %d", static_cast<int>(state));
+    zxlogf(TRACE, "notification callback with state %d", static_cast<int>(state));
     // No need to notify if we already stopped the DMA.
     if (thiz->enabled_) {
       auto status = thiz->port_.queue(&packet);
@@ -229,7 +232,7 @@ zx_status_t SynAudioInDevice::GetBuffer(size_t size, zx::vmo* buffer) {
     constexpr uint32_t flags = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE;
     auto status = root->map(flags, 0, dma_buffer_[i], 0, dma_buffer_size_[i], &dma_base_[i]);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "%s vmar mapping failed %d", __FILE__, status);
+      zxlogf(ERROR, "vmar mapping failed %s", zx_status_get_string(status));
       return status;
     }
     dma_buffer_[i].op_range(ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, 0, dma_buffer_size_[i], nullptr, 0);
@@ -241,7 +244,7 @@ zx_status_t SynAudioInDevice::GetBuffer(size_t size, zx::vmo* buffer) {
 
   auto status = zx::vmo::create(size, 0, &ring_buffer_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s failed to allocate ring buffer vmo %d", __FILE__, status);
+    zxlogf(ERROR, "failed to allocate ring buffer vmo %s", zx_status_get_string(status));
     return status;
   }
   ring_buffer_.get_size(&buffer_size);
@@ -249,7 +252,7 @@ zx_status_t SynAudioInDevice::GetBuffer(size_t size, zx::vmo* buffer) {
   constexpr uint32_t flags = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE;
   status = root->map(flags, 0, ring_buffer_, 0, ring_buffer_size_, &ring_buffer_base_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s vmar mapping failed %d", __FILE__, status);
+    zxlogf(ERROR, "vmar mapping failed %s", zx_status_get_string(status));
     return status;
   }
   constexpr uint32_t rights =
@@ -309,4 +312,10 @@ uint64_t SynAudioInDevice::Stop() {
   return before + (after - before) / 2;
 }
 
-void SynAudioInDevice::Shutdown() { Stop(); }
+void SynAudioInDevice::Shutdown() {
+  zx_port_packet packet = {kPortShutdown, ZX_PKT_TYPE_USER, ZX_OK, {}};
+  zx_status_t status = port_.queue(&packet);
+  ZX_ASSERT(status == ZX_OK);
+  thrd_join(thread_, NULL);
+  Stop();
+}

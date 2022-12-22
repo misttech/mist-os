@@ -49,7 +49,7 @@ class SynAudioInDevice {
   // Returns its best estimation of the actual time the buffer pointer stopped moving.
   uint64_t Stop();
 
-  // Stops clocking data and quiets output signals.
+  // Includes stopping clocking data and quieting output signals.
   void Shutdown();
 
   uint32_t FifoDepth() const;
