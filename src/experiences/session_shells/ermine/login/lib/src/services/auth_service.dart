@@ -5,8 +5,6 @@
 import 'dart:async';
 import 'dart:io' as io;
 import 'package:fidl/fidl.dart';
-//ignore: unused_import
-import 'package:ermine_utils/ermine_utils.dart';
 import 'package:fidl_fuchsia_identity_account/fidl_async.dart' as faccount;
 import 'package:fidl_fuchsia_identity_authentication/fidl_async.dart';
 import 'package:fidl_fuchsia_io/fidl_async.dart';
@@ -168,17 +166,23 @@ class AuthService {
             : kUserPickedAccountName);
 
     if (useNewAccountManager) {
-      final passwordInteractionFlow =
-          await _getPasswordInteractionFlowForEnroll(metadata);
+      try {
+        final passwordInteractionFlow =
+            await _getPasswordInteractionFlowForEnroll(metadata);
 
-      final id = await passwordInteractionFlow.setPassword(password);
-      clearPasswordInteractionFlow();
+        final id = await passwordInteractionFlow.setPassword(password);
+        clearPasswordInteractionFlow();
 
-      _account = faccount.AccountProxy();
-      await _accountManager.getAccount(faccount.AccountManagerGetAccountRequest(
-        id: id,
-        account: _account!.ctrl.request(),
-      ));
+        _account = faccount.AccountProxy();
+        await _accountManager
+            .getAccount(faccount.AccountManagerGetAccountRequest(
+          id: id,
+          account: _account!.ctrl.request(),
+        ));
+      } on FidlError catch (_) {
+        clearPasswordInteractionFlow();
+        rethrow;
+      }
     } else {
       _account = faccount.AccountProxy();
       await _accountManager.deprecatedProvisionNewAccount(
@@ -210,10 +214,15 @@ class AuthService {
     }
 
     if (useNewAccountManager) {
-      final passwordInteractionFlow =
-          await _getPasswordInteractionFlowForAuth(_accountIds.first);
-      await passwordInteractionFlow.setPassword(password);
-      clearPasswordInteractionFlow();
+      try {
+        final passwordInteractionFlow =
+            await _getPasswordInteractionFlowForAuth(_accountIds.first);
+        await passwordInteractionFlow.setPassword(password);
+        clearPasswordInteractionFlow();
+      } on FidlError catch (_) {
+        clearPasswordInteractionFlow();
+        rethrow;
+      }
     } else {
       _account = faccount.AccountProxy();
       await _accountManager.deprecatedGetAccount(
@@ -348,12 +357,15 @@ class _PasswordInteractionFlow {
               interaction.ctrl.request().passChannel()),
           account: account.ctrl.request(),
         ))
-        .then(getAccountOrProvisionNewAccountCompleter.complete);
+        .then(getAccountOrProvisionNewAccountCompleter.complete)
+        .catchError(getAccountOrProvisionNewAccountCompleter.completeError);
 
     // ignore: unawaited_futures
-    interaction.startPassword(
-        InterfaceRequest(passwordInteraction.ctrl.request().passChannel()),
-        Mode.authenticate);
+    interaction
+        .startPassword(
+            InterfaceRequest(passwordInteraction.ctrl.request().passChannel()),
+            Mode.authenticate)
+        .catchError(getAccountOrProvisionNewAccountCompleter.completeError);
 
     // Ensure watchState is waiting for setPassword.
     final response = await passwordInteraction.watchState();
@@ -384,12 +396,15 @@ class _PasswordInteractionFlow {
           interaction: InterfaceRequest<Interaction>(
               interaction.ctrl.request().passChannel()),
         ))
-        .then(getAccountOrProvisionNewAccountCompleter.complete);
+        .then(getAccountOrProvisionNewAccountCompleter.complete)
+        .catchError(getAccountOrProvisionNewAccountCompleter.completeError);
 
     // ignore: unawaited_futures
-    interaction.startPassword(
-        InterfaceRequest(passwordInteraction.ctrl.request().passChannel()),
-        Mode.enroll);
+    interaction
+        .startPassword(
+            InterfaceRequest(passwordInteraction.ctrl.request().passChannel()),
+            Mode.enroll)
+        .catchError(getAccountOrProvisionNewAccountCompleter.completeError);
 
     // Ensure watchState is waiting for setPassword.
     final response = await passwordInteraction.watchState();
@@ -412,15 +427,21 @@ class _PasswordInteractionFlow {
   Future<dynamic> setPassword(String password) async {
     // Set the password without blocking. This will allow us to call watchSate
     // right after.
+    final setPasswordCompleter = Completer();
     // ignore: unawaited_futures
-    passwordInteraction.setPassword(password);
+    passwordInteraction
+        .setPassword(password)
+        .catchError(setPasswordCompleter.completeError);
 
     // Watch for state change without blocking and report any state as an
     // exception to allow updating the UX accordingly.
     final watchStateCompleter = Completer();
     // ignore: unawaited_futures
-    passwordInteraction.watchState().then((response) => watchStateCompleter
-        .completeError(PasswordInteractionException(response)));
+    passwordInteraction
+        .watchState()
+        .then((response) => watchStateCompleter
+            .completeError(PasswordInteractionException(response)))
+        .catchError(watchStateCompleter.completeError);
 
     // Wait on futures from the auth/enroll method and channel closures on
     // passwordInteraction and interaction channels. These channels are closed
@@ -430,8 +451,12 @@ class _PasswordInteractionFlow {
       getAccountOrProvisionNewAccountFuture,
       passwordInteraction.ctrl.whenClosed,
       interaction.ctrl.whenClosed,
-      watchStateCompleter.future
-    ], eagerError: true);
+      watchStateCompleter.future,
+      setPasswordCompleter.future,
+    ],
+        eagerError: true,
+        // Log additional errors not handled eagerly from other futures.
+        cleanUp: (e) => log.shout('Errors during auth/enroll: $e'));
 
     return result.first;
   }
