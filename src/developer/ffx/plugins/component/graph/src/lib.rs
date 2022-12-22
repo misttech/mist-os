@@ -38,7 +38,12 @@ pub async fn graph(rcs_proxy: rc::RemoteControlProxy, cmd: ComponentGraphCommand
 
 fn construct_codesearch_url(component_url: &str) -> String {
     // Extract the last part of the component URL
-    let mut name_with_filetype = component_url.rsplit_once("/").unwrap().1.to_string();
+    let mut name_with_filetype = match component_url.rsplit_once("/") {
+        Some(parts) => parts.1.to_string(),
+        // No parts of the path contain `/`, this is already the last part of the component URL.
+        // Out-of-tree components may be standalone.
+        None => component_url.to_string(),
+    };
     if name_with_filetype.ends_with(".cm") {
         name_with_filetype.push('l');
     }
