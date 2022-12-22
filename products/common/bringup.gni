@@ -20,15 +20,6 @@ product_bootfs_labels = [
 product_bootfs_labels +=
     [ "//src/diagnostics/archivist:default-service-config" ]
 
-# Add kernel command line arguments.
-product_bootfs_labels += [
-  "//products/kernel_cmdline:console.shell--true",
-  "//products/kernel_cmdline:kernel.enable-debugging-syscalls--true",
-  "//products/kernel_cmdline:kernel.enable-serial-syscalls--true",
-  "//products/kernel_cmdline:netsvc.all-features--true",
-  "//products/kernel_cmdline:netsvc.disable--false",
-]
-
 meta_package_labels = []
 
 base_driver_package_labels = []
