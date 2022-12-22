@@ -19,18 +19,21 @@
 #include "src/media/audio/services/common/fidl_thread.h"
 #include "src/media/audio/services/common/vector_of_weak_ptr.h"
 #include "src/media/audio/services/device_registry/basic_types.h"
+#include "src/media/audio/services/device_registry/control_notify.h"
+#include "src/media/audio/services/device_registry/device.h"
+#include "src/media/audio/services/device_registry/device_detector.h"
 #include "src/media/audio/services/device_registry/device_presence_watcher.h"
 
 namespace media_audio {
 
 class ControlCreatorServer;
+class ControlServer;
 class ObserverServer;
 class ProviderServer;
 class RegistryServer;
 
-class Device;
-class DeviceDetector;
-
+// This singleton coordinates device detection, serves the outgoing FIDL, and maintains lists of
+// pending, active and unhealthy Devices. The object should live for the duration of the service.
 class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegistry>,
                             public DevicePresenceWatcher {
  public:
@@ -54,9 +57,9 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
   enum class DevicePresence { Unknown, Active, Error };
   std::pair<DevicePresence, std::shared_ptr<Device>> FindDeviceByTokenId(TokenId token_id);
 
-  bool ClaimDeviceForControl(std::shared_ptr<Device> device);
+  bool ClaimDeviceForControl(std::shared_ptr<Device> device, std::shared_ptr<ControlNotify> notify);
 
-  // DevicePresenceWatcher interface
+  // DevicePresenceWatcher interface -- called by Devices when they change state.
   // Add a successfully-initialized Device to our active list.
   void DeviceIsReady(std::shared_ptr<Device> ready_device) final;
   void DeviceHasError(std::shared_ptr<Device> device_with_error) final;
@@ -78,6 +81,11 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
   std::shared_ptr<ObserverServer> CreateObserverServer(
       fidl::ServerEnd<fuchsia_audio_device::Observer> server_end,
       std::shared_ptr<Device> observed_device);
+
+  // Control support
+  std::shared_ptr<ControlServer> CreateControlServer(
+      fidl::ServerEnd<fuchsia_audio_device::Control> server_end,
+      std::shared_ptr<Device> device_to_control);
 
  private:
   static inline const std::string_view kClassName = "AudioDeviceRegistry";

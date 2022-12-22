@@ -14,13 +14,16 @@
 #include <vector>
 
 #include "src/media/audio/services/common/base_fidl_server.h"
+#include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/logging.h"
 
 namespace media_audio {
 
 class AudioDeviceRegistry;
-class Device;
 
+// FIDL server for fuchsia_audio_device/Registry. This interface watches as devices arrive/depart,
+// and exposes summary information about devices that are present (most notably, the device's
+// TokenId which can be used to create an associated observer or Control).
 class RegistryServer
     : public std::enable_shared_from_this<RegistryServer>,
       public BaseFidlServer<RegistryServer, fidl::Server, fuchsia_audio_device::Registry> {
@@ -41,14 +44,14 @@ class RegistryServer
   void DeviceWasRemoved(uint64_t token_id);
 
   // Static object count, for debugging purposes.
-  static uint64_t count() { return count_; }
+  static inline uint64_t count() { return count_; }
 
  private:
   template <typename ServerT, template <typename T> typename FidlServerT, typename ProtocolT>
   friend class BaseFidlServer;
 
   static inline const std::string_view kClassName = "RegistryServer";
-  static uint64_t count_;
+  static inline uint64_t count_ = 0;
 
   explicit RegistryServer(std::shared_ptr<AudioDeviceRegistry> parent);
   void ReplyWithAddedDevices();

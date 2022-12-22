@@ -127,6 +127,63 @@ TEST_F(DeviceWarningTest, CannotObserveUnhealthyDevice) {
   EXPECT_FALSE(AddObserver(device_));
 }
 
+TEST_F(DeviceWarningTest, CannotSetControlTwice) {
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+  ASSERT_TRUE(SetControl(device_));
+
+  EXPECT_FALSE(SetControl(device_));
+}
+
+TEST_F(DeviceWarningTest, CannotDropUnknownControl) {
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+  fake_driver_->AllocateRingBuffer(8192);
+
+  EXPECT_FALSE(DropControl(device_));
+}
+
+TEST_F(DeviceWarningTest, CannotDropControlTwice) {
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+  fake_driver_->AllocateRingBuffer(8192);
+  ASSERT_TRUE(SetControl(device_));
+  ASSERT_TRUE(DropControl(device_));
+
+  EXPECT_FALSE(DropControl(device_));
+}
+
+TEST_F(DeviceWarningTest, CannotControlUnhealthyDevice) {
+  fake_driver_->set_health_state(false);
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(HasError(device_));
+
+  EXPECT_FALSE(SetControl(device_));
+}
+
+TEST_F(DeviceWarningTest, CannotSetGainWithoutControl) {
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+  RunLoopUntilIdle();
+  auto gain_state = DeviceGainState(device_);
+  EXPECT_EQ(*gain_state.gain_db(), 0.0f);
+  EXPECT_FALSE(*gain_state.muted());
+  EXPECT_FALSE(*gain_state.agc_enabled());
+
+  constexpr float kNewGainDb = -2.0f;
+  EXPECT_FALSE(SetDeviceGain({{
+      .muted = true,
+      .agc_enabled = true,
+      .gain_db = kNewGainDb,
+  }}));
+
+  RunLoopUntilIdle();
+  gain_state = DeviceGainState(device_);
+  EXPECT_EQ(*gain_state.gain_db(), 0.0f);
+  EXPECT_FALSE(*gain_state.muted());
+  EXPECT_FALSE(*gain_state.agc_enabled());
+}
+
 // TODO(fxbug.dev/117826): CreateRingBuffer with bad format.
 
 // TODO(fxbug.dev/117826): GetVmo size too large; min_frames too large

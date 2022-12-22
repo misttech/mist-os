@@ -204,11 +204,12 @@ TEST_F(DeviceTest, InitialPlugState) {
   EXPECT_EQ(notify_->plug_state()->second, zx::time(0));
 }
 
-// This tests the driver's ability to originate gain changes, such as from hardware buttons.
+// This tests the driver's ability to originate gain changes, such as from hardware buttons. It also
+// validates that gain notifications are delivered through ControlNotify (not just ObserverNotify).
 TEST_F(DeviceTest, DynamicGainUpdate) {
   InitializeDeviceForFakeDriver();
   ASSERT_TRUE(InInitializedState(device_));
-  ASSERT_TRUE(AddObserver(device_));
+  ASSERT_TRUE(SetControl(device_));
 
   RunLoopUntilIdle();
   auto gain_state = DeviceGainState(device_);
@@ -242,10 +243,12 @@ TEST_F(DeviceTest, DynamicGainUpdate) {
   EXPECT_TRUE(*notify_->gain_state()->agc_enabled());
 }
 
+// This tests the driver's ability to originate plug changes, such as from jack detection. It also
+// validates that plug notifications are delivered through ControlNotify (not just ObserverNotify).
 TEST_F(DeviceTest, DynamicPlugUpdate) {
   InitializeDeviceForFakeDriver();
   ASSERT_TRUE(InInitializedState(device_));
-  ASSERT_TRUE(AddObserver(device_));
+  ASSERT_TRUE(SetControl(device_));
 
   RunLoopUntilIdle();
   EXPECT_TRUE(DevicePluggedState(device_));
@@ -283,7 +286,6 @@ TEST_F(DeviceTest, SetGain) {
   InitializeDeviceForFakeDriver();
   ASSERT_TRUE(InInitializedState(device_));
   ASSERT_TRUE(SetControl(device_));
-  ASSERT_TRUE(AddObserver(device_));
 
   RunLoopUntilIdle();
   auto gain_state = DeviceGainState(device_);
@@ -344,6 +346,10 @@ TEST_F(DeviceTest, DelayInfo) {
   ConnectToRingBufferAndExpectValidClient();
 
   RetrieveDelayInfoAndExpect(62500, std::nullopt);
+  ASSERT_TRUE(notify_->delay_info()) << "ControlNotify was not notified of initial delay info";
+  ASSERT_TRUE(notify_->delay_info()->internal_delay());
+  EXPECT_EQ(*notify_->delay_info()->internal_delay(), 62500);
+  EXPECT_EQ(notify_->delay_info()->external_delay().value_or(0), 0);
 }
 
 // TODO(fxbug.dev/117826): Unittest CalculateRequiredRingBufferSizes
@@ -432,6 +438,10 @@ TEST_F(DeviceTest, InitialDelayReceivedDuringCreateRingBuffer) {
   ASSERT_TRUE(DeviceDelayInfo(device_));
   EXPECT_EQ(DeviceDelayInfo(device_)->internal_delay().value_or(0), 62500);
   EXPECT_EQ(DeviceDelayInfo(device_)->external_delay(), std::nullopt);
+  ASSERT_TRUE(notify_->delay_info()) << "ControlNotify was not notified of initial delay info";
+  ASSERT_TRUE(notify_->delay_info()->internal_delay());
+  EXPECT_EQ(*notify_->delay_info()->internal_delay(), 62500);
+  EXPECT_EQ(notify_->delay_info()->external_delay().value_or(0), 0);
 }
 
 TEST_F(DeviceTest, DynamicDelayInfo) {
@@ -447,14 +457,24 @@ TEST_F(DeviceTest, DynamicDelayInfo) {
   RunLoopUntilIdle();
 
   EXPECT_TRUE(created_ring_buffer);
+  EXPECT_EQ(*notify_->delay_info()->internal_delay(), 62500);
+  EXPECT_EQ(notify_->delay_info()->external_delay().value_or(0), 0);
+  notify_->delay_info().reset();
 
   RunLoopUntilIdle();
+  EXPECT_FALSE(notify_->delay_info());
 
   fake_driver_->InjectDelayUpdate(zx::nsec(123'456), zx::nsec(654'321));
   RunLoopUntilIdle();
   ASSERT_TRUE(DeviceDelayInfo(device_));
   EXPECT_EQ(*DeviceDelayInfo(device_)->internal_delay(), 123'456);
   EXPECT_EQ(*DeviceDelayInfo(device_)->external_delay(), 654'321);
+
+  ASSERT_TRUE(notify_->delay_info());
+  ASSERT_TRUE(notify_->delay_info()->internal_delay());
+  ASSERT_TRUE(notify_->delay_info()->external_delay());
+  EXPECT_EQ(*notify_->delay_info()->internal_delay(), 123'456);
+  EXPECT_EQ(*notify_->delay_info()->external_delay(), 654'321);
 }
 
 }  // namespace media_audio

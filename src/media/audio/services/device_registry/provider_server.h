@@ -18,6 +18,8 @@ namespace media_audio {
 
 class AudioDeviceRegistry;
 
+// FIDL server for fuchsia_audio_device/Provider. This interface programmatically adds audio devices
+// (instead of their being automatically detected in `devfs`).
 class ProviderServer
     : public std::enable_shared_from_this<ProviderServer>,
       public BaseFidlServer<ProviderServer, fidl::Server, fuchsia_audio_device::Provider> {
@@ -32,14 +34,14 @@ class ProviderServer
   void AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sync& completer) override;
 
   // Static object count, for debugging purposes.
-  static uint64_t count() { return count_; }
+  static inline uint64_t count() { return count_; }
 
  private:
   template <typename ServerT, template <typename T> typename FidlServerT, typename ProtocolT>
   friend class BaseFidlServer;
 
   static inline const std::string_view kClassName = "ProviderServer";
-  static uint64_t count_;
+  static inline uint64_t count_ = 0;
 
   explicit ProviderServer(std::shared_ptr<AudioDeviceRegistry> parent);
 

@@ -25,8 +25,6 @@
 namespace media_audio {
 
 // static
-uint64_t RegistryServer::count_ = 0;
-
 std::shared_ptr<RegistryServer> RegistryServer::Create(
     std::shared_ptr<const FidlThread> thread,
     fidl::ServerEnd<fuchsia_audio_device::Registry> server_end,
@@ -38,13 +36,13 @@ std::shared_ptr<RegistryServer> RegistryServer::Create(
 
 RegistryServer::RegistryServer(std::shared_ptr<AudioDeviceRegistry> parent) : parent_(parent) {
   ADR_LOG_OBJECT(kLogObjectLifetimes);
-  ++RegistryServer::count_;
+  ++count_;
   LogObjectCounts();
 }
 
 RegistryServer::~RegistryServer() {
   ADR_LOG_OBJECT(kLogObjectLifetimes);
-  --RegistryServer::count_;
+  --count_;
   LogObjectCounts();
 }
 

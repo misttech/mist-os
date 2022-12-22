@@ -17,8 +17,6 @@
 namespace media_audio {
 
 // static
-uint64_t ObserverServer::count_ = 0;
-
 std::shared_ptr<ObserverServer> ObserverServer::Create(
     std::shared_ptr<const FidlThread> thread,
     fidl::ServerEnd<fuchsia_audio_device::Observer> server_end,
@@ -33,13 +31,13 @@ ObserverServer::ObserverServer(std::shared_ptr<const Device> device) : device_(d
 
   // TODO(fxbug/dev:117199): When Health can change post-initialization, consider checking Health.
 
-  ++ObserverServer::count_;
+  ++count_;
   LogObjectCounts();
 }
 
 ObserverServer::~ObserverServer() {
   ADR_LOG_OBJECT(kLogObjectLifetimes);
-  --ObserverServer::count_;
+  --count_;
   LogObjectCounts();
 }
 

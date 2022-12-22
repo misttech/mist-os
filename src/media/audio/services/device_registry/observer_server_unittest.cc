@@ -465,5 +465,48 @@ TEST_F(ObserverServerTest, GetReferenceClock) {
   reg_server->WaitForShutdown(zx::sec(1));
 }
 
+TEST_F(ObserverServerTest, ObserverDoesNotDropIfDriverRingBufferDrops) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  fake_driver->AllocateRingBuffer(8192);
+
+  auto [control_creator_client, control_creator_server] = CreateControlCreatorServer();
+  auto [registry_client, registry_server] = CreateRegistryServer();
+  auto added_device_id = WaitForAddedDeviceTokenId(registry_client);
+
+  ASSERT_TRUE(added_device_id);
+  auto control_client = ConnectToControl(control_creator_client, *added_device_id);
+  auto observer_client = ConnectToObserver(registry_client, *added_device_id);
+
+  control_creator_server->Shutdown();
+  registry_server->Shutdown();
+  RunLoopUntilIdle();
+
+  auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
+  bool received_callback = false;
+  control_client
+      ->CreateRingBuffer(
+          {{.options = fidl_device::RingBufferOptions{{.format = kDefaultRingBufferFormat,
+                                                       .ring_buffer_min_bytes = 2000}},
+            .ring_buffer_server =
+                fidl::ServerEnd<fidl_device::RingBuffer>(std::move(ring_buffer_server_end))}})
+      .Then([&received_callback](fidl::Result<fidl_device::Control::CreateRingBuffer>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+      });
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+
+  fake_driver->DropRingBuffer();
+  RunLoopUntilIdle();
+
+  EXPECT_EQ(ObserverServer::count(), 1u);
+  EXPECT_FALSE(fidl_error_status_);
+
+  EXPECT_TRUE(control_creator_server->WaitForShutdown(zx::sec(1)));
+  EXPECT_TRUE(registry_server->WaitForShutdown(zx::sec(1)));
+  ring_buffer_client = fidl::Client<fidl_device::RingBuffer>();
+  control_client = fidl::Client<fidl_device::Control>();
+}
+
 }  // namespace
 }  // namespace media_audio

@@ -17,8 +17,6 @@
 namespace media_audio {
 
 // static
-uint64_t ProviderServer::count_ = 0;
-
 std::shared_ptr<ProviderServer> ProviderServer::Create(
     std::shared_ptr<const FidlThread> thread,
     fidl::ServerEnd<fuchsia_audio_device::Provider> server_end,
@@ -30,13 +28,13 @@ std::shared_ptr<ProviderServer> ProviderServer::Create(
 
 ProviderServer::ProviderServer(std::shared_ptr<AudioDeviceRegistry> parent) : parent_(parent) {
   ADR_LOG_OBJECT(kLogObjectLifetimes);
-  ++ProviderServer::count_;
+  ++count_;
   LogObjectCounts();
 }
 
 ProviderServer::~ProviderServer() {
   ADR_LOG_OBJECT(kLogObjectLifetimes);
-  --ProviderServer::count_;
+  --count_;
   LogObjectCounts();
 }
 

@@ -16,6 +16,8 @@
 
 #include "src/media/audio/services/common/fidl_thread.h"
 #include "src/media/audio/services/device_registry/control_creator_server.h"
+#include "src/media/audio/services/device_registry/control_notify.h"
+#include "src/media/audio/services/device_registry/control_server.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/device_detector.h"
 #include "src/media/audio/services/device_registry/logging.h"
@@ -155,8 +157,9 @@ AudioDeviceRegistry::FindDeviceByTokenId(TokenId token_id) {
   return std::make_pair(DevicePresence::Unknown, nullptr);
 }
 
-bool AudioDeviceRegistry::ClaimDeviceForControl(std::shared_ptr<Device> device) {
-  return device->SetControl();
+bool AudioDeviceRegistry::ClaimDeviceForControl(std::shared_ptr<Device> device,
+                                                std::shared_ptr<ControlNotify> notify) {
+  return device->SetControl(std::move(notify));
 }
 
 // Notify registry clients of this device departure (whether from surprise-removal or error).
@@ -256,6 +259,20 @@ std::shared_ptr<ObserverServer> AudioDeviceRegistry::CreateObserverServer(
   auto observer = ObserverServer::Create(thread_, std::move(server_end), observed_device);
   observed_device->AddObserver(observer);
   return observer;
+}
+
+std::shared_ptr<ControlServer> AudioDeviceRegistry::CreateControlServer(
+    fidl::ServerEnd<fuchsia_audio_device::Control> server_end,
+    std::shared_ptr<Device> device_to_control) {
+  ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods || kLogControlServerMethods);
+
+  auto control =
+      ControlServer::Create(thread_, std::move(server_end), shared_from_this(), device_to_control);
+
+  if (!device_to_control->SetControl(control)) {
+    return nullptr;
+  }
+  return control;
 }
 
 }  // namespace media_audio

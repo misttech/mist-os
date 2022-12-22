@@ -29,12 +29,14 @@
 #include "src/media/audio/lib/clock/clock.h"
 #include "src/media/audio/services/common/vector_of_weak_ptr.h"
 #include "src/media/audio/services/device_registry/basic_types.h"
+#include "src/media/audio/services/device_registry/control_notify.h"
 #include "src/media/audio/services/device_registry/device_presence_watcher.h"
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/observer_notify.h"
 
 namespace media_audio {
 
+// This class represents a driver and audio device, once it is detected.
 class Device : public std::enable_shared_from_this<Device>,
                public fidl::AsyncEventHandler<fuchsia_hardware_audio::StreamConfig> {
  public:
@@ -51,13 +53,14 @@ class Device : public std::enable_shared_from_this<Device>,
   // `info` is only populated once the device is initialized.
   const std::optional<fuchsia_audio_device::Info>& info() const { return device_info_; }
   zx::result<zx::clock> GetReadOnlyClock() const;
+
   bool AddObserver(std::shared_ptr<ObserverNotify> observer_to_add);
 
   void Initialize();
 
   void ForEachObserver(fit::function<void(std::shared_ptr<ObserverNotify>)> action);
 
-  bool SetControl();
+  bool SetControl(std::shared_ptr<ControlNotify> control_notify);
   bool DropControl();
   void DropRingBuffer();
 
@@ -99,9 +102,9 @@ class Device : public std::enable_shared_from_this<Device>,
   void StopRingBuffer(fit::callback<void(zx_status_t)> stop_callback);
 
   // Static object counts, for debugging purposes.
-  static uint64_t count() { return count_; }
-  static uint64_t initialized_count() { return initialized_count_; }
-  static uint64_t unhealthy_count() { return unhealthy_count_; }
+  static inline uint64_t count() { return count_; }
+  static inline uint64_t initialized_count() { return initialized_count_; }
+  static inline uint64_t unhealthy_count() { return unhealthy_count_; }
 
  private:
   friend class DeviceTestBase;
@@ -110,9 +113,9 @@ class Device : public std::enable_shared_from_this<Device>,
   friend class AudioDeviceRegistryServerTestBase;
 
   static inline const std::string_view kClassName = "Device";
-  static uint64_t count_;
-  static uint64_t initialized_count_;
-  static uint64_t unhealthy_count_;
+  static inline uint64_t count_ = 0;
+  static inline uint64_t initialized_count_ = 0;
+  static inline uint64_t unhealthy_count_ = 0;
 
   Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher, async_dispatcher_t* dispatcher,
          std::string_view name, fuchsia_audio_device::DeviceType device_type,
@@ -223,6 +226,8 @@ class Device : public std::enable_shared_from_this<Device>,
 
   void CalculateRequiredRingBufferSizes();
 
+  std::shared_ptr<ControlNotify> GetControlNotify();
+
   // Device notifies watcher when it completes initialization, encounters an error, or is removed.
   std::weak_ptr<DevicePresenceWatcher> presence_watcher_;
   async_dispatcher_t* dispatcher_;
@@ -253,8 +258,7 @@ class Device : public std::enable_shared_from_this<Device>,
   VectorOfWeakPtr<ObserverNotify> observers_;
 
   // Members related to being controlled.
-  // This will be replaced by a std::weak_ptr<ControlNotify> subsequent CL.
-  bool is_controlled_ = false;
+  std::optional<std::weak_ptr<ControlNotify>> control_notify_;
 
   // Members related to driver RingBuffer.
   fidl::Client<fuchsia_hardware_audio::RingBuffer> ring_buffer_client_;

@@ -21,6 +21,7 @@
 #include "src/media/audio/services/common/testing/test_server_and_async_client.h"
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
 #include "src/media/audio/services/device_registry/control_creator_server.h"
+#include "src/media/audio/services/device_registry/control_server.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/observer_server.h"
 #include "src/media/audio/services/device_registry/provider_server.h"
@@ -29,6 +30,7 @@
 
 namespace media_audio {
 
+// This provides shared unittest functions for AudioDeviceRegistry and the six FIDL server classes.
 class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
  protected:
   // Create a FakeAudioDriver that can mock a real device that has been detected, using default

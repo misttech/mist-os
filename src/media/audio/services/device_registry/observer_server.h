@@ -8,14 +8,14 @@
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
 
 #include "src/media/audio/services/common/base_fidl_server.h"
+#include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/observer_notify.h"
 
 namespace media_audio {
 
-class AudioDeviceRegistry;
-class Device;
-
+// FIDL server for fuchsia_audio_device/Observer. This class makes "immutable" (read-only) calls to
+// a Device, and otherwise watches it for state changes.
 class ObserverServer
     : public std::enable_shared_from_this<ObserverServer>,
       public ObserverNotify,
@@ -47,14 +47,14 @@ class ObserverServer
   void GetTopologies(GetTopologiesCompleter::Sync& completer) final {}
 
   // Static object count, for debugging purposes.
-  static uint64_t count() { return count_; }
+  static inline uint64_t count() { return count_; }
 
  private:
   template <typename ServerT, template <typename T> typename FidlServerT, typename ProtocolT>
   friend class BaseFidlServer;
 
   static inline const std::string_view kClassName = "ObserverServer";
-  static uint64_t count_;
+  static inline uint64_t count_ = 0;
 
   explicit ObserverServer(std::shared_ptr<const Device> device);
 

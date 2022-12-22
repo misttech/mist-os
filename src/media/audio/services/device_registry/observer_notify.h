@@ -10,6 +10,9 @@
 
 namespace media_audio {
 
+// An ObserverServer exposes this interface, to the Device that it is observing. The Device uses it
+// for asynchronous notifications. Note that the Device stores this interface as a weak_ptr, since
+// the ObserverServer can be destroyed at any time.
 class ObserverNotify {
  public:
   virtual void DeviceIsRemoved() = 0;

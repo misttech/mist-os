@@ -42,10 +42,6 @@ uint64_t NextTokenId() {
 // zone allocated to the producer and the zone allocated to the consumer.
 static inline constexpr zx::duration kRingBufferProducerConsumerGap = zx::msec(10);
 
-uint64_t Device::count_ = 0;
-uint64_t Device::initialized_count_ = 0;
-uint64_t Device::unhealthy_count_ = 0;
-
 std::shared_ptr<Device> Device::Create(
     std::weak_ptr<DevicePresenceWatcher> presence_watcher, async_dispatcher_t* dispatcher,
     std::string_view name, fuchsia_audio_device::DeviceType device_type,
@@ -82,7 +78,7 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
       token_id_(NextTokenId()),
       ring_buffer_handler_(this) {
   ADR_LOG_OBJECT(kLogObjectLifetimes);
-  ++Device::count_;
+  ++count_;
   LogObjectCounts();
 
   // Upon creation, automatically kick off initialization. This will complete asynchronously,
@@ -92,7 +88,7 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
 
 Device::~Device() {
   ADR_LOG_OBJECT(kLogObjectLifetimes);
-  --Device::count_;
+  --count_;
   LogObjectCounts();
 }
 
@@ -136,14 +132,13 @@ void Device::OnRemoval() {
   ADR_LOG_OBJECT(kLogDeviceState);
   if (state_ == State::Error) {
     ADR_WARN_OBJECT() << "device already has an error; no device state to unwind";
-    --Device::unhealthy_count_;
+    --unhealthy_count_;
   } else if (state_ != State::DeviceInitializing) {
-    --Device::initialized_count_;
+    --initialized_count_;
 
     DeviceDroppedRingBuffer();
-    // In next CL, we will notify ControlNotify of DeviceIsRemoved as well.
     DropControl();  // Probably unneeded (Device is going away) but makes unwind "complete".
-    ForEachObserver([](auto obs) { obs->DeviceIsRemoved(); });
+    ForEachObserver([](auto obs) { obs->DeviceIsRemoved(); });  // Our control is also an observer.
   }
   LogObjectCounts();
 
@@ -173,13 +168,13 @@ void Device::OnError(zx_status_t error) {
   FX_PLOGS(WARNING, error) << __func__;
 
   if (state_ != State::DeviceInitializing) {
-    --Device::initialized_count_;
+    --initialized_count_;
 
     DeviceDroppedRingBuffer();
     DropControl();
     ForEachObserver([](auto obs) { obs->DeviceHasError(); });
   }
-  ++Device::unhealthy_count_;
+  ++unhealthy_count_;
   SetError(error);
   LogObjectCounts();
 
@@ -209,7 +204,7 @@ void Device::OnInitializationResponse() {
 
   if (stream_config_properties_ && supported_formats_ && gain_state_ && plug_state_ &&
       health_state_) {
-    ++Device::initialized_count_;
+    ++initialized_count_;
     SetDeviceInfo();
     SetState(State::DeviceInitialized);
     LogObjectCounts();
@@ -220,7 +215,7 @@ void Device::OnInitializationResponse() {
   }
 }
 
-bool Device::SetControl() {
+bool Device::SetControl(std::shared_ptr<ControlNotify> control_notify) {
   ADR_LOG_OBJECT(kLogDeviceState || kLogNotifyMethods);
   FX_CHECK(state_ != State::DeviceInitializing);
 
@@ -229,8 +224,8 @@ bool Device::SetControl() {
     return false;
   }
 
-  if (is_controlled_) {
-    ADR_WARN_OBJECT() << "device is already controlled";
+  if (GetControlNotify()) {
+    ADR_WARN_OBJECT() << "already controlled";
     return false;
   }
 
@@ -239,12 +234,9 @@ bool Device::SetControl() {
     return false;
   }
 
-  if (state_ != State::DeviceInitialized) {
-    ADR_WARN_OBJECT() << "wrong state for this call (" << state_ << ")";
-    return false;
-  }
+  control_notify_ = control_notify;
+  AddObserver(std::move(control_notify));
 
-  is_controlled_ = true;
   LogObjectCounts();
   return true;
 }
@@ -253,12 +245,15 @@ bool Device::DropControl() {
   ADR_LOG_OBJECT(kLogDeviceMethods || kLogNotifyMethods);
   FX_CHECK(state_ != State::DeviceInitializing);
 
-  if (!is_controlled_) {
+  auto control_notify = GetControlNotify();
+  if (!control_notify) {
     ADR_LOG_OBJECT(kLogNotifyMethods) << "already not controlled";
     return false;
   }
 
-  is_controlled_ = false;
+  control_notify->DeviceIsRemoved();
+  control_notify_.reset();
+  // We don't remove our ControlNotify from the observer list, we wait for it to self-invalidate.
   LogObjectCounts();
 
   SetState(State::DeviceInitialized);
@@ -785,7 +780,7 @@ bool Device::SetGain(fuchsia_hardware_audio::GainState& gain_state) {
     ADR_WARN_OBJECT() << "Device has previous error; cannot set gain";
     return false;
   }
-  if (!is_controlled_) {
+  if (!GetControlNotify()) {
     ADR_WARN_OBJECT() << "Device must be allocated before this method can be called";
     return false;
   }
@@ -813,6 +808,22 @@ bool Device::SetGain(fuchsia_hardware_audio::GainState& gain_state) {
   return true;
 }
 
+// If the optional<weak_ptr> is set AND the weak_ptr can be locked to its shared_ptr, then the
+// resulting shared_ptr is returned. Otherwise, nullptr is returned, after first resetting the
+// optional `control_notify` if it is set but the weak_ptr is no longer valid.
+std::shared_ptr<ControlNotify> Device::GetControlNotify() {
+  if (!control_notify_) {
+    return nullptr;
+  }
+
+  auto sp_control = control_notify_->lock();
+  if (!sp_control) {
+    control_notify_.reset();
+    LogObjectCounts();
+  }
+  return sp_control;
+}
+
 bool Device::CreateRingBuffer(const fuchsia_hardware_audio::Format& format,
                               uint32_t min_ring_buffer_bytes,
                               fit::callback<void(RingBufferInfo)> create_ring_buffer_callback) {
@@ -832,7 +843,6 @@ bool Device::CreateRingBuffer(const fuchsia_hardware_audio::Format& format,
 
 bool Device::ConnectRingBufferFidl(fuchsia_hardware_audio::Format driver_format) {
   ADR_LOG_OBJECT(kLogRingBufferMethods || kLogRingBufferFidlCalls);
-  FX_CHECK(is_controlled_);
 
   auto status = ValidateRingBufferFormat(driver_format);
   if (status != ZX_OK) {
@@ -953,7 +963,12 @@ void Device::RetrieveDelayInfo() {
         }
 
         // Notify our controlling entity, if we have one.
-
+        if (auto notify = GetControlNotify()) {
+          notify->DelayInfoChanged({{
+              .internal_delay = delay_info_->internal_delay(),
+              .external_delay = delay_info_->external_delay(),
+          }});
+        }
         RetrieveDelayInfo();
       });
 }
@@ -980,10 +995,6 @@ void Device::GetVmo(uint32_t min_frames, uint32_t position_notifications_per_rin
           OnError(status);
           return;
         }
-        ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/GetVmo: success";
-
-        // For now, we save everything we receive from the On... callbacks (including this vmo).
-        // Eventually, we will just pass the vmo on and thus won't cache it here..
         ring_buffer_vmo_ = std::move(result->ring_buffer());
         num_ring_buffer_frames_ = result->num_frames();
         CheckForRingBufferReady();

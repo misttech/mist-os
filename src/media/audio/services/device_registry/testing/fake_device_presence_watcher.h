@@ -19,6 +19,7 @@ namespace media_audio {
 
 class Device;
 
+// This fakes the DevicePresenceWatcher interface, for use in Device testing.
 class FakeDevicePresenceWatcher : public DevicePresenceWatcher {
   static inline constexpr bool kLogFakeDevicePresenceWatcher = false;
 

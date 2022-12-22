@@ -12,7 +12,7 @@
 
 namespace media_audio {
 
-// Utility functions
+// Utility functions to validate direct responses from audio drivers.
 std::vector<fuchsia_audio_device::PcmFormatSet> TranslateFormatSets(
     std::vector<fuchsia_hardware_audio::SupportedFormats>& formats);
 

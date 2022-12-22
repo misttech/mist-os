@@ -11,14 +11,14 @@
 #include <optional>
 
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
+#include "src/media/audio/services/device_registry/control_notify.h"
+#include "src/media/audio/services/device_registry/control_server.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/logging.h"
 
 namespace media_audio {
 
 // static
-uint64_t ControlCreatorServer::count_ = 0;
-
 std::shared_ptr<ControlCreatorServer> ControlCreatorServer::Create(
     std::shared_ptr<const FidlThread> thread,
     fidl::ServerEnd<fuchsia_audio_device::ControlCreator> server_end,
@@ -31,13 +31,13 @@ std::shared_ptr<ControlCreatorServer> ControlCreatorServer::Create(
 ControlCreatorServer::ControlCreatorServer(std::shared_ptr<AudioDeviceRegistry> parent)
     : parent_(parent) {
   ADR_LOG_OBJECT(kLogObjectLifetimes);
-  ++ControlCreatorServer::count_;
+  ++count_;
   LogObjectCounts();
 }
 
 ControlCreatorServer::~ControlCreatorServer() {
   ADR_LOG_OBJECT(kLogObjectLifetimes);
-  --ControlCreatorServer::count_;
+  --count_;
   LogObjectCounts();
 }
 
@@ -70,8 +70,9 @@ void ControlCreatorServer::Create(CreateRequest& request, CreateCompleter::Sync&
   FX_CHECK(device);
   // TODO(fxbug.dev/117199): Decide when we proactively call GetHealthState, if at all.
 
-  // For now, just mark the Device as controlled.
-  if (!device->SetControl()) {
+  auto control = parent_->CreateControlServer(std::move(*request.control_server()), device);
+
+  if (!control) {
     completer.Reply(fit::error(fuchsia_audio_device::ControlCreatorError::kDeviceAlreadyAllocated));
     return;
   }

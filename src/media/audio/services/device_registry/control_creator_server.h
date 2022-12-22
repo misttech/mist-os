@@ -15,6 +15,7 @@ namespace media_audio {
 
 class AudioDeviceRegistry;
 
+// FIDL server for fuchsia_audio_device/ControlCreator. Builds fuchsia_audio_device/ControlServers.
 class ControlCreatorServer : public std::enable_shared_from_this<ControlCreatorServer>,
                              public BaseFidlServer<ControlCreatorServer, fidl::Server,
                                                    fuchsia_audio_device::ControlCreator> {
@@ -30,14 +31,14 @@ class ControlCreatorServer : public std::enable_shared_from_this<ControlCreatorS
   void Create(CreateRequest& request, CreateCompleter::Sync& completer) override;
 
   // Static object count, for debugging purposes.
-  static uint64_t count() { return count_; }
+  static inline uint64_t count() { return count_; }
 
  private:
   template <typename ServerT, template <typename T> typename FidlServerT, typename ProtocolT>
   friend class BaseFidlServer;
 
   static inline const std::string_view kClassName = "ControlCreatorServer";
-  static uint64_t count_;
+  static inline uint64_t count_ = 0;
 
   explicit ControlCreatorServer(std::shared_ptr<AudioDeviceRegistry> parent);
 

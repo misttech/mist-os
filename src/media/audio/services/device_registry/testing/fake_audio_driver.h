@@ -27,6 +27,7 @@
 
 namespace media_audio {
 
+// This driver implements the audio driver interface and is configurable to simulate audio hardware.
 class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig,
                         public fuchsia::hardware::audio::RingBuffer {
   static inline constexpr bool kLogFakeAudioDriver = false;

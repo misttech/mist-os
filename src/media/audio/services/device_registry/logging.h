@@ -31,10 +31,10 @@ namespace media_audio {
 
 inline constexpr bool kLogDeviceDetection = false;
 inline constexpr bool kLogDeviceInitializationProgress = false;
-inline constexpr bool kLogAudioDeviceRegistryMethods = true;
+inline constexpr bool kLogAudioDeviceRegistryMethods = false;
 inline constexpr bool kLogFinalDeviceInfo = false;
 
-inline constexpr bool kLogDeviceMethods = true;
+inline constexpr bool kLogDeviceMethods = false;
 inline constexpr bool kLogStreamConfigFidlCalls = false;
 inline constexpr bool kLogStreamConfigFidlResponses = false;
 inline constexpr bool kLogStreamConfigFidlResponseValues = false;
@@ -44,16 +44,19 @@ inline constexpr bool kLogRingBufferFidlCalls = false;
 inline constexpr bool kLogRingBufferFidlResponses = false;
 inline constexpr bool kLogRingBufferFidlResponseValues = false;
 
-inline constexpr bool kLogObjectLifetimes = true;
+inline constexpr bool kLogObjectLifetimes = false;
 inline constexpr bool kLogDeviceState = false;
-inline constexpr bool kLogObjectCounts = true;
-inline constexpr bool kLogNotifyMethods = true;
+inline constexpr bool kLogObjectCounts = false;
+inline constexpr bool kLogNotifyMethods = false;
 
 inline constexpr bool kLogControlCreatorServerMethods = false;
 inline constexpr bool kLogControlCreatorServerResponses = false;
 
-inline constexpr bool kLogObserverServerMethods = true;
-inline constexpr bool kLogObserverServerResponses = true;
+inline constexpr bool kLogControlServerMethods = false;
+inline constexpr bool kLogControlServerResponses = false;
+
+inline constexpr bool kLogObserverServerMethods = false;
+inline constexpr bool kLogObserverServerResponses = false;
 
 inline constexpr bool kLogProviderServerMethods = false;
 inline constexpr bool kLogProviderServerResponses = false;

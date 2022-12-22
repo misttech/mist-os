@@ -15,6 +15,7 @@
 
 #include "src/media/audio/services/device_registry/basic_types.h"
 #include "src/media/audio/services/device_registry/control_creator_server.h"
+#include "src/media/audio/services/device_registry/control_server.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/observer_server.h"
 #include "src/media/audio/services/device_registry/provider_server.h"
@@ -474,7 +475,8 @@ void LogObjectCounts() {
                             << " active/" << Device::unhealthy_count() << " unhealthy); "
                             << ProviderServer::count() << " Providers, " << RegistryServer::count()
                             << " Registries, " << ObserverServer::count() << " Observers, "
-                            << ControlCreatorServer::count() << " CtlCreators";
+                            << ControlCreatorServer::count() << " CtlCreators, "
+                            << ControlServer::count() << " Controls";
 }
 
 }  // namespace media_audio
