@@ -125,17 +125,20 @@ def main():
                         f'Source "{s}" for "{name}" comes from a subdirectory.'
                         f' Specify source_dir instead.')
 
-            # TODO: Use `glob.glob("*.go", root_dir=args.source_dir)` instead of
-            # os.listdir after upgrading to Python 3.10.
-            go_files = {
-                f for f in os.listdir(args.source_dir) if f.endswith('.go')
-            }
-            missing = go_files - go_sources
-            if missing:
-                raise ValueError(
-                    f'go_library requires that all Go files in source_dir be listed'
-                    f' as sources, but the following files are missing from sources'
-                    f' for target {name}: {", ".join(sorted(missing))}')
+            # Require all non-generated Go files to be listed as sources.
+            if not os.path.abspath(args.source_dir).startswith(build_dir):
+                # TODO: Use `glob.glob("*.go", root_dir=args.source_dir)`
+                # instead of os.listdir after upgrading to Python 3.10.
+                go_files = {
+                    f for f in os.listdir(args.source_dir) if f.endswith('.go')
+                }
+                missing = go_files - go_sources
+                if missing:
+                    raise ValueError(
+                        f'go_library requires that all Go files in source_dir'
+                        f' be listed as sources, but the following files are'
+                        f' missing from sources for target {name}:'
+                        f' {", ".join(sorted(missing))}')
     elif args.allow_globbing:
         current_sources.append(Source(name, args.source_dir, args.output))
     result = get_sources(args.deps, extra_sources=current_sources)
