@@ -59,31 +59,21 @@ class SynDhub : public DeviceType, public ddk::SharedDmaProtocol<SynDhub, ddk::b
   void Enable(uint32_t channel_id, bool enable);                // protected for unit tests.
 
  private:
-  static constexpr uint32_t kMtuSize = 128;
+  // The DMA will copy kMtuSize bytes at the time, dma_mtus number of times.
+  struct ChannelInfo {
+    uint32_t bank;      // Memory area used for the channel queues.
+    uint32_t dma_mtus;  // Number of MTUs in one StartDma() call.
+  };
+  static constexpr uint32_t kMtuFactor = 4;
+  static constexpr uint32_t kMtuSize = 8 * 2 << (kMtuFactor - 1);
   static constexpr uint32_t kConcurrentDmas = 1;
-  static constexpr struct {
-    uint32_t bank;
-    uint32_t fifo_data_depth;
-    uint32_t dma_mtus;  // We use 64 for I2S and 128 for PDM.
-  } channel_info_[] = {
-      // clang-format off
-    { 0,  60,  64},
-    { 1,  60,  64},
-    { 2,  60,  64},
-    { 3,  60,  64},
-    { 4,  60,  64},
-    { 5,  60,  64},
-    { 6,  60, 128},
-    { 7, 252,  64},
-    {11,  48,  64},
-    {12,  60, 128},
-    {13,  60, 128},
-    {14,  60, 128},
-    {15,  60,  64},
-    {16,  60,  64},
-    { 8, 252,  64},
-    {10, 252,  64},
-      // clang-format on
+  // Maps channel information per channel id.
+  // Making TDM half of PDM makes the interrupts occur at the same frequency that allows us to
+  // use a unified profile for deadline scheduling the interrupt handlinug.
+  std::map<uint32_t, ChannelInfo> channel_info_ = {
+      {kDmaIdMa0, {0, 64}},
+      {kDmaIdPdmW0, {13, 128}},
+      {kDmaIdPdmW1, {14, 128}},
   };
 
   zx_status_t Bind();

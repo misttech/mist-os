@@ -208,28 +208,30 @@ void SynDhub::Init(uint32_t channel_id) {
       .FromValue(0)
       .set_selfLoop(0)
       .set_QoS(0)
-      .set_MTU(4)  // 128 bytes (2 ^ 4 x 8).
+      .set_MTU(kMtuFactor)  // MTU = 2 ^ kMtuFactor x 8, e.g. 128 bytes for 2 ^ 4 x 8.
       .WriteTo(&mmio_);
-  ZX_ASSERT(kMtuSize == 128);
 
+  // Divide internal memory into banks.
+  constexpr uint32_t kBankSize = 512;
   const uint32_t bank = channel_info_[channel_id].bank;
-  const uint32_t base_cmd = bank * 512;
-  const uint32_t base_data = bank * 512 + 32;
-  constexpr uint32_t depth_cmd = 4;  // 4 x 8 = 32 bytes.
+  const uint32_t base_cmd = bank * kBankSize;
+  constexpr uint32_t kDepthCmd = 4;
+  const uint32_t base_data = bank * kBankSize + kDepthCmd * 8;
+  // kDepthData needs to be big enough for the specified MTU. It is not clear exactly how big it
+  // needs to be though, experimentation shows that for an MTU of 128 bytes it needs to be at
+  // least 16 (this is in 64 bits units).
+  constexpr uint32_t kDepthData = (kBankSize - kDepthCmd * 8) / 8;
 
   // FIFO semaphores use cells with hub == false.
 
   // FIFO cmd configure and start.
   FiFo_CFG::Get(fifo_cmd_id).FromValue(0).set_BASE(base_cmd).WriteTo(&mmio_);
-  cell_CFG::Get(false, fifo_cmd_id).FromValue(0).set_DEPTH(depth_cmd).WriteTo(&mmio_);
+  cell_CFG::Get(false, fifo_cmd_id).FromValue(0).set_DEPTH(kDepthCmd).WriteTo(&mmio_);
   FiFo_START::Get(fifo_cmd_id).FromValue(0).set_EN(1).WriteTo(&mmio_);
 
   // FIFO data configure and start.
   FiFo_CFG::Get(fifo_data_id).FromValue(0).set_BASE(base_data).WriteTo(&mmio_);
-  cell_CFG::Get(false, fifo_data_id)
-      .FromValue(0)
-      .set_DEPTH(channel_info_[channel_id].fifo_data_depth)
-      .WriteTo(&mmio_);
+  cell_CFG::Get(false, fifo_data_id).FromValue(0).set_DEPTH(kDepthData).WriteTo(&mmio_);
   FiFo_START::Get(fifo_data_id).FromValue(0).set_EN(1).WriteTo(&mmio_);
 
   // Channel configure and start.
