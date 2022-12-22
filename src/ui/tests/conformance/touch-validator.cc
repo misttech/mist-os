@@ -107,6 +107,7 @@ class TouchConformanceTest : public gtest::RealLoopFixture {
       FX_LOGS(INFO) << "Registering fake touch screen";
       fuchsia::ui::test::input::RegistryRegisterTouchScreenRequest request;
       request.set_device(fake_touch_screen_.NewRequest());
+      request.set_coordinate_unit(fuchsia::ui::test::input::CoordinateUnit::PHYSICAL_PIXELS);
       input_registry->RegisterTouchScreen(std::move(request), [this]() { QuitLoop(); });
       RunLoop();
     }
@@ -136,6 +137,9 @@ class TouchConformanceTest : public gtest::RealLoopFixture {
 };
 
 TEST_F(TouchConformanceTest, SimpleTap) {
+  const auto kTapX = 3 * display_width_as_int() / 4;
+  const auto kTapY = display_height_as_int() / 4;
+
   // Get root view token.
   //
   // Note that the test context will automatically present the view created
@@ -151,20 +155,26 @@ TEST_F(TouchConformanceTest, SimpleTap) {
 
   // Inject tap in the middle of the top-right quadrant.
   fuchsia::ui::test::input::TouchScreenSimulateTapRequest tap_request;
-  tap_request.mutable_tap_location()->x = 500;
-  tap_request.mutable_tap_location()->y = -500;
-  FX_LOGS(INFO) << "Injecting tap at (500, -500)";
+  tap_request.mutable_tap_location()->x = kTapX;
+  tap_request.mutable_tap_location()->y = kTapY;
+  FX_LOGS(INFO) << "Injecting tap at (" << kTapX << ", " << kTapY << ")";
   fake_touch_screen_->SimulateTap(std::move(tap_request));
 
   FX_LOGS(INFO) << "Waiting for touch event listener to receive response";
-  RunLoopUntil([this, &puppet]() {
-    return puppet.touch_listener.LastEventReceivedMatches(
-        static_cast<float>(display_width_) * 3.f / 4.f, static_cast<float>(display_height_) / 4.f);
+  RunLoopUntil([&puppet, kTapX, kTapY]() {
+    // The puppet's view matches the display dimensions exactly, and the device
+    // pixel ratio is 1. Therefore, the puppet's logical coordinate space will
+    // match the physical coordinate space, so we expect the puppet to report
+    // the event at (kTapX, kTapY).
+    return puppet.touch_listener.LastEventReceivedMatches(static_cast<float>(kTapX),
+                                                          static_cast<float>(kTapY));
   });
 }
 
 TEST_F(TouchConformanceTest, EmbeddedViewTap) {
   const uint64_t kChildViewportId = 1u;
+  const auto kTapX = 3 * display_width_as_int() / 4;
+  const auto kTapY = 3 * display_height_as_int() / 4;
 
   // Get root view token.
   //
@@ -199,9 +209,9 @@ TEST_F(TouchConformanceTest, EmbeddedViewTap) {
 
   // Inject tap in the middle of the bottom-right quadrant.
   fuchsia::ui::test::input::TouchScreenSimulateTapRequest tap_request;
-  tap_request.mutable_tap_location()->x = 500;
-  tap_request.mutable_tap_location()->y = 500;
-  FX_LOGS(INFO) << "Injecting tap at (500, 500)";
+  tap_request.mutable_tap_location()->x = kTapX;
+  tap_request.mutable_tap_location()->y = kTapY;
+  FX_LOGS(INFO) << "Injecting tap at (" << kTapX << ", " << kTapY << ")";
   fake_touch_screen_->SimulateTap(std::move(tap_request));
 
   FX_LOGS(INFO) << "Waiting for child touch event listener to receive response";
