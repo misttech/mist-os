@@ -41,4 +41,7 @@
 #define _LIBCPP_HAS_THREAD_API_EXTERNAL
 #define _LIBCPP_HAS_THREAD_LIBRARY_EXTERNAL
 
+// This tells <new> not to use `aligned_alloc` from <stdlib.h>.
+#define _LIBCPP_HAS_NO_C11_ALIGNED_ALLOC
+
 #endif  // ZIRCON_KERNEL_LIB_KTL_INCLUDE___CONFIG_SITE_
