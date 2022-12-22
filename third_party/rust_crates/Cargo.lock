@@ -1439,6 +1439,7 @@ dependencies = [
  "rustfix",
  "rustls",
  "rustls-native-certs",
+ "rustyline",
  "schemars",
  "scopeguard",
  "scrypt",
@@ -3543,6 +3544,19 @@ dependencies = [
  "quick-error 1.2.2",
  "tempfile",
  "wait-timeout",
+]
+
+[[package]]
+name = "rustyline"
+version = "2.1.0"
+dependencies = [
+ "libc",
+ "log",
+ "memchr",
+ "nix",
+ "unicode-segmentation",
+ "unicode-width",
+ "utf8parse",
 ]
 
 [[package]]

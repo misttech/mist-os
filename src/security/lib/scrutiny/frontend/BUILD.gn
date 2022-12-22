@@ -15,12 +15,12 @@ if (is_host) {
       "//src/security/lib/scrutiny/framework",
       "//src/security/lib/scrutiny/plugins",
       "//third_party/rust_crates:anyhow",
+      "//third_party/rust_crates:rustyline",
       "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:simplelog",
       "//third_party/rust_crates:termion",
       "//third_party/rust_crates:thiserror",
       "//third_party/rust_crates:tracing",
-      "//third_party/rust_crates/compat/rustyline",
     ]
 
     non_rust_deps = [ "//src/lib/chunked-compression" ]
