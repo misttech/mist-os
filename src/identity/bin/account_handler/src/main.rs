@@ -29,6 +29,7 @@ mod test_util;
 
 use {
     crate::{account_handler::AccountHandler, common::AccountLifetime},
+    account_common::AccountId,
     account_handler_structured_config::Config,
     anyhow::{Context as _, Error},
     fidl::endpoints::RequestStream,
@@ -52,7 +53,6 @@ use {
 };
 
 const DATA_DIR: &str = "/data";
-const ACCOUNT_LABEL: &str = "account";
 
 lazy_static! {
     static ref CONFIG: Config = Config::take_from_startup_handle();
@@ -102,12 +102,11 @@ fn get_dev_directory() -> fio::DirectoryProxy {
         .expect("open /dev root for disk manager")
 }
 
-fn get_storage_manager() -> StorageManagerEnum {
+fn get_storage_manager(account_id: &AccountId) -> StorageManagerEnum {
     match &*STORAGE_MANAGER_KIND {
         StorageManagerKind::Fxfs => StorageManagerEnum::Fxfs(FxfsStorageManager::new(
             FxfsStorageManagerArgs::builder()
-                // TODO(https://fxbug.dev/117284): Use the real account name.
-                .volume_label(ACCOUNT_LABEL.to_string())
+                .volume_label(account_id.to_canonical_string())
                 .filesystem_dir(get_dev_directory())
                 .build(),
         )),
@@ -155,7 +154,7 @@ fn main() -> Result<(), Error> {
         &inspector,
         CONFIG.is_interaction_enabled,
         get_available_mechanisms(),
-        Box::new(|_account_id| get_storage_manager()),
+        Box::new(get_storage_manager),
     ));
 
     let _lifecycle_task: fuchsia_async::Task<()> =

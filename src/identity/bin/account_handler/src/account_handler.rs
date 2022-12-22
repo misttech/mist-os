@@ -86,7 +86,7 @@ where
     /// An account has not yet been created or loaded.
     Uninitialized {
         /// A factory which produces storage managers for this account.
-        storage_manager_factory: Box<dyn Fn(AccountId) -> SM + Send + Sync>,
+        storage_manager_factory: Box<dyn Fn(&AccountId) -> SM + Send + Sync>,
     },
 
     /// The account is initialized, and is either locked or unlocked.
@@ -176,7 +176,7 @@ where
         inspector: &Inspector,
         is_interaction_enabled: bool,
         mechanisms: Vec<Mechanism>,
-        storage_manager_factory: Box<dyn Fn(AccountId) -> SM + Send + Sync>,
+        storage_manager_factory: Box<dyn Fn(&AccountId) -> SM + Send + Sync>,
     ) -> AccountHandler<SM> {
         let inspect = Arc::new(inspect::AccountHandler::new(inspector.root(), "uninitialized"));
         Self {
@@ -279,7 +279,7 @@ where
                     })?;
 
                 let storage_manager: Arc<Mutex<SM>> =
-                    Arc::new(Mutex::new((storage_manager_factory)(account_id)));
+                    Arc::new(Mutex::new((storage_manager_factory)(&account_id)));
 
                 let account: Account<SM> = Account::create(
                     self.lifetime.clone(),
@@ -335,7 +335,7 @@ where
                 self.inspect.set_account_id(*pre_auth_state.account_id());
 
                 let storage_manager =
-                    Arc::new(Mutex::new((storage_manager_factory)(*pre_auth_state.account_id())));
+                    Arc::new(Mutex::new((storage_manager_factory)(pre_auth_state.account_id())));
                 *state_lock = Lifecycle::Initialized {
                     lock_state: LockState::Locked,
                     pre_auth_state,
