@@ -50,14 +50,8 @@ void RendererShimImpl::SetPtsUnits(uint32_t ticks_per_second_numerator,
 }
 
 void RendererShimImpl::SetReferenceClock(TestFixture* fixture, const zx::clock& clock) {
-  if (clock.is_valid()) {
-    auto dup_result = ::media::audio::clock::DuplicateClock(clock);
-    ASSERT_TRUE(dup_result.is_ok());
-    fidl()->SetReferenceClock(dup_result.take_value());
-  } else {
-    fidl()->SetReferenceClock(zx::clock());
-  }
-
+  fidl()->SetReferenceClock(clock.is_valid() ? ::media::audio::clock::DuplicateClock(clock)
+                                             : zx::clock());
   RetrieveReferenceClock(fixture);
 }
 

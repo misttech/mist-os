@@ -54,9 +54,7 @@ class MixStageTest : public testing::ThreadingModelFixture {
 
   void SetUp() {
     zx::clock zx_device_clock = clock::CloneOfMonotonic();
-    auto clock_result = audio::clock::DuplicateClock(zx_device_clock);
-    ASSERT_TRUE(clock_result.is_ok());
-    zx::clock zx_clone_device_clock = clock_result.take_value();
+    zx::clock zx_clone_device_clock = audio::clock::DuplicateClock(zx_device_clock);
 
     device_clock_ = context().clock_factory()->CreateDeviceFixed(std::move(zx_device_clock),
                                                                  Clock::kMonotonicDomain);

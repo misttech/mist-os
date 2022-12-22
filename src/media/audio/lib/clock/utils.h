@@ -8,6 +8,7 @@
 #include <lib/affine/transform.h>
 #include <lib/fpromise/result.h>
 #include <lib/zx/clock.h>
+#include <zircon/rights.h>
 #include <zircon/types.h>
 
 #include <string>
@@ -28,7 +29,8 @@ struct ClockSnapshot {
 
 zx_koid_t GetKoid(const zx::clock& clock);
 
-fpromise::result<zx::clock, zx_status_t> DuplicateClock(const zx::clock& original_clock);
+zx::clock DuplicateClock(const zx::clock& clock, zx_rights_t rights = ZX_RIGHT_SAME_RIGHTS);
+
 fpromise::result<ClockSnapshot, zx_status_t> SnapshotClock(const zx::clock& ref_clock);
 
 fpromise::result<zx::time, zx_status_t> ReferenceTimeFromMonotonicTime(const zx::clock& ref_clock,

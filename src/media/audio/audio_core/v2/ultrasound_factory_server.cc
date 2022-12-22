@@ -9,25 +9,13 @@
 
 #include "src/media/audio/audio_core/v2/audio_capturer_server.h"
 #include "src/media/audio/audio_core/v2/audio_renderer_server.h"
+#include "src/media/audio/lib/clock/utils.h"
 
 namespace media_audio {
 
-namespace {
-
 using ::media::audio::CaptureUsage;
 using ::media::audio::RenderUsage;
-
-// TODO(fxbug.dev/98652): This code is duplicated in multiple places. Put a single copy in
-// src/media/audio/lib/clock
-zx::clock DupZxClockHandle(const zx::clock& in) {
-  zx::clock out;
-  if (auto status = in.duplicate(ZX_RIGHT_SAME_RIGHTS, &out); status != ZX_OK) {
-    FX_PLOGS(FATAL, status) << "zx::clock::duplicate failed";
-  }
-  return out;
-}
-
-}  // namespace
+using ::media::audio::clock::DuplicateClock;
 
 // static
 std::shared_ptr<UltrasoundFactoryServer> UltrasoundFactoryServer::Create(
@@ -49,7 +37,7 @@ void UltrasoundFactoryServer::CreateRenderer(CreateRendererRequestView request,
   creator_->CreateRenderer(
       std::move(request->renderer), RenderUsage::ULTRASOUND, renderer_format_,
       [format = renderer_format_, completer = completer.ToAsync()](const auto& clock) mutable {
-        completer.Reply(DupZxClockHandle(clock), format.ToLegacyMediaWireFidl());
+        completer.Reply(DuplicateClock(clock), format.ToLegacyMediaWireFidl());
       });
 }
 
@@ -66,7 +54,7 @@ void UltrasoundFactoryServer::CreateCapturer(CreateCapturerRequestView request,
   creator_->CreateCapturer(
       std::move(request->request), CaptureUsage::ULTRASOUND, capturer_format_,
       [format = capturer_format_, completer = completer.ToAsync()](const auto& clock) mutable {
-        completer.Reply(DupZxClockHandle(clock), format.ToLegacyMediaWireFidl());
+        completer.Reply(DuplicateClock(clock), format.ToLegacyMediaWireFidl());
       });
 }
 

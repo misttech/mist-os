@@ -523,9 +523,8 @@ class MicroSrcPipelineTest : public ClockSyncPipelineTest {
 
     // Now that the clock is adjusted, remove ZX_RIGHT_WRITE before sending it (AudioCore never
     // adjusts client-submitted clocks anyway, but this makes it truly impossible).
-    auto clock_result = audio::clock::DuplicateClock(ref_clock);
-    ASSERT_TRUE(clock_result.is_ok());
-    ref_clock = clock_result.take_value();
+    ref_clock = audio::clock::DuplicateClock(
+        ref_clock, ZX_RIGHT_DUPLICATE | ZX_RIGHT_TRANSFER | ZX_RIGHT_READ);
 
     // Buffer up to 2s of data.
     output_ = CreateOutput({{0xff, 0x00}}, format_, kPayloadFrames);

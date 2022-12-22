@@ -7,19 +7,11 @@
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include "src/media/audio/lib/clock/utils.h"
+
 namespace media_audio {
 
-namespace {
-
-zx::clock DupZxClockHandle(const zx::clock& in) {
-  zx::clock out;
-  if (auto status = in.duplicate(ZX_RIGHT_SAME_RIGHTS, &out); status != ZX_OK) {
-    FX_PLOGS(FATAL, status) << "zx::clock::duplicate failed";
-  }
-  return out;
-}
-
-}  // namespace
+using ::media::audio::clock::DuplicateClock;
 
 // static
 ReferenceClock ReferenceClock::FromMonotonic() {
@@ -40,7 +32,7 @@ ReferenceClock ReferenceClock::FromMonotonic() {
 // static
 ReferenceClock ReferenceClock::FromFidlRingBuffer(fuchsia_audio::wire::RingBuffer ring_buffer) {
   return {
-      .handle = DupZxClockHandle(ring_buffer.reference_clock()),
+      .handle = DuplicateClock(ring_buffer.reference_clock()),
       .domain = ring_buffer.has_reference_clock_domain()
                     ? ring_buffer.reference_clock_domain()
                     : fuchsia_hardware_audio::kClockDomainExternal,
@@ -50,19 +42,19 @@ ReferenceClock ReferenceClock::FromFidlRingBuffer(fuchsia_audio::wire::RingBuffe
 ReferenceClock ReferenceClock::Dup() const {
   return {
       .name = name,
-      .handle = DupZxClockHandle(handle),
+      .handle = DuplicateClock(handle),
       .domain = domain,
   };
 }
 
-zx::clock ReferenceClock::DupHandle() const { return DupZxClockHandle(handle); }
+zx::clock ReferenceClock::DupHandle() const { return DuplicateClock(handle); }
 
 fuchsia_audio_mixer::wire::ReferenceClock ReferenceClock::ToFidl(fidl::AnyArena& arena) const {
   auto builder = fuchsia_audio_mixer::wire::ReferenceClock::Builder(arena);
   if (!name.empty()) {
     builder.name(fidl::StringView(arena, name));
   }
-  builder.handle(DupZxClockHandle(handle));
+  builder.handle(DuplicateClock(handle));
   builder.domain(domain);
   return builder.Build();
 }

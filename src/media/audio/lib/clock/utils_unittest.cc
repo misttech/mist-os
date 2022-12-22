@@ -15,14 +15,6 @@
 namespace media::audio::clock {
 namespace {
 
-TEST(ClockUtilsTest, DuplicateBadClock) {
-  zx::clock uninitialized_clock;
-
-  auto bad_result = DuplicateClock(uninitialized_clock);
-  EXPECT_TRUE(bad_result.is_error());
-}
-
-// Immediately after duplication, the dupe clock has the same parameters
 TEST(ClockUtilsTest, DuplicateClockIsIdentical) {
   zx::clock ref_clock;
 
@@ -30,10 +22,7 @@ TEST(ClockUtilsTest, DuplicateClockIsIdentical) {
       zx::clock::create(ZX_CLOCK_OPT_MONOTONIC | ZX_CLOCK_OPT_CONTINUOUS, nullptr, &ref_clock);
   ASSERT_EQ(status, ZX_OK);
 
-  auto result = DuplicateClock(ref_clock);
-  EXPECT_TRUE(result.is_ok());
-  zx::clock dupe_clock = result.take_value();
-  EXPECT_TRUE(dupe_clock.is_valid());
+  zx::clock duplicate_clock = DuplicateClock(ref_clock);
 
   zx::clock::update_args args;
   args.reset().set_value(zx::time(123)).set_rate_adjust(-456);
@@ -41,7 +30,7 @@ TEST(ClockUtilsTest, DuplicateClockIsIdentical) {
 
   zx_clock_details_v1_t clock_details, clock_details_dupe;
   EXPECT_EQ(ref_clock.get_details(&clock_details), ZX_OK);
-  EXPECT_EQ(dupe_clock.get_details(&clock_details_dupe), ZX_OK);
+  EXPECT_EQ(duplicate_clock.get_details(&clock_details_dupe), ZX_OK);
 
   EXPECT_EQ(clock_details.options, clock_details_dupe.options);
   EXPECT_EQ(clock_details.last_value_update_ticks, clock_details_dupe.last_value_update_ticks);
@@ -59,74 +48,60 @@ TEST(ClockUtilsTest, DuplicateClockIsIdentical) {
             clock_details_dupe.mono_to_synthetic.rate.reference_ticks);
 }
 
-// The duplicate clock can be read
-TEST(ClockUtilsTest, DuplicateClockCanBeRead) {
+TEST(ClockUtilsTest, DuplicateClockReadable) {
   zx::clock ref_clock = audio::clock::CloneOfMonotonic();
   EXPECT_TRUE(ref_clock.is_valid());
 
   zx_time_t now;
   EXPECT_EQ(ref_clock.read(&now), ZX_OK);
 
-  auto result = DuplicateClock(ref_clock);
-  EXPECT_TRUE(result.is_ok());
-  zx::clock dupe_clock = result.take_value();
-  EXPECT_TRUE(dupe_clock.is_valid());
+  zx::clock duplicate_clock = DuplicateClock(ref_clock);
 
   zx_time_t now2;
-  EXPECT_EQ(dupe_clock.read(&now2), ZX_OK);
+  EXPECT_EQ(duplicate_clock.read(&now2), ZX_OK);
   EXPECT_GT(now2, now);
 }
 
-// The duplicate clock should not be adjustable.
-TEST(ClockUtilsTest, DuplicateClockCannotBeAdjusted) {
+TEST(ClockUtilsTest, DuplicateClockNotWritable) {
   zx::clock ref_clock;
   auto status =
       zx::clock::create(ZX_CLOCK_OPT_MONOTONIC | ZX_CLOCK_OPT_CONTINUOUS, nullptr, &ref_clock);
   EXPECT_EQ(status, ZX_OK);
 
-  // ref clock is not yet started
+  // Reference clock is not yet started.
   zx_time_t now;
   EXPECT_EQ(ref_clock.read(&now), ZX_OK);
   EXPECT_EQ(now, 0);
 
-  auto result = DuplicateClock(ref_clock);
-  EXPECT_TRUE(result.is_ok());
-  zx::clock dupe_clock = result.take_value();
-  EXPECT_TRUE(dupe_clock.is_valid());
+  // Remove writing right.
+  zx::clock duplicate_clock =
+      DuplicateClock(ref_clock, ZX_RIGHT_DUPLICATE | ZX_RIGHT_TRANSFER | ZX_RIGHT_READ);
 
   zx::clock::update_args args;
   args.reset().set_value(zx::clock::get_monotonic());
-  EXPECT_NE(dupe_clock.update(args), ZX_OK);
+  EXPECT_NE(duplicate_clock.update(args), ZX_OK);
 
-  // dupe is not yet started
-  EXPECT_EQ(dupe_clock.read(&now), ZX_OK);
+  // Duplicate clock is not yet started.
+  EXPECT_EQ(duplicate_clock.read(&now), ZX_OK);
   EXPECT_EQ(now, 0);
 
-  // ref can be updated
+  // Reference clock can be updated.
   EXPECT_EQ(ref_clock.update(args), ZX_OK);
 
-  // dupe is now started
-  EXPECT_EQ(dupe_clock.read(&now), ZX_OK);
+  // Duplicate clock is now started.
+  EXPECT_EQ(duplicate_clock.read(&now), ZX_OK);
   EXPECT_GT(now, 0);
 }
 
-// A duplicate clock can itself be further duplicated
 TEST(ClockUtilsTest, DuplicateClockCanBeDuplicated) {
   zx::clock ref_clock = audio::clock::CloneOfMonotonic();
   EXPECT_TRUE(ref_clock.is_valid());
 
-  auto result = DuplicateClock(ref_clock);
-  EXPECT_TRUE(result.is_ok());
-  zx::clock dupe_clock = result.take_value();
-  EXPECT_TRUE(dupe_clock.is_valid());
-
-  result = DuplicateClock(dupe_clock);
-  EXPECT_TRUE(result.is_ok());
-  zx::clock dupe_of_dupe_clock = result.take_value();
-  EXPECT_TRUE(dupe_of_dupe_clock.is_valid());
+  zx::clock duplicate_clock = DuplicateClock(ref_clock);
+  zx::clock duplicate_of_duplicate_clock = DuplicateClock(duplicate_clock);
 
   zx_time_t now;
-  EXPECT_EQ(dupe_of_dupe_clock.read(&now), ZX_OK);
+  EXPECT_EQ(duplicate_of_duplicate_clock.read(&now), ZX_OK);
   EXPECT_GT(now, 0);
 }
 

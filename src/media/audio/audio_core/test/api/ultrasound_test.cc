@@ -223,11 +223,7 @@ TEST_F(UltrasoundTest, RendererDoesNotSupportSetReferenceClock) {
 
   std::optional<zx_status_t> renderer_error;
   renderer->fidl().set_error_handler([&renderer_error](auto status) { renderer_error = {status}; });
-
-  auto clock_to_set_result = clock::DuplicateClock(renderer->reference_clock());
-  ASSERT_TRUE(clock_to_set_result.is_ok());
-
-  renderer->fidl()->SetReferenceClock(clock_to_set_result.take_value());
+  renderer->fidl()->SetReferenceClock(clock::DuplicateClock(renderer->reference_clock()));
 
   // Now expect we get disconnected with ZX_ERR_NOT_SUPPORTED.
   RunLoopUntil([&renderer_error] { return renderer_error.has_value(); });
@@ -319,12 +315,7 @@ TEST_F(UltrasoundTest, CapturerDoesNotSupportSetReferenceClock) {
 
   std::optional<zx_status_t> capturer_error;
   capturer->fidl().set_error_handler([&capturer_error](auto status) { capturer_error = {status}; });
-
-  auto result = clock::DuplicateClock(capturer->reference_clock());
-  ASSERT_TRUE(result.is_ok());
-  zx::clock clock_to_set = result.take_value();
-
-  capturer->fidl()->SetReferenceClock(std::move(clock_to_set));
+  capturer->fidl()->SetReferenceClock(clock::DuplicateClock(capturer->reference_clock()));
 
   // Now expect we get disconnected with ZX_ERR_NOT_SUPPORTED.
   RunLoopUntil([&capturer_error] { return capturer_error.has_value(); });

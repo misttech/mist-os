@@ -74,16 +74,10 @@ zx_koid_t GetKoid(const zx::clock& clock) {
   return basic_info.koid;
 }
 
-fpromise::result<zx::clock, zx_status_t> DuplicateClock(const zx::clock& original_clock) {
-  constexpr auto rights = ZX_RIGHT_DUPLICATE | ZX_RIGHT_TRANSFER | ZX_RIGHT_READ;
-
-  zx::clock dupe_clock;
-  auto status = original_clock.duplicate(rights, &dupe_clock);
-  if (status != ZX_OK) {
-    return fpromise::error(status);
-  }
-
-  return fpromise::ok(std::move(dupe_clock));
+zx::clock DuplicateClock(const zx::clock& clock, zx_rights_t rights) {
+  zx::clock duplicate_clock;
+  FX_CHECK(clock.duplicate(rights, &duplicate_clock) == ZX_OK);
+  return duplicate_clock;
 }
 
 fpromise::result<ClockSnapshot, zx_status_t> SnapshotClock(const zx::clock& ref_clock) {

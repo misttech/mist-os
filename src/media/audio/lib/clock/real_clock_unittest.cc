@@ -14,6 +14,7 @@
 #include <gtest/gtest.h>
 
 #include "src/media/audio/lib/clock/clone_mono.h"
+#include "src/media/audio/lib/clock/utils.h"
 
 namespace media_audio {
 namespace {
@@ -31,13 +32,6 @@ zx::clock NewClock(zx_rights_t rights = ZX_RIGHT_DUPLICATE | ZX_RIGHT_READ | ZX_
   FX_CHECK(status == ZX_OK) << "clock.replace failed, status is " << status;
 
   return clock;
-}
-
-zx::clock DupClock(const zx::clock& in_clock, zx_rights_t rights = ZX_RIGHT_SAME_RIGHTS) {
-  zx::clock out_clock;
-  auto status = in_clock.duplicate(rights, &out_clock);
-  FX_CHECK(status == ZX_OK) << "clock.duplicate failed, status is " << status;
-  return out_clock;
 }
 
 TEST(RealClockTest, CreateUnadjustable) {
@@ -74,7 +68,7 @@ TEST(RealClockTest, CreateAdjustableMonotonic) {
 
 TEST(RealClockTest, Koids) {
   auto c1 = NewClock();
-  auto c2 = DupClock(c1);
+  auto c2 = ::media::audio::clock::DuplicateClock(c1);
   auto c3 = NewClock();
 
   // Koids should match for duplicated clocks.
