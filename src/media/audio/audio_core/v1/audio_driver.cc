@@ -869,7 +869,6 @@ zx_status_t AudioDriver::Start() {
     SetupCommandTimeout();
     owner_->OnDriverStartComplete();
   });
-  SetupCommandTimeout();
   return ZX_OK;
 }
 
