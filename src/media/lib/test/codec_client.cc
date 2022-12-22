@@ -73,7 +73,7 @@ CodecClient::CodecClient(async::Loop* loop, thrd_t loop_thread,
       //
       // TODO(dustingreen): get and print epitaph once that's possible.
       if (!in_lax_mode_) {
-        ZX_PANIC("codec_ failed - !in_lax_mode_");
+        FX_PLOGS(FATAL, status) << "codec_ failed - !in_lax_mode_";
       } else {
         FX_PLOGS(WARNING, status) << "codec_ failed - in_lax_mode_";
         connection_lost_ = true;

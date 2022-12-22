@@ -29,7 +29,7 @@
     use: [
         {
             directory: "dev-gpu",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/gpu",
         },
         {

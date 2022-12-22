@@ -115,49 +115,60 @@ bool GptDevicePartitioner::FindGptDevices(const fbl::unique_fd& devfs_root, GptD
   constexpr char kBlockDevPath[] = "class/block/";
   fbl::unique_fd d_fd(openat(devfs_root.get(), kBlockDevPath, O_RDONLY));
   if (!d_fd) {
-    ERROR("Cannot inspect block devices\n");
+    ERROR("Cannot inspect block devices: %s\n", strerror(errno));
     return false;
   }
   DIR* d = fdopendir(d_fd.release());
   if (d == nullptr) {
-    ERROR("Cannot inspect block devices\n");
+    ERROR("Cannot inspect block devices: %s\n", strerror(errno));
     return false;
   }
-  const auto closer = fit::defer([&]() { closedir(d); });
+  const auto closer = fit::defer([d]() { closedir(d); });
 
   struct dirent* de;
   GptDevices found_devices;
   while ((de = readdir(d)) != nullptr) {
-    fbl::unique_fd fd(openat(dirfd(d), de->d_name, O_RDWR));
+    if (std::string_view{de->d_name} == ".") {
+      continue;
+    }
+    fbl::unique_fd fd(openat(dirfd(d), de->d_name, O_RDONLY));
     if (!fd) {
+      ERROR("Cannot open %s: %s\n", de->d_name, strerror(errno));
       continue;
     }
     fdio_cpp::FdioCaller caller(std::move(fd));
-
     {
       const fidl::WireResult result = fidl::WireCall(caller.borrow_as<block::Block>())->GetInfo();
       if (!result.ok()) {
+        ERROR("Cannot get block info from %s: %s\n", de->d_name,
+              result.FormatDescription().c_str());
         continue;
       }
       const fit::result response = result.value();
       if (response.is_error()) {
+        ERROR("Cannot get block info from %s: %s\n", de->d_name,
+              zx_status_get_string(response.error_value()));
         continue;
       }
       if (response.value()->info.flags & fuchsia_hardware_block::wire::Flag::kRemovable) {
         continue;
       }
     }
-    auto result = fidl::WireCall(caller.borrow_as<device::Controller>())->GetTopologicalPath();
-    if (result.status() != ZX_OK) {
+    const fidl::WireResult result =
+        fidl::WireCall(caller.borrow_as<device::Controller>())->GetTopologicalPath();
+    if (!result.ok()) {
+      ERROR("Cannot get topological path from %s: %s\n", de->d_name,
+            result.FormatDescription().c_str());
       continue;
     }
-    const auto& response = result.value();
+    const fit::result response = result.value();
     if (response.is_error()) {
+      ERROR("Cannot get topological path from %s: %s\n", de->d_name,
+            zx_status_get_string(response.error_value()));
       continue;
     }
 
-    std::string path_str(response.value()->path.data(),
-                         static_cast<size_t>(response.value()->path.size()));
+    std::string path_str(response.value()->path.get());
 
     // The GPT which will be a non-removable block device that isn't a partition or fvm created
     // partition itself.

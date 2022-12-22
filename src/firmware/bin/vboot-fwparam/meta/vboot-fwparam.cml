@@ -16,7 +16,7 @@
     use: [
         {
             directory: "dev-topological",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev",
         },
         { protocol: "fuchsia.nand.flashmap.Manager" },

@@ -12,7 +12,7 @@
     use: [
         {
             directory: "dev-class-display-controller",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/display-controller",
         },
         {

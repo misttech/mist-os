@@ -108,43 +108,32 @@
             to: "#chromium-tests",
         },
         {
-            directory: "dev-gpu",
-            from: "parent",
-            to: "#chromium-tests",
-            rights: [ "rw*" ],
-        },
-        {
-            directory: "dev-goldfish-address-space",
-            from: "parent",
-            to: "#chromium-tests",
-            rights: [ "rw*" ],
-        },
-        {
-            directory: "dev-goldfish-control",
-            from: "parent",
-            to: "#chromium-tests",
-            rights: [ "rw*" ],
-        },
-        {
-            directory: "dev-goldfish-pipe",
-            from: "parent",
-            to: "#chromium-tests",
-            rights: [ "rw*" ],
-        },
-        {
-            directory: "dev-goldfish-sync",
-            from: "parent",
-            to: "#chromium-tests",
-            rights: [ "rw*" ],
-        },
+            directory: [
+                "dev-gpu",
 
-        // Tests of the media system want to test against the real hardware
-        // TODO(fxbug.dev/83512): Remove when specialized test realms are ready.
-        {
-            directory: "dev-mediacodec",
+                // Tests of the media system want to test against the real hardware.
+                //
+                // TODO(fxbug.dev/83512): Remove when specialized test realms are ready.
+                "dev-mediacodec",
+            ],
             from: "parent",
             to: "#chromium-tests",
+
+            // TODO(https://fxbug.dev/110563): reduce this to r* once
+            // https://chromium-review.googlesource.com/c/chromium/src/+/4120894 is in
+            // chromium-release.
             rights: [ "rw*" ],
+        },
+        {
+            directory: [
+                "dev-goldfish-address-space",
+                "dev-goldfish-control",
+                "dev-goldfish-pipe",
+                "dev-goldfish-sync",
+            ],
+            from: "parent",
+            to: "#chromium-tests",
+            rights: [ "r*" ],
         },
         {
             directory: "root-ssl-certificates",

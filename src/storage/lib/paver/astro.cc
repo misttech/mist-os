@@ -108,7 +108,7 @@ zx::result<> AstroPartitioner::InitializeContext(const fbl::unique_fd& devfs_roo
         std::optional<sysconfig::SyncClient> client;
         if (auto status = zx::make_result(sysconfig::SyncClient::Create(devfs_root, &client));
             status.is_error()) {
-          ERROR("Failed to initialize context. %s\n", status.status_string());
+          ERROR("Failed to create sysconfig client. %s\n", status.status_string());
           return status.take_error();
         }
 

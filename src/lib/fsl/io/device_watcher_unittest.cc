@@ -38,7 +38,7 @@ TEST_F(DeviceWatcher, IgnoreDot) {
 
   auto request = dir_handle.NewRequest();
   async::PostTask(fs_loop.dispatcher(), [&, request = std::move(request)]() mutable {
-    vfs.Serve(empty_dir, request.TakeChannel(), fs::VnodeConnectionOptions::ReadWrite());
+    vfs.Serve(empty_dir, request.TakeChannel(), fs::VnodeConnectionOptions::ReadOnly());
   });
 
   fdio_ns_t* ns;

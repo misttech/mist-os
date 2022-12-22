@@ -202,7 +202,7 @@ static fbl::unique_fd OpenAcpiDevice() {
 
   while (true) {
     // Attempt to open the device.
-    fbl::unique_fd fd{open(kAcpiDevicePath, O_RDWR)};
+    fbl::unique_fd fd{open(kAcpiDevicePath, O_RDONLY)};
     if (fd.is_valid()) {
       return fd;
     }

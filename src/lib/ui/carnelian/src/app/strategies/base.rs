@@ -132,9 +132,13 @@ pub(crate) async fn create_app_strategy(
         ViewMode::Auto => {
             // Tries to open the display controller. If that fails, assume we want to run as hosted.
             let display_controller = if let Some(path) = first_display_device_path() {
-                DisplayController::open(&path, &app_config.virtcon_mode, &internal_sender)
-                    .await
-                    .ok()
+                DisplayController::open(
+                    path.to_str().unwrap(),
+                    &app_config.virtcon_mode,
+                    &internal_sender,
+                )
+                .await
+                .ok()
             } else {
                 None
             };

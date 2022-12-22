@@ -20,20 +20,17 @@
         {
             directory: "dev-topological",
 
-            // TODO(https://fxbug.dev/110563): make this read-only when clients
-            // have been updated.
+            // TODO(https://fxbug.dev/117725): change this to r* when that
+            // doesn't prevent the use of /dev/null.
             rights: [ "rw*" ],
-
-            // TODO(https://fxbug.dev/85030): make this /dev/sys; this is a
-            // prerequisite for changing the rights above to read-only for
-            // clients that use /dev/null or /dev/zero.
             path: "/dev",
         },
         {
             directory: "dev-class",
 
-            // TODO(https://fxbug.dev/110563): make this read-only when clients
-            // have been updated.
+            // TODO(https://fxbug.dev/110563): reduce this to r* once
+            // https://chromium-review.googlesource.com/c/chromium/src/+/4120894
+            // is in chromium-release.
             rights: [ "rw*" ],
             path: "/dev/class",
         },

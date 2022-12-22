@@ -6,6 +6,7 @@
 
 #include <fcntl.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <lib/component/incoming/cpp/service_client.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
@@ -36,16 +37,18 @@ void HardwareDisplayControllerProviderImpl::OpenController(
   const uint64_t id = ++last_id;
 
   std::unique_ptr<fsl::DeviceWatcher> watcher = fsl::DeviceWatcher::Create(
-      kDisplayDir, [id, holders = &holders_, request = std::move(request),
-                    callback = std::move(callback)](int dir_fd, std::string filename) mutable {
-        // Get display info.
-        std::string path = kDisplayDir + "/" + filename;
+      kDisplayDir,
+      [id, holders = &holders_, request = std::move(request), callback = std::move(callback)](
+          int dir_fd, const std::string& filename) mutable {
+        FX_LOGS(INFO) << "Found display controller at path: " << kDisplayDir << '/' << filename
+                      << '.';
 
-        FX_LOGS(INFO) << "Found display controller at path: " << path << ".";
-        fbl::unique_fd fd(open(path.c_str(), O_RDWR));
-        if (!fd.is_valid()) {
-          FX_LOGS(ERROR) << "Failed to open display_controller at path: " << path
-                         << " (errno: " << errno << " " << strerror(errno) << ")";
+        fdio_cpp::UnownedFdioCaller caller(dir_fd);
+        zx::result client =
+            component::ConnectAt<fuchsia_hardware_display::Provider>(caller.directory(), filename);
+        if (client.is_error()) {
+          FX_PLOGS(ERROR, client.error_value())
+              << "Failed to open display_controller at path: " << kDisplayDir << '/' << filename;
 
           // We could try to match the value of the C "errno" macro to the closest ZX error, but
           // this would give rise to many corner cases.  We never expect this to fail anyway, since
@@ -57,9 +60,8 @@ void HardwareDisplayControllerProviderImpl::OpenController(
         // TODO(fxbug.dev/57269): it would be nice to simply pass |callback| asynchronously into
         // OpenController(), rather than blocking on a synchronous call.  However, it is non-trivial
         // to do so, so for now we use a blocking call to proxy the request.
-        fdio_cpp::FdioCaller caller(std::move(fd));
         fidl::WireResult result =
-            fidl::WireCall(caller.borrow_as<fuchsia_hardware_display::Provider>())
+            fidl::WireCall(client.value())
                 ->OpenController(
                     fidl::ServerEnd<fuchsia_hardware_display::Controller>(request.TakeChannel()));
         if (!result.ok()) {

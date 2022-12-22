@@ -13,7 +13,7 @@
         },
         {
             directory: "dev-backlight",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/backlight",
         },
     ],

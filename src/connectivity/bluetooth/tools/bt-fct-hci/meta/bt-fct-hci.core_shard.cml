@@ -15,7 +15,7 @@
             from: "parent",
             as: "dev-class-bluetooth",
             to: "#bt-fct-hci",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             subdir: "bt-hci",
         },
     ],

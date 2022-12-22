@@ -438,7 +438,7 @@ zx_status_t FvmDestroy(std::string_view path) {
   if (!parent_fd) {
     return ZX_ERR_NOT_FOUND;
   }
-  fbl::unique_fd fvm_fd(open(driver_path.c_str(), O_RDWR));
+  fbl::unique_fd fvm_fd(open(driver_path.c_str(), O_RDONLY));
   if (!fvm_fd) {
     return ZX_ERR_NOT_FOUND;
   }
@@ -453,7 +453,7 @@ zx_status_t FvmDestroyWithDevfs(int devfs_root_fd, std::string_view relative_pat
   if (!parent_fd) {
     return ZX_ERR_NOT_FOUND;
   }
-  fbl::unique_fd fvm_fd(openat(devfs_root_fd, driver_path.c_str(), O_RDWR));
+  fbl::unique_fd fvm_fd(openat(devfs_root_fd, driver_path.c_str(), O_RDONLY));
   if (!fvm_fd) {
     return ZX_ERR_NOT_FOUND;
   }

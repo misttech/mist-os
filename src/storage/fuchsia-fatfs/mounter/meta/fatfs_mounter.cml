@@ -13,7 +13,7 @@
     use: [
         {
             directory: "dev-class-block",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/block",
         },
     ],

@@ -580,7 +580,7 @@
             directory: "dev-display-controller",
             from: "parent",
             to: [ "#system-tests" ],
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
 
         // Some non-hermetic tests require access to the GPU and vulkan
@@ -588,25 +588,25 @@
             directory: "dev-goldfish-address-space",
             from: "parent",
             to: [ "#system-tests" ],
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
         {
             directory: "dev-goldfish-control",
             from: "parent",
             to: [ "#system-tests" ],
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
         {
             directory: "dev-goldfish-pipe",
             from: "parent",
             to: [ "#system-tests" ],
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
         {
             directory: "dev-goldfish-sync",
             from: "parent",
             to: [ "#system-tests" ],
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
         {
             directory: "dev-gpu",
@@ -616,13 +616,13 @@
                 "#starnix_test_runners",
                 "#system-tests",
             ],
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
         {
             directory: "dev-gpu-performance-counters",
             from: "parent",
             to: [ "#system-tests" ],
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
 
         // audio_driver_tests requires access to audio input and output.
@@ -640,7 +640,7 @@
             directory: "dev-tee",
             from: "parent",
             to: [ "#system-tests" ],
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
 
         // Tests of the media system want to test against the real hardware
@@ -649,19 +649,19 @@
             directory: "dev-mediacodec",
             from: "parent",
             to: [ "#system-tests" ],
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
         {
             directory: "dev-sysmem",
             from: "parent",
             to: [ "#system-tests" ],
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
         {
             directory: "dev-securemem",
             from: "parent",
             to: [ "#system-tests" ],
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
         {
             directory: "boot",

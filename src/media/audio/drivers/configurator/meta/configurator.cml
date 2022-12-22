@@ -26,12 +26,12 @@
         },
         {
             directory: "dev-codec",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/codec",
         },
         {
             directory: "dev-dai",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/dai",
         },
     ],

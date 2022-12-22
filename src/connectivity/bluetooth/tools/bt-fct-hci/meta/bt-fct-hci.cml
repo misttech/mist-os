@@ -10,7 +10,7 @@
     use: [
         {
             directory: "dev-class-bluetooth",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/bt-hci",
         },
     ],

@@ -118,7 +118,7 @@ zx_status_t CheckIfAstro(const fbl::unique_fd& devfs_root) {
   // from a file descriptor to /dev created from a sandbox component is invalid, since /dev is not
   // part of its flat namespace. Here we use `openat` and only borrow the channel later, when it's
   // guaranteed to be backed by a remote service.
-  fbl::unique_fd platform_fd(openat(devfs_root.get(), "sys/platform", O_RDWR));
+  fbl::unique_fd platform_fd(openat(devfs_root.get(), "sys/platform", O_RDONLY));
   if (!platform_fd) {
     return ZX_ERR_IO;
   }
@@ -132,7 +132,7 @@ zx_status_t CheckIfAstro(const fbl::unique_fd& devfs_root) {
   if (status != ZX_OK) {
     return status;
   }
-  if (strncmp(result.value().name.data(), "astro", result.value().name.size()) == 0) {
+  if (result.value().name.get() == "astro") {
     return ZX_OK;
   }
 

@@ -16,12 +16,12 @@
         },
         {
             directory: "dev-class-block",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/block",
         },
         {
             directory: "dev-sys-platform",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/sys/platform",
         },
         {

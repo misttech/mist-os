@@ -33,7 +33,7 @@
         },
         {
             directory: "dev-display-controller",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/display-controller",
         },
     ],

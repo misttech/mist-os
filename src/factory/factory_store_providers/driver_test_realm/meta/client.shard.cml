@@ -13,7 +13,7 @@
         {
             directory: "dev-topological",
             from: "#factory_driver_test_realm",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev",
         },
     ],

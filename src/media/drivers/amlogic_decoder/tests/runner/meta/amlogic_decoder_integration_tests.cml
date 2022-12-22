@@ -19,7 +19,7 @@
             // we can't use dev-class here because test also uses the
             // topological path to open the device's parent.
             directory: "dev-topological",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev",
         },
         {

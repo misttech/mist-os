@@ -51,19 +51,19 @@
             directory: "dev-sysmem",
             from: "parent",
             to: "#drm-tests",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
         {
             directory: "dev-securemem",
             from: "parent",
             to: "#drm-tests",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
         {
             directory: "dev-tee",
             from: "parent",
             to: "#drm-tests",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
         {
             directory: "boot",

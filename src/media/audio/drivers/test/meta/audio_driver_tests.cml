@@ -19,12 +19,12 @@
         },
         {
             directory: "dev-audio-input",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/audio-input",
         },
         {
             directory: "dev-audio-output",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/audio-output",
         },
     ],

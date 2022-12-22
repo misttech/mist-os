@@ -28,7 +28,7 @@
         // For block and skip-block device access.
         {
             directory: "dev-topological",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev",
         },
         {

@@ -13,7 +13,7 @@
     use: [
         {
             directory: "dev-adb",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/adb",
         },
         {

@@ -33,7 +33,7 @@
         // the root of the device topology.
         {
             directory: "dev-topological",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev",
         },
     ],

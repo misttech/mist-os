@@ -10,15 +10,13 @@
         runner: "elf",
         binary: "bin/tpm_agent",
     },
-    capabilities: [
-    ],
+    capabilities: [],
     use: [
         {
             directory: "dev-class-tpm",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/tpm",
         },
     ],
-    expose: [
-    ],
+    expose: [],
 }

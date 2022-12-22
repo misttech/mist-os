@@ -17,7 +17,7 @@
     use: [
         {
             directory: "dev-class-tpm",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/tpm",
         },
         { protocol: "fuchsia.power.button.Monitor" },

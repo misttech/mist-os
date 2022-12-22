@@ -103,7 +103,7 @@
             ],
             from: "parent",
             to: "#system-validation-tests",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
         {
             storage: [

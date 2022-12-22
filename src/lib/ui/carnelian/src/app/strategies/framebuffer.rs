@@ -22,7 +22,7 @@ use async_trait::async_trait;
 use euclid::size2;
 use fidl::endpoints::{self};
 use fidl_fuchsia_hardware_display::{
-    ControllerEvent, ControllerMarker, ControllerProxy, ProviderSynchronousProxy, VirtconMode,
+    ControllerEvent, ControllerMarker, ControllerProxy, ProviderMarker, VirtconMode,
 };
 use fidl_fuchsia_input_report as hid_input_report;
 use fidl_fuchsia_ui_scenic::ScenicProxy;
@@ -35,7 +35,7 @@ use keymaps::Keymap;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
-    fs::{self, OpenOptions},
+    fs,
     path::{Path, PathBuf},
     rc::Rc,
 };
@@ -142,30 +142,25 @@ pub struct DisplayController {
 }
 
 impl DisplayController {
-    pub(crate) async fn open<P: AsRef<Path> + Debug>(
-        path: P,
+    pub(crate) async fn open(
+        path: &str,
         virtcon_mode: &Option<VirtconMode>,
         app_sender: &UnboundedSender<MessageInternal>,
     ) -> Result<Self, Error> {
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(path)
-            .context("while opening device file")?;
-        let channel = fdio::clone_channel(&file).context("while cloning channel")?;
-        let provider = ProviderSynchronousProxy::new(channel);
-        let (dc_client, dc_server) = endpoints::create_endpoints::<ControllerMarker>()?;
+        let provider =
+            fuchsia_component::client::connect_to_protocol_at_path::<ProviderMarker>(path)
+                .context("while opening device file")?;
+        let (controller, server) = endpoints::create_proxy::<ControllerMarker>()?;
         let status = if virtcon_mode.is_some() {
-            provider.open_virtcon_controller(dc_server, zx::Time::INFINITE)
+            provider.open_virtcon_controller(server).await
         } else {
-            provider.open_controller(dc_server, zx::Time::INFINITE)
+            provider.open_controller(server).await
         }?;
         ensure!(
             status == zx::sys::ZX_OK,
             "Failed to open display controller {}",
             Status::from_raw(status)
         );
-        let controller = dc_client.into_proxy()?;
 
         if let Some(virtcon_mode) = virtcon_mode {
             controller.set_virtcon_mode(*virtcon_mode as u8)?;
@@ -379,7 +374,7 @@ impl<'a> AppStrategy for DisplayDirectAppStrategy<'a> {
     async fn handle_new_display_controller(&mut self, display_path: PathBuf) {
         if self.display_controller.is_none() {
             let display_controller = DisplayController::open(
-                &display_path,
+                display_path.to_str().unwrap(),
                 &Config::get().virtcon_mode,
                 &self.app_sender,
             )
