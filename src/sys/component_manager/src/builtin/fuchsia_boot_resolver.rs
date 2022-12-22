@@ -11,8 +11,8 @@ use {
     anyhow::{format_err, Error},
     async_trait::async_trait,
     fidl::endpoints::{ClientEnd, Proxy},
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_component_abi as fabi, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
     fuchsia_pkg::PackagePath,
     fuchsia_url::{boot_url::BootUrl, PackageName, PackageVariant},
     futures::TryStreamExt,
@@ -23,6 +23,7 @@ use {
     std::str::FromStr,
     std::sync::Arc,
     system_image::{Bootfs, PathHashMapping},
+    version_history::AbiRevision,
 };
 
 pub static SCHEME: &str = "fuchsia-boot";
@@ -102,7 +103,7 @@ impl FuchsiaBootResolver {
         )
         .map_err(|_| fresolution::ResolverError::Internal)?;
 
-        self.construct_component(path_proxy, boot_url).await
+        self.construct_component(path_proxy, boot_url, None).await
     }
 
     async fn resolve_packaged_component(
@@ -116,8 +117,11 @@ impl FuchsiaBootResolver {
             Some(boot_package_resolver) => {
                 let package_dir_proxy =
                     boot_package_resolver.setup_package_dir(canonicalized_package_path).await?;
-
-                self.construct_component(package_dir_proxy, boot_url).await
+                // TODO(97517): when all bootfs components are packaged, abi_revision setting can be moved
+                // into `construct_component()`.
+                let abi_revision =
+                    fabi::read_abi_revision_optional(&package_dir_proxy, AbiRevision::PATH).await?;
+                self.construct_component(package_dir_proxy, boot_url, abi_revision).await
             }
             _ => {
                 tracing::warn!(
@@ -132,6 +136,7 @@ impl FuchsiaBootResolver {
         &self,
         proxy: fio::DirectoryProxy,
         boot_url: BootUrl,
+        abi_revision: Option<u64>,
     ) -> Result<fresolution::Component, fresolution::ResolverError> {
         let manifest = boot_url.resource().ok_or(fresolution::ResolverError::InvalidArgs)?;
 
@@ -166,7 +171,6 @@ impl FuchsiaBootResolver {
         } else {
             None
         };
-
         Ok(fresolution::Component {
             url: Some(boot_url.to_string().into()),
             resolution_context: None,
@@ -178,6 +182,7 @@ impl FuchsiaBootResolver {
                 ..fresolution::Package::EMPTY
             }),
             config_values,
+            abi_revision,
             ..fresolution::Component::EMPTY
         })
     }

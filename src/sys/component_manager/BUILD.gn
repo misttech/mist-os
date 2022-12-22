@@ -57,6 +57,7 @@ template("component_manager") {
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/cm_types",
     "//src/sys/lib/config_encoder",
+    "//src/sys/lib/fidl-fuchsia-component-abi",
     "//src/sys/lib/fuchsia-bootfs",
     "//src/sys/lib/fuchsia-zbi",
     "//src/sys/lib/mem_util",
