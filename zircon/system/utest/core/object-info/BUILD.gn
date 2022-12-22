@@ -14,6 +14,7 @@ source_set("object-info") {
     "vmar-object-info-test.cc",
   ]
   deps = [
+    "//sdk/lib/stdcompat",
     "//src/zircon/testing/maybe-standalone-test",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/mini-process",

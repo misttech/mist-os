@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/maybe-standalone-test/maybe-standalone.h>
+#include <lib/stdcompat/span.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/job.h>
 #include <lib/zx/pager.h>
@@ -15,7 +16,6 @@
 
 #include <zxtest/zxtest.h>
 
-namespace object_info_test {
 namespace {
 
 class KernelStatsGetInfoTest : public zxtest::Test {
@@ -23,6 +23,27 @@ class KernelStatsGetInfoTest : public zxtest::Test {
   void SetUp() override {
     root_resource_ = maybe_standalone::GetRootResource();
     num_cpus_ = zx_system_get_num_cpus();
+  }
+
+  // This is used on array-based info topics whose number of elements is
+  // constant after boot. It verifies the array-size sampling and buffer
+  // management behavior of zx_object_get_info.
+  template <zx_object_info_topic_t Topic, typename ElementType>
+  void TestArraySize() {
+    size_t probe_actual_records = -1, probe_avail_records = 0;
+    ASSERT_OK(zx_object_get_info(root_resource_->get(), Topic, nullptr, 0, &probe_actual_records,
+                                 &probe_avail_records));
+    EXPECT_EQ(probe_actual_records, 0u);
+    EXPECT_GT(probe_avail_records, 0u);
+
+    std::vector<ElementType> records(probe_avail_records);
+    ASSERT_EQ(records.size(), probe_avail_records);
+    cpp20::span buffer = records;
+    size_t actual_records, avail_records;
+    ASSERT_OK(zx_object_get_info(root_resource_->get(), Topic, buffer.data(), buffer.size_bytes(),
+                                 &actual_records, &avail_records));
+    EXPECT_EQ(avail_records, probe_avail_records);
+    EXPECT_EQ(actual_records, probe_avail_records);
   }
 
  protected:
@@ -324,5 +345,22 @@ TEST_F(KernelStatsGetInfoTest, CpuStatsNullBuffer) {
   EXPECT_EQ(avail, num_cpus_);
 }
 
+TEST_F(KernelStatsGetInfoTest, CpuStatsArraySize) {
+  if (!root_resource_->is_valid()) {
+    printf("Root resource not available, skipping\n");
+    return;
+  }
+
+  TestArraySize<ZX_INFO_CPU_STATS, zx_info_cpu_stats_t>();
+}
+
+TEST_F(KernelStatsGetInfoTest, GuestStatsArraySize) {
+  if (!root_resource_->is_valid()) {
+    printf("Root resource not available, skipping\n");
+    return;
+  }
+
+  TestArraySize<ZX_INFO_GUEST_STATS, zx_info_guest_stats_t>();
+}
+
 }  // namespace
-}  // namespace object_info_test

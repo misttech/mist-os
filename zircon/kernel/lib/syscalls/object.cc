@@ -558,7 +558,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
         return status;
 
       size_t num_cpus = arch_max_num_cpus();
-      size_t num_space_for = buffer_size / sizeof(zx_info_cpu_stats_t);
+      size_t num_space_for = buffer_size / sizeof(zx_info_guest_stats_t);
       size_t num_to_copy = ktl::min(num_cpus, num_space_for);
 
       user_out_ptr<zx_info_guest_stats_t> guest_buf = _buffer.reinterpret<zx_info_guest_stats_t>();
