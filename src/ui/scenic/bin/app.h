@@ -142,7 +142,7 @@ class App {
   std::shared_ptr<flatland::DisplayCompositor> flatland_compositor_;
   std::shared_ptr<flatland::Engine> flatland_engine_;
 
-  std::unique_ptr<display::ColorConverterImpl> color_converter_;
+  display::ColorConverter color_converter_;
 
   std::shared_ptr<TemporaryFrameRendererDelegator> frame_renderer_;
 

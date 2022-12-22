@@ -9,24 +9,34 @@
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/component_context.h>
 
-#include <sdk/lib/syslog/cpp/macros.h>
+namespace scenic_impl::display {
 
-namespace scenic_impl {
-namespace display {
+using SetColorConversionFunc = fit::function<void(const std::array<float, 9>& coefficients,
+                                                  const std::array<float, 3>& preoffsets,
+                                                  const std::array<float, 3>& postoffsets)>;
+using SetMinimumRgbFunc = fit::function<void(uint8_t minimum_rgb)>;
 
-// Backend for the ColorConverter FIDL interface. This class is just an abstract
-// class, since we have multiple implementations for GFX and Flatland.
-class ColorConverterImpl : public fuchsia::ui::display::color::Converter {
- protected:
-  ColorConverterImpl(sys::ComponentContext* app_context) {
-    FX_DCHECK(app_context);
-    app_context->outgoing()->AddPublicService(bindings_.GetHandler(this));
-  }
+// Backend for the ColorConverter FIDL interface.
+class ColorConverter : public fuchsia::ui::display::color::Converter {
+ public:
+  ColorConverter(sys::ComponentContext* app_context,
+                 SetColorConversionFunc set_color_conversion_values,
+                 SetMinimumRgbFunc set_minimum_rgb);
 
+  // |fuchsia.ui.display.color.Converter|
+  void SetValues(fuchsia::ui::display::color::ConversionProperties properties,
+                 SetValuesCallback callback) override;
+
+  // |fuchsia.ui.display.color.Converter|
+  void SetMinimumRgb(uint8_t minimum_rgb, SetMinimumRgbCallback callback) override;
+
+ private:
   fidl::BindingSet<fuchsia::ui::display::color::Converter> bindings_;
+
+  const SetColorConversionFunc set_color_conversion_values_;
+  const SetMinimumRgbFunc set_minimum_rgb_;
 };
 
-}  // namespace display
-}  // namespace scenic_impl
+}  // namespace scenic_impl::display
 
 #endif  //  SRC_UI_SCENIC_LIB_DISPLAY_COLOR_CONVERTER_H_

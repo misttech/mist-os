@@ -59,8 +59,6 @@ source_set("gfx") {
     "engine/annotation_manager.h",
     "engine/buffer_collection.cc",
     "engine/buffer_collection.h",
-    "engine/color_converter.cc",
-    "engine/color_converter.h",
     "engine/engine.cc",
     "engine/engine.h",
     "engine/engine_renderer.cc",
@@ -218,7 +216,6 @@ source_set("gfx") {
     # TODO(fxbug.dev/44143): Gfx should not depend on Input.
     "//sdk/fidl/fuchsia.math:fuchsia.math_hlcpp",
     "//sdk/fidl/fuchsia.ui.annotation:fuchsia.ui.annotation_hlcpp",
-    "//sdk/fidl/fuchsia.ui.display.color:fuchsia.ui.display.color_hlcpp",
     "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
     "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_hlcpp",
     "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",

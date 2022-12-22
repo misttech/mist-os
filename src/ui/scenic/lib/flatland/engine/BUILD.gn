@@ -24,8 +24,6 @@ template("engine_library") {
     sources = [
       "color_conversion_state_machine.cc",
       "color_conversion_state_machine.h",
-      "color_converter.cc",
-      "color_converter.h",
       "display_compositor.cc",
       "display_compositor.h",
       "engine.cc",
@@ -38,7 +36,6 @@ template("engine_library") {
 
     public_deps = [
       "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_hlcpp",
-      "//sdk/fidl/fuchsia.ui.display.color:fuchsia.ui.display.color_hlcpp",
       "//sdk/lib/sys/inspect/cpp",
       "//src/lib/fxl",
       "//src/ui/scenic/lib/display",

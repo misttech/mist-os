@@ -14,12 +14,11 @@
 #include "rapidjson/document.h"
 #include "src/lib/files/file.h"
 #include "src/ui/lib/escher/vk/pipeline_builder.h"
+#include "src/ui/scenic/lib/display/color_converter.h"
 #include "src/ui/scenic/lib/display/display_power_manager.h"
-#include "src/ui/scenic/lib/flatland/engine/color_converter.h"
 #include "src/ui/scenic/lib/flatland/engine/engine_types.h"
 #include "src/ui/scenic/lib/flatland/renderer/vk_renderer.h"
 #include "src/ui/scenic/lib/gfx/api/internal_snapshot_impl.h"
-#include "src/ui/scenic/lib/gfx/engine/color_converter.h"
 #include "src/ui/scenic/lib/gfx/gfx_system.h"
 #include "src/ui/scenic/lib/gfx/screenshotter.h"
 #include "src/ui/scenic/lib/scheduling/frame_metrics_registry.cb.h"
@@ -257,6 +256,45 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
           std::make_shared<flatland::LinkSystem>(uber_struct_system_->GetNextInstanceId())),
       flatland_presenter_(std::make_shared<flatland::FlatlandPresenterImpl>(
           async_get_default_dispatcher(), frame_scheduler_)),
+      color_converter_(app_context_.get(),
+                       /*set_color_conversion_values*/
+                       config_values_.i_can_haz_flatland
+                           ? display::SetColorConversionFunc([this](const auto& coefficients,
+                                                                    const auto& preoffsets,
+                                                                    const auto& postoffsets) {
+                               FX_DCHECK(flatland_compositor_);
+                               flatland_compositor_->SetColorConversionValues(
+                                   coefficients, preoffsets, postoffsets);
+                             })
+                           : display::SetColorConversionFunc([this](const auto& coefficients,
+                                                                    const auto& preoffsets,
+                                                                    const auto& postoffsets) {
+                               FX_DCHECK(engine_);
+                               for (auto compositor : engine_->scene_graph()->compositors()) {
+                                 if (auto swapchain = compositor->swapchain()) {
+                                   const bool success = swapchain->SetDisplayColorConversion(
+                                       {.preoffsets = preoffsets,
+                                        .matrix = coefficients,
+                                        .postoffsets = postoffsets});
+                                   FX_DCHECK(success);
+                                 }
+                               }
+                             }),
+                       /*set_minimum_rgb*/
+                       config_values_.i_can_haz_flatland
+                           ? display::SetMinimumRgbFunc([this](const uint8_t minimum_rgb) {
+                               FX_DCHECK(flatland_compositor_);
+                               flatland_compositor_->SetMinimumRgb(minimum_rgb);
+                             })
+                           : display::SetMinimumRgbFunc([this](const uint8_t minimum_rgb) {
+                               FX_DCHECK(engine_);
+                               for (auto compositor : engine_->scene_graph()->compositors()) {
+                                 if (auto swapchain = compositor->swapchain()) {
+                                   const bool success = swapchain->SetMinimumRgb(minimum_rgb);
+                                   FX_DCHECK(success);
+                                 }
+                               }
+                             })),
       annotation_registry_(app_context_.get()),
       lifecycle_controller_impl_(app_context_.get(),
                                  std::weak_ptr<ShutdownManager>(shutdown_manager_)) {
@@ -417,11 +455,6 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     TRACE_DURATION("gfx", "App::InitializeServices[engine]");
     engine_ = std::make_shared<gfx::Engine>(escher_->GetWeakPtr(), gfx_buffer_collection_importer,
                                             inspect_node_.CreateChild("Engine"));
-
-    if (!config_values_.i_can_haz_flatland) {
-      color_converter_ =
-          std::make_unique<gfx::ColorConverter>(app_context_.get(), engine_->scene_graph());
-    }
   }
 
   annotation_registry_.InitializeWithGfxAnnotationManager(engine_->annotation_manager());
@@ -548,11 +581,6 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
           return display ? std::optional<flatland::TransformHandle>(display->root_transform())
                          : std::nullopt;
         });
-
-    if (config_values_.i_can_haz_flatland) {
-      color_converter_ =
-          std::make_unique<flatland::ColorConverter>(app_context_.get(), flatland_compositor_);
-    }
 
     frame_renderer_ = std::make_shared<TemporaryFrameRendererDelegator>(flatland_manager_,
                                                                         flatland_engine_, engine_);
