@@ -157,9 +157,9 @@ void OtRadioDevice::LowpanSpinelDeviceFidlImpl::ReadyToReceiveFrames(
   if (ot_radio_obj_.inbound_allowance_ > 0 && ot_radio_obj_.spinel_framer_.get()) {
     ot_radio_obj_.spinel_framer_->SetInboundAllowanceStatus(true);
     ot_radio_obj_.ReadRadioPacket();
-    if (ot_radio_obj_.interrupt_asserted_and_pending_) {
-      ot_radio_obj_.interrupt_asserted_and_pending_ = false;
-      // signal the event loop thread to handle interrupt
+    if (ot_radio_obj_.spinel_framer_->IsPacketPresent()) {
+      // there is a frame available in the spinel framer
+      // signal the event loop thread to handle the processing of that frame
       ot_radio_obj_.InvokeInterruptHandler();
     }
   }
@@ -217,7 +217,7 @@ zx_status_t OtRadioDevice::Init() {
     return status;
   }
 
-  status = gpio_[OT_RADIO_INT_PIN].GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW, &interrupt_);
+  status = gpio_[OT_RADIO_INT_PIN].GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_LOW, &interrupt_);
 
   if (status != ZX_OK) {
     zxlogf(ERROR, "ot-radio %s: failed to get interrupt", __func__);
@@ -490,41 +490,14 @@ zx_status_t OtRadioDevice::RadioThread() {
     if (packet.key == PORT_KEY_EXIT_THREAD) {
       break;
     } else if (packet.key == PORT_KEY_RADIO_IRQ) {
-      interrupt_.ack();
-
-      if (!IsInterruptAsserted()) {
-        // Interrupt is deasserted. This means we took care of the trigger for interrupt
-        // event on port (which is edge triggered as of now) in previous inner loop.
-        zxlogf(DEBUG, "ot-radio: spurious interrupt");
-        continue;
-      }
-
       zxlogf(DEBUG, "ot-radio: interrupt");
-      uint16_t polling_count = 0;
-      const uint16_t kMaxNonDelayPollingCount = 5;
-      bool interrupt_asserted;
-      do {
-        spinel_framer_->HandleInterrupt();
-        ReadRadioPacket();
-
-        polling_count++;
-        if (!inbound_frame_available_ && polling_count > kMaxNonDelayPollingCount) {
-          zxlogf(DEBUG, "ot-radio: new packet unavailable, sleeping");
-          zx::nanosleep(zx::deadline_after(zx::msec(kRcpBusyPollingDelayMs)));
-        }
-
-        HandleResetRetry();
-
-        interrupt_asserted = IsInterruptAsserted();
-      } while (interrupt_asserted && inbound_allowance_ != 0);
-
-      if (interrupt_asserted) {
-        // This indicates that inbound_allowance_ went to 0.
-        // Set the shared flag to indicate to other thread to InvokeInterrupt when
-        // we get allowance. This is done conditionally to avoid cost of setting
-        // an atomic variable.
-        interrupt_asserted_and_pending_ = true;
-      }
+      // Since we are using level based interrupt triggering, after handling the interrupt
+      // and re-enable it, if there are more frames available in SPI, another packet will
+      // be queued to `port_` to let this loop keeps polling the frames.
+      spinel_framer_->HandleInterrupt();
+      ReadRadioPacket();
+      HandleResetRetry();
+      interrupt_.ack();
     } else if (packet.key == PORT_KEY_TX_TO_RADIO) {
       fbl::AutoLock lock(&spi_tx_lock_);
       if (spi_tx_queue_.size() > 0) {
