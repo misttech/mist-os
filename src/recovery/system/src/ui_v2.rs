@@ -12,18 +12,26 @@ use fidl_fuchsia_recovery_ui as frui;
 use fuchsia_async as fasync;
 use futures::TryStreamExt;
 use ota_lib::OtaComponent;
-use recovery_ui::{font, proxy_view_assistant::ProxyViewAssistant};
+use recovery_ui::proxy_view_assistant::ProxyViewAssistant;
+use recovery_ui::screens::Screens;
 use recovery_ui_config::Config as UiConfig;
 use recovery_util::crash::{CrashReportBuilder, CrashReporter};
+use recovery_util::ota::action::Action;
 use recovery_util::ota::controller::{Controller, ControllerImpl, SendEvent};
 use recovery_util::ota::state_machine::{Event, OtaStatus, State, StateMachine};
 use std::rc::Rc;
 use std::sync::Arc;
 
 #[cfg(feature = "debug_console")]
-use recovery_ui::console::ConsoleViewAssistant;
-use recovery_ui::screens::Screens;
-use recovery_util::ota::action::Action;
+use {
+    carnelian::{make_message, MessageTarget},
+    futures::channel::mpsc::{self, Sender},
+    futures::StreamExt,
+    ota_lib::{OtaLogListener, OtaLogListenerImpl},
+    recovery_ui::console::{ConsoleMessages, ConsoleViewAssistant},
+    recovery_ui::font,
+    recovery_util::ota::controller::EventSender,
+};
 
 struct RecoveryAppAssistant {
     app_sender: AppSender,
@@ -87,6 +95,58 @@ impl RecoveryAppAssistant {
     }
 }
 
+#[cfg(feature = "debug_console")]
+impl RecoveryAppAssistant {
+    fn setup_event_logging_observer(&self, view_key: ViewKey) -> Sender<Event> {
+        let app_sender = self.app_sender.clone();
+        let view_key = view_key.clone();
+        let (observer_sender, mut observer_receiver) = mpsc::channel::<Event>(10);
+
+        fasync::Task::local(async move {
+            loop {
+                match observer_receiver.next().await {
+                    Some(Event::DebugLog(msg)) => {
+                        app_sender.queue_message(
+                            MessageTarget::View(view_key),
+                            make_message(ConsoleMessages::AddText(msg)),
+                        );
+                    }
+                    Some(Event::Error(msg)) => {
+                        app_sender.queue_message(
+                            MessageTarget::View(view_key),
+                            make_message(ConsoleMessages::AddText(format!("Error: {}", msg))),
+                        );
+                    }
+                    _ => (), // Ignore other Events
+                }
+            }
+        })
+        .detach();
+        observer_sender
+    }
+
+    fn set_up_ota_logger(&mut self, mut event_sender: EventSender) -> Result<(), Error> {
+        let ota_log_listener = OtaLogListenerImpl::new().unwrap();
+
+        fasync::Task::local(async move {
+            let mut local_event_sender = event_sender.clone();
+            let result = ota_log_listener
+                .listen(Box::new(move |line| {
+                    local_event_sender.send(Event::DebugLog(format!("OTA: {}", line)))
+                }))
+                .await;
+
+            if let Err(e) = result {
+                let msg = format!("failed to subscribe to OTA syslog: {:?}", e);
+                eprintln!("{}", &msg);
+                event_sender.send(Event::Error(msg));
+            }
+        })
+        .detach();
+        Ok(())
+    }
+}
+
 impl AppAssistant for RecoveryAppAssistant {
     fn setup(&mut self) -> Result<(), Error> {
         // This line is required for the CQ build and test system, specifically boot_test.go
@@ -111,18 +171,25 @@ impl AppAssistant for RecoveryAppAssistant {
         self.controller.add_state_handler(Box::new(screens));
 
         let state_machine = Box::new(StateMachine::new(State::Home));
-        self.controller.start(state_machine);
 
-        let font_face = font::get_default_font_face();
         #[cfg(feature = "debug_console")]
-        let console_view_assistant_ptr = Box::new(ConsoleViewAssistant::new(font_face.clone())?);
+        let console_view_assistant_ptr: Option<ViewAssistantPtr> = {
+            // Debug Console setup
+            self.controller.add_event_observer(self.setup_event_logging_observer(view_key));
+            self.set_up_ota_logger(self.controller.get_event_sender().clone())?;
+
+            let font_face = font::get_default_font_face();
+            Some(Box::new(ConsoleViewAssistant::new(font_face.clone())?))
+        };
         #[cfg(not(feature = "debug_console"))]
-        let console_view_assistant_ptr = None;
+        let console_view_assistant_ptr: Option<ViewAssistantPtr> = None;
         let proxy_ptr = Box::new(ProxyViewAssistant::new(
             Some(Box::new(self.controller.get_event_sender())),
-            Some(console_view_assistant_ptr),
+            console_view_assistant_ptr,
             first_screen,
         )?);
+
+        self.controller.start(state_machine);
         Ok(proxy_ptr)
     }
 
@@ -231,6 +298,8 @@ mod tests {
         controller.expect_get_event_sender().return_const(EventSender::new(sender));
         controller.expect_add_state_handler().times(2).return_const(());
         controller.expect_start().once().return_const(());
+        #[cfg(feature = "debug_console")]
+        controller.expect_add_event_observer().once().return_const(());
 
         let mut recovery_app_assistant = RecoveryAppAssistant::new_with_params(
             AppSender::new_for_testing_purposes_only(),

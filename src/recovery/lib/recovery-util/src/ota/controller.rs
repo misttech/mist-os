@@ -58,6 +58,7 @@ impl SendEvent for EventSender {
 
 #[automock]
 pub trait Controller {
+    fn add_event_observer(&mut self, sender: mpsc::Sender<Event>);
     fn add_state_handler(&mut self, handler: Box<dyn StateHandler>);
     fn get_event_sender(&self) -> EventSender;
     fn start(&mut self, state_machine: Box<dyn EventProcessor>);
@@ -67,16 +68,28 @@ pub struct ControllerImpl {
     sender: mpsc::Sender<Event>,
     receiver: Option<mpsc::Receiver<Event>>,
     state_handlers: Option<Vec<Box<dyn StateHandler>>>,
+    event_observers: Option<Vec<mpsc::Sender<Event>>>,
 }
 
 impl ControllerImpl {
     pub fn new() -> Self {
         let (sender, receiver) = mpsc::channel::<Event>(10);
-        Self { sender, receiver: Some(receiver), state_handlers: Some(Vec::new()) }
+        Self {
+            sender,
+            receiver: Some(receiver),
+            state_handlers: Some(Vec::new()),
+            event_observers: Some(Vec::new()),
+        }
     }
 }
 
 impl Controller for ControllerImpl {
+    fn add_event_observer(&mut self, observer: mpsc::Sender<Event>) {
+        if let Some(ref mut event_observers) = self.event_observers {
+            event_observers.push(observer);
+        }
+    }
+
     fn add_state_handler(&mut self, handler: Box<dyn StateHandler>) {
         if let Some(ref mut state_handlers) = self.state_handlers {
             state_handlers.push(handler);
@@ -90,11 +103,17 @@ impl Controller for ControllerImpl {
     fn start(&mut self, mut state_machine: Box<dyn EventProcessor>) {
         let mut receiver = self.receiver.take().unwrap();
         let mut state_handlers = self.state_handlers.take().unwrap();
+        let mut event_observers = self.event_observers.take().unwrap();
         let main_loop = async move {
             loop {
                 match receiver.next().await {
                     Some(event) => {
                         let event_clone = event.clone();
+                        for sender in event_observers.iter_mut() {
+                            if let Err(e) = sender.send(event.clone()).await {
+                                eprintln!("Error sending observer event: {:#?}", e);
+                            }
+                        }
                         let state = state_machine.process_event(event);
                         println!("Controller: event {:?} -> state {:?}", event_clone, state);
                         if let Some(state) = &state {
@@ -119,7 +138,10 @@ mod test {
     use crate::ota::state_machine::{
         Event, MockEventProcessor, MockStateHandler, State, StateHandler,
     };
+    use assert_matches::assert_matches;
     use fuchsia_async as fasync;
+    use futures::channel::mpsc;
+    use futures::StreamExt;
     use mockall::predicate::*;
 
     #[test]
@@ -142,5 +164,24 @@ mod test {
         event_sender.send(Event::Cancel);
 
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+    }
+
+    #[fuchsia::test]
+    async fn test_observe_events() {
+        let (sender, mut receiver) = mpsc::channel::<Event>(5);
+        let mut state_machine = MockEventProcessor::new();
+        state_machine.expect_process_event().times(3).return_const(Some(State::Home));
+        let mut controller = ControllerImpl::new();
+        controller.add_event_observer(sender);
+        let mut event_sender: Box<dyn SendEvent> = Box::new(controller.get_event_sender());
+
+        controller.start(Box::new(state_machine));
+        event_sender.send(Event::Error("123".to_string()));
+        event_sender.send(Event::DebugLog("test".to_string()));
+        event_sender.send(Event::WiFiConnected);
+
+        assert_matches!(receiver.next().await.unwrap(), Event::Error(_));
+        assert_matches!(receiver.next().await.unwrap(), Event::DebugLog(_));
+        assert_matches!(receiver.next().await.unwrap(), Event::WiFiConnected);
     }
 }

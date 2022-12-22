@@ -82,6 +82,7 @@ pub enum Event {
     AddNetwork,
     Cancel,
     ChooseNetwork,
+    DebugLog(String),
     Error(ErrorMessage),
     Networks(NetworkInfos),
     OtaStatusReceived(OtaStatus),
@@ -129,6 +130,7 @@ impl StateMachine {
         #[cfg(feature = "debug_logging")]
         println!("====== SM: state {:?}, event: {:?}", self.current_state, event);
         let new_state = match (&self.current_state, event) {
+            (_, Event::DebugLog(_)) => None, // Ignore DebugLog Events
             // Any cancel or error sends us back to the start.
             (_, Event::Cancel) => Some(State::Home),
 
@@ -269,6 +271,7 @@ mod test {
             Event::AddNetwork,
             Event::Cancel,
             Event::ChooseNetwork,
+            Event::DebugLog("message".to_string()),
             Event::Error("Error".to_string()),
             Event::Networks(Vec::new()),
             Event::OtaStatusReceived(OtaStatus::Succeeded),

@@ -24,7 +24,6 @@ pub enum ProxyMessages {
 
 pub struct ProxyViewAssistant {
     event_sender: Option<Box<dyn SendEvent>>,
-    #[cfg(feature = "debug_console")]
     console_view_assistant: Option<ViewAssistantPtr>,
     view_assistant_stack: VecDeque<ViewAssistantPtr>,
     first_call_after_switch: bool,
@@ -37,7 +36,7 @@ impl ProxyViewAssistant {
     /// Console is disabled if `console_view_assistant` is `None`.
     pub fn new(
         event_sender: Option<Box<dyn SendEvent>>,
-        #[cfg(feature = "debug_console")] console_view_assistant: Option<ViewAssistantPtr>,
+        console_view_assistant: Option<ViewAssistantPtr>,
         view_assistant_ptr: ViewAssistantPtr,
     ) -> Result<ProxyViewAssistant, Error> {
         let mut view_assistant_stack = VecDeque::new();
@@ -45,7 +44,6 @@ impl ProxyViewAssistant {
 
         Ok(ProxyViewAssistant {
             event_sender,
-            #[cfg(feature = "debug_console")]
             console_view_assistant,
             view_assistant_stack,
             first_call_after_switch: true,
@@ -249,16 +247,14 @@ impl ViewAssistant for ProxyViewAssistant {
             }
         }
 
-        if cfg!(feature = "debug_console") {
-            #[cfg(feature = "debug_console")]
-            if message.is::<ConsoleMessages>() {
-                if let Some(console) = self.console_view_assistant.as_mut() {
-                    console.handle_message(message);
-                } else {
-                    eprintln!("Error: Unable to find console to pass ConsoleMessages");
-                }
-                return;
+        #[cfg(feature = "debug_console")]
+        if message.is::<ConsoleMessages>() {
+            if let Some(console) = self.console_view_assistant.as_mut() {
+                console.handle_message(message);
+            } else {
+                eprintln!("Error: Unable to find console to pass ConsoleMessages");
             }
+            return;
         }
 
         self.view_assistant_stack.front_mut().unwrap().handle_message(message);
