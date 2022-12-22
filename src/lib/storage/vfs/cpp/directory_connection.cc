@@ -233,12 +233,10 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
   }
 
   // Check for directory rights inheritance
-  if (!vnode()->IsSkipRightsEnforcementDevfsOnlyDoNotUse()) {
-    zx_status_t status = EnforceHierarchicalRights(options().rights, open_options, &open_options);
-    if (status != ZX_OK) {
-      FS_PRETTY_TRACE_DEBUG("Rights violation during DirectoryOpen");
-      return write_error(std::move(request->object), status);
-    }
+  zx_status_t status = EnforceHierarchicalRights(options().rights, open_options, &open_options);
+  if (status != ZX_OK) {
+    FS_PRETTY_TRACE_DEBUG("Rights violation during DirectoryOpen");
+    return write_error(std::move(request->object), status);
   }
   OpenAt(vfs(), vnode(), std::move(request->object), path, open_options, options().rights, mode);
 }

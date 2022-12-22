@@ -126,8 +126,6 @@ class Devnode {
     bool IsService() const final;
     zx_status_t OpenNode(ValidatedOptions options, fbl::RefPtr<Vnode>* out_redirect) final;
 
-    bool IsSkipRightsEnforcementDevfsOnlyDoNotUse() const final { return false; }
-
     PseudoDir& children() const { return *children_; }
 
     Devnode& holder_;
@@ -187,9 +185,6 @@ class PseudoDir : public fs::PseudoDir {
  public:
   std::unordered_map<fbl::String, std::reference_wrapper<Devnode>, std::hash<std::string_view>>
       unpublished;
-
- private:
-  bool IsSkipRightsEnforcementDevfsOnlyDoNotUse() const final { return false; }
 };
 
 // Represents an entry in the /dev/class directory. A thin wrapper around
