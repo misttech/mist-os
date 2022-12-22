@@ -7,16 +7,16 @@
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <lib/fidl/cpp/unified_messaging_declarations.h>
+#include <lib/fidl/cpp/wire/transaction.h>
 #include <lib/fidl/cpp/wire/wire_messaging_declarations.h>
 #include <lib/fit/internal/result.h>
 #include <lib/syslog/cpp/macros.h>
-#include <zircon/system/public/zircon/errors.h>
+#include <zircon/errors.h>
 
 #include <memory>
 #include <optional>
 #include <vector>
 
-#include "lib/fidl/cpp/wire/transaction.h"
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/logging.h"
@@ -175,11 +175,10 @@ void RegistryServer::CreateObserver(CreateObserverRequest& request,
     return;
   }
   auto token_id = *request.token_id();
-  auto matching_device = parent_->FindDeviceByTokenId(token_id);
-  switch (matching_device.first) {
+  auto [presence, matching_device] = parent_->FindDeviceByTokenId(token_id);
+  switch (presence) {
     // We could break these out into separate error codes if needed.
     case AudioDeviceRegistry::DevicePresence::Unknown:
-    case AudioDeviceRegistry::DevicePresence::Removed:
       ADR_WARN_OBJECT() << "no device found with 'id' " << token_id;
       completer.Reply(
           fit::error(fuchsia_audio_device::RegistryCreateObserverError::kDeviceNotFound));
@@ -196,7 +195,7 @@ void RegistryServer::CreateObserver(CreateObserverRequest& request,
 
   // TODO(fxbug.dev/117199): Decide when we proactively call GetHealthState, if at all.
 
-  // With observer_server and matching_device.second, we will create an Observer protocol server.
+  // (next CL) use observer_server and matching_device to create an Observer protocol server.
 
   completer.Reply(fit::success(fuchsia_audio_device::RegistryCreateObserverResponse{}));
 }

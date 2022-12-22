@@ -6,15 +6,16 @@
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_DEVICE_UNITTEST_H_
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
+#include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
-#include <fidl/fuchsia.mediastreams/cpp/natural_types.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/unified_messaging_declarations.h>
 #include <lib/fidl/cpp/wire/status.h>
-#include <zircon/system/public/zircon/errors.h>
+#include <zircon/errors.h>
 
 #include <iomanip>
 #include <memory>
+#include <sstream>
 #include <string>
 
 #include <gtest/gtest.h>
@@ -80,13 +81,153 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     return *device->gain_state_;
   }
 
+  static uint8_t ExpectFormatMatch(std::shared_ptr<Device> device,
+                                   fuchsia_audio::SampleType sample_type, uint32_t channel_count,
+                                   uint32_t rate) {
+    std::stringstream stream;
+    stream << "Expected format match: [" << sample_type << " " << channel_count << "-channel "
+           << rate << " hz]";
+    SCOPED_TRACE(stream.str());
+    const auto& match = device->SupportedDriverFormatForClientFormat({{
+        .sample_type = sample_type,
+        .channel_count = channel_count,
+        .frames_per_second = rate,
+    }});
+    EXPECT_TRUE(match);
+    return match->pcm_format()->valid_bits_per_sample();
+  }
+
+  static void ExpectNoFormatMatch(std::shared_ptr<Device> device,
+                                  fuchsia_audio::SampleType sample_type, uint32_t channel_count,
+                                  uint32_t rate) {
+    std::stringstream stream;
+    stream << "Unexpected format match: [" << sample_type << " " << channel_count << "-channel "
+           << rate << " hz]";
+    SCOPED_TRACE(stream.str());
+    const auto& match = device->SupportedDriverFormatForClientFormat({{
+        .sample_type = sample_type,
+        .channel_count = channel_count,
+        .frames_per_second = rate,
+    }});
+    EXPECT_FALSE(match);
+  }
+
   bool SetDeviceGain(fuchsia_hardware_audio::GainState new_state) {
     return device_->SetGain(new_state);
   }
-  // bool SetDevicePlugState(bool plugged, zx::time plug_time){return device_->}
 
   bool SetControl(std::shared_ptr<Device> device) { return device->SetControl(); }
   bool DropControl(std::shared_ptr<Device> device) { return device->DropControl(); }
+
+  void ConnectToRingBufferAndExpectValidClient() {
+    ASSERT_TRUE(device_->ConnectRingBufferFidl({{
+        fuchsia_hardware_audio::PcmFormat{{
+            .number_of_channels = 2,
+            .sample_format = fuchsia_hardware_audio::SampleFormat::kPcmSigned,
+            .bytes_per_sample = 2,
+            .valid_bits_per_sample = static_cast<uint8_t>(16),
+            .frame_rate = 48000,
+        }},
+    }}));
+    RunLoopUntilIdle();
+    EXPECT_TRUE(device_->ring_buffer_client_.is_valid());
+  }
+
+  void GetRingBufferProperties() {
+    ASSERT_TRUE(device_->state_ == Device::State::CreatingRingBuffer ||
+                device_->state_ == Device::State::RingBufferStopped ||
+                device_->state_ == Device::State::RingBufferStarted);
+
+    device_->RetrieveRingBufferProperties();
+    RunLoopUntilIdle();
+    ASSERT_TRUE(device_->ring_buffer_properties_);
+    ring_buffer_props_ = *device_->ring_buffer_properties_;
+  }
+
+  void RetrieveDelayInfoAndExpect(std::optional<int64_t> internal_delay,
+                                  std::optional<int64_t> external_delay) {
+    ASSERT_TRUE(device_->state_ == Device::State::CreatingRingBuffer ||
+                device_->state_ == Device::State::RingBufferStopped ||
+                device_->state_ == Device::State::RingBufferStarted);
+    device_->RetrieveDelayInfo();
+    RunLoopUntilIdle();
+    delay_info_ = *device_->delay_info_;
+
+    ASSERT_TRUE(device_->delay_info_);
+    EXPECT_EQ(device_->delay_info_->internal_delay().value_or(0), internal_delay.value_or(0));
+    EXPECT_EQ(device_->delay_info_->external_delay().value_or(0), external_delay.value_or(0));
+  }
+
+  void GetDriverVmoAndExpectValid() {
+    ASSERT_TRUE(device_->state_ == Device::State::CreatingRingBuffer ||
+                device_->state_ == Device::State::RingBufferStopped ||
+                device_->state_ == Device::State::RingBufferStarted);
+
+    device_->GetVmo(2000, 0);
+    RunLoopUntilIdle();
+    EXPECT_TRUE(device_->VmoReceived());
+    EXPECT_TRUE(device_->state_ == Device::State::CreatingRingBuffer ||
+                device_->state_ == Device::State::RingBufferStopped);
+  }
+
+  void SetActiveChannelsAndExpect(uint64_t expected_bitmask) {
+    ASSERT_TRUE(device_->state_ == Device::State::CreatingRingBuffer ||
+                device_->state_ == Device::State::RingBufferStopped ||
+                device_->state_ == Device::State::RingBufferStarted);
+
+    const auto now = zx::clock::get_monotonic();
+    device_->SetActiveChannels(expected_bitmask, [this](zx::result<zx::time> result) {
+      EXPECT_TRUE(result.is_ok());
+      ASSERT_TRUE(device_->active_channels_set_time_);
+      EXPECT_EQ(result.value(), *device_->active_channels_set_time_);
+    });
+    RunLoopUntilIdle();
+    ASSERT_TRUE(device_->active_channels_set_time_);
+    EXPECT_GT(*device_->active_channels_set_time_, now);
+
+    ExpectActiveChannels(expected_bitmask);
+  }
+
+  void ExpectActiveChannels(uint64_t expected_bitmask) {
+    EXPECT_EQ(device_->active_channels_bitmask_, expected_bitmask);
+  }
+
+  void ExpectRingBufferReady() {
+    RunLoopUntilIdle();
+    EXPECT_TRUE(device_->state_ == Device::State::RingBufferStopped);
+  }
+
+  void StartAndExpectValid() {
+    ASSERT_TRUE(device_->state_ == Device::State::RingBufferStopped);
+
+    const auto now = zx::clock::get_monotonic().get();
+    device_->StartRingBuffer([this](zx::result<zx::time> result) {
+      EXPECT_TRUE(result.is_ok());
+      ASSERT_TRUE(device_->start_time_);
+      EXPECT_EQ(result.value(), *device_->start_time_);
+    });
+    RunLoopUntilIdle();
+    ASSERT_TRUE(device_->start_time_);
+    EXPECT_GT(device_->start_time_->get(), now);
+    EXPECT_TRUE(device_->state_ == Device::State::RingBufferStarted);
+  }
+
+  void StopAndExpectValid() {
+    ASSERT_TRUE(device_->state_ == Device::State::RingBufferStarted);
+
+    device_->StopRingBuffer([](zx_status_t result) { EXPECT_EQ(result, ZX_OK); });
+    RunLoopUntilIdle();
+    ASSERT_FALSE(device_->start_time_);
+    EXPECT_TRUE(device_->state_ == Device::State::RingBufferStopped);
+  }
+
+  std::optional<fuchsia_hardware_audio::RingBufferProperties> ring_buffer_props_;
+
+  std::optional<fuchsia_audio_device::GainState> gain_state_;
+  std::optional<std::pair<fuchsia_audio_device::PlugState, zx::time>> plug_state_;
+  std::optional<fuchsia_hardware_audio::DelayInfo> delay_info_;
+
+  static inline constexpr zx::duration kCommandTimeout = zx::sec(0);  // zx::sec(10);
 
   std::shared_ptr<Device> device_;
   std::shared_ptr<Clock> device_clock() { return device_->device_clock_; }

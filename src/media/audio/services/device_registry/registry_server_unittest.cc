@@ -5,14 +5,13 @@
 #include "src/media/audio/services/device_registry/registry_server.h"
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
+#include <lib/fidl/cpp/client.h>
 #include <lib/sync/cpp/completion.h>
 
 #include <optional>
 
 #include <gtest/gtest.h>
 
-#include "fidl/fuchsia.audio.device/cpp/markers.h"
-#include "lib/fidl/cpp/client.h"
 #include "src/media/audio/services/common/testing/test_server_and_async_client.h"
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 
@@ -29,6 +28,24 @@ class RegistryServerTest : public AudioDeviceRegistryServerTestBase {
     return std::make_pair(std::move(client), server);
   }
 };
+
+TEST_F(RegistryServerTest, CleanClientDrop) {
+  auto [registry_client, registry_server] = CreateRegistryServer();
+  EXPECT_EQ(RegistryServer::count(), 1u);
+
+  registry_client = fidl::Client<fuchsia_audio_device::Registry>();
+  RunLoopUntilIdle();
+  EXPECT_TRUE(registry_server->WaitForShutdown(zx::sec(1)));
+}
+
+TEST_F(RegistryServerTest, CleanServerShutdown) {
+  auto [registry_client, registry_server] = CreateRegistryServer();
+  EXPECT_EQ(RegistryServer::count(), 1u);
+
+  registry_server->Shutdown();
+  RunLoopUntilIdle();
+  EXPECT_TRUE(registry_server->WaitForShutdown(zx::sec(1)));
+}
 
 // Device already exists before the Registry connection is created.
 TEST_F(RegistryServerTest, DeviceAddThenRegistryCreate) {

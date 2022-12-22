@@ -13,7 +13,6 @@
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
-#include <zircon/system/public/zircon/errors.h>
 
 #include <audio-proto-utils/format-utils.h>
 #include <gtest/gtest.h>
@@ -51,6 +50,7 @@ void FakeAudioDriver::DropStreamConfig() {
 }
 
 void FakeAudioDriver::InjectGainChange(fuchsia_hardware_audio::GainState gain_state) {
+  ADR_LOG_OBJECT(kLogFakeAudioDriver);
   fuchsia::hardware::audio::GainState new_state;
   gain_state.gain_db() ? new_state.set_gain_db(*gain_state.gain_db()) : new_state;
   gain_state.muted() ? new_state.set_muted(*gain_state.muted()) : new_state;
@@ -60,6 +60,8 @@ void FakeAudioDriver::InjectGainChange(fuchsia_hardware_audio::GainState gain_st
 }
 
 void FakeAudioDriver::InjectPlugChange(bool plugged, zx::time plug_time) {
+  ADR_LOG_OBJECT(kLogFakeAudioDriver)
+      << "(" << (plugged ? "plugged" : "unplugged") << ", " << plug_time.get() << ")";
   if (!plugged_ || (*plugged_ != plugged && plug_time > plug_state_time_)) {
     plugged_ = plugged;
     plug_state_time_ = plug_time;
@@ -69,6 +71,25 @@ void FakeAudioDriver::InjectPlugChange(bool plugged, zx::time plug_time) {
       WatchPlugState(std::move(pending_plug_callback_));
     }
   }
+}
+
+void FakeAudioDriver::DropRingBuffer() {
+  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+  if (ring_buffer_binding_) {
+    ring_buffer_binding_->Close(ZX_ERR_PEER_CLOSED);
+  }
+}
+
+fzl::VmoMapper FakeAudioDriver::AllocateRingBuffer(size_t size) {
+  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+
+  FX_CHECK(!ring_buffer_) << "Calling AllocateRingBuffer multiple times is not supported";
+
+  ring_buffer_size_ = size;
+  fzl::VmoMapper mapper;
+  mapper.CreateAndMap(ring_buffer_size_, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, nullptr,
+                      &ring_buffer_);
+  return mapper;
 }
 
 void FakeAudioDriver::GetHealthState(
@@ -264,11 +285,16 @@ void FakeAudioDriver::SetGain(fuchsia::hardware::audio::GainState target_state) 
   }
 }
 
-// For now, don't do anything with this. No response is needed so this should be OK even if called.
 void FakeAudioDriver::CreateRingBuffer(
     fuchsia::hardware::audio::Format format,
     fidl::InterfaceRequest<fuchsia::hardware::audio::RingBuffer> ring_buffer_request) {
   ADR_LOG_OBJECT(kLogFakeAudioDriver);
+
+  ring_buffer_binding_.emplace(this, ring_buffer_request.TakeChannel(), dispatcher_);
+  selected_format_ = format.pcm_format();
+
+  active_channels_bitmask_ = (1 << selected_format_->number_of_channels) - 1;
+  active_channels_set_time_ = zx::clock::get_monotonic();
 }
 
 // For now, don't do anything with this. No response is needed so this should be OK even if called.
@@ -276,6 +302,182 @@ void FakeAudioDriver::SignalProcessingConnect(
     fidl::InterfaceRequest<fuchsia::hardware::audio::signalprocessing::SignalProcessing>
         signal_processing_request) {
   ADR_LOG_OBJECT(kLogFakeAudioDriver);
+}
+
+// RingBuffer methods
+void FakeAudioDriver::GetProperties(
+    fuchsia::hardware::audio::RingBuffer::GetPropertiesCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+
+  fuchsia::hardware::audio::RingBufferProperties props = {};
+
+  if (external_delay_.has_value()) {
+    props.set_external_delay(external_delay_->to_nsecs());
+  }
+  if (fifo_depth_.has_value()) {
+    props.set_fifo_depth(*fifo_depth_);
+  }
+  if (turn_on_delay_.has_value()) {
+    props.set_turn_on_delay(turn_on_delay_->to_nsecs());
+  }
+  props.set_needs_cache_flush_or_invalidate(false);
+  callback(std::move(props));
+}
+
+void FakeAudioDriver::SendPositionNotification(zx::time timestamp, uint32_t position) {
+  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+
+  position_notify_timestamp_mono_ = timestamp;
+  position_notify_position_bytes_ = position;
+
+  position_notification_values_are_set_ = true;
+  if (position_notify_callback_) {
+    PositionNotification();
+  }
+}
+
+void FakeAudioDriver::WatchClockRecoveryPositionInfo(
+    fuchsia::hardware::audio::RingBuffer::WatchClockRecoveryPositionInfoCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+
+  position_notify_callback_ = std::move(callback);
+
+  if (position_notification_values_are_set_) {
+    PositionNotification();
+  }
+}
+
+void FakeAudioDriver::PositionNotification() {
+  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+
+  FX_CHECK(position_notify_callback_);
+  FX_CHECK(position_notification_values_are_set_);
+
+  // Real audio drivers can't emit position notifications until started; we shouldn't either
+  if (is_running_) {
+    // Clear both prerequisites for sending this notification
+    position_notification_values_are_set_ = false;
+    auto callback = *std::move(position_notify_callback_);
+    position_notify_callback_ = std::nullopt;
+
+    fuchsia::hardware::audio::RingBufferPositionInfo info{
+        .timestamp = position_notify_timestamp_mono_.get(),
+        .position = position_notify_position_bytes_,
+    };
+
+    callback(std::move(info));
+  }
+}
+
+void FakeAudioDriver::GetVmo(uint32_t min_frames, uint32_t clock_recovery_notifications_per_ring,
+                             fuchsia::hardware::audio::RingBuffer::GetVmoCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+
+  // This should be true since it's set as part of creating the channel that's carrying these
+  // messages.
+  FX_CHECK(selected_format_);
+
+  if (!ring_buffer_) {
+    // If we haven't created a ring buffer, we'll just drop this request.
+    FX_LOGS(ERROR) << "GetVmo will not respond because ring_buffer_ is not yet set";
+    return;
+  }
+  FX_CHECK(ring_buffer_);
+
+  // Dup our ring buffer VMO to send over the channel.
+  zx::vmo dup;
+  FX_CHECK(ring_buffer_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup) == ZX_OK);
+
+  // Compute the buffer size in frames.
+  auto frame_size = selected_format_->number_of_channels * selected_format_->bytes_per_sample;
+  auto ring_buffer_frames = ring_buffer_size_ / frame_size;
+
+  fuchsia::hardware::audio::RingBuffer_GetVmo_Result result = {};
+  fuchsia::hardware::audio::RingBuffer_GetVmo_Response response = {};
+  response.num_frames = static_cast<uint32_t>(ring_buffer_frames);
+  response.ring_buffer = std::move(dup);
+  result.set_response(std::move(response));
+  callback(std::move(result));
+}
+
+void FakeAudioDriver::Start(fuchsia::hardware::audio::RingBuffer::StartCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+
+  EXPECT_TRUE(!is_running_);
+  mono_start_time_ = zx::clock::get_monotonic();
+  is_running_ = true;
+
+  callback(mono_start_time_.get());
+}
+
+void FakeAudioDriver::Stop(fuchsia::hardware::audio::RingBuffer::StopCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+
+  EXPECT_TRUE(is_running_);
+  is_running_ = false;
+
+  position_notify_callback_ = std::nullopt;
+  position_notification_values_are_set_ = false;
+
+  callback();
+}
+
+void FakeAudioDriver::SetActiveChannels(
+    uint64_t active_channels_bitmask,
+    fuchsia::hardware::audio::RingBuffer::SetActiveChannelsCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+
+  if (active_channels_supported_) {
+    if (active_channels_bitmask != active_channels_bitmask_) {
+      active_channels_bitmask_ = active_channels_bitmask;
+      active_channels_set_time_ = zx::clock::get_monotonic();
+    }
+    FX_LOGS(DEBUG) << __FUNCTION__ << " active_channels_bitmask_ 0x" << std::hex
+                   << active_channels_bitmask_ << ", active_channels_supported_ "
+                   << active_channels_supported_;
+    callback(fpromise::ok(active_channels_set_time_.get()));
+  } else {
+    callback(fpromise::error(ZX_ERR_NOT_SUPPORTED));
+  }
+}
+
+void FakeAudioDriver::WatchDelayInfo(WatchDelayInfoCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+
+  if (delay_has_changed_) {
+    fuchsia::hardware::audio::DelayInfo delay_info = {};
+
+    if (fifo_depth_) {
+      auto fifo_related_delay =
+          // ns/sec * bytes * sample/byte * frame/sample * sec/frame => nanosec.
+          zx::duration(1'000'000'000ull * *fifo_depth_ / selected_format_->bytes_per_sample /
+                       selected_format_->number_of_channels / selected_format_->frame_rate);
+      internal_delay_ = std::max(internal_delay_.value_or(zx::nsec(0)), fifo_related_delay);
+    }
+    if (internal_delay_) {
+      delay_info.set_internal_delay(internal_delay_->to_nsecs());
+    }
+    if (external_delay_) {
+      delay_info.set_external_delay(external_delay_->to_nsecs());
+    }
+
+    delay_has_changed_ = false;
+    callback(std::move(delay_info));
+  } else {
+    pending_delay_callback_ = std::move(callback);
+  }
+}
+
+// Trigger a delay-changed event, based on current internal_delay_/external_delay_ values.
+void FakeAudioDriver::InjectDelayUpdate(std::optional<zx::duration> internal_delay,
+                                        std::optional<zx::duration> external_delay) {
+  internal_delay_ = internal_delay;
+  external_delay_ = external_delay;
+
+  delay_has_changed_ = true;
+  if (pending_delay_callback_) {
+    WatchDelayInfo(std::move(pending_delay_callback_));
+  }
 }
 
 }  // namespace media_audio

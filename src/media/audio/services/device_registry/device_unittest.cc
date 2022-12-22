@@ -4,22 +4,37 @@
 
 #include "src/media/audio/services/device_registry/device.h"
 
+#include <fidl/fuchsia.audio/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
-#include <fidl/fuchsia.mediastreams/cpp/common_types.h>
+#include <fuchsia/hardware/audio/cpp/fidl.h>
 #include <lib/zx/clock.h>
-#include <zircon/system/public/zircon/errors.h>
+#include <zircon/errors.h>
 
 #include <optional>
 
 #include <gtest/gtest.h>
 
-#include "fuchsia/hardware/audio/cpp/fidl.h"
 #include "src/media/audio/services/device_registry/device_unittest.h"
 #include "src/media/audio/services/device_registry/testing/fake_audio_driver.h"
 
 namespace media_audio {
 
-class DeviceTest : public DeviceTestBase {};
+class DeviceTest : public DeviceTestBase {
+ protected:
+  static inline const fuchsia_hardware_audio::Format kDefaultRingBufferFormat{{
+      .pcm_format = fuchsia_hardware_audio::PcmFormat{{
+          .number_of_channels = 2,
+          .sample_format = fuchsia_hardware_audio::SampleFormat::kPcmSigned,
+          .bytes_per_sample = 2,
+          .valid_bits_per_sample = static_cast<uint8_t>(16),
+          .frame_rate = 48000,
+      }},
+  }};
+  static const std::optional<fuchsia_hardware_audio::DelayInfo>& DeviceDelayInfo(
+      std::shared_ptr<Device> device) {
+    return device->delay_info_;
+  }
+};
 
 TEST_F(DeviceTest, Initialization) {
   InitializeDeviceForFakeDriver();
@@ -35,6 +50,28 @@ TEST_F(DeviceTest, Initialization) {
   fake_device_presence_watcher_.reset();
 }
 
+TEST_F(DeviceTest, StreamConfigDisconnect) {
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  ASSERT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+
+  ASSERT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
+  ASSERT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
+  ASSERT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+
+  FakeDriverDropStreamConfig();
+  RunLoopUntilIdle();
+
+  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 0u);
+  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+
+  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_removal_from_ready_count(), 1u);
+}
+
 TEST_F(DeviceTest, EmptyHealthResponse) {
   fake_driver_->set_health_state(std::nullopt);
   InitializeDeviceForFakeDriver();
@@ -44,11 +81,11 @@ TEST_F(DeviceTest, EmptyHealthResponse) {
   EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
 }
 
-// TODO: manufacturer and product strings that are 256 chars long
+// TODO(fxbug.dev/117826): manufacturer and product strings that are 256 chars long
 
-// TODO: unittest ValidateStreamProperties
+// TODO(fxbug.dev/117826): unittest ValidateStreamProperties
 
-// TODO: unittest ValidateSupportedFormats
+// TODO(fxbug.dev/117826): unittest ValidateSupportedFormats
 
 TEST_F(DeviceTest, DistinctTokenIds) {
   InitializeDeviceForFakeDriver();
@@ -97,9 +134,9 @@ TEST_F(DeviceTest, ClockInOtherDomain) {
   EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
 }
 
-// TODO: unittest ValidateGainState
+// TODO(fxbug.dev/117826): unittest ValidateGainState
 
-// TODO: unittest ValidatePlugState
+// TODO(fxbug.dev/117826): unittest ValidatePlugState
 
 TEST_F(DeviceTest, CreateDeviceInfo) {
   InitializeDeviceForFakeDriver();
@@ -113,14 +150,54 @@ TEST_F(DeviceTest, CreateDeviceInfo) {
   EXPECT_EQ(*info.clock_domain(), fuchsia_hardware_audio::kClockDomainMonotonic);
 }
 
-// TODO: unittest ValidateDeviceInfo
+// TODO(fxbug.dev/117826): unittest ValidateDeviceInfo
 
-// TODO: unittest RetrieveCurrentlyPermittedFormats
+// TODO(fxbug.dev/117826): unittest TranslateFormatSets
 
-// This tests the ability to change gain from the driver itself, such as from hardware buttons.
+// TODO(fxbug.dev/117826): unittest RetrieveCurrentlyPermittedFormats
+
+TEST_F(DeviceTest, SupportedDriverFormatForClientFormat) {
+  fake_driver_->set_frame_rates(0, {48000, 48001});
+  fake_driver_->set_valid_bits_per_sample(0, {12, 15, 20});
+  fake_driver_->set_bytes_per_sample(0, {2, 4});
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+
+  auto valid_bits = ExpectFormatMatch(device_, fuchsia_audio::SampleType::kInt16, 2, 48001);
+  EXPECT_EQ(valid_bits, 15u);
+
+  valid_bits = ExpectFormatMatch(device_, fuchsia_audio::SampleType::kInt32, 2, 48000);
+  EXPECT_EQ(valid_bits, 20u);
+}
+
+// This tests the driver's ability to inform its ControlNotify of initial gain state.
+TEST_F(DeviceTest, InitialGainState) {
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+  ASSERT_TRUE(SetControl(device_));
+
+  RunLoopUntilIdle();
+  auto gain_state = DeviceGainState(device_);
+  EXPECT_EQ(*gain_state.gain_db(), 0.0f);
+  EXPECT_FALSE(*gain_state.muted());
+  EXPECT_FALSE(*gain_state.agc_enabled());
+}
+
+// This tests the driver's ability to inform its ControlNotify of initial plug state.
+TEST_F(DeviceTest, InitialPlugState) {
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+  ASSERT_TRUE(SetControl(device_));
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(DevicePluggedState(device_));
+}
+
+// This tests the driver's ability to originate gain changes, such as from hardware buttons.
 TEST_F(DeviceTest, DynamicGainUpdate) {
   InitializeDeviceForFakeDriver();
   ASSERT_TRUE(InInitializedState(device_));
+  ASSERT_TRUE(SetControl(device_));
 
   RunLoopUntilIdle();
   auto gain_state = DeviceGainState(device_);
@@ -145,9 +222,13 @@ TEST_F(DeviceTest, DynamicGainUpdate) {
 TEST_F(DeviceTest, DynamicPlugUpdate) {
   InitializeDeviceForFakeDriver();
   ASSERT_TRUE(InInitializedState(device_));
+  ASSERT_TRUE(SetControl(device_));
+
+  RunLoopUntilIdle();
   EXPECT_TRUE(DevicePluggedState(device_));
 
-  fake_driver_->InjectPlugChange(false, zx::clock::get_monotonic());
+  auto unplug_time = zx::clock::get_monotonic();
+  fake_driver_->InjectPlugChange(false, unplug_time);
   RunLoopUntilIdle();
   EXPECT_FALSE(DevicePluggedState(device_));
 }
@@ -184,6 +265,146 @@ TEST_F(DeviceTest, SetGain) {
   EXPECT_EQ(*gain_state.gain_db(), kNewGainDb);
   EXPECT_TRUE(*gain_state.muted());
   EXPECT_TRUE(*gain_state.agc_enabled());
+}
+
+TEST_F(DeviceTest, RingBufferCreation) {
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+  fake_driver_->AllocateRingBuffer(8192);
+  ASSERT_TRUE(SetControl(device_));
+
+  ConnectToRingBufferAndExpectValidClient();
+}
+
+TEST_F(DeviceTest, RingBufferProperties) {
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+  fake_driver_->AllocateRingBuffer(8192);
+  ASSERT_TRUE(SetControl(device_));
+  ConnectToRingBufferAndExpectValidClient();
+
+  GetRingBufferProperties();
+}
+
+TEST_F(DeviceTest, DelayInfo) {
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+  fake_driver_->AllocateRingBuffer(8192);
+  ASSERT_TRUE(SetControl(device_));
+  ConnectToRingBufferAndExpectValidClient();
+
+  RetrieveDelayInfoAndExpect(62500, std::nullopt);
+}
+
+// TODO(fxbug.dev/117826): Unittest CalculateRequiredRingBufferSizes
+
+TEST_F(DeviceTest, RingBufferVmo) {
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+  fake_driver_->AllocateRingBuffer(8192);
+  ASSERT_TRUE(SetControl(device_));
+  ConnectToRingBufferAndExpectValidClient();
+
+  GetDriverVmoAndExpectValid();
+}
+
+TEST_F(DeviceTest, CreateRingBuffer) {
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+  fake_driver_->AllocateRingBuffer(8192);
+  ASSERT_TRUE(SetControl(device_));
+
+  auto connected_to_ring_buffer_fidl =
+      device_->CreateRingBuffer(kDefaultRingBufferFormat, 2000, [](Device::RingBufferInfo info) {
+        EXPECT_TRUE(info.ring_buffer.buffer());
+        EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
+
+        EXPECT_TRUE(info.ring_buffer.format());
+        EXPECT_TRUE(info.ring_buffer.producer_bytes());
+        EXPECT_TRUE(info.ring_buffer.consumer_bytes());
+        EXPECT_TRUE(info.ring_buffer.reference_clock());
+      });
+  EXPECT_TRUE(connected_to_ring_buffer_fidl);
+}
+
+TEST_F(DeviceTest, SetActiveChannels) {
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+  fake_driver_->AllocateRingBuffer(8192);
+  fake_driver_->set_active_channels_supported(true);
+  ASSERT_TRUE(SetControl(device_));
+  ConnectToRingBufferAndExpectValidClient();
+
+  ExpectActiveChannels(0x0003);
+
+  SetActiveChannelsAndExpect(0x0002);
+}
+
+// TODO(fxbug.dev/117826): SetActiveChannel no change => no callback (no change in set_time)
+
+TEST_F(DeviceTest, BasicStartAndStop) {
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+  fake_driver_->AllocateRingBuffer(8192);
+  ASSERT_TRUE(SetControl(device_));
+
+  auto connected_to_ring_buffer_fidl =
+      device_->CreateRingBuffer(kDefaultRingBufferFormat, 2000, [](Device::RingBufferInfo info) {
+        EXPECT_TRUE(info.ring_buffer.buffer());
+        EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
+
+        EXPECT_TRUE(info.ring_buffer.format());
+        EXPECT_TRUE(info.ring_buffer.producer_bytes());
+        EXPECT_TRUE(info.ring_buffer.consumer_bytes());
+        EXPECT_TRUE(info.ring_buffer.reference_clock());
+      });
+  EXPECT_TRUE(connected_to_ring_buffer_fidl);
+
+  ExpectRingBufferReady();
+
+  StartAndExpectValid();
+  StopAndExpectValid();
+}
+
+TEST_F(DeviceTest, InitialDelayInfo) {
+  InitializeDeviceForFakeDriver();
+  fake_driver_->AllocateRingBuffer(8192);
+  ASSERT_TRUE(SetControl(device_));
+
+  auto created_ring_buffer = false;
+  auto connected_to_ring_buffer_fidl = device_->CreateRingBuffer(
+      kDefaultRingBufferFormat, 2000,
+      [&created_ring_buffer](Device::RingBufferInfo info) { created_ring_buffer = true; });
+  EXPECT_TRUE(connected_to_ring_buffer_fidl);
+  RunLoopUntilIdle();
+
+  EXPECT_TRUE(created_ring_buffer);
+  ASSERT_TRUE(DeviceDelayInfo(device_));
+  EXPECT_EQ(DeviceDelayInfo(device_)->internal_delay().value_or(0), 62500);
+  EXPECT_EQ(DeviceDelayInfo(device_)->external_delay(), std::nullopt);
+}
+
+TEST_F(DeviceTest, DynamicDelayInfo) {
+  InitializeDeviceForFakeDriver();
+  fake_driver_->AllocateRingBuffer(8192);
+  ASSERT_TRUE(SetControl(device_));
+
+  auto created_ring_buffer = false;
+  auto connected_to_ring_buffer_fidl = device_->CreateRingBuffer(
+      kDefaultRingBufferFormat, 2000,
+      [&created_ring_buffer](Device::RingBufferInfo info) { created_ring_buffer = true; });
+  EXPECT_TRUE(connected_to_ring_buffer_fidl);
+  RunLoopUntilIdle();
+
+  EXPECT_TRUE(created_ring_buffer);
+
+  RunLoopUntilIdle();
+
+  fake_driver_->InjectDelayUpdate(zx::nsec(123'456), zx::nsec(654'321));
+  RunLoopUntilIdle();
+  ASSERT_TRUE(DeviceDelayInfo(device_));
+  EXPECT_EQ(*DeviceDelayInfo(device_)->internal_delay(), 123'456);
+  EXPECT_EQ(*DeviceDelayInfo(device_)->external_delay(), 654'321);
 }
 
 }  // namespace media_audio

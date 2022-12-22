@@ -27,7 +27,8 @@
 
 namespace media_audio {
 
-class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig {
+class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig,
+                        public fuchsia::hardware::audio::RingBuffer {
   static inline constexpr bool kLogFakeAudioDriver = false;
 
  public:
@@ -37,7 +38,9 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig {
   // This returns a fidl::client_end<StreamConfig). The driver will not start serving requests until
   // Enable is called, which is why the construction/Enable separation exists.
   zx::channel Enable();
+  fzl::VmoMapper AllocateRingBuffer(size_t size);
   void DropStreamConfig();
+  void DropRingBuffer();
 
   void set_stream_unique_id(std::optional<UniqueId> uid) {
     if (uid) {
@@ -137,6 +140,26 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig {
   void InjectGainChange(fuchsia_hardware_audio::GainState new_state);
   void InjectPlugChange(bool plugged, zx::time plug_time);
 
+  void set_active_channels_supported(bool supported) { active_channels_supported_ = supported; }
+  uint64_t active_channels_bitmask() const { return active_channels_bitmask_; }
+  zx::time active_channels_set_time() const { return active_channels_set_time_; }
+
+  // Explicitly trigger a change notification, for the current values of gain/plug/delay.
+  void InjectDelayUpdate(std::optional<zx::duration> internal_delay,
+                         std::optional<zx::duration> external_delay);
+  // Has a change been made, that will generate an immediate response to the next Watch... call?
+  bool delay_has_changed() const { return delay_has_changed_; }
+  // Is a Watch... callback pending, that will respond to the next "injected" update?
+  bool delay_callback_pending() const { return (pending_delay_callback_ != nullptr); }
+
+  zx::time mono_start_time() const { return mono_start_time_; }
+  bool is_running() const { return is_running_; }
+
+  // The returned optional will be empty if no |CreateRingBuffer| command has been received.
+  std::optional<fuchsia::hardware::audio::PcmFormat> selected_format() const {
+    return selected_format_;
+  }
+
  private:
   static inline const std::string_view kClassName = "FakeAudioDriver";
 
@@ -157,6 +180,22 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig {
   void SignalProcessingConnect(
       fidl::InterfaceRequest<fuchsia::hardware::audio::signalprocessing::SignalProcessing>
           signal_processing_request) final;
+
+  // fuchsia hardware audio RingBuffer Interface
+  void GetProperties(fuchsia::hardware::audio::RingBuffer::GetPropertiesCallback callback) final;
+  void WatchClockRecoveryPositionInfo(
+      fuchsia::hardware::audio::RingBuffer::WatchClockRecoveryPositionInfoCallback callback) final;
+  void GetVmo(uint32_t min_frames, uint32_t clock_recovery_notifications_per_ring,
+              fuchsia::hardware::audio::RingBuffer::GetVmoCallback callback) final;
+  void Start(fuchsia::hardware::audio::RingBuffer::StartCallback callback) final;
+  void Stop(fuchsia::hardware::audio::RingBuffer::StopCallback callback) final;
+  void SetActiveChannels(
+      uint64_t active_channels_bitmask,
+      fuchsia::hardware::audio::RingBuffer::SetActiveChannelsCallback callback) final;
+  void WatchDelayInfo(WatchDelayInfoCallback callback) final;
+
+  void PositionNotification();
+  void SendPositionNotification(zx::time timestamp, uint32_t position);
 
   std::optional<UniqueId> uid_ = kDefaultUniqueId;
   std::optional<bool> is_input_ = false;
@@ -195,17 +234,47 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig {
   };
 
   fuchsia::hardware::audio::PcmSupportedFormats format_set_ = {};
+  size_t ring_buffer_size_;
+  zx::vmo ring_buffer_;
+
+  // Although deprecated, fifo_depth (if set) directly affects internal_delay. In responses to
+  // WatchDelayInfo, we ensure that internal_delay is no less than what fifo_depth implies.
+  // For this reason, explicitly clearing internal_delay also clears fifo_depth.
+  std::optional<uint32_t> fifo_depth_;
+  // An arbitrarily-chosen non-zero delay -- 3 frames @ 48khz.
+  std::optional<zx::duration> internal_delay_{zx::nsec(62500)};
+  std::optional<zx::duration> external_delay_;
+  std::optional<zx::duration> turn_on_delay_;
+
+  std::optional<fuchsia::hardware::audio::PcmFormat> selected_format_;
+
+  bool active_channels_supported_ = true;
+  uint64_t active_channels_bitmask_;
+  zx::time active_channels_set_time_{0};
+
+  bool is_running_ = false;
+  zx::time mono_start_time_{0};
 
   async_dispatcher_t* dispatcher_;
   std::optional<fidl::Binding<fuchsia::hardware::audio::StreamConfig>> stream_config_binding_;
   zx::channel stream_config_server_end_;
   zx::channel stream_config_client_end_;
 
+  std::optional<fidl::Binding<fuchsia::hardware::audio::RingBuffer>> ring_buffer_binding_;
+
+  bool position_notification_values_are_set_ = false;
+  zx::time position_notify_timestamp_mono_;
+  uint32_t position_notify_position_bytes_ = 0;
+  std::optional<fuchsia::hardware::audio::RingBuffer::WatchClockRecoveryPositionInfoCallback>
+      position_notify_callback_;
+
   // Always respond to the first hanging-get request.
   bool gain_has_changed_ = true;
   bool plug_has_changed_ = true;
+  bool delay_has_changed_ = true;
   fuchsia::hardware::audio::StreamConfig::WatchGainStateCallback pending_gain_callback_ = nullptr;
   fuchsia::hardware::audio::StreamConfig::WatchPlugStateCallback pending_plug_callback_ = nullptr;
+  fuchsia::hardware::audio::RingBuffer::WatchDelayInfoCallback pending_delay_callback_ = nullptr;
 };
 
 }  // namespace media_audio

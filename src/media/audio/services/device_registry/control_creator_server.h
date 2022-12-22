@@ -24,7 +24,6 @@ class ControlCreatorServer : public std::enable_shared_from_this<ControlCreatorS
       fidl::ServerEnd<fuchsia_audio_device::ControlCreator> server_end,
       std::shared_ptr<AudioDeviceRegistry> parent);
 
-  std::shared_ptr<AudioDeviceRegistry> parent() { return parent_; }
   ~ControlCreatorServer() override;
 
   // fuchsia.audio.device.ControlCreator implementation

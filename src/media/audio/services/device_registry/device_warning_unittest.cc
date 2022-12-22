@@ -95,4 +95,24 @@ TEST_F(DeviceWarningTest, SetGainWithoutControl) {
   EXPECT_FALSE(*gain_state.agc_enabled());
 }
 
+TEST_F(DeviceWarningTest, NoMatchForSupportedDriverFormatForClientFormat) {
+  fake_driver_->set_frame_rates(0, {48000});
+  fake_driver_->set_valid_bits_per_sample(0, {12, 15, 20});
+  fake_driver_->set_bytes_per_sample(0, {2, 4});
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+
+  ExpectNoFormatMatch(device_, fuchsia_audio::SampleType::kInt16, 2, 47999);
+  ExpectNoFormatMatch(device_, fuchsia_audio::SampleType::kInt16, 2, 48001);
+  ExpectNoFormatMatch(device_, fuchsia_audio::SampleType::kInt16, 1, 48000);
+  ExpectNoFormatMatch(device_, fuchsia_audio::SampleType::kInt16, 3, 48000);
+  ExpectNoFormatMatch(device_, fuchsia_audio::SampleType::kUint8, 2, 48000);
+  ExpectNoFormatMatch(device_, fuchsia_audio::SampleType::kFloat32, 2, 48000);
+  ExpectNoFormatMatch(device_, fuchsia_audio::SampleType::kFloat64, 2, 48000);
+}
+
+// TODO: CreateRingBufferConnection with bad format.
+
+// TODO: RetrieveVmo size too large; min_frames too large
+
 }  // namespace media_audio

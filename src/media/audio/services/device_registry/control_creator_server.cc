@@ -58,8 +58,7 @@ void ControlCreatorServer::Create(CreateRequest& request, CreateCompleter::Sync&
 
   auto [status, device] = parent_->FindDeviceByTokenId(*request.token_id());
   // We could break these out into separate error codes if needed.
-  if (status == AudioDeviceRegistry::DevicePresence::Unknown ||
-      status == AudioDeviceRegistry::DevicePresence::Removed) {
+  if (status == AudioDeviceRegistry::DevicePresence::Unknown) {
     completer.Reply(fit::error(fuchsia_audio_device::ControlCreatorError::kDeviceNotFound));
     return;
   }

@@ -4,12 +4,12 @@
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <lib/sync/cpp/completion.h>
+#include <zircon/errors.h>
 
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 #include "src/media/audio/services/device_registry/registry_server.h"
-#include "zircon/errors.h"
 
 namespace media_audio {
 namespace {

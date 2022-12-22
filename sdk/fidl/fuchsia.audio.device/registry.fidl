@@ -6,7 +6,7 @@ library fuchsia.audio.device;
 
 using fuchsia.hardware.audio;
 using fuchsia.hardware.audio.signalprocessing;
-using fuchsia.mediastreams;
+using fuchsia.audio;
 using zx;
 
 alias ClockDomain = fuchsia.hardware.audio.ClockDomain;
@@ -22,7 +22,7 @@ const MAX_COUNT_FORMATS uint32 = fuchsia.hardware.audio.MAX_COUNT_FORMATS;
 const MAX_COUNT_CHANNEL_SETS uint32 = fuchsia.hardware.audio.MAX_COUNT_CHANNEL_SETS;
 
 /// Maximum number of distinct sample formats that a single PcmFormatSet can contain.
-const MAX_COUNT_SAMPLE_FORMATS uint32 = 32;
+const MAX_COUNT_SAMPLE_TYPES uint32 = 32;
 
 /// Maximum number of frame rates that a device can report in a PcmFormatSet.
 const MAX_COUNT_RATES uint32 = fuchsia.hardware.audio.MAX_COUNT_SUPPORTED_RATES;
@@ -139,7 +139,7 @@ type PcmFormatSet = table {
     /// contain least one `AudioSampleFormat` entry.
     ///
     /// Required.
-    2: sample_formats vector<fuchsia.mediastreams.AudioSampleFormat>:MAX_COUNT_SAMPLE_FORMATS;
+    2: sample_types vector<fuchsia.audio.SampleType>:MAX_COUNT_SAMPLE_TYPES;
 
     /// The number of frame rates that the device supports. This must contain at
     /// least one frame rate entry.

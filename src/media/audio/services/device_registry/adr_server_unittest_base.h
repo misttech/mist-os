@@ -8,8 +8,6 @@
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
-#include <fidl/fuchsia.mediastreams/cpp/common_types.h>
-#include <fidl/fuchsia.mediastreams/cpp/natural_types.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 
 #include <memory>

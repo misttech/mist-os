@@ -16,11 +16,6 @@ namespace {
 
 class ProviderServerTest : public AudioDeviceRegistryServerTestBase {
  protected:
-  std::unique_ptr<TestServerAndNaturalAsyncClient<ProviderServer>> CreateProviderServer() {
-    return std::make_unique<TestServerAndNaturalAsyncClient<ProviderServer>>(
-        test_loop(), server_thread_, adr_service_);
-  }
-
   std::pair<fidl::Client<fuchsia_audio_device::Registry>, std::shared_ptr<RegistryServer>>
   CreateRegistryServer() {
     auto [client_end, server_end] = CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Registry>();

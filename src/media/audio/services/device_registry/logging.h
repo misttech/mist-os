@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
-#include <fidl/fuchsia.mediastreams/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
 
@@ -22,13 +21,13 @@ namespace media_audio {
   FX_LAZY_STREAM(FX_LOG_STREAM(INFO, nullptr), CONDITION) \
       << kClassName << "(" << this << ")::" << __func__ << ": "
 
-#define ADR_WARN_OBJECT() FX_LOGS(WARNING) << kClassName << "(" << this << ")::" << __func__ << ": "
-
 #define ADR_LOG_CLASS(CONDITION) \
   FX_LAZY_STREAM(FX_LOG_STREAM(INFO, nullptr), CONDITION) << kClassName << "::" << __func__ << ": "
 
 #define ADR_LOG(CONDITION) \
   FX_LAZY_STREAM(FX_LOG_STREAM(INFO, nullptr), CONDITION) << __func__ << ": "
+
+#define ADR_WARN_OBJECT() FX_LOGS(WARNING) << kClassName << "(" << this << ")::" << __func__ << ": "
 
 inline constexpr bool kLogDeviceDetection = false;
 inline constexpr bool kLogDeviceInitializationProgress = false;
@@ -39,6 +38,11 @@ inline constexpr bool kLogDeviceMethods = false;
 inline constexpr bool kLogStreamConfigFidlCalls = false;
 inline constexpr bool kLogStreamConfigFidlResponses = false;
 inline constexpr bool kLogStreamConfigFidlResponseValues = false;
+
+inline constexpr bool kLogRingBufferMethods = false;
+inline constexpr bool kLogRingBufferFidlCalls = false;
+inline constexpr bool kLogRingBufferFidlResponses = false;
+inline constexpr bool kLogRingBufferFidlResponseValues = false;
 
 inline constexpr bool kLogObjectLifetimes = false;
 inline constexpr bool kLogDeviceState = false;
@@ -62,25 +66,15 @@ void LogPlugState(const fuchsia_hardware_audio::PlugState& plug_state);
 
 void LogDeviceInfo(const fuchsia_audio_device::Info& device_info);
 
+void LogRingBufferProperties(const fuchsia_hardware_audio::RingBufferProperties& props);
+void LogRingBufferFormat(const fuchsia_hardware_audio::Format& format);
+void LogRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames,
+                      fuchsia_hardware_audio::Format format);
+void LogDelayInfo(const fuchsia_hardware_audio::DelayInfo& info);
+void LogActiveChannels(uint64_t channel_bitmask, zx::time set_time);
+
 // Enabled by kLogObjectCounts.
 void LogObjectCounts();
-
-// fuchsia_mediastreams types
-inline std::ostream& operator<<(std::ostream& out,
-                                const fuchsia_mediastreams::AudioSampleFormat& format) {
-  switch (format) {
-    case fuchsia_mediastreams::AudioSampleFormat::kUnsigned8:
-      return (out << "UNSIGNED_8");
-    case fuchsia_mediastreams::AudioSampleFormat::kSigned16:
-      return (out << "SIGNED_16");
-    case fuchsia_mediastreams::AudioSampleFormat::kSigned24In32:
-      return (out << "SIGNED_24_IN_32");
-    case fuchsia_mediastreams::AudioSampleFormat::kSigned32:
-      return (out << "SIGNED_32");
-    case fuchsia_mediastreams::AudioSampleFormat::kFloat:
-      return (out << "FLOAT");
-  }
-}
 
 // fuchsia_hardware_audio types
 inline std::ostream& operator<<(std::ostream& out,
@@ -111,6 +105,23 @@ inline std::ostream& operator<<(std::ostream& out,
   }
 }
 
+inline std::ostream& operator<<(std::ostream& out, const fuchsia_audio::SampleType& sample_type) {
+  switch (sample_type) {
+    case fuchsia_audio::SampleType::kUint8:
+      return (out << "UINT_8");
+    case fuchsia_audio::SampleType::kInt16:
+      return (out << "INT_16");
+    case fuchsia_audio::SampleType::kInt32:
+      return (out << "INT_32");
+    case fuchsia_audio::SampleType::kFloat32:
+      return (out << "FLOAT_32");
+    case fuchsia_audio::SampleType::kFloat64:
+      return (out << "FLOAT_64");
+    default:
+      return (out << "UNKNOWN");
+  }
+}
+
 // fuchsia_audio_device types
 inline std::ostream& operator<<(
     std::ostream& out, const std::optional<fuchsia_audio_device::DeviceType>& device_type) {
@@ -121,7 +132,7 @@ inline std::ostream& operator<<(
       case fuchsia_audio_device::DeviceType::kOutput:
         return (out << "OUTPUT");
       default:
-        return (out << "UNKNOWN");
+        return (out << "OTHER (unknown enum)");
     }
   }
   return (out << "NONE (non-compliant)");
@@ -136,10 +147,21 @@ inline std::ostream& operator<<(
       case fuchsia_audio_device::PlugDetectCapabilities::kPluggable:
         return (out << "PLUGGABLE");
       default:
-        return (out << "UNKNOWN");
+        return (out << "OTHER (unknown enum)");
     }
   }
   return (out << "NONE (non-compliant)");
+}
+inline std::ostream& operator<<(std::ostream& out,
+                                const fuchsia_audio_device::PlugState& plug_state) {
+  switch (plug_state) {
+    case fuchsia_audio_device::PlugState::kPlugged:
+      return (out << "PLUGGED");
+    case fuchsia_audio_device::PlugState::kUnplugged:
+      return (out << "UNPLUGGED");
+    default:
+      return (out << "OTHER (unknown enum)");
+  }
 }
 
 }  // namespace media_audio

@@ -50,7 +50,7 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
   // Add a newly-constructed Device object to our "initializing" list.
   void AddDevice(const std::shared_ptr<Device>& initializing_device);
 
-  enum class DevicePresence { Unknown, Active, Error, Removed };
+  enum class DevicePresence { Unknown, Active, Error };
   std::pair<DevicePresence, std::shared_ptr<Device>> FindDeviceByTokenId(TokenId token_id);
 
   bool ClaimDeviceForControl(std::shared_ptr<Device> device);
@@ -87,9 +87,8 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
   // These devices have encountered an error or have self-reported as unhealthy. They have been
   // reported (via Registry/WatchDeviceRemoved) as being removed, and are no longer in the device
   // list provided to clients (via Registry/WatchDevicesAdded).
+  // Once one of these devices is actually removed, it is deleted from this set.
   std::unordered_set<std::shared_ptr<Device>> unhealthy_devices_;
-  // The list of IDs of devices that have been removed; they may previously have been in any state.
-  std::unordered_set<TokenId> removed_devices_;
 
   std::shared_ptr<FidlThread> thread_;
   component::OutgoingDirectory outgoing_;

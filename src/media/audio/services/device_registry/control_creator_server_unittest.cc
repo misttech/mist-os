@@ -16,15 +16,33 @@ namespace {
 
 class ControlCreatorServerTest : public AudioDeviceRegistryServerTestBase {};
 
-TEST_F(ControlCreatorServerTest, Basic) {
+// Validate that the ControlCreator client can be dropped cleanly without generating a WARNING.
+TEST_F(ControlCreatorServerTest, CleanClientDrop) {
   auto control_creator_wrapper =
       std::make_unique<TestServerAndNaturalAsyncClient<ControlCreatorServer>>(
           test_loop(), server_thread_, adr_service_);
-
   RunLoopUntilIdle();
-  EXPECT_EQ(ControlCreatorServer::count(), 1u);
+  ASSERT_EQ(ControlCreatorServer::count(), 1u);
+
+  control_creator_wrapper->client() = fidl::Client<fuchsia_audio_device::ControlCreator>();
+  RunLoopUntilIdle();
+  EXPECT_TRUE(control_creator_wrapper->server().WaitForShutdown(zx::sec(1)));
 }
 
+// Validate that the ControlCreator server can shutdown cleanly without generating a WARNING.
+TEST_F(ControlCreatorServerTest, CleanServerShutdown) {
+  auto control_creator_wrapper =
+      std::make_unique<TestServerAndNaturalAsyncClient<ControlCreatorServer>>(
+          test_loop(), server_thread_, adr_service_);
+  RunLoopUntilIdle();
+  ASSERT_EQ(ControlCreatorServer::count(), 1u);
+
+  control_creator_wrapper->server().Shutdown();
+  RunLoopUntilIdle();
+  EXPECT_TRUE(control_creator_wrapper->server().WaitForShutdown(zx::sec(1)));
+}
+
+// Validate the ControlCfreator/CreateControl method.
 TEST_F(ControlCreatorServerTest, CreateControl) {
   auto control_creator_wrapper =
       std::make_unique<TestServerAndNaturalAsyncClient<ControlCreatorServer>>(

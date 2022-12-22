@@ -79,7 +79,7 @@ void AudioDeviceRegistry::DeviceIsReady(std::shared_ptr<media_audio::Device> rea
 
   // Notify registry clients of this new device.
   for (auto& weak_registry : registries_) {
-    if (std::shared_ptr<RegistryServer> registry = weak_registry.lock()) {
+    if (auto registry = weak_registry.lock()) {
       registry->DeviceWasAdded(ready_device);
     }
   }
@@ -118,16 +118,15 @@ void AudioDeviceRegistry::DeviceIsRemoved(std::shared_ptr<media_audio::Device> d
         << "removed " << device_to_remove << " from active device list";
   }
 
-  if (unhealthy_devices_.erase(device_to_remove)) {
-    ADR_LOG_OBJECT(kLogObjectLifetimes)
-        << "removed " << device_to_remove << " from unhealthy device list";
-  }
-
   if (pending_devices_.erase(device_to_remove)) {
     ADR_LOG_OBJECT(kLogObjectLifetimes)
         << "removed " << device_to_remove << " from pending (initializing) device list";
   }
-  removed_devices_.insert(device_to_remove->token_id());
+
+  if (unhealthy_devices_.erase(device_to_remove)) {
+    ADR_LOG_OBJECT(kLogObjectLifetimes)
+        << "removed " << device_to_remove << " from unhealthy device list";
+  }
 }
 
 std::pair<AudioDeviceRegistry::DevicePresence, std::shared_ptr<Device>>
@@ -136,12 +135,6 @@ AudioDeviceRegistry::FindDeviceByTokenId(TokenId token_id) {
     if (device->token_id() == token_id) {
       ADR_LOG_CLASS(kLogAudioDeviceRegistryMethods) << "active (token_id " << token_id << ")";
       return std::make_pair(DevicePresence::Active, device);
-    }
-  }
-  for (auto& removed_id : removed_devices_) {
-    if (removed_id == token_id) {
-      ADR_LOG_CLASS(kLogAudioDeviceRegistryMethods) << "removed (token_id " << token_id << ")";
-      return std::make_pair(DevicePresence::Removed, nullptr);
     }
   }
   for (auto& device : unhealthy_devices_) {

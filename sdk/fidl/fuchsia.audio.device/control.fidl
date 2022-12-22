@@ -4,7 +4,6 @@
 
 library fuchsia.audio.device;
 
-using fuchsia.mediastreams;
 using fuchsia.audio;
 using fuchsia.hardware.audio.signalprocessing;
 using zx;
@@ -16,9 +15,8 @@ type RingBufferOptions = table {
     ///
     /// Required.
     //
-    // TODO(fxbug.dev/105130): Adopt `AudioEncoding` once it lands:
-    // 1: encoding fuchsia.mediastreams.AudioEncoding;
-    1: format fuchsia.mediastreams.AudioFormat;
+    // TODO(fxbug.dev/105130): Use a union, to accommodate non-PCM
+    1: format fuchsia.audio.Format;
 
     /// The minimum number of bytes required in the ring buffer. The actual
     /// buffer may be larger, as required by the encoding, driver, device or OS.
