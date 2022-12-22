@@ -1020,13 +1020,15 @@ bool HandleWriteScanEnable(const CommandData* cmd_data, const fxl::CommandLine& 
     }
   }
 
-  constexpr size_t kPayloadSize = sizeof(::bt::hci_spec::WriteScanEnableCommandParams);
-  auto packet = ::bt::hci::CommandPacket::New(::bt::hci_spec::kWriteScanEnable, kPayloadSize);
-
-  packet->mutable_payload<::bt::hci_spec::WriteScanEnableCommandParams>()->scan_enable =
-      scan_enable;
-
-  auto id = SendCompleteCommand(cmd_data, std::move(packet), std::move(complete_cb));
+  auto write_enable =
+      ::bt::hci::EmbossCommandPacket::New<::bt::hci_spec::WriteScanEnableCommandWriter>(
+          ::bt::hci_spec::kWriteScanEnable);
+  auto write_enable_view = write_enable.view_t();
+  write_enable_view.scan_enable().inquiry().Write(
+      scan_enable & static_cast<uint8_t>(::bt::hci_spec::ScanEnableBit::kInquiry));
+  write_enable_view.scan_enable().page().Write(
+      scan_enable & static_cast<uint8_t>(::bt::hci_spec::ScanEnableBit::kPage));
+  auto id = SendCompleteCommand(cmd_data, std::move(write_enable), std::move(complete_cb));
 
   std::cout << "  Sent HCI_Write_Scan_Enable (id=" << id << ")" << std::endl;
 
