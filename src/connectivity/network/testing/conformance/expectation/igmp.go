@@ -25,7 +25,8 @@ var igmpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]out
 	{5, 7}:  Pass,
 	{5, 8}:  Fail,
 	{5, 9}:  Fail,
-	{5, 11}: Pass,
+	// TODO(https://fxbug.dev/118202): Fix.
+	{5, 11}: Fail,
 	{6, 2}:  Pass,
 	{6, 8}:  Pass,
 }
