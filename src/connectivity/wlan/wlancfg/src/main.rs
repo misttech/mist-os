@@ -374,7 +374,6 @@ async fn run_all_futures() -> Result<(), Error> {
         iface_manager.clone(),
         saved_networks.clone(),
         telemetry_sender.clone(),
-        scan::LocationSensorUpdater {},
         scan_request_receiver,
     );
 

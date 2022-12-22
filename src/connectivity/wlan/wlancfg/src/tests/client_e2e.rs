@@ -14,7 +14,7 @@ use {
         },
         telemetry::{TelemetryEvent, TelemetrySender},
         util::listener,
-        util::testing::{create_inspect_persistence_channel, create_wlan_hasher, run_while},
+        util::testing::{create_inspect_persistence_channel, create_wlan_hasher},
     },
     anyhow::{format_err, Error},
     fidl::endpoints::{create_proxy, create_request_stream},
@@ -22,7 +22,7 @@ use {
     fidl_fuchsia_wlan_common_security as fidl_common_security,
     fidl_fuchsia_wlan_device_service::DeviceWatcherEvent,
     fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_async::{self as fasync, TestExecutor},
+    fuchsia_async::{self as fasync, DurationExt, TestExecutor},
     fuchsia_inspect::{self as inspect},
     fuchsia_zircon as zx,
     futures::{
@@ -35,7 +35,7 @@ use {
     },
     hex,
     lazy_static::lazy_static,
-    log::info,
+    log::{debug, info},
     pin_utils::pin_mut,
     std::{
         convert::{Infallible, TryFrom},
@@ -209,7 +209,6 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
             iface_manager.clone(),
             saved_networks.clone(),
             telemetry_sender.clone(),
-            scan::LocationSensorUpdater {},
             scan_request_receiver,
         )
         // Map the output type of this future to match the other ones we want to combine with it
@@ -562,6 +561,115 @@ fn get_client_state_update(
     update
 }
 
+/// It takes an indeterminate amount of time for the scan module to either send the results
+/// to the location sensor, or be notified by the component framework that the location
+/// sensor's channel is closed / non-existent. This function continues trying to advance the
+/// future until the next expected event happens (e.g. an event is present on the sme stream
+/// for the expected active scan).
+#[track_caller]
+pub fn poll_for_sme_scan_request(
+    exec: &mut fasync::TestExecutor,
+    network_selection_fut: &mut (impl futures::Future + std::marker::Unpin),
+    sme_stream: &mut fidl_sme::ClientSmeRequestStream,
+) -> fidl_sme::ClientSmeRequest {
+    let mut counter = 0;
+    let sme_stream_result = loop {
+        counter += 1;
+        if counter > 1000 {
+            panic!("Failed to progress network selection future until next scan");
+        };
+        let sleep_duration = zx::Duration::from_millis(2);
+        exec.run_singlethreaded(fasync::Timer::new(sleep_duration.after_now()));
+        assert_variant!(
+            exec.run_until_stalled(network_selection_fut),
+            Poll::Pending,
+            "Did not get 'poll::Pending' on network_selection_fut"
+        );
+        match exec.run_until_stalled(&mut sme_stream.next()) {
+            Poll::Pending => continue,
+            other_result => {
+                debug!("Required {} iterations to get an SME stream message", counter);
+                break other_result;
+            }
+        }
+    };
+
+    assert_variant!(
+        sme_stream_result,
+        Poll::Ready(Some(Ok(scan_req))) => scan_req
+    )
+}
+#[track_caller]
+pub fn poll_for_device_monitor_request(
+    exec: &mut fasync::TestExecutor,
+    fut: &mut (impl futures::Future + std::marker::Unpin),
+    stream: &mut fidl_fuchsia_wlan_device_service::DeviceMonitorRequestStream,
+) -> fidl_fuchsia_wlan_device_service::DeviceMonitorRequest {
+    let mut counter = 0;
+    let stream_result = loop {
+        counter += 1;
+        if counter > 1000 {
+            panic!("Failed to progress network selection future until next scan");
+        };
+        let sleep_duration = zx::Duration::from_millis(2);
+        exec.run_singlethreaded(fasync::Timer::new(sleep_duration.after_now()));
+        assert_variant!(
+            exec.run_until_stalled(fut),
+            Poll::Pending,
+            "Did not get 'poll::Pending' on network_selection_fut"
+        );
+        match exec.run_until_stalled(&mut stream.next()) {
+            Poll::Pending => continue,
+            other_result => {
+                debug!("Required {} iterations to get an SME stream message", counter);
+                break other_result;
+            }
+        }
+    };
+
+    assert_variant!(
+        stream_result,
+        Poll::Ready(Some(Ok(stream_item))) => stream_item
+    )
+}
+#[track_caller]
+pub fn poll_for_client_state_update(
+    exec: &mut fasync::TestExecutor,
+    fut: &mut (impl futures::Future + std::marker::Unpin),
+    stream: &mut fidl_policy::ClientStateUpdatesRequestStream,
+) -> fidl_policy::ClientStateSummary {
+    let mut counter = 0;
+    let stream_result = loop {
+        counter += 1;
+        if counter > 1000 {
+            panic!("Failed to progress network selection future until next scan");
+        };
+        let sleep_duration = zx::Duration::from_millis(2);
+        exec.run_singlethreaded(fasync::Timer::new(sleep_duration.after_now()));
+        assert_variant!(
+            exec.run_until_stalled(fut),
+            Poll::Pending,
+            "Did not get 'poll::Pending' on network_selection_fut"
+        );
+        match exec.run_until_stalled(&mut stream.next()) {
+            Poll::Pending => continue,
+            other_result => {
+                debug!("Required {} iterations to get an SME stream message", counter);
+                break other_result;
+            }
+        }
+    };
+
+    assert_variant!(
+        stream_result,
+        Poll::Ready(Some(Ok(stream_item))) =>  {
+            let (update, responder) = stream_item.into_on_client_state_update().unwrap();
+            let _ = responder.send();
+            update
+        }
+    )
+}
+
 /// Gets a set of security protocols that describe the protection of a BSS.
 ///
 /// This function does **not** consider hardware and driver support. Returns an empty `Vec` if
@@ -738,11 +846,16 @@ fn save_and_connect(
             channel: types::WlanChan::new(1, types::Cbw::Cbw20),
         ),
     }];
+    let sme_request = poll_for_sme_scan_request(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut iface_sme_stream,
+    );
     assert_variant!(
-        exec.run_until_stalled(&mut iface_sme_stream.next()),
-        Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
+        sme_request,
+        fidl_sme::ClientSmeRequest::Scan {
             req, responder
-        }))) => {
+        } => {
             assert_eq!(req, expected_scan_request);
             responder.send(&mut Ok(mock_scan_results)).expect("failed to send scan data");
         }
@@ -754,11 +867,16 @@ fn save_and_connect(
     );
 
     // Expect to get an SME request for state machine creation.
+    let device_monitor_request = poll_for_device_monitor_request(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.monitor_service_stream,
+    );
     let sme_server = assert_variant!(
-        exec.run_until_stalled(&mut test_values.external_interfaces.monitor_service_stream.next()),
-        Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
+        device_monitor_request,
+        fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
             iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
-        }))) => {
+        } => {
             // Send back a positive acknowledgement.
             assert!(responder.send(&mut Ok(())).is_ok());
             sme_server
@@ -974,16 +1092,16 @@ fn save_and_fail_to_connect(
                 channel: types::WlanChan::new(1, types::Cbw::Cbw20),
             ),
         }];
-        let (sme_request, _) = run_while(
+        let sme_request = poll_for_sme_scan_request(
             &mut exec,
             &mut test_values.internal_objects.internal_futures,
-            &mut iface_sme_stream.next(),
+            &mut iface_sme_stream,
         );
         assert_variant!(
             sme_request,
-            Some(Ok(fidl_sme::ClientSmeRequest::Scan {
+            fidl_sme::ClientSmeRequest::Scan {
                 req, responder
-            })) => {
+            } => {
                 match req {
                     fidl_sme::ScanRequest::Active(req) => {
                         assert_eq!(req, expected_scan_request);
@@ -997,15 +1115,19 @@ fn save_and_fail_to_connect(
                 responder.send(&mut Ok(mock_scan_results)).expect("failed to send scan data");
             }
         );
+
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+            Poll::Pending
+        );
     }
 
     // Check for a listener update saying we failed to connect
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
+    let fidl_policy::ClientStateSummary { state, networks, .. } = poll_for_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut client_listener_update_requests,
     );
-    let fidl_policy::ClientStateSummary { state, networks, .. } =
-        get_client_state_update(&mut exec, &mut client_listener_update_requests);
     assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
     let mut networks = networks.unwrap();
     assert_eq!(networks.len(), 1);
