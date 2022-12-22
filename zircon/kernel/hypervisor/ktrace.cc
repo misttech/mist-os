@@ -13,14 +13,14 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wc99-designator"
 #endif
-static StringRef* const vcpu_meta[] = {
+static fxt::StringRef<fxt::RefType::kId> vcpu_meta[] = {
     [VCPU_INTERRUPT] = "wait:interrupt"_stringref,
     [VCPU_PORT] = "wait:port"_stringref,
 };
 static_assert((sizeof(vcpu_meta) / sizeof(vcpu_meta[0])) == VCPU_META_COUNT,
               "vcpu_meta array must match enum VcpuMeta");
 
-static StringRef* const vcpu_exit[] = {
+static fxt::StringRef<fxt::RefType::kId> vcpu_exit[] = {
 #if ARCH_ARM64
     [VCPU_UNDERFLOW_MAINTENANCE_INTERRUPT] = "exit:underflow_maintenance_interrupt"_stringref,
     [VCPU_PHYSICAL_INTERRUPT] = "exit:physical_interrupt"_stringref,
@@ -58,12 +58,10 @@ static_assert((sizeof(vcpu_exit) / sizeof(vcpu_exit[0])) == VCPU_EXIT_COUNT,
 
 void ktrace_vcpu(uint32_t tag, VcpuMeta meta) {
   if (unlikely(ktrace_tag_enabled(tag))) {
-    const Thread* current_thread = Thread::Current::Get();
-    const fxt::ThreadRef thread{current_thread->pid(), current_thread->tid()};
-    const fxt::StringRef category{"kernel:vcpu"_stringref->GetId()};
-    const fxt::Argument arg{fxt::StringRef{"meta #"_stringref->GetId()}, meta};
-    const auto name = meta < VCPU_META_COUNT ? fxt::StringRef(vcpu_meta[meta]->GetId())
-                                             : fxt::StringRef("vcpu meta"_stringref->GetId());
+    const fxt::ThreadRef thread = ThreadRefFromContext(TraceContext::Thread);
+    const fxt::StringRef category = "kernel:vcpu"_stringref;
+    const fxt::Argument arg = {"meta #"_stringref, meta};
+    const fxt::StringRef name = meta < VCPU_META_COUNT ? vcpu_meta[meta] : "vcpu meta"_stringref;
     if (tag == TAG_VCPU_BLOCK) {
       fxt_duration_begin(tag, current_ticks(), thread, category, name, arg);
     } else if (tag == TAG_VCPU_UNBLOCK) {
@@ -74,19 +72,17 @@ void ktrace_vcpu(uint32_t tag, VcpuMeta meta) {
 
 void ktrace_vcpu_exit(VcpuExit exit, uint64_t exit_address) {
   if (unlikely(ktrace_tag_enabled(TAG_VCPU_EXIT))) {
-    const Thread* current_thread = Thread::Current::Get();
-    const fxt::ThreadRef thread{current_thread->pid(), current_thread->tid()};
-    const fxt::StringRef category{"kernel:vcpu"_stringref->GetId()};
-    const fxt::Argument addr_arg{fxt::StringRef{"exit_address"_stringref->GetId()}, exit_address};
-    const fxt::StringRef name{"vcpu"_stringref->GetId()};
+    const fxt::ThreadRef thread = ThreadRefFromContext(TraceContext::Thread);
+    const fxt::StringRef category = "kernel:vcpu"_stringref;
+    const fxt::Argument addr_arg = {"exit_address"_stringref, exit_address};
+    const fxt::StringRef name = "vcpu"_stringref;
 
     if (exit < VCPU_EXIT_COUNT) {
-      const fxt::Argument exit_type_arg{fxt::StringRef{"exit_address"_stringref->GetId()},
-                                        fxt::StringRef{vcpu_exit[exit]->GetId()}};
+      const fxt::Argument exit_type_arg = {"exit_address"_stringref, vcpu_exit[exit]};
       fxt_duration_end(TAG_VCPU_EXIT, current_ticks(), thread, category, name, addr_arg,
                        exit_type_arg);
     } else {
-      const fxt::Argument exit_type_arg{fxt::StringRef("exit_address"_stringref->GetId()), exit};
+      const fxt::Argument exit_type_arg = {"exit_address"_stringref, exit};
       fxt_duration_end(TAG_VCPU_EXIT, current_ticks(), thread, category, name, addr_arg,
                        exit_type_arg);
     }

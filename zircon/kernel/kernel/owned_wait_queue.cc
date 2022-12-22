@@ -198,13 +198,13 @@ class PiKTracer<Level, ktl::enable_if_t<(Level == PiTracingLevel::Normal) ||
         // Generate the start event and a flow id.
         flow_id_ = PiKTracerFlowIdGenerator::gen_.fetch_add(1, ktl::memory_order_relaxed);
         zx_ticks_t ts = current_ticks();
-        fxt_duration_complete(TAG_INHERIT_PRIORITY_START, ts, fxt::ThreadRef{t->pid(), t->tid()},
-                              fxt::StringRef{"kernel:sched"_stringref->GetId()},
-                              fxt::StringRef{"inherit_prio"_stringref->GetId()}, ts + 50);
+        fxt_duration_complete(TAG_INHERIT_PRIORITY_START, ts, t->fxt_ref(),
+                              fxt::StringRef{"kernel:sched"_stringref},
+                              fxt::StringRef{"inherit_prio"_stringref}, ts + 50);
 
-        fxt_flow_begin(TAG_INHERIT_PRIORITY_START, ts, fxt::ThreadRef{t->pid(), t->tid()},
-                       fxt::StringRef{"kernel:sched"_stringref->GetId()},
-                       fxt::StringRef{"inherit_prio"_stringref->GetId()}, flow_id_);
+        fxt_flow_begin(TAG_INHERIT_PRIORITY_START, ts, t->fxt_ref(),
+                       fxt::StringRef{"kernel:sched"_stringref},
+                       fxt::StringRef{"inherit_prio"_stringref}, flow_id_);
       } else {
         // Flush the previous event, but do not declare it to be the last in
         // the flow.
@@ -230,27 +230,23 @@ class PiKTracer<Level, ktl::enable_if_t<(Level == PiTracingLevel::Normal) ||
       return;
     }
 
-    fxt::Argument old_ep_arg{fxt::StringRef{"old_ip"_stringref->GetId()}, priorities_ & 0xFF};
-    fxt::Argument new_ep_arg{fxt::StringRef{"new_ip"_stringref->GetId()},
-                             (priorities_ >> 8) & 0xFF};
-    fxt::Argument old_ip_arg{fxt::StringRef{"old_ep"_stringref->GetId()},
-                             (priorities_ >> 16) & 0xFF};
-    fxt::Argument new_ip_arg{fxt::StringRef{"new_ep"_stringref->GetId()},
-                             (priorities_ >> 24) & 0xFF};
+    fxt::Argument old_ep_arg{"old_ip"_stringref, priorities_ & 0xFF};
+    fxt::Argument new_ep_arg{"new_ip"_stringref, (priorities_ >> 8) & 0xFF};
+    fxt::Argument old_ip_arg{"old_ep"_stringref, (priorities_ >> 16) & 0xFF};
+    fxt::Argument new_ip_arg{"new_ep"_stringref, (priorities_ >> 24) & 0xFF};
     zx_ticks_t ts = current_ticks();
-    fxt_duration_complete(TAG_INHERIT_PRIORITY_START, ts,
-                          fxt::ThreadRef{thread_->pid(), thread_->tid()},
-                          fxt::StringRef{"kernel:sched"_stringref->GetId()},
-                          fxt::StringRef{"inherit_prio"_stringref->GetId()}, ts + 50, old_ip_arg,
-                          new_ip_arg, old_ep_arg, new_ep_arg);
+    fxt_duration_complete(TAG_INHERIT_PRIORITY_START, ts, thread_->fxt_ref(),
+                          fxt::StringRef{"kernel:sched"_stringref},
+                          fxt::StringRef{"inherit_prio"_stringref}, ts + 50, old_ip_arg, new_ip_arg,
+                          old_ep_arg, new_ep_arg);
     if (type == FlushType::INTERMEDIATE) {
-      fxt_flow_step(TAG_INHERIT_PRIORITY, ts, fxt::ThreadRef{thread_->pid(), thread_->tid()},
-                    fxt::StringRef{"kernel:sched"_stringref->GetId()},
-                    fxt::StringRef{"inherit_prio"_stringref->GetId()}, flow_id_);
+      fxt_flow_step(TAG_INHERIT_PRIORITY, ts, thread_->fxt_ref(),
+                    fxt::StringRef{"kernel:sched"_stringref},
+                    fxt::StringRef{"inherit_prio"_stringref}, flow_id_);
     } else {
-      fxt_flow_end(TAG_INHERIT_PRIORITY, ts, fxt::ThreadRef{thread_->pid(), thread_->tid()},
-                   fxt::StringRef{"kernel:sched"_stringref->GetId()},
-                   fxt::StringRef{"inherit_prio"_stringref->GetId()}, flow_id_);
+      fxt_flow_end(TAG_INHERIT_PRIORITY, ts, thread_->fxt_ref(),
+                   fxt::StringRef{"kernel:sched"_stringref},
+                   fxt::StringRef{"inherit_prio"_stringref}, flow_id_);
     }
   }
 

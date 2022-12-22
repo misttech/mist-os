@@ -119,6 +119,17 @@ enum class TraceContext {
   // TODO(eieio): Support process?
 };
 
+inline fxt::ThreadRef<fxt::RefType::kInline> ThreadRefFromContext(TraceContext context) {
+  switch (context) {
+    case TraceContext::Thread:
+      return Thread::Current::Get()->fxt_ref();
+    case TraceContext::Cpu:
+      return {kNoProcess, fxt::Koid{kKernelPseudoCpuBase + arch_curr_cpu_num()}};
+    default:
+      return {kNoProcess, fxt::Koid{0}};
+  }
+}
+
 // Argument type that specifies whether a trace function is enabled or disabled.
 template <bool enabled>
 struct TraceEnabled {};
@@ -153,7 +164,7 @@ inline constexpr uint64_t kRecordCurrentTimestamp = 0xffffffff'ffffffff;
 #define KTRACE_STRING_REF_CAT(a, b) a##b
 #define KTRACE_STRING_REF(string) KTRACE_STRING_REF_CAT(string, _stringref)
 
-inline StringRef* GetCategoryForGroup(uint32_t group) {
+inline fxt::StringRef<fxt::RefType::kId> GetCategoryForGroup(uint32_t group) {
   switch (group) {
     case KTRACE_GRP_META:
       return "kernel:meta"_stringref;
@@ -184,205 +195,136 @@ inline StringRef* GetCategoryForGroup(uint32_t group) {
 inline bool ktrace_tag_enabled(uint32_t tag) { return ktrace_thunks::tag_enabled(tag); }
 
 template <bool enabled>
-inline void ktrace_probe(TraceEnabled<enabled>, TraceContext context, StringRef* string_ref) {
-  if constexpr (!enabled) {
-    return;
+inline void ktrace_probe(TraceEnabled<enabled>, TraceContext context, StringRef& label) {
+  if constexpr (enabled) {
+    const uint32_t tag = TAG_PROBE_16(label.GetId());
+    ktrace_thunks::fxt_instant(tag, current_ticks(), ThreadRefFromContext(context),
+                               GetCategoryForGroup(KTRACE_GROUP(tag)), fxt::StringRef{label});
   }
-  const uint32_t tag = TAG_PROBE_16(string_ref->GetId());
-  const auto thread_ref =
-      context == TraceContext::Thread
-          ? fxt::ThreadRef{Thread::Current::Get()->pid(), Thread::Current::Get()->tid()}
-          : fxt::ThreadRef{kNoProcess, fxt::Koid{kKernelPseudoCpuBase + arch_curr_cpu_num()}};
-  ktrace_thunks::fxt_instant(tag, current_ticks(), thread_ref,
-                             fxt::StringRef{GetCategoryForGroup(KTRACE_GROUP(tag))->GetId()},
-                             fxt::StringRef{string_ref->GetId()});
 }
 
 template <bool enabled>
-inline void ktrace_probe(TraceEnabled<enabled>, TraceContext context, StringRef* string_ref,
-                         uint32_t a, uint32_t b) {
-  if constexpr (!enabled) {
-    return;
+inline void ktrace_probe(TraceEnabled<enabled>, TraceContext context, StringRef& label, uint32_t a,
+                         uint32_t b) {
+  if constexpr (enabled) {
+    const uint32_t tag = TAG_PROBE_24(label.GetId());
+    ktrace_thunks::fxt_instant(tag, current_ticks(), ThreadRefFromContext(context),
+                               GetCategoryForGroup(KTRACE_GROUP(tag)), fxt::StringRef(label),
+                               fxt::Argument{"arg0"_stringref, a},
+                               fxt::Argument{"arg1"_stringref, b});
   }
-  const uint32_t tag = TAG_PROBE_24(string_ref->GetId());
-  const auto thread_ref =
-      context == TraceContext::Thread
-          ? fxt::ThreadRef{Thread::Current::Get()->pid(), Thread::Current::Get()->tid()}
-          : fxt::ThreadRef{kNoProcess, fxt::Koid{kKernelPseudoCpuBase + arch_curr_cpu_num()}};
-  ktrace_thunks::fxt_instant(tag, current_ticks(), thread_ref,
-                             fxt::StringRef{GetCategoryForGroup(KTRACE_GROUP(tag))->GetId()},
-                             fxt::StringRef{string_ref->GetId()},
-                             fxt::Argument{fxt::StringRef{"arg0"_stringref->GetId()}, a},
-                             fxt::Argument{fxt::StringRef{"arg1"_stringref->GetId()}, b});
 }
 
 template <bool enabled>
-inline void ktrace_probe(TraceEnabled<enabled>, TraceContext context, StringRef* string_ref,
+inline void ktrace_probe(TraceEnabled<enabled>, TraceContext context, StringRef& label,
                          uint64_t a) {
-  if constexpr (!enabled) {
-    return;
+  if constexpr (enabled) {
+    const uint32_t tag = TAG_PROBE_24(label.GetId());
+    ktrace_thunks::fxt_instant(tag, current_ticks(), ThreadRefFromContext(context),
+                               GetCategoryForGroup(KTRACE_GROUP(tag)), fxt::StringRef{label},
+                               fxt::Argument{"arg0"_stringref, a});
   }
-  const uint32_t tag = TAG_PROBE_24(string_ref->GetId());
-  const auto thread_ref =
-      context == TraceContext::Thread
-          ? fxt::ThreadRef{Thread::Current::Get()->pid(), Thread::Current::Get()->tid()}
-          : fxt::ThreadRef{kNoProcess, fxt::Koid{kKernelPseudoCpuBase + arch_curr_cpu_num()}};
-  ktrace_thunks::fxt_instant(tag, current_ticks(), thread_ref,
-                             fxt::StringRef{GetCategoryForGroup(KTRACE_GROUP(tag))->GetId()},
-                             fxt::StringRef{string_ref->GetId()},
-                             fxt::Argument{fxt::StringRef{"arg0"_stringref->GetId()}, a});
 }
 
 template <bool enabled>
-inline void ktrace_probe(TraceEnabled<enabled>, TraceContext context, StringRef* string_ref,
-                         uint64_t a, uint64_t b) {
-  if constexpr (!enabled) {
-    return;
+inline void ktrace_probe(TraceEnabled<enabled>, TraceContext context, StringRef& label, uint64_t a,
+                         uint64_t b) {
+  if constexpr (enabled) {
+    const uint32_t tag = TAG_PROBE_32(label.GetId());
+    ktrace_thunks::fxt_instant(tag, current_ticks(), ThreadRefFromContext(context),
+                               GetCategoryForGroup(KTRACE_GROUP(tag)), fxt::StringRef{label},
+                               fxt::Argument{"arg0"_stringref, a},
+                               fxt::Argument{"arg1"_stringref, b});
   }
-  const uint32_t tag = TAG_PROBE_32(string_ref->GetId());
-  const auto thread_ref =
-      context == TraceContext::Thread
-          ? fxt::ThreadRef{Thread::Current::Get()->pid(), Thread::Current::Get()->tid()}
-          : fxt::ThreadRef{kNoProcess, fxt::Koid{kKernelPseudoCpuBase + arch_curr_cpu_num()}};
-  ktrace_thunks::fxt_instant(tag, current_ticks(), thread_ref,
-                             fxt::StringRef{GetCategoryForGroup(KTRACE_GROUP(tag))->GetId()},
-                             fxt::StringRef{string_ref->GetId()},
-                             fxt::Argument{fxt::StringRef{"arg0"_stringref->GetId()}, a},
-                             fxt::Argument{fxt::StringRef{"arg1"_stringref->GetId()}, b});
 }
 
 template <bool enabled>
 inline void ktrace_begin_duration(TraceEnabled<enabled>, TraceContext context, uint32_t group,
-                                  StringRef* string_ref) {
-  if constexpr (!enabled) {
-    return;
+                                  StringRef& label) {
+  if constexpr (enabled) {
+    const uint32_t tag = TAG_BEGIN_DURATION_16(label.GetId(), group);
+    ktrace_thunks::fxt_duration_begin(tag, current_ticks(), ThreadRefFromContext(context),
+                                      GetCategoryForGroup(KTRACE_GROUP(tag)),
+                                      fxt::StringRef{label});
   }
-  const uint32_t tag = TAG_BEGIN_DURATION_16(string_ref->GetId(), group);
-  const auto thread_ref =
-      context == TraceContext::Thread
-          ? fxt::ThreadRef{Thread::Current::Get()->pid(), Thread::Current::Get()->tid()}
-          : fxt::ThreadRef{kNoProcess, fxt::Koid{kKernelPseudoCpuBase + arch_curr_cpu_num()}};
-  ktrace_thunks::fxt_duration_begin(tag, current_ticks(), thread_ref,
-                                    fxt::StringRef{GetCategoryForGroup(KTRACE_GROUP(tag))->GetId()},
-                                    fxt::StringRef{string_ref->GetId()});
 }
 
 template <bool enabled>
 inline void ktrace_end_duration(TraceEnabled<enabled>, TraceContext context, uint32_t group,
-                                StringRef* string_ref) {
-  if constexpr (!enabled) {
-    return;
+                                StringRef& label) {
+  if constexpr (enabled) {
+    const uint32_t tag = TAG_END_DURATION_16(label.GetId(), group);
+    ktrace_thunks::fxt_duration_end(tag, current_ticks(), ThreadRefFromContext(context),
+                                    GetCategoryForGroup(KTRACE_GROUP(tag)), fxt::StringRef{label});
   }
-  const uint32_t tag = TAG_END_DURATION_16(string_ref->GetId(), group);
-  const auto thread_ref =
-      context == TraceContext::Thread
-          ? fxt::ThreadRef{Thread::Current::Get()->pid(), Thread::Current::Get()->tid()}
-          : fxt::ThreadRef{kNoProcess, fxt::Koid{kKernelPseudoCpuBase + arch_curr_cpu_num()}};
-  ktrace_thunks::fxt_duration_end(tag, current_ticks(), thread_ref,
-                                  fxt::StringRef{GetCategoryForGroup(KTRACE_GROUP(tag))->GetId()},
-                                  fxt::StringRef{string_ref->GetId()});
 }
 
 template <bool enabled>
 inline void ktrace_begin_duration(TraceEnabled<enabled>, TraceContext context, uint32_t group,
-                                  StringRef* string_ref, uint64_t a, uint64_t b) {
-  if constexpr (!enabled) {
-    return;
+                                  StringRef& label, uint64_t a, uint64_t b) {
+  if constexpr (enabled) {
+    const uint32_t tag = TAG_BEGIN_DURATION_32(label.GetId(), group);
+    ktrace_thunks::fxt_duration_begin(tag, current_ticks(), ThreadRefFromContext(context),
+                                      GetCategoryForGroup(KTRACE_GROUP(tag)), fxt::StringRef{label},
+                                      fxt::Argument{"arg0"_stringref, a},
+                                      fxt::Argument{"arg1"_stringref, b});
   }
-  const uint32_t tag = TAG_BEGIN_DURATION_32(string_ref->GetId(), group);
-  const auto thread_ref =
-      context == TraceContext::Thread
-          ? fxt::ThreadRef{Thread::Current::Get()->pid(), Thread::Current::Get()->tid()}
-          : fxt::ThreadRef{kNoProcess, fxt::Koid{kKernelPseudoCpuBase + arch_curr_cpu_num()}};
-  ktrace_thunks::fxt_duration_begin(tag, current_ticks(), thread_ref,
-                                    fxt::StringRef{GetCategoryForGroup(KTRACE_GROUP(tag))->GetId()},
-                                    fxt::StringRef{string_ref->GetId()},
-                                    fxt::Argument{fxt::StringRef{"arg0"_stringref->GetId()}, a},
-                                    fxt::Argument{fxt::StringRef{"arg1"_stringref->GetId()}, b});
 }
 
 template <bool enabled>
 inline void ktrace_end_duration(TraceEnabled<enabled>, TraceContext context, uint32_t group,
-                                StringRef* string_ref, uint64_t a, uint64_t b) {
-  if constexpr (!enabled) {
-    return;
+                                StringRef& label, uint64_t a, uint64_t b) {
+  if constexpr (enabled) {
+    const uint32_t tag = TAG_END_DURATION_32(label.GetId(), group);
+    ktrace_thunks::fxt_duration_end(tag, current_ticks(), ThreadRefFromContext(context),
+                                    GetCategoryForGroup(KTRACE_GROUP(tag)), fxt::StringRef{label},
+                                    fxt::Argument{"arg0"_stringref, a},
+                                    fxt::Argument{"arg1"_stringref, b});
   }
-  const uint32_t tag = TAG_END_DURATION_32(string_ref->GetId(), group);
-  const auto thread_ref =
-      context == TraceContext::Thread
-          ? fxt::ThreadRef{Thread::Current::Get()->pid(), Thread::Current::Get()->tid()}
-          : fxt::ThreadRef{kNoProcess, fxt::Koid{kKernelPseudoCpuBase + arch_curr_cpu_num()}};
-  ktrace_thunks::fxt_duration_end(tag, current_ticks(), thread_ref,
-                                  fxt::StringRef{GetCategoryForGroup(KTRACE_GROUP(tag))->GetId()},
-                                  fxt::StringRef{string_ref->GetId()},
-                                  fxt::Argument{fxt::StringRef{"arg0"_stringref->GetId()}, a},
-                                  fxt::Argument{fxt::StringRef{"arg1"_stringref->GetId()}, b});
 }
 
 template <bool enabled>
 inline void ktrace_flow_begin(TraceEnabled<enabled>, TraceContext context, uint32_t group,
-                              StringRef* string_ref, uint64_t flow_id, uint64_t a = 0) {
-  if constexpr (!enabled) {
-    return;
+                              StringRef& label, uint64_t flow_id, uint64_t a = 0) {
+  if constexpr (enabled) {
+    const uint32_t tag = TAG_FLOW_BEGIN(label.GetId(), group);
+    ktrace_thunks::fxt_flow_begin(tag, current_ticks(), ThreadRefFromContext(context),
+                                  GetCategoryForGroup(KTRACE_GROUP(tag)), fxt::StringRef{label},
+                                  flow_id, fxt::Argument{"arg0"_stringref, a});
   }
-  const uint32_t tag = TAG_FLOW_BEGIN(string_ref->GetId(), group);
-  const auto thread_ref =
-      context == TraceContext::Thread
-          ? fxt::ThreadRef{Thread::Current::Get()->pid(), Thread::Current::Get()->tid()}
-          : fxt::ThreadRef{kNoProcess, fxt::Koid{kKernelPseudoCpuBase + arch_curr_cpu_num()}};
-  ktrace_thunks::fxt_flow_begin(tag, current_ticks(), thread_ref,
-                                fxt::StringRef{GetCategoryForGroup(KTRACE_GROUP(tag))->GetId()},
-                                fxt::StringRef{string_ref->GetId()}, flow_id,
-                                fxt::Argument{fxt::StringRef{"arg0"_stringref->GetId()}, a});
 }
 
 template <bool enabled>
 inline void ktrace_flow_end(TraceEnabled<enabled>, TraceContext context, uint32_t group,
-                            StringRef* string_ref, uint64_t flow_id, uint64_t a = 0) {
-  if constexpr (!enabled) {
-    return;
+                            StringRef& label, uint64_t flow_id, uint64_t a = 0) {
+  if constexpr (enabled) {
+    const uint32_t tag = TAG_FLOW_END(label.GetId(), group);
+    ktrace_thunks::fxt_flow_end(tag, current_ticks(), ThreadRefFromContext(context),
+                                GetCategoryForGroup(KTRACE_GROUP(tag)), fxt::StringRef{label},
+                                flow_id, fxt::Argument{"arg0"_stringref, a});
   }
-  const uint32_t tag = TAG_FLOW_END(string_ref->GetId(), group);
-  fxt::ThreadRef thread_ref =
-      context == TraceContext::Thread
-          ? fxt::ThreadRef{Thread::Current::Get()->pid(), Thread::Current::Get()->tid()}
-          : fxt::ThreadRef{kNoProcess, fxt::Koid{kKernelPseudoCpuBase + arch_curr_cpu_num()}};
-  ktrace_thunks::fxt_flow_end(tag, current_ticks(), thread_ref,
-                              fxt::StringRef{GetCategoryForGroup(KTRACE_GROUP(tag))->GetId()},
-                              fxt::StringRef{string_ref->GetId()}, flow_id,
-                              fxt::Argument{fxt::StringRef{"arg0"_stringref->GetId()}, a});
 }
 
 template <bool enabled>
 inline void ktrace_flow_step(TraceEnabled<enabled>, TraceContext context, uint32_t group,
-                             StringRef* string_ref, uint64_t flow_id, uint64_t a = 0) {
-  if constexpr (!enabled) {
-    return;
+                             StringRef& label, uint64_t flow_id, uint64_t a = 0) {
+  if constexpr (enabled) {
+    const uint32_t tag = TAG_FLOW_STEP(label.GetId(), group);
+    ktrace_thunks::fxt_flow_step(tag, current_ticks(), ThreadRefFromContext(context),
+                                 GetCategoryForGroup(KTRACE_GROUP(tag)), fxt::StringRef{label},
+                                 flow_id, fxt::Argument{"arg0"_stringref, a});
   }
-  const uint32_t tag = TAG_FLOW_STEP(string_ref->GetId(), group);
-  const auto thread_ref =
-      context == TraceContext::Thread
-          ? fxt::ThreadRef{Thread::Current::Get()->pid(), Thread::Current::Get()->tid()}
-          : fxt::ThreadRef{kNoProcess, fxt::Koid{kKernelPseudoCpuBase + arch_curr_cpu_num()}};
-  ktrace_thunks::fxt_flow_step(tag, current_ticks(), thread_ref,
-                               fxt::StringRef{GetCategoryForGroup(KTRACE_GROUP(tag))->GetId()},
-                               fxt::StringRef{string_ref->GetId()}, flow_id,
-                               fxt::Argument{fxt::StringRef{"arg0"_stringref->GetId()}, a});
 }
 
 template <bool enabled>
-inline void ktrace_counter(TraceEnabled<enabled>, uint32_t group, StringRef* string_ref,
-                           int64_t value, uint64_t counter_id = 0) {
-  if constexpr (!enabled) {
-    return;
+inline void ktrace_counter(TraceEnabled<enabled>, uint32_t group, StringRef& label, int64_t value,
+                           uint64_t counter_id = 0) {
+  if constexpr (enabled) {
+    const uint32_t tag = KTRACE_TAG_FLAGS(TAG_COUNTER(label.GetId(), group), KTRACE_FLAGS_CPU);
+    ktrace_thunks::fxt_counter(tag, current_ticks(), ThreadRefFromContext(TraceContext::Cpu),
+                               GetCategoryForGroup(KTRACE_GROUP(tag)), fxt::StringRef{label},
+                               counter_id, fxt::Argument{"arg0"_stringref, value});
   }
-  const uint32_t tag = KTRACE_TAG_FLAGS(TAG_COUNTER(string_ref->GetId(), group), KTRACE_FLAGS_CPU);
-  ktrace_thunks::fxt_counter(
-      tag, current_ticks(),
-      fxt::ThreadRef{kNoProcess, fxt::Koid{kKernelPseudoCpuBase + arch_curr_cpu_num()}},
-      fxt::StringRef{GetCategoryForGroup(KTRACE_GROUP(tag))->GetId()},
-      fxt::StringRef{string_ref->GetId()}, counter_id,
-      fxt::Argument{fxt::StringRef{"arg0"_stringref->GetId()}, value});
 }
 
 inline ssize_t ktrace_read_user(user_out_ptr<void> ptr, uint32_t off, size_t len) {
@@ -516,11 +458,11 @@ class TraceDuration;
 template <bool enabled, uint16_t group, TraceContext context>
 class TraceDuration<TraceEnabled<enabled>, group, context> {
  public:
-  explicit TraceDuration(StringRef* string_ref) : string_ref_{string_ref} {
-    ktrace_begin_duration(TraceEnabled<enabled>{}, context, group, string_ref_);
+  explicit TraceDuration(StringRef& label) : label_{&label} {
+    ktrace_begin_duration(TraceEnabled<enabled>{}, context, group, *label_);
   }
-  TraceDuration(StringRef* string_ref, uint64_t a, uint64_t b) : string_ref_{string_ref} {
-    ktrace_begin_duration(TraceEnabled<enabled>{}, context, group, string_ref_, a, b);
+  TraceDuration(StringRef& label, uint64_t a, uint64_t b) : label_{&label} {
+    ktrace_begin_duration(TraceEnabled<enabled>{}, context, group, *label_, a, b);
   }
 
   ~TraceDuration() { End(); }
@@ -532,17 +474,17 @@ class TraceDuration<TraceEnabled<enabled>, group, context> {
 
   // Emits the end trace early, before this instance destructs.
   void End() {
-    if (string_ref_) {
-      ktrace_end_duration(TraceEnabled<enabled>{}, context, group, string_ref_);
-      string_ref_ = nullptr;
+    if (label_) {
+      ktrace_end_duration(TraceEnabled<enabled>{}, context, group, *label_);
+      label_ = nullptr;
     }
   }
   // Similar to the overload above, taking the given arguments for the end
   // event.
   void End(uint64_t a, uint64_t b) {
-    if (string_ref_) {
-      ktrace_end_duration(TraceEnabled<enabled>{}, context, group, string_ref_, a, b);
-      string_ref_ = nullptr;
+    if (label_) {
+      ktrace_end_duration(TraceEnabled<enabled>{}, context, group, *label_, a, b);
+      label_ = nullptr;
     }
   }
 
@@ -554,7 +496,7 @@ class TraceDuration<TraceEnabled<enabled>, group, context> {
   }
 
  private:
-  StringRef* string_ref_;
+  StringRef* label_;
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_LIB_KTRACE_H_

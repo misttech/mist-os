@@ -530,21 +530,17 @@ extern "C" void arm64_serror_exception(iframe_t* iframe, uint exception_flags) {
   // occurrences and add a tracer to help analyze possible causes.
 
   if (unlikely(ktrace_tag_enabled(TAG_IRQ_ENTER))) {
-    fxt_duration_begin(
-        TAG_IRQ_ENTER, current_ticks(),
-        fxt::ThreadRef(kNoProcess, fxt::Koid(kKernelPseudoCpuBase + arch_curr_cpu_num())),
-        fxt::StringRef("kernel:irq"_stringref->GetId()), fxt::StringRef("irq"_stringref->GetId()),
-        fxt::Argument(fxt::StringRef("irq #"_stringref->GetId()), 0xaa55));
+    fxt_duration_begin(TAG_IRQ_ENTER, current_ticks(), ThreadRefFromContext(TraceContext::Cpu),
+                       fxt::StringRef{"kernel:irq"_stringref}, fxt::StringRef{"irq"_stringref},
+                       fxt::Argument{"irq #"_stringref, 0xaa55});
   }
 
   exceptions_serror.Add(1);
 
   if (unlikely(ktrace_tag_enabled(TAG_IRQ_EXIT))) {
-    fxt_duration_end(
-        TAG_IRQ_EXIT, current_ticks(),
-        fxt::ThreadRef(kNoProcess, fxt::Koid(kKernelPseudoCpuBase + arch_curr_cpu_num())),
-        fxt::StringRef("kernel:irq"_stringref->GetId()), fxt::StringRef("irq"_stringref->GetId()),
-        fxt::Argument(fxt::StringRef("irq #"_stringref->GetId()), 0xaa55));
+    fxt_duration_end(TAG_IRQ_EXIT, current_ticks(), ThreadRefFromContext(TraceContext::Cpu),
+                     fxt::StringRef{"kernel:irq"_stringref}, fxt::StringRef{"irq"_stringref},
+                     fxt::Argument{"irq #"_stringref, 0xaa55});
   }
 }
 

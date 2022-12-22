@@ -144,9 +144,7 @@ inline void TraceContextSwitch(const Thread* current_thread, const Thread* next_
       }
     }(current_thread->state());
     fxt_context_switch(TAG_CONTEXT_SWITCH, current_ticks(), static_cast<uint8_t>(current_cpu),
-                       user_thread_state,
-                       fxt::ThreadRef(current_thread->pid(), current_thread->tid()),
-                       fxt::ThreadRef(next_thread->pid(), next_thread->tid()),
+                       user_thread_state, current_thread->fxt_ref(), next_thread->fxt_ref(),
                        static_cast<uint8_t>(current_thread->scheduler_state().base_priority()),
                        static_cast<uint8_t>(next_thread->scheduler_state().base_priority()));
   }
@@ -221,7 +219,7 @@ inline uint64_t Scheduler::NextFlowId() {
 // CPUs, as well as which task on each CPU is currently active. These events are
 // used for trace analysis to compute statistics about overall utilization,
 // taking CPU affinity into account.
-inline void Scheduler::TraceThreadQueueEvent(StringRef* name, Thread* thread) const {
+inline void Scheduler::TraceThreadQueueEvent(StringRef& name, Thread* thread) const {
   // Traces marking the end of a queue/dequeue operation have arguments encoded
   // as follows:
   //
@@ -1504,7 +1502,7 @@ void Scheduler::QueueThread(Thread* thread, Placement placement, SchedTime now,
     // Both a new insertion into the run queue or a re-insertion due to
     // preemption can happen after the time slice and/or deadline expires.
     if (placement == Placement::Insertion || placement == Placement::Preemption) {
-      const auto string_ref = placement == Placement::Insertion
+      StringRef& string_ref = placement == Placement::Insertion
                                   ? "insert_deadline: r,c"_stringref
                                   : "preemption_deadline: r,c"_stringref;
       LocalTraceDuration<KTRACE_DETAILED> deadline_trace{string_ref};

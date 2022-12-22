@@ -57,11 +57,10 @@ zx_status_t vmm_accessed_fault_handler(vaddr_t addr) {
   const zx_status_t status = aspace->AccessedFault(addr);
 
   if (unlikely(ktrace_tag_enabled(TAG_ACCESS_FAULT))) {
-    fxt_duration_complete(TAG_ACCESS_FAULT, start_time,
-                          fxt::ThreadRef{current_thread->pid(), current_thread->tid()},
-                          fxt::StringRef{"kernel:vm"_stringref->GetId()},
-                          fxt::StringRef{"access_fault"_stringref->GetId()}, current_ticks(),
-                          fxt::Argument{fxt::StringRef{"vaddr"_stringref->GetId()}, addr});
+    fxt_duration_complete(TAG_ACCESS_FAULT, start_time, ThreadRefFromContext(TraceContext::Thread),
+                          fxt::StringRef{"kernel:vm"_stringref},
+                          fxt::StringRef{"access_fault"_stringref}, current_ticks(),
+                          fxt::Argument{"vaddr"_stringref, addr});
   }
 
   return status;
@@ -104,12 +103,11 @@ zx_status_t vmm_page_fault_handler(vaddr_t addr, uint flags) {
   }
 
   if (unlikely(ktrace_tag_enabled(TAG_PAGE_FAULT))) {
-    fxt_duration_complete(TAG_PAGE_FAULT, start_time,
-                          fxt::ThreadRef{current_thread->pid(), current_thread->tid()},
-                          fxt::StringRef{"kernel:vm"_stringref->GetId()},
-                          fxt::StringRef{"page_fault"_stringref->GetId()}, current_ticks(),
-                          fxt::Argument{fxt::StringRef{"vaddr"_stringref->GetId()}, addr},
-                          fxt::Argument{fxt::StringRef{"flags"_stringref->GetId()}, flags});
+    fxt_duration_complete(TAG_PAGE_FAULT, start_time, ThreadRefFromContext(TraceContext::Thread),
+                          fxt::StringRef{"kernel:vm"_stringref},
+                          fxt::StringRef{"page_fault"_stringref}, current_ticks(),
+                          fxt::Argument{"vaddr"_stringref, addr},
+                          fxt::Argument{"flags"_stringref, flags});
   }
 
   return status;

@@ -11,6 +11,7 @@
 #include <debug.h>
 #include <lib/backtrace.h>
 #include <lib/fit/function.h>
+#include <lib/fxt/thread_ref.h>
 #include <lib/relaxed_atomic.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <platform.h>
@@ -1092,6 +1093,12 @@ struct Thread {
   // Returns the koid of the associated ThreadDispatcher for user threads or an
   // independent koid for kernel threads.
   zx_koid_t tid() const { return tid_; }
+
+  // Return the pid/tid of the thread as a tracing thread reference.
+  fxt::ThreadRef<fxt::RefType::kInline> fxt_ref() const { return {pid(), tid()}; }
+
+  // Implicit conversion to a tracing thread reference.
+  operator fxt::ThreadRef<fxt::RefType::kInline>() const { return fxt_ref(); }
 
   // Called to mark a thread as schedulable.
   void Resume();

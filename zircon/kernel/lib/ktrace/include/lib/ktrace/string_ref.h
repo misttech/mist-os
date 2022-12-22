@@ -10,8 +10,8 @@
 #include <lib/fxt/interned_string.h>
 
 template <typename T, T... chars>
-inline fxt::InternedString* operator""_stringref() {
-  return const_cast<fxt::InternedString*>(&fxt::operator""_intern<T, chars... >());
+inline fxt::InternedString& operator""_stringref() {
+  return const_cast<fxt::InternedString&>(fxt::operator""_intern<T, chars... >());
 }
 
 using StringRef = fxt::InternedString;

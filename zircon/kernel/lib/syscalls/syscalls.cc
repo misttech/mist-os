@@ -34,9 +34,13 @@
 
 namespace {
 
+struct SyscallNameEntry {
+  fxt::StringRef<fxt::RefType::kId> name{"[unknown]"_stringref};
+};
+
 #define VDSO_SYSCALL(...)
 #define KERNEL_SYSCALL(name, type, attrs, nargs, arglist, prototype) \
-  [ZX_SYS_##name] = #name##_stringref,
+  [ZX_SYS_##name] = {#name##_stringref},
 #define INTERNAL_SYSCALL(...) KERNEL_SYSCALL(__VA_ARGS__)
 #define BLOCKING_SYSCALL(...) KERNEL_SYSCALL(__VA_ARGS__)
 
@@ -44,7 +48,7 @@ namespace {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wc99-designator"
 #endif
-StringRef* const kSyscallNames[] = {
+SyscallNameEntry kSyscallNames[] = {
 #include <lib/syscalls/kernel.inc>
 };
 #if defined(__clang__)
@@ -63,12 +67,11 @@ struct syscall_pre_out {
   ProcessDispatcher* current_process;
 };
 
-fxt::StringRef<fxt::RefType::kId> syscall_name_ref(uint64_t syscall_num) {
-  if (syscall_num < ktl::size(kSyscallNames) && kSyscallNames[syscall_num] != nullptr) {
-    return fxt::StringRef(kSyscallNames[syscall_num]->GetId());
-  } else {
-    return fxt::StringRef("Unknown Syscall"_stringref->GetId());
+inline fxt::StringRef<fxt::RefType::kId> syscall_name_ref(uint64_t syscall_num) {
+  if (syscall_num < ktl::size(kSyscallNames)) {
+    return kSyscallNames[syscall_num].name;
   }
+  return "[out of range]"_stringref;
 }
 
 // N.B. Interrupts must be disabled on entry and they will be disabled on exit.
@@ -79,11 +82,9 @@ fxt::StringRef<fxt::RefType::kId> syscall_name_ref(uint64_t syscall_num) {
 // between syscalls.
 __NO_INLINE syscall_pre_out do_syscall_pre(uint64_t syscall_num, uint64_t pc) {
   if (unlikely(ktrace_tag_enabled(TAG_SYSCALL_ENTER))) {
-    Thread* current_thread = Thread::Current::Get();
     fxt_duration_begin(TAG_SYSCALL_ENTER, current_ticks(),
-                       fxt::ThreadRef(current_thread->pid(), current_thread->tid()),
-                       fxt::StringRef("kernel:syscall"_stringref->GetId()),
-                       syscall_name_ref(syscall_num));
+                       ThreadRefFromContext(TraceContext::Thread),
+                       fxt::StringRef{"kernel:syscall"_stringref}, syscall_name_ref(syscall_num));
   }
 
   CPU_STATS_INC(syscalls);
@@ -110,11 +111,8 @@ __NO_INLINE syscall_result do_syscall_post(uint64_t ret, uint64_t syscall_num) {
   arch_disable_ints();
 
   if (unlikely(ktrace_tag_enabled(TAG_SYSCALL_EXIT))) {
-    Thread* current_thread = Thread::Current::Get();
-    fxt_duration_end(TAG_SYSCALL_EXIT, current_ticks(),
-                     fxt::ThreadRef(current_thread->pid(), current_thread->tid()),
-                     fxt::StringRef("kernel:syscall"_stringref->GetId()),
-                     syscall_name_ref(syscall_num));
+    fxt_duration_end(TAG_SYSCALL_EXIT, current_ticks(), ThreadRefFromContext(TraceContext::Thread),
+                     fxt::StringRef{"kernel:syscall"_stringref}, syscall_name_ref(syscall_num));
   }
 
   // The assembler caller will re-disable interrupts at the appropriate time.

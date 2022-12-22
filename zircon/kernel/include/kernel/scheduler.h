@@ -456,7 +456,7 @@ class Scheduler {
                                      Predicate&& predicate) TA_REQ(queue_lock_);
 
   // Emits queue event tracers for trace-based scheduler performance analysis.
-  inline void TraceThreadQueueEvent(StringRef* name, Thread* thread) const TA_REQ(queue_lock_);
+  inline void TraceThreadQueueEvent(StringRef& name, Thread* thread) const TA_REQ(queue_lock_);
 
   // Protects run queues and associated metadata for this Scheduler instance.
   // The queue lock is the bottom most lock in the system for the CPU it is
