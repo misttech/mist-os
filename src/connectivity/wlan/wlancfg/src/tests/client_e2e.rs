@@ -551,8 +551,8 @@ fn get_client_state_update(
     // test_values: &mut TestValues,
 ) -> fidl_policy::ClientStateSummary {
     let update_request = assert_variant!(
-        exec.run_until_stalled(&mut client_listener_update_requests.next()),
-        Poll::Ready(Some(Ok(update_request))) => {
+        exec.run_singlethreaded(&mut client_listener_update_requests.next()),
+        Some(Ok(update_request)) => {
             update_request
         }
     );
