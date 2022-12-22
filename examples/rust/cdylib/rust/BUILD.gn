@@ -11,8 +11,4 @@ rustc_cdylib("crust-shared") {
 
   edition = "2021"
   public = [ "crust.h" ]
-
-  # Unlike executables, libfdio is not added as an implicit dependency to
-  # shared libraries, so we have to add it ourselves.
-  deps = [ "//sdk/lib/fdio:fdio" ]
 }

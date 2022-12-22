@@ -87,6 +87,11 @@ import("//build/rust/rustc_test.gni")
 #     The name of the target as it appears in the BUILD file. Enables tooling
 #     to find the template invocation in a BUILD file where this target was defined.
 #
+#   exclude_toolchain_tags (optional)
+#     [strings] A list of tags that corresponds to toolchain variants that
+#     this target should not be built with.
+#     See: //docs/development/build/concepts/build_system/internals/toolchains/build_variants.md.
+#
 # Example of usage:
 #
 #   rustc_cdylib("foo") {
@@ -146,6 +151,7 @@ template("rustc_cdylib") {
       forward_variables_from(invoker,
                              [
                                "data_deps",
+                               "exclude_toolchain_tags",
                                "output_dir",
                                "runtime_deps",
                              ])
