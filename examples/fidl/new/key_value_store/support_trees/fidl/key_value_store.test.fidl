@@ -39,9 +39,9 @@ type WriteError = flexible enum {
 
 /// A very basic key-value store.
 @discoverable
-protocol Store {
+open protocol Store {
     /// Writes an item to the store.
-    WriteItem(struct {
+    flexible WriteItem(struct {
         attempt Item;
     }) -> () error WriteError;
 };

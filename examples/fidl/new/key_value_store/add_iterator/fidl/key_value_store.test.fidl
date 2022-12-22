@@ -29,9 +29,9 @@ type IterateConnectionError = flexible enum {
 
 /// A key-value store which supports insertion and iteration.
 @discoverable
-protocol Store {
+open protocol Store {
     /// Writes an item to the store.
-    WriteItem(struct {
+    flexible WriteItem(struct {
         attempt Item;
     }) -> () error WriteError;
 
@@ -42,7 +42,7 @@ protocol Store {
     /// immediately send requests over the new connection.
     ///
     /// [pipelining]: https://fuchsia.dev/fuchsia-src/development/api/fidl?hl=en#request-pipelining
-    Iterate(resource struct {
+    flexible Iterate(resource struct {
         /// If present, requests to start the iteration at this item.
         starting_at string:<128, optional>;
 
@@ -63,7 +63,12 @@ protocol Store {
 ///
 /// As is often the case with iterators, the client indicates that they are done with an instance of
 /// the iterator by simply closing their end of the connection.
-protocol Iterator {
+///
+/// Since the iterator is associated only with the Iterate method, it is declared as closed rather
+/// than open. This is because changes to how iteration works are more likely to require replacing
+/// the Iterate method completely (which is fine because that method is flexible) rather than
+/// evolving the Iterator protocol.
+closed protocol Iterator {
     /// Gets the next batch of keys.
     ///
     /// The client pulls keys rather than having the server proactively push them, to implement
@@ -71,7 +76,7 @@ protocol Iterator {
     ///
     /// [flow-control]:
     ///     https://fuchsia.dev/fuchsia-src/development/api/fidl?hl=en#prefer_pull_to_push
-    Get() -> (struct {
+    strict Get() -> (struct {
         /// A list of keys. If the iterator has reached the end of iteration, the list will be
         /// empty. The client is expected to then close the connection.
         entries vector<string:128>:10;

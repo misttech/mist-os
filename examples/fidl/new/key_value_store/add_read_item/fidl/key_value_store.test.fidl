@@ -36,15 +36,15 @@ type ReadError = flexible enum {
 
 /// A very basic key-value store - so basic, in fact, that one may only write to it, never read!
 @discoverable
-protocol Store {
+open protocol Store {
     /// Writes an item to the store.
-    WriteItem(struct {
+    flexible WriteItem(struct {
         attempt Item;
     }) -> () error WriteError;
 
     // [START diff_3]
     /// Reads an item from the store.
-    ReadItem(struct {
+    flexible ReadItem(struct {
         key Key;
     }) -> (Item) error ReadError;
     // [END diff_3]

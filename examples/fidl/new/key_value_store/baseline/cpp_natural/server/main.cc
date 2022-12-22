@@ -62,6 +62,12 @@ class StoreImpl final : public fidl::Server<examples_keyvaluestore_baseline::Sto
     return completer.Reply(fit::ok());
   }
 
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<examples_keyvaluestore_baseline::Store> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    FX_LOGS(WARNING) << "Received an unknown method with ordinal " << metadata.method_ordinal;
+  }
+
  private:
   fidl::ServerBindingRef<examples_keyvaluestore_baseline::Store> binding_;
 

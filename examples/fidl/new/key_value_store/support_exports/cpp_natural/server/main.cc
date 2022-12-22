@@ -75,6 +75,12 @@ class StoreImpl final : public fidl::Server<examples_keyvaluestore_supportexport
   }
   // [END diff_2]
 
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<examples_keyvaluestore_supportexports::Store> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    FX_LOGS(WARNING) << "Received an unknown method with ordinal " << metadata.method_ordinal;
+  }
+
  private:
   // [START diff_3]
   using ExportError = ::examples_keyvaluestore_supportexports::ExportError;

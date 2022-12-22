@@ -67,7 +67,7 @@ type WriteError = flexible enum {
 
 /// A very basic key-value store.
 @discoverable
-protocol Store {
+open protocol Store {
     // [START diff_2]
     /// Writes an item to the store.
     ///
@@ -80,7 +80,7 @@ protocol Store {
     /// `flexible`, meaning that adding or removing members is binary-compatible. This makes them
     /// much easier to evolve that the `struct` types that were previously used, which cannot be
     /// changed after release without breaking ABI.
-    WriteItem(table {
+    flexible WriteItem(table {
         1: attempt Item;
         2: options WriteOptions;
     }) -> (Value) error WriteError;

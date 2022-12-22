@@ -134,6 +134,9 @@ async fn run_server(stream: StoreRequestStream) -> Result<(), Error> {
                         .context("error sending reply")?;
                     println!("WriteItem response sent");
                 }
+                StoreRequest::_UnknownMethod { ordinal, .. } => {
+                    println!("Received an unknown method with ordinal {ordinal}");
+                }
             }
             Ok(())
         })
