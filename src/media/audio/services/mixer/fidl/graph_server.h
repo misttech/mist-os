@@ -73,7 +73,8 @@ class GraphServer
       CreateGraphControlledReferenceClockCompleter::Sync& completer) final;
   void Start(StartRequestView request, StartCompleter::Sync& completer) final;
   void Stop(StopRequestView request, StopCompleter::Sync& completer) final;
-  void CancelStartOrStop(CancelStartOrStopCompleter::Sync& completer) final;
+  void CancelStartOrStop(CancelStartOrStopRequestView request,
+                         CancelStartOrStopCompleter::Sync& completer) final;
   void BindProducerLeadTimeWatcher(BindProducerLeadTimeWatcherRequestView request,
                                    BindProducerLeadTimeWatcherCompleter::Sync& completer) final;
 

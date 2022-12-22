@@ -46,6 +46,7 @@ class FakeGraphServer
                                 DeleteGainControlRequest,           //
                                 StartRequest,                       //
                                 StopRequest,                        //
+                                CancelStartOrStopRequest,           //
                                 BindProducerLeadTimeWatcherRequest  //
                                 >;
 
@@ -126,7 +127,11 @@ class FakeGraphServer
     calls_.push_back(std::move(request));
     completer.Reply(fit::ok(stop_response_));
   }
-  void CancelStartOrStop(CancelStartOrStopCompleter::Sync& completer) final {}
+  void CancelStartOrStop(CancelStartOrStopRequest& request,
+                         CancelStartOrStopCompleter::Sync& completer) final {
+    calls_.push_back(std::move(request));
+    completer.Reply(fit::ok());
+  }
   void BindProducerLeadTimeWatcher(BindProducerLeadTimeWatcherRequest& request,
                                    BindProducerLeadTimeWatcherCompleter::Sync& completer) final {
     calls_.push_back(std::move(request));

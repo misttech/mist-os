@@ -63,10 +63,17 @@ class ProducerNode : public Node {
   static std::shared_ptr<ProducerNode> Create(Args args);
 
   // Starts this producer. The command is forwarded to the underlying ProducerStage.
-  void Start(ProducerStage::StartCommand cmd) const;
+  //
+  // Returns false if there is already a pending Start or Stop command. Otherwise, returns true.
+  bool Start(ProducerStage::StartCommand cmd) const;
 
   // Stops this producer. The command is forwarded to the underlying ProducerStage.
-  void Stop(ProducerStage::StopCommand cmd) const;
+  //
+  // Returns false if there is already a pending Start or Stop command. Otherwise, returns true.
+  bool Stop(ProducerStage::StopCommand cmd) const;
+
+  // Cancels pending Start or Stop command.
+  void CancelStartOrStop() const;
 
   // Binds a new lead time watcher.
   // REQUIRED: `pipeline_direction() == kOutput`

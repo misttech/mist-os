@@ -11,9 +11,7 @@
 
 namespace media_audio {
 
-namespace {
 using When = StartStopControl::When;
-}  // namespace
 
 StartStopControl::StartStopControl(const Format& format, TimelineRate media_ticks_per_ns,
                                    UnreadableClock reference_clock)
@@ -25,24 +23,20 @@ StartStopControl::StartStopControl(const Format& format, TimelineRate media_tick
 
 // static
 void StartStopControl::CancelCommand(Command& command) {
-  if (std::holds_alternative<StartCommand>(command)) {
-    if (auto& cmd = std::get<StartCommand>(command); cmd.callback) {
-      cmd.callback(fpromise::error(StartError::kCanceled));
-    }
-  } else {
-    if (auto& cmd = std::get<StopCommand>(command); cmd.callback) {
-      cmd.callback(fpromise::error(StopError::kCanceled));
-    }
+  if (auto* cmd = std::get_if<StartCommand>(&command); cmd && cmd->callback) {
+    cmd->callback(fpromise::error(StartError::kCanceled));
+  } else if (auto& cmd = std::get<StopCommand>(command); cmd.callback) {
+    cmd.callback(fpromise::error(StopError::kCanceled));
   }
 }
 
 void StartStopControl::Start(StartCommand cmd) {
-  CancelPendingCommand();
+  FX_CHECK(!pending_);
   pending_ = std::move(cmd);
 }
 
 void StartStopControl::Stop(StopCommand cmd) {
-  CancelPendingCommand();
+  FX_CHECK(!pending_);
   if (!is_started()) {
     if (cmd.callback) {
       cmd.callback(fpromise::error(StopError::kAlreadyStopped));
@@ -105,13 +99,6 @@ std::optional<std::pair<When, StartStopControl::CommandType>> StartStopControl::
     return PendingCommand(clocks.SnapshotFor(reference_clock_), *reference_time_now_);
   }
   return std::nullopt;
-}
-
-void StartStopControl::CancelPendingCommand() {
-  if (pending_) {
-    CancelCommand(*pending_);
-    pending_ = std::nullopt;
-  }
 }
 
 std::pair<When, StartStopControl::CommandType> StartStopControl::PendingCommand(

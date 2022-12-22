@@ -54,10 +54,17 @@ class ConsumerNode : public Node {
   static std::shared_ptr<ConsumerNode> Create(Args args);
 
   // Starts this consumer.
-  void Start(ConsumerStage::StartCommand cmd) const;
+  //
+  // Returns false if there is already a pending Start or Stop command. Otherwise, returns true. 
+  bool Start(ConsumerStage::StartCommand cmd) const;
 
   // Stops this consumer.
-  void Stop(ConsumerStage::StopCommand cmd) const;
+  //
+  // Returns false if there is already a pending Start or Stop command. Otherwise, returns true.
+  bool Stop(ConsumerStage::StopCommand cmd) const;
+
+  // Cancels pending Start or Stop command.
+  void CancelStartOrStop() const;
 
   // Implements `Node`.
   std::optional<std::pair<ThreadId, fit::closure>> SetMaxDelays(Delays delays) final;

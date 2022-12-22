@@ -75,19 +75,25 @@ ConsumerNode::ConsumerNode(std::string_view name, std::shared_ptr<Clock> referen
   set_thread(mix_thread_);
 }
 
-void ConsumerNode::Start(ConsumerStage::StartCommand cmd) const {
-  if (auto old = pending_start_stop_command_->swap(std::move(cmd)); old) {
-    StartStopControl::CancelCommand(*old);
-  } else {
-    mix_thread_->NotifyConsumerStarting(consumer_stage_);
+bool ConsumerNode::Start(ConsumerStage::StartCommand cmd) const {
+  if (pending_start_stop_command_->swap(std::move(cmd))) {
+    return false;
   }
+  mix_thread_->NotifyConsumerStarting(consumer_stage_);
+  return true;
 }
 
-void ConsumerNode::Stop(ConsumerStage::StopCommand cmd) const {
-  if (auto old = pending_start_stop_command_->swap(std::move(cmd)); old) {
-    StartStopControl::CancelCommand(*old);
-  } else {
-    mix_thread_->NotifyConsumerStarting(consumer_stage_);
+bool ConsumerNode::Stop(ConsumerStage::StopCommand cmd) const {
+  if (pending_start_stop_command_->swap(std::move(cmd))) {
+    return false;
+  }
+  mix_thread_->NotifyConsumerStarting(consumer_stage_);
+  return true;
+}
+
+void ConsumerNode::CancelStartOrStop() const {
+  if (auto cmd = pending_start_stop_command_->pop(); cmd) {
+    StartStopControl::CancelCommand(*cmd);
   }
 }
 

@@ -1284,10 +1284,29 @@ void GraphServer::Stop(StopRequestView request, StopCompleter::Sync& completer) 
   }
 }
 
-void GraphServer::CancelStartOrStop(CancelStartOrStopCompleter::Sync& completer) {
+void GraphServer::CancelStartOrStop(CancelStartOrStopRequestView request,
+                                    CancelStartOrStopCompleter::Sync& completer) {
   TRACE_DURATION("audio", "Graph:::CancelStartOrStop");
   ScopedThreadChecker checker(thread().checker());
-  FX_LOGS(FATAL) << "not implemented";
+
+  if (!request->has_node_id()) {
+    FX_LOGS(WARNING) << "CancelStartOrStop: missing field";
+    completer.ReplyError(fuchsia_audio_mixer::CancelStartOrStopError::kMissingRequiredField);
+    return;
+  }
+
+  if (const auto producer_it = producer_nodes_.find(request->node_id());
+      producer_it != producer_nodes_.end()) {
+    producer_it->second->CancelStartOrStop();
+    completer.ReplySuccess();
+  } else if (const auto consumer_it = consumer_nodes_.find(request->node_id());
+             consumer_it != consumer_nodes_.end()) {
+    consumer_it->second->CancelStartOrStop();
+    completer.ReplySuccess();
+  } else {
+    FX_LOGS(WARNING) << "CancelStartOrStop: invalid node id";
+    completer.ReplyError(fuchsia_audio_mixer::CancelStartOrStopError::kInvalidId);
+  }
 }
 
 void GraphServer::BindProducerLeadTimeWatcher(

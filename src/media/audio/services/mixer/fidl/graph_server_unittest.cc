@@ -39,6 +39,7 @@ namespace media_audio {
 namespace {
 
 using ::fuchsia_audio_mixer::wire::BindProducerLeadTimeWatcherError;
+using ::fuchsia_audio_mixer::wire::CancelStartOrStopError;
 using ::fuchsia_audio_mixer::wire::CreateEdgeError;
 using ::fuchsia_audio_mixer::wire::CreateGainControlError;
 using ::fuchsia_audio_mixer::wire::CreateNodeError;
@@ -485,7 +486,7 @@ TEST_F(GraphServerTest, CreateProducerStreamSinkFailsBadFields) {
   }
 }
 
-TEST_F(GraphServerTest, CreateProducerStreamSinkSuccess) {
+TEST_F(GraphServerTest, CreateProducerStreamSinkSucceeds) {
   auto result =
       client()->CreateProducer(MakeDefaultCreateProducerRequestWithStreamSink(arena_).Build());
 
@@ -592,7 +593,7 @@ TEST_F(GraphServerTest, CreateProducerRingBufferFailsBadFields) {
   }
 }
 
-TEST_F(GraphServerTest, CreateProducerRingBufferSuccess) {
+TEST_F(GraphServerTest, CreateProducerRingBufferSucceeds) {
   auto result =
       client()->CreateProducer(MakeDefaultCreateProducerRequestWithRingBuffer(arena_).Build());
 
@@ -743,7 +744,7 @@ TEST_F(GraphServerTest, CreateConsumerFailsBadFields) {
   }
 }
 
-TEST_F(GraphServerTest, CreateConsumerStreamSinkSuccess) {
+TEST_F(GraphServerTest, CreateConsumerStreamSinkSucceeds) {
   // Each consumer needs a thread.
   {
     auto result = client()->CreateThread(MakeDefaultCreateThreadRequest(arena_).Build());
@@ -764,7 +765,7 @@ TEST_F(GraphServerTest, CreateConsumerStreamSinkSuccess) {
   }
 }
 
-TEST_F(GraphServerTest, CreateConsumerRingBufferSuccess) {
+TEST_F(GraphServerTest, CreateConsumerRingBufferSucceeds) {
   // Each consumer needs a thread.
   {
     auto result = client()->CreateThread(MakeDefaultCreateThreadRequest(arena_).Build());
@@ -860,7 +861,7 @@ TEST_F(GraphServerTest, CreateMixerFails) {
   }
 }
 
-TEST_F(GraphServerTest, CreateMixerSuccess) {
+TEST_F(GraphServerTest, CreateMixerSucceeds) {
   const auto result = client()->CreateMixer(MakeDefaultCreateMixerRequest(arena_).Build());
   ASSERT_TRUE(result.ok()) << result;
   ASSERT_FALSE(result->is_error()) << result->error_value();
@@ -940,7 +941,7 @@ TEST_F(GraphServerTest, CreateSplitterFails) {
   }
 }
 
-TEST_F(GraphServerTest, CreateSplitterSuccess) {
+TEST_F(GraphServerTest, CreateSplitterSucceeds) {
   // The splitter's consumer needs a thread.
   {
     auto result = client()->CreateThread(MakeDefaultCreateThreadRequest(arena_).Build());
@@ -1020,7 +1021,7 @@ TEST_F(GraphServerTest, CreateCustomFailsInvalidConfig) {
   ASSERT_EQ(result->error_value(), CreateNodeError::kInvalidParameter);
 }
 
-TEST_F(GraphServerTest, CreateCustomSuccess) {
+TEST_F(GraphServerTest, CreateCustomSucceeds) {
   auto result =
       client()->CreateCustom(fuchsia_audio_mixer::wire::GraphCreateCustomRequest::Builder(arena_)
                                  .name(fidl::StringView::FromExternal("custom"))
@@ -1082,7 +1083,7 @@ TEST_F(GraphServerTest, DeleteNodeFails) {
   }
 }
 
-TEST_F(GraphServerTest, DeleteNodeSuccess) {
+TEST_F(GraphServerTest, DeleteNodeSucceeds) {
   NodeId producer_id;
   NodeId consumer_id;
   ASSERT_NO_FATAL_FAILURE(CreateProducerAndConsumer(&producer_id, &consumer_id));
@@ -1110,7 +1111,7 @@ TEST_F(GraphServerTest, DeleteNodeSuccess) {
   }
 }
 
-TEST_F(GraphServerTest, DeleteCustomNodeSuccess) {
+TEST_F(GraphServerTest, DeleteCustomNodeSucceeds) {
   NodeId producer_id;
   NodeId consumer_id;
   ASSERT_NO_FATAL_FAILURE(CreateProducerAndConsumer(&producer_id, &consumer_id));
@@ -1332,7 +1333,7 @@ TEST_F(GraphServerTest, CreateEdgeInvalidGainControl) {
   ASSERT_EQ(result->error_value(), fuchsia_audio_mixer::CreateEdgeError::kInvalidGainControl);
 }
 
-TEST_F(GraphServerTest, CreateEdgeSuccess) {
+TEST_F(GraphServerTest, CreateEdgeSucceeds) {
   NodeId producer_id;
   NodeId consumer_id;
   ASSERT_NO_FATAL_FAILURE(CreateProducerAndConsumer(&producer_id, &consumer_id));
@@ -1347,7 +1348,7 @@ TEST_F(GraphServerTest, CreateEdgeSuccess) {
   ASSERT_FALSE(result->is_error()) << result->error_value();
 }
 
-TEST_F(GraphServerTest, CreateEdgeSuccessMixerDest) {
+TEST_F(GraphServerTest, CreateEdgeSucceedsMixerDest) {
   // Producer.
   NodeId producer_id;
   {
@@ -1393,7 +1394,7 @@ TEST_F(GraphServerTest, CreateEdgeSuccessMixerDest) {
   ASSERT_FALSE(result->is_error()) << result->error_value();
 }
 
-TEST_F(GraphServerTest, CreateEdgeSuccessMixerSource) {
+TEST_F(GraphServerTest, CreateEdgeSucceedsMixerSource) {
   // Mixer.
   NodeId mixer_id;
   {
@@ -1526,7 +1527,7 @@ TEST_F(GraphServerTest, DeleteEdgeFails) {
   }
 }
 
-TEST_F(GraphServerTest, DeleteEdgeSuccess) {
+TEST_F(GraphServerTest, DeleteEdgeSucceeds) {
   NodeId producer_id;
   NodeId consumer_id;
   ASSERT_NO_FATAL_FAILURE(CreateProducerAndConsumer(&producer_id, &consumer_id));
@@ -1630,7 +1631,7 @@ TEST_F(GraphServerTest, CreateThreadFailsBadFields) {
   }
 }
 
-TEST_F(GraphServerTest, CreateThreadSuccess) {
+TEST_F(GraphServerTest, CreateThreadSucceeds) {
   auto result = client()->CreateThread(MakeDefaultCreateThreadRequest(arena_).Build());
   ASSERT_TRUE(result.ok()) << result;
   ASSERT_FALSE(result->is_error()) << result->error_value();
@@ -1687,7 +1688,7 @@ TEST_F(GraphServerTest, DeleteThreadFailsStillInUse) {
   }
 }
 
-TEST_F(GraphServerTest, DeleteThreadSuccess) {
+TEST_F(GraphServerTest, DeleteThreadSucceeds) {
   // Create a thread.
   {
     auto result = client()->CreateThread(MakeDefaultCreateThreadRequest(arena_).Build());
@@ -1706,7 +1707,7 @@ TEST_F(GraphServerTest, DeleteThreadSuccess) {
   }
 }
 
-TEST_F(GraphServerTest, DeleteThreadSuccessAfterConsumerDeleted) {
+TEST_F(GraphServerTest, DeleteThreadSucceedsAfterConsumerDeleted) {
   // Create a thread.
   {
     auto result = client()->CreateThread(MakeDefaultCreateThreadRequest(arena_).Build());
@@ -1788,7 +1789,7 @@ TEST_F(GraphServerTest, CreateGainControlFails) {
   }
 }
 
-TEST_F(GraphServerTest, CreateGainControlSuccess) {
+TEST_F(GraphServerTest, CreateGainControlSucceeds) {
   const auto result =
       client()->CreateGainControl(MakeDefaultCreateGainControlRequest(arena_).Build());
   ASSERT_TRUE(result.ok()) << result;
@@ -1817,7 +1818,7 @@ TEST_F(GraphServerTest, DeleteGainControlFailsIdNotFound) {
   ASSERT_EQ(result->error_value(), DeleteGainControlError::kInvalidId);
 }
 
-TEST_F(GraphServerTest, DeleteGainControlSuccess) {
+TEST_F(GraphServerTest, DeleteGainControlSucceeds) {
   // Create a gain control.
   GainControlId id = kInvalidId;
   {
@@ -1911,7 +1912,7 @@ TEST_F(GraphServerTest, StartFails) {
   }
 }
 
-TEST_F(GraphServerTest, StartSuccess) {
+TEST_F(GraphServerTest, StartSucceeds) {
   NodeId producer_id;
   NodeId consumer_id;
   ASSERT_NO_FATAL_FAILURE(CreateProducerAndConsumer(&producer_id, &consumer_id));
@@ -2009,7 +2010,7 @@ TEST_F(GraphServerTest, StopFails) {
   }
 }
 
-TEST_F(GraphServerTest, StopSuccess) {
+TEST_F(GraphServerTest, StopSucceeds) {
   NodeId producer_id;
   NodeId consumer_id;
   ASSERT_NO_FATAL_FAILURE(CreateProducerAndConsumer(&producer_id, &consumer_id));
@@ -2051,6 +2052,111 @@ TEST_F(GraphServerTest, StopSuccess) {
     ASSERT_TRUE(result->value()->has_reference_time());
     ASSERT_TRUE(result->value()->has_stream_time());
     ASSERT_TRUE(result->value()->has_packet_timestamp());
+  }
+}
+
+//
+// CancelStartOrStop
+//
+
+TEST_F(GraphServerTest, CancelStartOrStopFails) {
+  NodeId producer_id;
+  NodeId consumer_id;
+  ASSERT_NO_FATAL_FAILURE(CreateProducerAndConsumer(&producer_id, &consumer_id));
+
+  NodeId invalid_type_node_id;
+  {
+    const auto result = client()->CreateMixer(MakeDefaultCreateMixerRequest(arena_).Build());
+    ASSERT_TRUE(result.ok());
+    ASSERT_FALSE(result->is_error());
+    ASSERT_TRUE(result->value()->has_id());
+    invalid_type_node_id = result->value()->id();
+  }
+
+  struct TestCase {
+    std::string name;
+    std::function<void(
+        fidl::WireTableBuilder<fuchsia_audio_mixer::wire::GraphCancelStartOrStopRequest>&)>
+        edit;
+    CancelStartOrStopError expected_error;
+  };
+
+  const std::vector<TestCase> cases = {
+      {
+          .name = "MissingNodeId",
+          .edit = [](auto& request) { request.clear_node_id(); },
+          .expected_error = CancelStartOrStopError::kMissingRequiredField,
+      },
+      {
+          .name = "InvalidNodeId",
+          .edit = [](auto& request) { request.node_id(99); },
+          .expected_error = CancelStartOrStopError::kInvalidId,
+      },
+      {
+          .name = "InvalidNodeType",
+          .edit = [invalid_type_node_id](auto& request) { request.node_id(invalid_type_node_id); },
+          .expected_error = CancelStartOrStopError::kInvalidId,
+      },
+  };
+
+  for (auto& tc : cases) {
+    SCOPED_TRACE("TestCase: " + tc.name);
+    auto request =
+        fuchsia_audio_mixer::wire::GraphCancelStartOrStopRequest::Builder(arena_).node_id(
+            consumer_id);
+    tc.edit(request);
+
+    const auto result = client()->CancelStartOrStop(request.Build());
+    if (!result.ok()) {
+      ADD_FAILURE() << "failed to send method call: " << result;
+      continue;
+    }
+    if (!result->is_error()) {
+      ADD_FAILURE() << "CancelStartOrStop did not fail";
+      continue;
+    }
+    EXPECT_EQ(result->error_value(), tc.expected_error);
+  }
+}
+
+TEST_F(GraphServerTest, CancelStartOrStopSucceeds) {
+  NodeId producer_id;
+  NodeId consumer_id;
+  ASSERT_NO_FATAL_FAILURE(CreateProducerAndConsumer(&producer_id, &consumer_id));
+
+  {
+    // Create producer -> consumer edge.
+    const auto result =
+        client()->CreateEdge(fuchsia_audio_mixer::wire::GraphCreateEdgeRequest::Builder(arena_)
+                                 .source_id(producer_id)
+                                 .dest_id(consumer_id)
+                                 .Build());
+  }
+
+  {
+    // Start consumer.
+    const auto result =
+        client()->Start(fuchsia_audio_mixer::wire::GraphStartRequest::Builder(arena_)
+                            .node_id(consumer_id)
+                            .when(RealTime::WithSystemTime(arena_, 10))
+                            .stream_time(StreamTime::WithStreamTime(arena_, 20))
+                            .Build());
+    ASSERT_TRUE(result.ok()) << result;
+    ASSERT_FALSE(result->is_error()) << result->error_value();
+    ASSERT_TRUE(result->value()->has_system_time());
+    ASSERT_TRUE(result->value()->has_reference_time());
+    ASSERT_TRUE(result->value()->has_stream_time());
+    ASSERT_TRUE(result->value()->has_packet_timestamp());
+  }
+
+  {
+    // Cancel start consumer.
+    const auto result = client()->CancelStartOrStop(
+        fuchsia_audio_mixer::wire::GraphCancelStartOrStopRequest::Builder(arena_)
+            .node_id(consumer_id)
+            .Build());
+    ASSERT_TRUE(result.ok()) << result;
+    ASSERT_FALSE(result->is_error()) << result->error_value();
   }
 }
 
@@ -2142,7 +2248,7 @@ TEST_F(GraphServerTest, BindProducerLeadTimeWatcherFails) {
   }
 }
 
-TEST_F(GraphServerTest, BindProducerLeadTimeWatcherSuccess) {
+TEST_F(GraphServerTest, BindProducerLeadTimeWatcherSucceeds) {
   NodeId producer_id;
   NodeId consumer_id;
   ASSERT_NO_FATAL_FAILURE(CreateProducerAndConsumer(&producer_id, &consumer_id));

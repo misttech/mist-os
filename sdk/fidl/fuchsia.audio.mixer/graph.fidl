@@ -652,7 +652,12 @@ protocol Graph {
     /// the outcome of the race. In typical usage, a `CancelStartOrStop` request
     /// should be followed in short order by a `Stop` or `Start` request so that
     /// the state of the service is known.
-    CancelStartOrStop();
+    CancelStartOrStop(table {
+        /// ID of the consumer or producer node.
+        ///
+        /// Required.
+        1: node_id NodeId;
+    }) -> () error CancelStartOrStopError;
 
     /// Reports a producer's lead time. In output pipelines, a producer's lead
     /// time defines how early an audio frame must be received in order for that
@@ -816,6 +821,15 @@ type StopError = flexible enum {
 
     /// The stream is already stopped.
     ALREADY_STOPPED = 5;
+};
+
+/// Type of errors return by [`CancelStartOrStop`]
+type CancelStartOrStopError = flexible enum {
+    /// A required field was not provided.
+    MISSING_REQUIRED_FIELD = 1;
+
+    /// The given `node_id` does not refer to a producer or a consumer.
+    INVALID_ID = 2;
 };
 
 /// Type of errors return by [`BindProducerLeadTimeWatcher`].

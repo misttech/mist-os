@@ -22,8 +22,7 @@
 namespace media_audio {
 
 // Controls an audio stream using Start and Stop commands. Commands can be scheduled to happen in
-// the future. At most one command (Start or Stop) can be pending at any time. If a new command
-// arrives before a pending command takes effect, the pending command is canceled.
+// the future. At most one command (Start or Stop) can be pending at any time.
 class StartStopControl {
  public:
   StartStopControl(const Format& format, TimelineRate media_ticks_per_ns,
@@ -98,8 +97,7 @@ class StartStopControl {
   static void CancelCommand(Command& cmd);
 
   // Queues a Start or Stop command. The command will remain pending until it is scheduled to occur.
-  // If another command arrives before that time, the prior command will be canceled. There is never
-  // more than one command pending at a time.
+  // It is not allowed to queue a Start or Stop command while another command is already pending.
   //
   // If a Start command arrives while the control is already started, the Start command behaves as
   // if it was preceded instantaneously by a Stop.
@@ -146,8 +144,6 @@ class StartStopControl {
     zx::time start_reference_time;
     Fixed start_frame;
   };
-
-  void CancelPendingCommand();
 
   // Reports when the pending command should happen, using `reference_time_for_immediate` as the
   // scheduled time if the pending command should happen immediately.

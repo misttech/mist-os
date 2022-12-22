@@ -269,12 +269,12 @@ TEST(ProducerNodeTest, CreateEdgeSuccessWithRingBuffer) {
   q->RunForThread(ctx.detached_thread->id());
 }
 
-TEST(ProducerNodeTest, StopCancelsStart) {
+TEST(ProducerNodeTest, CancelStart) {
   FakeGraph graph({});
 
   auto h = MakeTestHarness(graph, TestDataSource::kStreamSink);
 
-  // Start then stop immediately -- the stop should cancel the start.
+  // Start then CancelStartOrStop immediately -- Start should get canceled.
   bool canceled = false;
   h.producer->Start(ProducerStage::StartCommand{
       .start_time = RealTime{.clock = WhichClock::kReference, .time = zx::time(0)},
@@ -286,14 +286,12 @@ TEST(ProducerNodeTest, StopCancelsStart) {
             canceled = true;
           },
   });
-  h.producer->Stop(ProducerStage::StopCommand{
-      .when = Fixed(1),
-  });
+  h.producer->CancelStartOrStop();
 
   EXPECT_TRUE(canceled);
 }
 
-TEST(ProducerNodeTest, StartCancelsStop) {
+TEST(ProducerNodeTest, CancelStop) {
   FakeGraph graph({});
 
   auto h = MakeTestHarness(graph, TestDataSource::kStreamSink);
@@ -314,7 +312,7 @@ TEST(ProducerNodeTest, StartCancelsStop) {
     [[maybe_unused]] const auto packet = h.producer->pipeline_stage()->Read(ctx, Fixed(0), 20);
   }
 
-  // Stop then start immediately -- the start should cancel the stop.
+  // Stop then CancelStartOrStop immediately -- Stop should get cancelled.
   bool canceled = false;
   h.producer->Stop(ProducerStage::StopCommand{
       .when = Fixed(1),
@@ -325,10 +323,7 @@ TEST(ProducerNodeTest, StartCancelsStop) {
             canceled = true;
           },
   });
-  h.producer->Start(ProducerStage::StartCommand{
-      .start_time = RealTime{.clock = WhichClock::kReference, .time = zx::time(0) + zx::msec(100)},
-      .stream_time = Fixed(1000),
-  });
+  h.producer->CancelStartOrStop();
 
   EXPECT_TRUE(canceled);
 }

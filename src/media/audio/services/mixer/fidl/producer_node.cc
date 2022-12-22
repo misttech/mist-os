@@ -110,15 +110,17 @@ ProducerNode::ProducerNode(std::string_view name, std::shared_ptr<Clock> referen
       delay_reporter_(std::move(delay_reporter)),
       delay_watcher_(std::move(delay_watcher)) {}
 
-void ProducerNode::Start(ProducerStage::StartCommand cmd) const {
-  if (auto old = pending_start_stop_command_->swap(std::move(cmd)); old) {
-    StartStopControl::CancelCommand(*old);
-  }
+bool ProducerNode::Start(ProducerStage::StartCommand cmd) const {
+  return !pending_start_stop_command_->swap(std::move(cmd));
 }
 
-void ProducerNode::Stop(ProducerStage::StopCommand cmd) const {
-  if (auto old = pending_start_stop_command_->swap(std::move(cmd)); old) {
-    StartStopControl::CancelCommand(*old);
+bool ProducerNode::Stop(ProducerStage::StopCommand cmd) const {
+  return !pending_start_stop_command_->swap(std::move(cmd));
+}
+
+void ProducerNode::CancelStartOrStop() const {
+  if (auto cmd = pending_start_stop_command_->pop(); cmd) {
+    StartStopControl::CancelCommand(*cmd);
   }
 }
 
