@@ -6,7 +6,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
 
 rustc_test("driver") {
-  name = "password_authenticator_integration_test"
+  name = "legacy_password_authenticator_integration_test"
   edition = "2021"
 
   deps = [
@@ -43,9 +43,9 @@ rustc_test("driver") {
   non_rust_deps = [ "//src/lib/storage/fs_management/c" ]
 }
 
-fuchsia_component("password-authenticator-integration-test") {
+fuchsia_component("legacy-password-authenticator-integration-test") {
   testonly = true
-  manifest = "meta/password-authenticator-integration-test.cml"
+  manifest = "meta/legacy-password-authenticator-integration-test.cml"
   deps = [
     ":driver",
     "//src/devices/bus/drivers/platform",
@@ -53,7 +53,7 @@ fuchsia_component("password-authenticator-integration-test") {
   ]
 }
 
-fuchsia_test_package("password-authenticator-integration-tests") {
+fuchsia_test_package("legacy-password-authenticator-integration-tests") {
   # isolated devmgr sometimes logs at error level when its processes are torn
   # down in unlucky orders, and there's no way to tear them down
   # deterministically, so I guess we tolerate ERROR level log messages
@@ -63,9 +63,9 @@ fuchsia_test_package("password-authenticator-integration-tests") {
     }
   }
 
-  test_components = [ ":password-authenticator-integration-test" ]
+  test_components = [ ":legacy-password-authenticator-integration-test" ]
   deps = [
-    ":password-authenticator-integration-test",
+    ":legacy-password-authenticator-integration-test",
     "//src/identity/bin/password_authenticator:component",
     "//src/identity/bin/password_authenticator:integration_test_config",
     "//src/security/bin/credential_manager:component",
@@ -73,7 +73,7 @@ fuchsia_test_package("password-authenticator-integration-tests") {
   ]
 }
 
-group("password_authenticator_integration") {
+group("legacy_password_authenticator_integration") {
   testonly = true
-  public_deps = [ ":password-authenticator-integration-tests" ]
+  public_deps = [ ":legacy-password-authenticator-integration-tests" ]
 }

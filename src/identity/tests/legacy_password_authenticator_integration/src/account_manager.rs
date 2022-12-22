@@ -97,7 +97,7 @@ impl TestEnv {
             .unwrap();
 
         let credential_manager = builder
-            .add_child("credential_manager", "fuchsia-pkg://fuchsia.com/password-authenticator-integration-tests#meta/credential-manager.cm", ChildOptions::new()).await.unwrap();
+            .add_child("credential_manager", "fuchsia-pkg://fuchsia.com/legacy-password-authenticator-integration-tests#meta/credential-manager.cm", ChildOptions::new()).await.unwrap();
         builder
             .add_route(
                 Route::new()

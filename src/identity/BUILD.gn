@@ -19,7 +19,7 @@ group("tests") {
     "bin:tests",
     "lib:tests",
     "tests/account_manager_integration",
-    "tests/password_authenticator_integration",
+    "tests/legacy_password_authenticator_integration",
     "tests/storage_manager_integration",
     "tools:tests",
 
