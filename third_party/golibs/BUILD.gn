@@ -2365,6 +2365,7 @@ go_library("gvisor.dev/gvisor") {
     "pkg/atomicbitops/atomicbitops_arm64_state_autogen.go",
     "pkg/atomicbitops/atomicbitops_noasm.go",
     "pkg/atomicbitops/atomicbitops_state_autogen.go",
+    "pkg/atomicbitops/bool.go",
     "pkg/bits/bits.go",
     "pkg/bits/bits32.go",
     "pkg/bits/bits64.go",
