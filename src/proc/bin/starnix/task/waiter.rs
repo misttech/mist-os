@@ -87,18 +87,30 @@ impl Waiter {
 
     /// Wait until the waiter is woken up.
     ///
-    /// If the wait is interrupted (see [`Waiter::interrupt`]), this function returns
-    /// EINTR.
+    /// If the wait is interrupted (see [`Waiter::interrupt`]), this function returns EINTR.
     pub fn wait(&self, current_task: &CurrentTask) -> Result<(), Errno> {
         self.wait_until(current_task, zx::Time::INFINITE)
     }
 
     /// Wait until the given deadline has passed or the waiter is woken up.
     ///
-    /// If the wait is interrupted (see [`Waiter::interrupt`]), this function returns
-    /// EINTR.
+    /// If the wait deadline is nonzero and is interrupted (see [`Waiter::interrupt`]), this
+    /// function returns EINTR. Callers must take special care not to lose any accumulated data or
+    /// local state when EINTR is received as this is a normal and recoverable situation.
+    ///
+    /// Using a 0 deadline (no waiting, useful for draining pending events) will not wait and is
+    /// guaranteed not to issue EINTR.
+    ///
+    /// It the timeout elapses with no events, this function returns ETIMEDOUT.
+    ///
+    /// Processes at most one event. If the caller is interested in draining the events, it should
+    /// repeatedly call this function with a 0 deadline until it reports ETIMEDOUT. (This case is
+    /// why a 0 deadline must not return EINTR, as previous calls to wait_until() may have
+    /// accumulated state that would be lost when returning EINTR to userspace.)
     pub fn wait_until(&self, current_task: &CurrentTask, deadline: zx::Time) -> Result<(), Errno> {
-        {
+        let is_waiting = deadline.into_nanos() > 0;
+
+        if is_waiting {
             let mut state = current_task.write();
             assert!(!state.signals.waiter.is_valid());
             if state.signals.is_any_pending() {
@@ -108,15 +120,35 @@ impl Waiter {
         }
 
         scopeguard::defer! {
-            let mut state = current_task.write();
-            assert!(
-                state.signals.waiter.access(|waiter| Arc::ptr_eq(&waiter.unwrap().0, &self.0)),
-                "SignalState waiter changed while waiting!"
-            );
-            state.signals.waiter = WaiterRef::empty();
+            if is_waiting {
+                let mut state = current_task.write();
+                assert!(
+                    state.signals.waiter.access(|waiter| Arc::ptr_eq(&waiter.unwrap().0, &self.0)),
+                    "SignalState waiter changed while waiting!"
+                );
+                state.signals.waiter = WaiterRef::empty();
+            }
         };
 
-        self.wait_internal(deadline)
+        // We are susceptible to spurious wakeups because interrupt() posts a message to the port
+        // queue. In addition to more subtle races, there could already be valid messages in the
+        // port queue that will immediately wake us up, leaving the interrupt message in the queue
+        // for subsequent waits (which by then may not have any signals pending) to read.
+        //
+        // It's impossible to non-racily guarantee that a signal is pending so there might always
+        // be an EINTR result here with no signal. But any signal we get when !is_waiting we know is
+        // leftover from before: the top of this function only sets ourself as the
+        // current_task.signals.waiter when there's a nonzero timeout, and that waiter reference is
+        // what is used to signal the interrupt().
+        loop {
+            let wait_result = self.wait_internal(deadline);
+            if let Err(errno) = &wait_result {
+                if errno.code == EINTR && !is_waiting {
+                    continue; // Spurious wakeup.
+                }
+            }
+            return wait_result;
+        }
     }
 
     /// Waits until the waiter is woken up. Do not use if a current_task is available, this will
@@ -125,7 +157,7 @@ impl Waiter {
         self.wait_internal(zx::Time::INFINITE)
     }
 
-    /// Waits until the given deadline has passed or the waiter is woken up.
+    /// Waits until the given deadline has passed or the waiter is woken up. See wait_until().
     fn wait_internal(&self, deadline: zx::Time) -> Result<(), Errno> {
         match self.0.port.wait(deadline) {
             Ok(packet) => match packet.status() {
@@ -169,9 +201,10 @@ impl Waiter {
                     }
                     Ok(())
                 }
-                // TODO make a match arm for this and return EBADMSG by default
+                zx::sys::ZX_ERR_CANCELED => error!(EINTR),
                 _ => {
-                    error!(EINTR)
+                    debug_assert!(false, "Unexpected status in port wait {}", packet.status());
+                    error!(EBADMSG)
                 }
             },
             Err(zx::Status::TIMED_OUT) => error!(ETIMEDOUT),
@@ -242,9 +275,9 @@ impl Waiter {
 
     /// Interrupt the waiter to deliver a signal. The wait operation will return EINTR, and a
     /// typical caller should then unwind to the syscall dispatch loop to let the signal be
-    /// processed.
+    /// processed. See wait_until() for more details.
     ///
-    /// Ignored if the waiter was created with new_ignore_signals.
+    /// Ignored if the waiter was created with new_ignoring_signals().
     pub fn interrupt(&self) {
         if self.0.ignore_signals {
             return;
