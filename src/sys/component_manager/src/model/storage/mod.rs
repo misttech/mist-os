@@ -281,7 +281,9 @@ pub async fn open_isolated_storage_by_id(
 }
 
 /// Delete the isolated storage sub-directory for the given component.  `dir_source_component` and
-/// `dir_source_path` are the component hosting the directory and its capability path.
+/// `dir_source_path` are the component hosting the directory and its capability path. Note that
+/// this removes the backing storage directory, meaning if this is called while the using
+/// component is still alive, that component's storage handle will start returning errors.
 pub async fn delete_isolated_storage(
     storage_source_info: StorageCapabilitySource,
     persistent_storage: bool,

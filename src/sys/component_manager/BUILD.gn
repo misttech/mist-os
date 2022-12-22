@@ -77,6 +77,7 @@ template("component_manager") {
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:regex",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
   ]

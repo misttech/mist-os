@@ -384,14 +384,22 @@ impl DirEntry {
     }
 }
 
-/// Returns a Vec of all non-directory nodes and all empty directory nodes in the given directory
-/// proxy. The returned entries will not include ".".
-/// |timeout| can be provided optionally to specify the maximum time to wait for a directory to be
-/// read.
-pub fn readdir_recursive(
-    dir: &fio::DirectoryProxy,
+/// Returns Stream of nodes in tree rooted at the given DirectoryProxy for which |results_filter|
+/// returns `true` plus any leaf (empty) directories. The results filter receives the directory
+/// entry for the node in question and if the node is a directory, a reference a Vec of the
+/// directory's contents. The function recurses into sub-directories for which |recurse_filter|
+/// returns true. The returned entries will not include ".". |timeout| can be provided optionally
+/// to specify the maximum time to wait for a directory to be read.
+pub fn readdir_recursive_filtered<'a, ResultFn, RecurseFn>(
+    dir: &'a fio::DirectoryProxy,
     timeout: Option<Duration>,
-) -> BoxStream<'_, Result<DirEntry, Error>> {
+    results_filter: ResultFn,
+    recurse_filter: RecurseFn,
+) -> BoxStream<'a, Result<DirEntry, Error>>
+where
+    ResultFn: Fn(&DirEntry, Option<&Vec<DirEntry>>) -> bool + Send + Sync + Copy + 'a,
+    RecurseFn: Fn(&DirEntry) -> bool + Send + Sync + Copy + 'a,
+{
     let mut pending = VecDeque::new();
     pending.push_back(DirEntry::root());
     let results: VecDeque<DirEntry> = VecDeque::new();
@@ -456,16 +464,21 @@ pub fn readdir_recursive(
                     }
                 };
 
-                // Emit empty directories as a single entry except for the root directory.
-                if subentries.is_empty() && !dir_entry.name.is_empty() {
+                // If this is an empty directory and the caller is interested
+                // in empty directories, emit that result.
+                if subentries.is_empty()
+                    && results_filter(&dir_entry, Some(&subentries))
+                    && !dir_entry.name.is_empty()
+                {
                     return Some((Ok(dir_entry), (results, pending)));
                 }
 
                 for subentry in subentries.into_iter() {
                     let subentry = dir_entry.chain(&subentry);
-                    if subentry.is_dir() {
-                        pending.push_back(subentry);
-                    } else {
+                    if subentry.is_dir() && recurse_filter(&subentry) {
+                        pending.push_back(subentry.clone());
+                    }
+                    if results_filter(&subentry, None) {
                         results.push_back(subentry);
                     }
                 }
@@ -473,6 +486,26 @@ pub fn readdir_recursive(
         }
     })
     .boxed()
+}
+
+/// Returns a Vec of all non-directory nodes and all empty directory nodes in the given directory
+/// proxy. The returned entries will not include ".".
+/// |timeout| can be provided optionally to specify the maximum time to wait for a directory to be
+/// read.
+pub fn readdir_recursive(
+    dir: &fio::DirectoryProxy,
+    timeout: Option<Duration>,
+) -> BoxStream<'_, Result<DirEntry, Error>> {
+    readdir_recursive_filtered(
+        dir,
+        timeout,
+        |entry: &DirEntry, contents: Option<&Vec<DirEntry>>| {
+            // We're interested in results which are not directories and any
+            // empty directories.
+            !entry.is_dir() || (contents.is_some() && contents.unwrap().is_empty())
+        },
+        |_| true,
+    )
 }
 
 /// Returns a sorted Vec of directory entries contained directly in the given directory proxy. The
