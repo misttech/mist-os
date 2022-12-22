@@ -4,7 +4,6 @@
 
 //! Module providing the TaskGroup type, which manages the life cycle of a group of asynchronous
 //! tasks on a multi-threaded Fuchsia executor.
-#![allow(warnings)] // TODO(fxbug.dev/117901)
 
 use fuchsia_async as fasync;
 use futures::channel::oneshot;
@@ -163,7 +162,9 @@ impl TaskGroup {
                 TaskGroupState::Cancelled => Err(TaskGroupError::AlreadyCancelled),
                 TaskGroupState::Active { cancel_sender, tasks, children } => {
                     children.iter().for_each(|child| {
-                        // #[allow(clippy::let_underscore_future)] // TODO(fxbug.dev/117901)
+                        #[allow(unknown_lints)]
+                        #[allow(clippy::let_underscore_future)]
+                        // TODO(fxbug.dev/117901)
                         let _ = child.cancel_no_wait();
                     });
                     let _ = cancel_sender.send(());

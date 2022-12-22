@@ -1,7 +1,6 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#![allow(warnings)] // TODO(fxbug.dev/117899)
 
 use crate::{constants::*, test_topology};
 use anyhow::Error;
@@ -38,7 +37,8 @@ const SPAM_COUNT: usize = 9001;
 
 #[fuchsia::test(logging = false)]
 async fn test_budget() {
-    // #[allow(clippy::let_underscore_future)] // TODO(fxbug.dev/117899)
+    #[allow(unknown_lints)]
+    #[allow(clippy::let_underscore_future)] // TODO(fxbug.dev/117899)
     let _ = diagnostics_log::init_publishing(diagnostics_log::PublishOptions {
         interest: diagnostics_log::Interest {
             min_severity: Some(diagnostics_log::Severity::Debug),
