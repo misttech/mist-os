@@ -90,27 +90,39 @@ struct CachedStorage {
 impl CachedStorage {
     /// Triggers a sync on the file proxy.
     async fn sync(&mut self, storage_dir: &DirectoryProxy) -> Result<(), Error> {
-        let file_proxy = fuchsia_fs::directory::open_file(
-            storage_dir,
-            &self.temp_file_path,
-            OpenFlags::CREATE
-                | OpenFlags::TRUNCATE
-                | OpenFlags::RIGHT_READABLE
-                | OpenFlags::RIGHT_WRITABLE,
-        )
-        .await
-        .with_context(|| format!("unable to open {:?} for writing", self.temp_file_path))?;
-        fuchsia_fs::file::write(&file_proxy, self.current_data.as_ref().unwrap())
+        // Scope is important. file_proxy needs to be out-of-scope when the directory is renamed.
+        {
+            let file_proxy = fuchsia_fs::directory::open_file(
+                storage_dir,
+                &self.temp_file_path,
+                OpenFlags::CREATE
+                    | OpenFlags::TRUNCATE
+                    | OpenFlags::RIGHT_READABLE
+                    | OpenFlags::RIGHT_WRITABLE,
+            )
             .await
-            .context("failed to write data to file")?;
-        file_proxy
-            .close()
-            .await
-            .context("failed to call close on temp file")?
-            .map_err(zx::Status::from_raw)?;
+            .with_context(|| format!("unable to open {:?} for writing", self.temp_file_path))?;
+            fuchsia_fs::file::write(&file_proxy, self.current_data.as_ref().unwrap())
+                .await
+                .context("failed to write data to file")?;
+            file_proxy
+                .close()
+                .await
+                .context("failed to call close on temp file")?
+                .map_err(zx::Status::from_raw)?;
+        }
         fuchsia_fs::directory::rename(storage_dir, &self.temp_file_path, &self.file_path)
             .await
-            .context("failed to rename temp file to permanent file")
+            .context("failed to rename temp file to permanent file")?;
+        storage_dir
+            .sync()
+            .await
+            .context("failed to call sync on directory after rename")?
+            .map_err(zx::Status::from_raw)
+            // This is only returned when the directory is backed by a VFS, so this is fine to
+            // ignore.
+            .or_else(|e| if let zx::Status::NOT_SUPPORTED = e { Ok(()) } else { Err(e) })
+            .context("failed to sync rename to directory")
     }
 }
 

@@ -335,35 +335,40 @@ impl MigrationManager {
         dir_proxy: &DirectoryProxy,
         migration_id: u64,
     ) -> Result<(), MigrationError> {
-        // Write to a temporary file before renaming so we can ensure the update is atomic.
-        let tmp_migration_file = fuchsia_fs::directory::open_file(
-            dir_proxy,
-            TMP_MIGRATION_FILE_NAME,
-            OpenFlags::NOT_DIRECTORY
-                | OpenFlags::CREATE
-                | OpenFlags::RIGHT_READABLE
-                | OpenFlags::RIGHT_WRITABLE,
-        )
-        .await
-        .context("unable to create migrations file")?;
-        if let Err(e) = fuchsia_fs::file::write(&tmp_migration_file, migration_id.to_string()).await
+        // Scope is important. tmp_migration_file needs to be out of scope when the file is
+        // renamed.
         {
-            return Err(match e {
-                WriteError::WriteError(zx::Status::NO_SPACE) => MigrationError::DiskFull,
-                _ => Error::from(e).context("failed to write tmp migration").into(),
-            });
-        };
-        if let Err(e) =
-            tmp_migration_file.sync().await.map_err(Error::from).context("failed to sync")?
-        {
-            fx_log_err!("Failed to sync tmp migration file to disk: {:?}", zx::Status::from_raw(e));
+            let tmp_migration_file = fuchsia_fs::directory::open_file(
+                dir_proxy,
+                TMP_MIGRATION_FILE_NAME,
+                OpenFlags::NOT_DIRECTORY
+                    | OpenFlags::CREATE
+                    | OpenFlags::RIGHT_READABLE
+                    | OpenFlags::RIGHT_WRITABLE,
+            )
+            .await
+            .context("unable to create migrations file")?;
+            if let Err(e) =
+                fuchsia_fs::file::write(&tmp_migration_file, migration_id.to_string()).await
+            {
+                return Err(match e {
+                    WriteError::WriteError(zx::Status::NO_SPACE) => MigrationError::DiskFull,
+                    _ => Error::from(e).context("failed to write tmp migration").into(),
+                });
+            };
+            if let Err(e) = tmp_migration_file
+                .close()
+                .await
+                .map_err(Error::from)
+                .context("failed to close")?
+                .map_err(zx::Status::from_raw)
+            {
+                return Err(match e {
+                    zx::Status::NO_SPACE => MigrationError::DiskFull,
+                    _ => anyhow!("{e:?}").context("failed to properly close migration file").into(),
+                });
+            }
         }
-        if let Err(e) =
-            tmp_migration_file.close().await.map_err(Error::from).context("failed to close")?
-        {
-            fx_log_err!("Failed to properly close migration file: {:?}", zx::Status::from_raw(e));
-        }
-        drop(tmp_migration_file);
 
         if let Err(e) =
             fuchsia_fs::directory::rename(dir_proxy, TMP_MIGRATION_FILE_NAME, MIGRATION_FILE_NAME)
@@ -374,6 +379,26 @@ impl MigrationManager {
                 _ => Error::from(e).context("failed to rename tmp to migrations.txt").into(),
             });
         };
+
+        if let Err(e) = dir_proxy
+            .sync()
+            .await
+            .map_err(Error::from)
+            .context("failed to sync dir")?
+            .map_err(zx::Status::from_raw)
+        {
+            match e {
+                // This is only returned when the directory is backed by a VFS, so this is fine to
+                // ignore.
+                zx::Status::NOT_SUPPORTED => {}
+                zx::Status::NO_SPACE => return Err(MigrationError::DiskFull),
+                _ => {
+                    return Err(anyhow!("{e:?}")
+                        .context("failed to sync directory for migration id")
+                        .into())
+                }
+            }
+        }
 
         Ok(())
     }
