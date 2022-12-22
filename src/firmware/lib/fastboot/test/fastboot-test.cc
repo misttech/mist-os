@@ -820,8 +820,10 @@ class FastbootRebootTest
  public:
   FastbootRebootTest()
       : loop_(&kAsyncLoopConfigNoAttachToCurrentThread), outgoing_(loop_.dispatcher()) {
-    ASSERT_OK(outgoing_.AddProtocol<fuchsia_hardware_power_statecontrol::Admin>(this));
-    ASSERT_OK(outgoing_.AddProtocol<fuchsia_paver::Paver>(this));
+    ASSERT_OK(outgoing_.AddUnmanagedProtocol<fuchsia_hardware_power_statecontrol::Admin>(
+        admin_bindings_.CreateHandler(this, loop_.dispatcher(), fidl::kIgnoreBindingClosure)));
+    ASSERT_OK(outgoing_.AddUnmanagedProtocol<fuchsia_paver::Paver>(
+        paver_bindings_.CreateHandler(this, loop_.dispatcher(), fidl::kIgnoreBindingClosure)));
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_TRUE(endpoints.is_ok());
     ASSERT_EQ(ZX_OK, outgoing_.Serve(std::move(endpoints->server)).status_value());
@@ -874,6 +876,8 @@ class FastbootRebootTest
 
   async::Loop loop_;
   component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_paver::Paver> paver_bindings_;
+  fidl::ServerBindingGroup<fuchsia_hardware_power_statecontrol::Admin> admin_bindings_;
   fidl::ClientEnd<fuchsia_io::Directory> svc_local_;
 
   bool reboot_triggered_ = false;
@@ -941,7 +945,8 @@ class FastbootFshostTest : public FastbootDownloadTest,
  public:
   FastbootFshostTest()
       : loop_(&kAsyncLoopConfigNoAttachToCurrentThread), outgoing_(loop_.dispatcher()) {
-    ASSERT_OK(outgoing_.AddProtocol<fuchsia_fshost::Admin>(this));
+    ASSERT_OK(outgoing_.AddUnmanagedProtocol<fuchsia_fshost::Admin>(
+        admin_bindings_.CreateHandler(this, loop_.dispatcher(), fidl::kIgnoreBindingClosure)));
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_TRUE(endpoints.is_ok());
     ASSERT_EQ(ZX_OK, outgoing_.Serve(std::move(endpoints->server)).status_value());
@@ -997,6 +1002,7 @@ class FastbootFshostTest : public FastbootDownloadTest,
 
   async::Loop loop_;
   component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_fshost::Admin> admin_bindings_;
   fidl::ClientEnd<fuchsia_io::Directory> svc_local_;
 
   std::string data_file_name_ TA_GUARDED(lock_);
@@ -1168,7 +1174,8 @@ class FastbootBuildInfoTest : public FastbootDownloadTest,
  public:
   FastbootBuildInfoTest()
       : loop_(&kAsyncLoopConfigNoAttachToCurrentThread), outgoing_(loop_.dispatcher()) {
-    ASSERT_OK(outgoing_.AddProtocol<fuchsia_buildinfo::Provider>(this));
+    ASSERT_OK(outgoing_.AddUnmanagedProtocol<fuchsia_buildinfo::Provider>(
+        provider_bindings_.CreateHandler(this, loop_.dispatcher(), fidl::kIgnoreBindingClosure)));
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_TRUE(endpoints.is_ok());
     ASSERT_EQ(ZX_OK, outgoing_.Serve(std::move(endpoints->server)).status_value());
@@ -1201,6 +1208,7 @@ class FastbootBuildInfoTest : public FastbootDownloadTest,
   }
 
   async::Loop loop_;
+  fidl::ServerBindingGroup<fuchsia_buildinfo::Provider> provider_bindings_;
   component::OutgoingDirectory outgoing_;
   fidl::ClientEnd<fuchsia_io::Directory> svc_local_;
 };
