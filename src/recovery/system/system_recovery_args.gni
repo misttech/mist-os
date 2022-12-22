@@ -11,7 +11,7 @@ declare_args() {
   qr_codes_path = "//src/recovery/system/res/qr_codes.riv"
 
   # Whether to use the new UX UI
-  enable_recovery_ui_v2 = false
+  enable_recovery_ui_v2 = true
 
   # Whether to log lots of debug info including PII
   enable_recovery_ui_v2_debug_logging = false
