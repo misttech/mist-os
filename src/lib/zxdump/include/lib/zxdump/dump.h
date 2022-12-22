@@ -399,9 +399,6 @@ static_assert(std::is_default_constructible_v<JobDump<zx::unowned_job>>);
 static_assert(std::is_move_constructible_v<JobDump<zx::unowned_job>>);
 static_assert(std::is_move_assignable_v<JobDump<zx::unowned_job>>);
 
-// Get the root resource handle of the running system, e.g. for CollectKernel.
-fit::result<Error, zx::resource> GetRootResource();
-
 }  // namespace zxdump
 
 #endif  // SRC_LIB_ZXDUMP_INCLUDE_LIB_ZXDUMP_DUMP_H_

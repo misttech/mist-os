@@ -388,7 +388,7 @@ TEST(ZxdumpTests, GcoreProcessDumpKernelInfo) {
   // The gcore process needs to get the RootResource protocol, which
   // StartChild() already fetched for us.
   EXPECT_TRUE(process.root_resource());
-  child.set_resource(process.root_resource().borrow());
+  child.set_resource(zx::unowned_resource{process.root_resource().get()});
   ASSERT_NO_FATAL_FAILURE(child.Start("gcore", args));
   ASSERT_NO_FATAL_FAILURE(child.CollectStdout());
   ASSERT_NO_FATAL_FAILURE(child.CollectStderr());

@@ -85,146 +85,175 @@ using InfoTraitsType = typename InfoTraits<Topic>::type;
 
 template <>
 struct InfoTraits<ZX_INFO_HANDLE_BASIC> {
+  static constexpr std::string_view kName = "ZX_INFO_HANDLE_BASIC";
   using type = zx_info_handle_basic_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_PROCESS> {
+  static constexpr std::string_view kName = "ZX_INFO_PROCESS";
   using type = zx_info_process_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_PROCESS_THREADS> {
+  static constexpr std::string_view kName = "ZX_INFO_PROCESS_THREADS";
   using type = cpp20::span<const zx_koid_t>;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_VMAR> {
+  static constexpr std::string_view kName = "ZX_INFO_VMAR";
   using type = zx_info_vmar_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_JOB_CHILDREN> {
+  static constexpr std::string_view kName = "ZX_INFO_JOB_CHILDREN";
   using type = cpp20::span<const zx_koid_t>;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_JOB_PROCESSES> {
+  static constexpr std::string_view kName = "ZX_INFO_JOB_PROCESSES";
   using type = cpp20::span<const zx_koid_t>;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_THREAD> {
+  static constexpr std::string_view kName = "ZX_INFO_THREAD";
   using type = zx_info_thread_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_THREAD_EXCEPTION_REPORT> {
+  static constexpr std::string_view kName = "ZX_INFO_THREAD_EXCEPTION_REPORT";
   using type = zx_exception_report_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_TASK_STATS> {
+  static constexpr std::string_view kName = "ZX_INFO_TASK_STATS";
   using type = zx_info_task_stats_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_PROCESS_MAPS> {
+  static constexpr std::string_view kName = "ZX_INFO_PROCESS_MAPS";
   using type = cpp20::span<const zx_info_maps_t>;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_PROCESS_VMOS_V1> {
+  static constexpr std::string_view kName = "ZX_INFO_PROCESS_VMOS_V1";
   using type = cpp20::span<const zx_info_vmo_t>;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_PROCESS_VMOS> {
+  static constexpr std::string_view kName = "ZX_INFO_PROCESS_VMOS";
   using type = cpp20::span<const zx_info_vmo_t>;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_THREAD_STATS> {
+  static constexpr std::string_view kName = "ZX_INFO_THREAD_STATS";
   using type = zx_info_thread_stats_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_CPU_STATS> {
+  static constexpr std::string_view kName = "ZX_INFO_CPU_STATS";
   using type = cpp20::span<const zx_info_cpu_stats_t>;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_KMEM_STATS> {
+  static constexpr std::string_view kName = "ZX_INFO_KMEM_STATS";
   using type = zx_info_kmem_stats_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_RESOURCE> {
+  static constexpr std::string_view kName = "ZX_INFO_RESOURCE";
   using type = zx_info_resource_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_HANDLE_COUNT> {
+  static constexpr std::string_view kName = "ZX_INFO_HANDLE_COUNT";
   using type = zx_info_handle_count_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_BTI> {
+  static constexpr std::string_view kName = "ZX_INFO_BTI";
   using type = zx_info_bti_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_PROCESS_HANDLE_STATS> {
+  static constexpr std::string_view kName = "ZX_INFO_PROCESS_HANDLE_STATS";
   using type = zx_info_process_handle_stats_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_SOCKET> {
+  static constexpr std::string_view kName = "ZX_INFO_SOCKET";
   using type = zx_info_socket_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_VMO_V1> {
+  static constexpr std::string_view kName = "ZX_INFO_VMO_V1";
   using type = zx_info_vmo_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_VMO> {
+  static constexpr std::string_view kName = "ZX_INFO_VMO";
   using type = zx_info_vmo_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_JOB> {
+  static constexpr std::string_view kName = "ZX_INFO_JOB";
   using type = zx_info_job_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_TIMER> {
+  static constexpr std::string_view kName = "ZX_INFO_TIMER";
   using type = zx_info_timer_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_STREAM> {
+  static constexpr std::string_view kName = "ZX_INFO_STREAM";
   using type = zx_info_stream_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_HANDLE_TABLE> {
+  static constexpr std::string_view kName = "ZX_INFO_HANDLE_TABLE";
   using type = cpp20::span<const zx_info_handle_extended_t>;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_MSI> {
+  static constexpr std::string_view kName = "ZX_INFO_MSI";
   using type = zx_info_msi_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_GUEST_STATS> {
+  static constexpr std::string_view kName = "ZX_INFO_GUEST_STATS";
   using type = zx_info_guest_stats_t;
 };
 
 template <>
 struct InfoTraits<ZX_INFO_TASK_RUNTIME> {
+  static constexpr std::string_view kName = "ZX_INFO_TASK_RUNTIME";
   using type = zx_info_task_runtime_t;
 };
 
@@ -244,6 +273,7 @@ using PropertyTraitsType = typename PropertyTraits<Property>::type;
 // Since an array can't be returned by value, it's returned as std::array.
 template <>
 struct PropertyTraits<ZX_PROP_NAME> {
+  static constexpr std::string_view kName = "ZX_PROP_NAME";
   using type = std::array<char, ZX_MAX_NAME_LEN>;
 };
 

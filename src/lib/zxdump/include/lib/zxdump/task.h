@@ -28,17 +28,17 @@ namespace zxdump {
 // systems, the API parts for live tasks are still available but they use a
 // stub handle type that is always invalid.
 #ifdef __Fuchsia__
-using LiveTask = zx::handle;
+using LiveHandle = zx::handle;
 #else
 // The stub type is move-only and contextually convertible to bool just like
 // the real one.  It supports only a few basic methods, which do nothing and
 // always report an invalid handle.
-struct LiveTask {
-  LiveTask() = default;
-  LiveTask(const LiveTask&) = delete;
-  LiveTask(LiveTask&&) = default;
-  LiveTask& operator=(const LiveTask&) = delete;
-  LiveTask& operator=(LiveTask&&) = default;
+struct LiveHandle {
+  LiveHandle() = default;
+  LiveHandle(const LiveHandle&) = delete;
+  LiveHandle(LiveHandle&&) = default;
+  LiveHandle& operator=(const LiveHandle&) = delete;
+  LiveHandle& operator=(LiveHandle&&) = default;
 
   void reset() {}
 
@@ -55,13 +55,15 @@ struct LiveTask {
     return ZX_ERR_BAD_HANDLE;
   }
 
-  zx_status_t get_child(uint64_t koid, zx_rights_t rights, LiveTask* result) const {
+  zx_status_t get_child(uint64_t koid, zx_rights_t rights, LiveHandle* result) const {
     return ZX_ERR_BAD_HANDLE;
   }
 };
 #endif
 
 // Forward declarations for below.
+class Object;
+class Resource;
 class Task;
 class Job;
 class Process;
@@ -130,9 +132,9 @@ class TaskHolder {
   // but read_memory calls will always fail with ZX_ERR_NOT_SUPPORTED.
   fit::result<Error> Insert(fbl::unique_fd fd, bool read_memory = true);
 
-  // Insert a live task (job or process).  Live threads cannot be inserted
-  // alone, only their containing process.
-  fit::result<Error, std::reference_wrapper<Task>> Insert(LiveTask task);
+  // Insert a live task (job or process) or resource.  Live threads cannot be
+  // inserted alone, only their containing process.
+  fit::result<Error, std::reference_wrapper<Object>> Insert(LiveHandle task);
 
   // Yields the current root job.  If all tasks in the eye of the TaskHolder
   // form a unified tree, this returns the actual root job in that tree.
@@ -146,6 +148,15 @@ class TaskHolder {
   // inserted, and later start reporting new orphan tasks inserted after that.
   Job& root_job() const;
 
+  // Yields the root resource.  If a live handle to the root resource was
+  // passed to Insert, this can access its data.  If dumps inserted include the
+  // "privileged kernel" information, that is attached to this fake root
+  // resource though it doesn't have information like a KOID itself.  If
+  // multiple dumps supply kernel information, conflicting data inserted later
+  // will be ignored.  If both live and dump data are available, the dump data
+  // will obscure the live data.
+  Resource& root_resource() const;
+
   // These can't fail, but return empty/zero if no corresponding data is in the
   // dump.  If multiple dumps supply system-wide information, only the first
   // dump's data will be used.  There is no checking that the system-wide data
@@ -158,22 +169,23 @@ class TaskHolder {
   std::string_view system_get_version_string() const;
 
  private:
+  friend Object;
   friend Task;
   friend Job;
   friend Process;
   friend Thread;
+  friend Resource;
   class JobTree;
 
   std::unique_ptr<JobTree> tree_;
 };
 
-// As with zx::task, this is the superclass of Job, Process, and Thread.
-// In fact, all the methods here correspond to the generic zx::object methods.
-// But no objects that aren't tasks are found in dumps as such.
-class Task {
+// This is the superclass of all (virtual) kernel object types.
+// All the methods here correspond to the generic zx::object methods.
+class Object {
  public:
-  Task(Task&&) = default;
-  Task& operator=(Task&&) = default;
+  Object(Object&&) = default;
+  Object& operator=(Object&&) = default;
 
   // Every task has a KOID.  This is just shorthand for extracting it from
   // ZX_INFO_HANDLE_BASIC.  The fake root job returns zero (ZX_KOID_INVALID).
@@ -183,8 +195,11 @@ class Task {
   //  * If it returns ZX_OBJ_TYPE_JOB, `static_cast<Job&>(*this)` is safe.
   //  * If it returns ZX_OBJ_TYPE_PROCESS, `static_cast<Process&>(*this)` is.
   //  * If it returns ZX_OBJ_TYPE_THREAD, `static_cast<Thread&>(*this)` is.
-  // The only task on which get_info<ZX_INFO_HANDLE_BASIC> can fail is the
-  // fake root job; type() on it returns zero (ZX_OBJ_TYPE_NONE).
+  //  * If it returns ZX_OBJ_TYPE_RESOURCE, `static_cast<Resource&>(*this)` is.
+
+  // The only objects on which get_info<ZX_INFO_HANDLE_BASIC> can fail are the
+  // fake root job and the fake root resource; type() on those returns zero
+  // (ZX_OBJ_TYPE_NONE).
   zx_obj_type_t type() const;
 
   // This returns the timestamp of the dump, which may be zero.
@@ -193,10 +208,10 @@ class Task {
   // This is provided for parity with zx::object::get_child, but just using
   // Process::threads, Job::children, or Job::processes is much more convenient
   // for iterating through the lists reported by get_info.
-  fit::result<Error, std::reference_wrapper<Task>> get_child(zx_koid_t koid);
+  fit::result<Error, std::reference_wrapper<Object>> get_child(zx_koid_t koid);
 
   // Find a task by KOID: this task or a descendent task.
-  fit::result<Error, std::reference_wrapper<Task>> find(zx_koid_t koid);
+  fit::result<Error, std::reference_wrapper<Object>> find(zx_koid_t koid);
 
   // This gets the full info block for this topic, whatever its size.  Note the
   // data is not necessarily aligned in memory, so it can't be safely accessed
@@ -260,18 +275,18 @@ class Task {
   // Turn a live task into a postmortem task.  The postmortem task holds only
   // the basic information (KOID, type) and whatever has been cached by past
   // get_info or get_property calls.
-  LiveTask Reap() { return std::exchange(live_, {}); }
+  LiveHandle Reap() { return std::exchange(live_, {}); }
 
  protected:
   // The class is abstract.  Only the subclasses can be created and destroyed.
-  Task() = delete;
+  Object() = delete;
 
-  explicit Task(TaskHolder::JobTree& tree, LiveTask live = {})
+  explicit Object(TaskHolder::JobTree& tree, LiveHandle live = {})
       : tree_{tree}, live_(std::move(live)) {}
 
-  ~Task();
+  ~Object();
 
-  LiveTask& live() { return live_; }
+  LiveHandle& live() { return live_; }
 
   TaskHolder::JobTree& tree() { return tree_; }
 
@@ -290,7 +305,21 @@ class Task {
   std::map<zx_object_info_topic_t, ByteView> info_;
   std::map<uint32_t, ByteView> properties_;
   time_t date_ = 0;
-  LiveTask live_;
+  LiveHandle live_;
+};
+
+// As with zx::task, this is the superclass of Job, Process, and Thread.
+// All the common methods are just those common to all kernel objects.
+// But Task is a distinct type: a Task is always a Job, Process, or Thread.
+class Task : public Object {
+ public:
+  Task(Task&&) = default;
+  Task& operator=(Task&&) = default;
+
+ protected:
+  using Object::Object;
+
+  ~Task();
 };
 
 // A Thread is a Task and also has register state.
@@ -380,8 +409,25 @@ class Job : public Task {
   std::map<zx_koid_t, Process> processes_;
 };
 
+// Resource objects just hold access to information, but are a distinct type.
+class Resource : public Object {
+ public:
+  Resource(Resource&&) = default;
+  Resource& operator=(Resource&&) = default;
+
+  ~Resource();
+
+ private:
+  friend TaskHolder::JobTree;
+
+  using Object::Object;
+};
+
 // Get the live root job of the running system, e.g. for TaskHolder::Insert.
-fit::result<Error, LiveTask> GetRootJob();
+fit::result<Error, LiveHandle> GetRootJob();
+
+// Get the live root resource handle of the running system.
+fit::result<Error, LiveHandle> GetRootResource();
 
 }  // namespace zxdump
 

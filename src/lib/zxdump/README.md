@@ -445,6 +445,20 @@ identifies a real, rooted job tree that can be displayed whole.  The zero KOID
 of the super-root indicates that instead it's really just a collection of
 unrelated "top-level" jobs and/or processes.
 
+### Resource Objects & Kernel Information
+
+The `zxdump::Task` base class is itself derived from `zxdump::Object`.  As in
+the Zircon system call API, `get_info` et al are actually provided generically
+for all kinds of kernel objects.  Zircon's resource objects are represented by
+the `zxdump::Resource` class, which is also derived from `zxdump::Object`.
+
+In dump files, the only resource object that ever exists is the root resource.
+`zxdump::TaskHolder` provides a simple `root_resource()` method similar to
+`root_job()`.  If a dump includes the privileged kernel information, then it
+will be available via `get_info` calls on the root resource.  If that data is
+omitted, then `root_resource()` will be a placeholder object that returns a
+zero KOID.
+
 ### Memory-Mapped & Streaming Input
 
 The reader code uses file descriptors to read dump files.  When possible, it
@@ -597,4 +611,12 @@ no conditional compilation is required.)  A tool or service can insert one or
 more dump files, or it can insert the live root job; and then look up tasks by
 KOID and interrogate them with identical code either way.
 
+Similarly, the `zxdump::GetRootResource()` function is provided to fetch the
+live system's root resource handle via the
+[fuchsia.boot.RootResource][fuchsia.boot.RootResource] FIDL protocol.  This
+handle can be passed to `zxdump::TaskHolder::Insert` to make live kernel data
+available via `root_resource()` as from a dump.  (Resource objects other than
+the root resource cannot be inserted.)
+
 [fuchsia.kernel.RootJob]: https://fuchsia.dev/reference/fidl/fuchsia.kernel#RootJob
+[fuchsia.boot.RootResource]: https://fuchsia.dev/reference/fidl/fuchsia.boot#RootResource

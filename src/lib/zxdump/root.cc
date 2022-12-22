@@ -14,8 +14,8 @@
 namespace zxdump {
 namespace {
 
-template <typename T, class Service, auto Member>
-fit::result<Error, T> GetFromService() {
+template <class Service, auto Member>
+fit::result<Error, LiveHandle> GetFromService() {
   constexpr const char* kSvcName = fidl::DiscoverableProtocolDefaultPath<Service>;
 
   static constexpr auto kGetName = []() {
@@ -50,13 +50,13 @@ fit::result<Error, T> GetFromService() {
 
 }  // namespace
 
-fit::result<Error, LiveTask> GetRootJob() {
-  return GetFromService<LiveTask, fuchsia_kernel::RootJob,
+fit::result<Error, LiveHandle> GetRootJob() {
+  return GetFromService<fuchsia_kernel::RootJob,
                         &fidl::WireResponse<fuchsia_kernel::RootJob::Get>::job>();
 }
 
-fit::result<Error, zx::resource> GetRootResource() {
-  return GetFromService<zx::handle, fuchsia_boot::RootResource,
+fit::result<Error, LiveHandle> GetRootResource() {
+  return GetFromService<fuchsia_boot::RootResource,
                         &fidl::WireResponse<fuchsia_boot::RootResource::Get>::resource>();
 }
 

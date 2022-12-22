@@ -122,6 +122,19 @@ source_set("test-pipe-reader") {
   deps = [ "//third_party/googletest:gtest" ]
 }
 
+source_set("test-data-holder") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  public = [ "test-data-holder.h" ]
+  public_deps = [
+    ":zxdump",
+    "//third_party/googletest:gtest",
+  ]
+
+  sources = [ "test-data-holder.cc" ]
+}
+
 source_set("test-tool-process") {
   visibility = [ ":*" ]
   testonly = true
@@ -182,6 +195,7 @@ test("zxdump-unittests") {
   ]
   deps = [
     ":piped-command",
+    ":test-data-holder",
     ":test-pipe-reader",
     ":test-tool-process",
     ":zxdump",

@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <zircon/assert.h>
 #include <zircon/syscalls/object.h>
+#include <zircon/syscalls/resource.h>
 
 #include <algorithm>
 #include <charconv>
@@ -170,11 +171,11 @@ constexpr Error kTaskNotFound{"task KOID not found", ZX_ERR_NOT_FOUND};
 using LiveJob = zx::job;
 using LiveProcess = zx::process;
 #else
-using LiveJob = LiveTask;
-using LiveProcess = LiveTask;
+using LiveJob = LiveHandle;
+using LiveProcess = LiveHandle;
 #endif
 
-using InsertChild = std::variant<std::monostate, Job, Process, Thread>;
+using InsertChild = std::variant<std::monostate, Job, Process, Thread, Resource>;
 
 }  // namespace
 
@@ -182,6 +183,8 @@ using InsertChild = std::variant<std::monostate, Job, Process, Thread>;
 class TaskHolder::JobTree {
  public:
   Job& root_job() const { return root_job_; }
+
+  Resource& root_resource() { return root_resource_; }
 
   // Insert any number of dumps by reading a core file or an archive.
   fit::result<Error> Insert(fbl::unique_fd fd, bool read_memory) {
@@ -203,8 +206,8 @@ class TaskHolder::JobTree {
   }
 
   // Insert a live task.
-  auto Insert(LiveTask live, InsertChild* parent)
-      -> fit::result<Error, std::reference_wrapper<Task>> {
+  auto Insert(LiveHandle live, InsertChild* parent)
+      -> fit::result<Error, std::reference_wrapper<Object>> {
     zx_info_handle_basic_t info;
     if (zx_status_t status =
             live.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
@@ -215,7 +218,7 @@ class TaskHolder::JobTree {
     // Place the basic info into a new Task object now that it's known valid.
     // Everything relies on the basic info always being available in the map.
     auto ingest = [&](auto attach, auto task)  //
-        -> fit::result<Error, std::reference_wrapper<Task>> {
+        -> fit::result<Error, std::reference_wrapper<Object>> {
       task.date_ = time(nullptr);  // Time of first data sample from this task.
       auto buffer = GetBuffer(sizeof(info));
       memcpy(buffer, &info, sizeof(info));
@@ -228,6 +231,8 @@ class TaskHolder::JobTree {
     };
 
     switch (info.type) {
+      case ZX_OBJ_TYPE_RESOURCE:
+        return ingest(&JobTree::AttachResource, Resource{*this, std::move(live)});
       case ZX_OBJ_TYPE_JOB:
         return ingest(&JobTree::AttachJob, Job{*this, std::move(live)});
       case ZX_OBJ_TYPE_PROCESS:
@@ -243,7 +248,7 @@ class TaskHolder::JobTree {
     }
   }
 
-  void AssertIsSuperroot(Task& task) { ZX_DEBUG_ASSERT(&task == &superroot_); }
+  void AssertIsSuperroot(Object& object) { ZX_DEBUG_ASSERT(&object == &superroot_); }
 
   // Unlike generic get_info, the view is always fully aligned for casting.
   fit::result<Error, ByteView> GetSuperrootInfo(zx_object_info_topic_t topic) {
@@ -407,6 +412,41 @@ class TaskHolder::JobTree {
     return fit::ok(std::ref(it->second));
   }
 
+  fit::result<Error, std::reference_wrapper<Resource>> AttachResource(Resource&& resource) {
+    zx_info_resource_t info;
+    if (auto result = resource.get_info<ZX_INFO_RESOURCE>(); result.is_error()) {
+      return result.take_error();
+    } else {
+      info = result.value();
+    }
+    if (info.kind != ZX_RSRC_KIND_ROOT) {
+      return fit::error{Error{
+          "non-root resources not supported",
+          ZX_ERR_NOT_SUPPORTED,
+      }};
+    }
+    if (root_resource_.live()) {
+      // There's already a live root resource attached.
+      return fit::error{Error{
+          "live root resource handle already inserted",
+          ZX_ERR_ALREADY_EXISTS,
+      }};
+    }
+    if (root_resource_.info_.empty()) {
+      // This is our real root resource!
+      root_resource_ = std::move(resource);
+    } else {
+      // There's already some dump data attached.  Just take the live handle.
+      root_resource_.live() = std::move(resource.live());
+    }
+    return fit::ok(std::ref(root_resource_));
+  }
+
+  fit::result<Error> ReadKernelNote(zx_object_info_topic_t topic, ByteView data) {
+    root_resource_.info_.try_emplace(topic, data);
+    return fit::ok();
+  }
+
   std::forward_list<std::unique_ptr<DumpFile>> dumps_;
   std::forward_list<std::unique_ptr<std::byte[]>> buffers_;
 
@@ -428,6 +468,9 @@ class TaskHolder::JobTree {
 
   // The root job is either the superroot or its only child.
   std::reference_wrapper<Job> root_job_{superroot_};
+
+  // The only resource we hold is the root resource.
+  Resource root_resource_{*this};
 };
 
 // JobTree is an incomplete type outside this translation unit.  Some methods
@@ -439,13 +482,17 @@ TaskHolder::~TaskHolder() = default;
 
 Job& TaskHolder::root_job() const { return tree_->root_job(); }
 
+Resource& TaskHolder::root_resource() const { return tree_->root_resource(); }
+
 fit::result<Error> TaskHolder::Insert(fbl::unique_fd fd, bool read_memory) {
   return tree_->Insert(std::move(fd), read_memory);
 }
 
-fit::result<Error, std::reference_wrapper<Task>> TaskHolder::Insert(LiveTask task) {
+fit::result<Error, std::reference_wrapper<Object>> TaskHolder::Insert(LiveHandle task) {
   return tree_->Insert(std::move(task), nullptr);
 }
+
+Object::~Object() = default;
 
 Task::~Task() = default;
 
@@ -454,6 +501,8 @@ Job::~Job() = default;
 Process::~Process() = default;
 
 Thread::~Thread() = default;
+
+Resource::~Resource() = default;
 
 fit::result<Error, std::reference_wrapper<zxdump::Job::JobMap>> Job::children() {
   if (children_.empty() && live()) {
@@ -469,7 +518,7 @@ fit::result<Error, std::reference_wrapper<zxdump::Job::JobMap>> Job::children() 
       if (koid == ZX_KOID_INVALID) {
         continue;
       }
-      LiveTask live_child;
+      LiveHandle live_child;
       zx_status_t status = job.get_child(koid, kChildRights, &live_child);
       switch (status) {
         case ZX_OK:
@@ -509,7 +558,7 @@ fit::result<Error, std::reference_wrapper<zxdump::Job::ProcessMap>> Job::process
     LiveJob job{std::move(live())};
     auto restore = fit::defer([&]() { live() = std::move(job); });
     for (zx_koid_t koid : result.value()) {
-      LiveTask live_process;
+      LiveHandle live_process;
       zx_status_t status = job.get_child(koid, kChildRights, &live_process);
       switch (status) {
         case ZX_OK:
@@ -549,7 +598,7 @@ fit::result<Error, std::reference_wrapper<zxdump::Process::ThreadMap>> Process::
     LiveProcess process{std::move(live())};
     auto restore = fit::defer([&]() { live() = std::move(process); });
     for (zx_koid_t koid : result.value()) {
-      LiveTask live_thread;
+      LiveHandle live_thread;
       zx_status_t status = process.get_child(koid, kChildRights, &live_thread);
       switch (status) {
         case ZX_OK:
@@ -580,7 +629,7 @@ fit::result<Error, std::reference_wrapper<zxdump::Process::ThreadMap>> Process::
   return fit::ok(std::ref(threads_));
 }
 
-fit::result<Error, std::reference_wrapper<Task>> Task::find(zx_koid_t match) {
+fit::result<Error, std::reference_wrapper<Object>> Object::find(zx_koid_t match) {
   if (koid() == match) {
     return fit::ok(std::ref(*this));
   }
@@ -609,7 +658,7 @@ fit::result<Error, std::reference_wrapper<Task>> Job::find(zx_koid_t match) {
   if (live()) {
     // Those maps aren't populated eagerly for live tasks.
     // Instead, just query the kernel for this one KOID first.
-    LiveTask live_child;
+    LiveHandle live_child;
 
     // zx::handle doesn't permit get_child, so momentarily move the live()
     // handle to a zx::job.  On non-Fuchsia, it's all still no-ops.
@@ -679,16 +728,18 @@ fit::result<Error, std::reference_wrapper<Task>> Process::find(zx_koid_t match) 
   return fit::error{kTaskNotFound};
 }
 
-std::byte* Task::GetBuffer(size_t size) { return tree().GetBuffer(size); }
+std::byte* Object::GetBuffer(size_t size) { return tree().GetBuffer(size); }
 
-void Task::TakeBuffer(std::unique_ptr<std::byte[]> buffer) { tree().TakeBuffer(std::move(buffer)); }
+void Object::TakeBuffer(std::unique_ptr<std::byte[]> buffer) {
+  tree().TakeBuffer(std::move(buffer));
+}
 
-fit::result<Error, ByteView> Task::GetSuperrootInfo(zx_object_info_topic_t topic) {
+fit::result<Error, ByteView> Object::GetSuperrootInfo(zx_object_info_topic_t topic) {
   tree_.get().AssertIsSuperroot(*this);
   return tree_.get().GetSuperrootInfo(topic);
 }
 
-fit::result<Error, ByteView> Task::get_info_aligned(  //
+fit::result<Error, ByteView> Object::get_info_aligned(  //
     zx_object_info_topic_t topic, size_t record_size, size_t align) {
   ByteView bytes;
   if (auto result = get_info(topic, record_size); result.is_error()) {
@@ -878,6 +929,15 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
       // Check for a system note.
       if (name == kSystemNoteName) {
         auto result = ReadSystemNote(desc);
+        if (result.is_error()) {
+          return result.take_error();
+        }
+        continue;
+      }
+
+      // Check for a kernel note.
+      if (name == std::string_view{kKernelInfoNoteName}) {
+        auto result = ReadKernelNote(nhdr.type, desc);
         if (result.is_error()) {
           return result.take_error();
         }
@@ -1199,6 +1259,17 @@ fit::result<Error> TaskHolder::JobTree::ReadArchive(DumpFile& file, FileRange ar
         return result.take_error();
       }
       return ReadSystemNote(result.value());
+    }
+
+    // Check for a kernel note.
+    if (auto kernel = JobNoteName<uint32_t>(kKernelInfoNoteName, member.name); kernel.is_error()) {
+      return kernel.take_error();
+    } else if (kernel.value()) {
+      auto result = file.ReadPermanent(contents);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+      return ReadKernelNote(*kernel.value(), result.value());
     }
 
     // This member file is not a job note.  It's an embedded dump file.

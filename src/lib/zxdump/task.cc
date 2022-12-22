@@ -9,7 +9,7 @@ namespace zxdump {
 
 constexpr size_t kMaxPropertySize = ZX_MAX_NAME_LEN;
 
-zx_koid_t Task::koid() const {
+zx_koid_t Object::koid() const {
   if (auto found = info_.find(ZX_INFO_HANDLE_BASIC); found != info_.end()) {
     auto [topic, data] = *found;
     zx_info_handle_basic_t info;
@@ -21,7 +21,7 @@ zx_koid_t Task::koid() const {
   return 0;
 }
 
-zx_obj_type_t Task::type() const {
+zx_obj_type_t Object::type() const {
   if (auto found = info_.find(ZX_INFO_HANDLE_BASIC); found != info_.end()) {
     auto [topic, data] = *found;
     zx_info_handle_basic_t info;
@@ -33,7 +33,7 @@ zx_obj_type_t Task::type() const {
   return 0;
 }
 
-fit::result<Error, ByteView> Task::get_info(zx_object_info_topic_t topic, size_t record_size) {
+fit::result<Error, ByteView> Object::get_info(zx_object_info_topic_t topic, size_t record_size) {
   if (info_.empty()) {
     // Only the superroot has no cached info at all.  It's a special case.
     return GetSuperrootInfo(topic);
@@ -77,7 +77,7 @@ fit::result<Error, ByteView> Task::get_info(zx_object_info_topic_t topic, size_t
   return fit::ok(found->second);
 }
 
-fit::result<Error, ByteView> Task::get_property(uint32_t property) {
+fit::result<Error, ByteView> Object::get_property(uint32_t property) {
   auto found = properties_.find(property);
   if (found == properties_.end()) {
     if (!live_) {

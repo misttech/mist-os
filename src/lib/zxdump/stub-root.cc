@@ -13,6 +13,8 @@ constexpr auto NotFuchsia() {
 
 }  // namespace
 
-fit::result<Error, LiveTask> GetRootJob() { return NotFuchsia(); }
+fit::result<Error, LiveHandle> GetRootJob() { return NotFuchsia(); }
+
+fit::result<Error, LiveHandle> GetRootResource() { return NotFuchsia(); }
 
 }  // namespace zxdump

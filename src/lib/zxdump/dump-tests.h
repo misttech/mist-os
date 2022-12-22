@@ -32,7 +32,7 @@ class TestProcess {
  public:
   zx::unowned_process borrow() const { return zx::unowned_process{process_}; }
 
-  LiveTask handle() const {
+  LiveHandle handle() const {
     zx::process dup;
     EXPECT_EQ(ZX_OK, process_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     return dup;
@@ -179,14 +179,14 @@ class TestProcessForKernelInfo : public TestProcessForPropertiesAndInfo {
   // Verify a dump file for that child was inserted and looks right.
   void CheckDump(zxdump::TaskHolder& holder);
 
-  const zx::resource& root_resource() const { return root_resource_; }
+  const LiveHandle& root_resource() const { return root_resource_; }
 
  private:
   static constexpr const char* kChildName = "zxdump-kernel-test-child";
 
   void Precollect(zxdump::ProcessDump<zx::unowned_process>& dump);
 
-  zx::resource root_resource_;
+  LiveHandle root_resource_;
 };
 
 }  // namespace zxdump::testing

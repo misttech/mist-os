@@ -339,7 +339,7 @@ fit::result<Error, AlignedStorageVector<Size, Align>> GetInfo(
       return fit::error(Error{"zx_object_get_info", status});
     }
 
-    if (actual <= avail) {
+    if (actual == avail) {
       // This is all the data.
       data.resize(actual);
       data.shrink_to_fit();

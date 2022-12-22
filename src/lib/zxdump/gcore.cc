@@ -197,7 +197,7 @@ constexpr auto CollectCommon = [](const Flags& flags, bool top,
       return resource.take_error();
     }
 
-    auto result = dumper.CollectKernel(resource->borrow());
+    auto result = dumper.CollectKernel(zx::unowned_resource{resource->get()});
     if (result.is_error()) {
       return result.take_error();
     }

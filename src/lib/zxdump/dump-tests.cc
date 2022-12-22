@@ -9,6 +9,7 @@
 #include <lib/zxdump/task.h>
 #include <lib/zxdump/zstd-writer.h>
 
+#include "test-data-holder.h"
 #include "test-file.h"
 #include "test-tool-process.h"
 
@@ -132,12 +133,38 @@ void TestProcessForKernelInfo::StartChild() {
 }
 
 void TestProcessForKernelInfo::Precollect(zxdump::ProcessDump<zx::unowned_process>& dump) {
-  auto result = dump.CollectKernel(root_resource_.borrow());
+  auto result = dump.CollectKernel(zx::unowned_resource{root_resource_.get()});
   EXPECT_TRUE(result.is_ok()) << result.error_value();
 }
 
 void TestProcessForKernelInfo::CheckDump(zxdump::TaskHolder& holder) {
-  // TODO(mcgrathr): needs reader support for kernel info, coming soon
+  using KernelData = TestDataHolder<   //
+      InfoTraits<ZX_INFO_CPU_STATS>,   //
+      InfoTraits<ZX_INFO_KMEM_STATS>,  //
+      InfoTraits<ZX_INFO_GUEST_STATS>>;
+
+  zxdump::Resource& root = holder.root_resource();
+  EXPECT_NE(root.koid(), ZX_KOID_INVALID);
+  EXPECT_EQ(root.type(), ZX_OBJ_TYPE_RESOURCE);
+
+  KernelData dump_data, live_data;
+
+  {
+    // Use a fresh holder to populate the live data.  It can consume the root
+    // resource handle we used in Precollect, since we've already dumped and
+    // don't need it any more.
+    zxdump::TaskHolder live_holder;
+    auto live_root = live_holder.Insert(std::move(root_resource_));
+    ASSERT_TRUE(live_root.is_ok()) << live_root.error_value();
+    ASSERT_NO_FATAL_FAILURE(live_data.Fill(*live_root));
+  }
+
+  // Fetch all the data from the dump.
+  ASSERT_NO_FATAL_FAILURE(dump_data.Fill(root));
+
+  // Check that the dump data makes sense as data collected before the live
+  // data just collected (after the dump was made).
+  dump_data.Check(live_data);
 }
 
 namespace {
