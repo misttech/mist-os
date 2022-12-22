@@ -49,10 +49,7 @@ ScreenCapture::ScreenCapture(const vector<std::shared_ptr<allocation::BufferColl
       renderer_(std::move(renderer)),
       get_renderables_(std::move(get_renderables)) {}
 
-ScreenCapture::~ScreenCapture() {
-  FX_LOGS(ERROR) << "ScreenCapture::Dtor: Clearing images.";
-  ClearImages();
-}
+ScreenCapture::~ScreenCapture() { ClearImages(); }
 
 void ScreenCapture::Configure(ScreenCaptureConfig args, ConfigureCallback callback) {
   // Check for missing args.
@@ -120,9 +117,6 @@ void ScreenCapture::Configure(ScreenCaptureConfig args, ConfigureCallback callba
     available_buffers_.push_back(i);
   }
   // Everything was successful!
-  FX_LOGS(INFO)
-      << "ScreenCapture::Configure: Configuration was successful with available buffer count: "
-      << available_buffers_.size();
   callback(fpromise::ok());
 }
 
