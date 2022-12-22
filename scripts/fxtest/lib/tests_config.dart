@@ -184,13 +184,20 @@ abstract class DynamicRunnerToken {
 /// Tokens for ffx test that produce an isolated output directory for each
 /// invocation of ffx test run.
 class FfxOutputDirectoryToken implements DynamicRunnerToken {
-  final String rootDirectory;
+  final String _rootDirectory;
   int _nextDirectoryId;
 
-  FfxOutputDirectoryToken(this.rootDirectory) : _nextDirectoryId = 0;
+  FfxOutputDirectoryToken(rootDirectory)
+      : _nextDirectoryId = 0,
+        // Since ffx test may be run in a different working directory, relative
+        // directories could be output in unexpected locations. To avoid this
+        // issue, ensure that we only pass absolute paths to ffx.
+        _rootDirectory = p.isAbsolute(rootDirectory)
+            ? rootDirectory
+            : p.absolute(rootDirectory);
 
   List<String> generateTokens() {
-    final directoryName = p.join(rootDirectory, '$_nextDirectoryId');
+    final directoryName = p.join(_rootDirectory, '$_nextDirectoryId');
     _nextDirectoryId += 1;
     return ['--output-directory', directoryName];
   }
