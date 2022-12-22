@@ -20,6 +20,7 @@
 #include "src/media/audio/services/device_registry/observer_server.h"
 #include "src/media/audio/services/device_registry/provider_server.h"
 #include "src/media/audio/services/device_registry/registry_server.h"
+#include "src/media/audio/services/device_registry/ring_buffer_server.h"
 
 namespace media_audio {
 
@@ -476,7 +477,8 @@ void LogObjectCounts() {
                             << ProviderServer::count() << " Providers, " << RegistryServer::count()
                             << " Registries, " << ObserverServer::count() << " Observers, "
                             << ControlCreatorServer::count() << " CtlCreators, "
-                            << ControlServer::count() << " Controls";
+                            << ControlServer::count() << " Controls, " << RingBufferServer::count()
+                            << " RingBuffers";
 }
 
 }  // namespace media_audio

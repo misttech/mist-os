@@ -4,11 +4,16 @@
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
+#include <zircon/errors.h>
+
+#include <memory>
+#include <optional>
 
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 #include "src/media/audio/services/device_registry/observer_server.h"
+#include "src/media/audio/services/device_registry/testing/fake_audio_driver.h"
 
 namespace media_audio {
 namespace {

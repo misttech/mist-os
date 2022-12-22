@@ -87,7 +87,7 @@ void RegistryServer::ReplyWithAddedDevices() {
   }
 
   auto completer = *std::move(watch_devices_added_completer_);
-  watch_devices_added_completer_.reset();
+  watch_devices_added_completer_ = std::nullopt;
   ADR_LOG_OBJECT(kLogRegistryServerResponses) << "responding to WatchDevicesAdded with "
                                               << devices_added_since_notify_.size() << " devices:";
   for (auto& info : devices_added_since_notify_) {
@@ -153,7 +153,7 @@ void RegistryServer::ReplyWithNextRemovedDevice() {
   devices_removed_since_notify_.pop();
   ADR_LOG_OBJECT(kLogRegistryServerResponses) << "responding with token_id " << next_removed_id;
   auto completer = *std::move(watch_device_removed_completer_);
-  watch_device_removed_completer_.reset();
+  watch_device_removed_completer_ = std::nullopt;
   completer.Reply(fit::success(
       fuchsia_audio_device::RegistryWatchDeviceRemovedResponse{{.token_id = next_removed_id}}));
 }

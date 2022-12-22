@@ -12,12 +12,15 @@
 
 #include <optional>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/device_registry/device_unittest.h"
 #include "src/media/audio/services/device_registry/testing/fake_audio_driver.h"
 
 namespace media_audio {
+
+using ::testing::Optional;
 
 class DeviceTest : public DeviceTestBase {
  protected:
@@ -30,6 +33,7 @@ class DeviceTest : public DeviceTestBase {
           .frame_rate = 48000,
       }},
   }};
+  // Accessor for a Device private member.
   static const std::optional<fuchsia_hardware_audio::DelayInfo>& DeviceDelayInfo(
       std::shared_ptr<Device> device) {
     return device->delay_info_;
@@ -219,7 +223,7 @@ TEST_F(DeviceTest, DynamicGainUpdate) {
   EXPECT_EQ(*notify_->gain_state()->gain_db(), 0.0f);
   EXPECT_FALSE(notify_->gain_state()->muted().value_or(false));
   EXPECT_FALSE(notify_->gain_state()->agc_enabled().value_or(false));
-  notify_->gain_state().reset();
+  notify_->gain_state() = std::nullopt;
 
   constexpr float kNewGainDb = -2.0f;
   fake_driver_->InjectGainChange({{
@@ -255,7 +259,7 @@ TEST_F(DeviceTest, DynamicPlugUpdate) {
   ASSERT_TRUE(notify_->plug_state());
   EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
   EXPECT_EQ(notify_->plug_state()->second, zx::time(0));
-  notify_->plug_state().reset();
+  notify_->plug_state() = std::nullopt;
 
   auto unplug_time = zx::clock::get_monotonic();
   fake_driver_->InjectPlugChange(false, unplug_time);
@@ -296,7 +300,7 @@ TEST_F(DeviceTest, SetGain) {
   EXPECT_EQ(*notify_->gain_state()->gain_db(), 0.0f);
   EXPECT_FALSE(notify_->gain_state()->muted().value_or(false));
   EXPECT_FALSE(notify_->gain_state()->agc_enabled().value_or(false));
-  notify_->gain_state().reset();
+  notify_->gain_state() = std::nullopt;
 
   constexpr float kNewGainDb = -2.0f;
   EXPECT_TRUE(SetDeviceGain({{
@@ -459,7 +463,7 @@ TEST_F(DeviceTest, DynamicDelayInfo) {
   EXPECT_TRUE(created_ring_buffer);
   EXPECT_EQ(*notify_->delay_info()->internal_delay(), 62500);
   EXPECT_EQ(notify_->delay_info()->external_delay().value_or(0), 0);
-  notify_->delay_info().reset();
+  notify_->delay_info() = std::nullopt;
 
   RunLoopUntilIdle();
   EXPECT_FALSE(notify_->delay_info());
@@ -475,6 +479,51 @@ TEST_F(DeviceTest, DynamicDelayInfo) {
   ASSERT_TRUE(notify_->delay_info()->external_delay());
   EXPECT_EQ(*notify_->delay_info()->internal_delay(), 123'456);
   EXPECT_EQ(*notify_->delay_info()->external_delay(), 654'321);
+}
+
+TEST_F(DeviceTest, SetActiveChannelsDuringCreateRingBuffer) {
+  InitializeDeviceForFakeDriver();
+  ASSERT_TRUE(InInitializedState(device_));
+  fake_driver_->AllocateRingBuffer(8192);
+  ASSERT_TRUE(SetControl(device_));
+
+  auto connected_to_ring_buffer_fidl =
+      device_->CreateRingBuffer(kDefaultRingBufferFormat, 2000, [](Device::RingBufferInfo info) {
+        EXPECT_TRUE(info.ring_buffer.buffer());
+        EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
+
+        EXPECT_TRUE(info.ring_buffer.format());
+        EXPECT_TRUE(info.ring_buffer.producer_bytes());
+        EXPECT_TRUE(info.ring_buffer.consumer_bytes());
+        EXPECT_TRUE(info.ring_buffer.reference_clock());
+      });
+  EXPECT_TRUE(connected_to_ring_buffer_fidl);
+
+  ExpectRingBufferReady();
+  EXPECT_THAT(device_->supports_set_active_channels(), Optional(true));
+}
+
+TEST_F(DeviceTest, SetActiveChannelsUnsupportedDuringCreateRingBuffer) {
+  InitializeDeviceForFakeDriver();
+  fake_driver_->set_active_channels_supported(false);
+  ASSERT_TRUE(InInitializedState(device_));
+  fake_driver_->AllocateRingBuffer(8192);
+  ASSERT_TRUE(SetControl(device_));
+
+  auto connected_to_ring_buffer_fidl =
+      device_->CreateRingBuffer(kDefaultRingBufferFormat, 2000, [](Device::RingBufferInfo info) {
+        EXPECT_TRUE(info.ring_buffer.buffer());
+        EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
+
+        EXPECT_TRUE(info.ring_buffer.format());
+        EXPECT_TRUE(info.ring_buffer.producer_bytes());
+        EXPECT_TRUE(info.ring_buffer.consumer_bytes());
+        EXPECT_TRUE(info.ring_buffer.reference_clock());
+      });
+  EXPECT_TRUE(connected_to_ring_buffer_fidl);
+
+  ExpectRingBufferReady();
+  EXPECT_THAT(device_->supports_set_active_channels(), Optional(false));
 }
 
 }  // namespace media_audio

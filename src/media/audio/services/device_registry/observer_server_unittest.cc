@@ -169,7 +169,7 @@ void ObserverServerTest::on_fidl_error(fidl::UnbindInfo error) {
   if (fidl_error_status_ != ZX_OK && fidl_error_status_ != ZX_ERR_PEER_CLOSED) {
     FX_LOGS(WARNING) << __func__ << ":" << error;
   } else {
-    FX_LOGS(INFO) << __func__ << ":" << error;
+    FX_LOGS(DEBUG) << __func__ << ":" << error;
   }
 }
 
@@ -401,7 +401,7 @@ TEST_F(ObserverServerTest, PlugChange) {
   observer_client->WatchPlugState().Then(
       [&received_callback,
        time_of_plug_change](fidl::Result<fidl_device::Observer::WatchPlugState>& result) {
-        FX_LOGS(INFO) << "Received callback 1";
+        FX_LOGS(DEBUG) << "Received callback 1";
         received_callback = true;
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->state());
@@ -416,7 +416,7 @@ TEST_F(ObserverServerTest, PlugChange) {
   observer_client->WatchPlugState().Then(
       [&received_callback,
        time_of_plug_change](fidl::Result<fidl_device::Observer::WatchPlugState>& result) {
-        FX_LOGS(INFO) << "Received callback 2";
+        FX_LOGS(DEBUG) << "Received callback 2";
         received_callback = true;
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->state());

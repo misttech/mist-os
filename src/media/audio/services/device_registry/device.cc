@@ -143,15 +143,15 @@ void Device::OnRemoval() {
   LogObjectCounts();
 
   // Regardless of whether device was pending / operational / unhealthy, notify the state watcher.
-  if (std::shared_ptr<DevicePresenceWatcher> pw = presence_watcher_.lock()) {
+  if (std::shared_ptr<DevicePresenceWatcher> pw = presence_watcher_.lock(); pw) {
     pw->DeviceIsRemoved(shared_from_this());
   }
 }
 
 void Device::ForEachObserver(fit::function<void(std::shared_ptr<ObserverNotify>)> action) {
   ADR_LOG_OBJECT(kLogNotifyMethods);
-  for (auto weak_it = observers_.begin(); weak_it < observers_.end(); ++weak_it) {
-    if (auto observer = weak_it->lock()) {
+  for (auto weak_obs = observers_.begin(); weak_obs < observers_.end(); ++weak_obs) {
+    if (auto observer = weak_obs->lock(); observer) {
       action(observer);
     }
   }
@@ -178,7 +178,7 @@ void Device::OnError(zx_status_t error) {
   SetError(error);
   LogObjectCounts();
 
-  if (std::shared_ptr<DevicePresenceWatcher> pw = presence_watcher_.lock()) {
+  if (std::shared_ptr<DevicePresenceWatcher> pw = presence_watcher_.lock(); pw) {
     pw->DeviceHasError(shared_from_this());
   }
 }
@@ -209,7 +209,7 @@ void Device::OnInitializationResponse() {
     SetState(State::DeviceInitialized);
     LogObjectCounts();
 
-    if (std::shared_ptr<DevicePresenceWatcher> pw = presence_watcher_.lock()) {
+    if (std::shared_ptr<DevicePresenceWatcher> pw = presence_watcher_.lock(); pw) {
       pw->DeviceIsReady(shared_from_this());
     }
   }
@@ -252,7 +252,7 @@ bool Device::DropControl() {
   }
 
   control_notify->DeviceIsRemoved();
-  control_notify_.reset();
+  control_notify_ = std::nullopt;
   // We don't remove our ControlNotify from the observer list, we wait for it to self-invalidate.
   LogObjectCounts();
 
@@ -269,8 +269,8 @@ bool Device::AddObserver(std::shared_ptr<ObserverNotify> observer_to_add) {
     FX_LOGS(WARNING) << "Device(" << this << ")::" << __func__ << ": unhealthy, cannot be observed";
     return false;
   }
-  for (auto weak_it = observers_.begin(); weak_it < observers_.end(); ++weak_it) {
-    if (auto observer = weak_it->lock()) {
+  for (auto weak_obs = observers_.begin(); weak_obs < observers_.end(); ++weak_obs) {
+    if (auto observer = weak_obs->lock(); observer) {
       if (observer == observer_to_add) {
         FX_LOGS(WARNING) << "Device(" << this << ")::AddObserver: observer cannot be re-added";
         return false;
@@ -279,9 +279,11 @@ bool Device::AddObserver(std::shared_ptr<ObserverNotify> observer_to_add) {
   }
   observers_.push_back(observer_to_add);
 
-  observer_to_add->GainStateChanged({{.gain_db = *gain_state_->gain_db(),
-                                      .muted = gain_state_->muted().value_or(false),
-                                      .agc_enabled = gain_state_->agc_enabled().value_or(false)}});
+  observer_to_add->GainStateChanged({{
+      .gain_db = *gain_state_->gain_db(),
+      .muted = gain_state_->muted().value_or(false),
+      .agc_enabled = gain_state_->agc_enabled().value_or(false),
+  }});
   observer_to_add->PlugStateChanged(*plug_state_->plugged()
                                         ? fuchsia_audio_device::PlugState::kPlugged
                                         : fuchsia_audio_device::PlugState::kUnplugged,
@@ -816,12 +818,13 @@ std::shared_ptr<ControlNotify> Device::GetControlNotify() {
     return nullptr;
   }
 
-  auto sp_control = control_notify_->lock();
-  if (!sp_control) {
-    control_notify_.reset();
+  auto sh_ptr_control = control_notify_->lock();
+  if (!sh_ptr_control) {
+    control_notify_ = std::nullopt;
     LogObjectCounts();
   }
-  return sp_control;
+
+  return sh_ptr_control;
 }
 
 bool Device::CreateRingBuffer(const fuchsia_hardware_audio::Format& format,
@@ -900,6 +903,18 @@ bool Device::ConnectRingBufferFidl(fuchsia_hardware_audio::Format driver_format)
   }};
 
   active_channels_bitmask_ = (1 << *vmo_format_.channel_count()) - 1;
+  SetActiveChannels(active_channels_bitmask_, [this](zx::result<zx::time> result) {
+    if (result.is_ok()) {
+      ADR_LOG_CLASS(kLogRingBufferFidlResponses) << "RingBuffer/SetActiveChannels IS supported";
+      return;
+    }
+    if (result.status_value() == ZX_ERR_NOT_SUPPORTED) {
+      ADR_LOG_CLASS(kLogRingBufferFidlResponses) << "RingBuffer/SetActiveChannels IS NOT supported";
+      return;
+    }
+    ADR_WARN_OBJECT() << "RingBuffer/SetActiveChannels returned error: " << result.status_string();
+    OnError(result.status_value());
+  });
   SetState(State::CreatingRingBuffer);
 
   return true;
@@ -963,7 +978,7 @@ void Device::RetrieveDelayInfo() {
         }
 
         // Notify our controlling entity, if we have one.
-        if (auto notify = GetControlNotify()) {
+        if (auto notify = GetControlNotify(); notify) {
           notify->DelayInfoChanged({{
               .internal_delay = delay_info_->internal_delay(),
               .external_delay = delay_info_->external_delay(),
@@ -1062,8 +1077,8 @@ void Device::SetActiveChannels(
       .Then(
           [this, channel_bitmask, callback = std::move(set_active_channels_callback)](
               fidl::Result<fuchsia_hardware_audio::RingBuffer::SetActiveChannels>& result) mutable {
-            if (result.is_error() &&
-                result.error_value().framework_error().status() == ZX_ERR_NOT_SUPPORTED) {
+            if (result.is_error() && result.error_value().is_domain_error() &&
+                result.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED) {
               ADR_LOG_OBJECT(kLogRingBufferFidlResponses)
                   << "RingBuffer/SetActiveChannels: device does not support this method";
               supports_set_active_channels_ = false;

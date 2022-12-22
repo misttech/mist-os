@@ -61,9 +61,9 @@ void ObserverServer::GainStateChanged(const fuchsia_audio_device::GainState& new
   ADR_LOG_OBJECT(kLogObserverServerMethods || kLogNotifyMethods);
 
   if (watch_gain_state_completer_) {
-    updated_gain_state_.reset();
+    updated_gain_state_ = std::nullopt;
     auto completer = std::move(*watch_gain_state_completer_);
-    watch_gain_state_completer_.reset();
+    watch_gain_state_completer_ = std::nullopt;
     completer.Reply(fit::success(fuchsia_audio_device::ObserverWatchGainStateResponse{{
         .state = new_gain_state,
     }}));
@@ -85,7 +85,7 @@ void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
     fuchsia_audio_device::ObserverWatchGainStateResponse response{{
         .state = std::move(*updated_gain_state_),
     }};
-    updated_gain_state_.reset();
+    updated_gain_state_ = std::nullopt;
     completer.Reply(fit::success(std::move(response)));
   } else {
     if (watch_gain_state_completer_) {
@@ -109,8 +109,8 @@ void ObserverServer::PlugStateChanged(const fuchsia_audio_device::PlugState& new
   if (watch_plug_state_completer_) {
     auto completer = std::move(*watch_plug_state_completer_);
     completer.Reply(fit::success(std::move(*plug_state_update_)));
-    watch_plug_state_completer_.reset();
-    plug_state_update_.reset();
+    watch_plug_state_completer_ = std::nullopt;
+    plug_state_update_ = std::nullopt;
   }
 }
 
@@ -129,7 +129,7 @@ void ObserverServer::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
 
   if (plug_state_update_) {
     completer.Reply(fit::success(std::move(*plug_state_update_)));
-    plug_state_update_.reset();
+    plug_state_update_ = std::nullopt;
   } else {
     watch_plug_state_completer_ = completer.ToAsync();
   }

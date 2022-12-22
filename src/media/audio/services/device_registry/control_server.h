@@ -14,13 +14,13 @@
 #include <unordered_set>
 
 #include "src/media/audio/services/common/base_fidl_server.h"
+#include "src/media/audio/services/device_registry/audio_device_registry.h"
 #include "src/media/audio/services/device_registry/control_notify.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/logging.h"
 
 namespace media_audio {
 
-class AudioDeviceRegistry;
 class RingBufferServer;
 
 // FIDL server for fuchsia_audio_device/Control. Claims a Device and makes "mutable" calls on it.

@@ -34,7 +34,7 @@ namespace media_audio {
 class DeviceTestBase : public gtest::TestLoopFixture {
  public:
   void SetUp() override {
-    notify_ = std::make_shared<NotifyStub>();
+    notify_ = std::make_shared<NotifyStub>(*this);
     zx::channel server_end, client_end;
     ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
 
@@ -87,6 +87,7 @@ class DeviceTestBase : public gtest::TestLoopFixture {
   }
   class NotifyStub : public std::enable_shared_from_this<NotifyStub>, public ControlNotify {
    public:
+    explicit NotifyStub(DeviceTestBase& parent) : parent_(parent) {}
     virtual ~NotifyStub() = default;
 
     bool AddObserver(std::shared_ptr<Device> device) {
@@ -128,6 +129,7 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     std::optional<fuchsia_audio_device::DelayInfo>& delay_info() { return delay_info_; }
 
    private:
+    [[maybe_unused]] DeviceTestBase& parent_;
     std::optional<fuchsia_audio_device::GainState> gain_state_;
     std::optional<std::pair<fuchsia_audio_device::PlugState, zx::time>> plug_state_;
     std::optional<fuchsia_audio_device::DelayInfo> delay_info_;

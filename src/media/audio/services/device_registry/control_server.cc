@@ -21,6 +21,7 @@
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/device_presence_watcher.h"
 #include "src/media/audio/services/device_registry/logging.h"
+#include "src/media/audio/services/device_registry/ring_buffer_server.h"
 
 namespace media_audio {
 
@@ -64,7 +65,16 @@ void ControlServer::OnShutdown(fidl::UnbindInfo info) {
 }
 
 // Called when Device drops its RingBuffer FIDL. Tell RingBufferServer and drop our reference.
-void ControlServer::DeviceDroppedRingBuffer() { ADR_LOG_OBJECT(kLogControlServerMethods); }
+void ControlServer::DeviceDroppedRingBuffer() {
+  ADR_LOG_OBJECT(kLogControlServerMethods);
+
+  if (auto ring_buffer = GetRingBufferServer(); ring_buffer) {
+    ring_buffer->DeviceDroppedRingBuffer();
+    ring_buffer_server_ = std::nullopt;
+  } else {
+    ADR_WARN_OBJECT() << "ring_buffer_server_ has already dropped";
+  }
+}
 
 void ControlServer::DeviceHasError() {
   ADR_LOG_OBJECT(kLogControlServerMethods);
@@ -79,6 +89,17 @@ void ControlServer::DeviceIsRemoved() {
 
   device_is_removed_ = true;
   Shutdown(ZX_ERR_PEER_CLOSED);
+}
+
+std::shared_ptr<RingBufferServer> ControlServer::GetRingBufferServer() {
+  ADR_LOG_OBJECT(kLogControlServerMethods);
+  if (ring_buffer_server_) {
+    if (auto sh_ptr_ring_buffer_server = ring_buffer_server_->lock(); sh_ptr_ring_buffer_server) {
+      return sh_ptr_ring_buffer_server;
+    }
+    ring_buffer_server_ = std::nullopt;
+  }
+  return nullptr;
 }
 
 // fuchsia.audio.device.Control implementation
@@ -149,7 +170,7 @@ void ControlServer::GetCurrentlyPermittedFormats(
         }
 
         auto completer = std::move(currently_permitted_formats_completer_);
-        currently_permitted_formats_completer_.reset();
+        currently_permitted_formats_completer_ = std::nullopt;
         if (device_has_error_) {
           ADR_WARN_OBJECT() << "device has an error";
           completer->Reply(fit::error(
@@ -202,7 +223,11 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
     return;
   }
 
-  // (future CL) If we already have a RingBuffer, reply with error kRingBufferAlreadyAllocated.
+  if (GetRingBufferServer()) {
+    ADR_WARN_OBJECT() << "device RingBuffer already exists";
+    completer.Reply(fit::error(
+        fuchsia_audio_device::wire::ControlCreateRingBufferError::kRingBufferAlreadyAllocated));
+  }
 
   auto driver_format = device_->SupportedDriverFormatForClientFormat(*request.options()->format());
   // Fail if device cannot satisfy the requested format.
@@ -220,11 +245,14 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
       [this](Device::RingBufferInfo info) {
         // If we have no async completer, maybe we're shutting down. Just exit.
         if (!create_ring_buffer_completer_) {
+          if (auto ring_buffer_server = GetRingBufferServer(); ring_buffer_server) {
+            ring_buffer_server_ = std::nullopt;
+          }
           return;
         }
 
         auto completer = std::move(*create_ring_buffer_completer_);
-        create_ring_buffer_completer_.reset();
+        create_ring_buffer_completer_ = std::nullopt;
 
         completer.Reply(fit::success(fuchsia_audio_device::ControlCreateRingBufferResponse{{
             .properties = info.properties,
@@ -234,17 +262,16 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
 
   if (!created) {
     ADR_WARN_OBJECT() << "device cannot create a ring buffer with the specified options";
+    ring_buffer_server_ = std::nullopt;
     create_ring_buffer_completer_->Reply(
         fidl::Response<fuchsia_audio_device::Control::CreateRingBuffer>(
             fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kBadRingBufferOption)));
     return;
   }
-
-  // This is where we'll create the RingBufferServer, by calling
-  //    RingBufferServer::Create(thread_ptr(), std::move(*request.ring_buffer_server()),
-  //        shared_from_this(), device_);
-  // As well as:
-  //    AddChildServer(ring_buffer_server);
+  auto ring_buffer_server = RingBufferServer::Create(
+      thread_ptr(), std::move(*request.ring_buffer_server()), shared_from_this(), device_);
+  AddChildServer(ring_buffer_server);
+  ring_buffer_server_ = ring_buffer_server;
 }
 
 void ControlServer::GainStateChanged(const fuchsia_audio_device::GainState&) {}
@@ -258,6 +285,9 @@ void ControlServer::DelayInfoChanged(const fuchsia_audio_device::DelayInfo& dela
   ADR_LOG_OBJECT(kLogControlServerResponses);
 
   // Initialization is complete, so this represents a delay update. Eventually, notify watchers.
+  if (auto ring_buffer_server = GetRingBufferServer(); ring_buffer_server) {
+    ring_buffer_server->DelayInfoChanged(delay_info);
+  }
   delay_info_ = delay_info;
 }
 

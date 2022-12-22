@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -31,6 +32,7 @@ class ControlServer;
 class ObserverServer;
 class ProviderServer;
 class RegistryServer;
+class RingBufferServer;
 
 // This singleton coordinates device detection, serves the outgoing FIDL, and maintains lists of
 // pending, active and unhealthy Devices. The object should live for the duration of the service.
@@ -86,6 +88,12 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
   std::shared_ptr<ControlServer> CreateControlServer(
       fidl::ServerEnd<fuchsia_audio_device::Control> server_end,
       std::shared_ptr<Device> device_to_control);
+
+  // RingBuffer support
+  std::shared_ptr<RingBufferServer> CreateRingBufferServer(
+      fidl::ServerEnd<fuchsia_audio_device::RingBuffer> server_end,
+      const std::shared_ptr<ControlServer>& parent,
+      const std::shared_ptr<Device>& device_to_control);
 
  private:
   static inline const std::string_view kClassName = "AudioDeviceRegistry";

@@ -53,6 +53,7 @@ executable("device_registry_unittests_bin") {
     "observer_server_unittest.cc",
     "provider_server_unittest.cc",
     "registry_server_unittest.cc",
+    "ring_buffer_server_unittest.cc",
   ]
 
   deps = [
@@ -73,6 +74,7 @@ executable("device_registry_warning_unittests_bin") {
     "observer_server_warning_unittest.cc",
     "provider_server_warning_unittest.cc",
     "registry_server_warning_unittest.cc",
+    "ring_buffer_server_warning_unittest.cc",
   ]
 
   deps = [ ":unittest_base" ]
@@ -103,6 +105,8 @@ source_set("device_registry_lib") {
     "provider_server.h",
     "registry_server.cc",
     "registry_server.h",
+    "ring_buffer_server.cc",
+    "ring_buffer_server.h",
     "validate.cc",
     "validate.h",
   ]
@@ -139,6 +143,7 @@ source_set("unittest_base") {
     "//src/lib/testing/loop_fixture",
     "//src/media/audio/lib/clock",
     "//src/media/audio/services/common/testing",
+    "//third_party/googletest:gmock",
     "//zircon/system/public",
   ]
 }

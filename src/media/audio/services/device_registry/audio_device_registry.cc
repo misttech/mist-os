@@ -24,6 +24,7 @@
 #include "src/media/audio/services/device_registry/observer_server.h"
 #include "src/media/audio/services/device_registry/provider_server.h"
 #include "src/media/audio/services/device_registry/registry_server.h"
+#include "src/media/audio/services/device_registry/ring_buffer_server.h"
 
 namespace media_audio {
 
@@ -82,7 +83,7 @@ void AudioDeviceRegistry::DeviceIsReady(std::shared_ptr<media_audio::Device> rea
 
   // Notify registry clients of this new device.
   for (auto& weak_registry : registries_) {
-    if (auto registry = weak_registry.lock()) {
+    if (auto registry = weak_registry.lock(); registry) {
       registry->DeviceWasAdded(ready_device);
     }
   }
@@ -166,8 +167,8 @@ bool AudioDeviceRegistry::ClaimDeviceForControl(std::shared_ptr<Device> device,
 void AudioDeviceRegistry::NotifyRegistriesOfDeviceRemoval(uint64_t removed_device_id) {
   ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods);
 
-  for (auto weak_it = registries_.begin(); weak_it != registries_.end(); ++weak_it) {
-    if (auto registry = weak_it->lock()) {
+  for (auto& weak_registry : registries_) {
+    if (auto registry = weak_registry.lock(); registry) {
       registry->DeviceWasRemoved(removed_device_id);
     }
   }
@@ -273,6 +274,15 @@ std::shared_ptr<ControlServer> AudioDeviceRegistry::CreateControlServer(
     return nullptr;
   }
   return control;
+}
+
+std::shared_ptr<RingBufferServer> AudioDeviceRegistry::CreateRingBufferServer(
+    fidl::ServerEnd<fuchsia_audio_device::RingBuffer> server_end,
+    const std::shared_ptr<ControlServer>& parent,
+    const std::shared_ptr<Device>& device_to_control) {
+  ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods || kLogRingBufferServerMethods);
+
+  return RingBufferServer::Create(thread_, std::move(server_end), parent, device_to_control);
 }
 
 }  // namespace media_audio
