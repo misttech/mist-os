@@ -371,7 +371,7 @@ impl<T: Resolver> EagerPackageManager<T> {
             temp_path,
             EAGER_PACKAGE_PERSISTENT_FIDL_NAME,
             |proxy| async move {
-                fuchsia_fs::write_file_fidl(&proxy, &mut packages)
+                fuchsia_fs::file::write_fidl(&proxy, &mut packages)
                     .await
                     .with_context(|| format!("writing file: {temp_path}"))
             },
@@ -884,7 +884,7 @@ mod tests {
             ),
             ..PersistentEagerPackages::EMPTY
         };
-        fuchsia_fs::write_file_fidl(&file_proxy, &mut packages).await.unwrap();
+        fuchsia_fs::file::write_fidl(&file_proxy, &mut packages).await.unwrap();
     }
 
     #[derive(Debug, derive_builder::Builder)]

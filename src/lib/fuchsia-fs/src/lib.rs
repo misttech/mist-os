@@ -98,15 +98,6 @@ pub async fn read_path_fidl<T: Persistable>(path: &str) -> Result<T, Error> {
     Ok(file::read_in_namespace_to_fidl(path).await?)
 }
 
-/// Write the given FIDL message in a binary form into a file open for writing.
-pub async fn write_file_fidl<T: Persistable>(
-    file: &fio::FileProxy,
-    data: &mut T,
-) -> Result<(), Error> {
-    file::write_fidl(file, data).await?;
-    Ok(())
-}
-
 /// Write the given FIDL encoded message into a file at `path`. The path must be an absolute path.
 /// * If the file already exists, replaces existing contents.
 /// * If the file does not exist, creates the file.
