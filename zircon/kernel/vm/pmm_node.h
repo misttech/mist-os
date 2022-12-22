@@ -134,6 +134,10 @@ class PmmNode {
 
   Evictor* GetEvictor() { return &evictor_; }
 
+  // If randomly waiting on allocations is enabled, this re-seeds from the global prng, otherwise it
+  // does nothing.
+  void SeedRandomShouldWait();
+
  private:
   void FreePageHelperLocked(vm_page* page) TA_REQ(lock_);
   void FreeListLocked(list_node* list) TA_REQ(lock_);
@@ -235,6 +239,10 @@ class PmmNode {
 
   bool free_fill_enabled_ TA_GUARDED(lock_) = false;
   PmmChecker checker_ TA_GUARDED(lock_);
+
+  // The rng state for random waiting on allocations. This allows us to use rand_r, which requires
+  // no further thread synchronization, unlike rand().
+  uintptr_t random_should_wait_seed_ TA_GUARDED(lock_) = 0;
 };
 
 // We don't need to hold the arena lock while executing this, since it is

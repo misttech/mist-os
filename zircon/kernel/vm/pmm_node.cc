@@ -10,6 +10,7 @@
 #include <inttypes.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/counters.h>
+#include <lib/crypto/global_prng.h>
 #include <lib/instrumentation/asan.h>
 #include <lib/zircon-internal/macros.h>
 #include <trace.h>
@@ -696,7 +697,8 @@ bool PmmNode::InOomStateLocked() {
   // only enabled if DEBUG_ASSERT_IMPLEMENTED.
   if constexpr (DEBUG_ASSERT_IMPLEMENTED) {
     // Randomly try to make 10% of allocations delayed allocations.
-    if (gBootOptions->pmm_alloc_random_should_wait && rand() < (RAND_MAX / 10)) {
+    if (gBootOptions->pmm_alloc_random_should_wait &&
+        rand_r(&random_should_wait_seed_) < (RAND_MAX / 10)) {
       return true;
     }
   }
@@ -1086,5 +1088,13 @@ void PmmNode::ReportAllocFailure() {
     // Note, the |cur_state| value passed to the callback doesn't really matter because all we're
     // trying to do here is signal and unblock the MemoryWatchdog's worker thread.
     mem_avail_state_callback_(mem_avail_state_context_, mem_avail_state_cur_index_);
+  }
+}
+
+void PmmNode::SeedRandomShouldWait() {
+  if constexpr (DEBUG_ASSERT_IMPLEMENTED) {
+    Guard<Mutex> guard{&lock_};
+    crypto::global_prng::GetInstance()->Draw(&random_should_wait_seed_,
+                                             sizeof(random_should_wait_seed_));
   }
 }
