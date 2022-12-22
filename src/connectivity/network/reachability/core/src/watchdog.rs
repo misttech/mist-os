@@ -109,6 +109,16 @@ impl HealthStatus {
 
         return trigger_debug_info;
     }
+
+    /// Sets the system health status to healthy.
+    fn set_healthy(&mut self) {
+        match self {
+            HealthStatus::Unhealthy { last_action } => {
+                *self = HealthStatus::Healthy { last_action: Some(*last_action) };
+            }
+            HealthStatus::Healthy { last_action: _ } => {}
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -306,10 +316,18 @@ where
             .into_inner();
 
         match found_healthy_gateway {
-            // If there are no gateways or there's at least one healthy gateway,
-            // there's no action to be taken.
-            None | Some(true) => {
+            // If there are no gateways, there's not much we can do. Assume that
+            // either the interface is not configured for upstream connectivity
+            // or we're going through a link flap event.
+            None => {
+                debug!(iface = interface, "no gateway in neighbors");
+                return None;
+            }
+            // If there's at least one healthy gateway, there's no action to be
+            // taken, but we can mark the interface as healthy.
+            Some(true) => {
                 debug!(iface = interface, "neighbors are healthy");
+                health.set_healthy();
                 return None;
             }
             // If we found at least one gateway and they're all unhealthy,
@@ -375,17 +393,15 @@ where
             return action;
         }
 
-        debug!(iface = interface, rx = rx_frames, tx = tx_frames, "counters are healthy");
+        info!(
+            iface = interface,
+            rx = rx_frames,
+            tx = tx_frames,
+            "gateways are unhealthy, but counters are healthy."
+        );
 
         // Counters are not stalled, mark the interface as healthy.
-        *health = match health {
-            HealthStatus::Unhealthy { last_action } => {
-                HealthStatus::Healthy { last_action: Some(*last_action) }
-            }
-            HealthStatus::Healthy { last_action } => {
-                HealthStatus::Healthy { last_action: *last_action }
-            }
-        };
+        health.set_healthy();
 
         None
     }
@@ -596,6 +612,26 @@ mod tests {
                 reason: ActionReason::DeviceTxStall
             })
         );
+        assert_eq!(state.health, HealthStatus::Unhealthy { last_action: now });
+
+        let later = now + zx::Duration::from_seconds(1);
+
+        // If the gateway disappears, no action is taken but we maintain the
+        // unhealthy state.
+        let view = MockInterfaceView::new(IFACE1, [], [(NEIGH1, HEALTHY_NEIGHBOR)]);
+        assert_eq!(Watchdog::evaluate_interface_state(later, &mut state, view.view()).await, None);
+        assert_eq!(state.health, HealthStatus::Unhealthy { last_action: now });
+
+        // Finally, if the gateway becomes healthy, the system should go back to
+        // healthy state.
+        let later = later + zx::Duration::from_seconds(1);
+        let view = MockInterfaceView::new(
+            IFACE1,
+            [new_gateway_route(IFACE1, NEIGH1)],
+            [(NEIGH1, HEALTHY_NEIGHBOR)],
+        );
+        assert_eq!(Watchdog::evaluate_interface_state(later, &mut state, view.view()).await, None);
+        assert_eq!(state.health, HealthStatus::Healthy { last_action: Some(now) });
     }
 
     #[fuchsia::test]
