@@ -156,7 +156,7 @@ To map a VMO:
                      region_size, &region, &region_addr);
     ```
     This step is optional; you can also map the VMO directly to the parent.
-1.  Use [`zx-vmar_map(...)`](/docs/reference/syscalls/vmar_map.md) to map the VMO within a VMAR.
+1.  Use [`zx_vmar_map(...)`](/docs/reference/syscalls/vmar_map.md) to map the VMO within a VMAR.
     This returns the start address of the VMO now mapped to the VMAR, for
     example:
 
