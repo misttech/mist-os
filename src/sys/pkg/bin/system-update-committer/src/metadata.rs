@@ -136,7 +136,7 @@ mod tests {
                 .boot_manager_close_with_epitaph(Status::NOT_SUPPORTED)
                 .build(),
         );
-        let (p_internal, p_external) = EventPair::create().unwrap();
+        let (p_internal, p_external) = EventPair::create();
         let (unblocker, unblocker_recv) = oneshot::channel();
         let (blobfs_verifier, blobfs_verifier_call_count) =
             success_blobfs_verifier_and_call_count();
@@ -171,7 +171,7 @@ mod tests {
                 .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Healthy)))
                 .build(),
         );
-        let (p_internal, p_external) = EventPair::create().unwrap();
+        let (p_internal, p_external) = EventPair::create();
         let (unblocker, unblocker_recv) = oneshot::channel();
         let (blobfs_verifier, blobfs_verifier_call_count) =
             success_blobfs_verifier_and_call_count();
@@ -204,7 +204,7 @@ mod tests {
         // end closed should work fine.
         let boot_manager_proxy =
             create_proxy::<paver::BootManagerMarker>().expect("Creating proxy succeeds").0;
-        let (p_internal, p_external) = EventPair::create().unwrap();
+        let (p_internal, p_external) = EventPair::create();
         let (unblocker, unblocker_recv) = oneshot::channel();
         let (blobfs_verifier, blobfs_verifier_call_count) =
             success_blobfs_verifier_and_call_count();
@@ -237,7 +237,7 @@ mod tests {
                 .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Healthy)))
                 .build(),
         );
-        let (p_internal, p_external) = EventPair::create().unwrap();
+        let (p_internal, p_external) = EventPair::create();
         let (unblocker, unblocker_recv) = oneshot::channel();
         let (blobfs_verifier, blobfs_verifier_call_count) =
             success_blobfs_verifier_and_call_count();
@@ -286,7 +286,7 @@ mod tests {
                 .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Pending)))
                 .build(),
         );
-        let (p_internal, p_external) = EventPair::create().unwrap();
+        let (p_internal, p_external) = EventPair::create();
         let (unblocker, unblocker_recv) = oneshot::channel();
         let (blobfs_verifier, blobfs_verifier_call_count) =
             success_blobfs_verifier_and_call_count();
@@ -337,7 +337,7 @@ mod tests {
                 .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Pending)))
                 .build(),
         );
-        let (p_internal, p_external) = EventPair::create().unwrap();
+        let (p_internal, p_external) = EventPair::create();
         let (unblocker, unblocker_recv) = oneshot::channel();
         let (blobfs_verifier, blobfs_verifier_call_count) =
             failing_blobfs_verifier_and_call_count();
@@ -388,7 +388,7 @@ mod tests {
                 .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Pending)))
                 .build(),
         );
-        let (p_internal, p_external) = EventPair::create().unwrap();
+        let (p_internal, p_external) = EventPair::create();
         let (unblocker, unblocker_recv) = oneshot::channel();
         let (blobfs_verifier, blobfs_verifier_call_count) =
             failing_blobfs_verifier_and_call_count();

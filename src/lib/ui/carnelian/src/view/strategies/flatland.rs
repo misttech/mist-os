@@ -600,14 +600,14 @@ impl FlatlandViewStrategy {
                 self.app_sender.clone(),
                 Time::from_nanos(presentation_time.presentation_time),
             );
-            let buffer_ready_event = Event::create().expect("Event.create");
+            let buffer_ready_event = Event::create();
             view_assistant
                 .render(&mut plumber.context, buffer_ready_event, &render_context)
                 .unwrap_or_else(|e| panic!("Update error: {:?}", e));
             plumber.frame_set.mark_prepared(available);
             let key = view_details.key;
             let collection_id = plumber.collection_id;
-            let release_event = Event::create().expect("Event.create");
+            let release_event = Event::create();
             let local_release_event =
                 release_event.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("duplicate_handle");
             let app_sender = self.app_sender.clone();

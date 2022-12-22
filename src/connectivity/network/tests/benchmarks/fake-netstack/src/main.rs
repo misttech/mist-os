@@ -185,7 +185,7 @@ impl DatagramSocket {
         domain: fposix_socket::Domain,
         control_handle: fposix_socket::SynchronousDatagramSocketControlHandle,
     ) -> Result<Self, anyhow::Error> {
-        let (local_event, peer_event) = zx::EventPair::create().context("create event pair")?;
+        let (local_event, peer_event) = zx::EventPair::create();
         local_event
             .signal_peer(
                 zx::Signals::NONE,

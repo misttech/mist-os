@@ -63,7 +63,7 @@ struct NoTransformChannel {
 
 impl NoTransformChannel {
     fn new() -> NoTransformChannel {
-        let (client_end, server_end) = Channel::create().unwrap();
+        let (client_end, server_end) = Channel::create();
         NoTransformChannel { client_end, server_end }
     }
 }
@@ -96,8 +96,8 @@ struct OrdinalTransformChannel {
 
 impl OrdinalTransformChannel {
     fn new(client_end_ordinal: u64, server_end_ordinal: u64) -> OrdinalTransformChannel {
-        let (client_end, proxy_client_end) = Channel::create().unwrap();
-        let (proxy_server_end, server_end) = Channel::create().unwrap();
+        let (client_end, proxy_client_end) = Channel::create();
+        let (proxy_server_end, server_end) = Channel::create();
         OrdinalTransformChannel {
             client_end,
             server_end,
@@ -192,7 +192,7 @@ fn send_handle_sync_helper<'a>(
 
     let mut proxy =
         SendHandleProtocolSynchronousProxy::new(transformable_channel.take_client_end());
-    let ev = Event::create().unwrap();
+    let ev = Event::create();
     send_fn(&mut proxy, ev).unwrap();
     transformable_channel.transform();
     receiver_fifo.recv().unwrap();
@@ -254,7 +254,7 @@ async fn send_handle_async_helper<'a>(
     let async_client_end =
         fasync::Channel::from_channel(transformable_channel.take_client_end()).unwrap();
     let proxy = SendHandleProtocolProxy::new(async_client_end);
-    let ev = Event::create().unwrap();
+    let ev = Event::create();
     send_fn(&proxy, ev).unwrap();
     transformable_channel.transform();
     receiver_fifo.recv().unwrap();
@@ -357,7 +357,7 @@ fn echo_handle_sync_helper<'a>(
         transformable_channel.transform();
         transformable_channel.reversed_transform();
     });
-    let ev = Event::create().unwrap();
+    let ev = Event::create();
     let h_response = send_fn(&mut proxy, ev, Time::INFINITE).unwrap();
 
     let info = h_response.as_handle_ref().basic_info().unwrap();
@@ -473,7 +473,7 @@ async fn echo_handle_async_helper(
         transformable_channel.reversed_transform();
     });
     let proxy = EchoHandleProtocolProxy::new(async_client_end);
-    let ev = Event::create().unwrap();
+    let ev = Event::create();
     let h_response = send_fn(&proxy, ev).await.unwrap();
 
     let info = h_response.as_handle_ref().basic_info().unwrap();
@@ -580,7 +580,7 @@ async fn push_event_helper<'a>(
     let stream = ServerEnd::<PushEventProtocolMarker>::new(transformable_channel.take_client_end())
         .into_stream()
         .unwrap();
-    let ev = Event::create().unwrap();
+    let ev = Event::create();
     send_fn(&fidl::endpoints::RequestStream::control_handle(&stream), ev).unwrap();
     transformable_channel.transform();
     receiver_fifo.recv().unwrap();
@@ -639,7 +639,7 @@ async fn error_syntax_receiver_thread(server_end: Channel) {
         .for_each(|request| {
             match request {
                 Ok(ErrorSyntaxProtocolRequest::TestErrorSyntax { responder }) => {
-                    let h = Event::create().unwrap();
+                    let h = Event::create();
                     responder.send(&mut Ok(h)).unwrap();
                 }
                 Err(_) => panic!("unexpected err"),
@@ -651,7 +651,7 @@ async fn error_syntax_receiver_thread(server_end: Channel) {
 
 #[test]
 fn error_syntax_sync_end_to_end() {
-    let (client_end, server_end) = Channel::create().unwrap();
+    let (client_end, server_end) = Channel::create();
     std::thread::spawn(|| {
         fasync::LocalExecutor::new().unwrap().run_singlethreaded(async move {
             error_syntax_receiver_thread(server_end).await;
@@ -668,7 +668,7 @@ fn error_syntax_sync_end_to_end() {
 
 #[fasync::run_singlethreaded(test)]
 async fn error_syntax_async_end_to_end() {
-    let (client_end, server_end) = Channel::create().unwrap();
+    let (client_end, server_end) = Channel::create();
     std::thread::spawn(|| {
         fasync::LocalExecutor::new().unwrap().run_singlethreaded(async move {
             error_syntax_receiver_thread(server_end).await;

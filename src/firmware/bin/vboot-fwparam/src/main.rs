@@ -85,7 +85,7 @@ async fn find_flashmap_device() -> Result<FlashmapProxy, anyhow::Error> {
         .context("Getting topological path")?;
 
     // Connect to the broker.
-    let (local, remote) = zx::Channel::create().context("Creating channels")?;
+    let (local, remote) = zx::Channel::create();
     fdio::service_connect(&(path + "/broker"), remote).context("Connecting to broker")?;
 
     // Start the flashmap manager on the device we found.

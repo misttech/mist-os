@@ -1542,7 +1542,7 @@ mod tests {
     async fn test_query_commit_status_and_update_status() {
         let (proxy, mut stream) = create_proxy_and_stream::<CommitStatusProviderMarker>().unwrap();
         let provider_fn = || Ok(proxy.clone());
-        let (p0, p1) = zx::EventPair::create().unwrap();
+        let (p0, p1) = zx::EventPair::create();
         let fidl_call_count = Arc::new(AtomicU8::new(0));
         let mut commit_status = None;
 

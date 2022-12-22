@@ -365,11 +365,11 @@ mod test {
                 .connect_to_protocol_at_exposed_dir::<fdebug::PublisherMarker>()
                 .expect("connect to publisher");
             let vmo_1 = zx::Vmo::create(VMO_SIZE).unwrap();
-            let (vmo_token_1, vmo_token_server_1) = zx::EventPair::create().unwrap();
+            let (vmo_token_1, vmo_token_server_1) = zx::EventPair::create();
             proxy.publish("data-sink-1", vmo_1, vmo_token_server_1).expect("publish vmo");
             drop(vmo_token_1);
             let vmo_2 = zx::Vmo::create(VMO_SIZE).unwrap();
-            let (vmo_token_2, vmo_token_server_2) = zx::EventPair::create().unwrap();
+            let (vmo_token_2, vmo_token_server_2) = zx::EventPair::create();
             proxy.publish("data-sink-2", vmo_2, vmo_token_server_2).expect("publish vmo");
             drop(vmo_token_2);
             drop(proxy);
@@ -429,7 +429,7 @@ mod test {
                 .connect_to_protocol_at_exposed_dir::<fdebug::PublisherMarker>()
                 .expect("connect to publisher");
             let vmo_1 = zx::Vmo::create(VMO_SIZE).unwrap();
-            let (vmo_token_1, vmo_token_server_1) = zx::EventPair::create().unwrap();
+            let (vmo_token_1, vmo_token_server_1) = zx::EventPair::create();
             proxy_1.publish("data-sink-1", vmo_1, vmo_token_server_1).expect("publish vmo");
             drop(vmo_token_1);
             let proxy_2 = test_realm
@@ -437,7 +437,7 @@ mod test {
                 .connect_to_protocol_at_exposed_dir::<fdebug::PublisherMarker>()
                 .expect("connect to publisher");
             let vmo_2 = zx::Vmo::create(VMO_SIZE).unwrap();
-            let (vmo_token_2, vmo_token_server_2) = zx::EventPair::create().unwrap();
+            let (vmo_token_2, vmo_token_server_2) = zx::EventPair::create();
             proxy_2.publish("data-sink-2", vmo_2, vmo_token_server_2).expect("publish vmo");
             drop(vmo_token_2);
             drop(proxy_1);
@@ -495,9 +495,9 @@ mod test {
                 .boxed();
 
         let vmo_1 = zx::Vmo::create(VMO_SIZE).unwrap();
-        let (vmo_token_1, vmo_token_server_1) = zx::EventPair::create().unwrap();
+        let (vmo_token_1, vmo_token_server_1) = zx::EventPair::create();
         let vmo_2 = zx::Vmo::create(VMO_SIZE).unwrap();
-        let (vmo_token_2, vmo_token_server_2) = zx::EventPair::create().unwrap();
+        let (vmo_token_2, vmo_token_server_2) = zx::EventPair::create();
 
         publisher_proxy.publish("data-sink-1", vmo_1, vmo_token_server_1).expect("publish vmo");
         publisher_proxy.publish("data-sink-2", vmo_2, vmo_token_server_2).expect("publish vmo");

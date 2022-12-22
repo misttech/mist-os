@@ -202,7 +202,7 @@ impl TestDevice {
         let emulator = EmulatorProxy::new(fasync::Channel::from_channel(channel)?);
 
         // Open a HciEmulator protocol channel.
-        let (proxy, remote) = zx::Channel::create()?;
+        let (proxy, remote) = zx::Channel::create();
         emulator.open(remote)?;
         let file =
             fdio::create_fd(emulator.into_channel().unwrap().into_zx_channel().into_handle())?;

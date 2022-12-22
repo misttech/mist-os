@@ -939,7 +939,7 @@ mod fuchsia_tests {
 
         // Spawn a read thread that holds a duplicate handle to the VMO that will be written.
         let vmo = inspector.duplicate_vmo().expect("duplicate vmo handle");
-        let (p1, p2) = zx::EventPair::create().unwrap();
+        let (p1, p2) = zx::EventPair::create();
 
         macro_rules! notify_and_wait_reader {
             () => {

@@ -23,7 +23,7 @@ pub struct ViewCreationTokenPair {
 
 impl ViewCreationTokenPair {
     pub fn new() -> Result<ViewCreationTokenPair, Error> {
-        let (view_creation_token, viewport_creation_token) = zx::Channel::create()?;
+        let (view_creation_token, viewport_creation_token) = zx::Channel::create();
         Ok(ViewCreationTokenPair {
             view_creation_token: ViewCreationToken { value: view_creation_token },
             viewport_creation_token: ViewportCreationToken { value: viewport_creation_token },

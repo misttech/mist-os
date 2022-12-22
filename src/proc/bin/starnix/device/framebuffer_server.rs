@@ -65,12 +65,12 @@ impl FramebufferServer {
     /// Returns a `FramebufferServer` that has created a scene and registered a buffer with
     /// Flatland.
     pub fn new() -> Result<Self, Errno> {
-        let (server_end, client_end) = zx::Channel::create().map_err(|_| errno!(ENOENT))?;
+        let (server_end, client_end) = zx::Channel::create();
         connect_channel_to_protocol::<fuicomposition::AllocatorMarker>(server_end)
             .map_err(|_| errno!(ENOENT))?;
         let allocator = fuicomposition::AllocatorSynchronousProxy::new(client_end);
 
-        let (server_end, client_end) = zx::Channel::create().map_err(|_| errno!(ENOENT))?;
+        let (server_end, client_end) = zx::Channel::create();
         connect_channel_to_protocol::<fuicomposition::FlatlandMarker>(server_end)
             .map_err(|_| errno!(ENOENT))?;
         let flatland = fuicomposition::FlatlandSynchronousProxy::new(client_end);

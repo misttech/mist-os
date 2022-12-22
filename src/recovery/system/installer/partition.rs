@@ -197,7 +197,7 @@ impl Partition {
                 // device itself.
                 continue;
             }
-            let (local, remote) = zx::Channel::create().context("Creating channel")?;
+            let (local, remote) = zx::Channel::create();
             fdio::service_connect(&entry.class_path, remote).context("Connecting to partition")?;
             let local = fidl::AsyncChannel::from_channel(local).context("Creating AsyncChannel")?;
 

@@ -632,7 +632,7 @@ mod tests {
 
     #[test]
     fn basic_info_channel() {
-        let (side1, side2) = Channel::create().unwrap();
+        let (side1, side2) = Channel::create();
         let info1 = side1.basic_info().expect("side1 basic_info failed");
         let info2 = side2.basic_info().expect("side2 basic_info failed");
 

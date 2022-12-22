@@ -32,7 +32,7 @@ impl channel::Fixture for ChanFixture {
         &self,
         purpose: channel::CreateHandlePurpose,
     ) -> (fidl::Channel, fidl::Channel) {
-        let (local, remote) = fidl::Channel::create().unwrap();
+        let (local, remote) = fidl::Channel::create();
         (local, self.fixture.distribute_handle(remote, (self.map_purpose_to_target)(purpose)).await)
     }
 }

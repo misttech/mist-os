@@ -85,12 +85,12 @@ impl DmaBufFile {
     /// Returns an error if the file could not establish connections to `fsysmem::Allocator` and
     /// `fuicomp::Allocator`.
     pub fn new_file() -> Result<Box<dyn FileOps>, Errno> {
-        let (server_end, client_end) = zx::Channel::create().map_err(|_| errno!(ENOENT))?;
+        let (server_end, client_end) = zx::Channel::create();
         connect_channel_to_protocol::<fsysmem::AllocatorMarker>(server_end)
             .map_err(|_| errno!(ENOENT))?;
         let sysmem_proxy = fsysmem::AllocatorSynchronousProxy::new(client_end);
 
-        let (server_end, client_end) = zx::Channel::create().map_err(|_| errno!(ENOENT))?;
+        let (server_end, client_end) = zx::Channel::create();
         connect_channel_to_protocol::<fuicomp::AllocatorMarker>(server_end)
             .map_err(|_| errno!(ENOENT))?;
         let composition_proxy = fuicomp::AllocatorSynchronousProxy::new(client_end);

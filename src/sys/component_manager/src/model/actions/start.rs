@@ -239,8 +239,8 @@ async fn make_execution_runtime(
     }
 
     // Create incoming/outgoing directories, and populate them.
-    let (outgoing_dir_client, outgoing_dir_server) = zx::Channel::create().unwrap();
-    let (runtime_dir_client, runtime_dir_server) = zx::Channel::create().unwrap();
+    let (outgoing_dir_client, outgoing_dir_server) = zx::Channel::create();
+    let (runtime_dir_client, runtime_dir_server) = zx::Channel::create();
     let mut namespace = IncomingNamespace::new(package);
     let ns = namespace.populate(component.as_weak(), decl).await?;
 
@@ -280,7 +280,7 @@ async fn make_execution_runtime(
         start_reason,
     )?;
     let numbered_handles = component.numbered_handles.lock().await.take();
-    let (break_on_start_left, break_on_start_right) = zx::EventPair::create().unwrap();
+    let (break_on_start_left, break_on_start_right) = zx::EventPair::create();
     let start_info = fcrunner::ComponentStartInfo {
         resolved_url: Some(url),
         program: decl.program.as_ref().map(|p| p.info.clone()),

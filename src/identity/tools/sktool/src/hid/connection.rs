@@ -248,7 +248,7 @@ pub mod fidl {
                         .expect("failed to send response");
                 }
                 (DeviceRequest::GetReportsEvent { responder }, 2) => {
-                    let event = zx::Event::create().unwrap();
+                    let event = zx::Event::create();
                     event.signal_handle(zx::Signals::NONE, zx::Signals::USER_0).unwrap();
                     responder.send(zx::sys::ZX_OK, event).expect("failed to send response");
                 }
@@ -272,7 +272,7 @@ pub mod fidl {
                 }
                 (DeviceRequest::GetReportsEvent { responder }, 2) => {
                     // Generate an event but never signal it.
-                    let event = zx::Event::create().unwrap();
+                    let event = zx::Event::create();
                     responder.send(zx::sys::ZX_OK, event).expect("failed to send response");
                 }
                 (req, num) => panic!("got unexpected device request {:?} as num {:?}", req, num),

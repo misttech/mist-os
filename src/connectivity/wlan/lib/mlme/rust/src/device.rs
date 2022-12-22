@@ -678,7 +678,7 @@ pub mod test_utils {
     impl FakeDevice {
         pub fn new(_executor: &fasync::TestExecutor) -> Self {
             // Create a channel for SME requests, to be surfaced by start().
-            let (mlme_proxy_channel, mlme_request_stream_channel) = zx::Channel::create().unwrap();
+            let (mlme_proxy_channel, mlme_request_stream_channel) = zx::Channel::create();
             let mut supported_phys: Vec<banjo_common::WlanPhyType> = Vec::new();
             let mut band_caps: Vec<banjo_wlan_softmac::WlanSoftmacBandCapability> = Vec::new();
 

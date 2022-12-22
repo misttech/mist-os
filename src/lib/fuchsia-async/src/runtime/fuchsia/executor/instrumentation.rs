@@ -432,7 +432,7 @@ mod tests {
     // and deadline at least once each. Min polls is 4.
     pub async fn simple_task_for_snapshot() {
         let bytes = &[0, 1, 2, 3];
-        let (tx, rx) = zx::Channel::create().unwrap();
+        let (tx, rx) = zx::Channel::create();
         let f_rx = Channel::from_channel(rx).unwrap();
         let mut buffer = zx::MessageBuf::new();
         let read_fut = f_rx.recv_msg(&mut buffer);

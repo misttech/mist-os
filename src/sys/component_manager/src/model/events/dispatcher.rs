@@ -207,7 +207,7 @@ mod tests {
         dispatcher: &EventDispatcher,
         source_moniker: &AbsoluteMoniker,
     ) -> Result<(), Error> {
-        let (_, capability_server_end) = zx::Channel::create().unwrap();
+        let (_, capability_server_end) = zx::Channel::create();
         let capability_server_end = Arc::new(Mutex::new(Some(capability_server_end)));
         let event = ComponentEvent::new_for_test(
             AbsoluteMoniker::root(),

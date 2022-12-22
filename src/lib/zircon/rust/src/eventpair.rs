@@ -22,9 +22,16 @@ impl EventPair {
     /// Create an event pair, a pair of objects which can signal each other. Wraps the
     /// [zx_eventpair_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/eventpair_create.md)
     /// syscall.
+    ///
+    /// # Panics
+    ///
+    /// If the kernel reports no available memory to create an event pair or the process' job
+    /// policy disallows EventPair creation.
     #[allow(deprecated)]
-    pub fn create() -> Result<(EventPair, EventPair), Status> {
-        Self::try_create()
+    pub fn create() -> (Self, Self) {
+        Self::try_create().expect(
+            "eventpair creation always succeeds except with OOM or when job policy denies it",
+        )
     }
 
     /// Create an event pair, a pair of objects which can signal each other. Wraps the
@@ -48,7 +55,7 @@ mod tests {
 
     #[test]
     fn wait_and_signal_peer() {
-        let (p1, p2) = EventPair::create().unwrap();
+        let (p1, p2) = EventPair::create();
         let eighty_ms = 80.millis();
 
         // Waiting on one without setting any signal should time out.

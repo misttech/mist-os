@@ -801,7 +801,7 @@ impl fidl::endpoints::ServiceProxy for ServiceProxy {
 #[cfg(target_os = "fuchsia")]
 impl ServiceProxy {
     pub fn r#p(&self) -> Result<ProtocolProxy, fidl::Error> {
-        let (proxy, server) = zx::Channel::create().map_err(fidl::Error::ChannelPairCreate)?;
+        let (proxy, server) = zx::Channel::create();
         self.0.open_member("p", server)?;
         let proxy = fidl::AsyncChannel::from_channel(proxy).map_err(fidl::Error::AsyncChannel)?;
         Ok(ProtocolProxy::new(proxy))

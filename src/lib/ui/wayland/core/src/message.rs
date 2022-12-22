@@ -584,7 +584,7 @@ mod tests {
 
     #[test]
     fn empty_message() {
-        let (h1, h2) = zx::Channel::create().unwrap();
+        let (h1, h2) = zx::Channel::create();
 
         let message = Message::new();
         assert!(message.is_empty());

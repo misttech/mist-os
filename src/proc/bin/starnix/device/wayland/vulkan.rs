@@ -383,8 +383,7 @@ fn register_buffer_collection_with_scenic(
     buffer_collection_token: ClientEnd<fsysmem::BufferCollectionTokenMarker>,
     scenic_allocator: &fuicomp::AllocatorSynchronousProxy,
 ) -> Result<fuicomp::BufferCollectionImportToken, vk::Result> {
-    let (scenic_import_token, export_token) =
-        zx::EventPair::create().expect("Failed to create event pair.");
+    let (scenic_import_token, export_token) = zx::EventPair::create();
 
     let export_token = fuicomp::BufferCollectionExportToken { value: export_token };
     let scenic_import_token = fuicomp::BufferCollectionImportToken { value: scenic_import_token };

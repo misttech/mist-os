@@ -804,7 +804,7 @@ mod tests {
         //        |            |-- connected through namespace bind/connect
         //        |-- zx channel connection
         let (ns_client, _server) = fidl::endpoints::create_endpoints().unwrap();
-        let (_client, ns_server) = zx::Channel::create().unwrap();
+        let (_client, ns_server) = zx::Channel::create();
         let path = "/test_path1";
 
         assert_eq!(namespace.bind(path, ns_client), Ok(()));
@@ -827,7 +827,7 @@ mod tests {
     #[test]
     fn namespace_open_error() {
         let namespace = Namespace::installed().unwrap();
-        let (_client, ns_server) = zx::Channel::create().unwrap();
+        let (_client, ns_server) = zx::Channel::create();
         let path = "/test_path3";
 
         assert_eq!(
@@ -933,28 +933,28 @@ mod tests {
 
         // fdio_open requires paths to be absolute
         {
-            let (_, pkg_server) = zx::Channel::create().unwrap();
+            let (_, pkg_server) = zx::Channel::create();
             assert_eq!(
                 open("pkg", fio::OpenFlags::RIGHT_READABLE, pkg_server),
                 Err(zx::Status::NOT_FOUND)
             );
         }
 
-        let (pkg_client, pkg_server) = zx::Channel::create().unwrap();
+        let (pkg_client, pkg_server) = zx::Channel::create();
         assert_eq!(open("/pkg", fio::OpenFlags::RIGHT_READABLE, pkg_server), Ok(()));
 
         // fdio_open/fdio_open_at disallow paths that are too long
         {
             let path = rand::distributions::Alphanumeric
                 .sample_string(&mut rand::thread_rng(), libc::PATH_MAX.try_into().unwrap());
-            let (_, server) = zx::Channel::create().unwrap();
+            let (_, server) = zx::Channel::create();
             assert_eq!(
                 open_at(&pkg_client, &path, fio::OpenFlags::empty(), server),
                 Err(zx::Status::INVALID_ARGS)
             );
         }
 
-        let (_, bin_server) = zx::Channel::create().unwrap();
+        let (_, bin_server) = zx::Channel::create();
         assert_eq!(open_at(&pkg_client, "bin", fio::OpenFlags::RIGHT_READABLE, bin_server), Ok(()));
     }
 

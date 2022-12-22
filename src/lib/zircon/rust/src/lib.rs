@@ -328,7 +328,7 @@ mod tests {
 
     #[test]
     fn wait_and_signal() {
-        let event = Event::create().unwrap();
+        let event = Event::create();
         let ten_ms = 10.millis();
 
         // Waiting on it without setting any signal should time out.
@@ -355,8 +355,8 @@ mod tests {
     #[test]
     fn wait_many_and_signal() {
         let ten_ms = 10.millis();
-        let e1 = Event::create().unwrap();
-        let e2 = Event::create().unwrap();
+        let e1 = Event::create();
+        let e2 = Event::create();
 
         // Waiting on them now should time out.
         let mut items = vec![

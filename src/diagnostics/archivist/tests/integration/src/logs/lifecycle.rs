@@ -36,7 +36,7 @@ async fn serve_mocks(
             while let Some(Ok(LogConnectorRequest::TakeLogConnectionListener { responder })) =
                 stream.next().await
             {
-                let (_client, server) = zx::Channel::create().unwrap();
+                let (_client, server) = zx::Channel::create();
                 recv_clone.lock().await.next().await;
                 responder.send(Some(ServerEnd::new(server))).unwrap();
                 send_clone.send(()).await.unwrap();

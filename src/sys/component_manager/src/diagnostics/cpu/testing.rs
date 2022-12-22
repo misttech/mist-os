@@ -37,7 +37,7 @@ impl FakeTask {
         Self {
             koid,
             values: Arc::new(Mutex::new(values.into())),
-            event: Arc::new(zx::Event::create().unwrap()),
+            event: Arc::new(zx::Event::create()),
         }
     }
 

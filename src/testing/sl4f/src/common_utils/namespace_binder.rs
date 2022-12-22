@@ -97,7 +97,7 @@ mod tests {
             });
         ns.bind_at_path(NAMESPACE_PATH, echo_entry)?;
 
-        let (client, server) = zx::Channel::create()?;
+        let (client, server) = zx::Channel::create();
         fdio::service_connect(NAMESPACE_PATH, server)?;
         let proxy = ClientEnd::<echo::EchoMarker>::new(client).into_proxy()?;
 

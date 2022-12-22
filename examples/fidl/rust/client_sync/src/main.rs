@@ -12,7 +12,7 @@ use fuchsia_zircon as zx;
 // [START main]
 fn main() -> Result<(), Error> {
     // Initialize a channel, and label the two ends as the server_end and client_end
-    let (server_end, client_end) = zx::Channel::create()?;
+    let (server_end, client_end) = zx::Channel::create();
     // Connect an implementation of the Echo protocol to the server end
     connect_channel_to_protocol::<EchoMarker>(server_end)
         .context("Failed to connect to echo service")?;

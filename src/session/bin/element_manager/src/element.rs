@@ -135,7 +135,7 @@ impl Element {
     /// the `Element`.
     #[inline]
     pub fn connect_to_protocol<P: DiscoverableProtocolMarker>(&self) -> Result<P::Proxy, Error> {
-        let (client_channel, server_channel) = zx::Channel::create()?;
+        let (client_channel, server_channel) = zx::Channel::create();
         self.connect_to_protocol_with_channel::<P>(server_channel)?;
         Ok(P::Proxy::from_channel(fasync::Channel::from_channel(client_channel)?))
     }

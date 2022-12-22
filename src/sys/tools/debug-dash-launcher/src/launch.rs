@@ -324,7 +324,7 @@ async fn create_loader_service(
         }
     }
 
-    let (ldsvc, server_end) = zx::Channel::create().unwrap();
+    let (ldsvc, server_end) = zx::Channel::create();
     let ldsvc = ldsvc.into_handle();
     library_loader::start_with_multiple_dirs(lib_dirs, server_end);
 

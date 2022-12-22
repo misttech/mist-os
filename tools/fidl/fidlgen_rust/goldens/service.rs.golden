@@ -686,13 +686,13 @@ impl fidl::endpoints::ServiceProxy for MultiHeterogeneousMemberServiceProxy {
 #[cfg(target_os = "fuchsia")]
 impl MultiHeterogeneousMemberServiceProxy {
     pub fn r#first_member(&self) -> Result<FirstProtocolProxy, fidl::Error> {
-        let (proxy, server) = zx::Channel::create().map_err(fidl::Error::ChannelPairCreate)?;
+        let (proxy, server) = zx::Channel::create();
         self.0.open_member("first_member", server)?;
         let proxy = fidl::AsyncChannel::from_channel(proxy).map_err(fidl::Error::AsyncChannel)?;
         Ok(FirstProtocolProxy::new(proxy))
     }
     pub fn r#second_member(&self) -> Result<SecondProtocolProxy, fidl::Error> {
-        let (proxy, server) = zx::Channel::create().map_err(fidl::Error::ChannelPairCreate)?;
+        let (proxy, server) = zx::Channel::create();
         self.0.open_member("second_member", server)?;
         let proxy = fidl::AsyncChannel::from_channel(proxy).map_err(fidl::Error::AsyncChannel)?;
         Ok(SecondProtocolProxy::new(proxy))
@@ -756,13 +756,13 @@ impl fidl::endpoints::ServiceProxy for MultiHomogeneousMemberServiceProxy {
 #[cfg(target_os = "fuchsia")]
 impl MultiHomogeneousMemberServiceProxy {
     pub fn r#first_member(&self) -> Result<FirstProtocolProxy, fidl::Error> {
-        let (proxy, server) = zx::Channel::create().map_err(fidl::Error::ChannelPairCreate)?;
+        let (proxy, server) = zx::Channel::create();
         self.0.open_member("first_member", server)?;
         let proxy = fidl::AsyncChannel::from_channel(proxy).map_err(fidl::Error::AsyncChannel)?;
         Ok(FirstProtocolProxy::new(proxy))
     }
     pub fn r#second_member(&self) -> Result<FirstProtocolProxy, fidl::Error> {
-        let (proxy, server) = zx::Channel::create().map_err(fidl::Error::ChannelPairCreate)?;
+        let (proxy, server) = zx::Channel::create();
         self.0.open_member("second_member", server)?;
         let proxy = fidl::AsyncChannel::from_channel(proxy).map_err(fidl::Error::AsyncChannel)?;
         Ok(FirstProtocolProxy::new(proxy))
@@ -820,7 +820,7 @@ impl fidl::endpoints::ServiceProxy for SingleMemberServiceProxy {
 #[cfg(target_os = "fuchsia")]
 impl SingleMemberServiceProxy {
     pub fn r#single_member(&self) -> Result<FirstProtocolProxy, fidl::Error> {
-        let (proxy, server) = zx::Channel::create().map_err(fidl::Error::ChannelPairCreate)?;
+        let (proxy, server) = zx::Channel::create();
         self.0.open_member("single_member", server)?;
         let proxy = fidl::AsyncChannel::from_channel(proxy).map_err(fidl::Error::AsyncChannel)?;
         Ok(FirstProtocolProxy::new(proxy))

@@ -13,7 +13,7 @@ use {
 
 /// Loads an inspect node hierarchy in the given path.
 pub async fn load_hierarchy_from_path(path: &str) -> Result<DiagnosticsHierarchy, Error> {
-    let (client, server) = zx::Channel::create()?;
+    let (client, server) = zx::Channel::create();
     fdio::service_connect(path, server)?;
     let inspect_proxy = InspectProxy::new(fasync::Channel::from_channel(client)?);
     let hierarchy = load_hierarchy(inspect_proxy).await?;
@@ -40,7 +40,7 @@ pub async fn load_hierarchy(proxy: InspectProxy) -> Result<DiagnosticsHierarchy,
             }
         } else {
             let next_child = current_node.pending_children.pop().unwrap();
-            let (client, server) = zx::Channel::create()?;
+            let (client, server) = zx::Channel::create();
             current_node
                 .proxy
                 .open_child(&next_child, fidl::endpoints::ServerEnd::new(server))

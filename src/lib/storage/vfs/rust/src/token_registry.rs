@@ -61,7 +61,7 @@ impl TokenRegistry {
         match owner_to_token.entry(ptr) {
             Entry::Occupied(o) => o.into_mut(),
             Entry::Vacant(v) => {
-                let handle = Event::create()?.into_handle();
+                let handle = Event::create().into_handle();
                 let koid = handle.get_koid()?;
                 assert!(
                     token_to_owner.insert(koid, &owner.0 as &dyn TokenInterface).is_none(),

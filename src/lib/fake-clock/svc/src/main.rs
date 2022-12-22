@@ -597,12 +597,12 @@ mod tests {
     async fn test_event_signaling() {
         let clock_handle = Arc::new(Mutex::new(FakeClock::<()>::new()));
         let mut mock_clock = clock_handle.lock().unwrap();
-        let (e1, cli1) = zx::EventPair::create().unwrap();
+        let (e1, cli1) = zx::EventPair::create();
         let time = mock_clock.time;
         mock_clock.install_event(Arc::clone(&clock_handle), time + 10.millis(), e1);
-        let (e2, cli2) = zx::EventPair::create().unwrap();
+        let (e2, cli2) = zx::EventPair::create();
         mock_clock.install_event(Arc::clone(&clock_handle), time + 20.millis(), e2);
-        let (e3, cli3) = zx::EventPair::create().unwrap();
+        let (e3, cli3) = zx::EventPair::create();
         mock_clock.install_event(Arc::clone(&clock_handle), time, e3);
         // only e3 should've signalled immediately:
         assert!(!check_signaled(&cli1));
@@ -622,7 +622,7 @@ mod tests {
         let clock_handle = Arc::new(Mutex::new(FakeClock::<()>::new()));
         let event = {
             let mut mock_clock = clock_handle.lock().unwrap();
-            let (event, client) = zx::EventPair::create().unwrap();
+            let (event, client) = zx::EventPair::create();
             let sched = mock_clock.time + 10.millis();
             mock_clock.install_event(Arc::clone(&clock_handle), sched, event);
             client
@@ -663,7 +663,7 @@ mod tests {
         let clock_handle = Arc::new(Mutex::new(FakeClock::<RemovalObserver>::new()));
         let event = {
             let mut mock_clock = clock_handle.lock().unwrap();
-            let (event, client) = zx::EventPair::create().unwrap();
+            let (event, client) = zx::EventPair::create();
             let sched = mock_clock.time + 10.millis();
             mock_clock.install_event(Arc::clone(&clock_handle), sched, event);
             client
@@ -680,7 +680,7 @@ mod tests {
     async fn test_reschedule() {
         let clock_handle = Arc::new(Mutex::new(FakeClock::<RemovalObserver>::new()));
         let mut mock_clock = clock_handle.lock().unwrap();
-        let (event, client) = zx::EventPair::create().unwrap();
+        let (event, client) = zx::EventPair::create();
         let sched = mock_clock.time + 10.millis();
         mock_clock.install_event(Arc::clone(&clock_handle), sched, event);
         assert!(!check_signaled(&client));
@@ -709,7 +709,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_stop_points() {
         let clock_handle = Arc::new(Mutex::new(FakeClock::<RemovalObserver>::new()));
-        let (client_event, server_event) = zx::EventPair::create().unwrap();
+        let (client_event, server_event) = zx::EventPair::create();
         let () = clock_handle
             .lock()
             .unwrap()
@@ -737,7 +737,7 @@ mod tests {
             deadline_id: DEADLINE_ID.into(),
             deadline: future_deadline_timeout,
         });
-        let (client_event, server_event) = zx::EventPair::create().unwrap();
+        let (client_event, server_event) = zx::EventPair::create();
         let () = clock_handle
             .lock()
             .unwrap()
@@ -779,7 +779,7 @@ mod tests {
         assert!(clock_handle.lock().unwrap().is_free_running());
 
         // Time is not stopped if the other end of a registered event pair is dropped.
-        let (client_event, server_event) = zx::EventPair::create().unwrap();
+        let (client_event, server_event) = zx::EventPair::create();
         let () = clock_handle
             .lock()
             .unwrap()
@@ -813,7 +813,7 @@ mod tests {
             deadline_id: DEADLINE_ID_2.into(),
             deadline: future_deadline_timeout_2,
         });
-        let (client_event_1, server_event_1) = zx::EventPair::create().unwrap();
+        let (client_event_1, server_event_1) = zx::EventPair::create();
         let () = clock_handle
             .lock()
             .unwrap()
@@ -825,7 +825,7 @@ mod tests {
                 server_event_1,
             )
             .expect("set stop point failed");
-        let (client_event_2, server_event_2) = zx::EventPair::create().unwrap();
+        let (client_event_2, server_event_2) = zx::EventPair::create();
         let () = clock_handle
             .lock()
             .unwrap()
@@ -855,7 +855,7 @@ mod tests {
     #[fuchsia::test]
     fn duplicate_stop_points_rejected() {
         let mut clock = FakeClock::<()>::new();
-        let (client_event_1, server_event_1) = zx::EventPair::create().unwrap();
+        let (client_event_1, server_event_1) = zx::EventPair::create();
         assert!(clock
             .set_stop_point(
                 StopPoint {
@@ -866,7 +866,7 @@ mod tests {
             )
             .is_ok());
 
-        let (client_event_2, server_event_2) = zx::EventPair::create().unwrap();
+        let (client_event_2, server_event_2) = zx::EventPair::create();
         assert_eq!(
             clock.set_stop_point(
                 StopPoint {
@@ -890,7 +890,7 @@ mod tests {
     #[fuchsia::test]
     fn duplicate_stop_point_accepted_if_initial_closed() {
         let mut clock = FakeClock::<()>::new();
-        let (client_event_1, server_event_1) = zx::EventPair::create().unwrap();
+        let (client_event_1, server_event_1) = zx::EventPair::create();
         assert!(clock
             .set_stop_point(
                 StopPoint {
@@ -902,7 +902,7 @@ mod tests {
             .is_ok());
 
         drop(client_event_1);
-        let (client_event_2, server_event_2) = zx::EventPair::create().unwrap();
+        let (client_event_2, server_event_2) = zx::EventPair::create();
         assert!(clock
             .set_stop_point(
                 StopPoint {

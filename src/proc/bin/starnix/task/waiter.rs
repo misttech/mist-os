@@ -63,7 +63,7 @@ impl Waiter {
     /// Internal constructor.
     fn new_internal(ignore_signals: bool) -> Self {
         Self(Arc::new(WaiterImpl {
-            port: zx::Port::create().map_err(impossible_error).unwrap(),
+            port: zx::Port::create(),
             key_map: Mutex::new(HashMap::new()),
             next_key: AtomicU64::new(1),
             ignore_signals,

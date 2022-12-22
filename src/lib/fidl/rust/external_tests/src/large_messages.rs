@@ -36,7 +36,7 @@ const WAIT_FOR_EVENT: Duration = Duration::from_seconds(1);
 fn build_handle_array(present: u64) -> [Option<fidl::Handle>; MAX_HANDLES] {
     std::array::from_fn(|i| {
         if i < present.try_into().unwrap() {
-            Some(Event::create().unwrap().into())
+            Some(Event::create().into())
         } else {
             None
         }
@@ -117,7 +117,7 @@ where
     C: 'static + FnOnce(OverflowingProtocolSynchronousProxy) -> R + Send,
     R: 'static + Send,
 {
-    let (client_end, server_end) = Channel::create().unwrap();
+    let (client_end, server_end) = Channel::create();
     let client = OverflowingProtocolSynchronousProxy::new(client_end);
 
     let s = std::thread::spawn(move || server_runner(expected_str, server_end));
@@ -130,7 +130,7 @@ where
     C: 'static + FnOnce(OverflowingProtocolProxy) -> F + Send,
     F: Future<Output = ()> + 'static + Send,
 {
-    let (client_end, server_end) = Channel::create().unwrap();
+    let (client_end, server_end) = Channel::create();
     let client_end = fasync::Channel::from_channel(client_end).unwrap();
     let client = OverflowingProtocolProxy::new(client_end);
 

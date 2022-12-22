@@ -418,7 +418,7 @@ mod tests {
     fn create_client() -> Result<Client, Error> {
         let display = Display::new_no_scenic(RegistryBuilder::new().build())
             .expect("Failed to create display");
-        let (c1, _c2) = zx::Channel::create()?;
+        let (c1, _c2) = zx::Channel::create();
         Ok(Client::new(fasync::Channel::from_channel(c1)?, display))
     }
 

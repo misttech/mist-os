@@ -292,7 +292,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn can_handle_service_connection_request_without_view() -> Result<(), Error> {
         let mut app = VirtualConsoleAppAssistant::new_for_test()?;
-        let (_, server_end) = zx::Channel::create().unwrap();
+        let (_, server_end) = zx::Channel::create();
         let channel = fasync::Channel::from_channel(server_end).unwrap();
         app.handle_service_connection_request(SessionManagerMarker::PROTOCOL_NAME, channel)?;
         Ok(())

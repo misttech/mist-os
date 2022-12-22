@@ -27,7 +27,7 @@ fn convert_info(info: &Info) -> DisplayInfo {
 fn read_info() -> Result<DetectResult, Error> {
     // Connect to the display controller.
     let provider = {
-        let (client_end, server_end) = zx::Channel::create()?;
+        let (client_end, server_end) = zx::Channel::create();
         fuchsia_component::client::connect_channel_to_protocol_at_path(server_end, DEVICE_PATH)?;
         ProviderSynchronousProxy::new(client_end)
     };

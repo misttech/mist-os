@@ -85,7 +85,7 @@ struct JsonConfig<'a> {
 }
 
 fn open_as_client_end<M: ProtocolMarker>(path: &str) -> Result<ClientEnd<M>, Error> {
-    let (client_end, server_end) = fidl::Channel::create()?;
+    let (client_end, server_end) = fidl::Channel::create();
     file::open_channel_in_namespace(
         path,
         OpenFlags::RIGHT_READABLE,

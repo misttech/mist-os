@@ -41,7 +41,7 @@ async fn connect_to_proxy(
 
 /// Run main loop to publish a udp socket to mdns.
 pub async fn publish(port: u16, node_id: NodeId) -> Result<(), Error> {
-    let (server, proxy) = zx::Channel::create()?;
+    let (server, proxy) = zx::Channel::create();
     let server = fasync::Channel::from_channel(server)?;
 
     let publisher = fuchsia_component::client::connect_to_protocol::<PublisherMarker>()?;
@@ -102,7 +102,7 @@ pub async fn subscribe(
 ) -> Result<(), Error> {
     tracing::info!("Query for overnet services");
 
-    let (server, proxy) = zx::Channel::create()?;
+    let (server, proxy) = zx::Channel::create();
     fuchsia_component::client::connect_to_protocol::<SubscriberMarker>()?
         .subscribe_to_service(SERVICE_NAME, fidl::endpoints::ClientEnd::new(proxy))?;
 

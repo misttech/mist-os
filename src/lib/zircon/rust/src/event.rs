@@ -21,9 +21,14 @@ impl Event {
     /// Create an event object, an object which is signalable but nothing else. Wraps the
     /// [zx_event_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/event_create.md)
     /// syscall.
+    ///
+    /// # Panics
+    ///
+    /// If the kernel reports no memory available or the process' job policy denies event creation.
     #[allow(deprecated)]
-    pub fn create() -> Result<Event, Status> {
+    pub fn create() -> Self {
         Self::try_create()
+            .expect("event creation always succeeds except with OOM or when job policy denies it")
     }
 
     /// Create an event object, an object which is signalable but nothing else. Wraps the

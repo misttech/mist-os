@@ -187,10 +187,7 @@ unsafe extern "C" fn service_connector<S: ServiceConnector>(
     service_name: *const std::os::raw::c_char,
     provider_handle: *mut zx_handle_t,
 ) -> zx_status_t {
-    let (client_end, server_end) = match zx::Channel::create() {
-        Err(e) => return e.into_raw(),
-        Ok((c, s)) => (c, s),
-    };
+    let (client_end, server_end) = zx::Channel::create();
 
     let service = match CStr::from_ptr(service_name).to_str() {
         Ok(s) => s,
@@ -721,7 +718,7 @@ fn directory_open(
 ) -> Result<DescribedNode, zx::Status> {
     let flags = flags | fio::OpenFlags::DESCRIBE;
 
-    let (client_end, server_end) = zx::Channel::create()?;
+    let (client_end, server_end) = zx::Channel::create();
     directory.open(flags, mode, path, ServerEnd::new(server_end)).map_err(|_| zx::Status::IO)?;
     let node = fio::NodeSynchronousProxy::new(client_end);
 
@@ -821,7 +818,7 @@ pub fn directory_open_async(
         return Err(zx::Status::INVALID_ARGS);
     }
 
-    let (client_end, server_end) = zx::Channel::create()?;
+    let (client_end, server_end) = zx::Channel::create();
     directory.open(flags, mode, path, ServerEnd::new(server_end)).map_err(|_| zx::Status::IO)?;
     Ok(client_end)
 }
@@ -853,7 +850,7 @@ pub fn directory_clone(
     directory: &fio::DirectorySynchronousProxy,
     flags: fio::OpenFlags,
 ) -> Result<fio::DirectorySynchronousProxy, zx::Status> {
-    let (client_end, server_end) = zx::Channel::create()?;
+    let (client_end, server_end) = zx::Channel::create();
     directory.clone(flags, ServerEnd::new(server_end)).map_err(|_| zx::Status::IO)?;
     Ok(fio::DirectorySynchronousProxy::new(client_end))
 }
@@ -862,7 +859,7 @@ pub fn file_clone(
     file: &fio::FileSynchronousProxy,
     flags: fio::OpenFlags,
 ) -> Result<fio::FileSynchronousProxy, zx::Status> {
-    let (client_end, server_end) = zx::Channel::create()?;
+    let (client_end, server_end) = zx::Channel::create();
     file.clone(flags, ServerEnd::new(server_end)).map_err(|_| zx::Status::IO)?;
     Ok(fio::FileSynchronousProxy::new(client_end))
 }

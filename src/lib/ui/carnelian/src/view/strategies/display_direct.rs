@@ -62,7 +62,7 @@ fn next_collection_id() -> u64 {
 }
 
 async fn create_and_import_event(controller: &ControllerProxy) -> Result<(Event, u64), Error> {
-    let event = Event::create()?;
+    let event = Event::create();
 
     let their_event = event.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
     let event_id = event.get_koid()?.raw_koid();

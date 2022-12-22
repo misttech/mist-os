@@ -354,7 +354,7 @@ mod tests {
         Fut: Future<Output = Result<(), Error>>,
     {
         let mut executor = fasync::LocalExecutor::new().expect("Failed to create executor");
-        let (server_chan, client_chan) = zx::Channel::create().expect("Failed to create channel");
+        let (server_chan, client_chan) = zx::Channel::create();
         let proxy = AccountManagerProxy::new(fasync::Channel::from_channel(client_chan).unwrap());
         let request_stream = AccountManagerRequestStream::from_channel(
             fasync::Channel::from_channel(server_chan).unwrap(),

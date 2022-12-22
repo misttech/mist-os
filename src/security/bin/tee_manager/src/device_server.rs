@@ -22,8 +22,7 @@ pub async fn serve_application_passthrough(
 ) -> Result<(), Error> {
     // Create a ProviderServer to support the TEE driver
     let provider = ProviderServer::try_new(PathBuf::new().join(STORAGE_DIR))?;
-    let (zx_provider_server_end, zx_provider_client_end) =
-        zx::Channel::create().context("Could not create Provider channel pair")?;
+    let (zx_provider_server_end, zx_provider_client_end) = zx::Channel::create();
 
     let provider_server_chan = fasync::Channel::from_channel(zx_provider_server_end)?;
 

@@ -350,7 +350,7 @@ mod test {
         let listener = UnixListener::bind(&sockpath).unwrap();
         let local_link_task = local_hoist.start_socket_link(sockpath.clone());
 
-        let (s, p) = fidl::Channel::create().unwrap();
+        let (s, p) = fidl::Channel::create();
         daemon_hoist.publish_service(DaemonMarker::PROTOCOL_NAME, ClientEnd::new(p)).unwrap();
 
         let link_tasks = Arc::new(Mutex::new(Vec::<Task<()>>::new()));

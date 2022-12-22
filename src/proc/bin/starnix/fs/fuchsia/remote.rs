@@ -619,7 +619,7 @@ mod test {
     fn test_tree() -> Result<(), anyhow::Error> {
         let (kernel, current_task) = create_kernel_and_task();
         let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
-        let (server, client) = zx::Channel::create().expect("failed to create channel pair");
+        let (server, client) = zx::Channel::create();
         fdio::open("/pkg", rights, server).expect("failed to open /pkg");
         let fs = RemoteFs::new_fs(&kernel, client, rights)?;
         let ns = Namespace::new(fs);

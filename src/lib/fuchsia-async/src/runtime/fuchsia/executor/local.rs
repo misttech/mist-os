@@ -544,7 +544,7 @@ mod tests {
     #[test]
     fn stepwise_event() {
         let mut executor = TestExecutor::new_with_fake_time().unwrap();
-        let event = zx::Event::create().unwrap();
+        let event = zx::Event::create();
         let fut = OnSignals::new(&event, zx::Signals::USER_0);
         pin_mut!(fut);
         executor.wake_main_future();

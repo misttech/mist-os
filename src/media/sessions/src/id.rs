@@ -17,7 +17,7 @@ pub struct Id {
 
 impl Id {
     pub fn new() -> Result<Self> {
-        let id_handle = zx::Event::create()?;
+        let id_handle = zx::Event::create();
         let id = id_handle.get_koid()?.raw_koid();
 
         Ok(Self { id, id_handle })

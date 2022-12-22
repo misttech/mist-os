@@ -690,7 +690,7 @@ async fn serve_failing_blobfs(
 
 #[fasync::run_singlethreaded(test)]
 pub async fn test_blobfs_broken() -> Result<(), Error> {
-    let (client, server) = zx::Channel::create().context("creating blobfs channel")?;
+    let (client, server) = zx::Channel::create();
     let package = build_test_package().await?;
     let paver_hook = |_: &PaverEvent| zx::Status::IO;
     let env = TestEnvBuilder::new()

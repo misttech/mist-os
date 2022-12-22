@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn create_vmo() {
-        let port = zx::Port::create().unwrap();
+        let port = zx::Port::create();
         let pager = zx::Pager::create(zx::PagerOptions::empty()).unwrap();
         let vmo = pager.create_vmo(zx::VmoOptions::RESIZABLE, &port, KEY, /*size=*/ 100).unwrap();
         let vmo_info = vmo.info().unwrap();
@@ -138,7 +138,7 @@ mod tests {
 
     #[test]
     fn detach_vmo() {
-        let port = zx::Port::create().unwrap();
+        let port = zx::Port::create();
         let pager = zx::Pager::create(zx::PagerOptions::empty()).unwrap();
         let vmo = pager.create_vmo(zx::VmoOptions::empty(), &port, KEY, /*size=*/ 100).unwrap();
         pager.detach_vmo(&vmo).unwrap();
@@ -153,7 +153,7 @@ mod tests {
     #[test]
     fn supply_pages() {
         let page_size: u64 = zx::system_get_page_size().into();
-        let port = zx::Port::create().unwrap();
+        let port = zx::Port::create();
         let pager = zx::Pager::create(zx::PagerOptions::empty()).unwrap();
         let vmo =
             Arc::new(pager.create_vmo(zx::VmoOptions::empty(), &port, KEY, page_size).unwrap());
@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn fail_page_request() {
         let page_size: u64 = zx::system_get_page_size().into();
-        let port = zx::Port::create().unwrap();
+        let port = zx::Port::create();
         let pager = zx::Pager::create(zx::PagerOptions::empty()).unwrap();
         let vmo =
             Arc::new(pager.create_vmo(zx::VmoOptions::empty(), &port, KEY, page_size).unwrap());
@@ -225,7 +225,7 @@ mod tests {
     #[test]
     fn pager_writeback() {
         let page_size: u64 = zx::system_get_page_size().into();
-        let port = zx::Port::create().unwrap();
+        let port = zx::Port::create();
         let pager = zx::Pager::create(zx::PagerOptions::empty()).unwrap();
         let vmo =
             Arc::new(pager.create_vmo(zx::VmoOptions::TRAP_DIRTY, &port, KEY, page_size).unwrap());

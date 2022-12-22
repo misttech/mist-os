@@ -28,7 +28,7 @@ pub(crate) const LED2_NAME: &str = "led2";
 /// Helper function for setting up proxies with default data.
 pub(crate) fn setup_proxies_and_data() -> SetupData {
     // Create light proxy and request stream.
-    let (proxy, server) = zx::Channel::create().expect("Cannot create channel");
+    let (proxy, server) = zx::Channel::create();
     let light_requests = ServerEnd::<LightMarker>::new(server)
         .into_stream()
         .expect("Cannot convert channel to Light server end");
@@ -38,7 +38,7 @@ pub(crate) fn setup_proxies_and_data() -> SetupData {
     let light_proxy = LightProxy::from_channel(channel);
 
     // Create control proxy and request stream.
-    let (proxy, server) = zx::Channel::create().expect("Cannot create channel");
+    let (proxy, server) = zx::Channel::create();
     let brightness_requests = ServerEnd::<ControlMarker>::new(server)
         .into_stream()
         .expect("Cannot convert channel to Light server end");

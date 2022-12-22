@@ -103,8 +103,7 @@ async fn exec_server() -> Result<(), Error> {
         loop {
             let sc = sc.clone();
             let stream = (|| -> Result<_, Error> {
-                let (s, p) =
-                    fidl::Channel::create().context("creating ServiceProvider zx channel")?;
+                let (s, p) = fidl::Channel::create();
                 let chan = fidl::AsyncChannel::from_channel(s)
                     .context("creating ServiceProvider async channel")?;
                 let stream = ServiceProviderRequestStream::from_channel(chan);

@@ -739,7 +739,7 @@ async fn monitor_all_update_checks() {
 
 #[fasync::run_singlethreaded(test)]
 async fn wait_for_commit_success() {
-    let (p0, p1) = EventPair::create().unwrap();
+    let (p0, p1) = EventPair::create();
     let env = TestEnv::builder().commit_status_provider_response(p1).build();
 
     let () = p0.signal_peer(zx::Signals::NONE, zx::Signals::USER_0).unwrap();

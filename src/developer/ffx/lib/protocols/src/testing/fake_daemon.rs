@@ -150,7 +150,7 @@ impl Default for FakeDaemon {
 #[async_trait(?Send)]
 impl DaemonProtocolProvider for FakeDaemon {
     async fn open_protocol(&self, protocol_name: String) -> Result<fidl::Channel> {
-        let (server, client) = fidl::Channel::create().context("creating channel")?;
+        let (server, client) = fidl::Channel::create();
         self.register
             .as_ref()
             .unwrap()

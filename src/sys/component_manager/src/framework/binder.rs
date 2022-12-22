@@ -259,8 +259,7 @@ mod tests {
         let (_event_source, mut event_stream) = fixture
             .new_event_stream(vec![EventType::Resolved.into(), EventType::Started.into()])
             .await;
-        let (_client_end, mut server_end) =
-            zx::Channel::create().expect("failed to create channels");
+        let (_client_end, mut server_end) = zx::Channel::create();
         let moniker: AbsoluteMoniker = vec!["source"].into();
 
         let task_scope = TaskScope::new();
@@ -288,8 +287,7 @@ mod tests {
                 .build(),
         )])
         .await;
-        let (client_end, mut server_end) =
-            zx::Channel::create().expect("failed to create channels");
+        let (client_end, mut server_end) = zx::Channel::create();
         let moniker: AbsoluteMoniker = vec!["foo"].into();
 
         let task_scope = TaskScope::new();

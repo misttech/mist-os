@@ -52,7 +52,7 @@ impl ServiceContext {
         &self,
     ) -> Result<ExternalServiceProxy<P::Proxy>, Error> {
         let proxy = if let Some(generate_service) = &self.generate_service {
-            let (client, server) = zx::Channel::create()?;
+            let (client, server) = zx::Channel::create();
             ((generate_service)(P::PROTOCOL_NAME, server)).await?;
             P::Proxy::from_channel(fasync::Channel::from_channel(client)?)
         } else {
@@ -77,7 +77,7 @@ impl ServiceContext {
         publisher: Publisher,
     ) -> Result<ExternalServiceProxy<P::Proxy>, Error> {
         let proxy = if let Some(generate_service) = &self.generate_service {
-            let (client, server) = zx::Channel::create()?;
+            let (client, server) = zx::Channel::create();
             ((generate_service)(P::PROTOCOL_NAME, server)).await?;
             P::Proxy::from_channel(fasync::Channel::from_channel(client)?)
         } else {
@@ -102,7 +102,7 @@ impl ServiceContext {
         service_name: &str,
     ) -> Result<ExternalServiceProxy<P::Proxy>, Error> {
         if let Some(generate_service) = &self.generate_service {
-            let (client, server) = zx::Channel::create()?;
+            let (client, server) = zx::Channel::create();
             if (generate_service)(service_name, server).await.is_err() {
                 return Err(format_err!("Could not handl service {:?}", service_name));
             }

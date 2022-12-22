@@ -13,7 +13,7 @@ pub struct ViewTokenPair {
 
 impl ViewTokenPair {
     pub fn new() -> Result<ViewTokenPair, Error> {
-        let (raw_view_token, raw_view_holder_token) = EventPair::create()?;
+        let (raw_view_token, raw_view_holder_token) = EventPair::create();
         let token_pair = ViewTokenPair {
             view_token: ViewToken { value: raw_view_token },
             view_holder_token: ViewHolderToken { value: raw_view_holder_token },

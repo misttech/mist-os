@@ -81,7 +81,7 @@ pub async fn create_galaxy() -> Result<Galaxy, Error> {
     const COMPONENT_PKG_PATH: &str = "/pkg";
     const DEFAULT_INIT: &str = "/galaxy/init";
 
-    let (server, client) = zx::Channel::create().context("failed to create channel pair")?;
+    let (server, client) = zx::Channel::create();
     fdio::open(
         COMPONENT_PKG_PATH,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,

@@ -925,7 +925,7 @@ mod tests {
         let selector =
             parse_selector::<VerboseError>("core/my_component:expose:fuchsia.hwinfo.Board")
                 .unwrap();
-        let (_client, server) = zx::Channel::create().unwrap();
+        let (_client, server) = zx::Channel::create();
         let lifecycle = setup_fake_lifecycle_controller();
         let query = setup_fake_realm_query();
         connect_to_exposed_protocol(selector, server, lifecycle, query).await.unwrap();
@@ -936,7 +936,7 @@ mod tests {
     async fn test_connect_to_protocol_not_exposed() -> Result<()> {
         let selector =
             parse_selector::<VerboseError>("core/my_component:expose:fuchsia.not.exposed").unwrap();
-        let (_client, server) = zx::Channel::create().unwrap();
+        let (_client, server) = zx::Channel::create();
         let lifecycle = setup_fake_lifecycle_controller();
         let query = setup_fake_realm_query();
         let error =

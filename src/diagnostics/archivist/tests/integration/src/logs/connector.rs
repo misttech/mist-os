@@ -110,7 +110,7 @@ async fn serve_mocks(
     handles: LocalComponentHandles,
     take_log_listener_response_snd: mpsc::Sender<()>,
 ) -> Result<(), anyhow::Error> {
-    let (client, server) = zx::Channel::create().unwrap();
+    let (client, server) = zx::Channel::create();
     let mut server_end = Some(ServerEnd::new(server));
 
     // connect multiple identical log sinks
@@ -133,7 +133,7 @@ async fn serve_mocks(
     {
         let listener = ClientEnd::<LogConnectionListenerMarker>::new(client).into_proxy().unwrap();
         for socket in sockets {
-            let (client, server) = zx::Channel::create().unwrap();
+            let (client, server) = zx::Channel::create();
             let log_request = ServerEnd::<LogSinkMarker>::new(server);
             let source_identity = SourceIdentity {
                 realm_path: Some(vec![]),

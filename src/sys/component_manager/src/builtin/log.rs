@@ -174,7 +174,7 @@ mod tests {
         );
         hooks.dispatch(&event).await;
 
-        let (client, mut server) = zx::Channel::create()?;
+        let (client, mut server) = zx::Channel::create();
         let task_scope = TaskScope::new();
         if let Some(provider) = provider.lock().await.take() {
             provider
@@ -241,7 +241,7 @@ mod tests {
         );
         hooks.dispatch(&event).await;
 
-        let (client, mut server) = zx::Channel::create()?;
+        let (client, mut server) = zx::Channel::create();
         let task_scope = TaskScope::new();
         if let Some(provider) = provider.lock().await.take() {
             provider

@@ -699,7 +699,7 @@ mod tests {
             lifecycle_controller.serve(AbsoluteMoniker::root(), lifecycle_request_stream).await
         });
 
-        let (client, server) = Channel::create().unwrap();
+        let (client, server) = Channel::create();
 
         let server_end = ServerEnd::new(server);
 

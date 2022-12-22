@@ -186,7 +186,7 @@ mod test {
     #[test]
     fn async_channel_write_read() {
         block_on(async move {
-            let (a, b) = Channel::create().unwrap();
+            let (a, b) = Channel::create();
             let (a, b) =
                 (AsyncChannel::from_channel(a).unwrap(), AsyncChannel::from_channel(b).unwrap());
             let mut buf = MessageBuf::new();
@@ -210,7 +210,7 @@ mod test {
     #[test]
     fn async_channel_write_etc_read_etc() {
         block_on(async move {
-            let (a, b) = Channel::create().unwrap();
+            let (a, b) = Channel::create();
             let (a, b) =
                 (AsyncChannel::from_channel(a).unwrap(), AsyncChannel::from_channel(b).unwrap());
             let mut buf = MessageBufEtc::new();
@@ -225,7 +225,7 @@ mod test {
 
             let mut rx = a.recv_etc_msg(&mut buf);
             assert!(Pin::new(&mut rx).poll(&mut cx).is_pending());
-            let (c, _) = Channel::create().unwrap();
+            let (c, _) = Channel::create();
             b.write_etc(
                 &[1, 2, 3],
                 &mut vec![HandleDisposition {

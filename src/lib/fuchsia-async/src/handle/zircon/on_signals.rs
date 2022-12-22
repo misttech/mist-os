@@ -156,7 +156,7 @@ mod test {
         let mut deliver_events =
             || assert!(exec.run_until_stalled(&mut pending::<()>()).is_pending());
 
-        let event = zx::Event::create()?;
+        let event = zx::Event::create();
         let mut signals = OnSignals::new(&event, zx::Signals::EVENT_SIGNALED);
         let (waker, waker_count) = futures_test::task::new_count_waker();
         let cx = &mut std::task::Context::from_waker(&waker);
@@ -182,7 +182,7 @@ mod test {
         let _exec = crate::TestExecutor::new()?;
         let ehandle = EHandle::local();
 
-        let event = zx::Event::create()?;
+        let event = zx::Event::create();
         let signals = OnSignals::new(&event, zx::Signals::EVENT_SIGNALED);
         let key = signals.state.as_ref().unwrap().key();
 

@@ -15,8 +15,8 @@ use fuchsia_zircon as zx;
 #[fasync::run_singlethreaded(test)]
 async fn test_basic() -> Result<(), Error> {
     // Initialize a channel, and label the two ends as the server_end and client_end
-    let (server_end, client_end) = zx::Channel::create()?;
-    let (admin_server_end, admin_client_end) = zx::Channel::create()?;
+    let (server_end, client_end) = zx::Channel::create();
+    let (admin_server_end, admin_client_end) = zx::Channel::create();
 
     // Connect an implementation of the OptOut protocols to the server ends
     connect_channel_to_protocol::<OptOutMarker>(server_end)

@@ -17,8 +17,7 @@ pub struct BufferCollectionTokenPair {
 
 impl BufferCollectionTokenPair {
     pub fn new() -> BufferCollectionTokenPair {
-        let (raw_export_token, raw_import_token) =
-            zx::EventPair::create().expect("failed to create eventpair");
+        let (raw_export_token, raw_import_token) = zx::EventPair::create();
         BufferCollectionTokenPair {
             export_token: fland::BufferCollectionExportToken { value: raw_export_token },
             import_token: fland::BufferCollectionImportToken { value: raw_import_token },

@@ -122,7 +122,7 @@ mod tests {
 
         let (proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<CommitStatusProviderMarker>().unwrap();
-        let (p, p_stream) = EventPair::create().unwrap();
+        let (p, p_stream) = EventPair::create();
         fasync::Task::spawn(async move {
             while let Some(req) = stream.try_next().await.unwrap() {
                 let CommitStatusProviderRequest::IsCurrentSystemCommitted { responder } = req;

@@ -393,8 +393,9 @@ impl<T> HandleBased for ServerEnd<T> {}
 handle_based_codable![ClientEnd :- <T,>, ServerEnd :- <T,>,];
 
 /// Creates client and server endpoints connected to by a channel.
+// TODO(https://fxbug.dev/115384) make this API infallible, consider offering try_ variant
 pub fn create_endpoints<T: ProtocolMarker>() -> Result<(ClientEnd<T>, ServerEnd<T>), Error> {
-    let (client, server) = Channel::create().map_err(|e| Error::ChannelPairCreate(e.into()))?;
+    let (client, server) = Channel::create();
     let client_end = ClientEnd::<T>::new(client);
     let server_end = ServerEnd::new(server);
     Ok((client_end, server_end))

@@ -829,7 +829,7 @@ mod tests {
 
         // Now use the element api to open a service in the element's outgoing dir. Verify
         // that the directory channel received the request with the correct path.
-        let (_client_channel, server_channel) = zx::Channel::create().unwrap();
+        let (_client_channel, server_channel) = zx::Channel::create();
         let _ = element.connect_to_named_protocol_with_channel("myProtocol", server_channel);
         let open_paths = directory_open_receiver.take(1).collect::<Vec<_>>().await;
         // While a standard v1 component publishes its services to "svc/...", LaunchInfo.directory_request,
@@ -956,7 +956,7 @@ mod tests {
                         assert_eq!(vec![service_name.to_string()], services.names);
 
                         // Connect to the service hosted in `additional_services.host_directory`.
-                        let (_client_channel, server_channel) = zx::Channel::create().unwrap();
+                        let (_client_channel, server_channel) = zx::Channel::create();
                         fdio::service_connect_at(
                             host_directory.channel(),
                             service_name,
@@ -1111,7 +1111,7 @@ mod tests {
 
         // Now use the element api to open a service in the element's outgoing dir. Verify
         // that the directory channel received the request with the correct path.
-        let (_client_channel, server_channel) = zx::Channel::create().unwrap();
+        let (_client_channel, server_channel) = zx::Channel::create();
         let _ = element.connect_to_named_protocol_with_channel("myProtocol", server_channel);
         let open_paths = directory_open_receiver.take(2).collect::<Vec<_>>().await;
         assert_eq!(vec![fcomponent::BinderMarker::DEBUG_NAME, "myProtocol"], open_paths);
@@ -1175,7 +1175,7 @@ mod tests {
 
         // Now use the element api to open a service in the element's outgoing dir. Verify
         // that the directory channel received the request with the correct path.
-        let (_client_channel, server_channel) = zx::Channel::create().unwrap();
+        let (_client_channel, server_channel) = zx::Channel::create();
         let _ = element.connect_to_named_protocol_with_channel("myProtocol", server_channel);
         let open_paths = directory_open_receiver.take(2).collect::<Vec<_>>().await;
         assert_eq!(vec![fcomponent::BinderMarker::DEBUG_NAME, "myProtocol"], open_paths);
@@ -1226,7 +1226,7 @@ mod tests {
     async fn launch_v1_element_with_service_list_provider() {
         let component_url = "fuchsia-pkg://fuchsia.com/simple_element#meta/simple_element.cmx";
 
-        let (channel, _) = fidl::Channel::create().unwrap();
+        let (channel, _) = fidl::Channel::create();
         let provider = fidl::endpoints::ClientEnd::<fsys::ServiceProviderMarker>::new(channel);
 
         // This ServiceList is invalid because it specifies a `provider` that is not None.

@@ -654,8 +654,7 @@ async fn use_restricted_storage_open_failure() {
         .expect("could not resolve state");
 
     // `parent_consumer` should be able to open its storage because its not restricted
-    let (_client_end, mut server_end) =
-        zx::Channel::create().expect("could not create storage dir endpoints");
+    let (_client_end, mut server_end) = zx::Channel::create();
     route_and_open_capability(
         RouteRequest::UseStorage(UseStorageDecl {
             source_name: "cache".into(),
@@ -691,8 +690,7 @@ async fn use_restricted_storage_open_failure() {
     }
 
     // `parent_consumer` should NOT be able to open its storage because its IS restricted
-    let (_client_end, mut server_end) =
-        zx::Channel::create().expect("could not create storage dir endpoints");
+    let (_client_end, mut server_end) = zx::Channel::create();
     let result = route_and_open_capability(
         RouteRequest::UseStorage(UseStorageDecl {
             source_name: "cache".into(),

@@ -60,7 +60,7 @@ async fn exec_client() -> Result<(), Error> {
             {
                 continue;
             }
-            let (s, p) = fidl::Channel::create().context("failed to create zx channel")?;
+            let (s, p) = fidl::Channel::create();
             if let Err(e) =
                 svc.connect_to_service(&mut peer.id, event_pair::ExampleMarker::PROTOCOL_NAME, s)
             {
@@ -71,7 +71,7 @@ async fn exec_client() -> Result<(), Error> {
                 fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?;
             let cli = event_pair::ExampleProxy::new(proxy);
 
-            let (cev, sev) = fidl::EventPair::create().context("failed to create event pair")?;
+            let (cev, sev) = fidl::EventPair::create();
             let r = Task::spawn(cli.pass(sev));
             println!("signal peer on 0");
             cev.signal_peer(Signals::empty(), Signals::USER_0)?;
@@ -118,7 +118,7 @@ async fn example_server(chan: fidl::AsyncChannel) -> Result<(), Error> {
 }
 
 async fn exec_server() -> Result<(), Error> {
-    let (s, p) = fidl::Channel::create().context("failed to create zx channel")?;
+    let (s, p) = fidl::Channel::create();
     let chan = fidl::AsyncChannel::from_channel(s).context("failed to make async channel")?;
     hoist().publish_service(event_pair::ExampleMarker::PROTOCOL_NAME, ClientEnd::new(p))?;
     ServiceProviderRequestStream::from_channel(chan)

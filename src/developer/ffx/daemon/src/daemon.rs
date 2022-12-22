@@ -169,7 +169,7 @@ impl DaemonEventHandler {
 #[async_trait(?Send)]
 impl DaemonProtocolProvider for Daemon {
     async fn open_protocol(&self, protocol_name: String) -> Result<fidl::Channel> {
-        let (server, client) = fidl::Channel::create().context("creating zx channel")?;
+        let (server, client) = fidl::Channel::create();
         self.protocol_register
             .open(
                 protocol_name,
@@ -214,7 +214,7 @@ impl DaemonProtocolProvider for Daemon {
             .rcs()
             .ok_or(anyhow!("rcs disconnected after event fired"))
             .context("getting rcs instance")?;
-        let (server, client) = fidl::Channel::create().context("creating zx channel")?;
+        let (server, client) = fidl::Channel::create();
 
         // TODO(awdavies): Handle these errors properly so the client knows what happened.
         rcs.proxy
@@ -725,7 +725,7 @@ impl Daemon {
         quit_tx: mpsc::Sender<()>,
         mut quit_rx: mpsc::Receiver<()>,
     ) -> Result<()> {
-        let (s, p) = fidl::Channel::create().context("failed to create zx channel")?;
+        let (s, p) = fidl::Channel::create();
         let chan = fidl::AsyncChannel::from_channel(s).context("failed to make async channel")?;
         let mut stream = ServiceProviderRequestStream::from_channel(chan);
 

@@ -435,7 +435,7 @@ mod tests {
 
         fasync::Task::spawn(fs.collect()).detach();
 
-        let (done0, done1) = zx::Channel::create().unwrap();
+        let (done0, done1) = zx::Channel::create();
 
         let thread_path = path.join("out/diagnostics");
 
@@ -505,7 +505,7 @@ mod tests {
 
         fasync::Task::spawn(fs.collect()).detach();
 
-        let (done0, done1) = zx::Channel::create().unwrap();
+        let (done0, done1) = zx::Channel::create();
         let thread_path = path.join("out/diagnostics");
 
         // Run the actual test in a separate thread so that it does not block on FS operations.
@@ -569,7 +569,7 @@ mod tests {
         ns.bind(path.join("out").to_str().unwrap(), h0).unwrap();
 
         fasync::Task::spawn(fs.collect()).detach();
-        let (done0, done1) = zx::Channel::create().unwrap();
+        let (done0, done1) = zx::Channel::create();
         let thread_path = path.join("out");
 
         // Run the actual test in a separate thread so that it does not block on FS operations.
@@ -606,7 +606,7 @@ mod tests {
         ns.bind(path.join("out").to_str().unwrap(), h0).unwrap();
 
         fasync::Task::spawn(fs.collect()).detach();
-        let (done0, done1) = zx::Channel::create().unwrap();
+        let (done0, done1) = zx::Channel::create();
         let thread_path = path.join("out");
 
         // Run the actual test in a separate thread so that it does not block on FS operations.
@@ -641,7 +641,7 @@ mod tests {
         ns.bind(path.join("out").to_str().unwrap(), h0).unwrap();
 
         fasync::Task::spawn(fs.collect()).detach();
-        let (done0, done1) = zx::Channel::create().unwrap();
+        let (done0, done1) = zx::Channel::create();
         let thread_path = path.join("out");
 
         // Run the actual test in a separate thread so that it does not block on FS operations.
@@ -726,7 +726,7 @@ mod tests {
 
         fasync::Task::spawn(fs.collect()).detach();
 
-        let (done0, done1) = zx::Channel::create().unwrap();
+        let (done0, done1) = zx::Channel::create();
 
         let cloned_path = path.clone();
         // Run the actual test in a separate thread so that it does not block on FS operations.

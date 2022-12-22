@@ -30,7 +30,7 @@ async fn if_probe_has_bit<R>(
 }
 
 pub async fn run_diagostic_service_request_handler(router: &Weak<Router>) -> Result<(), Error> {
-    let (s, p) = Channel::create().context("failed to create zx channel")?;
+    let (s, p) = Channel::create();
     let chan = AsyncChannel::from_channel(s).context("failed to make async channel")?;
     Weak::upgrade(router)
         .ok_or_else(|| format_err!("router gone"))?

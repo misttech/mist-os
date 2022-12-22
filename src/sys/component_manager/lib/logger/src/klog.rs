@@ -129,7 +129,7 @@ mod tests {
     };
 
     fn get_root_resource() -> zx::Resource {
-        let (client_end, server_end) = zx::Channel::create().unwrap();
+        let (client_end, server_end) = zx::Channel::create();
         connect_channel_to_protocol::<fboot::RootResourceMarker>(server_end).unwrap();
         let service = fboot::RootResourceSynchronousProxy::new(client_end);
         let resource = service.get(zx::Time::INFINITE).expect("couldn't get root resource");

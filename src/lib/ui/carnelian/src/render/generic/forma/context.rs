@@ -159,8 +159,7 @@ impl FormaContext {
     ) -> Self {
         let sysmem = connect_to_protocol::<AllocatorMarker>().expect("failed to connect to sysmem");
         set_allocator_name(&sysmem).unwrap_or_else(|e| eprintln!("set_allocator_name: {:?}", e));
-        let (collection_client, collection_request) =
-            zx::Channel::create().expect("failed to create Zircon channel");
+        let (collection_client, collection_request) = zx::Channel::create();
         sysmem
             .bind_shared_collection(
                 ClientEnd::new(token.into_channel()),

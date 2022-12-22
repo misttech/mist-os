@@ -24,7 +24,7 @@ use crate::types::*;
 /// Open "/pkg" and returns an FsContext rooted in that directory.
 fn create_pkgfs(kernel: &Kernel) -> FileSystemHandle {
     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
-    let (server, client) = zx::Channel::create().expect("failed to create channel");
+    let (server, client) = zx::Channel::create();
     fdio::open("/pkg", rights, server).expect("failed to open /pkg");
     RemoteFs::new_fs(kernel, client, rights).unwrap()
 }

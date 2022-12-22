@@ -972,13 +972,14 @@ impl Router {
         conn: PeerConnRef<'_>,
         stats: Arc<MessageStats>,
     ) -> Result<Handle, Error> {
+        #[allow(deprecated)]
         match handle {
             ZirconHandle::Channel(ChannelHandle { stream_ref, rights }) => {
                 self.recv_proxied_handle(
                     conn,
                     stats,
                     stream_ref,
-                    move || Channel::create().map_err(Into::into),
+                    move || Channel::try_create().map_err(Into::into),
                     rights,
                 )
                 .await
@@ -1002,7 +1003,7 @@ impl Router {
                     conn,
                     stats,
                     stream_ref,
-                    move || EventPair::create().map_err(Into::into),
+                    move || EventPair::try_create().map_err(Into::into),
                     rights,
                 )
                 .await
@@ -1386,7 +1387,7 @@ mod tests {
     #[fuchsia::test]
     async fn create_stream(run: usize) -> Result<(), Error> {
         run_two_node("create_stream", run, |router1, router2| async move {
-            let (_, p) = fidl::Channel::create()?;
+            let (_, p) = fidl::Channel::create();
             println!("create_stream: register service");
             let s = register_test_service(router2.clone(), router1.clone(), "create_stream").await;
             println!("create_stream: connect to service");
@@ -1402,7 +1403,7 @@ mod tests {
     #[fuchsia::test]
     async fn send_datagram_immediately(run: usize) -> Result<(), Error> {
         run_two_node("send_datagram_immediately", run, |router1, router2| async move {
-            let (c, p) = fidl::Channel::create()?;
+            let (c, p) = fidl::Channel::create();
             println!("send_datagram_immediately: register service");
             let s = register_test_service(
                 router2.clone(),
@@ -1431,7 +1432,7 @@ mod tests {
     #[fuchsia::test]
     async fn ping_pong(run: usize) -> Result<(), Error> {
         run_two_node("ping_pong", run, |router1, router2| async move {
-            let (c, p) = fidl::Channel::create()?;
+            let (c, p) = fidl::Channel::create();
             println!("ping_pong: register service");
             let s = register_test_service(router2.clone(), router1.clone(), "ping_pong").await;
             println!("ping_pong: connect to service");

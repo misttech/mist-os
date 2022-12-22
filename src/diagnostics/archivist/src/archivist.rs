@@ -160,7 +160,7 @@ impl Archivist {
         // Start related services that should start once the Archivist has started.
         for name in &config.bind_services {
             info!("Connecting to service {}", name);
-            let (_local, remote) = zx::Channel::create().expect("cannot create channels");
+            let (_local, remote) = zx::Channel::create();
             if let Err(e) = fdio::service_connect(&format!("/svc/{name}"), remote) {
                 error!("Couldn't connect to service {}: {:?}", name, e);
             }

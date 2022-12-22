@@ -23,7 +23,7 @@ pub fn list_host_devices() -> Vec<PathBuf> {
 pub fn open_host_channel(device: &File) -> Result<zx::Channel, Error> {
     let dev_channel = fdio::clone_channel(device)?;
     let host = HostSynchronousProxy::new(dev_channel);
-    let (ours, theirs) = zx::Channel::create()?;
+    let (ours, theirs) = zx::Channel::create();
     host.open(theirs)?;
     Ok(ours)
 }

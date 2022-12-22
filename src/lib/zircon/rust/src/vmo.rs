@@ -287,7 +287,7 @@ mod tests {
     #[test]
     fn vmo_create_contiguous() {
         use fuchsia_zircon::{Channel, HandleBased, Time};
-        let (client_end, server_end) = Channel::create().unwrap();
+        let (client_end, server_end) = Channel::create();
         connect_channel_to_protocol::<fboot::RootResourceMarker>(server_end).unwrap();
         let service = fboot::RootResourceSynchronousProxy::new(client_end);
         let resource = service.get(Time::INFINITE).expect("couldn't get root resource");
@@ -499,7 +499,7 @@ mod tests {
         let info = vmo.as_handle_ref().basic_info().unwrap();
         assert!(!info.rights.contains(Rights::EXECUTE));
 
-        let (client_end, server_end) = Channel::create().unwrap();
+        let (client_end, server_end) = Channel::create();
         connect_channel_to_protocol::<fkernel::VmexResourceMarker>(server_end).unwrap();
         let service = fkernel::VmexResourceSynchronousProxy::new(client_end);
         let resource = service.get(Time::INFINITE).expect("couldn't get vmex resource");

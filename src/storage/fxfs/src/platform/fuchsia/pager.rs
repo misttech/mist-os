@@ -181,7 +181,7 @@ impl PortThread {
         executor: Arc<PagerExecutor>,
         inner: Arc<Mutex<Inner<T>>>,
     ) -> Result<Self, Error> {
-        let port = Arc::new(zx::Port::create()?);
+        let port = Arc::new(zx::Port::create());
         let port_clone = port.clone();
 
         let terminate_event = Arc::new(DropEvent::new());

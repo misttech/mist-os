@@ -187,7 +187,7 @@ impl ProcessLoader {
         };
         let ld_stack_size = calculate_initial_linker_stack_size(&mut ld_msg_contents, 0)?;
         let ld_msg = Message::build(ld_msg_contents)?;
-        let (bootstrap, bootstrap_server) = Channel::create()?;
+        let (bootstrap, bootstrap_server) = Channel::create();
         ld_msg.write(&bootstrap).map_err(ProcessBuilderError::WriteBootstrapMessage)?;
 
         let ld_stack_vmo = Vmo::create(ld_stack_size.try_into()?)?;

@@ -1483,8 +1483,7 @@ where
         properties: SocketWorkerProperties,
         events: fposix_socket::SynchronousDatagramSocketRequestStream,
     ) -> Result<(), fposix::Errno> {
-        let (local_event, peer_event) =
-            zx::EventPair::create().map_err(|_| fposix::Errno::Enobufs)?;
+        let (local_event, peer_event) = zx::EventPair::create();
         // signal peer that OUTGOING is available.
         // TODO(brunodalbo): We're currently not enforcing any sort of
         // flow-control for outgoing datagrams. That'll get fixed once we
@@ -3655,7 +3654,7 @@ mod tests {
             fposix::Errno::Einval,
         );
 
-        let (e1, e2) = zx::EventPair::create().unwrap();
+        let (e1, e2) = zx::EventPair::create();
         fasync::Task::spawn(async move {
             assert_eq!(
                 fasync::OnSignals::new(&events, ZXSIO_SIGNAL_INCOMING).await,

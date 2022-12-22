@@ -74,7 +74,7 @@ fn new_phy(device_filename: String) -> Result<NewPhyDevice, anyhow::Error> {
     let device_path = format!("{}/{}", crate::PHY_PATH, device_filename);
     let device = std::fs::File::open(&device_path)?;
 
-    let (local, remote) = zx::Channel::create()?;
+    let (local, remote) = zx::Channel::create();
     let connector_channel = fdio::clone_channel(&device)?;
     let connector = fidl_fuchsia_wlan_device::ConnectorProxy::new(fasync::Channel::from_channel(
         connector_channel,

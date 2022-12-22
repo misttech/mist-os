@@ -267,10 +267,6 @@ pub enum Error {
         protocol_name: &'static str,
     },
 
-    /// There was an error creating a channel to be used for a FIDL client-server pair.
-    #[error("There was an error creating a channel to be used for a FIDL client-server pair: {0}")]
-    ChannelPairCreate(#[source] zx_status::Status),
-
     /// There was an error attaching a FIDL channel to the async executor.
     #[error("There was an error attaching a FIDL channel to the async executor: {0}")]
     AsyncChannel(#[source] zx_status::Status),

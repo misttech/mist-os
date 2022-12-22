@@ -378,7 +378,7 @@ pub mod test_utils {
         // We use this unused parameter to ensure that an executor exists.
         _exec: &fuchsia_async::TestExecutor,
     ) -> (fidl_mlme::MlmeControlHandle, fuchsia_zircon::Channel) {
-        let (c1, c2) = fuchsia_zircon::Channel::create().unwrap();
+        let (c1, c2) = fuchsia_zircon::Channel::create();
         let async_c1 = fidl::AsyncChannel::from_channel(c1).unwrap();
         let request_stream = fidl_mlme::MlmeRequestStream::from_channel(async_c1);
         let control_handle = request_stream.control_handle();

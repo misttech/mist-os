@@ -110,7 +110,7 @@ impl TunNetworkInterface {
                 .id
                 .ok_or_else(|| anyhow::anyhow!("port id missing from info"))?;
 
-            let (control_sync_client_channel, control_sync_server) = zx::Channel::create()?;
+            let (control_sync_client_channel, control_sync_server) = zx::Channel::create();
             let control_sync =
                 fnetifadmin::ControlSynchronousProxy::new(control_sync_client_channel);
             device_control
@@ -140,7 +140,7 @@ impl TunNetworkInterface {
             .context("enable error")?
             .map_err(|e| anyhow::anyhow!("enable failed {:?}", e))?;
 
-        let (client, server) = zx::Channel::create()?;
+        let (client, server) = zx::Channel::create();
         connect_channel_to_protocol::<fnetstack::StackMarker>(server)?;
         let stack_sync = Mutex::new(fnetstack::StackSynchronousProxy::new(client));
         let mcast_socket = UdpSocket::bind((Ipv6Addr::LOCALHOST, 0)).context("UdpSocket::bind")?;

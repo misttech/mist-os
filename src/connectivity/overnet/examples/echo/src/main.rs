@@ -67,7 +67,7 @@ async fn exec_client(text: Option<String>) -> Result<(), Error> {
 
             tracing::info!(id = ?peer.id, "Trying peer");
 
-            let (s, p) = fidl::Channel::create().context("failed to create zx channel")?;
+            let (s, p) = fidl::Channel::create();
             if let Err(err) =
                 svc.connect_to_service(&mut peer.id, echo::EchoMarker::PROTOCOL_NAME, s)
             {
@@ -116,7 +116,7 @@ async fn echo_server(chan: fidl::AsyncChannel, quiet: bool) -> Result<(), Error>
 }
 
 async fn exec_server(quiet: bool) -> Result<(), Error> {
-    let (s, p) = fidl::Channel::create().context("failed to create zx channel")?;
+    let (s, p) = fidl::Channel::create();
     let chan = fidl::AsyncChannel::from_channel(s).context("failed to make async channel")?;
     hoist().publish_service(echo::EchoMarker::PROTOCOL_NAME, ClientEnd::new(p))?;
     ServiceProviderRequestStream::from_channel(chan)

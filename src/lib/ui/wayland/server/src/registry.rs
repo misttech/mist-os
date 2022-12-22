@@ -158,7 +158,7 @@ mod tests {
         assert_eq!(0, counts.lock().interface_2_bind_count);
 
         // Bind to the globals.
-        let (c1, _c2) = zx::Channel::create()?;
+        let (c1, _c2) = zx::Channel::create();
         let _executor = fasync::LocalExecutor::new();
         let display = Display::new_no_scenic(registry).expect("Failed to create display");
         let mut client = Client::new(fasync::Channel::from_channel(c1)?, display.clone());

@@ -303,7 +303,7 @@ mod tests {
         // handler_event is the event that the unit under test will examine for
         // display ownership changes.  test_event is used to set the appropriate
         // signals.
-        let (test_event, handler_event) = EventPair::create().unwrap();
+        let (test_event, handler_event) = EventPair::create();
 
         // test_sender is used to pipe input events into the handler.
         let (test_sender, handler_receiver) = mpsc::unbounded::<InputEvent>();
@@ -382,7 +382,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn basic_key_state_handling() {
-        let (test_event, handler_event) = EventPair::create().unwrap();
+        let (test_event, handler_event) = EventPair::create();
         let (test_sender, handler_receiver) = mpsc::unbounded::<InputEvent>();
         let (handler_sender, test_receiver) = mpsc::unbounded::<InputEvent>();
         let (loop_done_sender, mut loop_done) = mpsc::unbounded::<()>();
@@ -434,7 +434,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn more_key_state_handling() {
-        let (test_event, handler_event) = EventPair::create().unwrap();
+        let (test_event, handler_event) = EventPair::create();
         let (test_sender, handler_receiver) = mpsc::unbounded::<InputEvent>();
         let (handler_sender, test_receiver) = mpsc::unbounded::<InputEvent>();
         let (loop_done_sender, mut loop_done) = mpsc::unbounded::<()>();

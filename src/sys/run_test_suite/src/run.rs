@@ -737,7 +737,7 @@ mod test {
             ServerEnd::new(directory_service.into_channel()),
         );
 
-        let (_pair_1, pair_2) = zx::EventPair::create().unwrap();
+        let (_pair_1, pair_2) = zx::EventPair::create();
 
         let events = vec![ftest_manager::RunEvent {
             payload: Some(ftest_manager::RunEventPayload::Artifact(

@@ -133,7 +133,7 @@ impl FilesystemConfig for Blobfs {
 fn get_crypt_client() -> zx::Channel {
     static CRYPT_CLIENT_INITIALIZER: Once = Once::new();
     CRYPT_CLIENT_INITIALIZER.call_once(|| {
-        let (client_end, server_end) = zx::Channel::create().unwrap();
+        let (client_end, server_end) = zx::Channel::create();
         connect_channel_to_protocol::<CryptManagementMarker>(server_end)
             .expect("Failed to connect to the crypt management service");
         let crypt_management_service =
@@ -171,7 +171,7 @@ fn get_crypt_client() -> zx::Channel {
             .map_err(zx::Status::from_raw)
             .expect("set_active_key failed");
     });
-    let (client_end, server_end) = zx::Channel::create().unwrap();
+    let (client_end, server_end) = zx::Channel::create();
     connect_channel_to_protocol::<CryptMarker>(server_end)
         .expect("Failed to connect to crypt service");
     client_end

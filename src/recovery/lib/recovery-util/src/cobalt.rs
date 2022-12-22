@@ -40,7 +40,7 @@ impl CobaltImpl {
 
 impl Cobalt for CobaltImpl {
     fn aggregate_and_upload(&self, timeout_seconds: i64) -> Result<(), Error> {
-        let (server_end, client_end) = zx::Channel::create()?;
+        let (server_end, client_end) = zx::Channel::create();
         connect_channel_to_protocol::<AggregateAndUploadMarker>(server_end)
             .context("Failed to connect to the Cobalt AggregateAndUploadMarker")?;
         let cobalt_proxy = AggregateAndUploadSynchronousProxy::new(client_end);

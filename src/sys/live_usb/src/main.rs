@@ -42,7 +42,7 @@ async fn is_live_usb_enabled() -> Result<bool, Error> {
 
 /// This function is intended for use as an argument to skip_while().
 async fn is_not_sparse_fvm(devfs_root: &zx::Channel, path: &PathBuf) -> Result<bool, Error> {
-    let (local, remote) = zx::Channel::create()?;
+    let (local, remote) = zx::Channel::create();
     fdio::service_connect_at(&devfs_root, path.file_name().unwrap().to_str().unwrap(), remote)?;
 
     let proxy = PartitionProxy::new(fidl::AsyncChannel::from_channel(local)?);
@@ -62,7 +62,7 @@ async fn is_not_sparse_fvm(devfs_root: &zx::Channel, path: &PathBuf) -> Result<b
 async fn wait_for_sparse_fvm() -> Result<String, Error> {
     let stream =
         fuchsia_watch::watch("/dev/class/block").await.context("Starting block watcher")?;
-    let (root, remote) = zx::Channel::create()?;
+    let (root, remote) = zx::Channel::create();
     fdio::service_connect("/dev/class/block", remote)?;
     let root_ref = &root;
     let event = Box::pin(stream.skip_while(|e| {
@@ -216,7 +216,7 @@ mod tests {
         let _disk = create_ramdisk_with_partitions(uuids).await;
         let path = wait_for_sparse_fvm().await.expect("found FVM");
 
-        let (local, remote) = zx::Channel::create().unwrap();
+        let (local, remote) = zx::Channel::create();
         // Don't just assert on the path, as other tests might use the devmgr and cause race
         // conditions.
         fdio::service_connect(&path, remote).expect("connecting to partition OK");

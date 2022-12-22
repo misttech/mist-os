@@ -402,7 +402,13 @@ impl Drop for Channel {
 impl Channel {
     /// Create a channel, resulting in a pair of `Channel` objects representing both
     /// sides of the channel. Messages written into one maybe read from the opposite.
-    pub fn create() -> Result<(Channel, Channel), zx_status::Status> {
+    pub fn create() -> (Channel, Channel) {
+        Self::try_create().unwrap()
+    }
+
+    /// Create a channel, resulting in a pair of `Channel` objects representing both
+    /// sides of the channel. Messages written into one maybe read from the opposite.
+    pub fn try_create() -> Result<(Channel, Channel), zx_status::Status> {
         let rights = Rights::CHANNEL_DEFAULT;
         let (shard, slot) = CHANNELS.new_two_sided_slot(rights);
         let left = pack_handle(shard, slot, HdlType::Channel, Side::Left);
@@ -815,7 +821,12 @@ impl Drop for EventPair {
 
 impl EventPair {
     /// Create an event pair.
-    pub fn create() -> Result<(EventPair, EventPair), Status> {
+    pub fn create() -> (Self, Self) {
+        Self::try_create().unwrap()
+    }
+
+    /// Create an event pair.
+    pub fn try_create() -> Result<(EventPair, EventPair), Status> {
         let rights = Rights::EVENTPAIR_DEFAULT;
         let (shard, slot) = EVENT_PAIRS.new_two_sided_slot(rights);
         let left = pack_handle(shard, slot, HdlType::EventPair, Side::Left);
@@ -857,10 +868,10 @@ impl Drop for Event {
 
 impl Event {
     /// Create an event .
-    pub fn create() -> Result<Event, Status> {
+    pub fn create() -> Event {
         let rights = Rights::EVENT_DEFAULT;
         let (shard, slot) = EVENTS.new_one_sided_slot(rights);
-        Ok(Event(pack_handle(shard, slot, HdlType::Event, Side::Left)))
+        Event(pack_handle(shard, slot, HdlType::Event, Side::Left))
     }
 }
 
@@ -1881,14 +1892,14 @@ mod test {
 
     #[test]
     fn channel_create_not_closed() {
-        let (a, b) = Channel::create().unwrap();
+        let (a, b) = Channel::create();
         assert_eq!(a.is_closed(), false);
         assert_eq!(b.is_closed(), false);
     }
 
     #[test]
     fn channel_closed_after_drop() {
-        let (a, _b) = Channel::create().unwrap();
+        let (a, _b) = Channel::create();
         let a_copy = Channel::from(unsafe { Handle::from_raw(a.0) });
         // Prevent trying to close a twice at the end of the test.
         let a_copy = ManuallyDrop::new(a_copy);
@@ -1898,22 +1909,22 @@ mod test {
 
     #[test]
     fn channel_drop_left_closes_right() {
-        let (a, b) = Channel::create().unwrap();
+        let (a, b) = Channel::create();
         drop(a);
         assert_eq!(b.is_closed(), true);
     }
 
     #[test]
     fn channel_drop_right_closes_left() {
-        let (a, b) = Channel::create().unwrap();
+        let (a, b) = Channel::create();
         drop(b);
         assert_eq!(a.is_closed(), true);
     }
 
     #[test]
     fn channel_write_read() {
-        let (a, b) = Channel::create().unwrap();
-        let (c, d) = Channel::create().unwrap();
+        let (a, b) = Channel::create();
+        let (c, d) = Channel::create();
         let mut incoming = MessageBuf::new();
 
         assert_eq!(b.read(&mut incoming).err().unwrap(), Status::SHOULD_WAIT);
@@ -1933,8 +1944,8 @@ mod test {
 
     #[test]
     fn channel_write_etc_read_etc() {
-        let (a, b) = Channel::create().unwrap();
-        let (c, d) = Channel::create().unwrap();
+        let (a, b) = Channel::create();
+        let (c, d) = Channel::create();
         let mut incoming = MessageBufEtc::new();
 
         assert_eq!(b.read_etc(&mut incoming).err().unwrap(), Status::SHOULD_WAIT);
@@ -1975,8 +1986,8 @@ mod test {
 
     #[test]
     fn mixed_channel_write_read_etc() {
-        let (a, b) = Channel::create().unwrap();
-        let (c, _) = Channel::create().unwrap();
+        let (a, b) = Channel::create();
+        let (c, _) = Channel::create();
         a.write(&[1, 2, 3], &mut [c.into()]).unwrap();
         let mut buf = MessageBufEtc::new();
         b.read_etc(&mut buf).unwrap();
@@ -1990,8 +2001,8 @@ mod test {
 
     #[test]
     fn mixed_channel_write_etc_read() {
-        let (a, b) = Channel::create().unwrap();
-        let (c, _) = Channel::create().unwrap();
+        let (a, b) = Channel::create();
+        let (c, _) = Channel::create();
         let hd = HandleDisposition {
             handle_op: HandleOp::Move(c.into()),
             object_type: ObjectType::NONE,
@@ -2009,11 +2020,11 @@ mod test {
     #[test]
     fn channel_write_etc_closes_handles_in_same_shard_on_peer_closed() {
         // Create 2 channel pairs, ensuring both are allocated in the same shard.
-        let (a, b) = Channel::create().unwrap();
+        let (a, b) = Channel::create();
         let (a_shard, _, _, _) = unpack_handle(a.0);
 
         let (c, _d) = loop {
-            let (c, d) = Channel::create().unwrap();
+            let (c, d) = Channel::create();
             let (c_shard, _, _, _) = unpack_handle(c.0);
 
             if a_shard == c_shard {
@@ -2065,7 +2076,7 @@ mod test {
 
     #[test]
     fn channel_basic() {
-        let (p1, p2) = Channel::create().unwrap();
+        let (p1, p2) = Channel::create();
 
         let mut empty = vec![];
         assert!(p1.write(b"hello", &mut empty).is_ok());
@@ -2080,7 +2091,7 @@ mod test {
         let hello_length: usize = 5;
 
         // Create a pair of channels and a pair of sockets.
-        let (p1, p2) = Channel::create().unwrap();
+        let (p1, p2) = Channel::create();
         let (s1, s2) = Socket::create(SocketOpts::STREAM).unwrap();
 
         // Send one socket down the channel
@@ -2131,7 +2142,7 @@ mod test {
     #[cfg(not(target_os = "fuchsia"))]
     #[test]
     fn object_type_is_correct() {
-        let (c1, c2) = Channel::create().unwrap();
+        let (c1, c2) = Channel::create();
         let (s1, s2) = Socket::create(SocketOpts::STREAM).unwrap();
         assert_eq!(c1.into_handle().object_type(), ObjectType::CHANNEL);
         assert_eq!(c2.into_handle().object_type(), ObjectType::CHANNEL);
@@ -2149,7 +2160,7 @@ mod test {
     #[cfg(not(target_os = "fuchsia"))]
     #[test]
     fn live_valid_handle_is_not_dangling() {
-        let (c1, c2) = Channel::create().unwrap();
+        let (c1, c2) = Channel::create();
         assert!(!c1.is_dangling());
         assert!(!c2.is_dangling());
     }
@@ -2164,7 +2175,7 @@ mod test {
 
     #[test]
     fn handle_basic_info_success() {
-        let (c1, c2) = Channel::create().unwrap();
+        let (c1, c2) = Channel::create();
         let c1_info = c1.basic_info().unwrap();
         let c2_info = c2.basic_info().unwrap();
 
@@ -2189,7 +2200,7 @@ mod test {
 
     #[test]
     fn handle_replace_success() {
-        let (c1, c2) = Channel::create().unwrap();
+        let (c1, c2) = Channel::create();
         let c1_basic_info = c1.basic_info().unwrap();
         let c2_basic_info = c2.basic_info().unwrap();
         assert_eq!(c1_basic_info.rights, Rights::CHANNEL_DEFAULT);
@@ -2225,7 +2236,7 @@ mod test {
 
     #[test]
     fn handle_replace_increasing_rights() {
-        let (c1, _) = Channel::create().unwrap();
+        let (c1, _) = Channel::create();
         let orig_basic_info = c1.basic_info().unwrap();
         assert_eq!(orig_basic_info.rights, Rights::CHANNEL_DEFAULT);
         assert_eq!(
@@ -2236,7 +2247,7 @@ mod test {
 
     #[test]
     fn handle_replace_same_rights() {
-        let (c1, _) = Channel::create().unwrap();
+        let (c1, _) = Channel::create();
         let orig_basic_info = c1.basic_info().unwrap();
         assert_eq!(orig_basic_info.rights, Rights::CHANNEL_DEFAULT);
         let orig_raw = c1.raw_handle();
@@ -2250,7 +2261,7 @@ mod test {
 
     #[test]
     fn await_user_signal() {
-        let (c1, _) = EventPair::create().unwrap();
+        let (c1, _) = EventPair::create();
         let mut on_sig = on_signals::OnSignals::new(&c1, Signals::USER_0);
         let (waker, count) = futures_test::task::new_count_waker();
         let mut ctx = Context::from_waker(&waker);
@@ -2272,7 +2283,7 @@ mod test {
 
     #[test]
     fn await_user_signal_peer() {
-        let (c1, c2) = EventPair::create().unwrap();
+        let (c1, c2) = EventPair::create();
         let mut on_sig = on_signals::OnSignals::new(&c1, Signals::USER_0);
         let (waker, count) = futures_test::task::new_count_waker();
         let mut ctx = Context::from_waker(&waker);
@@ -2294,7 +2305,7 @@ mod test {
 
     #[test]
     fn await_close_signal() {
-        let (c1, c2) = EventPair::create().unwrap();
+        let (c1, c2) = EventPair::create();
         let mut on_sig = on_signals::OnSignals::new(&c1, Signals::OBJECT_PEER_CLOSED);
         let (waker, count) = futures_test::task::new_count_waker();
         let mut ctx = Context::from_waker(&waker);
@@ -2311,14 +2322,14 @@ mod test {
 
     #[test]
     fn user_signal_no_rights() {
-        let (c1, _) = EventPair::create().unwrap();
+        let (c1, _) = EventPair::create();
         let c1 = c1.into_handle().replace(Rights::EVENTPAIR_DEFAULT & !Rights::SIGNAL).unwrap();
         assert_eq!(c1.signal_handle(Signals::empty(), Signals::USER_1), Err(Status::ACCESS_DENIED));
     }
 
     #[test]
     fn user_signal_peer_no_rights() {
-        let (c1, _) = EventPair::create().unwrap();
+        let (c1, _) = EventPair::create();
         let c1 =
             c1.into_handle().replace(Rights::EVENTPAIR_DEFAULT & !Rights::SIGNAL_PEER).unwrap();
         let c1 = EventPair::from(c1);
@@ -2327,7 +2338,7 @@ mod test {
 
     #[test]
     fn kernel_signal_denied() {
-        let (c1, _) = EventPair::create().unwrap();
+        let (c1, _) = EventPair::create();
         assert_eq!(
             c1.signal_handle(Signals::empty(), Signals::OBJECT_WRITABLE),
             Err(Status::INVALID_ARGS)
@@ -2336,7 +2347,7 @@ mod test {
 
     #[test]
     fn kernel_signal_peer_denied() {
-        let (c1, _) = EventPair::create().unwrap();
+        let (c1, _) = EventPair::create();
         assert_eq!(
             c1.signal_peer(Signals::empty(), Signals::OBJECT_WRITABLE),
             Err(Status::INVALID_ARGS)
@@ -2358,7 +2369,7 @@ mod test {
         let mut on_sig = on_signals::OnSignals::new(&s2, Signals::OBJECT_WRITABLE);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Ready(Ok(Signals::OBJECT_WRITABLE)));
 
-        let (c1, c2) = Channel::create().unwrap();
+        let (c1, c2) = Channel::create();
         let mut on_sig = on_signals::OnSignals::new(&c1, Signals::OBJECT_WRITABLE);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Ready(Ok(Signals::OBJECT_WRITABLE)));
         let mut on_sig = on_signals::OnSignals::new(&c2, Signals::OBJECT_WRITABLE);
@@ -2367,7 +2378,7 @@ mod test {
 
     #[test]
     fn read_signal() {
-        let (c1, c2) = Channel::create().unwrap();
+        let (c1, c2) = Channel::create();
         let mut on_sig = on_signals::OnSignals::new(&c1, Signals::OBJECT_READABLE);
         let (waker, count) = futures_test::task::new_count_waker();
         let mut ctx = Context::from_waker(&waker);
@@ -2380,7 +2391,7 @@ mod test {
 
     #[test]
     fn event_is_one_sided() {
-        let e = Event::create().unwrap();
+        let e = Event::create();
         assert_eq!(e.object_type(), ObjectType::EVENT);
         assert!(e.related().is_invalid());
         assert_eq!(e.koid_pair().1, INVALID_KOID.0);
@@ -2389,7 +2400,7 @@ mod test {
 
     #[test]
     fn event_replace_rights() {
-        let e = Event::create().unwrap();
+        let e = Event::create();
         assert_eq!(e.basic_info().unwrap().rights, Rights::EVENT_DEFAULT);
         let e = e.into_handle().replace(Rights::TRANSFER).unwrap();
         assert_eq!(e.basic_info().unwrap().rights, Rights::TRANSFER);
@@ -2397,7 +2408,7 @@ mod test {
 
     #[test]
     fn event_user_signal() {
-        let e = Event::create().unwrap();
+        let e = Event::create();
         let mut on_sig = on_signals::OnSignals::new(&e, Signals::USER_0);
         let (waker, count) = futures_test::task::new_count_waker();
         let mut ctx = Context::from_waker(&waker);
@@ -2411,10 +2422,10 @@ mod test {
     #[test]
     fn mix_one_sided_and_two_sided_handles() {
         // Test non-sided, left-side, and right-side handles for odd/even koids.
-        let e1 = Event::create().unwrap(); // odd
-        let (c1, c2) = Channel::create().unwrap(); // (even, odd)
-        let e2 = Event::create().unwrap(); // even
-        let (p1, p2) = EventPair::create().unwrap(); // (odd, even)
+        let e1 = Event::create(); // odd
+        let (c1, c2) = Channel::create(); // (even, odd)
+        let e2 = Event::create(); // even
+        let (p1, p2) = EventPair::create(); // (odd, even)
 
         let e1_info = e1.basic_info().unwrap();
         let c1_info = c1.basic_info().unwrap();

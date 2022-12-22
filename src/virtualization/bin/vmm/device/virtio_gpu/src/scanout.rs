@@ -46,8 +46,7 @@ fn new_content_id(counter: &mut u64) -> ContentId {
 }
 
 fn create_view_creation_tokens() -> (ViewCreationToken, ViewportCreationToken) {
-    let (c1, c2) =
-        zx::Channel::create().expect("Failed to create zx::channel for ViewCreationTokens");
+    let (c1, c2) = zx::Channel::create();
     let view_token = ViewCreationToken { value: c1 };
     let viewport_token = ViewportCreationToken { value: c2 };
     (view_token, viewport_token)

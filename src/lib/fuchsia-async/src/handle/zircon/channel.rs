@@ -200,7 +200,7 @@ mod tests {
         let mut exec = TestExecutor::new().unwrap();
         let bytes = &[0, 1, 2, 3];
 
-        let (tx, rx) = zx::Channel::create().unwrap();
+        let (tx, rx) = zx::Channel::create();
         let f_rx = Channel::from_channel(rx).unwrap();
 
         let receiver = async move {
@@ -223,7 +223,7 @@ mod tests {
         let mut exec = TestExecutor::new().unwrap();
         let bytes = &[0, 1, 2, 3];
 
-        let (tx, rx) = zx::Channel::create().unwrap();
+        let (tx, rx) = zx::Channel::create();
         let f_rx = Channel::from_channel(rx).unwrap();
 
         let receiver = async move {
@@ -244,8 +244,8 @@ mod tests {
     #[test]
     fn key_reuse() {
         let mut exec = TestExecutor::new().unwrap();
-        let (tx0, rx0) = zx::Channel::create().unwrap();
-        let (_tx1, rx1) = zx::Channel::create().unwrap();
+        let (tx0, rx0) = zx::Channel::create();
+        let (_tx1, rx1) = zx::Channel::create();
         let f_rx0 = Channel::from_channel(rx0).unwrap();
         mem::drop(tx0);
         mem::drop(f_rx0);
@@ -263,8 +263,8 @@ mod tests {
     #[test]
     fn key_reuse_etc() {
         let mut exec = TestExecutor::new().unwrap();
-        let (tx0, rx0) = zx::Channel::create().unwrap();
-        let (_tx1, rx1) = zx::Channel::create().unwrap();
+        let (tx0, rx0) = zx::Channel::create();
+        let (_tx1, rx1) = zx::Channel::create();
         let f_rx0 = Channel::from_channel(rx0).unwrap();
         mem::drop(tx0);
         mem::drop(f_rx0);

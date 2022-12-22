@@ -114,7 +114,7 @@ impl WebdriverFacadeInternal {
         let context_provider = app::client::connect_to_protocol::<ContextProviderMarker>()?;
         let (context_proxy, context_server_end) = create_proxy::<ContextMarker>()?;
 
-        let (client, server) = zx::Channel::create()?;
+        let (client, server) = zx::Channel::create();
         fdio::service_connect("/svc", server)?;
         let service_directory = ClientEnd::new(client);
 

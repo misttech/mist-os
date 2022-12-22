@@ -409,7 +409,7 @@ mod tests {
         let (helper, future) = setup();
         pin_mut!(future);
 
-        let (client_chan, server_chan) = zx::Channel::create().unwrap();
+        let (client_chan, server_chan) = zx::Channel::create();
         // Make a channel without a WRITE permission to make sure sending an event fails
         let server_handle: zx::Handle = server_chan.into();
         let reduced_chan: zx::Channel =

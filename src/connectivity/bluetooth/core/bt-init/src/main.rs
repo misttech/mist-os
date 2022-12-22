@@ -178,7 +178,7 @@ mod tests {
             if self.children_to_fail_for.contains(&child_name) {
                 return Err(format_err!("couldn't open {}'s directory", &child_name));
             }
-            let (local, client) = zx::Channel::create()?;
+            let (local, client) = zx::Channel::create();
             match child_name.as_str() {
                 BT_RFCOMM_CHILD_NAME => self.bt_rfcomm_channel = Some(local),
                 BT_GAP_CHILD_NAME => self.bt_gap_channel = Some(local),

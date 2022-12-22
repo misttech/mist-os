@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 
 lazy_static! {
     pub static ref VMEX_RESOURCE: zx::Resource = {
-        let (client_end, server_end) = zx::Channel::create().unwrap();
+        let (client_end, server_end) = zx::Channel::create();
         connect_channel_to_protocol::<fkernel::VmexResourceMarker>(server_end)
             .expect("couldn't connect to fuchsia.kernel.VmexResource");
         let service = fkernel::VmexResourceSynchronousProxy::new(client_end);

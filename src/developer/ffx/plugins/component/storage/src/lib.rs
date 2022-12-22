@@ -27,7 +27,7 @@ pub async fn storage(remote_proxy: RemoteControlProxy, args: StorageCommand) -> 
     let writer = &mut write;
 
     let lifecycle_controller = connect_to_lifecycle_controller(&remote_proxy).await?;
-    let (client, server) = Channel::create()?;
+    let (client, server) = Channel::create();
 
     let server_end = ServerEnd::new(server);
 

@@ -5572,7 +5572,7 @@ mod zx_test {
     #[test]
     fn encode_handle() {
         for ctx in CONTEXTS {
-            let mut handle = Handle::from(zx::Port::create().expect("Port creation failed"));
+            let mut handle = Handle::from(zx::Port::create());
             let raw_handle = handle.raw_handle();
 
             wrap_handle_metadata!(HandleWrapper, ObjectType::NONE, Rights::SAME_RIGHTS);

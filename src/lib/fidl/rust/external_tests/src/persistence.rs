@@ -69,7 +69,7 @@ mod zx {
 
     #[test]
     fn standalone_encode_decode_resource() {
-        let (c1, c2) = zx::Channel::create().expect("creating channel failed");
+        let (c1, c2) = zx::Channel::create();
         let c1_koid = c1.get_koid();
         let c2_koid = c2.get_koid();
 

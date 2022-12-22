@@ -306,7 +306,7 @@ impl RunningSuite {
                 fio::MODE_TYPE_DIRECTORY,
                 server,
             )?;
-            let (event_client, event_server) = zx::EventPair::create()?;
+            let (event_client, event_server) = zx::EventPair::create();
             self.custom_artifact_tokens.push(event_server);
 
             // Monikers should be reported relative to the test root, so strip away the wrapping

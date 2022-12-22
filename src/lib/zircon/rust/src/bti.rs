@@ -60,7 +60,7 @@ mod tests {
 
     fn create_iommu() -> Iommu {
         use fuchsia_zircon::{Channel, HandleBased, Time};
-        let (client_end, server_end) = Channel::create().unwrap();
+        let (client_end, server_end) = Channel::create();
         connect_channel_to_protocol::<fboot::RootResourceMarker>(server_end).unwrap();
         let service = fboot::RootResourceSynchronousProxy::new(client_end);
         let resource = service.get(Time::INFINITE).expect("couldn't get root resource");

@@ -110,7 +110,7 @@ async fn choose_and_copy_remote_minidumps(rcs: &RemoteControlProxy) -> Result<Te
 
 // List all the "minidump.dmp" files in "/reports" directory with the given capability.
 async fn list_minidumps(rcs: &RemoteControlProxy, capability: &str) -> Result<Vec<File>> {
-    let (client, server) = fidl::handle::Channel::create()?;
+    let (client, server) = fidl::handle::Channel::create();
     connect_to_lifecycle_controller(&rcs)
         .await
         .context("Error in connect_to_lifecycle_controller")?

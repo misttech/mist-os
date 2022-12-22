@@ -1012,7 +1012,7 @@ mod tests {
 
     #[test]
     fn sync_client() -> Result<(), Error> {
-        let (client_end, server_end) = zx::Channel::create().context("chan create")?;
+        let (client_end, server_end) = zx::Channel::create();
         let client = sync::Client::new(client_end, "test_protocol");
         client
             .send::<u8, false>(&mut SEND_DATA.clone(), SEND_ORDINAL, DynamicFlags::empty())
@@ -1026,7 +1026,7 @@ mod tests {
 
     #[test]
     fn sync_client_with_response() -> Result<(), Error> {
-        let (client_end, server_end) = zx::Channel::create().context("chan create")?;
+        let (client_end, server_end) = zx::Channel::create();
         let client = sync::Client::new(client_end, "test_protocol");
         thread::spawn(move || {
             // Server
@@ -1057,7 +1057,7 @@ mod tests {
 
     #[test]
     fn sync_client_with_event_and_response() -> Result<(), Error> {
-        let (client_end, server_end) = zx::Channel::create().context("chan create")?;
+        let (client_end, server_end) = zx::Channel::create();
         let client = sync::Client::new(client_end, "test_protocol");
         thread::spawn(move || {
             // Server
@@ -1103,7 +1103,7 @@ mod tests {
 
     #[test]
     fn sync_client_with_racing_events() -> Result<(), Error> {
-        let (client_end, server_end) = zx::Channel::create().context("chan create")?;
+        let (client_end, server_end) = zx::Channel::create();
         let client1 = Arc::new(sync::Client::new(client_end, "test_protocol"));
         let client2 = client1.clone();
 
@@ -1134,7 +1134,7 @@ mod tests {
 
     #[test]
     fn sync_client_wait_for_event_gets_method_response() -> Result<(), Error> {
-        let (client_end, server_end) = zx::Channel::create().context("chan create")?;
+        let (client_end, server_end) = zx::Channel::create();
         let client = sync::Client::new(client_end, "test_protocol");
         send_transaction(
             TransactionHeader::new(3902304923, SEND_ORDINAL, DynamicFlags::empty()),
@@ -1149,7 +1149,7 @@ mod tests {
 
     #[test]
     fn sync_client_peer_closed() -> Result<(), Error> {
-        let (client_end, server_end) = zx::Channel::create().context("chan create")?;
+        let (client_end, server_end) = zx::Channel::create();
         let client = sync::Client::new(client_end, "test_protocol");
         // Close the server channel.
         drop(server_end);
@@ -1167,7 +1167,7 @@ mod tests {
     // this and change the assert to expect zx_status::Status::UNAVAILABLE.
     #[test]
     fn sync_client_does_not_receive_epitaphs() -> Result<(), Error> {
-        let (client_end, server_end) = zx::Channel::create().context("chan create")?;
+        let (client_end, server_end) = zx::Channel::create();
         let client = sync::Client::new(client_end, "test_protocol");
         // Close the server channel with an epitaph.
         server_end
@@ -1185,7 +1185,7 @@ mod tests {
 
     #[test]
     fn sync_client_into_channel() -> Result<(), Error> {
-        let (client_end, _server_end) = zx::Channel::create().context("chan create")?;
+        let (client_end, _server_end) = zx::Channel::create();
         let client_end_raw = client_end.raw_handle();
         let client = sync::Client::new(client_end, "test_protocol");
         assert_eq!(client.into_channel().raw_handle(), client_end_raw);
@@ -1194,7 +1194,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn client() {
-        let (client_end, server_end) = zx::Channel::create().unwrap();
+        let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
 
@@ -1219,7 +1219,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn client_with_response() {
-        let (client_end, server_end) = zx::Channel::create().unwrap();
+        let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
 
@@ -1258,7 +1258,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn client_with_response_receives_epitaph() {
-        let (client_end, server_end) = zx::Channel::create().unwrap();
+        let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
 
@@ -1296,7 +1296,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     #[should_panic]
     async fn event_cant_be_taken_twice() {
-        let (client_end, _) = zx::Channel::create().unwrap();
+        let (client_end, _) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
         let _foo = client.take_event_receiver();
@@ -1305,7 +1305,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn event_can_be_taken_after_drop() {
-        let (client_end, _) = zx::Channel::create().unwrap();
+        let (client_end, _) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
         let foo = client.take_event_receiver();
@@ -1315,7 +1315,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn receiver_termination_test() {
-        let (client_end, _) = zx::Channel::create().unwrap();
+        let (client_end, _) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
         let mut foo = client.take_event_receiver();
@@ -1330,7 +1330,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     #[should_panic(expected = "polled EventReceiver after `None`")]
     async fn receiver_cant_be_polled_more_than_once_on_closed_stream() {
-        let (client_end, _) = zx::Channel::create().unwrap();
+        let (client_end, _) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
         let foo = client.take_event_receiver();
@@ -1344,7 +1344,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     #[should_panic(expected = "polled EventReceiver after `None`")]
     async fn receiver_panics_when_polled_after_receiving_epitaph_then_none() {
-        let (client_end, server_end) = zx::Channel::create().unwrap();
+        let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
         let mut stream = client.take_event_receiver();
@@ -1367,7 +1367,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn event_can_be_taken() {
-        let (client_end, _) = zx::Channel::create().unwrap();
+        let (client_end, _) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
         client.take_event_receiver();
@@ -1375,7 +1375,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn event_received() {
-        let (client_end, server_end) = zx::Channel::create().unwrap();
+        let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
 
@@ -1412,7 +1412,7 @@ mod tests {
     /// stream again.
     #[fasync::run_singlethreaded(test)]
     async fn receiver_can_be_taken_after_end_of_stream() {
-        let (client_end, server_end) = zx::Channel::create().unwrap();
+        let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
 
@@ -1459,7 +1459,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn event_incompatible_format() {
-        let (client_end, server_end) = zx::Channel::create().unwrap();
+        let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
 
@@ -1495,7 +1495,7 @@ mod tests {
     fn client_always_wakes_pending_futures() {
         let mut executor = fasync::TestExecutor::new().unwrap();
 
-        let (client_end, server_end) = zx::Channel::create().unwrap();
+        let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
 
@@ -1557,7 +1557,7 @@ mod tests {
     fn client_always_wakes_pending_futures_on_epitaph() {
         let mut executor = fasync::TestExecutor::new().unwrap();
 
-        let (client_end, server_end) = zx::Channel::create().unwrap();
+        let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
 
@@ -1646,7 +1646,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn client_allows_take_event_stream_even_if_event_delivered() {
-        let (client_end, server_end) = zx::Channel::create().unwrap();
+        let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
 
@@ -1695,7 +1695,7 @@ mod tests {
             // No [RecvEvent, RecvEvent] because it behaves differently: after
             // reporting an epitaph, the next call returns None.
         ] {
-            let (client_end, server_end) = zx::Channel::create().unwrap();
+            let (client_end, server_end) = zx::Channel::create();
             let client_end = AsyncChannel::from_channel(client_end).unwrap();
             let client = Client::new(client_end, "test_protocol");
 
@@ -1763,7 +1763,7 @@ mod tests {
     #[test]
     fn client_query_result_check() {
         let mut executor = fasync::TestExecutor::new().unwrap();
-        let (client_end, server_end) = zx::Channel::create().unwrap();
+        let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
 
@@ -1811,7 +1811,7 @@ mod tests {
     async fn client_into_channel() {
         // This test doesn't actually do any async work, but the fuchsia
         // executor must be set up in order to create the channel.
-        let (client_end, _server_end) = zx::Channel::create().unwrap();
+        let (client_end, _server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
 
@@ -1822,7 +1822,7 @@ mod tests {
     async fn client_into_channel_outstanding_messages() {
         // This test doesn't actually do any async work, but the fuchsia
         // executor must be set up in order to create the channel.
-        let (client_end, _server_end) = zx::Channel::create().unwrap();
+        let (client_end, _server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
 
@@ -1843,7 +1843,7 @@ mod tests {
     async fn client_into_channel_active_clone() {
         // This test doesn't actually do any async work, but the fuchsia
         // executor must be set up in order to create the channel.
-        let (client_end, _server_end) = zx::Channel::create().unwrap();
+        let (client_end, _server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
 
@@ -1854,7 +1854,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn client_into_channel_outstanding_messages_get_received() {
-        let (client_end, server_end) = zx::Channel::create().unwrap();
+        let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end).unwrap();
         let client = Client::new(client_end, "test_protocol");
 

@@ -97,11 +97,8 @@ impl FatFilesystem {
             filesystem: Some(fatfs::FileSystem::new(disk, options)?),
             _pinned: PhantomPinned,
         });
-        let result = Arc::pin(FatFilesystem {
-            inner,
-            dirty_task: Mutex::new(None),
-            fs_id: Event::create()?,
-        });
+        let result =
+            Arc::pin(FatFilesystem { inner, dirty_task: Mutex::new(None), fs_id: Event::create() });
         Ok((result.clone(), result.root_dir()))
     }
 
@@ -109,11 +106,8 @@ impl FatFilesystem {
     pub fn from_filesystem(filesystem: FileSystem) -> (Pin<Arc<Self>>, Arc<FatDirectory>) {
         let inner =
             Mutex::new(FatFilesystemInner { filesystem: Some(filesystem), _pinned: PhantomPinned });
-        let result = Arc::pin(FatFilesystem {
-            inner,
-            dirty_task: Mutex::new(None),
-            fs_id: Event::create().unwrap(),
-        });
+        let result =
+            Arc::pin(FatFilesystem { inner, dirty_task: Mutex::new(None), fs_id: Event::create() });
         (result.clone(), result.root_dir())
     }
 

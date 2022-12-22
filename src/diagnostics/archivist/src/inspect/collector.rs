@@ -220,7 +220,7 @@ mod tests {
 
         fasync::Task::spawn(fs.collect()).detach();
 
-        let (done0, done1) = zx::Channel::create().unwrap();
+        let (done0, done1) = zx::Channel::create();
 
         let thread_path = path.join("out/diagnostics");
 
@@ -290,7 +290,7 @@ mod tests {
 
         fasync::Task::spawn(fs.collect()).detach();
 
-        let (done0, done1) = zx::Channel::create().unwrap();
+        let (done0, done1) = zx::Channel::create();
         let thread_path = path.join("out/diagnostics");
 
         // Run the actual test in a separate thread so that it does not block on FS operations.

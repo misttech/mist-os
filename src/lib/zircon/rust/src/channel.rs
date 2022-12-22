@@ -40,9 +40,15 @@ impl Channel {
     /// Wraps the
     /// [zx_channel_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_create.md)
     /// syscall.
+    ///
+    /// # Panics
+    ///
+    /// If the process' job policy denies channel creation or the kernel reports no memory
+    /// available to create a new channel.
     #[allow(deprecated)]
-    pub fn create() -> Result<(Channel, Channel), Status> {
+    pub fn create() -> (Self, Self) {
         Self::try_create()
+            .expect("channel creation always succeeds except with OOM or when job policy denies it")
     }
 
     /// Create a channel, resulting in a pair of `Channel` objects representing both
@@ -694,7 +700,7 @@ mod tests {
 
     #[test]
     fn channel_basic() {
-        let (p1, p2) = Channel::create().unwrap();
+        let (p1, p2) = Channel::create();
 
         let mut empty = vec![];
         assert!(p1.write(b"hello", &mut empty).is_ok());
@@ -706,7 +712,7 @@ mod tests {
 
     #[test]
     fn channel_basic_etc() {
-        let (p1, p2) = Channel::create().unwrap();
+        let (p1, p2) = Channel::create();
 
         let mut empty = vec![];
         assert!(p1.write_etc(b"hello", &mut empty).is_ok());
@@ -718,10 +724,10 @@ mod tests {
 
     #[test]
     fn channel_basic_etc_with_handle_move() {
-        let (p1, p2) = Channel::create().unwrap();
+        let (p1, p2) = Channel::create();
 
         let mut handles = vec![HandleDisposition {
-            handle_op: HandleOp::Move(Port::create().unwrap().into()),
+            handle_op: HandleOp::Move(Port::create().into()),
             rights: Rights::TRANSFER,
             object_type: ObjectType::PORT,
             result: Status::OK,
@@ -746,9 +752,9 @@ mod tests {
 
     #[test]
     fn channel_basic_etc_with_handle_duplicate() {
-        let (p1, p2) = Channel::create().unwrap();
+        let (p1, p2) = Channel::create();
 
-        let port = Port::create().unwrap();
+        let port = Port::create();
         let mut handles = vec![HandleDisposition {
             handle_op: HandleOp::Duplicate(port.as_handle_ref()),
             rights: Rights::SAME_RIGHTS,
@@ -772,7 +778,7 @@ mod tests {
 
     #[test]
     fn channel_read_raw_too_small() {
-        let (p1, p2) = Channel::create().unwrap();
+        let (p1, p2) = Channel::create();
 
         let mut empty = vec![];
         assert!(p1.write(b"hello", &mut empty).is_ok());
@@ -783,7 +789,7 @@ mod tests {
 
     #[test]
     fn channel_read_etc_raw_too_small() {
-        let (p1, p2) = Channel::create().unwrap();
+        let (p1, p2) = Channel::create();
 
         let mut empty = vec![];
         assert!(p1.write_etc(b"hello", &mut empty).is_ok());
@@ -799,7 +805,7 @@ mod tests {
     fn too_many_handles() -> Vec<Handle> {
         let mut handles = vec![];
         for _ in 0..sys::ZX_CHANNEL_MAX_MSG_HANDLES + 1 {
-            handles.push(crate::Event::create().unwrap().into());
+            handles.push(crate::Event::create().into());
         }
         handles
     }
@@ -808,7 +814,7 @@ mod tests {
         let mut handles = vec![];
         for _ in 0..sys::ZX_CHANNEL_MAX_MSG_HANDLES + 1 {
             handles.push(HandleDisposition {
-                handle_op: HandleOp::Move(crate::Event::create().unwrap().into()),
+                handle_op: HandleOp::Move(crate::Event::create().into()),
                 object_type: ObjectType::EVENT,
                 rights: Rights::TRANSFER,
                 result: Status::OK,
@@ -819,32 +825,27 @@ mod tests {
 
     #[test]
     fn channel_write_too_many_bytes() {
-        Channel::create().unwrap().0.write(&too_many_bytes(), &mut vec![]).unwrap_err();
+        Channel::create().0.write(&too_many_bytes(), &mut vec![]).unwrap_err();
     }
 
     #[test]
     fn channel_write_too_many_handles() {
-        Channel::create().unwrap().0.write(&vec![], &mut too_many_handles()[..]).unwrap_err();
+        Channel::create().0.write(&vec![], &mut too_many_handles()[..]).unwrap_err();
     }
 
     #[test]
     fn channel_write_etc_too_many_bytes() {
-        Channel::create().unwrap().0.write_etc(&too_many_bytes(), &mut []).unwrap_err();
+        Channel::create().0.write_etc(&too_many_bytes(), &mut []).unwrap_err();
     }
 
     #[test]
     fn channel_write_etc_too_many_handles() {
-        Channel::create()
-            .unwrap()
-            .0
-            .write_etc(&vec![], &mut too_many_dispositions()[..])
-            .unwrap_err();
+        Channel::create().0.write_etc(&vec![], &mut too_many_dispositions()[..]).unwrap_err();
     }
 
     #[test]
     fn channel_call_too_many_bytes() {
         Channel::create()
-            .unwrap()
             .0
             .call(Time::INFINITE, &too_many_bytes(), &mut vec![], &mut MessageBuf::new())
             .unwrap_err();
@@ -853,7 +854,6 @@ mod tests {
     #[test]
     fn channel_call_too_many_handles() {
         Channel::create()
-            .unwrap()
             .0
             .call(Time::INFINITE, &vec![], &mut too_many_handles()[..], &mut MessageBuf::new())
             .unwrap_err();
@@ -862,7 +862,6 @@ mod tests {
     #[test]
     fn channel_call_etc_too_many_bytes() {
         Channel::create()
-            .unwrap()
             .0
             .call_etc(Time::INFINITE, &too_many_bytes(), &mut vec![], &mut MessageBufEtc::new())
             .unwrap_err();
@@ -871,7 +870,6 @@ mod tests {
     #[test]
     fn channel_call_etc_too_many_handles() {
         Channel::create()
-            .unwrap()
             .0
             .call_etc(
                 Time::INFINITE,
@@ -887,7 +885,7 @@ mod tests {
         let hello_length: usize = 5;
 
         // Create a pair of channels and a virtual memory object.
-        let (p1, p2) = Channel::create().unwrap();
+        let (p1, p2) = Channel::create();
         let vmo = Vmo::create(hello_length as u64).unwrap();
 
         // Duplicate VMO handle and send it down the channel.
@@ -925,7 +923,7 @@ mod tests {
         let ten_ms = 10.millis();
 
         // Create a pair of channels and a virtual memory object.
-        let (p1, p2) = Channel::create().unwrap();
+        let (p1, p2) = Channel::create();
         let vmo = Vmo::create(0 as u64).unwrap();
 
         // Duplicate VMO handle and send it along with the call.
@@ -954,7 +952,7 @@ mod tests {
         let ten_ms = 10.millis();
 
         // Create a pair of channels and a virtual memory object.
-        let (p1, p2) = Channel::create().unwrap();
+        let (p1, p2) = Channel::create();
 
         // Duplicate VMO handle and send it along with the call.
         let mut empty: Vec<HandleDisposition<'_>> = vec![];
@@ -974,7 +972,7 @@ mod tests {
     #[test]
     fn channel_call() {
         // Create a pair of channels
-        let (p1, p2) = Channel::create().unwrap();
+        let (p1, p2) = Channel::create();
 
         // create an mpsc channel for communicating the call data for later assertion
         let (tx, rx) = ::std::sync::mpsc::channel();
@@ -1020,7 +1018,7 @@ mod tests {
     #[test]
     fn channel_call_etc() {
         // Create a pair of channels
-        let (p1, p2) = Channel::create().unwrap();
+        let (p1, p2) = Channel::create();
 
         // create an mpsc channel for communicating the call data for later assertion
         let (tx, rx) = ::std::sync::mpsc::channel();
@@ -1049,7 +1047,7 @@ mod tests {
         buf.ensure_capacity_bytes(12);
         buf.ensure_capacity_handle_infos(1);
         let mut handle_dispositions = [HandleDisposition {
-            handle_op: HandleOp::Move(Port::create().unwrap().into()),
+            handle_op: HandleOp::Move(Port::create().into()),
             object_type: ObjectType::PORT,
             rights: Rights::TRANSFER,
             result: Status::OK,

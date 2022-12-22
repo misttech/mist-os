@@ -37,7 +37,7 @@ async fn main() -> Result<(), Error> {
     fs.dir("svc").add_fidl_service(IncomingServices::CommitStatusProvider);
     fs.take_and_serve_directory_handle().context("while serving directory handle")?;
 
-    let (p0, p1) = zx::EventPair::create().context("while creating event pair")?;
+    let (p0, p1) = zx::EventPair::create();
     let () =
         p0.signal_peer(zx::Signals::NONE, zx::Signals::USER_0).context("while signalling peer")?;
     let p1 = Arc::new(p1);
@@ -64,7 +64,7 @@ mod tests {
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<CommitStatusProviderMarker>().unwrap();
 
-        let (p0, p1) = zx::EventPair::create().context("while creating event pair").unwrap();
+        let (p0, p1) = zx::EventPair::create();
         let () = p0
             .signal_peer(zx::Signals::NONE, zx::Signals::USER_0)
             .context("while signalling peer")

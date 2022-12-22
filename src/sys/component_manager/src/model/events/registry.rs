@@ -546,7 +546,7 @@ mod tests {
     };
 
     async fn dispatch_capability_requested_event(registry: &EventRegistry) {
-        let (_, capability_server_end) = zx::Channel::create().unwrap();
+        let (_, capability_server_end) = zx::Channel::create();
         let capability_server_end = Arc::new(Mutex::new(Some(capability_server_end)));
         let event = ComponentEvent::new_for_test(
             AbsoluteMoniker::root(),

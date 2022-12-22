@@ -30,7 +30,7 @@ async fn main() -> Result<(), Error> {
     let (send_test_result, recv_test_result) = mpsc::channel(10);
     let mut recv_test_result = Some(recv_test_result);
 
-    let event = zx::Event::create()?;
+    let event = zx::Event::create();
     let event_for_test_protocol = event.duplicate_handle(event_handle_rights())?;
 
     let mut fs = fserver::ServiceFs::new();

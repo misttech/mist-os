@@ -1294,10 +1294,7 @@ async fn assert_unsupported_directory_calls(
     // error we get just so long as we get one.
     assert_ne!(
         zx::Status::from_raw(
-            parent
-                .link(child_base_path, zx::Event::create().unwrap().into(), "link")
-                .await
-                .unwrap()
+            parent.link(child_base_path, zx::Event::create().into(), "link").await.unwrap()
         ),
         zx::Status::OK
     );
@@ -1305,7 +1302,7 @@ async fn assert_unsupported_directory_calls(
     // Verify rename() is not supported.
     // Since we can't call GetToken, we can't construct a valid token to pass here.
     // But we can at least test what it does with an arbitrary event object.
-    let token = zx::Event::create().unwrap();
+    let token = zx::Event::create();
     assert_eq!(
         parent.rename(child_base_path, token, "renamed").await.unwrap(),
         Err(zx::sys::ZX_ERR_NOT_SUPPORTED)

@@ -104,7 +104,7 @@ mod tests {
         let launcher_proxy = fclient::connect_to_protocol::<fprocess::LauncherMarker>()?;
 
         // Set up a new library loader and provide it to the loader service
-        let (ll_client_chan, ll_service_chan) = zx::Channel::create()?;
+        let (ll_client_chan, ll_service_chan) = zx::Channel::create();
         library_loader::start(
             Arc::new(fuchsia_fs::directory::open_in_namespace(
                 "/pkg/lib",

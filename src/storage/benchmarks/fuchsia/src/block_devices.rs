@@ -133,7 +133,7 @@ pub struct FvmVolume {
 impl FvmVolume {
     async fn new(fvm: &VolumeManagerProxy, config: &BlockDeviceConfig) -> Self {
         let volume_path = set_up_fvm_volume(fvm, config.fvm_volume_size).await;
-        let (client_end, server_end) = zx::Channel::create().unwrap();
+        let (client_end, server_end) = zx::Channel::create();
         connect_channel_to_protocol_at_path(server_end, volume_path.to_str().unwrap()).unwrap();
         let volume = VolumeSynchronousProxy::new(client_end);
 

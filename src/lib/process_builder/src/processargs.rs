@@ -292,7 +292,7 @@ mod tests {
         assert_eq!(calculated_size, message.bytes.len());
 
         // Write the message into a channel, read it back from the other end.
-        let (chan_wr, chan_rd) = zx::Channel::create()?;
+        let (chan_wr, chan_rd) = zx::Channel::create();
         message.write(&chan_wr)?;
         let mut read_buf = zx::MessageBuf::new();
         chan_rd.read(&mut read_buf)?;
@@ -335,7 +335,7 @@ mod tests {
         const LIMIT: usize = zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize;
         const ARG_LIMIT: usize = LIMIT - 1 - mem::size_of::<MessageHeader>();
 
-        let (chan_wr, chan_rd) = zx::Channel::create()?;
+        let (chan_wr, chan_rd) = zx::Channel::create();
         let mut read_buf = zx::MessageBuf::new();
 
         let make_bytes = iter::repeat_with(|| b'a');
@@ -376,7 +376,7 @@ mod tests {
         let config = MessageContents { handles, ..Default::default() };
 
         // Should succeed at limit.
-        let (chan_wr, chan_rd) = zx::Channel::create()?;
+        let (chan_wr, chan_rd) = zx::Channel::create();
         Message::build(config)?.write(&chan_wr)?;
         let mut read_buf = zx::MessageBuf::new();
         chan_rd.read(&mut read_buf)?;

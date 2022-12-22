@@ -427,7 +427,7 @@ impl VirtualConsoleViewAssistant {
                     }
                     // Provides a CTRL-ALT-DEL reboot sequence.
                     HID_USAGE_KEY_DELETE if modifiers.control && modifiers.alt => {
-                        let (server_end, client_end) = zx::Channel::create()?;
+                        let (server_end, client_end) = zx::Channel::create();
                         connect_channel_to_protocol::<AdminMarker>(server_end)?;
                         let admin = AdminSynchronousProxy::new(client_end);
                         match admin

@@ -345,9 +345,15 @@ impl Port {
     /// Wraps the
     /// [zx_port_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/port_create.md)
     /// syscall.
+    ///
+    /// # Panics
+    ///
+    /// If the kernel reports no memory available to create a port or the process' job policy
+    /// denies port creation.
     #[allow(deprecated)]
-    pub fn create() -> Result<Port, Status> {
+    pub fn create() -> Self {
         Self::try_create()
+            .expect("port creation always succeeds except with OOM or when job policy denies it")
     }
 
     /// Create an IO port, allowing IO packets to be read and enqueued.
@@ -424,7 +430,7 @@ mod tests {
     fn port_basic() {
         let ten_ms = 10.millis();
 
-        let port = Port::create().unwrap();
+        let port = Port::create();
 
         // Waiting now should time out.
         assert_eq!(port.wait(Time::after(ten_ms)), Err(Status::TIMED_OUT));
@@ -443,8 +449,8 @@ mod tests {
         let ten_ms = 10.millis();
         let key = 42;
 
-        let port = Port::create().unwrap();
-        let event = Event::create().unwrap();
+        let port = Port::create();
+        let event = Event::create();
         let no_opts = WaitAsyncOpts::empty();
 
         assert!(event

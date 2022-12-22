@@ -182,7 +182,7 @@ impl Controller {
     /// Creates and registers a zircon event with the display driver. The returned event can be
     /// used as a fence in a display configuration.
     pub fn create_event(&self) -> Result<Event> {
-        let event = zx::Event::create()?;
+        let event = zx::Event::create();
         let remote = event.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
         let id = self.inner.write().next_free_event_id()?;
 
@@ -374,7 +374,7 @@ async fn connect_controller<P: AsRef<Path>>(dev_path: P) -> Result<display::Cont
         display::ProviderProxy::new(fasync::Channel::from_channel(channel)?)
     };
 
-    let (local, remote) = zx::Channel::create()?;
+    let (local, remote) = zx::Channel::create();
     let _ = zx::Status::ok(provider.open_controller(ServerEnd::new(remote)).await?)?;
 
     Ok(display::ControllerProxy::new(fasync::Channel::from_channel(local)?))

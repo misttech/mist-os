@@ -128,8 +128,8 @@ impl Fixture {
                 break;
             }
         }
-        let (dist_a_to_b, dist_b) = fidl::Channel::create().unwrap();
-        let (dist_a_to_c, dist_c) = fidl::Channel::create().unwrap();
+        let (dist_a_to_b, dist_b) = fidl::Channel::create();
+        let (dist_a_to_c, dist_c) = fidl::Channel::create();
         tracing::info!(%test_name, %fixture_id, "connect 2");
         router1.connect_to_service(router2.node_id(), &service, dist_b).await.unwrap();
         tracing::info!(%test_name, %fixture_id,"get 2");

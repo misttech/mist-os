@@ -176,7 +176,7 @@ impl Stream for Snooper {
 pub fn open_snoop_channel(device: &File) -> Result<Channel, Error> {
     let hci_channel = fdio::clone_channel(device)?;
     let interface = HciSynchronousProxy::new(hci_channel);
-    let (ours, theirs) = Channel::create()?;
+    let (ours, theirs) = Channel::create();
     interface.open_snoop_channel(theirs)?;
     Ok(ours)
 }
@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn test_from_channel() {
         let _exec = fasync::TestExecutor::new();
-        let (channel, _) = Channel::create().unwrap();
+        let (channel, _) = Channel::create();
         let snooper = Snooper::from_channel(channel, PathBuf::from("/a/b/c")).unwrap();
         assert_eq!(snooper.device_name, "c");
         assert_eq!(snooper.device_path, PathBuf::from("/a/b/c"));
@@ -221,7 +221,7 @@ mod tests {
     #[test]
     fn test_snoop_stream() {
         let mut exec = fasync::TestExecutor::new().unwrap();
-        let (tx, rx) = Channel::create().unwrap();
+        let (tx, rx) = Channel::create();
         let mut snooper = Snooper::from_channel(rx, PathBuf::from("/a/b/c")).unwrap();
         let flags = HciFlags::IS_RECEIVED | HciFlags::PACKET_TYPE_EVENT;
         tx.write(&[flags, 0, 1, 2], &mut vec![]).unwrap();

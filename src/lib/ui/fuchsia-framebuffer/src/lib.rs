@@ -345,7 +345,7 @@ impl Frame {
     }
 
     async fn create_and_import_event(framebuffer: &FrameBuffer) -> Result<(Event, u64), Error> {
-        let event = Event::create()?;
+        let event = Event::create();
 
         let their_event = event.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
         let event_id = event.get_koid()?.raw_koid();
@@ -774,7 +774,7 @@ impl FrameBuffer {
             format!("/dev/class/display-controller/{}", filename.display())
         };
 
-        let (client_end, server_end) = zx::Channel::create()?;
+        let (client_end, server_end) = zx::Channel::create();
         fuchsia_component::client::connect_channel_to_protocol_at_path(server_end, &device_path)?;
         let provider = ProviderSynchronousProxy::new(client_end);
 

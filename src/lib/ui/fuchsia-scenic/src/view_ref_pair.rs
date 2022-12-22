@@ -15,7 +15,7 @@ pub struct ViewRefPair {
 
 impl ViewRefPair {
     pub fn new() -> Result<ViewRefPair, Error> {
-        let (raw_control_ref, raw_view_ref) = EventPair::create()?;
+        let (raw_control_ref, raw_view_ref) = EventPair::create();
 
         // Remove duplication from the control ref. This is the same
         // as `ZX_DEFAULT_EVENTPAIR_RIGHTS & (~ZX_RIGHT_DUPLICATE)`

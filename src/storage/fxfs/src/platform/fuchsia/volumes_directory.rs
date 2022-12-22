@@ -186,7 +186,7 @@ impl VolumesDirectory {
     ) -> Result<FxVolumeAndRoot, Error> {
         store.track_statistics(&*OBJECT_STORES_NODE.lock().unwrap(), name);
         let store_id = store.store_object_id();
-        let unique_id = zx::Event::create().expect("Failed to create event");
+        let unique_id = zx::Event::create();
         let volume = FxVolumeAndRoot::new(
             Arc::downgrade(self),
             store,

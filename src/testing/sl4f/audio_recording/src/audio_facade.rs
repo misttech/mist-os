@@ -835,7 +835,7 @@ impl AudioFacade {
 
     pub fn new() -> Result<AudioFacade, Error> {
         // Connect to the virtual audio control service.
-        let (control_client, control_server) = zx::Channel::create()?;
+        let (control_client, control_server) = zx::Channel::create();
         fdio::service_connect(fidl_fuchsia_virtualaudio::CONTROL_NODE_NAME, control_server)
             .context(format!(
                 "failed to connect to '{}'",

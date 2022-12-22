@@ -171,7 +171,7 @@ fn connect_peer(
     svc: &impl ServiceConsumerProxyInterface,
     node_id: NodeId,
 ) -> Result<triangle::ConscriptProxy, Error> {
-    let (s, p) = fidl::Channel::create().context("failed to create zx channel")?;
+    let (s, p) = fidl::Channel::create();
     svc.connect_to_service(&mut node_id.into(), triangle::ConscriptMarker::PROTOCOL_NAME, s)
         .unwrap();
     let proxy = fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?;
@@ -194,7 +194,7 @@ async fn exec_captain(
         if has_peer_conscript(&peers, client) && has_peer_conscript(&peers, server) {
             let client = connect_peer(&svc, client)?;
             let server = connect_peer(&svc, server)?;
-            let (s, p) = fidl::Channel::create().context("failed to create zx channel")?;
+            let (s, p) = fidl::Channel::create();
             tracing::info!(node_id = overnet.node_id().0, "server/proxy hdls: {:?} {:?}", s, p);
             tracing::info!(node_id = overnet.node_id().0, "ENGAGE CONSCRIPTS");
             server.serve(ServerEnd::new(s))?;
@@ -246,7 +246,7 @@ async fn exec_conscript<
     overnet: Arc<Overnet>,
     action: F,
 ) -> Result<(), Error> {
-    let (s, p) = fidl::Channel::create().context("failed to create zx channel")?;
+    let (s, p) = fidl::Channel::create();
     let chan = fidl::AsyncChannel::from_channel(s).context("failed to make async channel")?;
     let node_id = overnet.node_id();
     overnet

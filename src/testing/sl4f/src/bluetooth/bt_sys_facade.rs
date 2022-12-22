@@ -300,7 +300,7 @@ impl BluetoothSysFacade {
         };
 
         info!(tag = &with_line!(tag), "Accepting pairing");
-        let (delegate_local, delegate_remote) = zx::Channel::create()?;
+        let (delegate_local, delegate_remote) = zx::Channel::create();
         let delegate_local = fasync::Channel::from_channel(delegate_local)?;
         let delegate_ptr =
             fidl::endpoints::ClientEnd::<PairingDelegateMarker>::new(delegate_remote);

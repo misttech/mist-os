@@ -418,7 +418,7 @@ struct FidlFixture;
 #[async_trait]
 impl Fixture for FidlFixture {
     async fn create_handles(&self, _: CreateHandlePurpose) -> (fidl::Channel, fidl::Channel) {
-        fidl::Channel::create().unwrap()
+        fidl::Channel::create()
     }
 }
 

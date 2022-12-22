@@ -69,14 +69,14 @@ struct HandleFactory {
 // factory functions that work on all platforms.
 impl HandleFactory {
     fn create_event(&mut self) -> Result<fidl::Event, Status> {
-        fidl::Event::create()
+        Ok(fidl::Event::create())
     }
 
     fn create_channel(&mut self) -> Result<fidl::Channel, Status> {
         match self.extra_channel.take() {
             Some(channel) => Ok(channel),
             None => {
-                let (c1, c2) = fidl::Channel::create()?;
+                let (c1, c2) = fidl::Channel::create();
                 self.extra_channel = Some(c2);
                 Ok(c1)
             }

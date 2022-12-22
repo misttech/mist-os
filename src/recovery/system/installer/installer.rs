@@ -46,9 +46,9 @@ pub async fn find_install_source(
 }
 
 pub fn paver_connect(path: &str) -> Result<(PaverProxy, DynamicDataSinkProxy), Error> {
-    let (block_device_chan, block_remote) = zx::Channel::create()?;
+    let (block_device_chan, block_remote) = zx::Channel::create();
     fdio::service_connect(&path, block_remote)?;
-    let (data_sink_chan, data_remote) = zx::Channel::create()?;
+    let (data_sink_chan, data_remote) = zx::Channel::create();
 
     let paver: PaverProxy =
         client::connect_to_protocol::<PaverMarker>().context("Could not connect to paver")?;

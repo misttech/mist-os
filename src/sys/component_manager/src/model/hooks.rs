@@ -508,7 +508,7 @@ mod tests {
     // This test verifies that the payload of the CapabilityRequested event will be transferred.
     #[fuchsia::test]
     async fn capability_requested_transfer() {
-        let (_, capability_server_end) = zx::Channel::create().unwrap();
+        let (_, capability_server_end) = zx::Channel::create();
         let capability_server_end = Arc::new(Mutex::new(Some(capability_server_end)));
         let event = Event::new_for_test(
             AbsoluteMoniker::root(),

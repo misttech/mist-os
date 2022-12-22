@@ -13,7 +13,7 @@ fn publish_debug_data(num_vmos: usize, vmo_size: usize) {
     let vmo_contents = "a".repeat(vmo_size);
     let publisher = connect_to_protocol_at_path::<PublisherMarker>(PUBLISHER_PATH).unwrap();
     for i in 0..num_vmos {
-        let (_vmo_server, vmo_token) = zx::EventPair::create().unwrap();
+        let (_vmo_server, vmo_token) = zx::EventPair::create();
         let data = zx::Vmo::create(vmo_size as u64).unwrap();
         data.write(vmo_contents.as_bytes(), 0).expect("write to VMO");
         data.set_content_size(&(vmo_contents.len() as u64)).expect("set VMO content size");

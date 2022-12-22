@@ -182,7 +182,7 @@ fn open_command_channel(device_path: PathBuf) -> Result<Channel, Error> {
     let hci_device = OpenOptions::new().read(true).write(true).open(&device_path)?;
     let hci_channel = fasync::Channel::from_channel(fdio::clone_channel(&hci_device)?)?;
     let interface = HciProxy::new(hci_channel);
-    let (ours, theirs) = Channel::create()?;
+    let (ours, theirs) = Channel::create();
     interface.open_command_channel(theirs)?;
     Ok(ours)
 }
@@ -201,14 +201,14 @@ mod tests {
     #[test]
     fn test_from_channel() {
         let _exec = fasync::TestExecutor::new();
-        let (channel, _) = Channel::create().unwrap();
+        let (channel, _) = Channel::create();
         let _command_channel = CommandChannel::from_channel(channel).unwrap();
     }
 
     #[test]
     fn test_command_channel() {
         let mut exec = fasync::TestExecutor::new().unwrap();
-        let (remote, local) = Channel::create().unwrap();
+        let (remote, local) = Channel::create();
         let command_channel = CommandChannel::from_channel(local).unwrap();
 
         pin_utils::pin_mut!(command_channel);

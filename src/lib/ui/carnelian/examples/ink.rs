@@ -883,7 +883,7 @@ struct StylusDevice {
 
 impl StylusDevice {
     fn open_input_device(path: &str) -> Result<hid::DeviceSynchronousProxy, Error> {
-        let (client, server) = zx::Channel::create()?;
+        let (client, server) = zx::Channel::create();
         fdio::service_connect(path, server)?;
         Ok(hid::DeviceSynchronousProxy::new(client))
     }

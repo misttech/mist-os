@@ -393,8 +393,7 @@ pub async fn configure_launcher(
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
             )
             .map_err(|e| LaunchError::LibLoadError(e.to_string()))?;
-            let (ll_client_chan, ll_service_chan) =
-                zx::Channel::create().map_err(LaunchError::ChannelCreation)?;
+            let (ll_client_chan, ll_service_chan) = zx::Channel::create();
             library_loader::start(lib_proxy.into(), ll_service_chan);
             ll_client_chan
         }
@@ -1142,7 +1141,7 @@ mod tests {
         async fn handles_added_with_custom_loader_chan() -> Result<(), Error> {
             let (launcher_proxy, recv) = start_launcher()?;
 
-            let (c1, _c2) = zx::Channel::create()?;
+            let (c1, _c2) = zx::Channel::create();
 
             let ns = setup_namespace(true, vec![])?;
 

@@ -116,7 +116,7 @@ async fn run_closed_target_server(
                 ClosedTargetRequest::CreateNHandleVector { n, responder } => {
                     let mut handles: Vec<fidl::Event> = Vec::new();
                     for _ in 0..n {
-                        handles.push(Event::create().unwrap());
+                        handles.push(Event::create());
                     }
                     responder.send(&mut handles.into_iter()).expect("failed to send response");
                 }
@@ -315,7 +315,7 @@ async fn run_large_message_target_server(
                                 if populate_unset_handles {
                                     match element.handle {
                                         None => {
-                                            element.handle = Some(Event::create().unwrap().into());
+                                            element.handle = Some(Event::create().into());
                                         }
                                         _ => {}
                                     }

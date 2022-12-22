@@ -229,7 +229,7 @@ pub struct Blob {
 
 impl Blob {
     fn send_on_open_with_file_signals(&mut self, status: Status, signals: zx::Signals) {
-        let event = fidl::Event::create().unwrap();
+        let event = fidl::Event::create();
         event.signal_handle(zx::Signals::NONE, signals).unwrap();
 
         let mut info =

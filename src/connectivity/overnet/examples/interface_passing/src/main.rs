@@ -49,7 +49,7 @@ async fn exec_client(text: Option<&str>) -> Result<(), Error> {
             {
                 continue;
             }
-            let (s, p) = fidl::Channel::create().context("failed to create zx channel")?;
+            let (s, p) = fidl::Channel::create();
             if let Err(e) = svc.connect_to_service(
                 &mut peer.id,
                 interfacepassing::ExampleMarker::PROTOCOL_NAME,
@@ -62,7 +62,7 @@ async fn exec_client(text: Option<&str>) -> Result<(), Error> {
                 fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?;
             let cli = interfacepassing::ExampleProxy::new(proxy);
 
-            let (s1, p1) = fidl::Channel::create().context("failed to create zx channel")?;
+            let (s1, p1) = fidl::Channel::create();
             let proxy_echo =
                 fidl::AsyncChannel::from_channel(p1).context("failed to make async channel")?;
             let cli_echo = echo::EchoProxy::new(proxy_echo);
@@ -115,7 +115,7 @@ async fn example_server(chan: fidl::AsyncChannel, quiet: bool) -> Result<(), Err
 }
 
 async fn exec_server(quiet: bool) -> Result<(), Error> {
-    let (s, p) = fidl::Channel::create().context("failed to create zx channel")?;
+    let (s, p) = fidl::Channel::create();
     let chan = fidl::AsyncChannel::from_channel(s).context("failed to make async channel")?;
     hoist().publish_service(interfacepassing::ExampleMarker::PROTOCOL_NAME, ClientEnd::new(p))?;
     ServiceProviderRequestStream::from_channel(chan)

@@ -189,7 +189,7 @@ mod tests {
         tree.install(&root.abs_moniker, &mut in_dir).expect("Unable to build pseudodirectory");
 
         // Ensure that we can't create a file if the permission is read-only
-        let (data_dir, data_server) = zx::Channel::create().unwrap();
+        let (data_dir, data_server) = zx::Channel::create();
         in_dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE,
@@ -259,7 +259,7 @@ mod tests {
         // Convert the tree to a directory.
         let mut in_dir = pfs::simple();
         tree.install(&root.abs_moniker, &mut in_dir).expect("Unable to build pseudodirectory");
-        let (in_dir_client, in_dir_server) = zx::Channel::create().unwrap();
+        let (in_dir_client, in_dir_server) = zx::Channel::create();
         in_dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -337,7 +337,7 @@ mod tests {
         // Convert the tree to a directory.
         let mut expose_dir = pfs::simple();
         tree.install(&root.abs_moniker, &mut expose_dir).expect("Unable to build pseudodirectory");
-        let (expose_dir_client, expose_dir_server) = zx::Channel::create().unwrap();
+        let (expose_dir_client, expose_dir_server) = zx::Channel::create();
         expose_dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,

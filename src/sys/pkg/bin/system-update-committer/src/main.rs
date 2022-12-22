@@ -79,7 +79,7 @@ async fn main_inner_async() -> Result<(), Error> {
         .context("while connecting to blobfs verifier")?;
 
     let futures = FuturesUnordered::new();
-    let (p_internal, p_external) = zx::EventPair::create().context("while creating EventPairs")?;
+    let (p_internal, p_external) = zx::EventPair::create();
 
     // Keep a copy of the internal pair so that external consumers don't observe EVENTPAIR_CLOSED.
     let _p_internal_clone =

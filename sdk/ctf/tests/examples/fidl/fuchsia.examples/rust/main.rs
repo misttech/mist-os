@@ -12,7 +12,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test() -> Result<(), Error> {
-        let (server_end, client_end) = zx::Channel::create()?;
+        let (server_end, client_end) = zx::Channel::create();
         connect_channel_to_protocol::<EchoMarker>(server_end)
             .context("Failed to connect to echo service")?;
         let echo = EchoSynchronousProxy::new(client_end);

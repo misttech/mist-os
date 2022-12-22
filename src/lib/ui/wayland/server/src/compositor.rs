@@ -595,7 +595,7 @@ impl Surface {
         let buffer_id = self.content.as_ref().map(|content| content.id());
         if last_buffer_id != buffer_id {
             if let Some(last_buffer_id) = last_buffer_id {
-                let release_fence = zx::Event::create().unwrap();
+                let release_fence = zx::Event::create();
                 node.flatland.borrow_mut().add_release_fence(
                     release_fence.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
                 );

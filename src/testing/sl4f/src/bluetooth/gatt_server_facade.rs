@@ -153,7 +153,7 @@ impl GattServerFacade {
                 ..ValueChangedParameters::EMPTY
             };
             // Ignore the confirmation.
-            let (confirmation, _) = fidl::EventPair::create().unwrap();
+            let (confirmation, _) = fidl::EventPair::create();
             let _ = control_handle.send_on_indicate_value(value, confirmation);
         } else if notify {
             let value = ValueChangedParameters {

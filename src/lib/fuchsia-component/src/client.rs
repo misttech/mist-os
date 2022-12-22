@@ -498,7 +498,7 @@ impl App {
     /// Connect to a protocol provided by the `App`.
     #[inline]
     pub fn connect_to_protocol<P: DiscoverableProtocolMarker>(&self) -> Result<P::Proxy, Error> {
-        let (client_channel, server_channel) = zx::Channel::create()?;
+        let (client_channel, server_channel) = zx::Channel::create();
         self.pass_to_protocol::<P>(server_channel)?;
         Ok(P::Proxy::from_channel(fasync::Channel::from_channel(client_channel)?))
     }
@@ -509,7 +509,7 @@ impl App {
         &self,
         protocol_name: &str,
     ) -> Result<P::Proxy, Error> {
-        let (client_channel, server_channel) = zx::Channel::create()?;
+        let (client_channel, server_channel) = zx::Channel::create();
         self.pass_to_named_protocol(protocol_name, server_channel)?;
         Ok(P::Proxy::from_channel(fasync::Channel::from_channel(client_channel)?))
     }

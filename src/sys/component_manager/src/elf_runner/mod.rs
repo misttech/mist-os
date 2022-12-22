@@ -951,7 +951,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn args_test() -> Result<(), Error> {
-        let (runtime_dir_client, runtime_dir_server) = zx::Channel::create()?;
+        let (runtime_dir_client, runtime_dir_server) = zx::Channel::create();
         let start_info = lifecycle_startinfo(Some(ServerEnd::new(runtime_dir_server)));
 
         let runtime_dir_proxy = fio::DirectoryProxy::from_channel(
@@ -1005,7 +1005,7 @@ mod tests {
     // from the test's namespace instead of serving and using a built-in one.
     #[fuchsia::test]
     async fn hello_world_fail_test() -> Result<(), Error> {
-        let (_runtime_dir_client, runtime_dir_server) = zx::Channel::create()?;
+        let (_runtime_dir_client, runtime_dir_server) = zx::Channel::create();
         let start_info = hello_world_startinfo(Some(ServerEnd::new(runtime_dir_server)));
 
         // Note that value of should_use... is negated
@@ -1304,7 +1304,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn vmex_security_policy_allowed() -> Result<(), Error> {
-        let (runtime_dir_client, runtime_dir_server) = zx::Channel::create()?;
+        let (runtime_dir_client, runtime_dir_server) = zx::Channel::create();
         let start_info =
             lifecycle_startinfo_mark_vmo_exec(Some(ServerEnd::new(runtime_dir_server)));
         let runtime_dir_proxy = fio::DirectoryProxy::from_channel(
@@ -1486,7 +1486,7 @@ mod tests {
         let (dir, ns) = create_fs_with_mock_logsink()?;
 
         let run_component_fut = async move {
-            let (_, runtime_dir_server) = zx::Channel::create().unwrap();
+            let (_, runtime_dir_server) = zx::Channel::create();
             let start_info = hello_world_startinfo_forward_stdout_to_log(
                 Some(ServerEnd::new(runtime_dir_server)),
                 ns,
@@ -1551,7 +1551,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn on_publish_diagnostics_contains_job_handle() {
-        let (runtime_dir_client, runtime_dir_server) = zx::Channel::create().unwrap();
+        let (runtime_dir_client, runtime_dir_server) = zx::Channel::create();
         let start_info = lifecycle_startinfo(Some(ServerEnd::new(runtime_dir_server)));
 
         let runtime_dir_proxy = fio::DirectoryProxy::from_channel(

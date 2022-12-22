@@ -241,7 +241,7 @@ pub fn create_drm_image(
 
 /// Initializes and returns Scenic allocator proxy.
 pub fn init_scenic() -> Result<fuicomp::AllocatorSynchronousProxy, Errno> {
-    let (server_end, client_end) = zx::Channel::create().map_err(|_| errno!(ENOENT))?;
+    let (server_end, client_end) = zx::Channel::create();
     connect_channel_to_protocol::<fuicomp::AllocatorMarker>(server_end)
         .map_err(|_| errno!(ENOENT))?;
     let composition_proxy = fuicomp::AllocatorSynchronousProxy::new(client_end);
@@ -255,7 +255,7 @@ pub fn init_scenic() -> Result<fuicomp::AllocatorSynchronousProxy, Errno> {
 pub fn init_sysmem(
     use_scenic: bool,
 ) -> Result<(BufferCollectionTokens, fsysmem::AllocatorSynchronousProxy), Errno> {
-    let (server_end, client_end) = zx::Channel::create().map_err(|_| errno!(ENOENT))?;
+    let (server_end, client_end) = zx::Channel::create();
     connect_channel_to_protocol::<fsysmem::AllocatorMarker>(server_end)
         .map_err(|_| errno!(ENOENT))?;
     let sysmem_allocator = fsysmem::AllocatorSynchronousProxy::new(client_end);

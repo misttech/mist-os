@@ -422,7 +422,7 @@ mod tests {
             .unwrap();
         let daemon = FakeDaemonBuilder::new().build();
         let cx = Context::new(daemon);
-        let (client, server) = fidl::Channel::create().unwrap();
+        let (client, server) = fidl::Channel::create();
         local_hoist
             .connect_as_service_consumer()
             .unwrap()

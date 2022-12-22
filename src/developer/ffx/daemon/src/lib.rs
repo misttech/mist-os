@@ -29,7 +29,7 @@ pub use socket::SocketDetails;
 
 async fn create_daemon_proxy(hoist: &Hoist, id: &mut NodeId) -> Result<DaemonProxy> {
     let svc = hoist.connect_as_service_consumer()?;
-    let (s, p) = fidl::Channel::create().context("failed to create zx channel")?;
+    let (s, p) = fidl::Channel::create();
     svc.connect_to_service(id, DaemonMarker::PROTOCOL_NAME, s)?;
     let proxy = fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?;
     Ok(DaemonProxy::new(proxy))

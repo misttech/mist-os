@@ -345,9 +345,15 @@ impl Timer {
     /// Wraps the
     /// [zx_timer_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/timer_create.md)
     /// syscall.
+    ///
+    /// # Panics
+    ///
+    /// If the kernel reports no memory available to create a timer or the process' job policy
+    /// denies timer creation.
     #[allow(deprecated)]
-    pub fn create() -> Result<Timer, Status> {
+    pub fn create() -> Self {
         Self::try_create()
+            .expect("timer creation always succeeds except with OOM or when job policy denies it")
     }
 
     /// Create a timer, an object that can signal when a specified point in time has been reached.
@@ -452,7 +458,7 @@ mod tests {
         let five_secs = 5.seconds();
 
         // Create a timer
-        let timer = Timer::create().unwrap();
+        let timer = Timer::create();
 
         // Should not signal yet.
         assert_eq!(

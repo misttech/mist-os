@@ -611,8 +611,7 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_block_server() {
-        let (client_channel, server_channel) =
-            zx::Channel::create().expect("Channel::create failed");
+        let (client_channel, server_channel) = zx::Channel::create();
         join!(
             async {
                 let mut blobfs = Filesystem::from_channel(client_channel, Blobfs::default())
@@ -661,12 +660,9 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_clone() {
-        let (client_channel, server_channel) =
-            zx::Channel::create().expect("Channel::create failed");
-        let (client_channel_copy1, server_channel_copy1) =
-            zx::Channel::create().expect("Channel::create failed");
-        let (client_channel_copy2, server_channel_copy2) =
-            zx::Channel::create().expect("Channel::create failed");
+        let (client_channel, server_channel) = zx::Channel::create();
+        let (client_channel_copy1, server_channel_copy1) = zx::Channel::create();
+        let (client_channel_copy2, server_channel_copy2) = zx::Channel::create();
 
         join!(
             async {
@@ -742,8 +738,7 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_attach_vmo() {
-        let (client_channel, server_channel) =
-            zx::Channel::create().expect("Channel::create failed");
+        let (client_channel, server_channel) = zx::Channel::create();
         join!(
             async {
                 let remote_block_device = RemoteBlockClient::new(
@@ -788,8 +783,7 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_detach_vmo() {
-        let (client_channel, server_channel) =
-            zx::Channel::create().expect("Channel::create failed");
+        let (client_channel, server_channel) = zx::Channel::create();
         join!(
             async {
                 let remote_block_device = RemoteBlockClient::new(
@@ -825,8 +819,7 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_read_write_files() {
-        let (client_channel, server_channel) =
-            zx::Channel::create().expect("Channel::create failed");
+        let (client_channel, server_channel) = zx::Channel::create();
         join!(
             async {
                 let remote_block_device = RemoteBlockClient::new(
@@ -888,8 +881,7 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_flush_is_called() {
-        let (client_channel, server_channel) =
-            zx::Channel::create().expect("Channel::create failed");
+        let (client_channel, server_channel) = zx::Channel::create();
         join!(
             async {
                 let remote_block_device = RemoteBlockClient::new(
@@ -921,8 +913,7 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_getattr() {
-        let (client_channel, server_channel) =
-            zx::Channel::create().expect("Channel::create failed");
+        let (client_channel, server_channel) = zx::Channel::create();
 
         join!(
             async {
@@ -954,8 +945,7 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_get_info() {
-        let (client_channel, server_channel) =
-            zx::Channel::create().expect("Channel::create failed");
+        let (client_channel, server_channel) = zx::Channel::create();
         let file_size = 2 * 1024 * 1024;
         join!(
             async {
@@ -1011,8 +1001,7 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_blobfs() {
-        let (client_channel, server_channel) =
-            zx::Channel::create().expect("Channel::create failed");
+        let (client_channel, server_channel) = zx::Channel::create();
         join!(
             async {
                 let mut blobfs = Filesystem::from_channel(client_channel, Blobfs::default())

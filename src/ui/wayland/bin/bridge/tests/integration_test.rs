@@ -56,7 +56,7 @@ mod test {
         // Launch the wayland bridge process & connect to the WaylandDispatcher
         // FIDL service.
         let bridge_proxy = connect_to_protocol::<Server_Marker>()?;
-        let (h1, h2) = zx::Channel::create()?;
+        let (h1, h2) = zx::Channel::create();
         bridge_proxy.connect(h1)?;
         let client_channel = fasync::Channel::from_channel(h2)?;
 

@@ -78,7 +78,7 @@ mod test {
         let (vmo_send, vmo_recv) = mpsc::channel(5);
         let serve_fut = serve_publisher(message, vmo_send);
         let test_fut = async move {
-            let (vmo_token, vmo_token_server) = zx::EventPair::create().unwrap();
+            let (vmo_token, vmo_token_server) = zx::EventPair::create();
             let vmo = zx::Vmo::create(1024).unwrap();
             let vmo_koid = vmo.get_koid().unwrap();
             proxy.publish("data-sink", vmo, vmo_token_server).expect("publish vmo");
@@ -102,7 +102,7 @@ mod test {
         let (vmo_send, mut vmo_recv) = mpsc::channel(5);
         let mut serve_fut = serve_publisher(message, vmo_send).boxed();
 
-        let (vmo_token, vmo_token_server) = zx::EventPair::create().unwrap();
+        let (vmo_token, vmo_token_server) = zx::EventPair::create();
         let vmo = zx::Vmo::create(1024).unwrap();
         let vmo_koid = vmo.get_koid().unwrap();
 
@@ -140,7 +140,7 @@ mod test {
             let first_vmo_tokens: Vec<_> = proxies
                 .iter()
                 .map(|proxy| {
-                    let (vmo_token, vmo_token_server) = zx::EventPair::create().unwrap();
+                    let (vmo_token, vmo_token_server) = zx::EventPair::create();
                     let vmo = zx::Vmo::create(1024).unwrap();
                     proxy.publish("data-sink-1", vmo, vmo_token_server).expect("publish vmo");
                     vmo_token
@@ -150,7 +150,7 @@ mod test {
             let second_vmo_tokens: Vec<_> = proxies
                 .iter()
                 .map(|proxy| {
-                    let (vmo_token, vmo_token_server) = zx::EventPair::create().unwrap();
+                    let (vmo_token, vmo_token_server) = zx::EventPair::create();
                     let vmo = zx::Vmo::create(1024).unwrap();
                     proxy.publish("data-sink-2", vmo, vmo_token_server).expect("publish vmo");
                     vmo_token
@@ -181,14 +181,14 @@ mod test {
         let (vmo_send, mut vmo_recv) = mpsc::channel(5);
         let serve_fut = serve_publisher(message, vmo_send);
         let test_fut = async move {
-            let (vmo_token_1, vmo_token_server_1) = zx::EventPair::create().unwrap();
+            let (vmo_token_1, vmo_token_server_1) = zx::EventPair::create();
             let vmo_1 = zx::Vmo::create(1024).unwrap();
             let vmo_1_koid = vmo_1.get_koid().unwrap();
 
             proxy.publish("data-sink-1", vmo_1, vmo_token_server_1).expect("publish vmo");
             // VMO should not be sent for processing until the vmo_token_1 channel is closed.
             // Hold it open, and in the meantime, send another vmo
-            let (vmo_token_2, vmo_token_server_2) = zx::EventPair::create().unwrap();
+            let (vmo_token_2, vmo_token_server_2) = zx::EventPair::create();
             let vmo_2 = zx::Vmo::create(1024).unwrap();
             let vmo_2_koid = vmo_2.get_koid().unwrap();
             proxy.publish("data-sink-2", vmo_2, vmo_token_server_2).expect("publish vmo");

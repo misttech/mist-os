@@ -73,7 +73,7 @@ mod tests {
 
     // Just need a channel to stash.
     async fn get_svc_stash_handle() -> Result<Channel, Error> {
-        let (_p1, p2) = Channel::create()?;
+        let (_p1, p2) = Channel::create();
         Ok(p2)
     }
 
@@ -96,7 +96,7 @@ mod tests {
         );
         hooks.dispatch(&event).await;
 
-        let (client, mut server) = Channel::create()?;
+        let (client, mut server) = Channel::create();
         let task_scope = TaskScope::new();
         if let Some(provider) = provider.lock().await.take() {
             provider

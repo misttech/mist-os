@@ -72,6 +72,7 @@ pub(super) struct Inner {
 
 impl Inner {
     #[cfg_attr(trace_level_logging, track_caller)]
+    // TODO(https://fxbug.dev/115386) make this API and its callers infallible
     pub fn new(time: ExecutorTime, is_local: bool) -> Result<Self, zx::Status> {
         #[cfg(trace_level_logging)]
         let source = Some(Location::caller());
@@ -81,7 +82,7 @@ impl Inner {
         let collector = Collector::new();
         collector.task_created(MAIN_TASK_ID, source);
         Ok(Inner {
-            port: zx::Port::create()?,
+            port: zx::Port::create(),
             done: AtomicBool::new(false),
             is_local,
             receivers: Mutex::new(PacketReceiverMap::new()),

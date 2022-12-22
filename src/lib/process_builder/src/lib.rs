@@ -450,8 +450,7 @@ impl ProcessBuilder {
         let elf_headers = elf_parse::Elf64Headers::from_vmo(&self.executable)?;
 
         // Create bootstrap message channel.
-        let (bootstrap_rd, bootstrap_wr) = zx::Channel::create()
-            .map_err(|s| ProcessBuilderError::GenericStatus("Failed to create channel", s))?;
+        let (bootstrap_rd, bootstrap_wr) = zx::Channel::create();
 
         // Check if main executable is dynamically linked, and handle appropriately.
         let loaded_elf;
@@ -1058,7 +1057,7 @@ mod tests {
     }
 
     fn connect_util(client: &zx::Channel) -> Result<UtilProxy, Error> {
-        let (proxy, server) = zx::Channel::create()?;
+        let (proxy, server) = zx::Channel::create();
         fdio::service_connect_at(&client, UtilMarker::PROTOCOL_NAME, server)
             .context("failed to connect to util service")?;
         Ok(UtilProxy::from_channel(fasync::Channel::from_channel(proxy)?))
@@ -1093,7 +1092,7 @@ mod tests {
             }])?;
         }
 
-        let (dir_client, dir_server) = zx::Channel::create()?;
+        let (dir_client, dir_server) = zx::Channel::create();
         builder.add_handles(vec![StartupHandle {
             handle: dir_server.into_handle(),
             info: HandleInfo::new(HandleType::DirectoryRequest, 0),
@@ -1205,7 +1204,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn start_util_with_lifecycle_channel() -> Result<(), Error> {
         let (mut builder, proxy) = setup_test_util_builder(true)?;
-        let (lifecycle_server, _lifecycle_client) = zx::Channel::create()?;
+        let (lifecycle_server, _lifecycle_client) = zx::Channel::create();
         let koid = lifecycle_server
             .as_handle_ref()
             .basic_info()
@@ -1469,7 +1468,7 @@ mod tests {
         let test_content2 = format!("test content 2 {}", u64::from_le_bytes(randbuf));
 
         let test_content1_bytes = test_content1.clone().into_bytes();
-        let (dir1_server, dir1_client) = zx::Channel::create()?;
+        let (dir1_server, dir1_client) = zx::Channel::create();
         let dir_scope = ExecutionScope::new();
         let dir1 = pseudo_directory! {
             "test_file1" => read_only_const(test_content1_bytes.as_ref()),
@@ -1483,7 +1482,7 @@ mod tests {
         );
 
         let test_content2_bytes = test_content2.clone().into_bytes();
-        let (dir2_server, dir2_client) = zx::Channel::create()?;
+        let (dir2_server, dir2_client) = zx::Channel::create();
         let dir2 = pseudo_directory! {
             "test_file2" => read_only_const(test_content2_bytes.as_ref()),
         };
@@ -1741,7 +1740,7 @@ mod tests {
 
         // We pass the program a channel with handle type User0 which we send a message on and
         // expect it to echo back the message on the same channel.
-        let (local, remote) = zx::Channel::create()?;
+        let (local, remote) = zx::Channel::create();
         builder.add_handles(vec![StartupHandle {
             handle: remote.into_handle(),
             info: HandleInfo::new(HandleType::User0, 0),

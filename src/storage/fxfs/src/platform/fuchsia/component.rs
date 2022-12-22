@@ -82,7 +82,7 @@ struct InspectedFxFilesystem(OpenFxFilesystem, /*fs_id=*/ u64);
 
 impl From<OpenFxFilesystem> for InspectedFxFilesystem {
     fn from(fs: OpenFxFilesystem) -> Self {
-        Self(fs, zx::Event::create().unwrap().get_koid().unwrap().raw_koid())
+        Self(fs, zx::Event::create().get_koid().unwrap().raw_koid())
     }
 }
 

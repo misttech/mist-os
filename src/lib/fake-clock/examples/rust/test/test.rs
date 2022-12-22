@@ -44,8 +44,7 @@ async fn test_pause_advance() {
 
     // Test named deadlines.
     // First, we set a stop point to detect when a timer is set, then resume time.
-    let (deadline_set_event, deadline_set_server) =
-        zx::EventPair::create().expect("failed to create eventpair");
+    let (deadline_set_event, deadline_set_server) = zx::EventPair::create();
     let () = fake_time
         .add_stop_point(&mut DEADLINE_NAME.into(), DeadlineEventType::Set, deadline_set_server)
         .await
@@ -76,8 +75,7 @@ async fn test_pause_advance() {
     assert_eq!(now_1, now_2);
 
     // We now register a stop point to trigger when the timer expires, and run time fast.
-    let (deadline_expire_event, deadline_expire_server) =
-        zx::EventPair::create().expect("failed to create eventpair");
+    let (deadline_expire_event, deadline_expire_server) = zx::EventPair::create();
     let () = fake_time
         .add_stop_point(
             &mut DEADLINE_NAME.into(),

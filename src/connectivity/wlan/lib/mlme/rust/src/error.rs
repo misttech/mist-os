@@ -45,8 +45,7 @@ impl From<Error> for zx::Status {
                 fidl::Error::ClientRead(status)
                 | fidl::Error::ClientWrite(status)
                 | fidl::Error::ServerResponseWrite(status)
-                | fidl::Error::ServerRequestRead(status)
-                | fidl::Error::ChannelPairCreate(status) => status,
+                | fidl::Error::ServerRequestRead(status) => status,
                 _ => zx::Status::IO,
             },
             Error::Status(_, status) => status,

@@ -941,7 +941,7 @@ mod testing {
     }
 
     pub(super) fn capability_event(moniker: &str) -> fcomponent::Event {
-        let (_client, server) = zx::Channel::create().unwrap();
+        let (_client, server) = zx::Channel::create();
         fcomponent::Event {
             header: fcomponent::EventHeader {
                 event_type: fcomponent::EventType::CapabilityRequested.into(),

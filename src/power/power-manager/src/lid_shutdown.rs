@@ -436,7 +436,7 @@ mod tests {
             let lid_state = Rc::new(Cell::new(0));
             let lid_state_clone = lid_state.clone();
 
-            let report_event = zx::Event::create().unwrap();
+            let report_event = zx::Event::create();
             let report_event_clone =
                 report_event.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
 

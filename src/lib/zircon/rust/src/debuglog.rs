@@ -97,7 +97,7 @@ mod tests {
     // messages doesn't contain `sent_msg`, it will panic.
     fn expect_message_in_debuglog(sent_msg: String) {
         use fuchsia_zircon::{Channel, HandleBased};
-        let (client_end, server_end) = Channel::create().unwrap();
+        let (client_end, server_end) = Channel::create();
         connect_channel_to_protocol::<fboot::RootResourceMarker>(server_end).unwrap();
         let service = fboot::RootResourceSynchronousProxy::new(client_end);
         let resource =

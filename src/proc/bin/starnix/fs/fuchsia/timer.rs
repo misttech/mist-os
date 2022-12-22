@@ -47,7 +47,7 @@ impl TimerFile {
         clock: TimerFileClock,
         flags: OpenFlags,
     ) -> Result<FileHandle, Errno> {
-        let timer = zx::Timer::create().map_err(|status| from_status_like_fdio!(status))?;
+        let timer = zx::Timer::create();
 
         Ok(Anon::new_file(
             current_task,

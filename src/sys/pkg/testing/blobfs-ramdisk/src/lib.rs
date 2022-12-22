@@ -164,7 +164,7 @@ impl BlobfsRamdisk {
 
     /// Returns a new connection to blobfs's root directory as a raw zircon channel.
     pub fn root_dir_handle(&self) -> Result<ClientEnd<fio::DirectoryMarker>, Error> {
-        let (root_clone, server_end) = zx::Channel::create()?;
+        let (root_clone, server_end) = zx::Channel::create();
         self.root_proxy.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end.into())?;
         Ok(root_clone.into())
     }
@@ -300,7 +300,7 @@ impl Ramdisk {
     }
 
     fn clone_channel(&self) -> Result<zx::Channel, Error> {
-        let (result, server_end) = zx::Channel::create()?;
+        let (result, server_end) = zx::Channel::create();
         self.proxy.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end))?;
         Ok(result)
     }

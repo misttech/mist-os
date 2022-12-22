@@ -19,7 +19,7 @@ async fn publish_debug_data() {
     vmo.write(VMO_CONTENTS, 0).expect("write to VMO");
     vmo.set_content_size(&(VMO_CONTENTS.len() as u64)).expect("set VMO content size");
     vmo.set_name(CStr::from_bytes_with_nul(VMO_NAME).unwrap()).expect("set VMO name");
-    let (vmo_token, vmo_server) = zx::EventPair::create().unwrap();
+    let (vmo_token, vmo_server) = zx::EventPair::create();
     publish_data.publish(VMO_DATA_SINK, vmo, vmo_server).expect("Publish debugdata");
     drop(vmo_token);
 }

@@ -109,7 +109,7 @@ pub mod tests {
                 payload: Some(fcomponent::EventPayload::CapabilityRequested(
                     fcomponent::CapabilityRequestedPayload {
                         name: Some("fuchsia.logger.LogSink".to_string()),
-                        capability: Some(zx::Channel::create().unwrap().0),
+                        capability: Some(zx::Channel::create().0),
                         ..fcomponent::CapabilityRequestedPayload::EMPTY
                     },
                 )),

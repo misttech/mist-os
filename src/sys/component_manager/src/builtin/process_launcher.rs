@@ -460,7 +460,7 @@ mod tests {
             top_instance: Weak::new(),
         };
 
-        let (client, mut server) = zx::Channel::create()?;
+        let (client, mut server) = zx::Channel::create();
 
         let event = Event::new_for_test(
             AbsoluteMoniker::root(),
@@ -487,7 +487,7 @@ mod tests {
     }
 
     fn connect_util(client: &zx::Channel) -> Result<UtilProxy, Error> {
-        let (proxy, server) = zx::Channel::create()?;
+        let (proxy, server) = zx::Channel::create();
         fdio::service_connect_at(&client, UtilMarker::PROTOCOL_NAME, server)
             .context("failed to connect to util service")?;
         Ok(UtilProxy::from_channel(fasync::Channel::from_channel(proxy)?))
@@ -541,7 +541,7 @@ mod tests {
             .map_err(|e| format_err!("getting test_util as exec failed: {}", e))?;
         let job = job_default();
 
-        let (dir_client, dir_server) = zx::Channel::create()?;
+        let (dir_client, dir_server) = zx::Channel::create();
         let mut handles = vec![
             fproc::HandleInfo {
                 handle: dir_server.into_handle(),
@@ -625,7 +625,7 @@ mod tests {
         let test_content = format!("test content {}", u64::from_le_bytes(randbuf));
 
         let test_content_bytes = test_content.clone().into_bytes();
-        let (dir_server, dir_client) = zx::Channel::create()?;
+        let (dir_server, dir_client) = zx::Channel::create();
         let dir = pseudo_directory! {
             "test_file" => read_only_static(test_content_bytes),
         };
