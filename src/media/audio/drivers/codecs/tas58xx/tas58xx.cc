@@ -814,9 +814,15 @@ zx::result<CodecFormatInfo> Tas58xx::SetDaiFormat(const DaiFormat& format) {
         return zx::error(status);
       }
     }
-    // Restore the mute state for cases when the initialization sequence affects it.
+    WriteReg(kRegSelectPage, 0x00);
+    WriteReg(kRegSelectBook, 0x00);
+    // Restore the gain/mute state for cases when the initialization sequence affects it.
     // TODO(fxbug.dev/116503): Create an alternative mechanism for external config to avoid having
     // to restore state here.
+    status = SetGain(gain_enabled_ ? gain_state_.gain : 0.0f);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
     status = SetMute(gain_state_.muted);
     if (status != ZX_OK) {
       return zx::error(status);

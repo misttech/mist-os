@@ -1601,6 +1601,7 @@ TEST(Tas58xxTest, ExternalConfig) {
         .ExpectWriteStop({0x7f, 0x00})  // book 0.
         .ExpectWriteStop({0x02, 0x01})  // Normal modulation, mono, no PBTL (Stereo BTL).
         .ExpectWriteStop({0x03, 0x03})  // Play,
+        // Make sure to go back to page 0, book 0 after external config.
         .ExpectWriteStop({0x00, 0x00})  // Page 0.
         .ExpectWriteStop({0x7f, 0x00})  // book 0.
         .ExpectWriteStop({0x78, 0x80})  // Clear analog fault.
@@ -1625,6 +1626,12 @@ TEST(Tas58xxTest, ExternalConfig) {
     mock_i2c.ExpectWriteStop({0x02, 0x22});  // External config.
     mock_i2c.ExpectWriteStop({0x03, 0x33});  // External config DeviceCtrl2 affects mute state.
     mock_i2c.ExpectWriteStop({0x04, 0x44});  // External config.
+    // Make sure to go back to page 0, book 0 after external config.
+    mock_i2c.ExpectWriteStop({0x00, 0x00});  // Page 0.
+    mock_i2c.ExpectWriteStop({0x7f, 0x00});  // book 0.
+    // Restore gain state.
+    mock_i2c.ExpectWriteStop({0x4c, 0x6c});  // digital vol -30dB.
+    // Restore mute state.
     mock_i2c.ExpectWrite({0x03}).ExpectReadStop({0x33}).ExpectWriteStop(
         {0x03, 0x3b});  // Muted = true.
     auto formats = client.GetDaiFormats();
