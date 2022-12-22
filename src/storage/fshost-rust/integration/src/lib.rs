@@ -196,6 +196,33 @@ impl TestFixture {
             .open(fio::OpenFlags::RIGHT_READABLE, 0, "foo", server)
             .expect("open failed");
         file.get_attr().await.expect("get_attr failed");
+
+        let data = self.dir("data");
+        fuchsia_fs::directory::open_file(&data, "foo", fio::OpenFlags::RIGHT_READABLE)
+            .await
+            .unwrap();
+
+        fuchsia_fs::directory::open_directory(&data, "ssh", fio::OpenFlags::RIGHT_READABLE)
+            .await
+            .unwrap();
+        fuchsia_fs::directory::open_directory(&data, "ssh/config", fio::OpenFlags::RIGHT_READABLE)
+            .await
+            .unwrap();
+        fuchsia_fs::directory::open_directory(&data, "problems", fio::OpenFlags::RIGHT_READABLE)
+            .await
+            .unwrap();
+
+        let authorized_keys = fuchsia_fs::directory::open_file(
+            &data,
+            "ssh/authorized_keys",
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            &fuchsia_fs::file::read_to_string(&authorized_keys).await.unwrap(),
+            "public key!"
+        );
     }
 
     pub fn ramdisk_vmo(&self) -> Option<&zx::Vmo> {

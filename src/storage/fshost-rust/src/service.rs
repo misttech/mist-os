@@ -135,13 +135,13 @@ async fn write_data_file(
     let mut device = BlockDevice::new(partition_path).await.context("failed to make new device")?;
     let mut filesystem = match format {
         DiskFormat::Fxfs => {
-            launcher.serve_data(&mut device, Fxfs::dynamic_child(), inside_zxcrypt).await?
+            launcher.serve_data(&mut device, Fxfs::dynamic_child(), inside_zxcrypt, None).await?
         }
         DiskFormat::F2fs => {
-            launcher.serve_data(&mut device, F2fs::dynamic_child(), inside_zxcrypt).await?
+            launcher.serve_data(&mut device, F2fs::dynamic_child(), inside_zxcrypt, None).await?
         }
         DiskFormat::Minfs => {
-            launcher.serve_data(&mut device, Minfs::dynamic_child(), inside_zxcrypt).await?
+            launcher.serve_data(&mut device, Minfs::dynamic_child(), inside_zxcrypt, None).await?
         }
         _ => unreachable!(),
     };

@@ -4,7 +4,7 @@
 
 use {
     device_watcher::recursive_wait_and_open_node,
-    fidl::endpoints::{create_proxy, Proxy},
+    fidl::endpoints::Proxy,
     fidl_fuchsia_device::ControllerProxy,
     fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose},
     fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
@@ -398,21 +398,7 @@ impl DiskBuilder {
         .expect("from_channel failed");
         minfs.format().await.expect("format failed");
         let fs = minfs.serve().await.expect("serve_single_volume failed");
-        // Create a file called "foo" that tests can test for presence.
-        let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
-        fs.root()
-            .open(
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::CREATE,
-                0,
-                "foo",
-                server,
-            )
-            .expect("open failed");
-        // We must solicit a response since otherwise shutdown below could race and creation of
-        // the file could get dropped.
-        let _: Vec<_> = file.query().await.expect("query failed");
+        self.write_test_data(&fs.root()).await;
         fs.shutdown().await.expect("shutdown failed");
     }
 
@@ -434,21 +420,7 @@ impl DiskBuilder {
         .expect("from_channel failed");
         f2fs.format().await.expect("format failed");
         let fs = f2fs.serve().await.expect("serve_single_volume failed");
-        // Create a file called "foo" that tests can test for presence.
-        let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
-        fs.root()
-            .open(
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::CREATE,
-                0,
-                "foo",
-                server,
-            )
-            .expect("open failed");
-        // We must solicit a response since otherwise shutdown below could race and creation of
-        // the file could get dropped.
-        let _: Vec<_> = file.query().await.expect("query failed");
+        self.write_test_data(&fs.root()).await;
         fs.shutdown().await.expect("shutdown failed");
     }
 
@@ -507,22 +479,50 @@ impl DiskBuilder {
             );
             fs.create_volume("data", crypt_service).await.expect("create_volume failed")
         };
-        // Create a file called "foo" that tests can test for presence.
-        let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
-        vol.root()
-            .open(
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::CREATE,
-                0,
-                "foo",
-                server,
-            )
-            .expect("open failed");
-        // We must solicit a response since otherwise shutdown below could race and creation of
-        // the file could get dropped.
-        let _: Vec<_> = file.query().await.expect("query failed");
+        self.write_test_data(&vol.root()).await;
         fs.shutdown().await.expect("shutdown failed");
+    }
+
+    /// Create a small set of known files to test for presence. The test tree is
+    ///  root
+    ///   |- foo (file, empty)
+    ///   |- ssh (directory, non-empty)
+    ///   |   |- authorized_keys (file, non-empty)
+    ///   |   |- config (directory, empty)
+    ///   |- problems (directory, empty (no problems))
+    async fn write_test_data(&self, root: &fio::DirectoryProxy) {
+        fuchsia_fs::directory::open_file(
+            root,
+            "foo",
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::CREATE,
+        )
+        .await
+        .unwrap();
+
+        let ssh_dir = fuchsia_fs::directory::create_directory(
+            root,
+            "ssh",
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        )
+        .await
+        .unwrap();
+        let authorized_keys = fuchsia_fs::directory::open_file(
+            &ssh_dir,
+            "authorized_keys",
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::CREATE,
+        )
+        .await
+        .unwrap();
+        fuchsia_fs::file::write(&authorized_keys, "public key!").await.unwrap();
+        fuchsia_fs::directory::create_directory(&ssh_dir, "config", fio::OpenFlags::RIGHT_READABLE)
+            .await
+            .unwrap();
+
+        fuchsia_fs::directory::create_directory(&root, "problems", fio::OpenFlags::RIGHT_READABLE)
+            .await
+            .unwrap();
     }
 
     async fn write_magic<const N: usize>(
