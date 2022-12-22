@@ -49,7 +49,7 @@ SynAudioInDevice::SynAudioInDevice(ddk::MmioBuffer mmio_avio_global, ddk::MmioBu
 
 uint32_t SynAudioInDevice::PcmAmountPerTransfer() const {
   constexpr uint32_t kChannelsPerDma = 2;
-  const uint32_t kTransferSize = dma_.GetTransferSize(DmaId::kDmaIdPdmW0);
+  const uint32_t kTransferSize = size_per_notification_;
   ZX_DEBUG_ASSERT(kTransferSize % (kChannelsPerDma * cic_filter_->GetInputToOutputRatio()) == 0);
   const uint32_t kPcmDataForOneChannel =
       kTransferSize / (kChannelsPerDma * cic_filter_->GetInputToOutputRatio());
@@ -62,7 +62,6 @@ uint32_t SynAudioInDevice::FifoDepth() const {
 }
 
 void SynAudioInDevice::ProcessDma(uint32_t index) {
-  const uint32_t dma_transfer_size = dma_.GetTransferSize(DmaId::kDmaIdPdmW0);
   while (1) {
     static uint32_t run_count = 0;
     auto before = zx::clock::get_monotonic();
@@ -88,13 +87,13 @@ void SynAudioInDevice::ProcessDma(uint32_t index) {
     run_count++;
 
     // Check for overflowing.
-    if (distance <= dma_transfer_size) {
+    if (distance <= size_per_notification_) {
       overflows_++;
       zxlogf(ERROR, "%u  overflows %u", index, overflows_);
       return;  // We can't keep up.
     }
 
-    const uint32_t max_dma_to_process = dma_transfer_size;
+    const uint32_t max_dma_to_process = size_per_notification_;
     if (amount_pdm > max_dma_to_process) {
       zxlogf(DEBUG, "%u  PDM data (%u) from dhub is too big (>%u),  overflows %u", index,
              amount_pdm, max_dma_to_process, overflows_);
@@ -199,7 +198,8 @@ zx_status_t SynAudioInDevice::Init() {
   };
   notify.callback = notify_cb;
   notify.ctx = this;
-  dma_.SetNotifyCallback(DmaId::kDmaIdPdmW0, &notify);
+  dma_.SetNotifyCallback(DmaId::kDmaIdPdmW0, &notify, &size_per_notification_);
+  ZX_DEBUG_ASSERT(size_per_notification_ != 0);
   // Only need notification for PDM0, PDM1 piggybacks onto it.
 
   auto cb = [](void* arg) -> int { return reinterpret_cast<SynAudioInDevice*>(arg)->Thread(); };
@@ -218,7 +218,6 @@ zx_status_t SynAudioInDevice::GetBuffer(size_t size, zx::vmo* buffer) {
   // although if we get behind on decoding there is more latency added to the created ringbuffer.
   // Note though that it is expected for the driver to decode one transfer within the time it takes
   // to receive the next as reported on fifo_depth() (kNumberOfTransfersForFifoDepth == 2).
-  ZX_ASSERT(dma_.GetTransferSize(DmaId::kDmaIdPdmW0) == dma_.GetTransferSize(DmaId::kDmaIdPdmW1));
   ZX_ASSERT(kNumberOfDmas <= 2);
 
   auto root = zx::vmar::root_self();

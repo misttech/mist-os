@@ -64,14 +64,17 @@ protocol SharedDma {
     GetTransferSize(struct {
         channel_id uint32;
     }) -> (struct {
-        available_size uint32;
+        size_per_transfer uint32;
     });
 
     /// Specifies a callback for notifications of state change.
+    /// Notification for DmaType CYCLIC with DmaState COMPLETE are expected periodically;
+    /// size_per_notification indicates how often (in bytes) the notifications are delivered.
     SetNotifyCallback(resource struct {
         channel_id uint32;
         cb client_end:DmaNotifyCallback;
     }) -> (struct {
         s zx.status;
+        size_per_notification uint32;
     });
 };

@@ -81,6 +81,7 @@ class SynAudioInDevice {
   uintptr_t dma_base_          [kNumberOfDmas] = {};
   // clang-format on
   uint32_t overflows_ = 0;
+  uint32_t size_per_notification_ = 0;
 
   int Thread();
   uint32_t PcmAmountPerTransfer() const;

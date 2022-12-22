@@ -1,15 +1,20 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
 #include "syn-dhub.h"
 
+#include <lib/device-protocol/pdev.h>
 #include <lib/mmio/mmio.h>
+#include <lib/zx/clock.h>
 
+#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
 #include <soc/as370/as370-clk.h>
 #include <soc/as370/as370-hw.h>
 #include <zxtest/zxtest.h>
+
+#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace as370 {
 
@@ -168,4 +173,85 @@ TEST(SynDhubTest, StartDmaForChannel0) {
   region.VerifyAll();
 }
 
+class FakeMmio {
+ public:
+  explicit FakeMmio(uint32_t size) : reg_count_(size / sizeof(uint32_t)) {  // in 32 bits chunks.
+    regs_ = std::make_unique<ddk_fake::FakeMmioReg[]>(reg_count_);
+    mmio_ =
+        std::make_unique<ddk_fake::FakeMmioRegRegion>(regs_.get(), sizeof(uint32_t), reg_count_);
+  }
+
+  fake_pdev::MmioInfo mmio_info() { return {.offset = reinterpret_cast<size_t>(this)}; }
+
+  fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_->GetMmioBuffer()); }
+  ddk_fake::FakeMmioReg& reg(size_t ix) {
+    return regs_[ix >> 2];  // Registers are in virtual address units.
+  }
+
+ private:
+  const size_t reg_count_;
+  std::unique_ptr<ddk_fake::FakeMmioReg[]> regs_;
+  std::unique_ptr<ddk_fake::FakeMmioRegRegion> mmio_;
+};
+
+struct SynDhubLocal : public SynDhub {
+  shared_dma_protocol_t GetProto() { return {&this->shared_dma_protocol_ops_, this}; }
+};
+
+class DhubTest : public zxtest::Test {
+ public:
+  DhubTest() : mmio_(as370::kAudioDhubSize) {}
+  void SetUp() override {
+    fake_parent_ = MockDevice::FakeRootParent();
+    pdev_.set_mmio(0, mmio_.mmio_info());
+    pdev_.UseFakeBti();
+    zx::interrupt irq;
+    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
+    ASSERT_OK(irq.duplicate(ZX_RIGHT_SAME_RIGHTS, &irq_));
+    pdev_.set_interrupt(0, std::move(irq));
+    fake_parent_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx);
+
+    std::unique_ptr<SynDhub> server = SynDhub::Create(fake_parent_.get());
+    server_ = server.release();  // Driver managed by the DF.
+
+    auto* child_dev = fake_parent_->GetLatestChild();
+    ASSERT_NOT_NULL(child_dev);
+    auto dhub = child_dev->GetDeviceContext<SynDhubLocal>();
+    auto proto = dhub->GetProto();
+    proto_client_ = ddk::SharedDmaProtocolClient(&proto);
+  }
+  void TearDown() override {
+    server_->DdkAsyncRemove();
+    mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+  }
+
+ protected:
+  ddk::SharedDmaProtocolClient& proto_client() { return proto_client_; }
+
+ private:
+  zx::interrupt irq_;
+  fake_pdev::FakePDev pdev_;
+  FakeMmio mmio_;
+  std::shared_ptr<MockDevice> fake_parent_;
+  SynDhub* server_;
+  ddk::SharedDmaProtocolClient proto_client_;
+};
+
+TEST_F(DhubTest, SizePerNotification) {
+  uint32_t size_per_notification = 0;
+  dma_notify_callback_t notify = {};
+  auto notify_cb = [](void* ctx, dma_state_t state) -> void {};
+  notify.callback = notify_cb;
+  proto_client().SetNotifyCallback(DmaId::kDmaIdPdmW0, &notify, &size_per_notification);
+  ASSERT_EQ(size_per_notification, 16 * 1024);
+}
+
 }  // namespace as370
+
+// Redefine PDevMakeMmioBufferWeak per the recommendation in pdev.h.
+zx_status_t ddk::PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio,
+                                        std::optional<MmioBuffer>* mmio, uint32_t cache_policy) {
+  auto* test_harness = reinterpret_cast<as370::FakeMmio*>(pdev_mmio.offset);
+  mmio->emplace(test_harness->mmio());
+  return ZX_OK;
+}

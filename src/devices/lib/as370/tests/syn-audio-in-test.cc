@@ -59,12 +59,6 @@ class SynAudioInTest : public zxtest::Test {
 
     device_ = std::unique_ptr<SynAudioInDeviceTest>(
         new SynAudioInDeviceTest(std::move(global_buffer), std::move(i2s_buffer), dma_.GetProto()));
-
-    dma_notify_callback_t notify = {};
-    auto callback = [](void* ctx, dma_state_t state) -> void {};
-    notify.callback = callback;
-    dma_.ExpectSetNotifyCallback(ZX_OK, DmaId::kDmaIdPdmW0, notify);
-    device_->Init();
   }
 
   void TearDown() override {
@@ -77,6 +71,18 @@ class SynAudioInTest : public zxtest::Test {
  protected:
   std::unique_ptr<SynAudioInDeviceTest>& device() { return device_; }
   ddk::MockSharedDma& dma() { return dma_; }
+
+  void Init(uint32_t notification_size) {
+    ExpectNotificationCallback(notification_size, DmaId::kDmaIdPdmW0);
+    device_->Init();
+  }
+
+  void ExpectNotificationCallback(uint32_t size_per_notification, uint32_t client_id) {
+    dma_notify_callback_t notify = {};
+    auto notify_cb = [](void* ctx, dma_state_t state) -> void {};
+    notify.callback = notify_cb;
+    dma_.ExpectSetNotifyCallback(ZX_OK, client_id, notify, size_per_notification);
+  }
 
  private:
   fbl::Array<ddk_mock::MockMmioReg> global_mocks_;
@@ -92,7 +98,7 @@ class SynAudioInTest : public zxtest::Test {
 namespace audio {
 
 TEST_F(SynAudioInTest, ProcessDmaSimple) {
-  dma().ExpectGetTransferSize(4, DmaId::kDmaIdPdmW0);
+  Init(4);
 
   dma().ExpectGetBufferPosition(0x4, DmaId::kDmaIdPdmW0);
   dma().ExpectGetBufferPosition(0x8, DmaId::kDmaIdPdmW0);
@@ -103,7 +109,7 @@ TEST_F(SynAudioInTest, ProcessDmaSimple) {
 }
 
 TEST_F(SynAudioInTest, ProcessDmaWarp) {
-  dma().ExpectGetTransferSize(4, DmaId::kDmaIdPdmW0);
+  Init(4);
 
   dma().ExpectGetBufferPosition(0x4, DmaId::kDmaIdPdmW0);
   dma().ExpectGetBufferPosition(0x8, DmaId::kDmaIdPdmW0);
@@ -118,7 +124,7 @@ TEST_F(SynAudioInTest, ProcessDmaWarp) {
 }
 
 TEST_F(SynAudioInTest, ProcessDmaIrregular) {
-  dma().ExpectGetTransferSize(4, DmaId::kDmaIdPdmW0);
+  Init(4);
 
   dma().ExpectGetBufferPosition(0x8, DmaId::kDmaIdPdmW0);
   dma().ExpectGetBufferPosition(0xc, DmaId::kDmaIdPdmW0);
@@ -129,7 +135,7 @@ TEST_F(SynAudioInTest, ProcessDmaIrregular) {
 }
 
 TEST_F(SynAudioInTest, ProcessDmaOverflow) {
-  dma().ExpectGetTransferSize(4, DmaId::kDmaIdPdmW0);
+  Init(4);
 
   dma().ExpectGetBufferPosition(0x4, DmaId::kDmaIdPdmW0);
   dma().ExpectGetBufferPosition(0xc, DmaId::kDmaIdPdmW0);
@@ -139,14 +145,11 @@ TEST_F(SynAudioInTest, ProcessDmaOverflow) {
 }
 
 TEST_F(SynAudioInTest, ProcessDmaPdm0AndPdm1) {
+  Init(4);
+
   if (!device()->HasAtLeastTwoDmas()) {
     return;
   }
-
-  // every call to ProcessDma gets transfer size from PDM0.
-  dma().ExpectGetTransferSize(4, DmaId::kDmaIdPdmW0);
-  dma().ExpectGetTransferSize(4, DmaId::kDmaIdPdmW0);
-  dma().ExpectGetTransferSize(4, DmaId::kDmaIdPdmW0);
 
   dma().ExpectGetBufferPosition(0x4, DmaId::kDmaIdPdmW0);
   dma().ExpectGetBufferPosition(0x8, DmaId::kDmaIdPdmW0);
@@ -177,13 +180,15 @@ TEST_F(SynAudioInTest, ProcessDmaPdm0AndPdm1) {
 
 TEST_F(SynAudioInTest, FifoDepth) {
   // 16384 PDM DMA transfer size as used for PDM, generates 1024 samples at 48KHz 16 bits.
-  dma().ExpectGetTransferSize(16384, DmaId::kDmaIdPdmW0);
+  Init(16384);
 
   // 12288 = 3 channels x 1024 samples per DMA x 2 bytes per sample x 2 for ping-pong.
   ASSERT_EQ(device()->FifoDepth(), 12288);
 }
 
 TEST_F(SynAudioInTest, StartTime) {
+  Init(4);
+
   dma().ExpectStart(DmaId::kDmaIdPdmW0);
   dma().ExpectStart(DmaId::kDmaIdPdmW1);
 
@@ -195,6 +200,8 @@ TEST_F(SynAudioInTest, StartTime) {
 }
 
 TEST_F(SynAudioInTest, StopTime) {
+  Init(4);
+
   dma().ExpectStop(DmaId::kDmaIdPdmW0);
   dma().ExpectStop(DmaId::kDmaIdPdmW1);
 

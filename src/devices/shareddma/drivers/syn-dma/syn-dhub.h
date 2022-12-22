@@ -42,7 +42,8 @@ class SynDhub : public DeviceType, public ddk::SharedDmaProtocol<SynDhub, ddk::b
   void SharedDmaStop(uint32_t dma_id) { Enable(dma_id, false); }
   uint32_t SharedDmaGetTransferSize(uint32_t dma_id);
   uint32_t SharedDmaGetBufferPosition(uint32_t dma_id);
-  zx_status_t SharedDmaSetNotifyCallback(uint32_t dma_id, const dma_notify_callback_t* cb);
+  zx_status_t SharedDmaSetNotifyCallback(uint32_t dma_id, const dma_notify_callback_t* cb,
+                                         uint32_t* out_size_per_notification);
 
   void DdkUnbind(ddk::UnbindTxn txn) {
     Shutdown();
@@ -99,7 +100,7 @@ class SynDhub : public DeviceType, public ddk::SharedDmaProtocol<SynDhub, ddk::b
   fbl::Mutex position_lock_;
   // clang-format off
   bool enabled_                    [DmaId::kDmaIdMax] = {};
-  dma_notify_callback_t callback_           [DmaId::kDmaIdMax] = {};
+  dma_notify_callback_t callback_  [DmaId::kDmaIdMax] = {};
   fzl::PinnedVmo pinned_dma_buffer_[DmaId::kDmaIdMax] = {};
   zx::vmo    dma_buffer_           [DmaId::kDmaIdMax] = {};
   uint32_t   dma_size_             [DmaId::kDmaIdMax] = {};

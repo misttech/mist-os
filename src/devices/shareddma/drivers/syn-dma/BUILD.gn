@@ -44,6 +44,7 @@ fuchsia_driver("syn-dma-driver") {
 }
 
 executable("syn-dhub-test-bin") {
+  configs += [ "//build/config:all_source" ]
   testonly = true
   output_name = "syn-dhub-test"
   sources = [
@@ -57,16 +58,17 @@ executable("syn-dhub-test-bin") {
     "//sdk/lib/fdio",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/bus/lib/device-protocol-platform-device",
+    "//src/devices/bus/testing/fake-pdev",
     "//src/devices/lib/as370",
     "//src/devices/lib/mmio",
+    "//src/devices/testing/fake-mmio-reg",
+    "//src/devices/testing/mock-ddk",
     "//src/devices/testing/mock-mmio-reg",
-    "//src/devices/testing/no_ddk",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/mock-function",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
