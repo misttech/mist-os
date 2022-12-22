@@ -239,14 +239,14 @@ SECTIONS
     }
 
     /*
-     * Collects instances of StringRef for registration during trace
-     * subsystem initialization, where ids are allocated and instances
+     * Collects instances of fxt::InternedString for registration during
+     * trace subsystem initialization, where ids are allocated and instances
      * are added to the global list.
      */
-    __trace_string_refs_table : ALIGN(8) {
-        PROVIDE_HIDDEN(__start__trace_string_refs_table = .);
-        *(__trace_string_refs_table)
-        PROVIDE_HIDDEN(__stop__trace_string_refs_table = .);
+    __fxt_interned_string_table : ALIGN(8) {
+        PROVIDE_HIDDEN(__start___fxt_interned_string_table = .);
+        *(__fxt_interned_string_table)
+        PROVIDE_HIDDEN(__stop___fxt_interned_string_table = .);
     }
 
     /*

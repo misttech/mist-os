@@ -34,8 +34,8 @@ internal::KTraceState KTRACE_STATE;
 
 namespace {
 
-StringRef* ktrace_find_probe(const char* name) {
-  for (StringRef* ref = StringRef::head(); ref != nullptr; ref = ref->next) {
+const StringRef* ktrace_find_probe(const char* name) {
+  for (const StringRef* ref = StringRef::head(); ref != nullptr; ref = ref->next) {
     if (!strcmp(name, ref->string)) {
       return ref;
     }
@@ -49,7 +49,7 @@ void ktrace_add_probe(StringRef* string_ref) {
 }
 
 void ktrace_report_probes() {
-  for (StringRef* ref = StringRef::head(); ref != nullptr; ref = ref->next) {
+  for (const StringRef* ref = StringRef::head(); ref != nullptr; ref = ref->next) {
     fxt_string_record(ref->id, ref->string, strnlen(ref->string, ZX_MAX_NAME_LEN - 1));
   }
 }
@@ -90,6 +90,7 @@ void KTraceState::Init(uint32_t target_bufsize, uint32_t initial_groups) {
   // Allocations are rounded up to the nearest page size.
   target_bufsize_ = fbl::round_up(target_bufsize, static_cast<uint32_t>(PAGE_SIZE));
 
+  StringRef::SetMapStringCallback(fxt_string_record);
   StringRef::PreRegister();
 
   if (initial_groups != 0) {
@@ -582,7 +583,7 @@ zx_status_t ktrace_control(uint32_t action, uint32_t options, void* ptr) {
     case KTRACE_ACTION_NEW_PROBE: {
       const char* const string_in = static_cast<const char*>(ptr);
 
-      StringRef* ref = ktrace_find_probe(string_in);
+      const StringRef* ref = ktrace_find_probe(string_in);
       if (ref != nullptr) {
         return ref->id;
       }

@@ -10,7 +10,6 @@ zx_library("ktrace") {
   sources = [
     "ktrace.cc",
     "ktrace_thunks.cc",
-    "string_ref.cc",
   ]
   deps = [
     "//zircon/kernel/hypervisor:headers",
@@ -25,7 +24,6 @@ zx_library("ktrace") {
   public_deps = [
     ":suppress-warning",
     "//src/performance/lib/fxt:headers",
-    "//zircon/kernel/lib/special-sections",
   ]
 }
 
