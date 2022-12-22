@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 #![cfg(test)]
 
+pub mod async_stream;
 pub mod fakes;
 pub mod generate_struct;
-pub mod sme_stream;
 
+pub use async_stream::*;
 pub use fakes::*;
 pub use generate_struct::*;
-pub use sme_stream::*;
