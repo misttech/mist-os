@@ -1,0 +1,33 @@
+# Copyright 2022 The Fuchsia Authors.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+group("tests") {
+  testonly = true
+  deps = [ ":rust-shared" ]
+}
+
+rustc_test("rust-bin") {
+  name = "rust_shared_test_bin"
+
+  edition = "2021"
+
+  sources = [ "src/lib.rs" ]
+
+  deps = [
+    "//examples/rust/dylib/rust-shared",
+    "//src/lib/fuchsia",
+  ]
+
+  # rustc doesn't support linking to dylibs while using LTO unless the
+  # `-Zdylib-lto` flag is passed. For now we exclude this binary from building
+  # with any LTO variants.
+  exclude_toolchain_tags = [ "lto" ]
+}
+
+fuchsia_unittest_package("rust-shared") {
+  deps = [ ":rust-bin" ]
+}
