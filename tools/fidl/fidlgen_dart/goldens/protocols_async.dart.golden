@@ -1068,10 +1068,10 @@ class ChannelProtocolProxy extends $fidl.AsyncProxy<ChannelProtocol>
               .decodeMessageWithCallback<ChannelProtocol$EventA$Response>(
                   $message,
                   _kChannelProtocol_EventA_Type.responseInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return ChannelProtocol$EventA$Response(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[1].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
+              $types[1].decode($decoder, $offset, 1),
             );
           });
 
@@ -1314,10 +1314,10 @@ class ChannelProtocolBinding extends $fidl.AsyncBinding<ChannelProtocol> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,
                   _kChannelProtocol_MethodA_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.methodA(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[1].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
+              $types[1].decode($decoder, $offset, 1),
             );
           });
         }, close);
@@ -1332,10 +1332,10 @@ class ChannelProtocolBinding extends $fidl.AsyncBinding<ChannelProtocol> {
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>($message,
                   _kChannelProtocol_MethodB_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.methodB(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[1].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
+              $types[1].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {
@@ -1367,10 +1367,10 @@ class ChannelProtocolBinding extends $fidl.AsyncBinding<ChannelProtocol> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
-                  _kChannelProtocol_TakeHandle_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kChannelProtocol_TakeHandle_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.takeHandle(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {
@@ -1394,10 +1394,10 @@ class ChannelProtocolBinding extends $fidl.AsyncBinding<ChannelProtocol> {
           final $async.Future<$zircon.Socket> $future = $fidl
               .decodeMessageWithCallback<$async.Future<$zircon.Socket>>(
                   $message,
-                  _kChannelProtocol_MutateSocket_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kChannelProtocol_MutateSocket_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.mutateSocket(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {
@@ -1535,8 +1535,8 @@ class DiscoverableProtocolBinding
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
-                  _kDiscoverableProtocol_Method_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kDiscoverableProtocol_Method_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.method();
           });
         }, close);
@@ -1805,9 +1805,10 @@ class HandleRightsProtocolBinding
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
                   _kHandleRightsProtocol_NoResponseMethod_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                      .requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.noResponseMethod(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
         }, close);
@@ -1822,10 +1823,10 @@ class HandleRightsProtocolBinding
           final $async.Future<$zircon.Socket> $future = $fidl
               .decodeMessageWithCallback<$async.Future<$zircon.Socket>>(
                   $message,
-                  _kHandleRightsProtocol_ResponseMethod_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kHandleRightsProtocol_ResponseMethod_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.responseMethod(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {
@@ -2027,23 +2028,23 @@ class ManyParametersBinding extends $fidl.AsyncBinding<ManyParameters> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,
                   _kManyParameters_Fifteen_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.fifteen(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[1].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[2].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[3].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[4].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[5].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[6].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[7].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[8].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[9].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[10].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[11].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[12].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[13].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[14].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
+              $types[1].decode($decoder, $offset, 1),
+              $types[2].decode($decoder, $offset, 1),
+              $types[3].decode($decoder, $offset, 1),
+              $types[4].decode($decoder, $offset, 1),
+              $types[5].decode($decoder, $offset, 1),
+              $types[6].decode($decoder, $offset, 1),
+              $types[7].decode($decoder, $offset, 1),
+              $types[8].decode($decoder, $offset, 1),
+              $types[9].decode($decoder, $offset, 1),
+              $types[10].decode($decoder, $offset, 1),
+              $types[11].decode($decoder, $offset, 1),
+              $types[12].decode($decoder, $offset, 1),
+              $types[13].decode($decoder, $offset, 1),
+              $types[14].decode($decoder, $offset, 1),
             );
           });
         }, close);
@@ -2188,10 +2189,10 @@ class MethodWithUnionBinding extends $fidl.AsyncBinding<MethodWithUnion> {
           final $async.Future<TheUnion?> $future = $fidl
               .decodeMessageWithCallback<$async.Future<TheUnion?>>(
                   $message,
-                  _kMethodWithUnion_UnionMethod_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kMethodWithUnion_UnionMethod_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.unionMethod(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {
@@ -2463,9 +2464,9 @@ class TransitionalBinding extends $fidl.AsyncBinding<Transitional> {
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>($message,
                   _kTransitional_Request_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.request(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {
@@ -2497,9 +2498,9 @@ class TransitionalBinding extends $fidl.AsyncBinding<Transitional> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,
                   _kTransitional_OneWay_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.oneWay(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
         }, close);
@@ -3029,7 +3030,8 @@ class WithAndWithoutRequestResponseBinding
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
                   _kWithAndWithoutRequestResponse_NoRequestNoResponse_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                      .requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.noRequestNoResponse();
           });
         }, close);
@@ -3047,7 +3049,8 @@ class WithAndWithoutRequestResponseBinding
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
                   _kWithAndWithoutRequestResponse_NoRequestEmptyResponse_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                      .requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.noRequestEmptyResponse();
           });
           $future.then(($response) {
@@ -3076,7 +3079,8 @@ class WithAndWithoutRequestResponseBinding
               .decodeMessageWithCallback<$async.Future<String>>(
                   $message,
                   _kWithAndWithoutRequestResponse_NoRequestWithResponse_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                      .requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.noRequestWithResponse();
           });
           $future.then(($response) {
@@ -3114,9 +3118,10 @@ class WithAndWithoutRequestResponseBinding
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
                   _kWithAndWithoutRequestResponse_WithRequestNoResponse_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                      .requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.withRequestNoResponse(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
         }, close);
@@ -3134,9 +3139,10 @@ class WithAndWithoutRequestResponseBinding
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
                   _kWithAndWithoutRequestResponse_WithRequestEmptyResponse_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                      .requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.withRequestEmptyResponse(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {
@@ -3165,9 +3171,10 @@ class WithAndWithoutRequestResponseBinding
               .decodeMessageWithCallback<$async.Future<String>>(
                   $message,
                   _kWithAndWithoutRequestResponse_WithRequestWithResponse_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                      .requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.withRequestWithResponse(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {
@@ -3503,8 +3510,8 @@ class WithErrorSyntaxBinding extends $fidl.AsyncBinding<WithErrorSyntax> {
               $future = $fidl.decodeMessageWithCallback<
                       $async.Future<WithErrorSyntax$ResponseAsStruct$Response>>(
                   $message,
-                  _kWithErrorSyntax_ResponseAsStruct_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kWithErrorSyntax_ResponseAsStruct_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.responseAsStruct();
           });
           $future.then(($responseValue) {
@@ -3552,8 +3559,8 @@ class WithErrorSyntaxBinding extends $fidl.AsyncBinding<WithErrorSyntax> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
-                  _kWithErrorSyntax_ErrorAsPrimitive_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kWithErrorSyntax_ErrorAsPrimitive_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.errorAsPrimitive();
           });
           $future.then(($responseValue) {
@@ -3597,8 +3604,8 @@ class WithErrorSyntaxBinding extends $fidl.AsyncBinding<WithErrorSyntax> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
-                  _kWithErrorSyntax_ErrorAsEnum_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kWithErrorSyntax_ErrorAsEnum_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.errorAsEnum();
           });
           $future.then(($responseValue) {
@@ -3639,8 +3646,8 @@ class WithErrorSyntaxBinding extends $fidl.AsyncBinding<WithErrorSyntax> {
           final $async.Future<$zircon.Handle> $future = $fidl
               .decodeMessageWithCallback<$async.Future<$zircon.Handle>>(
                   $message,
-                  _kWithErrorSyntax_HandleInResult_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kWithErrorSyntax_HandleInResult_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.handleInResult();
           });
           $future.then(($responseValue) {
@@ -3940,10 +3947,10 @@ class WithProtocolEndsBinding extends $fidl.AsyncBinding<WithProtocolEnds> {
                       $async.Future<
                           $fidl.InterfaceHandle<DiscoverableProtocol>?>>(
                   $message,
-                  _kWithProtocolEnds_ClientEnds_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kWithProtocolEnds_ClientEnds_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.clientEnds(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {
@@ -3977,10 +3984,10 @@ class WithProtocolEndsBinding extends $fidl.AsyncBinding<WithProtocolEnds> {
                       $async.Future<
                           $fidl.InterfaceRequest<DiscoverableProtocol>>>(
                   $message,
-                  _kWithProtocolEnds_ServerEnds_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kWithProtocolEnds_ServerEnds_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.serverEnds(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {
@@ -4013,9 +4020,10 @@ class WithProtocolEndsBinding extends $fidl.AsyncBinding<WithProtocolEnds> {
               .decodeMessageWithCallback<$async.Future<ProtocolEnds>>(
                   $message,
                   _kWithProtocolEnds_StructContainingEnds_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                      .requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.structContainingEnds(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {

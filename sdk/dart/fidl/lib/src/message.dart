@@ -16,7 +16,7 @@ import 'wire_format.dart';
 const int kMessageHeaderSize = 16;
 const int kMessageTxidOffset = 0;
 const int kMessageFlagOffset = 4;
-const int kMessageDyanmicFlagOffset = 6;
+const int kMessageDynamicFlagOffset = 6;
 const int kMessageMagicOffset = 7;
 const int kMessageOrdinalOffset = 8;
 
@@ -67,7 +67,7 @@ class _BaseMessage {
   }
 
   CallStrictness get strictness =>
-      strictnessFromFlags(data.getUint8(kMessageDyanmicFlagOffset));
+      strictnessFromFlags(data.getUint8(kMessageDynamicFlagOffset));
 
   bool isCompatible() => magic == kMagicNumberInitial;
 
@@ -203,8 +203,9 @@ void _validateDecoding(Decoder decoder) {
 
 /// Decodes a FIDL message that contains a single parameter.
 T decodeMessage<T>(IncomingMessage message, int inlineSize, MemberType typ) {
-  return decodeMessageWithCallback(message, inlineSize, (Decoder decoder) {
-    return typ.decode(decoder, kMessageHeaderSize, 1);
+  return decodeMessageWithCallback(message, inlineSize,
+      (Decoder decoder, int offset) {
+    return typ.decode(decoder, offset, 1);
   });
 }
 
@@ -218,16 +219,17 @@ T decodeMessage<T>(IncomingMessage message, int inlineSize, MemberType typ) {
 /// whereas we want to retain concrete types of each decoded parameter.  The
 /// only way to accomplish this in Dart is to pass in a function that collects
 /// these multiple values into a bespoke, properly typed class.
-A decodeMessageWithCallback<A>(
-    IncomingMessage message, int inlineSize, A Function(Decoder decoder) f) {
+T decodeMessageWithCallback<T>(
+    IncomingMessage message, int inlineSize, DecodeMessageCallback<T> f) {
   final int size = kMessageHeaderSize + inlineSize;
   final Decoder decoder = Decoder(message)..claimBytes(size, 0);
-  A out = f(decoder);
+  T out = f(decoder, kMessageHeaderSize);
   final int padding = align(size) - size;
   decoder.checkPadding(size, padding);
   _validateDecoding(decoder);
   return out;
 }
 
+typedef DecodeMessageCallback<T> = T Function(Decoder decoder, int offset);
 typedef IncomingMessageSink = void Function(IncomingMessage message);
 typedef OutgoingMessageSink = void Function(OutgoingMessage message);

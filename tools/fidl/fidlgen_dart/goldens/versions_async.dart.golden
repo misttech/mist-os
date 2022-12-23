@@ -479,7 +479,7 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message, _kProtocol_Foo_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.foo();
           });
         }, close);

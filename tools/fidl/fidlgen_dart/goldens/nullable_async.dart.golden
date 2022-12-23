@@ -730,10 +730,10 @@ class SimpleProtocolBinding extends $fidl.AsyncBinding<SimpleProtocol> {
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>($message,
                   _kSimpleProtocol_Add_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.add(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[1].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
+              $types[1].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {

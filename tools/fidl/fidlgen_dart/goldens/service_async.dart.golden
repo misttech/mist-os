@@ -143,8 +143,8 @@ class FirstProtocolBinding extends $fidl.AsyncBinding<FirstProtocol> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
-                  _kFirstProtocol_MethodOnFirst_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kFirstProtocol_MethodOnFirst_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.methodOnFirst();
           });
         }, close);
@@ -260,8 +260,8 @@ class SecondProtocolBinding extends $fidl.AsyncBinding<SecondProtocol> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
-                  _kSecondProtocol_MethodOnSecond_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kSecondProtocol_MethodOnSecond_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.methodOnSecond();
           });
         }, close);

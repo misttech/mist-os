@@ -3796,6 +3796,20 @@
               "type": "SimpleFormalParameterImpl",
               "varType": "IncomingMessage"
             },
+            "offset": {
+              "isConst": false,
+              "isFinal": false,
+              "isOptional": false,
+              "isOptionalNamed": false,
+              "isOptionalPositional": false,
+              "isPositional": true,
+              "isRequired": true,
+              "isRequiredNamed": false,
+              "isRequiredPositional": true,
+              "name": "offset",
+              "type": "SimpleFormalParameterImpl",
+              "varType": "int"
+            },
             "typ": {
               "isConst": false,
               "isFinal": false,
@@ -3843,7 +3857,7 @@
               "isRequiredPositional": true,
               "name": "f",
               "type": "SimpleFormalParameterImpl",
-              "varType": "A Function(Decoder decoder)"
+              "varType": "DecodeMessageCallback<T>"
             },
             "inlineSize": {
               "isConst": false,
@@ -3875,21 +3889,21 @@
             }
           },
           "TypeParameterListImpl": {
-            "<A>": {
+            "<T>": {
               "TypeParameterImpl": {
-                "A": {
-                  "name": "A",
+                "T": {
+                  "name": "T",
                   "type": "TypeParameterImpl"
                 }
               },
-              "name": "<A>",
+              "name": "<T>",
               "type": "TypeParameterListImpl"
             }
           },
           "isGetter": false,
           "isSetter": false,
           "name": "decodeMessageWithCallback",
-          "returnType": "A",
+          "returnType": "T",
           "type": "FunctionDeclarationImpl"
         },
         "encodeMessage": {
@@ -4067,6 +4081,18 @@
           "type": "FunctionDeclarationImpl"
         }
       },
+      "TypeParameterListImpl": {
+        "<T>": {
+          "TypeParameterImpl": {
+            "T": {
+              "name": "T",
+              "type": "TypeParameterImpl"
+            }
+          },
+          "name": "<T>",
+          "type": "TypeParameterListImpl"
+        }
+      },
       "VariableDeclarationImpl": {
         "kMagicNumberInitial": {
           "isConst": true,
@@ -4076,11 +4102,11 @@
           "type": "VariableDeclarationImpl",
           "varType": "int"
         },
-        "kMessageDyanmicFlagOffset": {
+        "kMessageDynamicFlagOffset": {
           "isConst": true,
           "isFinal": false,
           "isLate": false,
-          "name": "kMessageDyanmicFlagOffset",
+          "name": "kMessageDynamicFlagOffset",
           "type": "VariableDeclarationImpl",
           "varType": "int"
         },

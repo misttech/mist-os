@@ -2618,7 +2618,8 @@ class TestProtocolBinding extends $fidl.AsyncBinding<TestProtocol> {
                   $async.Future<StrictBoundedXUnion>>(
               $message,
               _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Type
-                  .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  .requestInlineSize($wireFormat),
+              ($fidl.Decoder $decoder, int $offset) {
             return _impl.strictXUnionHenceResponseMayBeStackAllocated();
           });
           $future.then(($response) {
@@ -2658,7 +2659,8 @@ class TestProtocolBinding extends $fidl.AsyncBinding<TestProtocol> {
                   $async.Future<OlderSimpleUnion>>(
               $message,
               _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Type
-                  .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  .requestInlineSize($wireFormat),
+              ($fidl.Decoder $decoder, int $offset) {
             return _impl.flexibleXUnionHenceResponseMustBeHeapAllocated();
           });
           $future.then(($response) {

@@ -2982,10 +2982,10 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
-                  _kMainProtocol_OneWayAnonComposed_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kMainProtocol_OneWayAnonComposed_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.oneWayAnonComposed(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
         }, close);
@@ -3004,11 +3004,10 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
                       $async.Future<
                           lib$test_protocollayouts_imported
                               .ComposedProtocolTwoWayAnonComposedResponse>>(
-                  $message,
-                  _kMainProtocol_TwoWayAnonComposed_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  $message, _kMainProtocol_TwoWayAnonComposed_Type.requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.twoWayAnonComposed(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {
@@ -3040,18 +3039,18 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
               _kMainProtocol_TwoWayAnonComposedWithError_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
-          final $async.Future<
-                  lib$test_protocollayouts_imported
-                      .ComposedProtocolTwoWayAnonComposedWithErrorResponse>
+          final $async
+                  .Future<lib$test_protocollayouts_imported.ComposedProtocolTwoWayAnonComposedWithErrorResponse>
               $future = $fidl.decodeMessageWithCallback<
                       $async.Future<
                           lib$test_protocollayouts_imported
                               .ComposedProtocolTwoWayAnonComposedWithErrorResponse>>(
                   $message,
                   _kMainProtocol_TwoWayAnonComposedWithError_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                      .requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.twoWayAnonComposedWithError(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($responseValue) {
@@ -3097,10 +3096,10 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
-                  _kMainProtocol_OneWayNamedComposed_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kMainProtocol_OneWayNamedComposed_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.oneWayNamedComposed(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
         }, close);
@@ -3119,10 +3118,10 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
                           lib$test_protocollayouts_imported
                               .ImportTablePayload>>(
                   $message,
-                  _kMainProtocol_TwoWayNamedComposed_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kMainProtocol_TwoWayNamedComposed_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.twoWayNamedComposed(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {
@@ -3162,9 +3161,10 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
                               .ImportUnionPayload>>(
                   $message,
                   _kMainProtocol_TwoWayNamedComposedWithError_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                      .requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.twoWayNamedComposedWithError(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($responseValue) {
@@ -3210,10 +3210,10 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
-                  _kMainProtocol_OneWayImport_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kMainProtocol_OneWayImport_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.oneWayImport(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
         }, close);
@@ -3232,10 +3232,10 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
                           lib$test_protocollayouts_imported
                               .ImportTablePayload>>(
                   $message,
-                  _kMainProtocol_TwoWayImport_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kMainProtocol_TwoWayImport_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.twoWayImport(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {
@@ -3271,10 +3271,10 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
                           lib$test_protocollayouts_imported
                               .ImportUnionPayload>>(
                   $message,
-                  _kMainProtocol_TwoWayImportWithError_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kMainProtocol_TwoWayImportWithError_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.twoWayImportWithError(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($responseValue) {
@@ -3318,10 +3318,10 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
-                  _kMainProtocol_OneWayLocal_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kMainProtocol_OneWayLocal_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.oneWayLocal(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
         }, close);
@@ -3336,10 +3336,10 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           final $async.Future<LocalTablePayload> $future = $fidl
               .decodeMessageWithCallback<$async.Future<LocalTablePayload>>(
                   $message,
-                  _kMainProtocol_TwoWayLocal_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kMainProtocol_TwoWayLocal_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.twoWayLocal(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {
@@ -3371,10 +3371,10 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           final $async.Future<LocalUnionPayload> $future = $fidl
               .decodeMessageWithCallback<$async.Future<LocalUnionPayload>>(
                   $message,
-                  _kMainProtocol_TwoWayLocalWithError_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kMainProtocol_TwoWayLocalWithError_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.twoWayLocalWithError(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($responseValue) {
@@ -3418,9 +3418,9 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,
                   _kMainProtocol_OneWayAnon_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.oneWayAnon(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
         }, close);
@@ -3436,9 +3436,9 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
               .decodeMessageWithCallback<
                       $async.Future<MainProtocolTwoWayAnonResponse>>($message,
                   _kMainProtocol_TwoWayAnon_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.twoWayAnon(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {
@@ -3471,10 +3471,10 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
               $fidl.decodeMessageWithCallback<
                       $async.Future<MainProtocolTwoWayAnonWithErrorResponse>>(
                   $message,
-                  _kMainProtocol_TwoWayAnonWithError_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kMainProtocol_TwoWayAnonWithError_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.twoWayAnonWithError(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($responseValue) {

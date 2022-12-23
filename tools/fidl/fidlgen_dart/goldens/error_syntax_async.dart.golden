@@ -414,9 +414,10 @@ class ExampleUseOfErrorSyntaxBinding
               .decodeMessageWithCallback<$async.Future<int>>(
                   $message,
                   _kExampleUseOfErrorSyntax_ComposedCallWhichMayFail_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                      .requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.composedCallWhichMayFail(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($responseValue) {
@@ -467,9 +468,10 @@ class ExampleUseOfErrorSyntaxBinding
               .decodeMessageWithCallback<$async.Future<int>>(
                   $message,
                   _kExampleUseOfErrorSyntax_CallWhichMayFail_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                      .requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.callWhichMayFail(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($responseValue) {

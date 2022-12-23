@@ -87,7 +87,7 @@ class Encoder {
     encodeUint32(txid, kMessageTxidOffset);
     encodeUint8(kWireFormatV2FlagMask, kMessageFlagOffset);
     encodeUint8(0, kMessageFlagOffset + 1);
-    encodeUint8(strictnessToFlags(strictness), kMessageDyanmicFlagOffset);
+    encodeUint8(strictnessToFlags(strictness), kMessageDynamicFlagOffset);
     encodeUint8(kMagicNumberInitial, kMessageMagicOffset);
     encodeUint64(ordinal, kMessageOrdinalOffset);
   }

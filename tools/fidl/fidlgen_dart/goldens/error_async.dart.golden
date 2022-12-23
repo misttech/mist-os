@@ -308,9 +308,9 @@ class ExampleBinding extends $fidl.AsyncBinding<Example> {
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
                   $message, _kExample_foo_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.foo(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($responseValue) {

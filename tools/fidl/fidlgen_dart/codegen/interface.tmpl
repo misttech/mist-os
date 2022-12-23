@@ -40,10 +40,10 @@ $async.Future<void>
       $fidl.decodeMessageWithCallback<{{ .AsyncResponseClass }}>(
         $message,
         {{ .TypeSymbol }}.responseInlineSize($wireFormat),
-        ($fidl.Decoder decoder) {
+        ($fidl.Decoder $decoder, int $offset) {
           return {{ .AsyncResponseClass }}(
             {{- range $index, $response := .Response.WireParameters }}
-              $types[{{ $index }}].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[{{ $index }}].decode($decoder, $offset, 1),
             {{- end -}}
           );
         }
@@ -421,10 +421,10 @@ class {{ .BindingName }} extends $fidl.AsyncBinding<{{ .ServerName }}> {
               final {{ template "AsyncReturn" . }} $future = $fidl.decodeMessageWithCallback<{{ template "AsyncReturn" . }}>(
                 $message,
                 {{ .TypeSymbol }}.requestInlineSize($wireFormat),
-                ($fidl.Decoder decoder) {
+                ($fidl.Decoder $decoder, int $offset) {
                   return _impl.{{ .Name }}(
                     {{- range $index, $request := .Request }}
-                      $types[{{ $index }}].decode(decoder, $fidl.kMessageHeaderSize, 1),
+                      $types[{{ $index }}].decode($decoder, $offset, 1),
                     {{- end }}
                   );
                 }

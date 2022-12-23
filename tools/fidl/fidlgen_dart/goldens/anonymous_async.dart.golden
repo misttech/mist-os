@@ -972,10 +972,10 @@ class SomeProtocolBinding extends $fidl.AsyncBinding<SomeProtocol> {
           final $async.Future<BitsMember> $future = $fidl
               .decodeMessageWithCallback<$async.Future<BitsMember>>($message,
                   _kSomeProtocol_SomeMethod_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.someMethod(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
-              $types[1].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
+              $types[1].decode($decoder, $offset, 1),
             );
           });
           $future.then(($responseValue) {

@@ -732,7 +732,7 @@ class InterfaceBinding extends $fidl.AsyncBinding<Interface> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,
                   _kInterface_Method_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.method();
           });
         }, close);

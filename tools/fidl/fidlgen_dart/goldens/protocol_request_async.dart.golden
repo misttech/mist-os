@@ -346,7 +346,7 @@ class ParentBinding extends $fidl.AsyncBinding<Parent> {
               .decodeMessageWithCallback<
                       $async.Future<$fidl.InterfaceHandle<Child>>>($message,
                   _kParent_GetChild_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.getChild();
           });
           $future.then(($response) {
@@ -378,7 +378,7 @@ class ParentBinding extends $fidl.AsyncBinding<Parent> {
               .decodeMessageWithCallback<
                       $async.Future<$fidl.InterfaceRequest<Child>>>($message,
                   _kParent_GetChildRequest_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.getChildRequest();
           });
           $future.then(($response) {
@@ -410,9 +410,9 @@ class ParentBinding extends $fidl.AsyncBinding<Parent> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,
                   _kParent_TakeChild_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.takeChild(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
         }, close);
@@ -427,9 +427,9 @@ class ParentBinding extends $fidl.AsyncBinding<Parent> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,
                   _kParent_TakeChildRequest_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.takeChildRequest(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
         }, close);

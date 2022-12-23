@@ -329,9 +329,9 @@ class EmptyProtocolBinding extends $fidl.AsyncBinding<EmptyProtocol> {
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,
                   _kEmptyProtocol_Send_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.send(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
         }, close);
@@ -346,10 +346,10 @@ class EmptyProtocolBinding extends $fidl.AsyncBinding<EmptyProtocol> {
           final $async.Future<Empty> $future = $fidl
               .decodeMessageWithCallback<$async.Future<Empty>>(
                   $message,
-                  _kEmptyProtocol_SendAndReceive_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kEmptyProtocol_SendAndReceive_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.sendAndReceive(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {

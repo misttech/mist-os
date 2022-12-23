@@ -1381,10 +1381,10 @@ class DenyEachBindingBinding extends $fidl.AsyncBinding<DenyEachBinding> {
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
                   $message,
-                  _kDenyEachBinding_OnlyDenyCpp_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kDenyEachBinding_OnlyDenyCpp_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.onlyDenyCpp(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($responseValue) {
@@ -1425,10 +1425,10 @@ class DenyEachBindingBinding extends $fidl.AsyncBinding<DenyEachBinding> {
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
                   $message,
-                  _kDenyEachBinding_OnlyDenyGo_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kDenyEachBinding_OnlyDenyGo_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.onlyDenyGo(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($responseValue) {
@@ -1469,10 +1469,10 @@ class DenyEachBindingBinding extends $fidl.AsyncBinding<DenyEachBinding> {
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
                   $message,
-                  _kDenyEachBinding_OnlyDenyLibfuzzer_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kDenyEachBinding_OnlyDenyLibfuzzer_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.onlyDenyLibfuzzer(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($responseValue) {
@@ -1516,10 +1516,10 @@ class DenyEachBindingBinding extends $fidl.AsyncBinding<DenyEachBinding> {
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
                   $message,
-                  _kDenyEachBinding_OnlyDenyRust_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kDenyEachBinding_OnlyDenyRust_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.onlyDenyRust(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($responseValue) {
@@ -1560,10 +1560,10 @@ class DenyEachBindingBinding extends $fidl.AsyncBinding<DenyEachBinding> {
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
                   $message,
-                  _kDenyEachBinding_OnlyDenySyzkaller_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kDenyEachBinding_OnlyDenySyzkaller_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.onlyDenySyzkaller(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($responseValue) {
@@ -1742,8 +1742,8 @@ class ImportsSameNameContextBinding
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
-                  _kImportsSameNameContext_Unattributed_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                  _kImportsSameNameContext_Unattributed_Type.requestInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
             return _impl.unattributed();
           });
         }, close);
@@ -1761,7 +1761,8 @@ class ImportsSameNameContextBinding
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
                   _kImportsSameNameContext_AlwaysAppearsInImportingLibrary_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                      .requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.alwaysAppearsInImportingLibrary();
           });
         }, close);

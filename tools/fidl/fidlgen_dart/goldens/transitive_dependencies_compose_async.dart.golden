@@ -157,7 +157,7 @@ class TopBinding extends $fidl.AsyncBinding<Top> {
           final $async.Future<lib$test_bottom.Foo> $future = $fidl
               .decodeMessageWithCallback<$async.Future<lib$test_bottom.Foo>>(
                   $message, _kTop_GetFoo_Type.requestInlineSize($wireFormat),
-                  ($fidl.Decoder decoder) {
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.getFoo();
           });
           $future.then(($response) {

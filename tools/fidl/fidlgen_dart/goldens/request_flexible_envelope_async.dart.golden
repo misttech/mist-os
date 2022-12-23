@@ -412,9 +412,10 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
               .decodeMessageWithCallback<$async.Future<FlexibleFoo>>(
                   $message,
                   _kProtocol_RequestStrictResponseFlexible_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                      .requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.requestStrictResponseFlexible(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {
@@ -449,9 +450,10 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
               .decodeMessageWithCallback<$async.Future<StrictFoo>>(
                   $message,
                   _kProtocol_RequestFlexibleResponseStrict_Type
-                      .requestInlineSize($wireFormat), ($fidl.Decoder decoder) {
+                      .requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
             return _impl.requestFlexibleResponseStrict(
-              $types[0].decode(decoder, $fidl.kMessageHeaderSize, 1),
+              $types[0].decode($decoder, $offset, 1),
             );
           });
           $future.then(($response) {
