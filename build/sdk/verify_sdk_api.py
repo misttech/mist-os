@@ -22,6 +22,12 @@ def main():
         '--warn',
         help='Whether API changes should only cause warnings',
         action='store_true')
+    parser.add_argument(
+        '--base_reference',
+        help=
+        'If the reference has been filtered to remove items, this is the original file'
+    )
+
     args = parser.parse_args()
 
     if not args.reference:
@@ -72,12 +78,25 @@ def main():
     if removed_ids or added_ids:
         type = 'Warning' if args.warn else 'Error'
         print('%s: SDK contents have changed!' % type)
-        print('Please acknowledge this change by running:')
-        print(
-            '  cp ' + os.path.abspath(args.updated) + ' ' +
-            os.path.abspath(args.reference))
-        print('Elements can be marked optional with a leading question mark.')
-        print('Please remember to complete transitions by marking elements required!')
+        if args.base_reference:
+            print(
+                'The manifest cannot be automatically updated when not cross compiling host tools'
+            )
+            print(
+                'Please update the manifest manually - {}'.format(
+                    args.base_reference))
+            print(
+                'or run fx set with "--args sdk_cross_compile_host_tools=true"')
+        else:
+            print('Please acknowledge this change by running:')
+            print(
+                '  cp ' + os.path.abspath(args.updated) + ' ' +
+                os.path.abspath(args.reference))
+            print(
+                'Elements can be marked optional with a leading question mark.')
+            print(
+                'Please remember to complete transitions by marking elements required!'
+            )
         if not args.warn:
             return 1
 

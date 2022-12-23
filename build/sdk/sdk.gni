@@ -110,6 +110,8 @@ template("sdk") {
 
   computed_api_file = "$root_out_dir/sdk/api/$sdk_name"
 
+  base_reference_manifest = ""
+
   if (defined(invoker.api)) {
     api_reference = invoker.api
     api_deps = []
@@ -135,6 +137,7 @@ template("sdk") {
           "sdk://tools/",
         ]
       }
+      base_reference_manifest = api_reference
       api_reference = host_api
       api_deps = [ ":$host_api_target" ]
     }
@@ -168,6 +171,13 @@ template("sdk") {
 
     if (warn_on_sdk_changes) {
       args += [ "--warn" ]
+    }
+
+    if (base_reference_manifest != "") {
+      args += [
+        "--base_reference",
+        rebase_path(base_reference_manifest, root_build_dir),
+      ]
     }
 
     public_deps = [ ":$generation_target_name" ]
