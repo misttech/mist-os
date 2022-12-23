@@ -364,6 +364,8 @@ windows_x86_64_msvc = { path = "empty/windows_x86_64_msvc" }
 fatfs = { path = "forks/fatfs" }
 hound = { path = "forks/hound" }
 libm = { path = "forks/libm" }
+# FIXME(118248): We can unfork once undefined behavior is resolved.
+prettytable-rs = { path = "forks/prettytable-rs" }
 pulldown-cmark = { path = "forks/pulldown-cmark" }
 # FIXME(87798): We can unfork to 0.19.1 once we've updated hyper to 0.14.x, and
 # tokio to 1.x.

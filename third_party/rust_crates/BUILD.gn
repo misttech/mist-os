@@ -7674,8 +7674,7 @@ rust_library("pretty_assertions-v1_2_1") {
 
 rust_library("prettytable-rs-v0_8_0") {
   crate_name = "prettytable"
-  crate_root =
-      "//third_party/rust_crates/vendor/prettytable-rs-0.8.0/src/lib.rs"
+  crate_root = "//third_party/rust_crates/forks/prettytable-rs/src/lib.rs"
   output_name = "prettytable-1855933ce08984ad"
   configs -= [ "//build/config/rust:2018_idioms" ]
 

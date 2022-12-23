@@ -1,0 +1,16 @@
+* What is this crate used for?
+Creating pretty tables for printing to console.
+
+* Are there any use restrictions? i.e. only for development hosts
+No.
+
+* What differs from upstream? Include a changelog if feasible.
+Contains changes from https://github.com/phsym/prettytable-rs/pull/146 to
+resolve https://github.com/phsym/prettytable-rs/issues/145.
+
+* Are there any restrictions to how it should be rolled?
+No.
+
+* Is there anything else which makes this dependency "special"?
+We're hot patching because there is undefined behavior blocking a toolchain
+release, and crate authors are not acting after 3 weeks.
