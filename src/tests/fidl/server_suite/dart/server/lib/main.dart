@@ -229,6 +229,73 @@ class OpenTargetImpl extends OpenTargetServer {
   }
 }
 
+class LargeMessageTargetImpl extends LargeMessageTargetServer {
+  LargeMessageTargetImpl({ReporterProxy reporter}) : _reporter = reporter;
+
+  final ReporterProxy _reporter;
+
+  Future<void> decodeBoundedKnownToBeSmall(Uint8List bytes) async {
+    await _reporter.receivedStrictOneWay();
+  }
+
+  Future<void> decodeBoundedMaybeLarge(Uint8List bytes) async {
+    await _reporter.receivedStrictOneWay();
+  }
+
+  Future<void> decodeSemiBoundedBelievedToBeSmall(
+      SemiBoundedBelievedToBeSmall payload) async {
+    await _reporter.receivedStrictOneWay();
+  }
+
+  Future<void> decodeSemiBoundedMaybeLarge(
+      SemiBoundedMaybeLarge payload) async {
+    await _reporter.receivedStrictOneWay();
+  }
+
+  Future<void> decodeUnboundedMaybeLargeValue(Uint8List bytes) async {
+    await _reporter.receivedStrictOneWay();
+  }
+
+  Future<void> decodeUnboundedMaybeLargeResource(
+      List<Elements> elements) async {
+    await _reporter.receivedStrictOneWay();
+  }
+
+  Future<Uint8List> encodeBoundedKnownToBeSmall(Uint8List bytes) async {
+    return bytes;
+  }
+
+  Future<Uint8List> encodeBoundedMaybeLarge(Uint8List bytes) async {
+    return bytes;
+  }
+
+  Future<SemiBoundedBelievedToBeSmall> encodeSemiBoundedBelievedToBeSmall(
+      SemiBoundedBelievedToBeSmall payload) async {
+    return payload;
+  }
+
+  Future<SemiBoundedMaybeLarge> encodeSemiBoundedMaybeLarge(
+      SemiBoundedMaybeLarge payload) async {
+    return payload;
+  }
+
+  Future<Uint8List> encodeUnboundedMaybeLargeValue(Uint8List bytes) async {
+    return bytes;
+  }
+
+  Future<List<Elements>> encodeUnboundedMaybeLargeResource(
+      bool populateUnsetHandles, UnboundedMaybeLargeResource data) async {
+    // TODO(fxbug.dev/114263): Support populating unset handles. This will probably require using a
+    // zircon object besides an event, since the Dart runtime has no API for creating zircon events.
+    return data.elements;
+  }
+
+  Future<void> $unknownMethod(UnknownMethodMetadata metadata) async {
+    await _reporter.receivedUnknownMethod(
+        metadata.ordinal, convertUnknownMethodType(metadata.unknownMethodType));
+  }
+}
+
 class RunnerImpl extends Runner {
   Future<bool> isTestEnabled(Test test) async {
     switch (test) {
@@ -260,18 +327,11 @@ class RunnerImpl extends Runner {
       //   have the rights specified in the handle dispositions list.
       case Test.serverSendsTooFewRights:
         return false;
-      case Test.goodDecodeBoundedKnownSmallMessage:
-      case Test.goodDecodeBoundedMaybeSmallMessage:
       case Test.goodDecodeBoundedMaybeLargeMessage:
-      case Test.goodDecodeSemiBoundedUnknowableSmallMessage:
       case Test.goodDecodeSemiBoundedUnknowableLargeMessage:
-      case Test.goodDecodeSemiBoundedMaybeSmallMessage:
       case Test.goodDecodeSemiBoundedMaybeLargeMessage:
-      case Test.goodDecodeUnboundedSmallMessage:
       case Test.goodDecodeUnboundedLargeMessage:
-      case Test.goodDecode64HandleSmallMessage:
       case Test.goodDecode63HandleLargeMessage:
-      case Test.goodDecodeUnknownSmallMessage:
       case Test.goodDecodeUnknownLargeMessage:
       case Test.badDecodeByteOverflowFlagSetOnBoundedSmallMessage:
       case Test.badDecodeByteOverflowFlagSetOnUnboundedSmallMessage:
@@ -293,15 +353,9 @@ class RunnerImpl extends Runner {
       case Test.badDecodeLargeMessageInfoByteCountTooLarge:
         // TODO(fxbug.dev/114261): Test decoding large messages.
         return false;
-      case Test.goodEncodeBoundedKnownSmallMessage:
-      case Test.goodEncodeBoundedMaybeSmallMessage:
       case Test.goodEncodeBoundedMaybeLargeMessage:
-      case Test.goodEncodeSemiBoundedKnownSmallMessage:
-      case Test.goodEncodeSemiBoundedMaybeSmallMessage:
       case Test.goodEncodeSemiBoundedMaybeLargeMessage:
-      case Test.goodEncodeUnboundedSmallMessage:
       case Test.goodEncodeUnboundedLargeMessage:
-      case Test.goodEncode64HandleSmallMessage:
       case Test.goodEncode63HandleLargeMessage:
       case Test.badEncode64HandleLargeMessage:
         // TODO(fxbug.dev/114263): Test encoding large messages.
@@ -332,10 +386,9 @@ class RunnerImpl extends Runner {
       var server = OpenTargetImpl(reporter: reporter, binding: binding);
       binding.bind(server, target.openTarget);
     } else if (target.largeMessageTarget != null) {
-      // TODO(fxbug.dev/114261): Test decoding large messages.
-      // TODO(fxbug.dev/114263): Test encoding large messages.
-      throw ArgumentError(
-          "Unimplemented AnyTarget variant: LargeMessageTarget");
+      var binding = LargeMessageTargetBinding();
+      var server = LargeMessageTargetImpl(reporter: reporter);
+      binding.bind(server, target.largeMessageTarget);
     } else {
       throw ArgumentError("Unknown AnyTarget variant: ${target.$ordinal}");
     }
