@@ -110,6 +110,10 @@ void AudioInput::OnDriverInfoFetched() {
   if (profile.driver_gain_db()) {
     float driver_gain_db = *profile.driver_gain_db();
     AudioDeviceSettings::GainState gain_state = {.gain_db = driver_gain_db, .muted = false};
+    if constexpr (kLogSetDeviceGainMuteActions) {
+      FX_LOGS(INFO) << "Based on profile driver_gain_db, we will call StreamConfig/SetGain("
+                    << driver_gain_db << ", unmuted)";
+    }
     driver()->SetGain(gain_state, AUDIO_SGF_GAIN_VALID | AUDIO_SGF_MUTE_VALID);
   }
 
@@ -228,6 +232,11 @@ void AudioInput::UpdateDriverGainState() {
     return;
   }
 
+  if constexpr (kLogSetDeviceGainMuteActions) {
+    FX_LOGS(INFO) << "Updating input gain: StreamConfig/SetGain(" << gain_state.gain_db
+                  << (gain_state.muted ? ", muted" : "") << (gain_state.agc_enabled ? ", agc" : "")
+                  << ")";
+  }
   driver()->SetGain(gain_state, dirty_flags);
 }
 

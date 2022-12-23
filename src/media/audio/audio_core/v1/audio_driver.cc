@@ -1037,7 +1037,6 @@ zx_status_t AudioDriver::SetGain(const AudioDeviceSettings::GainState& gain_stat
 
 zx_status_t AudioDriver::SetGain(const AudioDeviceSettings::GainState& gain_state) {
   TRACE_DURATION("audio", "AudioDriver::SetGain");
-
   fuchsia::hardware::audio::GainState gain_state2 = {};
   if (gain_state.muted) {
     gain_state2.set_muted(true);
@@ -1046,6 +1045,12 @@ zx_status_t AudioDriver::SetGain(const AudioDeviceSettings::GainState& gain_stat
     gain_state2.set_agc_enabled(true);
   }
   gain_state2.set_gain_db(gain_state.gain_db);
+  if constexpr (kLogSetDeviceGainMuteActions) {
+    FX_LOGS(INFO) << "AudioDriver(" << (owner_->is_output() ? "output" : "input")
+                  << "): StreamConfig/SetGain(" << gain_state.gain_db
+                  << (gain_state.muted ? ", MUTED" : "") << (gain_state.agc_enabled ? ", AGC" : "")
+                  << ")";
+  }
   stream_config_fidl_->SetGain(std::move(gain_state2));
   return ZX_OK;
 }

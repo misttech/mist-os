@@ -393,6 +393,9 @@ void DriverOutput::OnDriverInfoFetched() {
   if (profile.driver_gain_db()) {
     float driver_gain_db = *profile.driver_gain_db();
     AudioDeviceSettings::GainState gain_state = {.gain_db = driver_gain_db, .muted = false};
+    if constexpr (kLogSetDeviceGainMuteActions) {
+      FX_LOGS(INFO) << "Calling driver->SetGain(" << driver_gain_db << ", unmuted)";
+    }
     driver()->SetGain(gain_state, AUDIO_SGF_GAIN_VALID | AUDIO_SGF_MUTE_VALID);
   }
 

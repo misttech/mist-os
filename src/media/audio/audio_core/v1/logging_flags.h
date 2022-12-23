@@ -61,7 +61,7 @@ inline constexpr bool kLogPresentationDelay = false;
 //
 inline constexpr bool kLogAudioDevice = false;
 inline constexpr bool kLogDevicePlugUnplug = true;
-inline constexpr bool kLogSetDeviceGainMuteActions = false;
+inline constexpr bool kLogSetDeviceGainMuteActions = true;
 
 // Values retrieved from the audio driver related to delay, and associated calculations.
 inline constexpr bool kLogDriverDelayProperties = false;
