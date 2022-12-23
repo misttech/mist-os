@@ -1350,6 +1350,12 @@ uint64_t UsbXhci::UsbHciGetCurrentFrame() {
   if (!running_) {
     return 0;
   }
+
+  // Locking the logic below is important; without the lock, race conditions
+  // were observed which led to "phantom" wraps being incorrectly counted.
+  static fbl::Mutex lock;
+  fbl::AutoLock _(&lock);
+
   uint32_t mfindex = MFINDEX::Get(runtime_offset_).ReadFrom(&mmio_.value()).INDEX();
   if (mfindex < last_mfindex_) {
     // Wrapped
