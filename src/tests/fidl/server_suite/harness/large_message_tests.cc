@@ -454,10 +454,25 @@ LARGE_MESSAGE_SERVER_TEST(GoodDecodeUnknownLargeMessage) {
 // Bad decode tests
 // ////////////////////////////////////////////////////////////////////////
 
-LARGE_MESSAGE_SERVER_TEST(BadDecodeByteOverflowFlagSetOnSmallMessage) {
+LARGE_MESSAGE_SERVER_TEST(BadDecodeByteOverflowFlagSetOnBoundedSmallMessage) {
+  // This payload is entirely correct, except the `byte_overflow` flag has been erroneously flipped
+  // to indicate that this is a large message.
+  uint32_t n = kSmallStructByteVectorSize;
+  Bytes bytes_in = {
+      header(kOneWayTxid, kDecodeBoundedKnownToBeSmall, kStrictMethodAndByteOverflow),
+      vector_header(n),
+      repeat(kSomeByte).times(n),
+  };
+
+  ASSERT_OK(client_end().write(bytes_in));
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+}
+
+LARGE_MESSAGE_SERVER_TEST(BadDecodeByteOverflowFlagSetOnUnboundedSmallMessage) {
   auto writer = UnboundedMaybeLargeResourceWriter::SmallMessageAnd64Handles();
 
-  // The `kStrictMethodAndByteOverflow` flag here is incorrect - there is no overflow buffer.
+  // The |kStrictMethodAndByteOverflow| flag here is incorrect - there is no overflow buffer.
   writer.WriteSmallMessageForDecode(
       client_end(),
       header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow));
@@ -466,10 +481,10 @@ LARGE_MESSAGE_SERVER_TEST(BadDecodeByteOverflowFlagSetOnSmallMessage) {
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
 }
 
-LARGE_MESSAGE_SERVER_TEST(BadDecodeByteOverflowFlagUnsetOnLargeMessage) {
+LARGE_MESSAGE_SERVER_TEST(BadDecodeByteOverflowFlagUnsetOnUnboundedLargeMessage) {
   auto writer = UnboundedMaybeLargeResourceWriter::LargeMessageAnd63Handles();
 
-  // The `kStrictMethod` flag here is incorrect - the `byte_overflow` flag should be set too.
+  // The |kStrictMethod| flag here is incorrect - the `byte_overflow` flag should be set too.
   writer.WriteLargeMessageForDecode(client_end(),
                                     header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource,
                                            fidl::MessageDynamicFlags::kStrictMethod));

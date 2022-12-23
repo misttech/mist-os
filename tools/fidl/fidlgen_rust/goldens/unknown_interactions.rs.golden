@@ -3736,7 +3736,9 @@ impl UnknownInteractionsAjarProtocolEvent {
             0x6022ae999e9dc2b0 => {
                 let mut out_tuple: () = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictEventEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -3746,7 +3748,9 @@ impl UnknownInteractionsAjarProtocolEvent {
             0x510586752445c769 => {
                 let mut out_tuple: (i32,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictEventFieldsEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -3756,8 +3760,7 @@ impl UnknownInteractionsAjarProtocolEvent {
             0x57794b4cc91f816f => {
                 let mut out_tuple: (UnknownInteractionsAjarProtocolStrictEventUnionRequest,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictEventUnionEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsAjarProtocolEvent::StrictEventUnion {payload: out_tuple.0,}
@@ -3766,8 +3769,7 @@ impl UnknownInteractionsAjarProtocolEvent {
             0x92639249201f89d => {
                 let mut out_tuple: (UnknownInteractionsAjarProtocolStrictEventTableRequest,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictEventTableEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsAjarProtocolEvent::StrictEventTable {payload: out_tuple.0,}
@@ -3776,7 +3778,9 @@ impl UnknownInteractionsAjarProtocolEvent {
             0x715bfcab27f735ed => {
                 let mut out_tuple: (UnknownInteractionsAjarProtocolStrictEventErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictEventErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -3786,7 +3790,9 @@ impl UnknownInteractionsAjarProtocolEvent {
             0x3ae22659224effb9 => {
                 let mut out_tuple: (UnknownInteractionsAjarProtocolStrictEventFieldsErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictEventFieldsErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -3796,8 +3802,7 @@ impl UnknownInteractionsAjarProtocolEvent {
             0xab5b2d1199942b => {
                 let mut out_tuple: (UnknownInteractionsAjarProtocolStrictEventUnionErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictEventUnionErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsAjarProtocolEvent::StrictEventUnionErr {result: out_tuple.0,}
@@ -3806,8 +3811,7 @@ impl UnknownInteractionsAjarProtocolEvent {
             0x6c6abc426c7c8406 => {
                 let mut out_tuple: (UnknownInteractionsAjarProtocolStrictEventTableErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictEventTableErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsAjarProtocolEvent::StrictEventTableErr {result: out_tuple.0,}
@@ -3816,7 +3820,9 @@ impl UnknownInteractionsAjarProtocolEvent {
             0x11c9ba570ce71df3 => {
                 let mut out_tuple: () = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleEventEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -3826,7 +3832,9 @@ impl UnknownInteractionsAjarProtocolEvent {
             0x3ba8fd32bf87d862 => {
                 let mut out_tuple: (i32,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleEventFieldsEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -3836,8 +3844,7 @@ impl UnknownInteractionsAjarProtocolEvent {
             0x7c3823f47ce0fcad => {
                 let mut out_tuple: (UnknownInteractionsAjarProtocolFlexibleEventUnionRequest,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleEventUnionEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsAjarProtocolEvent::FlexibleEventUnion {payload: out_tuple.0,}
@@ -3846,8 +3853,7 @@ impl UnknownInteractionsAjarProtocolEvent {
             0x9ca944d1d6436b0 => {
                 let mut out_tuple: (UnknownInteractionsAjarProtocolFlexibleEventTableRequest,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleEventTableEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsAjarProtocolEvent::FlexibleEventTable {payload: out_tuple.0,}
@@ -3856,7 +3862,9 @@ impl UnknownInteractionsAjarProtocolEvent {
             0x4fbe0d51e074e5bc => {
                 let mut out_tuple: (UnknownInteractionsAjarProtocolFlexibleEventErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleEventErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -3866,7 +3874,9 @@ impl UnknownInteractionsAjarProtocolEvent {
             0x22a3e45e944031c4 => {
                 let mut out_tuple: (UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleEventFieldsErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -3876,8 +3886,7 @@ impl UnknownInteractionsAjarProtocolEvent {
             0xc1637e7694d6680 => {
                 let mut out_tuple: (UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleEventUnionErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsAjarProtocolEvent::FlexibleEventUnionErr {result: out_tuple.0,}
@@ -3886,8 +3895,7 @@ impl UnknownInteractionsAjarProtocolEvent {
             0x6e69d4c524bf3a27 => {
                 let mut out_tuple: (UnknownInteractionsAjarProtocolFlexibleEventTableErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleEventTableErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsAjarProtocolEvent::FlexibleEventTableErr {result: out_tuple.0,}
@@ -3984,7 +3992,9 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 0xd4663d6b2b5048b => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictOneWayRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -3996,7 +4006,9 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 0x2275b8171ae4834f => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleOneWayRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -4008,7 +4020,9 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 0x50e66d328336038 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -4024,7 +4038,9 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 0x1947e36d61e4493a => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayFieldsRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -4040,7 +4056,9 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 0x5177371967e0e6d1 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayUnionRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -4056,7 +4074,9 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 0x6f8f9343b34e2ed4 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayTableRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -4072,7 +4092,9 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 0x5b47637577c69006 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayErrRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -4088,7 +4110,9 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 0x844ff7bb3f186d9 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -4104,7 +4128,9 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 0x2cbfd5a859d4ac95 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayUnionErrRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -4120,7 +4146,9 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 0x30c9e1b3da57dc37 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayTableErrRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
@@ -6062,7 +6090,9 @@ impl UnknownInteractionsClosedProtocolEvent {
             0xa8ee6ee302f693b => {
                 let mut out_tuple: () = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictEventEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -6072,7 +6102,9 @@ impl UnknownInteractionsClosedProtocolEvent {
             0x5d7c57b62e9c3a74 => {
                 let mut out_tuple: (i32,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictEventFieldsEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -6082,8 +6114,7 @@ impl UnknownInteractionsClosedProtocolEvent {
             0x3b8475deeb4a9d64 => {
                 let mut out_tuple: (UnknownInteractionsClosedProtocolStrictEventUnionRequest,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictEventUnionEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsClosedProtocolEvent::StrictEventUnion {payload: out_tuple.0,}
@@ -6092,8 +6123,7 @@ impl UnknownInteractionsClosedProtocolEvent {
             0x27da43fc85a7f5be => {
                 let mut out_tuple: (UnknownInteractionsClosedProtocolStrictEventTableRequest,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictEventTableEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsClosedProtocolEvent::StrictEventTable {payload: out_tuple.0,}
@@ -6102,7 +6132,9 @@ impl UnknownInteractionsClosedProtocolEvent {
             0x12b105b1430a1201 => {
                 let mut out_tuple: (UnknownInteractionsClosedProtocolStrictEventErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictEventErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -6112,7 +6144,9 @@ impl UnknownInteractionsClosedProtocolEvent {
             0x2d16399d2e8a5c96 => {
                 let mut out_tuple: (UnknownInteractionsClosedProtocolStrictEventFieldsErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictEventFieldsErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -6122,8 +6156,7 @@ impl UnknownInteractionsClosedProtocolEvent {
             0x6dcf67f2a1d16034 => {
                 let mut out_tuple: (UnknownInteractionsClosedProtocolStrictEventUnionErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictEventUnionErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsClosedProtocolEvent::StrictEventUnionErr {result: out_tuple.0,}
@@ -6132,8 +6165,7 @@ impl UnknownInteractionsClosedProtocolEvent {
             0x4e90e92eafa9eefa => {
                 let mut out_tuple: (UnknownInteractionsClosedProtocolStrictEventTableErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictEventTableErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsClosedProtocolEvent::StrictEventTableErr {result: out_tuple.0,}
@@ -6222,7 +6254,9 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                 0x59282385962da24 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictOneWayRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -6234,7 +6268,9 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                 0x5eda305d6b22f1f7 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -6250,7 +6286,9 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                 0x1323afa3e0541253 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayFieldsRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -6266,7 +6304,9 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                 0x68b32554eb0f6fa7 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayUnionRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -6282,7 +6322,9 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                 0x6e4a94d44b69e785 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayTableRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -6298,7 +6340,9 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                 0x4fa35d5433db4d3a => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayErrRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -6314,7 +6358,9 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                 0xb22aebf23bb58fd => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -6330,7 +6376,9 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                 0xcd65d4d29a43c80 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayUnionErrRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -6346,7 +6394,9 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                 0x117dde20b92f7b90 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayTableErrRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
@@ -8590,7 +8640,9 @@ impl UnknownInteractionsProtocolEvent {
             0x9842669255c4fc1 => {
                 let mut out_tuple: () = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolStrictEventEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -8600,7 +8652,9 @@ impl UnknownInteractionsProtocolEvent {
             0x7b75ae46520ee732 => {
                 let mut out_tuple: (i32,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolStrictEventFieldsEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -8610,8 +8664,7 @@ impl UnknownInteractionsProtocolEvent {
             0x3663b5197598cbda => {
                 let mut out_tuple: (UnknownInteractionsProtocolStrictEventUnionRequest,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolStrictEventUnionEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsProtocolEvent::StrictEventUnion {payload: out_tuple.0,}
@@ -8620,8 +8673,7 @@ impl UnknownInteractionsProtocolEvent {
             0x25a10039a9f96910 => {
                 let mut out_tuple: (UnknownInteractionsProtocolStrictEventTableRequest,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolStrictEventTableEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsProtocolEvent::StrictEventTable {payload: out_tuple.0,}
@@ -8630,7 +8682,9 @@ impl UnknownInteractionsProtocolEvent {
             0x3d956048f723bc6d => {
                 let mut out_tuple: (UnknownInteractionsProtocolStrictEventErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolStrictEventErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -8640,7 +8694,9 @@ impl UnknownInteractionsProtocolEvent {
             0x72c0566865e53c8b => {
                 let mut out_tuple: (UnknownInteractionsProtocolStrictEventFieldsErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolStrictEventFieldsErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -8650,8 +8706,7 @@ impl UnknownInteractionsProtocolEvent {
             0x40f96851e6f82abb => {
                 let mut out_tuple: (UnknownInteractionsProtocolStrictEventUnionErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolStrictEventUnionErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsProtocolEvent::StrictEventUnionErr {result: out_tuple.0,}
@@ -8660,8 +8715,7 @@ impl UnknownInteractionsProtocolEvent {
             0x6ca24cbed7b2784a => {
                 let mut out_tuple: (UnknownInteractionsProtocolStrictEventTableErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolStrictEventTableErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsProtocolEvent::StrictEventTableErr {result: out_tuple.0,}
@@ -8670,7 +8724,9 @@ impl UnknownInteractionsProtocolEvent {
             0x61bb1fab7d767866 => {
                 let mut out_tuple: () = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolFlexibleEventEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -8680,7 +8736,9 @@ impl UnknownInteractionsProtocolEvent {
             0x3226dff9b0c1d801 => {
                 let mut out_tuple: (i32,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolFlexibleEventFieldsEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -8690,8 +8748,7 @@ impl UnknownInteractionsProtocolEvent {
             0x22afd161ca71e467 => {
                 let mut out_tuple: (UnknownInteractionsProtocolFlexibleEventUnionRequest,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolFlexibleEventUnionEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsProtocolEvent::FlexibleEventUnion {payload: out_tuple.0,}
@@ -8700,8 +8757,7 @@ impl UnknownInteractionsProtocolEvent {
             0x4f72dd46888b89e0 => {
                 let mut out_tuple: (UnknownInteractionsProtocolFlexibleEventTableRequest,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolFlexibleEventTableEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsProtocolEvent::FlexibleEventTable {payload: out_tuple.0,}
@@ -8710,7 +8766,9 @@ impl UnknownInteractionsProtocolEvent {
             0x4bda3e6fb22bb5a9 => {
                 let mut out_tuple: (UnknownInteractionsProtocolFlexibleEventErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolFlexibleEventErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -8720,7 +8778,9 @@ impl UnknownInteractionsProtocolEvent {
             0xf370ade2f7c7a4a => {
                 let mut out_tuple: (UnknownInteractionsProtocolFlexibleEventFieldsErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolFlexibleEventFieldsErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
                 fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -8730,8 +8790,7 @@ impl UnknownInteractionsProtocolEvent {
             0xc94989e5f6707ec => {
                 let mut out_tuple: (UnknownInteractionsProtocolFlexibleEventUnionErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolFlexibleEventUnionErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsProtocolEvent::FlexibleEventUnionErr {result: out_tuple.0,}
@@ -8740,8 +8799,7 @@ impl UnknownInteractionsProtocolEvent {
             0x4dca02085aeb2d43 => {
                 let mut out_tuple: (UnknownInteractionsProtocolFlexibleEventTableErrResult,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolFlexibleEventTableErrEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
                     UnknownInteractionsProtocolEvent::FlexibleEventTableErr {result: out_tuple.0,}
@@ -8838,7 +8896,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0x4e7273b964d117a6 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolStrictOneWayRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -8850,7 +8910,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0x818bb3a7a910446 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolFlexibleOneWayRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -8862,7 +8924,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0x734c996b0f37b942 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -8878,7 +8942,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0x334f4e7fff460ae3 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayFieldsRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -8894,7 +8960,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0x2212805eca592cad => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayUnionRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -8910,7 +8978,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0x746ebf8659ff23b7 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayTableRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -8926,7 +8996,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0x6d1c6002c51bb967 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayErrRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -8942,7 +9014,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0x2182a49480e5bd2b => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayFieldsErrRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -8958,7 +9032,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0x453af745d38b20ca => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayUnionErrRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -8974,7 +9050,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0x4c26c7ab89cb68d8 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayTableErrRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -8990,7 +9068,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0x4a5bb3397008b7c => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolFlexibleTwoWayRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -9006,7 +9086,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0x3b13f82f44813a32 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolFlexibleTwoWayFieldsRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -9022,7 +9104,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0x44301e4e8d514fb6 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolFlexibleTwoWayUnionRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -9038,7 +9122,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0x7f492934b6c76187 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolFlexibleTwoWayTableRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -9054,7 +9140,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0x61240f878cc37c07 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolFlexibleTwoWayErrRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -9070,7 +9158,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0xf2b9611a9089b05 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolFlexibleTwoWayFieldsErrRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -9086,7 +9176,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0x2172940a75f107d7 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolFlexibleTwoWayUnionErrRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {
@@ -9102,7 +9194,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 0x6d8aab48e1693bf2 => {
                     let mut req: () = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.unknowninteractions/UnknownInteractionsProtocolFlexibleTwoWayTableErrRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = UnknownInteractionsProtocolControlHandle {

@@ -303,8 +303,9 @@ class RunnerServer : public fidl::Server<fidl_serversuite::Runner> {
         case fidl_serversuite::Test::kGoodDecode63HandleLargeMessage:
         case fidl_serversuite::Test::kGoodDecodeUnknownSmallMessage:
         case fidl_serversuite::Test::kGoodDecodeUnknownLargeMessage:
-        case fidl_serversuite::Test::kBadDecodeByteOverflowFlagSetOnSmallMessage:
-        case fidl_serversuite::Test::kBadDecodeByteOverflowFlagUnsetOnLargeMessage:
+        case fidl_serversuite::Test::kBadDecodeByteOverflowFlagSetOnBoundedSmallMessage:
+        case fidl_serversuite::Test::kBadDecodeByteOverflowFlagSetOnUnboundedSmallMessage:
+        case fidl_serversuite::Test::kBadDecodeByteOverflowFlagUnsetOnUnboundedLargeMessage:
         case fidl_serversuite::Test::kBadDecodeLargeMessageInfoOmitted:
         case fidl_serversuite::Test::kBadDecodeLargeMessageInfoTooSmall:
         case fidl_serversuite::Test::kBadDecodeLargeMessageInfoTooLarge:

@@ -437,10 +437,13 @@ impl {{ $protocol.Name }}Event {
                 ) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "{{ $protocol.ECI }}{{ $method.CamelName }}Event");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
-                fidl::encoding::{{- if $method.Overflowable.OnResponseDecode -}}
-                maybe_overflowing_decode
+                {{- if $method.Overflowable.OnResponseDecode -}}
+                fidl::encoding::maybe_overflowing_decode
                 {{- else -}}
-                Decoder::decode_into
+                if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible)
+                }
+                fidl::encoding::Decoder::decode_into
                 {{- end -}}(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
@@ -561,10 +564,13 @@ impl futures::Stream for {{ $protocol.Name }}RequestStream {
                     ) = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "{{ $protocol.ECI }}{{ $method.CamelName }}Request");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::{{- if $method.Overflowable.OnRequestDecode -}}
-                    maybe_overflowing_decode
+                    {{- if $method.Overflowable.OnRequestDecode -}}
+                    fidl::encoding::maybe_overflowing_decode
                     {{- else -}}
-                    Decoder::decode_into
+                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
+                    fidl::encoding::Decoder::decode_into
                     {{- end -}}(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = {{ $protocol.Name }}ControlHandle {

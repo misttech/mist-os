@@ -273,8 +273,9 @@ class RunnerImpl extends Runner {
       case Test.goodDecode63HandleLargeMessage:
       case Test.goodDecodeUnknownSmallMessage:
       case Test.goodDecodeUnknownLargeMessage:
-      case Test.badDecodeByteOverflowFlagSetOnSmallMessage:
-      case Test.badDecodeByteOverflowFlagUnsetOnLargeMessage:
+      case Test.badDecodeByteOverflowFlagSetOnBoundedSmallMessage:
+      case Test.badDecodeByteOverflowFlagSetOnUnboundedSmallMessage:
+      case Test.badDecodeByteOverflowFlagUnsetOnUnboundedLargeMessage:
       case Test.badDecodeLargeMessageInfoOmitted:
       case Test.badDecodeLargeMessageInfoTooSmall:
       case Test.badDecodeLargeMessageInfoTooLarge:

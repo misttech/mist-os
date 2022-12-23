@@ -552,11 +552,22 @@ type Test = flexible enum : uint32 {
     // message and 64 handles.
     GOOD_ENCODE_63_HANDLE_LARGE_MESSAGE = 87;
 
+    // Some backends generate different codegen output, or use constexpr magic, to avoid generating
+    // runtime instructions for handling large messages when decoding known bounded payloads.
+    // However, even in these cases, we should take care to validate that the header is properly
+    // formed, and that the `byte_overflow` flag therein is not erroneously flipped. This test
+    // should use the `DecodeBoundedKnownToBeSmall(...)` method.
+    //
+    // Because semi-bounded payloads use the same codegen paths as unbounded ones (that is, we
+    // always generate large-message handling code on them), we don't need to add any tests specific
+    // to those cases.
+    BAD_DECODE_BYTE_OVERFLOW_FLAG_SET_ON_BOUNDED_SMALL_MESSAGE = 112;
+
     // All large message related decode errors that can be checked before the decoder attempts to
     // read the overflow buffer VMO. All tests should be executed using the method
     // `DecodeUnboundedMaybeLargeResource(...)`.
-    BAD_DECODE_BYTE_OVERFLOW_FLAG_SET_ON_SMALL_MESSAGE = 88;
-    BAD_DECODE_BYTE_OVERFLOW_FLAG_UNSET_ON_LARGE_MESSAGE = 89;
+    BAD_DECODE_BYTE_OVERFLOW_FLAG_SET_ON_UNBOUNDED_SMALL_MESSAGE = 88;
+    BAD_DECODE_BYTE_OVERFLOW_FLAG_UNSET_ON_UNBOUNDED_LARGE_MESSAGE = 89;
     BAD_DECODE_LARGE_MESSAGE_INFO_OMITTED = 90;
     BAD_DECODE_LARGE_MESSAGE_INFO_TOO_SMALL = 91;
     BAD_DECODE_LARGE_MESSAGE_INFO_TOO_LARGE = 92;
@@ -583,5 +594,5 @@ type Test = flexible enum : uint32 {
     // `EncodeUnboundedMaybeLargeResource(...) -> (...)` method.
     BAD_ENCODE_64_HANDLE_LARGE_MESSAGE = 108;
 
-    // Next available: 112
+    // Next available: 113
 };

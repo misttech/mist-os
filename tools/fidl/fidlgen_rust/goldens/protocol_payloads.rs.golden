@@ -772,6 +772,9 @@ impl MainProtocolEvent {
                 let mut out_tuple: (i32,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolOnComposedEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
+                if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible);
+                }
                 fidl::encoding::Decoder::decode_into(
                     &tx_header,
                     _body_bytes,
@@ -787,6 +790,9 @@ impl MainProtocolEvent {
                 ) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolOnComposedWithErrorEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
+                if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible);
+                }
                 fidl::encoding::Decoder::decode_into(
                     &tx_header,
                     _body_bytes,
@@ -800,6 +806,9 @@ impl MainProtocolEvent {
                 let mut out_tuple: (u32, u32) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolOnLocalEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
+                if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible);
+                }
                 fidl::encoding::Decoder::decode_into(
                     &tx_header,
                     _body_bytes,
@@ -814,6 +823,9 @@ impl MainProtocolEvent {
                     fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolOnLocalWithErrorEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
+                if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible);
+                }
                 fidl::encoding::Decoder::decode_into(
                     &tx_header,
                     _body_bytes,
@@ -827,6 +839,9 @@ impl MainProtocolEvent {
                 let mut out_tuple: (i32,) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolOnImportEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
+                if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible);
+                }
                 fidl::encoding::Decoder::decode_into(
                     &tx_header,
                     _body_bytes,
@@ -841,6 +856,9 @@ impl MainProtocolEvent {
                     fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolOnImportWithErrorEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
+                if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible);
+                }
                 fidl::encoding::Decoder::decode_into(
                     &tx_header,
                     _body_bytes,
@@ -854,6 +872,9 @@ impl MainProtocolEvent {
                 let mut out_tuple: (u32, u32) = fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolOnAnonEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
+                if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible);
+                }
                 fidl::encoding::Decoder::decode_into(
                     &tx_header,
                     _body_bytes,
@@ -868,6 +889,9 @@ impl MainProtocolEvent {
                     fidl::encoding::Decodable::new_empty();
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolOnAnonWithErrorEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
+                if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    return Err(fidl::Error::LargeMessageImpossible);
+                }
                 fidl::encoding::Decoder::decode_into(
                     &tx_header,
                     _body_bytes,
@@ -961,6 +985,10 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req: (i32,) = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolOneWayComposedRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
+                    {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
@@ -971,6 +999,10 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req: (i32,) = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolTwoWayComposedRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
+                    {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
@@ -988,6 +1020,10 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req: (i32,) = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolTwoWayComposedWithErrorRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
+                    {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
@@ -1005,6 +1041,10 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req: (u32, u32) = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolOneWayLocalRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
+                    {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
@@ -1015,6 +1055,10 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req: (u32, u32) = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolTwoWayLocalRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
+                    {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
@@ -1033,6 +1077,10 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req: (u32, u32) = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolTwoWayLocalWithErrorRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
+                    {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
@@ -1051,6 +1099,10 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req: (i32,) = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolOneWayImportRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
+                    {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
@@ -1061,6 +1113,10 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req: (i32,) = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolTwoWayImportRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
+                    {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
@@ -1078,6 +1134,10 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req: (i32,) = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolTwoWayImportWithErrorRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
+                    {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
@@ -1095,6 +1155,10 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req: (u32, u32) = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolOneWayAnonRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
+                    {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
@@ -1105,6 +1169,10 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req: (u32, u32) = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolTwoWayAnonRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
+                    {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
@@ -1123,6 +1191,10 @@ impl futures::Stream for MainProtocolRequestStream {
                     let mut req: (u32, u32) = fidl::encoding::Decodable::new_empty();
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocolpayloads/MainProtocolTwoWayAnonWithErrorRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
+                    {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
                     fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };

@@ -87,7 +87,7 @@ CLOSED_SERVER_TEST(IgnoresUnrecognizedDynamicFlags) {
       as_bytes(fidl_message_header_t{
           .txid = kTwoWayTxid,
           .at_rest_flags = {FIDL_MESSAGE_HEADER_AT_REST_FLAGS_0_USE_VERSION_V2, 0},
-          .dynamic_flags = 100,
+          .dynamic_flags = 7,  // First 3 bits are flipped.
           .magic_number = kFidlWireFormatMagicNumberInitial,
           .ordinal = kOrdinalTwoWayNoPayload,
       }),

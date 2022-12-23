@@ -296,8 +296,9 @@ class RunnerServer : public fidl::serversuite::Runner {
       case fidl::serversuite::Test::GOOD_DECODE_63_HANDLE_LARGE_MESSAGE:
       case fidl::serversuite::Test::GOOD_DECODE_UNKNOWN_SMALL_MESSAGE:
       case fidl::serversuite::Test::GOOD_DECODE_UNKNOWN_LARGE_MESSAGE:
-      case fidl::serversuite::Test::BAD_DECODE_BYTE_OVERFLOW_FLAG_SET_ON_SMALL_MESSAGE:
-      case fidl::serversuite::Test::BAD_DECODE_BYTE_OVERFLOW_FLAG_UNSET_ON_LARGE_MESSAGE:
+      case fidl::serversuite::Test::BAD_DECODE_BYTE_OVERFLOW_FLAG_SET_ON_BOUNDED_SMALL_MESSAGE:
+      case fidl::serversuite::Test::BAD_DECODE_BYTE_OVERFLOW_FLAG_SET_ON_UNBOUNDED_SMALL_MESSAGE:
+      case fidl::serversuite::Test::BAD_DECODE_BYTE_OVERFLOW_FLAG_UNSET_ON_UNBOUNDED_LARGE_MESSAGE:
       case fidl::serversuite::Test::BAD_DECODE_LARGE_MESSAGE_INFO_OMITTED:
       case fidl::serversuite::Test::BAD_DECODE_LARGE_MESSAGE_INFO_TOO_SMALL:
       case fidl::serversuite::Test::BAD_DECODE_LARGE_MESSAGE_INFO_TOO_LARGE:

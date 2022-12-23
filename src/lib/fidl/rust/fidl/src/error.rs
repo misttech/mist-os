@@ -45,6 +45,10 @@ pub enum Error {
     #[error("The FIDL object could not fit within the provided buffer range")]
     OutOfRange,
 
+    /// FIDL types bounded to less than or equal to 65520 bytes cannot be large messages.
+    #[error("FIDL types bounded to less than or equal to 65520 bytes cannot be large messages.")]
+    LargeMessageImpossible,
+
     // TODO(fxbug.dev/117162): There is a tracking bug keeping tabs on the eventual removal of this
     // limitation.
     /// Large FIDL messages must have <=63 handles, rather than the usual limit of 64.
