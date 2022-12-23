@@ -1112,27 +1112,21 @@ Tells openweave to include files that require heap access.
 
 From [//third_party/openweave-core/config.gni:32](https://fuchsia.googlesource.com/third_party/openweave-core/+/d31416b9e564536f33f5b764169a9234eee7287f/config.gni#32)
 
-### core_realm_package_name
+### core_realm_restrict_persistent_storage
+
+**Current value (from the default):** `true`
+
+From //build/product.gni:31
+
+### core_realm_shards
 The following arguments are all used to configure the contents of the core
 component realm. See //src/sys/core/build/core.gni for documentation on what
 each field means.
 TODO: redo comments
 
-**Current value (from the default):** `"core-generic"`
-
-From //build/product.gni:30
-
-### core_realm_restrict_persistent_storage
-
-**Current value (from the default):** `true`
-
-From //build/product.gni:32
-
-### core_realm_shards
-
 **Current value (from the default):** `[]`
 
-From //build/product.gni:31
+From //build/product.gni:30
 
 ### crash_diagnostics_dir
 Clang crash reports directory path. Use empty path to disable altogether.
@@ -2365,14 +2359,14 @@ From //src/ui/tests/integration_flutter_tests/embedder/flutter_build_config.gni:
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:56
+From //build/product.gni:55
 
 ### emu_window_size_width
 Configuration to override the default window size for the virtual device in pixels.
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:55
+From //build/product.gni:54
 
 ### enable_api_diff
 Detect dart API changes
@@ -3084,7 +3078,7 @@ TODO(fxbug.dev/80742) move this to a toolchain to allow multiple products to bui
 
 **Current value (from the default):** `true`
 
-From //build/product.gni:37
+From //build/product.gni:36
 
 ### fuchsia_product_assembly_config_file
 Used to provide assembly with a complete product assembly config.  This can
@@ -3093,7 +3087,7 @@ GN using generated_file().
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:42
+From //build/product.gni:41
 
 ### fuchsia_product_assembly_config_label
 If the above file is created by a target in GN, then the label that creates
@@ -3101,7 +3095,7 @@ it needs to be specified as well.
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:46
+From //build/product.gni:45
 
 ### fuchsia_route_sources_config
 An optional file path to the route_sources verifier configuration to be used
@@ -7693,7 +7687,7 @@ between similar virtual device's using different configuration's such as
 
 **Current value (from the default):** `""`
 
-From //build/product.gni:52
+From //build/product.gni:51
 
 ### vm_tracing_level
 The level of detail for traces emitted by the VM system. Values greater than
