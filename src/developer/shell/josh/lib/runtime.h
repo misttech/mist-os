@@ -73,6 +73,25 @@ class Context {
   bool is_valid_;
 };
 
+// Wrapper class for JSValue types that provides some convenience features.
+class Value {
+ public:
+  Value(Context* ctx, JSValue value) : ctx_(ctx->Get()), val_(value) {}
+  Value(JSContext* ctx, JSValue value) : ctx_(ctx), val_(value) {}
+
+  // Returns a std::string with the value of the JSValue and any additional
+  // exception/error information..
+  std::string ToString() const;
+
+ private:
+  std::string RawValueToString() const;
+
+  JSContext* ctx_;
+  JSValue val_;
+};
+
+std::ostream& operator<<(std::ostream& os, const Value& value);
+
 }  // namespace shell
 
 #endif  // SRC_DEVELOPER_SHELL_JOSH_LIB_RUNTIME_H_

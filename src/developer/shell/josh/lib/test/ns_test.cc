@@ -49,7 +49,7 @@ TEST_F(NsTest, Utf8Decode) {
       }
     }
   )";
-  ASSERT_TRUE(Eval(test_string));
+  ASSERT_EVAL(ctx_, test_string);
 }
 
 // Sanity check test to make sure Hello World works.
@@ -63,7 +63,7 @@ TEST_F(NsTest, ListFiles) {
   std::string test_string = R"(
       globalThis.resultOne = ns.ls("/ns_test_tmp");
   )";
-  ASSERT_TRUE(Eval(test_string));
+  ASSERT_EVAL(ctx_, test_string);
   js_std_loop(ctx_->Get());
   test_string = R"(
       let res = globalThis.resultOne;
@@ -77,7 +77,7 @@ TEST_F(NsTest, ListFiles) {
           throw "Unexpected name " + res[0];
       }
   )";
-  ASSERT_TRUE(Eval(test_string));
+  ASSERT_EVAL(ctx_, test_string);
 
   constexpr const char* name = "/ns_test_tmp/tmp.XXXXXX";
   std::unique_ptr<char[]> buffer(new char[strlen(name) + 1]);
@@ -90,7 +90,7 @@ TEST_F(NsTest, ListFiles) {
       globalThis.resultTwo = ns.ls("/ns_test_tmp");
       globalThis.resultThree = ns.ls("/pkg/data/fidling");
   )";
-  ASSERT_TRUE(Eval(test_string));
+  ASSERT_EVAL(ctx_, test_string);
   js_std_loop(ctx_->Get());
   test_string = R"(
       let resTwo = globalThis.resultTwo;
@@ -116,7 +116,7 @@ TEST_F(NsTest, ListFiles) {
         throw "Could not read subdirectory";
       }
   )";
-  ASSERT_TRUE(Eval(test_string));
+  ASSERT_EVAL(ctx_, test_string);
 
   sync_completion_t unmounted;
   memfs_free_filesystem(fs, &unmounted);
@@ -130,7 +130,7 @@ TEST_F(NsTest, ListRootDir) {
   std::string test_string = R"(
       globalThis.resultOne = ns.ls("/pkg");
   )";
-  ASSERT_TRUE(Eval(test_string));
+  ASSERT_EVAL(ctx_, test_string);
   js_std_loop(ctx_->Get());
   test_string = R"(
       let res = globalThis.resultOne;
@@ -150,6 +150,6 @@ TEST_F(NsTest, ListRootDir) {
         throw "meta subdirectory not found";
       }
   )";
-  ASSERT_TRUE(Eval(test_string));
+  ASSERT_EVAL(ctx_, test_string);
 }
 }  // namespace shell

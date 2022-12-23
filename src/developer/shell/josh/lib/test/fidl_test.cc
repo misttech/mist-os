@@ -86,11 +86,11 @@ class FidlTest : public JsTest {
 TEST_F(FidlTest, FrobinatorFrob) {
   EXPECT_EQ(0u, frob_impl_->frobs.size());
 
-  ASSERT_TRUE(Eval(FidlTest::GetJsHeader() + R"(
+  ASSERT_EVAL(ctx_, FidlTest::GetJsHeader() + R"(
     client = new fidl.ProtocolClient(
         new zx.Channel(globalThis.outHandle), fidling.fidl_test_frobinator.Frobinator);
     client.Frob("one");
-  )"));
+  )");
   loop_->RunUntilIdle();
   // This means that the message was received.
   EXPECT_EQ(1u, frob_impl_->frobs.size());
@@ -99,11 +99,11 @@ TEST_F(FidlTest, FrobinatorFrob) {
 TEST_F(FidlTest, FrobinatorSendBasicUnion) {
   EXPECT_EQ(0u, frob_impl_->send_basic_union_received_value_);
 
-  ASSERT_TRUE(Eval(FidlTest::GetJsHeader() + R"(
+  ASSERT_EVAL(ctx_, FidlTest::GetJsHeader() + R"(
     client = new fidl.ProtocolClient(
         new zx.Channel(globalThis.outHandle), fidling.fidl_test_frobinator.Frobinator);
     client.SendBasicUnion({ v: 100 });
-  )"));
+  )");
   loop_->RunUntilIdle();
   EXPECT_EQ(100u, frob_impl_->send_basic_union_received_value_);
 }
@@ -111,11 +111,11 @@ TEST_F(FidlTest, FrobinatorSendBasicUnion) {
 TEST_F(FidlTest, FrobinatorSendBasicTable) {
   EXPECT_EQ(0u, frob_impl_->send_basic_table_received_value_);
 
-  ASSERT_TRUE(Eval(FidlTest::GetJsHeader() + R"(
+  ASSERT_EVAL(ctx_, FidlTest::GetJsHeader() + R"(
     client = new fidl.ProtocolClient(
         new zx.Channel(globalThis.outHandle), fidling.fidl_test_frobinator.Frobinator);
     client.SendBasicTable({ v: 200 });
-  )"));
+  )");
   loop_->RunUntilIdle();
   EXPECT_EQ(200u, frob_impl_->send_basic_table_received_value_);
 }
@@ -123,7 +123,7 @@ TEST_F(FidlTest, FrobinatorSendBasicTable) {
 TEST_F(FidlTest, FrobinatorSendComplexTables) {
   EXPECT_EQ(0u, frob_impl_->send_complex_tables_received_entry_count_);
 
-  ASSERT_TRUE(Eval(FidlTest::GetJsHeader() + R"(
+  ASSERT_EVAL(ctx_, FidlTest::GetJsHeader() + R"(
     client = new fidl.ProtocolClient(
       new zx.Channel(globalThis.outHandle), fidling.fidl_test_frobinator.Frobinator);
     client.SendComplexTables([
@@ -148,7 +148,7 @@ TEST_F(FidlTest, FrobinatorSendComplexTables) {
         y: true,
       }
     ]);
-  )"));
+  )");
   loop_->RunUntilIdle();
   EXPECT_EQ(4u, frob_impl_->send_complex_tables_received_entry_count_);
   EXPECT_EQ(2u, frob_impl_->send_complex_tables_received_x_a_count_);

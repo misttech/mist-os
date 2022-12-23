@@ -157,7 +157,7 @@ class FxLogTest : public JsTest {
 
 TEST_F(FxLogTest, TestEvalLog) {
   // Validate the results
-  ASSERT_EQ(true, Eval(R"(
+  ASSERT_EVAL(ctx_, R"(
     function my_func() { // line2
       fxlog.error("Message3");
       fxlog.info("Message4", "TestTag2");
@@ -170,7 +170,7 @@ TEST_F(FxLogTest, TestEvalLog) {
     let file = std.open('/test_tmp/test_eval_log.done', 'a+');
     file.puts("OK");
     file.close();
-  )"));
+  )");
   loop_->RunUntilIdle();
 
   // Make sure the test is complete
@@ -221,9 +221,9 @@ TEST_F(FxLogTest, TestScriptLog) {
   test_script.close();
 
   // Validate the results
-  ASSERT_EQ(true, Eval(R"(
+  ASSERT_EVAL(ctx_, R"(
       std.loadScript("/test_tmp/test_log.js")
-    )"));
+    )");
   loop_->RunUntilIdle();
 
   // Make sure the test is complete

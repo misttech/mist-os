@@ -130,7 +130,7 @@ TEST_F(RuntimeTest, TestStartupScripts) {
   ASSERT_EQ(true, ctx_->InitStartups(startup_path));
 
   // Validate the results
-  ASSERT_EQ(true, Eval(R"(
+  ASSERT_EVAL(ctx_, R"(
         // Make sure modules are loaded correctly
         validations = [
             [module1.GetValue, 1],

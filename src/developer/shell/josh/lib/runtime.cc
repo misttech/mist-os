@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <sstream>
 #include <vector>
 
@@ -28,33 +29,6 @@ namespace fs = std::filesystem;
 // It's only here so that we can run against both the old and new version until
 // we integrate the new version.
 __attribute__((weak)) void js_std_init_handlers(JSRuntime* rt) {}
-
-namespace {
-void js_dump_obj(JSContext* ctx, FILE* f, JSValueConst val) {
-  const char* str;
-
-  str = JS_ToCString(ctx, val);
-  if (str) {
-    fprintf(f, "%s\n", str);
-    JS_FreeCString(ctx, str);
-  } else {
-    fprintf(f, "[unknown object]\n");
-  }
-}
-
-void js_std_dump_error(JSContext* ctx, JSValueConst exception_val) {
-  JSValue val;
-  bool is_error = JS_IsError(ctx, exception_val);
-  js_dump_obj(ctx, stderr, exception_val);
-  if (is_error) {
-    val = JS_GetPropertyStr(ctx, exception_val, "stack");
-    if (!JS_IsUndefined(val)) {
-      js_dump_obj(ctx, stderr, val);
-    }
-    JS_FreeValue(ctx, val);
-  }
-}
-}  // namespace
 
 namespace shell {
 
@@ -77,9 +51,9 @@ Runtime::~Runtime() {
 void Runtime::HandlePromiseRejection(JSContext* ctx, JSValueConst promise, JSValueConst reason) {
   // Currently there is no additional handling of promise rejections
   has_error_ = true;
+  Value rv(ctx, reason);
 
-  fprintf(stderr, "Unhandled promise rejection: ");
-  js_std_dump_error(ctx, reason);
+  std::cerr << "Unhandled promise rejection: " << rv;
 }
 
 Context::Context(const Runtime* rt) : ctx_(JS_NewContext(rt->Get())) {
@@ -272,6 +246,38 @@ bool Context::InitStartups(const std::string& startup_js_path) {
   }
 
   return true;
+}
+
+std::ostream& operator<<(std::ostream& os, const Value& value) {
+  os << value.ToString();
+  return os;
+}
+
+std::string Value::RawValueToString() const {
+  std::string result;
+  const char* str = JS_ToCString(ctx_, val_);
+
+  if (str) {
+    result += str;
+    JS_FreeCString(ctx_, str);
+  } else {
+    result += "[unknown object]";
+  }
+
+  return result;
+}
+
+std::string Value::ToString() const {
+  std::string&& result = RawValueToString();
+  if (JS_IsError(ctx_, val_)) {
+    JSValue prop_string = JS_GetPropertyStr(ctx_, val_, "stack");
+    if (!JS_IsUndefined(prop_string)) {
+      Value ps(ctx_, prop_string);
+      result += ps.RawValueToString();
+    }
+    JS_FreeValue(ctx_, prop_string);
+  }
+  return result;
 }
 
 }  // namespace shell

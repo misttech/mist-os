@@ -40,7 +40,7 @@ view.setInt8(0, TEST_VAL);
 ch[0].write(writeBuffer, []);
 Promise.all([p]);
 )";
-  ASSERT_TRUE(Eval(test_string));
+  ASSERT_EVAL(ctx_, test_string);
 }
 
 }  // namespace shell

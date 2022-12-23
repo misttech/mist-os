@@ -47,18 +47,21 @@ class JsTest : public ::testing::Test {
     }
   }
 
-  bool Eval(std::string_view command) {
-    JSValue result = JS_Eval(ctx_->Get(), command.data(), command.size(), "batch", 0);
-    if (JS_IsException(result)) {
-      ctx_->DumpError();
-      return false;
-    }
-    return true;
-  }
-
   std::unique_ptr<Context> ctx_;
   std::unique_ptr<Runtime> rt_;
 };
+
+// Evaluates the given string as JS and asserts it doesn't throw an exception
+#define ASSERT_EVAL(ctx_, eval_string)                                         \
+  do {                                                                         \
+    JSContext* ctx = ctx_->Get();                                              \
+    std::string command(eval_string);                                          \
+    JSValue result = JS_Eval(ctx, command.data(), command.size(), "batch", 0); \
+    ::shell::Value val(ctx, result);                                           \
+    if (JS_IsException(result)) {                                              \
+      GTEST_FAIL() << val.ToString();                                          \
+    }                                                                          \
+  } while (0)
 
 }  // namespace shell
 

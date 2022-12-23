@@ -35,7 +35,7 @@ TEST_F(TaskTest, SimplePs) {
             globalThis.resultOne = result; }).
         catch((e) => { std.printf(e); std.printf(e.stack); globalThis.resultOne = e;});
   )";
-    ASSERT_TRUE(Eval(test_string));
+    ASSERT_EVAL(ctx_, test_string);
   }
   js_std_loop(ctx_->Get());
 
@@ -54,7 +54,7 @@ TEST_F(TaskTest, SimplePs) {
           }
        });
   )";
-    ASSERT_TRUE(Eval(test_string));
+    ASSERT_EVAL(ctx_, test_string);
   }
 }
 
@@ -76,7 +76,7 @@ TEST_F(TaskTest, Kill) {
               then((result) => {
                   globalThis.resultOne = result; })
   )";
-    ASSERT_TRUE(Eval(test_string));
+    ASSERT_EVAL(ctx_, test_string);
   }
   js_std_loop(ctx_->Get());
 
@@ -123,7 +123,7 @@ TEST_F(TaskTest, Kill) {
         ").then((result) => {"
         "globalThis.resultTwo = result; })."
         "catch((e) => { std.printf(e); std.printf(e.stack); globalThis.resultTwo = e;});";
-    ASSERT_TRUE(Eval(test_string));
+    ASSERT_EVAL(ctx_, test_string);
   }
 
   // task.kill() is async, the loop is needed to ensure it is executed.
@@ -139,7 +139,7 @@ TEST_F(TaskTest, Kill) {
         throw res;
       }
   )";
-    ASSERT_TRUE(Eval(test_string));
+    ASSERT_EVAL(ctx_, test_string);
   }
 }
 
@@ -161,7 +161,7 @@ TEST_F(TaskTest, KillAll) {
               then((result) => {
                   globalThis.resultOne = result; })
   )";
-    ASSERT_TRUE(Eval(test_string));
+    ASSERT_EVAL(ctx_, test_string);
   }
   js_std_loop(ctx_->Get());
 
@@ -216,7 +216,7 @@ TEST_F(TaskTest, KillAll) {
         "\").then((result) => {"
         "globalThis.resultTwo = result; })."
         "catch((e) => { std.printf(e); std.printf(e.stack); globalThis.resultTwo = e;});";
-    ASSERT_TRUE(Eval(test_string));
+    ASSERT_EVAL(ctx_, test_string);
   }
 
   // task.kill() is async, the loop is needed to ensure it is executed.
@@ -232,7 +232,7 @@ TEST_F(TaskTest, KillAll) {
         throw res;
       }
   )";
-    ASSERT_TRUE(Eval(test_string));
+    ASSERT_EVAL(ctx_, test_string);
   }
 
   // Launch the same process again, to kill it using a regex.
@@ -253,7 +253,7 @@ TEST_F(TaskTest, KillAll) {
         "\", \"r\").then((result) => {"
         "globalThis.resultTwo = result; })."
         "catch((e) => { std.printf(e); std.printf(e.stack); globalThis.resultTwo = e;});";
-    ASSERT_TRUE(Eval(test_string));
+    ASSERT_EVAL(ctx_, test_string);
   }
 
   // task.kill() is async, the loop is needed to ensure it is executed.
@@ -269,7 +269,7 @@ TEST_F(TaskTest, KillAll) {
         throw res;
       }
   )";
-    ASSERT_TRUE(Eval(test_string));
+    ASSERT_EVAL(ctx_, test_string);
   }
 }
 

@@ -46,6 +46,6 @@ TEST_F(PpTest, BasicPrettyPrint) {
       }
     }
   )";
-  ASSERT_TRUE(Eval(test_string));
+  ASSERT_EVAL(ctx_, test_string);
 }
 }  // namespace shell
