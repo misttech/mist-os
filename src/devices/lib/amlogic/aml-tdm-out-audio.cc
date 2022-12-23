@@ -31,6 +31,7 @@ std::unique_ptr<AmlTdmDevice> AmlTdmOutDevice::Create(fdf::MmioBuffer mmio, ee_a
         fifo_depth = 128 * 8;  // FRDDR_B/C/D has 128 x 64-bit
       break;
     case metadata::AmlVersion::kA5:
+    case metadata::AmlVersion::kA1:
       fifo_depth = 64 * 8;  // FRDDR_A/B/C has 64 x 64-bit
       break;
   }
@@ -47,8 +48,13 @@ std::unique_ptr<AmlTdmDevice> AmlTdmOutDevice::Create(fdf::MmioBuffer mmio, ee_a
 
 void AmlTdmOutDevice::Initialize() {
   // Enable the audio domain clocks used by this instance.
-  AudioClkEna((EE_AUDIO_CLK_GATE_TDMOUTA << tdm_ch_) | (EE_AUDIO_CLK_GATE_FRDDRA << frddr_ch_) |
-              EE_AUDIO_CLK_GATE_ARB);
+  if (version_ == metadata::AmlVersion::kA1) {
+    AudioClkEna((EE_AUDIO_CLK_GATE_TDMOUTA_A1 << tdm_ch_) |
+                (EE_AUDIO_CLK_GATE_FRDDRA_A1 << frddr_ch_) | EE_AUDIO_CLK_GATE_ARB_A1);
+  } else {
+    AudioClkEna((EE_AUDIO_CLK_GATE_TDMOUTA << tdm_ch_) | (EE_AUDIO_CLK_GATE_FRDDRA << frddr_ch_) |
+                EE_AUDIO_CLK_GATE_ARB);
+  }
 
   InitMclk();
 
@@ -72,6 +78,7 @@ void AmlTdmOutDevice::Initialize() {
       mmio_.Write32(tdm_ch_ | (0x30 << 16) | (1 << 3), GetFrddrOffset(FRDDR_CTRL0_OFFS));
       break;
     case metadata::AmlVersion::kS905D3G:
+    case metadata::AmlVersion::kA1:
       // Enable DDR ARB, and enable this ddr channels bit.
       mmio_.SetBits32((1 << 31) | (1 << (4 + frddr_ch_)), EE_AUDIO_ARB_CTRL);
       mmio_.Write32(tdm_ch_ | (1 << 4), GetFrddrOffset(FRDDR_CTRL2_OFFS_D3G));
@@ -143,6 +150,9 @@ zx_status_t AmlTdmOutDevice::SetSclkPad(aml_tdm_sclk_pad_t sclk_pad, bool is_cus
       pad[0] = EE_AUDIO_SCLK_PAD_CTRL0_A5;
       pad[1] = EE_AUDIO_LRCLK_PAD_CTRL0_A5;
       pad_ctrl_separated = true;
+      break;
+    case metadata::AmlVersion::kA1:
+      pad[0] = EE_AUDIO_MST_PAD_CTRL1_A1;
       break;
   }
 
@@ -268,7 +278,8 @@ void AmlTdmOutDevice::ConfigTdmSlot(uint8_t bit_offset, uint8_t num_slots, uint8
       uint32_t reg2 = (mix_mask << 0);
       mmio_.Write32(reg2, GetTdmOffset(TDMOUT_CTRL2_OFFS_D3G));
     } break;
-    case metadata::AmlVersion::kA5: {
+    case metadata::AmlVersion::kA5:
+    case metadata::AmlVersion::kA1: {
       uint32_t reg0 =
           bits_per_slot | (num_slots << 5) | (bit_offset << 15) | (1 << 31);  // Bit 31 to enable.
       mmio_.Write32(reg0, GetTdmOffset(TDMOUT_CTRL0_OFFS));
@@ -374,7 +385,13 @@ void AmlTdmOutDevice::Shutdown() {
   mmio_.ClearBits32(0x03 << 30, ptr);
 
   // Disable the audio domain clocks used by this instance.
-  AudioClkDis((EE_AUDIO_CLK_GATE_TDMOUTA << tdm_ch_) | (EE_AUDIO_CLK_GATE_FRDDRA << frddr_ch_));
+  if (version_ == metadata::AmlVersion::kA1) {
+    AudioClkDis((EE_AUDIO_CLK_GATE_TDMOUTA_A1 << tdm_ch_) |
+                (EE_AUDIO_CLK_GATE_FRDDRA_A1 << frddr_ch_) | EE_AUDIO_CLK_GATE_ARB_A1);
+  } else {
+    AudioClkDis((EE_AUDIO_CLK_GATE_TDMOUTA << tdm_ch_) | (EE_AUDIO_CLK_GATE_FRDDRA << frddr_ch_) |
+                EE_AUDIO_CLK_GATE_ARB);
+  }
 
   // Note: We are leaving the ARB unit clocked as well as MCLK and
   //  SCLK generation units since it is possible they are used by

@@ -36,6 +36,7 @@ std::unique_ptr<AmlTdmDevice> AmlTdmInDevice::Create(fdf::MmioBuffer mmio, ee_au
         fifo_depth = 128 * 8;  // TODDR_B/C/D has 128 x 64-bit
       break;
     case metadata::AmlVersion::kA5:
+    case metadata::AmlVersion::kA1:
       fifo_depth = 64 * 8;  // TODDR_A/B has 64 x 64-bit
       break;
   }
@@ -52,9 +53,13 @@ std::unique_ptr<AmlTdmDevice> AmlTdmInDevice::Create(fdf::MmioBuffer mmio, ee_au
 
 void AmlTdmInDevice::Initialize() {
   // Enable the audio domain clocks used by this instance.
-  AudioClkEna((EE_AUDIO_CLK_GATE_TDMINA << tdm_ch_) | (EE_AUDIO_CLK_GATE_TODDRA << toddr_ch_) |
-              EE_AUDIO_CLK_GATE_ARB);
-
+  if (version_ == metadata::AmlVersion::kA1) {
+    AudioClkEna((EE_AUDIO_CLK_GATE_TDMINA_A1 << tdm_ch_) |
+                (EE_AUDIO_CLK_GATE_TODDRA_A1 << toddr_ch_) | EE_AUDIO_CLK_GATE_ARB_A1);
+  } else {
+    AudioClkEna((EE_AUDIO_CLK_GATE_TDMINA << tdm_ch_) | (EE_AUDIO_CLK_GATE_TODDRA << toddr_ch_) |
+                EE_AUDIO_CLK_GATE_ARB);
+  }
   InitMclk();
 
   // Set the sclk and lrclk sources to the chosen mclk channel
@@ -91,6 +96,19 @@ void AmlTdmInDevice::Initialize() {
                     GetToddrOffset(TODDR_CTRL0_OFFS));
       mmio_.Write32((0x0 << 26) |    // select tdmin_a as data source
                         (1 << 25) |  // set the magic force end bit(25) to cause fetch from start
+                        ((fifo_depth_ / 8 / 2) << 12) |  // trigger ddr when fifo half full
+                        (0x02 << 8),                     // STATUS2 source is ddr position
+                    GetToddrOffset(TODDR_CTRL1_OFFS));
+      break;
+    case metadata::AmlVersion::kA1:
+      // Enable DDR ARB, and enable this ddr channels bit.
+      mmio_.SetBits32((1 << 31) | (1 << (toddr_ch_)), EE_AUDIO_ARB_CTRL);
+      mmio_.Write32((0x00 << 13) |   // Packed.
+                        (31 << 8) |  // MSB position of data.
+                        (16 << 3),   // LSB position of data. - (S/U32 - 0; S/U16 - 16)
+                    GetToddrOffset(TODDR_CTRL0_OFFS));
+      mmio_.Write32((tdm_ch_ << 28) |  // select tdmin_a/b as data source
+                        (1 << 25) |    // set the magic force end bit(25) to cause fetch from start
                         ((fifo_depth_ / 8 / 2) << 12) |  // trigger ddr when fifo half full
                         (0x02 << 8),                     // STATUS2 source is ddr position
                     GetToddrOffset(TODDR_CTRL1_OFFS));
@@ -148,6 +166,9 @@ zx_status_t AmlTdmInDevice::SetSclkPad(aml_tdm_sclk_pad_t sclk_pad, bool is_cust
       pad[0] = EE_AUDIO_SCLK_PAD_CTRL0_A5;
       pad[1] = EE_AUDIO_LRCLK_PAD_CTRL0_A5;
       pad_ctrl_separated = true;
+      break;
+    case metadata::AmlVersion::kA1:
+      pad[0] = EE_AUDIO_MST_PAD_CTRL1_A1;
       break;
   }
 
@@ -311,6 +332,26 @@ void AmlTdmInDevice::ConfigTdmSlot(uint8_t bit_offset, uint8_t num_slots, uint8_
 
       mmio_.Write32(reg0, GetTdmOffset(TDMIN_CTRL_OFFS));
     } break;
+    case metadata::AmlVersion::kA1: {
+      uint32_t src = 0;
+      switch (tdm_ch_) {
+        case TDM_IN_A:
+          src = 0;
+          break;
+        case TDM_IN_B:
+          src = 1;
+          break;
+        case TDM_IN_C:
+        case TDM_IN_LB:
+          ZX_ASSERT(0);
+          break;
+      }
+      uint32_t reg0 = (i2s_mode << 30) |    // TDM/I2S mode.
+                      (src << 20) |         // Source for TDMIN.
+                      (bit_offset << 16) |  // Add delay to ws or data for skew modification.
+                      bits_per_slot;
+      mmio_.Write32(reg0, GetTdmOffset(TDMIN_CTRL_OFFS));
+    } break;
   }
 }
 
@@ -388,7 +429,12 @@ void AmlTdmInDevice::Shutdown() {
   mmio_.ClearBits32(0x03 << 30, ptr);
 
   // Disable the audio domain clocks used by this instance.
-  AudioClkDis((EE_AUDIO_CLK_GATE_TDMINA << tdm_ch_) | (EE_AUDIO_CLK_GATE_TODDRA << toddr_ch_));
+  if (version_ == metadata::AmlVersion::kA1) {
+    AudioClkDis((EE_AUDIO_CLK_GATE_TDMINA_A1 << tdm_ch_) |
+                (EE_AUDIO_CLK_GATE_TODDRA_A1 << toddr_ch_));
+  } else {
+    AudioClkDis((EE_AUDIO_CLK_GATE_TDMINA << tdm_ch_) | (EE_AUDIO_CLK_GATE_TODDRA << toddr_ch_));
+  }
 
   // Note: We are leaving the ARB unit clocked as well as MCLK and
   //  SCLK generation units since it is possible they are used by

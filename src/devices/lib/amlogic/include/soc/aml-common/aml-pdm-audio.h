@@ -123,6 +123,8 @@ class AmlPdmDevice {
         return ToS905D3GAudioClkSrcSel(clk_src);
       case metadata::AmlVersion::kA5:
         return ToA5AudioClkSrcSel(clk_src);
+      case metadata::AmlVersion::kA1:
+        return ToA1AudioClkSrcSel(clk_src);
     }
     ZX_PANIC("Unreachable");
   }

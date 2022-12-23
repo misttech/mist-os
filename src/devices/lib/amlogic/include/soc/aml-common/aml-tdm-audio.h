@@ -102,6 +102,8 @@ class AmlTdmDevice {
         return ToS905D3GAudioClkSrcSel(clk_src);
       case metadata::AmlVersion::kA5:
         return ToA5AudioClkSrcSel(clk_src);
+      case metadata::AmlVersion::kA1:
+        return ToA1AudioClkSrcSel(clk_src);
     }
     ZX_PANIC("Unreachable");
   }
@@ -344,7 +346,7 @@ class AmlTdmLbDevice : public AmlTdmDevice {
     ZX_PANIC("Unreachable");
   }
 
-  // For S905D2/S905D3.
+  // For S905D2/S905D3/A1.
   static uint32_t ToTdminLbSrcV1(metadata::AmlAudioBlock src) {
     switch (src) {
       case metadata::AmlAudioBlock::TDMOUT_A:

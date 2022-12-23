@@ -82,3 +82,17 @@ uint8_t ToA5AudioClkSrcSel(ee_audio_mclk_src_t clk_src) {
   }
   ZX_PANIC("Unsupport clk_src: %d", clk_src);
 }
+
+// It follows up `A113L Datasheet`
+// - Page153(EE_AUDIO_MCLK_A_CTRL)
+// - Page224(EE_AUDIO2_CLK_PDMIN_CRTL0)
+// - Page224(EE_AUDIO2_CLK_PDMIN_CTRL1)
+uint8_t ToA1AudioClkSrcSel(ee_audio_mclk_src_t clk_src) {
+  switch (clk_src) {
+    case HIFI_PLL:
+      return 3;
+    default:
+      break;
+  }
+  ZX_PANIC("Unsupport clk_src: %d", clk_src);
+}

@@ -76,6 +76,12 @@ __BEGIN_CDECLS
 #define EE_AUDIO_SCLK_PAD_CTRL0_A5    0x0e88
 #define EE_AUDIO_LRCLK_PAD_CTRL0_A5   0x0e8c
 
+// For Version A1
+#define EE_AUDIO_MCLK_A_CTRL_A1       0x0008
+#define EE_AUDIO_MST_PAD_CTRL0_A1     0x0020
+#define EE_AUDIO_MST_PAD_CTRL1_A1     0x0024
+
+
 #define EE_AUDIO_MST_A_SCLK_CTRL0     0x0040
 #define EE_AUDIO_MST_A_SCLK_CTRL1     0x0044
 #define EE_AUDIO_MST_B_SCLK_CTRL0     0x0048
@@ -125,6 +131,7 @@ __BEGIN_CDECLS
 #define FRDDR_STATUS2_OFFS      (0x06 << 2)
 #define FRDDR_CTRL2_OFFS_D3G    (0x0a << 2)
 #define FRDDR_CTRL2_OFFS_A5     (0x0a << 2)
+#define FRDDR_CTRL2_OFFS_A1     (0x0a << 2)
 
 #define EE_AUDIO_TODDR_A_CTRL0       (0x40 << 2)
 #define EE_AUDIO_TODDR_B_CTRL0       (0x50 << 2)
@@ -154,6 +161,7 @@ __BEGIN_CDECLS
 #define TDMOUT_MASK_VAL_OFFS  (0x0f << 2)
 #define TDMOUT_CTRL2_OFFS_D3G (0x160 << 2)
 #define TDMOUT_CTRL2_OFFS_A5  (0x2a0 << 2)
+#define TDMOUT_CTRL2_OFFS_A1  (0x2a0 << 2)
 
 #define EE_AUDIO_TDMOUT_A_CTRL0         (0x140 << 2)
 #define EE_AUDIO_TDMOUT_B_CTRL0         (0x150 << 2)
@@ -206,6 +214,18 @@ __BEGIN_CDECLS
 #define EE_AUDIO_CLK_GATE_TODDRC     (1 << 14)
 #define EE_AUDIO_CLK_GATE_LOOPBACK   (1 << 15)
 
+//A1 Audio clock gating masks
+#define EE_AUDIO_CLK_GATE_ARB_A1      (1 << 0)
+#define EE_AUDIO_CLK_GATE_TDMINA_A1   (1 << 1)
+#define EE_AUDIO_CLK_GATE_TDMINB_A1   (1 << 2)
+#define EE_AUDIO_CLK_GATE_TDMINLB_A1  (1 << 3)
+#define EE_AUDIO_CLK_GATE_LOOPBACK_A1 (1 << 4)
+#define EE_AUDIO_CLK_GATE_TDMOUTA_A1  (1 << 5)
+#define EE_AUDIO_CLK_GATE_TDMOUTB_A1  (1 << 6)
+#define EE_AUDIO_CLK_GATE_FRDDRA_A1   (1 << 7)
+#define EE_AUDIO_CLK_GATE_FRDDRB_A1   (1 << 8)
+#define EE_AUDIO_CLK_GATE_TODDRA_A1   (1 << 9)
+#define EE_AUDIO_CLK_GATE_TODDRB_A1   (1 << 10)
 
 //Audio TOP control reg offsets
 #define EE_AUDIO2_CLK_GATE_EN0_A5     (0x0003  << 2)
@@ -295,6 +315,7 @@ typedef enum {
 uint8_t ToS905D2AudioClkSrcSel(ee_audio_mclk_src_t clk_src);
 uint8_t ToS905D3GAudioClkSrcSel(ee_audio_mclk_src_t clk_src);
 uint8_t ToA5AudioClkSrcSel(ee_audio_mclk_src_t clk_src);
+uint8_t ToA1AudioClkSrcSel(ee_audio_mclk_src_t clk_src);
 
 // clang-format on
 __END_CDECLS

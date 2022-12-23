@@ -76,6 +76,7 @@ std::unique_ptr<AmlPdmDevice> AmlPdmDevice::Create(
         fifo_depth = 128 * 8;  // TODDR_B/C/D has 128 x 64-bit
       break;
     case metadata::AmlVersion::kA5:
+    case metadata::AmlVersion::kA1:
       fifo_depth = 64 * 8;  // TODDR_A/B has 64 x 64-bit
       break;
   }
@@ -153,6 +154,23 @@ void AmlPdmDevice::InitRegs() {
       audio2_mmio_.Write32((clk_src_sel_ << 24) | dclk_div_, EE_AUDIO2_CLK_PDMIN_CTRL0);
       audio2_mmio_.Write32((1 << 31) | (clk_src_sel_ << 24) | sysclk_div_,
                            EE_AUDIO2_CLK_PDMIN_CTRL1);
+      break;
+    case metadata::AmlVersion::kA1:
+      audio_mmio_.Write32(
+          (0x02 << 13) |   // Right justified 16-bit
+              (31 << 8) |  // msb position of data out of pdm
+              (16 << 3),   // lsb position of data out of pdm - (S/U32 - 0; S/U16 - 16)
+          GetToddrOffset(TODDR_CTRL0_OFFS));
+      audio_mmio_.Write32((0x04 << 28) |                       // select pdm as data source
+                              ((fifo_depth_ / 8 / 2) << 12) |  // trigger ddr when fifo half full
+                              (0x02 << 8),                     // STATUS2 source is ddr position
+                          GetToddrOffset(TODDR_CTRL1_OFFS));
+      // dclk & sysclk
+      audio_mmio_.Write32((clk_src_sel_ << 24) | dclk_div_, EE_AUDIO2_CLK_PDMIN_CTRL0);
+      audio_mmio_.Write32((1 << 31) | (clk_src_sel_ << 24) | sysclk_div_,
+                          EE_AUDIO2_CLK_PDMIN_CTRL1);
+      // arb
+      audio_mmio_.SetBits32((1 << 31) | (1 << toddr_ch_), EE_AUDIO_ARB_CTRL);
       break;
   }
 
@@ -309,6 +327,7 @@ void AmlPdmDevice::PdmInDisable() {
       audio_mmio_.ClearBits32(1 << 31, EE_AUDIO_CLK_PDMIN_CTRL0);
       break;
     case metadata::AmlVersion::kA5:
+    case metadata::AmlVersion::kA1:
       audio2_mmio_.ClearBits32(1 << 31, EE_AUDIO2_CLK_PDMIN_CTRL0);
       break;
   }
@@ -324,6 +343,7 @@ void AmlPdmDevice::PdmInEnable() {
       audio_mmio_.SetBits32(1 << 31, EE_AUDIO_CLK_PDMIN_CTRL0);
       break;
     case metadata::AmlVersion::kA5:
+    case metadata::AmlVersion::kA1:
       audio2_mmio_.SetBits32(1 << 31, EE_AUDIO2_CLK_PDMIN_CTRL0);
       break;
   }

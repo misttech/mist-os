@@ -33,9 +33,10 @@ class LbCtrl : public hwreg::RegisterBase<LbCtrl, uint32_t> {
   // Active channel mask of |Datain| source.
   DEF_FIELD(23, 16, datain_channel_mask);
 
-  // For S905D2/S905D3.
+  // For S905D2/S905D3/A1.
   static bool has_datain_src(metadata::AmlVersion version) {
-    return version == metadata::AmlVersion::kS905D2G || version == metadata::AmlVersion::kS905D3G;
+    return version == metadata::AmlVersion::kS905D2G || version == metadata::AmlVersion::kS905D3G ||
+           version == metadata::AmlVersion::kA1;
   }
   // Source for LOOPBACK |Datain|.
   DEF_FIELD(2, 0, datain_src);
@@ -60,9 +61,10 @@ class LbCtrl1 : public hwreg::RegisterBase<LbCtrl1, uint32_t> {
   // Active channel mask of |Datalb| source.
   DEF_FIELD(23, 16, datalb_channel_mask);
 
-  // For S905D2/S905D3.
+  // For S905D2/S905D3/A1.
   static bool has_datalb_src(metadata::AmlVersion version) {
-    return version == metadata::AmlVersion::kS905D2G || version == metadata::AmlVersion::kS905D3G;
+    return version == metadata::AmlVersion::kS905D2G || version == metadata::AmlVersion::kS905D3G ||
+           version == metadata::AmlVersion::kA1;
   }
   // Source for LOOPBACK |Datalb|.
   DEF_FIELD(2, 0, datalb_src);
@@ -72,7 +74,7 @@ class LbCtrl1 : public hwreg::RegisterBase<LbCtrl1, uint32_t> {
 
 class LbCtrl2 : public hwreg::RegisterBase<LbCtrl2, uint32_t> {
  public:
-  // For S905D3/A5.
+  // For S905D3/A1/A5.
   static bool has_datain_channel_sel(metadata::AmlVersion version) {
     return version != metadata::AmlVersion::kS905D2G;
   }
@@ -93,7 +95,7 @@ class LbCtrl2 : public hwreg::RegisterBase<LbCtrl2, uint32_t> {
 
 class LbCtrl3 : public hwreg::RegisterBase<LbCtrl3, uint32_t> {
  public:
-  // For S905D3/A5.
+  // For S905D3/A1/A5.
   static bool has_datalb_channel_sel(metadata::AmlVersion version) {
     return version != metadata::AmlVersion::kS905D2G;
   }
@@ -209,7 +211,7 @@ zx_status_t AmlLoopbackDevice::ConfigDataLb(uint32_t active_channels, uint32_t e
   // LOOPBACK |Datalb| Source Config.
   uint32_t src_id = {};
   if (LbCtrl1::has_datalb_src(version_)) {
-    src_id = 0;  // 'TDMIN_LB' - S905D2/S905D3.
+    src_id = 0;  // 'TDMIN_LB' - S905D2/S905D3/A1.
     LbCtrl1::Get().ReadFrom(&view_).set_datalb_src(src_id).WriteTo(&view_);
   } else {
     src_id = 6;  // 'TDMIN_LB' - A5.
