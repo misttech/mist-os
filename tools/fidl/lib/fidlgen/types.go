@@ -794,13 +794,13 @@ func (t *Type) MaxDecodeSize() *int {
 	// both type shapes should be identical with respect to the properties being
 	// checked.
 	ts := t.TypeShapeV2
-	mes := ts.InlineSize + ts.MaxOutOfLine
-	return &mes
+	mds := ts.InlineSize + ts.MaxOutOfLine
+	return &mds
 }
 
 // Subtract 16 to account for the header that will need to prefix this type when
 // encoded.
-const largeMessageCutoffForZxChannel = math.MaxUint16 - 16
+const largeMessageCutoffForZxChannel = (1 << 16) - 16
 
 // EncodeOverflowableOnTransport determines whether this type could possibly
 // overflow when encoded after being sent on the given transport.
@@ -820,9 +820,9 @@ func (t *Type) EncodeOverflowableOnTransport(transport string) bool {
 // DecodeOverflowableOnTransport determines whether this type could possibly
 // overflow when decoded after being sent on the given transport.
 func (t *Type) DecodeOverflowableOnTransport(transport string) bool {
-	mes := t.MaxDecodeSize()
+	mds := t.MaxDecodeSize()
 	if strings.ToLower(transport) == "channel" {
-		if mes == nil || *mes > largeMessageCutoffForZxChannel {
+		if mds == nil || *mds > largeMessageCutoffForZxChannel {
 			return true
 		}
 		return false
