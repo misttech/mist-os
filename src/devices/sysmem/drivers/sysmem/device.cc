@@ -1096,14 +1096,18 @@ zx_handle_t Device::SecureMemConnection::channel() {
 
 FidlDevice::FidlDevice(zx_device_t* parent, sysmem_driver::Device* sysmem_device,
                        async_dispatcher_t* dispatcher)
-    : DdkFidlDeviceType(parent), sysmem_device_(sysmem_device), outgoing_(dispatcher) {
+    : DdkFidlDeviceType(parent),
+      sysmem_device_(sysmem_device),
+      dispatcher_(dispatcher),
+      outgoing_(dispatcher) {
   ZX_DEBUG_ASSERT(parent_);
   ZX_DEBUG_ASSERT(sysmem_device_);
 }
 
 zx_status_t FidlDevice::Bind() {
-  zx::result status =
-      outgoing_.AddProtocol(this, fidl::DiscoverableProtocolName<fuchsia_hardware_sysmem::Sysmem>);
+  zx::result status = outgoing_.AddUnmanagedProtocol(
+      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+      fidl::DiscoverableProtocolName<fuchsia_hardware_sysmem::Sysmem>);
   if (status.is_error()) {
     zxlogf(ERROR, "failed to add FIDL protocol to the outgoing directory: %s",
            status.status_string());

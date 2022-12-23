@@ -14,6 +14,7 @@
 #include <lib/inspect/component/cpp/component.h>
 #include <zircon/errors.h>
 
+#include "lib/fidl/cpp/wire/channel.h"
 #include "src/ui/input/drivers/hid-input-report/input-report.h"
 
 namespace fdf2 = fuchsia_driver_framework;
@@ -54,8 +55,11 @@ class InputReportDriver : public driver::DriverBase {
     input_report_->Start();
 
     // Export our InputReport protocol.
-    auto status = context().outgoing()->component().AddProtocol<fuchsia_input_report::InputDevice>(
-        &input_report_.value(), kDeviceName);
+    auto status =
+        context().outgoing()->component().AddUnmanagedProtocol<fuchsia_input_report::InputDevice>(
+            input_report_bindings_.CreateHandler(&input_report_.value(), dispatcher(),
+                                                 fidl::kIgnoreBindingClosure),
+            kDeviceName);
     if (status.is_error()) {
       return status.take_error();
     }
@@ -92,6 +96,7 @@ class InputReportDriver : public driver::DriverBase {
   void ScheduleStop() { node().reset(); }
 
   std::optional<hid_input_report_dev::InputReport> input_report_;
+  fidl::ServerBindingGroup<fuchsia_input_report::InputDevice> input_report_bindings_;
   std::optional<inspect::ComponentInspector> exposed_inspector_;
   std::optional<compat::DeviceServer> child_;
   std::shared_ptr<compat::Context> compat_context_;

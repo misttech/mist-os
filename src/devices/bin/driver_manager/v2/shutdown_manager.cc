@@ -99,18 +99,26 @@ void ShutdownManager::OnUnbound(const char* connection, fidl::UnbindInfo info) {
 
 void ShutdownManager::Publish(component::OutgoingDirectory& outgoing,
                               fidl::ClientEnd<fuchsia_io::Directory> dev_io) {
-  auto result = outgoing.AddProtocol<fuchsia_device_manager::Administrator>(this);
+  auto result = outgoing.AddUnmanagedProtocol<fuchsia_device_manager::Administrator>(
+      admin_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
 
-  result = outgoing.AddProtocol(&devfs_lifecycle_, "fuchsia.device.fs.lifecycle.Lifecycle");
+  result = outgoing.AddUnmanagedProtocol<fuchsia_process_lifecycle::Lifecycle>(
+      lifecycle_bindings_.CreateHandler(&devfs_lifecycle_, dispatcher_,
+                                        fidl::kIgnoreBindingClosure),
+      "fuchsia.device.fs.lifecycle.Lifecycle");
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
 
-  result = outgoing.AddProtocol(&fshost_lifecycle_, "fuchsia.fshost.lifecycle.Lifecycle");
+  result = outgoing.AddUnmanagedProtocol<fuchsia_process_lifecycle::Lifecycle>(
+      lifecycle_bindings_.CreateHandler(&fshost_lifecycle_, dispatcher_,
+                                        fidl::kIgnoreBindingClosure),
+      "fuchsia.fshost.lifecycle.Lifecycle");
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
 
   // We advertise the SystemStateTransition protocol in case the shutdown shim needs
   // to connect to us.
-  result = outgoing.AddProtocol<fuchsia_device_manager::SystemStateTransition>(this);
+  result = outgoing.AddUnmanagedProtocol<fuchsia_device_manager::SystemStateTransition>(
+      sys_state_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   ZX_ASSERT(result.is_ok());
 
   // Bind to lifecycle server
@@ -118,10 +126,10 @@ void ShutdownManager::Publish(component::OutgoingDirectory& outgoing,
       zx::channel(zx_take_startup_handle(PA_LIFECYCLE)));
 
   if (lifecycle_server.is_valid()) {
-    lifecycle_binding_ = fidl::BindServer(dispatcher_, std::move(lifecycle_server), this,
-                                          [](ShutdownManager* server, fidl::UnbindInfo info, auto) {
-                                            server->OnUnbound("Lifecycle", info);
-                                          });
+    lifecycle_bindings_.AddBinding(dispatcher_, std::move(lifecycle_server), this,
+                                   [](ShutdownManager* server, fidl::UnbindInfo info) {
+                                     server->OnUnbound("Lifecycle", info);
+                                   });
   } else {
     LOGF(INFO,
          "No valid handle found for lifecycle events, assuming test environment and continuing");
@@ -130,11 +138,10 @@ void ShutdownManager::Publish(component::OutgoingDirectory& outgoing,
   auto system_state_endpoints =
       fidl::CreateEndpoints<fuchsia_device_manager::SystemStateTransition>();
   ZX_ASSERT(system_state_endpoints.is_ok());
-  sys_state_binding_ =
-      fidl::BindServer(dispatcher_, std::move(system_state_endpoints->server), this,
-                       [](ShutdownManager* server, fidl::UnbindInfo info, auto channel) {
-                         server->OnUnbound("Power Manager", info);
-                       });
+  sys_state_bindings_.AddBinding(dispatcher_, std::move(system_state_endpoints->server), this,
+                                 [](ShutdownManager* server, fidl::UnbindInfo info) {
+                                   server->OnUnbound("Power Manager", info);
+                                 });
 
   auto fpm_result = component::Connect<fuchsia_power_manager::DriverManagerRegistration>();
   if (fpm_result.is_error()) {

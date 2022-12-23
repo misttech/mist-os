@@ -115,6 +115,8 @@ class KernelPciFidl : public KernelPciFidlType,
 
  private:
   kpci_device device_;
+  fidl::ServerBindingGroup<fuchsia_hardware_pci::Device> bindings_;
+  async_dispatcher_t* dispatcher_;
   component::OutgoingDirectory outgoing_;
 };
 

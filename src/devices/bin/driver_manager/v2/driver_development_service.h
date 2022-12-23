@@ -40,6 +40,7 @@ class DriverDevelopmentService
   dfv2::DriverRunner& driver_runner_;
   // A map of the test nodes that have been created.
   std::map<std::string, std::weak_ptr<dfv2::Node>> test_nodes_;
+  fidl::ServerBindingGroup<fuchsia_driver_development::DriverDevelopment> bindings_;
   async_dispatcher_t* const dispatcher_;
 };
 

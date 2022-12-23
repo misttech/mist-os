@@ -81,6 +81,7 @@ class DevfsExporter : public fidl::WireServer<fuchsia_device_fs::Exporter> {
 
   Devfs& devfs_;
   Devnode* const root_;
+  fidl::ServerBindingGroup<fuchsia_device_fs::Exporter> bindings_;
   async_dispatcher_t* const dispatcher_;
 
   std::unordered_map<ExportWatcher*, std::unique_ptr<ExportWatcher>> exports_;

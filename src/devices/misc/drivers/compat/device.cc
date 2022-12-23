@@ -961,7 +961,8 @@ zx_status_t Device::ConnectRuntime(const char* service_name, const char* protoco
 
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Device::ServeRuntimeConnectorProtocol() {
   auto& outgoing = driver()->outgoing();
-  zx::result<> status = outgoing.component().AddProtocol<fdf::RuntimeConnector>(this);
+  zx::result<> status = outgoing.component().AddUnmanagedProtocol<fdf::RuntimeConnector>(
+      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   if (status.is_error()) {
     return status.take_error();
   }

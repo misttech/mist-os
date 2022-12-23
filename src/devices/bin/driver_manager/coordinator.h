@@ -298,6 +298,13 @@ class Coordinator : public CompositeManagerBridge,
   std::unique_ptr<BindDriverManager> bind_driver_manager_;
 
   uint32_t next_dfv2_device_id_ = 0;
+
+  fidl::ServerBindingGroup<fuchsia_device_manager::Administrator> admin_bindings_;
+  fidl::ServerBindingGroup<fuchsia_device_manager::SystemStateTransition> system_state_bindings_;
+
+  // This needs to outlive `coordinator` but should be destroyed in the same
+  // event loop iteration. Otherwise, we risk use-after-free issues if a client
+  // tries to connect to the servers published in it.
   component::OutgoingDirectory* outgoing_;
 
   // The runner for DFv2 components. This needs to outlive `coordinator`.

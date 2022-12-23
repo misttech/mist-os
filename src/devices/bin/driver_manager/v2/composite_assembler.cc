@@ -273,7 +273,8 @@ bool CompositeDeviceManager::BindNode(std::shared_ptr<Node> node) {
 }
 
 void CompositeDeviceManager::Publish(component::OutgoingDirectory& outgoing) {
-  auto result = outgoing.AddProtocol<fuchsia_device_composite::DeprecatedCompositeCreator>(this);
+  auto result = outgoing.AddUnmanagedProtocol<fuchsia_device_composite::DeprecatedCompositeCreator>(
+      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   ZX_ASSERT(result.is_ok());
 }
 

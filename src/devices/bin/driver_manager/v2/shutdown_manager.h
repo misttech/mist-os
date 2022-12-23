@@ -197,9 +197,9 @@ class ShutdownManager : public fidl::WireServer<fuchsia_device_manager::Administ
   // drivers upon receiving this signal.
   Lifecycle fshost_lifecycle_;
 
-  std::optional<fidl::ServerBindingRef<fuchsia_process_lifecycle::Lifecycle>> lifecycle_binding_;
-  std::optional<fidl::ServerBindingRef<fuchsia_device_manager::SystemStateTransition>>
-      sys_state_binding_;
+  fidl::ServerBindingGroup<fuchsia_device_manager::Administrator> admin_bindings_;
+  fidl::ServerBindingGroup<fuchsia_process_lifecycle::Lifecycle> lifecycle_bindings_;
+  fidl::ServerBindingGroup<fuchsia_device_manager::SystemStateTransition> sys_state_bindings_;
   std::list<fit::callback<void(zx_status_t)>> package_shutdown_complete_callbacks_;
   std::list<fit::callback<void(zx_status_t)>> boot_shutdown_complete_callbacks_;
 

@@ -121,6 +121,8 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
   fidl::WireClient<fuchsia_component::Realm> realm_;
   fidl::WireClient<fuchsia_driver_index::DriverIndex> driver_index_;
   LoaderServiceFactory loader_service_factory_;
+  fidl::ServerBindingGroup<fuchsia_component_runner::ComponentRunner> runner_bindings_;
+  fidl::ServerBindingGroup<fuchsia_driver_framework::NodeGroupManager> manager_bindings_;
   async_dispatcher_t* const dispatcher_;
   std::shared_ptr<Node> root_node_;
 

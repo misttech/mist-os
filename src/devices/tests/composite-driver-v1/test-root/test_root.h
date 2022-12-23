@@ -48,6 +48,7 @@ class TestRoot : public DeviceType {
   inspect::BoolProperty is_bound = inspect_.GetRoot().CreateBool("is_bound", false);
 
   NumberServer server_ = NumberServer(0);
+  fidl::ServerBindingGroup<fuchsia_composite_test::Device> bindings_;
   async::Loop loop_;
   std::optional<component::OutgoingDirectory> outgoing_;
 };

@@ -184,6 +184,7 @@ class Device : public std::enable_shared_from_this<Device>,
   uint32_t device_id_ = 0;
 
   driver::Logger* logger_;
+  fidl::ServerBindingGroup<fuchsia_driver_framework::RuntimeConnector> bindings_;
   async_dispatcher_t* const dispatcher_;
   uint32_t device_flags_ = 0;
   std::vector<std::string> fragments_;

@@ -79,7 +79,8 @@ class CompositeDeviceAssembler {
 };
 
 // This class manages all of the `CompositeDeviceAssemblers` that exist.
-class CompositeDeviceManager : fidl::Server<fuchsia_device_composite::DeprecatedCompositeCreator> {
+class CompositeDeviceManager
+    : public fidl::Server<fuchsia_device_composite::DeprecatedCompositeCreator> {
  public:
   // Create a CompositeDeviceManager. `node_manager` is unowned and must outlive the
   // manager class.
@@ -110,6 +111,7 @@ class CompositeDeviceManager : fidl::Server<fuchsia_device_composite::Deprecated
                           AddCompositeDeviceCompleter::Sync& completer) override;
 
   NodeManager* node_manager_;
+  fidl::ServerBindingGroup<fuchsia_device_composite::DeprecatedCompositeCreator> bindings_;
   async_dispatcher_t* dispatcher_;
   fit::function<void()> rebind_callback_;
 

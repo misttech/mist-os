@@ -524,7 +524,7 @@ zx_status_t KernelPciFidl::CreateComposite(zx_device_t* parent, kpci_device devi
 
 KernelPciFidl::KernelPciFidl(zx_device_t* parent, kpci_device device,
                              async_dispatcher_t* dispatcher)
-    : KernelPciFidlType(parent), device_(device), outgoing_(dispatcher) {}
+    : KernelPciFidlType(parent), device_(device), dispatcher_(dispatcher), outgoing_(dispatcher) {}
 
 void KernelPciFidl::DdkRelease() {
   if (device_.handle != ZX_HANDLE_INVALID) {
@@ -733,7 +733,9 @@ void KernelPciFidl::GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& com
 
 zx_status_t KernelPciFidl::SetUpOutgoingDirectory(
     fidl::ServerEnd<fuchsia_io::Directory> server_end) {
-  zx::result status = outgoing_.AddProtocol(this, fidl::DiscoverableProtocolName<fpci::Device>);
+  zx::result status = outgoing_.AddUnmanagedProtocol<fuchsia_hardware_pci::Device>(
+      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+      fidl::DiscoverableProtocolName<fpci::Device>);
   if (status.is_error()) {
     return status.status_value();
   }

@@ -314,6 +314,8 @@ class FidlDevice : public DdkFidlDeviceType {
 
  private:
   sysmem_driver::Device* sysmem_device_;
+  fidl::ServerBindingGroup<fuchsia_hardware_sysmem::Sysmem> bindings_;
+  async_dispatcher_t* dispatcher_;
   component::OutgoingDirectory outgoing_;
 };
 

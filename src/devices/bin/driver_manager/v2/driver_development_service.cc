@@ -24,7 +24,8 @@ DriverDevelopmentService::DriverDevelopmentService(dfv2::DriverRunner& driver_ru
     : driver_runner_(driver_runner), dispatcher_(dispatcher) {}
 
 void DriverDevelopmentService::Publish(component::OutgoingDirectory& outgoing) {
-  auto result = outgoing.AddProtocol<fdd::DriverDevelopment>(this);
+  auto result = outgoing.AddUnmanagedProtocol<fdd::DriverDevelopment>(
+      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   ZX_ASSERT(result.is_ok());
 }
 

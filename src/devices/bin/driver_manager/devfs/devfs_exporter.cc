@@ -94,7 +94,8 @@ DevfsExporter::DevfsExporter(Devfs& devfs, Devnode* root, async_dispatcher_t* di
     : devfs_(devfs), root_(root), dispatcher_(dispatcher) {}
 
 void DevfsExporter::PublishExporter(component::OutgoingDirectory& outgoing) {
-  auto result = outgoing.AddProtocol<fdfs::Exporter>(this);
+  auto result = outgoing.AddUnmanagedProtocol<fdfs::Exporter>(
+      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   ZX_ASSERT(result.is_ok());
 }
 

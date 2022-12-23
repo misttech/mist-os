@@ -249,14 +249,16 @@ fpromise::promise<inspect::Inspector> DriverRunner::Inspect() const {
 size_t DriverRunner::NumOrphanedNodes() const { return orphaned_nodes_.size(); }
 
 void DriverRunner::PublishComponentRunner(component::OutgoingDirectory& outgoing) {
-  auto result = outgoing.AddProtocol<frunner::ComponentRunner>(this);
+  auto result = outgoing.AddUnmanagedProtocol<frunner::ComponentRunner>(
+      runner_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   ZX_ASSERT(result.is_ok());
 
   composite_device_manager_.Publish(outgoing);
 }
 
 void DriverRunner::PublishNodeGroupManager(component::OutgoingDirectory& outgoing) {
-  auto result = outgoing.AddProtocol<fdf::NodeGroupManager>(this);
+  auto result = outgoing.AddUnmanagedProtocol<fdf::NodeGroupManager>(
+      manager_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   ZX_ASSERT(result.is_ok());
 }
 

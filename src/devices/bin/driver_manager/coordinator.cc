@@ -59,6 +59,7 @@
 #include <src/lib/fsl/vmo/sized_vmo.h>
 #include <src/lib/fsl/vmo/vector.h>
 
+#include "lib/fidl/cpp/wire/channel.h"
 #include "src/devices/bin/driver_manager/package_resolver.h"
 #include "src/devices/bin/driver_manager/v1/driver_development.h"
 #include "src/devices/bin/driver_manager/v1/node_group_v1.h"
@@ -1035,10 +1036,13 @@ void Coordinator::PublishDriverDevelopmentService(component::OutgoingDirectory& 
 
 void Coordinator::InitOutgoingServices(component::OutgoingDirectory& outgoing) {
   outgoing_ = &outgoing;
-  auto result = outgoing.AddProtocol<fdm::Administrator>(this);
+  auto result = outgoing.AddUnmanagedProtocol<fdm::Administrator>(
+      admin_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   ZX_ASSERT(result.is_ok());
 
-  result = outgoing.AddProtocol<fdm::SystemStateTransition>(&system_state_manager_);
+  result = outgoing.AddUnmanagedProtocol<fdm::SystemStateTransition>(
+      system_state_bindings_.CreateHandler(&system_state_manager_, dispatcher_,
+                                           fidl::kIgnoreBindingClosure));
   ZX_ASSERT(result.is_ok());
 }
 

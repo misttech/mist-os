@@ -23,7 +23,8 @@ class RootDriver : public driver::DriverBase, public fidl::WireServer<ft::Device
 
   zx::result<> Start() override {
     // Setup the outgoing directory.
-    auto status = context().outgoing()->component().AddProtocol<ft::Device>(this, name);
+    auto status = context().outgoing()->component().AddUnmanagedProtocol<ft::Device>(
+        bindings_.CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure), name);
     if (status.is_error()) {
       return status.take_error();
     }
@@ -64,6 +65,7 @@ class RootDriver : public driver::DriverBase, public fidl::WireServer<ft::Device
   // fidl::WireServer<ft::Device>
   void Ping(PingCompleter::Sync& completer) override { completer.Reply(); }
 
+  fidl::ServerBindingGroup<ft::Device> bindings_;
   driver::DevfsExporter exporter_;
 };
 
