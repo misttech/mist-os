@@ -3,6 +3,7 @@
 extern crate csv;
 
 pub use self::csv::{Reader, Writer, Result, ReaderBuilder};
+use crate::AsTableSlice;
 use std::path::Path;
 use std::io::{Read, Write};
 
@@ -64,17 +65,17 @@ impl super::Table {
                         .collect())
     }
 
-    
+
     /// Write the table to the specified writer.
     pub fn to_csv<W: Write>(&self, w: W) -> Result<Writer<W>> {
-        self.as_ref().to_csv(w)
+        self.as_slice().to_csv(w)
     }
 
     /// Write the table to the specified writer.
     ///
     /// This allows for format customisation.
     pub fn to_csv_writer<W: Write>(&self, writer: Writer<W>) -> Result<Writer<W>> {
-        self.as_ref().to_csv_writer(writer)
+        self.as_slice().to_csv_writer(writer)
     }
 }
 
