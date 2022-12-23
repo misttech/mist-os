@@ -1,0 +1,26 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Verifies that there are no duplicate headers in an SDK library declaration.
+#
+# Parameters
+#
+#   headers (required)
+#     A list of headers.
+#
+template("verify_public_headers") {
+  unique = []
+  foreach(header, invoker.headers) {
+    if (unique + [ header ] - [ header ] != unique) {
+      print("sdk_shared_library",
+            target_name,
+            "called with duplicate headers:",
+            header)
+      assert(false)
+    }
+    unique += [ header ]
+  }
+  not_needed([ "target_name" ])
+  not_needed([ "unique" ])
+}

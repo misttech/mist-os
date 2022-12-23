@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/cpp/verify_pragma_once.gni")
+import("//build/cpp/verify_public_headers.gni")
 import("//build/sdk/plasa/config.gni")
 import("//build/sdk/plasa/plasa_fragment_cc.gni")
 import("//build/sdk/sdk_atom.gni")
@@ -231,6 +232,10 @@ template("sdk_source_set") {
     verify_pragma_once(verify_pragma_target_name) {
       headers = all_headers
     }
+  }
+
+  verify_public_headers(target_name) {
+    headers = all_headers
   }
 
   if (generate_plasa_artifacts) {
