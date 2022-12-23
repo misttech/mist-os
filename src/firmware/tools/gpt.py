@@ -7,19 +7,54 @@
 
 This script wraps the `sgdisk` utility to provide a simpler interface tailored
 specifically for Fuchsia GPT images.
+
+When creating a new GPT, the layout is specified by a JSON file that looks like:
+
+{
+    "size_mib": disk size in MiB
+    "block_size": disk R/W block size in bytes
+    "alignment_kib": partition start alignment in KiB; should generally be a
+                     multiple of the disk erase block size
+    "partitions": [
+        {
+            "name": partition name
+            "size_kib": size in KiB, or "fill" to use the rest of the disk
+            "unique_guid": unique GUID; omit to assign randomly
+            "type_guid": type GUID, or one of ("fvm", "vbmeta", "zircon") to use
+                         the standard Fuchsia types
+        }
+    ]
+}
+
+Each partition starts immediately following the previous; this tool does not
+support creating GPTs with out-of-order partitions or gaps between partitions.
 """
 
+import argparse
 import contextlib
 import dataclasses
+import json
+import logging
 import os
+import pathlib
 import re
 import subprocess
+import sys
 import tempfile
-from typing import Iterator, List, Optional
+import textwrap
+from typing import Dict, Iterator, List, Optional
 
 # A regexp to capture GUIDs as reported by `sgdisk`.
 # Example: 4B7A23A5-E9D1-456A-BACB-78B23D855324.
-_GUID_RE = r"[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"
+GUID_RE = r"[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"
+
+# Maps partition type names to known type GUIDs.
+# https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/system/public/zircon/hw/gpt.h.
+_TYPE_GUID_FROM_NAME = {
+    "fvm": "49FD7CB8-DF15-4E73-B9D9-992070127F0F",
+    "vbmeta": "421A8BFC-85D9-4D85-ACDA-B64EEC0133E9",
+    "zircon": "9B37FFF6-2E58-466A-983A-F7926D0B04E0",
+}
 
 
 @dataclasses.dataclass
@@ -28,9 +63,15 @@ class Partition():
     # 1-based index in the GPT entry array.
     index: int
     name: str
+
+    # Partition first block, last block (inclusive), and size in blocks.
+    # Logical block addressing (LBA) is used here because it's what GPT uses
+    # internally and is indivisible so will always be integers for exact
+    # calculations (unlike KiB/MiB).
     first_lba: int
     last_lba: int
-    size: int
+    size_lba: int
+
     type_guid: str
     unique_guid: str
     attr_flags: str
@@ -115,9 +156,9 @@ def get_partitions(disk_file: str) -> List[Partition]:
                 name=get_param(r"Partition name: '(.*?)'"),
                 first_lba=int(get_param(r"First sector: (\d+)")),
                 last_lba=int(get_param(r"Last sector: (\d+)")),
-                size=int(get_param(r"Partition size: (\d+) sectors")),
-                type_guid=get_param(f"Partition GUID code: ({_GUID_RE})"),
-                unique_guid=get_param(f"Partition unique GUID: ({_GUID_RE})"),
+                size_lba=int(get_param(r"Partition size: (\d+) sectors")),
+                type_guid=get_param(f"Partition GUID code: ({GUID_RE})"),
+                unique_guid=get_param(f"Partition unique GUID: ({GUID_RE})"),
                 attr_flags=get_param(r"Attribute flags: (\S*)")))
 
     return partitions
@@ -160,60 +201,42 @@ def mib_to_lba(mib: int, blk_size: int) -> int:
 
 
 def save_gpt(
-        disk_file: str, image_size_lba: int, blk_size: int, *,
-        flashing_gpt_file: str, primary_gpt_file: str, secondary_gpt_file: str,
-        combined_gpt_file: str):
-    """Extract and save GPT of a given disk
+        disk_path: pathlib.Path,
+        block_size: int,
+        *,
+        mbr_path: Optional[pathlib.Path] = None,
+        primary_path: Optional[pathlib.Path] = None,
+        backup_path: Optional[pathlib.Path] = None):
+    """Extracts and saves the GPT sections from a given disk image.
 
-    The extracted image can be saved in provisioning/primary/secondary/combined
-    format. The paths are specified by |flashing_gpt_file|, |primary_gpt_file|,
-    |secondary_gpt_file| and |combined_gpt_file| respectively.
+    Args:
+        disk_path: path to the disk image.
+        block_size: block size in bytes.
+        mbr_path: the path to write the MBR binary, or None.
+        primary_path: the path to write the primary GPT binary, or None.
+        backup_path: the path to write the backup GPT binary, or None.
     """
-    if flashing_gpt_file:
-        subprocess.run(
-            [
-                "dd", f"if={disk_file}", f"of={flashing_gpt_file}",
-                f"bs={blk_size}", "count=34"
-            ],
-            capture_output=True,
-            check=True)
-    if primary_gpt_file:
-        subprocess.run(
-            [
-                "dd", f"if={disk_file}", f"of={primary_gpt_file}",
-                f"bs={blk_size}", "skip=1", "count=33"
-            ],
-            capture_output=True,
-            check=True)
-    if secondary_gpt_file:
-        subprocess.run(
-            [
-                "dd", f"if={disk_file}", f"of={secondary_gpt_file}",
-                f"bs={blk_size}", f"skip={image_size_lba-33}", "count=33"
-            ],
-            capture_output=True,
-            check=True)
-    if combined_gpt_file:
-        subprocess.run(
-            [
-                "dd", f"if={disk_file}", f"of={combined_gpt_file}",
-                f"bs={blk_size}", "skip=1", "count=33"
-            ],
-            capture_output=True,
-            check=True)
-        subprocess.run(
-            [
-                "dd",
-                f"if={disk_file}",
-                f"of={combined_gpt_file}",
-                f"bs={blk_size}",
-                f"skip={image_size_lba-33}",
-                "count=33",
-                "oflag=append",
-                "conv=notrunc",
-            ],
-            capture_output=True,
-            check=True)
+    # The MBR is always the first block.
+    mbr_size = block_size
+
+    # GPT header is always one block, followed by 16KiB of space for partition
+    # entries. Technically it can be more than 16KiB but none of our layouts
+    # need this so we don't worry about it.
+    gpt_size = block_size + (16 * 1024)
+
+    with open(disk_path, "rb") as disk_file:
+        mbr = disk_file.read(mbr_size)
+        primary = disk_file.read(gpt_size)
+        disk_file.seek(-gpt_size, 2)
+        backup = disk_file.read()
+
+    for path, contents in (
+        (mbr_path, mbr),
+        (primary_path, primary),
+        (backup_path, backup),
+    ):
+        if path:
+            path.write_bytes(contents)
 
 
 def delete_part(disk_file: str, part_num: int):
@@ -271,7 +294,7 @@ def gpt_rename_part(
         name=new_part_name,
         first_lba=orig_part.first_lba,
         last_lba=orig_part.last_lba,
-        size=orig_part.size,
+        size_lba=orig_part.size_lba,
         type_guid=new_part_type_guid or orig_part.type_guid,
         unique_guid="",  #generate new
         attr_flags=orig_part.attr_flags,
@@ -279,3 +302,204 @@ def gpt_rename_part(
 
     delete_part(disk_image, orig_part.index)
     new_part(disk_image, orig_part.index, new_partition)
+
+
+def create_gpt(spec: Dict, out_dir: pathlib.Path):
+    """Creates a GPT from the given specification.
+
+    See the file docstring for a description of the spec.
+
+    Args:
+        spec_path: the layout specification.
+        out_dir: directory to write resulting images.
+
+    Raises:
+        ValueError if the given spec is invalid.
+    """
+    disk_size = spec["size_mib"] * 1024 * 1024
+    alignment = spec["alignment_kib"] * 1024
+    block_size = spec["block_size"]
+
+    # TODO: sgdisk appears to hardcode a 512-byte block size when working with
+    # raw image files and I can't find any option to modify this behavior. For
+    # now all our disks also have 512-byte blocks so it's fine, just punt on
+    # this until we need it.
+    if block_size != 512:
+        raise NotImplementedError(
+            "Only 512-byte blocks are currently implemented")
+
+    if disk_size % alignment != 0:
+        raise ValueError("Disk size must be a multiple of alignment")
+    if alignment % block_size != 0:
+        raise ValueError("Disk alignment must be a multiple of block size")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir = pathlib.Path(temp_dir)
+        disk_path = temp_dir / "disk.img"
+
+        with open(disk_path, "wb") as disk_file:
+            disk_file.truncate(disk_size)
+
+        # We generate a single big `sgdisk` command so that it only has to read
+        # the file once, do all the operations in memory, and then write the
+        # final result once.
+
+        # Initialize the disk.
+        command = ["sgdisk", disk_path, "--clear"]
+
+        # Partition alignment is in block units.
+        command += ["--set-alignment", str(alignment // block_size)]
+
+        # Add the partitions.
+        for i, part in enumerate(spec["partitions"], start=1):
+            name = part["name"]
+
+            size_kib = part["size_kib"]
+            if size_kib == "fill":
+                # "fill" means use the rest of the partition, which sgdisk does
+                # if you pass "0" as the end sector.
+                end = 0
+            else:
+                # Otherwise, use "+" notation to tell sgdisk to set the end
+                # relative to the partition start (i.e. partition size rather
+                # than end position).
+                end = f"+{size_kib}K"
+
+            # If a unique GUID isn't provided, "R" tells sgdisk to generate one
+            # randomly.
+            unique_guid = part.get("unique_guid", "R")
+
+            # Fetch the type GUID from the name map if it exists.
+            type_guid = part["type_guid"]
+            if type_guid in _TYPE_GUID_FROM_NAME:
+                type_guid = _TYPE_GUID_FROM_NAME[type_guid]
+
+            command += ["--new", f"{i}:0:{end}"]
+            command += ["--change-name", f"{i}:{name}"]
+            command += ["--typecode", f"{i}:{type_guid}"]
+            command += ["--partition-guid", f"{i}:{unique_guid}"]
+
+        # Run the command to write the GPT.
+        subprocess.run(command, check=True, capture_output=True, text=True)
+
+        # Extract the pieces to individual files.
+        out_dir.mkdir(exist_ok=True)
+        save_gpt(
+            disk_path,
+            block_size,
+            mbr_path=out_dir / "mbr.bin",
+            primary_path=out_dir / "primary.bin",
+            backup_path=out_dir / "backup.bin")
+
+        # Grab a high level summary and the final partition details for the
+        # README file.
+        summary = subprocess.run(
+            ["sgdisk", disk_path, "--print"],
+            check=True,
+            capture_output=True,
+            text=True).stdout.strip()
+
+        partitions = get_partitions(disk_path)
+
+    # Write a README to document this GPT so it's easy for a reader to see
+    # where it came from and what it looks like.
+    (out_dir / "README.md").write_text(
+        textwrap.dedent(
+            """\
+            # {name} GPT binaries
+
+            Generated by
+            https://cs.opensource.google/fuchsia/fuchsia/+/main:src/firmware/tools/gpt.py.
+
+            ## Summary
+
+            ```
+            {summary}
+            ```
+
+            ## Details
+
+            ```
+            {details}
+            ```
+
+            ## Input specification
+
+            ```
+            {spec}
+            ```
+
+            ## Command
+
+            ```
+            {command}
+            ```
+
+            """).format(
+                name=out_dir.name,
+                summary=summary,
+                details=json.dumps(
+                    [dataclasses.asdict(p) for p in partitions], indent=2),
+                spec=json.dumps(spec, indent=2),
+                command=" ".join(str(c) for c in command)))
+
+
+def parse_args() -> argparse.Namespace:
+    """Parses commandline args."""
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+
+    subparsers = parser.add_subparsers(
+        title="Subcommands",
+        dest="action",
+        help="Action to perform",
+        required=True)
+
+    create_parser = subparsers.add_parser(
+        "create", help="create GPT images from a given specification")
+    create_parser.add_argument(
+        "spec",
+        type=pathlib.Path,
+        help="layout specification JSON file; see --help for details")
+    create_parser.add_argument(
+        "out_dir",
+        type=pathlib.Path,
+        help="directory to write the resulting files to, with names:"
+        " [mbr.bin, primary.bin, backup.bin, README.md]")
+
+    return parser.parse_args()
+
+
+def main():
+    """Main function entry point. Raises an exception on failure."""
+    logging.basicConfig(level=logging.INFO)
+
+    args = parse_args()
+
+    if args.action == "create":
+        create_gpt(json.loads(args.spec.read_text()), args.out_dir)
+
+    else:
+        raise ValueError(f"Unknown action {args.action}")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+        sys.exit(0)
+    except KeyboardInterrupt:
+        # Catch this to avoid printing exception context in this case.
+        sys.exit(1)
+    except subprocess.CalledProcessError as error:
+        # If we failed with a subprocess that captured stdout/stderr,
+        # dump it out to the user so they can see what went wrong.
+        logging.error(
+            "Command failed: `%s`", " ".join(str(c) for c in error.cmd))
+        if error.stdout or error.stderr:
+            logging.error(
+                "\n"
+                "----\n"
+                "%s\n"
+                "----", (error.stdout or "") + (error.stderr or ""))
+        raise
