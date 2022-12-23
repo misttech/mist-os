@@ -2,7 +2,49 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# NOTE:  This is the only file that can be imported in this BUILD.gn file.  No
+# other files are to be imported.
 import("//build/assembly/assembly_input_bundle.gni")
+
+########
+# Guaranteed Invariants
+#
+#
+# Invariants that are guaranteed by these platform-defined Assembly Input
+# Bundles (AIBs):
+#
+# 1) Their contents are bitwise identical for all boards and products, for a
+#    given architecture and "debug" vs. "release".  They could be built once-
+#    each for the following, and then used as prebuilts if the build supported
+#    that:
+#      - x64-release
+#      - x64-debug
+#      - arm64-release
+#      - arm64-debug
+#    This is not currently possible given the state of the in-tree build, but it
+#    is a contract that we have for using these with our OOT product assembly
+#    environments.
+#
+# 2) Each AIB directly lists files that it includes, or the label to the exact
+#    GN target that it includes.  They do not include group() targets.
+#
+# 3) Any single artifact is only included in one AIB.
+
+########
+# Maintenance Guidelines
+#
+# DO:  Prefer verboseness and clarity over abstractions and delegation.
+#
+# The template used in this file requires the direct listing of the package,
+# config_data, and bootfs labels or entries.
+#
+# DO NOT: import a file that defines, for example, a list of labels or a set of
+# config_data entries, that are added to an AIB using a GN variable.
+#
+# Importing other files which define variables used to provide the contents for
+# an AIB reduces the clarity of how an artifact gets included first in AIBs, and
+# later the assembled image.  This makes it harder to reason about how and when
+# the artifacts are included within the assembled product.
 
 assert(is_fuchsia,
        "Assembly Input Bundles can only be in the Fuchsia toolchain")
