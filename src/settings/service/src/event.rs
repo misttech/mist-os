@@ -178,7 +178,7 @@ impl Publisher {
         self.messenger
             .message(
                 Payload::Event(event).into(),
-                Audience::Role(role::Signature::role(service::Role::Event(event::Role::Sink))),
+                Audience::Role(role::Signature::Role(service::Role::Event(event::Role::Sink))),
             )
             .send()
             .ack();

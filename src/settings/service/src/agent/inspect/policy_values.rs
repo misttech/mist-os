@@ -100,7 +100,7 @@ impl PolicyValuesInspectAgent {
                 .messenger_client
                 .message(
                     PolicyPayload::Request(Request::Get).into(),
-                    Audience::Role(role::Signature::role(service::Role::Policy(
+                    Audience::Role(role::Signature::Role(service::Role::Policy(
                         Role::PolicyHandler,
                     ))),
                 )
@@ -301,7 +301,7 @@ mod tests {
         let (_, mut policy_receptor) = context
             .delegate
             .messenger_builder(MessengerType::Unbound)
-            .add_role(role::Signature::role(service::Role::Policy(Role::PolicyHandler)))
+            .add_role(role::Signature::Role(service::Role::Policy(Role::PolicyHandler)))
             .build()
             .await
             .unwrap();
@@ -366,7 +366,7 @@ mod tests {
         let (_, mut policy_receptor) = context
             .delegate
             .messenger_builder(MessengerType::Unbound)
-            .add_role(role::Signature::role(service::Role::Policy(Role::PolicyHandler)))
+            .add_role(role::Signature::Role(service::Role::Policy(Role::PolicyHandler)))
             .build()
             .await
             .unwrap();

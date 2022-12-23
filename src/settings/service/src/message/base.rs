@@ -75,25 +75,10 @@ pub enum MessageEvent<P: Payload + 'static, A: Address + 'static, R: Role + 'sta
 pub mod role {
     use super::Role;
 
-    /// The public representation of a role. `Signature` is used for adding a
-    /// messenger to a particular role group and targeting a particular group
-    /// as the audience for an outbound message.
-    #[derive(PartialEq, Copy, Clone, Debug, Eq, Hash)]
-    pub struct Signature<R: Role + 'static> {
-        signature_type: SignatureType<R>,
-    }
-
-    impl<R: Role + 'static> Signature<R> {
-        /// Returns a `Signature` based on the a predefined role.
-        pub(crate) fn role(role: R) -> Self {
-            Self { signature_type: SignatureType::Role(role) }
-        }
-    }
-
     /// An enumeration of role types used internally in [`Signature`] to
     /// uniquely identify the role.
     #[derive(PartialEq, Copy, Clone, Debug, Eq, Hash)]
-    enum SignatureType<R: Role + 'static> {
+    pub enum Signature<R: Role + 'static> {
         Role(R),
     }
 }

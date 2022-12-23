@@ -91,7 +91,7 @@ impl PolicyProxy {
             .messenger_builder(MessengerType::Addressable(service::Address::PolicyHandler(
                 policy_type,
             )))
-            .add_role(role::Signature::role(service::Role::Policy(Role::PolicyHandler)))
+            .add_role(role::Signature::Role(service::Role::Policy(Role::PolicyHandler)))
             .build()
             .await?;
 

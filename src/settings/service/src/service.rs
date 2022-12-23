@@ -210,7 +210,7 @@ macro_rules! payload_convert {
 pub(crate) async fn build_event_listener(delegate: &message::Delegate) -> message::Receptor {
     delegate
         .messenger_builder(MessengerType::Unbound)
-        .add_role(role::Signature::role(Role::Event(event::Role::Sink)))
+        .add_role(role::Signature::Role(Role::Event(event::Role::Sink)))
         .build()
         .await
         .expect("Should be able to retrieve receptor")
