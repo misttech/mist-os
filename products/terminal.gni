@@ -4,8 +4,6 @@
 
 import("//products/common/core.gni")
 
-core_realm_package_name = "core-terminal"
-
 product_bootfs_labels += [
   "//bundles/drivers:usb-peripheral-stack",
   "//src/sys/component_manager:component_manager_bootfs_config",

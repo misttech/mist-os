@@ -10,7 +10,6 @@ import("//products/common/bringup.gni")
 use_bringup_assembly = false
 bootfs_only = false
 
-core_realm_package_name = "core-minimal"
 core_realm_shards = [
   "//src/connectivity/network:virtualization-core-shard",
   "//src/developer/build_info:build_info_core_shard",

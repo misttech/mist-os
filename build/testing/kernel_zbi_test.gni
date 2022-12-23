@@ -7,9 +7,6 @@ import("//build/board.gni")
 import("//build/testing/zbi_test.gni")
 
 cuckoo_kernel_zbi_test_params = {
-  # Name of the core realm package that is expected by the assembled cuckoo kernel zbi.
-  core_realm_package_name = "cuckoo-core"
-
   # List of assembly input groups that the kernel cuckoo zbi will use. Each one may provide
   # packages, core realm shards, etc.
   input_groups = [

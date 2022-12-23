@@ -33,15 +33,5 @@ Any product wishing to merge a shard into its core realm should include the
 shard's GN target in the `core_realm_shards` argument in the product's `.gni`
 file.
 
-## The core name
-
-Each product which uses the `core_realm_shards` argument should set a unique
-value for the `core_realm_package_name`. This value is used for the name of the
-generated core realm's package, so that the core realm packages between
-different products can be disambiguated.
-
-By convention, this value should be set to `core-$PRODUCT_NAME`. So for example
-the workstation product's core package name is `core-workstation`.
-
 [rfc]: //docs/contribute/governance/rfcs/0089_core_realm_variations.md
 [cml-includes]: //docs/development/components/build.md#component-manifest-includes

@@ -6,7 +6,6 @@
 # _userdebug, and _user build types.
 
 import("//products/common/core.gni")
-core_realm_package_name = "core-workstation"
 
 core_realm_shards += [
   "//src/developer/build_info:build_info_core_shard",
