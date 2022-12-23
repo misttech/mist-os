@@ -5,7 +5,8 @@
 use anyhow::{anyhow, Context, Error};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_io as fio;
-use fidl_fuchsia_tpm::TpmDeviceProxy;
+use fidl_fuchsia_tpm::{TpmDeviceMarker, TpmDeviceProxy};
+use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use fuchsia_fs::OpenFlags;
 use fuchsia_zircon as zx;
 use std::path::Path;
@@ -32,15 +33,9 @@ async fn try_connect_tpm20(
     device: &fio::DirectoryProxy,
     device_name: &str,
 ) -> Result<Option<TpmDeviceProxy>, Error> {
-    let node = fuchsia_fs::open_node(
-        device,
-        Path::new(device_name),
-        OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-        0,
-    )
-    .with_context(|| format!("Opening {}", device_name))?;
     let tpm_device_proxy =
-        TpmDeviceProxy::new(node.into_channel().map_err(|e| anyhow!("{:?}", e))?);
+        connect_to_named_protocol_at_dir_root::<TpmDeviceMarker>(device, device_name)
+            .with_context(|| format!("Opening {}", device_name))?;
     let (vendor_id, device_id, revision_id) = tpm_device_proxy
         .get_device_id()
         .await
@@ -67,11 +62,8 @@ async fn try_connect_tpm20(
 /// path until it finds a valid TPM. For a TPM to be valid it must
 /// be a TPM 2.0, TPM 1.2 devices will not be accepted.
 pub async fn find_tpm20() -> Result<TpmDeviceProxy, Error> {
-    let tpm_proxy = fuchsia_fs::directory::open_in_namespace(
-        TPM_PATH,
-        OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-    )
-    .with_context(|| format!("Opening {}", TPM_PATH))?;
+    let tpm_proxy = fuchsia_fs::directory::open_in_namespace(TPM_PATH, OpenFlags::RIGHT_READABLE)
+        .with_context(|| format!("Opening {}", TPM_PATH))?;
 
     // If multiple devices exist we always go with the first one in the order we iterate
     // the directory.

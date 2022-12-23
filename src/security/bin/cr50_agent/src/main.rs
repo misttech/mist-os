@@ -8,17 +8,16 @@ mod util;
 
 use crate::{cr50::Cr50, power_button::PowerButton};
 use anyhow::{anyhow, Context, Error};
-use fidl::endpoints::Proxy;
 use fidl_fuchsia_io as fio;
-use fidl_fuchsia_tpm::TpmDeviceProxy;
+use fidl_fuchsia_tpm::{TpmDeviceMarker, TpmDeviceProxy};
 use fidl_fuchsia_tpm_cr50::{Cr50RequestStream, PinWeaverRequestStream};
 use fuchsia_async::TimeoutExt;
-use fuchsia_component::server::ServiceFs;
+use fuchsia_component::{client::connect_to_named_protocol_at_dir_root, server::ServiceFs};
 use fuchsia_fs::OpenFlags;
 use fuchsia_inspect::{component, health::Reporter};
 use fuchsia_zircon as zx;
 use futures::{prelude::*, stream::TryStreamExt};
-use std::{path::Path, sync::Arc};
+use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 /// Wraps all hosted protocols into a single type that can be matched against
@@ -32,14 +31,8 @@ const CR50_VENDOR_ID: u16 = 0x1ae0;
 const CR50_DEVICE_ID: u16 = 0x0028;
 
 async fn is_cr50(dir: &fio::DirectoryProxy, name: &str) -> Result<Option<TpmDeviceProxy>, Error> {
-    let node = fuchsia_fs::open_node(
-        dir,
-        Path::new(name),
-        OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-        0,
-    )
-    .context("Sending open")?;
-    let proxy = TpmDeviceProxy::new(node.into_channel().unwrap());
+    let proxy = connect_to_named_protocol_at_dir_root::<TpmDeviceMarker>(dir, name)
+        .context("Sending open")?;
 
     let (vendor_id, device_id, _revision_id) = proxy
         .get_device_id()
@@ -61,11 +54,8 @@ async fn is_cr50(dir: &fio::DirectoryProxy, name: &str) -> Result<Option<TpmDevi
 
 async fn find_cr50() -> Result<TpmDeviceProxy, Error> {
     let tpm_path = "/dev/class/tpm";
-    let proxy = fuchsia_fs::directory::open_in_namespace(
-        tpm_path,
-        OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-    )
-    .context("Opening TPM directory")?;
+    let proxy = fuchsia_fs::directory::open_in_namespace(tpm_path, OpenFlags::RIGHT_READABLE)
+        .context("Opening TPM directory")?;
 
     let mut stream = Box::pin(
         device_watcher::watch_for_files(&proxy).await.context("Starting watch for TPM devices")?,
