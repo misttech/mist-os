@@ -15,7 +15,7 @@ use crate::message::messenger::{Messenger, MessengerClient};
 use crate::{trace, trace_guard};
 use anyhow::format_err;
 use fuchsia_async as fasync;
-use fuchsia_syslog::{fx_log_err, fx_log_warn};
+use fuchsia_syslog::fx_log_warn;
 use fuchsia_trace as ftrace;
 use futures::lock::Mutex;
 use futures::StreamExt;
@@ -84,8 +84,6 @@ pub struct MessageHub<P: Payload + 'static, A: Address + 'static, R: Role + 'sta
     next_message_client_id: MessageClientId,
     /// Indicates whether the messenger channel has closed.
     messenger_channel_closed: bool,
-    /// Generator for creating new roles.
-    role_generator: role::Generator,
     /// Sender to signal when the hub should exit.
     exit_tx: ExitSender,
 }
@@ -101,10 +99,6 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageHub<P
         let (messenger_tx, mut messenger_rx) =
             futures::channel::mpsc::unbounded::<MessengerAction<P, A, R>>();
 
-        // A channel used by the MessageHub to listen to requests for
-        // role-related actions.
-        let (_, mut role_rx) = futures::channel::mpsc::unbounded::<role::Action<R>>();
-
         let (exit_tx, mut exit_rx) = futures::channel::mpsc::unbounded::<()>();
 
         let mut hub = MessageHub {
@@ -117,7 +111,6 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageHub<P
             roles: HashMap::new(),
             brokers: Vec::new(),
             messenger_channel_closed: false,
-            role_generator: role::Generator::new(),
             exit_tx,
         };
 
@@ -160,16 +153,6 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageHub<P
                             }
                         }
                     }
-                    role_action = role_rx.select_next_some() => {
-                        trace!(
-                            id,
-
-                            "role action"
-                        );
-                        if hub.process_role_request(id, role_action).is_err() {
-                            fx_log_err!("failed to process role action");
-                        }
-                     }
                 }
             }
         })
@@ -652,22 +635,5 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageHub<P
         }
 
         self.send_to_next(id, fingerprint.id, outgoing_message).await;
-    }
-
-    fn process_role_request(
-        &mut self,
-        id: ftrace::Id,
-        action: role::Action<R>,
-    ) -> Result<(), Error> {
-        trace!(id, "process role request");
-        match action {
-            // Handle creating a new role. Currently there is no way this call
-            // can fail. A signature for the generated role is handed back
-            // through the provided response sender.
-            role::Action::Create(result_sender) => result_sender
-                .send(Ok(role::Response::Role(self.role_generator.generate())))
-                .map(|_| ())
-                .map_err(|_| Error::ResponseSendFail("create role".into())),
-        }
     }
 }
