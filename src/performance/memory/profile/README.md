@@ -53,6 +53,17 @@ This tool does the following:
     fuchsia-pkg://fuchsia.com/hello-memory-profiler#meta/hello-memory-profiler.cm`
     `ffx component start /core/session-manager/session:hello-memory-profiler`
 
+## Report
+
+The profile contains the following values:
+
+* **new object** is the number of new allocations for the duration of the pprof
+  sampling session.
+* **new allocated** is the number of bytes contained in those new allocations.
+* **residual object** is the number of objects that were allocated during the
+  session, and remain allocated at the end of the session.
+* **residual bytes** is the number of bytes in residual objects.
+
 ## Development
 
 Run the test with fx set: `--with //src/performance/memory/profile:tests`
