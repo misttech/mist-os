@@ -36,6 +36,9 @@ zx_status_t driver_write(fidl_handle_t handle, WriteOptions write_options, const
   zx_status_t status =
       fdf_channel_write(handle, 0, arena, const_cast<void*>(iovec.buffer), iovec.capacity,
                         static_cast<fdf_handle_t*>(arena_handles), args.handles_count);
+  if (status == ZX_ERR_PEER_CLOSED) {
+    return ZX_OK;
+  }
   return status;
 }
 

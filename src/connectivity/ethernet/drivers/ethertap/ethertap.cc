@@ -231,7 +231,7 @@ zx_status_t TapDevice::EthernetImplSetParam(uint32_t param, int32_t value, const
   }
 
   auto result = fidl::WireSendEvent(server_end_)->OnReportParams(param, value, event_data);
-  if (!result.ok() && !result.is_peer_closed()) {
+  if (!result.ok()) {
     // A failure of sending the event data is not a simulated failure of hardware under test,
     // so log it but don't report failure on the SetParam attempt.
 

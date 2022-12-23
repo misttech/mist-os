@@ -820,20 +820,19 @@ TEST(AllClients, DrainAllMessageInPeerClosedSendError) {
 
     // Make a client method call which should fail, but not interfere with
     // reading the event.
-    {
-      fidl::Status result = client->OneWay("foo");
+    client->Echo("foo").ThenExactlyOnce([&](fidl::WireUnownedResult<Values::Echo>& result) {
       EXPECT_EQ(fidl::Reason::kPeerClosed, result.reason());
       EXPECT_STATUS(ZX_ERR_PEER_CLOSED, result.status());
-    }
+    });
     ASSERT_OK(loop.RunUntilIdle());
     EXPECT_TRUE(event_handler.received());
 
     // The client binding should still be torn down.
-    {
-      fidl::Status result = client->OneWay("foo");
+    client->Echo("foo").ThenExactlyOnce([&](fidl::WireUnownedResult<Values::Echo>& result) {
       EXPECT_EQ(fidl::Reason::kUnbind, result.reason());
       EXPECT_STATUS(ZX_ERR_CANCELED, result.status());
-    }
+    });
+    ASSERT_OK(loop.RunUntilIdle());
   };
 
   do_test(fidl::WireClient<Values>{});

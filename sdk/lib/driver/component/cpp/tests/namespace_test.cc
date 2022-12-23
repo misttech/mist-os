@@ -53,7 +53,12 @@ TEST(NamespaceTest, CreateAndConnect) {
   EXPECT_EQ(client_info.koid, server_info.related_koid);
 
   auto not_found_client_end = ns->Connect<frunner::ComponentRunner>("/svc/path-does-not-exist");
-  EXPECT_EQ(ZX_ERR_PEER_CLOSED, not_found_client_end.error_value());
+  EXPECT_EQ(ZX_OK, not_found_client_end.status_value());
+
+  zx_signals_t observed = ZX_SIGNAL_NONE;
+  EXPECT_EQ(ZX_OK, not_found_client_end->channel().wait_one(ZX_CHANNEL_PEER_CLOSED,
+                                                            zx::time::infinite_past(), &observed));
+  EXPECT_EQ(ZX_CHANNEL_PEER_CLOSED, observed);
 }
 
 TEST(NamespaceTest, CreateFailed) {

@@ -12,6 +12,7 @@ executable("bin") {
     "harness.h",
     "message_header_tests.cc",
     "ordinals.h",
+    "peer_closed_tests.cc",
     "unknown_interactions_tests.cc",
   ]
 

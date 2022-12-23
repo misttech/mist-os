@@ -175,7 +175,7 @@ TEST(LoggerTest, Create_NoLogSink) {
   svc->server.TakeChannel().reset();
 
   // Setup logger.
-  auto logger = driver::Logger::Create(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, false);
+  auto logger = driver::Logger::Create(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, true);
   ASSERT_TRUE(logger.is_error());
 }
 

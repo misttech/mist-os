@@ -420,6 +420,12 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                             // TODO(fxbug.dev/99738): Rust bindings should reject V1 wire format.
                             false
                         }
+                        Test::EventSendingDoNotReportPeerClosed
+                        | Test::ReplySendingDoNotReportPeerClosed => {
+                            // TODO(fxbug.dev/113160): Peer-closed errors should be
+                            // hidden from one-way calls.
+                            false
+                        }
                         _ => true,
                     };
                     responder.send(enabled)?;

@@ -366,7 +366,7 @@ TEST(BindServerTestCase, DestroyBindingWithPendingCancel) {
       sync_completion_signal(worker_start_);
       sync_completion_wait(worker_done_, ZX_TIME_INFINITE);
       completer.Reply(request->s);
-      EXPECT_EQ(ZX_ERR_PEER_CLOSED, completer.result_of_reply().status());
+      EXPECT_OK(completer.result_of_reply().status());
     }
     sync_completion_t* worker_start_;
     sync_completion_t* worker_done_;
@@ -1320,9 +1320,10 @@ TEST(BindServerTestCase, DrainAllMessageInPeerClosedSendErrorEvent) {
   ASSERT_OK(fidl::WireCall(local)->OneWay(kData).status());
   local.reset();
 
-  // Sending event fails due to client endpoint closing.
+  // Send an event to the closed peer.
+  // Because transport writing errors are suppressed, this does not error.
   fidl::Status result = fidl::WireSendEvent(binding)->OnValueEvent("");
-  ASSERT_STATUS(ZX_ERR_PEER_CLOSED, result.status());
+  ASSERT_OK(result.status());
 
   // The initial call should still be processed.
   ASSERT_FALSE(observer.DidUnbind());
@@ -1337,11 +1338,12 @@ TEST(BindServerTestCase, DrainAllMessageInPeerClosedSendErrorReply) {
   struct MockServer : fidl::WireServer<Values> {
     MockServer() = default;
     void Echo(EchoRequestView request, EchoCompleter::Sync& completer) override {
-      // Sending reply fails due to client endpoint closing.
+      // Send a reply to the closed peer.
+      // Because transport writing errors are suppressed, this does not error.
       EXPECT_EQ(request->s.get(), kData);
       completer.Reply(kData);
       fidl::Status result = completer.result_of_reply();
-      EXPECT_STATUS(ZX_ERR_PEER_CLOSED, result.status());
+      EXPECT_OK(result.status());
       two_way_called_ = true;
     }
     void OneWay(OneWayRequestView request, OneWayCompleter::Sync& completer) override {

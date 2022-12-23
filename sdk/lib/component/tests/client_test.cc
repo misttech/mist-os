@@ -367,12 +367,45 @@ TEST(CloneService, AssumeProtocolComposesNodeAlwaysDispatchesToNode) {
                 ZX_ERR_TIMED_OUT);
 }
 
-TEST(CloneService, Error) {
+TEST(CloneService, PeerClosed) {
   auto bad_endpoint = fidl::CreateEndpoints<fuchsia_io::Directory>();
   bad_endpoint->server.reset();
 
+  // To mitigate race conditions, the FIDL bindings do not expose PEER_CLOSED
+  // errors when writing. The behavior is thus that the cloning succeeds, but
+  // the returned endpoint is always closed. This behavior will be consistent
+  // regardless if the server closed the |bad_endpoint->server| before or after
+  // the |component::Clone| call.
+
+  {
+    auto failure = component::Clone(bad_endpoint->client);
+    ASSERT_OK(failure.status_value());
+
+    zx_signals_t observed = ZX_SIGNAL_NONE;
+    ASSERT_OK(
+        failure->channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite_past(), &observed));
+    ASSERT_EQ(ZX_CHANNEL_PEER_CLOSED, observed);
+  }
+
+  {
+    auto failure = component::MaybeClone(bad_endpoint->client);
+    ASSERT_TRUE(failure.is_valid());
+
+    zx_signals_t observed = ZX_SIGNAL_NONE;
+    ASSERT_OK(
+        failure.channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite_past(), &observed));
+    ASSERT_EQ(ZX_CHANNEL_PEER_CLOSED, observed);
+  }
+}
+
+TEST(CloneService, Error) {
+  auto bad_endpoint = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  zx::channel result;
+  ASSERT_OK(bad_endpoint->client.TakeHandle().replace(ZX_RIGHT_NONE, &result));
+  bad_endpoint->client.reset(result.release());
+
   auto failure = component::Clone(bad_endpoint->client);
-  ASSERT_STATUS(failure.status_value(), ZX_ERR_PEER_CLOSED);
+  ASSERT_STATUS(failure.status_value(), ZX_ERR_ACCESS_DENIED);
 
   auto invalid = component::MaybeClone(bad_endpoint->client);
   ASSERT_FALSE(invalid.is_valid());

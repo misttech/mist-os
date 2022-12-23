@@ -47,6 +47,11 @@ class RunnerServer : public fidl::clientsuite::Runner {
       case fidl::clientsuite::Test::V1_TWO_WAY_STRUCT_PAYLOAD:
         callback(false);
         return;
+      // TODO(fxbug.dev/113160): Peer-closed errors should be
+      // hidden from one-way calls.
+      case fidl::clientsuite::Test::ONE_WAY_CALL_DO_NOT_REPORT_PEER_CLOSED:
+        callback(false);
+        return;
       default:
         callback(true);
         return;

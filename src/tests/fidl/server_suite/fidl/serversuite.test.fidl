@@ -377,6 +377,14 @@ type Test = flexible enum : uint32 {
     V1_TWO_WAY_STRUCT_PAYLOAD = 106;
 
     // ////////////////////////////////////////////////////////////////////////
+    // peer_closed_tests.cc
+    // ////////////////////////////////////////////////////////////////////////
+
+    EVENT_SENDING_DO_NOT_REPORT_PEER_CLOSED = 109;
+    REPLY_SENDING_DO_NOT_REPORT_PEER_CLOSED = 110;
+    RECEIVE_ONE_WAY_NO_PAYLOAD_FROM_PEER_CLOSED_CHANNEL = 111;
+
+    // ////////////////////////////////////////////////////////////////////////
     // handle_rights_tests.cc
     // ////////////////////////////////////////////////////////////////////////
 
@@ -575,5 +583,5 @@ type Test = flexible enum : uint32 {
     // `EncodeUnboundedMaybeLargeResource(...) -> (...)` method.
     BAD_ENCODE_64_HANDLE_LARGE_MESSAGE = 108;
 
-    // Next available: 109
+    // Next available: 112
 };

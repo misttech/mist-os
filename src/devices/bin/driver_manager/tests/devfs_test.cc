@@ -15,6 +15,8 @@
 
 #include "src/devices/bin/driver_manager/devfs/devfs_exporter.h"
 
+namespace {
+
 namespace fio = fuchsia_io;
 
 std::optional<std::reference_wrapper<const Devnode>> lookup(const Devnode& parent,
@@ -363,8 +365,6 @@ TEST(Devfs, ExportWatcherCreateFails) {
   // Export the svc/test.
   auto endpoints = fidl::CreateEndpoints<fio::Directory>();
   ASSERT_OK(endpoints.status_value());
-  // Close the server end, so that the eventual call to Open() fails.
-  endpoints->server.Close(ZX_ERR_PEER_CLOSED);
 
   driver_manager::DevfsExporter exporter(devfs, &root_node, loop.dispatcher());
   auto exporter_endpoints = fidl::CreateEndpoints<fuchsia_device_fs::Exporter>();
@@ -377,11 +377,60 @@ TEST(Devfs, ExportWatcherCreateFails) {
   const fidl::WireSyncClient<fuchsia_device_fs::Exporter> client(
       std::move(exporter_endpoints->client));
 
-  // ExportWatcher::Create will fail because we closed the server end of the channel.
+  std::vector<std::unique_ptr<Devnode>> out;
+  ASSERT_OK(ExportServiceDir(root_node, "svc/test", {}, "one/two", {}, out));
+  // ExportWatcher::Create will fail because the node exists.
   auto result =
       client->Export(std::move(endpoints->client), "svc/test", "one/two", ZX_PROTOCOL_BLOCK);
   ASSERT_TRUE(result.ok());
   ASSERT_TRUE(result->is_error());
+  ASSERT_STATUS(ZX_ERR_ALREADY_EXISTS, result->error_value());
+}
+
+TEST(Devfs, ExportWatcherEndpointClosedCleanup) {
+  async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
+
+  std::optional<Devnode> root_slot;
+  Devfs devfs(root_slot);
+  ASSERT_TRUE(root_slot.has_value());
+  Devnode& root_node = root_slot.value();
+
+  // Create a fake service at svc/test.
+  // Export the svc/test.
+  auto endpoints = fidl::CreateEndpoints<fio::Directory>();
+  ASSERT_OK(endpoints.status_value());
+
+  driver_manager::DevfsExporter exporter(devfs, &root_node, loop.dispatcher());
+  auto exporter_endpoints = fidl::CreateEndpoints<fuchsia_device_fs::Exporter>();
+  ASSERT_OK(exporter_endpoints.status_value());
+
+  fidl::ServerBinding<fuchsia_device_fs::Exporter> exporter_binding(
+      loop.dispatcher(), std::move(exporter_endpoints->server), &exporter,
+      fidl::kIgnoreBindingClosure);
+
+  const fidl::WireClient<fuchsia_device_fs::Exporter> client(std::move(exporter_endpoints->client),
+                                                             loop.dispatcher());
+
+  client->Export(std::move(endpoints->client), "svc/test", "one/two", ZX_PROTOCOL_BLOCK)
+      .ThenExactlyOnce([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+      });
+  ASSERT_OK(loop.RunUntilIdle());
+
+  // Close the server end, so that the export is destroyed.
+  endpoints->server.Close(ZX_ERR_PEER_CLOSED);
+
+  // Make sure the server observes the closing.
+  ASSERT_OK(loop.RunUntilIdle());
+
+  // Check that the export is destroyed.
+  client->MakeVisible("one/two").ThenExactlyOnce([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_error());
+    ASSERT_STATUS(ZX_ERR_NOT_FOUND, result->error_value());
+  });
+  ASSERT_OK(loop.RunUntilIdle());
 }
 
 class Connecter : public fidl::WireServer<fuchsia_device_fs::Connector> {
@@ -561,3 +610,5 @@ TEST(Devfs, ExportWatcherConnector_Export_Invisible) {
 
   ASSERT_OK(loop.RunUntilIdle());
 }
+
+}  // namespace

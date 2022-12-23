@@ -62,8 +62,12 @@ class HandleInfo {
 
 zx_status_t channel_write(fidl_handle_t handle, WriteOptions write_options, const WriteArgs& args) {
   HandleDisposition disposition(args);
-  return zx_channel_write_etc(handle, ZX_CHANNEL_WRITE_USE_IOVEC, args.data, args.data_count,
-                              disposition.get(), args.handles_count);
+  zx_status_t status = zx_channel_write_etc(handle, ZX_CHANNEL_WRITE_USE_IOVEC, args.data,
+                                            args.data_count, disposition.get(), args.handles_count);
+  if (status == ZX_ERR_PEER_CLOSED) {
+    return ZX_OK;
+  }
+  return status;
 }
 
 zx_status_t channel_read(fidl_handle_t handle, const ReadOptions& read_options,

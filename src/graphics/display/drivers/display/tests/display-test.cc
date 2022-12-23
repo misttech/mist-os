@@ -82,7 +82,7 @@ TEST(DisplayTest, ClientVSynPeerClosed) {
   fbl::AutoLock lock(controller.mtx());
   client_chl.reset();
   status = clientproxy.OnDisplayVsync(0, 0, INVALID_CONFIG_STAMP_BANJO);
-  EXPECT_TRUE(status == ZX_ERR_PEER_CLOSED);
+  EXPECT_TRUE(status == ZX_OK);
   clientproxy.CloseTest();
 }
 

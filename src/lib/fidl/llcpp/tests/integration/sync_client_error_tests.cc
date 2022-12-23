@@ -26,7 +26,7 @@ TEST(SyncClientErrorTest, PeerClosed) {
   ASSERT_OK(endpoints.status_value());
   fidl::WireSyncClient client{std::move(endpoints->client)};
   endpoints->server.reset();
-  auto result = client->SendEnum(test::wire::MyError::kBadError);
+  auto result = client->GetEnum();
   EXPECT_STATUS(ZX_ERR_PEER_CLOSED, result.status());
   EXPECT_EQ(fidl::Reason::kPeerClosed, result.reason());
 }

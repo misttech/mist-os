@@ -50,7 +50,7 @@ type EmptyResultClassification = union {
     1: success Empty;
     // This variant would be used for error syntax if error syntax were used.
     2: reserved;
-    // This vairant will be set if there is any error resulting from FIDL during
+    // This variant will be set if there is any error resulting from FIDL during
     // the call.
     3: fidl_error FidlErrorKind;
 };
@@ -63,7 +63,7 @@ type EmptyResultWithErrorClassification = union {
     // This variant will be set to the returned error if an application error
     // was sent.
     2: application_error int32;
-    // This vairant will be set if there is any error resulting from FIDL during
+    // This variant will be set if there is any error resulting from FIDL during
     // the call.
     3: fidl_error FidlErrorKind;
 };
@@ -80,7 +80,7 @@ type NonEmptyResultClassification = union {
     // This variant would be used for error syntax if error syntax were
     // used.
     2: reserved;
-    // This vairant will be set if there is any error resulting from FIDL
+    // This varrant will be set if there is any error resulting from FIDL
     // during the call.
     3: fidl_error FidlErrorKind;
 };
@@ -110,7 +110,7 @@ type TableResultClassification = union {
     // This variant would be used for error syntax if error syntax were
     // used.
     2: reserved;
-    // This vairant will be set if there is any error resulting from FIDL
+    // This variant will be set if there is any error resulting from FIDL
     // during the call.
     3: fidl_error FidlErrorKind;
 };
@@ -127,7 +127,7 @@ type UnionResultClassification = union {
     // This variant would be used for error syntax if error syntax were
     // used.
     2: reserved;
-    // This vairant will be set if there is any error resulting from FIDL
+    // This variant will be set if there is any error resulting from FIDL
     // during the call.
     3: fidl_error FidlErrorKind;
 };
@@ -476,6 +476,17 @@ type Test = flexible enum : uint32 {
     TWO_WAY_WRONG_RESPONSE_ORDINAL = 47;
 
     // ////////////////////////////////////////////////////////////////////////
+    // coding_tests.cc
+    // ////////////////////////////////////////////////////////////////////////
+    V1_TWO_WAY_NO_PAYLOAD = 40;
+    V1_TWO_WAY_STRUCT_PAYLOAD = 41;
+
+    // ////////////////////////////////////////////////////////////////////////
+    // peer_closed_tests.cc
+    // ////////////////////////////////////////////////////////////////////////
+    ONE_WAY_CALL_DO_NOT_REPORT_PEER_CLOSED = 59;
+
+    // ////////////////////////////////////////////////////////////////////////
     // unknown_interactions_tests.cc
     // ////////////////////////////////////////////////////////////////////////
 
@@ -519,9 +530,5 @@ type Test = flexible enum : uint32 {
     UNKNOWN_STRICT_SERVER_INITIATED_TWO_WAY = 36;
     UNKNOWN_FLEXIBLE_SERVER_INITIATED_TWO_WAY = 37;
 
-    // coding_tests.cc
-    V1_TWO_WAY_NO_PAYLOAD = 40;
-    V1_TWO_WAY_STRUCT_PAYLOAD = 41;
-
-    // next available: 59
+    // next available: 60
 };

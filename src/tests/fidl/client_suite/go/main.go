@@ -126,6 +126,10 @@ func (*runnerImpl) IsTestEnabled(_ fidl.Context, test clientsuite.Test) (bool, e
 		case clientsuite.TestV1TwoWayNoPayload, clientsuite.TestV1TwoWayStructPayload:
 			// TODO(fxbug.dev/99738): Go bindings should reject V1 wire format.
 			return false
+		case clientsuite.TestOneWayCallDoNotReportPeerClosed:
+			// TODO(fxbug.dev/113160): Peer-closed errors should be
+			// hidden from one-way calls.
+			return false
 		default:
 			return true
 		}

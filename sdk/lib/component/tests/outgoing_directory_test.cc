@@ -31,10 +31,12 @@
 #include <fbl/unique_fd.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include <src/lib/storage/vfs/cpp/managed_vfs.h>
-#include <src/lib/storage/vfs/cpp/pseudo_dir.h>
-#include <src/lib/storage/vfs/cpp/pseudo_file.h>
-#include <src/lib/testing/loop_fixture/real_loop_fixture.h>
+
+#include "src/lib/storage/vfs/cpp/managed_vfs.h"
+#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
+#include "src/lib/storage/vfs/cpp/pseudo_file.h"
+#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace {
 
@@ -101,17 +103,13 @@ class OutgoingDirectoryTest : public gtest::RealLoopFixture {
     return std::move(outgoing_directory_);
   }
 
-  fidl::ClientEnd<fuchsia_io::Directory> TakeSvcClientEnd(
-      fidl::ClientEnd<fuchsia_io::Directory> root, fidl::StringView path = kSvcDirectoryPath) {
-    // Check if this has already been initialized.
-    if (!svc_client_.is_valid()) {
-      svc_client_ = fidl::WireClient<fuchsia_io::Directory>(std::move(root), dispatcher());
-    }
-
+  static fidl::ClientEnd<fuchsia_io::Directory> GetSvcClientEnd(
+      const fidl::ClientEnd<fuchsia_io::Directory>& root,
+      fidl::StringView path = kSvcDirectoryPath) {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     EXPECT_TRUE(endpoints.is_ok()) << endpoints.status_string();
     auto& [client_end, server_end] = endpoints.value();
-    const fidl::Status status = svc_client_->Open(
+    auto status = fidl::WireCall(root)->Open(
         fuchsia_io::wire::OpenFlags::kRightWritable | fuchsia_io::wire::OpenFlags::kRightReadable,
         fuchsia_io::wire::kModeTypeDirectory, path,
         fidl::ServerEnd<fuchsia_io::Node>{server_end.TakeChannel()});
@@ -120,6 +118,8 @@ class OutgoingDirectoryTest : public gtest::RealLoopFixture {
   }
 
   fidl::ClientEnd<fuchsia_io::Directory> TakeRootClientEnd() { return std::move(client_end_); }
+
+  const fidl::ClientEnd<fuchsia_io::Directory>& GetRootClientEnd() { return client_end_; }
 
  protected:
   fidl::WireClient<fuchsia_examples::Echo> ConnectToServiceMember(
@@ -148,7 +148,6 @@ class OutgoingDirectoryTest : public gtest::RealLoopFixture {
  private:
   std::unique_ptr<component::OutgoingDirectory> outgoing_directory_ = nullptr;
   fidl::ClientEnd<fuchsia_io::Directory> client_end_;
-  fidl::WireClient<fuchsia_io::Directory> svc_client_;
 };
 
 TEST_F(OutgoingDirectoryTest, MutualExclusionGuarantees_CheckOperations) {
@@ -199,7 +198,7 @@ TEST_F(OutgoingDirectoryTest, CanBeMovedSafely) {
   moved_in_assignment = std::move(moved_in_constructor);
 
   zx::result client_end =
-      component::ConnectAt<fuchsia_examples::Echo>(TakeSvcClientEnd(std::move(endpoints->client)));
+      component::ConnectAt<fuchsia_examples::Echo>(GetSvcClientEnd(endpoints->client));
   ASSERT_TRUE(client_end.is_ok()) << client_end.status_string();
   fidl::WireClient<fuchsia_examples::Echo> client(std::move(client_end.value()), dispatcher());
 
@@ -227,7 +226,7 @@ TEST_F(OutgoingDirectoryTest, AddProtocol) {
 
   // Setup fuchsia.examples.Echo client.
   zx::result client_end =
-      component::ConnectAt<fuchsia_examples::Echo>(TakeSvcClientEnd(TakeRootClientEnd()));
+      component::ConnectAt<fuchsia_examples::Echo>(GetSvcClientEnd(GetRootClientEnd()));
   ASSERT_EQ(client_end.status_value(), ZX_OK);
   fidl::WireClient<fuchsia_examples::Echo> client(std::move(*client_end), dispatcher());
 
@@ -254,7 +253,7 @@ TEST_F(OutgoingDirectoryTest, AddProtocolNaturalServer) {
 
   // Setup fuchsia.examples.Echo client.
   zx::result client_end =
-      component::ConnectAt<fuchsia_examples::Echo>(TakeSvcClientEnd(TakeRootClientEnd()));
+      component::ConnectAt<fuchsia_examples::Echo>(GetSvcClientEnd(GetRootClientEnd()));
   ASSERT_EQ(client_end.status_value(), ZX_OK);
   fidl::Client<fuchsia_examples::Echo> client(std::move(*client_end), dispatcher());
 
@@ -287,8 +286,8 @@ TEST_F(OutgoingDirectoryTest, AddServiceServesAllMembers) {
   }
 
   // Setup test client.
-  zx::result open_result = component::OpenServiceAt<fuchsia_examples::EchoService>(
-      TakeSvcClientEnd(TakeRootClientEnd()));
+  zx::result open_result =
+      component::OpenServiceAt<fuchsia_examples::EchoService>(GetSvcClientEnd(GetRootClientEnd()));
   ASSERT_TRUE(open_result.is_ok()) << open_result.status_string();
 
   fuchsia_examples::EchoService::ServiceClient service = std::move(open_result.value());
@@ -313,15 +312,29 @@ TEST_F(OutgoingDirectoryTest, AddServiceServesAllMembers) {
     EXPECT_TRUE(message_echoed);
   }
 
-  // Next, assert that after removing the service, the client end yields ZX_ERR_PEER_CLOSED.
+  // Next, assert that after removing the service, the directory connection to
+  // the directory housing the service members will be closed.
+  zx::channel client, server;
+  ASSERT_OK(zx::channel::create(0, &client, &server));
+  zx::result result = component::OpenNamedServiceAt(GetSvcClientEnd(GetRootClientEnd()),
+                                                    fuchsia_examples::EchoService::Name,
+                                                    component::kDefaultInstance, std::move(server));
+  ASSERT_OK(result.status_value());
+  RunLoopUntilIdle();
+  {
+    zx_signals_t pending = ZX_SIGNAL_NONE;
+    EXPECT_STATUS(ZX_ERR_TIMED_OUT,
+                  client.wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite_past(), &pending));
+  }
   {
     zx::result result = GetOutgoingDirectory()->RemoveService<fuchsia_examples::EchoService>();
     ASSERT_TRUE(result.is_ok()) << result.status_string();
   }
-  for (bool reversed : {true, false}) {
-    zx::result connect_result =
-        reversed ? service.connect_reversed_echo() : service.connect_regular_echo();
-    EXPECT_EQ(connect_result.status_value(), ZX_ERR_PEER_CLOSED);
+  RunLoopUntilIdle();
+  {
+    zx_signals_t pending = ZX_SIGNAL_NONE;
+    EXPECT_OK(client.wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite_past(), &pending));
+    EXPECT_EQ(pending, ZX_CHANNEL_PEER_CLOSED);
   }
 }
 
@@ -341,7 +354,7 @@ TEST_F(OutgoingDirectoryTest, AddProtocolCanServeMultipleProtocols) {
   // Setup fuchsia.examples.Echo client
   for (auto [reversed, path] : kIsReversedAndPaths) {
     zx::result client_end =
-        component::ConnectAt<fuchsia_examples::Echo>(TakeSvcClientEnd(TakeRootClientEnd()), path);
+        component::ConnectAt<fuchsia_examples::Echo>(GetSvcClientEnd(GetRootClientEnd()), path);
     ASSERT_EQ(client_end.status_value(), ZX_OK);
     fidl::WireClient<fuchsia_examples::Echo> client(std::move(*client_end), dispatcher());
 
@@ -373,7 +386,7 @@ TEST_F(OutgoingDirectoryTest, AddProtocolAtServesProtocol) {
             ZX_OK);
 
   zx::result client_end = component::ConnectAt<fuchsia_examples::Echo>(
-      TakeSvcClientEnd(TakeRootClientEnd(), /*path=*/kDirectory));
+      GetSvcClientEnd(GetRootClientEnd(), /*path=*/kDirectory));
   ASSERT_EQ(client_end.status_value(), ZX_OK);
   fidl::WireClient<fuchsia_examples::Echo> client(std::move(*client_end), dispatcher());
 
@@ -472,7 +485,7 @@ TEST_F(OutgoingDirectoryTest, ServeCanYieldMultipleConnections) {
     root_client_ends.pop_back();
 
     zx::result client_end =
-        component::ConnectAt<fuchsia_examples::Echo>(TakeSvcClientEnd(/*root=*/std::move(root)));
+        component::ConnectAt<fuchsia_examples::Echo>(GetSvcClientEnd(/*root=*/root));
     ASSERT_EQ(client_end.status_value(), ZX_OK);
     fidl::WireClient<fuchsia_examples::Echo> client(std::move(*client_end), dispatcher());
 
@@ -518,7 +531,7 @@ TEST_F(OutgoingDirectoryTest, RemoveProtocolClosesAllConnections) {
                 .status_value(),
             ZX_OK);
 
-  fidl::ClientEnd<fuchsia_io::Directory> svc_directory = TakeSvcClientEnd(TakeRootClientEnd());
+  fidl::ClientEnd<fuchsia_io::Directory> svc_directory = GetSvcClientEnd(GetRootClientEnd());
   std::vector<fidl::Client<fuchsia_examples::Echo>> clients = {};
   for (size_t i = 0; i < kNumClients; ++i) {
     zx::result client_end = component::ConnectAt<fuchsia_examples::Echo>(svc_directory.borrow());
@@ -560,7 +573,7 @@ TEST_F(OutgoingDirectoryTest, OutgoingDirectoryDestructorClosesAllConnections) {
 
   // Setup client
   zx::result client_end =
-      component::ConnectAt<fuchsia_examples::Echo>(TakeSvcClientEnd(TakeRootClientEnd()));
+      component::ConnectAt<fuchsia_examples::Echo>(GetSvcClientEnd(TakeRootClientEnd()));
   ASSERT_EQ(client_end.status_value(), ZX_OK);
 
   EchoEventHandler event_handler;
