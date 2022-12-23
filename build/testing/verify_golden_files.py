@@ -62,8 +62,10 @@ def main():
     any_comparison_failed = False
     inputs = []
     for comparison in comparisons:
+        # Unlike the candidate and formatted_golden, which are build directory
+        # -relative paths, the golden is source-relative.
+        golden = os.path.join(args.source_root, comparison["golden"])
         candidate = comparison["candidate"]
-        golden = comparison["golden"]
         inputs.extend([candidate, golden])
 
         # A formatted golden might have been supplied. Compare against that if
@@ -81,11 +83,7 @@ def main():
         if current_comparison_failed:
             any_comparison_failed = True
             type = 'Warning' if args.warn or args.bless else 'Error'
-            # Print the source-relative golden so that it can be conveniently
-            # navigated to (e.g., in an IDE).
-            src_rel_golden = os.path.relpath(
-                os.path.join(os.getcwd(), golden), args.source_root)
-            print(f'{type}: Golden file mismatch: {src_rel_golden}')
+            print(f'{type}: Golden file mismatch: {comparison["golden"]}')
 
             if args.bless:
                 os.makedirs(os.path.dirname(golden), exist_ok=True)

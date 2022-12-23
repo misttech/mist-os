@@ -71,16 +71,11 @@ import("//build/testing/config.gni")
 #    - Optional: Usual GN meanings.
 #
 template("golden_files") {
-  forward_variables_from(invoker,
-                         [
-                           "comparisons",
-                           "formatter",
-                         ])
-
   assert_context = "golden_files(\"$target_name\")"
-  assert(defined(comparisons) && comparisons != [],
+  assert(defined(invoker.comparisons) && invoker.comparisons != [],
          "$assert_context: `comparisons` is required")
 
+  forward_variables_from(invoker, [ "formatter" ])
   if (defined(formatter)) {
     assert(
         defined(formatter.script),
@@ -103,12 +98,9 @@ template("golden_files") {
   main_target = target_name
   comparison_json_target = "_golden_files.$target_name.generated_file"
 
-  # We build up variations of `comparisons` to construct the JSON file we pass
-  # to verify_golden_files.py and for the metadata we'll attach to the action.
-  comparison_json_contents = []
-  file_metadata = []
+  processed_comparisons = []
   verify_deps = []
-  foreach(comparison, comparisons) {
+  foreach(comparison, invoker.comparisons) {
     assert(defined(comparison.golden),
            "$assert_context: no `golden` given in comparison: $comparison")
     assert(defined(comparison.candidate),
@@ -119,12 +111,10 @@ template("golden_files") {
     forward_variables_from(comparison,
                            "*",
                            [
-                             "golden",
                              "candidate",
+                             "golden",
                            ])
-
-    source_relative_golden = rebase_path(comparison.golden, "//")
-    golden = rebase_path(comparison.golden, root_build_dir)
+    golden = rebase_path(comparison.golden, "//")
     candidate = rebase_path(comparison.candidate, root_build_dir)
 
     formatted_golden = ""  # Clear from previous iteration.
@@ -138,7 +128,7 @@ template("golden_files") {
       if (extensions + [ golden_ext ] - [ golden_ext ] != extensions ||
           extensions == []) {
         format_golden_target = "_golden_files.$target_name.format.$golden"
-        formatted_golden = "$formatted_goldens_dir/$source_relative_golden"
+        formatted_golden = "$formatted_goldens_dir/$golden"
         action(format_golden_target) {
           forward_variables_from(invoker, [ "testonly" ])
           visibility = [ ":$main_target" ]
@@ -166,7 +156,7 @@ template("golden_files") {
           script = "//build/testing/format_golden.sh"
           args = [
             rebase_path(depfile, root_build_dir),
-            golden,
+            rebase_path(golden, root_build_dir, "//"),
             rebase_path(formatted_golden, root_build_dir),
             rebase_path(formatter.script, root_build_dir),
           ]
@@ -178,7 +168,7 @@ template("golden_files") {
       }
     }
 
-    comparison_json_contents += [
+    processed_comparisons += [
       {
         golden = golden
         candidate = candidate
@@ -191,18 +181,12 @@ template("golden_files") {
         }
       },
     ]
-    file_metadata += [
-      {
-        golden = source_relative_golden
-        candidate = candidate
-      },
-    ]
   }
 
   comparison_json = "$target_gen_dir/$target_name.comparisons.json"
   generated_file(comparison_json_target) {
     output_conversion = "json"
-    contents = comparison_json_contents
+    contents = processed_comparisons
     outputs = [ comparison_json ]
   }
 
@@ -259,7 +243,7 @@ template("golden_files") {
           name = target_name
           label = get_label_info(":$target_name", "label_with_toolchain")
           stamp = rebase_path(stamp_file, root_build_dir)
-          files = file_metadata
+          comparisons = processed_comparisons
         },
       ]
     }
