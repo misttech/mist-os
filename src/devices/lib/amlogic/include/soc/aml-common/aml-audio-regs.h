@@ -212,6 +212,9 @@ __BEGIN_CDECLS
 #define EE_AUDIO2_CLK_PDMIN_CTRL0     (0x0016  << 2)
 #define EE_AUDIO2_CLK_PDMIN_CTRL1     (0x0017  << 2)
 
+// |ee_audio_mclk_src_t| type is only used to
+// identify the mclk source and is no longer used
+// to directly set the value of the register.
 typedef enum {
     MP0_PLL = 0,
     MP1_PLL = 1,
@@ -288,6 +291,10 @@ typedef enum {
     TODDR_B,
     TODDR_C
 } aml_toddr_t;
+
+uint8_t ToS905D2AudioClkSrcSel(ee_audio_mclk_src_t clk_src);
+uint8_t ToS905D3GAudioClkSrcSel(ee_audio_mclk_src_t clk_src);
+uint8_t ToA5AudioClkSrcSel(ee_audio_mclk_src_t clk_src);
 
 // clang-format on
 __END_CDECLS

@@ -85,7 +85,7 @@ class AmlTdmDevice {
 
   AmlTdmDevice(aml_tdm_mclk_t mclk_ch, const ee_audio_mclk_src_t clk_src,
                const metadata::AmlVersion version)
-      : mclk_ch_(mclk_ch), clk_src_(clk_src), version_(version) {}
+      : mclk_ch_(mclk_ch), clk_src_sel_(ToClkSrcSel(clk_src, version)), version_(version) {}
   virtual ~AmlTdmDevice() = default;
 
   void InitMclk();
@@ -94,12 +94,24 @@ class AmlTdmDevice {
   void AudioClkDis(uint32_t audio_blk_mask);
 
  private:
+  static uint8_t ToClkSrcSel(ee_audio_mclk_src_t clk_src, metadata::AmlVersion version) {
+    switch (version) {
+      case metadata::AmlVersion::kS905D2G:
+        return ToS905D2AudioClkSrcSel(clk_src);
+      case metadata::AmlVersion::kS905D3G:
+        return ToS905D3GAudioClkSrcSel(clk_src);
+      case metadata::AmlVersion::kA5:
+        return ToA5AudioClkSrcSel(clk_src);
+    }
+    ZX_PANIC("Unreachable");
+  }
+
   static constexpr int32_t kMclkDivBits = 16;
   static constexpr int32_t kSclkDivBits = 10;
   static constexpr int32_t kLRclkDivBits = 10;
 
   const aml_tdm_mclk_t mclk_ch_;  // mclk channel used by this instance
-  const ee_audio_mclk_src_t clk_src_;
+  const uint8_t clk_src_sel_;     // PLL clock used by this mclk.
   const metadata::AmlVersion version_;
 };
 
@@ -153,9 +165,7 @@ class AmlTdmOutDevice : public AmlTdmDevice {  // Not final for unit testing.
       case FRDDR_C:
         return EE_AUDIO_FRDDR_C_CTRL0;
     }
-    // We should never get here, but if we do, make it obvious
-    assert(0);
-    return 0;
+    ZX_PANIC("Unreachable");
   }
   /* Get the register block offset for our tdm block */
   zx_off_t GetTdmBase(aml_tdm_out_t ch) {
@@ -167,9 +177,7 @@ class AmlTdmOutDevice : public AmlTdmDevice {  // Not final for unit testing.
       case TDM_OUT_C:
         return EE_AUDIO_TDMOUT_C_CTRL0;
     }
-    // We should never get here, but if we do, make it obvious
-    assert(0);
-    return 0;
+    ZX_PANIC("Unreachable");
   }
 
   void FRDDREnable();
@@ -242,9 +250,7 @@ class AmlTdmInDevice : public AmlTdmDevice {  // Not final for unit testing.
       case TODDR_C:
         return EE_AUDIO_TODDR_C_CTRL0;
     }
-    // We should never get here, but if we do, make it obvious
-    assert(0);
-    return 0;
+    ZX_PANIC("Unreachable");
   }
   /* Get the register block offset for our tdm block */
   static zx_off_t GetTdmBase(aml_tdm_in_t ch) {
@@ -258,9 +264,7 @@ class AmlTdmInDevice : public AmlTdmDevice {  // Not final for unit testing.
       case TDM_IN_LB:
         return EE_AUDIO_TDMIN_LB_CTRL0;
     }
-    // We should never get here, but if we do, make it obvious
-    assert(0);
-    return 0;
+    ZX_PANIC("Unreachable");
   }
 
   void TODDREnable();
@@ -337,9 +341,7 @@ class AmlTdmLbDevice : public AmlTdmDevice {
       case TODDR_C:
         return EE_AUDIO_TODDR_C_CTRL0;
     }
-    // We should never get here, but if we do, make it obvious
-    assert(0);
-    return 0;
+    ZX_PANIC("Unreachable");
   }
 
   // For S905D2/S905D3.
@@ -360,10 +362,7 @@ class AmlTdmLbDevice : public AmlTdmDevice {
       default:
         break;
     }
-
-    // We should never get here, but if we do, make it obvious
-    assert(0);
-    return 0;
+    ZX_PANIC("Unreachable");
   }
 
   // For A5.
@@ -384,10 +383,7 @@ class AmlTdmLbDevice : public AmlTdmDevice {
       default:
         break;
     }
-
-    // We should never get here, but if we do, make it obvious
-    assert(0);
-    return 0;
+    ZX_PANIC("Unreachable");
   }
 
   void TODDREnable();

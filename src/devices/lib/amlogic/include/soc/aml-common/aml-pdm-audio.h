@@ -86,7 +86,7 @@ class AmlPdmDevice {
                aml_toddr_t toddr, uint32_t fifo_depth, metadata::AmlVersion version)
       : fifo_depth_(fifo_depth),
         toddr_ch_(toddr),
-        clk_src_(clk_src),
+        clk_src_sel_(ToClkSrcSel(clk_src, version)),
         sysclk_div_(sysclk_div),
         dclk_div_(dclk_div),
         toddr_base_(GetToddrBase(toddr)),
@@ -115,6 +115,18 @@ class AmlPdmDevice {
     return 0;
   }
 
+  static uint8_t ToClkSrcSel(ee_audio_mclk_src_t clk_src, metadata::AmlVersion version) {
+    switch (version) {
+      case metadata::AmlVersion::kS905D2G:
+        return ToS905D2AudioClkSrcSel(clk_src);
+      case metadata::AmlVersion::kS905D3G:
+        return ToS905D3GAudioClkSrcSel(clk_src);
+      case metadata::AmlVersion::kA5:
+        return ToA5AudioClkSrcSel(clk_src);
+    }
+    ZX_PANIC("Unreachable");
+  }
+
   void AudioClkEna(uint32_t audio_blk_mask);
   void AudioClkDis(uint32_t audio_blk_mask);
   void InitRegs();
@@ -128,7 +140,7 @@ class AmlPdmDevice {
   zx_off_t GetToddrOffset(zx_off_t off) { return toddr_base_ + off; }
   const uint32_t fifo_depth_;   // in bytes.
   const aml_toddr_t toddr_ch_;  // fromddr channel used by this instance
-  const ee_audio_mclk_src_t clk_src_;
+  const uint8_t clk_src_sel_;   // PLL clock used by this mclk.
   const uint32_t sysclk_div_;
   const uint32_t dclk_div_;
   const zx_off_t toddr_base_;  // base offset of frddr ch used by this instance

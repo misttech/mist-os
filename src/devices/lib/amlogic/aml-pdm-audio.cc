@@ -119,8 +119,8 @@ void AmlPdmDevice::InitRegs() {
                               (0x02 << 8),                 // STATUS2 source is ddr position
                           GetToddrOffset(TODDR_CTRL1_OFFS));
       // dclk & sysclk
-      audio_mmio_.Write32((clk_src_ << 24) | dclk_div_, EE_AUDIO_CLK_PDMIN_CTRL0);
-      audio_mmio_.Write32((1 << 31) | (clk_src_ << 24) | sysclk_div_, EE_AUDIO_CLK_PDMIN_CTRL1);
+      audio_mmio_.Write32((clk_src_sel_ << 24) | dclk_div_, EE_AUDIO_CLK_PDMIN_CTRL0);
+      audio_mmio_.Write32((1 << 31) | (clk_src_sel_ << 24) | sysclk_div_, EE_AUDIO_CLK_PDMIN_CTRL1);
       // arb
       audio_mmio_.SetBits32((1 << 31) | (1 << toddr_ch_), EE_AUDIO_ARB_CTRL);
       break;
@@ -134,8 +134,8 @@ void AmlPdmDevice::InitRegs() {
                               (0x02 << 8),                     // STATUS2 source is ddr position
                           GetToddrOffset(TODDR_CTRL1_OFFS));
       // dclk & sysclk
-      audio_mmio_.Write32((clk_src_ << 24) | dclk_div_, EE_AUDIO_CLK_PDMIN_CTRL0);
-      audio_mmio_.Write32((1 << 31) | (clk_src_ << 24) | sysclk_div_, EE_AUDIO_CLK_PDMIN_CTRL1);
+      audio_mmio_.Write32((clk_src_sel_ << 24) | dclk_div_, EE_AUDIO_CLK_PDMIN_CTRL0);
+      audio_mmio_.Write32((1 << 31) | (clk_src_sel_ << 24) | sysclk_div_, EE_AUDIO_CLK_PDMIN_CTRL1);
       // arb
       audio_mmio_.SetBits32((1 << 31) | (1 << toddr_ch_), EE_AUDIO_ARB_CTRL);
       break;
@@ -150,8 +150,9 @@ void AmlPdmDevice::InitRegs() {
                               (0x02 << 8),                     // STATUS2 source is ddr position
                           GetToddrOffset(TODDR_CTRL1_OFFS));
       // dclk & sysclk
-      audio2_mmio_.Write32((clk_src_ << 24) | dclk_div_, EE_AUDIO2_CLK_PDMIN_CTRL0);
-      audio2_mmio_.Write32((1 << 31) | (clk_src_ << 24) | sysclk_div_, EE_AUDIO2_CLK_PDMIN_CTRL1);
+      audio2_mmio_.Write32((clk_src_sel_ << 24) | dclk_div_, EE_AUDIO2_CLK_PDMIN_CTRL0);
+      audio2_mmio_.Write32((1 << 31) | (clk_src_sel_ << 24) | sysclk_div_,
+                           EE_AUDIO2_CLK_PDMIN_CTRL1);
       break;
   }
 

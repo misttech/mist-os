@@ -28,7 +28,7 @@ void AmlTdmDevice::InitMclk() {
   //    be set to proper value later (slower is safer from circuit standpoint)
   // Leave disabled for now.
   zx_off_t ptr = mclk_a + (mclk_ch_ * sizeof(uint32_t));
-  GetMmio().Write32((clk_src_ << 24) | 0xffff, ptr);
+  GetMmio().Write32((clk_src_sel_ << 24) | 0xffff, ptr);
 }
 
 /* Notes
@@ -54,7 +54,7 @@ zx_status_t AmlTdmDevice::SetMclkDiv(uint32_t div) {
   // disable and clear out old divider value
   GetMmio().ClearBits32((1 << 31) | ((1 << kMclkDivBits) - 1), ptr);
 
-  GetMmio().SetBits32((1 << 31) | (clk_src_ << 24) | (div & ((1 << kMclkDivBits) - 1)), ptr);
+  GetMmio().SetBits32((1 << 31) | (clk_src_sel_ << 24) | (div & ((1 << kMclkDivBits) - 1)), ptr);
   return ZX_OK;
 }
 
