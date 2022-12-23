@@ -1435,25 +1435,35 @@ pub trait RealmTcpStream: Sized {
     // TODO: Implement this trait for std::net::TcpStream.
 }
 
+fn connect_in_realm_with_sock<'a, F: FnOnce(&socket2::Socket) -> Result + 'a>(
+    realm: &'a TestRealm<'a>,
+    dst: std::net::SocketAddr,
+    with_sock: F,
+) -> futures::future::LocalBoxFuture<'a, Result<fuchsia_async::net::TcpStream>> {
+    async move {
+        let sock = realm
+            .stream_socket(get_socket2_domain(&dst), fposix_socket::StreamSocketProtocol::Tcp)
+            .await
+            .context("failed to create socket")?;
+
+        with_sock(&sock)?;
+
+        let stream = fuchsia_async::net::TcpStream::connect_from_raw(sock, dst)
+            .context("failed to create client tcp stream")?
+            .await
+            .context("failed to connect to server")?;
+
+        Result::Ok(stream)
+    }
+    .boxed_local()
+}
+
 impl RealmTcpStream for fuchsia_async::net::TcpStream {
     fn connect_in_realm<'a>(
         realm: &'a TestRealm<'a>,
         addr: std::net::SocketAddr,
     ) -> futures::future::LocalBoxFuture<'a, Result<Self>> {
-        async move {
-            let sock = realm
-                .stream_socket(get_socket2_domain(&addr), fposix_socket::StreamSocketProtocol::Tcp)
-                .await
-                .context("failed to create socket")?;
-
-            let stream = fuchsia_async::net::TcpStream::connect_from_raw(sock, addr)
-                .context("failed to create client tcp stream")?
-                .await
-                .context("failed to connect to server")?;
-
-            Result::Ok(stream)
-        }
-        .boxed_local()
+        connect_in_realm_with_sock(realm, addr, |_: &socket2::Socket| Ok(()))
     }
 
     fn bind_and_connect_in_realm<'a>(
@@ -1461,22 +1471,9 @@ impl RealmTcpStream for fuchsia_async::net::TcpStream {
         local: std::net::SocketAddr,
         dst: std::net::SocketAddr,
     ) -> futures::future::LocalBoxFuture<'a, Result<Self>> {
-        async move {
-            let sock = realm
-                .stream_socket(get_socket2_domain(&dst), fposix_socket::StreamSocketProtocol::Tcp)
-                .await
-                .context("failed to create socket")?;
-
-            let () = sock.bind(&local.into()).context("failed to bind")?;
-
-            let stream = fuchsia_async::net::TcpStream::connect_from_raw(sock, dst)
-                .context("failed to create client tcp stream")?
-                .await
-                .context("failed to connect to server")?;
-
-            Result::Ok(stream)
-        }
-        .boxed_local()
+        connect_in_realm_with_sock(realm, dst, move |sock| {
+            sock.bind(&local.into()).context("failed to bind")
+        })
     }
 }
 
