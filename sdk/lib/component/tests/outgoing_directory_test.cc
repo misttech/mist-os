@@ -734,9 +734,9 @@ TEST_F(OutgoingDirectoryTest, AddDirectoryFailsIfEntryExists) {
 TEST_F(OutgoingDirectoryTest, AddDirectoryFailsIfNameUsedForAddProtocolAt) {
   constexpr char kDirectoryName[] = "diagnostics";
 
-  EchoImpl regular_impl(/*reversed=*/false);
   ASSERT_EQ(GetOutgoingDirectory()
-                ->AddProtocolAt<fuchsia_examples::Echo>(kDirectoryName, &regular_impl)
+                ->AddProtocolAt<fuchsia_examples::Echo>(
+                    kDirectoryName, std::make_unique<EchoImpl>(/*reversed*/ false))
                 .status_value(),
             ZX_OK);
 
