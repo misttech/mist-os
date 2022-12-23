@@ -624,7 +624,7 @@ mod tests {
                         source: UseSource::Framework,
                         source_name: "hub".into(),
                         target_path: CapabilityPath::try_from("/hub").unwrap(),
-                        rights: *routing::rights::READ_RIGHTS,
+                        rights: fio::R_STAR_DIR,
                         subdir: Some("resolved".into()),
                         availability: Availability::Required,
                     }))
@@ -740,7 +740,7 @@ mod tests {
                         source: UseSource::Framework,
                         source_name: "hub".into(),
                         target_path: CapabilityPath::try_from("/hub").unwrap(),
-                        rights: *routing::rights::READ_RIGHTS,
+                        rights: fio::R_STAR_DIR,
                         subdir: None,
                         availability: Availability::Required,
                     }))
@@ -785,7 +785,7 @@ mod tests {
                     .directory(DirectoryDecl {
                         name: "baz".into(),
                         source_path: Some("/data".parse().unwrap()),
-                        rights: *routing::rights::READ_RIGHTS,
+                        rights: fio::R_STAR_DIR,
                     })
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,

@@ -12,9 +12,9 @@ mod tests {
         },
         cm_rust_testing::{ComponentDeclBuilder, DirectoryDeclBuilder},
         component_id_index::gen_instance_id,
-        fidl_fuchsia_component_decl as fdecl, fuchsia_zircon_status as zx_status,
+        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
+        fuchsia_zircon_status as zx_status,
         moniker::{AbsoluteMoniker, AbsoluteMonikerBase, RelativeMonikerBase},
-        routing::rights::{READ_RIGHTS, WRITE_RIGHTS},
         routing_test_helpers::{
             component_id_index::make_index_file, storage::CommonStorageTest, CheckUse,
             ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
@@ -172,7 +172,7 @@ mod tests {
                     .directory(
                         DirectoryDeclBuilder::new("data")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .storage(StorageDecl {

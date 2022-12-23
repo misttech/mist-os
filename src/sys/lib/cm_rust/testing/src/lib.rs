@@ -6,7 +6,6 @@ use {
     anyhow::{Context, Error},
     cm_rust::{ComponentDecl, FidlIntoNative},
     cml, fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-    routing::rights::READ_RIGHTS,
 };
 
 /// Name of the test runner.
@@ -407,7 +406,7 @@ impl DirectoryDeclBuilder {
         Self(cm_rust::DirectoryDecl {
             name: name.into(),
             source_path: Some(format!("/data/foo").parse().unwrap()),
-            rights: *READ_RIGHTS,
+            rights: fio::R_STAR_DIR,
         })
     }
 

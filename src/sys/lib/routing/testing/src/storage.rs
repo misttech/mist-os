@@ -11,12 +11,10 @@ use {
     cm_rust::*,
     cm_rust_testing::{ComponentDeclBuilder, DirectoryDeclBuilder},
     component_id_index::gen_instance_id,
-    fidl_fuchsia_component_decl as fdecl, fuchsia_zircon_status as zx_status,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
+    fuchsia_zircon_status as zx_status,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker, RelativeMonikerBase},
-    routing::{
-        config::{CapabilityAllowlistKey, CapabilityAllowlistSource},
-        rights::{READ_RIGHTS, WRITE_RIGHTS},
-    },
+    routing::config::{CapabilityAllowlistKey, CapabilityAllowlistSource},
     std::{collections::HashSet, convert::TryInto, marker::PhantomData, path::PathBuf},
 };
 
@@ -72,10 +70,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             ),
         ];
         let namespace_capabilities = vec![CapabilityDecl::Directory(
-            DirectoryDeclBuilder::new("tmp")
-                .path("/tmp")
-                .rights(*READ_RIGHTS | *WRITE_RIGHTS)
-                .build(),
+            DirectoryDeclBuilder::new("tmp").path("/tmp").rights(fio::RW_STAR_DIR).build(),
         )];
         let mut builder = T::new("a", components);
         builder.set_namespace_capabilities(namespace_capabilities);
@@ -112,7 +107,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("data")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
@@ -175,7 +170,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("data")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
@@ -238,7 +233,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("data")
                             .path("/data")
-                            .rights(*READ_RIGHTS)
+                            .rights(fio::R_STAR_DIR)
                             .build(),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
@@ -302,7 +297,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("data")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
@@ -310,7 +305,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         source_name: "data".try_into().unwrap(),
                         target_name: "minfs".try_into().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
-                        rights: Some(*READ_RIGHTS | *WRITE_RIGHTS),
+                        rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -383,7 +378,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("data")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
@@ -391,7 +386,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         source_name: "data".try_into().unwrap(),
                         target_name: "minfs".try_into().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
-                        rights: Some(*READ_RIGHTS | *WRITE_RIGHTS),
+                        rights: Some(fio::RW_STAR_DIR),
                         subdir: Some("subdir_1".into()),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -470,7 +465,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("data")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
@@ -478,7 +473,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         source_name: "data".try_into().unwrap(),
                         target_name: "minfs".try_into().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
-                        rights: Some(*READ_RIGHTS | *WRITE_RIGHTS),
+                        rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -551,7 +546,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("data-root")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
@@ -650,7 +645,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("data")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
@@ -658,7 +653,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         source: ExposeSource::Self_,
                         target_name: "minfs".try_into().unwrap(),
                         target: ExposeTarget::Parent,
-                        rights: Some(*READ_RIGHTS | *WRITE_RIGHTS),
+                        rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
                     }))
                     .build(),
@@ -727,7 +722,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("data")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
@@ -735,7 +730,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         source: ExposeSource::Self_,
                         target_name: "minfs".try_into().unwrap(),
                         target: ExposeTarget::Parent,
-                        rights: Some(*READ_RIGHTS | *WRITE_RIGHTS),
+                        rights: Some(fio::RW_STAR_DIR),
                         subdir: Some("subdir_1".into()),
                     }))
                     .build(),
@@ -827,7 +822,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("data")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
@@ -835,7 +830,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         source: ExposeSource::Self_,
                         target_name: "minfs".try_into().unwrap(),
                         target: ExposeTarget::Parent,
-                        rights: Some(*READ_RIGHTS | *WRITE_RIGHTS),
+                        rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
                     }))
                     .build(),
@@ -959,7 +954,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("data")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
@@ -1019,7 +1014,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("data")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
@@ -1027,7 +1022,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         source_name: "data".try_into().unwrap(),
                         target_name: "data".try_into().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
-                        rights: Some(*READ_RIGHTS | *WRITE_RIGHTS),
+                        rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1077,7 +1072,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("minfs")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .storage(StorageDecl {
@@ -1133,7 +1128,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("data")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
@@ -1141,7 +1136,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         source_name: "data".try_into().unwrap(),
                         target_name: "minfs".try_into().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
-                        rights: Some(*READ_RIGHTS | *WRITE_RIGHTS),
+                        rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1239,10 +1234,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             ),
         ];
         let namespace_capabilities = vec![CapabilityDecl::Directory(
-            DirectoryDeclBuilder::new("tmp")
-                .path("/tmp")
-                .rights(*READ_RIGHTS | *WRITE_RIGHTS)
-                .build(),
+            DirectoryDeclBuilder::new("tmp").path("/tmp").rights(fio::RW_STAR_DIR).build(),
         )];
         let mut builder = T::new("a", components);
         builder.set_namespace_capabilities(namespace_capabilities);
@@ -1299,7 +1291,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("data")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {

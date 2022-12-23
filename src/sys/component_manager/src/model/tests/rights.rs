@@ -143,7 +143,7 @@ async fn framework_directory_rights() {
                     source: UseSource::Parent,
                     source_name: "foo_data".into(),
                     target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
-                    rights: *routing::rights::READ_RIGHTS,
+                    rights: fio::R_STAR_DIR,
                     subdir: None,
                     availability: Availability::Required,
                 }))
@@ -193,7 +193,7 @@ async fn framework_directory_incompatible_rights() {
                     source: UseSource::Parent,
                     source_name: "foo_data".into(),
                     target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
-                    rights: *routing::rights::EXECUTE_RIGHTS,
+                    rights: fio::X_STAR_DIR,
                     subdir: None,
                     availability: Availability::Required,
                 }))

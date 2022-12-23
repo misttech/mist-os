@@ -12,7 +12,6 @@ use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
     fuchsia_zircon_status as zx_status,
     moniker::RelativeMonikerBase,
-    routing::rights::{READ_RIGHTS, WRITE_RIGHTS},
     std::{
         convert::TryInto,
         marker::PhantomData,
@@ -99,7 +98,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             source_name: "dir".try_into().unwrap(),
                             target: OfferTarget::static_child("c".to_string()),
                             target_name: "dir".try_into().unwrap(),
-                            rights: Some(*READ_RIGHTS),
+                            rights: Some(fio::R_STAR_DIR),
                             subdir: None,
                             dependency_type: DependencyType::Strong,
                             availability: test_case.offer_availability.clone(),
@@ -107,7 +106,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                         .directory(
                             DirectoryDeclBuilder::new("data")
                                 .path("/data")
-                                .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                                .rights(fio::RW_STAR_DIR)
                                 .build(),
                         )
                         .storage(StorageDecl {
@@ -165,7 +164,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                         .directory(
                             DirectoryDeclBuilder::new("dir")
                                 .path("/data/dir")
-                                .rights(*READ_RIGHTS)
+                                .rights(fio::R_STAR_DIR)
                                 .build(),
                         )
                         .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
@@ -199,7 +198,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             source: UseSource::Parent,
                             source_name: "dir".try_into().unwrap(),
                             target_path: "/dir".try_into().unwrap(),
-                            rights: *READ_RIGHTS,
+                            rights: fio::R_STAR_DIR,
                             subdir: None,
                             dependency_type: DependencyType::Strong,
                             availability: test_case.use_availability.clone(),

@@ -30,7 +30,7 @@ use {
     },
     fidl::prelude::*,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal,
-    fidl_fuchsia_sys2 as fsys, fuchsia_zircon_status as zx_status,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_zircon_status as zx_status,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase},
     routing::{
         component_id_index::ComponentIdIndex,
@@ -41,7 +41,6 @@ use {
         },
         environment::RunnerRegistry,
         error::RoutingError,
-        rights::{READ_RIGHTS, WRITE_RIGHTS},
         RegistrationDecl, RouteInfo,
     },
     routing_test_helpers::{
@@ -1548,7 +1547,7 @@ mod tests {
             source: UseSource::Parent,
             source_name: "foobar_data".into(),
             target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
-            rights: *READ_RIGHTS,
+            rights: fio::R_STAR_DIR,
             subdir: None,
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1558,7 +1557,7 @@ mod tests {
             source_name: "baz_data".into(),
             target_name: "foobar_data".into(),
             target: OfferTarget::static_child("c".to_string()),
-            rights: Some(*READ_RIGHTS),
+            rights: Some(fio::R_STAR_DIR),
             subdir: None,
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1568,7 +1567,7 @@ mod tests {
             source_name: "bar_data".into(),
             target_name: "baz_data".into(),
             target: ExposeTarget::Parent,
-            rights: Some(*READ_RIGHTS),
+            rights: Some(fio::R_STAR_DIR),
             subdir: None,
         });
         let d_expose_decl = ExposeDecl::Directory(ExposeDirectoryDecl {
@@ -1576,7 +1575,7 @@ mod tests {
             source_name: "foo_data".into(),
             target_name: "bar_data".into(),
             target: ExposeTarget::Parent,
-            rights: Some(*READ_RIGHTS),
+            rights: Some(fio::R_STAR_DIR),
             subdir: None,
         });
         let directory_decl = DirectoryDeclBuilder::new("foo_data").build();
@@ -1723,10 +1722,8 @@ mod tests {
     /// directory.
     #[fuchsia::test]
     async fn map_route_storage_and_dir_from_parent() {
-        let directory_decl = DirectoryDeclBuilder::new("data")
-            .path("/data")
-            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
-            .build();
+        let directory_decl =
+            DirectoryDeclBuilder::new("data").path("/data").rights(fio::RW_STAR_DIR).build();
         let storage_decl = StorageDecl {
             name: "cache".into(),
             backing_dir: "data".try_into().unwrap(),
@@ -2332,7 +2329,7 @@ mod tests {
             source: UseSource::Parent,
             source_name: "bar_data".into(),
             target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
-            rights: *READ_RIGHTS,
+            rights: fio::R_STAR_DIR,
             subdir: None,
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -2342,7 +2339,7 @@ mod tests {
             source_name: "foo_data".into(),
             target_name: "bar_data".into(),
             target: OfferTarget::static_child("b".to_string()),
-            rights: Some(*READ_RIGHTS),
+            rights: Some(fio::R_STAR_DIR),
             subdir: None,
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,

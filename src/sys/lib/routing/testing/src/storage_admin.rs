@@ -7,9 +7,8 @@ use {
     cm_moniker::InstancedRelativeMoniker,
     cm_rust::*,
     cm_rust_testing::*,
-    fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
     moniker::RelativeMonikerBase,
-    routing::rights::{READ_RIGHTS, WRITE_RIGHTS},
     std::{
         convert::{TryFrom, TryInto},
         marker::PhantomData,
@@ -43,7 +42,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("tmpfs")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .storage(StorageDecl {
@@ -129,7 +128,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("data")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
@@ -137,7 +136,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         source_name: "data".into(),
                         target_name: "data".into(),
                         target: OfferTarget::static_child("b".to_string()),
-                        rights: Some(*READ_RIGHTS | *WRITE_RIGHTS),
+                        rights: Some(fio::RW_STAR_DIR),
                         subdir: Some(PathBuf::from("foo")),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -242,7 +241,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("tmpfs")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .storage(StorageDecl {
@@ -308,7 +307,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("tmpfs")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .storage(StorageDecl {
@@ -378,7 +377,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("tmpfs")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .protocol(ProtocolDeclBuilder::new("unrelated.protocol").build())
@@ -448,7 +447,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("tmpfs")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .protocol(ProtocolDeclBuilder::new("unrelated.protocol").build())
@@ -547,7 +546,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("tmpfs")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .storage(StorageDecl {
@@ -615,7 +614,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("tmpfs")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .protocol(ProtocolDeclBuilder::new("unrelated.protocol").build())
@@ -684,7 +683,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("tmpfs")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .storage(StorageDecl {
@@ -781,7 +780,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                     .directory(
                         DirectoryDeclBuilder::new("tmpfs")
                             .path("/data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
+                            .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
                     .storage(StorageDecl {

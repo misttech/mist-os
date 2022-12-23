@@ -108,7 +108,7 @@ async fn use_in_collection_from_parent() {
                 .directory(
                     DirectoryDeclBuilder::new("data")
                         .path("/data")
-                        .rights(*routing::rights::READ_RIGHTS | *routing::rights::WRITE_RIGHTS)
+                        .rights(fio::RW_STAR_DIR)
                         .build(),
                 )
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
@@ -116,7 +116,7 @@ async fn use_in_collection_from_parent() {
                     source_name: "data".try_into().unwrap(),
                     target_name: "minfs".try_into().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
-                    rights: Some(*routing::rights::READ_RIGHTS | *routing::rights::WRITE_RIGHTS),
+                    rights: Some(fio::RW_STAR_DIR),
                     subdir: None,
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -284,7 +284,7 @@ async fn use_in_collection_from_grandparent() {
                 .directory(
                     DirectoryDeclBuilder::new("minfs")
                         .path("/data")
-                        .rights(*routing::rights::READ_RIGHTS | *routing::rights::WRITE_RIGHTS)
+                        .rights(fio::RW_STAR_DIR)
                         .build(),
                 )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
@@ -515,7 +515,7 @@ async fn use_restricted_storage_start_failure() {
                 .directory(
                     DirectoryDeclBuilder::new("data")
                         .path("/data")
-                        .rights(*routing::rights::READ_RIGHTS | *routing::rights::WRITE_RIGHTS)
+                        .rights(fio::RW_STAR_DIR)
                         .build(),
                 )
                 .storage(StorageDecl {
@@ -611,7 +611,7 @@ async fn use_restricted_storage_open_failure() {
                 .directory(
                     DirectoryDeclBuilder::new("data")
                         .path("/data")
-                        .rights(*routing::rights::READ_RIGHTS | *routing::rights::WRITE_RIGHTS)
+                        .rights(fio::RW_STAR_DIR)
                         .build(),
                 )
                 .storage(StorageDecl {
@@ -738,7 +738,7 @@ async fn open_storage_subdirectory() {
                 .directory(
                     DirectoryDeclBuilder::new("data")
                         .path("/data")
-                        .rights(*routing::rights::READ_RIGHTS | *routing::rights::WRITE_RIGHTS)
+                        .rights(fio::RW_STAR_DIR)
                         .build(),
                 )
                 .storage(StorageDecl {
@@ -857,7 +857,7 @@ async fn storage_persistence_relative_moniker_path() {
                 .directory(
                     DirectoryDeclBuilder::new("minfs")
                         .path("/data")
-                        .rights(*routing::rights::READ_RIGHTS | *routing::rights::WRITE_RIGHTS)
+                        .rights(fio::RW_STAR_DIR)
                         .build(),
                 )
                 .storage(StorageDecl {
@@ -1040,7 +1040,7 @@ async fn storage_persistence_instance_id_path() {
                 .directory(
                     DirectoryDeclBuilder::new("minfs")
                         .path("/data")
-                        .rights(*routing::rights::READ_RIGHTS | *routing::rights::WRITE_RIGHTS)
+                        .rights(fio::RW_STAR_DIR)
                         .build(),
                 )
                 .storage(StorageDecl {
@@ -1226,7 +1226,7 @@ async fn storage_persistence_inheritance() {
                 .directory(
                     DirectoryDeclBuilder::new("minfs")
                         .path("/data")
-                        .rights(*routing::rights::READ_RIGHTS | *routing::rights::WRITE_RIGHTS)
+                        .rights(fio::RW_STAR_DIR)
                         .build(),
                 )
                 .storage(StorageDecl {
@@ -1482,7 +1482,7 @@ async fn storage_persistence_disablement() {
                 .directory(
                     DirectoryDeclBuilder::new("minfs")
                         .path("/data")
-                        .rights(*routing::rights::READ_RIGHTS | *routing::rights::WRITE_RIGHTS)
+                        .rights(fio::RW_STAR_DIR)
                         .build(),
                 )
                 .storage(StorageDecl {

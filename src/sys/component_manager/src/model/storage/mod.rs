@@ -473,7 +473,7 @@ mod tests {
                     .directory(DirectoryDecl {
                         name: "data".into(),
                         source_path: Some("/data".try_into().unwrap()),
-                        rights: *routing::rights::READ_RIGHTS | *routing::rights::WRITE_RIGHTS,
+                        rights: fio::RW_STAR_DIR,
                     })
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".try_into().unwrap(),
@@ -557,7 +557,7 @@ mod tests {
                     .directory(DirectoryDecl {
                         name: "data".into(),
                         source_path: Some("/data".try_into().unwrap()),
-                        rights: *routing::rights::READ_RIGHTS | *routing::rights::WRITE_RIGHTS,
+                        rights: fio::RW_STAR_DIR,
                     })
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".try_into().unwrap(),
@@ -676,7 +676,7 @@ mod tests {
                     .directory(DirectoryDecl {
                         name: "data".into(),
                         source_path: Some("/data".try_into().unwrap()),
-                        rights: *routing::rights::READ_RIGHTS | *routing::rights::WRITE_RIGHTS,
+                        rights: fio::RW_STAR_DIR,
                     })
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".try_into().unwrap(),
@@ -801,7 +801,7 @@ mod tests {
                     .directory(DirectoryDecl {
                         name: "data".into(),
                         source_path: Some("/data".try_into().unwrap()),
-                        rights: *routing::rights::READ_RIGHTS | *routing::rights::WRITE_RIGHTS,
+                        rights: fio::RW_STAR_DIR,
                     })
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".try_into().unwrap(),

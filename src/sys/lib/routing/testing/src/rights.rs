@@ -6,8 +6,7 @@ use {
     crate::{CheckUse, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder},
     cm_rust::*,
     cm_rust_testing::{ComponentDeclBuilder, DirectoryDeclBuilder},
-    fuchsia_zircon_status as zx_status,
-    routing::rights::{READ_RIGHTS, WRITE_RIGHTS},
+    fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status,
     std::{convert::TryFrom, marker::PhantomData},
 };
 
@@ -30,7 +29,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         source_name: "bar_data".into(),
                         target_name: "baz_data".into(),
                         target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(*READ_RIGHTS | *WRITE_RIGHTS),
+                        rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -43,16 +42,14 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .directory(
-                        DirectoryDeclBuilder::new("foo_data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
-                            .build(),
+                        DirectoryDeclBuilder::new("foo_data").rights(fio::RW_STAR_DIR).build(),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".into(),
                         target_name: "bar_data".into(),
                         target: ExposeTarget::Parent,
-                        rights: Some(*READ_RIGHTS | *WRITE_RIGHTS),
+                        rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
                     }))
                     .build(),
@@ -64,7 +61,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         source: UseSource::Parent,
                         source_name: "baz_data".into(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
-                        rights: *READ_RIGHTS,
+                        rights: fio::R_STAR_DIR,
                         subdir: None,
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -86,7 +83,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         source_name: "bar_data".into(),
                         target_name: "baz_data".into(),
                         target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(*WRITE_RIGHTS),
+                        rights: Some(fio::W_STAR_DIR),
                         subdir: None,
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -99,16 +96,14 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .directory(
-                        DirectoryDeclBuilder::new("foo_data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
-                            .build(),
+                        DirectoryDeclBuilder::new("foo_data").rights(fio::RW_STAR_DIR).build(),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".into(),
                         target_name: "bar_data".into(),
                         target: ExposeTarget::Parent,
-                        rights: Some(*READ_RIGHTS | *WRITE_RIGHTS),
+                        rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
                     }))
                     .build(),
@@ -120,7 +115,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         source: UseSource::Parent,
                         source_name: "baz_data".into(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
-                        rights: *READ_RIGHTS,
+                        rights: fio::R_STAR_DIR,
                         subdir: None,
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -147,7 +142,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         source_name: "bar_data".into(),
                         target_name: "baz_data".into(),
                         target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(*READ_RIGHTS),
+                        rights: Some(fio::R_STAR_DIR),
                         subdir: None,
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -160,16 +155,14 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .directory(
-                        DirectoryDeclBuilder::new("foo_data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
-                            .build(),
+                        DirectoryDeclBuilder::new("foo_data").rights(fio::RW_STAR_DIR).build(),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".into(),
                         target_name: "bar_data".into(),
                         target: ExposeTarget::Parent,
-                        rights: Some(*READ_RIGHTS | *WRITE_RIGHTS),
+                        rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
                     }))
                     .build(),
@@ -181,7 +174,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         source: UseSource::Parent,
                         source_name: "baz_data".into(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
-                        rights: *READ_RIGHTS,
+                        rights: fio::R_STAR_DIR,
                         subdir: None,
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -203,7 +196,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         source_name: "bar_data".into(),
                         target_name: "baz_data".into(),
                         target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(*READ_RIGHTS | *WRITE_RIGHTS),
+                        rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -216,16 +209,14 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .directory(
-                        DirectoryDeclBuilder::new("foo_data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
-                            .build(),
+                        DirectoryDeclBuilder::new("foo_data").rights(fio::RW_STAR_DIR).build(),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".into(),
                         target_name: "bar_data".into(),
                         target: ExposeTarget::Parent,
-                        rights: Some(*WRITE_RIGHTS),
+                        rights: Some(fio::W_STAR_DIR),
                         subdir: None,
                     }))
                     .build(),
@@ -237,7 +228,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         source: UseSource::Parent,
                         source_name: "baz_data".into(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
-                        rights: *READ_RIGHTS,
+                        rights: fio::R_STAR_DIR,
                         subdir: None,
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -264,7 +255,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         source_name: "bar_data".into(),
                         target_name: "baz_data".into(),
                         target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(*READ_RIGHTS),
+                        rights: Some(fio::R_STAR_DIR),
                         subdir: None,
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -277,16 +268,14 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .directory(
-                        DirectoryDeclBuilder::new("foo_data")
-                            .rights(*READ_RIGHTS | *WRITE_RIGHTS)
-                            .build(),
+                        DirectoryDeclBuilder::new("foo_data").rights(fio::RW_STAR_DIR).build(),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".into(),
                         target_name: "bar_data".into(),
                         target: ExposeTarget::Parent,
-                        rights: Some(*READ_RIGHTS),
+                        rights: Some(fio::R_STAR_DIR),
                         subdir: None,
                     }))
                     .build(),
@@ -298,7 +287,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         source: UseSource::Parent,
                         source_name: "baz_data".into(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
-                        rights: *READ_RIGHTS,
+                        rights: fio::R_STAR_DIR,
                         subdir: None,
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -320,7 +309,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         source_name: "bar_data".into(),
                         target_name: "baz_data".into(),
                         target: OfferTarget::static_child("c".to_string()),
-                        rights: Some(*READ_RIGHTS | *WRITE_RIGHTS),
+                        rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -332,13 +321,15 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDeclBuilder::new("foo_data").rights(*WRITE_RIGHTS).build())
+                    .directory(
+                        DirectoryDeclBuilder::new("foo_data").rights(fio::W_STAR_DIR).build(),
+                    )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".into(),
                         target_name: "bar_data".into(),
                         target: ExposeTarget::Parent,
-                        rights: Some(*READ_RIGHTS | *WRITE_RIGHTS),
+                        rights: Some(fio::RW_STAR_DIR),
                         subdir: None,
                     }))
                     .build(),
@@ -350,7 +341,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         source: UseSource::Parent,
                         source_name: "baz_data".into(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
-                        rights: *READ_RIGHTS,
+                        rights: fio::R_STAR_DIR,
                         subdir: None,
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -400,7 +391,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         source: UseSource::Parent,
                         source_name: "bar_data".into(),
                         target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
-                        rights: *READ_RIGHTS,
+                        rights: fio::R_STAR_DIR,
                         subdir: None,
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -411,7 +402,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
         let namespace_capabilities = vec![CapabilityDecl::Directory(
             DirectoryDeclBuilder::new("foo_data")
                 .path("/offer_from_cm_namespace/data/foo")
-                .rights(*WRITE_RIGHTS)
+                .rights(fio::W_STAR_DIR)
                 .build(),
         )];
         let mut builder = T::new("a", components);

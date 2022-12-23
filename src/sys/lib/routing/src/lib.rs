@@ -36,7 +36,7 @@ use {
         error::RoutingError,
         event::EventFilter,
         path::PathBufExt,
-        rights::{Rights, READ_RIGHTS, READ_WRITE_RIGHTS, WRITE_RIGHTS},
+        rights::Rights,
         router::{
             AllowedSourcesBuilder, CapabilityVisitor, ErrorNotFoundFromParent,
             ErrorNotFoundInChild, ExposeVisitor, OfferVisitor, RoutingStrategy, Sources,
@@ -842,7 +842,7 @@ impl OfferVisitor for DirectoryState {
 
     fn visit(&mut self, offer: &OfferDirectoryDecl) -> Result<(), RoutingError> {
         match offer.source {
-            OfferSource::Framework => self.finalize(*READ_WRITE_RIGHTS, offer.subdir.clone()),
+            OfferSource::Framework => self.finalize(fio::RW_STAR_DIR, offer.subdir.clone()),
             _ => self.advance_with_offer(offer),
         }
     }
@@ -853,7 +853,7 @@ impl ExposeVisitor for DirectoryState {
 
     fn visit(&mut self, expose: &ExposeDirectoryDecl) -> Result<(), RoutingError> {
         match expose.source {
-            ExposeSource::Framework => self.finalize(*READ_WRITE_RIGHTS, expose.subdir.clone()),
+            ExposeSource::Framework => self.finalize(fio::RW_STAR_DIR, expose.subdir.clone()),
             _ => self.advance(expose.rights.clone(), expose.subdir.clone()),
         }
     }
@@ -895,7 +895,7 @@ where
                 &use_decl.availability.clone(),
             );
             if let UseSource::Framework = &use_decl.source {
-                state.finalize(*READ_WRITE_RIGHTS, None)?;
+                state.finalize(fio::RW_STAR_DIR, None)?;
             }
             let allowed_sources = AllowedSourcesBuilder::new()
                 .framework(InternalCapability::Directory)
@@ -1020,8 +1020,7 @@ where
     C: ComponentInstanceInterface + 'static,
 {
     // Storage rights are always READ+WRITE.
-    let mut state =
-        DirectoryState::new(*READ_RIGHTS | *WRITE_RIGHTS, None, &Availability::Required);
+    let mut state = DirectoryState::new(fio::RW_STAR_DIR, None, &Availability::Required);
     let allowed_sources = AllowedSourcesBuilder::new().component().namespace();
     let source = RoutingStrategy::new()
         .registration::<StorageDeclAsRegistration>()

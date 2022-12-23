@@ -431,7 +431,7 @@ mod tests {
             .create_event(
                 &component,
                 Ok(&proxy),
-                Rights::from(*routing::rights::READ_RIGHTS),
+                Rights::from(fio::R_STAR_DIR),
                 &CapabilityPath::try_from("/foo").unwrap(),
                 &CapabilityName::from("foo"),
             )

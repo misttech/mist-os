@@ -5,59 +5,21 @@
 use {
     crate::{error::RightsRoutingError, walk_state::WalkStateUnit},
     fidl_fuchsia_io as fio,
-    lazy_static::lazy_static,
     std::convert::From,
 };
 
-lazy_static! {
-    // TODO: const initialization of bitflag types with bitwise-or is not supported in FIDL. Change
-    // when supported.
-    /// All rights corresponding to r*.
-    pub static ref READ_RIGHTS: fio::Operations =
-        fio::Operations::CONNECT
-        | fio::Operations::ENUMERATE
-        | fio::Operations::TRAVERSE
-        | fio::Operations::READ_BYTES
-        | fio::Operations::GET_ATTRIBUTES;
-    /// All rights corresponding to w*.
-    pub static ref WRITE_RIGHTS: fio::Operations =
-        fio::Operations::CONNECT
-        | fio::Operations::ENUMERATE
-        | fio::Operations::TRAVERSE
-        | fio::Operations::WRITE_BYTES
-        | fio::Operations::MODIFY_DIRECTORY
-        | fio::Operations::UPDATE_ATTRIBUTES;
-    /// All rights corresponding to x*.
-    pub static ref EXECUTE_RIGHTS: fio::Operations =
-        fio::Operations::CONNECT
-        | fio::Operations::ENUMERATE
-        | fio::Operations::TRAVERSE
-        | fio::Operations::EXECUTE;
-    /// All rights corresponding to rw*.
-    pub static ref READ_WRITE_RIGHTS: fio::Operations =
-        fio::Operations::CONNECT
-        | fio::Operations::ENUMERATE
-        | fio::Operations::TRAVERSE
-        | fio::Operations::READ_BYTES
-        | fio::Operations::WRITE_BYTES
-        | fio::Operations::MODIFY_DIRECTORY
-        | fio::Operations::GET_ATTRIBUTES
-        | fio::Operations::UPDATE_ATTRIBUTES;
+/// All the fio rights required to represent fio::OpenFlags::RIGHT_READABLE.
+const LEGACY_READABLE_RIGHTS: fio::Operations = fio::Operations::empty()
+    .union(fio::Operations::READ_BYTES)
+    .union(fio::Operations::GET_ATTRIBUTES)
+    .union(fio::Operations::TRAVERSE)
+    .union(fio::Operations::ENUMERATE);
 
-    /// All the fio rights required to represent fio::OpenFlags::RIGHT_READABLE.
-    static ref LEGACY_READABLE_RIGHTS: fio::Operations =
-        fio::Operations::READ_BYTES
-        | fio::Operations::GET_ATTRIBUTES
-        | fio::Operations::TRAVERSE
-        | fio::Operations::ENUMERATE;
-    /// All the fio rights required to represent fio::OpenFlags::RIGHT_WRITABLE.
-    static ref LEGACY_WRITABLE_RIGHTS: fio::Operations =
-        fio::Operations::WRITE_BYTES
-        | fio::Operations::UPDATE_ATTRIBUTES
-        | fio::Operations::MODIFY_DIRECTORY;
-    /// All the fio rights required to represent fio::OpenFlags::RIGHT_EXECUTABLE.
-    static ref LEGACY_EXECUTABLE_RIGHTS: fio::Operations = fio::Operations::EXECUTE;
-}
+/// All the fio rights required to represent fio::OpenFlags::RIGHT_WRITABLE.
+const LEGACY_WRITABLE_RIGHTS: fio::Operations = fio::Operations::empty()
+    .union(fio::Operations::WRITE_BYTES)
+    .union(fio::Operations::UPDATE_ATTRIBUTES)
+    .union(fio::Operations::MODIFY_DIRECTORY);
 
 /// Opaque rights type to define new traits like PartialOrd on.
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -71,10 +33,10 @@ impl Rights {
         let Self(rights) = self;
         // The `intersects` below is intentional. The translation from io2 to io rights is lossy
         // in the sense that a single io2 right may require an io right with coarser permissions.
-        if rights.intersects(*LEGACY_READABLE_RIGHTS) {
+        if rights.intersects(LEGACY_READABLE_RIGHTS) {
             flags |= fio::OpenFlags::RIGHT_READABLE;
         }
-        if rights.intersects(*LEGACY_WRITABLE_RIGHTS) {
+        if rights.intersects(LEGACY_WRITABLE_RIGHTS) {
             flags |= fio::OpenFlags::RIGHT_WRITABLE;
         }
         if rights.contains(fio::Operations::EXECUTE) {
@@ -123,25 +85,28 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
 
+    /// All the fio rights required to represent fio::OpenFlags::RIGHT_EXECUTABLE.
+    const LEGACY_EXECUTABLE_RIGHTS: fio::Operations = fio::Operations::EXECUTE;
+
     #[test]
     fn validate_next() {
         assert_matches!(
             Rights::from(fio::Operations::empty())
-                .validate_next(&Rights::from(*LEGACY_READABLE_RIGHTS)),
+                .validate_next(&Rights::from(LEGACY_READABLE_RIGHTS)),
             Ok(())
         );
         assert_matches!(
             Rights::from(fio::Operations::READ_BYTES | fio::Operations::GET_ATTRIBUTES)
-                .validate_next(&Rights::from(*LEGACY_READABLE_RIGHTS)),
+                .validate_next(&Rights::from(LEGACY_READABLE_RIGHTS)),
             Ok(())
         );
-        assert_matches!(
-            Rights::from(Rights::from(*LEGACY_READABLE_RIGHTS)).validate_next(&Rights::from(
+        assert_eq!(
+            Rights::from(Rights::from(LEGACY_READABLE_RIGHTS)).validate_next(&Rights::from(
                 fio::Operations::READ_BYTES | fio::Operations::GET_ATTRIBUTES
             )),
             Err(RightsRoutingError::Invalid)
         );
-        assert_matches!(
+        assert_eq!(
             Rights::from(fio::Operations::WRITE_BYTES).validate_next(&Rights::from(
                 fio::Operations::READ_BYTES | fio::Operations::GET_ATTRIBUTES
             )),
@@ -152,24 +117,24 @@ mod tests {
     #[test]
     fn into_legacy() {
         assert_eq!(
-            Rights::from(*LEGACY_READABLE_RIGHTS).into_legacy(),
+            Rights::from(LEGACY_READABLE_RIGHTS).into_legacy(),
             fio::OpenFlags::RIGHT_READABLE
         );
         assert_eq!(
-            Rights::from(*LEGACY_WRITABLE_RIGHTS).into_legacy(),
+            Rights::from(LEGACY_WRITABLE_RIGHTS).into_legacy(),
             fio::OpenFlags::RIGHT_WRITABLE
         );
         assert_eq!(
-            Rights::from(*LEGACY_EXECUTABLE_RIGHTS).into_legacy(),
+            Rights::from(LEGACY_EXECUTABLE_RIGHTS).into_legacy(),
             fio::OpenFlags::RIGHT_EXECUTABLE
         );
         assert_eq!(
-            Rights::from(*LEGACY_READABLE_RIGHTS | *LEGACY_WRITABLE_RIGHTS).into_legacy(),
+            Rights::from(LEGACY_READABLE_RIGHTS | LEGACY_WRITABLE_RIGHTS).into_legacy(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE
         );
         assert_eq!(
             Rights::from(
-                *LEGACY_READABLE_RIGHTS | *LEGACY_WRITABLE_RIGHTS | *LEGACY_EXECUTABLE_RIGHTS
+                LEGACY_READABLE_RIGHTS | LEGACY_WRITABLE_RIGHTS | LEGACY_EXECUTABLE_RIGHTS
             )
             .into_legacy(),
             fio::OpenFlags::RIGHT_READABLE
