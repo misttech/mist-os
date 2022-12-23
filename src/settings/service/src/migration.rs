@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(fxbug.dev/91407) Remove allow once used.
-#![cfg_attr(not(test), allow(dead_code))]
-
 //! The `migration` module exposes structs and traits that can be used to write data migrations for
 //! the settings service.
 //!
@@ -118,8 +115,6 @@ impl MigrationManagerBuilder {
 }
 
 impl MigrationManager {
-    // TODO(fxbug.dev/91407): Remove allow once used.
-    #[allow(dead_code)]
     /// Run all migrations, and then log the results to cobalt. Will only return an error if there
     /// was an error running the migrations, but not if there's an error logging to cobalt.
     pub(crate) async fn run_tracked_migrations(
@@ -459,7 +454,9 @@ impl MigrationManager {
 }
 
 pub(crate) struct FileGenerator {
-    // TODO(fxbug.dev/91407) Remove allow once used.
+    // This will be used when migrating in between pfidl storage types,
+    // currently we only have migrations from stash to pfidl so it needs to
+    // annotated.
     #[allow(dead_code)]
     old_id: u64,
     new_id: u64,
@@ -471,7 +468,9 @@ impl FileGenerator {
         Self { old_id, new_id, dir_proxy }
     }
 
-    // TODO(fxbug.dev/91407) Remove allow once used.
+    // This will be used when migrating in between pfidl storage types,
+    // currently we only have migrations from stash to pfidl so it needs to
+    // annotated.
     #[allow(dead_code)]
     pub(crate) async fn old_file(
         &self,
@@ -1220,10 +1219,4 @@ mod tests {
         join_handle.await;
         assert!(triggered.load(Ordering::SeqCst));
     }
-
-    // TODO(fxbug.dev/91407) Test for disk full behavior
-    // TODO(fxbug.dev/91407) Tests for power outage simulation (drop future after various write
-    // stages)
-    // TODO(fxbug.dev/91407) Test that migration file is accurate even after a partial failure, e.g.
-    // simulate disk full after certain number of migrations)
 }
