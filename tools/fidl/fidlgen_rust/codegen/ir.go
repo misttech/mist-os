@@ -171,29 +171,6 @@ type Protocol struct {
 	ProtocolName string
 }
 
-// Overflowable stores information about a method's payloads, indicating whether
-// it is possible for either of them to overflow on either encode or decode.
-type Overflowable struct {
-	// OnRequestEncode indicates whether or not the parent method's request
-	// payload may be so large on encode as to require overflow handling.
-	OnRequestEncode bool
-	// OnRequestDecode indicates whether or not the parent method's request
-	// payload may be so large on decode as to require overflow handling. This
-	// will always be true if OnRequestEncode is true, as the maximum size on
-	// decode is always larger than encode. This is because only the latter may
-	// include unknown, arbitrarily large data.
-	OnRequestDecode bool
-	// OnResponseEncode indicates whether or not the parent method's response
-	// payload may be so large on encode as to require overflow handling.
-	OnResponseEncode bool
-	// OnResponseDecode indicates whether or not the parent method's response
-	// payload may be so large on decode as to require overflow handling. This
-	// will always be true if OnResponseEncode is true, as the maximum size on
-	// decode is always larger than encode. This is because only the latter may
-	// include unknown, arbitrarily large data.
-	OnResponseDecode bool
-}
-
 // Method is a method defined in a protocol.
 type Method struct {
 	// Raw JSON IR data about this method. Embedded to provide access to fields
@@ -225,7 +202,7 @@ type Method struct {
 	// union.
 	Result *Result
 	// Stores overflowing information for this method's payloads.
-	Overflowable Overflowable
+	Overflowable fidlgen.Overflowable
 }
 
 // DynamicFlags gets rust code for the DynamicFlags value that should be set for
@@ -1121,10 +1098,8 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
 	}
 
 	for _, v := range val.Methods {
-		overflowable := Overflowable{}
 		var compiledRequestParameterList []Parameter
 		if v.RequestPayload != nil {
-			overflowable.OnRequestDecode = v.RequestPayload.DecodeOverflowableOnTransport(val.OverTransport())
 			compiledRequestParameterList = getParametersFromType(v.RequestPayload)
 			if len(compiledRequestParameterList) > maximumAllowedParameters {
 				panic(fmt.Sprintf(
@@ -1146,10 +1121,6 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
 			panic(fmt.Sprintf("unknown result type: %v", v.ResultType.Identifier))
 		}
 
-		// TODO(fxbug.dev/100478): Use this special variable to hold the actual
-		// `overflowable.OnResponseEncode` result, but only apply that result if the
-		// experimental flag allows it below.
-		canBeOverflowableOnResponseEncode := false
 		if v.ResponsePayload != nil {
 			if v.HasError || v.HasTransportError() {
 				foundResult = findResultType()
@@ -1159,24 +1130,6 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
 				innerResponse = v.ValueType
 			}
 			compiledResponseParameterList = getParametersFromType(innerResponse)
-			canBeOverflowableOnResponseEncode = v.ResponsePayload.EncodeOverflowableOnTransport(val.OverTransport())
-			overflowable.OnResponseDecode = v.ResponsePayload.DecodeOverflowableOnTransport(val.OverTransport())
-		}
-
-		// TODO(fxbug.dev/100478): Encoding large messages is currently restricted
-		// to allowlisted libraries.
-		if c.experiments.Contains(fidlgen.ExperimentAllowOverflowing) {
-			attr, found := v.Attributes.LookupAttribute("experimental_overflowing")
-			if found {
-				reqArg, hasReq := attr.LookupArg("request")
-				if hasReq && reqArg.ValueString() != "false" && v.RequestPayload != nil {
-					overflowable.OnRequestEncode = v.RequestPayload.EncodeOverflowableOnTransport(val.OverTransport())
-				}
-				resArg, hasRes := attr.LookupArg("response")
-				if hasRes && resArg.ValueString() != "false" {
-					overflowable.OnResponseEncode = canBeOverflowableOnResponseEncode
-				}
-			}
 		}
 
 		r.Methods = append(r.Methods, Method{
@@ -1186,7 +1139,7 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
 			Request:      compiledRequestParameterList,
 			Response:     compiledResponseParameterList,
 			Result:       foundResult,
-			Overflowable: overflowable,
+			Overflowable: v.GetOverflowable(val, c.experiments),
 		})
 	}
 

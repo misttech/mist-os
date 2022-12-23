@@ -1469,6 +1469,66 @@ type Method struct {
 	ErrorType *Type `json:"maybe_response_err_type,omitempty"`
 }
 
+// Overflowable stores information about a method's payloads, indicating whether
+// it is possible for either of them to overflow on either encode or decode.
+type Overflowable struct {
+	// OnRequestEncode indicates whether or not the parent method's request
+	// payload may be so large on encode as to require overflow handling.
+	OnRequestEncode bool
+	// OnRequestDecode indicates whether or not the parent method's request
+	// payload may be so large on decode as to require overflow handling. This
+	// will always be true if OnRequestEncode is true, as the maximum size on
+	// decode is always larger than encode. This is because only the latter may
+	// include unknown, arbitrarily large data.
+	OnRequestDecode bool
+	// OnResponseEncode indicates whether or not the parent method's response
+	// payload may be so large on encode as to require overflow handling.
+	OnResponseEncode bool
+	// OnResponseDecode indicates whether or not the parent method's response
+	// payload may be so large on decode as to require overflow handling. This
+	// will always be true if OnResponseEncode is true, as the maximum size on
+	// decode is always larger than encode. This is because only the latter may
+	// include unknown, arbitrarily large data.
+	OnResponseDecode bool
+}
+
+// GetOverflowable gets boundedness information for the method in question, in
+// both the request and response directions.
+func (m *Method) GetOverflowable(protocol Protocol, experiments Experiments) Overflowable {
+	// TODO(fxbug.dev/100478): Encoding large messages is currently restricted
+	// to allowlisted libraries.
+	var experimentalRequestEncodeOverflowingEnabled, experimentalResponseEncodeOverflowingEnabled bool
+	if experiments.Contains(ExperimentAllowOverflowing) {
+		attr, found := m.Attributes.LookupAttribute("experimental_overflowing")
+		if found {
+			reqArg, hasReq := attr.LookupArg("request")
+			if hasReq && reqArg.ValueString() == "true" {
+				experimentalRequestEncodeOverflowingEnabled = true
+			}
+			resArg, hasRes := attr.LookupArg("response")
+			if hasRes && resArg.ValueString() == "true" {
+				experimentalResponseEncodeOverflowingEnabled = true
+			}
+		}
+	}
+
+	transport := protocol.OverTransport()
+	overflowable := Overflowable{}
+	if m.RequestPayload != nil {
+		overflowable.OnRequestDecode = m.RequestPayload.DecodeOverflowableOnTransport(transport)
+		if experimentalRequestEncodeOverflowingEnabled {
+			overflowable.OnRequestEncode = m.RequestPayload.EncodeOverflowableOnTransport(transport)
+		}
+	}
+	if m.ResponsePayload != nil {
+		overflowable.OnResponseDecode = m.ResponsePayload.DecodeOverflowableOnTransport(transport)
+		if experimentalResponseEncodeOverflowingEnabled {
+			overflowable.OnResponseEncode = m.ResponsePayload.EncodeOverflowableOnTransport(transport)
+		}
+	}
+	return overflowable
+}
+
 // GetRequestPayloadIdentifier retrieves the identifier that points to the
 // declaration of the request payload.
 func (m *Method) GetRequestPayloadIdentifier() (EncodedCompoundIdentifier, bool) {
