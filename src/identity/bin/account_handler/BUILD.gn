@@ -96,6 +96,7 @@ fuchsia_package("account_handler_persistent") {
     ":component",
     ":persistent-config",
     "//src/storage/bin/minfs",
+    "//src/storage/fxfs-crypt",
   ]
 }
 
@@ -104,6 +105,7 @@ fuchsia_package("account_handler_ephemeral") {
     ":component",
     ":ephemeral-config",
     "//src/storage/bin/minfs",
+    "//src/storage/fxfs-crypt",
   ]
 }
 
