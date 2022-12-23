@@ -8290,12 +8290,10 @@ impl Default for siginfo {
 }
 pub type siginfo_t = siginfo;
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[repr(align(8))]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct sigevent {
-    pub sigev_value: sigval_t,
-    pub sigev_signo: crate::x86_64_types::c_int,
-    pub sigev_notify: crate::x86_64_types::c_int,
-    pub _sigev_un: sigevent__bindgen_ty_1,
+    pub _bindgen_opaque_blob: [u64; 8usize],
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -8320,15 +8318,6 @@ impl Default for sigevent__bindgen_ty_1__bindgen_ty_1 {
     }
 }
 impl Default for sigevent__bindgen_ty_1 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl Default for sigevent {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
         unsafe {

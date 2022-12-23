@@ -386,6 +386,55 @@ pub fn sys_sched_getparam(
     Ok(())
 }
 
+pub fn sys_timer_create(
+    current_task: &CurrentTask,
+    clockid: uapi::__kernel_clockid_t,
+    event: UserRef<sigevent>,
+    timerid: UserRef<uapi::__kernel_timer_t>,
+) -> Result<(), Errno> {
+    let timers = &current_task.thread_group.read().timers;
+    let user_event = current_task.mm.read_object(event)?;
+    let id = timers.create(clockid, &user_event)? as uapi::__kernel_timer_t;
+    current_task.mm.write_object(timerid, &id)?;
+    Ok(())
+}
+
+pub fn sys_timer_delete(
+    current_task: &CurrentTask,
+    id: uapi::__kernel_timer_t,
+) -> Result<(), Errno> {
+    let timers = &current_task.thread_group.read().timers;
+    timers.delete(id as usize)
+}
+
+pub fn sys_timer_gettime(
+    current_task: &CurrentTask,
+    id: uapi::__kernel_timer_t,
+    curr_value: UserRef<itimerspec>,
+) -> Result<(), Errno> {
+    let timers = &current_task.thread_group.read().timers;
+    current_task.mm.write_object(curr_value, &timers.get_time(id as usize)?)?;
+    Ok(())
+}
+
+pub fn sys_timer_getoverrun(
+    current_task: &CurrentTask,
+    id: uapi::__kernel_timer_t,
+) -> Result<i32, Errno> {
+    let timers = &current_task.thread_group.read().timers;
+    timers.get_overrun(id as usize)
+}
+
+pub fn sys_timer_settime(
+    _current_task: &CurrentTask,
+    _id: uapi::__kernel_timer_t,
+    _flags: i32,
+    _new_value: UserRef<itimerspec>,
+    _old_value: UserRef<itimerspec>,
+) -> Result<(), Errno> {
+    error!(ENOSYS)
+}
+
 pub fn sys_getitimer(
     current_task: &CurrentTask,
     which: u32,

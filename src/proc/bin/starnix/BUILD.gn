@@ -243,6 +243,7 @@ if (target_cpu == "x64") {
       "task/syscalls.rs",
       "task/task.rs",
       "task/thread_group.rs",
+      "task/timers.rs",
       "task/waiter.rs",
       "testing.rs",
       "types/arc_key.rs",

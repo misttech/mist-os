@@ -60,6 +60,9 @@ pub struct ThreadGroupMutableState {
     /// The IDs used to perform shell job control.
     pub process_group: Arc<ProcessGroup>,
 
+    /// The timers for this thread group (from timer_create(), etc.).
+    pub timers: Arc<TimerTable>,
+
     /// The itimers for this thread group.
     pub itimers: [itimerval; 3],
 
@@ -196,6 +199,7 @@ impl ThreadGroup {
                 child_status_waiters: WaitQueue::default(),
                 is_child_subreaper: false,
                 process_group: Arc::clone(&process_group),
+                timers: TimerTable::new(),
                 itimers: Default::default(),
                 did_exec: false,
                 stopped: false,
