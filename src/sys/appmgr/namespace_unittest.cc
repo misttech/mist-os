@@ -59,12 +59,14 @@ class NamespaceTest : public gtest::RealLoopFixture {
  protected:
   static NamespaceGuard MakeNamespace(ServiceListPtr additional_services,
                                       NamespaceGuard parent = NamespaceGuard(nullptr)) {
-    if (parent.ns().get() == nullptr) {
+    // Prevent parent's destructor from destroying the parent namespace.
+    fxl::RefPtr ns = std::move(parent.ns());
+    if (ns.get() == nullptr) {
       return NamespaceGuard(
           fxl::MakeRefCounted<Namespace>(nullptr, std::move(additional_services), nullptr));
     }
-    return NamespaceGuard(Namespace::CreateChildNamespace(parent.ns(), nullptr,
-                                                          std::move(additional_services), nullptr));
+    return NamespaceGuard(
+        Namespace::CreateChildNamespace(ns, nullptr, std::move(additional_services), nullptr));
   }
 
   static zx_status_t ConnectToService(zx_handle_t svc_dir, const std::string& name) {
