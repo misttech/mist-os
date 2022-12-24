@@ -40,6 +40,15 @@ libc_source_set("scudo") {
     "string_utils.cpp",
   ]
 
+  # TODO(mcgrathr): This is temporary until scudo rolls from upstream where new
+  # source files were added. After the roll, the new file can just be added
+  # unconditionally to the list.
+  scudo_git_revision =
+      read_file("${scudo_common_vars.dir}/.git/HEAD", "list lines")
+  if (scudo_git_revision != [ "08ce66ddc3c93d632258c2b5487ed09366e7c871" ]) {
+    sources += [ "rss_limit_checker.cpp" ]
+  }
+
   # The code needs to be compiled separately for production and test use for
   # two reasons.
   #
