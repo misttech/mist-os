@@ -285,7 +285,7 @@ source_set("loader-tests") {
   visibility = [ ":*" ]
   testonly = true
 
-  sources = [ "mmap-loader-tests.cc" ]
+  sources = [ "loader-tests.cc" ]
 
   deps = [
     ":test-data",
