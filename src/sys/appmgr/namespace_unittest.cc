@@ -31,7 +31,6 @@
 
 using fuchsia::sys::ServiceList;
 using fuchsia::sys::ServiceListPtr;
-using fuchsia::sys::ServiceProvider;
 using fuchsia::sys::ServiceProviderPtr;
 
 namespace component {
@@ -40,7 +39,6 @@ namespace {
 class NamespaceGuard {
  public:
   explicit NamespaceGuard(fxl::RefPtr<Namespace> ns) : ns_(std::move(ns)) {}
-  NamespaceGuard(std::nullptr_t) : ns_(nullptr) {}
   ~NamespaceGuard() { Kill(); }
   Namespace* operator->() const { return ns_.get(); }
 
@@ -57,10 +55,10 @@ class NamespaceGuard {
   fxl::RefPtr<Namespace> ns_;
 };
 
-class NamespaceTest : public ::gtest::RealLoopFixture {
+class NamespaceTest : public gtest::RealLoopFixture {
  protected:
-  NamespaceGuard MakeNamespace(ServiceListPtr additional_services,
-                               NamespaceGuard parent = nullptr) {
+  static NamespaceGuard MakeNamespace(ServiceListPtr additional_services,
+                                      NamespaceGuard parent = NamespaceGuard(nullptr)) {
     if (parent.ns().get() == nullptr) {
       return NamespaceGuard(
           fxl::MakeRefCounted<Namespace>(nullptr, std::move(additional_services), nullptr));
@@ -69,13 +67,12 @@ class NamespaceTest : public ::gtest::RealLoopFixture {
                                                           std::move(additional_services), nullptr));
   }
 
-  zx_status_t ConnectToService(zx_handle_t svc_dir, const std::string& name) {
+  static zx_status_t ConnectToService(zx_handle_t svc_dir, const std::string& name) {
     zx::channel h1, h2;
-    zx_status_t r = zx::channel::create(0, &h1, &h2);
-    if (r != ZX_OK)
-      return r;
-    fdio_service_connect_at(svc_dir, name.c_str(), h2.release());
-    return ZX_OK;
+    if (zx_status_t status = zx::channel::create(0, &h1, &h2); status != ZX_OK) {
+      return status;
+    }
+    return fdio_service_connect_at(svc_dir, name.c_str(), h2.release());
   }
 };
 
@@ -134,7 +131,7 @@ class NamespaceHostDirectoryTest : public NamespaceTest {
 
 class NamespaceProviderTest : public NamespaceTest {
  protected:
-  NamespaceGuard MakeNamespace(ServiceListPtr additional_services) {
+  static NamespaceGuard MakeNamespace(ServiceListPtr additional_services) {
     return NamespaceGuard(
         fxl::MakeRefCounted<Namespace>(nullptr, std::move(additional_services), nullptr));
   }
@@ -162,7 +159,6 @@ TEST_F(NamespaceHostDirectoryTest, AdditionalServices) {
   service_list->names.push_back(kService2);
   AddService(kService1);
   AddService(kService2);
-  ServiceProviderPtr service_provider;
   service_list->host_directory = OpenAsDirectory();
   auto ns = MakeNamespace(std::move(service_list));
 
@@ -173,12 +169,8 @@ TEST_F(NamespaceHostDirectoryTest, AdditionalServices) {
   // fdio_service_connect_at does not return an error if connection failed.
   EXPECT_EQ(ZX_OK, ConnectToService(svc_dir.channel().get(), "fuchsia.test.NotExists"));
   RunLoopUntilIdle();
-  std::vector<std::pair<std::string, int>> connection_ctr_vec;
-  for (const auto& e : connection_ctr_) {
-    connection_ctr_vec.push_back(e);
-  }
-  EXPECT_THAT(connection_ctr_vec,
-              ::testing::ElementsAre(StringIntPair(kService1, 1), StringIntPair(kService2, 2)));
+  EXPECT_THAT(connection_ctr_,
+              testing::ElementsAre(StringIntPair(kService1, 1), StringIntPair(kService2, 2)));
 }
 
 TEST_F(NamespaceHostDirectoryTest, AdditionalServices_InheritParent) {
@@ -201,19 +193,14 @@ TEST_F(NamespaceHostDirectoryTest, AdditionalServices_InheritParent) {
   // fdio_service_connect_at does not return an error if connection failed.
   EXPECT_EQ(ZX_OK, ConnectToService(svc_dir.channel().get(), "fuchsia.test.NotExists"));
   RunLoopUntilIdle();
-  std::vector<std::pair<std::string, int>> connection_ctr_vec;
-  for (const auto& e : connection_ctr_) {
-    connection_ctr_vec.push_back(e);
-  }
-  EXPECT_THAT(connection_ctr_vec,
-              ::testing::ElementsAre(StringIntPair(kService1, 1), StringIntPair(kService2, 1)));
+  EXPECT_THAT(connection_ctr_,
+              testing::ElementsAre(StringIntPair(kService1, 1), StringIntPair(kService2, 1)));
 }
 
 TEST_F(NamespaceProviderTest, AdditionalServices) {
   static constexpr char kService1[] = "fuchsia.test.TestService1";
   static constexpr char kService2[] = "fuchsia.test.TestService2";
   ServiceListPtr service_list(new ServiceList);
-  ServiceProviderPtr service_provider;
   service_list->names.push_back(kService1);
   service_list->names.push_back(kService2);
   EXPECT_EQ(ZX_OK, AddService(kService1));
@@ -229,12 +216,8 @@ TEST_F(NamespaceProviderTest, AdditionalServices) {
   // fdio_service_connect_at does not return an error if connection failed.
   EXPECT_EQ(ZX_OK, ConnectToService(svc_dir.channel().get(), "fuchsia.test.NotExists"));
   RunLoopUntilIdle();
-  std::vector<std::pair<std::string, int>> connection_ctr_vec;
-  for (const auto& e : connection_ctr_) {
-    connection_ctr_vec.push_back(e);
-  }
-  EXPECT_THAT(connection_ctr_vec,
-              ::testing::ElementsAre(StringIntPair(kService1, 1), StringIntPair(kService2, 2)));
+  EXPECT_THAT(connection_ctr_,
+              testing::ElementsAre(StringIntPair(kService1, 1), StringIntPair(kService2, 2)));
 }
 
 // test that service is connected even when namespace dies right after connect request.
@@ -246,7 +229,6 @@ TEST_F(NamespaceHostDirectoryTest, AdditionalServices_NsDies) {
   service_list->names.push_back(kService2);
   AddService(kService1);
   AddService(kService2);
-  ServiceProviderPtr service_provider;
   service_list->host_directory = OpenAsDirectory();
   auto ns = MakeNamespace(std::move(service_list));
 
@@ -258,18 +240,13 @@ TEST_F(NamespaceHostDirectoryTest, AdditionalServices_NsDies) {
   EXPECT_EQ(ZX_OK, ConnectToService(svc_dir.channel().get(), "fuchsia.test.NotExists"));
   ns.Kill();
   RunLoopUntilIdle();
-  std::vector<std::pair<std::string, int>> connection_ctr_vec;
-  for (const auto& e : connection_ctr_) {
-    connection_ctr_vec.push_back(e);
-  }
-  EXPECT_THAT(connection_ctr_vec,
-              ::testing::ElementsAre(StringIntPair(kService1, 1), StringIntPair(kService2, 2)));
+  EXPECT_THAT(connection_ctr_,
+              testing::ElementsAre(StringIntPair(kService1, 1), StringIntPair(kService2, 2)));
+  // we should not see anymore processed connection requests.
   connection_ctr_.clear();
-  EXPECT_EQ(ZX_OK, ConnectToService(svc_dir.channel().get(),
-                                    kService1));  // cannot make anymore connections
+  EXPECT_EQ(ZX_OK, ConnectToService(svc_dir.channel().get(), kService1));
   RunLoopUntilIdle();
-  // we should not see anymore processed conenction requests.
-  EXPECT_EQ(0u, connection_ctr_.size());
+  EXPECT_THAT(connection_ctr_, testing::IsEmpty());
 }
 
 // test that service in parent is connected even when namespace dies right after connect request.
@@ -294,12 +271,8 @@ TEST_F(NamespaceHostDirectoryTest, AdditionalServices_InheritParent_nsDies) {
   EXPECT_EQ(ZX_OK, ConnectToService(svc_dir.channel().get(), "fuchsia.test.NotExists"));
   ns.Kill();
   RunLoopUntilIdle();
-  std::vector<std::pair<std::string, int>> connection_ctr_vec;
-  for (const auto& e : connection_ctr_) {
-    connection_ctr_vec.push_back(e);
-  }
-  EXPECT_THAT(connection_ctr_vec,
-              ::testing::ElementsAre(StringIntPair(kService1, 1), StringIntPair(kService2, 1)));
+  EXPECT_THAT(connection_ctr_,
+              testing::ElementsAre(StringIntPair(kService1, 1), StringIntPair(kService2, 1)));
 }
 
 }  // namespace
