@@ -485,10 +485,15 @@ TEST_F(MultipleDeviceTestCase, PowerManagerRegistration) {
 
   ASSERT_OK(fidl::BindSingleInFlightOnly(coordinator_loop()->dispatcher(),
                                          std::move(power_endpoints->server), &mock_power_manager));
-  coordinator().RegisterWithPowerManager(
-      std::move(power_endpoints->client), std::move(endpoints->client),
-      std::move(dev_endpoints->client), [](zx_status_t status) { ASSERT_OK(status); });
-  mock_power_manager.wait_until_register_called();
+
+  sync_completion_t register_called;
+  coordinator().RegisterWithPowerManager(std::move(power_endpoints->client),
+                                         std::move(endpoints->client),
+                                         std::move(dev_endpoints->client), [&](zx_status_t status) {
+                                           ASSERT_OK(status);
+                                           sync_completion_signal(&register_called);
+                                         });
+  sync_completion_wait(&register_called, ZX_TIME_INFINITE);
 }
 
 // This functor accepts a |fidl::WireUnownedResult<FidlMethod>&| and checks that

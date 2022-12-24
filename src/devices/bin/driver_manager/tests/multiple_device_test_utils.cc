@@ -273,10 +273,8 @@ void MultipleDeviceTestCase::SetUp() {
 
 void MultipleDeviceTestCase::TearDown() {
   // Stop any threads, so we're serialized here.
-  if (coordinator_loop_thread_running_) {
-    coordinator_loop_.Quit();
-    coordinator_loop_.JoinThreads();
-    coordinator_loop_.ResetQuit();
+  if (coordinator_loop_thread_running()) {
+    coordinator_loop_.Shutdown();
   }
 
   coordinator_loop_.RunUntilIdle();
