@@ -8,6 +8,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <string>
 #include <thread>
@@ -199,7 +200,11 @@ int ConsoleMain(int argc, const char* argv[]) {
                         options.ids_txts, options.symbol_cache, options.symbol_servers,
                         std::move(decoder_dispatcher));
 
-    if (workflow.HasSymbolServers()) {
+    {
+      // EnqueueStartup is called when the last reference to |start| is dropped, i.e., when all
+      // symbol servers are either ready or unreachable.
+      auto start = std::make_shared<fit::deferred_callback>(
+          [&workflow, &options, &params]() { EnqueueStartup(&workflow, options, params); });
       for (const auto& server : workflow.GetSymbolServers()) {
         // The first time we connect to a server, we have to provide an authentication.
         // After that, the key is cached.
@@ -207,24 +212,16 @@ int ConsoleMain(int argc, const char* argv[]) {
           workflow.AuthenticateServer(server);
         }
         fit::callback<void(zxdb::SymbolServer*, zxdb::SymbolServer::State)> state_change_callback =
-            [&workflow, &options, &params](zxdb::SymbolServer* server,
-                                           zxdb::SymbolServer::State state) {
+            [&workflow, start](zxdb::SymbolServer* server,
+                               zxdb::SymbolServer::State state) mutable {
               if (state == zxdb::SymbolServer::State::kAuth) {
                 workflow.AuthenticateServer(server);
               } else if (state == zxdb::SymbolServer::State::kUnreachable) {
-                FX_LOGS(ERROR) << "Can't connect to symbol server";
+                FX_LOGS(ERROR) << "Can't connect to symbol server " << server->name();
+                start.reset();
               } else if (state == zxdb::SymbolServer::State::kReady) {
                 FX_LOGS(INFO) << "Connected to symbol server " << server->name();
-                bool ready = true;
-                for (const auto& server : workflow.GetSymbolServers()) {
-                  if (server->state() != zxdb::SymbolServer::State::kReady) {
-                    ready = false;
-                  }
-                }
-                if (ready) {
-                  // Now all the symbol servers are ready. We can start fidlcat work.
-                  EnqueueStartup(&workflow, options, params);
-                }
+                start.reset();
               }
             };
         // The state_change_callback will not be called if the state is already kReady.
@@ -236,9 +233,6 @@ int ConsoleMain(int argc, const char* argv[]) {
           server->set_state_change_callback(std::move(state_change_callback));
         }
       }
-    } else {
-      // No symbol server => directly start monitoring.
-      EnqueueStartup(&workflow, options, params);
     }
 
     workflow_.store(&workflow);
