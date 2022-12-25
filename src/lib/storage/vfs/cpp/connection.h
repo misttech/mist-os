@@ -30,11 +30,8 @@
 
 namespace fs {
 
-constexpr zx_signals_t kLocalTeardownSignal = ZX_USER_SIGNAL_1;
-
 namespace internal {
 
-class FidlTransaction;
 class Binding;
 
 // Perform basic flags sanitization.
@@ -68,38 +65,24 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   // destroyed on the wait handler's dispatch thread to prevent a race.
   virtual ~Connection();
 
-  // Sets a signal on the channel which causes the dispatcher to asynchronously close, tear down,
-  // and unregister this connection from the Vfs object.
-  void AsyncTeardown();
+  // Triggers asynchronous closure of the receiver.
+  void Unbind();
 
-  // Explicitly teardown and close the connection synchronously, unregistering it from the Vfs
-  // object.
-  void SyncTeardown();
+  using OnUnbound = fit::function<void(Connection*)>;
 
   // Begins waiting for messages on the channel. |channel| is the channel on which the FIDL protocol
   // will be served.
   //
   // Before calling this function, the connection ownership must be transferred to the Vfs through
   // |RegisterConnection|. Cannot be called more than once in the lifetime of the connection.
-  zx_status_t StartDispatching(zx::channel channel);
-
-  // Drains one FIDL message from the channel and handles it. This should only be called when new
-  // messages arrive on the channel. In practice, this implies it should be used by a |Binding|.
-  // Returns if the handling succeeded. In event of failure, the caller should synchronously
-  // teardown the connection.
-  bool OnMessage();
-
-  // For AdvisoryLocking - the KOID of the incoming FIDL channel acts as the identifier
-  // (or owner) for the remote file or directory.
-  zx_koid_t GetChannelOwnerKoid();
+  void StartDispatching(zx::channel channel, OnUnbound on_unbound);
 
   fbl::RefPtr<fs::Vnode>& vnode() { return vnode_; }
 
   zx::result<VnodeRepresentation> GetNodeRepresentation() { return NodeDescribe(); }
 
  protected:
-  virtual void Dispatch(fidl::IncomingHeaderAndMessage&&, fidl::Transaction*) = 0;
-
+  virtual std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) = 0;
   // Create a connection bound to a particular vnode.
   //
   // The VFS will be notified when remote side closes the connection.
@@ -123,8 +106,6 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   FuchsiaVfs* vfs() const { return vfs_; }
 
   zx::event& token() { return token_; }
-
-  virtual void OnTeardown() {}
 
   // Flags which can be modified by SetFlags.
   constexpr static fuchsia_io::wire::OpenFlags kSettableStatusFlags =
@@ -160,9 +141,6 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
 
   bool vnode_is_open_;
 
-  // If we have received a |Node.Close| call on this connection.
-  bool closing_ = false;
-
   // The Vfs instance which owns this connection. Connections must not outlive the Vfs, hence this
   // borrowing is safe.
   fs::FuchsiaVfs* const vfs_;
@@ -170,7 +148,7 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   fbl::RefPtr<fs::Vnode> vnode_;
 
   // State related to FIDL message dispatching. See |Binding|.
-  std::shared_ptr<Binding> binding_;
+  std::unique_ptr<Binding> binding_;
 
   // The operational protocol that is used to interact with the vnode over this connection. It
   // provides finer grained information than the FIDL protocol, e.g. both a regular file and a
@@ -189,49 +167,25 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   zx::event token_ = {};
 };
 
-// |Binding| contains state related to FIDL message dispatching. After starting FIDL message
-// dispatching, each |Connection| maintains one corresponding binding instance in |binding_|. When
-// processing an in-flight request, the binding is borrowed via a |std::weak_ptr| by the in-flight
-// transaction, and no more message dispatching will happen until the transaction goes out of scope,
-// when binding is again exclusively owned by the connection.
-//
-// This object contains an |async::WaitMethod| struct to wait for signals.
-class Binding final {
+class Binding {
  public:
-  Binding(Connection& connection, async_dispatcher_t* dispatcher, zx::channel channel);
-  ~Binding();
+  virtual ~Binding() = default;
 
-  Binding(const Binding&) = delete;
-  Binding& operator=(const Binding&) = delete;
-  Binding(Binding&&) = delete;
-  Binding& operator=(Binding&&) = delete;
+  virtual void Unbind() = 0;
+  virtual void Close(zx_status_t) = 0;
+};
 
-  // Begins waiting for messages on the channel.
-  zx_status_t StartDispatching();
-
-  // Stops waiting for messages on the channel.
-  void CancelDispatching();
-
-  void AsyncTeardown();
-
-  zx::channel& channel() { return channel_; }
+template <typename Protocol>
+class TypedBinding : public Binding {
+ public:
+  explicit TypedBinding(fidl::ServerBindingRef<Protocol> binding) : binding(binding) {}
+  ~TypedBinding() override { binding.Unbind(); }
 
  private:
-  // Callback for when new signals arrive on the channel, which could be: readable, peer closed,
-  // async teardown request, etc.
-  void HandleSignals(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
-                     const zx_packet_signal_t* signal);
+  void Unbind() override { return binding.Unbind(); }
+  void Close(zx_status_t epitaph) override { return binding.Close(epitaph); }
 
-  async::WaitMethod<Binding, &Binding::HandleSignals> wait_;
-
-  // The connection which owns this binding.
-  Connection& connection_;
-
-  // The dispatcher for reading messages and handling FIDL requests.
-  async_dispatcher_t* dispatcher_;
-
-  // Channel on which the connection is being served.
-  zx::channel channel_;
+  fidl::ServerBindingRef<Protocol> binding;
 };
 
 }  // namespace internal

@@ -23,16 +23,13 @@ class DirectoryConnection final : public Connection,
  public:
   // Refer to documentation for |Connection::Connection|.
   DirectoryConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol,
-                      VnodeConnectionOptions options);
+                      VnodeConnectionOptions options, zx_koid_t koid);
 
-  ~DirectoryConnection() final = default;
-
- protected:
-  void Dispatch(fidl::IncomingHeaderAndMessage&&, fidl::Transaction*) override;
-
-  void OnTeardown() override;
+  ~DirectoryConnection() final;
 
  private:
+  std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) override;
+
   //
   // |fuchsia.io/Node| operations.
   //
@@ -71,6 +68,8 @@ class DirectoryConnection final : public Connection,
 
   // Directory cookie for readdir operations.
   fs::VdirCookie dircookie_;
+
+  const zx_koid_t koid_;
 };
 
 }  // namespace internal
