@@ -14,4 +14,6 @@ bazel_top_dir =
 bazel_launcher = bazel_top_dir + "/bazel"
 
 # Location of the Bazel workspace, relative to the source root.
+# LINT.IfChange
 bazel_workspace_dir = bazel_top_dir + "/workspace"
+# LINT.ThenChange(/tools/devshell/get-workspace-dir)
