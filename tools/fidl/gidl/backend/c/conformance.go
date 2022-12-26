@@ -37,10 +37,10 @@ type encodeSuccessCase struct {
 }
 
 type decodeSuccessCase struct {
-	Name, HandleDefs, HandleKoidVectorName, ValueBuild, ValueVar, ValueType string
-	Equality                                                                llcpp.EqualityCheck
-	Bytes, Handles, WireFormatVersion                                       string
-	FuchsiaOnly                                                             bool
+	Name, HandleDefs, HandleKoidVectorName, ValueType string
+	Equality                                          llcpp.EqualityCheck
+	Bytes, Handles, WireFormatVersion                 string
+	FuchsiaOnly                                       bool
 }
 
 type decodeFailureCase struct {
@@ -116,7 +116,6 @@ func decodeSuccessCases(gidlDecodeSuccesses []ir.DecodeSuccess, schema mixer.Sch
 			continue
 		}
 		handleDefs := hlcpp.BuildHandleInfoDefs(decodeSuccess.HandleDefs)
-		valueBuild, valueVar := llcpp.BuildValueAllocator("allocator", decodeSuccess.Value, decl, llcpp.HandleReprInfo)
 		equalityInputVar := "actual"
 		handleKoidVectorName := "handle_koids"
 		equality := llcpp.BuildEqualityCheck(equalityInputVar, decodeSuccess.Value, decl, handleKoidVectorName)
@@ -129,8 +128,6 @@ func decodeSuccessCases(gidlDecodeSuccesses []ir.DecodeSuccess, schema mixer.Sch
 				Name:                 testCaseName(decodeSuccess.Name, encoding.WireFormat),
 				HandleDefs:           handleDefs,
 				HandleKoidVectorName: handleKoidVectorName,
-				ValueBuild:           valueBuild,
-				ValueVar:             valueVar,
 				ValueType:            llcpp.ConformanceType(ir.TypeFromValue(decodeSuccess.Value)),
 				Equality:             equality,
 				Bytes:                hlcpp.BuildBytes(encoding.Bytes),

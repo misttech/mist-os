@@ -54,31 +54,25 @@ TEST(C_Conformance, {{ .Name }}_Decode) {
     {{ .HandleKoidVectorName }}.push_back(info.koid);
   }
   {{- end }}
-  [[maybe_unused]] fidl::Arena<ZX_CHANNEL_MAX_MSG_BYTES> allocator;
-  {{ .ValueBuild }}
   std::vector<uint8_t> bytes = {{ .Bytes }};
   std::vector<zx_handle_info_t> handles = {{ .Handles }};
-  auto obj = {{ .ValueVar }};
   auto equality_check = [&](void* raw_actual_value) -> bool {
     {{ .ValueType }}& {{ .Equality.InputVar }} = *static_cast<{{ .ValueType }}*>(raw_actual_value);
     {{ .Equality.HelperStatements }}
     return {{ .Equality.Expr }};
   };
   EXPECT_TRUE(c_conformance_utils::DecodeSuccess(
-    {{ .WireFormatVersion }}, fidl::DeprecatedCTypeTraits<decltype(obj)>::kType, std::move(bytes), std::move(handles), equality_check));
+    {{ .WireFormatVersion }}, fidl::DeprecatedCTypeTraits<{{ .ValueType }}>::kType, std::move(bytes), std::move(handles), equality_check));
 }
 
 TEST(C_Conformance, {{ .Name }}_Validate) {
   {{- if .HandleDefs }}
   const std::vector<zx_handle_info_t> handle_defs = {{ .HandleDefs }};
   {{- end }}
-  [[maybe_unused]] fidl::Arena<ZX_CHANNEL_MAX_MSG_BYTES> allocator;
-  {{ .ValueBuild }}
   std::vector<uint8_t> bytes = {{ .Bytes }};
   std::vector<zx_handle_info_t> handles = {{ .Handles }};
-  auto obj = {{ .ValueVar }};
   EXPECT_TRUE(c_conformance_utils::ValidateSuccess(
-    {{ .WireFormatVersion }}, fidl::DeprecatedCTypeTraits<decltype(obj)>::kType, std::move(bytes), handles));
+    {{ .WireFormatVersion }}, fidl::DeprecatedCTypeTraits<{{ .ValueType }}>::kType, std::move(bytes), handles));
 }
 {{- if .FuchsiaOnly }}
 #endif  // __Fuchsia__
