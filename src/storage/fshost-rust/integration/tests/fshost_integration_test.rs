@@ -55,26 +55,30 @@ const DATA_MAX_BYTES: u64 = 109876543;
 
 fn data_fs_type() -> u32 {
     match DATA_FILESYSTEM_FORMAT {
-        "f2fs" => VFS_TYPE_F2FS,
+        "f2fs" | "f2fs-no-zxcrypt" => VFS_TYPE_F2FS,
         "fxfs" | "fxfs-legacy-crypto" => VFS_TYPE_FXFS,
-        "minfs" => VFS_TYPE_MINFS,
+        "minfs" | "minfs-no-zxcrypt" => VFS_TYPE_MINFS,
         _ => panic!("invalid data filesystem format"),
     }
 }
 
 fn data_fs_name() -> &'static str {
     match DATA_FILESYSTEM_FORMAT {
-        "f2fs" => "f2fs",
+        "f2fs" | "f2fs-no-zxcrypt" => "f2fs",
         "fxfs" | "fxfs-legacy-crypto" => "fxfs",
-        "minfs" => "minfs",
+        "minfs" | "minfs-no-zxcrypt" => "minfs",
         _ => panic!("invalid data filesystem format"),
     }
+}
+
+fn data_fs_zxcrypt() -> bool {
+    !DATA_FILESYSTEM_FORMAT.ends_with("no-zxcrypt")
 }
 
 fn data_fs_spec() -> DataSpec {
     DataSpec {
         format: Some(data_fs_name()),
-        zxcrypt: true,
+        zxcrypt: data_fs_zxcrypt(),
         legacy_crypto_format: DATA_FILESYSTEM_FORMAT == "fxfs-legacy-crypto",
     }
 }
@@ -171,36 +175,13 @@ async fn data_formatted_with_small_initial_volume_big_target() {
 #[fuchsia::test]
 async fn data_mounted_legacy_crypto_format() {
     let mut builder = new_builder();
+    // fshost should be able to handle the data partition using legacy crypto no matter what it's
+    // configured for.
     builder.with_disk().format_data(DataSpec { legacy_crypto_format: true, ..data_fs_spec() });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
     fixture.check_test_data_file().await;
-
-    fixture.tear_down().await;
-}
-
-#[fuchsia::test]
-async fn data_mounted_no_zxcrypt() {
-    let mut builder = new_builder();
-    builder.fshost().set_no_zxcrypt();
-    builder.with_disk().format_data(DataSpec { zxcrypt: false, ..data_fs_spec() });
-    let fixture = builder.build().await;
-
-    fixture.check_fs_type("data", data_fs_type()).await;
-    fixture.check_test_data_file().await;
-
-    fixture.tear_down().await;
-}
-
-#[fuchsia::test]
-async fn data_formatted_no_zxcrypt() {
-    let mut builder = new_builder();
-    builder.fshost().set_no_zxcrypt();
-    builder.with_disk();
-    let fixture = builder.build().await;
-
-    fixture.check_fs_type("data", data_fs_type()).await;
 
     fixture.tear_down().await;
 }
@@ -258,7 +239,7 @@ async fn ramdisk_data_ignores_non_ramdisk() {
     .await
     .unwrap();
 
-    if data_fs_name() != "fxfs" {
+    if data_fs_name() != "fxfs" && data_fs_zxcrypt() {
         device_watcher::wait_for_device_with(&dev, |info| {
             info.topological_path
                 .ends_with("fvm/data-p-2/block/zxcrypt/unsealed/block")

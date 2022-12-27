@@ -213,7 +213,7 @@ impl Disk {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct DataSpec {
     pub format: Option<&'static str>,
     pub zxcrypt: bool,
@@ -253,6 +253,7 @@ impl DiskBuilder {
     }
 
     pub fn format_data(&mut self, data_spec: DataSpec) -> &mut Self {
+        tracing::info!(?data_spec, "formatting data volume");
         assert!(self.format_fvm);
         self.data_spec = data_spec;
         self

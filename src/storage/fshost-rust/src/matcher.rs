@@ -102,7 +102,7 @@ impl Matchers {
                     "/fvm",
                     None,
                 ));
-                if config.data_filesystem_format != "fxfs" {
+                if config.data_filesystem_format != "fxfs" && !config.no_zxcrypt {
                     non_ramdisk_fvm_matcher.child_matchers.push(Box::new(ZxcryptMatcher::new()));
                 }
                 matchers.push(non_ramdisk_fvm_matcher);

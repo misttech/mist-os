@@ -733,7 +733,7 @@ BlockDeviceManager::BlockDeviceManager(const fshost_config::Config* config,
                                                               /*allow_multiple=*/false, "/fvm",
                                                               /*ramdisk_required=*/false);
 
-      if (config_.data_filesystem_format() != "fxfs") {
+      if (config_.data_filesystem_format() != "fxfs" && !config_.no_zxcrypt()) {
         // For filesystems which we expect to be inside zxcrypt, add a matcher to unwrap zxcrypt.
         // This matcher will format the partition as zxcrypt if it's not present.
         matchers_.push_back(std::make_unique<DataPartitionMatcher>(

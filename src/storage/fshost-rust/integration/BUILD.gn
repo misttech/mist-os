@@ -49,6 +49,7 @@ rustc_library("fshost_test_fixture") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:gpt",
+    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:uuid",
     "//third_party/rust_crates:zerocopy",
     "//third_party/rust_crates:zstd",
@@ -192,6 +193,26 @@ template("fshost_integration_test_suite") {
     options.data_filesystem_format = "fxfs"
   }
   fshost_integration_tests += [ ":$fshost_integration_fxfs_legacy_label" ]
+
+  fshost_integration_minfs_no_zxcrypt_label = "${target_name}_minfs_no_zxcrypt"
+  fshost_integration_test(fshost_integration_minfs_no_zxcrypt_label) {
+    data_filesystem_format = "minfs-no-zxcrypt"
+    use_rust_port = invoker.use_rust_port
+    options = default_integration_test_options
+    options.no_zxcrypt = true
+    options.data_filesystem_format = "minfs"
+  }
+  fshost_integration_tests += [ ":$fshost_integration_minfs_no_zxcrypt_label" ]
+
+  fshost_integration_f2fs_no_zxcrypt_label = "${target_name}_f2fs_no_zxcrypt"
+  fshost_integration_test(fshost_integration_f2fs_no_zxcrypt_label) {
+    data_filesystem_format = "f2fs-no-zxcrypt"
+    use_rust_port = invoker.use_rust_port
+    options = default_integration_test_options
+    options.no_zxcrypt = true
+    options.data_filesystem_format = "f2fs"
+  }
+  fshost_integration_tests += [ ":$fshost_integration_f2fs_no_zxcrypt_label" ]
 
   fuchsia_test_package(target_name) {
     # Currently required because the data_formatted test causes Fxfs to log:

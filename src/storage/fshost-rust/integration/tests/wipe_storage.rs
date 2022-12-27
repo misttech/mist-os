@@ -6,7 +6,7 @@
 //! among other things, sets the fvm_ramdisk flag to prevent binding of the on-disk filesystems.)
 
 use {
-    crate::{data_fs_name, data_fs_spec, new_builder},
+    crate::{data_fs_name, data_fs_spec, data_fs_zxcrypt, new_builder},
     device_watcher::recursive_wait_and_open_node,
     fidl::endpoints::{create_proxy, Proxy as _},
     fidl_fuchsia_fshost as fshost,
@@ -55,7 +55,7 @@ async fn wait_for_block_watcher(fixture: &TestFixture, has_formatted_fvm: bool) 
         recursive_wait_and_open_node(&dev_root, &blobfs_path).await.unwrap();
         let data_path = format!("{}/fvm/data-p-2/block", gpt_path);
         recursive_wait_and_open_node(&dev_root, &data_path).await.unwrap();
-        if data_fs_name() != "fxfs" {
+        if data_fs_name() != "fxfs" && data_fs_zxcrypt() {
             let zxcrypt_path = format!("{}/zxcrypt/unsealed/block", data_path);
             recursive_wait_and_open_node(&dev_root, &zxcrypt_path).await.unwrap();
         }
