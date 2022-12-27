@@ -51,7 +51,7 @@ use {
             ObjectStore, StoreObjectHandle, INVALID_OBJECT_ID,
         },
         range::RangeExt,
-        round::{round_down, round_up},
+        round::{round_div, round_down, round_up},
         serialized_types::{Migrate, Version, Versioned, LATEST_VERSION},
         trace_duration,
     },
@@ -1438,6 +1438,47 @@ impl Journal {
         }
     }
 
+    /// Creates a lazy inspect node named `str` under `parent` which will yield statistics for the
+    /// journal when queried.
+    pub fn track_statistics(self: &Arc<Self>, parent: &fuchsia_inspect::Node, name: &str) {
+        let this = Arc::downgrade(self);
+        parent.record_lazy_child(name, move || {
+            let this_clone = this.clone();
+            async move {
+                let inspector = fuchsia_inspect::Inspector::new();
+                if let Some(this) = this_clone.upgrade() {
+                    let (journal_min, journal_max, journal_reclaim_size) = {
+                        // TODO(fxbug.dev/118342): Push-back or rate-limit to prevent DoS.
+                        let inner = this.inner.lock().unwrap();
+                        (
+                            round_down(
+                                inner.super_block_header.journal_checkpoint.file_offset,
+                                BLOCK_SIZE,
+                            ),
+                            inner.flushed_offset,
+                            inner.reclaim_size,
+                        )
+                    };
+                    let root = inspector.root();
+                    root.record_uint("journal_min_offset", journal_min);
+                    root.record_uint("journal_max_offset", journal_max);
+                    root.record_uint("journal_size", journal_max - journal_min);
+                    root.record_uint("journal_reclaim_size", journal_reclaim_size);
+
+                    // TODO(fxbug.dev/117057): Post-compute rather than manually computing metrics.
+                    if let Some(x) = round_div(
+                        100 * (journal_max - journal_min),
+                        this.objects.allocator().get_disk_bytes(),
+                    ) {
+                        root.record_uint("journal_size_to_disk_size_percent", x);
+                    }
+                }
+                Ok(inspector)
+            }
+            .boxed()
+        });
+    }
+
     /// Terminate all journal activity.
     pub fn terminate(&self) {
         self.inner.lock().unwrap().terminate();
@@ -1663,7 +1704,7 @@ mod fuzz {
     #[fuzz]
     fn fuzz_journal_bytes(input: Vec<u8>) {
         use {
-            crate::filesystem::FxFilesystem,
+            crate::filesystem::{Filesystem as _, FxFilesystem},
             fuchsia_async as fasync,
             std::io::Write,
             storage_device::{fake_device::FakeDevice, DeviceHolder},
@@ -1685,7 +1726,7 @@ mod fuzz {
     #[fuzz]
     fn fuzz_journal(input: Vec<super::JournalRecord>) {
         use {
-            crate::filesystem::FxFilesystem,
+            crate::filesystem::{Filesystem as _, FxFilesystem},
             fuchsia_async as fasync,
             storage_device::{fake_device::FakeDevice, DeviceHolder},
         };

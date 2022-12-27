@@ -112,7 +112,7 @@ pub trait Filesystem: TransactionHandler {
     fn object_manager(&self) -> &Arc<ObjectManager>;
 
     /// Returns the journal for the filesystem.
-    fn journal(&self) -> &Journal;
+    fn journal(&self) -> &Arc<Journal>;
 
     /// Flushes buffered data to the underlying device.
     async fn sync(&self, options: SyncOptions<'_>) -> Result<(), Error>;
@@ -249,7 +249,7 @@ pub struct FxFilesystem {
     device: OnceCell<DeviceHolder>,
     block_size: u64,
     objects: Arc<ObjectManager>,
-    journal: Journal,
+    journal: Arc<Journal>,
     commit_mutex: futures::lock::Mutex<()>,
     lock_manager: LockManager,
     flush_task: Mutex<Option<fasync::Task<()>>>,
@@ -299,7 +299,7 @@ impl OpenOptions {
 impl FxFilesystem {
     pub async fn new_empty(device: DeviceHolder) -> Result<OpenFxFilesystem, Error> {
         let objects = Arc::new(ObjectManager::new(None));
-        let journal = Journal::new(objects.clone(), JournalOptions::default());
+        let journal = Arc::new(Journal::new(objects.clone(), JournalOptions::default()));
         let block_size = std::cmp::max(device.block_size().into(), MIN_BLOCK_SIZE);
         assert_eq!(block_size % MIN_BLOCK_SIZE, 0);
         let filesystem = Arc::new(FxFilesystem {
@@ -362,7 +362,7 @@ impl FxFilesystem {
                 Some(Box::new(move || instance.clone().run().boxed()));
         }
 
-        let journal = Journal::new(objects.clone(), options.journal_options);
+        let journal = Arc::new(Journal::new(objects.clone(), options.journal_options));
         let block_size = std::cmp::max(device.block_size().into(), MIN_BLOCK_SIZE);
         assert_eq!(block_size % MIN_BLOCK_SIZE, 0);
         let read_only = filesystem_options.read_only;
@@ -497,10 +497,6 @@ impl FxFilesystem {
         Ok((metadata_reservation, options.allocator_reservation, hold))
     }
 
-    pub fn journal(&self) -> &Journal {
-        &self.journal
-    }
-
     async fn add_transaction(&self, skip_journal_checks: bool) {
         if skip_journal_checks {
             self.in_flight_transactions.fetch_add(1, Ordering::Relaxed);
@@ -566,7 +562,7 @@ impl Filesystem for FxFilesystem {
         &self.objects
     }
 
-    fn journal(&self) -> &Journal {
+    fn journal(&self) -> &Arc<Journal> {
         &self.journal
     }
 

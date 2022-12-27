@@ -28,7 +28,7 @@ use {
             tree, CachingObjectHandle, HandleOptions, ObjectStore,
         },
         range::RangeExt,
-        round::round_down,
+        round::{round_div, round_down},
         serialized_types::{
             Migrate, Version, Versioned, VersionedLatest, DEFAULT_MAX_SERIALIZED_RECORD_SIZE,
         },
@@ -40,7 +40,6 @@ use {
     fuchsia_inspect::ArrayProperty,
     futures::FutureExt,
     merge::{filter_marked_for_deletion, filter_tombstones, merge},
-    once_cell::sync::OnceCell,
     serde::{Deserialize, Serialize},
     std::{
         borrow::Borrow,
@@ -125,6 +124,9 @@ pub trait Allocator: ReservationOwner {
 
     /// Returns the total number of allocated bytes.
     fn get_allocated_bytes(&self) -> u64;
+
+    /// Returns the size of bytes available to allocate.
+    fn get_disk_bytes(&self) -> u64;
 
     /// Returns the total number of allocated bytes per owner_object_id.
     /// Note that this is quite an expensive operation as it copies the collection.
@@ -428,9 +430,6 @@ pub struct SimpleAllocator {
     reserved_allocations: Arc<SkipListLayer<AllocatorKey, AllocatorValue>>,
     inner: Mutex<Inner>,
     allocation_mutex: futures::lock::Mutex<()>,
-    // While the allocator is being tracked, the node is retained here.  See
-    // `Self::track_statistics`.
-    tracking: OnceCell<fuchsia_inspect::LazyNode>,
     counters: Mutex<SimpleAllocatorCounters>,
 }
 
@@ -606,7 +605,6 @@ impl SimpleAllocator {
                 committed_marked_for_deletion: BTreeMap::new(),
             }),
             allocation_mutex: futures::lock::Mutex::new(()),
-            tracking: OnceCell::new(),
             counters: Mutex::new(SimpleAllocatorCounters::default()),
         }
     }
@@ -802,7 +800,7 @@ impl SimpleAllocator {
     /// allocator when queried.
     pub fn track_statistics(self: &Arc<Self>, parent: &fuchsia_inspect::Node, name: &str) {
         let this = Arc::downgrade(self);
-        let _ = self.tracking.set(parent.create_lazy_child(name, move || {
+        parent.record_lazy_child(name, move || {
             let this_clone = this.clone();
             async move {
                 let inspector = fuchsia_inspect::Inspector::new();
@@ -811,13 +809,36 @@ impl SimpleAllocator {
                     let root = inspector.root();
                     root.record_uint("max_extent_size_bytes", this.max_extent_size_bytes);
                     root.record_uint("bytes_total", this.device_size);
-                    {
+                    let (allocated, reserved, used, unavailable) = {
+                        // TODO(fxbug.dev/118342): Push-back or rate-limit to prevent DoS.
                         let inner = this.inner.lock().unwrap();
-                        root.record_int("bytes_allocated", inner.allocated_bytes());
-                        root.record_uint("bytes_reserved", inner.reserved_bytes());
-                        root.record_uint("bytes_used", inner.used_bytes());
-                        root.record_uint("bytes_unavailable", inner.unavailable_bytes());
+                        (
+                            inner.allocated_bytes().try_into().unwrap_or(0u64),
+                            inner.reserved_bytes(),
+                            inner.used_bytes(),
+                            inner.unavailable_bytes(),
+                        )
+                    };
+                    root.record_uint("bytes_allocated", allocated);
+                    root.record_uint("bytes_reserved", reserved);
+                    root.record_uint("bytes_used", used);
+                    root.record_uint("bytes_unavailable", unavailable);
+
+                    // TODO(fxbug.dev/117057): Post-compute rather than manually computing
+                    // metrics.
+                    if let Some(x) = round_div(100 * allocated, this.device_size) {
+                        root.record_uint("bytes_allocated_percent", x);
                     }
+                    if let Some(x) = round_div(100 * reserved, this.device_size) {
+                        root.record_uint("bytes_reserved_percent", x);
+                    }
+                    if let Some(x) = round_div(100 * used, this.device_size) {
+                        root.record_uint("bytes_used_percent", x);
+                    }
+                    if let Some(x) = round_div(100 * unavailable, this.device_size) {
+                        root.record_uint("bytes_unavailable_percent", x);
+                    }
+
                     root.record_uint("num_flushes", counters.num_flushes);
                     if let Some(last_flush_time) = counters.last_flush_time.as_ref() {
                         root.record_uint(
@@ -842,7 +863,7 @@ impl SimpleAllocator {
                 Ok(inspector)
             }
             .boxed()
-        }));
+        });
     }
 }
 
@@ -1249,6 +1270,10 @@ impl Allocator for SimpleAllocator {
 
     fn get_allocated_bytes(&self) -> u64 {
         self.inner.lock().unwrap().allocated_bytes() as u64
+    }
+
+    fn get_disk_bytes(&self) -> u64 {
+        self.device_size
     }
 
     fn get_owner_allocated_bytes(&self) -> BTreeMap<u64, i64> {

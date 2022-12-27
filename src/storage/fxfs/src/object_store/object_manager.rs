@@ -20,6 +20,7 @@ use {
             volume::{list_volumes, VOLUMES_DIRECTORY},
             LastObjectId, LockState, ObjectDescriptor, ObjectStore,
         },
+        round::round_div,
         serialized_types::{Version, LATEST_VERSION},
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
@@ -50,9 +51,6 @@ pub struct ObjectManager {
     metadata_reservation: OnceCell<Reservation>,
     volume_directory: OnceCell<Directory<ObjectStore>>,
     on_new_store: Option<Box<dyn Fn(&ObjectStore) + Send + Sync>>,
-    // While the ObjectManager is being tracked, the node is retained here.  See
-    // `Self::track_statistics`.
-    tracking: OnceCell<fuchsia_inspect::LazyNode>,
 }
 
 // Whilst we are flushing we need to keep track of the old checkpoint that we are hoping to flush,
@@ -106,6 +104,10 @@ struct Inner {
 }
 
 impl Inner {
+    fn earliest_journal_offset(&self) -> Option<u64> {
+        self.journal_checkpoints.values().map(|c| c.earliest().file_offset).min()
+    }
+
     // Returns the required size of the metadata reservation assuming that no space has been
     // borrowed.  The invariant is: reservation-size + borrowed-space = required.
     fn required_reservation(&self) -> u64 {
@@ -114,7 +116,7 @@ impl Inner {
 
         // Account for data that has been written to the journal that will need to be written
         // to layer files when flushed.
-            + self.journal_checkpoints.values().map(|c| c.earliest().file_offset).min()
+            + self.earliest_journal_offset()
             .map(|min| reserved_space_from_journal_usage(self.last_end_offset - min))
             .unwrap_or(0)
 
@@ -142,7 +144,6 @@ impl ObjectManager {
             metadata_reservation: OnceCell::new(),
             volume_directory: OnceCell::new(),
             on_new_store,
-            tracking: OnceCell::new(),
         }
     }
 
@@ -691,27 +692,40 @@ impl ObjectManager {
     }
 
     /// Creates a lazy inspect node named `str` under `parent` which will yield statistics for the
-    /// allocator when queried.
+    /// object manager when queried.
     pub fn track_statistics(self: &Arc<Self>, parent: &fuchsia_inspect::Node, name: &str) {
         let this = Arc::downgrade(self);
-        let _ = self.tracking.set(parent.create_lazy_child(name, move || {
+        parent.record_lazy_child(name, move || {
             let this_clone = this.clone();
             async move {
                 let inspector = fuchsia_inspect::Inspector::new();
                 if let Some(this) = this_clone.upgrade() {
-                    let (required, borrowed) = {
+                    let (required, borrowed, earliest_checkpoint) = {
+                        // TODO(fxbug.dev/118342): Push-back or rate-limit to prevent DoS.
                         let inner = this.inner.read().unwrap();
-                        (inner.required_reservation(), inner.borrowed_metadata_space)
+                        (
+                            inner.required_reservation(),
+                            inner.borrowed_metadata_space,
+                            inner.earliest_journal_offset(),
+                        )
                     };
                     let root = inspector.root();
                     root.record_uint("metadata_reservation", this.metadata_reservation().amount());
                     root.record_uint("required_reservation", required);
                     root.record_uint("borrowed_reservation", borrowed);
+                    if let Some(earliest_checkpoint) = earliest_checkpoint {
+                        root.record_uint("earliest_checkpoint", earliest_checkpoint);
+                    }
+
+                    // TODO(fxbug.dev/117057): Post-compute rather than manually computing metrics.
+                    if let Some(x) = round_div(100 * borrowed, required) {
+                        root.record_uint("borrowed_to_required_reservation_percent", x);
+                    }
                 }
                 Ok(inspector)
             }
             .boxed()
-        }));
+        });
     }
 }
 

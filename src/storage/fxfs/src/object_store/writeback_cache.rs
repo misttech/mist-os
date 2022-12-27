@@ -800,6 +800,10 @@ mod tests {
             unreachable!();
         }
 
+        fn get_disk_bytes(&self) -> u64 {
+            unreachable!();
+        }
+
         fn get_owner_allocated_bytes(&self) -> BTreeMap<u64, i64> {
             unimplemented!();
         }

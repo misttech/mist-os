@@ -18,6 +18,13 @@ pub fn round_down<T: Into<u64>>(offset: u64, block_size: T) -> u64 {
     offset - offset % block_size
 }
 
+/// Computes the rounded division of `numerator` / `denominator`.
+///
+/// Returns None for an arithmetic error (overflow, or divide-by-zero).
+pub fn round_div(numerator: u64, denominator: u64) -> Option<u64> {
+    numerator.checked_add(denominator / 2)?.checked_div(denominator)
+}
+
 /// Returns how many items of a given size are needed to contain a value.
 ///
 /// TODO(https://github.com/rust-lang/rust/issues/88581): Replace with `{integer}::div_ceil()` when
@@ -35,7 +42,7 @@ pub fn how_many<T: Into<u64>>(value: u64, item_size: T) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use crate::round::how_many;
+    use crate::round::{how_many, round_div};
 
     #[test]
     fn test_how_many() {
@@ -50,5 +57,18 @@ mod tests {
         assert_eq!(how_many(17u64, 3u8), 6u64);
 
         assert_eq!(how_many(u64::MAX, 4096u32), u64::MAX / 4096 + 1);
+    }
+
+    #[test]
+    fn test_round_div() {
+        assert_eq!(round_div(9, 4), Some(2));
+        assert_eq!(round_div(10, 4), Some(3));
+        assert_eq!(round_div(11, 4), Some(3));
+        assert_eq!(round_div(12, 4), Some(3));
+        assert_eq!(round_div(13, 4), Some(3));
+        assert_eq!(round_div(14, 4), Some(4));
+        assert_eq!(round_div(0, 1), Some(0));
+        assert_eq!(round_div(100, 0), None);
+        assert_eq!(round_div(u64::MAX, 2), None);
     }
 }

@@ -59,7 +59,7 @@ use {
     anyhow::{anyhow, bail, ensure, Context, Error},
     assert_matches::assert_matches,
     async_trait::async_trait,
-    fuchsia_inspect::{ArrayProperty, LazyNode},
+    fuchsia_inspect::ArrayProperty,
     futures::FutureExt,
     once_cell::sync::OnceCell,
     scopeguard::ScopeGuard,
@@ -450,10 +450,6 @@ pub struct ObjectStore {
     // Informational counters for events occurring within the store.
     counters: Mutex<ObjectStoreCounters>,
 
-    // While the object store is being tracked, the node is retained here.  See
-    // `Self::track_statistics`.
-    tracking: OnceCell<LazyNode>,
-
     // Contains the last object ID and, optionally, a cipher to be used when generating new object
     // IDs.
     last_object_id: Mutex<LastObjectId>,
@@ -496,7 +492,6 @@ impl ObjectStore {
             lock_state: Mutex::new(lock_state),
             trace: AtomicBool::new(false),
             counters: Mutex::new(ObjectStoreCounters::default()),
-            tracking: OnceCell::new(),
             last_object_id: Mutex::new(last_object_id),
         })
     }
@@ -533,7 +528,6 @@ impl ObjectStore {
             lock_state: Mutex::new(LockState::Unencrypted),
             trace: AtomicBool::new(false),
             counters: Mutex::new(ObjectStoreCounters::default()),
-            tracking: OnceCell::new(),
             last_object_id: Mutex::new(LastObjectId::default()),
         }
     }
@@ -660,11 +654,12 @@ impl ObjectStore {
     /// object store when queried.
     pub fn track_statistics(self: &Arc<Self>, parent: &fuchsia_inspect::Node, name: &str) {
         let this = Arc::downgrade(self);
-        let _ = self.tracking.set(parent.create_lazy_child(name, move || {
+        parent.record_lazy_child(name, move || {
             let this_clone = this.clone();
             async move {
                 let inspector = fuchsia_inspect::Inspector::new();
                 if let Some(this) = this_clone.upgrade() {
+                    // TODO(fxbug.dev/118342): Push-back or rate-limit to prevent DoS.
                     let counters = this.counters.lock().unwrap();
                     let root = inspector.root();
                     root.record_string(
@@ -698,7 +693,7 @@ impl ObjectStore {
                 Ok(inspector)
             }
             .boxed()
-        }));
+        });
     }
 
     pub fn device(&self) -> &Arc<dyn Device> {

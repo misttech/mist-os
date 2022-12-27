@@ -69,7 +69,7 @@ impl Filesystem for FakeFilesystem {
         &self.object_manager
     }
 
-    fn journal(&self) -> &Journal {
+    fn journal(&self) -> &Arc<Journal> {
         unimplemented!();
     }
 

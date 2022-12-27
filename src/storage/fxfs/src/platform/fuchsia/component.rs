@@ -5,7 +5,7 @@
 use {
     crate::{
         filesystem::{
-            mkfs, Filesystem, FxFilesystem, OpenFxFilesystem, OpenOptions, MIN_BLOCK_SIZE,
+            mkfs, Filesystem as _, FxFilesystem, OpenFxFilesystem, OpenOptions, MIN_BLOCK_SIZE,
         },
         fsck,
         log::*,
@@ -317,6 +317,7 @@ impl Component {
         )?;
 
         fs.allocator().track_statistics(&*DETAIL_NODE.lock().unwrap(), "allocator");
+        fs.journal().track_statistics(&*DETAIL_NODE.lock().unwrap(), "journal");
         fs.object_manager().track_statistics(&*DETAIL_NODE.lock().unwrap(), "object_manager");
         fs.root_store().track_statistics(&*OBJECT_STORES_NODE.lock().unwrap(), "__root");
 
