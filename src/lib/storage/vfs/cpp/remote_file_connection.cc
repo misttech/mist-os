@@ -23,6 +23,7 @@
 #include <fbl/string_buffer.h>
 
 #include "src/lib/storage/vfs/cpp/debug.h"
+#include "src/lib/storage/vfs/cpp/fidl_transaction.h"
 #include "src/lib/storage/vfs/cpp/vfs_types.h"
 #include "src/lib/storage/vfs/cpp/vnode.h"
 
@@ -33,9 +34,8 @@ namespace fs {
 namespace internal {
 
 RemoteFileConnection::RemoteFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
-                                           VnodeProtocol protocol, VnodeConnectionOptions options,
-                                           zx_koid_t koid)
-    : FileConnection(vfs, std::move(vnode), protocol, options, koid) {}
+                                           VnodeProtocol protocol, VnodeConnectionOptions options)
+    : FileConnection(vfs, std::move(vnode), protocol, options) {}
 
 zx_status_t RemoteFileConnection::ReadInternal(void* data, size_t len, size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileRead] options: ", options());
@@ -174,7 +174,8 @@ zx_status_t RemoteFileConnection::SeekInternal(fuchsia_io::wire::SeekOrigin orig
     return ZX_ERR_BAD_HANDLE;
   }
   fs::VnodeAttributes attr;
-  if (zx_status_t status = vnode()->GetAttributes(&attr); status != ZX_OK) {
+  zx_status_t r;
+  if ((r = vnode()->GetAttributes(&attr)) < 0) {
     return ZX_ERR_STOP;
   }
   size_t n;

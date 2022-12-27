@@ -35,12 +35,8 @@ NodeConnection::NodeConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode
                                VnodeProtocol protocol, VnodeConnectionOptions options)
     : Connection(vfs, std::move(vnode), protocol, options) {}
 
-std::unique_ptr<Binding> NodeConnection::Bind(async_dispatcher_t* dispatcher, zx::channel channel,
-                                              OnUnbound on_unbound) {
-  return std::make_unique<TypedBinding<fio::Node>>(fidl::BindServer(
-      dispatcher, fidl::ServerEnd<fio::Node>{std::move(channel)}, this,
-      [on_unbound = std::move(on_unbound)](NodeConnection* self, fidl::UnbindInfo,
-                                           fidl::ServerEnd<fio::Node>) { on_unbound(self); }));
+void NodeConnection::Dispatch(fidl::IncomingHeaderAndMessage&& msg, fidl::Transaction* txn) {
+  fidl::WireDispatch(this, std::forward<fidl::IncomingHeaderAndMessage>(msg), txn);
 }
 
 void NodeConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {

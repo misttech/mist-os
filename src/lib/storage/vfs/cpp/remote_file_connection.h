@@ -12,6 +12,7 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 
 #include "src/lib/storage/vfs/cpp/file_connection.h"
+#include "src/lib/storage/vfs/cpp/vfs.h"
 #include "src/lib/storage/vfs/cpp/vfs_types.h"
 #include "src/lib/storage/vfs/cpp/vnode.h"
 
@@ -23,7 +24,7 @@ class RemoteFileConnection final : public FileConnection {
  public:
   // Refer to documentation for |Connection::Connection|.
   RemoteFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol,
-                       VnodeConnectionOptions options, zx_koid_t koid);
+                       VnodeConnectionOptions options);
 
   ~RemoteFileConnection() final = default;
 

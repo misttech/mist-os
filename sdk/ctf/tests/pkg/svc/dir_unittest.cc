@@ -54,17 +54,7 @@ zx_status_t svc_directory_remove_entry_unsized(svc_dir_t* dir, std::string_view 
   return svc_directory_remove_entry(dir, path.data(), path.size(), name.data(), name.size());
 }
 
-class ServiceTest : public loop_fixture::RealLoop, public zxtest::Test {
- protected:
-  zx_status_t svc_directory_destroy(svc_dir_t* dir) {
-    zx_status_t status = ::svc_directory_destroy(dir);
-
-    // Cleanup is asynchronous.
-    RunLoopUntilIdle();
-
-    return status;
-  }
-};
+class ServiceTest : public loop_fixture::RealLoop, public zxtest::Test {};
 
 TEST_F(ServiceTest, Control) {
   zx::channel dir, dir_request;

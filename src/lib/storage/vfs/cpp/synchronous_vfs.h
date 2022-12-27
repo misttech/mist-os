@@ -36,7 +36,9 @@ namespace fs {
 // destruction.
 class SynchronousVfs : public FuchsiaVfs {
  public:
-  explicit SynchronousVfs(async_dispatcher_t* dispatcher = nullptr);
+  SynchronousVfs();
+
+  explicit SynchronousVfs(async_dispatcher_t* dispatcher);
 
   // The SynchronousVfs destructor terminates all open connections.
   ~SynchronousVfs() override;
@@ -55,11 +57,10 @@ class SynchronousVfs : public FuchsiaVfs {
 
   zx_status_t RegisterConnection(std::unique_ptr<internal::Connection> connection,
                                  zx::channel channel) final;
+  void UnregisterConnection(internal::Connection* connection) final;
 
-  // Held by shared_ptr to allow weak pointers to be vended to connections. Reset when the VFS is
-  // shutting down.
-  std::shared_ptr<fbl::DoublyLinkedList<std::unique_ptr<internal::Connection>>> connections_{
-      std::make_shared<decltype(connections_)::element_type>()};
+  fbl::DoublyLinkedList<std::unique_ptr<internal::Connection>> connections_;
+  bool is_shutting_down_;
 };
 
 }  // namespace fs

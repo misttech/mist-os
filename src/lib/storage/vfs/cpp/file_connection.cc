@@ -34,18 +34,11 @@ namespace fs {
 namespace internal {
 
 FileConnection::FileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
-                               VnodeProtocol protocol, VnodeConnectionOptions options,
-                               zx_koid_t koid)
-    : Connection(vfs, std::move(vnode), protocol, options), koid_(koid) {}
+                               VnodeProtocol protocol, VnodeConnectionOptions options)
+    : Connection(vfs, std::move(vnode), protocol, options) {}
 
-FileConnection::~FileConnection() { vnode()->DeleteFileLockInTeardown(koid_); }
-
-std::unique_ptr<Binding> FileConnection::Bind(async_dispatcher_t* dispatcher, zx::channel channel,
-                                              OnUnbound on_unbound) {
-  return std::make_unique<TypedBinding<fio::File>>(fidl::BindServer(
-      dispatcher, fidl::ServerEnd<fio::File>{std::move(channel)}, this,
-      [on_unbound = std::move(on_unbound)](FileConnection* self, fidl::UnbindInfo,
-                                           fidl::ServerEnd<fio::File>) { on_unbound(self); }));
+void FileConnection::Dispatch(fidl::IncomingHeaderAndMessage&& msg, fidl::Transaction* txn) {
+  fidl::WireDispatch(this, std::forward<fidl::IncomingHeaderAndMessage>(msg), txn);
 }
 
 void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
@@ -179,6 +172,7 @@ void FileConnection::GetBackingMemory(GetBackingMemoryRequestView request,
 void FileConnection::AdvisoryLock(
     fidl::WireServer<fuchsia_io::File>::AdvisoryLockRequestView request,
     AdvisoryLockCompleter::Sync& completer) {
+  zx_koid_t owner = GetChannelOwnerKoid();
   // advisory_lock replies to the completer
   auto async_completer = completer.ToAsync();
   fit::callback<void(zx_status_t)> callback = file_lock::lock_completer_t(
@@ -186,7 +180,12 @@ void FileConnection::AdvisoryLock(
         lock_completer.ReplyError(status);
       });
 
-  advisory_lock(koid_, vnode(), true, request->request, std::move(callback));
+  advisory_lock(owner, vnode(), true, request->request, std::move(callback));
+}
+
+void FileConnection::OnTeardown() {
+  auto owner = GetChannelOwnerKoid();
+  vnode()->DeleteFileLockInTeardown(owner);
 }
 
 }  // namespace internal

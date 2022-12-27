@@ -24,7 +24,7 @@ class StreamFileConnection final : public FileConnection {
  public:
   // Refer to documentation for |Connection::Connection|.
   StreamFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, zx::stream stream,
-                       VnodeProtocol protocol, VnodeConnectionOptions options, zx_koid_t koid);
+                       VnodeProtocol protocol, VnodeConnectionOptions options);
 
   ~StreamFileConnection() final = default;
 

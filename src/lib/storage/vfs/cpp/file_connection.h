@@ -27,12 +27,14 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
  public:
   // Refer to documentation for |Connection::Connection|.
   FileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol,
-                 VnodeConnectionOptions options, zx_koid_t koid);
+                 VnodeConnectionOptions options);
 
-  ~FileConnection() override;
+  ~FileConnection() override = default;
 
- private:
-  std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) override;
+ protected:
+  void Dispatch(fidl::IncomingHeaderAndMessage&&, fidl::Transaction*) override;
+
+  void OnTeardown() override;
 
   //
   // |fuchsia.io/Node| operations.
@@ -63,10 +65,9 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   void AdvisoryLock(fidl::WireServer<fuchsia_io::File>::AdvisoryLockRequestView request,
                     AdvisoryLockCompleter::Sync& _completer) final;
 
+ private:
   zx_status_t ResizeInternal(uint64_t length);
   zx_status_t GetBackingMemoryInternal(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo);
-
-  const zx_koid_t koid_;
 };
 
 }  // namespace internal

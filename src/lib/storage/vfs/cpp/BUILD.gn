@@ -40,6 +40,7 @@ static_library("cpp") {
 
   if (is_fuchsia) {
     public += [
+      "fidl_transaction.h",
       "file_connection.h",
       "fuchsia_vfs.h",
       "lazy_dir.h",
@@ -68,6 +69,8 @@ static_library("cpp") {
       "connection.h",
       "directory_connection.cc",
       "directory_connection.h",
+      "fidl_transaction.cc",
+      "fidl_transaction.h",
       "file_connection.cc",
       "file_connection.h",
       "fuchsia_vfs.cc",
@@ -217,6 +220,7 @@ test("fs-connection-test") {
     "connection_contract_tests.cc",
     "connection_integration_tests.cc",
     "connection_rights_tests.cc",
+    "fidl_transaction_tests.cc",
     "paging_test.cc",
   ]
   deps = [

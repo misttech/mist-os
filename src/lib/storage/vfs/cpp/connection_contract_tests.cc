@@ -25,6 +25,9 @@ class NoOpVfs : public fs::FuchsiaVfs {
   fbl::DoublyLinkedList<std::unique_ptr<fs::internal::Connection>> connections_;
 
  private:
+  void UnregisterConnection(fs::internal::Connection* connection) final {
+    FAIL("Should never be reached in this test");
+  }
   void Shutdown(ShutdownCallback handler) override { FAIL("Should never be reached in this test"); }
   bool IsTerminating() const final {
     ADD_FAILURE("Should never be reached in this test");
@@ -46,7 +49,7 @@ class NoOpVfsGood : public NoOpVfs {
   zx_status_t RegisterConnection(std::unique_ptr<fs::internal::Connection> connection,
                                  zx::channel server_end) final {
     connections_.push_back(std::move(connection));
-    connections_.back().StartDispatching(std::move(server_end), [](fs::internal::Connection*) {});
+    EXPECT_OK(connections_.back().StartDispatching(std::move(server_end)));
     return ZX_OK;
   }
 };
@@ -60,7 +63,7 @@ class NoOpVfsBad : public NoOpVfs {
  private:
   zx_status_t RegisterConnection(std::unique_ptr<fs::internal::Connection> connection,
                                  zx::channel server_end) final {
-    connection->StartDispatching(std::move(server_end), [](fs::internal::Connection*) {});
+    EXPECT_OK(connection->StartDispatching(std::move(server_end)));
     connections_.push_back(std::move(connection));
     return ZX_OK;
   }

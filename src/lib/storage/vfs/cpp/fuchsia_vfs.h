@@ -117,6 +117,10 @@ class FuchsiaVfs : public Vfs {
                                       uint32_t watch_descriptor, zx::socket socket)
       __TA_EXCLUDES(vfs_lock_);
 
+  // Called by a VFS connection when it is closed remotely. The VFS is now responsible for
+  // destroying the connection.
+  void OnConnectionClosedRemotely(internal::Connection* connection) __TA_EXCLUDES(vfs_lock_);
+
   // Serves a Vnode over the specified channel (used for creating new filesystems); the Vnode must
   // be a directory.
   zx_status_t ServeDirectory(fbl::RefPtr<Vnode> vn,
@@ -149,6 +153,9 @@ class FuchsiaVfs : public Vfs {
   // called on the pointer to destroy it.
   virtual zx_status_t RegisterConnection(std::unique_ptr<internal::Connection> connection,
                                          zx::channel channel) = 0;
+
+  // Destroys a connection.
+  virtual void UnregisterConnection(internal::Connection* connection) = 0;
 
  private:
   zx_status_t TokenToVnode(zx::event token, fbl::RefPtr<Vnode>* out) __TA_REQUIRES(vfs_lock_);
