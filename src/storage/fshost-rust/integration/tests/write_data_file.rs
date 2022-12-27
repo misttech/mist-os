@@ -53,6 +53,32 @@ async fn unformatted() {
 }
 
 #[fuchsia::test]
+async fn unformatted_netboot() {
+    let mut builder = new_builder();
+    builder.fshost().set_netboot().set_ramdisk_prefix("/nada/zip/zilch");
+    builder.with_disk();
+    let fixture = builder.build().await;
+
+    let admin =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    call_write_data_file(&admin).await.expect("write_data_file failed");
+    let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
+    fixture.tear_down().await;
+
+    let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    let (secret, secret_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    fixture
+        .dir("data")
+        .open(fio::OpenFlags::RIGHT_READABLE, 0, SECRET_FILE_NAME, secret_server)
+        .expect("open failed");
+    secret.get_attr().await.expect("get_attr failed");
+
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
 async fn unformatted_small_disk() {
     let mut builder = new_builder();
     builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/nada/zip/zilch");
@@ -99,6 +125,46 @@ async fn formatted() {
     let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
+
+    // Make sure the original contents in the data partition still exist.
+    fixture.check_test_data_file().await;
+
+    let (file, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    fixture
+        .dir("data")
+        .open(fio::OpenFlags::RIGHT_READABLE, 0, "foo", server)
+        .expect("open failed");
+    file.get_attr().await.expect("get_attr failed");
+
+    let (secret, secret_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    fixture
+        .dir("data")
+        .open(fio::OpenFlags::RIGHT_READABLE, 0, SECRET_FILE_NAME, secret_server)
+        .expect("open failed");
+    secret.get_attr().await.expect("get_attr failed");
+
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+async fn formatted_netboot() {
+    let mut builder = new_builder();
+    builder.fshost().set_netboot().set_ramdisk_prefix("/nada/zip/zilch");
+    builder.with_disk().format_data(data_fs_spec());
+    let fixture = builder.build().await;
+
+    let admin =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    call_write_data_file(&admin).await.expect("write_data_file failed");
+    let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
+    fixture.tear_down().await;
+
+    let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
+
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    // Make sure the original contents in the data partition still exist.
+    fixture.check_test_data_file().await;
 
     let (file, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
     fixture

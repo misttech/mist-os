@@ -343,9 +343,9 @@ namespace {
 
 // Formats a block device as a zxcrypt volume.
 //
-// On success, returns a file descriptor to an FVM.
-// On failure, returns -1
-zx_status_t ZxcryptCreate(PartitionInfo* part) {
+// On success, returns the VolumeManager for the zxcrypt instance, and writes the inner block
+// device's into |part|.
+zx::result<zxcrypt::VolumeManager> ZxcryptCreate(PartitionInfo* part) {
   // TODO(security): fxbug.dev/31073. We need to bind with channel in order to pass a key here.
   // TODO(security): fxbug.dev/31733. The created volume must marked as needing key rotation.
 
@@ -355,27 +355,27 @@ zx_status_t ZxcryptCreate(PartitionInfo* part) {
   zx::channel client_chan;
   if (zx_status_t status = zxcrypt_manager.OpenClient(zx::sec(3), client_chan); status != ZX_OK) {
     ERROR("Could not open zxcrypt volume manager\n");
-    return status;
+    return zx::error(status);
   }
   zxcrypt::EncryptedVolumeClient zxcrypt_client(std::move(client_chan));
   uint8_t slot = 0;
   if (zx_status_t status = zxcrypt_client.FormatWithImplicitKey(slot); status != ZX_OK) {
     ERROR("Could not create zxcrypt volume\n");
-    return status;
+    return zx::error(status);
   }
 
   if (zx_status_t status = zxcrypt_client.UnsealWithImplicitKey(slot); status != ZX_OK) {
     ERROR("Could not unseal zxcrypt volume\n");
-    return status;
+    return zx::error(status);
   }
 
   if (zx_status_t status = zxcrypt_manager.OpenInnerBlockDevice(zx::sec(3), &part->new_part);
       status != ZX_OK) {
     ERROR("Could not open zxcrypt volume\n");
-    return status;
+    return zx::error(status);
   }
 
-  return ZX_OK;
+  return zx::ok(std::move(zxcrypt_manager));
 }
 
 // Returns |ZX_OK| if |partition_fd| is a child of |fvm_fd|.
@@ -485,12 +485,33 @@ zx_status_t PreProcessPartitions(const fbl::unique_fd& fvm_fd,
   return ZX_OK;
 }
 
+struct BoundZxcryptDevice {
+ public:
+  BoundZxcryptDevice() = default;
+  BoundZxcryptDevice(BoundZxcryptDevice&&) = default;
+  BoundZxcryptDevice(const BoundZxcryptDevice&) = delete;
+  explicit BoundZxcryptDevice(zxcrypt::VolumeManager&& manager) : manager(std::move(manager)) {}
+  ~BoundZxcryptDevice() {
+    if (manager) {
+      if (zx_status_t status = manager->Unbind(); status != ZX_OK) {
+        ERROR("Failed to unbind Zxcrypt: %s.  The driver may be unavailable.",
+              zx_status_get_string(status));
+      }
+    }
+  }
+  std::optional<zxcrypt::VolumeManager> manager;
+};
+
 // Allocates the space requested by the partitions by creating new
 // partitions and filling them with extents. This guarantees that
 // streaming the data to the device will not run into "no space" issues
 // later.
-zx_status_t AllocatePartitions(const fbl::unique_fd& devfs_root, const fbl::unique_fd& fvm_fd,
-                               fbl::Array<PartitionInfo>* parts) {
+// Partitions which are zxcrypt-enabled will have their driver bound.  A set of all such drivers is
+// returned so the caller can unbind them when finished writing into them.
+zx::result<std::vector<BoundZxcryptDevice>> AllocatePartitions(const fbl::unique_fd& devfs_root,
+                                                               const fbl::unique_fd& fvm_fd,
+                                                               fbl::Array<PartitionInfo>* parts) {
+  std::vector<BoundZxcryptDevice> bound_devices;
   for (PartitionInfo& part_info : *parts) {
     fvm::ExtentDescriptor ext = GetExtent(part_info.pd, 0);
     alloc_req_t alloc = {};
@@ -506,7 +527,7 @@ zx_status_t AllocatePartitions(const fbl::unique_fd& devfs_root, const fbl::uniq
             fs_management::FvmAllocatePartitionWithDevfs(devfs_root.get(), fvm_fd.get(), alloc);
         fd_or.is_error()) {
       ERROR("Couldn't allocate partition\n");
-      return ZX_ERR_NO_SPACE;
+      return zx::error(ZX_ERR_NO_SPACE);
     } else {
       part_info.new_part = *std::move(fd_or);
     }
@@ -514,10 +535,11 @@ zx_status_t AllocatePartitions(const fbl::unique_fd& devfs_root, const fbl::uniq
     // Add filter drivers.
     if ((part_info.pd->flags & fvm::kSparseFlagZxcrypt) != 0) {
       LOG("Creating zxcrypt volume\n");
-      zx_status_t status = ZxcryptCreate(&part_info);
-      if (status != ZX_OK) {
-        return status;
+      auto volume_manager = ZxcryptCreate(&part_info);
+      if (volume_manager.is_error()) {
+        return volume_manager.take_error();
       }
+      bound_devices.emplace_back(std::move(*volume_manager));
     }
 
     // The 0th index extent is allocated alongside the partition, so we
@@ -533,12 +555,12 @@ zx_status_t AllocatePartitions(const fbl::unique_fd& devfs_root, const fbl::uniq
       auto status = result.ok() ? result.value().status : result.status();
       if (status != ZX_OK) {
         ERROR("Failed to extend partition: %s\n", zx_status_get_string(status));
-        return status;
+        return zx::error(status);
       }
     }
   }
 
-  return ZX_OK;
+  return zx::ok(std::move(bound_devices));
 }
 
 // Holds the description of a partition with a single extent. Note that even though some code asks
@@ -630,7 +652,11 @@ zx::result<> AllocateEmptyPartitions(const fbl::unique_fd& devfs_root,
                                                                 .active = true,
                                                             }},
                                        2);
-  return zx::make_result(AllocatePartitions(devfs_root, fvm_fd, &partitions));
+  auto res = AllocatePartitions(devfs_root, fvm_fd, &partitions);
+  if (res.is_error()) {
+    return res.take_error();
+  }
+  return zx::ok();
 }
 
 zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
@@ -698,9 +724,10 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
   LOG("Partitions pre-validated successfully: Enough space exists to pave.\n");
 
   // Actually allocate the storage for the incoming image.
-  if (status = zx::make_result(AllocatePartitions(devfs_root, fvm_fd, &parts)); status.is_error()) {
-    ERROR("Failed to allocate partitions: %s\n", status.status_string());
-    return status.take_error();
+  auto devices = AllocatePartitions(devfs_root, fvm_fd, &parts);
+  if (devices.is_error()) {
+    ERROR("Failed to allocate partitions: %s\n", devices.status_string());
+    return devices.take_error();
   }
 
   LOG("Partition space pre-allocated successfully.\n");

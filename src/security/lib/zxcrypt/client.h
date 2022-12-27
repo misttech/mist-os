@@ -133,6 +133,10 @@ class __EXPORT VolumeManager {
  public:
   explicit VolumeManager(fbl::unique_fd&& block_dev_fd, fbl::unique_fd&& devfs_root_fd);
 
+  // Unbinds the zxcrypt driver.  Invalidates channels previously returned from `OpenClient` and FDs
+  // returned from `OpenInnerBlockDevice`.
+  zx_status_t Unbind();
+
   // Attempts to open the zxcrypt driver device associated with the underlying
   // block device described by |fd|, binding the driver if necessary,
   // and returning a channel to the zxcrypt device node.

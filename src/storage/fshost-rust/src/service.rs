@@ -33,6 +33,7 @@ use {
     futures::{channel::mpsc, StreamExt, TryStreamExt},
     remote_block_device::{BlockClient, BufferSlice, RemoteBlockClient},
     std::sync::Arc,
+    tracing::info,
     vfs::service,
 };
 
@@ -92,6 +93,9 @@ async fn write_data_file(
             fvm_ramdisk must be set."
         ));
     }
+    // When `fvm_ramdisk` is set, zxcrypt will be bound (and formatted if needed) automatically
+    // during matching.  Otherwise, do it ourselves.
+    let bind_zxcrypt = !config.fvm_ramdisk;
 
     let content_size = if let Ok(content_size) = payload.get_content_size() {
         content_size
@@ -118,6 +122,12 @@ async fn write_data_file(
     let mut inside_zxcrypt = false;
 
     if format != DiskFormat::Fxfs && !config.no_zxcrypt {
+        if bind_zxcrypt {
+            info!("Ensuring device is formatted with zxcrypt");
+            let mut device =
+                BlockDevice::new(partition_path.clone()).await.context("failed to make device")?;
+            launcher.bind_zxcrypt(&mut device).await.context("Failed to bind zxcrypt")?;
+        }
         let mut zxcrypt_path = partition_path;
         zxcrypt_path.push_str("/zxcrypt/unsealed");
         let zxcrypt_matcher = PartitionMatcher {

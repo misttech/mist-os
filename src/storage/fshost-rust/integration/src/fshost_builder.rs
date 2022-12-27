@@ -20,6 +20,7 @@ pub struct FshostBuilder {
     component_name: &'static str,
     no_zxcrypt: bool,
     fvm_ramdisk: bool,
+    netboot: bool,
     ramdisk_prefix: Option<&'static str>,
     blobfs_max_bytes: Option<u64>,
     data_max_bytes: Option<u64>,
@@ -31,6 +32,7 @@ impl FshostBuilder {
             component_name,
             no_zxcrypt: false,
             fvm_ramdisk: false,
+            netboot: false,
             ramdisk_prefix: None,
             blobfs_max_bytes: None,
             data_max_bytes: None,
@@ -44,6 +46,11 @@ impl FshostBuilder {
 
     pub fn set_fvm_ramdisk(&mut self) -> &mut Self {
         self.fvm_ramdisk = true;
+        self
+    }
+
+    pub fn set_netboot(&mut self) -> &mut Self {
+        self.netboot = true;
         self
     }
 
@@ -84,6 +91,9 @@ impl FshostBuilder {
                 .set_config_value_bool(&fshost, "fvm_ramdisk", self.fvm_ramdisk)
                 .await
                 .unwrap();
+        }
+        if self.netboot {
+            realm_builder.set_config_value_bool(&fshost, "netboot", self.netboot).await.unwrap();
         }
         if let Some(prefix) = self.ramdisk_prefix {
             realm_builder.set_config_value_string(&fshost, "ramdisk_prefix", prefix).await.unwrap();

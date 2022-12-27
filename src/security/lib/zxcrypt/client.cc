@@ -265,6 +265,15 @@ zx_status_t EncryptedVolumeClient::Shred() {
 VolumeManager::VolumeManager(fbl::unique_fd&& block_dev_fd, fbl::unique_fd&& devfs_root_fd)
     : block_dev_fd_(std::move(block_dev_fd)), devfs_root_fd_(std::move(devfs_root_fd)) {}
 
+zx_status_t VolumeManager::Unbind() {
+  fdio_cpp::UnownedFdioCaller caller(block_dev_fd_.get());
+  if (!caller) {
+    xprintf("could not convert fd to io\n");
+    return ZX_ERR_BAD_STATE;
+  }
+  return fidl::WireCall(caller.borrow_as<fuchsia_device::Controller>())->UnbindChildren().status();
+}
+
 zx_status_t VolumeManager::OpenInnerBlockDevice(const zx::duration& timeout, fbl::unique_fd* out) {
   fbl::String path_base;
 

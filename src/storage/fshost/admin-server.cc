@@ -34,6 +34,7 @@
 #include "src/storage/fshost/block-device.h"
 #include "src/storage/fshost/block-watcher.h"
 #include "src/storage/fshost/constants.h"
+#include "src/storage/fshost/encrypted-volume.h"
 #include "src/storage/fshost/filesystem-mounter.h"
 #include "src/storage/fshost/fxfs.h"
 #include "src/storage/fshost/storage-wiper.h"
@@ -173,6 +174,9 @@ zx::result<> AdminServer::WriteDataFileInner(WriteDataFileRequestView request) {
     FX_LOGS(INFO) << "Can't WriteDataFile from a non-recovery build; fvm_ramdisk must be set.";
     return zx::error(ZX_ERR_BAD_STATE);
   }
+  // When `fvm_ramdisk` is set, zxcrypt will be bound (and formatted if needed) automatically during
+  // matching.  Otherwise, do it ourselves.
+  const bool bind_zxcrypt = !config_.fvm_ramdisk();
   if (!files::IsValidCanonicalPath(request->filename.get())) {
     FX_LOGS(WARNING) << "Bad path " << request->filename.get();
     return zx::error(ZX_ERR_BAD_PATH);
@@ -232,8 +236,32 @@ zx::result<> AdminServer::WriteDataFileInner(WriteDataFileRequestView request) {
 
   bool inside_zxcrypt = false;
   if (format != fs_management::kDiskFormatFxfs && !config_.no_zxcrypt()) {
-    // For non-Fxfs configurations, we expect zxcrypt to be present and have already been formatted
-    // (if needed) by the block watcher.
+    if (bind_zxcrypt) {
+      FX_LOGS(INFO) << "Ensuring device is formatted with zxcrypt";
+      fbl::unique_fd devfs_root_fd(open("/dev", O_RDONLY));
+      if (!devfs_root_fd) {
+        FX_LOGS(ERROR) << "Failed to open /dev";
+        return zx::error(ZX_ERR_NOT_FOUND);
+      }
+      zx::result cloned = component::Clone(caller.borrow_as<fuchsia_hardware_block::Block>(),
+                                           component::AssumeProtocolComposesNode);
+
+      if (cloned.is_error()) {
+        return cloned.take_error();
+      }
+      fbl::unique_fd fd;
+      if (zx_status_t status =
+              fdio_fd_create(cloned.value().TakeChannel().release(), fd.reset_and_get_address());
+          status != ZX_OK) {
+        return zx::error(status);
+      }
+
+      EncryptedVolume volume(std::move(fd), std::move(devfs_root_fd));
+      if (zx_status_t status = volume.EnsureUnsealedAndFormatIfNeeded(); status != ZX_OK) {
+        FX_PLOGS(ERROR, status) << "Failed to format and unseal zxcrypt";
+        return zx::error(status);
+      }
+    }
     std::string parent_device;
     if (zx::result device_path = GetTopologicalPath(caller.borrow_as<fuchsia_device::Controller>());
         device_path.is_error()) {

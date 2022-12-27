@@ -287,7 +287,7 @@ impl FilesystemLauncher {
         Ok(())
     }
 
-    async fn bind_zxcrypt(&self, device: &mut dyn Device) -> Result<(), Error> {
+    pub async fn bind_zxcrypt(&self, device: &mut dyn Device) -> Result<(), Error> {
         self.attach_driver(device, "zxcrypt.so").await?;
         zxcrypt::unseal_or_format(device).await
     }
