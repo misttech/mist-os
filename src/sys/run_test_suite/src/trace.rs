@@ -4,15 +4,41 @@
 
 #[cfg(target_os = "fuchsia")]
 macro_rules! duration {
-    ($name:expr $(, $key:expr => $val:expr)*) => {
-        ::fuchsia_trace::duration!("run_test_suite", $name $(, $key => $val)*);
+    ($name:expr) => {
+        ::fuchsia_trace::duration!("run_test_suite", $name);
+    };
+}
+
+// On host we'll measure durations manually, then emit a trace level log.
+#[cfg(not(target_os = "fuchsia"))]
+macro_rules! duration {
+    ($name:expr) => {
+        let _scope = crate::trace::DurationScope::new($name);
+    };
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+pub(crate) struct DurationScope {
+    start: std::time::Instant,
+    name: &'static str,
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+impl DurationScope {
+    pub(crate) fn new(name: &'static str) -> Self {
+        Self { name, start: std::time::Instant::now() }
     }
 }
 
-// On host we'll need to find another trace mechanism, but we'll disable this for now.
 #[cfg(not(target_os = "fuchsia"))]
-macro_rules! duration {
-    ($name:expr $(, $key:expr => $val:expr)*) => {};
+impl std::ops::Drop for DurationScope {
+    fn drop(&mut self) {
+        tracing::trace!(
+            name = self.name,
+            duration = self.start.elapsed().as_nanos() as u64,
+            "DURATION_NANOS"
+        );
+    }
 }
 
 pub(crate) use duration;
