@@ -162,9 +162,13 @@ impl Environment for FshostEnvironment {
         };
 
         // Set the max partition size for data
-        if let Err(e) = set_partition_max_size(device, self.config.data_max_bytes).await {
-            tracing::warn!(?e, "Failed to set max partition size for data");
-        };
+        if self.config.apply_limits_to_ramdisk
+            || !device.topological_path().starts_with(&self.config.ramdisk_prefix)
+        {
+            if let Err(e) = set_partition_max_size(device, self.config.data_max_bytes).await {
+                tracing::warn!(?e, "Failed to set max partition size for data");
+            };
+        }
 
         // Potentially read the data off the disk in cases where we want to migrate the data.
         // TODO(fxbug.dev/109293): This is good enough for the ram-based migration, but the
@@ -296,13 +300,18 @@ impl FilesystemLauncher {
         tracing::info!(path = %device.path(), "Mounting /blob");
 
         // Setting max partition size for blobfs
-        if let Err(e) = set_partition_max_size(device, self.config.blobfs_max_bytes).await {
-            tracing::warn!("Failed to set max partition size for blobfs: {:?}", e);
-        };
+        if self.config.apply_limits_to_ramdisk
+            || !device.topological_path().starts_with(&self.config.ramdisk_prefix)
+        {
+            if let Err(e) = set_partition_max_size(device, self.config.blobfs_max_bytes).await {
+                tracing::warn!("Failed to set max partition size for blobfs: {:?}", e);
+            };
+        }
 
         let config = Blobfs {
             write_compression_algorithm: self.boot_args.blobfs_write_compression_algorithm(),
             cache_eviction_policy_override: self.boot_args.blobfs_eviction_policy(),
+            sandbox_decompression: self.config.sandbox_decompression,
             component_type: fs_management::ComponentType::StaticChild,
             ..Default::default()
         };

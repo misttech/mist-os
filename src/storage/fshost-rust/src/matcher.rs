@@ -8,7 +8,7 @@ use {
             constants::{
                 BLOBFS_PARTITION_LABEL, BLOBFS_TYPE_GUID, BOOTPART_DRIVER_PATH,
                 DATA_PARTITION_LABEL, DATA_TYPE_GUID, FVM_DRIVER_PATH, GPT_DRIVER_PATH,
-                NAND_BROKER_DRIVER_PATH,
+                MBR_DRIVER_PATH, NAND_BROKER_DRIVER_PATH,
             },
             Device,
         },
@@ -116,6 +116,16 @@ impl Matchers {
                 "",
                 None,
             )));
+        }
+
+        if config.mbr {
+            matchers.push(Box::new(PartitionMapMatcher::new(
+                DiskFormat::Mbr,
+                true,
+                MBR_DRIVER_PATH,
+                "",
+                None,
+            )))
         }
 
         Matchers { matchers, matched: BTreeMap::new() }
