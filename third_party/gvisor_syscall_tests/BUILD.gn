@@ -526,10 +526,6 @@ syscall_test_suite(generic_test_label) {
   run_in_cq_with_ns3 = true
 }
 syscall_test_suite(loopback_test_label) {
-  run_in_cq_with_ns3 = true
-  test_specs = {
-    timeout_secs = 1200
-  }
 }
 syscall_test_suite(loopback_isolated_test_label) {
   run_in_cq_with_ns3 = true

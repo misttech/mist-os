@@ -70,6 +70,7 @@ void AddNonPassingTests(TestMap& tests) {
   // Skip tests that will otherwise hang forever.
   // TODO(b/245940107): un-skip some of these when the data path is ready.
   SkipTest(tests, "All/SocketInetLoopbackTest.TCPResetAfterClose/*");
+  SkipTest(tests, "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/*");
   SkipTest(tests, "All/SocketInetLoopbackTest.TCPListenClose/*");
   SkipTest(tests, "All/SocketInetLoopbackTest.TCPListenUnbound/*");
 
@@ -77,130 +78,9 @@ void AddNonPassingTests(TestMap& tests) {
   ExpectFailure(tests, "All/SocketInetLoopbackTest.TCPBacklog/*");
   ExpectFailure(tests, "All/SocketInetLoopbackTest.TCPInfoState/*");
   ExpectFailure(tests, "All/SocketInetLoopbackTest.TCPListenCloseConnectingRead/*");
+  ExpectFailure(tests, "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/*");
   ExpectFailure(tests, "All/SocketInetLoopbackTest.TCPListenShutdownConnectingRead/*");
-
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV4Any_ConnectV4Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV4Any_ConnectV4Loopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV4Any_ConnectV4MappedAny");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV4Any_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV4Loopback_ConnectV4Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV4Loopback_ConnectV4Loopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV4Loopback_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV4MappedAny_ConnectV4Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV4MappedAny_ConnectV4Loopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV4MappedAny_ConnectV4MappedAny");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV4MappedAny_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV4MappedLoopback_ConnectV4Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV4MappedLoopback_ConnectV4Loopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV4MappedLoopback_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV6Any_ConnectV4MappedAny");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV6Any_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV6Any_ConnectV6Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV6Any_ConnectV6Loopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV6Loopback_ConnectV6Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenCloseDuringConnect/"
-                "ListenV6Loopback_ConnectV6Loopback");
-
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV6Loopback_ConnectV6Loopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV6Loopback_ConnectV6Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV6Any_ConnectV6Loopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV6Any_ConnectV6Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV6Any_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV6Any_ConnectV4MappedAny");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV4MappedLoopback_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV4MappedLoopback_ConnectV4Loopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV4MappedLoopback_ConnectV4Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV4MappedAny_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV4MappedAny_ConnectV4MappedAny");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV4MappedAny_ConnectV4Loopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV4MappedAny_ConnectV4Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV4Loopback_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV4Loopback_ConnectV4Loopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV4Loopback_ConnectV4Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV4Any_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV4Any_ConnectV4MappedAny");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV4Any_ConnectV4Loopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
-                "ListenV4Any_ConnectV4Any");
-
+  ExpectFailure(tests, "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/*");
   ExpectFailure(tests, "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/*");
   ExpectFailure(tests, "All/SocketInetReusePortTest.TcpPortReuseMultiThread/*");
 
@@ -294,100 +174,6 @@ void AddNonPassingTests(TestMap& tests) {
   // TODO(https://fxbug.dev/113481): Netstack3 does not interpret listener
   // backlog exactly as Linux does.
   ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownListen/"
-                "ListenV4Any_ConnectV4MappedAny");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownListen/"
-                "ListenV4Any_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownListen/"
-                "ListenV4Loopback_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownListen/"
-                "ListenV4Loopback_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownListen/"
-                "ListenV4MappedAny_ConnectV4Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownListen/"
-                "ListenV4MappedAny_ConnectV4Loopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownListen/"
-                "ListenV4MappedAny_ConnectV4MappedAny");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownListen/"
-                "ListenV4MappedAny_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownListen/"
-                "ListenV4MappedLoopback_ConnectV4Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownListen/"
-                "ListenV4MappedLoopback_ConnectV4Loopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownListen/"
-                "ListenV4MappedLoopback_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownListen/"
-                "ListenV6Any_ConnectV4MappedAny");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdownListen/"
-                "ListenV6Any_ConnectV4MappedLoopback");
-  SkipTest(tests,
-           "All/SocketInetLoopbackTest.TCPListenShutdownListen/"
-           "ListenV6Any_ConnectV4Loopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdown/"
-                "ListenV6Any_ConnectV4MappedAny");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdown/"
-                "ListenV4Loopback_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdown/"
-                "ListenV4MappedAny_ConnectV4Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdown/"
-                "ListenV6Any_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdown/"
-                "ListenV4MappedAny_ConnectV4Loopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdown/"
-                "ListenV4MappedAny_ConnectV4MappedAny");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdown/"
-                "ListenV4MappedAny_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdown/"
-                "ListenV4MappedLoopback_ConnectV4Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdown/"
-                "ListenV4Any_ConnectV4MappedAny");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdown/"
-                "ListenV4MappedLoopback_ConnectV4Loopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdown/"
-                "ListenV4Any_ConnectV4MappedLoopback");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdown/"
-                "ListenV4MappedLoopback_ConnectV4MappedLoopback");
-  SkipTest(tests,
-           "All/SocketInetLoopbackTest.TCPListenShutdown/"
-           "ListenV6Any_ConnectV4Loopback");
-  // Netstack3 does not interpret listener backlog exactly as Linux does.
-  ExpectFailure(tests, "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV6Any");
-  ExpectFailure(tests, "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Any_ConnectV4Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdown/"
-                "ListenV6Loopback_ConnectV6Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPListenShutdown/"
-                "ListenV4Loopback_ConnectV4Any");
-  SkipTest(tests, "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4Any");
-  SkipTest(tests,
-           "All/SocketInetLoopbackTest.TCPListenShutdownListen/"
-           "ListenV6Any_ConnectV4Any");
-  ExpectFailure(tests,
                 "All/SocketInetLoopbackTest.TCPListenShutdown/"
                 "ListenV6Any_ConnectV6Loopback");
   ExpectFailure(tests,
@@ -399,6 +185,17 @@ void AddNonPassingTests(TestMap& tests) {
   ExpectFailure(tests,
                 "All/SocketInetLoopbackTest.TCPListenShutdown/"
                 "ListenV4Loopback_ConnectV4Loopback");
+  ExpectFailure(tests,
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Loopback_ConnectV4Any");
+  ExpectFailure(tests, "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Any_ConnectV4Any");
+  ExpectFailure(tests,
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Loopback_ConnectV6Any");
+  ExpectFailure(tests, "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV6Any");
+  SkipTest(tests, "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV6Any_ConnectV4Any");
+  SkipTest(tests,
+           "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV6Any_ConnectV4Loopback");
+  SkipTest(tests, "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4Loopback");
+  SkipTest(tests, "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4Any");
 
 }  // NOLINT(readability/fn_size)
 
