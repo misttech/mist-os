@@ -21,7 +21,7 @@ comes up.
 ### Source additions
 
 Trace records are easiest to add by invoking the `TRACE_*()` macros
-from `ddk/trace/event.h`.
+from `lib/trace/event.h`.
 
 There are various kinds of trace records that can be emitted.
 Please see `trace/internal/event_common.h` for a description
@@ -34,7 +34,7 @@ in a more appropriate place.
 Example:
 
 ```c++
-#include <ddk/trace/event.h>
+#include <lib/trace/event.h>
 
 void DoSomething(int a, std::string b) {
   TRACE_DURATION("example", "DoSomething", "a", a, "b", b);
