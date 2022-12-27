@@ -91,8 +91,11 @@ class AddressSpace : public magma::AddressSpace<GpuMapping> {
 
   static inline bool pte_encode(uint64_t bus_addr, bool valid, bool writeable, bool exception,
                                 pte_t* pte_out) {
-    if (!fits_in_40_bits(bus_addr))
-      return DRETF(false, "bus address doesn't fit in 40 bits: 0x%lx", bus_addr);
+    if (!fits_in_40_bits(bus_addr)) {
+      MAGMA_LOG(ERROR, "bus address doesn't fit in 40 bits: 0x%lx", bus_addr);
+      return false;
+    }
+
     *pte_out = pte_encode_unsafe(bus_addr, valid, writeable, exception);
     return true;
   }

@@ -7,8 +7,10 @@
 magma_status_t msd_semaphore_import(uint32_t handle, uint64_t client_id,
                                     msd_semaphore_t** semaphore_out) {
   auto semaphore = magma::PlatformSemaphore::Import(handle);
-  if (!semaphore)
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "couldn't import semaphore handle 0x%x", handle);
+  if (!semaphore) {
+    MAGMA_LOG(ERROR, "couldn't import semaphore handle 0x%x", handle);
+    return MAGMA_STATUS_INVALID_ARGS;
+  }
 
   semaphore->set_local_id(client_id);
 

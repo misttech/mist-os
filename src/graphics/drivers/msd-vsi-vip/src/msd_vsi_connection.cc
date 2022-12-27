@@ -18,7 +18,8 @@ msd_context_t* msd_connection_create_context(msd_connection_t* abi_connection) {
   auto context =
       MsdVsiContext::Create(connection, connection->address_space(), connection->GetRingbuffer());
   if (!context) {
-    return DRETP(nullptr, "failed to create new context");
+    MAGMA_LOG(ERROR, "failed to create new context");
+    return nullptr;
   }
   return new MsdVsiAbiContext(context);
 }
@@ -26,8 +27,10 @@ msd_context_t* msd_connection_create_context(msd_connection_t* abi_connection) {
 magma_status_t msd_connection_map_buffer(msd_connection_t* abi_connection, msd_buffer_t* abi_buffer,
                                          uint64_t gpu_va, uint64_t offset, uint64_t length,
                                          uint64_t flags) {
-  if (!magma::is_page_aligned(offset) || !magma::is_page_aligned(length))
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Offset or length not page aligned");
+  if (!magma::is_page_aligned(offset) || !magma::is_page_aligned(length)) {
+    MAGMA_LOG(ERROR, "Offset or length not page aligned");
+    return MAGMA_STATUS_INVALID_ARGS;
+  }
 
   uint64_t page_offset = offset / magma::page_size();
   uint64_t page_count = length / magma::page_size();
@@ -43,20 +46,22 @@ magma::Status MsdVsiConnection::MapBufferGpu(std::shared_ptr<MsdVsiBuffer> buffe
                                              uint64_t page_offset, uint64_t page_count) {
   uint64_t end_gpu_va = gpu_va + (page_count * magma::page_size());
   if (!AddressSpaceLayout::IsValidClientGpuRange(gpu_va, end_gpu_va)) {
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS,
-                    "failed to map buffer to [0x%lx, 0x%lx), lies outside client region", gpu_va,
-                    end_gpu_va);
+    MAGMA_LOG(ERROR, "failed to map buffer to [0x%lx, 0x%lx), lies outside client region", gpu_va,
+              end_gpu_va);
+    return MAGMA_STATUS_INVALID_ARGS;
   }
   std::shared_ptr<GpuMapping> mapping;
   magma::Status status = AddressSpace::MapBufferGpu(address_space(), buffer, gpu_va, page_offset,
                                                     page_count, &mapping);
   if (!status.ok()) {
-    return DRET_MSG(status.get(), "MapBufferGpu failed");
+    MAGMA_LOG(ERROR, "MapBufferGpu failed");
+    return status.get();
   }
   address_space_dirty_ = true;
 
   if (!address_space()->AddMapping(mapping)) {
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "failed to add mapping");
+    MAGMA_LOG(ERROR, "failed to add mapping");
+    return MAGMA_STATUS_INVALID_ARGS;
   }
   return MAGMA_STATUS_OK;
 }
@@ -66,7 +71,8 @@ magma_status_t msd_connection_unmap_buffer(msd_connection_t* abi_connection,
   if (!MsdVsiAbiConnection::cast(abi_connection)
            ->ptr()
            ->ReleaseMapping(MsdVsiAbiBuffer::cast(abi_buffer)->ptr()->platform_buffer(), gpu_va)) {
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "failed to remove mapping");
+    MAGMA_LOG(ERROR, "failed to remove mapping");
+    return MAGMA_STATUS_INVALID_ARGS;
   }
   return MAGMA_STATUS_OK;
 }
@@ -111,7 +117,8 @@ void MsdVsiConnection::QueueReleasedMappings(std::vector<std::shared_ptr<GpuMapp
 bool MsdVsiConnection::ReleaseMapping(magma::PlatformBuffer* buffer, uint64_t gpu_va) {
   std::shared_ptr<GpuMapping> mapping;
   if (!address_space()->ReleaseMapping(buffer, gpu_va, &mapping)) {
-    return DRETF(false, "failed to remove mapping");
+    MAGMA_LOG(ERROR, "failed to remove mapping");
+    return false;
   }
   std::vector<std::shared_ptr<GpuMapping>> mappings = {std::move(mapping)};
   QueueReleasedMappings(std::move(mappings));
@@ -133,7 +140,8 @@ bool MsdVsiConnection::SubmitPendingReleaseMappings(std::shared_ptr<MsdVsiContex
                     true /* do_flush */);
     mappings_to_release_.clear();
     if (!status.ok()) {
-      return DRETF(false, "Failed to submit mapping release batch: %d", status.get());
+      MAGMA_LOG(ERROR, "Failed to submit mapping release batch: %d", status.get());
+      return false;
     }
   }
   return true;

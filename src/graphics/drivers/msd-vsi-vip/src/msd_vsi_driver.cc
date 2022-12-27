@@ -17,7 +17,10 @@ void msd_driver_destroy(msd_driver_t* drv) { delete MsdVsiDriver::cast(drv); }
 msd_device_t* msd_driver_create_device(msd_driver_t* drv, void* device_handle) {
   std::unique_ptr<MsdVsiDevice> device =
       MsdVsiDevice::Create(device_handle, true /* start_device_thread */);
-  if (!device)
-    return DRETP(nullptr, "failed to create device");
+  if (!device) {
+    MAGMA_LOG(ERROR, "failed to create device");
+    return nullptr;
+  }
+
   return device.release();
 }

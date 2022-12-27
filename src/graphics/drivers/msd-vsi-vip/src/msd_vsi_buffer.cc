@@ -6,8 +6,10 @@
 
 std::unique_ptr<MsdVsiBuffer> MsdVsiBuffer::Import(uint32_t handle, uint64_t client_id) {
   auto platform_buf = magma::PlatformBuffer::Import(handle);
-  if (!platform_buf)
-    return DRETP(nullptr, "failed to import buffer handle 0x%x", handle);
+  if (!platform_buf) {
+    MAGMA_LOG(ERROR, "failed to import buffer handle 0x%x", handle);
+    return nullptr;
+  }
 
   platform_buf->set_local_id(client_id);
 
@@ -16,8 +18,10 @@ std::unique_ptr<MsdVsiBuffer> MsdVsiBuffer::Import(uint32_t handle, uint64_t cli
 
 std::unique_ptr<MsdVsiBuffer> MsdVsiBuffer::Create(uint64_t size, const char* name) {
   auto platform_buf = magma::PlatformBuffer::Create(size, name);
-  if (!platform_buf)
-    return DRETP(nullptr, "failed to create buffer size %lu", size);
+  if (!platform_buf) {
+    MAGMA_LOG(ERROR, "failed to create buffer size %lu", size);
+    return nullptr;
+  }
   return std::make_unique<MsdVsiBuffer>(std::move(platform_buf));
 }
 
@@ -25,8 +29,11 @@ std::unique_ptr<MsdVsiBuffer> MsdVsiBuffer::Create(uint64_t size, const char* na
 
 msd_buffer_t* msd_buffer_import(uint32_t handle, uint64_t client_id) {
   auto buffer = MsdVsiBuffer::Import(handle, client_id);
-  if (!buffer)
-    return DRETP(nullptr, "failed to import buffer handle 0x%x", handle);
+  if (!buffer) {
+    MAGMA_LOG(ERROR, "failed to import buffer handle 0x%x", handle);
+    return nullptr;
+  }
+
   return new MsdVsiAbiBuffer(std::move(buffer));
 }
 

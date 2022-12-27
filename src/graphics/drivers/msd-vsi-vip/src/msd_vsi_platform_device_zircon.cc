@@ -27,8 +27,10 @@ class MsdVsiPlatformDeviceZircon : public MsdVsiPlatformDevice {
 
 std::unique_ptr<MsdVsiPlatformDevice> MsdVsiPlatformDevice::Create(void* platform_device_handle) {
   auto platform_device = magma::PlatformDevice::Create(platform_device_handle);
-  if (!platform_device)
-    return DRETP(nullptr, "PlatformDevice::Create failed");
+  if (!platform_device) {
+    MAGMA_LOG(ERROR, "PlatformDevice::Create failed");
+    return nullptr;
+  }
 
   auto zircon_device = static_cast<magma::ZirconPlatformDevice*>(platform_device.get());
 

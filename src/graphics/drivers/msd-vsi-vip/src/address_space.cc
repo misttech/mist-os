@@ -13,26 +13,36 @@ const AddressSpace::pde_t AddressSpace::kInvalidPde =
 
 bool AddressSpace::Page::Init(bool cached) {
   buffer_ = magma::PlatformBuffer::Create(PAGE_SIZE, "page table");
-  if (!buffer_)
-    return DRETF(false, "couldn't create buffer");
+  if (!buffer_) {
+    MAGMA_LOG(ERROR, "couldn't create buffer");
+    return false;
+  }
 
-  if (!cached && !buffer_->SetCachePolicy(MAGMA_CACHE_POLICY_UNCACHED))
-    return DRETF(false, "couldn't set buffer uncached");
+  if (!cached && !buffer_->SetCachePolicy(MAGMA_CACHE_POLICY_UNCACHED)) {
+    MAGMA_LOG(ERROR, "couldn't set buffer uncached");
+    return false;
+  }
 
-  if (!buffer_->MapCpu(&mapping_))
-    return DRETF(false, "failed to map cpu");
+  if (!buffer_->MapCpu(&mapping_)) {
+    MAGMA_LOG(ERROR, "failed to map cpu");
+    return false;
+  }
 
   bus_mapping_ = owner_->GetBusMapper()->MapPageRangeBus(buffer_.get(), 0, 1);
-  if (!bus_mapping_)
-    return DRETF(false, "failed to map page range bus");
+  if (!bus_mapping_) {
+    MAGMA_LOG(ERROR, "failed to map page range bus");
+    return false;
+  }
 
   return true;
 }
 
 std::unique_ptr<AddressSpace::PageTable> AddressSpace::PageTable::Create(Owner* owner) {
   auto page_table = std::make_unique<PageTable>(owner);
-  if (!page_table->Init(true))  // cached
-    return DRETP(nullptr, "page table init failed");
+  if (!page_table->Init(true)) {  // cached
+    MAGMA_LOG(ERROR, "page table init failed");
+    return nullptr;
+  }
 
   for (uint32_t i = 0; i < kPageTableEntries; i++) {
     *page_table->entry(i) = kInvalidPte;
@@ -44,8 +54,10 @@ std::unique_ptr<AddressSpace::PageTable> AddressSpace::PageTable::Create(Owner* 
 
 std::unique_ptr<AddressSpace::PageDirectory> AddressSpace::PageDirectory::Create(Owner* owner) {
   auto dir = std::make_unique<PageDirectory>(owner);
-  if (!dir->Init(false))  // not cached
-    return DRETP(nullptr, "init failed");
+  if (!dir->Init(false)) {  // not cached
+    MAGMA_LOG(ERROR, "init failed");
+    return nullptr;
+  }
 
   for (uint32_t i = 0; i < kPageDirectoryEntries; i++) {
     *dir->entry(i) = kInvalidPde;
@@ -56,14 +68,21 @@ std::unique_ptr<AddressSpace::PageDirectory> AddressSpace::PageDirectory::Create
 AddressSpace::PageTable* AddressSpace::PageDirectory::GetPageTable(uint32_t index, bool alloc) {
   DASSERT(index < kPageDirectoryEntries);
   if (!page_tables_[index]) {
-    if (!alloc)
-      return nullptr;  // No scratch table
+    if (!alloc) {
+      MAGMA_LOG(ERROR, "No scratch table");
+      return nullptr;
+    }
     page_tables_[index] = PageTable::Create(owner());
-    if (!page_tables_[index])
-      return DRETP(nullptr, "couldn't create page table");
+    if (!page_tables_[index]) {
+      MAGMA_LOG(ERROR, "couldn't create page table");
+      return nullptr;
+    }
+
     pde_t* pde = entry(index);
-    if (!pde_encode(page_tables_[index]->bus_addr(), true, pde))
-      return DRETP(nullptr, "failed to encode pde");
+    if (!pde_encode(page_tables_[index]->bus_addr(), true, pde)) {
+      MAGMA_LOG(ERROR, "failed to encode pde");
+      return nullptr;
+    }
   }
   return page_tables_[index].get();
 }
@@ -74,8 +93,10 @@ AddressSpace::pte_t* AddressSpace::PageDirectory::GetPageTableEntry(uint32_t pag
   DASSERT(page_directory_index < kPageDirectoryEntries);
   *valid_count_out = valid_counts_[page_directory_index];
   auto table = GetPageTable(page_directory_index, true);
-  if (!table)
+  if (!table) {
+    MAGMA_LOG(ERROR, "Page table entry not found");
     return nullptr;
+  }
   return table->entry(page_table_index);
 }
 
@@ -95,15 +116,19 @@ void AddressSpace::PageDirectory::PageTableUpdated(uint32_t page_directory_index
 
 std::unique_ptr<AddressSpace> AddressSpace::Create(Owner* owner, uint32_t page_table_array_slot) {
   auto address_space = std::make_unique<AddressSpace>(owner, page_table_array_slot);
-  if (!address_space->Init())
-    return DRETP(nullptr, "Failed to init");
+  if (!address_space->Init()) {
+    MAGMA_LOG(ERROR, "Failed to init");
+    return nullptr;
+  }
   return address_space;
 }
 
 bool AddressSpace::Init() {
   root_ = PageDirectory::Create(owner_);
-  if (!root_)
-    return DRETF(false, "Failed to create page directory");
+  if (!root_) {
+    MAGMA_LOG(ERROR, "Failed to create page directory");
+    return false;
+  }
 
   return true;
 }
@@ -116,9 +141,11 @@ bool AddressSpace::InsertLocked(uint64_t addr, magma::PlatformBusMapper::BusMapp
   auto& bus_addr_array = bus_mapping->Get();
   uint64_t page_count = bus_addr_array.size();
 
-  if (page_count > bus_addr_array.size())
-    return DRETF(false, "page_count %lu larger than bus mapping length %zu", page_count,
-                 bus_addr_array.size());
+  if (page_count > bus_addr_array.size()) {
+    MAGMA_LOG(ERROR, "page_count %lu larger than bus mapping length %zu", page_count,
+              bus_addr_array.size());
+    return false;
+  }
 
   uint32_t page_table_index = (addr >>= PAGE_SHIFT) & kPageTableMask;
   uint32_t page_directory_index = (addr >>= kPageTableShift) & kPageDirectoryMask;
@@ -131,11 +158,15 @@ bool AddressSpace::InsertLocked(uint64_t addr, magma::PlatformBusMapper::BusMapp
 
   for (uint64_t i = 0; i < page_count; i++) {
     pte_t pte;
-    if (!pte_encode(bus_addr_array[i], true, true, true, &pte))
-      return DRETF(false, "failed to encode pte");
+    if (!pte_encode(bus_addr_array[i], true, true, true, &pte)) {
+      MAGMA_LOG(ERROR, "failed to encode pte");
+      return false;
+    }
 
-    if (!page_table_entry)
-      return DRETF(false, "couldn't get page table entry");
+    if (!page_table_entry) {
+      MAGMA_LOG(ERROR, "couldn't get page table entry");
+      return false;
+    }
 
     if (*page_table_entry == kInvalidPte) {
       valid_count++;
@@ -164,8 +195,10 @@ bool AddressSpace::ClearLocked(uint64_t addr, magma::PlatformBusMapper::BusMappi
   DASSERT(magma::is_page_aligned(addr));
   uint64_t page_count = bus_mapping->page_count();
 
-  if ((addr >> PAGE_SHIFT) + page_count > (1l << (kVirtualAddressBits - PAGE_SHIFT)))
-    return DRETF(false, "Virtual address too large");
+  if ((addr >> PAGE_SHIFT) + page_count > (1l << (kVirtualAddressBits - PAGE_SHIFT))) {
+    MAGMA_LOG(ERROR, "Virtual address too large");
+    return false;
+  }
 
   uint32_t page_table_index = (addr >>= PAGE_SHIFT) & kPageTableMask;
   uint32_t page_directory_index = (addr >>= kPageTableShift) & kPageDirectoryMask;
@@ -177,8 +210,10 @@ bool AddressSpace::ClearLocked(uint64_t addr, magma::PlatformBusMapper::BusMappi
       root_->GetPageTableEntry(page_directory_index, page_table_index, &valid_count);
 
   for (uint64_t i = 0; i < page_count; i++) {
-    if (!page_table_entry)
-      return DRETF(false, "couldn't get page table entry");
+    if (!page_table_entry) {
+      MAGMA_LOG(ERROR, "couldn't get page table entry");
+      return false;
+    }
 
     if (*page_table_entry != kInvalidPte) {
       DASSERT(valid_count > 0);

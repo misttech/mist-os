@@ -101,8 +101,10 @@ bool MsdVsiDevice::Shutdown() {
 std::unique_ptr<MsdVsiDevice> MsdVsiDevice::Create(void* device_handle, bool start_device_thread) {
   auto device = std::make_unique<MsdVsiDevice>();
 
-  if (!device->Init(device_handle))
-    return DRETP(nullptr, "Failed to initialize device");
+  if (!device->Init(device_handle)) {
+    MAGMA_LOG(ERROR, "Failed to initialize device");
+    return nullptr;
+  }
 
   if (start_device_thread)
     device->StartDeviceThread();
@@ -112,16 +114,20 @@ std::unique_ptr<MsdVsiDevice> MsdVsiDevice::Create(void* device_handle, bool sta
 
 bool MsdVsiDevice::Init(void* device_handle) {
   platform_device_ = MsdVsiPlatformDevice::Create(device_handle);
-  if (!platform_device_)
-    return DRETF(false, "Failed to create platform device");
+  if (!platform_device_) {
+    MAGMA_LOG(ERROR, "Failed to create platform device");
+    return false;
+  }
 
   uint32_t mmio_count = platform_device_->platform_device()->GetMmioCount();
   DASSERT(mmio_count > 0);
 
   std::unique_ptr<magma::PlatformMmio> mmio = platform_device_->platform_device()->CpuMapMmio(
       0, magma::PlatformMmio::CACHE_POLICY_UNCACHED_DEVICE);
-  if (!mmio)
-    return DRETF(false, "failed to map registers");
+  if (!mmio) {
+    MAGMA_LOG(ERROR, "failed to map registers");
+    return false;
+  }
 
   register_io_ = std::make_unique<VsiRegisterIo>(std::move(mmio), *this);
 
@@ -134,15 +140,21 @@ bool MsdVsiDevice::Init(void* device_handle) {
 
   if (HasAxiSram()) {
     external_sram_ = platform_device_->platform_device()->GetMmioBuffer(kSramMmioIndex);
-    if (!external_sram_)
-      return DRETF(false, "GetMmioBuffer(%d) failed", kSramMmioIndex);
+    if (!external_sram_) {
+      MAGMA_LOG(ERROR, "GetMmioBuffer(%d) failed", kSramMmioIndex);
+      return false;
+    }
 
-    if (!external_sram_->SetCachePolicy(MAGMA_CACHE_POLICY_WRITE_COMBINING))
-      return DRETF(false, "Failed setting cache policy on external SRAM");
+    if (!external_sram_->SetCachePolicy(MAGMA_CACHE_POLICY_WRITE_COMBINING)) {
+      MAGMA_LOG(ERROR, "Failed setting cache policy on external SRAM");
+      return false;
+    }
   }
 
-  if (!IsValidDeviceId())
-    return DRETF(false, "Unsupported gpu model 0x%x\n", device_id_);
+  if (!IsValidDeviceId()) {
+    MAGMA_LOG(ERROR, "Unsupported gpu model 0x%x\n", device_id_);
+    return false;
+  }
 
   revision_ = registers::Revision::Get().ReadFrom(register_io()).chip_revision();
 
@@ -165,19 +177,25 @@ bool MsdVsiDevice::Init(void* device_handle) {
        gpu_features_->num_constants(), gpu_features_->varyings_count());
 
   if (Has3dPipe()) {
-    if (!gpu_features_->features().pipe_3d())
-      return DRETF(false, "Gpu has no 3d pipe: features 0x%x\n",
-                   gpu_features_->features().reg_value());
+    if (!gpu_features_->features().pipe_3d()) {
+      MAGMA_LOG(ERROR, "Gpu has no 3d pipe: features 0x%x\n",
+                gpu_features_->features().reg_value());
+      return false;
+    }
   }
 
   bus_mapper_ = magma::PlatformBusMapper::Create(
       platform_device_->platform_device()->GetBusTransactionInitiator());
-  if (!bus_mapper_)
-    return DRETF(false, "failed to create bus mapper");
+  if (!bus_mapper_) {
+    MAGMA_LOG(ERROR, "failed to create bus mapper");
+    return false;
+  }
 
   page_table_arrays_ = PageTableArrays::Create(bus_mapper_.get());
-  if (!page_table_arrays_)
-    return DRETF(false, "failed to create page table arrays");
+  if (!page_table_arrays_) {
+    MAGMA_LOG(ERROR, "failed to create page table arrays");
+    return false;
+  }
 
   // Add a page to account for ringbuffer overfetch
   uint32_t ringbuffer_size = AddressSpaceLayout::ringbuffer_size() + magma::page_size();
@@ -190,7 +208,8 @@ bool MsdVsiDevice::Init(void* device_handle) {
       std::make_unique<Ringbuffer>(std::move(buffer), AddressSpaceLayout::ringbuffer_size());
 
   if (!ringbuffer_->MapCpu()) {
-    return DRETF(false, "Failed to map cpu for ringbuffer");
+    MAGMA_LOG(ERROR, "Failed to map cpu for ringbuffer");
+    return false;
   }
 
   progress_ = std::make_unique<GpuProgress>();
@@ -202,14 +221,16 @@ bool MsdVsiDevice::Init(void* device_handle) {
 
   interrupt_ = platform_device_->platform_device()->RegisterInterrupt(kInterruptIndex);
   if (!interrupt_) {
-    return DRETF(false, "Failed to register interrupt");
+    MAGMA_LOG(ERROR, "Failed to register interrupt");
+    return false;
   }
 
   page_table_slot_allocator_ = std::make_unique<PageTableSlotAllocator>(page_table_arrays_->size());
 
   bool reset = HardwareReset();
   if (!reset) {
-    return DRETF(false, "Failed to reset hardware");
+    MAGMA_LOG(ERROR, "Failed to reset hardware");
+    return false;
   }
 
   HardwareInit();
@@ -335,7 +356,8 @@ int MsdVsiDevice::DeviceThreadLoop() {
       magma::PlatformThreadHelper::SetRole(platform_device_->platform_device()->GetDeviceHandle(),
                                            "fuchsia.graphics.drivers.msd-vsi-vip.device");
   if (!applied_role) {
-    return DRETF(0, "Failed to get higher priority!");
+    MAGMA_LOG(ERROR, "Failed to get higher priority!");
+    return 0;
   }
 
   std::unique_lock<std::mutex> lock(device_request_mutex_, std::defer_lock);
@@ -409,7 +431,8 @@ int MsdVsiDevice::InterruptThreadLoop() {
       magma::PlatformThreadHelper::SetRole(platform_device_->platform_device()->GetDeviceHandle(),
                                            "fuchsia.graphics.drivers.msd-vsi-vip.vsi-interrupt");
   if (!applied_role) {
-    return DRETF(0, "Failed to get higher priority!");
+    MAGMA_LOG(ERROR, "Failed to get higher priority!");
+    return 0;
   }
 
   while (!stop_interrupt_thread_) {
@@ -629,17 +652,21 @@ bool MsdVsiDevice::AllocInterruptEvent(bool free_on_complete, uint32_t* out_even
       return true;
     }
   }
-  return DRETF(false, "No events are currently available");
+
+  MAGMA_LOG(ERROR, "No events are currently available");
+  return false;
 }
 
 bool MsdVsiDevice::FreeInterruptEvent(uint32_t event_id) {
   CHECK_THREAD_IS_CURRENT(device_thread_id_);
 
   if (event_id >= kNumEvents) {
-    return DRETF(false, "Invalid event id %u", event_id);
+    MAGMA_LOG(ERROR, "Invalid event id %u", event_id);
+    return false;
   }
   if (!events_[event_id].allocated) {
-    return DRETF(false, "Event id %u was not allocated", event_id);
+    MAGMA_LOG(ERROR, "Event id %u was not allocated", event_id);
+    return false;
   }
   events_[event_id] = {};
 
@@ -652,16 +679,20 @@ bool MsdVsiDevice::WriteInterruptEvent(uint32_t event_id, std::unique_ptr<Mapped
   CHECK_THREAD_IS_CURRENT(device_thread_id_);
 
   if (event_id >= kNumEvents) {
-    return DRETF(false, "Invalid event id %u", event_id);
+    MAGMA_LOG(ERROR, "Invalid event id %u", event_id);
+    return false;
   }
   if (!events_[event_id].allocated) {
-    return DRETF(false, "Event id %u was not allocated", event_id);
+    MAGMA_LOG(ERROR, "Event id %u was not allocated", event_id);
+    return false;
   }
   if (events_[event_id].submitted) {
-    return DRETF(false, "Event id %u was already submitted", event_id);
+    MAGMA_LOG(ERROR, "Event id %u was already submitted", event_id);
+    return false;
   }
   if (!mapped_batch) {
-    return DRETF(false, "No mapped batch was provided");
+    MAGMA_LOG(ERROR, "No mapped batch was provided");
+    return false;
   }
   events_[event_id].submitted = true;
   events_[event_id].mapped_batch = std::move(mapped_batch);
@@ -677,11 +708,13 @@ bool MsdVsiDevice::CompleteInterruptEvent(uint32_t event_id) {
   CHECK_THREAD_IS_CURRENT(device_thread_id_);
 
   if (event_id >= kNumEvents) {
-    return DRETF(false, "Invalid event id %u", event_id);
+    MAGMA_LOG(ERROR, "Invalid event id %u", event_id);
+    return false;
   }
   if (!events_[event_id].allocated || !events_[event_id].submitted) {
-    return DRETF(false, "Cannot complete event %u, allocated %u submitted %u", event_id,
-                 events_[event_id].allocated, events_[event_id].submitted);
+    MAGMA_LOG(ERROR, "Cannot complete event %u, allocated %u submitted %u", event_id,
+              events_[event_id].allocated, events_[event_id].submitted);
+    return false;
   }
   num_events_completed_++;
 
@@ -752,7 +785,8 @@ bool MsdVsiDevice::StopRingbuffer() {
   // Overwrite the last WAIT with an END.
   uint32_t prev_wait_link = ringbuffer_->SubtractOffset(kWaitLinkDwords * sizeof(uint32_t));
   if (!ringbuffer_->Overwrite32(prev_wait_link, MiEnd::kCommandType)) {
-    return DRETF(false, "Failed to overwrite WAIT in ringbuffer");
+    MAGMA_LOG(ERROR, "Failed to overwrite WAIT in ringbuffer");
+    return false;
   }
 
   DLOG("Ringbuffer stopped (0x%X)", prev_wait_link);
@@ -773,7 +807,9 @@ bool MsdVsiDevice::WaitUntilIdle(uint32_t timeout_ms) {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   auto idle_state = registers::IdleState::Get().ReadFrom(register_io_.get()).reg_value();
-  return DRETF(false, "WaitUntilIdle failed, IdleState register: 0x%x", idle_state);
+
+  MAGMA_LOG(ERROR, "WaitUntilIdle failed, IdleState register: 0x%x", idle_state);
+  return false;
 }
 
 bool MsdVsiDevice::LoadInitialAddressSpace(std::shared_ptr<MsdVsiContext> context,
@@ -783,24 +819,28 @@ bool MsdVsiDevice::LoadInitialAddressSpace(std::shared_ptr<MsdVsiContext> contex
 
   // Check if we have already configured an address space and enabled the MMU.
   if (page_table_arrays_->IsEnabled(register_io())) {
-    return DRETF(false, "MMU already enabled");
+    MAGMA_LOG(ERROR, "MMU already enabled");
+    return false;
   }
   static constexpr uint32_t kPageCount = 1;
 
   std::unique_ptr<magma::PlatformBuffer> buffer =
       magma::PlatformBuffer::Create(PAGE_SIZE * kPageCount, "address space config");
   if (!buffer) {
-    return DRETF(false, "failed to create buffer");
+    MAGMA_LOG(ERROR, "failed to create buffer");
+    return false;
   }
 
   auto bus_mapping = GetBusMapper()->MapPageRangeBus(buffer.get(), 0, kPageCount);
   if (!bus_mapping) {
-    return DRETF(false, "failed to create bus mapping");
+    MAGMA_LOG(ERROR, "failed to create bus mapping");
+    return false;
   }
 
   uint32_t* cmd_ptr;
   if (!buffer->MapCpu(reinterpret_cast<void**>(&cmd_ptr))) {
-    return DRETF(false, "failed to map command buffer");
+    MAGMA_LOG(ERROR, "failed to map command buffer");
+    return false;
   }
 
   BufferWriter buf_writer(cmd_ptr, magma::to_uint32(buffer->size()), 0);
@@ -809,20 +849,24 @@ bool MsdVsiDevice::LoadInitialAddressSpace(std::shared_ptr<MsdVsiContext> contex
   MiEnd::write(&buf_writer);
 
   if (!buffer->UnmapCpu()) {
-    return DRETF(false, "failed to unmap cpu");
+    MAGMA_LOG(ERROR, "failed to unmap cpu");
+    return false;
   }
   if (!buffer->CleanCache(0, PAGE_SIZE * kPageCount, false)) {
-    return DRETF(false, "failed to clean buffer cache");
+    MAGMA_LOG(ERROR, "failed to clean buffer cache");
+    return false;
   }
 
   auto res =
       SubmitCommandBufferNoMmu(bus_mapping->Get()[0], magma::to_uint32(buf_writer.bytes_written()));
   if (!res) {
-    return DRETF(false, "failed to submit command buffer");
+    MAGMA_LOG(ERROR, "failed to submit command buffer");
+    return false;
   }
   constexpr uint32_t kTimeoutMs = 1000;
   if (!WaitUntilIdle(kTimeoutMs)) {
-    return DRETF(false, "failed to wait for device to be idle");
+    MAGMA_LOG(ERROR, "failed to wait for device to be idle");
+    return false;
   }
 
   page_table_arrays_->Enable(register_io(), true);
@@ -836,13 +880,17 @@ bool MsdVsiDevice::LoadInitialAddressSpace(std::shared_ptr<MsdVsiContext> contex
 
 bool MsdVsiDevice::SubmitCommandBufferNoMmu(uint64_t bus_addr, uint32_t length,
                                             uint16_t* prefetch_out) {
-  if (bus_addr & 0xFFFFFFFF00000000ul)
-    return DRETF(false, "Can't submit address > 32 bits without mmu: 0x%08lx", bus_addr);
+  if (bus_addr & 0xFFFFFFFF00000000ul) {
+    MAGMA_LOG(ERROR, "Can't submit address > 32 bits without mmu: 0x%08lx", bus_addr);
+    return false;
+  }
 
   uint32_t prefetch =
       magma::round_up(length, static_cast<uint32_t>(sizeof(uint64_t))) / sizeof(uint64_t);
-  if (prefetch & 0xFFFF0000)
-    return DRETF(false, "Can't submit length %u (prefetch 0x%x)", length, prefetch);
+  if (prefetch & 0xFFFF0000) {
+    MAGMA_LOG(ERROR, "Can't submit length %u (prefetch 0x%x)", length, prefetch);
+    return false;
+  }
 
   prefetch &= 0xFFFF;
   if (prefetch_out) {
@@ -884,7 +932,8 @@ bool MsdVsiDevice::StartRingbuffer(std::shared_ptr<MsdVsiContext> context) {
   uint64_t rb_gpu_addr;
   bool res = context->exec_address_space()->GetRingbufferGpuAddress(&rb_gpu_addr);
   if (!res) {
-    return DRETF(res, "Could not get ringbuffer gpu address");
+    MAGMA_LOG(ERROR, "Could not get ringbuffer gpu address");
+    return false;
   }
 
   const uint16_t kRbPrefetch = 2;
@@ -918,7 +967,8 @@ bool MsdVsiDevice::AddRingbufferWaitLink() {
   uint64_t rb_gpu_addr;
   bool res = configured_address_space_->GetRingbufferGpuAddress(&rb_gpu_addr);
   if (!res) {
-    return DRETF(false, "Failed to get ringbuffer gpu address");
+    MAGMA_LOG(ERROR, "Failed to get ringbuffer gpu address");
+    return false;
   }
   uint32_t wait_gpu_addr = magma::to_uint32(rb_gpu_addr) + ringbuffer_->tail();
   MiWait::write(ringbuffer_.get());
@@ -947,19 +997,22 @@ bool MsdVsiDevice::WriteLinkCommand(magma::PlatformBuffer* buf, uint32_t write_o
   uint32_t link_instr_size = kInstructionDwords * sizeof(uint32_t);
 
   if (buf->size() < write_offset + link_instr_size) {
-    return DRETF(false, "Buffer does not have %d free bytes for ringbuffer LINK", link_instr_size);
+    MAGMA_LOG(ERROR, "Buffer does not have %d free bytes for ringbuffer LINK", link_instr_size);
+    return false;
   }
 
   uint32_t* buf_cpu_addr;
   bool res = buf->MapCpu(reinterpret_cast<void**>(&buf_cpu_addr));
   if (!res) {
-    return DRETF(false, "Failed to map command buffer");
+    MAGMA_LOG(ERROR, "Failed to map command buffer");
+    return false;
   }
 
   BufferWriter buf_writer(buf_cpu_addr, magma::to_uint32(buf->size()), write_offset);
   MiLink::write(&buf_writer, link_prefetch, link_addr);
   if (!buf->UnmapCpu()) {
-    return DRETF(false, "Failed to unmap command buffer");
+    MAGMA_LOG(ERROR, "Failed to unmap command buffer");
+    return false;
   }
   return true;
 }
@@ -972,7 +1025,8 @@ bool MsdVsiDevice::SubmitFlushTlb(std::shared_ptr<MsdVsiContext> context) {
   uint64_t rb_gpu_addr;
   bool res = configured_address_space_->GetRingbufferGpuAddress(&rb_gpu_addr);
   if (!res) {
-    return DRETF(false, "Failed to get ringbuffer gpu address");
+    MAGMA_LOG(ERROR, "Failed to get ringbuffer gpu address");
+    return false;
   }
 
   // Save the previous WAIT LINK which will be replaced with a LINK jumping to the new commands.
@@ -1017,7 +1071,8 @@ bool MsdVsiDevice::SubmitFlushTlb(std::shared_ptr<MsdVsiContext> context) {
                  kWaitAddressSpaceChange);
 
   if (!AddRingbufferWaitLink()) {
-    return DRETF(false, "Failed to add WAIT-LINK to ringbuffer");
+    MAGMA_LOG(ERROR, "Failed to get ringbuffer gpu address");
+    return false;
   }
 
   // Verify the number of instructions we just wrote matches the prefetch value
@@ -1041,7 +1096,8 @@ bool MsdVsiDevice::SubmitCommandBuffer(std::shared_ptr<MsdVsiContext> context,
                                        std::unique_ptr<MappedBatch> mapped_batch,
                                        uint32_t event_id) {
   if (context->killed()) {
-    return DRETF(false, "Context killed");
+    MAGMA_LOG(ERROR, "Context killed");
+    return false;
   }
 
   auto kill_context = fit::defer([context]() { context->Kill(); });
@@ -1053,13 +1109,15 @@ bool MsdVsiDevice::SubmitCommandBuffer(std::shared_ptr<MsdVsiContext> context,
   bool initial_address_space_loaded = page_table_arrays_->IsEnabled(register_io());
   if (!initial_address_space_loaded) {
     if (!LoadInitialAddressSpace(context, address_space_index)) {
-      return DRETF(false, "Failed to load initial address space");
+      MAGMA_LOG(ERROR, "Failed to load initial address space");
+      return false;
     }
   }
   // Check if we have started the ringbuffer WAIT-LINK loop.
   if (IsIdle()) {
     if (!StartRingbuffer(context)) {
-      return DRETF(false, "Failed to start ringbuffer");
+      MAGMA_LOG(ERROR, "Failed to start ringbuffer");
+      return false;
     }
   }
   // Check if we need to switch address spaces. We should also save this copy before
@@ -1071,12 +1129,14 @@ bool MsdVsiDevice::SubmitCommandBuffer(std::shared_ptr<MsdVsiContext> context,
   bool switch_address_space = prev_address_space.get() != context->exec_address_space().get();
   do_flush |= switch_address_space;
   if (do_flush && !SubmitFlushTlb(context)) {
-    return DRETF(false, "Failed to submit flush tlb command");
+    MAGMA_LOG(ERROR, "Failed to submit flush tlb command");
+    return false;
   }
   uint64_t rb_gpu_addr;
   bool res = context->exec_address_space()->GetRingbufferGpuAddress(&rb_gpu_addr);
   if (!res) {
-    return DRETF(false, "Failed to get ringbuffer gpu address");
+    MAGMA_LOG(ERROR, "Failed to get ringbuffer gpu address");
+    return false;
   }
   uint32_t gpu_addr = magma::to_uint32(mapped_batch->GetGpuAddress());
   uint32_t length = magma::to_uint32(magma::round_up(mapped_batch->GetLength(), sizeof(uint64_t)));
@@ -1107,7 +1167,8 @@ bool MsdVsiDevice::SubmitCommandBuffer(std::shared_ptr<MsdVsiContext> context,
 
     // Write a LINK at the end of the command buffer that links back to the ringbuffer.
     if (!WriteLinkCommand(buf, write_offset, kRbPrefetch, rb_complete_addr)) {
-      return DRETF(false, "Failed to write LINK from command buffer to ringbuffer");
+      MAGMA_LOG(ERROR, "Failed to write LINK from command buffer to ringbuffer");
+      return false;
     }
     // Increment the command buffer length to account for the LINK command size.
     length += (kInstructionDwords * sizeof(uint32_t));
@@ -1124,7 +1185,8 @@ bool MsdVsiDevice::SubmitCommandBuffer(std::shared_ptr<MsdVsiContext> context,
         uint32_t cmd_buf_prefetch =
             magma::round_up(length, static_cast<uint32_t>(sizeof(uint64_t))) / sizeof(uint64_t);
         if (cmd_buf_prefetch & 0xFFFF0000) {
-          return DRETF(false, "Can't submit length %u (prefetch 0x%x)", length, cmd_buf_prefetch);
+          MAGMA_LOG(ERROR, "Can't submit length %u (prefetch 0x%x)", length, cmd_buf_prefetch);
+          return false;
         }
         // Write a LINK at the end of the context state buffer that links to the command buffer.
         uint32_t csb_length = magma::to_uint32(magma::round_up(csb->length, sizeof(uint64_t)));
@@ -1132,7 +1194,8 @@ bool MsdVsiDevice::SubmitCommandBuffer(std::shared_ptr<MsdVsiContext> context,
                                     magma::to_uint32(csb_length + csb->offset) /* write_offset */,
                                     static_cast<uint16_t>(cmd_buf_prefetch), gpu_addr);
         if (!res) {
-          return DRETF(false, "Failed to write LINK from context state buffer to command buffer");
+          MAGMA_LOG(ERROR, "Failed to write LINK from context state buffer to command buffer");
+          return false;
         }
         // Update the address the ringbuffer will link to.
         gpu_addr = magma::to_uint32(csb_mapping->gpu_addr());
@@ -1147,19 +1210,23 @@ bool MsdVsiDevice::SubmitCommandBuffer(std::shared_ptr<MsdVsiContext> context,
 
   uint32_t prefetch =
       magma::round_up(length, static_cast<uint32_t>(sizeof(uint64_t))) / sizeof(uint64_t);
-  if (prefetch & 0xFFFF0000)
-    return DRETF(false, "Can't submit length %u (prefetch 0x%x)", length, prefetch);
+  if (prefetch & 0xFFFF0000) {
+    MAGMA_LOG(ERROR, "Can't submit length %u (prefetch 0x%x)", length, prefetch);
+    return false;
+  }
 
   // Write the new commands to the end of the ringbuffer.
   // When adding new instructions, make sure to modify |kRbInstructionsPerBatch| accordingly.
   // Add an EVENT to the end to the ringbuffer.
   uint32_t new_rb_instructions_start = ringbuffer_->tail();
   if (!WriteInterruptEvent(event_id, std::move(mapped_batch), prev_address_space)) {
-    return DRETF(false, "Failed to write interrupt event %u\n", event_id);
+    MAGMA_LOG(ERROR, "Failed to write interrupt event %u\n", event_id);
+    return false;
   }
   // Add a new WAIT-LINK to the end of the ringbuffer.
   if (!AddRingbufferWaitLink()) {
-    return DRETF(false, "Failed to add WAIT-LINK to ringbuffer");
+    MAGMA_LOG(ERROR, "Failed to add WAIT-LINK to ringbuffer");
+    return false;
   }
   // Verify the number of instructions we just wrote matches the prefetch value
   // of the user buffer's LINK command.
@@ -1215,8 +1282,9 @@ magma::Status MsdVsiDevice::ProcessBatch(std::unique_ptr<MappedBatch> batch, boo
 
   auto context = batch->GetContext().lock();
   if (!context) {
-    return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "No context for batch %lu, IsCommandBuffer=%d",
-                    batch->GetBatchBufferId(), batch->IsCommandBuffer());
+    MAGMA_LOG(ERROR, "No context for batch %lu, IsCommandBuffer=%d", batch->GetBatchBufferId(),
+              batch->IsCommandBuffer());
+    return MAGMA_STATUS_INTERNAL_ERROR;
   }
 
   uint32_t sequence_number = sequencer_->next_sequence_number();
@@ -1233,7 +1301,8 @@ magma::Status MsdVsiDevice::ProcessBatch(std::unique_ptr<MappedBatch> batch, boo
   if (!SubmitCommandBuffer(context, context->exec_address_space()->page_table_array_slot(),
                            do_flush, std::move(batch), event_id)) {
     FreeInterruptEvent(event_id);
-    return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Failed to submit command buffer");
+    MAGMA_LOG(ERROR, "Failed to submit command buffer");
+    return MAGMA_STATUS_INTERNAL_ERROR;
   }
 
   return MAGMA_STATUS_OK;
@@ -1241,12 +1310,16 @@ magma::Status MsdVsiDevice::ProcessBatch(std::unique_ptr<MappedBatch> batch, boo
 
 std::unique_ptr<MsdVsiConnection> MsdVsiDevice::Open(msd_client_id_t client_id) {
   uint32_t page_table_array_slot;
-  if (!page_table_slot_allocator_->Alloc(&page_table_array_slot))
-    return DRETP(nullptr, "couldn't allocate page table slot");
+  if (!page_table_slot_allocator_->Alloc(&page_table_array_slot)) {
+    MAGMA_LOG(ERROR, "couldn't allocate page table slot");
+    return nullptr;
+  }
 
   auto address_space = AddressSpace::Create(this, page_table_array_slot);
-  if (!address_space)
-    return DRETP(nullptr, "failed to create address space");
+  if (!address_space) {
+    MAGMA_LOG(ERROR, "failed to create address space");
+    return nullptr;
+  }
 
   page_table_arrays_->AssignAddressSpace(page_table_array_slot, address_space.get());
 
@@ -1256,7 +1329,8 @@ std::unique_ptr<MsdVsiConnection> MsdVsiDevice::Open(msd_client_id_t client_id) 
 magma_status_t MsdVsiDevice::ChipIdentity(magma_vsi_vip_chip_identity* out_identity) {
   if (!IsValidDeviceId()) {
     // TODO(fxbug.dev/37962): Read hardcoded values from features database instead.
-    return DRET_MSG(MAGMA_STATUS_UNIMPLEMENTED, "unhandled device id 0x%x", device_id());
+    MAGMA_LOG(ERROR, "unhandled device id 0x%x", device_id());
+    return MAGMA_STATUS_UNIMPLEMENTED;
   }
 
   memset(out_identity, 0, sizeof(*out_identity));
@@ -1282,7 +1356,8 @@ magma_status_t MsdVsiDevice::ChipIdentity(magma_vsi_vip_chip_identity* out_ident
 magma_status_t MsdVsiDevice::ChipOption(magma_vsi_vip_chip_option* out_option) {
   if (!IsValidDeviceId()) {
     // TODO(fxbug.dev/37962): Read hardcoded values from features database instead.
-    return DRET_MSG(MAGMA_STATUS_UNIMPLEMENTED, "unhandled device id 0x%x", device_id());
+    MAGMA_LOG(ERROR, "unhandled device id 0x%x", device_id());
+    return MAGMA_STATUS_UNIMPLEMENTED;
   }
 
   memset(out_option, 0, sizeof(*out_option));
@@ -1297,16 +1372,22 @@ magma_status_t MsdVsiDevice::ChipOption(magma_vsi_vip_chip_option* out_option) {
 }
 
 magma_status_t MsdVsiDevice::QuerySram(uint32_t* handle_out) {
-  if (!external_sram_)
-    return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Device has no external SRAM");
+  if (!external_sram_) {
+    MAGMA_LOG(ERROR, "Device has no external SRAM");
+    return MAGMA_STATUS_INTERNAL_ERROR;
+  }
 
   // TODO(fxbug.dev/70430): this may fail due to delays in handling client VMO release
-  if (external_sram_->HasChildren())
-    return DRET_MSG(MAGMA_STATUS_ACCESS_DENIED, "External SRAM has children");
+  if (external_sram_->HasChildren()) {
+    MAGMA_LOG(ERROR, "External SRAM has children");
+    return MAGMA_STATUS_ACCESS_DENIED;
+  }
 
   void* ptr;
-  if (!external_sram_->MapCpu(&ptr))
+  if (!external_sram_->MapCpu(&ptr)) {
+    MAGMA_LOG(ERROR, "MapCpu failed");
     return MAGMA_STATUS_INTERNAL_ERROR;
+  }
 
   // Wipe any previous content
   memset(ptr, 0, external_sram_->size());
@@ -1315,14 +1396,17 @@ magma_status_t MsdVsiDevice::QuerySram(uint32_t* handle_out) {
   std::optional<uint64_t> sram_base = platform_device_->GetExternalSramPhysicalBase();
   if (!sram_base.has_value()) {
     external_sram_->UnmapCpu();
-    return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Could not get external sram physical base");
+    MAGMA_LOG(ERROR, "Could not get external sram physical base");
+    return MAGMA_STATUS_INTERNAL_ERROR;
   }
   *reinterpret_cast<uint64_t*>(ptr) = sram_base.value();
 
   external_sram_->UnmapCpu();
 
-  if (!external_sram_->CreateChild(handle_out))
-    return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "CreateChild failed");
+  if (!external_sram_->CreateChild(handle_out)) {
+    MAGMA_LOG(ERROR, "CreateChild failed");
+    return MAGMA_STATUS_INTERNAL_ERROR;
+  }
 
   return MAGMA_STATUS_OK;
 }
@@ -1331,8 +1415,10 @@ magma_status_t MsdVsiDevice::QuerySram(uint32_t* handle_out) {
 
 msd_connection_t* msd_device_open(msd_device_t* device, msd_client_id_t client_id) {
   auto connection = MsdVsiDevice::cast(device)->Open(client_id);
-  if (!connection)
-    return DRETP(nullptr, "failed to create connection");
+  if (!connection) {
+    MAGMA_LOG(ERROR, "failed to create connection");
+    return nullptr;
+  }
   return new MsdVsiAbiConnection(std::move(connection));
 }
 
@@ -1342,13 +1428,16 @@ static magma_status_t DataToBuffer(const char* name, void* data, uint64_t size,
                                    uint32_t* buffer_out) {
   std::unique_ptr<magma::PlatformBuffer> buffer = magma::PlatformBuffer::Create(size, name);
   if (!buffer) {
-    return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Failed to allocate buffer");
+    MAGMA_LOG(ERROR, "Failed to allocate buffer");
+    return MAGMA_STATUS_INTERNAL_ERROR;
   }
   if (!buffer->Write(data, 0, size)) {
-    return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Failed to write result to buffer");
+    MAGMA_LOG(ERROR, "Failed to write result to buffer");
+    return MAGMA_STATUS_INTERNAL_ERROR;
   }
   if (!buffer->duplicate_handle(buffer_out)) {
-    return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Failed to duplicate handle");
+    MAGMA_LOG(ERROR, "Failed to duplicate handle");
+    return MAGMA_STATUS_INTERNAL_ERROR;
   }
   return MAGMA_STATUS_OK;
 }
@@ -1400,7 +1489,8 @@ magma_status_t msd_device_query(msd_device_t* device, uint64_t id,
       return MsdVsiDevice::cast(device)->QuerySram(result_buffer_out);
 
     default:
-      return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "unhandled id %" PRIu64, id);
+      MAGMA_LOG(ERROR, "unhandled id %" PRIu64, id);
+      return MAGMA_STATUS_INVALID_ARGS;
   }
 
   if (result_buffer_out)

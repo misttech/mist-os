@@ -14,7 +14,8 @@ std::shared_ptr<MsdVsiContext> MsdVsiContext::Create(std::weak_ptr<MsdVsiConnect
                                                      Ringbuffer* ringbuffer) {
   auto context = std::make_shared<MsdVsiContext>(connection, address_space);
   if (!context->MapRingbuffer(ringbuffer)) {
-    return DRETP(nullptr, "failed to map ringbuffer into new context");
+    MAGMA_LOG(ERROR, "failed to map ringbuffer into new context");
+    return nullptr;
   }
   return context;
 }
@@ -42,7 +43,8 @@ std::unique_ptr<MappedBatch> MsdVsiContext::CreateBatch(std::shared_ptr<MsdVsiCo
 
   auto connection = context->connection().lock();
   if (!connection) {
-    return DRETP(nullptr, "Connection is already dead");
+    MAGMA_LOG(ERROR, "Connection is already dead");
+    return nullptr;
   }
 
   std::unique_ptr<MappedBatch> batch;
@@ -53,7 +55,8 @@ std::unique_ptr<MappedBatch> MsdVsiContext::CreateBatch(std::shared_ptr<MsdVsiCo
                                                 std::make_unique<magma_command_buffer>(*cmd_buf),
                                                 std::move(resources), std::move(signal_semaphores));
     if (!command_buffer) {
-      return DRETP(nullptr, "Failed to create command buffer");
+      MAGMA_LOG(ERROR, "Failed to create command buffer");
+      return nullptr;
     }
     batch = std::move(command_buffer);
   } else {
@@ -123,19 +126,22 @@ magma_status_t msd_context_execute_command_buffer_with_resources(
     struct msd_semaphore_t** wait_semaphores, struct msd_semaphore_t** signal_semaphores) {
   auto context = MsdVsiAbiContext::cast(ctx)->ptr();
 
-  if (cmd_buf->flags)
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Flags not supported");
+  if (cmd_buf->flags) {
+    MAGMA_LOG(ERROR, "Flags not supported");
+    return MAGMA_STATUS_INVALID_ARGS;
+  }
 
   std::unique_ptr<MappedBatch> batch = MsdVsiContext::CreateBatch(
       context, cmd_buf, exec_resources, buffers, wait_semaphores, signal_semaphores);
   if (batch->IsCommandBuffer()) {
     auto* command_buffer = static_cast<CommandBuffer*>(batch.get());
     if (!command_buffer->PrepareForExecution()) {
-      return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR,
-                      "Failed to prepare command buffer for execution");
+      MAGMA_LOG(ERROR, "Failed to prepare command buffer for execution");
+      return MAGMA_STATUS_INTERNAL_ERROR;
     }
     if (!command_buffer->IsValidBatch()) {
-      return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Command buffer is not a valid batch");
+      MAGMA_LOG(ERROR, "Command buffer is not a valid batch");
+      return MAGMA_STATUS_INTERNAL_ERROR;
     }
   }
   magma::Status status = context->SubmitBatch(std::move(batch));

@@ -26,7 +26,8 @@ class CommandBuffer : public magma::CommandBuffer<MsdVsiContext, GpuMapping> {
       std::unique_ptr<magma_command_buffer> cmd_buf, std::vector<ExecResource> resources,
       std::vector<std::shared_ptr<magma::PlatformSemaphore>> signal_semaphores) {
     if (cmd_buf->resource_count > kMaxAllowedResources) {
-      return DRETP(nullptr, "Invalid resource count, only 1 additional context state is supported");
+      MAGMA_LOG(ERROR, "Invalid resource count, only 1 additional context state is supported");
+      return nullptr;
     }
     std::optional<uint32_t> context_state_buffer_resource_index;
     if (cmd_buf->resource_count == 2) {
@@ -36,7 +37,8 @@ class CommandBuffer : public magma::CommandBuffer<MsdVsiContext, GpuMapping> {
                                                           context_state_buffer_resource_index);
     if (!command_buffer->InitializeResources(std::move(resources), {} /* wait_semaphores */,
                                              std::move(signal_semaphores))) {
-      return DRETP(nullptr, "Failed to initialize resources");
+      MAGMA_LOG(ERROR, "Failed to initialize resources");
+      return nullptr;
     }
     return command_buffer;
   }
@@ -92,13 +94,15 @@ class CommandBuffer : public magma::CommandBuffer<MsdVsiContext, GpuMapping> {
     DASSERT(prepared_to_execute_);
 
     if ((batch_start_offset() & (sizeof(uint64_t) - 1)) != 0) {
-      return DRETF(false, "batch start offset is not 8 byte aligned");
+      MAGMA_LOG(ERROR, "batch start offset is not 8 byte aligned");
+      return false;
     }
     auto mapping = GetBatchMapping();
     // |GetLength| returns the actual size of the user's data.
     if (mapping->length() < batch_start_offset() + GetLength() + kAdditionalBytes) {
-      return DRETF(false, "insufficient space for LINK command, mapped %lu used %lu need %u\n",
-                   mapping->length(), GetLength(), kAdditionalBytes);
+      MAGMA_LOG(ERROR, "insufficient space for LINK command, mapped %lu used %lu need %u\n",
+                mapping->length(), GetLength(), kAdditionalBytes);
+      return false;
     }
 
     auto csb = GetContextStateBufferResource();
@@ -107,9 +111,9 @@ class CommandBuffer : public magma::CommandBuffer<MsdVsiContext, GpuMapping> {
       auto csb_mapping = GetContextStateBufferMapping();
       DASSERT(csb_mapping);
       if (csb_mapping->length() < csb->length + kAdditionalBytes) {
-        return DRETF(false,
-                     "CSB: insufficient space for LINK command, mapped %lu used %lu need %u\n",
-                     csb_mapping->length(), csb->length, kAdditionalBytes);
+        MAGMA_LOG(ERROR, "CSB: insufficient space for LINK command, mapped %lu used %lu need %u\n",
+                  csb_mapping->length(), csb->length, kAdditionalBytes);
+        return false;
       }
     }
     return true;
