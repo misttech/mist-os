@@ -11,7 +11,7 @@ group("example") {
 if (is_host) {
   host_test_data("tests") {
     sources = [
-      "project.json",
+      "project.json.gz",
       "want.json",
     ]
     outputs = [ "$root_gen_dir/{{source}}" ]

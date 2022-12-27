@@ -11,7 +11,7 @@ if (is_host) {
   host_test_data("tests") {
     sources = [
       "BUILD.gn",
-      "project.json",
+      "project.json.gz",
     ]
     outputs = [ "$root_gen_dir/{{source}}" ]
   }

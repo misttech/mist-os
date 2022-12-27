@@ -5,8 +5,10 @@
 package util
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"flag"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -21,16 +23,23 @@ var (
 )
 
 func TestFilterTargetsEmpty(t *testing.T) {
-	projectJson := filepath.Join(*testDataDir, "project.json")
-	_, err := NewGen(projectJson)
-	if err == nil {
-		t.Errorf("%v: expected error (Unable to find target in gen map), got nothing (project.json: %v).", t.Name(), projectJson)
+	root := filepath.Join(*testDataDir, "empty")
+	zippedProjectJson := filepath.Join(root, "project.json.gz")
+	projectJson := unzipProjectJson(t, zippedProjectJson)
+	gen, err := NewGen(projectJson)
+	if err != nil {
+		t.Errorf("%v: expected no error, got: %v.", t.Name(), err)
+	}
+
+	if len(gen.Targets) > 0 {
+		t.Errorf("%v: expected to find no targets, found %d: %v.", t.Name(), len(gen.Targets), gen.Targets)
 	}
 }
 
 func TestFilterTargets(t *testing.T) {
 	root := filepath.Join(*testDataDir, "example")
-	projectJson := filepath.Join(root, "project.json")
+	zippedProjectJson := filepath.Join(root, "project.json.gz")
+	projectJson := unzipProjectJson(t, zippedProjectJson)
 	gen, err := NewGen(projectJson)
 	if err != nil {
 		t.Fatalf("%v: expected no error, (project.json: %v) got %v.", t.Name(), projectJson, err)
@@ -66,4 +75,34 @@ func loadWantJSON(wantFile string, t *testing.T) map[string]*Target {
 		t.Fatalf("%v: failed to unmarshal want.json data [%v]: %v\n", t.Name(), wantFile, err)
 	}
 	return want
+}
+
+func unzipProjectJson(t *testing.T, path string) string {
+	t.Helper()
+
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("%s: failed to open zipped project.json file [%s]: %v", t.Name(), path, err)
+	}
+	defer f.Close()
+
+	stream, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatalf("%s: failed to create gzip reader: %v", t.Name(), err)
+	}
+
+	dir := t.TempDir()
+	outputFilePath := filepath.Join(dir, "project.json")
+	outputFile, err := os.Create(outputFilePath)
+	if err != nil {
+		t.Fatalf("%s: failed to create project.json file [%s]: %v", t.Name(), outputFilePath, err)
+	}
+	defer outputFile.Close()
+
+	_, err = io.Copy(outputFile, stream)
+	if err != nil {
+		t.Fatalf("%s: failed to copy zipped contents into output file [%s]: %v", t.Name(), outputFilePath, err)
+	}
+
+	return outputFilePath
 }
