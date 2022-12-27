@@ -99,12 +99,20 @@ async fn main() -> Result<(), Error> {
         tracing::error!(?e, "failed to set up ramdisk filesystems");
     });
 
+    // TODO(fxbug.dev/118209): //src/tests/oom looks for "fshost: lifecycle handler ready" to
+    // indicate the watcher is about to start.
+    tracing::info!("fshost: lifecycle handler ready");
+
     // Run the main loop of fshost, handling devices as they appear according to our filesystem
     // policy.
     let mut fs_manager = manager::Manager::new(shutdown_rx, &config, env);
     let shutdown_responder = fs_manager.device_handler(device_stream).await?;
 
     tracing::info!("shutdown signal received");
+    // TODO(fxbug.dev/118209): //src/tests/oom looks for "received shutdown command over lifecycle
+    // interface" to indicate fshost shutdown is starting. Shutdown logs have to go straight to
+    // serial because of timing issues (fxbug.dev/97630).
+    debug_log("received shutdown command over lifecycle interface");
 
     // Shutting down fshost involves sending asynchronous shutdown signals to several different
     // systems in order. If at any point we hit an error, we log loudly, but continue with the

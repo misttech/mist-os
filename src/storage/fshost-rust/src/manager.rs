@@ -58,7 +58,9 @@ impl<E: Environment> Manager<E> {
 
             match self.matcher.match_device(device.as_mut(), &mut self.environment).await {
                 Ok(true) => {}
-                Ok(false) => tracing::info!(path = %device.path(), "Ignored device"),
+                // TODO(fxbug.dev/118209): //src/tests/installer and //src/tests/femu look for
+                // "/dev/class/block/008 ignored"
+                Ok(false) => tracing::info!("{} ignored", device.path()),
                 Err(e) => {
                     tracing::error!(
                         path = %device.path(),
