@@ -330,10 +330,7 @@
             subdir: "pkg-resolver",
         },
         {
-            protocol: [
-                "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.logger.Log",
-            ],
+            protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
             from: "parent",
             to: [
                 "#log-stats",

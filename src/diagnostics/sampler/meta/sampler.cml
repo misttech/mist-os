@@ -13,10 +13,6 @@
     },
     use: [
         {
-            protocol: "fuchsia.logger.Log",
-            from: "parent",
-        },
-        {
             protocol: "fuchsia.diagnostics.ArchiveAccessor",
             from: "parent",
         },
