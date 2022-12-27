@@ -565,3 +565,24 @@ async fn shred_data_volume_from_recovery() {
         fuchsia_fs::node::OpenError::OpenError(zx::Status::NOT_FOUND)
     );
 }
+
+#[fuchsia::test]
+async fn disable_block_watcher() {
+    let mut builder = new_builder();
+    builder.fshost().set_config_value("disable_block_watcher", true);
+    builder.with_disk().format_data(data_fs_spec());
+    let fixture = builder.build().await;
+
+    // The filesystems are not mounted when the block watcher is disabled.
+    futures::select! {
+        _ = fixture.check_fs_type("data", data_fs_type()).fuse() => {
+            panic!("check_fs_type returned unexpectedly - data was mounted");
+        },
+        _ = fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).fuse() => {
+            panic!("check_fs_type returned unexpectedly - blob was mounted");
+        },
+        _ = fasync::Timer::new(std::time::Duration::from_secs(2)).fuse() => (),
+    }
+
+    fixture.tear_down().await;
+}

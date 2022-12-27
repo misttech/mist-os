@@ -12,7 +12,7 @@ use {
     fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio,
     fuchsia_runtime::{take_startup_handle, HandleType},
     fuchsia_zircon::sys::zx_debug_write,
-    futures::channel::mpsc,
+    futures::{channel::mpsc, StreamExt},
     inspect_runtime,
     std::sync::Arc,
     vfs::{
@@ -58,7 +58,7 @@ async fn main() -> Result<(), Error> {
             format_err!("missing DirectoryRequest startup handle - not launched as a component?")
         })?;
 
-    let (shutdown_tx, shutdown_rx) = mpsc::channel::<service::FshostShutdownResponder>(1);
+    let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<service::FshostShutdownResponder>(1);
     let (watcher, device_stream) = watcher::Watcher::new().await?;
 
     let mut env = FshostEnvironment::new(config.clone(), boot_args);
@@ -105,8 +105,17 @@ async fn main() -> Result<(), Error> {
 
     // Run the main loop of fshost, handling devices as they appear according to our filesystem
     // policy.
-    let mut fs_manager = manager::Manager::new(shutdown_rx, &config, env);
-    let shutdown_responder = fs_manager.device_handler(device_stream).await?;
+    let mut fs_manager = manager::Manager::new(&config, env);
+    let shutdown_responder = if config.disable_block_watcher {
+        // If the block watcher is disabled, fshost just waits on the shutdown receiver instead of
+        // processing devices.
+        shutdown_rx
+            .next()
+            .await
+            .ok_or_else(|| format_err!("shutdown signal stream ended unexpectedly"))?
+    } else {
+        fs_manager.device_handler(device_stream, shutdown_rx).await?
+    };
 
     tracing::info!("shutdown signal received");
     // TODO(fxbug.dev/118209): //src/tests/oom looks for "received shutdown command over lifecycle
