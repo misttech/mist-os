@@ -284,7 +284,6 @@ where
         debug!(iface = interface, "evaluate interface state");
 
         let mut neighbors = neighbors.as_ref()?.iter_health();
-
         let found_healthy_gateway = neighbors
             .fold_while(None, |found_healthy_gateway, (neighbor, health)| {
                 let is_router = routes.iter().any(|route| {
@@ -299,19 +298,38 @@ where
                     return itertools::FoldWhile::Continue(found_healthy_gateway);
                 }
 
-                let healthy = is_healthy_gateway(health, now);
+                let gateway_health = GatewayHealth::from_neighbor_health(health, now);
                 debug!(
                     iface = interface,
                     neighbor = ?fidl_fuchsia_net_ext::IpAddress::from(neighbor.clone()),
-                    healthy,
+                    health = ?gateway_health,
                     "router check"
                 );
-
-                if healthy {
-                    return itertools::FoldWhile::Done(Some(true));
+                match gateway_health {
+                    // When we find a healthy neighbor, immediately break the
+                    // fold.
+                    GatewayHealth::Healthy
+                    // A gateway that hasn't been unhealthy for a long time may
+                    // only be going through a temporary outage.
+                    | GatewayHealth::RecentlyUnhealthy
+                    // Unknown gateway state is assumed to be healthy. Expected
+                    // to shift once neighbor table fills up.
+                    | GatewayHealth::Unknown
+                    // A gateway that has been in the stale state for a short
+                    // time may simply be observing loss of traffic interest in
+                    // it.
+                    | GatewayHealth::RecentlyStale
+                    => {
+                        itertools::FoldWhile::Done(Some(true))
+                    }
+                    // A gateway that was never healthy is considered a
+                    // misconfiguration and should not trip the watchdog.
+                    // Skip it entirely so it's not considered for the search.
+                    | GatewayHealth::NeverHealthy => {
+                        itertools::FoldWhile::Continue(found_healthy_gateway)
+                    }
+                    GatewayHealth::Unhealthy => itertools::FoldWhile::Continue(Some(false)),
                 }
-
-                itertools::FoldWhile::Continue(Some(false))
             })
             .into_inner();
 
@@ -415,18 +433,38 @@ where
     }
 }
 
-/// Checks if a gateway with reported `health` should be considered healthy.
-fn is_healthy_gateway(health: &NeighborHealth, now: zx::Time) -> bool {
-    match health {
-        NeighborHealth::Unknown
-        | NeighborHealth::Healthy { last_observed: _ }
-        | NeighborHealth::Stale { last_observed: _, last_healthy: None }
-        | NeighborHealth::Unhealthy { last_healthy: None } => true,
-        NeighborHealth::Stale { last_observed, last_healthy: Some(_) } => {
-            now - *last_observed < NEIGHBOR_STALE_AS_UNHEALTHY_TIME
-        }
-        NeighborHealth::Unhealthy { last_healthy: Some(last_healthy) } => {
-            now - *last_healthy < NEIGHBOR_UNHEALTHY_TIME
+#[derive(Debug, PartialEq, Eq)]
+enum GatewayHealth {
+    Unknown,
+    Healthy,
+    RecentlyUnhealthy,
+    RecentlyStale,
+    Unhealthy,
+    NeverHealthy,
+}
+
+impl GatewayHealth {
+    /// Checks if a gateway with reported `health` should be considered healthy.
+    fn from_neighbor_health(health: &NeighborHealth, now: zx::Time) -> Self {
+        match health {
+            NeighborHealth::Unknown => Self::Unknown,
+            NeighborHealth::Healthy { last_observed: _ } => Self::Healthy,
+            NeighborHealth::Stale { last_observed: _, last_healthy: None }
+            | NeighborHealth::Unhealthy { last_healthy: None } => Self::NeverHealthy,
+            NeighborHealth::Stale { last_observed, last_healthy: Some(_) } => {
+                if now - *last_observed < NEIGHBOR_STALE_AS_UNHEALTHY_TIME {
+                    Self::RecentlyStale
+                } else {
+                    Self::Unhealthy
+                }
+            }
+            NeighborHealth::Unhealthy { last_healthy: Some(last_healthy) } => {
+                if now - *last_healthy < NEIGHBOR_UNHEALTHY_TIME {
+                    Self::RecentlyUnhealthy
+                } else {
+                    Self::Unhealthy
+                }
+            }
         }
     }
 }
@@ -559,6 +597,40 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn ignore_never_healthy_neighbors() {
+        const NEVER_HEALTHY_NEIGHBOR: NeighborState =
+            NeighborState::new(NeighborHealth::Unhealthy { last_healthy: None });
+
+        let sys = MockSystem::default();
+        let now = SOME_TIME;
+        let mut state = sys.new_diagnostics_state(now, IFACE1);
+        let view = MockInterfaceView::new(
+            IFACE1,
+            [new_gateway_route(IFACE1, NEIGH2)],
+            [(NEIGH2, NEVER_HEALTHY_NEIGHBOR)],
+        );
+        // Only never healthy neighbor doesn't trigger actions.
+        assert_eq!(Watchdog::evaluate_interface_state(now, &mut state, view.view()).await, None);
+
+        // Once we have another eligible unhealthy gateway an action is
+        // triggered.
+        let view = MockInterfaceView::new(
+            IFACE1,
+            [new_gateway_route(IFACE1, NEIGH1), new_gateway_route(IFACE1, NEIGH2)],
+            [(NEIGH1, UNHEALTHY_NEIGHBOR), (NEIGH2, NEVER_HEALTHY_NEIGHBOR)],
+        );
+        sys.set_counters_return_timeout(IFACE1);
+        assert_eq!(
+            Watchdog::evaluate_interface_state(now, &mut state, view.view()).await,
+            Some(Action {
+                trigger_stack_diagnosis: false,
+                trigger_device_diagnosis: true,
+                reason: ActionReason::CantFetchCounters
+            })
+        );
+    }
+
+    #[fuchsia::test]
     async fn no_action_if_one_gateway_is_healthy() {
         let sys = MockSystem::default();
         let now = SOME_TIME;
@@ -672,42 +744,77 @@ mod tests {
         let now = SOME_TIME;
 
         // Healthy neighbor is never considered unhealthy.
-        assert!(is_healthy_gateway(&NeighborHealth::Healthy { last_observed: now }, now));
-        assert!(is_healthy_gateway(
-            &NeighborHealth::Healthy { last_observed: now },
-            now + zx::Duration::from_minutes(60)
-        ));
+        assert_eq!(
+            GatewayHealth::from_neighbor_health(
+                &NeighborHealth::Healthy { last_observed: now },
+                now
+            ),
+            GatewayHealth::Healthy
+        );
+        assert_eq!(
+            GatewayHealth::from_neighbor_health(
+                &NeighborHealth::Healthy { last_observed: now },
+                now + zx::Duration::from_minutes(60),
+            ),
+            GatewayHealth::Healthy
+        );
 
-        // Neighbor is unhealthy and has never been healthy; it is not
-        // treated as unhealthy.
-        assert!(is_healthy_gateway(&NeighborHealth::Unhealthy { last_healthy: None }, now));
+        // Neighbor is unhealthy has never been healthy.
+        assert_eq!(
+            GatewayHealth::from_neighbor_health(
+                &NeighborHealth::Unhealthy { last_healthy: None },
+                now
+            ),
+            GatewayHealth::NeverHealthy
+        );
 
         // Unhealthy neighbor is only considered unhealthy gateway after some
         // time.
-        assert!(is_healthy_gateway(&NeighborHealth::Unhealthy { last_healthy: Some(now) }, now));
-        assert!(!is_healthy_gateway(
-            &NeighborHealth::Unhealthy { last_healthy: Some(now) },
-            now + NEIGHBOR_UNHEALTHY_TIME
-        ));
+        assert_eq!(
+            GatewayHealth::from_neighbor_health(
+                &NeighborHealth::Unhealthy { last_healthy: Some(now) },
+                now
+            ),
+            GatewayHealth::RecentlyUnhealthy
+        );
+        assert_eq!(
+            GatewayHealth::from_neighbor_health(
+                &NeighborHealth::Unhealthy { last_healthy: Some(now) },
+                now + NEIGHBOR_UNHEALTHY_TIME
+            ),
+            GatewayHealth::Unhealthy
+        );
 
         // Stale neighbor is considered unhealthy gateway after some time *and*
         // if it's been healthy at some point.
-        assert!(is_healthy_gateway(
-            &NeighborHealth::Stale { last_observed: now, last_healthy: None },
-            now
-        ));
-        assert!(is_healthy_gateway(
-            &NeighborHealth::Stale { last_observed: now, last_healthy: None },
-            now + NEIGHBOR_STALE_AS_UNHEALTHY_TIME
-        ));
-        assert!(is_healthy_gateway(
-            &NeighborHealth::Stale { last_observed: now, last_healthy: Some(now) },
-            now
-        ));
-        assert!(!is_healthy_gateway(
-            &NeighborHealth::Stale { last_observed: now, last_healthy: Some(now) },
-            now + NEIGHBOR_STALE_AS_UNHEALTHY_TIME
-        ));
+        assert_eq!(
+            GatewayHealth::from_neighbor_health(
+                &NeighborHealth::Stale { last_observed: now, last_healthy: None },
+                now
+            ),
+            GatewayHealth::NeverHealthy
+        );
+        assert_eq!(
+            GatewayHealth::from_neighbor_health(
+                &NeighborHealth::Stale { last_observed: now, last_healthy: None },
+                now + NEIGHBOR_STALE_AS_UNHEALTHY_TIME
+            ),
+            GatewayHealth::NeverHealthy
+        );
+        assert_eq!(
+            GatewayHealth::from_neighbor_health(
+                &NeighborHealth::Stale { last_observed: now, last_healthy: Some(now) },
+                now
+            ),
+            GatewayHealth::RecentlyStale
+        );
+        assert_eq!(
+            GatewayHealth::from_neighbor_health(
+                &NeighborHealth::Stale { last_observed: now, last_healthy: Some(now) },
+                now + NEIGHBOR_STALE_AS_UNHEALTHY_TIME
+            ),
+            GatewayHealth::Unhealthy
+        );
     }
 
     const ZERO_TIME: zx::Time = zx::Time::from_nanos(0);
