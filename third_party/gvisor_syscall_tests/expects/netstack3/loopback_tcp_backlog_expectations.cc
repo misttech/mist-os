@@ -12,7 +12,8 @@ namespace netstack_syscall_test {
 void AddNonPassingTests(TestMap& tests) {
   FilterTestsForLoopbackTcpBacklogTarget(tests);
 
-  ExpectFailure(tests, "All/SocketInetLoopbackTest.TCPBacklog/*");
+  // https://fxbug.dev/118330
+  SkipTest(tests, "All/SocketInetLoopbackTest.TCPBacklog/*");
 
   // Dual-stack TCP sockets are not supported.
   ExpectFailure(tests,
@@ -66,21 +67,6 @@ void AddNonPassingTests(TestMap& tests) {
   ExpectFailure(tests,
                 "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/"
                 "ListenV6Any_ConnectV4Loopback");
-
-  // Netstack3 does not yet follow the Linux/BSD convention that connecting to
-  // the unspecified address is equivalent to connecting to loopback.
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/"
-                "ListenV4Any_ConnectV4Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/"
-                "ListenV4Loopback_ConnectV4Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/"
-                "ListenV6Any_ConnectV6Any");
-  ExpectFailure(tests,
-                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/"
-                "ListenV6Loopback_ConnectV6Any");
 }  // NOLINT(readability/fn_size)
 
 }  // namespace netstack_syscall_test

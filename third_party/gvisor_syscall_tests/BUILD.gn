@@ -567,7 +567,16 @@ syscall_test_suite(loopback_tcp_accept_test_label) {
 }
 syscall_test_suite(loopback_tcp_backlog_test_label) {
   run_with_fast_udp = false
+  run_in_cq_with_ns3 = true
   test_srcs_target = ":${loopback_test_label}_socket_tests"
+
+  # TODO(https://fxbug.dev/65359): Figure out how to allow high-severity logs
+  # in expected-to-fail tests.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 syscall_test_suite(tcp_blocking_test_label) {
   run_with_fast_udp = false
