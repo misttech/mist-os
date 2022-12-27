@@ -7,7 +7,6 @@ package clangdoc
 
 import (
 	"archive/zip"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -16,6 +15,11 @@ import (
 
 	"gopkg.in/yaml.v2"
 )
+
+// Debug can be set to true to add more logging information.
+// Or the logging could be migrated to use glog, and make use of Google logging
+// flags.
+var Debug bool
 
 type Location struct {
 	LineNumber int    `yaml:"LineNumber"`
@@ -359,7 +363,9 @@ func LoadNamespace(reader fileReader, subdir string) *NamespaceInfo {
 	content, err := reader.ReadFile(filename)
 	if os.IsNotExist(err) {
 		// index.yaml may not exist if the child namespace has no additional attributes
-		fmt.Printf("WARNING: %v.\n", err)
+		if Debug {
+			log.Printf("WARNING: %v.\n", err)
+		}
 		// Return an empty namespace object
 		return &NamespaceInfo{}
 	} else if err != nil {

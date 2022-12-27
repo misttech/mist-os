@@ -7,13 +7,14 @@ package main
 import (
 	"archive/zip"
 	"flag"
-	"go.fuchsia.dev/fuchsia/tools/cppdocgen/clangdoc"
-	"go.fuchsia.dev/fuchsia/tools/cppdocgen/docgen"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"go.fuchsia.dev/fuchsia/tools/cppdocgen/clangdoc"
+	"go.fuchsia.dev/fuchsia/tools/cppdocgen/docgen"
 )
 
 var flags struct {
@@ -50,6 +51,7 @@ func init() {
 }
 
 func main() {
+	log.SetPrefix("cppdocgen: ")
 	flag.Parse()
 	if len(flags.repoBaseUrl) == 0 {
 		log.Fatal("No repo base URL (-u) specified")
