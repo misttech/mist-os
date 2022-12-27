@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(feature = "serde")]
+use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 use {
     crate::{error::RightsRoutingError, walk_state::WalkStateUnit},
     fidl_fuchsia_io as fio,
-    std::convert::From,
+    std::{convert::From, fmt},
 };
 
 /// All the fio rights required to represent fio::OpenFlags::RIGHT_READABLE.
@@ -22,7 +24,7 @@ const LEGACY_WRITABLE_RIGHTS: fio::Operations = fio::Operations::empty()
     .union(fio::Operations::MODIFY_DIRECTORY);
 
 /// Opaque rights type to define new traits like PartialOrd on.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Rights(fio::Operations);
 
 impl Rights {
@@ -61,6 +63,44 @@ impl From<fio::Operations> for Rights {
     }
 }
 
+impl fmt::Display for Rights {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self(rights) = self;
+        match *rights {
+            fio::R_STAR_DIR => write!(f, "r*"),
+            fio::W_STAR_DIR => write!(f, "w*"),
+            fio::X_STAR_DIR => write!(f, "x*"),
+            fio::RW_STAR_DIR => write!(f, "rw*"),
+            fio::RX_STAR_DIR => write!(f, "rx*"),
+            ops => write!(f, "{:?}", ops),
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for Rights {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let Self(rights) = self;
+        rights.bits().serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for Rights {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let bits: u64 = Deserialize::deserialize(deserializer)?;
+        let rights = fio::Operations::from_bits(bits)
+            .ok_or(serde::de::Error::custom("invalid value for fuchsia.io/Operations"))?;
+        Ok(Self(rights))
+    }
+}
+
 impl WalkStateUnit for Rights {
     type Error = RightsRoutingError;
 
@@ -71,7 +111,7 @@ impl WalkStateUnit for Rights {
         if next_rights.0.contains(self.0) {
             Ok(())
         } else {
-            Err(RightsRoutingError::Invalid)
+            Err(RightsRoutingError::Invalid { requested: *self, provided: *next_rights })
         }
     }
 
@@ -100,17 +140,21 @@ mod tests {
                 .validate_next(&Rights::from(LEGACY_READABLE_RIGHTS)),
             Ok(())
         );
+        let provided = fio::Operations::READ_BYTES | fio::Operations::GET_ATTRIBUTES;
         assert_eq!(
-            Rights::from(Rights::from(LEGACY_READABLE_RIGHTS)).validate_next(&Rights::from(
-                fio::Operations::READ_BYTES | fio::Operations::GET_ATTRIBUTES
-            )),
-            Err(RightsRoutingError::Invalid)
+            Rights::from(LEGACY_READABLE_RIGHTS).validate_next(&Rights::from(provided)),
+            Err(RightsRoutingError::Invalid {
+                requested: Rights::from(LEGACY_READABLE_RIGHTS),
+                provided: Rights::from(provided),
+            })
         );
+        let provided = fio::Operations::READ_BYTES | fio::Operations::GET_ATTRIBUTES;
         assert_eq!(
-            Rights::from(fio::Operations::WRITE_BYTES).validate_next(&Rights::from(
-                fio::Operations::READ_BYTES | fio::Operations::GET_ATTRIBUTES
-            )),
-            Err(RightsRoutingError::Invalid)
+            Rights::from(fio::Operations::WRITE_BYTES).validate_next(&Rights::from(provided)),
+            Err(RightsRoutingError::Invalid {
+                requested: Rights::from(fio::Operations::WRITE_BYTES),
+                provided: Rights::from(provided),
+            })
         );
     }
 

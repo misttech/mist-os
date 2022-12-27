@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{component_id_index::ComponentIdIndexError, policy::PolicyError},
+    crate::{component_id_index::ComponentIdIndexError, policy::PolicyError, rights::Rights},
     clonable_error::ClonableError,
     cm_rust::{CapabilityName, CapabilityTypeName},
     fidl_fuchsia_component as fcomponent, fuchsia_zircon_status as zx,
@@ -673,8 +673,8 @@ pub enum EventsRoutingError {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum RightsRoutingError {
-    #[error("Requested rights greater than provided rights")]
-    Invalid,
+    #[error("Requested rights ({requested}) greater than provided rights ({provided})")]
+    Invalid { requested: Rights, provided: Rights },
 
     #[error("Directory routes must end at source with a rights declaration")]
     MissingRightsSource,
