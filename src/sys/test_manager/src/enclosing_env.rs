@@ -67,6 +67,7 @@ impl EnclosingEnvironment {
         hermetic_test_package_name: Arc<String>,
         other_allowed_packages: resolver::AllowedPackages,
     ) -> Result<Arc<Self>, Error> {
+        tracing::info!("Creating an environemnte");
         let sys_env = connect_to_protocol::<fv1sys::EnvironmentMarker>()?;
         let (additional_svc_client, additional_svc_server) = fidl::endpoints::create_endpoints()?;
         let incoming_svc = Arc::new(incoming_svc);
@@ -76,6 +77,7 @@ impl EnclosingEnvironment {
         let loader_service = connect_to_protocol::<fv1sys::LoaderMarker>()?;
 
         fs.add_fidl_service(move |stream: fv1sys::LoaderRequestStream| {
+            tracing::info!("Got a loader request");
             let hermetic_test_package_name = hermetic_test_package_name.clone();
             let other_allowed_packages = other_allowed_packages.clone();
             let loader_service = loader_service.clone();
@@ -93,6 +95,7 @@ impl EnclosingEnvironment {
         fs.add_service_at(
             fdebugdata::PublisherMarker::PROTOCOL_NAME,
             move |chan: fuchsia_zircon::Channel| {
+                tracing::info!("Got a request for debug data");
                 if let Err(e) = fdio::service_connect_at(
                     incoming_svc_clone.as_channel().as_ref(),
                     fdebugdata::PublisherMarker::PROTOCOL_NAME,
@@ -104,6 +107,7 @@ impl EnclosingEnvironment {
             },
         )
         .add_service_at("fuchsia.logger.LogSink", move |chan: fuchsia_zircon::Channel| {
+            tracing::info!("Got a request for logs");
             if let Err(e) = fdio::service_connect_at(
                 incoming_svc.as_channel().as_ref(),
                 "fuchsia.logger.LogSink",

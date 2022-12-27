@@ -6,9 +6,10 @@ use {
     crate::{
         above_root_capabilities::AboveRootCapabilitiesForTest,
         constants::{
-            ENCLOSING_ENV_REALM_NAME, HERMETIC_ENVIRONMENT_NAME, HERMETIC_RESOLVER_REALM_NAME,
+            ENCLOSING_ENV_REALM_NAME, HERMETIC_RESOLVER_REALM_NAME, TEST_ENVIRONMENT_NAME,
             TEST_ROOT_COLLECTION, TEST_ROOT_REALM_NAME, WRAPPER_REALM_NAME,
         },
+        debug_data_processor::{serve_debug_data_publisher, DebugDataSender},
         diagnostics, enclosing_env,
         error::LaunchTestError,
         facet, resolver,
@@ -18,7 +19,6 @@ use {
     anyhow::{anyhow, format_err, Context, Error},
     cm_rust,
     fidl::endpoints::{create_proxy, ClientEnd},
-    fidl::prelude::*,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_resolution::ResolverProxy,
     fidl_fuchsia_debugdata as fdebugdata, fidl_fuchsia_diagnostics as fdiagnostics,
@@ -45,7 +45,6 @@ use {
     resolver::AllowedPackages,
     std::{
         collections::HashSet,
-        convert::{TryFrom, TryInto},
         sync::{
             atomic::{AtomicU32, Ordering},
             Arc,
@@ -55,6 +54,7 @@ use {
     tracing::{debug, error, info, warn},
 };
 
+const DEBUG_DATA_REALM_NAME: &'static str = "debug-data";
 const ARCHIVIST_REALM_NAME: &'static str = "archivist";
 const ARCHIVIST_FOR_EMBEDDING_URL: &'static str =
     "fuchsia-pkg://fuchsia.com/test_manager#meta/archivist-for-embedding.cm";
@@ -66,6 +66,7 @@ pub(crate) struct RunningSuite {
     instance: RealmInstance,
     // Task that checks that archivist is active and responding to requests.
     archivist_ready_task: Option<fasync::Task<()>>,
+    mock_ready_task: Option<fasync::Task<()>>,
     logs_iterator_task: Option<fasync::Task<Result<(), Error>>>,
     /// Server ends of event pairs used to track if a client is accessing a component's
     /// custom storage. Used to defer destruction of the realm until clients have completed
@@ -85,6 +86,7 @@ impl RunningSuite {
         instance_name: Option<&str>,
         resolver: Arc<ResolverProxy>,
         above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
+        debug_data_sender: DebugDataSender,
     ) -> Result<Self, LaunchTestError> {
         info!("Starting '{}' in '{}' collection.", test_url, facets.collection);
 
@@ -95,10 +97,16 @@ impl RunningSuite {
         above_root_capabilities_for_test
             .validate(facets.collection)
             .map_err(LaunchTestError::ValidateTestRealm)?;
-        let builder =
-            get_realm(test_package.as_ref(), &facets, above_root_capabilities_for_test, resolver)
-                .await
-                .map_err(LaunchTestError::InitializeTestRealm)?;
+        let (builder, mock_ready_event) = get_realm(
+            test_url,
+            test_package.as_ref(),
+            &facets,
+            above_root_capabilities_for_test,
+            resolver,
+            debug_data_sender,
+        )
+        .await
+        .map_err(LaunchTestError::InitializeTestRealm)?;
         let instance = match instance_name {
             None => builder.build().await,
             Some(name) => builder.build_with_name(name).await,
@@ -125,6 +133,9 @@ impl RunningSuite {
         Ok(RunningSuite {
             custom_artifact_tokens: vec![],
             archivist_ready_task: None,
+            mock_ready_task: Some(fasync::Task::spawn(
+                mock_ready_event.wait_or_dropped().map(|_| ()),
+            )),
             logs_iterator_task: None,
             instance,
             test_realm_proxy,
@@ -381,6 +392,9 @@ impl RunningSuite {
         if let Some(archivist_ready_task) = self.archivist_ready_task {
             archivist_ready_task.await;
         }
+        if let Some(mock_ready_task) = self.mock_ready_task {
+            mock_ready_task.await;
+        }
         futures::future::join_all(tokens_closed_signals)
             .map(|_| Ok(()))
             .on_timeout(TEARDOWN_TIMEOUT, || {
@@ -537,12 +551,21 @@ fn get_allowed_package_value(suite_facet: &facet::SuiteFacets) -> AllowedPackage
     }
 }
 
+/// Create a RealmBuilder and populate it with local components and routes needed to run a
+/// test. Returns a populated RealmBuilder instance, and an Event which is signalled when
+/// the debug_data local component is ready to accept connection requests.
+// TODO(fxbug.dev/105308): The returned event is part of a synchronization mechanism to
+// work around cases when a component is destroyed before starting, even though there is a
+// request. In this case debug data can be lost. Remove the synchronization once it is
+// provided by cm.
 async fn get_realm(
+    test_url: &str,
     test_package: &str,
     suite_facet: &facet::SuiteFacets,
     above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
     resolver: Arc<ResolverProxy>,
-) -> Result<RealmBuilder, RealmBuilderError> {
+    debug_data_sender: DebugDataSender,
+) -> Result<(RealmBuilder, async_utils::event::Event), RealmBuilderError> {
     let builder = RealmBuilder::new_with_collection(suite_facet.collection.to_string()).await?;
     let wrapper_realm =
         builder.add_child_realm(WRAPPER_REALM_NAME, ChildOptions::new().eager()).await?;
@@ -566,6 +589,43 @@ async fn get_realm(
             ChildOptions::new(),
         )
         .await?;
+
+    // Provide and expose the debug data capability to the test environment.
+    let owned_url = test_url.to_string();
+    let mock_ready_event = async_utils::event::Event::new();
+    let mock_ready_clone = mock_ready_event.clone();
+    let debug_data = wrapper_realm
+        .add_local_child(
+            DEBUG_DATA_REALM_NAME,
+            move |handles| {
+                Box::pin(serve_debug_data_publisher(
+                    handles,
+                    owned_url.clone(),
+                    debug_data_sender.clone(),
+                    mock_ready_clone.clone(),
+                ))
+            },
+            // This component is launched eagerly so that debug_data always signals ready, even
+            // in absense of a connection request. TODO(fxbug.dev/105308): Remove once
+            // synchronization is provided by cm.
+            ChildOptions::new().eager(),
+        )
+        .await?;
+    let mut debug_data_decl = wrapper_realm.get_component_decl(&debug_data).await?;
+    debug_data_decl.exposes.push(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
+        source: cm_rust::ExposeSource::Self_,
+        source_name: cm_rust::CapabilityName(String::from("fuchsia.debugdata.Publisher")),
+        target: cm_rust::ExposeTarget::Parent,
+        target_name: cm_rust::CapabilityName(String::from("fuchsia.debugdata.Publisher")),
+    }));
+    debug_data_decl.capabilities.push(cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
+        name: cm_rust::CapabilityName(String::from("fuchsia.debugdata.Publisher")),
+        source_path: Some(cm_rust::CapabilityPath {
+            dirname: String::from("/svc"),
+            basename: String::from("fuchsia.debugdata.Publisher"),
+        }),
+    }));
+    wrapper_realm.replace_component_decl(&debug_data, debug_data_decl).await?;
 
     // Provide and expose the resolver capability from the resolver to test_wrapper.
     let mut hermetic_resolver_decl =
@@ -595,7 +655,7 @@ async fn get_realm(
     // Create the hermetic environment in the test_wrapper.
     let mut test_wrapper_decl = wrapper_realm.get_realm_decl().await?;
     test_wrapper_decl.environments.push(cm_rust::EnvironmentDecl {
-        name: String::from(HERMETIC_ENVIRONMENT_NAME),
+        name: String::from(TEST_ENVIRONMENT_NAME),
         extends: fdecl::EnvironmentExtends::Realm,
         resolvers: vec![cm_rust::ResolverRegistration {
             resolver: cm_rust::CapabilityName(String::from(HERMETIC_RESOLVER_CAPABILITY_NAME)),
@@ -605,7 +665,13 @@ async fn get_realm(
             scheme: String::from("fuchsia-pkg"),
         }],
         runners: vec![],
-        debug_capabilities: vec![],
+        debug_capabilities: vec![cm_rust::DebugRegistration::Protocol(
+            cm_rust::DebugProtocolRegistration {
+                source_name: cm_rust::CapabilityName(String::from("fuchsia.debugdata.Publisher")),
+                source: cm_rust::RegistrationSource::Child(DEBUG_DATA_REALM_NAME.to_string()),
+                target_name: cm_rust::CapabilityName(String::from("fuchsia.debugdata.Publisher")),
+            },
+        )],
         stop_timeout_ms: None,
     });
 
@@ -613,7 +679,7 @@ async fn get_realm(
     test_wrapper_decl.collections.push(cm_rust::CollectionDecl {
         name: TEST_ROOT_COLLECTION.to_string(),
         durability: fdecl::Durability::Transient,
-        environment: Some(HERMETIC_ENVIRONMENT_NAME.into()),
+        environment: Some(TEST_ENVIRONMENT_NAME.into()),
         allowed_offers: cm_types::AllowedOffers::StaticOnly,
         allow_long_names: false,
         persistent_storage: None,
@@ -712,20 +778,14 @@ async fn get_realm(
         .await?;
 
     // debug to enclosing env
-    // This must be done manually, as there is currently no way to add a "use from debug"
-    // declaration using `add_route`.
-    let mut enclosing_env_decl = wrapper_realm.get_component_decl(&enclosing_env).await?;
-    enclosing_env_decl.uses.push(cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
-        source: cm_rust::UseSource::Debug,
-        source_name: fdebugdata::PublisherMarker::PROTOCOL_NAME.into(),
-        target_path: format!("/svc/{}", fdebugdata::PublisherMarker::PROTOCOL_NAME)
-            .as_str()
-            .try_into()
-            .unwrap(),
-        dependency_type: cm_rust::DependencyType::Strong,
-        availability: cm_rust::Availability::Required,
-    }));
-    wrapper_realm.replace_component_decl(&enclosing_env, enclosing_env_decl).await?;
+    wrapper_realm
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<fdebugdata::PublisherMarker>())
+                .from(&debug_data)
+                .to(&enclosing_env),
+        )
+        .await?;
 
     // wrapper realm to parent
     wrapper_realm
@@ -774,7 +834,7 @@ async fn get_realm(
         .apply(suite_facet.collection, &builder, &wrapper_realm)
         .await?;
 
-    Ok(builder)
+    Ok((builder, mock_ready_event))
 }
 
 fn get_invocation_options(options: ftest_manager::RunOptions) -> ftest::RunOptions {

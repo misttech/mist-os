@@ -610,8 +610,8 @@ async fn debug_data_test() {
     let num_debug_data_events = stream::iter(run_events_result.unwrap())
         .then(|run_event| async move {
             let TestRunEventPayload::DebugData { proxy, .. } = &run_event.payload;
-            let contents = fuchsia_fs::read_file(&proxy).await.expect("read_file");
-            contents == "Debug data from test\n"
+            let contents = fuchsia_fs::file::read(&proxy).await.expect("read_file");
+            contents == b"Debug data from test\n"
         })
         .filter(|matches_vmo| futures::future::ready(*matches_vmo))
         .count()
@@ -638,8 +638,8 @@ async fn debug_data_accumulate_test() {
         let num_debug_data_events = stream::iter(run_events_result.unwrap())
             .then(|run_event| async move {
                 let TestRunEventPayload::DebugData { proxy, .. } = &run_event.payload;
-                let contents = fuchsia_fs::read_file(&proxy).await.expect("read_file");
-                contents == "Debug data from test\n"
+                let contents = fuchsia_fs::file::read(&proxy).await.expect("read_file");
+                contents == b"Debug data from test\n"
             })
             .filter(|matches_vmo| futures::future::ready(*matches_vmo))
             .count()
@@ -668,8 +668,8 @@ async fn debug_data_isolated_test() {
         let num_debug_data_events = stream::iter(run_events_result.unwrap())
             .then(|run_event| async move {
                 let TestRunEventPayload::DebugData { proxy, .. } = &run_event.payload;
-                let contents = fuchsia_fs::read_file(&proxy).await.expect("read_file");
-                contents == "Debug data from test\n"
+                let contents = fuchsia_fs::file::read(&proxy).await.expect("read_file");
+                contents == b"Debug data from test\n"
             })
             .filter(|matches_vmo| futures::future::ready(*matches_vmo))
             .count()
