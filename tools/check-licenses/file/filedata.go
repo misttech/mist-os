@@ -9,6 +9,7 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file/notice"
@@ -202,6 +203,13 @@ func (fd *FileData) UpdateURLs(project string, projectURL string) {
 			relPath = override
 		}
 		fd.URL = fmt.Sprintf("%v/%v", projectURL, relPath)
+	}
+
+	// TODO(fxbug.dev/118257): Design a more elegant solution for URL replacements.
+	// Rust has several license files, so it cannot be implemented using
+	// the current strategy.
+	if strings.Contains(fd.RelPath, "prebuilt/third_party/rust/linux-x64/share/doc/rust") {
+		fd.URL = "https://fuchsia.googlesource.com/third_party/rust/+/refs/heads/main/" + filepath.Base(fd.RelPath)
 	}
 }
 
