@@ -9,7 +9,9 @@
 
 #include <iostream>
 
-static void Random(bool deterministic, char* bytes, size_t count) {
+namespace {
+
+void Random(bool deterministic, char* bytes, size_t count) {
   if (deterministic) {
     for (size_t i = 0; i < count; i += sizeof(int)) {
       const int r = rand();
@@ -20,16 +22,15 @@ static void Random(bool deterministic, char* bytes, size_t count) {
   }
 }
 
-static uintptr_t MaskNoiseToUserPointer(uintptr_t n) {
+uintptr_t MaskNoiseToUserPointer(uintptr_t n) {
   n &= 0x00007FFFFFFFFFFFULL;
   return n;
 }
 
+}  // namespace
+
 int main(int argc, const char** argv) {
-  unsigned int seed = 0;
-  if (argc > 1) {
-    seed = atoi(argv[1]);
-  }
+  const unsigned int seed = argc > 1 ? atoi(argv[1]) : 0;
   const bool deterministic = seed != 0;
   if (deterministic) {
     srand(seed);
