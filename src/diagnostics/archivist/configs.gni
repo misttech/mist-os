@@ -24,6 +24,12 @@ default_config = {
   serve_unattributed_logs = false
 }
 
+bringup_config = {
+  forward_variables_from(default_config, "*")
+
+  bind_services = []
+}
+
 embedded_config = {
   forward_variables_from(default_config, "*")
 

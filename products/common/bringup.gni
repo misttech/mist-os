@@ -16,9 +16,8 @@ product_bootfs_labels = [
   "//bundles/drivers:utils",
 ]
 
-# Enable diagnostics services.
-product_bootfs_labels +=
-    [ "//src/diagnostics/archivist:default-service-config" ]
+# Enable the archivist: logging and inspect gathering.
+product_bootfs_labels += [ "//src/diagnostics/archivist:bringup-config" ]
 
 meta_package_labels = []
 
