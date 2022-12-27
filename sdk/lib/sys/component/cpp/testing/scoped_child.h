@@ -149,12 +149,4 @@ class ScopedChild final {
 
 }  // namespace component_testing
 
-// Until all clients of the API have been migrated, keep the legacy namespace.
-// TODO(fxbug.dev/90794): Remove this.
-namespace sys {
-namespace testing {
-using component_testing::ScopedChild;
-}  // namespace testing
-}  // namespace sys
-
 #endif  // LIB_SYS_COMPONENT_CPP_TESTING_SCOPED_CHILD_H_
