@@ -227,7 +227,7 @@ impl Arguments {
         }
     }
 
-    fn vars<'a>(&'a self) -> Iter<String, String> {
+    fn vars<'a>(&'a self) -> Iter<'_, String, String> {
         self.vars.iter()
     }
 }

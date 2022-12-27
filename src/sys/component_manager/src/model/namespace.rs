@@ -266,7 +266,7 @@ async fn add_storage_use(
 /// terminates.
 fn add_directory_helper(
     ns: &mut Vec<fcrunner::ComponentNamespaceEntry>,
-    waiters: &mut Vec<BoxFuture<()>>,
+    waiters: &mut Vec<BoxFuture<'_, ()>>,
     use_: &UseDecl,
     component: WeakComponentInstance,
 ) -> Result<(), ModelError> {
@@ -750,7 +750,9 @@ pub mod test {
         let ns_entries = vec![];
 
         verify_logger_connects_in_namespace(
-            Option::<&mut ServiceFs<fuchsia_component::server::ServiceObjLocal<MockServiceRequest>>>::None,
+            Option::<
+                &mut ServiceFs<fuchsia_component::server::ServiceObjLocal<'_, MockServiceRequest>>,
+            >::None,
             ns_entries,
             log_decl,
             false,

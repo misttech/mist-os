@@ -275,7 +275,7 @@ impl RuntimeInfo {
 }
 
 impl fmt::Debug for EventPayload {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut formatter = fmt.debug_struct("EventPayload");
         formatter.field("type", &self.event_type());
         match self {

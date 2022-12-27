@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO Follow 2018 idioms
-#![allow(elided_lifetimes_in_paths)]
 // This is needed for the pseudo_directory nesting in crate::model::tests
 #![recursion_limit = "256"]
 // Printing to stdout and stderr directly is discouraged for component_manager.

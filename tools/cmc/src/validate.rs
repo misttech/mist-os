@@ -1328,7 +1328,7 @@ impl<'a> ValidationContext<'a> {
     fn validate_component_child_ref(
         &self,
         reference_description: &str,
-        component_ref: &cml::AnyRef,
+        component_ref: &cml::AnyRef<'_>,
     ) -> Result<(), Error> {
         match component_ref {
             cml::AnyRef::Named(name) => {
@@ -1355,7 +1355,7 @@ impl<'a> ValidationContext<'a> {
     fn validate_component_child_or_collection_ref(
         &self,
         reference_description: &str,
-        component_ref: &cml::AnyRef,
+        component_ref: &cml::AnyRef<'_>,
     ) -> Result<(), Error> {
         match component_ref {
             cml::AnyRef::Named(name) => {
@@ -1382,7 +1382,7 @@ impl<'a> ValidationContext<'a> {
     fn validate_component_capability_ref(
         &self,
         reference_description: &str,
-        capability_ref: &cml::AnyRef,
+        capability_ref: &cml::AnyRef<'_>,
     ) -> Result<(), Error> {
         match capability_ref {
             cml::AnyRef::Named(name) => {
@@ -1407,7 +1407,7 @@ impl<'a> ValidationContext<'a> {
     fn validate_component_child_or_capability_ref(
         &self,
         reference_description: &str,
-        ref_: &cml::AnyRef,
+        ref_: &cml::AnyRef<'_>,
     ) -> Result<(), Error> {
         if self.validate_component_child_ref(reference_description, ref_).is_err()
             && self.validate_component_capability_ref(reference_description, ref_).is_err()

@@ -4,10 +4,6 @@
 
 //! A library of common utilities used by `cmc` and related tools.
 
-// TODO(fxb/87635): Fix this.
-// This crate doesn't comply with all 2018 idioms
-#![allow(elided_lifetimes_in_paths)]
-
 pub mod error;
 pub mod one_or_many;
 

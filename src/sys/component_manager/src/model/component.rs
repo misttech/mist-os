@@ -1380,7 +1380,7 @@ impl InstanceState {
 }
 
 impl fmt::Debug for InstanceState {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
             Self::New => "New",
             Self::Unresolved => "Discovered",

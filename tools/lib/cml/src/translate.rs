@@ -1344,7 +1344,7 @@ fn extract_all_offer_sources<T: FromClause>(
 }
 
 fn translate_child_or_collection_ref(
-    reference: AnyRef,
+    reference: AnyRef<'_>,
     all_children: &BTreeSet<&Name>,
     all_collections: &BTreeSet<&Name>,
 ) -> Result<fdecl::Ref, Error> {
