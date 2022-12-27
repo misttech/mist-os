@@ -7,6 +7,9 @@
 
 #include <zircon/syscalls/smc.h>
 
+constexpr uint32_t kPowerOff = 0;
+constexpr uint32_t kPowerOn = 1;
+
 #define A5_PDID_NNA 0
 #define A5_PDID_AUDIO 1
 #define A5_PDID_SDIOA 2
@@ -18,6 +21,9 @@
 #define A5_PDID_DMC 8
 #define A5_PDID_SYS_WRAP 9
 #define A5_PDID_DSPA 10
+
+// Copy from datasheet table 7-3
+#define A1_PDID_SD_EMMC 18
 
 namespace aml_pd_smc {
 

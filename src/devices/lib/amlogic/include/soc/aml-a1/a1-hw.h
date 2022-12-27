@@ -66,6 +66,10 @@
 // Peripherals - datasheet is nondescript about this section, but it contains
 //  top level ethernet control and temp sensor registers
 
+// SDIO
+#define A1_EMMC_A_BASE 0xfe010000
+#define A1_EMMC_A_LENGTH 0x1000
+
 // DMC
 #define A1_DMC_BASE 0xfd020000
 #define A1_DMC_LENGTH 0x400
@@ -94,21 +98,22 @@
 #define A1_SEC_RESET0__MASK 0x148
 
 // IRQs
-#define A1_I2C_A_IRQ 64    // 32+32
-#define A1_SPICC0_IRQ 80   // 32+48
-#define A1_GPIO_IRQ_0 81   // 32+49
-#define A1_GPIO_IRQ_1 82   // 32+50
-#define A1_GPIO_IRQ_2 83   // 32+51
-#define A1_GPIO_IRQ_3 84   // 32+52
-#define A1_GPIO_IRQ_4 85   // 32+53
-#define A1_GPIO_IRQ_5 86   // 32+54
-#define A1_GPIO_IRQ_6 87   // 32+55
-#define A1_GPIO_IRQ_7 88   // 32+56
-#define A1_TS_PLL_IRQ 89   // 57+32
-#define A1_I2C_B_IRQ 100   // 32+68
-#define A1_I2C_C_IRQ 108   // 32+76
-#define A1_I2C_D_IRQ 110   // 32+78
-#define A1_DDR_BW_IRQ 141  // 109+32
+#define A1_I2C_A_IRQ 64      // 32+32
+#define A1_SPICC0_IRQ 80     // 32+48
+#define A1_GPIO_IRQ_0 81     // 32+49
+#define A1_GPIO_IRQ_1 82     // 32+50
+#define A1_GPIO_IRQ_2 83     // 32+51
+#define A1_GPIO_IRQ_3 84     // 32+52
+#define A1_GPIO_IRQ_4 85     // 32+53
+#define A1_GPIO_IRQ_5 86     // 32+54
+#define A1_GPIO_IRQ_6 87     // 32+55
+#define A1_GPIO_IRQ_7 88     // 32+56
+#define A1_TS_PLL_IRQ 89     // 57+32
+#define A1_SD_EMMC_A_IRQ 90  // 58+32
+#define A1_I2C_B_IRQ 100     // 32+68
+#define A1_I2C_C_IRQ 108     // 32+76
+#define A1_I2C_D_IRQ 110     // 32+78
+#define A1_DDR_BW_IRQ 141    // 109+32
 
 // PWM
 #define A1_PWM_LENGTH 0x400  // applies to each PWM bank

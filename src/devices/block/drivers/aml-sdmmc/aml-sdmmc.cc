@@ -35,6 +35,7 @@
 
 #include <bits/limits.h>
 #include <fbl/algorithm.h>
+#include <soc/aml-common/aml-power-domain.h>
 #include <soc/aml-common/aml-sdmmc.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
@@ -1218,6 +1219,30 @@ zx_status_t AmlSdmmc::Create(void* ctx, zx_device_t* parent) {
     ddk::ClockProtocolClient emmc_clk_sel(parent, "clk-emmc-sel");
     if ((status = emmc_clk_sel.SetInput(AmlSdmmcClock::kCtsOscinClkSrc)) != ZX_OK) {
       AML_SDMMC_ERROR("Could not SetInput clock for emmc: %d", status);
+      return status;
+    }
+  } else if (dev_info.pid == PDEV_PID_AMLOGIC_A1) {
+    zx::resource smc_handler;
+    status = pdev.GetSmc(0, &smc_handler);
+    if (status != ZX_OK) {
+      AML_SDMMC_ERROR("Failed to get smc handler: %s", zx_status_get_string(status));
+      return status;
+    }
+
+    // Power domain
+    static const zx_smc_parameters_t kSetPdCall =
+        aml_pd_smc::CreatePdSmcCall(A1_PDID_SD_EMMC, kPowerOn);
+    zx_smc_result_t result;
+    status = zx_smc_call(smc_handler.get(), &kSetPdCall, &result);
+    if (status != ZX_OK) {
+      AML_SDMMC_ERROR("Call zx_smc_call failed: %s", zx_status_get_string(status));
+      return status;
+    }
+
+    // Clock source
+    ddk::ClockProtocolClient sdio_clk_gate(parent, "sdio-clk-gate");
+    if ((status = sdio_clk_gate.Enable()) != ZX_OK) {
+      AML_SDMMC_ERROR("Could not enable the clk for sdio: %s", zx_status_get_string(status));
       return status;
     }
   }

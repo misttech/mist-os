@@ -114,4 +114,18 @@
 #define A1_SPI_A_CLK A1_GPIOX(10)
 #define A1_SPI_A_CLK_FN 4
 
+// Alternate Functions for EMMC_A(SDIO)
+#define A1_SDIO_D0 A1_GPIOX(0)
+#define A1_SDIO_D0_FN 1
+#define A1_SDIO_D1 A1_GPIOX(1)
+#define A1_SDIO_D1_FN 1
+#define A1_SDIO_D2 A1_GPIOX(2)
+#define A1_SDIO_D2_FN 1
+#define A1_SDIO_D3 A1_GPIOX(3)
+#define A1_SDIO_D3_FN 1
+#define A1_SDIO_CLK A1_GPIOX(4)
+#define A1_SDIO_CLK_FN 1
+#define A1_SDIO_CMD A1_GPIOX(5)
+#define A1_SDIO_CMD_FN 1
+
 #endif  // SRC_DEVICES_LIB_AMLOGIC_INCLUDE_SOC_AML_A1_A1_GPIO_H_

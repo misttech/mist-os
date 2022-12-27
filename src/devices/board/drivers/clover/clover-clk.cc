@@ -41,6 +41,7 @@ static const std::vector<fpbus::Mmio> clk_mmios{
 
 constexpr clock_id_t clock_ids[] = {
     {a1_clk::CLK_SYS_CPU_CLK},
+    {a1_clk::CLK_SD_EMMC},
 };
 
 static const std::vector<fpbus::Metadata> clock_metadata{
