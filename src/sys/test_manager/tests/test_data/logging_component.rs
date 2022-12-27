@@ -7,6 +7,8 @@ use diagnostics_log::{self, Interest, PublishOptions, Severity};
 
 #[fuchsia::main(logging = false)]
 async fn main() {
+    #[allow(unknown_lints)]
+    #[allow(clippy::let_underscore_future)]
     let _ = diagnostics_log::init_publishing(PublishOptions {
         interest: Interest { min_severity: Some(Severity::Debug), ..Interest::EMPTY },
         ..Default::default()
