@@ -191,16 +191,17 @@ TEST_F(SnapshotPersistenceTest, Succeed_Get) {
 
   const auto archive = persistence_->Get(kTestUuid);
 
+  ASSERT_TRUE(archive.has_value());
   EXPECT_EQ(archive->key, feedback_data::kSnapshotFilename);
   EXPECT_EQ(std::string(archive->value.begin(), archive->value.end()), kArchiveValue);
 }
 
-TEST_F(SnapshotPersistenceDeathTest, Check_FailGet) {
+TEST_F(SnapshotPersistenceTest, Check_FailGet) {
   const SnapshotUuid kTestUuid = "test uuid";
 
   // Attempt to get snapshot that doesn't exist.
-  ASSERT_DEATH({ persistence_->Get(kTestUuid); },
-               HasSubstr("Contains() should be called before any Get()"));
+  const auto archive = persistence_->Get(kTestUuid);
+  EXPECT_FALSE(archive.has_value());
 }
 
 TEST_F(SnapshotPersistenceTest, Check_RebuildsMetadata) {
@@ -216,6 +217,7 @@ TEST_F(SnapshotPersistenceTest, Check_RebuildsMetadata) {
 
   const auto archive = persistence_->Get(kTestUuid);
 
+  ASSERT_TRUE(archive.has_value());
   EXPECT_EQ(archive->key, feedback_data::kSnapshotFilename);
   EXPECT_EQ(std::string(archive->value.begin(), archive->value.end()), kArchiveValue);
 }

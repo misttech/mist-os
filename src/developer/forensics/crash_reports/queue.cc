@@ -240,14 +240,16 @@ void Queue::Upload() {
 
   bool add_to_store = active_report_->HasReport();
   if (!active_report_->HasReport()) {
-    if (!report_store_->Contains(active_report_->report_id)) {
+    std::optional<Report> report = report_store_->Get(active_report_->report_id);
+
+    if (!report.has_value()) {
       Retire(std::move(*active_report_), RetireReason::kGarbageCollected);
       active_report_ = std::nullopt;
       Upload();
       return;
     }
 
-    active_report_->SetReport(report_store_->Get(active_report_->report_id));
+    active_report_->SetReport(std::move(*report));
   }
 
   // The upload will fail if the annotations are empty.

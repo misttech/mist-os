@@ -95,8 +95,8 @@ Snapshot SnapshotStore::GetSnapshot(const SnapshotUuid& uuid) {
       return BuildMissing(garbage_collected_snapshot_);
     }
 
-    if (persistence_.Contains(uuid)) {
-      return ManagedSnapshot::StoreShared(persistence_.Get(uuid));
+    if (auto snapshot = persistence_.Get(uuid); snapshot.has_value()) {
+      return ManagedSnapshot::StoreShared(MakeShared(std::move(*snapshot)));
     }
 
     return BuildMissing(not_persisted_snapshot_);

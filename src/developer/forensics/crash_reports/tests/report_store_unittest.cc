@@ -113,19 +113,20 @@ class ReportStoreTest : public UnitTestFixture {
            std::map<std::string, std::string>* annotations,
            std::map<std::string, std::string>* attachments, std::string* snapshot_uuid,
            std::optional<std::string>* minidump) {
-    if (!report_store_->Contains(id)) {
-      return false;
-    }
     const auto report = report_store_->Get(id);
 
-    *program_shortname = report.ProgramShortname();
-    *annotations = report.Annotations().Raw();
-    for (const auto& [filename, attachment] : report.Attachments()) {
+    if (!report.has_value()) {
+      return false;
+    }
+
+    *program_shortname = report->ProgramShortname();
+    *annotations = report->Annotations().Raw();
+    for (const auto& [filename, attachment] : report->Attachments()) {
       (*attachments)[filename] = std::string(attachment.begin(), attachment.end());
     }
-    *snapshot_uuid = report.SnapshotUuid();
-    if (report.Minidump().has_value()) {
-      const auto& value = report.Minidump().value();
+    *snapshot_uuid = report->SnapshotUuid();
+    if (report->Minidump().has_value()) {
+      const auto& value = report->Minidump().value();
       *minidump = std::string(value.begin(), value.end());
     } else {
       *minidump = std::nullopt;

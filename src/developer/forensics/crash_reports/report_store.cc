@@ -312,8 +312,10 @@ void ReportStore::AddAnnotation(ReportId id, const std::string& key, const std::
   root_metadata.IncreaseSize(id, StorageSize::Bytes(value.size()));
 }
 
-Report ReportStore::Get(const ReportId report_id) {
-  FX_CHECK(Contains(report_id)) << "Contains() should be called before any Get()";
+std::optional<Report> ReportStore::Get(const ReportId report_id) {
+  if (!Contains(report_id)) {
+    return std::nullopt;
+  }
 
   auto& root_metadata = RootFor(report_id);
   auto attachment_files = root_metadata.ReportAttachments(report_id, /*absolute_paths=*/
@@ -328,14 +330,17 @@ Report ReportStore::Get(const ReportId report_id) {
   for (size_t i = 0; i < attachment_files.size(); ++i) {
     if (attachment_files[i] == "annotations.json") {
       if (!ReadAnnotations(attachment_paths[i], &annotations)) {
-        continue;
+        FX_LOGST(ERROR, tags_->Get(report_id)) << "Failed to read annotations.json";
+        return std::nullopt;
       }
     } else if (attachment_files[i] == "snapshot_uuid.txt") {
       snapshot_uuid = ReadSnapshotUuid(attachment_paths[i]);
     } else {
       SizedData attachment;
       if (!ReadAttachment(attachment_paths[i], &attachment)) {
-        continue;
+        FX_LOGST(ERROR, tags_->Get(report_id))
+            << "Failed to read attachment '" << attachment_files[i] << "'";
+        return std::nullopt;
       }
 
       if (attachment_files[i] == "minidump.dmp") {

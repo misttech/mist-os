@@ -45,9 +45,9 @@ class SnapshotPersistence {
   // Returns location for where |uuid| is currently stored in persistence, if anywhere.
   std::optional<ItemLocation> SnapshotLocation(const SnapshotUuid& uuid);
 
-  // Gets an archive from disk. Check-fails that the archive for |uuid| exists on disk. Call
-  // Contains to verify existence on disk first.
-  std::shared_ptr<const ManagedSnapshot::Archive> Get(const SnapshotUuid& uuid);
+  // Gets an archive from disk. Returns std::nullopt if the snapshot isn't in persistence or if the
+  // read fails.
+  std::optional<ManagedSnapshot::Archive> Get(const SnapshotUuid& uuid);
 
   std::vector<SnapshotUuid> GetSnapshotUuids() const;
 

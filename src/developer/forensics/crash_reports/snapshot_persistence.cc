@@ -212,9 +212,10 @@ std::optional<ItemLocation> SnapshotPersistence::SnapshotLocation(const Snapshot
   return std::nullopt;
 }
 
-std::shared_ptr<const ManagedSnapshot::Archive> SnapshotPersistence::Get(const SnapshotUuid& uuid) {
-  FX_CHECK(SnapshotPersistenceEnabled()) << "Snapshot persistence not enabled";
-  FX_CHECK(Contains(uuid)) << "Contains() should be called before any Get()";
+std::optional<ManagedSnapshot::Archive> SnapshotPersistence::Get(const SnapshotUuid& uuid) {
+  if (!Contains(uuid)) {
+    return std::nullopt;
+  }
 
   const auto& root_metadata = RootFor(uuid);
   const auto snapshot_dir = root_metadata.SnapshotDirectory(uuid);
@@ -222,10 +223,11 @@ std::shared_ptr<const ManagedSnapshot::Archive> SnapshotPersistence::Get(const S
 
   SizedData archive;
   if (!ReadSnapshot(files::JoinPath(snapshot_dir, snapshot_filename), &archive)) {
-    FX_LOGS(FATAL) << "Failed to read snapshot for uuid '" << uuid << "'";
+    FX_LOGS(ERROR) << "Failed to read snapshot for uuid '" << uuid << "'";
+    return std::nullopt;
   }
 
-  return std::make_shared<ManagedSnapshot::Archive>(snapshot_filename, std::move(archive));
+  return ManagedSnapshot::Archive(snapshot_filename, std::move(archive));
 }
 
 std::vector<SnapshotUuid> SnapshotPersistence::GetSnapshotUuids() const {
