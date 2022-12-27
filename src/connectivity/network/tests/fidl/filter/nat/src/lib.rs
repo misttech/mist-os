@@ -60,7 +60,7 @@ pub fn subnet_to_addr(fnet::Subnet { addr, prefix_len: _ }: fnet::Subnet) -> std
     addr
 }
 
-pub async fn setup_masquerade_nat_network<'a, E: netemul::Endpoint>(
+pub async fn setup_masquerade_nat_network<'a>(
     sandbox: &'a netemul::TestSandbox,
     name: &str,
     test_case: &NatTestCase,
@@ -78,7 +78,7 @@ pub async fn setup_masquerade_nat_network<'a, E: netemul::Endpoint>(
         .create_netstack_realm::<Netstack2, _>(format!("{}_router", name))
         .expect("failed to create router_realm");
 
-    async fn configure_host_network<'a, E: netemul::Endpoint, S: Into<Cow<'a, str>>>(
+    async fn configure_host_network<'a, S: Into<Cow<'a, str>>>(
         sandbox: &'a netemul::TestSandbox,
         name: &str,
         router_realm: &netemul::TestRealm<'a>,
@@ -100,7 +100,7 @@ pub async fn setup_masquerade_nat_network<'a, E: netemul::Endpoint>(
             .expect("failed to create host realm");
 
         let router_ep = router_realm
-            .join_network_with_if_config::<E, _>(
+            .join_network_with_if_config(
                 &net,
                 format!("router_ep{}", net_num),
                 netemul::InterfaceConfig {
@@ -135,7 +135,7 @@ pub async fn setup_masquerade_nat_network<'a, E: netemul::Endpoint>(
         );
 
         let host_ep = host_realm
-            .join_network::<E, _>(&net, format!("host{}_ep", net_num))
+            .join_network(&net, format!("host{}_ep", net_num))
             .await
             .expect("host failed to join network");
         host_ep.add_address_and_subnet_route(host_addr).await.expect("configure address");
@@ -161,7 +161,7 @@ pub async fn setup_masquerade_nat_network<'a, E: netemul::Endpoint>(
         HostNetwork { net, router_ep, router_addr, host_realm, host_ep, host_addr }
     }
 
-    let net1 = configure_host_network::<E, _>(
+    let net1 = configure_host_network(
         &sandbox,
         name,
         &router_realm,
@@ -181,7 +181,7 @@ pub async fn setup_masquerade_nat_network<'a, E: netemul::Endpoint>(
     } = &net1;
 
     let net2_factory = |router_if_name| async {
-        configure_host_network::<E, _>(
+        configure_host_network(
             &sandbox,
             name,
             &router_realm,
@@ -496,7 +496,7 @@ pub const IPV6_SUBNET2: fnet::Subnet = fidl_subnet!("b::/24");
         cycle_dst_net: false,
     },
     true; "dont_perform_nat66_different_nic")]
-async fn masquerade_nat_udp<E: netemul::Endpoint>(
+async fn masquerade_nat_udp(
     test_name: &str,
     sub_test_name: &str,
     test_case: NatTestCase,
@@ -527,7 +527,7 @@ async fn masquerade_nat_udp<E: netemul::Endpoint>(
                 host_ep: _host2_ep,
                 host_addr: host2_addr,
             },
-    } = setup_masquerade_nat_network::<E>(&sandbox, name, &test_case).await;
+    } = setup_masquerade_nat_network(&sandbox, name, &test_case).await;
 
     let get_sock = |realm, subnet| async move {
         let addr = subnet_to_addr(subnet);
@@ -705,7 +705,7 @@ async fn masquerade_nat_udp<E: netemul::Endpoint>(
         cycle_dst_net: false,
     },
     true; "dont_perform_nat66_different_nic")]
-async fn masquerade_nat_tcp<E: netemul::Endpoint>(
+async fn masquerade_nat_tcp(
     test_name: &str,
     sub_test_name: &str,
     test_case: NatTestCase,
@@ -736,7 +736,7 @@ async fn masquerade_nat_tcp<E: netemul::Endpoint>(
                 host_ep: _host2_ep,
                 host_addr: host2_addr,
             },
-    } = setup_masquerade_nat_network::<E>(&sandbox, name, &test_case).await;
+    } = setup_masquerade_nat_network(&sandbox, name, &test_case).await;
 
     let host2_listener = fuchsia_async::net::TcpListener::listen_in_realm(
         &host2_realm,
@@ -874,11 +874,7 @@ async fn masquerade_nat_tcp<E: netemul::Endpoint>(
         nat_outgoing_nic: NatNic::RouterNic1,
         cycle_dst_net: false,
     }; "dont_perform_nat66_different_nic")]
-async fn masquerade_nat_ping<E: netemul::Endpoint>(
-    test_name: &str,
-    sub_test_name: &str,
-    test_case: NatTestCase,
-) {
+async fn masquerade_nat_ping(test_name: &str, sub_test_name: &str, test_case: NatTestCase) {
     let name = format!("{}_{}", test_name, sub_test_name);
     let name = name.as_str();
 
@@ -904,7 +900,7 @@ async fn masquerade_nat_ping<E: netemul::Endpoint>(
                 host_ep: host2_ep,
                 host_addr: host2_addr,
             },
-    } = setup_masquerade_nat_network::<E>(&sandbox, name, &test_case).await;
+    } = setup_masquerade_nat_network(&sandbox, name, &test_case).await;
 
     let ping_node = |realm, id, fnet::Subnet { addr, prefix_len: _ }| {
         let (v4_addrs, v6_addrs) = match addr {

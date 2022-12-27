@@ -195,7 +195,7 @@ fn icmp_event_stream<'a>(
     possible_icmp_payload_length(FULLY_USABLE_MTU);
     "fully used mtu"
 )]
-async fn ping_succeeds_with_expected_payload<E: netemul::Endpoint>(
+async fn ping_succeeds_with_expected_payload(
     name: &str,
     sub_name: &str,
     mtu: usize,
@@ -223,7 +223,7 @@ async fn ping_succeeds_with_expected_payload<E: netemul::Endpoint>(
         .join_network_with(
             &network,
             "source_ep",
-            E::make_config(mtu, Some(SOURCE_MAC_ADDRESS)),
+            netemul::new_endpoint_config(mtu, Some(SOURCE_MAC_ADDRESS)),
             Default::default(),
         )
         .await
@@ -233,7 +233,7 @@ async fn ping_succeeds_with_expected_payload<E: netemul::Endpoint>(
         .join_network_with(
             &network,
             "target_ep",
-            E::make_config(mtu, Some(TARGET_MAC_ADDRESS)),
+            netemul::new_endpoint_config(mtu, Some(TARGET_MAC_ADDRESS)),
             Default::default(),
         )
         .await

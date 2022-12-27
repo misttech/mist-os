@@ -8,8 +8,8 @@ use fidl_fuchsia_net_filter as fnetfilter;
 use netstack_testing_macros::netstack_test;
 
 #[netstack_test]
-async fn drop_udp_incoming<E: netemul::Endpoint>(name: &str) {
-    common::test_filter::<E>(
+async fn drop_udp_incoming(name: &str) {
+    common::test_filter(
         name,
         common::client_incoming_drop_test(
             fnetfilter::SocketProtocol::Udp,
@@ -26,8 +26,8 @@ async fn drop_udp_incoming<E: netemul::Endpoint>(name: &str) {
 }
 
 #[netstack_test]
-async fn drop_udp_outgoing<E: netemul::Endpoint>(name: &str) {
-    common::test_filter::<E>(
+async fn drop_udp_outgoing(name: &str) {
+    common::test_filter(
         name,
         common::server_outgoing_drop_test(
             fnetfilter::SocketProtocol::Udp,
@@ -44,8 +44,8 @@ async fn drop_udp_outgoing<E: netemul::Endpoint>(name: &str) {
 }
 
 #[netstack_test]
-async fn drop_udp_incoming_within_port_range<E: netemul::Endpoint>(name: &str) {
-    common::test_filter::<E>(
+async fn drop_udp_incoming_within_port_range(name: &str) {
+    common::test_filter(
         name,
         common::client_incoming_drop_test(
             fnetfilter::SocketProtocol::Udp,
@@ -62,8 +62,8 @@ async fn drop_udp_incoming_within_port_range<E: netemul::Endpoint>(name: &str) {
 }
 
 #[netstack_test]
-async fn drop_udp_outgoing_within_port_range<E: netemul::Endpoint>(name: &str) {
-    common::test_filter::<E>(
+async fn drop_udp_outgoing_within_port_range(name: &str) {
+    common::test_filter(
         name,
         common::server_outgoing_drop_test(
             fnetfilter::SocketProtocol::Udp,
@@ -80,8 +80,8 @@ async fn drop_udp_outgoing_within_port_range<E: netemul::Endpoint>(name: &str) {
 }
 
 #[netstack_test]
-async fn drop_udp_incoming_outside_port_range<E: netemul::Endpoint>(name: &str) {
-    common::test_filter::<E>(
+async fn drop_udp_incoming_outside_port_range(name: &str) {
+    common::test_filter(
         name,
         common::client_incoming_drop_test(
             fnetfilter::SocketProtocol::Udp,
@@ -98,8 +98,8 @@ async fn drop_udp_incoming_outside_port_range<E: netemul::Endpoint>(name: &str) 
 }
 
 #[netstack_test]
-async fn drop_udp_outgoing_outside_port_range<E: netemul::Endpoint>(name: &str) {
-    common::test_filter::<E>(
+async fn drop_udp_outgoing_outside_port_range(name: &str) {
+    common::test_filter(
         name,
         common::server_outgoing_drop_test(
             fnetfilter::SocketProtocol::Udp,
@@ -116,8 +116,8 @@ async fn drop_udp_outgoing_outside_port_range<E: netemul::Endpoint>(name: &str) 
 }
 
 #[netstack_test]
-async fn drop_udp_incoming_with_address_range<E: netemul::Endpoint>(name: &str) {
-    common::test_filter::<E>(
+async fn drop_udp_incoming_with_address_range(name: &str) {
+    common::test_filter(
         name,
         common::client_incoming_drop_test(
             fnetfilter::SocketProtocol::Udp,
@@ -134,8 +134,8 @@ async fn drop_udp_incoming_with_address_range<E: netemul::Endpoint>(name: &str) 
 }
 
 #[netstack_test]
-async fn drop_udp_outgoing_with_address_range<E: netemul::Endpoint>(name: &str) {
-    common::test_filter::<E>(
+async fn drop_udp_outgoing_with_address_range(name: &str) {
+    common::test_filter(
         name,
         common::server_outgoing_drop_test(
             fnetfilter::SocketProtocol::Udp,
@@ -152,8 +152,8 @@ async fn drop_udp_outgoing_with_address_range<E: netemul::Endpoint>(name: &str) 
 }
 
 #[netstack_test]
-async fn drop_udp_incoming_with_src_address_invert<E: netemul::Endpoint>(name: &str) {
-    common::test_filter::<E>(
+async fn drop_udp_incoming_with_src_address_invert(name: &str) {
+    common::test_filter(
         name,
         common::client_incoming_drop_test(
             fnetfilter::SocketProtocol::Udp,
@@ -170,8 +170,8 @@ async fn drop_udp_incoming_with_src_address_invert<E: netemul::Endpoint>(name: &
 }
 
 #[netstack_test]
-async fn drop_udp_outgoing_with_src_address_invert<E: netemul::Endpoint>(name: &str) {
-    common::test_filter::<E>(
+async fn drop_udp_outgoing_with_src_address_invert(name: &str) {
+    common::test_filter(
         name,
         common::server_outgoing_drop_test(
             fnetfilter::SocketProtocol::Udp,
@@ -188,8 +188,8 @@ async fn drop_udp_outgoing_with_src_address_invert<E: netemul::Endpoint>(name: &
 }
 
 #[netstack_test]
-async fn drop_udp_incoming_with_dst_address_invert<E: netemul::Endpoint>(name: &str) {
-    common::test_filter::<E>(
+async fn drop_udp_incoming_with_dst_address_invert(name: &str) {
+    common::test_filter(
         name,
         common::client_incoming_drop_test(
             fnetfilter::SocketProtocol::Udp,
@@ -206,8 +206,8 @@ async fn drop_udp_incoming_with_dst_address_invert<E: netemul::Endpoint>(name: &
 }
 
 #[netstack_test]
-async fn drop_udp_outgoing_with_dst_address_invert<E: netemul::Endpoint>(name: &str) {
-    common::test_filter::<E>(
+async fn drop_udp_outgoing_with_dst_address_invert(name: &str) {
+    common::test_filter(
         name,
         common::server_outgoing_drop_test(
             fnetfilter::SocketProtocol::Udp,

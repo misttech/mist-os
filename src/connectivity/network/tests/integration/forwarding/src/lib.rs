@@ -73,7 +73,7 @@ const RESPONSE: &str = "hello from server";
     };
     "ipv6"
 )]
-async fn forwarding<E: netemul::Endpoint>(name: &str, setup: Setup) {
+async fn forwarding(name: &str, setup: Setup) {
     let Setup {
         client_ip,
         client_subnet,
@@ -100,17 +100,17 @@ async fn forwarding<E: netemul::Endpoint>(name: &str, setup: Setup) {
         .expect("create realm");
 
     let client_iface = client
-        .join_network::<E, _>(&client_net, "client-ep")
+        .join_network(&client_net, "client-ep")
         .await
         .expect("install interface in client netstack");
     client_iface.add_address_and_subnet_route(client_subnet).await.expect("configure address");
     let server_iface = server
-        .join_network::<E, _>(&server_net, "server-ep")
+        .join_network(&server_net, "server-ep")
         .await
         .expect("install interface in server netstack");
     server_iface.add_address_and_subnet_route(server_subnet).await.expect("configure address");
     let router_client_iface = router
-        .join_network::<E, _>(&client_net, "router-client-ep")
+        .join_network(&client_net, "router-client-ep")
         .await
         .expect("install interface in router netstack");
     router_client_iface
@@ -118,7 +118,7 @@ async fn forwarding<E: netemul::Endpoint>(name: &str, setup: Setup) {
         .await
         .expect("configure address");
     let router_server_iface = router
-        .join_network::<E, _>(&server_net, "router-server-ep")
+        .join_network(&server_net, "router-server-ep")
         .await
         .expect("install interface in router netstack");
     router_server_iface

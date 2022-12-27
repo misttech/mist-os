@@ -183,7 +183,7 @@ struct MulticastForwardingNetwork<'a> {
 impl<'a> MulticastForwardingNetwork<'a> {
     const PAYLOAD: &'static str = "Hello multicast";
 
-    async fn new<E: netemul::Endpoint>(
+    async fn new(
         name: &'a str,
         version: IpVersion,
         sandbox: &'a netemul::TestSandbox,
@@ -201,7 +201,7 @@ impl<'a> MulticastForwardingNetwork<'a> {
         let multicast_socket_addr = create_socket_addr(IpAddrType::Multicast.address(version));
         let servers: HashMap<_, _> = futures::stream::iter(servers)
             .then(|server| async move {
-                let device = create_router_connected_device::<E>(
+                let device = create_router_connected_device(
                     format!("{}_{}", name, server.name()),
                     sandbox,
                     router_realm,
@@ -214,7 +214,7 @@ impl<'a> MulticastForwardingNetwork<'a> {
             .await;
         let clients: HashMap<_, _> = futures::stream::iter(clients)
             .then(|client| async move {
-                let device = create_router_connected_device::<E>(
+                let device = create_router_connected_device(
                     format!("{}_{}", name, client.name()),
                     sandbox,
                     router_realm,
@@ -797,7 +797,7 @@ async fn add_address(interface: &netemul::TestInterface<'_>, addr: fnet::Subnet)
 
 /// Creates a `RouterConnectedDevice` from the provided `config` that is
 /// connected to the `router_realm`.
-async fn create_router_connected_device<'a, E: netemul::Endpoint>(
+async fn create_router_connected_device<'a>(
     name: String,
     sandbox: &'a netemul::TestSandbox,
     router_realm: &'a netemul::TestRealm<'a>,
@@ -809,13 +809,13 @@ async fn create_router_connected_device<'a, E: netemul::Endpoint>(
     let network =
         sandbox.create_network(format!("{}_network", name)).await.expect("create_network failed");
     let interface = realm
-        .join_network::<E, _>(&network, format!("{}-ep", name))
+        .join_network(&network, format!("{}-ep", name))
         .await
         .expect("join_network failed for router connected device");
     add_address(&interface, config.ep_addr).await;
 
     let router_interface = router_realm
-        .join_network::<E, _>(&network, format!("{}-router-ep", name))
+        .join_network(&network, format!("{}-router-ep", name))
         .await
         .expect("join_network failed for router");
     add_address(&router_interface, config.router_ep_addr).await;
@@ -1136,7 +1136,7 @@ struct MulticastForwardingTestOptions {
     };
     "missing route"
 )]
-async fn multicast_forwarding<E: netemul::Endpoint, I: net_types::ip::Ip>(
+async fn multicast_forwarding<I: net_types::ip::Ip>(
     name: &str,
     case_name: &str,
     clients: HashMap<Client, ClientConfig>,
@@ -1152,7 +1152,7 @@ async fn multicast_forwarding<E: netemul::Endpoint, I: net_types::ip::Ip>(
     let test_name = format!("{}_{}", name, case_name);
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm(&test_name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<E>(
+    let test_network = MulticastForwardingNetwork::new(
         &test_name,
         I::VERSION,
         &sandbox,
@@ -1463,7 +1463,7 @@ struct AddMulticastRouteTestOptions {
     };
     "link-local multicast destination address"
 )]
-async fn add_multicast_route<E: netemul::Endpoint, I: net_types::ip::Ip>(
+async fn add_multicast_route<I: net_types::ip::Ip>(
     name: &str,
     case_name: &str,
     client: ClientConfig,
@@ -1481,7 +1481,7 @@ async fn add_multicast_route<E: netemul::Endpoint, I: net_types::ip::Ip>(
     let test_name = format!("{}_{}", name, case_name);
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm(&test_name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<E>(
+    let test_network = MulticastForwardingNetwork::new(
         &test_name,
         I::VERSION,
         &sandbox,
@@ -1549,10 +1549,10 @@ async fn add_multicast_route<E: netemul::Endpoint, I: net_types::ip::Ip>(
 }
 
 #[netstack_test]
-async fn multiple_multicast_controllers<E: netemul::Endpoint, I: net_types::ip::Ip>(name: &str) {
+async fn multiple_multicast_controllers<I: net_types::ip::Ip>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm(name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<E>(
+    let test_network = MulticastForwardingNetwork::new(
         name,
         I::VERSION,
         &sandbox,
@@ -1582,10 +1582,10 @@ async fn multiple_multicast_controllers<E: netemul::Endpoint, I: net_types::ip::
 }
 
 #[netstack_test]
-async fn watch_routing_events_hanging<E: netemul::Endpoint, I: net_types::ip::Ip>(name: &str) {
+async fn watch_routing_events_hanging<I: net_types::ip::Ip>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm(name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<E>(
+    let test_network = MulticastForwardingNetwork::new(
         name,
         I::VERSION,
         &sandbox,
@@ -1624,12 +1624,10 @@ async fn watch_routing_events_hanging<E: netemul::Endpoint, I: net_types::ip::Ip
 }
 
 #[netstack_test]
-async fn watch_routing_events_already_hanging<E: netemul::Endpoint, I: net_types::ip::Ip>(
-    name: &str,
-) {
+async fn watch_routing_events_already_hanging<I: net_types::ip::Ip>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm(name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<E>(
+    let test_network = MulticastForwardingNetwork::new(
         name,
         I::VERSION,
         &sandbox,
@@ -1668,12 +1666,10 @@ async fn watch_routing_events_already_hanging<E: netemul::Endpoint, I: net_types
 }
 
 #[netstack_test]
-async fn watch_routing_events_dropped_events<E: netemul::Endpoint, I: net_types::ip::Ip>(
-    name: &str,
-) {
+async fn watch_routing_events_dropped_events<I: net_types::ip::Ip>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm(name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<E>(
+    let test_network = MulticastForwardingNetwork::new(
         name,
         I::VERSION,
         &sandbox,
@@ -1803,7 +1799,7 @@ async fn watch_routing_events_dropped_events<E: netemul::Endpoint, I: net_types:
     Err(DelRouteError::InvalidAddress);
     "link local multicast destination address"
 )]
-async fn del_multicast_route<E: netemul::Endpoint, I: net_types::ip::Ip>(
+async fn del_multicast_route<I: net_types::ip::Ip>(
     name: &str,
     case_name: &str,
     source_address: DeviceAddress,
@@ -1814,7 +1810,7 @@ async fn del_multicast_route<E: netemul::Endpoint, I: net_types::ip::Ip>(
     let test_name = format!("{}_{}", name, case_name);
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm(&test_name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<E>(
+    let test_network = MulticastForwardingNetwork::new(
         &test_name,
         I::VERSION,
         &sandbox,
@@ -1909,7 +1905,7 @@ async fn del_multicast_route<E: netemul::Endpoint, I: net_types::ip::Ip>(
     GetRouteStatsError::InvalidAddress;
     "link local multicast destination address"
 )]
-async fn get_route_stats_errors<E: netemul::Endpoint, I: net_types::ip::Ip>(
+async fn get_route_stats_errors<I: net_types::ip::Ip>(
     name: &str,
     case_name: &str,
     source_address: DeviceAddress,
@@ -1920,7 +1916,7 @@ async fn get_route_stats_errors<E: netemul::Endpoint, I: net_types::ip::Ip>(
     let test_name = format!("{}_{}", name, case_name);
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm(&test_name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<E>(
+    let test_network = MulticastForwardingNetwork::new(
         &test_name,
         I::VERSION,
         &sandbox,
@@ -1943,10 +1939,10 @@ async fn get_route_stats_errors<E: netemul::Endpoint, I: net_types::ip::Ip>(
 }
 
 #[netstack_test]
-async fn get_route_stats<E: netemul::Endpoint, I: net_types::ip::Ip>(name: &str) {
+async fn get_route_stats<I: net_types::ip::Ip>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm(name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<E>(
+    let test_network = MulticastForwardingNetwork::new(
         name,
         I::VERSION,
         &sandbox,

@@ -6,7 +6,6 @@
 
 use anyhow::Context as _;
 use net_declare::{fidl_ip, fidl_ip_v4, fidl_mac, fidl_subnet};
-use netemul::Endpoint as _;
 use netstack_testing_common::Result;
 use netstack_testing_common::{
     interfaces,
@@ -78,10 +77,7 @@ async fn resolve_route(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
         .expect("failed to connect to netstack");
 
-    let host_ep = host
-        .join_network::<netemul::NetworkDevice, _>(&net, "host")
-        .await
-        .expect("host failed to join network");
+    let host_ep = host.join_network(&net, "host").await.expect("host failed to join network");
     host_ep.add_address_and_subnet_route(HOST_IP_V4).await.expect("configure address");
     let _host_address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
         &host_ep,
@@ -100,7 +96,7 @@ async fn resolve_route(name: &str) {
         .join_network_with(
             &net,
             "gateway",
-            netemul::NetworkDevice::make_config(netemul::DEFAULT_MTU, Some(GATEWAY_MAC)),
+            netemul::new_endpoint_config(netemul::DEFAULT_MTU, Some(GATEWAY_MAC)),
             Default::default(),
         )
         .await
@@ -213,10 +209,7 @@ async fn resolve_default_route_while_dhcp_is_running(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
         .expect("failed to connect to netstack");
 
-    let ep = realm
-        .join_network::<netemul::NetworkDevice, _>(&net, "host")
-        .await
-        .expect("host failed to join network");
+    let ep = realm.join_network(&net, "host").await.expect("host failed to join network");
     ep.start_dhcp().await.expect("failed to start DHCP");
 
     let routes = realm

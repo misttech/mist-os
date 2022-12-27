@@ -11,9 +11,7 @@ use anyhow::Context as _;
 use futures::{stream, FutureExt as _, StreamExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip, fidl_mac};
 use net_types::SpecifiedAddress;
-use netemul::{
-    Endpoint as _, RealmUdpSocket as _, TestInterface, TestNetwork, TestRealm, TestSandbox,
-};
+use netemul::{RealmUdpSocket as _, TestInterface, TestNetwork, TestRealm, TestSandbox};
 use netstack_testing_common::realms::{Netstack2, TestRealmExt as _, TestSandboxExt as _};
 use netstack_testing_common::Result;
 use netstack_testing_macros::netstack_test;
@@ -52,7 +50,7 @@ async fn create_realm<'a>(
         .join_network_with(
             &network,
             format!("ep-{}", variant_name),
-            netemul::NetworkDevice::make_config(netemul::DEFAULT_MTU, Some(mac)),
+            netemul::new_endpoint_config(netemul::DEFAULT_MTU, Some(mac)),
             Default::default(),
         )
         .await

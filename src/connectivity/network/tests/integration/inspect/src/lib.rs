@@ -14,7 +14,6 @@ use diagnostics_hierarchy::Property;
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_mac, fidl_subnet};
 use net_types::ip::Ip as _;
-use netemul::Endpoint as _;
 use netstack_testing_common::{
     constants, get_inspect_data,
     realms::{Netstack2, TestSandboxExt as _},
@@ -104,29 +103,17 @@ async fn inspect_nic(name: &str) {
     let realm =
         sandbox.create_netstack_realm::<Netstack2, _>(name).expect("failed to create realm");
 
-    const ETH_MAC: fidl_fuchsia_net::MacAddress = fidl_mac!("02:01:02:03:04:05");
     const NETDEV_MAC: fidl_fuchsia_net::MacAddress = fidl_mac!("02:0A:0B:0C:0D:0E");
 
     let max_frame_size = netemul::DEFAULT_MTU
         + u16::try_from(ETHERNET_HDR_LEN_NO_TAG)
             .expect("should fit ethernet header length in a u16");
-    let eth = realm
-        .join_network_with(
-            &network,
-            "eth-ep",
-            netemul::Ethernet::make_config(max_frame_size, Some(ETH_MAC)),
-            Default::default(),
-        )
-        .await
-        .expect("failed to join network with ethernet endpoint");
-    eth.add_address_and_subnet_route(fidl_subnet!("192.168.0.1/24"))
-        .await
-        .expect("configure address");
+
     let netdev = realm
         .join_network_with(
             &network,
             "netdev-ep",
-            netemul::NetworkDevice::make_config(max_frame_size, Some(NETDEV_MAC)),
+            netemul::new_endpoint_config(max_frame_size, Some(NETDEV_MAC)),
             Default::default(),
         )
         .await
@@ -142,53 +129,51 @@ async fn inspect_nic(name: &str) {
 
     // Wait for the world to stabilize and capture the state to verify inspect
     // data.
-    let (loopback_props, netdev_props, eth_props) =
-        fidl_fuchsia_net_interfaces_ext::wait_interface(
-            fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interfaces_state)
-                .expect("failed to create event stream"),
-            &mut HashMap::new(),
-            |if_map| {
-                let loopback =
-                    if_map.values().find_map(|properties| match properties.device_class {
-                        fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                            fidl_fuchsia_net_interfaces::Empty {},
-                        ) => Some(properties.clone()),
-                        fidl_fuchsia_net_interfaces::DeviceClass::Device(_) => None,
-                    })?;
-                // Endpoint is up, has assigned IPv4 and at least the expected number of
-                // IPv6 addresses.
-                let get_properties = |id| {
-                    let properties = if_map.get(&id)?;
-                    let fidl_fuchsia_net_interfaces_ext::Properties { online, addresses, .. } =
-                        properties;
-                    if !online {
-                        return None;
-                    }
-                    let (v4_count, v6_count) = addresses.iter().fold(
-                        (0, 0),
-                        |(v4_count, v6_count),
-                         fidl_fuchsia_net_interfaces_ext::Address {
-                             addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
-                             valid_until: _,
-                         }| match addr {
-                            fidl_fuchsia_net::IpAddress::Ipv4(_) => (v4_count + 1, v6_count),
-                            fidl_fuchsia_net::IpAddress::Ipv6(_) => (v4_count, v6_count + 1),
-                        },
-                    );
-                    if v4_count > 0 && v6_count >= EXPECTED_NUM_IPV6_ADDRESSES {
-                        Some(properties.clone())
-                    } else {
-                        None
-                    }
-                };
-                Some((loopback, get_properties(netdev.id())?, get_properties(eth.id())?))
-            },
-        )
-        .await
-        .expect("failed to wait for interfaces up and addresses configured");
+    let (loopback_props, netdev_props) = fidl_fuchsia_net_interfaces_ext::wait_interface(
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interfaces_state)
+            .expect("failed to create event stream"),
+        &mut HashMap::new(),
+        |if_map| {
+            let loopback =
+                if_map.values().find_map(|properties| match properties.device_class {
+                    fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
+                        fidl_fuchsia_net_interfaces::Empty {},
+                    ) => Some(properties.clone()),
+                    fidl_fuchsia_net_interfaces::DeviceClass::Device(_) => None,
+                })?;
+            // Endpoint is up, has assigned IPv4 and at least the expected number of
+            // IPv6 addresses.
+            let netdev_properties = {
+                let properties = if_map.get(&netdev.id())?;
+                let fidl_fuchsia_net_interfaces_ext::Properties { online, addresses, .. } =
+                    properties;
+                if !online {
+                    return None;
+                }
+                let (v4_count, v6_count) = addresses.iter().fold(
+                    (0, 0),
+                    |(v4_count, v6_count),
+                     fidl_fuchsia_net_interfaces_ext::Address {
+                         addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
+                         valid_until: _,
+                     }| match addr {
+                        fidl_fuchsia_net::IpAddress::Ipv4(_) => (v4_count + 1, v6_count),
+                        fidl_fuchsia_net::IpAddress::Ipv6(_) => (v4_count, v6_count + 1),
+                    },
+                );
+                if v4_count > 0 && v6_count >= EXPECTED_NUM_IPV6_ADDRESSES {
+                    properties.clone()
+                } else {
+                    return None;
+                }
+            };
+            Some((loopback, netdev_properties))
+        },
+    )
+    .await
+    .expect("failed to wait for interfaces up and addresses configured");
     let loopback_addrs = AddressMatcher::new(&loopback_props);
     let netdev_addrs = AddressMatcher::new(&netdev_props);
-    let eth_addrs = AddressMatcher::new(&eth_props);
 
     // Populate the neighbor table so we can verify inspection of its entries.
     const BOB_IP: fidl_fuchsia_net::IpAddress = fidl_ip!("192.168.0.1");
@@ -196,7 +181,7 @@ async fn inspect_nic(name: &str) {
     let () = realm
         .connect_to_protocol::<fidl_fuchsia_net_neighbor::ControllerMarker>()
         .expect("failed to connect to Controller")
-        .add_entry(eth.id(), &mut BOB_IP.clone(), &mut BOB_MAC.clone())
+        .add_entry(netdev.id(), &mut BOB_IP.clone(), &mut BOB_MAC.clone())
         .await
         .expect("add_entry FIDL error")
         .map_err(zx::Status::from_raw)
@@ -260,80 +245,6 @@ async fn inspect_nic(name: &str) {
                 IPv6: contains {},
             }
         },
-        eth.id().to_string() => {
-            Name: eth_props.name,
-            Loopback: "false",
-            LinkOnline: "true",
-            AdminUp: "true",
-            Promiscuous: "false",
-            Up: "true",
-            MTU: u64::from(netemul::DEFAULT_MTU),
-            NICID: eth.id().to_string(),
-            Running: "true",
-            "DHCP enabled": "false",
-            LinkAddress: fidl_fuchsia_net_ext::MacAddress::from(ETH_MAC).to_string(),
-            // IPv4.
-            ProtocolAddress0: eth_addrs.clone(),
-            // Link-local IPv6.
-            ProtocolAddress1: eth_addrs.clone(),
-            Stats: {
-                DisabledRx: {
-                    Bytes: AnyProperty,
-                    Packets: AnyProperty,
-                },
-                Tx: {
-                   Bytes: AnyProperty,
-                   Packets: AnyProperty,
-                },
-                TxPacketsDroppedNoBufferSpace: AnyProperty,
-                Rx: {
-                    Bytes: AnyProperty,
-                    Packets: AnyProperty,
-                },
-                Neighbor: {
-                    DroppedConfirmationForNoninitiatedNeighbor: AnyProperty,
-                    DroppedInvalidLinkAddressConfirmations: AnyProperty,
-                    UnreachableEntryLookups: AnyProperty,
-                },
-                MalformedL4RcvdPackets: 0u64,
-                UnknownL3ProtocolRcvdPacketCounts: {
-                    Total: {
-                        Count: "0"
-                    },
-                },
-                UnknownL4ProtocolRcvdPacketCounts: {
-                    Total: {
-                        Count: "0"
-                    },
-                },
-            },
-            "Ethernet Info": {
-                Filepath: "",
-                Topopath: "eth-ep",
-                Features: "Synthetic",
-                TxDrops: AnyProperty,
-                RxReads: contains {},
-                RxWrites: contains {},
-                TxReads: contains {},
-                TxWrites: contains {}
-            },
-            Neighbors: {
-                fidl_fuchsia_net_ext::IpAddress::from(BOB_IP).to_string() => {
-                    "Link address": fidl_fuchsia_net_ext::MacAddress::from(BOB_MAC).to_string(),
-                    State: "Static",
-                    // TODO(https://fxbug.dev/78847): Use NonZeroIntProperty once we are able to
-                    // distinguish between signed and unsigned integers from the
-                    // fuchsia.diagnostics FIDL. This is currently not possible because the inspect
-                    // data is serialized into JSON then converted back, losing type information.
-                    "Last updated": NonZeroUintProperty,
-                }
-            },
-            "Network Endpoint Stats": {
-                ARP: contains {},
-                IPv4: contains {},
-                IPv6: contains {},
-            }
-        },
         netdev.id().to_string() => {
             Name: netdev_props.name,
             Loopback: "false",
@@ -389,7 +300,17 @@ async fn inspect_nic(name: &str) {
                 TxReads: contains {},
                 TxWrites: contains {}
             },
-            Neighbors: {},
+            Neighbors: {
+                fidl_fuchsia_net_ext::IpAddress::from(BOB_IP).to_string() => {
+                    "Link address": fidl_fuchsia_net_ext::MacAddress::from(BOB_MAC).to_string(),
+                    State: "Static",
+                    // TODO(https://fxbug.dev/78847): Use NonZeroIntProperty once we are able to
+                    // distinguish between signed and unsigned integers from the
+                    // fuchsia.diagnostics FIDL. This is currently not possible because the inspect
+                    // data is serialized into JSON then converted back, losing type information.
+                    "Last updated": NonZeroUintProperty,
+                }
+            },
             "Network Endpoint Stats": {
                 ARP: contains {},
                 IPv4: contains {},
@@ -399,7 +320,6 @@ async fn inspect_nic(name: &str) {
     });
 
     let () = loopback_addrs.check().expect("loopback addresses match failed");
-    let () = eth_addrs.check().expect("ethernet addresses match failed");
     let () = netdev_addrs.check().expect("netdev addresses match failed");
 }
 
@@ -500,7 +420,7 @@ const DHCP_CLIENT_PORT: NonZeroU16 = nonzero!(dhcpv4::protocol::CLIENT_PORT);
             port: DHCP_CLIENT_PORT,
         }
     ]; "multiple_invalid_port_and_single_invalid_trans_proto")]
-async fn inspect_dhcp<E: netemul::Endpoint>(
+async fn inspect_dhcp(
     netstack_test_name: &str,
     test_case_name: &str,
     inbound_packets: Vec<PacketAttributes>,
@@ -515,7 +435,7 @@ async fn inspect_dhcp<E: netemul::Endpoint>(
     // Create the fake endpoint before installing an endpoint in the netstack to ensure
     // that we receive all DHCP messages sent by the client.
     let fake_ep = network.create_fake_endpoint().expect("failed to create fake endpoint");
-    let eth = realm.join_network::<E, _>(&network, "ep1").await.expect("failed to join network");
+    let eth = realm.join_network(&network, "ep1").await.expect("failed to join network");
     eth.start_dhcp().await.expect("failed to start DHCP");
 
     // Wait for a DHCP message here to ensure that the client is ready to receive

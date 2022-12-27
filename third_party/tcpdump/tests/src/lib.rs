@@ -290,15 +290,13 @@ async fn packet_test() {
 #[netstack_test]
 // TODO(https://fxbug.dev/88133): Fix memory leak and run this with Lsan.
 #[cfg_attr(feature = "variant_asan", ignore)]
-async fn bridged_packet_test<E: netemul::Endpoint>(name: &str) {
+async fn bridged_packet_test(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
 
     let net = sandbox.create_network(name).await.expect("error creating network");
-    let iface = realm
-        .join_network::<E, _>(&net, "ep")
-        .await
-        .expect("failed to join network in gateway realm");
+    let iface =
+        realm.join_network(&net, "ep").await.expect("failed to join network in gateway realm");
 
     const REMOTE_MAC: fnet::MacAddress = fidl_mac!("02:00:00:00:00:01");
     const NETWORK_ADDR: fnet::Ipv4Address = fidl_ip_v4!("192.168.1.0");

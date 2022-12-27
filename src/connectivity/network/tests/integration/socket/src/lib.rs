@@ -112,7 +112,7 @@ enum UdpProtocol {
     UdpProtocol::Synchronous; "synchronous_protocol")]
 #[test_case(
     UdpProtocol::Fast; "fast_protocol")]
-async fn test_udp_socket<E: netemul::Endpoint>(name: &str, protocol: UdpProtocol) {
+async fn test_udp_socket(name: &str, protocol: UdpProtocol) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
 
@@ -129,7 +129,7 @@ async fn test_udp_socket<E: netemul::Endpoint>(name: &str, protocol: UdpProtocol
         .join_network_with(
             &net,
             "client",
-            E::make_config(netemul::DEFAULT_MTU, Some(CLIENT_MAC)),
+            netemul::new_endpoint_config(netemul::DEFAULT_MTU, Some(CLIENT_MAC)),
             Default::default(),
         )
         .await
@@ -147,7 +147,7 @@ async fn test_udp_socket<E: netemul::Endpoint>(name: &str, protocol: UdpProtocol
         .join_network_with(
             &net,
             "server",
-            E::make_config(netemul::DEFAULT_MTU, Some(SERVER_MAC)),
+            netemul::new_endpoint_config(netemul::DEFAULT_MTU, Some(SERVER_MAC)),
             Default::default(),
         )
         .await
@@ -212,10 +212,7 @@ async fn setup_fastudp_network<'a>(
     let netstack = sandbox
         .create_netstack_realm::<Netstack2WithFastUdp, _>(name)
         .expect("create netstack realm");
-    let iface = netstack
-        .join_network::<netemul::NetworkDevice, _>(&net, "ep")
-        .await
-        .expect("failed to join network");
+    let iface = netstack.join_network(&net, "ep").await.expect("failed to join network");
 
     let socket = {
         let socket_provider = netstack
@@ -1009,7 +1006,6 @@ async fn tcp_socket_accept_cross_ns<
     I: net_types::ip::Ip + TestIpExt,
     Client: Netstack,
     Server: Netstack,
-    E: netemul::Endpoint,
     Fut: Future,
     F: FnOnce(fasync::net::TcpStream, fasync::net::TcpStream) -> Fut,
 >(
@@ -1022,10 +1018,8 @@ async fn tcp_socket_accept_cross_ns<
     let client = sandbox
         .create_netstack_realm::<Client, _>(format!("{}_client", name))
         .expect("failed to create client realm");
-    let client_interface = client
-        .join_network::<E, _>(&net, "client-ep")
-        .await
-        .expect("failed to join network in realm");
+    let client_interface =
+        client.join_network(&net, "client-ep").await.expect("failed to join network in realm");
     client_interface
         .add_address_and_subnet_route(I::CLIENT_SUBNET)
         .await
@@ -1034,10 +1028,8 @@ async fn tcp_socket_accept_cross_ns<
     let server = sandbox
         .create_netstack_realm::<Server, _>(format!("{}_server", name))
         .expect("failed to create server realm");
-    let server_interface = server
-        .join_network::<E, _>(&net, "server-ep")
-        .await
-        .expect("failed to join network in realm");
+    let server_interface =
+        server.join_network(&net, "server-ep").await.expect("failed to join network in realm");
     server_interface
         .add_address_and_subnet_route(I::SERVER_SUBNET)
         .await
@@ -1063,22 +1055,15 @@ async fn tcp_socket_accept_cross_ns<
 }
 
 #[netstack_test]
-async fn tcp_socket_accept<
-    I: net_types::ip::Ip + TestIpExt,
-    E: netemul::Endpoint,
-    Client: Netstack,
-    Server: Netstack,
->(
+async fn tcp_socket_accept<I: net_types::ip::Ip + TestIpExt, Client: Netstack, Server: Netstack>(
     name: &str,
 ) {
-    tcp_socket_accept_cross_ns::<I, Client, Server, E, _, _>(name, |_client, _server| async {})
-        .await
+    tcp_socket_accept_cross_ns::<I, Client, Server, _, _>(name, |_client, _server| async {}).await
 }
 
 #[netstack_test]
 async fn tcp_socket_send_recv<
     I: net_types::ip::Ip + TestIpExt,
-    E: netemul::Endpoint,
     Client: Netstack,
     Server: Netstack,
 >(
@@ -1105,19 +1090,18 @@ async fn tcp_socket_send_recv<
             read_count
         );
     }
-    tcp_socket_accept_cross_ns::<I, Client, Server, E, _, _>(name, send_recv).await
+    tcp_socket_accept_cross_ns::<I, Client, Server, _, _>(name, send_recv).await
 }
 
 #[netstack_test]
 async fn tcp_socket_shutdown_connection<
     I: net_types::ip::Ip + TestIpExt,
-    E: netemul::Endpoint,
     Client: Netstack,
     Server: Netstack,
 >(
     name: &str,
 ) {
-    tcp_socket_accept_cross_ns::<I, Client, Server, E, _, _>(
+    tcp_socket_accept_cross_ns::<I, Client, Server, _, _>(
         name,
         |mut client: fasync::net::TcpStream, mut server: fasync::net::TcpStream| async move {
             client.shutdown(std::net::Shutdown::Both).expect("failed to shutdown the client");
@@ -1139,19 +1123,15 @@ async fn tcp_socket_shutdown_connection<
 
 // TODO(https://fxbug.dev/112135): Parametrize netstack.
 #[netstack_test]
-async fn tcp_socket_shutdown_listener<I: net_types::ip::Ip + TestIpExt, E: netemul::Endpoint>(
-    name: &str,
-) {
+async fn tcp_socket_shutdown_listener<I: net_types::ip::Ip + TestIpExt>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
 
     let client = sandbox
         .create_netstack_realm::<Netstack3, _>(format!("{}_client", name))
         .expect("failed to create client realm");
-    let client_interface = client
-        .join_network::<E, _>(&net, "client-ep")
-        .await
-        .expect("failed to join network in realm");
+    let client_interface =
+        client.join_network(&net, "client-ep").await.expect("failed to join network in realm");
     client_interface
         .add_address_and_subnet_route(I::CLIENT_SUBNET)
         .await
@@ -1160,10 +1140,8 @@ async fn tcp_socket_shutdown_listener<I: net_types::ip::Ip + TestIpExt, E: netem
     let server = sandbox
         .create_netstack_realm::<Netstack3, _>(format!("{}_server", name))
         .expect("failed to create server realm");
-    let server_interface = server
-        .join_network::<E, _>(&net, "server-ep")
-        .await
-        .expect("failed to join network in realm");
+    let server_interface =
+        server.join_network(&net, "server-ep").await.expect("failed to join network in realm");
     server_interface
         .add_address_and_subnet_route(I::SERVER_SUBNET)
         .await
@@ -1206,16 +1184,14 @@ async fn tcp_socket_shutdown_listener<I: net_types::ip::Ip + TestIpExt, E: netem
 }
 
 #[netstack_test]
-async fn tcpv4_tcpv6_listeners_coexist<E: netemul::Endpoint>(name: &str) {
+async fn tcpv4_tcpv6_listeners_coexist(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
 
     let host =
         sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create server realm");
-    let interface = host
-        .join_network::<E, _>(&net, "server-ep")
-        .await
-        .expect("failed to join network in realm");
+    let interface =
+        host.join_network(&net, "server-ep").await.expect("failed to join network in realm");
     interface
         .add_address_and_subnet_route(Ipv4::SERVER_SUBNET)
         .await
@@ -1290,7 +1266,7 @@ async fn tcp_socket_listen<N: Netstack, I: net_types::ip::Ip + TestIpExt>(
 }
 
 #[netstack_test]
-async fn test_tcp_socket<N: Netstack, E: netemul::Endpoint>(name: &str) {
+async fn tcp_socket<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
 
@@ -1301,7 +1277,7 @@ async fn test_tcp_socket<N: Netstack, E: netemul::Endpoint>(name: &str) {
         .join_network_with(
             &net,
             "client",
-            E::make_config(netemul::DEFAULT_MTU, Some(CLIENT_MAC)),
+            netemul::new_endpoint_config(netemul::DEFAULT_MTU, Some(CLIENT_MAC)),
             Default::default(),
         )
         .await
@@ -1315,7 +1291,7 @@ async fn test_tcp_socket<N: Netstack, E: netemul::Endpoint>(name: &str) {
         .join_network_with(
             &net,
             "server",
-            E::make_config(netemul::DEFAULT_MTU, Some(SERVER_MAC)),
+            netemul::new_endpoint_config(netemul::DEFAULT_MTU, Some(SERVER_MAC)),
             Default::default(),
         )
         .await
@@ -1327,8 +1303,7 @@ async fn test_tcp_socket<N: Netstack, E: netemul::Endpoint>(name: &str) {
 
 #[netstack_test]
 async fn tcp_sendbuf_size<I: net_types::ip::Ip + TestIpExt, N: Netstack>(name: &str) {
-    type E = netemul::NetworkDevice;
-    tcp_socket_accept_cross_ns::<I, N, N, E, _, _>(name, |mut sender, mut receiver| async move {
+    tcp_socket_accept_cross_ns::<I, N, N, _, _>(name, |mut sender, mut receiver| async move {
         // If the sender supports setting SO_SNDBUF, it should be able to buffer
         // a large amount of data even if the receiver isn't reading.
         const BUFFER_SIZE: usize = 1024 * 1024;
@@ -1831,7 +1806,7 @@ async fn ip_endpoint_packets(name: &str) {
 }
 
 #[netstack_test]
-async fn ping<E: netemul::Endpoint>(name: &str) {
+async fn ping(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
 
@@ -1843,7 +1818,7 @@ async fn ping<E: netemul::Endpoint>(name: &str) {
                 .create_netstack_realm::<Netstack2, _>(format!("{}_{}", name, suffix))
                 .expect("failed to create realm");
             let interface = realm
-                .join_network::<E, _>(&net, format!("ep_{}", suffix))
+                .join_network(&net, format!("ep_{}", suffix))
                 .await
                 .expect("failed to join network in realm");
             interface.add_address_and_subnet_route(addr).await.expect("configure address");
@@ -1905,10 +1880,7 @@ async fn socket_clone_bind<N: Netstack>(name: &str, socket_type: SocketType) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
-    let interface = realm
-        .join_network::<netemul::Ethernet, _>(&network, "stack")
-        .await
-        .expect("join network failed");
+    let interface = realm.join_network(&network, "stack").await.expect("join network failed");
     interface
         .add_address_and_subnet_route(fidl_subnet!("192.168.1.10/16"))
         .await
@@ -1952,10 +1924,7 @@ async fn udp_sendto_unroutable_leaves_socket_bound<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
-    let interface = realm
-        .join_network::<netemul::Ethernet, _>(&network, "stack")
-        .await
-        .expect("join network failed");
+    let interface = realm.join_network(&network, "stack").await.expect("join network failed");
     interface
         .add_address_and_subnet_route(fidl_subnet!("192.168.1.10/16"))
         .await
@@ -2047,7 +2016,6 @@ async fn with_multinic_and_peers<
     port: u16,
     call_with_sockets: F,
 ) {
-    type E = netemul::Ethernet;
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let sandbox = &sandbox;
 
@@ -2081,7 +2049,7 @@ async fn with_multinic_and_peers<
                 .create_netstack_realm::<N, _>(format!("{name}_peer_{i}"))
                 .expect("create realm");
             let peer_iface = peer
-                .join_network::<E, _>(&network, format!("peer-{i}-ep"))
+                .join_network(&network, format!("peer-{i}-ep"))
                 .await
                 .expect("install interface in peer netstack");
             peer_iface
@@ -2095,10 +2063,8 @@ async fn with_multinic_and_peers<
         };
         let multinic_interface = {
             let name = format!("multinic-ep-{i}");
-            let multinic_iface = multinic
-                .join_network::<E, _>(&network, name)
-                .await
-                .expect("adding interface failed");
+            let multinic_iface =
+                multinic.join_network(&network, name).await.expect("adding interface failed");
             multinic_iface
                 .add_address_and_subnet_route(fnet::Subnet {
                     addr: fnet::IpAddress::Ipv4(multinic_ip.addr),
@@ -2283,7 +2249,7 @@ async fn udp_send_from_bound_to_device<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
-async fn tcp_connect_bound_to_device<E: netemul::Endpoint>(name: &str) {
+async fn tcp_connect_bound_to_device(name: &str) {
     // TODO(https://github.com/google/gvisor/issues/8276): Run this against
     // Netstack2 variants once gVisor uses the bound device when connecting TCP
     // sockets.
@@ -2358,16 +2324,14 @@ async fn tcp_connect_bound_to_device<E: netemul::Endpoint>(name: &str) {
 }
 
 #[netstack_test]
-async fn get_bound_device_errors_after_device_deleted<N: Netstack, E: netemul::Endpoint>(
-    name: &str,
-) {
+async fn get_bound_device_errors_after_device_deleted<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
 
     let host = sandbox.create_netstack_realm::<N, _>(format!("{name}_host")).expect("create realm");
 
     let bound_interface =
-        host.join_network::<E, _>(&net, "bound-device").await.expect("host failed to join network");
+        host.join_network(&net, "bound-device").await.expect("host failed to join network");
     bound_interface
         .add_address_and_subnet_route(fidl_subnet!("192.168.0.1/16"))
         .await
@@ -2417,7 +2381,7 @@ async fn get_bound_device_errors_after_device_deleted<N: Netstack, E: netemul::E
 }
 
 #[netstack_test]
-async fn send_to_remote_with_zone<N: Netstack, E: netemul::Endpoint>(name: &str) {
+async fn send_to_remote_with_zone<N: Netstack>(name: &str) {
     const PORT: u16 = 80;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net_a = sandbox.create_network("a").await.expect("failed to create network");
@@ -2425,14 +2389,14 @@ async fn send_to_remote_with_zone<N: Netstack, E: netemul::Endpoint>(name: &str)
 
     let host = sandbox.create_netstack_realm::<N, _>(format!("{name}_host")).expect("create realm");
 
-    async fn make_interface<'a, N: Netstack, E: netemul::Endpoint>(
+    async fn make_interface<'a, N: Netstack>(
         host: &netemul::TestRealm<'a>,
         id: u8,
         net: &netemul::TestNetwork<'a>,
         subnet: fnet::Subnet,
     ) -> TestInterface<'a> {
         let interface = host
-            .join_network::<E, _>(net, format!("host-{id}"))
+            .join_network(net, format!("host-{id}"))
             .await
             .expect("host failed to join network");
 
@@ -2451,9 +2415,9 @@ async fn send_to_remote_with_zone<N: Netstack, E: netemul::Endpoint>(name: &str)
     }
 
     let host_interface_a =
-        make_interface::<N, E>(&host, 1, &net_a, fidl_subnet!("fe80::1111/64")).await;
+        make_interface::<N>(&host, 1, &net_a, fidl_subnet!("fe80::1111/64")).await;
     let host_interface_b =
-        make_interface::<N, E>(&host, 2, &net_b, fidl_subnet!("fe80::2222/64")).await;
+        make_interface::<N>(&host, 2, &net_b, fidl_subnet!("fe80::2222/64")).await;
 
     let peer_a =
         sandbox.create_netstack_realm::<N, _>(format!("{name}_peer-a")).expect("create realm");
@@ -2464,8 +2428,8 @@ async fn send_to_remote_with_zone<N: Netstack, E: netemul::Endpoint>(name: &str)
     let peer_ip = std_ip_v6!("fe80::3");
     let peer_subnet =
         fnet::Subnet { addr: fnet_ext::IpAddress(peer_ip.into()).into(), prefix_len: 64 };
-    let _peer_a_interface = make_interface::<N, E>(&peer_a, 3, &net_a, peer_subnet.clone()).await;
-    let _peer_b_interface = make_interface::<N, E>(&peer_b, 4, &net_b, peer_subnet).await;
+    let _peer_a_interface = make_interface::<N>(&peer_a, 3, &net_a, peer_subnet.clone()).await;
+    let _peer_b_interface = make_interface::<N>(&peer_b, 4, &net_b, peer_subnet).await;
 
     let make_socket = |realm| async move {
         fasync::net::UdpSocket::bind_in_realm(realm, (std::net::Ipv6Addr::UNSPECIFIED, PORT).into())

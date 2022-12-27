@@ -25,13 +25,13 @@ use packet_formats::{
 };
 
 #[netstack_test]
-async fn sends_igmp_reports<E: netemul::Endpoint>(name: &str) {
+async fn sends_igmp_reports(name: &str) {
     const INTERFACE_ADDR: std::net::Ipv4Addr = std_ip_v4!("192.168.0.1");
     const MULTICAST_ADDR: std::net::Ipv4Addr = std_ip_v4!("224.1.2.3");
 
     let sandbox = netemul::TestSandbox::new().expect("error creating sandbox");
     let (_network, realm, _netstack, iface, fake_ep) =
-        setup_network::<E>(&sandbox, name, None).await.expect("error setting up network");
+        setup_network(&sandbox, name, None).await.expect("error setting up network");
 
     let addr = net::Ipv4Address { addr: INTERFACE_ADDR.octets() };
     let _address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(

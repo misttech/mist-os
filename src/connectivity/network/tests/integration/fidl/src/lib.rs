@@ -10,7 +10,6 @@ use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_netemul as fnetemul;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
-use fuchsia_zircon as zx;
 
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use net_declare::{fidl_mac, fidl_subnet, net_mac, std_ip_v4, std_ip_v6, std_socket_addr};
@@ -36,118 +35,6 @@ use packet_formats::{
     ip::{IpExt, IpPacketBuilder as _},
 };
 use test_case::test_case;
-
-#[netstack_test]
-async fn add_ethernet_device(name: &str) {
-    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
-    let netstack = realm
-        .connect_to_protocol::<fidl_fuchsia_netstack::NetstackMarker>()
-        .expect("connect to protocol");
-    let device =
-        sandbox.create_endpoint::<netemul::Ethernet, _>(name).await.expect("create endpoint");
-
-    // We're testing add_ethernet_device (netstack.fidl), which
-    // does not have a network device entry point.
-    let eth = device.get_ethernet().await.expect("connet to ethernet device");
-    let id = netstack
-        .add_ethernet_device(
-            name,
-            &mut fidl_fuchsia_netstack::InterfaceConfig {
-                name: name[..fidl_fuchsia_net_interfaces::INTERFACE_NAME_LENGTH.into()].to_string(),
-                filepath: "/fake/filepath/for_test".to_string(),
-                metric: 0,
-            },
-            eth,
-        )
-        .await
-        .expect("add_ethernet_device FIDL error")
-        .map_err(zx::Status::from_raw)
-        .expect("add_ethernet_device failed");
-
-    let interface_state = realm
-        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
-        .expect("connect to protocol");
-    let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(id.into());
-    let (device_class, online) = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-            .expect("create event stream"),
-        &mut state,
-        |fidl_fuchsia_net_interfaces_ext::Properties {
-             id: _,
-             name: _,
-             device_class,
-             online,
-             addresses: _,
-             has_default_ipv4_route: _,
-             has_default_ipv6_route: _,
-         }| Some((*device_class, *online)),
-    )
-    .await
-    .expect("observe interface addition");
-
-    assert_eq!(
-        device_class,
-        fidl_fuchsia_net_interfaces::DeviceClass::Device(
-            fidl_fuchsia_hardware_network::DeviceClass::Virtual
-        )
-    );
-    assert!(!online);
-}
-
-#[netstack_test]
-async fn no_duplicate_interface_names(name: &str) {
-    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
-    let netstack = realm
-        .connect_to_protocol::<fidl_fuchsia_netstack::NetstackMarker>()
-        .expect("connect to protocol");
-    // Create one endpoint of each type so we can use all the APIs that add an
-    // interface. Note that fuchsia.net.stack/Stack.AddEthernetInterface does
-    // not support setting the interface name.
-    let eth_ep = sandbox
-        .create_endpoint::<netemul::Ethernet, _>("eth-ep")
-        .await
-        .expect("create ethernet endpoint");
-
-    const IFNAME: &'static str = "testif";
-    const TOPOPATH: &'static str = "/fake/topopath";
-    const FILEPATH: &'static str = "/fake/filepath";
-
-    // Add the first ep to the stack so it takes over the name.
-    let eth = eth_ep.get_ethernet().await.expect("connect to ethernet device");
-    let _id: u32 = netstack
-        .add_ethernet_device(
-            TOPOPATH,
-            &mut fidl_fuchsia_netstack::InterfaceConfig {
-                name: IFNAME.to_string(),
-                filepath: FILEPATH.to_string(),
-                metric: 0,
-            },
-            eth,
-        )
-        .await
-        .expect("add_ethernet_device FIDL error")
-        .map_err(zx::Status::from_raw)
-        .expect("add_ethernet_device error");
-
-    // Now try to add again with the same parameters and expect an error.
-    let eth = eth_ep.get_ethernet().await.expect("connect to ethernet device");
-    let result = netstack
-        .add_ethernet_device(
-            TOPOPATH,
-            &mut fidl_fuchsia_netstack::InterfaceConfig {
-                name: IFNAME.to_string(),
-                filepath: FILEPATH.to_string(),
-                metric: 0,
-            },
-            eth,
-        )
-        .await
-        .expect("add_ethernet_device FIDL error")
-        .map_err(zx::Status::from_raw);
-    assert_eq!(result, Err(zx::Status::ALREADY_EXISTS));
-}
 
 #[netstack_test]
 async fn log_packets(name: &str) {
@@ -339,7 +226,7 @@ async fn disable_interface_loopback<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
-async fn reject_multicast_mac_address<N: Netstack, E: netemul::Endpoint>(name: &str) {
+async fn reject_multicast_mac_address<N: Netstack>(name: &str) {
     const BAD_MAC_ADDRESS: net_types::ethernet::Mac = net_mac!("CF:AA:BB:CC:DD:EE");
     assert_eq!(net_types::UnicastAddr::new(BAD_MAC_ADDRESS), None);
 
@@ -350,7 +237,7 @@ async fn reject_multicast_mac_address<N: Netstack, E: netemul::Endpoint>(name: &
         .join_network_with(
             &net,
             "host",
-            E::make_config(
+            netemul::new_endpoint_config(
                 netemul::DEFAULT_MTU,
                 Some(fnet::MacAddress { octets: BAD_MAC_ADDRESS.bytes() }),
             ),
@@ -470,7 +357,7 @@ fn test_forwarding_v6(
         Some(ForwardingConfiguration::Iface2Only(fidl_fuchsia_net::IpVersion::V6)),
         false,
     ); "v6_iface2_forward_v6_icmp_v6")]
-async fn test_forwarding<E: netemul::Endpoint, I: IpExt + IcmpIpExt>(
+async fn test_forwarding<I: IpExt + IcmpIpExt>(
     test_name: &str,
     sub_test_name: &str,
     test_case: ForwardingTestCase<I>,
@@ -505,7 +392,7 @@ async fn test_forwarding<E: netemul::Endpoint, I: IpExt + IcmpIpExt>(
         let net = sandbox.create_network(format!("net{}", net_num)).await.expect("create network");
         let fake_ep = net.create_fake_endpoint().expect("create fake endpoint");
         let iface = realm
-            .join_network::<E, _>(&net, format!("iface{}", net_num))
+            .join_network(&net, format!("iface{}", net_num))
             .await
             .expect("configure networking");
         iface.add_address_and_subnet_route(addr).await.expect("configure address");

@@ -91,7 +91,7 @@ enum Step {
     "link_flap",
     &[Step::Bridge(vec![Link::A]), Step::FlapLink(Link::A)];
     "link_flap")]
-async fn test<E: netemul::Endpoint>(name: &str, sub_name: &str, steps: &[Step]) {
+async fn test(name: &str, sub_name: &str, steps: &[Step]) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let gateway_realm = sandbox
         .create_netstack_realm::<Netstack2, _>(format!("{}_{}_gateway", name, sub_name))
@@ -101,7 +101,7 @@ async fn test<E: netemul::Endpoint>(name: &str, sub_name: &str, steps: &[Step]) 
         .await
         .expect("failed to create network between switch and gateway");
     let gateway_if = gateway_realm
-        .join_network::<E, _>(&net_switch_gateway, "gateway_ep")
+        .join_network(&net_switch_gateway, "gateway_ep")
         .await
         .expect("failed to join network in gateway realm");
     gateway_if
@@ -113,7 +113,7 @@ async fn test<E: netemul::Endpoint>(name: &str, sub_name: &str, steps: &[Step]) 
         .create_netstack_realm::<Netstack2, _>(format!("{}_{}_switch", name, sub_name))
         .expect("failed to create switch netstack realm");
     let switch_if = switch_realm
-        .join_network::<E, _>(&net_switch_gateway, "switch_ep")
+        .join_network(&net_switch_gateway, "switch_ep")
         .await
         .expect("failed to join network in switch realm");
     switch_if
@@ -198,7 +198,7 @@ async fn test<E: netemul::Endpoint>(name: &str, sub_name: &str, steps: &[Step]) 
                                 .await
                                 .expect("failed to create network between host and switch");
                             let host_if = realm
-                                .join_network::<E, _>(&net, format!("host{}", link))
+                                .join_network(&net, format!("host{}", link))
                                 .await
                                 .expect("failed to join network in host realm");
                             host_if
@@ -213,7 +213,7 @@ async fn test<E: netemul::Endpoint>(name: &str, sub_name: &str, steps: &[Step]) 
                                 .await
                                 .expect("configure address");
                             let switch_if = switch_realm
-                                .join_network::<E, _>(&net, format!("switch_ep{}", link))
+                                .join_network(&net, format!("switch_ep{}", link))
                                 .await
                                 .expect("failed to join network in switch realm");
 
@@ -350,7 +350,7 @@ async fn test<E: netemul::Endpoint>(name: &str, sub_name: &str, steps: &[Step]) 
 // Tests that an admin-disabled interface attached to a bridge is still
 // disabled when the bridge is removed.
 #[netstack_test]
-async fn test_remove_bridge_interface_disabled<E: netemul::Endpoint>(name: &str) {
+async fn test_remove_bridge_interface_disabled(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let gateway_realm = sandbox
         .create_netstack_realm::<Netstack2, _>(format!("{}_gateway", name))
@@ -360,7 +360,7 @@ async fn test_remove_bridge_interface_disabled<E: netemul::Endpoint>(name: &str)
         .await
         .expect("failed to create network between switch and gateway");
     let gateway_if = gateway_realm
-        .join_network::<E, _>(&net_switch_gateway, "gateway_ep")
+        .join_network(&net_switch_gateway, "gateway_ep")
         .await
         .expect("failed to join network in gateway realm");
     gateway_if
@@ -372,7 +372,7 @@ async fn test_remove_bridge_interface_disabled<E: netemul::Endpoint>(name: &str)
         .create_netstack_realm::<Netstack2, _>(format!("{}_switch", name))
         .expect("failed to create switch netstack realm");
     let switch_if = switch_realm
-        .join_network::<E, _>(&net_switch_gateway, "switch_ep")
+        .join_network(&net_switch_gateway, "switch_ep")
         .await
         .expect("failed to join network to gateway in switch realm");
     switch_if

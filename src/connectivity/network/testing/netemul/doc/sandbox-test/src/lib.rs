@@ -23,14 +23,12 @@ async fn test() -> Result<(), anyhow::Error> {
     let server_addr = std_socket_addr!("192.168.0.2:8080");
 
     let client = sandbox.create_netstack_realm::<Netstack2, _>("client")?;
-    let client_interface =
-        client.join_network::<netemul::NetworkDevice, _>(&network, "client-ep").await?;
+    let client_interface = client.join_network(&network, "client-ep").await?;
     client_interface.add_address_and_subnet_route(CLIENT_SUBNET).await?;
     let client_socket = fuchsia_async::net::UdpSocket::bind_in_realm(&client, client_addr).await?;
 
     let server = sandbox.create_netstack_realm::<Netstack2, _>("server")?;
-    let server_interface =
-        server.join_network::<netemul::NetworkDevice, _>(&network, "server-ep").await?;
+    let server_interface = server.join_network(&network, "server-ep").await?;
     server_interface.add_address_and_subnet_route(SERVER_SUBNET).await?;
     let server_socket = fuchsia_async::net::UdpSocket::bind_in_realm(&server, server_addr).await?;
 

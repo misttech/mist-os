@@ -208,7 +208,7 @@ pub async fn get_inspect_data(
 }
 
 /// Sets up a realm with a network with no required services.
-pub async fn setup_network<'a, E>(
+pub async fn setup_network<'a>(
     sandbox: &'a netemul::TestSandbox,
     name: &'a str,
     metric: Option<u32>,
@@ -220,10 +220,8 @@ pub async fn setup_network<'a, E>(
     netemul::TestFakeEndpoint<'a>,
 )>
 where
-    E: netemul::Endpoint,
 {
-    setup_network_with::<E, _>(sandbox, name, metric, std::iter::empty::<fnetemul::ChildDef>())
-        .await
+    setup_network_with(sandbox, name, metric, std::iter::empty::<fnetemul::ChildDef>()).await
 }
 
 /// Sets up a realm with required services and a network used for tests
@@ -232,7 +230,7 @@ where
 /// Returns the network, realm, netstack client, interface (added to the
 /// netstack and up) and a fake endpoint used to read and write raw ethernet
 /// packets.
-pub async fn setup_network_with<'a, E, I>(
+pub async fn setup_network_with<'a, I>(
     sandbox: &'a netemul::TestSandbox,
     name: &'a str,
     metric: Option<u32>,
@@ -245,7 +243,6 @@ pub async fn setup_network_with<'a, E, I>(
     netemul::TestFakeEndpoint<'a>,
 )>
 where
-    E: netemul::Endpoint,
     I: IntoIterator,
     I::Item: Into<fnetemul::ChildDef>,
 {
@@ -258,7 +255,7 @@ where
     let fake_ep = network.create_fake_endpoint()?;
 
     let iface = realm
-        .join_network_with_if_config::<E, _>(
+        .join_network_with_if_config(
             &network,
             name,
             netemul::InterfaceConfig { name: Some(name.into()), metric },

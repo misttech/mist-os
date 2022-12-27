@@ -7,7 +7,6 @@
 use anyhow::Context as _;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
-use fidl_fuchsia_netemul_network as fnetemul_network;
 use fuchsia_async::{self as fasync, TimeoutExt as _};
 use fuchsia_zircon as zx;
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
@@ -119,10 +118,7 @@ async fn watcher_existing<N: Netstack>(name: &str) {
     {
         let if_name = format!("test-ep-{}", idx);
 
-        let ep = sandbox
-            .create_endpoint::<netemul::NetworkDevice, _>(if_name.clone())
-            .await
-            .expect("create endpoint");
+        let ep = sandbox.create_endpoint(if_name.clone()).await.expect("create endpoint");
 
         let iface = ep
             .into_interface_in_realm_with_name(
@@ -300,10 +296,10 @@ async fn watcher_after_state_closed<N: Netstack>(name: &str) {
 
 /// Tests that adding an interface causes an interface changed event.
 #[netstack_test]
-async fn test_add_remove_interface<N: Netstack, E: netemul::Endpoint>(name: &str) {
+async fn test_add_remove_interface<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
-    let device = sandbox.create_endpoint::<E, _>(name).await.expect("create endpoint");
+    let device = sandbox.create_endpoint(name).await.expect("create endpoint");
 
     let iface = device.into_interface_in_realm(&realm).await.expect("add device");
     let id = iface.id();
@@ -341,26 +337,13 @@ async fn test_add_remove_interface<N: Netstack, E: netemul::Endpoint>(name: &str
 #[netstack_test]
 #[test_case("disabled", false; "disabled")]
 #[test_case("enabled", true ; "enabled")]
-async fn test_close_interface<N: Netstack, E: netemul::Endpoint>(
-    test_name: &str,
-    sub_test_name: &str,
-    enabled: bool,
-) {
-    // TODO(https://fxbug.dev/102064): Remove this once Ethernet devices are
-    // no longer supported.
-    if E::NETEMUL_BACKING == fnetemul_network::EndpointBacking::Ethertap
-        && N::VERSION == NetstackVersion::Netstack3
-    {
-        // Netstack3 does not remove Ethernet interfaces when the device is
-        // removed.
-        return;
-    }
+async fn test_close_interface<N: Netstack>(test_name: &str, sub_test_name: &str, enabled: bool) {
     let name = format!("{}_{}", test_name, sub_test_name);
     let name = name.as_str();
 
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
-    let device = sandbox.create_endpoint::<E, _>(name).await.expect("create endpoint");
+    let device = sandbox.create_endpoint(name).await.expect("create endpoint");
 
     let iface = device.into_interface_in_realm(&realm).await.expect("add device");
     let id = iface.id();
@@ -399,16 +382,7 @@ async fn test_close_interface<N: Netstack, E: netemul::Endpoint>(
 
 /// Tests races between device link down and close.
 #[netstack_test]
-async fn test_down_close_race<N: Netstack, E: netemul::Endpoint>(name: &str) {
-    // TODO(https://fxbug.dev/102064): Remove this once Ethernet devices are
-    // no longer supported.
-    if E::NETEMUL_BACKING == fnetemul_network::EndpointBacking::Ethertap
-        && N::VERSION == NetstackVersion::Netstack3
-    {
-        // Netstack3 does not remove Ethernet interfaces on link down events.
-        return;
-    }
-
+async fn test_down_close_race<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
     let interface_state = realm
@@ -421,7 +395,7 @@ async fn test_down_close_race<N: Netstack, E: netemul::Endpoint>(name: &str) {
 
     for _ in 0..10u64 {
         let dev = sandbox
-            .create_endpoint::<E, _>("ep")
+            .create_endpoint("ep")
             .await
             .expect("create endpoint")
             .into_interface_in_realm(&realm)
@@ -467,7 +441,7 @@ async fn test_down_close_race<N: Netstack, E: netemul::Endpoint>(name: &str) {
 #[netstack_test]
 // TODO(https://fxbug.dev/117966): re-enable once this test is not flaky.
 #[ignore]
-async fn test_close_data_race<N: Netstack, E: netemul::Endpoint>(name: &str) {
+async fn test_close_data_race<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let net = sandbox.create_network("net").await.expect("create network");
     let fake_ep = net.create_fake_endpoint().expect("create fake endpoint");
@@ -489,19 +463,14 @@ async fn test_close_data_race<N: Netstack, E: netemul::Endpoint>(name: &str) {
     let mut if_map = HashMap::new();
     for _ in 0..10u64 {
         let dev = net
-            .create_endpoint::<E, _>("ep")
+            .create_endpoint("ep")
             .await
             .expect("create endpoint")
             .into_interface_in_realm(&realm)
             .await
             .expect("add endpoint to Netstack");
 
-        let expect_enable = !(E::NETEMUL_BACKING == fnetemul_network::EndpointBacking::Ethertap
-            && N::VERSION == NetstackVersion::Netstack3);
-        assert_eq!(
-            expect_enable,
-            dev.control().enable().await.expect("send enable").expect("enable")
-        );
+        assert!(dev.control().enable().await.expect("send enable").expect("enable"));
         let () = dev.set_link_up(true).await.expect("bring device up");
 
         let address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
@@ -607,7 +576,7 @@ async fn test_watcher_online_edges<N: Netstack>(name: &str) {
     let ep = sandbox
         // We don't need to run variants for this test, all we care about is
         // the Netstack race. Use NetworkDevice because it's lighter weight.
-        .create_endpoint::<netemul::NetworkDevice, _>("ep")
+        .create_endpoint("ep")
         .await
         .expect("create fixed ep")
         .into_interface_in_realm(&realm)
@@ -753,7 +722,7 @@ async fn test_watcher_race<N: Netstack>(name: &str) {
         let ep = sandbox
             // We don't need to run variants for this test, all we care about is
             // the Netstack race. Use NetworkDevice because it's lighter weight.
-            .create_endpoint::<netemul::NetworkDevice, _>("ep")
+            .create_endpoint("ep")
             .await
             .expect("create fixed ep")
             .into_interface_in_realm(&realm)
@@ -939,8 +908,7 @@ async fn test_watcher_race<N: Netstack>(name: &str) {
 async fn addresses_while_offline(name: &str, addr_with_prefix: fidl_fuchsia_net::Subnet) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
-    let device =
-        sandbox.create_endpoint::<netemul::NetworkDevice, _>(name).await.expect("create endpoint");
+    let device = sandbox.create_endpoint(name).await.expect("create endpoint");
     let interface = realm
         .install_endpoint(device, Default::default())
         .await
@@ -1115,7 +1083,7 @@ async fn watcher(name: &str) {
     // Add an interface.
     let () = assert_blocked(&mut blocking_stream).await;
     let dev = sandbox
-        .create_endpoint::<netemul::NetworkDevice, _>("ep")
+        .create_endpoint("ep")
         .await
         .expect("create endpoint")
         .into_interface_in_realm(&realm)
@@ -1392,10 +1360,7 @@ async fn test_readded_address_present<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network(name).await.expect("create network");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
-    let interface = realm
-        .join_network::<netemul::NetworkDevice, _>(&network, name)
-        .await
-        .expect("join network");
+    let interface = realm.join_network(&network, name).await.expect("join network");
 
     const SRC_IP: fidl_fuchsia_net::Subnet = fidl_subnet!("192.168.0.1/24");
     interface
@@ -1456,7 +1421,7 @@ async fn test_lifetime_change_on_hidden_addr(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
     let interface = sandbox
-        .create_endpoint::<netemul::NetworkDevice, _>(name)
+        .create_endpoint(name)
         .await
         .expect("create endpoint")
         .into_interface_in_realm(&realm)

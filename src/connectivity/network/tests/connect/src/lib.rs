@@ -57,7 +57,7 @@ const REMOTE_IP: std::net::IpAddr = std_ip!("192.168.0.1");
 const PORT: u16 = 80;
 
 #[netstack_test]
-async fn timeouts<E: netemul::Endpoint>(name: &str) {
+async fn timeouts(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");
     let client = sandbox
@@ -67,12 +67,12 @@ async fn timeouts<E: netemul::Endpoint>(name: &str) {
         .create_netstack_realm::<Netstack2, _>(format!("{}_server", name))
         .expect("create realm");
     let client_iface = client
-        .join_network::<E, _>(&network, "client-ep")
+        .join_network(&network, "client-ep")
         .await
         .expect("install interface in client netstack");
     client_iface.add_address_and_subnet_route(CLIENT_IP).await.expect("configure address");
     let server_iface = server
-        .join_network::<E, _>(&network, "server-ep")
+        .join_network(&network, "server-ep")
         .await
         .expect("install interface in server netstack");
     server_iface.add_address_and_subnet_route(SERVER_IP).await.expect("configure address");

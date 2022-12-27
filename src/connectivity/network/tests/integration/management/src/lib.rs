@@ -14,8 +14,6 @@ use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
 use fidl_fuchsia_net_ext::IntoExt as _;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_netemul_network as fnetemul_network;
-use fidl_fuchsia_netstack as fnetstack;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_zircon as zx;
 
@@ -48,7 +46,6 @@ use packet_formats_dhcp::v6 as dhcpv6;
 use test_case::test_case;
 
 async fn with_netcfg_owned_device<
-    E: netemul::Endpoint,
     M: Manager,
     F: for<'a> FnOnce(
         u64,
@@ -82,9 +79,9 @@ async fn with_netcfg_owned_device<
 
     // Add a device to the realm.
     let network = sandbox.create_network(name).await.expect("create network");
-    let endpoint = network.create_endpoint::<E, _>(name).await.expect("create endpoint");
+    let endpoint = network.create_endpoint(name).await.expect("create endpoint");
     let () = endpoint.set_link_up(true).await.expect("set link up");
-    let endpoint_mount_path = E::dev_path("ep");
+    let endpoint_mount_path = netemul::devfs_device_path("ep");
     let endpoint_mount_path = endpoint_mount_path.as_path();
     let () = realm.add_virtual_device(&endpoint, endpoint_mount_path).await.unwrap_or_else(|e| {
         panic!("add virtual device {}: {:?}", endpoint_mount_path.display(), e)
@@ -120,8 +117,8 @@ async fn with_netcfg_owned_device<
 /// Test that NetCfg discovers a newly added device and it adds the device
 /// to the Netstack.
 #[netstack_test]
-async fn test_oir<E: netemul::Endpoint, M: Manager>(name: &str) {
-    with_netcfg_owned_device::<E, M, _>(
+async fn test_oir<M: Manager>(name: &str) {
+    with_netcfg_owned_device::<M, _>(
         name,
         ManagerConfig::Empty,
         false, /* with_dhcpv6_client */
@@ -135,7 +132,7 @@ async fn test_oir<E: netemul::Endpoint, M: Manager>(name: &str) {
 
 /// Tests that stable interface name conflicts are handled gracefully.
 #[netstack_test]
-async fn test_oir_interface_name_conflict<E: netemul::Endpoint, M: Manager>(name: &str) {
+async fn test_oir_interface_name_conflict<M: Manager>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
         .create_netstack_realm_with::<Netstack2, _, _>(
@@ -154,10 +151,6 @@ async fn test_oir_interface_name_conflict<E: netemul::Endpoint, M: Manager>(name
 
     let wait_for_netmgr =
         wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None);
-
-    let netstack = realm
-        .connect_to_protocol::<fnetstack::NetstackMarker>()
-        .expect("connect to netstack service");
 
     let interface_state = realm
         .connect_to_protocol::<fnet_interfaces::StateMarker>()
@@ -203,15 +196,12 @@ async fn test_oir_interface_name_conflict<E: netemul::Endpoint, M: Manager>(name
     // Non PCI and USB devices get their interface names from their MAC addresses.
     // Using the same MAC address for different devices will result in the same
     // interface name.
-    let mac = || Some(Box::new(fnet::MacAddress { octets: [2, 3, 4, 5, 6, 7] }));
+    let mac = || Some(fnet::MacAddress { octets: [2, 3, 4, 5, 6, 7] });
     let ethx7 = sandbox
-        .create_endpoint_with(
-            "ep1",
-            fnetemul_network::EndpointConfig { mtu: 1500, mac: mac(), backing: E::NETEMUL_BACKING },
-        )
+        .create_endpoint_with("ep1", netemul::new_endpoint_config(1500, mac()))
         .await
         .expect("create ethx7");
-    let endpoint_mount_path = E::dev_path("ep1");
+    let endpoint_mount_path = netemul::devfs_device_path("ep1");
     let endpoint_mount_path = endpoint_mount_path.as_path();
     let () = realm.add_virtual_device(&ethx7, endpoint_mount_path).await.unwrap_or_else(|e| {
         panic!("add virtual device1 {}: {:?}", endpoint_mount_path.display(), e)
@@ -225,26 +215,16 @@ async fn test_oir_interface_name_conflict<E: netemul::Endpoint, M: Manager>(name
 
     // Create an interface that the network manager does not know about that will cause a
     // name conflict with the first temporary name.
-    let etht0 =
-        sandbox.create_endpoint::<netemul::Ethernet, _>("etht0").await.expect("create eth0");
     let name = "etht0";
-    let netstack_id_etht0 = netstack
-        .add_ethernet_device(
-            name,
-            &mut fnetstack::InterfaceConfig {
-                name: name.to_string(),
-                filepath: "/fake/filepath/for_test".to_string(),
-                metric: 0,
-            },
-            etht0
-                .get_ethernet()
-                .await
-                .expect("netstack.add_ethernet_device requires an Ethernet endpoint"),
+    let etht0 = sandbox.create_endpoint(name).await.expect("create eth0");
+    let etht0 = etht0
+        .into_interface_in_realm_with_name(
+            &realm,
+            netemul::InterfaceConfig { name: Some(name.into()), ..Default::default() },
         )
         .await
-        .expect("add_ethernet_device FIDL error")
-        .map_err(zx::Status::from_raw)
-        .expect("add_ethernet_device error");
+        .expect("install interface");
+    let netstack_id_etht0 = etht0.id();
 
     let (id_etht0, name_etht0) = interfaces_stream.select_next_some().await;
     assert_eq!(id_etht0, u64::from(netstack_id_etht0));
@@ -254,13 +234,10 @@ async fn test_oir_interface_name_conflict<E: netemul::Endpoint, M: Manager>(name
     // to be added to the netstack. Its first two attempts at adding a name should conflict
     // with the above two devices.
     let etht1 = sandbox
-        .create_endpoint_with(
-            "ep2",
-            fnetemul_network::EndpointConfig { mtu: 1500, mac: mac(), backing: E::NETEMUL_BACKING },
-        )
+        .create_endpoint_with("ep2", netemul::new_endpoint_config(1500, mac()))
         .await
         .expect("create etht1");
-    let endpoint_mount_path = E::dev_path("ep2");
+    let endpoint_mount_path = netemul::devfs_device_path("ep2");
     let endpoint_mount_path = endpoint_mount_path.as_path();
     let () = realm.add_virtual_device(&etht1, endpoint_mount_path).await.unwrap_or_else(|e| {
         panic!("add virtual device2 {}: {:?}", endpoint_mount_path.display(), e)
@@ -288,7 +265,7 @@ async fn test_oir_interface_name_conflict<E: netemul::Endpoint, M: Manager>(name
 /// Also make sure that a new WLAN AP interface may be added after a previous interface has been
 /// removed from the netstack.
 #[netstack_test]
-async fn test_wlan_ap_dhcp_server<E: netemul::Endpoint, M: Manager>(name: &str) {
+async fn test_wlan_ap_dhcp_server<M: Manager>(name: &str) {
     // Use a large timeout to check for resolution.
     //
     // These values effectively result in a large timeout of 60s which should avoid
@@ -316,7 +293,7 @@ async fn test_wlan_ap_dhcp_server<E: netemul::Endpoint, M: Manager>(name: &str) 
     ///
     /// When `wlan_ap_dhcp_server_inner` returns successfully, the interface that it creates will
     /// have been removed.
-    async fn wlan_ap_dhcp_server_inner<'a, E: netemul::Endpoint>(
+    async fn wlan_ap_dhcp_server_inner<'a>(
         sandbox: &'a netemul::TestSandbox,
         realm: &netemul::TestRealm<'a>,
         offset: u8,
@@ -345,10 +322,10 @@ async fn test_wlan_ap_dhcp_server<E: netemul::Endpoint, M: Manager>(name: &str) 
             .await
             .expect("create network");
         let wlan_ap = network
-            .create_endpoint::<E, _>(format!("wlanif-ap-dhcp-server-{}", offset))
+            .create_endpoint(format!("wlanif-ap-dhcp-server-{}", offset))
             .await
             .expect("create wlan ap");
-        let path = E::dev_path(&format!("dhcp-server-ep-{}", offset));
+        let path = netemul::devfs_device_path(&format!("dhcp-server-ep-{}", offset));
         let () = realm
             .add_virtual_device(&wlan_ap, path.as_path())
             .await
@@ -462,10 +439,10 @@ async fn test_wlan_ap_dhcp_server<E: netemul::Endpoint, M: Manager>(name: &str) 
 
         // Add a host endpoint to the network. It should be configured by the DHCP server.
         let host = network
-            .create_endpoint::<E, _>(format!("host-dhcp-client-{}", offset))
+            .create_endpoint(format!("host-dhcp-client-{}", offset))
             .await
             .expect("create host");
-        let path = E::dev_path(&format!("dhcp-client-ep-{}", offset));
+        let path = netemul::devfs_device_path(&format!("dhcp-client-ep-{}", offset));
         let () = realm
             .add_virtual_device(&host, path.as_path())
             .await
@@ -558,7 +535,7 @@ async fn test_wlan_ap_dhcp_server<E: netemul::Endpoint, M: Manager>(name: &str) 
     // stops when the interface is added and brought up or brought down/removed.
     // A loop is used to emulate interface flaps.
     for i in 0..=1 {
-        let test_fut = wlan_ap_dhcp_server_inner::<E>(&sandbox, &realm, i).fuse();
+        let test_fut = wlan_ap_dhcp_server_inner(&sandbox, &realm, i).fuse();
         futures::pin_mut!(test_fut);
         let () = futures::select! {
             () = test_fut => {},
@@ -625,8 +602,8 @@ async fn observes_stop_events<M: Manager>(name: &str) {
 /// Test that NetCfg enables forwarding on interfaces when the device class is configured to have
 /// that enabled.
 #[netstack_test]
-async fn test_forwarding<E: netemul::Endpoint, M: Manager>(name: &str) {
-    with_netcfg_owned_device::<E, M, _>(
+async fn test_forwarding<M: Manager>(name: &str) {
+    with_netcfg_owned_device::<M, _>(
         name,
         ManagerConfig::Forwarding,
         false, /* with_dhcpv6_client */
@@ -895,7 +872,7 @@ async fn test_prefix_provider_double_watch<M: Manager>(name: &str) {
 }
 
 #[netstack_test]
-async fn test_prefix_provider_full_integration<E: netemul::Endpoint, M: Manager>(name: &str) {
+async fn test_prefix_provider_full_integration<M: Manager>(name: &str) {
     const SERVER_ADDR: net_types_ip::Ipv6Addr = net_ip_v6!("fe80::5122");
     const SERVER_ID: [u8; 3] = [2, 5, 1];
     const PREFIX: net_types_ip::Subnet<net_types_ip::Ipv6Addr> = net_subnet_v6!("a::/64");
@@ -1063,7 +1040,7 @@ async fn test_prefix_provider_full_integration<E: netemul::Endpoint, M: Manager>
         stream.next().await.expect("expected DHCPv6 message")
     }
 
-    with_netcfg_owned_device::<E, M, _>(
+    with_netcfg_owned_device::<M, _>(
         name,
         ManagerConfig::Dhcpv6,
         true, /* with_dhcpv6_client */

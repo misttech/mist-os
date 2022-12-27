@@ -276,7 +276,7 @@ pub async fn run_socket_test(
     }
 }
 
-pub async fn test_filter<E: netemul::Endpoint>(name: &str, test: Test) {
+pub async fn test_filter(name: &str, test: Test) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
 
@@ -287,7 +287,7 @@ pub async fn test_filter<E: netemul::Endpoint>(name: &str, test: Test) {
         .join_network_with(
             &net,
             "client",
-            E::make_config(netemul::DEFAULT_MTU, Some(CLIENT_MAC_ADDRESS)),
+            netemul::new_endpoint_config(netemul::DEFAULT_MTU, Some(CLIENT_MAC_ADDRESS)),
             Default::default(),
         )
         .await
@@ -304,7 +304,7 @@ pub async fn test_filter<E: netemul::Endpoint>(name: &str, test: Test) {
         .join_network_with(
             &net,
             "server",
-            E::make_config(netemul::DEFAULT_MTU, Some(SERVER_MAC_ADDRESS)),
+            netemul::new_endpoint_config(netemul::DEFAULT_MTU, Some(SERVER_MAC_ADDRESS)),
             Default::default(),
         )
         .await

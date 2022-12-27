@@ -108,7 +108,7 @@ impl<'a> DhcpTestNetwork<'a> {
         DhcpTestNetwork { name, network: Once::new(), next_ep_idx: RefCell::new(0), sandbox }
     }
 
-    async fn create_endpoint<E: netemul::Endpoint>(&self) -> netemul::TestEndpoint<'_> {
+    async fn create_endpoint(&self) -> netemul::TestEndpoint<'_> {
         let DhcpTestNetwork { name, network, next_ep_idx, sandbox } = self;
         let net = network
             .get_or_try_init(async { sandbox.create_network(name.to_string()).await })
@@ -116,8 +116,7 @@ impl<'a> DhcpTestNetwork<'a> {
             .expect("failed to create network");
         let curr_idx: usize = next_ep_idx.replace_with(|&mut old| old + 1);
         let ep_name = format!("{}-{}", name, curr_idx);
-        let endpoint =
-            net.create_endpoint::<E, _>(ep_name).await.expect("failed to create endpoint");
+        let endpoint = net.create_endpoint(ep_name).await.expect("failed to create endpoint");
         endpoint
     }
 }
@@ -309,11 +308,11 @@ struct Settings<'a> {
 }
 
 #[netstack_test]
-async fn acquire_with_dhcpd_bound_device<E: netemul::Endpoint>(name: &str) {
+async fn acquire_with_dhcpd_bound_device(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
 
-    test_dhcp::<E>(
+    test_dhcp(
         name,
         &sandbox,
         &mut [
@@ -349,7 +348,7 @@ async fn acquire_with_dhcpd_bound_device<E: netemul::Endpoint>(name: &str) {
 }
 
 #[netstack_test]
-async fn acquire_then_renew_with_dhcpd_bound_device<E: netemul::Endpoint>(name: &str) {
+async fn acquire_then_renew_with_dhcpd_bound_device(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
 
@@ -365,7 +364,7 @@ async fn acquire_then_renew_with_dhcpd_bound_device<E: netemul::Endpoint>(name: 
         ..fidl_fuchsia_net_dhcp::LeaseLength::EMPTY
     }));
 
-    test_dhcp::<E>(
+    test_dhcp(
         name,
         &sandbox,
         &mut [
@@ -403,7 +402,7 @@ async fn acquire_then_renew_with_dhcpd_bound_device<E: netemul::Endpoint>(name: 
 }
 
 #[netstack_test]
-async fn acquire_with_dhcpd_bound_device_dup_addr<E: netemul::Endpoint>(name: &str) {
+async fn acquire_with_dhcpd_bound_device_dup_addr(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
 
@@ -428,7 +427,7 @@ async fn acquire_with_dhcpd_bound_device_dup_addr<E: netemul::Endpoint>(name: &s
         }
     };
 
-    test_dhcp::<E>(
+    test_dhcp(
         name,
         &sandbox,
         &mut [
@@ -478,7 +477,7 @@ async fn acquire_with_dhcpd_bound_device_dup_addr<E: netemul::Endpoint>(name: &s
 ///        -- Start DHCP servers on each server endpoint
 ///        -- Start DHCP clients on each client endpoint and verify that they acquire the expected
 ///           addresses
-fn test_dhcp<'a, E: netemul::Endpoint>(
+fn test_dhcp<'a>(
     test_name: &'a str,
     sandbox: &'a netemul::TestSandbox,
     netstack_configs: &'a mut [TestNetstackRealmConfig<'a>],
@@ -518,7 +517,7 @@ fn test_dhcp<'a, E: netemul::Endpoint>(
                             .then(|(idx, endpoint)| async move {
                                 let DhcpTestEndpointConfig { ep_type, network } = endpoint;
                                 let endpoint = network
-                                    .create_endpoint::<E>()
+                                    .create_endpoint()
                                     .await;
                                 let if_name = format!("{}{}", "testeth", idx);
                                 let iface = netstack_realm_ref
@@ -592,7 +591,7 @@ fn test_dhcp<'a, E: netemul::Endpoint>(
                     .then(|client| async move {
                         let DhcpTestEndpointConfig { ep_type, network } = client;
                         let endpoint = network
-                            .create_endpoint::<E>()
+                            .create_endpoint()
                             .await;
                         let iface = netstack_realm_ref
                             .install_endpoint(endpoint, Default::default())
@@ -750,9 +749,9 @@ fn param_name(param: &fidl_fuchsia_net_dhcp::Parameter) -> fidl_fuchsia_net_dhcp
 // clear_leases() function is triggered, which will cause a panic if the server is in an
 // inconsistent state.
 #[netstack_test]
-async fn acquire_persistent_dhcp_server_after_restart<E: netemul::Endpoint>(name: &str) {
+async fn acquire_persistent_dhcp_server_after_restart(name: &str) {
     let mode = PersistenceMode::Persistent;
-    acquire_dhcp_server_after_restart::<E>(&format!("{}_{}", name, mode), mode).await
+    acquire_dhcp_server_after_restart(&format!("{}_{}", name, mode), mode).await
 }
 
 // An ephemeral dhcp server cannot become inconsistent with its persistent state because it has
@@ -760,15 +759,12 @@ async fn acquire_persistent_dhcp_server_after_restart<E: netemul::Endpoint>(name
 // configuration.  This test verifies that an ephemeral dhcp server will return an error if run
 // after restarting.
 #[netstack_test]
-async fn acquire_ephemeral_dhcp_server_after_restart<E: netemul::Endpoint>(name: &str) {
+async fn acquire_ephemeral_dhcp_server_after_restart(name: &str) {
     let mode = PersistenceMode::Ephemeral;
-    acquire_dhcp_server_after_restart::<E>(&format!("{}_{}", name, mode), mode).await
+    acquire_dhcp_server_after_restart(&format!("{}_{}", name, mode), mode).await
 }
 
-async fn acquire_dhcp_server_after_restart<E: netemul::Endpoint>(
-    name: &str,
-    mode: PersistenceMode,
-) {
+async fn acquire_dhcp_server_after_restart(name: &str, mode: PersistenceMode) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
 
     let server_realm = sandbox
@@ -796,8 +792,7 @@ async fn acquire_dhcp_server_after_restart<E: netemul::Endpoint>(
 
     let network = sandbox.create_network(name).await.expect("failed to create network");
     let if_name = "testeth";
-    let endpoint =
-        network.create_endpoint::<E, _>("server-ep").await.expect("failed to create endpoint");
+    let endpoint = network.create_endpoint("server-ep").await.expect("failed to create endpoint");
     let server_ep = server_realm
         .install_endpoint(
             endpoint,
@@ -810,7 +805,7 @@ async fn acquire_dhcp_server_after_restart<E: netemul::Endpoint>(
         .await
         .expect("configure address");
     let client_ep = client_realm
-        .join_network::<E, _>(&network, "client-ep")
+        .join_network(&network, "client-ep")
         .await
         .expect("failed to create client network endpoint");
 
@@ -927,21 +922,18 @@ async fn acquire_dhcp_server_after_restart<E: netemul::Endpoint>(
 }
 
 #[netstack_test]
-async fn dhcp_server_persistence_mode_persistent<E: netemul::Endpoint>(name: &str) {
+async fn dhcp_server_persistence_mode_persistent(name: &str) {
     let mode = PersistenceMode::Persistent;
-    test_dhcp_server_persistence_mode::<E>(&format!("{}_{}", name, mode), mode).await
+    test_dhcp_server_persistence_mode(&format!("{}_{}", name, mode), mode).await
 }
 
 #[netstack_test]
-async fn dhcp_server_persistence_mode_ephemeral<E: netemul::Endpoint>(name: &str) {
+async fn dhcp_server_persistence_mode_ephemeral(name: &str) {
     let mode = PersistenceMode::Ephemeral;
-    test_dhcp_server_persistence_mode::<E>(&format!("{}_{}", name, mode), mode).await
+    test_dhcp_server_persistence_mode(&format!("{}_{}", name, mode), mode).await
 }
 
-async fn test_dhcp_server_persistence_mode<E: netemul::Endpoint>(
-    name: &str,
-    mode: PersistenceMode,
-) {
+async fn test_dhcp_server_persistence_mode(name: &str, mode: PersistenceMode) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
 
     let server_realm = sandbox
@@ -965,8 +957,7 @@ async fn test_dhcp_server_persistence_mode<E: netemul::Endpoint>(
 
     let network = sandbox.create_network(name).await.expect("failed to create network");
     let if_name = "testeth";
-    let endpoint =
-        network.create_endpoint::<E, _>("server-ep").await.expect("failed to create endpoint");
+    let endpoint = network.create_endpoint("server-ep").await.expect("failed to create endpoint");
     let server_ep = server_realm
         .install_endpoint(
             endpoint,

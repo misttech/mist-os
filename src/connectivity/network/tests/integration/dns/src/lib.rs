@@ -150,7 +150,7 @@ async fn poll_lookup_admin<
 /// Tests that Netstack exposes DNS servers discovered dynamically and NetworkManager
 /// configures the Lookup service.
 #[netstack_test]
-async fn discovered_dns<E: netemul::Endpoint, M: Manager>(name: &str) {
+async fn discovered_dns<M: Manager>(name: &str) {
     const SERVER_ADDR: fnet::Subnet = fidl_subnet!("192.168.0.1/24");
     /// DNS server served by DHCP.
     const DHCP_DNS_SERVER: fnet::Ipv4Address = fidl_ip_v4!("123.12.34.56");
@@ -200,7 +200,7 @@ async fn discovered_dns<E: netemul::Endpoint, M: Manager>(name: &str) {
         .expect("failed to create client realm");
 
     let server_iface = server_realm
-        .join_network::<E, _>(&network, "server-ep")
+        .join_network(&network, "server-ep")
         .await
         .expect("failed to configure server networking");
     server_iface.add_address_and_subnet_route(SERVER_ADDR).await.expect("configure address");
@@ -259,7 +259,7 @@ async fn discovered_dns<E: netemul::Endpoint, M: Manager>(name: &str) {
 
     // Start networking on client realm.
     let client_iface = client_realm
-        .join_network::<E, _>(&network, "client-ep")
+        .join_network(&network, "client-ep")
         .await
         .expect("failed to configure client networking");
     client_iface.start_dhcp().await.expect("failed to start DHCP");
@@ -300,7 +300,7 @@ async fn discovered_dns<E: netemul::Endpoint, M: Manager>(name: &str) {
 /// Tests that DHCPv6 exposes DNS servers discovered dynamically and the network manager
 /// configures the Lookup service.
 #[netstack_test]
-async fn discovered_dhcpv6_dns<E: netemul::Endpoint, M: Manager>(name: &str) {
+async fn discovered_dhcpv6_dns<M: Manager>(name: &str) {
     /// DHCPv6 server IP.
     const DHCPV6_SERVER: net_types_ip::Ipv6Addr =
         net_types_ip::Ipv6Addr::from_bytes(std_ip_v6!("fe80::1").octets());
@@ -339,9 +339,9 @@ async fn discovered_dhcpv6_dns<E: netemul::Endpoint, M: Manager>(name: &str) {
         .expect("failed to create realm");
 
     // Start networking on client realm.
-    let endpoint = network.create_endpoint::<E, _>(name).await.expect("create endpoint");
+    let endpoint = network.create_endpoint(name).await.expect("create endpoint");
     let () = endpoint.set_link_up(true).await.expect("set link up");
-    let endpoint_mount_path = E::dev_path("ep");
+    let endpoint_mount_path = netemul::devfs_device_path("ep");
     let endpoint_mount_path = endpoint_mount_path.as_path();
     let () = realm.add_virtual_device(&endpoint, endpoint_mount_path).await.unwrap_or_else(|e| {
         panic!("add virtual device {}: {:?}", endpoint_mount_path.display(), e)

@@ -416,11 +416,7 @@ fn handle_frame_stream<'a>(
         (InterfaceConfig::new_secondary(HIGHER_METRIC), State::Internet),
     ];
     "internet_internet")]
-async fn test_state<E: netemul::Endpoint>(
-    name: &str,
-    sub_test_name: &str,
-    configs: &[(InterfaceConfig, State)],
-) {
+async fn test_state(name: &str, sub_test_name: &str, configs: &[(InterfaceConfig, State)]) {
     let name = format!("{}_{}", name, sub_test_name);
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox
@@ -445,7 +441,7 @@ async fn test_state<E: netemul::Endpoint>(
                 let fake_ep =
                     network.create_fake_endpoint().expect("failed to create fake endpoint");
                 let interface = realm
-                    .join_network::<E, _>(&network, name)
+                    .join_network(&network, name)
                     .await
                     .expect("failed to join network with netdevice endpoint");
 

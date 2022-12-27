@@ -6,11 +6,7 @@
 
 //! Netemul utilities.
 
-use std::{
-    borrow::Cow,
-    convert::TryFrom as _,
-    path::{Path, PathBuf},
-};
+use std::{borrow::Cow, convert::TryFrom as _, path::Path};
 
 use fidl_fuchsia_hardware_ethernet as fethernet;
 use fidl_fuchsia_hardware_network as fnetwork;
@@ -42,54 +38,28 @@ type Result<T = ()> = std::result::Result<T, anyhow::Error>;
 /// The default MTU used in netemul endpoint configurations.
 pub const DEFAULT_MTU: u16 = 1500;
 
-/// Abstraction for different endpoint backing types.
-pub trait Endpoint: Copy + Clone {
-    /// The backing [`EndpointBacking`] for this `Endpoint`.
-    ///
-    /// [`EndpointBacking`]: fnetemul_network::EndpointBacking
-    const NETEMUL_BACKING: fnetemul_network::EndpointBacking;
+/// The devfs path at which endpoints show up.
+pub const NETDEVICE_DEVFS_PATH: &'static str = "class/network";
 
-    /// The relative path from the root device directory where devices of this `Endpoint`
-    /// can be discovered.
-    const DEV_PATH: &'static str;
+/// Ethernet drivers devfs path.
+// TODO(https://fxbug.dev/109169): Remove when Ethernet is no more.
+pub const ETHERNET_DEVFS_PATH: &'static str = "class/ethernet";
 
-    /// Returns the path to an endpoint with the given name in this `Endpoint`'s
-    /// device directory.
-    fn dev_path(name: &str) -> PathBuf {
-        Path::new(Self::DEV_PATH).join(name)
-    }
-
-    /// Returns an [`EndpointConfig`] with the provided parameters for this
-    /// endpoint type.
-    ///
-    /// [`EndpointConfig`]: fnetemul_network::EndpointConfig
-    fn make_config(mtu: u16, mac: Option<fnet::MacAddress>) -> fnetemul_network::EndpointConfig {
-        fnetemul_network::EndpointConfig {
-            mtu,
-            mac: mac.map(Box::new),
-            backing: Self::NETEMUL_BACKING,
-        }
-    }
+/// Returns the full path for a device node `node_name` relative to devfs root.
+pub fn devfs_device_path(node_name: &str) -> std::path::PathBuf {
+    std::path::Path::new(NETDEVICE_DEVFS_PATH).join(node_name)
 }
 
-/// An Ethernet implementation of `Endpoint`.
-#[derive(Copy, Clone)]
-pub enum Ethernet {}
-
-impl Endpoint for Ethernet {
-    const NETEMUL_BACKING: fnetemul_network::EndpointBacking =
-        fnetemul_network::EndpointBacking::Ethertap;
-    const DEV_PATH: &'static str = "class/ethernet";
-}
-
-/// A Network Device implementation of `Endpoint`.
-#[derive(Copy, Clone)]
-pub enum NetworkDevice {}
-
-impl Endpoint for NetworkDevice {
-    const NETEMUL_BACKING: fnetemul_network::EndpointBacking =
-        fnetemul_network::EndpointBacking::NetworkDevice;
-    const DEV_PATH: &'static str = "class/network";
+/// Creates a common netemul endpoint configuration for tests.
+pub fn new_endpoint_config(
+    mtu: u16,
+    mac: Option<fnet::MacAddress>,
+) -> fnetemul_network::EndpointConfig {
+    fnetemul_network::EndpointConfig {
+        mtu,
+        mac: mac.map(Box::new),
+        backing: fnetemul_network::EndpointBacking::NetworkDevice,
+    }
 }
 
 /// A test sandbox backed by a [`fnetemul::SandboxProxy`].
@@ -212,12 +182,11 @@ impl TestSandbox {
     /// Creates a new unattached endpoint with default configurations and `name`.
     ///
     /// Characters may be dropped from the front of `name` if it exceeds the maximum length.
-    pub async fn create_endpoint<'a, E, S>(&'a self, name: S) -> Result<TestEndpoint<'a>>
+    pub async fn create_endpoint<'a, S>(&'a self, name: S) -> Result<TestEndpoint<'a>>
     where
         S: Into<Cow<'a, str>>,
-        E: Endpoint,
     {
-        self.create_endpoint_with(name, E::make_config(DEFAULT_MTU, None)).await
+        self.create_endpoint_with(name, new_endpoint_config(DEFAULT_MTU, None)).await
     }
 
     /// Creates a new unattached endpoint with the provided configuration.
@@ -337,16 +306,15 @@ impl<'a> TestRealm<'a> {
     ///
     /// Characters may be dropped from the front of `ep_name` if it exceeds the
     /// maximum length.
-    pub async fn join_network<E, S>(
+    pub async fn join_network<S>(
         &self,
         network: &TestNetwork<'a>,
         ep_name: S,
     ) -> Result<TestInterface<'a>>
     where
-        E: Endpoint,
         S: Into<Cow<'a, str>>,
     {
-        self.join_network_with_if_config::<E, S>(network, ep_name, Default::default()).await
+        self.join_network_with_if_config(network, ep_name, Default::default()).await
     }
 
     /// Use default endpoint configuration and the specified interface/address
@@ -354,18 +322,17 @@ impl<'a> TestRealm<'a> {
     ///
     /// Characters may be dropped from the front of `ep_name` if it exceeds the
     /// maximum length.
-    pub async fn join_network_with_if_config<E, S>(
+    pub async fn join_network_with_if_config<S>(
         &self,
         network: &TestNetwork<'a>,
         ep_name: S,
         if_config: InterfaceConfig<'a>,
     ) -> Result<TestInterface<'a>>
     where
-        E: Endpoint,
         S: Into<Cow<'a, str>>,
     {
         let endpoint =
-            network.create_endpoint::<E, _>(ep_name).await.context("failed to create endpoint")?;
+            network.create_endpoint(ep_name).await.context("failed to create endpoint")?;
         self.install_endpoint(endpoint, if_config).await
     }
 
@@ -704,14 +671,13 @@ impl<'a> TestNetwork<'a> {
     /// Creates a new endpoint with `name` attached to this network.
     ///
     /// Characters may be dropped from the front of `name` if it exceeds the maximum length.
-    pub async fn create_endpoint<E, S>(&self, name: S) -> Result<TestEndpoint<'a>>
+    pub async fn create_endpoint<S>(&self, name: S) -> Result<TestEndpoint<'a>>
     where
-        E: Endpoint,
         S: Into<Cow<'a, str>>,
     {
         let ep = self
             .sandbox
-            .create_endpoint::<E, _>(name)
+            .create_endpoint(name)
             .await
             .with_context(|| format!("failed to create endpoint for network {}", self.name))?;
         let () = self.attach_endpoint(&ep).await.with_context(|| {

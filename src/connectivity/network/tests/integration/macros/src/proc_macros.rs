@@ -317,12 +317,12 @@ fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
     result.into()
 }
 
-/// Runs a test `fn` over different variations of Netstacks and/or network
-/// managers based on the test `fn`'s type parameters.
+/// Runs a test `fn` over different variations of Netstacks, device endpoints
+/// and/or network managers based on the test `fn`'s type parameters.
 ///
-/// The test `fn` may only be generic over any combination of `Endpoint`,
-/// `Netstack` and `Manager`. It may only have a single `&str` argument, used to
-/// identify the test variation.
+/// The test `fn` may only be generic over any combination of `Netstack` and
+/// `Manager`. It may only have a single `&str` argument, used to identify the
+/// test variation.
 ///
 /// Example:
 ///
@@ -347,140 +347,51 @@ fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
 /// Similarly,
 /// ```
 /// #[netstack_test]
-/// async fn test_foo<E: netemul::Endpoint>(name: &str) {/*...*/}
-/// ```
-///
-/// and
-///
-/// ```
-/// #[netstack_test]
 /// async fn test_foo<M: Manager>(name: &str) {/*...*/}
 /// ```
 ///
 /// Expands equivalently to the netstack variant.
 ///
-/// This macro also supports expanding with multiple variations.
-///
-/// Example:
-///
+/// This macro also supports expanding with multiple variations, including
+/// multiple occurrences of the same trait bound.
 /// ```
 /// #[netstack_test]
-/// async fn test_foo<N: Netstack, E: netemul::Endpoint>(name: &str) {/*...*/}
+/// async fn test_foo<N1: Netstack, N2: Netstack>(name: &str) {/*...*/}
 /// ```
 ///
 /// Expands to:
 /// ```
-/// async fn test_foo<N: Netstack, E: netemul::Endpoint>(name: &str){/*...*/}
+/// async fn test_foo<N1: Netstack, N2: Netstack>(name: &str) {/*...*/}
 /// #[fuchsia_async::run_singlethreaded(test)]
-/// async fn test_foo_ns2_eth() {
-///     test_foo::<netstack_testing_common::realms::Netstack2, netemul::Ethernet>(
-///         "test_foo_ns2_eth",
-///     )
-///     .await
-/// }
-/// #[fuchsia_async::run_singlethreaded(test)]
-/// async fn test_foo_ns3_eth() {
-///     test_foo::<netstack_testing_common::realms::Netstack3, netemul::Ethernet>(
-///         "test_foo_ns3_eth",
-///     )
-///     .await
-/// }
-/// #[fuchsia_async::run_singlethreaded(test)]
-/// async fn test_foo_ns2_netdevice() {
-///     test_foo::<
-///         netstack_testing_common::realms::Netstack2,
-///         netemul::NetworkDevice,
-///     >("test_foo_ns2_netdevice").await
-/// }
-/// #[fuchsia_async::run_singlethreaded(test)]
-/// async fn test_foo_ns3_netdevice() {
-///     test_foo::<
-///         netstack_testing_common::realms::Netstack3,
-///         netemul::NetworkDevice,
-///     >("test_foo_ns3_netdevice").await
-/// }
-/// ```
-//
-/// Similarly, this macro also handles expanding multiple occurrences of the
-/// same trait bound.
-/// ```
-/// #[netstack_test]
-/// async fn test_foo<N1: Netstack, N2: Netstack, E: netemul::Endpoint>(name: &str) {/*...*/}
-/// ```
-///
-/// Expands to:
-/// ```
-/// async fn test_foo<N1: Netstack, N2: Netstack, E: netemul::Endpoint>(name: &str) {/*...*/}
-/// #[fuchsia_async::run_singlethreaded(test)]
-/// async fn test_foo_ns2_ns2_eth() {
+/// async fn test_foo_ns2_ns2() {
 ///     test_foo::<
 ///         netstack_testing_common::realms::Netstack2,
 ///         netstack_testing_common::realms::Netstack2,
-///         netemul::Ethernet,
-///     >("test_foo_ns2_ns2_eth")
+///     >("test_foo_ns2_ns2")
 ///     .await
 /// }
 /// #[fuchsia_async::run_singlethreaded(test)]
-/// async fn test_foo_ns2_ns2_netdevice() {
-///     test_foo::<
-///         netstack_testing_common::realms::Netstack2,
-///         netstack_testing_common::realms::Netstack2,
-///         netemul::NetworkDevice,
-///     >("test_foo_ns2_ns2_netdevice")
-///     .await
-/// }
-/// #[fuchsia_async::run_singlethreaded(test)]
-/// async fn test_foo_ns2_ns3_eth() {
+/// async fn test_foo_ns2_ns3() {
 ///     test_foo::<
 ///         netstack_testing_common::realms::Netstack2,
 ///         netstack_testing_common::realms::Netstack3,
-///         netemul::Ethernet,
-///     >("test_foo_ns2_ns3_eth")
+///     >("test_foo_ns2_ns3")
 ///     .await
 /// }
 /// #[fuchsia_async::run_singlethreaded(test)]
-/// async fn test_foo_ns2_ns3_netdevice() {
-///     test_foo::<
-///         netstack_testing_common::realms::Netstack2,
-///         netstack_testing_common::realms::Netstack3,
-///         netemul::NetworkDevice,
-///     >("test_foo_ns2_ns3_netdevice")
-///     .await
-/// }
-/// #[fuchsia_async::run_singlethreaded(test)]
-/// async fn test_foo_ns3_ns2_eth() {
+/// async fn test_foo_ns3_ns2() {
 ///     test_foo::<
 ///         netstack_testing_common::realms::Netstack3,
 ///         netstack_testing_common::realms::Netstack2,
-///         netemul::Ethernet,
-///     >("test_foo_ns3_ns2_eth")
+///     >("test_foo_ns3_ns2")
 ///     .await
 /// }
 /// #[fuchsia_async::run_singlethreaded(test)]
-/// async fn test_foo_ns3_ns2_netdevice() {
-///     test_foo::<
-///         netstack_testing_common::realms::Netstack3,
-///         netstack_testing_common::realms::Netstack2,
-///         netemul::NetworkDevice,
-///     >("test_foo_ns3_ns2_netdevice")
-///     .await
-/// }
-/// #[fuchsia_async::run_singlethreaded(test)]
-/// async fn test_foo_ns3_ns3_eth() {
+/// async fn test_foo_ns3_ns3() {
 ///     test_foo::<
 ///         netstack_testing_common::realms::Netstack3,
 ///         netstack_testing_common::realms::Netstack3,
-///         netemul::Ethernet,
-///     >("test_foo_ns3_ns3_eth")
-///     .await
-/// }
-/// #[fuchsia_async::run_singlethreaded(test)]
-/// async fn test_foo_ns3_ns3_netdevice() {
-///     test_foo::<
-///         netstack_testing_common::realms::Netstack3,
-///         netstack_testing_common::realms::Netstack3,
-///         netemul::NetworkDevice,
-///     >("test_foo_ns3_ns3_netdevice")
+///     >("test_foo_ns3_ns3")
 ///     .await
 /// }
 /// ```
@@ -524,19 +435,6 @@ pub fn netstack_test(attrs: TokenStream, input: TokenStream) -> TokenStream {
                     Implementation {
                         type_name: str_to_syn_path("netstack_testing_common::realms::Netstack3"),
                         suffix: "ns3",
-                    },
-                ],
-            },
-            Variant {
-                trait_bound: str_to_syn_path("netemul::Endpoint"),
-                implementations: &[
-                    Implementation {
-                        type_name: str_to_syn_path("netemul::Ethernet"),
-                        suffix: "eth",
-                    },
-                    Implementation {
-                        type_name: str_to_syn_path("netemul::NetworkDevice"),
-                        suffix: "netdevice",
                     },
                 ],
             },

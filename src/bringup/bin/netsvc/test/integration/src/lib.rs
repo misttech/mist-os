@@ -7,7 +7,7 @@ use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::{Future, FutureExt as _, StreamExt as _};
 use itertools::Itertools as _;
 use net_types::Witness as _;
-use netemul::{Endpoint, RealmUdpSocket as _};
+use netemul::RealmUdpSocket as _;
 use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use netsvc_proto::{debuglog, netboot, tftp};
@@ -297,17 +297,19 @@ where
                     name: Some(NETSVC_NAME.to_string()),
                     program_args: Some(args.into_iter().map(Into::into).collect()),
                     uses: Some(fidl_fuchsia_netemul::ChildUses::Capabilities(vec![
+                        // TODO(https://fxbug.dev/109169): Remove when netsvc no
+                        // longer enumerates Ethernet devices.
                         fidl_fuchsia_netemul::Capability::NetemulDevfs(
                             fidl_fuchsia_netemul::DevfsDep {
                                 name: Some(DEV_ETHERNET_DIRECTORY.to_string()),
-                                subdir: Some(netemul::Ethernet::DEV_PATH.to_string()),
+                                subdir: Some(netemul::ETHERNET_DEVFS_PATH.to_string()),
                                 ..fidl_fuchsia_netemul::DevfsDep::EMPTY
                             },
                         ),
                         fidl_fuchsia_netemul::Capability::NetemulDevfs(
                             fidl_fuchsia_netemul::DevfsDep {
                                 name: Some(DEV_NETWORK_DIRECTORY.to_string()),
-                                subdir: Some(netemul::NetworkDevice::DEV_PATH.to_string()),
+                                subdir: Some(netemul::NETDEVICE_DEVFS_PATH.to_string()),
                                 ..fidl_fuchsia_netemul::DevfsDep::EMPTY
                             },
                         ),
@@ -368,17 +370,19 @@ where
                     )),
                     name: Some(NAME_PROVIDER_NAME.to_string()),
                     uses: Some(fidl_fuchsia_netemul::ChildUses::Capabilities(vec![
+                        // TODO(https://fxbug.dev/109169): Remove when netsvc no
+                        // longer enumerates Ethernet devices.
                         fidl_fuchsia_netemul::Capability::NetemulDevfs(
                             fidl_fuchsia_netemul::DevfsDep {
                                 name: Some(DEV_ETHERNET_DIRECTORY.to_string()),
-                                subdir: Some(netemul::Ethernet::DEV_PATH.to_string()),
+                                subdir: Some(netemul::ETHERNET_DEVFS_PATH.to_string()),
                                 ..fidl_fuchsia_netemul::DevfsDep::EMPTY
                             },
                         ),
                         fidl_fuchsia_netemul::Capability::NetemulDevfs(
                             fidl_fuchsia_netemul::DevfsDep {
                                 name: Some(DEV_NETWORK_DIRECTORY.to_string()),
-                                subdir: Some(netemul::NetworkDevice::DEV_PATH.to_string()),
+                                subdir: Some(netemul::NETDEVICE_DEVFS_PATH.to_string()),
                                 ..fidl_fuchsia_netemul::DevfsDep::EMPTY
                             },
                         ),
@@ -401,7 +405,7 @@ where
     (realm, fs)
 }
 
-async fn with_netsvc_and_netstack_bind_port<E, F, Fut, A, V, P>(
+async fn with_netsvc_and_netstack_bind_port<F, Fut, A, V, P>(
     port: u16,
     avoid_ports: P,
     name: &str,
@@ -412,7 +416,6 @@ async fn with_netsvc_and_netstack_bind_port<E, F, Fut, A, V, P>(
     Fut: futures::Future<Output = ()>,
     A: Into<String>,
     V: IntoIterator<Item = A>,
-    E: netemul::Endpoint,
     P: IntoIterator<Item = u16>,
 {
     let netsvc_name = format!("{}-netsvc", name);
@@ -435,11 +438,11 @@ async fn with_netsvc_and_netstack_bind_port<E, F, Fut, A, V, P>(
     );
 
     let network = sandbox.create_network("net").await.expect("create network");
-    let ep = network.create_endpoint::<E, _>(&netsvc_name).await.expect("create endpoint");
+    let ep = network.create_endpoint(&netsvc_name).await.expect("create endpoint");
     let () = ep.set_link_up(true).await.expect("set link up");
 
     let () = netsvc_realm
-        .add_virtual_device(&ep, E::dev_path("ep").as_path())
+        .add_virtual_device(&ep, netemul::devfs_device_path("ep").as_path())
         .await
         .expect("add virtual device");
 
@@ -447,7 +450,7 @@ async fn with_netsvc_and_netstack_bind_port<E, F, Fut, A, V, P>(
         sandbox.create_netstack_realm::<Netstack2, _>(&ns_name).expect("create netstack realm");
 
     let interface: netemul::TestInterface<'_> =
-        netstack_realm.join_network::<E, _>(&network, &ns_name).await.expect("join network");
+        netstack_realm.join_network(&network, &ns_name).await.expect("join network");
 
     let _: net_types::ip::Ipv6Addr = netstack_testing_common::interfaces::wait_for_v6_ll(
         &netstack_realm
@@ -509,13 +512,12 @@ async fn with_netsvc_and_netstack_bind_port<E, F, Fut, A, V, P>(
 
 const DEFAULT_NETSVC_ARGS: [&str; 3] = ["--netboot", "--all-features", "--log-packets"];
 
-async fn with_netsvc_and_netstack<E, F, Fut>(name: &str, test: F)
+async fn with_netsvc_and_netstack<F, Fut>(name: &str, test: F)
 where
     F: FnOnce(fuchsia_async::net::UdpSocket, u32) -> Fut,
     Fut: futures::Future<Output = ()>,
-    E: netemul::Endpoint,
 {
-    with_netsvc_and_netstack_bind_port::<E, _, _, _, _, _>(
+    with_netsvc_and_netstack_bind_port(
         /* unspecified port */ 0,
         // Avoid the multicast ports, which will cause test flakes.
         [debuglog::MULTICAST_PORT.get(), netboot::ADVERT_PORT.get()],
@@ -659,8 +661,8 @@ async fn can_discover_inner(sock: fuchsia_async::net::UdpSocket, scope_id: u32) 
 }
 
 #[netstack_test]
-async fn can_discover<E: netemul::Endpoint>(name: &str) {
-    with_netsvc_and_netstack::<E, _, _>(name, can_discover_inner).await;
+async fn can_discover(name: &str) {
+    with_netsvc_and_netstack(name, can_discover_inner).await;
 }
 
 async fn debuglog_inner(sock: fuchsia_async::net::UdpSocket, _scope_id: u32) {
@@ -742,8 +744,8 @@ async fn debuglog_inner(sock: fuchsia_async::net::UdpSocket, _scope_id: u32) {
 }
 
 #[netstack_test]
-async fn debuglog<E: netemul::Endpoint>(name: &str) {
-    with_netsvc_and_netstack_bind_port::<E, _, _, _, _, _>(
+async fn debuglog(name: &str) {
+    with_netsvc_and_netstack_bind_port(
         debuglog::MULTICAST_PORT.get(),
         [],
         name,
@@ -855,8 +857,8 @@ async fn get_board_info_inner(sock: fuchsia_async::net::UdpSocket, scope_id: u32
 }
 
 #[netstack_test]
-async fn get_board_info<E: netemul::Endpoint>(name: &str) {
-    with_netsvc_and_netstack::<E, _, _>(name, get_board_info_inner).await;
+async fn get_board_info(name: &str) {
+    with_netsvc_and_netstack(name, get_board_info_inner).await;
 }
 
 async fn start_transfer(
@@ -1054,19 +1056,16 @@ async fn pave(image_name: &str, sock: fuchsia_async::net::UdpSocket, scope_id: u
 #[netstack_test]
 #[test_case("zirconr.img"; "recovery")]
 #[test_case("sparse.fvm"; "fvm")]
-async fn pave_image<E: netemul::Endpoint>(name: &str, image: &str) {
-    with_netsvc_and_netstack::<E, _, _>(
-        &format!("{}-{}", name, image),
-        |sock, scope_id| async move {
-            let () = pave(&format!("<<image>>{}", image), sock, scope_id).await;
-        },
-    )
+async fn pave_image(name: &str, image: &str) {
+    with_netsvc_and_netstack(&format!("{}-{}", name, image), |sock, scope_id| async move {
+        let () = pave(&format!("<<image>>{}", image), sock, scope_id).await;
+    })
     .await;
 }
 
 #[netstack_test]
-async fn advertises<E: netemul::Endpoint>(name: &str) {
-    let () = with_netsvc_and_netstack_bind_port::<E, _, _, _, _, _>(
+async fn advertises(name: &str) {
+    let () = with_netsvc_and_netstack_bind_port(
         netsvc_proto::netboot::ADVERT_PORT.get(),
         [],
         name,
@@ -1119,7 +1118,7 @@ async fn advertises<E: netemul::Endpoint>(name: &str) {
 }
 
 #[netstack_test]
-async fn survives_device_removal<E: netemul::Endpoint>(name: &str) {
+async fn survives_device_removal(name: &str) {
     use packet_formats::ethernet::{EthernetFrame, EthernetFrameLengthCheck};
 
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
@@ -1158,12 +1157,12 @@ async fn survives_device_removal<E: netemul::Endpoint>(name: &str) {
 
     let test_fut = async {
         for i in 0..3 {
-            let ep_name = format!("ep-{:?}-{}", E::NETEMUL_BACKING, i);
+            let ep_name = format!("ep-{}", i);
             let mac = net_types::ethernet::Mac::new([2, 3, 4, 5, 6, i]);
             let ep = network
                 .create_endpoint_with(
                     &ep_name,
-                    E::make_config(
+                    netemul::new_endpoint_config(
                         netemul::DEFAULT_MTU,
                         Some(fidl_fuchsia_net::MacAddress { octets: mac.bytes() }),
                     ),
@@ -1172,7 +1171,7 @@ async fn survives_device_removal<E: netemul::Endpoint>(name: &str) {
                 .expect("create endpoint");
             let () = ep.set_link_up(true).await.expect("set link up");
             let () = netsvc_realm
-                .add_virtual_device(&ep, E::dev_path(&ep_name).as_path())
+                .add_virtual_device(&ep, netemul::devfs_device_path(&ep_name).as_path())
                 .await
                 .expect("add virtual device");
 
@@ -1210,8 +1209,8 @@ async fn survives_device_removal<E: netemul::Endpoint>(name: &str) {
 /// against a regression where netsvc was not sending ACKs when it was receiving
 /// retransmitted blocks from the host.
 #[netstack_test]
-async fn retransmits_acks<E: netemul::Endpoint>(name: &str) {
-    with_netsvc_and_netstack::<E, _, _>(name, |sock, scope_id| async move {
+async fn retransmits_acks(name: &str) {
+    with_netsvc_and_netstack(name, |sock, scope_id| async move {
         let device = discover(&sock, scope_id).await;
         let image_name = "<<image>>sparse.fvm";
 
