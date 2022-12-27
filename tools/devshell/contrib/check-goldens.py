@@ -45,6 +45,12 @@ def main():
         action="store_true",
     )
     parser.add_argument(
+        "--all",
+        help=
+        "if set, includes otherwise ignored, dynamically-specified goldens (i.e., those specified via a build-time manifest)",
+        action="store_true",
+    )
+    parser.add_argument(
         "search_term",
         help="search term to match golden files against",
         nargs="?",
@@ -63,6 +69,20 @@ def main():
     with open(golden_files_json) as f:
         entries = json.load(f)
 
+    # Account for comparisons given indirectly via build-time manifests,
+    # ensuring that they are built before proceeding.
+    if args.all:
+        manifests = []
+        for entry in entries:
+            if "comparison_manifest" in entry:
+                manifests.append(entry["comparison_manifest"])
+        if manifests:
+            subprocess.check_call(["fx", "build"] + manifests)
+
+    # Reload `entries`, as the JSON file may have been regenerated.
+    with open(golden_files_json) as f:
+        entries = json.load(f)
+
     def is_match(filename):
         if not args.search_term:
             return True
@@ -73,8 +93,16 @@ def main():
     stamps = []
     matches = []
     for entry in entries:
+        comparisons = []
+        if "comparisons" in entry:
+            comparisons = entry["comparisons"]
+        elif args.all:
+            manifest = os.path.join(build_dir, entry["comparison_manifest"])
+            with open(manifest) as f:
+                comparisons = json.load(f)
+
         matched = False
-        for comparison in entry["comparisons"]:
+        for comparison in comparisons:
             golden = comparison["golden"]
             if is_match(golden):
                 matched = True
