@@ -29,7 +29,10 @@ async fn call_write_data_file(admin: &AdminProxy) -> AdminWriteDataFileResult {
 #[fuchsia::test]
 async fn unformatted() {
     let mut builder = new_builder();
-    builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/nada/zip/zilch");
+    builder
+        .fshost()
+        .set_config_value("fvm_ramdisk", true)
+        .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
     builder.with_disk();
     let fixture = builder.build().await;
 
@@ -55,7 +58,10 @@ async fn unformatted() {
 #[fuchsia::test]
 async fn unformatted_netboot() {
     let mut builder = new_builder();
-    builder.fshost().set_netboot().set_ramdisk_prefix("/nada/zip/zilch");
+    builder
+        .fshost()
+        .set_config_value("netboot", true)
+        .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
     builder.with_disk();
     let fixture = builder.build().await;
 
@@ -81,7 +87,10 @@ async fn unformatted_netboot() {
 #[fuchsia::test]
 async fn unformatted_small_disk() {
     let mut builder = new_builder();
-    builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/nada/zip/zilch");
+    builder
+        .fshost()
+        .set_config_value("fvm_ramdisk", true)
+        .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
     builder.with_disk().size(SMALL_DISK_SIZE).data_volume_size(SMALL_DISK_SIZE / 2);
     let fixture = builder.build().await;
 
@@ -112,7 +121,10 @@ async fn unformatted_small_disk() {
 #[fuchsia::test]
 async fn formatted() {
     let mut builder = new_builder();
-    builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/nada/zip/zilch");
+    builder
+        .fshost()
+        .set_config_value("fvm_ramdisk", true)
+        .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
     builder.with_disk().format_data(data_fs_spec());
     let fixture = builder.build().await;
 
@@ -149,7 +161,10 @@ async fn formatted() {
 #[fuchsia::test]
 async fn formatted_netboot() {
     let mut builder = new_builder();
-    builder.fshost().set_netboot().set_ramdisk_prefix("/nada/zip/zilch");
+    builder
+        .fshost()
+        .set_config_value("netboot", true)
+        .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
     builder.with_disk().format_data(data_fs_spec());
     let fixture = builder.build().await;
 

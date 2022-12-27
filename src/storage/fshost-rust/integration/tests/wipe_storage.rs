@@ -71,7 +71,10 @@ async fn no_fvm_device() {
     }
 
     let mut builder = new_builder();
-    builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/nada/zip/zilch");
+    builder
+        .fshost()
+        .set_config_value("fvm_ramdisk", true)
+        .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
     let fixture = builder.build().await;
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
@@ -96,7 +99,10 @@ async fn write_blob() {
     let mut builder = new_builder();
     // Ensure the ramdisk prefix will **not** match the ramdisks we create in the fixture, thus
     // treating them as "real" storage devices.
-    builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/nada/zip/zilch");
+    builder
+        .fshost()
+        .set_config_value("fvm_ramdisk", true)
+        .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
     // We need to use a GPT as WipeStorage relies on the reported partition type GUID, rather than
     // content sniffing of the FVM magic.
     builder.with_disk().with_gpt();
@@ -124,7 +130,10 @@ async fn blobfs_formatted() {
     }
 
     let mut builder = new_builder();
-    builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/nada/zip/zilch");
+    builder
+        .fshost()
+        .set_config_value("fvm_ramdisk", true)
+        .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
     builder.with_disk().with_gpt();
     let fixture = builder.build().await;
     wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ true).await;
@@ -176,7 +185,10 @@ async fn data_unformatted() {
 
     const BUFF_LEN: usize = 512;
     let mut builder = new_builder();
-    builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/nada/zip/zilch");
+    builder
+        .fshost()
+        .set_config_value("fvm_ramdisk", true)
+        .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
     builder.with_disk().format_data(data_fs_spec()).with_gpt();
     let fixture = builder.build().await;
     wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ true).await;
@@ -248,7 +260,10 @@ async fn handles_corrupt_fvm() {
     let mut builder = new_builder();
     // Ensure the ramdisk prefix will **not** match the ramdisks we create in the fixture, thus
     // treating them as "real" storage devices.
-    builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/nada/zip/zilch");
+    builder
+        .fshost()
+        .set_config_value("fvm_ramdisk", true)
+        .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
     // Ensure that, while we allocate an FVM partition inside the GPT, we leave it empty.
     builder.with_disk().with_gpt().with_unformatted_fvm();
     let fixture = builder.build().await;

@@ -162,7 +162,10 @@ async fn data_formatted_with_small_initial_volume_big_target() {
     let mut builder = new_builder();
     // The formatting uses the max bytes argument as the initial target to resize to. If this
     // target is larger than the disk, the resize should still succeed.
-    builder.fshost().set_data_max_bytes(fshost_test_fixture::disk_builder::DEFAULT_DISK_SIZE * 2);
+    builder.fshost().set_config_value(
+        "data_max_bytes",
+        fshost_test_fixture::disk_builder::DEFAULT_DISK_SIZE * 2,
+    );
     builder.with_disk().data_volume_size(1);
     let fixture = builder.build().await;
 
@@ -211,7 +214,7 @@ async fn wipe_storage_not_supported() {
 #[fuchsia::test]
 async fn ramdisk_blob_and_data_mounted() {
     let mut builder = new_builder();
-    builder.fshost().set_fvm_ramdisk();
+    builder.fshost().set_config_value("fvm_ramdisk", true);
     builder.with_disk().format_data(DataSpec { zxcrypt: false, ..data_fs_spec() });
     let fixture = builder.build().await;
 
@@ -226,7 +229,10 @@ async fn ramdisk_blob_and_data_mounted() {
 async fn ramdisk_data_ignores_non_ramdisk() {
     let mut builder = new_builder();
     // Fake out the ramdisk checking by providing a nonsense ramdisk prefix.
-    builder.fshost().set_fvm_ramdisk().set_ramdisk_prefix("/not/the/prefix");
+    builder
+        .fshost()
+        .set_config_value("fvm_ramdisk", true)
+        .set_config_value("ramdisk_prefix", "/not/the/prefix");
     builder.with_disk().format_data(DataSpec { zxcrypt: false, ..data_fs_spec() });
     let fixture = builder.build().await;
 
@@ -277,7 +283,10 @@ async fn get_instance_guid_from_path(dir_proxy: &fio::DirectoryProxy, path: &str
 #[fuchsia::test]
 async fn partition_max_size_set() {
     let mut builder = new_builder();
-    builder.fshost().set_data_max_bytes(DATA_MAX_BYTES).set_blobfs_max_bytes(BLOBFS_MAX_BYTES);
+    builder
+        .fshost()
+        .set_config_value("data_max_bytes", DATA_MAX_BYTES)
+        .set_config_value("blobfs_max_bytes", BLOBFS_MAX_BYTES);
     builder.with_disk();
     let fixture = builder.build().await;
 
@@ -361,7 +370,7 @@ async fn netboot_set() {
 #[fuchsia::test]
 async fn fvm_ramdisk_serves_zbi_ramdisk_contents_with_unformatted_data() {
     let mut builder = new_builder();
-    builder.fshost().set_fvm_ramdisk();
+    builder.fshost().set_config_value("fvm_ramdisk", true);
     builder.with_zbi_ramdisk();
     let fixture = builder.build().await;
 
@@ -521,7 +530,10 @@ async fn shred_data_volume_from_recovery() {
     // Launch a version of fshost that will behave like recovery: it won't mount the data volume.
     let mut builder =
         new_builder().with_disk_from_vmo(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap());
-    builder.fshost().set_ramdisk_prefix("/nada/zip/zilch").set_fvm_ramdisk();
+    builder
+        .fshost()
+        .set_config_value("ramdisk_prefix", "/nada/zip/zilch")
+        .set_config_value("fvm_ramdisk", true);
     let fixture = builder.build().await;
 
     let admin = fixture
