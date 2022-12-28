@@ -341,8 +341,8 @@ TEST_F(PagingTest, Read) {
   // Map the data and validate the result can be read.
   zx_vaddr_t mapped_addr = 0;
   size_t mapped_len = RoundUp<uint64_t>(kFile1Size, zx_system_get_page_size());
-  ASSERT_EQ(ZX_OK,
-            zx::vmar::root_self()->map(ZX_VM_PERM_READ, 0, vmo, 0, mapped_len, &mapped_addr));
+  ASSERT_EQ(ZX_OK, zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_ALLOW_FAULTS, 0, vmo, 0,
+                                              mapped_len, &mapped_addr));
   ASSERT_TRUE(mapped_addr);
 
   // Clear the VMO so the code below also validates that the mapped memory works even when the
@@ -428,8 +428,9 @@ TEST_F(PagingTest, Write) {
   // Map the data and validate the result can be read.
   zx_vaddr_t mapped_addr = 0;
   size_t mapped_len = RoundUp<uint64_t>(kFile1Size, zx_system_get_page_size());
-  ASSERT_EQ(ZX_OK, zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0,
-                                              mapped_len, &mapped_addr));
+  ASSERT_EQ(ZX_OK,
+            zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_ALLOW_FAULTS, 0,
+                                       vmo, 0, mapped_len, &mapped_addr));
   ASSERT_TRUE(mapped_addr);
 
   // Clear the VMO so the code below also validates that the mapped memory works even when the
@@ -466,8 +467,8 @@ TEST_F(PagingTest, Write) {
 
   // Map the data and validate the result can be read.
   zx_vaddr_t mapped_addr_2 = 0;
-  ASSERT_EQ(ZX_OK,
-            zx::vmar::root_self()->map(ZX_VM_PERM_READ, 0, vmo, 0, mapped_len, &mapped_addr_2));
+  ASSERT_EQ(ZX_OK, zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_ALLOW_FAULTS, 0, vmo, 0,
+                                              mapped_len, &mapped_addr_2));
   ASSERT_TRUE(mapped_addr_2);
   ASSERT_NE(mapped_addr, mapped_addr_2);
   vmo.reset();
