@@ -56,7 +56,7 @@ protocol Meshcop {
     ///
     /// [1]: https://github.com/openthread/ot-br-posix/blob/0b5c6e1ecb8152ef6cea57c09b8a37a020fc4d6f/src/dbus/server/introspect.xml#L196-L210
     UpdateTxtEntries(struct {
-        txt_entries vector< struct {
+        txt_entries vector<struct {
             /// The key string for this TXT entry.
             ///
             /// Must not contain the character `=`.

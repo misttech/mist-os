@@ -16,6 +16,8 @@
 
 namespace fidl::fmt {
 
+using SpanSequenceList = std::vector<std::unique_ptr<SpanSequence>>;
+
 // This class is a pretty printer for a parse-able FIDL file.  It takes two representations of the
 // file as input: the raw AST (via the OnFile method), and a view into the source text of the file
 // from which that raw AST was generated.
@@ -100,7 +102,7 @@ class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
     kServiceMember,
     kStructLayout,
     kStructLayoutMember,
-    kTypeConstructorNew,
+    kTypeConstructor,
     kTypeDeclaration,
     kUsing,
     kValueLayout,
@@ -328,7 +330,7 @@ class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
   // SpanSequence for the file.  Calling this class' Result() method pops that element off and
   // returns it, representing the fully processed SpanSequence tree for the given source file, and
   // exhausting this class.
-  std::stack<std::vector<std::unique_ptr<SpanSequence>>> building_;
+  std::stack<SpanSequenceList> building_;
 
   // An ordered list of all tokens (including comments) in the source file.
   std::vector<const Token*> tokens_;

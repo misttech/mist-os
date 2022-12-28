@@ -4,7 +4,7 @@
 library test.good.fi0193;
 
 type MyStruct = struct {
-    my_member box< struct {
+    my_member box<struct {
         my_bool bool;
     }>;
 };

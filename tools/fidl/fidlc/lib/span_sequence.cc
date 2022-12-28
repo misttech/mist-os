@@ -83,7 +83,7 @@ void SpanSequence::Close() { closed_ = true; }
 
 void TokenSpanSequence::Close() {
   if (!IsClosed()) {
-    SetRequiredSize(span_.size());
+    SetRequiredSize(token_.span().data().size());
     SpanSequence::Close();
   }
 }
@@ -93,7 +93,7 @@ std::optional<SpanSequence::Kind> TokenSpanSequence::Print(
     size_t indentation, bool wrapped, AdjacentIndents adjacent_indents, std::string* out) const {
   MaybeAddBlankLinesAfterStandaloneComment(this, last_printed_kind, out);
   MaybeIndentLine(indentation, GetOutdentation(), out);
-  *out += std::string(span_);
+  *out += std::string(token_.span().data());
   return SpanSequence::Kind::kToken;
 }
 

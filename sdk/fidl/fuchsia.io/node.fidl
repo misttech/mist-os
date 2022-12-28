@@ -94,7 +94,7 @@ protocol Node1 {
 
             /// The connection composes [`Directory`].
             3: directory @generated_name("DirectoryObject") struct {};
-        } :optional;
+        }:optional;
     });
 
     /// Acquires information about the node.

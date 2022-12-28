@@ -667,7 +667,7 @@
         "filename": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
         "line": 26,
         "column": 28,
-        "length": 267
+        "length": 266
       },
       "maybe_attributes": [
         {
@@ -961,7 +961,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
         "line": 33,
-        "column": 35,
+        "column": 34,
         "length": 50
       },
       "members": [
@@ -1224,7 +1224,7 @@
         "filename": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
         "line": 31,
         "column": 22,
-        "length": 132
+        "length": 131
       },
       "members": [
         {

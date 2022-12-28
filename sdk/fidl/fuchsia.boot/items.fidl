@@ -32,11 +32,11 @@ protocol Items {
     @transitional
     Get2(struct {
         type uint32;
-        extra box< struct {
+        extra box<struct {
             n uint32;
         }>;
     }) -> (resource struct {
-        retrieved_items vector< resource struct {
+        retrieved_items vector<resource struct {
             payload zx.handle:VMO;
             length uint32;
             extra uint32;

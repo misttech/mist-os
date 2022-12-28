@@ -97,7 +97,7 @@ void ClearLeadingBlankLines(std::unique_ptr<SpanSequence>& span_sequence) {
 // does, the first element in the currently open SpanSequence list has its leading_blank_lines
 // overwritten to 0.
 void ClearBlankLinesAfterAttributeList(const std::unique_ptr<raw::AttributeList>& attrs,
-                                       std::vector<std::unique_ptr<SpanSequence>>& list) {
+                                       SpanSequenceList& list) {
   if (attrs != nullptr && !list.empty()) {
     ClearLeadingBlankLines(list[0]);
   }
@@ -150,8 +150,8 @@ void IngestToken(const Token token, const Token prev_token, size_t leading_newli
     return;
   }
 
-  auto token_span_sequence = std::make_unique<TokenSpanSequence>(
-      token.span().data(), leading_newlines > 0 ? leading_newlines - 1 : 0);
+  auto token_span_sequence =
+      std::make_unique<TokenSpanSequence>(token, leading_newlines > 0 ? leading_newlines - 1 : 0);
   switch (kind) {
     case Token::kEndOfFile:
       return;
@@ -288,7 +288,7 @@ SpanSequenceTreeVisitor::Builder<T>::Builder(SpanSequenceTreeVisitor* ftv, const
                                              const Token& end, bool new_list)
     : ftv_(ftv), start_(start), end_(end) {
   if (new_list)
-    this->GetFormattingTreeVisitor()->building_.push(std::vector<std::unique_ptr<SpanSequence>>());
+    this->GetFormattingTreeVisitor()->building_.push(SpanSequenceList());
 
   auto prelude = ftv_->IngestUpTo(start_);
   if (prelude.has_value())
@@ -299,7 +299,7 @@ SpanSequenceTreeVisitor::TokenBuilder::TokenBuilder(SpanSequenceTreeVisitor* ftv
                                                     const Token& token, bool has_trailing_space)
     : Builder<TokenSpanSequence>(ftv, token, token, false) {
   auto token_span_sequence = std::make_unique<TokenSpanSequence>(
-      token.span().data(), token.leading_newlines() == 0 ? 0 : token.leading_newlines() - 1);
+      token, token.leading_newlines() == 0 ? 0 : token.leading_newlines() - 1);
   token_span_sequence->SetTrailingSpace(has_trailing_space);
   token_span_sequence->Close();
 
@@ -461,7 +461,7 @@ void SpanSequenceTreeVisitor::OnAttributeList(const std::unique_ptr<raw::Attribu
   if (already_seen_.insert(element.get()).second) {
     // Special case: attributes on anonymous layouts do not go on newlines.  Instead, they are put
     // into a DivisibleSpanSequence and kept on the same line if possible.
-    if (IsDirectlyInsideOf(VisitorKind::kInlineLayoutReference)) {
+    if (IsDirectlyInsideOf(VisitorKind::kTypeConstructor)) {
       const auto visiting = Visiting(this, VisitorKind::kAttributeList);
       const auto builder = SpanBuilder<DivisibleSpanSequence>(this, *element);
       TreeVisitor::OnAttributeList(element);
@@ -602,10 +602,9 @@ void SpanSequenceTreeVisitor::OnIdentifierConstant(
 void SpanSequenceTreeVisitor::OnInlineLayoutReference(
     const std::unique_ptr<raw::InlineLayoutReference>& element) {
   const auto visiting = Visiting(this, VisitorKind::kInlineLayoutReference);
-  if (element->attributes != nullptr) {
-    OnAttributeList(element->attributes);
-  }
 
+  // We deliberately ignore the AttributeList, as it has been handled by the OnTypeConstructor call
+  // that called into this function.
   TreeVisitor::OnInlineLayoutReference(element);
   ClearBlankLinesAfterAttributeList(element->attributes, building_.top());
 }
@@ -994,14 +993,23 @@ void SpanSequenceTreeVisitor::OnTypeConstructor(
                                                 !IsInsideOf(VisitorKind::kResourceProperty))) {
     return;
   }
-  const auto visiting = Visiting(this, VisitorKind::kTypeConstructorNew);
 
+  const auto visiting = Visiting(this, VisitorKind::kTypeConstructor);
   if (element->layout_ref->kind == raw::LayoutReference::Kind::kInline) {
-    TreeVisitor::OnTypeConstructor(element);
-  } else {
-    const auto builder = SpanBuilder<AtomicSpanSequence>(this, *element);
-    TreeVisitor::OnTypeConstructor(element);
+    // Check if we have attributes - if we do, we'll need to process them before creating the
+    // TypeConstructor-containing AtomicSpanSequence, because inline layout attributes should be
+    // stacked when wrapped.
+    auto as_inline_layout_ref = static_cast<raw::InlineLayoutReference*>(element->layout_ref.get());
+    if (as_inline_layout_ref->attributes != nullptr) {
+      OnAttributeList(as_inline_layout_ref->attributes);
+      const auto builder = SpanBuilder<AtomicSpanSequence>(this, *element);
+      TreeVisitor::OnTypeConstructor(element);
+      return;
+    }
   }
+
+  const auto builder = SpanBuilder<AtomicSpanSequence>(this, *element);
+  TreeVisitor::OnTypeConstructor(element);
 }
 
 void SpanSequenceTreeVisitor::OnTypeDeclaration(

@@ -35,7 +35,7 @@ type Route = table {
         /// Send multicast packets through a set of output interfaces if the
         /// multicast packet meets a minimum TTL (IPv4) or HopLimit (IPv6)
         /// requirement for the interface.
-        1: outgoing_interfaces vector< struct {
+        1: outgoing_interfaces vector<struct {
             /// The ID for the outgoing interface.
             id fuchsia.net.InterfaceId;
 

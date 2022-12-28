@@ -30,7 +30,7 @@ protocol SomeProtocol {
         };
         table_member table {
             1: reserved;
-            2: table_data vector< struct {
+            2: table_data vector<struct {
                 data uint8;
             }>:10;
         };

@@ -11,6 +11,8 @@
 #include <utility>
 #include <vector>
 
+#include "tools/fidl/fidlc/include/fidl/token.h"
+
 namespace fidl::fmt {
 
 // Tracks whether the line a particular token finds itself on is indented relative to either its
@@ -196,10 +198,10 @@ class SpanSequence {
 // source code in the SpanSequence tree.
 class TokenSpanSequence final : public SpanSequence {
  public:
-  explicit TokenSpanSequence(const std::string_view span, size_t leading_blank_lines = 0)
+  explicit TokenSpanSequence(Token token, size_t leading_blank_lines = 0)
       : SpanSequence(SpanSequence::Kind::kToken, SpanSequence::Position::kDefault,
                      leading_blank_lines),
-        span_(span) {}
+        token_(token) {}
 
   void Close() override;
   bool HasNonLeadingComments() const override { return false; }
@@ -211,9 +213,10 @@ class TokenSpanSequence final : public SpanSequence {
                                           size_t indentation, bool wrapped,
                                           AdjacentIndents adjacent_indents,
                                           std::string* out) const override;
+  Token GetToken() const { return token_; }
 
  private:
-  const std::string_view span_;
+  const Token token_;
 };
 
 // A CompositeSpanSequence is a base class for all branch nodes in the SpanSequence tree

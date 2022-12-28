@@ -358,8 +358,8 @@ TEST(NewFormatterTests, AttributesInlineFormatted) {
 library foo.bar;
 
 type MyStruct = struct {
-    field1 @no_arg_attr_abcde struct {};
-    field2 @one_arg_attr("1") struct {};
+    my_field1 @no_arg_abcdefg struct {};
+    my_field2 @one_arg("123") struct {};
 };
 )FIDL";
 
@@ -368,8 +368,8 @@ type MyStruct = struct {
 library foo.bar;
 
 type MyStruct = struct {
-    field1 @no_arg_attr_abcde struct {};
-    field2 @one_arg_attr("1") struct {};
+    my_field1 @no_arg_abcdefg struct {};
+    my_field2 @one_arg("123") struct {};
 };
 )FIDL";
 
@@ -383,8 +383,8 @@ TEST(NewFormatterTests, AttributesInlineOverflow) {
 library foo.bar;
 
 type MyStruct = struct {
-    field1 @no_arg_attr_abcdef struct {};
-    field2 @one_arg_attr("12") struct {};
+    my_field1 @no_arg_abcdefgh struct {};
+    my_field2 @one_arg("1234") struct {};
 };
 )FIDL";
 
@@ -393,11 +393,11 @@ type MyStruct = struct {
 library foo.bar;
 
 type MyStruct = struct {
-    field1
-            @no_arg_attr_abcdef
+    my_field1
+            @no_arg_abcdefgh
             struct {};
-    field2
-            @one_arg_attr("12")
+    my_field2
+            @one_arg("1234")
             struct {};
 };
 )FIDL";
@@ -4206,7 +4206,7 @@ using baz.qux; // C4
 }
 
 // Regression test for fxbug.dev/107841.
-TEST(NewFormatterTests, CommentsOnOverflowing) {
+TEST(NewFormatterTests, CommentsOnOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library example;
@@ -5614,4 +5614,264 @@ open protocol Test {
 
   ASSERT_STREQ(formatted, Format(unformatted));
 }
+
+// Regression test for fxbug.dev/90644.
+TEST(NewFormatterTests, AliasAnonymousLayoutInLayoutParameterFormatted) {
+  // ---------------40---------------- |
+  std::string unformatted = R"FIDL(
+library example;
+
+alias MyVec = vector<struct {
+    inner bool;
+}>;
+alias MyEmptyVec = vector<struct {}>;
+alias MyArr = array<struct {
+    inner bool;
+}, 1>;
+alias MyEmptyArr = array<struct {}, 1>;
+)FIDL";
+
+  // ---------------40---------------- |
+  std::string formatted = R"FIDL(
+library example;
+
+alias MyVec = vector<struct {
+    inner bool;
+}>;
+alias MyEmptyVec = vector<struct {}>;
+alias MyArr = array<struct {
+    inner bool;
+}, 1>;
+alias MyEmptyArr = array<struct {}, 1>;
+)FIDL";
+
+  ASSERT_STREQ(formatted, Format(unformatted));
+}
+
+// Regression test for fxbug.dev/90644.
+TEST(NewFormatterTests, AliasAnonymousLayoutInLayoutParameterOverflow) {
+  // ---------------40---------------- |
+  std::string unformatted = R"FIDL(
+library example;
+
+alias MyVec_abcdefghijk = vector<struct {
+    inner bool;
+}>;
+alias MyEmptyVec_abc = vector<struct {}>;
+alias MyArr_abcdefghijkl = array<struct {
+    inner bool;
+}, 1>;
+alias MyEmptyArr_a = array<struct {}, 1>;
+)FIDL";
+
+  // ---------------40---------------- |
+  std::string formatted = R"FIDL(
+library example;
+
+alias MyVec_abcdefghijk
+        = vector<struct {
+    inner bool;
+}>;
+alias MyEmptyVec_abc
+        = vector<struct {}>;
+alias MyArr_abcdefghijkl
+        = array<struct {
+    inner bool;
+}, 1>;
+alias MyEmptyArr_a
+        = array<struct {}, 1>;
+)FIDL";
+
+  ASSERT_STREQ(formatted, Format(unformatted));
+}
+
+// Regression test for fxbug.dev/90644.
+TEST(NewFormatterTests, LayoutMemberAnonymousLayoutInLayoutParameterFormatted) {
+  // ---------------40---------------- |
+  std::string unformatted = R"FIDL(
+library example;
+
+type MyStruct = struct {
+    box box<struct {
+        inner bool;
+    }>;
+};
+type MyTable = table {
+    1: vec vector<table {
+        1: inner bool;
+    }>;
+};
+type MyUnion = union {
+    1: arr array<flexible union {
+        1: inner bool;
+    }, 1>;
+};
+
+type MyEmptyStruct = struct {
+    box box<struct {}>;
+};
+type MyEmptyTable = table {
+    1: arr array<table {}, 1>;
+};
+type MyEmptyUnion = union {
+    1: vec vector<flexible union {}>;
+};
+)FIDL";
+
+  // ---------------40---------------- |
+  std::string formatted = R"FIDL(
+library example;
+
+type MyStruct = struct {
+    box box<struct {
+        inner bool;
+    }>;
+};
+type MyTable = table {
+    1: vec vector<table {
+        1: inner bool;
+    }>;
+};
+type MyUnion = union {
+    1: arr array<flexible union {
+        1: inner bool;
+    }, 1>;
+};
+
+type MyEmptyStruct = struct {
+    box box<struct {}>;
+};
+type MyEmptyTable = table {
+    1: arr array<table {}, 1>;
+};
+type MyEmptyUnion = union {
+    1: vec vector<flexible union {}>;
+};
+)FIDL";
+
+  ASSERT_STREQ(formatted, Format(unformatted));
+}
+
+// Regression test for fxbug.dev/90644.
+TEST(NewFormatterTests, LayoutMemberAnonymousLayoutInLayoutParameterOverflow) {
+  // ---------------40---------------- |
+  std::string unformatted = R"FIDL(
+library example;
+
+type MyStruct = struct {
+    box_abcdefghijklmnopqrst box<struct {
+        inner bool;
+    }>;
+};
+type MyTable = table {
+    1: vec_abcdefghijklmno vector<table {
+        1: inner bool;
+    }>;
+};
+type MyUnion = union {
+    1: arr_abcdefg array<flexible union {
+        1: inner bool;
+    }, 1>;
+};
+
+type MyEmptyStruct = struct {
+    box_abcdefghijklmnopq box<struct {}>;
+};
+type MyEmptyTable = table {
+    1: arr_abcdefghij array<table {}, 1>;
+};
+type MyEmptyUnion = union {
+    1: vec_abc vector<flexible union {}>;
+};
+)FIDL";
+
+  // ---------------40---------------- |
+  std::string formatted = R"FIDL(
+library example;
+
+type MyStruct = struct {
+    box_abcdefghijklmnopqrst
+            box<struct {
+        inner bool;
+    }>;
+};
+type MyTable = table {
+    1: vec_abcdefghijklmno
+            vector<table {
+        1: inner bool;
+    }>;
+};
+type MyUnion = union {
+    1: arr_abcdefg
+            array<flexible union {
+        1: inner bool;
+    }, 1>;
+};
+
+type MyEmptyStruct = struct {
+    box_abcdefghijklmnopq
+            box<struct {}>;
+};
+type MyEmptyTable = table {
+    1: arr_abcdefghij
+            array<table {}, 1>;
+};
+type MyEmptyUnion = union {
+    1: vec_abc
+            vector<flexible union {}>;
+};
+)FIDL";
+
+  ASSERT_STREQ(formatted, Format(unformatted));
+}
+
+// Regression test for fxbug.dev/113349.
+TEST(NewFormatterTests, ConstraintOnInlineAnonymousLayoutNormal) {
+  // ---------------40---------------- |
+  std::string unformatted = R"FIDL(
+library example;
+
+type MyStruct = struct {
+    member flexible union {}:optional;
+}:optional;
+)FIDL";
+
+  // ---------------40---------------- |
+  std::string formatted = R"FIDL(
+library example;
+
+type MyStruct = struct {
+    member flexible union {}:optional;
+}:optional;
+)FIDL";
+
+  ASSERT_STREQ(formatted, Format(unformatted));
+  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+}
+
+// Regression test for fxbug.dev/113349.
+TEST(NewFormatterTests, ConstraintOnInlineAnonymousLayoutOverflow) {
+  // ---------------40---------------- |
+  std::string unformatted = R"FIDL(
+library example;
+
+type MyStruct = struct {
+    member_ab flexible union {}:optional;
+}:optional;
+)FIDL";
+
+  // ---------------40---------------- |
+  std::string formatted = R"FIDL(
+library example;
+
+type MyStruct = struct {
+    member_ab
+            flexible union {}:optional;
+}:optional;
+)FIDL";
+
+  ASSERT_STREQ(formatted, Format(unformatted));
+  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+}
+
 }  // namespace

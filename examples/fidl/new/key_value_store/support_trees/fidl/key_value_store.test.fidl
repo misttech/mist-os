@@ -25,7 +25,7 @@ type Item = struct {
         2: store @generated_name("nested_store") table {
             1: items vector<box<Item>>;
         };
-    } :optional;
+    }:optional;
     // [END diff_1]
 };
 
