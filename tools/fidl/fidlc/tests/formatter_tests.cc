@@ -8,6 +8,11 @@
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
+#define ASSERT_FORMATTED(SOURCE, EXPECTED)                         \
+  std::string actual = Format(SOURCE);                             \
+  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(SOURCE, actual)); \
+  ASSERT_STREQ(EXPECTED, actual);
+
 namespace {
 std::string Format(const std::string& source, bool reformat_and_compare = true) {
   auto lib = TestLibrary(source);
@@ -39,7 +44,7 @@ std::string Format(const std::string& source, bool reformat_and_compare = true) 
 }
 
 // Ensure that the formatter does not attempt to format unparsable FIDL.
-TEST(NewFormatterTests, BadErrorOnInvalidInput) {
+TEST(FormatterTests, BadErrorOnInvalidInput) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -54,14 +59,7 @@ type MyStruct = struct {
 
 // Ensure that an already properly formatted alias declaration is not modified by another run
 // through the formatter.
-TEST(NewFormatterTests, AliasFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library foo.bar;
-
-alias MyAlias_Abcdefghijklmnopqr = bool;
-)FIDL";
-
+TEST(FormatterTests, AliasAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library foo.bar;
@@ -69,12 +67,11 @@ library foo.bar;
 alias MyAlias_Abcdefghijklmnopqr = bool;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
 // Test that an alias declaration gets wrapped properly.
-TEST(NewFormatterTests, AliasOverflow) {
+TEST(FormatterTests, AliasOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -90,12 +87,11 @@ alias MyAlias_Abcdefghijklmnopqrs
         = bool;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Test with comments, doc comments, and attributes added and spaced out.
-TEST(NewFormatterTests, AliasWithAllAnnotations) {
+TEST(FormatterTests, AliasWithAllAnnotations) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -120,13 +116,12 @@ library foo.bar;
 alias MyAlias_Abcdefghijklmnopqr = bool;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // This test's input is semantically identical to AliasFormatted.  The only difference is that the
 // newlines and unnecessary spaces have been removed.
-TEST(NewFormatterTests, AliasMinimalWhitespace) {
+TEST(FormatterTests, AliasMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(library foo.bar;alias MyAlias_Abcdefghijklmnopqr=bool;)FIDL";
 
@@ -136,12 +131,11 @@ library foo.bar;
 alias MyAlias_Abcdefghijklmnopqr = bool;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Input is identical to AliasFormatted, except that every token is on a newline.
-TEST(NewFormatterTests, AliasMaximalNewlines) {
+TEST(FormatterTests, AliasMaximalNewlines) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -160,8 +154,7 @@ library foo.bar;
 alias MyAlias_Abcdefghijklmnopqr = bool;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // TODO(fxbug.dev/78236): more tests need to be added here once multiple arguments are supported for
@@ -169,15 +162,7 @@ alias MyAlias_Abcdefghijklmnopqr = bool;
 
 // Ensure that already properly formatted attributes declarations are not modified by another run
 // through the formatter.
-TEST(NewFormatterTests, AttributesFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-@attr_without_args
-@attr_with_one_arg("abcdefghijklmnopqr")
-@attr_with_two_args(a=true, b="abc")
-library foo.bar;
-)FIDL";
-
+TEST(FormatterTests, AttributesAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 @attr_without_args
@@ -186,11 +171,10 @@ library foo.bar;
 library foo.bar;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
-TEST(NewFormatterTests, AttributesSingle) {
+TEST(FormatterTests, AttributesSingle) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
    @attr_with_one_arg("abcd")
@@ -203,12 +187,11 @@ library foo.bar;
 library foo.bar;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Attributes with arguments should overflow gracefully, while attributes without them should not.
-TEST(NewFormatterTests, AttributesOverflow) {
+TEST(FormatterTests, AttributesOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 @attr_without_args_abcdefghijklmnopqrstuv
@@ -229,10 +212,9 @@ library foo.bar;
 library foo.bar;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
-TEST(NewFormatterTests, AttributesWithComment) {
+TEST(FormatterTests, AttributesWithComment) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
  @attr_without_args
@@ -253,11 +235,10 @@ TEST(NewFormatterTests, AttributesWithComment) {
 library foo.bar;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, AttributesWithDocComment) {
+TEST(FormatterTests, AttributesWithDocComment) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
     /// doc comment 1
@@ -277,13 +258,12 @@ library foo.bar;
 library foo.bar;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // This test's input is semantically identical to AttributesFormatted.  The only difference is that
 // the newlines and unnecessary spaces have been removed.
-TEST(NewFormatterTests, AttributesMinimalWhitespace) {
+TEST(FormatterTests, AttributesMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted =
       R"FIDL(@attr_without_args @attr_with_one_arg("abcdefghijklmnopqr")library foo.bar;)FIDL";
@@ -295,11 +275,10 @@ TEST(NewFormatterTests, AttributesMinimalWhitespace) {
 library foo.bar;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, AttributesMaximalNewLines) {
+TEST(FormatterTests, AttributesMaximalNewLines) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 @attr_without_args
@@ -321,11 +300,10 @@ bar
 library foo.bar;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, AttributesWeird) {
+TEST(FormatterTests, AttributesWeird) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -348,21 +326,10 @@ protocol MyProtocol {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, AttributesInlineFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library foo.bar;
-
-type MyStruct = struct {
-    my_field1 @no_arg_abcdefg struct {};
-    my_field2 @one_arg("123") struct {};
-};
-)FIDL";
-
+TEST(FormatterTests, AttributesInlineAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library foo.bar;
@@ -373,11 +340,10 @@ type MyStruct = struct {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
-TEST(NewFormatterTests, AttributesInlineOverflow) {
+TEST(FormatterTests, AttributesInlineOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -402,23 +368,12 @@ type MyStruct = struct {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Ensure that an already properly formatted bits declaration is not modified by another run
 // through the formatter.
-TEST(NewFormatterTests, BitsFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library foo.bar;
-
-type MyBits_Abcdefghijklmnopqrs = bits {
-    value1_abcdefghijklmnopqrstuvwx = 0;
-    value2_abcdefghijklmnopqrstu = 0x01;
-};
-)FIDL";
-
+TEST(FormatterTests, BitsAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library foo.bar;
@@ -429,11 +384,10 @@ type MyBits_Abcdefghijklmnopqrs = bits {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
-TEST(NewFormatterTests, BitsOverflow) {
+TEST(FormatterTests, BitsOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -457,11 +411,10 @@ type MyBits_Abcdefghijklmnopqrst
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, BitsUnformatted) {
+TEST(FormatterTests, BitsUnformatted) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -481,11 +434,10 @@ type MyBits_Abcdefghij = flexible bits {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, BitsWithAllAnnotations) {
+TEST(FormatterTests, BitsWithAllAnnotations) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -523,13 +475,12 @@ type MyBits_Abcdefghijklmnopqrs = bits {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // This test's input is semantically identical to BitsFormatted.  The only difference is that the
 // newlines and unnecessary spaces have been removed.
-TEST(NewFormatterTests, BitsMinimalWhitespace) {
+TEST(FormatterTests, BitsMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted =
       R"FIDL(library foo.bar;type MyBits_Abcdefghijklmnopqrs=bits{value1_abcdefghijklmnopqrstuvwx=0;value2_abcdefghijklmnopqrstu=0x01;};)FIDL";
@@ -543,12 +494,11 @@ type MyBits_Abcdefghijklmnopqrs = bits {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Input is identical to BitsFormatted, except that every token is on a newline.
-TEST(NewFormatterTests, BitsMaximalNewlines) {
+TEST(FormatterTests, BitsMaximalNewlines) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library
@@ -584,29 +534,12 @@ type MyBits_Abcdefghijklmnopqrs = bits {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Ensure that already properly formatted const declarations are not modified by another run
 // through the formatter.
-TEST(NewFormatterTests, ConstFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library foo.bar;
-
-const MY_TRUE_ABCDEFGHIJKLM bool = true;
-const MY_FALSE_ABCDEFGHIJK bool = false;
-const MY_UINT64_AB uint64 = 12345678900;
-
-
-const MY_FLOAT64_ABCDEF float64 = 12.34;
-const MY_STRING_ABCDEFGH string = "foo";
-const MY_OR_A uint64 = 1 | MY_UINT64_AB;
-const MY_ORS_ABCDEFG uint64 = 1 | 2 | 3;
-const MY_REF_ABCD uint64 = MY_UINT64_AB;
-)FIDL";
-
+TEST(FormatterTests, ConstAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library foo.bar;
@@ -623,10 +556,9 @@ const MY_ORS_ABCDEFG uint64 = 1 | 2 | 3;
 const MY_REF_ABCD uint64 = MY_UINT64_AB;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(formatted, formatted);
 }
-TEST(NewFormatterTests, ConstUnformatted) {
+TEST(FormatterTests, ConstUnformatted) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -662,15 +594,14 @@ const MY_ORS_ABCDEFG uint64 = 1 | 2 | 3;
 const MY_REF_ABCD uint64 = MY_UINT64_AB;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // The const declaration has two levels of subspanning: the first is split at the equal sign, while
 // the second is split at the type declaration.  This test cases tests for "partial" overflows where
 // the first level of subspanning is invoked: the whole line is too long, but the `const NAME TYPE`
 // portion still fits on the first line.
-TEST(NewFormatterTests, ConstPartialOverflow) {
+TEST(FormatterTests, ConstPartialOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -705,15 +636,14 @@ const MY_REF_ABCD uint64
         = MY_UINT64_ABC;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Tests cases where even the nested subspan to the left of the equal sign is longer than the
 // overflow window.  Note that this test case looks a bit unusual because the name is very long, but
 // the type is very short.  In reality, both would probably have to be quite long to cause this kind
 // of overflow, so the output will look less "lopsided."
-TEST(NewFormatterTests, ConstTotalOverflow) {
+TEST(FormatterTests, ConstTotalOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -754,12 +684,11 @@ const MY_WAY_TOO_LONG_REF_ABCDEFGHIJKLMNO
         = MY_WAY_TOO_LONG_UINT64_ABCDEFGHIJKL;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Test with comments, doc comments, and attributes added and spaced out.
-TEST(NewFormatterTests, ConstWithAllAnnotations) {
+TEST(FormatterTests, ConstWithAllAnnotations) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -784,13 +713,12 @@ library foo.bar;
 const MY_TRUE_ABCDEFGHIJKLM bool = true;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // This test's input is semantically identical to ConstFormatted.  The only difference is that the
 // newlines and unnecessary spaces have been removed.
-TEST(NewFormatterTests, ConstMinimalWhitespace) {
+TEST(FormatterTests, ConstMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted =
       R"FIDL(library foo.bar;const MY_TRUE_ABCDEFGHIJKLM bool=true;const MY_FALSE_ABCDEFGHIJK bool=false;const MY_UINT64_AB uint64=12345678900;const MY_FLOAT64_ABCDEF float64=12.34;const MY_STRING_ABCDEFGH string="foo";const MY_OR_A uint64=1|MY_UINT64_AB;const MY_ORS_ABCDEFG uint64=1|2|3;const MY_REF_ABCD uint64=MY_UINT64_AB;)FIDL";
@@ -808,12 +736,11 @@ const MY_ORS_ABCDEFG uint64 = 1 | 2 | 3;
 const MY_REF_ABCD uint64 = MY_UINT64_AB;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Input is identical to ConstFormatted, except that every token is on a newline.
-TEST(NewFormatterTests, ConstMaximalNewlines) {
+TEST(FormatterTests, ConstMaximalNewlines) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -892,26 +819,12 @@ const MY_ORS_ABCDEFG uint64 = 1 | 2 | 3;
 const MY_REF_ABCD uint64 = MY_UINT64_AB;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Ensure that an already properly formatted enum declaration is not modified by another run
 // through the formatter.
-TEST(NewFormatterTests, EnumFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library foo.bar;
-
-type MyEnum_Abcdefghij = enum : uint32 {
-    value1_abcdefghijklmnopqrstuvwx = 0;
-    value2_abcdefghijklmnopqrstuvw = 01;
-
-    @unknown
-    value3_abcdefghijklmnopqrstuv = 002;
-};
-)FIDL";
-
+TEST(FormatterTests, EnumAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library foo.bar;
@@ -925,11 +838,10 @@ type MyEnum_Abcdefghij = enum : uint32 {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
-TEST(NewFormatterTests, EnumOverflow) {
+TEST(FormatterTests, EnumOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -960,11 +872,10 @@ type MyEnum_Abcdefghijk
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, EnumUnformatted) {
+TEST(FormatterTests, EnumUnformatted) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -990,11 +901,10 @@ type MyEnum_Abc = strict enum : uint32 {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, EnumWithAllAnnotations) {
+TEST(FormatterTests, EnumWithAllAnnotations) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -1038,13 +948,12 @@ type MyEnum_Abcdefghij = enum : uint32 {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // This test's input is semantically identical to EnumFormatted.  The only difference is that the
 // newlines and unnecessary spaces have been removed.
-TEST(NewFormatterTests, EnumMinimalWhitespace) {
+TEST(FormatterTests, EnumMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted =
       R"FIDL(library foo.bar;type MyEnum_Abcdefghij=enum:uint32{value1_abcdefghijklmnopqrstuvwx=0;value2_abcdefghijklmnopqrstuvw=01;@unknown value3_abcdefghijklmnopqrstuv=002;};)FIDL";
@@ -1060,12 +969,11 @@ type MyEnum_Abcdefghij = enum : uint32 {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Input is identical to EnumFormatted, except that every token is on a newline.
-TEST(NewFormatterTests, EnumMaximalNewlines) {
+TEST(FormatterTests, EnumMaximalNewlines) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library
@@ -1112,11 +1020,10 @@ type MyEnum_Abcdefghij = enum : uint32 {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, EnumMemberless) {
+TEST(FormatterTests, EnumMemberless) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -1131,11 +1038,10 @@ library foo.bar;
 type EmptyEnum = strict enum : uint8 {};
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, EnumMemberlessCommentAfterColon) {
+TEST(FormatterTests, EnumMemberlessCommentAfterColon) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -1152,45 +1058,32 @@ type EmptyEnum = strict enum : // Comment
         uint8 {};
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Ensure that an already properly formatted library declaration is not modified by another run
 // through the formatter.
-TEST(NewFormatterTests, LibraryFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library foo.bar;
-)FIDL";
-
+TEST(FormatterTests, LibraryAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library foo.bar;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
 // Test that the library declaration is never wrapped.
-TEST(NewFormatterTests, LibraryOverflow) {
+TEST(FormatterTests, LibraryOverflowNoop) {
   // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
+  std::string noop = R"FIDL(
 library my.overlong.severely.overflowing.name;
 )FIDL";
 
-  // ---------------40---------------- |
-  std::string formatted = R"FIDL(
-library my.overlong.severely.overflowing.name;
-)FIDL";
-
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(noop, noop);
 }
 
 // No overflow, but incorrect leading spacing and newlines.
-TEST(NewFormatterTests, LibraryUnformatted) {
+TEST(FormatterTests, LibraryUnformatted) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
   library
@@ -1203,12 +1096,11 @@ TEST(NewFormatterTests, LibraryUnformatted) {
 library foo.bar;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Test with comments, doc comments, and attributes added and spaced out.
-TEST(NewFormatterTests, LibraryWithAllAnnotations) {
+TEST(FormatterTests, LibraryWithAllAnnotations) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
  // comment
@@ -1229,13 +1121,12 @@ TEST(NewFormatterTests, LibraryWithAllAnnotations) {
 library foo.bar;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // This test's input is semantically identical to LibraryFormatted.  The only difference is that the
 // newlines and unnecessary spaces have been removed.
-TEST(NewFormatterTests, LibraryMinimalWhitespace) {
+TEST(FormatterTests, LibraryMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(library foo.bar;)FIDL";
 
@@ -1244,12 +1135,11 @@ TEST(NewFormatterTests, LibraryMinimalWhitespace) {
 library foo.bar;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Input is identical to LibraryFormatted, except that every token is on a newline.
-TEST(NewFormatterTests, LibraryMaximalNewlines) {
+TEST(FormatterTests, LibraryMaximalNewlines) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library
@@ -1264,31 +1154,12 @@ bar
 library foo.bar;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Ensure that an already properly formatted resource declaration is not modified by another run
 // through the formatter.
-TEST(NewFormatterTests, ResourceFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library foo.bar;
-
-resource_definition default_abcdefghij {
-    properties {
-        obj_type subtype_abcdefghijklmn;
-    };
-};
-
-resource_definition subtype_a : uint32 {
-    properties {
-        obj_type subtype_abcdefghijklmn;
-        rights rights_abcdefghijklmnopq;
-    };
-};
-)FIDL";
-
+TEST(FormatterTests, ResourceAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library foo.bar;
@@ -1307,14 +1178,13 @@ resource_definition subtype_a : uint32 {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
 // No part of a resource_definition should wrap on overflow.
-TEST(NewFormatterTests, ResourceOverflow) {
+TEST(FormatterTests, ResourceOverflowNoop) {
   // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
+  std::string noop = R"FIDL(
 library foo.bar;
 
 resource_definition default_abcdefghijk {
@@ -1331,29 +1201,10 @@ resource_definition subtype_ab : uint32 {
 };
 )FIDL";
 
-  // ---------------40---------------- |
-  std::string formatted = R"FIDL(
-library foo.bar;
-
-resource_definition default_abcdefghijk {
-    properties {
-        obj_type subtype_abcdefghijklmno;
-    };
-};
-
-resource_definition subtype_ab : uint32 {
-    properties {
-        obj_type subtype_abcdefghijklmno;
-        rights rights_abcdefghijklmnopqr;
-    };
-};
-)FIDL";
-
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(noop, noop);
 }
 
-TEST(NewFormatterTests, ResourceUnormatted) {
+TEST(FormatterTests, ResourceUnformatted) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -1389,11 +1240,10 @@ resource_definition subtype_a : uint32 {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, ResourceWithAllAnnotations) {
+TEST(FormatterTests, ResourceWithAllAnnotations) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -1454,13 +1304,12 @@ resource_definition subtype_a : uint32 {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // This test's input is semantically identical to ResourceFormatted.  The only difference is that
 // the newlines and unnecessary spaces have been removed.
-TEST(NewFormatterTests, ResourceMinimalWhitespace) {
+TEST(FormatterTests, ResourceMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted =
       R"FIDL(library foo.bar;resource_definition default_abcdefghij{properties{obj_type subtype_abcdefghijklmn;};};resource_definition subtype_a:uint32{properties{obj_type subtype_abcdefghijklmn;rights rights_abcdefghijklmnopq;};};)FIDL";
@@ -1481,12 +1330,11 @@ resource_definition subtype_a : uint32 {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Input is identical to ResourceFormatted, except that every token is on a newline.
-TEST(NewFormatterTests, ResourceMaximalNewlines) {
+TEST(FormatterTests, ResourceMaximalNewlines) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library
@@ -1545,25 +1393,12 @@ resource_definition subtype_a : uint32 {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Ensure that an already properly formatted service declaration is not modified by another run
 // through the formatter.
-TEST(NewFormatterTests, ServiceFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library foo.bar;
-
-service MyEmptyService_Abcdefghijklm {};
-
-service MyPopulatedService_Abcdefghik {
-    import_ab client_end:foo.baz.Import;
-    local_abcdefghijkl client_end:Local;
-};
-)FIDL";
-
+TEST(FormatterTests, ServiceAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library foo.bar;
@@ -1576,14 +1411,13 @@ service MyPopulatedService_Abcdefghik {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
 // No part of the service should wrap if it overflows.
-TEST(NewFormatterTests, ServiceOverflow) {
+TEST(FormatterTests, ServiceOverflowNoop) {
   // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
+  std::string noop = R"FIDL(
 library foo.bar;
 
 service MyEmptyService_Abcdefghijklmn {};
@@ -1594,23 +1428,10 @@ service MyPopulatedService_Abcdefghikl {
 };
 )FIDL";
 
-  // ---------------40---------------- |
-  std::string formatted = R"FIDL(
-library foo.bar;
-
-service MyEmptyService_Abcdefghijklmn {};
-
-service MyPopulatedService_Abcdefghikl {
-    import_abc client_end:foo.baz.Import;
-    local_abcdefghijklm client_end:Local;
-};
-)FIDL";
-
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(noop, noop);
 }
 
-TEST(NewFormatterTests, ServiceUnformatted) {
+TEST(FormatterTests, ServiceUnformatted) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -1636,12 +1457,11 @@ service MyPopulatedService_Abcdefghikl {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Test with comments, doc comments, and attributes added and spaced out.
-TEST(NewFormatterTests, ServiceWithAllAnnotations) {
+TEST(FormatterTests, ServiceWithAllAnnotations) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -1685,13 +1505,12 @@ service MyPopulatedService_Abcdefghikl {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // This test's input is semantically identical to ServiceFormatted.  The only difference is that the
 // newlines and unnecessary spaces have been removed.
-TEST(NewFormatterTests, ServiceMinimalWhitespace) {
+TEST(FormatterTests, ServiceMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted =
       R"FIDL(library foo.bar;service MyEmptyService_Abcdefghijklm{};service MyPopulatedService_Abcdefghikl{import_ab client_end:foo.baz.Import;local_abcdefghijkl client_end:Local;};)FIDL";
@@ -1706,12 +1525,11 @@ service MyPopulatedService_Abcdefghikl {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Input is identical to ServiceFormatted, except that every token is on a newline.
-TEST(NewFormatterTests, ServiceMaximalNewlines) {
+TEST(FormatterTests, ServiceMaximalNewlines) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library
@@ -1759,30 +1577,12 @@ service MyPopulatedService_Abcdefghikl {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Ensure that an already properly formatted struct declaration is not modified by another run
 // through the formatter.
-TEST(NewFormatterTests, StructFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library foo.bar;
-
-type MyEmptyStruct_Abcdefgh = struct {};
-
-type MyPopulatedStruct_Abcdef = struct {
-    field1_abcdefghijklmnopqrstuvw bool;
-    field2_abcdefghijklmno bool = false;
-
-    field3_abcdefghijklmnopqrst struct {
-        nested1_abcdef vector<uint8>:16;
-        nested2_abcdef string = "abcde";
-    };
-};
-)FIDL";
-
+TEST(FormatterTests, StructAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library foo.bar;
@@ -1800,38 +1600,10 @@ type MyPopulatedStruct_Abcdef = struct {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
-TEST(NewFormatterTests, ProtocolNoArgumentsFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library foo.bar;
-
-protocol Empty_Abcdefghijklmnopqrstu {};
-
-protocol Composed_Abcdefghijklmnopqrst {
-    compose Empty_Abcdefghijklmnopqrstu;
-};
-
-protocol Populated_Abcdefghijklmnopqrs {
-    compose Composed_Abcdefghijklmnopqr;
-    OneWay_Abcdefghijklmnopqrstuvwxyz();
-    OneWayNull_Abcdefghijklm(struct {});
-
-    TwoWay_Abcdefghijklmnopqrst() -> ();
-    TwoWayNil(struct {}) -> (struct {});
-    TwoWayError_Ab() -> () error uint32;
-
-    compose Empty_Abcdefghijklmnopqrstu;
-
-    -> Event_Abcdefghijklmnopqrstuvwx();
-    -> EventNull_Abcdefghijk(struct {});
-    -> EventError() error abcdefghijklm;
-};
-)FIDL";
-
+TEST(FormatterTests, ProtocolNoArgumentsAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library foo.bar;
@@ -1859,15 +1631,14 @@ protocol Populated_Abcdefghijklmnopqrs {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
 // Aside from the contents of the request/response layouts themselves, nothing in a protocol
 // definition should cause wrapping on overflow.
-TEST(NewFormatterTests, ProtocolNoArgumentsOverflow) {
+TEST(FormatterTests, ProtocolNoArgumentsOverflowNoop) {
   // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
+  std::string noop = R"FIDL(
 library foo.bar;
 
 protocol Empty_Abcdefghijklmnopqrstuv {};
@@ -1893,38 +1664,10 @@ protocol Populated_Abcdefghijklmnopqrst {
 };
 )FIDL";
 
-  // ---------------40---------------- |
-  std::string formatted = R"FIDL(
-library foo.bar;
-
-protocol Empty_Abcdefghijklmnopqrstuv {};
-
-protocol Composed_Abcdefghijklmnopqrs {
-    compose Empty_Abcdefghijklmnopqrstuv;
-};
-
-protocol Populated_Abcdefghijklmnopqrst {
-    compose Composed_Abcdefghijklmnopqrs;
-    OneWay_Abcdefghijklmnopqrstuvwxyzz();
-    OneWayNull_Abcdefghijklmn(struct {});
-
-    TwoWay_Abcdefghijklmnopqrstu() -> ();
-    TwoWayNils(struct {}) -> (struct {});
-    TwoWayError_Abc() -> () error uint32;
-
-    compose Empty_Abcdefghijklmnopqrstuv;
-
-    -> Event_Abcdefghijklmnopqrstuvwxy();
-    -> EventNull_Abcdefghijkl(struct {});
-    -> EventError() error abcdefghijklmn;
-};
-)FIDL";
-
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(noop, noop);
 }
 
-TEST(NewFormatterTests, ProtocolNoArgumentsUnformatted) {
+TEST(FormatterTests, ProtocolNoArgumentsUnformatted) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -1982,11 +1725,10 @@ protocol Populated_Abcdefghijklmnopqrs {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, ProtocolNoArgumentsWithAllAnnotations) {
+TEST(FormatterTests, ProtocolNoArgumentsWithAllAnnotations) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -2082,13 +1824,12 @@ protocol Populated_Abcdefghijklmnopqrs {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // This test's input is semantically identical to ProtocolNoArgumentsFormatted.  The only difference
 // is that the newlines and unnecessary spaces have been removed.
-TEST(NewFormatterTests, ProtocolNoArgumentsMinimalWhitespace) {
+TEST(FormatterTests, ProtocolNoArgumentsMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted =
       R"FIDL(library foo.bar;protocol Empty_Abcdefghijklmnopqrstu{};protocol Composed_Abcdefghijklmnopqrst{compose Empty_Abcdefghijklmnopqrstu;};protocol Populated_Abcdefghijklmnopqrs{compose Composed_Abcdefghijklmnopqr;OneWay_Abcdefghijklmnopqrstuvwxyz();OneWayNull_Abcdefghijklm(struct{});TwoWay_Abcdefghijklmnopqrst()->();TwoWayNil(struct{})->(struct{});TwoWayError_Ab()->()error uint32;compose Empty_Abcdefghijklmnopqrstu;->Event_Abcdefghijklmnopqrstuvwx();->EventNull_Abcdefghijk(struct{});->EventError()error abcdefghijklm;};)FIDL";
@@ -2114,12 +1855,11 @@ protocol Populated_Abcdefghijklmnopqrs {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Input is identical to ProtocolNoArgumentsFormatted, except that every token is on a newline.
-TEST(NewFormatterTests, ProtocolNoArgumentsMaximalNewlines) {
+TEST(FormatterTests, ProtocolNoArgumentsMaximalNewlines) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library
@@ -2243,55 +1983,10 @@ protocol Populated_Abcdefghijklmnopqrs {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, ProtocolWithArgumentsFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library foo.bar;
-
-protocol Empty_Abcdefghijklmnopqrstu {};
-
-protocol Composed_Abcdefghijklmnopqr {
-    compose Empty_Abcdefghijklmnopqrstu;
-};
-
-protocol Populated_Abcdefghijklmnopqrs {
-    compose Composed_Abcdefghijklmnopqr;
-    OneWay_Abcdefghijklmnopqrst(struct {
-        req1_abcdefghijklmnopqrstu bool;
-    });
-
-    TwoWay_Abcdefghijklmnopqrst(struct {
-        req2_abcdefghijklmnopqrstu bool;
-    }) -> (struct {
-        res3_abcdefghijklmnopqrstu bool;
-    });
-    TwoWayError_Abcdefghijklmno(struct {
-        req4_abcdefghijklm bool = false;
-        req5_abcdefghijklmnopqr struct {
-            inner1_abcdefghijklmno int8;
-        };
-    }) -> (struct {
-        res6_abcdefghijklmnopqrstu bool;
-    }) error uint32;
-
-    compose Empty_Abcdefghijklmnopqrstu;
-
-    -> Event_Abcdefghijklmnopqr(struct {
-        res7_abcdefghijklmnopqrstu bool;
-    });
-    -> EventError_Abcdefghijklm(struct {
-        res8_abcdefghijklmnopqrs union {
-            1: inner2_abcdefghijkl bool;
-        };
-        res9_abcdefghijklmnopqrstu bool;
-    }) error noop_abcdefghijklmnopqrstu;
-};
-)FIDL";
-
+TEST(FormatterTests, ProtocolWithArgumentsAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library foo.bar;
@@ -2336,11 +2031,10 @@ protocol Populated_Abcdefghijklmnopqrs {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
-TEST(NewFormatterTests, ProtocolWithArgumentsOverflow) {
+TEST(FormatterTests, ProtocolWithArgumentsOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -2441,11 +2135,10 @@ protocol Populated_Abcdefghijklmnopqrst {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, ProtocolWithArgumentsUnformatted) {
+TEST(FormatterTests, ProtocolWithArgumentsUnformatted) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -2535,11 +2228,10 @@ protocol Populated_Abcdefghijklmnopqrs {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, ProtocolWithArgumentsWithAllAnnotations) {
+TEST(FormatterTests, ProtocolWithArgumentsWithAllAnnotations) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -2669,13 +2361,12 @@ protocol Populated_Abcdefghijklmnopqrs {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // This test's input is semantically identical to ProtocolWithArgumentsFormatted.  The only
 // difference is that the newlines and unnecessary spaces have been removed.
-TEST(NewFormatterTests, ProtocolWithArgumentsMinimalWhitespace) {
+TEST(FormatterTests, ProtocolWithArgumentsMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted =
       R"FIDL(library foo.bar;protocol Empty_Abcdefghijklmnopqrstu{};protocol Composed_Abcdefghijklmnopqrst{compose Empty_Abcdefghijklmnopqrstu;};protocol Populated_Abcdefghijklmnopqrs{compose Composed_Abcdefghijklmnopqr;OneWay_Abcdefghijklmnopqrst(struct{req1_abcdefghijklmnopqrstu bool;});TwoWay_Abcdefghijklmnopqrst(struct{req2_abcdefghijklmnopqrstu bool;})->(struct{res3_abcdefghijklmnopqrstu bool;});TwoWayError_Abcdefghijklmno(struct{req4_abcdefghijklm bool=false;req5_abcdefghijklmnopqr struct{inner1_abcdefghijklmno int8;};})->(struct{res6_abcdefghijklmnopqrstu bool;})error uint32;compose Empty_Abcdefghijklmnopqrstu;->Event_Abcdefghijklmnopqr(struct{res7_abcdefghijklmnopqrstu bool;});->EventError_Abcdefghijklm(struct{res8_abcdefghijklmnopqrs union{1:inner2_abcdefghijkl bool;};res9_abcdefghijklmnopqrstu bool;})error noop_abcdefghijklmnopqrstu;};)FIDL";
@@ -2718,12 +2409,11 @@ protocol Populated_Abcdefghijklmnopqrs {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Input is identical to ProtocolWithArgumentsFormatted, except that every token is on a newline.
-TEST(NewFormatterTests, ProtocolWithArgumentsMaximalNewlines) {
+TEST(FormatterTests, ProtocolWithArgumentsMaximalNewlines) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library
@@ -2892,12 +2582,11 @@ protocol Populated_Abcdefghijklmnopqrs {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // fxbug.dev/78688
-TEST(NewFormatterTests, ProtocolMethodBeforeCompose) {
+TEST(FormatterTests, ProtocolMethodBeforeCompose) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library example;
@@ -2924,11 +2613,10 @@ protocol MyProtocol {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, StructOverflow) {
+TEST(FormatterTests, StructOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -2970,11 +2658,10 @@ type MyPopulatedStruct_Abcdefg
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, StructUnformatted) {
+TEST(FormatterTests, StructUnformatted) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -3011,12 +2698,11 @@ type MyStruct_Abcdef = resource struct {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Test with comments, doc comments, and attributes added.
-TEST(NewFormatterTests, StructWithAllAnnotations) {
+TEST(FormatterTests, StructWithAllAnnotations) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -3075,13 +2761,12 @@ type MyPopulatedStruct_Abcdef = struct {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // This test's input is semantically identical to StructFormatted.  The only difference is that the
 // newlines and unnecessary spaces have been removed.
-TEST(NewFormatterTests, StructMinimalWhitespace) {
+TEST(FormatterTests, StructMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted =
       R"FIDL(library foo.bar;type MyEmptyStruct_Abcdefgh=struct{};type MyPopulatedStruct_Abcdef=struct{field1_abcdefghijklmnopqrstuvw bool;field2_abcdefghijklmno bool=false;field3_abcdefghijklmnopqrst struct{nested1_abcdef vector<uint8>:16;nested2_abcdef string="abcde";};};)FIDL";
@@ -3100,12 +2785,11 @@ type MyPopulatedStruct_Abcdef = struct {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Input is identical to StructFormatted, except that every token is on a newline.
-TEST(NewFormatterTests, StructMaximalNewlines) {
+TEST(FormatterTests, StructMaximalNewlines) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library
@@ -3169,29 +2853,12 @@ type MyPopulatedStruct_Abcdef = struct {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Ensure that an already properly formatted table declaration is not modified by another run
 // through the formatter.
-TEST(NewFormatterTests, TableFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library foo.bar;
-
-type MyEmptyTable_Abcdefghij = table {};
-
-type MyPopulatedTable_Abcdefgh = table {
-    1: field1_abcdefghijklmnopqrst bool;
-    2: reserved;
-
-    3: field3_abcdefghijklmnopqr table {
-        1: nested1_abc vector<uint8>:16;
-    };
-};
-)FIDL";
-
+TEST(FormatterTests, TableAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library foo.bar;
@@ -3208,11 +2875,10 @@ type MyPopulatedTable_Abcdefgh = table {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
-TEST(NewFormatterTests, TableOverflow) {
+TEST(FormatterTests, TableOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -3248,11 +2914,10 @@ type MyPopulatedTable_Abcdefghi
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, TableUnformatted) {
+TEST(FormatterTests, TableUnformatted) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -3287,13 +2952,12 @@ type MyPopulatedTable_Abcdefgh = table {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // This test is not technically valid FIDL (ordinals must be dense), but it does parse successfully,
 // which is sufficient for testing outdentation formatting.
-TEST(NewFormatterTests, TableOutdentation) {
+TEST(FormatterTests, TableOutdentation) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -3361,12 +3025,11 @@ type MyTable = table {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Test with comments, doc comments, and attributes added.
-TEST(NewFormatterTests, TableWithAllAnnotations) {
+TEST(FormatterTests, TableWithAllAnnotations) {
   // ---------------40---------------- |
   std::string unformatted =
       R"FIDL(
@@ -3424,13 +3087,12 @@ type MyPopulatedTable_Abcdefgh = table {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // This test's input is semantically identical to TableFormatted.  The only difference is that the
 // newlines and unnecessary spaces have been removed.
-TEST(NewFormatterTests, TableMinimalWhitespace) {
+TEST(FormatterTests, TableMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted =
       R"FIDL(library foo.bar;type MyEmptyTable_Abcdefghij=table{};type MyPopulatedTable_Abcdefgh=table{1:field1_abcdefghijklmnopqrst bool;2:reserved;3:field3_abcdefghijklmnopqr table{1:nested1_abc vector<uint8>:16;};};)FIDL";
@@ -3448,12 +3110,11 @@ type MyPopulatedTable_Abcdefgh = table {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Input is identical to TableFormatted, except that every token is on a newline.
-TEST(NewFormatterTests, TableMaximalNewlines) {
+TEST(FormatterTests, TableMaximalNewlines) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library
@@ -3520,27 +3181,12 @@ type MyPopulatedTable_Abcdefgh = table {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Ensure that an already properly formatted union declaration is not modified by another run
 // through the formatter.
-TEST(NewFormatterTests, UnionFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library foo.bar;
-
-type MyUnion_Abcdefghijklmnopq = union {
-    1: field1_abcdefghijklmnopqrst bool;
-    2: reserved;
-
-    3: field3_abcdefghijklmnopqr union {
-        1: nested1_abc vector<uint8>:16;
-    };
-};
-)FIDL";
-
+TEST(FormatterTests, UnionAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library foo.bar;
@@ -3555,11 +3201,10 @@ type MyUnion_Abcdefghijklmnopq = union {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
-TEST(NewFormatterTests, UnionOverflow) {
+TEST(FormatterTests, UnionOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -3592,11 +3237,10 @@ type MyUnion_Abcdefghijklmnopqr
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, UnionUnformatted) {
+TEST(FormatterTests, UnionUnformatted) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -3627,13 +3271,12 @@ type MyUnion_A = strict resource union {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // This test is not technically valid FIDL (ordinals must be dense), but it does parse successfully,
 // which is sufficient for testing outdentation formatting.
-TEST(NewFormatterTests, UnionOutdentation) {
+TEST(FormatterTests, UnionOutdentation) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -3702,12 +3345,11 @@ type MyUnion = flexible resource union {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Test with comments, doc comments, and attributes added.
-TEST(NewFormatterTests, UnionWithAllAnnotations) {
+TEST(FormatterTests, UnionWithAllAnnotations) {
   // ---------------40---------------- |
   std::string unformatted =
       R"FIDL(
@@ -3760,13 +3402,12 @@ type MyUnion_Abcdefgh = resource union {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // This test's input is semantically identical to UnionFormatted.  The only difference is that the
 // newlines and unnecessary spaces have been removed.
-TEST(NewFormatterTests, UnionMinimalWhitespace) {
+TEST(FormatterTests, UnionMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted =
       R"FIDL(library foo.bar;type MyUnion_Abcdefghijklmnopq=union{1:field1_abcdefghijklmnopqrst bool;2:reserved;3:field3_abcdefghijklmnopqr union{1:nested1_abc vector<uint8>:16;};};)FIDL";
@@ -3783,12 +3424,11 @@ type MyUnion_Abcdefghijklmnopq = union {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Input is identical to UnionFormatted, except that every token is on a newline.
-TEST(NewFormatterTests, UnionMaximalNewlines) {
+TEST(FormatterTests, UnionMaximalNewlines) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library
@@ -3845,20 +3485,12 @@ type MyUnion_Abcdefghijklmnopq = union {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Ensure that an already properly formatted using declaration is not modified by another run
 // through the formatter.
-TEST(NewFormatterTests, UsingFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library foo.bar;
-
-using imported.abcdefhijklmnopqrstubwxy;
-)FIDL";
-
+TEST(FormatterTests, UsingAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library foo.bar;
@@ -3866,11 +3498,10 @@ library foo.bar;
 using imported.abcdefhijklmnopqrstubwxy;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
-TEST(NewFormatterTests, UsingUnformatted) {
+TEST(FormatterTests, UsingUnformatted) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -3886,32 +3517,23 @@ library foo.bar;
 using imported.abcdefhijklmnopqrstubwxy;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Test that a using declaration with no alias does not get wrapped.
-TEST(NewFormatterTests, UsingOverflow) {
+TEST(FormatterTests, UsingOverflowNoop) {
   // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
+  std::string noop = R"FIDL(
 library foo.bar;
 
 using imported.abcdefhijklmnopqrstubwxyz;
 )FIDL";
 
-  // ---------------40---------------- |
-  std::string formatted = R"FIDL(
-library foo.bar;
-
-using imported.abcdefhijklmnopqrstubwxyz;
-)FIDL";
-
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(noop, noop);
 }
 
 // Test with comments, doc comments, and attributes added and spaced out.
-TEST(NewFormatterTests, UsingWithAllAnnotations) {
+TEST(FormatterTests, UsingWithAllAnnotations) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -3936,13 +3558,12 @@ library foo.bar;
 using imported.abcdefhijklmnopqrstubwxy;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // This test's input is semantically identical to UsingFormatted.  The only difference is that the
 // newlines and unnecessary spaces have been removed.
-TEST(NewFormatterTests, UsingMinimalWhitespace) {
+TEST(FormatterTests, UsingMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(library foo.bar;using imported.abcdefhijklmnopqrstubwxy;)FIDL";
 
@@ -3952,12 +3573,11 @@ library foo.bar;
 using imported.abcdefhijklmnopqrstubwxy;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Input is identical to UsingFormatted, except that every token is on a newline.
-TEST(NewFormatterTests, UsingMaximalNewlines) {
+TEST(FormatterTests, UsingMaximalNewlines) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -3976,20 +3596,12 @@ library foo.bar;
 using imported.abcdefhijklmnopqrstubwxy;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Ensure that an already properly formatted aliased using declaration is not modified by another
 // run through the formatter.
-TEST(NewFormatterTests, UsingWithAliasFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library foo.bar;
-
-using baz.qux as abcdefghijklmnopqrstuv;
-)FIDL";
-
+TEST(FormatterTests, UsingWithAliasAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library foo.bar;
@@ -3997,11 +3609,10 @@ library foo.bar;
 using baz.qux as abcdefghijklmnopqrstuv;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
-TEST(NewFormatterTests, UsingWithAliasUnformatted) {
+TEST(FormatterTests, UsingWithAliasUnformatted) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -4017,12 +3628,11 @@ library foo.bar;
 using baz.qux as abcdefghijklmnopqrstuv;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Test that the aliased using declaration is properly wrapped
-TEST(NewFormatterTests, UsingWithAliasOverflow) {
+TEST(FormatterTests, UsingWithAliasOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -4038,13 +3648,12 @@ using baz.qux
         as abcdefghijklmnopqrstuvw;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // This test's input is semantically identical to UsingWithAliasFormatted.  The only difference is
 // that the newlines and unnecessary spaces have been removed.
-TEST(NewFormatterTests, UsingWithAliasMinimalWhitespace) {
+TEST(FormatterTests, UsingWithAliasMinimalWhitespace) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(library foo.bar;using baz.qux as abcdefghijklmnopqrstuv;)FIDL";
 
@@ -4054,12 +3663,11 @@ library foo.bar;
 using baz.qux as abcdefghijklmnopqrstuv;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Input is identical to UsingWithAliasFormatted, except that every token is on a newline.
-TEST(NewFormatterTests, UsingWithAliasMaximalNewlines) {
+TEST(FormatterTests, UsingWithAliasMaximalNewlines) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -4080,12 +3688,11 @@ library foo.bar;
 using baz.qux as abcdefghijklmnopqrstuv;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // What happens when we have both an inline and standalone comment surrounding each token?
-TEST(NewFormatterTests, CommentsMaximal) {
+TEST(FormatterTests, CommentsMaximal) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 // 0
@@ -4158,55 +3765,36 @@ using // F
         ; // 11
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, CommentsNormal) {
+TEST(FormatterTests, CommentsNormalNoop) {
   // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
+  std::string noop = R"FIDL(
 // C1
 library foo.bar; // C2
 // C3
 using baz.qux; // C4
 )FIDL";
 
-  // ---------------40---------------- |
-  std::string formatted = R"FIDL(
-// C1
-library foo.bar; // C2
-// C3
-using baz.qux; // C4
-)FIDL";
-
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(noop, noop);
 }
 
 // Ensure that overlong comments are not wrapped.
-TEST(NewFormatterTests, CommentsOverflow) {
+TEST(FormatterTests, CommentsOverflowNoop) {
   // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
+  std::string noop = R"FIDL(
 // C1: This is my very very long comment.
 library foo.bar; // C2
 // C3: This is my very very long comment.
 using baz.qux; // C4
 )FIDL";
 
-  // ---------------40---------------- |
-  std::string formatted = R"FIDL(
-// C1: This is my very very long comment.
-library foo.bar; // C2
-// C3: This is my very very long comment.
-using baz.qux; // C4
-)FIDL";
-
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(noop, noop);
 }
 
 // Regression test for fxbug.dev/107841.
-TEST(NewFormatterTests, CommentsOnOverflow) {
+TEST(FormatterTests, CommentsBeforeStatementOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library example;
@@ -4224,11 +3812,10 @@ using dependency
         as import_abcdefghijklm;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, CommentsMultiline) {
+TEST(FormatterTests, CommentsMultiline) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 // C1a
@@ -4363,11 +3950,10 @@ service MyService { // C32
 }; // C35
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, CommentsWeird) {
+TEST(FormatterTests, CommentsWeird) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
    // C1
@@ -4450,14 +4036,13 @@ type // C8
 // C12
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // TODO(fxbug.dev/88107): This test currently behaves correctly per the specified line-wrapping
 // algorithm, but the output is unintuitive and unexpected. Once the referenced bug is fixed, this
 // test should result in the `unformatted` input being unmodified.
-TEST(NewFormatterTests, DISABLED_CommentsEmptyLayout) {
+TEST(FormatterTests, DISABLED_CommentsEmptyLayout) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -4476,11 +4061,10 @@ MyStruct = struct {
         };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, DocCommentsMultiline) {
+TEST(FormatterTests, DocCommentsMultiline) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 /// C1a
@@ -4611,11 +4195,10 @@ service MyService { // C32
 }; // C35
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, DocCommentsThenComments) {
+TEST(FormatterTests, DocCommentsThenComments) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 /// C1a
@@ -4746,11 +4329,10 @@ service MyService { // C32
 }; // C35
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, DocCommentsThenAttributes) {
+TEST(FormatterTests, DocCommentsThenAttributes) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 /// C1a
@@ -4881,11 +4463,10 @@ service MyService { // C32
 }; // C35
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, DocCommentsThenAttributesThenInlineComments) {
+TEST(FormatterTests, DocCommentsThenAttributesThenInlineComments) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 /// C1a
@@ -5016,11 +4597,10 @@ service MyService { // C32
 }; // C35
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, DocCommentsThenAttributesThenStandaloneComments) {
+TEST(FormatterTests, DocCommentsThenAttributesThenStandaloneComments) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 /// C1a
@@ -5181,11 +4761,10 @@ service MyService { // C32
 }; // C35
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, NewlinesAbsent) {
+TEST(FormatterTests, NewlinesAbsent) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(library foo.bar;
 // comment
@@ -5209,14 +4788,13 @@ alias MyAlias_Abcdefghijklmnopqr = bool;
 const MY_TRUE_ABCDEFGHIJKLM bool = true;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // For this test and the one below, new lines are generally expected to be retained.  An exception
 // is made for doc comment and attribute blocks, which must never have newlines between the
 // respective attributes, or between the last attribute and the declaration the block is describing.
-TEST(NewFormatterTests, NewlinesSingle) {
+TEST(FormatterTests, NewlinesSingle) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -5253,11 +4831,10 @@ alias MyAlias_Abcdefghijklmnopqr = bool;
 const MY_TRUE_ABCDEFGHIJKLM bool = true;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, NewlinesDouble) {
+TEST(FormatterTests, NewlinesDouble) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 
@@ -5307,11 +4884,10 @@ alias MyAlias_Abcdefghijklmnopqr = bool;
 const MY_TRUE_ABCDEFGHIJKLM bool = true;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, ListSpacing) {
+TEST(FormatterTests, ListSpacing) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -5330,12 +4906,11 @@ alias constrained_handle
         = zx.handle:<VMO, RIGHTS_BASIC>;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Regression test for fxbug.dev/82455.
-TEST(NewFormatterTests, DocCommentThenCommentThenChildComment) {
+TEST(FormatterTests, DocCommentThenCommentThenChildComment) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -5360,11 +4935,10 @@ type MyEnum = strict enum : uint16 {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, InlineAttribute) {
+TEST(FormatterTests, InlineAttribute) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -5389,21 +4963,10 @@ protocol Foo {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, VectorWithInlineAttribute) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library foo.bar;
-
-type MyTable = struct {
-    anon vector< @foo("bar") table {
-        1: inner bool;
-    }>:123;
-};
-)FIDL";
-
+TEST(FormatterTests, VectorWithInlineAttributeAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library foo.bar;
@@ -5415,7 +4978,35 @@ type MyTable = struct {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
+  ASSERT_FORMATTED(formatted, formatted);
+}
+
+TEST(FormatterTests, VectorWithInlineAttributeOverflow) {
+  // ---------------40---------------- |
+  std::string unformatted = R"FIDL(
+library foo.bar;
+
+type MyTable = struct {
+    anon_abcd vector< @foo("bar") table {
+        1: inner_abcdefghijklmnopqr bool;
+    }>:123;
+};
+)FIDL";
+
+  // ---------------40---------------- |
+  std::string formatted = R"FIDL(
+library foo.bar;
+
+type MyTable = struct {
+    anon_abcd
+            vector<@foo("bar") table {
+        1: inner_abcdefghijklmnopqr
+                bool;
+    }>:123;
+};
+)FIDL";
+
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Don't wrap if <8 chars have been used before the wrapping, as this will cause greater offsetting
@@ -5429,7 +5020,7 @@ type MyTable = struct {
 //             zx.handle:<VMO, RIGHT_A | RIGHT_B>;
 //
 // which looks and reads strictly worse.
-TEST(NewFormatterTests, NoPointlessWrapping) {
+TEST(FormatterTests, NoPointlessWrapping) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -5451,11 +5042,10 @@ type MyStruct = resource struct {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, ProtocolModifierDoesntWrap) {
+TEST(FormatterTests, ProtocolModifierDoesntWrap) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -5481,10 +5071,10 @@ ajar protocol FooBarBazQuixLongNameSomething {};
 closed protocol FooBarBazQuixLongNameSomething {};
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, ProtocolModifierDoesntPreventContentsWrapping) {
+TEST(FormatterTests, ProtocolModifierDoesntPreventContentsWrapping) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -5513,12 +5103,12 @@ closed protocol FooBarBazQuixLongNameSomething {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, MethodModifierDoesntWrap) {
+TEST(FormatterTests, MethodModifierDoesntWrapNoop) {
   // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
+  std::string noop = R"FIDL(
 library foo.bar;
 
 open protocol Test {
@@ -5529,22 +5119,10 @@ open protocol Test {
 };
 )FIDL";
 
-  // ---------------40---------------- |
-  std::string formatted = R"FIDL(
-library foo.bar;
-
-open protocol Test {
-    strict FooBarBazQuixLongNameSomething();
-    flexible BazFooQuixBarLongNameSomething();
-    strict LongNameSomethingFooBarBazQuix() -> ();
-    flexible LongNameSomethingBazFooQuixBar() -> ();
-};
-)FIDL";
-
-  ASSERT_STREQ(formatted, Format(unformatted));
+  ASSERT_FORMATTED(noop, noop);
 }
 
-TEST(NewFormatterTests, MethodModifierDoesntPreventContentsWrapping) {
+TEST(FormatterTests, MethodModifierDoesntPreventContentsWrapping) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -5587,10 +5165,10 @@ open protocol Test {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
-TEST(NewFormatterTests, MethodModifierDoesntPreventProtocolWrapping) {
+TEST(FormatterTests, MethodModifierDoesntPreventProtocolWrapping) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library foo.bar;
@@ -5612,25 +5190,11 @@ open protocol Test {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Regression test for fxbug.dev/90644.
-TEST(NewFormatterTests, AliasAnonymousLayoutInLayoutParameterFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library example;
-
-alias MyVec = vector<struct {
-    inner bool;
-}>;
-alias MyEmptyVec = vector<struct {}>;
-alias MyArr = array<struct {
-    inner bool;
-}, 1>;
-alias MyEmptyArr = array<struct {}, 1>;
-)FIDL";
-
+TEST(FormatterTests, AliasAnonymousLayoutInLayoutParameterAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library example;
@@ -5645,11 +5209,11 @@ alias MyArr = array<struct {
 alias MyEmptyArr = array<struct {}, 1>;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
 // Regression test for fxbug.dev/90644.
-TEST(NewFormatterTests, AliasAnonymousLayoutInLayoutParameterOverflow) {
+TEST(FormatterTests, AliasAnonymousLayoutInLayoutParameterOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library example;
@@ -5682,42 +5246,11 @@ alias MyEmptyArr_a
         = array<struct {}, 1>;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Regression test for fxbug.dev/90644.
-TEST(NewFormatterTests, LayoutMemberAnonymousLayoutInLayoutParameterFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library example;
-
-type MyStruct = struct {
-    box box<struct {
-        inner bool;
-    }>;
-};
-type MyTable = table {
-    1: vec vector<table {
-        1: inner bool;
-    }>;
-};
-type MyUnion = union {
-    1: arr array<flexible union {
-        1: inner bool;
-    }, 1>;
-};
-
-type MyEmptyStruct = struct {
-    box box<struct {}>;
-};
-type MyEmptyTable = table {
-    1: arr array<table {}, 1>;
-};
-type MyEmptyUnion = union {
-    1: vec vector<flexible union {}>;
-};
-)FIDL";
-
+TEST(FormatterTests, LayoutMemberAnonymousLayoutInLayoutParameterAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library example;
@@ -5749,11 +5282,11 @@ type MyEmptyUnion = union {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
 // Regression test for fxbug.dev/90644.
-TEST(NewFormatterTests, LayoutMemberAnonymousLayoutInLayoutParameterOverflow) {
+TEST(FormatterTests, LayoutMemberAnonymousLayoutInLayoutParameterOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library example;
@@ -5822,11 +5355,11 @@ type MyEmptyUnion = union {
 };
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Regression test for fxbug.dev/113349.
-TEST(NewFormatterTests, ConstraintOnInlineAnonymousLayoutNormal) {
+TEST(FormatterTests, ConstraintOnInlineAnonymousLayoutNormal) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library example;
@@ -5845,12 +5378,11 @@ type MyStruct = struct {
 }:optional;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Regression test for fxbug.dev/113349.
-TEST(NewFormatterTests, ConstraintOnInlineAnonymousLayoutOverflow) {
+TEST(FormatterTests, ConstraintOnInlineAnonymousLayoutOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library example;
@@ -5870,19 +5402,11 @@ type MyStruct = struct {
 }:optional;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 // Regression test for fxbug.dev/112547.
-TEST(NewFormatterTests, InlineCommentTrailingNewlineFormatted) {
-  // ---------------40---------------- |
-  std::string unformatted = R"FIDL(
-library example; // C1
-
-alias MyAlias = uint8;
-)FIDL";
-
+TEST(FormatterTests, InlineCommentTrailingNewlineAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
 library example; // C1
@@ -5890,12 +5414,11 @@ library example; // C1
 alias MyAlias = uint8;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(formatted, formatted);
 }
 
 // Regression test for fxbug.dev/112547.
-TEST(NewFormatterTests, InlineCommentTrailingNewlineOverflow) {
+TEST(FormatterTests, InlineCommentTrailingNewlineOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
 library example; // C1
@@ -5917,8 +5440,7 @@ alias MyAlias_abcdefghijklmnopq
 alias MyOtherAlias = uint8;
 )FIDL";
 
-  ASSERT_STREQ(formatted, Format(unformatted));
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+  ASSERT_FORMATTED(unformatted, formatted);
 }
 
 }  // namespace
