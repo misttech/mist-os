@@ -243,8 +243,10 @@ __EXPORT zx_status_t device_get_variable(zx_device_t* device, const char* name, 
     if (variable.is_error()) {
       return variable.status_value();
     }
-    *size_actual = variable->size();
-    if (out_size < *size_actual) {
+    if (size_actual) {
+      *size_actual = variable->size();
+    }
+    if (out_size < variable->size()) {
       return ZX_ERR_BUFFER_TOO_SMALL;
     }
     strcpy(out, variable->c_str());
