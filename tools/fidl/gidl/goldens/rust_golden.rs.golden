@@ -1320,7 +1320,7 @@ HandleDef{
 match value.v.basic_info() {
 	Ok(info) => {
 		assert_eq!(info.koid.raw_koid(), _handle_koids[0]);
-		
+		assert_eq!(info.object_type, fidl::ObjectType::EVENT);
 		assert_eq!(info.rights, Rights::from_bits(49155).unwrap());
 	},
 	Err(e) => panic!("handle basic_info failed: {}", e),
@@ -1350,7 +1350,7 @@ HandleDef{
 match value.v.basic_info() {
 	Ok(info) => {
 		assert_eq!(info.koid.raw_koid(), _handle_koids[0]);
-		
+		assert_eq!(info.object_type, fidl::ObjectType::EVENT);
 		assert_eq!(info.rights, Rights::from_bits(49155).unwrap());
 	},
 	Err(e) => panic!("handle basic_info failed: {}", e),
@@ -1376,16 +1376,7 @@ HandleDef{
 0,]);
     let value = &mut test_conformance::GoldenNullableHandleStruct::new_empty();
     Decoder::decode_with_context(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
-    
-match value.v.as_ref().unwrap().basic_info() {
-	Ok(info) => {
-		assert_eq!(info.koid.raw_koid(), _handle_koids[0]);
-		
-		
-	},
-	Err(e) => panic!("handle basic_info failed: {}", e),
-}
-
+    assert_eq!(value.v.as_ref().unwrap().basic_info().unwrap().koid.raw_koid(), _handle_koids[0]);
 
 }
 
@@ -1406,16 +1397,7 @@ HandleDef{
 0,]);
     let value = &mut test_conformance::GoldenNullableHandleStruct::new_empty();
     Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
-    
-match value.v.as_ref().unwrap().basic_info() {
-	Ok(info) => {
-		assert_eq!(info.koid.raw_koid(), _handle_koids[0]);
-		
-		
-	},
-	Err(e) => panic!("handle basic_info failed: {}", e),
-}
-
+    assert_eq!(value.v.as_ref().unwrap().basic_info().unwrap().koid.raw_koid(), _handle_koids[0]);
 
 }
 

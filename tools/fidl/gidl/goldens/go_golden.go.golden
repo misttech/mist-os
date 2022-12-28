@@ -1118,11 +1118,11 @@ func TestAllDecodeSuccessCases(t *testing.T) {
 					if f2.Koid != koidArray[0] {
 						t.Errorf("unexpectedly unequal: %s and %s", "f2.Koid", "koidArray[0]")
 					}
-					if !(f2.Type == 0 || 0 == zx.ObjTypeNone) {
-						t.Errorf("expected true but was false: %s", "f2.Type == 0 || 0 == zx.ObjTypeNone")
+					if !(f2.Type == 5) {
+						t.Errorf("expected true but was false: %s", "f2.Type == 5")
 					}
-					if !(f2.Rights == 49155 || 49155 == zx.RightSameRights) {
-						t.Errorf("expected true but was false: %s", "f2.Rights == 49155 || 49155 == zx.RightSameRights")
+					if !(f2.Rights == 49155) {
+						t.Errorf("expected true but was false: %s", "f2.Rights == 49155")
 					}
 				}
 
@@ -1174,12 +1174,6 @@ func TestAllDecodeSuccessCases(t *testing.T) {
 					}
 					if f3.Koid != koidArray[0] {
 						t.Errorf("unexpectedly unequal: %s and %s", "f3.Koid", "koidArray[0]")
-					}
-					if !(f3.Type == 0 || 0 == zx.ObjTypeNone) {
-						t.Errorf("expected true but was false: %s", "f3.Type == 0 || 0 == zx.ObjTypeNone")
-					}
-					if !(f3.Rights == 2147483648 || 2147483648 == zx.RightSameRights) {
-						t.Errorf("expected true but was false: %s", "f3.Rights == 2147483648 || 2147483648 == zx.RightSameRights")
 					}
 				}
 

@@ -662,7 +662,7 @@ decode_success("DecodeHandleHasExactTypeAndRights") {
         ],
     },
     value = EventWithDefaultRights{
-        h: restrict(#0, rights: event_default),
+        h: restrict(#0, type: event, rights: event_default),
     },
 }
 
@@ -702,7 +702,7 @@ decode_success("DecodeHandleHasExtraRights") {
         ],
     },
     value = EventWithReducedRights{
-        h: restrict(#0, rights: basic),
+        h: restrict(#0, type: event, rights: basic),
     },
 }
 
@@ -964,7 +964,7 @@ decode_success("DecodeArrayOfVectorOfEventInStructExtraRights") {
         ],
     },
     value = ArrayOfVectorOfEventInStructWithReducedRights{
-        h: [[restrict(#0, rights: basic)]],
+        h: [[restrict(#0, type: event, rights: basic)]],
     },
 }
 
@@ -1042,7 +1042,7 @@ decode_success("DecodeVectorOfArrayOfEventInStructExtraRights") {
         ],
     },
     value = VectorOfArrayOfEventInStructWithReducedRights{
-        h: [[restrict(#0, rights: basic)]],
+        h: [[restrict(#0, type: event, rights: basic)]],
     },
 }
 
@@ -1138,7 +1138,7 @@ decode_success("DecodeArrayOfVectorOfEventInTableExtraRights") {
     },
     value = ArrayOfVectorOfEventInTableWithReducedRightsStruct{
         t: ArrayOfVectorOfEventInTableWithReducedRights{
-            h: [[restrict(#0, rights: basic)]],
+            h: [[restrict(#0, type: event, rights: basic)]],
         },
     },
 }
@@ -1265,7 +1265,7 @@ decode_success("DecodeArrayOfVectorOfEventInUnionExtraRights") {
     },
     value = ArrayOfVectorOfEventInUnionWithReducedRightsStruct{
         u: ArrayOfVectorOfEventInUnionWithReducedRights{
-            h: [[restrict(#0, rights: basic)]],
+            h: [[restrict(#0, type: event, rights: basic)]],
         },
     },
 }

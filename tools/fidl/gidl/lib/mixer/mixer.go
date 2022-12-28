@@ -52,10 +52,10 @@ type context struct {
 	// Handle definitions in scope, used for HandleDecl conformance.
 	handleDefs []ir.HandleDef
 
-	// If true, handle types are ignored in conforms(). This allows us to
-	// express EncodeSuccess tests with incorrect handle types (which pass
-	// because bindings do not check handles during encoding).
-	ignoreWrongHandleType bool
+	// If true, handle subtypes and rights are ignored in conforms(). This
+	// allows us to express EncodeSuccess tests with incorrect handles (which
+	// pass because bindings do not check handles during encoding).
+	ignoreHandleSubtypeAndRights bool
 }
 
 type PrimitiveDeclaration interface {
@@ -288,8 +288,8 @@ func (decl *StringDecl) conforms(value ir.Value, _ context) error {
 
 type HandleDecl struct {
 	AlwaysInlinable
-	subtype fidlgen.HandleSubtype
-	// TODO(fxbug.dev/41920): Add a field for handle rights.
+	subtype  fidlgen.HandleSubtype
+	rights   fidlgen.HandleRights
 	nullable bool
 }
 
@@ -297,25 +297,47 @@ func (decl *HandleDecl) Subtype() fidlgen.HandleSubtype {
 	return decl.subtype
 }
 
+func (decl *HandleDecl) Rights() fidlgen.HandleRights {
+	return decl.rights
+}
+
 func (decl *HandleDecl) IsNullable() bool {
 	return decl.nullable
+}
+
+// Returns true if x contains all the rights in y, or if either one is same_rights.
+func containsRights(x, y fidlgen.HandleRights) bool {
+	return x == fidlgen.HandleRightsSameRights || y == fidlgen.HandleRightsSameRights || y&^x == 0
 }
 
 func (decl *HandleDecl) conforms(value ir.Value, ctx context) error {
 	switch value := value.(type) {
 	default:
 		return fmt.Errorf("expecting handle, found %T (%v)", value, value)
-	case ir.HandleWithRights:
-		if v := int(value.Handle); v < 0 || v >= len(ctx.handleDefs) {
-			return fmt.Errorf("handle #%d out of range", value.Handle)
+	case ir.AnyHandle:
+		handle := value.GetHandle()
+		if v := int(handle); v < 0 || v >= len(ctx.handleDefs) {
+			return fmt.Errorf("handle #%d out of range", handle)
 		}
-		if !ctx.ignoreWrongHandleType {
-			if decl.subtype == fidlgen.HandleSubtypeNone {
-				// The declaration is an untyped handle. Any subtype conforms.
-				return nil
+		if ctx.ignoreHandleSubtypeAndRights {
+			return nil
+		}
+		def := ctx.handleDefs[handle]
+		if decl.subtype != fidlgen.HandleSubtypeNone && def.Subtype != decl.subtype {
+			return fmt.Errorf("handle #%d subtype '%s' does not match FIDL schema subtype '%s'", value, def.Subtype, decl.subtype)
+		}
+		if !containsRights(def.Rights, decl.rights) {
+			return fmt.Errorf("handle #%d rights 0x%08x does not contain all FIDL schema rights 0x%08x", value, def.Rights, decl.rights)
+		}
+		if value, ok := value.(ir.RestrictedHandle); ok {
+			if value.Type != fidlgen.ObjectTypeFromHandleSubtype(def.Subtype) {
+				return fmt.Errorf("restrict(...) type %d does not match handle #%d subtype '%s'", value.Type, handle, def.Subtype)
 			}
-			if subtype := ctx.handleDefs[value.Handle].Subtype; subtype != decl.subtype {
-				return fmt.Errorf("expecting handle:%s, found handle:%s", decl.subtype, subtype)
+			if !containsRights(def.Rights, value.Rights) {
+				return fmt.Errorf("restrict(...) rights 0x%08x are not a subset of handle #%d rights 0x%08x", value.Rights, handle, def.Rights)
+			}
+			if decl.rights != fidlgen.HandleRightsSameRights && value.Rights != decl.rights {
+				return fmt.Errorf("restrict(...) rights 0x%08x do not match FIDL schema rights 0x%08x", value.Rights, decl.rights)
 			}
 		}
 		return nil
@@ -342,8 +364,13 @@ func (decl *ClientEndDecl) ProtocolName() string {
 }
 
 func (decl *ClientEndDecl) UnderlyingHandleDecl() *HandleDecl {
+	rights, ok := ir.HandleRightsByName("channel_default")
+	if !ok {
+		panic("channel_default rights not found")
+	}
 	return &HandleDecl{
 		subtype:  fidlgen.HandleSubtypeChannel,
+		rights:   rights,
 		nullable: decl.nullable,
 	}
 }
@@ -367,8 +394,13 @@ func (decl *ServerEndDecl) ProtocolName() string {
 }
 
 func (decl *ServerEndDecl) UnderlyingHandleDecl() *HandleDecl {
+	rights, ok := ir.HandleRightsByName("channel_default")
+	if !ok {
+		panic("channel_default rights not found")
+	}
 	return &HandleDecl{
 		subtype:  fidlgen.HandleSubtypeChannel,
+		rights:   rights,
 		nullable: decl.nullable,
 	}
 }
@@ -878,7 +910,7 @@ func (s Schema) ExtractDeclarationEncodeSuccess(value ir.Record, handleDefs []ir
 	if err != nil {
 		return nil, err
 	}
-	if err := decl.conforms(value, context{handleDefs: handleDefs, ignoreWrongHandleType: true}); err != nil {
+	if err := decl.conforms(value, context{handleDefs: handleDefs, ignoreHandleSubtypeAndRights: true}); err != nil {
 		return nil, fmt.Errorf("value %v failed to conform to declaration (type %T): %v", value, decl, err)
 	}
 	return decl, nil
@@ -1003,6 +1035,7 @@ func (s Schema) lookupDeclByType(typ fidlgen.Type) (Declaration, bool) {
 	case fidlgen.HandleType:
 		return &HandleDecl{
 			subtype:  typ.HandleSubtype,
+			rights:   typ.HandleRights,
 			nullable: typ.Nullable,
 		}, true
 	case fidlgen.PrimitiveType:

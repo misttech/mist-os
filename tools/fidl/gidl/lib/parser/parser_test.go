@@ -31,30 +31,13 @@ func TestParseValues(t *testing.T) {
 		{gidl: `"\""`, expectedValue: "\""},
 		{gidl: `true`, expectedValue: true},
 		{gidl: `null`, expectedValue: nil},
-		{gidl: `#0`, expectedValue: ir.HandleWithRights{
-			Handle: ir.Handle(0),
-			Type:   fidlgen.ObjectTypeNone,
-			Rights: fidlgen.HandleRightsSameRights,
-		},
-		},
-		{gidl: `#123`, expectedValue: ir.HandleWithRights{
+		{gidl: `#0`, expectedValue: ir.Handle(0)},
+		{gidl: `#123`, expectedValue: ir.Handle(123)},
+		{gidl: `restrict(#123, type: event, rights: read + write)`, expectedValue: ir.RestrictedHandle{
 			Handle: ir.Handle(123),
-			Type:   fidlgen.ObjectTypeNone,
-			Rights: fidlgen.HandleRightsSameRights,
-		},
-		},
-		{gidl: `restrict(#123)`, expectedValue: ir.HandleWithRights{
-			Handle: ir.Handle(123),
-			Type:   fidlgen.ObjectTypeNone,
-			Rights: fidlgen.HandleRightsSameRights,
-		},
-		},
-		{gidl: `restrict(#123, rights: read + write)`, expectedValue: ir.HandleWithRights{
-			Handle: ir.Handle(123),
-			Type:   fidlgen.ObjectTypeNone,
+			Type:   fidlgen.ObjectTypeEvent,
 			Rights: fidlgen.HandleRightsRead | fidlgen.HandleRightsWrite,
-		},
-		},
+		}},
 		{gidl: `SomeRecord {}`, expectedValue: ir.Record{
 			Name: "SomeRecord",
 		}},
@@ -146,7 +129,7 @@ func TestParseValues(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.gidl, func(t *testing.T) {
 			p := NewParser("", strings.NewReader(tc.gidl), Config{})
-			value, err := p.parseValue(rightsConfiguration{allowRights: true})
+			value, err := p.parseValue(scope{allowed: allowedFeatures{restrictFunction: true}})
 			checkMatch(t, value, tc.expectedValue, err)
 		})
 	}
@@ -162,13 +145,15 @@ func TestFailsParseValues(t *testing.T) {
 		{gidl: `"\xwrong"`, expectedErrorSubstr: "improperly escaped string"},
 		{gidl: `#-1`, expectedErrorSubstr: `want "<text>", got "-"`},
 		{gidl: `SomeRecord { 0x01020304: 5, }`, expectedErrorSubstr: "unexpected tokenKind"},
-		{gidl: `restrict(#123, type: channel, rights: read + write)`, expectedErrorSubstr: "unknown restrict label"},
+		{gidl: `restrict(#123, type: channel)`, expectedErrorSubstr: "missing restrict argument 'rights'"},
+		{gidl: `restrict(#123, rights: read)`, expectedErrorSubstr: "missing restrict argument 'type'"},
+		{gidl: `restrict(#123, type: channel, rights: read, foo: bar)`, expectedErrorSubstr: "unknown restrict argument: foo"},
 		{gidl: `[repeat(1):0]`, expectedErrorSubstr: "expected non-zero"},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.gidl, func(t *testing.T) {
 			p := NewParser("", strings.NewReader(tc.gidl), Config{})
-			_, err := p.parseValue(rightsConfiguration{allowRights: true})
+			_, err := p.parseValue(scope{allowed: allowedFeatures{restrictFunction: true}})
 			checkFailure(t, err, tc.expectedErrorSubstr)
 		})
 	}
@@ -180,12 +165,12 @@ func TestFailsParseValuesRightsDisabled(t *testing.T) {
 		expectedErrorSubstr string
 	}
 	testCases := []testCase{
-		{gidl: `restrict(#123, rights: read)`, expectedErrorSubstr: "rights are disabled for this section"},
+		{gidl: `restrict(#123, type: event, rights: read)`, expectedErrorSubstr: "the 'restrict' function is not allowed here"},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.gidl, func(t *testing.T) {
 			p := NewParser("", strings.NewReader(tc.gidl), Config{})
-			_, err := p.parseValue(rightsConfiguration{allowRights: false})
+			_, err := p.parseValue(scope{allowed: allowedFeatures{restrictFunction: false}})
 			checkFailure(t, err, tc.expectedErrorSubstr)
 		})
 	}
@@ -672,7 +657,7 @@ func TestParseHandleDefs(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		p := NewParser("", strings.NewReader(tc.gidl), Config{})
-		value, err := p.parseHandleDefSection(rightsConfiguration{allowRights: true})
+		value, err := p.parseHandleDefSection(scope{allowed: allowedFeatures{handleDefRights: true}})
 		t.Run(tc.gidl, func(t *testing.T) {
 			checkMatch(t, value, tc.expectedValue, err)
 		})
@@ -716,7 +701,7 @@ func TestParseHandleDefsFailures(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		p := NewParser("", strings.NewReader(tc.gidl), Config{})
-		_, err := p.parseHandleDefSection(rightsConfiguration{allowRights: true})
+		_, err := p.parseHandleDefSection(scope{allowed: allowedFeatures{handleDefRights: true}})
 		t.Run(tc.gidl, func(t *testing.T) {
 			if err == nil {
 				t.Fatalf("error was expected, but no error was returned")
@@ -741,7 +726,7 @@ func TestParseHandleDefsFailuresRightsDisabled(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		p := NewParser("", strings.NewReader(tc.gidl), Config{})
-		_, err := p.parseHandleDefSection(rightsConfiguration{allowRights: false})
+		_, err := p.parseHandleDefSection(scope{allowed: allowedFeatures{handleDefRights: false}})
 		t.Run(tc.gidl, func(t *testing.T) {
 			if err == nil {
 				t.Fatalf("error was expected, but no error was returned")
@@ -970,7 +955,7 @@ func TestParseDecodeSuccessCase(t *testing.T) {
 		value = OneStringOfMaxLengthFive {
 			first: "four",
 			handle0: #0,
-			handle1: restrict(#1, rights: basic + signal),
+			handle1: restrict(#1, type: channel, rights: basic + signal),
 		},
 	}`
 	all, err := parse(gidl)
@@ -994,19 +979,15 @@ func TestParseDecodeSuccessCase(t *testing.T) {
 						Key: ir.FieldKey{
 							Name: "handle0",
 						},
-						Value: ir.HandleWithRights{
-							Handle: ir.Handle(0),
-							Type:   fidlgen.ObjectTypeNone,
-							Rights: fidlgen.HandleRightsSameRights,
-						},
+						Value: ir.Handle(0),
 					},
 					{
 						Key: ir.FieldKey{
 							Name: "handle1",
 						},
-						Value: ir.HandleWithRights{
+						Value: ir.RestrictedHandle{
 							Handle: ir.Handle(1),
-							Type:   fidlgen.ObjectTypeNone,
+							Type:   fidlgen.ObjectTypeChannel,
 							Rights: fidlgen.HandleRightsBasic | fidlgen.HandleRightsSignal,
 						},
 					},
@@ -1381,12 +1362,8 @@ func TestParseSucceedsHandles(t *testing.T) {
 				Name: "HasHandles",
 				Fields: []ir.Field{
 					{
-						Key: ir.FieldKey{Name: "h"},
-						Value: ir.HandleWithRights{
-							Handle: ir.Handle(0),
-							Type:   fidlgen.ObjectTypeNone,
-							Rights: fidlgen.HandleRightsSameRights,
-						},
+						Key:   ir.FieldKey{Name: "h"},
+						Value: ir.Handle(0),
 					},
 				},
 			},
@@ -1396,7 +1373,6 @@ func TestParseSucceedsHandles(t *testing.T) {
 				HandleDispositions: []ir.HandleDisposition{
 					{
 						Handle: 0,
-						Type:   fidlgen.ObjectTypeNone,
 						Rights: fidlgen.HandleRightsSameRights,
 					},
 				},
@@ -1412,12 +1388,8 @@ func TestParseSucceedsHandles(t *testing.T) {
 				Name: "HasHandles",
 				Fields: []ir.Field{
 					{
-						Key: ir.FieldKey{Name: "h"},
-						Value: ir.HandleWithRights{
-							Handle: ir.Handle(0),
-							Type:   fidlgen.ObjectTypeNone,
-							Rights: fidlgen.HandleRightsSameRights,
-						},
+						Key:   ir.FieldKey{Name: "h"},
+						Value: ir.Handle(0),
 					},
 				},
 			},
@@ -1484,12 +1456,8 @@ func TestParseSucceedsHandlesDefsAfterHandles(t *testing.T) {
 				Name: "HasHandles",
 				Fields: []ir.Field{
 					{
-						Key: ir.FieldKey{Name: "h"},
-						Value: ir.HandleWithRights{
-							Handle: ir.Handle(0),
-							Type:   fidlgen.ObjectTypeNone,
-							Rights: fidlgen.HandleRightsSameRights,
-						},
+						Key:   ir.FieldKey{Name: "h"},
+						Value: ir.Handle(0),
 					},
 				},
 			},
@@ -1499,7 +1467,6 @@ func TestParseSucceedsHandlesDefsAfterHandles(t *testing.T) {
 				HandleDispositions: []ir.HandleDisposition{
 					{
 						Handle: 0,
-						Type:   fidlgen.ObjectTypeNone,
 						Rights: fidlgen.HandleRightsSameRights,
 					},
 				},
@@ -1515,12 +1482,8 @@ func TestParseSucceedsHandlesDefsAfterHandles(t *testing.T) {
 				Name: "HasHandles",
 				Fields: []ir.Field{
 					{
-						Key: ir.FieldKey{Name: "h"},
-						Value: ir.HandleWithRights{
-							Handle: ir.Handle(0),
-							Type:   fidlgen.ObjectTypeNone,
-							Rights: fidlgen.HandleRightsSameRights,
-						},
+						Key:   ir.FieldKey{Name: "h"},
+						Value: ir.Handle(0),
 					},
 				},
 			},

@@ -53,11 +53,11 @@ func primitiveTypeName(subtype fidlgen.PrimitiveSubtype) string {
 	}
 }
 
-func (b *unownedBuilder) adoptHandle(decl mixer.Declaration, value ir.HandleWithRights) string {
+func (b *unownedBuilder) adoptHandle(decl mixer.Declaration, value ir.Handle) string {
 	if b.handleRepr == HandleReprDisposition || b.handleRepr == HandleReprInfo {
-		return fmt.Sprintf("%s(handle_defs[%d].handle)", typeName(decl), value.Handle)
+		return fmt.Sprintf("%s(handle_defs[%d].handle)", typeName(decl), value)
 	}
-	return fmt.Sprintf("%s(handle_defs[%d])", typeName(decl), value.Handle)
+	return fmt.Sprintf("%s(handle_defs[%d])", typeName(decl), value)
 }
 
 func (b *unownedBuilder) visit(value ir.Value, decl mixer.Declaration) string {
@@ -94,7 +94,7 @@ func (b *unownedBuilder) visit(value ir.Value, decl mixer.Declaration) string {
 		}
 	case string:
 		return fmt.Sprintf("fidl::StringView(%s)", strconv.Quote(value))
-	case ir.HandleWithRights:
+	case ir.Handle:
 		switch decl := decl.(type) {
 		case *mixer.HandleDecl:
 			return b.adoptHandle(decl, value)

@@ -55,11 +55,11 @@ func (a *allocatorBuilder) construct(typename string, isPointer bool, fmtStr str
 	return fmt.Sprintf("fidl::ObjectView<%s>(%s, %s)", typename, a.allocatorVar, val)
 }
 
-func (a *allocatorBuilder) adoptHandle(decl mixer.Declaration, value ir.HandleWithRights) string {
+func (a *allocatorBuilder) adoptHandle(decl mixer.Declaration, value ir.Handle) string {
 	if a.handleRepr == HandleReprDisposition || a.handleRepr == HandleReprInfo {
-		return fmt.Sprintf("%s(handle_defs[%d].handle)", typeName(decl), value.Handle)
+		return fmt.Sprintf("%s(handle_defs[%d].handle)", typeName(decl), value)
 	}
-	return fmt.Sprintf("%s(handle_defs[%d])", typeName(decl), value.Handle)
+	return fmt.Sprintf("%s(handle_defs[%d])", typeName(decl), value)
 }
 
 func formatPrimitive(value ir.Value) string {
@@ -107,7 +107,7 @@ func (a *allocatorBuilder) visit(value ir.Value, decl mixer.Declaration) string 
 			return strconv.Quote(value)
 		}
 		return a.construct(typeNameIgnoreNullable(decl), isPointer, "%q", value)
-	case ir.HandleWithRights:
+	case ir.Handle:
 		switch decl := decl.(type) {
 		case *mixer.HandleDecl:
 			return a.adoptHandle(decl, value)

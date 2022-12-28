@@ -136,7 +136,7 @@ func (b *equalityCheckBuilder) visit(actualExpr string, expectedValue ir.Value, 
 		}
 		b.expectEquals(actualExpr, fmt.Sprintf("%q", expectedValue))
 		return
-	case ir.HandleWithRights:
+	case ir.AnyHandle:
 		switch decl := decl.(type) {
 		case *mixer.HandleDecl:
 			b.visitHandle(actualExpr, expectedValue, decl)
@@ -176,7 +176,7 @@ func (b *equalityCheckBuilder) visit(actualExpr string, expectedValue ir.Value, 
 	panic(fmt.Sprintf("not implemented: %T (decl: %T)", expectedValue, decl))
 }
 
-func (b *equalityCheckBuilder) visitHandle(actualExpr string, expectedValue ir.HandleWithRights, decl *mixer.HandleDecl) {
+func (b *equalityCheckBuilder) visitHandle(actualExpr string, expectedValue ir.AnyHandle, decl *mixer.HandleDecl) {
 	var handleVar string
 	if decl.Subtype() == fidlgen.HandleSubtypeNone {
 		handleVar = fmt.Sprintf("&%s", b.createAndAssignVar(actualExpr))
@@ -191,17 +191,19 @@ func (b *equalityCheckBuilder) visitHandle(actualExpr string, expectedValue ir.H
 		t.Fatal(err)
 	}
 `, infoVar, handleVar)
-	b.expectEquals(fmt.Sprintf("%s.Koid", infoVar), fmt.Sprintf("%s[%d]", b.koidArrayVar, expectedValue.Handle))
-	b.expectTrue(fmt.Sprintf("%[1]s.Type == %[2]d || %[2]d == zx.ObjTypeNone", infoVar, expectedValue.Type))
-	b.expectTrue(fmt.Sprintf("%[1]s.Rights == %[2]d || %[2]d == zx.RightSameRights", infoVar, expectedValue.Rights))
+	b.expectEquals(fmt.Sprintf("%s.Koid", infoVar), fmt.Sprintf("%s[%d]", b.koidArrayVar, expectedValue.GetHandle()))
+	if h, ok := expectedValue.(ir.RestrictedHandle); ok {
+		b.expectTrue(fmt.Sprintf("%s.Type == %d", infoVar, h.Type))
+		b.expectTrue(fmt.Sprintf("%s.Rights == %d", infoVar, h.Rights))
+	}
 	b.write("}\n")
 }
 
-func (b *equalityCheckBuilder) visitClientEnd(actualExpr string, expectedValue ir.HandleWithRights, decl *mixer.ClientEndDecl) {
+func (b *equalityCheckBuilder) visitClientEnd(actualExpr string, expectedValue ir.AnyHandle, decl *mixer.ClientEndDecl) {
 	b.visitHandle(actualExpr, expectedValue, decl.UnderlyingHandleDecl())
 }
 
-func (b *equalityCheckBuilder) visitServerEnd(actualExpr string, expectedValue ir.HandleWithRights, decl *mixer.ServerEndDecl) {
+func (b *equalityCheckBuilder) visitServerEnd(actualExpr string, expectedValue ir.AnyHandle, decl *mixer.ServerEndDecl) {
 	b.visitHandle(actualExpr, expectedValue, decl.UnderlyingHandleDecl())
 }
 

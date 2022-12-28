@@ -29,11 +29,7 @@ func canAssertEq(value ir.Value) bool {
 	switch value := value.(type) {
 	case nil, string, bool, int64, uint64, float64:
 		return true
-	case ir.RawFloat:
-		return false
-	case ir.HandleWithRights:
-		return false
-	case ir.UnknownData:
+	case ir.RawFloat, ir.AnyHandle, ir.UnknownData:
 		return false
 	case []ir.Value:
 		for _, elem := range value {
@@ -78,25 +74,19 @@ func (b *equalityCheckBuilder) visit(expr string, value ir.Value, decl mixer.Dec
 	switch value := value.(type) {
 	case ir.RawFloat:
 		b.write("assert_eq!(%s.to_bits(), 0x%x)", expr, value)
-	case ir.HandleWithRights:
-		assertType := ""
-		if value.Type != fidlgen.ObjectTypeNone {
-			assertType = fmt.Sprintf("assert_eq!(info.object_type, %d);", value.Type)
-		}
-		assertRights := ""
-		if value.Rights != fidlgen.HandleRightsSameRights {
-			assertRights = fmt.Sprintf("assert_eq!(info.rights, Rights::from_bits(%d).unwrap());", value.Rights)
-		}
+	case ir.Handle:
+		b.write("assert_eq!(%s.basic_info().unwrap().koid.raw_koid(), _handle_koids[%d]);", expr, value)
+	case ir.RestrictedHandle:
 		b.write(`
 match %s.basic_info() {
 	Ok(info) => {
 		assert_eq!(info.koid.raw_koid(), _handle_koids[%d]);
-		%s
-		%s
+		assert_eq!(info.object_type, %s);
+		assert_eq!(info.rights, Rights::from_bits(%d).unwrap());
 	},
 	Err(e) => panic!("handle basic_info failed: {}", e),
 }
-`, expr, value.Handle, assertType, assertRights)
+`, expr, value.Handle, objectTypeConst(value.Type), value.Rights)
 	case []ir.Value:
 		elemDecl := decl.(mixer.ListDeclaration).Elem()
 		for i, elem := range value {
@@ -120,8 +110,8 @@ match %s.basic_info() {
 					panic(fmt.Sprintf("union %s: unknown ordinal %d: Rust cannot construct union with unknown bytes/handles",
 						decl.Name(), field.Key.UnknownOrdinal))
 				}
-				// TODO(fxbug.dev/116269): Assert on field.Key.UnknownOrdinal.
 				b.write("assert!(%s.is_unknown());", expr)
+				b.write("assert_eq!(%s.ordinal(), %d);", expr, field.Key.UnknownOrdinal)
 			} else {
 				b.write(`
 	match &%s {
@@ -139,5 +129,18 @@ match %s.basic_info() {
 		}
 	default:
 		panic(fmt.Sprintf("unhandled value type: %T", value))
+	}
+}
+
+func objectTypeConst(objectType fidlgen.ObjectType) string {
+	switch objectType {
+	case fidlgen.ObjectTypeEvent:
+		return "fidl::ObjectType::EVENT"
+	case fidlgen.ObjectTypeChannel:
+		return "fidl::ObjectType::CHANNEL"
+	case fidlgen.ObjectTypeSocket:
+		return "fidl::ObjectType::SOCKET"
+	default:
+		panic(fmt.Sprintf("unsupported object type: %d", objectType))
 	}
 }

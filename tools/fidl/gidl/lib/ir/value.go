@@ -15,7 +15,8 @@ import (
 // - `uint64` for nonnegative integers (of any size), bits, and enums
 // - `float64` or `RawFloat` for floating point numbers (of any size)
 // - `bool` for booleans
-// - `Handle` or `HandleWithRights` for handles
+// - `Handle` for handles
+// - `RestrictedHandle` for handles with expected type and rights (decode_success only)
 // - `Record` for structs, tables, and unions
 // - `[]Value` for slices of values
 // - `nil` for null values (only allowed for nullable types)
@@ -30,12 +31,21 @@ type RawFloat uint64
 // A Handle is an index into the test's []HandleDef.
 type Handle int
 
-// A HandleWithRights is a Handle with rights information.
-type HandleWithRights struct {
+// A RestrictedHandle is a Handle along with its expected type and rights. It
+// only appears in decode_success tests.
+type RestrictedHandle struct {
 	Handle Handle
 	Type   fidlgen.ObjectType
 	Rights fidlgen.HandleRights
 }
+
+// AnyHandle is either Handle or RestrictedHandle.
+type AnyHandle interface {
+	GetHandle() Handle
+}
+
+func (h Handle) GetHandle() Handle           { return h }
+func (h RestrictedHandle) GetHandle() Handle { return h.Handle }
 
 // Record represents a value for a struct, table, or union type.
 type Record struct {

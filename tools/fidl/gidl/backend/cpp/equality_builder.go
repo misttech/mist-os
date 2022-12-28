@@ -112,7 +112,7 @@ func (b *equalityCheckBuilder) visit(actualExpr string, expectedValue ir.Value, 
 		}
 		b.assertStringEquals(dereferencedActual, escapeStr(expectedValue))
 		return
-	case ir.HandleWithRights:
+	case ir.AnyHandle:
 		switch decl := decl.(type) {
 		case *mixer.HandleDecl:
 			b.visitHandle(actualExpr, expectedValue, decl, ownedHandle)
@@ -168,7 +168,7 @@ const (
 	ownedHandle
 )
 
-func (b *equalityCheckBuilder) visitHandle(actualExpr string, expectedValue ir.HandleWithRights, decl *mixer.HandleDecl, ownership handleOwnership) {
+func (b *equalityCheckBuilder) visitHandle(actualExpr string, expectedValue ir.AnyHandle, decl *mixer.HandleDecl, ownership handleOwnership) {
 	actualVar := b.createAndAssignVar(actualExpr)
 	resultVar := b.varSeq.next()
 	var handleValueExpr string
@@ -178,24 +178,22 @@ func (b *equalityCheckBuilder) visitHandle(actualExpr string, expectedValue ir.H
 	case ownedHandle:
 		handleValueExpr = fmt.Sprintf("%s.get()", actualVar)
 	}
-	// Check:
-	// - Original handle's koid matches final handle (it could be replaced so can't check handle value).
-	// - Type matches expectation.
-	// - Rights matches expectation.
 	b.write(`
 	zx_info_handle_basic_t %[1]s_info;
 	ASSERT_OK(zx_object_get_info(%[2]s, ZX_INFO_HANDLE_BASIC, &%[1]s_info, sizeof(%[1]s_info), nullptr, nullptr));
 	ASSERT_EQ(%[1]s_info.koid, %[3]s[%[4]d]);
-	ASSERT_TRUE(%[1]s_info.type == %[5]d || %[5]d == ZX_OBJ_TYPE_NONE);
-	ASSERT_TRUE(%[1]s_info.rights == %[6]d || %[6]d == ZX_RIGHT_SAME_RIGHTS);
-  `, resultVar, handleValueExpr, b.handleKoidVectorName, expectedValue.Handle, expectedValue.Type, expectedValue.Rights)
+	`, resultVar, handleValueExpr, b.handleKoidVectorName, expectedValue.GetHandle())
+	if h, ok := expectedValue.(ir.RestrictedHandle); ok {
+		b.write("ASSERT_EQ(%s_info.type, %d);", resultVar, h.Type)
+		b.write("ASSERT_EQ(%s_info.rights, %d);", resultVar, h.Rights)
+	}
 }
 
-func (b *equalityCheckBuilder) visitClientEnd(actualExpr string, expectedValue ir.HandleWithRights, decl *mixer.ClientEndDecl) {
+func (b *equalityCheckBuilder) visitClientEnd(actualExpr string, expectedValue ir.AnyHandle, decl *mixer.ClientEndDecl) {
 	b.visitHandle(fmt.Sprintf("(%s).handle()", actualExpr), expectedValue, decl.UnderlyingHandleDecl(), unownedHandle)
 }
 
-func (b *equalityCheckBuilder) visitServerEnd(actualExpr string, expectedValue ir.HandleWithRights, decl *mixer.ServerEndDecl) {
+func (b *equalityCheckBuilder) visitServerEnd(actualExpr string, expectedValue ir.AnyHandle, decl *mixer.ServerEndDecl) {
 	b.visitHandle(fmt.Sprintf("(%s).handle()", actualExpr), expectedValue, decl.UnderlyingHandleDecl(), unownedHandle)
 }
 

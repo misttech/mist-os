@@ -62,11 +62,11 @@ func (b *builder) construct(typename string, isPointer bool, fmtStr string, args
 	return fmt.Sprintf("std::make_unique<%s>(%s)", typename, val)
 }
 
-func (b *builder) adoptHandle(decl mixer.Declaration, value ir.HandleWithRights) string {
+func (b *builder) adoptHandle(decl mixer.Declaration, value ir.Handle) string {
 	if b.handleRepr == handleReprDisposition || b.handleRepr == handleReprInfo {
-		return fmt.Sprintf("%s(handle_defs[%d].handle)", TypeName(decl), value.Handle)
+		return fmt.Sprintf("%s(handle_defs[%d].handle)", TypeName(decl), value)
 	}
-	return fmt.Sprintf("%s(handle_defs[%d])", TypeName(decl), value.Handle)
+	return fmt.Sprintf("%s(handle_defs[%d])", TypeName(decl), value)
 }
 
 func FormatPrimitive(value ir.Value) string {
@@ -109,7 +109,7 @@ func (a *builder) visit(value ir.Value, decl mixer.Declaration) string {
 		}
 	case string:
 		return a.construct(typeNameIgnoreNullable(decl), isPointer, "%q, %d", value, len(value))
-	case ir.HandleWithRights:
+	case ir.Handle:
 		switch decl := decl.(type) {
 		case *mixer.HandleDecl:
 			return a.adoptHandle(decl, value)

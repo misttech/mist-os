@@ -54,8 +54,8 @@ func (b *cppValueBuilder) newVar() string {
 	return fmt.Sprintf("v%d", b.varidx)
 }
 
-func (b *cppValueBuilder) adoptHandle(decl mixer.Declaration, value ir.HandleWithRights) string {
-	return fmt.Sprintf("%s(handle_defs[%d]%s)", typeName(decl), value.Handle, b.handleExtractOp)
+func (b *cppValueBuilder) adoptHandle(decl mixer.Declaration, value ir.Handle) string {
+	return fmt.Sprintf("%s(handle_defs[%d]%s)", typeName(decl), value, b.handleExtractOp)
 }
 
 func (b *cppValueBuilder) visit(value ir.Value, decl mixer.Declaration) string {
@@ -108,7 +108,7 @@ func (b *cppValueBuilder) visit(value ir.Value, decl mixer.Declaration) string {
 		}
 	case string:
 		return fmt.Sprintf("%s(%s, %d)", typeName(decl), escapeStr(value), len(value))
-	case ir.HandleWithRights:
+	case ir.Handle:
 		switch decl := decl.(type) {
 		case *mixer.HandleDecl:
 			return b.adoptHandle(decl, value)

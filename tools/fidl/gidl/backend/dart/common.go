@@ -85,8 +85,8 @@ func visit(value ir.Value, decl mixer.Declaration) string {
 		}
 	case string:
 		return toDartStr(value)
-	case ir.HandleWithRights:
-		rawHandle := buildHandleValue(value.Handle)
+	case ir.AnyHandle:
+		rawHandle := buildHandleValue(value.GetHandle())
 		handleDecl := decl.(*mixer.HandleDecl)
 		switch handleDecl.Subtype() {
 		case fidlgen.HandleSubtypeNone:

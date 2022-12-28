@@ -139,7 +139,7 @@ func (b *equalityCheckBuilder) visit(actualExpr fidlExpr, expectedValue ir.Value
 		}
 	case string:
 		return boolSprintf("(%[1]s.size() == %[3]d && memcmp(%[1]s.data(), %[2]q, %[3]d) == 0)", actualExpr, expectedValue, len(expectedValue))
-	case ir.HandleWithRights:
+	case ir.AnyHandle:
 		switch decl := decl.(type) {
 		case *mixer.HandleDecl:
 			return b.visitHandle(actualExpr, expectedValue, decl, ownedHandle)
@@ -183,7 +183,7 @@ const (
 	ownedHandle
 )
 
-func (b *equalityCheckBuilder) visitHandle(actualExpr fidlExpr, expectedValue ir.HandleWithRights, decl *mixer.HandleDecl, ownership handleOwnership) boolExpr {
+func (b *equalityCheckBuilder) visitHandle(actualExpr fidlExpr, expectedValue ir.AnyHandle, decl *mixer.HandleDecl, ownership handleOwnership) boolExpr {
 	actualVar := b.createAndAssignVar(actualExpr)
 	resultVar := b.varSeq.nextBoolVar()
 	var handleValueExpr string
@@ -200,18 +200,21 @@ func (b *equalityCheckBuilder) visitHandle(actualExpr fidlExpr, expectedValue ir
 	b.write(`
     zx_info_handle_basic_t %[1]s_info;
     ZX_ASSERT(ZX_OK == zx_object_get_info(%[2]s, ZX_INFO_HANDLE_BASIC, &%[1]s_info, sizeof(%[1]s_info), nullptr, nullptr));
-    bool %[1]s = %[1]s_info.koid == %[3]s[%[4]d] &&
-        (%[1]s_info.type == %[5]d || %[5]d == ZX_OBJ_TYPE_NONE) &&
-        (%[1]s_info.rights == %[6]d || %[6]d == ZX_RIGHT_SAME_RIGHTS);
-    `, resultVar, handleValueExpr, b.handleKoidVectorName, expectedValue.Handle, expectedValue.Type, expectedValue.Rights)
+    bool %[1]s = %[1]s_info.koid == %[3]s[%[4]d]
+	`, resultVar, handleValueExpr, b.handleKoidVectorName, expectedValue.GetHandle())
+	if expectedValue, ok := expectedValue.(ir.RestrictedHandle); ok {
+		b.write("&& %s_info.type == %d && %s_info.rights == %d",
+			resultVar, expectedValue.Type, resultVar, expectedValue.Rights)
+	}
+	b.write(";")
 	return resultVar
 }
 
-func (b *equalityCheckBuilder) visitClientEnd(actualExpr fidlExpr, expectedValue ir.HandleWithRights, decl *mixer.ClientEndDecl) boolExpr {
+func (b *equalityCheckBuilder) visitClientEnd(actualExpr fidlExpr, expectedValue ir.AnyHandle, decl *mixer.ClientEndDecl) boolExpr {
 	return b.visitHandle(fidlExpr(fmt.Sprintf("(%s).handle()", actualExpr)), expectedValue, decl.UnderlyingHandleDecl(), unownedHandle)
 }
 
-func (b *equalityCheckBuilder) visitServerEnd(actualExpr fidlExpr, expectedValue ir.HandleWithRights, decl *mixer.ServerEndDecl) boolExpr {
+func (b *equalityCheckBuilder) visitServerEnd(actualExpr fidlExpr, expectedValue ir.AnyHandle, decl *mixer.ServerEndDecl) boolExpr {
 	return b.visitHandle(fidlExpr(fmt.Sprintf("(%s).handle()", actualExpr)), expectedValue, decl.UnderlyingHandleDecl(), unownedHandle)
 }
 

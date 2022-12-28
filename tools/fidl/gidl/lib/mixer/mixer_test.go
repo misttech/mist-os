@@ -60,14 +60,6 @@ func checkStruct(t *testing.T, decl *StructDecl, expectedName string, expectedNu
 	}
 }
 
-func defaultMetadataForHandle(h ir.Handle) ir.HandleWithRights {
-	return ir.HandleWithRights{
-		Handle: h,
-		Type:   fidlgen.ObjectTypeNone,
-		Rights: fidlgen.HandleRightsSameRights,
-	}
-}
-
 func TestLookupDeclByNameNonNullable(t *testing.T) {
 	decl, ok := testSchema(t).lookupDeclByName("ExampleStruct", false)
 	if !ok {
@@ -158,11 +150,7 @@ func TestExtractDeclarationWrongHandleTypeFailure(t *testing.T) {
 					Name:           "channel",
 					UnknownOrdinal: 1,
 				},
-				Value: ir.HandleWithRights{
-					Handle: 0,
-					Type:   fidlgen.ObjectTypeChannel,
-					Rights: fidlgen.HandleRightsDuplicate,
-				},
+				Value: ir.Handle(0),
 			},
 		},
 	}
@@ -176,8 +164,9 @@ func TestExtractDeclarationWrongHandleTypeFailure(t *testing.T) {
 	if err == nil {
 		t.Fatalf("ExtractDeclaration unexpectedly succeeded: %#v", decl)
 	}
-	if !strings.Contains(err.Error(), "expecting handle:channel") {
-		t.Fatalf("expected err to contain 'failed to conform to declaration', got '%s'", err)
+	substring := "handle #0 subtype 'fifo' does not match FIDL schema subtype 'channel'"
+	if !strings.Contains(err.Error(), substring) {
+		t.Fatalf("expected err to contain '%s', got '%s'", substring, err)
 	}
 }
 
@@ -190,11 +179,7 @@ func TestExtractDeclarationEncodeSuccessWrongHandleTypeSuccess(t *testing.T) {
 					Name:           "channel",
 					UnknownOrdinal: 1,
 				},
-				Value: ir.HandleWithRights{
-					Handle: 0,
-					Type:   fidlgen.ObjectTypeChannel,
-					Rights: fidlgen.HandleRightsDuplicate,
-				},
+				Value: ir.Handle(0),
 			},
 		},
 	}
@@ -392,26 +377,30 @@ func TestHandleDeclConforms(t *testing.T) {
 	// Cannot refer to any handles if there are no handle_defs.
 	checkConforms(t,
 		context{},
-		&HandleDecl{subtype: fidlgen.HandleSubtypeEvent, nullable: false},
+		&HandleDecl{
+			subtype:  fidlgen.HandleSubtypeEvent,
+			rights:   fidlgen.HandleRightsSameRights,
+			nullable: false,
+		},
 		[]conformTest{
 			conformFail{
-				defaultMetadataForHandle(-1),
+				ir.Handle(-1),
 				"out of range",
 			},
 			conformFail{
-				defaultMetadataForHandle(0),
+				ir.Handle(0),
 				"out of range",
 			},
 			conformFail{
-				defaultMetadataForHandle(1),
+				ir.Handle(1),
 				"out of range",
 			},
 			conformFail{
-				defaultMetadataForHandle(2),
+				ir.Handle(2),
 				"out of range",
 			},
 			conformFail{
-				defaultMetadataForHandle(3),
+				ir.Handle(3),
 				"out of range",
 			},
 			conformFail{nil, "expecting non-null handle"},
@@ -419,32 +408,43 @@ func TestHandleDeclConforms(t *testing.T) {
 			conformFail{0, "expecting handle"},
 		},
 	)
-	// The FIDL type `handle` is compatible with all subtypes.
+	// The FIDL type `zx.handle` is compatible with all subtypes.
 	checkConforms(t,
 		context{
 			handleDefs: []ir.HandleDef{
-				{Subtype: fidlgen.HandleSubtypeEvent}, // #0
-				{Subtype: fidlgen.HandleSubtypePort},  // #1
-				{Subtype: fidlgen.HandleSubtypeEvent}, // #2
+				{Subtype: fidlgen.HandleSubtypeEvent, Rights: fidlgen.HandleRightsSameRights}, // #0
+				{Subtype: fidlgen.HandleSubtypePort, Rights: fidlgen.HandleRightsSameRights},  // #1
+				{Subtype: fidlgen.HandleSubtypeEvent, Rights: fidlgen.HandleRightsSameRights}, // #2
 			},
 		},
-		&HandleDecl{subtype: fidlgen.HandleSubtypeNone, nullable: false},
+		&HandleDecl{
+			subtype:  fidlgen.HandleSubtypeNone,
+			rights:   fidlgen.HandleRightsSameRights,
+			nullable: false,
+		},
 		[]conformTest{
 			conformOk{
-				defaultMetadataForHandle(0),
+				ir.Handle(0),
 			},
 			conformOk{
-				defaultMetadataForHandle(1),
+				ir.Handle(1),
 			},
 			conformOk{
-				defaultMetadataForHandle(2),
+				ir.Handle(2),
+			},
+			conformOk{
+				ir.RestrictedHandle{
+					Handle: ir.Handle(0),
+					Type:   fidlgen.ObjectTypeEvent,
+					Rights: fidlgen.HandleRightsBasic,
+				},
 			},
 			conformFail{
-				defaultMetadataForHandle(-1),
+				ir.Handle(-1),
 				"out of range",
 			},
 			conformFail{
-				defaultMetadataForHandle(3),
+				ir.Handle(3),
 				"out of range",
 			},
 			conformFail{nil, "expecting non-null handle"},
@@ -452,33 +452,45 @@ func TestHandleDeclConforms(t *testing.T) {
 			conformFail{0, "expecting handle"},
 		},
 	)
-	// The FIDL type `handle<event>` requires an event.
+	// The FIDL type `zx.handle:EVENT` requires an event.
 	checkConforms(t,
 		context{
 			handleDefs: []ir.HandleDef{
-				{Subtype: fidlgen.HandleSubtypeEvent}, // #0
-				{Subtype: fidlgen.HandleSubtypePort},  // #1
-				{Subtype: fidlgen.HandleSubtypeEvent}, // #2
+				{Subtype: fidlgen.HandleSubtypeEvent, Rights: fidlgen.HandleRightsSameRights}, // #0
+				{Subtype: fidlgen.HandleSubtypePort, Rights: fidlgen.HandleRightsSameRights},  // #1
+				{Subtype: fidlgen.HandleSubtypeEvent, Rights: fidlgen.HandleRightsSameRights}, // #2
 			},
 		},
-		&HandleDecl{subtype: fidlgen.HandleSubtypeEvent, nullable: false},
+		&HandleDecl{
+			subtype:  fidlgen.HandleSubtypeEvent,
+			rights:   fidlgen.HandleRightsSameRights,
+			nullable: false,
+		},
 		[]conformTest{
 			conformOk{
-				defaultMetadataForHandle(0),
+				ir.Handle(0),
 			},
 			conformOk{
-				defaultMetadataForHandle(2),
+				ir.Handle(2),
 			},
 			conformFail{
-				defaultMetadataForHandle(1),
-				"expecting handle:event",
+				ir.Handle(1),
+				"handle #1 subtype 'port' does not match FIDL schema subtype 'event'",
 			},
 			conformFail{
-				defaultMetadataForHandle(-1),
+				ir.RestrictedHandle{
+					Handle: ir.Handle(0),
+					Type:   fidlgen.ObjectTypePort,
+					Rights: fidlgen.HandleRightsBasic,
+				},
+				"restrict(...) type 6 does not match handle #0 subtype 'event'",
+			},
+			conformFail{
+				ir.Handle(-1),
 				"out of range",
 			},
 			conformFail{
-				defaultMetadataForHandle(3),
+				ir.Handle(3),
 				"out of range",
 			},
 			conformFail{nil, "expecting non-null handle"},
@@ -486,38 +498,110 @@ func TestHandleDeclConforms(t *testing.T) {
 			conformFail{0, "expecting handle"},
 		},
 	)
-	// The FIDL type `handle<port>?` requires an event or nil.
+	// The FIDL type `zx.handle:<PORT, optional>` requires a port or nil.
 	checkConforms(t,
 		context{
 			handleDefs: []ir.HandleDef{
-				{Subtype: fidlgen.HandleSubtypeEvent}, // #0
-				{Subtype: fidlgen.HandleSubtypePort},  // #1
-				{Subtype: fidlgen.HandleSubtypeEvent}, // #2
+				{Subtype: fidlgen.HandleSubtypeEvent, Rights: fidlgen.HandleRightsSameRights}, // #0
+				{Subtype: fidlgen.HandleSubtypePort, Rights: fidlgen.HandleRightsSameRights},  // #1
+				{Subtype: fidlgen.HandleSubtypeEvent, Rights: fidlgen.HandleRightsSameRights}, // #2
 			},
 		},
-		&HandleDecl{subtype: fidlgen.HandleSubtypePort, nullable: true},
+		&HandleDecl{
+			subtype:  fidlgen.HandleSubtypePort,
+			rights:   fidlgen.HandleRightsSameRights,
+			nullable: true,
+		},
 		[]conformTest{
 			conformOk{
-				defaultMetadataForHandle(1),
+				ir.Handle(1),
 			},
 			conformOk{nil},
 			conformFail{
-				defaultMetadataForHandle(0),
-				"expecting handle:port",
+				ir.Handle(0),
+				"handle #0 subtype 'event' does not match FIDL schema subtype 'port'",
 			},
 			conformFail{
-				defaultMetadataForHandle(2),
-				"expecting handle:port",
+				ir.Handle(2),
+				"handle #2 subtype 'event' does not match FIDL schema subtype 'port'",
 			},
 			conformFail{
-				defaultMetadataForHandle(-1),
+				ir.Handle(-1),
 				"out of range",
 			},
 			conformFail{
-				defaultMetadataForHandle(3),
+				ir.Handle(3),
 				"out of range",
 			},
 			conformFail{0, "expecting handle"},
+		},
+	)
+	// The FIDL type `zx.handle<CHANNEL, zx.rights.READ | zx.rights.WRITE>`
+	// requires a channel with the appropriate rights.
+	checkConforms(t,
+		context{
+			handleDefs: []ir.HandleDef{
+				{ // #0
+					Subtype: fidlgen.HandleSubtypeChannel,
+					Rights:  fidlgen.HandleRightsSameRights,
+				},
+				{ // #1
+					Subtype: fidlgen.HandleSubtypeChannel,
+					Rights:  fidlgen.HandleRightsRead,
+				},
+				{ // #2
+					Subtype: fidlgen.HandleSubtypeChannel,
+					Rights:  fidlgen.HandleRightsRead | fidlgen.HandleRightsWrite,
+				},
+				{ // #3
+					Subtype: fidlgen.HandleSubtypeChannel,
+					Rights:  fidlgen.HandleRightsRead | fidlgen.HandleRightsWrite | fidlgen.HandleRightsInspect,
+				},
+			},
+		},
+		&HandleDecl{
+			subtype:  fidlgen.HandleSubtypeChannel,
+			rights:   fidlgen.HandleRightsRead | fidlgen.HandleRightsWrite,
+			nullable: true,
+		},
+		[]conformTest{
+			conformOk{ir.Handle(0)},
+			conformOk{ir.Handle(2)},
+			conformOk{ir.Handle(3)},
+			conformOk{
+				ir.RestrictedHandle{
+					Handle: ir.Handle(0),
+					Type:   fidlgen.ObjectTypeChannel,
+					Rights: fidlgen.HandleRightsRead | fidlgen.HandleRightsWrite,
+				},
+			},
+			conformOk{
+				ir.RestrictedHandle{
+					Handle: ir.Handle(3),
+					Type:   fidlgen.ObjectTypeChannel,
+					Rights: fidlgen.HandleRightsRead | fidlgen.HandleRightsWrite,
+				},
+			},
+			conformFail{
+				ir.Handle(1),
+				"handle #1 rights 0x00000004 does not contain all FIDL schema rights 0x0000000c",
+			},
+			conformFail{
+				ir.RestrictedHandle{
+					Handle: ir.Handle(2),
+					Type:   fidlgen.ObjectTypeChannel,
+					Rights: fidlgen.HandleRightsRead | fidlgen.HandleRightsWrite | fidlgen.HandleRightsInspect,
+				},
+				"restrict(...) rights 0x0000800c are not a subset of handle #2 rights 0x0000000c",
+			},
+			conformFail{
+				ir.RestrictedHandle{
+					Handle: ir.Handle(3),
+					Type:   fidlgen.ObjectTypeChannel,
+					Rights: fidlgen.HandleRightsRead | fidlgen.HandleRightsWrite | fidlgen.HandleRightsInspect,
+				},
+				"restrict(...) rights 0x0000800c do not match FIDL schema rights 0x0000000c",
+			},
 		},
 	)
 }
@@ -531,10 +615,10 @@ func TestProtocolEndpointConforms(t *testing.T) {
 	checkConforms(t,
 		context{
 			handleDefs: []ir.HandleDef{
-				{Subtype: fidlgen.HandleSubtypeChannel}, // #0
-				{Subtype: fidlgen.HandleSubtypeChannel}, // #1
-				{Subtype: fidlgen.HandleSubtypeChannel}, // #2
-				{Subtype: fidlgen.HandleSubtypeChannel}, // #3
+				{Subtype: fidlgen.HandleSubtypeChannel, Rights: fidlgen.HandleRightsSameRights}, // #0
+				{Subtype: fidlgen.HandleSubtypeChannel, Rights: fidlgen.HandleRightsSameRights}, // #1
+				{Subtype: fidlgen.HandleSubtypeChannel, Rights: fidlgen.HandleRightsSameRights}, // #2
+				{Subtype: fidlgen.HandleSubtypeChannel, Rights: fidlgen.HandleRightsSameRights}, // #3
 			},
 		},
 		structDecl,
@@ -546,25 +630,25 @@ func TestProtocolEndpointConforms(t *testing.T) {
 						Key: ir.FieldKey{
 							Name: "client_end",
 						},
-						Value: defaultMetadataForHandle(0),
+						Value: ir.Handle(0),
 					},
 					{
 						Key: ir.FieldKey{
 							Name: "optional_client_end",
 						},
-						Value: defaultMetadataForHandle(1),
+						Value: ir.Handle(1),
 					},
 					{
 						Key: ir.FieldKey{
 							Name: "server_end",
 						},
-						Value: defaultMetadataForHandle(2),
+						Value: ir.Handle(2),
 					},
 					{
 						Key: ir.FieldKey{
 							Name: "optional_server_end",
 						},
-						Value: defaultMetadataForHandle(3),
+						Value: ir.Handle(3),
 					},
 				},
 			}},
@@ -575,13 +659,13 @@ func TestProtocolEndpointConforms(t *testing.T) {
 						Key: ir.FieldKey{
 							Name: "client_end",
 						},
-						Value: defaultMetadataForHandle(0),
+						Value: ir.Handle(0),
 					},
 					{
 						Key: ir.FieldKey{
 							Name: "server_end",
 						},
-						Value: defaultMetadataForHandle(2),
+						Value: ir.Handle(2),
 					},
 				},
 			}},
@@ -593,7 +677,7 @@ func TestProtocolEndpointConforms(t *testing.T) {
 							Key: ir.FieldKey{
 								Name: "client_end",
 							},
-							Value: defaultMetadataForHandle(0),
+							Value: ir.Handle(0),
 						},
 					},
 				}, "missing non-nullable field server_end",
@@ -603,10 +687,10 @@ func TestProtocolEndpointConforms(t *testing.T) {
 	checkConforms(t,
 		context{
 			handleDefs: []ir.HandleDef{
-				{Subtype: fidlgen.HandleSubtypeChannel}, // #0
-				{Subtype: fidlgen.HandleSubtypeChannel}, // #1
-				{Subtype: fidlgen.HandleSubtypeEvent},   // #2
-				{Subtype: fidlgen.HandleSubtypeChannel}, // #3
+				{Subtype: fidlgen.HandleSubtypeChannel, Rights: fidlgen.HandleRightsSameRights}, // #0
+				{Subtype: fidlgen.HandleSubtypeChannel, Rights: fidlgen.HandleRightsSameRights}, // #1
+				{Subtype: fidlgen.HandleSubtypeEvent, Rights: fidlgen.HandleRightsSameRights},   // #2
+				{Subtype: fidlgen.HandleSubtypeChannel, Rights: fidlgen.HandleRightsSameRights}, // #3
 			},
 		},
 		structDecl,
@@ -618,16 +702,16 @@ func TestProtocolEndpointConforms(t *testing.T) {
 						Key: ir.FieldKey{
 							Name: "client_end",
 						},
-						Value: defaultMetadataForHandle(0),
+						Value: ir.Handle(0),
 					},
 					{
 						Key: ir.FieldKey{
 							Name: "server_end",
 						},
-						Value: defaultMetadataForHandle(2),
+						Value: ir.Handle(2),
 					},
 				},
-			}, "expecting handle:channel, found handle:event"},
+			}, "handle #2 subtype 'event' does not match FIDL schema subtype 'channel'"},
 		},
 	)
 }
@@ -1024,8 +1108,8 @@ func TestVectorDeclConformsWithHandles(t *testing.T) {
 	checkConforms(t,
 		context{
 			handleDefs: []ir.HandleDef{
-				{Subtype: fidlgen.HandleSubtypeEvent},
-				{Subtype: fidlgen.HandleSubtypeEvent},
+				{Subtype: fidlgen.HandleSubtypeEvent, Rights: fidlgen.HandleRightsSameRights},
+				{Subtype: fidlgen.HandleSubtypeEvent, Rights: fidlgen.HandleRightsSameRights},
 			},
 		},
 		&VectorDecl{
@@ -1040,20 +1124,20 @@ func TestVectorDeclConformsWithHandles(t *testing.T) {
 		},
 		[]conformTest{
 			conformOk{[]ir.Value{}},
-			conformOk{[]ir.Value{defaultMetadataForHandle(0)}},
+			conformOk{[]ir.Value{ir.Handle(0)}},
 			conformOk{[]ir.Value{
-				defaultMetadataForHandle(0),
-				defaultMetadataForHandle(1),
+				ir.Handle(0),
+				ir.Handle(1),
 			}},
 			conformOk{[]ir.Value{
-				defaultMetadataForHandle(1),
-				defaultMetadataForHandle(0),
+				ir.Handle(1),
+				ir.Handle(0),
 			}},
 			// The parser is responsible for ensuring handles are used exactly
 			// once, not the mixer, so this passes.
 			conformOk{[]ir.Value{
-				defaultMetadataForHandle(0),
-				defaultMetadataForHandle(0),
+				ir.Handle(0),
+				ir.Handle(0),
 			}},
 			conformFail{[]ir.Value{uint64(0)}, "[0]: expecting handle"},
 			conformFail{[]ir.Value{nil}, "[0]: expecting non-null handle"},

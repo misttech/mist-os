@@ -96,7 +96,7 @@ func isSupported(decl mixer.Declaration) bool {
 		*mixer.TableDecl, *mixer.UnionDecl, *mixer.VectorDecl:
 		return false
 	default:
-		panic(fmt.Sprint("unrecognized type %s", decl))
+		panic(fmt.Sprintf("unrecognized type %s", decl))
 	}
 }
 

@@ -180,8 +180,8 @@ func visit(value ir.Value, decl mixer.Declaration) string {
 			return fmt.Sprintf("&[]string{%q}[0]", value)
 		}
 		return strconv.Quote(value)
-	case ir.HandleWithRights:
-		rawHandle := fmt.Sprintf("handles[%d]", value.Handle)
+	case ir.Handle:
+		rawHandle := fmt.Sprintf("handles[%d]", value)
 		switch decl := decl.(type) {
 		case *mixer.ClientEndDecl:
 			return fmt.Sprintf("%s{Channel: zx.Channel(%s)}", endpointDeclName(decl), rawHandle)

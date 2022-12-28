@@ -870,10 +870,8 @@ handle_defs[0],};
 
     zx_info_handle_basic_t b3_info;
     ZX_ASSERT(ZX_OK == zx_object_get_info(f2.get(), ZX_INFO_HANDLE_BASIC, &b3_info, sizeof(b3_info), nullptr, nullptr));
-    bool b3 = b3_info.koid == handle_koids[0] &&
-        (b3_info.type == 0 || 0 == ZX_OBJ_TYPE_NONE) &&
-        (b3_info.rights == 49155 || 49155 == ZX_RIGHT_SAME_RIGHTS);
-    
+    bool b3 = b3_info.koid == handle_koids[0]
+	&& b3_info.type == 5 && b3_info.rights == 49155;
     return (b3);
   };
   EXPECT_TRUE(llcpp_conformance_utils::DecodeSuccess<test_conformance::wire::GoldenHandleBasicRightsStruct>(
@@ -912,10 +910,8 @@ handle_defs[0],};
 
     zx_info_handle_basic_t b3_info;
     ZX_ASSERT(ZX_OK == zx_object_get_info(f2.get(), ZX_INFO_HANDLE_BASIC, &b3_info, sizeof(b3_info), nullptr, nullptr));
-    bool b3 = b3_info.koid == handle_koids[0] &&
-        (b3_info.type == 0 || 0 == ZX_OBJ_TYPE_NONE) &&
-        (b3_info.rights == 2147483648 || 2147483648 == ZX_RIGHT_SAME_RIGHTS);
-    
+    bool b3 = b3_info.koid == handle_koids[0]
+	;
     return (b3);
   };
   EXPECT_TRUE(llcpp_conformance_utils::DecodeSuccess<test_conformance::wire::GoldenNullableHandleStruct>(

@@ -101,7 +101,7 @@ func (b *equalityCheckBuilder) visit(actualExpr string, expectedValue ir.Value, 
 		}
 		b.assertStringEquals(dereferencedActual, escapeStr(expectedValue))
 		return
-	case ir.HandleWithRights:
+	case ir.AnyHandle:
 		switch decl := decl.(type) {
 		case *mixer.HandleDecl:
 			b.visitHandle(actualExpr, expectedValue, decl)
@@ -150,7 +150,7 @@ func (b *equalityCheckBuilder) visit(actualExpr string, expectedValue ir.Value, 
 	panic(fmt.Sprintf("not implemented: %T (decl: %T)", expectedValue, decl))
 }
 
-func (b *equalityCheckBuilder) visitHandle(actualExpr string, expectedValue ir.HandleWithRights, decl *mixer.HandleDecl) {
+func (b *equalityCheckBuilder) visitHandle(actualExpr string, expectedValue ir.AnyHandle, decl *mixer.HandleDecl) {
 	actualVar := b.createAndAssignVar(actualExpr)
 	resultVar := b.varSeq.next()
 	// Check:
@@ -161,16 +161,18 @@ func (b *equalityCheckBuilder) visitHandle(actualExpr string, expectedValue ir.H
 	zx_info_handle_basic_t %[1]s_info;
 	ASSERT_OK(zx_object_get_info(%[2]s.get(), ZX_INFO_HANDLE_BASIC, &%[1]s_info, sizeof(%[1]s_info), nullptr, nullptr));
 	ASSERT_EQ(%[1]s_info.koid, %[3]s[%[4]d]);
-	ASSERT_TRUE(%[1]s_info.type == %[5]d || %[5]d == ZX_OBJ_TYPE_NONE);
-	ASSERT_TRUE(%[1]s_info.rights == %[6]d || %[6]d == ZX_RIGHT_SAME_RIGHTS);
-  `, resultVar, actualVar, b.handleKoidVectorName, expectedValue.Handle, expectedValue.Type, expectedValue.Rights)
+	`, resultVar, actualVar, b.handleKoidVectorName, expectedValue.GetHandle())
+	if expectedValue, ok := expectedValue.(ir.RestrictedHandle); ok {
+		b.write("ASSERT_EQ(%s_info.type, %d);\n", resultVar, expectedValue.Type)
+		b.write("ASSERT_EQ(%s_info.rights, %d);\n", resultVar, expectedValue.Rights)
+	}
 }
 
-func (b *equalityCheckBuilder) visitInterfaceHandle(actualExpr string, expectedValue ir.HandleWithRights, decl *mixer.ClientEndDecl) {
+func (b *equalityCheckBuilder) visitInterfaceHandle(actualExpr string, expectedValue ir.AnyHandle, decl *mixer.ClientEndDecl) {
 	b.visitHandle(fmt.Sprintf("(%s).channel()", actualExpr), expectedValue, decl.UnderlyingHandleDecl())
 }
 
-func (b *equalityCheckBuilder) visitInterfaceRequest(actualExpr string, expectedValue ir.HandleWithRights, decl *mixer.ServerEndDecl) {
+func (b *equalityCheckBuilder) visitInterfaceRequest(actualExpr string, expectedValue ir.AnyHandle, decl *mixer.ServerEndDecl) {
 	b.visitHandle(fmt.Sprintf("(%s).channel()", actualExpr), expectedValue, decl.UnderlyingHandleDecl())
 }
 

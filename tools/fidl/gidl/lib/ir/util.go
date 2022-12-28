@@ -128,8 +128,8 @@ func GetUnusedHandles(value Value, handles []Handle) []Handle {
 
 func populateUsedHandles(value Value, seen map[Handle]struct{}) {
 	switch value := value.(type) {
-	case Handle:
-		seen[value] = struct{}{}
+	case AnyHandle:
+		seen[value.GetHandle()] = struct{}{}
 	case Record:
 		for _, field := range value.Fields {
 			populateUsedHandles(field.Value, seen)

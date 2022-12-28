@@ -349,7 +349,7 @@ decode_success("GoldenHandleBasicRightsStruct") {
         ],
     },
     value = GoldenHandleBasicRightsStruct{
-        v: restrict(#0, rights: basic),
+        v: restrict(#0, type: event, rights: basic),
     },
 }
 

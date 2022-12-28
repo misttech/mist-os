@@ -126,8 +126,8 @@ func visit(value ir.Value, decl mixer.Declaration) string {
 			expr = fmt.Sprintf("std::str::from_utf8(b\"%s\").unwrap().to_string()", rust.EscapeStr(value))
 		}
 		return wrapNullable(decl, expr)
-	case ir.HandleWithRights:
-		expr := buildHandleValue(value.Handle)
+	case ir.Handle:
+		expr := buildHandleValue(value)
 		return wrapNullable(decl, expr)
 	case ir.Record:
 		switch decl := decl.(type) {

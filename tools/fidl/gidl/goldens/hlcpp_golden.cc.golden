@@ -858,9 +858,9 @@ handle_defs[0],};
 	zx_info_handle_basic_t f3_info;
 	ASSERT_OK(zx_object_get_info(f2.get(), ZX_INFO_HANDLE_BASIC, &f3_info, sizeof(f3_info), nullptr, nullptr));
 	ASSERT_EQ(f3_info.koid, handle_koids[0]);
-	ASSERT_TRUE(f3_info.type == 0 || 0 == ZX_OBJ_TYPE_NONE);
-	ASSERT_TRUE(f3_info.rights == 49155 || 49155 == ZX_RIGHT_SAME_RIGHTS);
-  
+	ASSERT_EQ(f3_info.type, 5);
+ASSERT_EQ(f3_info.rights, 49155);
+
 }
 #endif  // __Fuchsia__
 
@@ -897,9 +897,7 @@ handle_defs[0],};
 	zx_info_handle_basic_t f3_info;
 	ASSERT_OK(zx_object_get_info(f2.get(), ZX_INFO_HANDLE_BASIC, &f3_info, sizeof(f3_info), nullptr, nullptr));
 	ASSERT_EQ(f3_info.koid, handle_koids[0]);
-	ASSERT_TRUE(f3_info.type == 0 || 0 == ZX_OBJ_TYPE_NONE);
-	ASSERT_TRUE(f3_info.rights == 2147483648 || 2147483648 == ZX_RIGHT_SAME_RIGHTS);
-  
+	
 }
 #endif  // __Fuchsia__
 

@@ -507,7 +507,7 @@ HandleDef(HandleSubtype.event, 2147483648),// #0
         [
 0,],
         [
-0,]);
+]);
       
       DecodeSuccessCase.run(
         'GoldenNullableHandleStructNull_v2',
