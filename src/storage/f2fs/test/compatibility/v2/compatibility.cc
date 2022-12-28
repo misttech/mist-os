@@ -102,6 +102,28 @@ int LinuxTestFile::Ftruncate(off_t len) {
   return result.length() == 0 ? 0 : -1;
 }
 
+int LinuxTestFile::Fallocate(int mode, off_t offset, off_t len) {
+  auto converted_filename = filename_;
+  std::string command = "fallocate ";
+
+  if (mode & FALLOC_FL_PUNCH_HOLE) {
+    command.append("-p ");
+  }
+  if (mode & FALLOC_FL_KEEP_SIZE) {
+    command.append("-n ");
+  }
+
+  command.append("-o ")
+      .append(std::to_string(offset))
+      .append(" -l ")
+      .append(std::to_string(len))
+      .append(" ")
+      .append(converted_filename);
+  linux_operator_->ExecuteWithAssert({command});
+
+  return 0;
+}
+
 void LinuxTestFile::WritePattern(size_t block_count) {
   char buffer[kBlockSize];
   for (uint32_t i = 0; i < block_count; ++i) {

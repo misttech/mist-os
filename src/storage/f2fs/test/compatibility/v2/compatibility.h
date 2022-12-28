@@ -63,7 +63,7 @@ class LinuxTestFile : public TestFile {
   int Fchmod(mode_t mode) final;
   int Fstat(struct stat& file_stat) final;
   int Ftruncate(off_t len) final;
-  int Fallocate(int mode, off_t offset, off_t len) final { return -1; }
+  int Fallocate(int mode, off_t offset, off_t len) final;
 
   void WritePattern(size_t block_count) final;
   void VerifyPattern(size_t block_count) final;

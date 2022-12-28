@@ -241,5 +241,59 @@ TEST_F(FileAttrCompatibilityTest, FileRenameTestFuchsiaToLinux) {
   }
 }
 
+TEST_F(FileAttrCompatibilityTest, FallocateLinuxToFuchsia) {
+  constexpr uint32_t kVerifyPatternSize = 1024 * 1024 * 10;  // 10MB
+  constexpr off_t kOffset = 5000;
+  constexpr uint32_t num_blocks = kVerifyPatternSize / kBlockSize;
+  const std::string filename = "alpha";
+
+  struct stat host_stat;
+  struct stat target_stat;
+
+  // Fallocate on Linux
+  {
+    GetEnclosedGuest().GetLinuxOperator().Mkfs();
+    GetEnclosedGuest().GetLinuxOperator().Mount();
+
+    auto umount = fit::defer([&] { GetEnclosedGuest().GetLinuxOperator().Umount(); });
+
+    auto test_file = GetEnclosedGuest().GetLinuxOperator().Open(
+        std::string(kLinuxPathPrefix) + filename, O_CREAT | O_RDWR, 0644);
+    ASSERT_TRUE(test_file->IsValid());
+
+    test_file->Fallocate(0, kOffset, kVerifyPatternSize);
+
+    ASSERT_EQ(test_file->Fstat(host_stat), 0);
+  }
+
+  // Verify and write on Fuchsia
+  {
+    GetEnclosedGuest().GetFuchsiaOperator().Fsck();
+    GetEnclosedGuest().GetFuchsiaOperator().Mount();
+
+    auto umount = fit::defer([&] { GetEnclosedGuest().GetFuchsiaOperator().Umount(); });
+
+    auto test_file = GetEnclosedGuest().GetFuchsiaOperator().Open(filename, O_RDWR, 0644);
+    ASSERT_TRUE(test_file->IsValid());
+    ASSERT_EQ(test_file->Fstat(target_stat), 0);
+    CompareStat(target_stat, host_stat);
+
+    test_file->WritePattern(num_blocks);
+  }
+
+  // Verify on Linux
+  {
+    GetEnclosedGuest().GetLinuxOperator().Fsck();
+    GetEnclosedGuest().GetLinuxOperator().Mount();
+
+    auto umount = fit::defer([&] { GetEnclosedGuest().GetLinuxOperator().Umount(); });
+
+    auto testfile = GetEnclosedGuest().GetLinuxOperator().Open(
+        std::string(kLinuxPathPrefix) + filename, O_RDWR, 0644);
+    ASSERT_TRUE(testfile->IsValid());
+    testfile->VerifyPattern(num_blocks);
+  }
+}
+
 }  // namespace
 }  // namespace f2fs
