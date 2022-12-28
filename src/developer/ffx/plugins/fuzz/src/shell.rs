@@ -158,6 +158,11 @@ impl<R: Reader, O: OutputSink> Shell<R, O> {
                 let tests_json = json_file.or(self.tests_json.clone());
                 let mut urls =
                     get_fuzzer_urls(&tests_json).context("failed to get URLs to list")?;
+                if urls.is_empty() {
+                    self.writer.println(
+                        "Empty list: did you include '-fuzz-with' in your 'fx set' command ?",
+                    );
+                }
                 if let Some(pattern) = pattern {
                     let globbed = glob::Pattern::new(&pattern)
                         .context("failed to create glob from pattern")?;
@@ -846,6 +851,7 @@ mod tests {
         let urls: Vec<&str> = vec![];
         test.create_tests_json(urls.iter())?;
         script.add(&mut test, "list");
+        test.output_matches("Empty list: did you include '-fuzz-with' in your 'fx set' command ?");
         test.output_matches("[]");
         script.run(&mut test).await?;
         test.verify_output()?;
