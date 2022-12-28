@@ -90,7 +90,9 @@ fuchsia_component_manifest(
 fuchsia_test_component(
     name = "hello_gtest_component",
     manifest = ":hello_gtest_manifest",
-    deps = [":hello_gtest"],
+    deps = [
+        ":hello_gtest",
+    ],
 )
 
 fuchsia_test_package(

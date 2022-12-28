@@ -15,10 +15,8 @@ bazel_fuchsia_test_package("test_pkg") {
 
 group("hello_rust") {
   testonly = true
-  deps = [ ":pkg" ]
-
-  # TODO(fxbug.dev/117831): this test crashes when building with asan
-  if (!is_asan) {
-    deps += [ ":test_pkg" ]
-  }
+  deps = [
+    ":pkg",
+    ":test_pkg",
+  ]
 }

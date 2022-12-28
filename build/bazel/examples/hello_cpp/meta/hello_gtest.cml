@@ -9,4 +9,10 @@
     program: {
         binary: "bin/hello_gtest",
     },
+    use: [
+        {
+            // Needed for ASSERT_DEATH
+            protocol: [ "fuchsia.process.Launcher" ],
+        },
+    ],
 }

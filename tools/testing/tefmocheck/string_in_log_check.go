@@ -285,7 +285,9 @@ func fuchsiaLogChecks() []FailureModeCheck {
 		// For fxbug.dev/43355.
 		ret = append(ret, []FailureModeCheck{
 			&stringInLogCheck{String: "Timed out loading dynamic linker from fuchsia.ldsvc.Loader", Type: lt},
-			&stringInLogCheck{String: "ERROR: AddressSanitizer", Type: lt, AttributeToTest: true},
+			&stringInLogCheck{String: "ERROR: AddressSanitizer", Type: lt, AttributeToTest: true, ExceptBlocks: []*logBlock{
+				{startString: "[===ASAN EXCEPT BLOCK START===]", endString: "[===ASAN EXCEPT BLOCK END===]"},
+			}},
 			&stringInLogCheck{String: "ERROR: LeakSanitizer", Type: lt, AttributeToTest: true, ExceptBlocks: []*logBlock{
 				// startString and endString should match string in //zircon/system/ulib/c/test/sanitizer/lsan-test.cc.
 				{startString: "[===LSAN EXCEPT BLOCK START===]", endString: "[===LSAN EXCEPT BLOCK END===]"},
@@ -293,7 +295,9 @@ func fuchsiaLogChecks() []FailureModeCheck {
 				{startString: "RUN   TestOOMHard", endString: "PASS: TestOOMHard"},
 			}},
 			&stringInLogCheck{String: "WARNING: ThreadSanitizer", Type: lt, AttributeToTest: true},
-			&stringInLogCheck{String: "SUMMARY: UndefinedBehaviorSanitizer", Type: lt, AttributeToTest: true},
+			&stringInLogCheck{String: "SUMMARY: UndefinedBehaviorSanitizer", Type: lt, AttributeToTest: true, ExceptBlocks: []*logBlock{
+				{startString: "[===UBSAN EXCEPT BLOCK START===]", endString: "[===UBSAN EXCEPT BLOCK END===]"},
+			}},
 			// Match specific OOPS types before finally matching the generic type.
 			&stringInLogCheck{String: "lockup_detector: no heartbeat from", Type: lt, AttributeToTest: true, ExceptBlocks: oopsExceptBlocks},
 			&stringInLogCheck{String: "ZIRCON KERNEL OOPS", Type: lt, AttributeToTest: true, ExceptBlocks: oopsExceptBlocks},
