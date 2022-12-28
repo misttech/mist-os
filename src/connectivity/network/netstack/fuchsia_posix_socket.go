@@ -4313,6 +4313,10 @@ func tcpipErrorToCode(err tcpip.Error) posix.Errno {
 		return posix.ErrnoEafnosupport
 	case *tcpip.ErrMalformedHeader:
 		return posix.ErrnoEinval
+	case *tcpip.ErrHostDown:
+		return posix.ErrnoEhostdown
+	case *tcpip.ErrNoNet:
+		return posix.ErrnoEnonet
 	default:
 		panic(fmt.Sprintf("unknown error %v", err))
 	}
