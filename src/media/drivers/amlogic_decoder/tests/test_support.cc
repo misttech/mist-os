@@ -39,7 +39,8 @@ std::unique_ptr<TestSupport::FirmwareFile> TestSupport::LoadFirmwareFile(const c
   if (status != ZX_OK)
     return nullptr;
   uint64_t ptr;
-  status = zx::vmar::root_self()->map(ZX_VM_PERM_READ, 0, test_file, 0, test_file_size, &ptr);
+  status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_ALLOW_FAULTS, 0, test_file, 0,
+                                      test_file_size, &ptr);
   if (status != ZX_OK)
     return nullptr;
   firmware_file->vmo = std::move(test_file);
