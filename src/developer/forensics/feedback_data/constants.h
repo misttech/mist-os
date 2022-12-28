@@ -79,6 +79,7 @@ constexpr zx::duration kActiveLoggingPeriod = zx::min(5);
 // Logs from previous boot cycle.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+constexpr char kBuildSnapshotPath[] = "/config/build-info/snapshot";
 constexpr char kPreviousLogsFilePath[] = "/tmp/log.system.previous_boot.txt";
 
 constexpr char kCurrentLogsDir[] = "/cache/current_system_logs";

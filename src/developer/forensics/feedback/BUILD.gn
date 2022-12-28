@@ -108,6 +108,7 @@ source_set("main_service") {
     "//src/developer/forensics/feedback/annotations:time_provider",
     "//src/developer/forensics/feedback/annotations:timezone_provider",
     "//src/developer/forensics/feedback/annotations:ui_state_provider",
+    "//src/developer/forensics/feedback/attachments:file_backed_provider",
     "//src/developer/forensics/feedback/attachments:inspect",
     "//src/developer/forensics/feedback/attachments:kernel_log",
     "//src/developer/forensics/feedback/attachments:previous_boot_log",

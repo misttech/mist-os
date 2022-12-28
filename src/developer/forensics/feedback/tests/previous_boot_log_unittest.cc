@@ -63,58 +63,6 @@ TEST_F(PreviousBootLogTest, PreviousBootLogDeletedAfterDeviceUptimeThresholdReac
   EXPECT_FALSE(files::IsFile(path));
 }
 
-TEST_F(PreviousBootLogTest, MalformedFilePath) {
-  const uint64_t kTicket = 21;
-  const std::string kBadPath = "/bad/path";
-
-  PreviousBootLog previous_boot_log_(dispatcher(), Clock(), zx::sec(5), kBadPath);
-
-  AttachmentValue attachment(Error::kNotSet);
-  GetExecutor().schedule_task(
-      previous_boot_log_.Get(kTicket)
-          .and_then([&attachment](AttachmentValue& res) { attachment = std::move(res); })
-          .or_else([] { FX_LOGS(FATAL) << "Logic error"; }));
-
-  RunLoopUntilIdle();
-
-  EXPECT_THAT(attachment, AttachmentValueIs(Error::kFileReadFailure));
-}
-
-TEST_F(PreviousBootLogTest, EmptyFile) {
-  const std::string path = NewFile();
-  const uint64_t kTicket = 21;
-
-  PreviousBootLog previous_boot_log_(dispatcher(), Clock(), zx::sec(5), path);
-
-  AttachmentValue attachment(Error::kNotSet);
-  GetExecutor().schedule_task(
-      previous_boot_log_.Get(kTicket)
-          .and_then([&attachment](AttachmentValue& res) { attachment = std::move(res); })
-          .or_else([] { FX_LOGS(FATAL) << "Logic error"; }));
-
-  RunLoopUntilIdle();
-
-  EXPECT_THAT(attachment, AttachmentValueIs(Error::kMissingValue));
-}
-
-TEST_F(PreviousBootLogTest, NonEmptyFile) {
-  const std::string data = "content";
-  const std::string path = NewFile(data);
-  const uint64_t kTicket = 21;
-
-  PreviousBootLog previous_boot_log_(dispatcher(), Clock(), zx::sec(5), path);
-
-  AttachmentValue attachment(Error::kNotSet);
-  GetExecutor().schedule_task(
-      previous_boot_log_.Get(kTicket)
-          .and_then([&attachment](AttachmentValue& res) { attachment = std::move(res); })
-          .or_else([] { FX_LOGS(FATAL) << "Logic error"; }));
-
-  RunLoopUntilIdle();
-
-  EXPECT_THAT(attachment, AttachmentValueIs(data));
-}
-
 TEST_F(PreviousBootLogTest, ForceCompletionCalledWhenPromiseIsIncomplete) {
   const std::string path = NewFile();
   const uint64_t kTicket = 21;

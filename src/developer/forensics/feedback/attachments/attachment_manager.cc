@@ -10,7 +10,6 @@
 
 #include <utility>
 
-#include "src/developer/forensics/feedback/attachments/static_attachments.h"
 #include "src/developer/forensics/feedback/attachments/types.h"
 #include "src/developer/forensics/feedback_data/constants.h"
 #include "src/lib/timekeeper/clock.h"
@@ -34,17 +33,13 @@ void EraseNotAllowlisted(std::map<std::string, T>& c, const std::set<std::string
 
 AttachmentManager::AttachmentManager(async_dispatcher_t* dispatcher,
                                      const std::set<std::string>& allowlist,
-                                     Attachments static_attachments,
                                      std::map<std::string, AttachmentProvider*> providers)
-    : dispatcher_(dispatcher),
-      static_attachments_(std::move(static_attachments)),
-      providers_(std::move(providers)) {
-  // Remove any static attachments or providers that return attachments not in |allowlist_|.
-  EraseNotAllowlisted(static_attachments_, allowlist);
+    : dispatcher_(dispatcher), providers_(std::move(providers)) {
+  // Remove any providers that return attachments not in |allowlist_|.
   EraseNotAllowlisted(providers_, allowlist);
 
   for (const auto& k : allowlist) {
-    const auto num_providers = static_attachments_.count(k) + providers_.count(k);
+    const auto num_providers = providers_.count(k);
 
     FX_CHECK(num_providers == 1) << "Attachment \"" << k << "\" collected by " << num_providers
                                  << " providers";
@@ -77,26 +72,22 @@ AttachmentManager::AttachmentManager(async_dispatcher_t* dispatcher,
   auto join = ::fpromise::join_promise_vector(std::move(promises));
   using result_t = decltype(join)::value_type;
 
-  Attachments static_attachments;
-  for (const auto& [k, v] : static_attachments_) {
-    static_attachments.insert({k, v.Clone()});
-  }
+  Attachments attachments;
 
   // Start with the static attachments and the add the dynamically collected values to them.
-  return join.and_then(
-      [keys, attachments = std::move(static_attachments)](result_t& results) mutable {
-        for (size_t i = 0; i < results.size(); ++i) {
-          attachments.insert({keys[i], results[i].take_value()});
+  return join.and_then([keys, attachments = std::move(attachments)](result_t& results) mutable {
+    for (size_t i = 0; i < results.size(); ++i) {
+      attachments.insert({keys[i], results[i].take_value()});
 
-          // Consider any attachments without content as missing attachments.
-          if (auto& attachment = attachments.at(keys[i]);
-              attachment.HasValue() && attachment.Value().empty()) {
-            attachment = attachment.HasError() ? attachment.Error() : Error::kMissingValue;
-          }
-        }
+      // Consider any attachments without content as missing attachments.
+      if (auto& attachment = attachments.at(keys[i]);
+          attachment.HasValue() && attachment.Value().empty()) {
+        attachment = attachment.HasError() ? attachment.Error() : Error::kMissingValue;
+      }
+    }
 
-        return ::fpromise::ok(std::move(attachments));
-      });
+    return ::fpromise::ok(std::move(attachments));
+  });
 }
 
 }  // namespace forensics::feedback

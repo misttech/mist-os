@@ -16,7 +16,11 @@ namespace forensics::feedback {
 
 PreviousBootLog::PreviousBootLog(async_dispatcher_t* dispatcher, timekeeper::Clock* clock,
                                  const zx::duration delete_previous_boot_log_at, std::string path)
-    : dispatcher_(dispatcher), clock_(clock), is_file_deleted_(false), path_(std::move(path)) {
+    : FileBackedProvider(path),
+      dispatcher_(dispatcher),
+      clock_(clock),
+      is_file_deleted_(false),
+      path_(std::move(path)) {
   auto self = weak_factory_.GetWeakPtr();
   async::PostDelayedTask(
       dispatcher_,
@@ -38,18 +42,7 @@ PreviousBootLog::PreviousBootLog(async_dispatcher_t* dispatcher, timekeeper::Clo
     return fpromise::make_ok_promise(AttachmentValue(Error::kCustom));
   }
 
-  if (std::string content; files::ReadFileToString(path_, &content)) {
-    previous_boot_log = content.empty() ? AttachmentValue(Error::kMissingValue)
-                                        : AttachmentValue(std::move(content));
-  } else {
-    FX_LOGS(WARNING) << "Failed to read: " << path_;
-    previous_boot_log = AttachmentValue(Error::kFileReadFailure);
-  }
-
-  // The previous boot log is moved because it can be megabytes in size.
-  return fpromise::make_ok_promise(std::move(previous_boot_log));
+  return FileBackedProvider::Get(ticket);
 }
-
-void PreviousBootLog::ForceCompletion(const uint64_t ticket, const Error error) {}
 
 }  // namespace forensics::feedback

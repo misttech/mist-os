@@ -25,7 +25,6 @@ namespace forensics::feedback {
 class AttachmentManager {
  public:
   explicit AttachmentManager(async_dispatcher_t* dispatcher, const std::set<std::string>& allowlist,
-                             Attachments static_attachments = {},
                              std::map<std::string, AttachmentProvider*> providers = {});
 
   ::fpromise::promise<Attachments> GetAttachments(zx::duration timeout);
@@ -33,7 +32,6 @@ class AttachmentManager {
  private:
   async_dispatcher_t* dispatcher_;
 
-  Attachments static_attachments_;
   std::map<std::string, AttachmentProvider*> providers_;
   uint64_t next_ticket_{0};
   fxl::WeakPtrFactory<AttachmentManager> weak_factory_{this};

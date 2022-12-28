@@ -206,6 +206,27 @@ executable("fidl_provider_unittest_exe") {
   ]
 }
 
+executable("file_backed_provider_unittest_exe") {
+  testonly = true
+
+  sources = [ "file_backed_provider_unittest.cc" ]
+
+  deps = [
+    "//sdk/lib/sys/cpp/testing:cpp",
+    "//src/developer/forensics/feedback/attachments",
+    "//src/developer/forensics/feedback/attachments:file_backed_provider",
+    "//src/developer/forensics/feedback_data:constants",
+    "//src/developer/forensics/testing:gmatchers",
+    "//src/developer/forensics/testing:gpretty_printers",
+    "//src/developer/forensics/testing:gtest_with_syslog_main",
+    "//src/developer/forensics/testing:unit_test_fixture",
+    "//src/developer/forensics/utils:errors",
+    "//src/lib/timekeeper:testing",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
+  ]
+}
+
 executable("inspect_unittest_exe") {
   testonly = true
 
@@ -406,23 +427,6 @@ executable("startup_annotations_unittest_exe") {
   ]
 }
 
-executable("static_attachments_unittest_exe") {
-  testonly = true
-
-  sources = [ "static_attachments_unittest.cc" ]
-
-  deps = [
-    "//src/developer/forensics/feedback/attachments",
-    "//src/developer/forensics/feedback_data:constants",
-    "//src/developer/forensics/testing:gmatchers",
-    "//src/developer/forensics/testing:gtest_with_syslog_main",
-    "//src/developer/forensics/testing:scoped_memfs_manager",
-    "//src/lib/files",
-    "//third_party/googletest:gmock",
-    "//third_party/googletest:gtest",
-  ]
-}
-
 executable("system_log_unittest_exe") {
   testonly = true
 
@@ -594,6 +598,14 @@ fuchsia_unittest_component("fidl_provider_unittest") {
   deps = [ ":fidl_provider_unittest_exe" ]
 }
 
+fuchsia_unittest_component("file_backed_provider_unittest") {
+  deps = [
+    ":file_backed_provider_unittest_exe",
+    "//src/sys/test_runners:tmp_storage",
+    "//src/sys/test_runners/gtest:death_test",
+  ]
+}
+
 fuchsia_unittest_component("inspect_unittest") {
   deps = [
     ":inspect_unittest_exe",
@@ -659,10 +671,6 @@ fuchsia_unittest_component("startup_annotations_unittest") {
   deps = [ ":startup_annotations_unittest_exe" ]
 }
 
-fuchsia_unittest_component("static_attachments_unittest") {
-  deps = [ ":static_attachments_unittest_exe" ]
-}
-
 fuchsia_unittest_component("system_log_unittest") {
   deps = [
     ":system_log_unittest_exe",
@@ -702,6 +710,7 @@ fuchsia_test_package("feedback-tests") {
     ":device_id_provider_unittest",
     ":encode_unittest",
     ":fidl_provider_unittest",
+    ":file_backed_provider_unittest",
     ":last_reboot_unittest",
     ":kernel_log_integration_test",
     ":inspect_unittest",
@@ -712,7 +721,6 @@ fuchsia_test_package("feedback-tests") {
     ":product_info_provider_unittest",
     ":redactor_factory_unittest",
     ":startup_annotations_unittest",
-    ":static_attachments_unittest",
     ":system_log_unittest",
     ":target_channel_provider_unittest",
     ":time_provider_unittest",

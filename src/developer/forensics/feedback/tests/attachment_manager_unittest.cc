@@ -74,31 +74,13 @@ class SimpleAttachmentProvider : public AttachmentProvider {
 
 using AttachmentManagerTest = UnitTestFixture;
 
-TEST_F(AttachmentManagerTest, Static) {
-  async::Executor executor(dispatcher());
-
-  Attachments static_attachments;
-  static_attachments.insert({"static", AttachmentValue("value")});
-
-  AttachmentManager manager(dispatcher(), {"static"}, std::move(static_attachments));
-
-  Attachments attachments;
-  executor.schedule_task(
-      manager.GetAttachments(zx::duration::infinite())
-          .and_then([&attachments](Attachments& result) { attachments = std::move(result); })
-          .or_else([] { FX_LOGS(FATAL) << "Unreachable branch"; }));
-
-  RunLoopUntilIdle();
-  EXPECT_THAT(attachments, ElementsAreArray({Pair("static", AttachmentValueIs("value"))}));
-}
-
 TEST_F(AttachmentManagerTest, Dynamic) {
   async::Executor executor(dispatcher());
 
   SimpleAttachmentProvider provider1(dispatcher(), zx::sec(1), "value1");
   SimpleAttachmentProvider provider2(dispatcher(), zx::sec(3), "value2");
 
-  AttachmentManager manager(dispatcher(), {"dynamic1", "dynamic2"}, {},
+  AttachmentManager manager(dispatcher(), {"dynamic1", "dynamic2"},
                             {
                                 {"dynamic1", &provider1},
                                 {"dynamic2", &provider2},

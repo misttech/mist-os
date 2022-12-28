@@ -12,7 +12,7 @@
 #include <memory>
 #include <string>
 
-#include "src/developer/forensics/feedback/attachments/provider.h"
+#include "src/developer/forensics/feedback/attachments/file_backed_provider.h"
 #include "src/developer/forensics/feedback/attachments/types.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
 #include "src/lib/timekeeper/clock.h"
@@ -21,16 +21,13 @@ namespace forensics::feedback {
 
 // Collects the previous boot log and also deletes previous boot log after
 // |delete_previous_boot_log_at| of device uptime.
-class PreviousBootLog : public AttachmentProvider {
+class PreviousBootLog : public FileBackedProvider {
  public:
   PreviousBootLog(async_dispatcher_t* dispatcher, timekeeper::Clock* clock,
                   zx::duration delete_previous_boot_log_at, std::string path);
 
   // Returns a promise, that is immediately available, to the previous boot log.
   ::fpromise::promise<AttachmentValue> Get(uint64_t ticket) override;
-
-  // No-op because collection happens synchronously
-  void ForceCompletion(uint64_t ticket, Error error) override;
 
  private:
   async_dispatcher_t* dispatcher_;

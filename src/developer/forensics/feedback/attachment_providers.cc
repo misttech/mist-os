@@ -13,19 +13,20 @@ AttachmentProviders::AttachmentProviders(async_dispatcher_t* dispatcher,
                                          zx::duration delete_previous_boot_log_at,
                                          timekeeper::Clock* clock, RedactorBase* redactor,
                                          feedback_data::InspectDataBudget* inspect_data_budget,
-                                         std::set<std::string> allowlist,
-                                         Attachments static_attachments)
+                                         std::set<std::string> allowlist)
     : kernel_log_(dispatcher, services, AttachmentProviderBackoff(), redactor),
       system_log_(dispatcher, services, clock, redactor, feedback_data::kActiveLoggingPeriod),
       inspect_(dispatcher, services, AttachmentProviderBackoff(), inspect_data_budget),
       previous_boot_log_(dispatcher, clock, delete_previous_boot_log_at,
                          feedback_data::kPreviousLogsFilePath),
-      attachment_manager_(dispatcher, allowlist, std::move(static_attachments),
+      build_snapshot_(feedback_data::kBuildSnapshotPath),
+      attachment_manager_(dispatcher, allowlist,
                           {
                               {feedback_data::kAttachmentLogKernel, &kernel_log_},
                               {feedback_data::kAttachmentLogSystem, &system_log_},
                               {feedback_data::kAttachmentLogSystemPrevious, &previous_boot_log_},
                               {feedback_data::kAttachmentInspect, &inspect_},
+                              {feedback_data::kAttachmentBuildSnapshot, &build_snapshot_},
                           }) {
   if (allowlist.empty()) {
     FX_LOGS(WARNING)

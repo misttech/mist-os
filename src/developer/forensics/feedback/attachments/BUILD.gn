@@ -12,8 +12,6 @@ source_set("attachments") {
     "metrics.cc",
     "metrics.h",
     "provider.h",
-    "static_attachments.cc",
-    "static_attachments.h",
     "types.h",
   ]
 
@@ -92,6 +90,24 @@ source_set("previous_boot_log") {
   sources = [
     "previous_boot_log.cc",
     "previous_boot_log.h",
+  ]
+
+  public_deps = [
+    ":attachments",
+    "//sdk/lib/fit-promise",
+    "//sdk/lib/sys/cpp",
+  ]
+
+  deps = [
+    "//sdk/lib/syslog/cpp",
+    "//src/developer/forensics/feedback/attachments:file_backed_provider",
+  ]
+}
+
+source_set("file_backed_provider") {
+  sources = [
+    "file_backed_provider.cc",
+    "file_backed_provider.h",
   ]
 
   public_deps = [

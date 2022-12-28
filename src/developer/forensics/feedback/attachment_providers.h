@@ -12,6 +12,7 @@
 #include <string>
 
 #include "src/developer/forensics/feedback/attachments/attachment_manager.h"
+#include "src/developer/forensics/feedback/attachments/file_backed_provider.h"
 #include "src/developer/forensics/feedback/attachments/inspect.h"
 #include "src/developer/forensics/feedback/attachments/kernel_log.h"
 #include "src/developer/forensics/feedback/attachments/previous_boot_log.h"
@@ -30,7 +31,7 @@ class AttachmentProviders {
                       std::shared_ptr<sys::ServiceDirectory> services,
                       zx::duration delete_previous_boot_log_at, timekeeper::Clock* clock,
                       RedactorBase* redactor, feedback_data::InspectDataBudget* inspect_data_budget,
-                      std::set<std::string> allowlist, Attachments static_attachments);
+                      std::set<std::string> allowlist);
 
   AttachmentManager* GetAttachmentManager() { return &attachment_manager_; }
 
@@ -41,6 +42,7 @@ class AttachmentProviders {
   SystemLog system_log_;
   Inspect inspect_;
   PreviousBootLog previous_boot_log_;
+  FileBackedProvider build_snapshot_;
 
   AttachmentManager attachment_manager_;
 };
