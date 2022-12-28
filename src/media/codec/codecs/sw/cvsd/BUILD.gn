@@ -1,0 +1,31 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/testing/environments.gni")
+
+group("cvsd") {
+  testonly = true
+  deps = [ ":codec_runner_sw_cvsd" ]
+}
+
+executable("codec_runner_sw_cvsd") {
+  visibility = [
+    "//src/media/codec:codec_runner_sw_cvsd",
+    "//src/media/codec:codec_runner_sw_cvsd.manifest",
+    "//src/media/codec/*",  # TODO(fxbug.dev/4129): Dep shouldn't be needed
+    "//src/media/codec/factory",
+  ]
+
+  sources = [
+    "codec_adapter_cvsd_encoder.cc",
+    "codec_adapter_cvsd_encoder.h",
+    "main.cc",
+  ]
+
+  deps = [
+    "//src/media/codec/codecs:chunk_input_stream",
+    "//src/media/codec/codecs/sw:codec_adapter_sw",
+    "//src/media/codec/codecs/sw:codec_runner_sw",
+  ]
+}

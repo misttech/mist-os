@@ -10,6 +10,7 @@ group("codec") {
   testonly = true
   deps = [
     ":codec_factory",
+    ":codec_factory_test",
     ":services",
     ":tests",
     "//src/media/codec/codecs",
@@ -69,6 +70,17 @@ fuchsia_package("codec_factory") {
   deps = [ ":factory_with_sw_codecs" ]
 }
 
+# Codec factory package dedicated for testing.
+# It may contain codec components that are not yet fully released.
+fuchsia_package("codec_factory_test") {
+  testonly = true
+  deps = [
+    ":codec_runner_sw_cvsd_comp",  # TODO: move to `sw_codecs` after testing.
+    ":sw_codecs",
+    "//src/media/codec/factory:component",
+  ]
+}
+
 group("factory_with_sw_codecs") {
   deps = [
     ":sw_codecs",
@@ -100,4 +112,10 @@ fuchsia_component("codec_runner_sw_ffmpeg_comp") {
   manifest = "codecs/meta/codec_runner_sw_ffmpeg.cml"
   deps = [ "//src/media/codec/codecs/sw/ffmpeg:codec_runner_sw_ffmpeg" ]
   component_name = "codec_runner_sw_ffmpeg"
+}
+
+fuchsia_component("codec_runner_sw_cvsd_comp") {
+  manifest = "codecs/meta/codec_runner_sw_cvsd.cml"
+  deps = [ "//src/media/codec/codecs/sw/cvsd:codec_runner_sw_cvsd" ]
+  component_name = "codec_runner_sw_cvsd"
 }

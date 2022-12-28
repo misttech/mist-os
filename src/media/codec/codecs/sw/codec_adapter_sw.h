@@ -222,8 +222,6 @@ class CodecAdapterSW : public CodecAdapter {
   std::unique_ptr<const fuchsia::media::StreamOutputConstraints> CoreCodecBuildNewOutputConstraints(
       uint64_t stream_lifetime_ordinal, uint64_t new_output_buffer_constraints_version_ordinal,
       bool buffer_constraints_action_required) override {
-    auto [format_details, per_packet_buffer_bytes] = OutputFormatDetails();
-
     auto config = std::make_unique<fuchsia::media::StreamOutputConstraints>();
 
     config->set_stream_lifetime_ordinal(stream_lifetime_ordinal);
