@@ -396,6 +396,8 @@ class AIBCreator:
         # A set of file entries to include in compiled packages
         self.compiled_package_contents: Dict[PackageName, FileEntryList] = []
 
+        self.compiled_package_shards: List[CompiledPackageAdditionalShards] = []
+
     def build(self) -> Tuple[AssemblyInputBundle, FilePath, DepSet]:
         """
         Copy all the artifacts from the ImageAssemblyConfig into an AssemblyInputBundle that is in
@@ -552,6 +554,26 @@ class AIBCreator:
                         }))
 
                 deps.update(package_deps)
+
+        if self.compiled_package_shards:
+            for package_shards in self.compiled_package_shards:
+                component_shards = {}
+                for component_name in package_shards.component_shards.keys():
+                    component_files, component_deps = self._copy_component_shards(
+                        package_shards.component_shards[component_name],
+                        package_name=package_shards.name)
+
+                    deps.update(component_deps)
+
+                    component_shards[component_name] = component_files
+
+                result.packages_to_compile.append(
+                    CompiledPackageAdditionalShards(
+                        name=package_shards.name,
+                        component_shards={
+                            component_name: component_shards[component_name]
+                            for component_name in component_shards.keys()
+                        }))
 
         # Copy the config_data entries into the out-of-tree layout
         (config_data, config_data_deps) = self._copy_config_data_entries()

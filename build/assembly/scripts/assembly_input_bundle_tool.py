@@ -10,9 +10,10 @@ import subprocess
 import sys
 from typing import Dict, List, Set, Tuple
 import logging
+from assembly.assembly_input_bundle import CompiledPackageAdditionalShards, CompiledPackageMainDefinition
 from depfile import DepFile
 from assembly import AssemblyInputBundle, AIBCreator, DriverDetails, FilePath, PackageManifest, FileEntry
-from serialization.serialization import json_load
+from serialization.serialization import instance_from_dict, json_load
 logger = logging.getLogger()
 
 
@@ -34,6 +35,9 @@ def create_bundle(args: argparse.Namespace) -> None:
 
     if args.shell_cmds_list:
         add_shell_commands_from_file(aib_creator, args.shell_cmds_list)
+
+    if args.compiled_packages:
+        add_compiled_packages_from_file(aib_creator, args.compiled_packages)
 
     if args.drivers_pkg_list:
         add_driver_list_from_file(aib_creator, args.drivers_pkg_list)
@@ -143,6 +147,28 @@ def add_config_data_entries_from_file(
             f"meta/data/{definition['package_name']}/{definition['destination']}"
         )
         aib_creator.config_data.append(entry)
+
+
+def add_compiled_packages_from_file(aib_creator: AIBCreator, compiled_packages):
+    """
+    compiled_packages should be
+    List[CompiledPackageMainDefinition|CompiledPackageAdditionalShards]
+    """
+
+    _compiled_packages = _read_json_file(compiled_packages)
+    for package_def in _compiled_packages:
+        # Differentiate entries by field names
+        if "component_shards" in package_def:
+            aib_creator.compiled_package_shards.append(
+                instance_from_dict(
+                    CompiledPackageAdditionalShards, package_def))
+        else:
+            aib_creator.component_shards[
+                package_def["name"]] = package_def["components"]
+            aib_creator.component_includes[
+                package_def["name"]] = package_def["includes"]
+            aib_creator.compiled_package_contents[
+                package_def["name"]] = package_def["contents"]
 
 
 def add_bootfs_files_from_list(aib_creator: AIBCreator, bootfs_files):
@@ -401,6 +427,10 @@ def main():
         help=
         "Path to a json file of bootfs-file entries, may be specified multiple times"
     )
+    bundle_creation_parser.add_argument(
+        "--compiled-packages",
+        type=argparse.FileType('r'),
+        help="Path to a json file of compiled package configuration")
 
     bundle_creation_parser.set_defaults(handler=create_bundle)
 

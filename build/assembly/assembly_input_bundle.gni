@@ -156,6 +156,18 @@ import("//build/python/python_action.gni")
 #      },
 #    ]
 #
+#  compiled_packages [optional]
+#     [list of GN scopes] List of GN scopes of `CompiledPackageDefinition`s
+#     that describe packages that are to be built dynamically by Assembly, for
+#     example, the `core` package.
+#
+#  component_includes [optional]
+#     [list of FileEntry] List of source/destination pairs related to a compiled
+#     package in the compiled_packages list.
+#     that specifies cml files that can be included by any cml shards in any
+#     platform AIB for the given package. These files will be included
+#     in the Assembly Input Bundle.
+#
 #  create_aib_package (optional; default: true)
 #    [boolean] Set to true to also create a package that contains the contents
 #    of the AIB.
@@ -209,6 +221,7 @@ template("assembly_input_bundle") {
     bootfs_files_with_verification = "${target_name}.group_with.bootfs_files"
     kernel_cmdline = "${target_name}.kernel_cmdline"
     shell_commands_list = "${target_name}.shell_commands.list"
+    compiled_packages = "${target_name}.compiled_packages"
   }
 
   files = {
@@ -239,7 +252,7 @@ template("assembly_input_bundle") {
     shell_commands_list = "${_gen_files}/shell_commands.list"
 
     # The output path for the generated file which collects bootfs_files from
-    # the invoking
+    # the invoking scope
     bootfs_files = "${assembly_input_bundle_dir}.bootfs_files_list"
 
     # The output path for the generated file which collects config_data from
@@ -249,6 +262,10 @@ template("assembly_input_bundle") {
     # The output path for the generated file which collects kernel cmdline
     # arguments.
     kernel_cmdline = "${assembly_input_bundle_dir}.kernel_cmdline"
+
+    # The list of user-provided compiled_package_definitions to include in
+    # the AIB config
+    compiled_packages = "${assembly_input_bundle_dir}.compiled_packages"
   }
 
   # See if the fuchsia-pkg and archive for the AIB are to be created.
@@ -605,6 +622,23 @@ template("assembly_input_bundle") {
     creation_deps += [ ":${labels.kernel_cmdline}" ]
   }
 
+  if (defined(invoker.compiled_packages)) {
+    generated_file(labels.compiled_packages) {
+      forward_variables_from(invoker, [ "testonly" ])
+      outputs = [ "${files.compiled_packages}" ]
+      output_conversion = "json"
+      contents = invoker.compiled_packages
+    }
+
+    creation_args += [
+      "--compiled-packages",
+      rebase_path(files.compiled_packages, root_build_dir),
+    ]
+
+    creation_inputs += [ files.compiled_packages ]
+    creation_deps += [ ":${labels.compiled_packages}" ]
+  }
+
   # Create the out-of-tree-usable Assembly Input Bundle
   python_action(labels.assembly_input_bundle) {
     forward_variables_from(invoker,
@@ -623,12 +657,13 @@ template("assembly_input_bundle") {
     # These folders would grow in size forever, if it was not cleaned out on
     # each incremental build.
     hermetic_action_ignored_prefixes = [
+      "${files.assembly_input_bundle_dir}/blobs",
+      "${files.assembly_input_bundle_dir}/bootfs",
+      "${files.assembly_input_bundle_dir}/compiled_packages",
+      "${files.assembly_input_bundle_dir}/config_data",
+      "${files.assembly_input_bundle_dir}/kernel",
       "${files.assembly_input_bundle_dir}/packages",
       "${files.assembly_input_bundle_dir}/subpackages",
-      "${files.assembly_input_bundle_dir}/blobs",
-      "${files.assembly_input_bundle_dir}/config_data",
-      "${files.assembly_input_bundle_dir}/bootfs",
-      "${files.assembly_input_bundle_dir}/kernel",
     ]
 
     outputs = [ files.assembly_input_bundle_config ]
