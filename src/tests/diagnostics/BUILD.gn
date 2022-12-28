@@ -5,6 +5,9 @@
 import("//build/components.gni")
 import("//build/testing/environments.gni")
 
+# For data_filesystem_format
+import("//src/storage/fshost/generated_fshost_config.gni")
+
 # This is copied from "//zircon/kernel/lib/instrumentation/asan" to
 # detect if we are running an ASAN build.
 #
@@ -45,6 +48,10 @@ group("tests") {
   ]
 
   #  }
+
+  if (data_filesystem_format == "fxfs") {
+    deps += [ ":fshost-fxfs-stats-tests" ]
+  }
 }
 
 fuchsia_unittest_package("appmgr-log-tests") {
@@ -79,6 +86,21 @@ fuchsia_unittest_package("appmgr-cpu-stats-tests") {
 
 fuchsia_unittest_package("fshost-stats-tests") {
   manifest = "meta/fshost_stats_tests.cml"
+
+  test_specs = {
+    environments = [
+      emu_env,
+      {
+        dimensions = {
+          device_type = "Astro"
+        }
+      },
+    ]
+  }
+}
+
+fuchsia_unittest_package("fshost-fxfs-stats-tests") {
+  manifest = "meta/fshost_fxfs_stats_tests.cml"
 
   test_specs = {
     environments = [
