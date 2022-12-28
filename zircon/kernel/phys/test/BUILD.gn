@@ -186,9 +186,6 @@ if (current_toolchain != default_toolchain) {
   # only enables extra stack support conditionally so as not to waste space, so
   # there isn't a good way to test non-default configurations.
   common_test("phys-unittests") {
-    # TODO(fxbug.dev/115881): Fix and enable me.
-    disabled_for_efi = current_cpu == "x64"
-
     sources = [
       "phys-unittests.cc",
       "stack-tests.cc",

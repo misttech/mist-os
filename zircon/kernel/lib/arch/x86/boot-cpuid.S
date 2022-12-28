@@ -173,13 +173,13 @@ mov %edx, CPUID_EDX + \addr
 .ascii " /MERGE:.BootCpuidLeaf=.rdata"
 
 .section  .BootCpuidLeaf$A, "dr"
-.balign 4
-.int 0
+.balign 8
+.quad 0
 .label __start_BootCpuidLeaf
 
 .section  .BootCpuidLeaf$Z, "dr"
-.balign 4
+.balign 8
 .label __stop_BootCpuidLeaf
-.int 0
+.quad 0
 
 #endif  // _WIN32
