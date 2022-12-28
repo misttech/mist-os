@@ -452,7 +452,8 @@ std::optional<SpanSequence::Kind> MultilineSpanSequence::Print(
                child->GetPosition() != SpanSequence::Position::kNewlineIndented);
 
     if (child->GetPosition() != SpanSequence::Position::kDefault) {
-      if (last_printed_kind == SpanSequence::Kind::kToken) {
+      if (last_printed_kind.has_value() &&
+          last_printed_kind != SpanSequence::Kind::kStandaloneComment) {
         // Omit one of the blank lines in cases where a MultilineSpanSequence is the first child of
         // another MultilineSpanSequence, meaning that the first newline has already been printed.
         auto blanks = child->GetLeadingBlankLines();

@@ -5874,4 +5874,51 @@ type MyStruct = struct {
   ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
 }
 
+// Regression test for fxbug.dev/112547.
+TEST(NewFormatterTests, InlineCommentTrailingNewlineFormatted) {
+  // ---------------40---------------- |
+  std::string unformatted = R"FIDL(
+library example; // C1
+
+alias MyAlias = uint8;
+)FIDL";
+
+  // ---------------40---------------- |
+  std::string formatted = R"FIDL(
+library example; // C1
+
+alias MyAlias = uint8;
+)FIDL";
+
+  ASSERT_STREQ(formatted, Format(unformatted));
+  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+}
+
+// Regression test for fxbug.dev/112547.
+TEST(NewFormatterTests, InlineCommentTrailingNewlineOverflow) {
+  // ---------------40---------------- |
+  std::string unformatted = R"FIDL(
+library example; // C1
+
+alias MyAlias_abcdefghijklmnopq = uint64; // C2
+
+
+alias MyOtherAlias = uint8;
+)FIDL";
+
+  // ---------------40---------------- |
+  std::string formatted = R"FIDL(
+library example; // C1
+
+alias MyAlias_abcdefghijklmnopq
+        = uint64; // C2
+
+
+alias MyOtherAlias = uint8;
+)FIDL";
+
+  ASSERT_STREQ(formatted, Format(unformatted));
+  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(formatted, Format(unformatted)));
+}
+
 }  // namespace
