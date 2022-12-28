@@ -101,9 +101,6 @@ action("generate_main_workspace") {
 
     # The script reads RBE configs
     rbe_config_file,
-
-    # The script reads platform versions to set DEFINEs in .bazelrc
-    "//build/config/fuchsia/platform_version.json",
   ]
 
   deps = [
