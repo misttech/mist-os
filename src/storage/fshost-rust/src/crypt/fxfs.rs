@@ -4,14 +4,25 @@
 
 use {
     super::{format_sources, get_policy, unseal_sources, KeyConsumer},
+    crate::service::SHRED_DATA_VOLUME_MARKER_FILE,
+    anyhow::bail,
     anyhow::{anyhow, Context, Error},
     fidl::endpoints::Proxy,
+    fidl_fuchsia_component::{self as fcomponent, RealmMarker},
+    fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose},
+    fidl_fuchsia_io as fio,
     fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingVolume},
-    fuchsia_component::client::connect_to_protocol,
+    fuchsia_component::client::{
+        connect_to_protocol, connect_to_protocol_at_dir_root, open_childs_exposed_directory,
+    },
     fuchsia_zircon as zx,
     key_bag::{Aes256Key, KeyBagManager, WrappingKey, AES128_KEY_SIZE, AES256_KEY_SIZE},
-    std::{ops::Deref, path::Path},
+    std::{
+        ops::Deref,
+        path::Path,
+        sync::atomic::{AtomicU64, Ordering},
+    },
 };
 
 const LEGACY_DATA_KEY: Aes256Key = Aes256Key::create([
@@ -81,7 +92,7 @@ async fn unwrap_or_create_keys(
 pub async fn unlock_data_volume<'a>(
     fs: &'a mut ServingMultiVolumeFilesystem,
     config: &'a fshost_config::Config,
-) -> Result<(String, &'a mut ServingVolume), Error> {
+) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
     unlock_or_init_data_volume(fs, config, false).await
 }
 
@@ -90,7 +101,7 @@ pub async fn unlock_data_volume<'a>(
 pub async fn init_data_volume<'a>(
     fs: &'a mut ServingMultiVolumeFilesystem,
     config: &'a fshost_config::Config,
-) -> Result<(String, &'a mut ServingVolume), Error> {
+) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
     unlock_or_init_data_volume(fs, config, true).await
 }
 
@@ -98,7 +109,7 @@ async fn unlock_or_init_data_volume<'a>(
     fs: &'a mut ServingMultiVolumeFilesystem,
     config: &'a fshost_config::Config,
     create: bool,
-) -> Result<(String, &'a mut ServingVolume), Error> {
+) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
     let mut use_native_fxfs_crypto = config.use_native_fxfs_crypto;
     let has_native_layout = !fs.has_volume("default").await?;
     if !create && (has_native_layout != use_native_fxfs_crypto) {
@@ -106,7 +117,7 @@ async fn unlock_or_init_data_volume<'a>(
         use_native_fxfs_crypto = !use_native_fxfs_crypto;
     }
 
-    let data_volume_name = if use_native_fxfs_crypto {
+    let (crypt_service, data_volume_name) = if use_native_fxfs_crypto {
         // Open up the unencrypted volume so that we can access the key-bag for data.
         let root_vol = if create {
             fs.create_volume("unencrypted", None).await.context("Failed to create unencrypted")?
@@ -125,59 +136,130 @@ async fn unlock_or_init_data_volume<'a>(
         let keybag = KeyBagManager::open(Path::new(KEY_BAG_FILE)).map_err(|e| anyhow!(e))?;
 
         let (data_unwrapped, metadata_unwrapped) = unwrap_or_create_keys(keybag, create).await?;
-        init_crypt_service(data_unwrapped, metadata_unwrapped).await?;
-        "data".to_string()
+        (
+            CryptService::new(data_unwrapped, metadata_unwrapped)
+                .await
+                .context("init_crypt_service (2)")?,
+            "data".to_string(),
+        )
     } else {
-        init_crypt_service(LEGACY_DATA_KEY, LEGACY_METADATA_KEY).await?;
-        "default".to_string()
+        (
+            CryptService::new(LEGACY_DATA_KEY, LEGACY_METADATA_KEY)
+                .await
+                .context("init_crypt_service")?,
+            "default".to_string(),
+        )
     };
 
-    let crypt_service = Some(
-        connect_to_protocol::<CryptMarker>()
+    let crypt_proxy = Some(
+        connect_to_protocol_at_dir_root::<CryptMarker>(&crypt_service.exposed_dir)
             .expect("Unable to connect to Crypt service")
             .into_channel()
             .unwrap()
             .into_zx_channel()
             .into(),
     );
-    Ok((
-        data_volume_name.clone(),
-        if create {
-            fs.create_volume(&data_volume_name, crypt_service)
+
+    let volume = if create {
+        fs.create_volume(&data_volume_name, crypt_proxy).await.context("Failed to create data")?
+    } else {
+        let crypt_proxy = if config.check_filesystems {
+            fs.check_volume(&data_volume_name, crypt_proxy)
                 .await
-                .context("Failed to create data")?
+                .context(format!("Failed to verify {}", data_volume_name))?;
+            Some(
+                connect_to_protocol_at_dir_root::<CryptMarker>(&crypt_service.exposed_dir)
+                    .expect("Unable to connect to Crypt service")
+                    .into_channel()
+                    .unwrap()
+                    .into_zx_channel()
+                    .into(),
+            )
         } else {
-            let crypt_service = if config.check_filesystems {
-                fs.check_volume(&data_volume_name, crypt_service)
-                    .await
-                    .context(format!("Failed to verify {}", data_volume_name))?;
-                Some(
-                    connect_to_protocol::<CryptMarker>()
-                        .expect("Unable to connect to Crypt service")
-                        .into_channel()
-                        .unwrap()
-                        .into_zx_channel()
-                        .into(),
-                )
-            } else {
-                crypt_service
-            };
-            fs.open_volume(&data_volume_name, crypt_service).await.context("Failed to open data")?
-        },
-    ))
+            crypt_proxy
+        };
+        let volume =
+            fs.open_volume(&data_volume_name, crypt_proxy).await.context("Failed to open data")?;
+        if fuchsia_fs::directory::dir_contains(volume.root(), SHRED_DATA_VOLUME_MARKER_FILE).await?
+        {
+            // Return an error and it should cause the volume to be reformatted.
+            bail!(
+                "Found shred marker file (NB. this is not a bug; disregard any messages stating _
+                   otherwise)"
+            );
+        }
+        volume
+    };
+
+    Ok((crypt_service, data_volume_name, volume))
 }
 
-async fn init_crypt_service(data_key: Aes256Key, metadata_key: Aes256Key) -> Result<(), Error> {
-    let crypt_management = connect_to_protocol::<CryptManagementMarker>()?;
-    crypt_management.add_wrapping_key(0, data_key.deref()).await?.map_err(zx::Status::from_raw)?;
-    crypt_management
-        .add_wrapping_key(1, metadata_key.deref())
-        .await?
-        .map_err(zx::Status::from_raw)?;
-    crypt_management.set_active_key(KeyPurpose::Data, 0).await?.map_err(zx::Status::from_raw)?;
-    crypt_management
-        .set_active_key(KeyPurpose::Metadata, 1)
-        .await?
-        .map_err(zx::Status::from_raw)?;
-    Ok(())
+static FXFS_CRYPT_COLLECTION_NAME: &str = "fxfs-crypt";
+
+pub struct CryptService {
+    component_name: String,
+    exposed_dir: fio::DirectoryProxy,
+}
+
+impl CryptService {
+    async fn new(data_key: Aes256Key, metadata_key: Aes256Key) -> Result<Self, Error> {
+        static INSTANCE: AtomicU64 = AtomicU64::new(1);
+
+        let mut collection_ref =
+            fdecl::CollectionRef { name: FXFS_CRYPT_COLLECTION_NAME.to_string() };
+
+        let component_name = format!("fxfs-crypt.{}", INSTANCE.fetch_add(1, Ordering::SeqCst));
+
+        let child_decl = fdecl::Child {
+            name: Some(component_name.clone()),
+            url: Some("#meta/fxfs-crypt.cm".to_string()),
+            startup: Some(fdecl::StartupMode::Lazy),
+            ..fdecl::Child::EMPTY
+        };
+
+        let realm_proxy = connect_to_protocol::<RealmMarker>()?;
+
+        realm_proxy
+            .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
+            .await?
+            .map_err(|e| anyhow!("create_child failed: {:?}", e))?;
+
+        let exposed_dir = open_childs_exposed_directory(
+            component_name.clone(),
+            Some(FXFS_CRYPT_COLLECTION_NAME.to_string()),
+        )
+        .await?;
+
+        let crypt_management =
+            connect_to_protocol_at_dir_root::<CryptManagementMarker>(&exposed_dir)?;
+        crypt_management
+            .add_wrapping_key(0, data_key.deref())
+            .await?
+            .map_err(zx::Status::from_raw)?;
+        crypt_management
+            .add_wrapping_key(1, metadata_key.deref())
+            .await?
+            .map_err(zx::Status::from_raw)?;
+        crypt_management
+            .set_active_key(KeyPurpose::Data, 0)
+            .await?
+            .map_err(zx::Status::from_raw)?;
+        crypt_management
+            .set_active_key(KeyPurpose::Metadata, 1)
+            .await?
+            .map_err(zx::Status::from_raw)?;
+
+        Ok(CryptService { component_name, exposed_dir })
+    }
+}
+
+impl Drop for CryptService {
+    fn drop(&mut self) {
+        if let Ok(realm_proxy) = connect_to_protocol::<RealmMarker>() {
+            let _ = realm_proxy.destroy_child(&mut fdecl::ChildRef {
+                name: self.component_name.clone(),
+                collection: Some(FXFS_CRYPT_COLLECTION_NAME.to_string()),
+            });
+        }
+    }
 }

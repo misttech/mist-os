@@ -4,27 +4,25 @@
 {
     children: [
         {
-            name: "fxfs-crypt",
-            url: "#meta/fxfs-crypt.cm",
-        },
-        {
             name: "fxfs",
             url: "#meta/fxfs.cm",
         },
     ],
+    collections: [
+        {
+            name: "fxfs-crypt",
+            durability: "transient",
+        },
+    ],
     use: [
-        {
-            protocol: "fuchsia.fxfs.Crypt",
-            from: "#fxfs-crypt",
-        },
-        {
-            protocol: "fuchsia.fxfs.CryptManagement",
-            from: "#fxfs-crypt",
-        },
         {
             protocol: "fuchsia.fs.startup.Startup",
             from: "#fxfs",
             path: "/fxfs/svc/fuchsia.fs.startup.Startup",
+        },
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
         },
     ],
     offer: [

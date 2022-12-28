@@ -15,7 +15,7 @@ use {
     fidl::endpoints::RequestStream,
     fidl_fuchsia_fshost as fshost,
     fidl_fuchsia_hardware_block::BlockMarker,
-    fidl_fuchsia_io::OpenFlags,
+    fidl_fuchsia_io::{self as fio, OpenFlags},
     fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream},
     fs_management::{
         format::DiskFormat,
@@ -53,6 +53,7 @@ impl FshostShutdownResponder {
 const FIND_PARTITION_DURATION: Duration = Duration::from_seconds(10);
 const DATA_PARTITION_LABEL: &str = "data";
 const LEGACY_DATA_PARTITION_LABEL: &str = "minfs";
+pub const SHRED_DATA_VOLUME_MARKER_FILE: &str = "shred_data_volume";
 
 fn data_partition_names() -> Vec<String> {
     vec![DATA_PARTITION_LABEL.to_string(), LEGACY_DATA_PARTITION_LABEL.to_string()]
@@ -183,15 +184,33 @@ async fn write_data_file(
     return Ok(());
 }
 
-async fn shred_data_volume(config: &fshost_config::Config) -> Result<(), zx::Status> {
+async fn shred_data_volume(
+    config: &fshost_config::Config,
+    data_root: &fio::DirectoryProxy,
+) -> Result<(), zx::Status> {
     if config.data_filesystem_format != "fxfs" {
         return Err(zx::Status::NOT_SUPPORTED);
     }
     // If we expect Fxfs to be live, just erase the key bag.
     if config.data && !config.fvm_ramdisk {
-        std::fs::remove_file(KEY_BAG_FILE)?;
-
-        debug_log("Erased key bag");
+        if config.use_native_fxfs_crypto {
+            std::fs::remove_file(KEY_BAG_FILE)?;
+            debug_log("Erased key bag");
+        } else {
+            // If we're using legacy crypto (which we will until we can switch to hardware backed
+            // keys), all we can do is store a file so that the volume gets wiped on next boot.
+            fuchsia_fs::directory::open_file(
+                data_root,
+                SHRED_DATA_VOLUME_MARKER_FILE,
+                fio::OpenFlags::CREATE,
+            )
+            .await
+            .map_err(|error| {
+                tracing::warn!(?error, "Unable to create shred_data_volume marker file");
+                zx::Status::INTERNAL
+            })?;
+            debug_log("Wrote shred_data_volume marker file");
+        }
     } else {
         // Otherwise we need to find the Fxfs partition and shred it.
         let partition_path =
@@ -222,10 +241,12 @@ async fn shred_data_volume(config: &fshost_config::Config) -> Result<(), zx::Sta
 pub fn fshost_admin(
     config: Arc<fshost_config::Config>,
     launcher: Arc<FilesystemLauncher>,
+    data_root: fio::DirectoryProxy,
 ) -> Arc<service::Service> {
     service::host(move |mut stream: fshost::AdminRequestStream| {
         let config = config.clone();
         let launcher = launcher.clone();
+        let data_root = fuchsia_fs::directory::clone_no_describe(&data_root, None).unwrap();
         async move {
             while let Some(request) = stream.next().await {
                 match request {
@@ -287,7 +308,7 @@ pub fn fshost_admin(
                     }
                     Ok(fshost::AdminRequest::ShredDataVolume { responder }) => {
                         tracing::info!("admin shred data volume called");
-                        let mut res = match shred_data_volume(&config).await {
+                        let mut res = match shred_data_volume(&config, &data_root).await {
                             Ok(()) => Ok(()),
                             Err(e) => {
                                 debug_log(&format!(

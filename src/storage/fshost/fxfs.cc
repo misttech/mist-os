@@ -5,6 +5,7 @@
 #include "src/storage/fshost/fxfs.h"
 
 #include <fcntl.h>
+#include <fidl/fuchsia.component/cpp/wire.h>
 #include <fidl/fuchsia.fxfs/cpp/wire.h>
 #include <fidl/fuchsia.fxfs/cpp/wire_types.h>
 #include <lib/component/incoming/cpp/service_client.h>
@@ -91,33 +92,81 @@ zx::result<crypto::Bytes> GenerateInsecureKey(std::string_view key_name) {
   return zx::ok(std::move(key));
 }
 
-zx::result<> InitCryptClient(fidl::UnownedClientEnd<fuchsia_fxfs::CryptManagement> crypt,
-                             crypto::Bytes data, crypto::Bytes metadata) {
-  if (auto result = fidl::WireCall(crypt)->AddWrappingKey(
+// This will spawn a new crypt client component. Nothing exists to destroy the components so it's
+// possible to end up with orphaned crypt components.  The Rust port of fshost does not have this
+// problem and the C++ version of fshost is not long for this world, so it's not something to worry
+// about.
+zx::result<fidl::ClientEnd<fuchsia_io::Directory>> InitCryptClient(crypto::Bytes data,
+                                                                   crypto::Bytes metadata) {
+  auto realm_client_end = component::Connect<fuchsia_component::Realm>();
+  if (realm_client_end.is_error())
+    return realm_client_end.take_error();
+  fidl::WireSyncClient realm{std::move(*realm_client_end)};
+  fidl::ClientEnd<fuchsia_io::Directory> client_end;
+
+  static std::atomic_int instance(1);
+  std::string component_name = "fxfs-crypt." + std::to_string(instance.fetch_add(1));
+  constexpr std::string_view kCollectionName = "fxfs-crypt";
+
+  fidl::Arena allocator;
+  fuchsia_component_decl::wire::CollectionRef collection_ref{
+      .name = fidl::StringView::FromExternal(kCollectionName)};
+  auto child_decl = fuchsia_component_decl::wire::Child::Builder(allocator)
+                        .name(component_name)
+                        .url("#meta/fxfs-crypt.cm")
+                        .startup(fuchsia_component_decl::wire::StartupMode::kLazy)
+                        .Build();
+  fuchsia_component::wire::CreateChildArgs child_args;
+  auto create_res = realm->CreateChild(collection_ref, child_decl, child_args);
+  if (!create_res.ok())
+    return zx::error(create_res.status());
+  if (create_res->is_error())
+    return zx::error(ZX_ERR_INVALID_ARGS);
+
+  fuchsia_component_decl::wire::ChildRef child_ref{
+      .name = fidl::StringView::FromExternal(component_name),
+      .collection = fidl::StringView::FromExternal(kCollectionName)};
+  auto exposed_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (exposed_endpoints.is_error())
+    return exposed_endpoints.take_error();
+  auto open_exposed_res = realm->OpenExposedDir(child_ref, std::move(exposed_endpoints->server));
+  if (!open_exposed_res.ok()) {
+    return zx::error(open_exposed_res.status());
+  }
+  if (open_exposed_res->is_error())
+    return zx::error(ZX_ERR_INVALID_ARGS);
+
+  auto crypt = component::ConnectAt<fuchsia_fxfs::CryptManagement>(exposed_endpoints->client);
+  if (crypt.is_error()) {
+    FX_PLOGS(ERROR, crypt.error_value()) << "Failed to connect to CryptManagement service.";
+    return crypt.take_error();
+  }
+
+  if (auto result = fidl::WireCall(*crypt)->AddWrappingKey(
           0, fidl::VectorView<unsigned char>::FromExternal(data.get(), data.len()));
       !result.ok()) {
     FX_LOGS(ERROR) << "Failed to add data key: " << zx_status_get_string(result.status());
     return zx::error(result.status());
   }
-  if (auto result = fidl::WireCall(crypt)->AddWrappingKey(
+  if (auto result = fidl::WireCall(*crypt)->AddWrappingKey(
           1, fidl::VectorView<unsigned char>::FromExternal(metadata.get(), metadata.len()));
       !result.ok()) {
     FX_LOGS(ERROR) << "Failed to add metadata key: " << zx_status_get_string(result.status());
     return zx::error(result.status());
   }
-  if (auto result = fidl::WireCall(crypt)->SetActiveKey(fuchsia_fxfs::wire::KeyPurpose::kData, 0);
+  if (auto result = fidl::WireCall(*crypt)->SetActiveKey(fuchsia_fxfs::wire::KeyPurpose::kData, 0);
       !result.ok()) {
     FX_LOGS(ERROR) << "Failed to set active data key: " << zx_status_get_string(result.status());
     return zx::error(result.status());
   }
   if (auto result =
-          fidl::WireCall(crypt)->SetActiveKey(fuchsia_fxfs::wire::KeyPurpose::kMetadata, 1);
+          fidl::WireCall(*crypt)->SetActiveKey(fuchsia_fxfs::wire::KeyPurpose::kMetadata, 1);
       !result.ok()) {
     FX_LOGS(ERROR) << "Failed to set active metadata key: "
                    << zx_status_get_string(result.status());
     return zx::error(result.status());
   }
-  return zx::ok();
+  return zx::ok(std::move(exposed_endpoints->client));
 }
 
 zx::result<fs_management::MountedVolume*> UnwrapOrInitDataVolume(
@@ -144,18 +193,14 @@ zx::result<fs_management::MountedVolume*> UnwrapOrInitDataVolume(
     crypto::Bytes data_key, metadata_key;
     data_key.Copy(kLegacyCryptDataKey, sizeof(kLegacyCryptDataKey));
     metadata_key.Copy(kLegacyCryptMetadataKey, sizeof(kLegacyCryptMetadataKey));
-    auto cm_client = component::Connect<fuchsia_fxfs::CryptManagement>();
-    if (cm_client.is_error()) {
-      FX_PLOGS(ERROR, cm_client.error_value()) << "Failed to connect to CryptManagement service.";
-      return cm_client.take_error();
-    }
-    if (auto status = InitCryptClient(*cm_client, std::move(data_key), std::move(metadata_key));
-        status.is_error())
-      return status.take_error();
+
+    auto exposed_dir = InitCryptClient(std::move(data_key), std::move(metadata_key));
+    if (exposed_dir.is_error())
+      return exposed_dir.take_error();
 
     if (!create && config.check_filesystems()) {
       FX_LOGS(INFO) << "Checking default volume integrity...";
-      auto crypt = component::Connect<fuchsia_fxfs::Crypt>();
+      auto crypt = component::ConnectAt<fuchsia_fxfs::Crypt>(*exposed_dir);
       if (crypt.is_error()) {
         FX_PLOGS(ERROR, crypt.error_value()) << "Failed to connect to Crypt service.";
         return crypt.take_error();
@@ -166,7 +211,7 @@ zx::result<fs_management::MountedVolume*> UnwrapOrInitDataVolume(
         return status.take_error();
       }
     }
-    auto crypt = component::Connect<fuchsia_fxfs::Crypt>();
+    auto crypt = component::ConnectAt<fuchsia_fxfs::Crypt>(*exposed_dir);
     if (crypt.is_error()) {
       FX_PLOGS(ERROR, crypt.error_value()) << "Failed to connect to Crypt service.";
       return crypt.take_error();
@@ -281,19 +326,14 @@ zx::result<fs_management::MountedVolume*> UnwrapOrInitDataVolume(
     return zx::error(status);
   if (status = metadata_key.Copy(metadata_unwrapped._0, key_bag::AES256_KEY_SIZE); status != ZX_OK)
     return zx::error(status);
-  auto cm_client = component::Connect<fuchsia_fxfs::CryptManagement>();
-  if (cm_client.is_error()) {
-    FX_PLOGS(ERROR, cm_client.error_value()) << "Failed to connect to CryptManagement service.";
-    return cm_client.take_error();
-  }
-  if (auto status = InitCryptClient(*cm_client, std::move(data_key), std::move(metadata_key));
-      status.is_error())
-    return status.take_error();
+  auto exposed_dir = InitCryptClient(std::move(data_key), std::move(metadata_key));
+  if (exposed_dir.is_error())
+    return exposed_dir.take_error();
 
   // OK, crypt is seeded with the stored keys, so we can finally open the data volume.
   if (!create && config.check_filesystems()) {
     FX_LOGS(INFO) << "Checking " << kFxfsDataVolumeName << " volume integrity...";
-    auto crypt = component::Connect<fuchsia_fxfs::Crypt>();
+    auto crypt = component::ConnectAt<fuchsia_fxfs::Crypt>(*exposed_dir);
     if (crypt.is_error()) {
       FX_PLOGS(ERROR, crypt.error_value()) << "Failed to connect to Crypt service.";
       return crypt.take_error();
@@ -304,7 +344,7 @@ zx::result<fs_management::MountedVolume*> UnwrapOrInitDataVolume(
       return status.take_error();
     }
   }
-  auto crypt = component::Connect<fuchsia_fxfs::Crypt>();
+  auto crypt = component::ConnectAt<fuchsia_fxfs::Crypt>(*exposed_dir);
   if (crypt.is_error()) {
     FX_PLOGS(ERROR, crypt.error_value()) << "Failed to connect to Crypt service.";
     return crypt.take_error();

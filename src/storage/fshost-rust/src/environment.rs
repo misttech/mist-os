@@ -5,7 +5,10 @@
 use {
     crate::{
         boot_args::BootArgs,
-        crypt::{fxfs, zxcrypt},
+        crypt::{
+            fxfs::{self, CryptService},
+            zxcrypt,
+        },
         device::{constants::DEFAULT_F2FS_MIN_BYTES, Device},
         volume::resize_volume,
     },
@@ -53,7 +56,7 @@ pub trait Environment: Send + Sync {
 pub enum Filesystem {
     Queue(Vec<ServerEnd<fio::DirectoryMarker>>),
     Serving(ServingSingleVolumeFilesystem),
-    ServingMultiVolume(ServingMultiVolumeFilesystem, String),
+    ServingMultiVolume(CryptService, ServingMultiVolumeFilesystem, String),
 }
 
 impl Filesystem {
@@ -64,7 +67,7 @@ impl Filesystem {
             Filesystem::Serving(fs) => {
                 fs.root().clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?
             }
-            Filesystem::ServingMultiVolume(fs, data_volume_name) => fs
+            Filesystem::ServingMultiVolume(_, fs, data_volume_name) => fs
                 .volume(&data_volume_name)
                 .ok_or(anyhow!("data volume {} not found", data_volume_name))?
                 .root()
@@ -84,7 +87,9 @@ impl Filesystem {
         match self {
             Filesystem::Queue(_) => Ok(()),
             Filesystem::Serving(fs) => fs.shutdown().await.context("shutdown failed"),
-            Filesystem::ServingMultiVolume(fs, _) => fs.shutdown().await.context("shutdown failed"),
+            Filesystem::ServingMultiVolume(_, fs, _) => {
+                fs.shutdown().await.context("shutdown failed")
+            }
         }
     }
 }
@@ -380,10 +385,9 @@ impl FilesystemLauncher {
             match format {
                 DiskFormat::Fxfs => {
                     let mut serving_fs = fs.serve_multi_volume().await?;
-                    fxfs::unlock_data_volume(&mut serving_fs, &self.config)
-                        .await
-                        .map(|t| t.0)
-                        .map(|volume_name| Filesystem::ServingMultiVolume(serving_fs, volume_name))
+                    let (crypt_service, volume_name, _) =
+                        fxfs::unlock_data_volume(&mut serving_fs, &self.config).await?;
+                    Ok(Filesystem::ServingMultiVolume(crypt_service, serving_fs, volume_name))
                 }
                 _ => Ok(Filesystem::Serving(fs.serve().await?)),
             }
@@ -466,8 +470,9 @@ impl FilesystemLauncher {
         fs.format().await?;
         let mut serving_fs = if let DiskFormat::Fxfs = format {
             let mut serving_fs = fs.serve_multi_volume().await?;
-            let (volume_name, _) = fxfs::init_data_volume(&mut serving_fs, &self.config).await?;
-            Filesystem::ServingMultiVolume(serving_fs, volume_name)
+            let (crypt_service, volume_name, _) =
+                fxfs::init_data_volume(&mut serving_fs, &self.config).await?;
+            Filesystem::ServingMultiVolume(crypt_service, serving_fs, volume_name)
         } else {
             Filesystem::Serving(fs.serve().await?)
         };

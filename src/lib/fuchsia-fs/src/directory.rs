@@ -261,7 +261,7 @@ pub fn open_node_no_describe(
 }
 
 /// Opens a new connection to the given directory using `flags` if provided, or
-/// `fidl_fuchsia_io::OpenFlags::SAME_RIGHTS` otherwise.
+/// `fidl_fuchsia_io::OpenFlags::CLONE_SAME_RIGHTS` otherwise.
 pub fn clone_no_describe(
     dir: &fio::DirectoryProxy,
     flags: Option<fio::OpenFlags>,
