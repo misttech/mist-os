@@ -74,7 +74,7 @@ TEST_F(UIStateProviderTest, Get) {
 
   EXPECT_THAT(ui_state_provider_->Get(),
               UnorderedElementsAreArray({
-                  Pair(kSystemUserActivityCurrentDurationKey, "0d0h0m2s"),
+                  Pair(kSystemUserActivityCurrentDurationKey, "000d00h00m02s"),
               }));
 }
 
@@ -151,7 +151,7 @@ TEST_F(UIStateProviderTest, ReconnectsOnProviderDisconnect) {
                            }));
   EXPECT_THAT(ui_state_provider_->Get(),
               UnorderedElementsAreArray({
-                  Pair(kSystemUserActivityCurrentDurationKey, "0d0h0m1s"),
+                  Pair(kSystemUserActivityCurrentDurationKey, "000d00h00m01s"),
               }));
 }
 
@@ -189,7 +189,7 @@ TEST_F(UIStateProviderTest, ReconnectsOnListenerDisconnect) {
                            }));
   EXPECT_THAT(ui_state_provider_->Get(),
               UnorderedElementsAreArray({
-                  Pair(kSystemUserActivityCurrentDurationKey, "0d0h0m1s"),
+                  Pair(kSystemUserActivityCurrentDurationKey, "000d00h00m01s"),
               }));
 }
 

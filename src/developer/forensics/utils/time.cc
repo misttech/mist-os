@@ -33,7 +33,7 @@ std::optional<std::string> FormatDuration(zx::duration duration) {
 
   int64_t s = duration.to_secs();
 
-  return fxl::StringPrintf("%ldd%ldh%ldm%lds", d, h, m, s);
+  return fxl::StringPrintf("%03ldd%02ldh%02ldm%02lds", d, h, m, s);
 }
 
 timekeeper::time_utc CurrentUtcTimeRaw(timekeeper::Clock* clock) {
