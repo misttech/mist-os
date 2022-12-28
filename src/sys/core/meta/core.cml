@@ -95,10 +95,6 @@
             url: "fuchsia-pkg://fuchsia.com/diagnostics-persistence#meta/diagnostics-persistence.cm",
         },
         {
-            name: "diagnostics-kcounter",
-            url: "fuchsia-pkg://fuchsia.com/diagnostics-kcounter#meta/diagnostics-kcounter.cm",
-        },
-        {
             name: "log-stats",
             url: "fuchsia-pkg://fuchsia.com/log-stats#meta/log-stats.cm",
         },
@@ -364,11 +360,6 @@
             protocol: "fuchsia.pkg.PackageResolver",
             from: "#pkg-resolver",
             to: "#debug-dash-launcher",
-        },
-        {
-            protocol: [ "fuchsia.kernel.Counter" ],
-            from: "parent",
-            to: "#diagnostics-kcounter",
         },
         {
             protocol: [
@@ -798,11 +789,6 @@
             protocol: [ "fuchsia.component.Binder" ],
             from: "#detect",
             as: "fuchsia.component.DetectBinder",
-        },
-        {
-            protocol: [ "fuchsia.component.Binder" ],
-            from: "#diagnostics-kcounter",
-            as: "fuchsia.component.KcounterBinder",
         },
         {
             protocol: [ "fuchsia.component.Binder" ],

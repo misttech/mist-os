@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
+import("//src/sys/core/build/core_shard.gni")
 
 rustc_library("lib") {
   name = "kcounter"
@@ -43,6 +44,10 @@ fuchsia_package_with_single_component("diagnostics-kcounter") {
 
 fuchsia_unittest_package("diagnostics-kcounter-tests") {
   deps = [ ":lib_test" ]
+}
+
+core_shard("core_shard") {
+  shard_file = "meta/diagnostics-kcounter.core_shard.cml"
 }
 
 group("tests") {
