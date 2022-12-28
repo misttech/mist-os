@@ -214,10 +214,6 @@
             from: "#cobalt",
         },
         {
-            protocol: "fuchsia.diagnostics.persist.DataPersistence-wlan",
-            from: "#diagnostics-persistence",
-        },
-        {
             protocol: "fuchsia.ssh.AuthorizedKeys",
             from: "#ssh-key-manager",
         },
