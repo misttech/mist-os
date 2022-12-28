@@ -27,7 +27,6 @@ var (
 
 var (
 	configFile_deprecated = flag.String("config_file", "", "Deprecated, but kept around for backwards compatibility.")
-	filter                = flag.String("filter", "", "Files that contain dependencies of the target or workspace. Used to filter projects in the final NOTICE file.")
 
 	diffTarget = flag.String("diff_target", "", "Notice file to diff the current licenses against.")
 

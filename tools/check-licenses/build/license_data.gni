@@ -24,11 +24,6 @@ import("//build/info/info.gni")
 #
 #   testonly, visibility
 template("license_data") {
-  filter = ""
-  if (defined(invoker.filter)) {
-    filter = invoker.filter
-  }
-
   target = "//:default"
   if (defined(invoker.target)) {
     target = invoker.target
@@ -124,13 +119,6 @@ template("license_data") {
       "--build_info_board",
       build_info_board,
     ]
-
-    if (filter != "") {
-      args += [
-        "--filter",
-        filter,
-      ]
-    }
 
     args += [ target ]
 
