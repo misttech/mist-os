@@ -67,7 +67,7 @@ from `DeviceType`:
 
 Because the `DeviceType` class contains mixins (lines `[02` .. `03]`:
 `Initializable` and `Unbindable`), we're required to provide the respective
-function implementations (lines `[17` .. `28]`) in our class.
+function implementations (lines `[17` .. `18]`) in our class.
 
 All DDKTL classes must provide a release function (here, line `[19]` provides
 **DdkRelease()**), so that's why we didn't specify this in the mixin definition
