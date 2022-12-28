@@ -58,10 +58,9 @@ struct StructPadding {
   StructPadding(uint32_t offset_v2, std::variant<uint16_t, uint32_t, uint64_t> mask)
       : offset_v2(offset_v2), mask(mask) {}
 
-  // TODO(bprosnitz) This computes a mask for a single padding segment.
-  // It is inefficient if multiple padding segments can be covered by a single mask.
-  // (e.g. struct{uint8, uint16, uint8, uint16} has two padding segments but can
-  // be covered by a single uint64 mask)
+  // TODO(fxbug.dev/118282) This computes a mask for a single padding segment. It is inefficient if
+  // multiple padding segments can be covered by a single mask. (e.g. struct{uint8, uint16, uint8,
+  // uint16} has two padding segments but can be covered by a single uint64 mask)
   static StructPadding FromLength(uint32_t offset_v2, uint32_t length) {
     ZX_ASSERT_MSG(length != 0, "padding shouldn't be created for zero-length offsets");
     if (length <= 2) {

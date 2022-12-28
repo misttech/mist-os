@@ -12,8 +12,8 @@ void LogMessageAndAbort(const char* file, int line, const char* condition, const
 
 }  // namespace fidl
 
-// TODO(unification): This can be replaced by FX_CHECK(condition) << message
-// when //sdk/lib/syslog can be used here.
+// TODO(fxbug.dev/118282): This can be replaced by FX_CHECK(condition) << message when
+// //sdk/lib/syslog can be used here.
 #define FIDL_CHECK(condition, message)                                     \
   do {                                                                     \
     if (!(condition)) {                                                    \

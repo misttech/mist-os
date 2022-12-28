@@ -706,8 +706,8 @@ bool CompileStep::TypeIsConvertibleTo(const Type* from_type, const Type* to_type
         case types::PrimitiveSubtype::kBool:
           return from_primitive_type->subtype == types::PrimitiveSubtype::kBool;
         default:
-          // TODO(pascallouis): be more precise about convertibility, e.g. it
-          // should not be allowed to convert a float to an int.
+          // TODO(fxbug.dev/118282): be more precise about convertibility, e.g. it should not be
+          // allowed to convert a float to an int.
           return from_primitive_type->subtype != types::PrimitiveSubtype::kBool;
       }
     }

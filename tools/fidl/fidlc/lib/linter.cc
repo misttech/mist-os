@@ -321,7 +321,7 @@ void Linter::AddInvalidCopyrightFinding(SourceSpan span) {
 void Linter::CheckInvalidCopyright(SourceSpan span, std::string line_comment,
                                    std::string line_to_match) {
   if (line_comment == line_to_match ||
-      // TODO(66908): Remove this branch once all platform FIDL files are updated.
+      // TODO(fxbug.dev/66908): Remove this branch once all platform FIDL files are updated.
       line_comment == line_to_match + " All rights reserved.") {
     good_copyright_lines_found_++;
     return;

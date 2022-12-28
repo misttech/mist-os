@@ -303,14 +303,126 @@ void Write(const std::ostringstream& output_stream, const std::string& file_path
 
 }  // namespace
 
-// TODO(pascallouis): remove forward declaration, this was only introduced to
-// reduce diff size while breaking things up.
 int compile(fidl::Reporter* reporter, const std::string& library_name,
             const std::string& dep_file_path, const std::vector<std::string>& source_list,
             const std::vector<std::pair<Behavior, std::string>>& outputs,
             const std::vector<fidl::SourceManager>& source_managers,
             fidl::VirtualSourceFile* virtual_file, const fidl::VersionSelection* version_selection,
-            fidl::ExperimentalFlags experimental_flags);
+            fidl::ExperimentalFlags experimental_flags) {
+  fidl::flat::Libraries all_libraries(reporter, virtual_file);
+  for (const auto& source_manager : source_managers) {
+    if (source_manager.sources().empty()) {
+      continue;
+    }
+    fidl::flat::Compiler compiler(&all_libraries, version_selection,
+                                  fidl::ordinals::GetGeneratedOrdinal64, experimental_flags);
+    for (const auto& source_file : source_manager.sources()) {
+      if (!Parse(*source_file, reporter, &compiler, experimental_flags)) {
+        return 1;
+      }
+    }
+    if (!compiler.Compile()) {
+      return 1;
+    }
+  }
+  if (all_libraries.Empty()) {
+    Fail("No library was produced.\n");
+  }
+
+  auto unused_libraries = all_libraries.Unused();
+  // TODO(fxbug.dev/90838): Remove this once all GN rules only include zx
+  // sources when the zx library is actually used.
+  if (auto zx_library = all_libraries.Lookup({"zx"})) {
+    if (auto iter = unused_libraries.find(zx_library); iter != unused_libraries.end()) {
+      // Remove from unused_libraries to avoid reporting an error below.
+      unused_libraries.erase(iter);
+      // Remove from all_libraries to avoid emitting it in coding tables.
+      all_libraries.Remove(zx_library);
+    }
+  }
+  if (!unused_libraries.empty()) {
+    std::string library_names;
+    bool first = true;
+    for (auto library : unused_libraries) {
+      if (first) {
+        first = false;
+      } else {
+        library_names.append(", ");
+      }
+      library_names.append(fidl::NameLibrary(library->name));
+    }
+    library_names.append("\n");
+    Fail("Unused libraries provided via --files: %s", library_names.c_str());
+  }
+
+  auto compilation = all_libraries.Filter(version_selection);
+
+  // Verify that the produced library's name matches the expected name.
+  std::string produced_name = fidl::NameLibrary(compilation->library_name);
+  if (!library_name.empty() && produced_name != library_name) {
+    Fail("Generated library '%s' did not match --name argument: %s\n", produced_name.data(),
+         library_name.data());
+  }
+
+  // Write depfile, with format:
+  // output1 : inputA inputB inputC
+  // output2 : inputA inputB inputC
+  // ...
+  if (!dep_file_path.empty()) {
+    std::ostringstream dep_file_contents;
+    for (auto& output : outputs) {
+      auto& file_path = output.second;
+      dep_file_contents << file_path << " ";
+      dep_file_contents << ": ";
+      for (auto& input_path : source_list) {
+        dep_file_contents << input_path << " ";
+      }
+      dep_file_contents << "\n";
+    }
+
+    Write(dep_file_contents, dep_file_path);
+  }
+
+  // We recompile dependencies, and only emit output for the target library.
+  for (auto& output : outputs) {
+    auto& behavior = output.first;
+    auto& file_path = output.second;
+
+    switch (behavior) {
+      case Behavior::kCHeader: {
+        fidl::CGenerator generator(compilation.get());
+        Write(generator.ProduceHeader(), file_path);
+        break;
+      }
+      case Behavior::kCClient: {
+        fidl::CGenerator generator(compilation.get());
+        Write(generator.ProduceClient(), file_path);
+        break;
+      }
+      case Behavior::kCServer: {
+        fidl::CGenerator generator(compilation.get());
+        Write(generator.ProduceServer(), file_path);
+        break;
+      }
+      case Behavior::kTables: {
+        fidl::TablesGenerator generator(compilation.get());
+        Write(generator.Produce(), file_path);
+        break;
+      }
+      case Behavior::kJSON: {
+        fidl::JSONGenerator generator(compilation.get(), experimental_flags);
+        Write(generator.Produce(), file_path);
+        break;
+      }
+      case Behavior::kIndex: {
+        fidl::IndexJSONGenerator generator(compilation.get());
+        Write(generator.Produce(), file_path);
+        break;
+      }
+    }
+  }
+  return 0;
+}
 
 int main(int argc, char* argv[]) {
   auto args = std::make_unique<ArgvArguments>(argc, argv);
@@ -437,125 +549,4 @@ int main(int argc, char* argv[]) {
     reporter.PrintReports(enable_color);
   }
   return status;
-}
-
-int compile(fidl::Reporter* reporter, const std::string& library_name,
-            const std::string& dep_file_path, const std::vector<std::string>& source_list,
-            const std::vector<std::pair<Behavior, std::string>>& outputs,
-            const std::vector<fidl::SourceManager>& source_managers,
-            fidl::VirtualSourceFile* virtual_file, const fidl::VersionSelection* version_selection,
-            fidl::ExperimentalFlags experimental_flags) {
-  fidl::flat::Libraries all_libraries(reporter, virtual_file);
-  for (const auto& source_manager : source_managers) {
-    if (source_manager.sources().empty()) {
-      continue;
-    }
-    fidl::flat::Compiler compiler(&all_libraries, version_selection,
-                                  fidl::ordinals::GetGeneratedOrdinal64, experimental_flags);
-    for (const auto& source_file : source_manager.sources()) {
-      if (!Parse(*source_file, reporter, &compiler, experimental_flags)) {
-        return 1;
-      }
-    }
-    if (!compiler.Compile()) {
-      return 1;
-    }
-  }
-  if (all_libraries.Empty()) {
-    Fail("No library was produced.\n");
-  }
-
-  auto unused_libraries = all_libraries.Unused();
-  // TODO(fxbug.dev/90838): Remove this once all GN rules only include zx
-  // sources when the zx library is actually used.
-  if (auto zx_library = all_libraries.Lookup({"zx"})) {
-    if (auto iter = unused_libraries.find(zx_library); iter != unused_libraries.end()) {
-      // Remove from unused_libraries to avoid reporting an error below.
-      unused_libraries.erase(iter);
-      // Remove from all_libraries to avoid emitting it in coding tables.
-      all_libraries.Remove(zx_library);
-    }
-  }
-  if (!unused_libraries.empty()) {
-    std::string library_names;
-    bool first = true;
-    for (auto library : unused_libraries) {
-      if (first) {
-        first = false;
-      } else {
-        library_names.append(", ");
-      }
-      library_names.append(fidl::NameLibrary(library->name));
-    }
-    library_names.append("\n");
-    Fail("Unused libraries provided via --files: %s", library_names.c_str());
-  }
-
-  auto compilation = all_libraries.Filter(version_selection);
-
-  // Verify that the produced library's name matches the expected name.
-  std::string produced_name = fidl::NameLibrary(compilation->library_name);
-  if (!library_name.empty() && produced_name != library_name) {
-    Fail("Generated library '%s' did not match --name argument: %s\n", produced_name.data(),
-         library_name.data());
-  }
-
-  // Write depfile, with format:
-  // output1 : inputA inputB inputC
-  // output2 : inputA inputB inputC
-  // ...
-  if (!dep_file_path.empty()) {
-    std::ostringstream dep_file_contents;
-    for (auto& output : outputs) {
-      auto& file_path = output.second;
-      dep_file_contents << file_path << " ";
-      dep_file_contents << ": ";
-      for (auto& input_path : source_list) {
-        dep_file_contents << input_path << " ";
-      }
-      dep_file_contents << "\n";
-    }
-
-    Write(dep_file_contents, dep_file_path);
-  }
-
-  // We recompile dependencies, and only emit output for the target library.
-  for (auto& output : outputs) {
-    auto& behavior = output.first;
-    auto& file_path = output.second;
-
-    switch (behavior) {
-      case Behavior::kCHeader: {
-        fidl::CGenerator generator(compilation.get());
-        Write(generator.ProduceHeader(), file_path);
-        break;
-      }
-      case Behavior::kCClient: {
-        fidl::CGenerator generator(compilation.get());
-        Write(generator.ProduceClient(), file_path);
-        break;
-      }
-      case Behavior::kCServer: {
-        fidl::CGenerator generator(compilation.get());
-        Write(generator.ProduceServer(), file_path);
-        break;
-      }
-      case Behavior::kTables: {
-        fidl::TablesGenerator generator(compilation.get());
-        Write(generator.Produce(), file_path);
-        break;
-      }
-      case Behavior::kJSON: {
-        fidl::JSONGenerator generator(compilation.get(), experimental_flags);
-        Write(generator.Produce(), file_path);
-        break;
-      }
-      case Behavior::kIndex: {
-        fidl::IndexJSONGenerator generator(compilation.get());
-        Write(generator.Produce(), file_path);
-        break;
-      }
-    }
-  }
-  return 0;
 }

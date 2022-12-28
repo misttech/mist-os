@@ -1863,7 +1863,7 @@ type TableWithNullableHandleArray = resource table {
                                     }));
 }
 
-// TODO(pascallouis): write an "xunions_with_handles" test case.
+// TODO(fxbug.dev/118282): write an "xunions_with_handles" test case.
 
 TEST(TypeshapeTests, GoodFlexibleUnions) {
   TestLibrary test_library(R"FIDL(library example;

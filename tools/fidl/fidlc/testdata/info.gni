@@ -284,7 +284,7 @@ fidl_testdata_info = [
     name = "new_type"
     target = "//tools/fidl/fidlc/testdata:test.newtype"
     denylist = [
-      # TODO(deep.majumder2019): Handle the IR changes for each language binding and other tools
+      # TODO(fxbug.dev/7807): Handle the IR changes for each language binding and other tools
       "fidldoc",
       "fidlgen_banjo",
       "fidlgen_dart",

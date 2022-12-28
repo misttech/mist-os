@@ -246,7 +246,7 @@ static std::vector<const flat::Struct*> ExternalStructs(
 namespace {
 
 // Helper class to calculate Compilation::direct_and_composed_dependencies.
-class CalcDepedencies {
+class CalcDependencies {
  public:
   std::set<const Library*, LibraryComparator> From(std::vector<const Decl*>& roots) && {
     for (const Decl* decl : roots) {
@@ -456,7 +456,7 @@ std::unique_ptr<Compilation> Libraries::Filter(const VersionSelection* version_s
   for (const auto& lib : libraries_) {
     filter(&compilation->all_libraries_declaration_order, lib->declaration_order);
   };
-  auto dependencies = CalcDepedencies().From(compilation->declaration_order);
+  auto dependencies = CalcDependencies().From(compilation->declaration_order);
   dependencies.erase(library);
   dependencies.erase(root_library());
   for (auto dep_library : dependencies) {
