@@ -87,10 +87,6 @@
             url: "fuchsia-pkg://fuchsia.com/cobalt#meta/cobalt.cm",
         },
         {
-            name: "detect",
-            url: "fuchsia-pkg://fuchsia.com/triage-detect#meta/triage-detect.cm",
-        },
-        {
             name: "diagnostics-persistence",
             url: "fuchsia-pkg://fuchsia.com/diagnostics-persistence#meta/diagnostics-persistence.cm",
         },
@@ -329,10 +325,7 @@
         {
             protocol: [ "fuchsia.diagnostics.FeedbackArchiveAccessor" ],
             from: "parent",
-            to: [
-                "#detect",
-                "#diagnostics-persistence",
-            ],
+            to: [ "#diagnostics-persistence" ],
         },
         {
             protocol: [ "fuchsia.diagnostics.persist.DataPersistence-netstack" ],
@@ -434,15 +427,6 @@
             subdir: "diagnostics-persistence",
         },
         {
-            protocol: [
-                "fuchsia.feedback.CrashReporter",
-                "fuchsia.feedback.CrashReportingProductRegister",
-            ],
-            from: "#feedback",
-            to: "#detect",
-            source_availability: "unknown",
-        },
-        {
             protocol: "fuchsia.kernel.Stats",
             from: "parent",
             to: [
@@ -515,12 +499,6 @@
                 "#pkg-resolver",
                 "#timekeeper",
             ],
-        },
-        {
-            directory: "config-data",
-            from: "parent",
-            to: "#detect",
-            subdir: "triage-detect",
         },
         {
             directory: "config-data",
@@ -765,11 +743,6 @@
         {
             protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
             from: "#cobalt",
-        },
-        {
-            protocol: [ "fuchsia.component.Binder" ],
-            from: "#detect",
-            as: "fuchsia.component.DetectBinder",
         },
         {
             protocol: [ "fuchsia.component.Binder" ],
