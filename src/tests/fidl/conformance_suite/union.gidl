@@ -187,7 +187,6 @@ success("FlexibleUnionUnknownValueStored") {
 
 decode_success("FlexibleUnionUnknownValue") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Rewrite this test using the decode() function.
     bindings_allowlist = [rust],
     value = TestFlexibleXUnionInStruct{
         xu: SampleXUnion{
@@ -210,12 +209,18 @@ decode_success("FlexibleUnionUnknownValue") {
 
 encode_failure("FlexibleUnionUnknownValue") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Rewrite this test using the decode() function.
     bindings_allowlist = [rust],
     value = TestFlexibleXUnionInStruct{
-        xu: SampleXUnion{
-            1234: null,
-        },
+        xu: decode({
+            type = SampleXUnion,
+            bytes = {
+                v2 = [
+                    num(1234):8, // unknown ordinal
+                    num(24):4, num(0):2, num(0):2, // envelope
+                    repeat(0xab):20, padding:4, // unknown bytes
+                ],
+            },
+        }),
     },
     err = FLEXIBLE_UNION_UNKNOWN_FIELD,
 }
@@ -248,7 +253,6 @@ success("FlexibleResourceUnionUnknownValueStored") {
 
 decode_success("FlexibleResourceUnionUnknownValue") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Rewrite this test using the decode() function.
     bindings_allowlist = [rust],
     value = TestFlexibleResourceXUnionInStruct{
         xu: SampleResourceXUnion{
@@ -271,12 +275,18 @@ decode_success("FlexibleResourceUnionUnknownValue") {
 
 encode_failure("FlexibleResourceUnionUnknownValue") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Rewrite this test using the decode() function.
     bindings_allowlist = [rust],
     value = TestFlexibleResourceXUnionInStruct{
-        xu: SampleResourceXUnion{
-            1234: null,
-        },
+        xu: decode({
+            type = SampleResourceXUnion,
+            bytes = {
+                v2 = [
+                    num(1234):8, // unknown ordinal
+                    num(24):4, num(0):2, num(0):2, // envelope
+                    repeat(0xab):20, padding:4, // unknown bytes
+                ],
+            },
+        }),
     },
     err = FLEXIBLE_UNION_UNKNOWN_FIELD,
 }
@@ -322,7 +332,6 @@ success("FlexibleResourceUnionUnknownValueWithHandlesStored") {
 
 decode_success("FlexibleResourceUnionUnknownValueWithHandles") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Rewrite this test using the decode() function.
     bindings_allowlist = [rust],
     handle_defs = {
         #0 = event(),
@@ -356,12 +365,29 @@ decode_success("FlexibleResourceUnionUnknownValueWithHandles") {
 
 encode_failure("FlexibleResourceUnionUnknownValueWithHandles") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Rewrite this test using the decode() function.
     bindings_allowlist = [rust],
+    handle_defs = {
+        #0 = event(),
+        #1 = event(),
+        #2 = channel(),
+        #3 = channel(),
+    },
     value = TestFlexibleResourceXUnionInStruct{
-        xu: SampleResourceXUnion{
-            1234: null,
-        },
+        xu: decode({
+            type = SampleResourceXUnion,
+            bytes = {
+                v2 = [
+                    num(1234):8, // unknown ordinal
+                    num(24):4, num(4):2, num(0):2, // envelope
+                    repeat(0xab):20, padding:4, // unknown bytes
+                ],
+            },
+            handles = {
+                v2 = [
+                    #0, #1, #2, #3,
+                ],
+            },
+        }),
     },
     err = FLEXIBLE_UNION_UNKNOWN_FIELD,
 }
@@ -444,7 +470,6 @@ decode_failure("FlexibleUnionUnknownValueWithHandles") {
 
 decode_success("FlexibleUnionUnknownValueWithHandlesCloseHandles") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Rewrite this test using the decode() function.
     bindings_allowlist = [rust],
     handle_defs = {
         #0 = event(),
@@ -665,7 +690,6 @@ success("UnionEnvelopeInlining_UnknownSmallValue_Inlined_Stored") {
 
 decode_success("UnionEnvelopeInlining_UnknownSmallValue_Inlined") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Rewrite this test using the decode() function.
     bindings_allowlist = [rust],
     value = EnvelopeInliningTestUnionStruct{
         u: EnvelopeInliningTestUnion{
@@ -706,7 +730,6 @@ success("UnionEnvelopeInlining_UnknownLargeValue_Outlined_Stored") {
 
 decode_success("UnionEnvelopeInlining_UnknownLargeValue_Outlined") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Rewrite this test using the decode() function.
     bindings_allowlist = [rust],
     value = EnvelopeInliningTestUnionStruct{
         u: EnvelopeInliningTestUnion{
@@ -754,7 +777,6 @@ success("UnionEnvelopeInlining_UnknownHandleValue_Inlined_Stored") {
 
 decode_success("UnionEnvelopeInlining_UnknownHandleValue_Inlined") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Rewrite this test using the decode() function.
     bindings_allowlist = [rust],
     handle_defs = {
         #0 = event(),
@@ -823,7 +845,6 @@ encode_failure("RequiredFlexibleValueUnionZeroOrdinalNoPayloadOld") {
 
 encode_failure("RequiredFlexibleValueUnionZeroOrdinalNoPayload") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Rewrite this test using the decode() function.
     bindings_allowlist = [rust],
     value = TestFlexibleXUnionInStruct{
         xu: SampleXUnion{
@@ -863,7 +884,6 @@ encode_failure("RequiredFlexibleResourceUnionZeroOrdinalNoPayloadOld") {
 
 encode_failure("RequiredFlexibleResourceUnionZeroOrdinalNoPayload") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Rewrite this test using the decode() function.
     bindings_allowlist = [rust],
     value = TestFlexibleResourceXUnionInStruct{
         xu: SampleResourceXUnion{
@@ -1308,7 +1328,6 @@ decode_success("EmptyFlexibleUnionDecodesUnknownSmallValueStored") {
 
 decode_success("EmptyFlexibleUnionDecodesUnknownSmallValue") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Rewrite this test using the decode() function.
     bindings_allowlist = [rust],
     value = StructOfEmptyFlexibleUnion{
         empty: EmptyFlexibleUnion{
@@ -1350,7 +1369,6 @@ decode_success("EmptyFlexibleUnionDecodesUnknownLargeValueStored") {
 
 decode_success("EmptyFlexibleUnionDecodesUnknownLargeValue") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Rewrite this test using the decode() function.
     bindings_allowlist = [rust],
     value = StructOfEmptyFlexibleUnion{
         empty: EmptyFlexibleUnion{

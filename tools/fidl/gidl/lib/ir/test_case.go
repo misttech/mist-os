@@ -20,7 +20,7 @@ type All struct {
 
 type EncodeSuccess struct {
 	Name              string
-	Value             Record
+	Value             RecordLike
 	Encodings         []HandleDispositionEncoding
 	HandleDefs        []HandleDef
 	BindingsAllowlist *LanguageList
@@ -33,7 +33,7 @@ type EncodeSuccess struct {
 
 type DecodeSuccess struct {
 	Name              string
-	Value             Record
+	Value             RecordLike
 	Encodings         []Encoding
 	HandleDefs        []HandleDef
 	BindingsAllowlist *LanguageList
@@ -42,7 +42,7 @@ type DecodeSuccess struct {
 
 type EncodeFailure struct {
 	Name              string
-	Value             Record
+	Value             RecordLike
 	HandleDefs        []HandleDef
 	Err               ErrorCode
 	BindingsAllowlist *LanguageList
@@ -61,7 +61,7 @@ type DecodeFailure struct {
 
 type Benchmark struct {
 	Name                     string
-	Value                    Record
+	Value                    RecordLike
 	HandleDefs               []HandleDef
 	BindingsAllowlist        *LanguageList
 	BindingsDenylist         *LanguageList

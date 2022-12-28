@@ -48,16 +48,6 @@ func buildHandles(handles []ir.Handle) string {
 	return builder.String()
 }
 
-func buildHandleValues(handles []ir.Handle) string {
-	var builder strings.Builder
-	builder.WriteString("vec![\n")
-	for _, h := range handles {
-		builder.WriteString(fmt.Sprintf("%s,", buildHandleValue(h)))
-	}
-	builder.WriteString("]")
-	return builder.String()
-}
-
 func buildRawHandleDispositions(handleDispositions []ir.HandleDisposition) string {
 	var builder strings.Builder
 	builder.WriteString("[")
@@ -145,6 +135,8 @@ func visit(value ir.Value, decl mixer.Declaration) string {
 		case *mixer.VectorDecl:
 			return onList(value, decl)
 		}
+	case ir.DecodedRecord:
+		return onDecodedRecord(value, decl.(mixer.RecordDeclaration))
 	case nil:
 		if !decl.IsNullable() {
 			if _, ok := decl.(*mixer.HandleDecl); ok {
@@ -272,32 +264,15 @@ func onUnion(value ir.Record, decl *mixer.UnionDecl) string {
 	field := value.Fields[0]
 	var valueStr string
 	if field.Key.IsUnknown() {
-		unknownData := field.Value.(ir.UnknownData)
-		if unknownData.HasData() {
+		if field.Key.UnknownOrdinal != 0 {
+			panic(fmt.Sprintf("union %s: unknown ordinal %d: Rust can only construct unknowns with the ordinal 0",
+				decl.Name(), field.Key.UnknownOrdinal))
+		}
+		if field.Value != nil {
 			panic(fmt.Sprintf("union %s: unknown ordinal %d: Rust cannot construct union with unknown bytes/handles",
 				decl.Name(), field.Key.UnknownOrdinal))
 		}
-		if field.Key.UnknownOrdinal == 0 {
-			valueStr = fmt.Sprintf("%s::unknown_variant_for_testing()", declName(decl))
-		} else {
-			// TODO(fxbug.dev/116276): This is a temporary workaround until
-			// we implement the GIDL decode() function.
-			var ordinalBytes strings.Builder
-			for i := 0; i < 64; i += 8 {
-				fmt.Fprintf(&ordinalBytes, "%d, ", (field.Key.UnknownOrdinal>>i)&0xff)
-			}
-			return fmt.Sprintf(`
-				(|| {
-					let mut value = %s::new_empty();
-					let bytes = &[
-						%s// ordinal
-						0, 0, 0, 0, 0, 0, 1, 0, // inlined envelope
-					];
-					Decoder::decode_with_context(_V2_CONTEXT, bytes, &mut [], &mut value).unwrap();
-					value
-				})()
-			`, declName(decl), ordinalBytes.String())
-		}
+		valueStr = fmt.Sprintf("%s::unknown_variant_for_testing()", declName(decl))
 	} else {
 		fieldName := fidlgen.ToUpperCamelCase(field.Key.Name)
 		fieldValueStr := visit(field.Value, decl.Field(field.Key.Name))
@@ -327,4 +302,19 @@ func onList(value []ir.Value, decl mixer.ListDeclaration) string {
 
 func buildHandleValue(handle ir.Handle) string {
 	return fmt.Sprintf("copy_handle(&handle_defs[%d])", handle)
+}
+
+func onDecodedRecord(value ir.DecodedRecord, decl mixer.RecordDeclaration) string {
+	if value.Encoding.WireFormat != ir.V2WireFormat {
+		panic("Rust backend only supports V2 in decode() function")
+	}
+	name := declName(decl)
+	bytes := rust.BuildBytes(value.Encoding.Bytes)
+	handles := "[]"
+	if len(value.Encoding.Handles) > 0 {
+		handles = fmt.Sprintf("select_handle_infos(&handle_defs, &%s)",
+			buildHandles(value.Encoding.Handles))
+	}
+	context := encodingContext(value.Encoding.WireFormat)
+	return fmt.Sprintf("decode_value::<%s>(%s, &%s, &mut %s)", name, context, bytes, handles)
 }

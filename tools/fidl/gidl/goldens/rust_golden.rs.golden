@@ -10,7 +10,7 @@ use {
     fidl_test_conformance as test_conformance,
     fuchsia_zircon_status::Status,
     fuchsia_zircon_types as zx_types,
-    gidl_util::{HandleDef, HandleSubtype, copy_handle, create_handles, get_handle_koid, get_info_handle_valid, select_handle_infos, to_zx_handle_t, to_zx_handle_disposition_t},
+    gidl_util::{HandleDef, HandleSubtype, copy_handle, create_handles, decode_value, get_handle_koid, get_info_handle_valid, select_handle_infos, to_zx_handle_t, to_zx_handle_disposition_t},
 };
 
 const _V1_CONTEXT: &Context = &Context { wire_format_version: WireFormatVersion::V1 };
@@ -766,6 +766,72 @@ fn test_golden_nullable_handle_struct_null_v2_encode() {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 ]);
     assert_eq!(handle_dispositions, &[]);
+}
+
+#[test]
+fn test_golden_handle_basic_rights_struct_re_encode_v1_encode() {
+    let handle_defs = create_handles(&[
+// #0
+HandleDef{
+	subtype: HandleSubtype::Event,
+	rights: Rights::from_bits(49155).unwrap(),
+},
+]);
+    let value = &mut decode_value::<test_conformance::GoldenHandleBasicRightsStruct>(_V2_CONTEXT, &[
+0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,
+], &mut select_handle_infos(&handle_defs, &[
+0,]));
+    let bytes = &mut Vec::new();
+    let handle_dispositions = &mut Vec::new();
+    bytes.resize(65536, 0xcd); // fill with junk data
+    Encoder::encode_with_context(_V1_CONTEXT, bytes, handle_dispositions, value).unwrap();
+    assert_eq!(bytes, &[
+0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,
+]);
+    assert_eq!(
+        handle_dispositions.iter().map(to_zx_handle_disposition_t).collect::<Vec<_>>(),
+        &[
+zx_types::zx_handle_disposition_t {
+   operation: zx_types::ZX_HANDLE_OP_MOVE,
+   handle: handle_defs[0].handle,
+   type_: 5,
+   rights: 49155,
+   result: zx_types::ZX_OK,
+},]
+    );
+}
+
+#[test]
+fn test_golden_handle_basic_rights_struct_re_encode_v2_encode() {
+    let handle_defs = create_handles(&[
+// #0
+HandleDef{
+	subtype: HandleSubtype::Event,
+	rights: Rights::from_bits(49155).unwrap(),
+},
+]);
+    let value = &mut decode_value::<test_conformance::GoldenHandleBasicRightsStruct>(_V2_CONTEXT, &[
+0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,
+], &mut select_handle_infos(&handle_defs, &[
+0,]));
+    let bytes = &mut Vec::new();
+    let handle_dispositions = &mut Vec::new();
+    bytes.resize(65536, 0xcd); // fill with junk data
+    Encoder::encode_with_context(_V2_CONTEXT, bytes, handle_dispositions, value).unwrap();
+    assert_eq!(bytes, &[
+0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,
+]);
+    assert_eq!(
+        handle_dispositions.iter().map(to_zx_handle_disposition_t).collect::<Vec<_>>(),
+        &[
+zx_types::zx_handle_disposition_t {
+   operation: zx_types::ZX_HANDLE_OP_MOVE,
+   handle: handle_defs[0].handle,
+   type_: 5,
+   rights: 49155,
+   result: zx_types::ZX_OK,
+},]
+    );
 }
 
 

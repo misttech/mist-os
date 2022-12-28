@@ -18,6 +18,7 @@ import (
 // - `Handle` for handles
 // - `RestrictedHandle` for handles with expected type and rights (decode_success only)
 // - `Record` for structs, tables, and unions
+// - `DecodedRecord` for a record to be constructed by decoding
 // - `[]Value` for slices of values
 // - `nil` for null values (only allowed for nullable types)
 // - `UnknownData` for unknown variants of unions
@@ -84,26 +85,31 @@ func (f *FieldKey) IsUnknown() bool {
 	return f.Name == ""
 }
 
+// DecodedRecord represents a value to be constructed by decoding bytes and
+// handles. This is useful to represent values that cannot be constructed
+// directly in all bindings, e.g. unions with an unknown ordinal. It only
+// appears in encode_success and encode_failure tests.
+type DecodedRecord struct {
+	Type     string
+	Encoding Encoding
+}
+
+// RecordLike is either Record or DecodedRecord.
+type RecordLike interface {
+	TypeName() string
+}
+
+func (r Record) TypeName() string {
+	return r.Name
+}
+
+func (d DecodedRecord) TypeName() string {
+	return d.Type
+}
+
 // UnknownData represents the raw payload of an envelope, e.g. the data
 // corresponding to an unknown variant of a union
 type UnknownData struct {
 	Bytes   []byte
 	Handles []Handle
-}
-
-// HasData returns true if u stores unknown data. For example, it returns true
-// in the case of `MyUnion { 123: { bytes = [ repeat(0xab):8 ] } }` representing
-// a domain object that stores unknown bytes and handles, but false in the case
-// of `MyUnion { 123: null }`.
-//
-// TODO(fxbug.dev/85383): Fully implement RFC-0137 and then remove UnknownData
-// since it should not be possible to store unknown data in any bindings.
-func (u *UnknownData) HasData() bool {
-	if u.Bytes == nil && u.Handles == nil {
-		return false
-	}
-	if u.Bytes == nil {
-		panic("UnknownData has handles but not bytes")
-	}
-	return true
 }

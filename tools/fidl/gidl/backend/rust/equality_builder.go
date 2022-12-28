@@ -40,7 +40,7 @@ func canAssertEq(value ir.Value) bool {
 		return true
 	case ir.Record:
 		for _, field := range value.Fields {
-			if !canAssertEq(field.Value) {
+			if field.Key.IsUnknown() || !canAssertEq(field.Value) {
 				return false
 			}
 		}
@@ -105,8 +105,7 @@ match %s.basic_info() {
 		case *mixer.UnionDecl:
 			field := value.Fields[0]
 			if field.Key.IsUnknown() {
-				unknownData := field.Value.(ir.UnknownData)
-				if unknownData.HasData() {
+				if field.Value != nil {
 					panic(fmt.Sprintf("union %s: unknown ordinal %d: Rust cannot construct union with unknown bytes/handles",
 						decl.Name(), field.Key.UnknownOrdinal))
 				}

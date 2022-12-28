@@ -850,6 +850,14 @@ func TestStructDeclConformsNonNullable(t *testing.T) {
 					{Key: ir.FieldKey{Name: "s"}, Value: "foo"},
 				},
 			}},
+			conformOk{ir.DecodedRecord{
+				Type: "ExampleStruct",
+				Encoding: ir.Encoding{
+					WireFormat: ir.V2WireFormat,
+					Bytes:      []byte{1, 2, 3, 4, 5, 6, 7, 8},
+					Handles:    nil,
+				},
+			}},
 			conformFail{ir.Record{
 				Name: "ExampleStruct",
 				Fields: []ir.Field{
@@ -860,6 +868,14 @@ func TestStructDeclConformsNonNullable(t *testing.T) {
 				Name: "DefinitelyNotExampleStruct",
 				Fields: []ir.Field{
 					{Key: ir.FieldKey{Name: "s"}, Value: "foo"},
+				},
+			}, "expecting struct test.mixer/ExampleStruct"},
+			conformFail{ir.DecodedRecord{
+				Type: "DefinitelyNotExampleStruct",
+				Encoding: ir.Encoding{
+					WireFormat: ir.V2WireFormat,
+					Bytes:      []byte{1, 2, 3, 4, 5, 6, 7, 8},
+					Handles:    nil,
 				},
 			}, "expecting struct test.mixer/ExampleStruct"},
 			conformFail{nil, "expecting non-null struct"},
@@ -886,6 +902,14 @@ func TestStructDeclConformsNullable(t *testing.T) {
 				},
 			}},
 			conformOk{nil},
+			conformFail{ir.DecodedRecord{
+				Type: "ExampleStruct",
+				Encoding: ir.Encoding{
+					WireFormat: ir.V2WireFormat,
+					Bytes:      []byte{1, 2, 3, 4, 5, 6, 7, 8},
+					Handles:    nil,
+				},
+			}, "the decode function cannot be used for a nullable struct"},
 		},
 	)
 }
@@ -926,6 +950,14 @@ func TestTableDeclConforms(t *testing.T) {
 					},
 				},
 			}},
+			conformOk{ir.DecodedRecord{
+				Type: "ExampleTable",
+				Encoding: ir.Encoding{
+					WireFormat: ir.V2WireFormat,
+					Bytes:      []byte{1, 2, 3, 4, 5, 6, 7, 8},
+					Handles:    nil,
+				},
+			}},
 			conformFail{ir.Record{
 				Name: "ExampleTable",
 				Fields: []ir.Field{
@@ -946,6 +978,14 @@ func TestTableDeclConforms(t *testing.T) {
 				Name: "DefinitelyNotExampleTable",
 				Fields: []ir.Field{
 					{Key: ir.FieldKey{Name: "s"}, Value: "foo"},
+				},
+			}, "expecting table test.mixer/ExampleTable"},
+			conformFail{ir.DecodedRecord{
+				Type: "DefinitelyNotExampleTable",
+				Encoding: ir.Encoding{
+					WireFormat: ir.V2WireFormat,
+					Bytes:      []byte{1, 2, 3, 4, 5, 6, 7, 8},
+					Handles:    nil,
 				},
 			}, "expecting table test.mixer/ExampleTable"},
 			conformFail{nil, "expecting non-null table"},
@@ -980,6 +1020,14 @@ func TestFlexibleUnionDeclConformsNonNullable(t *testing.T) {
 					},
 				},
 			}},
+			conformOk{ir.DecodedRecord{
+				Type: "ExampleFlexibleUnion",
+				Encoding: ir.Encoding{
+					WireFormat: ir.V2WireFormat,
+					Bytes:      []byte{1, 2, 3, 4, 5, 6, 7, 8},
+					Handles:    nil,
+				},
+			}},
 			conformFail{ir.Record{
 				Name: "ExampleFlexibleUnion",
 				Fields: []ir.Field{
@@ -990,6 +1038,14 @@ func TestFlexibleUnionDeclConformsNonNullable(t *testing.T) {
 				Name: "DefinitelyNotExampleFlexibleUnion",
 				Fields: []ir.Field{
 					{Key: ir.FieldKey{Name: "s"}, Value: "foo"},
+				},
+			}, "expecting union test.mixer/ExampleFlexibleUnion"},
+			conformFail{ir.DecodedRecord{
+				Type: "DefinitelyNotExampleFlexibleUnion",
+				Encoding: ir.Encoding{
+					WireFormat: ir.V2WireFormat,
+					Bytes:      []byte{1, 2, 3, 4, 5, 6, 7, 8},
+					Handles:    nil,
 				},
 			}, "expecting union test.mixer/ExampleFlexibleUnion"},
 			conformFail{ir.Record{
@@ -1025,6 +1081,14 @@ func TestUnionDeclConformsNullable(t *testing.T) {
 				},
 			}},
 			conformOk{nil},
+			conformFail{ir.DecodedRecord{
+				Type: "ExampleFlexibleUnion",
+				Encoding: ir.Encoding{
+					WireFormat: ir.V2WireFormat,
+					Bytes:      []byte{1, 2, 3, 4, 5, 6, 7, 8},
+					Handles:    nil,
+				},
+			}, "the decode function cannot be used for a nullable union"},
 		},
 	)
 }

@@ -14,7 +14,7 @@ use {
     fidl_test_conformance as test_conformance,
     fuchsia_zircon_status::Status,
     fuchsia_zircon_types as zx_types,
-    gidl_util::{HandleDef, HandleSubtype, copy_handle, create_handles, get_handle_koid, get_info_handle_valid, select_handle_infos, to_zx_handle_t, to_zx_handle_disposition_t},
+    gidl_util::{HandleDef, HandleSubtype, copy_handle, create_handles, decode_value, get_handle_koid, get_info_handle_valid, select_handle_infos, to_zx_handle_t, to_zx_handle_disposition_t},
 };
 
 const _V1_CONTEXT: &Context = &Context { wire_format_version: WireFormatVersion::V1 };

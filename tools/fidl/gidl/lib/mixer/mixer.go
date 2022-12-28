@@ -531,32 +531,39 @@ func (decl *StructDecl) Field(name string) Declaration {
 }
 
 // recordConforms is a helper function for implementing Declarations.conforms on
-// types that expect a ir.Record value. It takes the kind ("struct", etc.),
-// expected identifier, schema, and nullability, and returns the record or an
-// error. It can also return (nil, nil) when value is nil and nullable is true.
-func recordConforms(value ir.Value, kind string, decl NamedDeclaration, schema Schema) (*ir.Record, error) {
+// types that expect ir.Record, ir.DecodedRecord, or nil. The kind parameter
+// should be "struct", "table", or "union".
+func recordConforms(value ir.Value, kind string, decl NamedDeclaration, schema Schema) error {
 	switch value := value.(type) {
 	default:
-		return nil, fmt.Errorf("expecting %s, found %T (%v)", kind, value, value)
+		return fmt.Errorf("expecting %s, found %T (%v)", kind, value, value)
 	case ir.Record:
 		if name := schema.qualifyName(value.Name); name != decl.Name() {
-			return nil, fmt.Errorf("expecting %s %s, found %s", kind, decl.Name(), name)
+			return fmt.Errorf("expecting %s %s, found %s", kind, decl.Name(), name)
 		}
-		return &value, nil
+		return nil
+	case ir.DecodedRecord:
+		if name := schema.qualifyName(value.Type); name != decl.Name() {
+			return fmt.Errorf("expecting %s %s, found %s", kind, decl.Name(), name)
+		}
+		if decl.IsNullable() {
+			return fmt.Errorf("the decode function cannot be used for a nullable %s", kind)
+		}
+		return nil
 	case nil:
 		if decl.IsNullable() {
-			return nil, nil
+			return nil
 		}
-		return nil, fmt.Errorf("expecting non-null %s %s, found nil", kind, decl.Name())
+		return fmt.Errorf("expecting non-null %s %s, found nil", kind, decl.Name())
 	}
 }
 
 func (decl *StructDecl) conforms(value ir.Value, ctx context) error {
-	record, err := recordConforms(value, "struct", decl, decl.schema)
-	if err != nil {
+	if err := recordConforms(value, "struct", decl, decl.schema); err != nil {
 		return err
 	}
-	if record == nil {
+	record, ok := value.(ir.Record)
+	if !ok {
 		return nil
 	}
 	provided := make(map[string]struct{}, len(record.Fields))
@@ -639,12 +646,12 @@ func (decl *TableDecl) fieldByOrdinal(ordinal uint64) (Declaration, bool) {
 }
 
 func (decl *TableDecl) conforms(value ir.Value, ctx context) error {
-	record, err := recordConforms(value, "table", decl, decl.schema)
-	if err != nil {
+	if err := recordConforms(value, "table", decl, decl.schema); err != nil {
 		return err
 	}
-	if record == nil {
-		panic("tables cannot be nullable")
+	record, ok := value.(ir.Record)
+	if !ok {
+		return nil
 	}
 	for _, field := range record.Fields {
 		// The mixer explicitly allows using unknown keys for strict unions to
@@ -720,11 +727,11 @@ func (decl *UnionDecl) fieldByOrdinal(ordinal uint64) (Declaration, bool) {
 }
 
 func (decl *UnionDecl) conforms(value ir.Value, ctx context) error {
-	record, err := recordConforms(value, "union", decl, decl.schema)
-	if err != nil {
+	if err := recordConforms(value, "union", decl, decl.schema); err != nil {
 		return err
 	}
-	if record == nil {
+	record, ok := value.(ir.Record)
+	if !ok {
 		return nil
 	}
 	if num := len(record.Fields); num != 1 {
@@ -890,7 +897,7 @@ func BuildSchema(fidl fidlgen.Root) Schema {
 // ExtractDeclaration extract the top-level declaration for the provided value,
 // and ensures the value conforms to the schema. It also takes a list of handle
 // definitions in scope, which can be nil if there are no handles.
-func (s Schema) ExtractDeclaration(value ir.Record, handleDefs []ir.HandleDef) (*StructDecl, error) {
+func (s Schema) ExtractDeclaration(value ir.RecordLike, handleDefs []ir.HandleDef) (*StructDecl, error) {
 	decl, err := s.ExtractDeclarationUnsafe(value)
 	if err != nil {
 		return nil, err
@@ -905,7 +912,7 @@ func (s Schema) ExtractDeclaration(value ir.Record, handleDefs []ir.HandleDef) (
 // provided value, and ensures the value conforms to the schema based on the
 // rules for EncodeSuccess. It also takes a list of handle definitions in
 // scope, which can be nil if there are no handles.
-func (s Schema) ExtractDeclarationEncodeSuccess(value ir.Record, handleDefs []ir.HandleDef) (*StructDecl, error) {
+func (s Schema) ExtractDeclarationEncodeSuccess(value ir.RecordLike, handleDefs []ir.HandleDef) (*StructDecl, error) {
 	decl, err := s.ExtractDeclarationUnsafe(value)
 	if err != nil {
 		return nil, err
@@ -919,8 +926,8 @@ func (s Schema) ExtractDeclarationEncodeSuccess(value ir.Record, handleDefs []ir
 // ExtractDeclarationUnsafe extracts the top-level declaration for the provided
 // value, but does not ensure the value conforms to the schema. This is used in
 // cases where conformance is too strict (e.g. failure cases).
-func (s Schema) ExtractDeclarationUnsafe(value ir.Record) (*StructDecl, error) {
-	return s.ExtractDeclarationByName(value.Name)
+func (s Schema) ExtractDeclarationUnsafe(value ir.RecordLike) (*StructDecl, error) {
+	return s.ExtractDeclarationByName(value.TypeName())
 }
 
 // ExtractDeclarationByName extracts the top-level declaration for the given

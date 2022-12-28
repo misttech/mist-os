@@ -14,21 +14,11 @@ import (
 func Merge(input []All) All {
 	var output All
 	for _, elem := range input {
-		for _, encodeSuccess := range elem.EncodeSuccess {
-			output.EncodeSuccess = append(output.EncodeSuccess, encodeSuccess)
-		}
-		for _, decodeSuccess := range elem.DecodeSuccess {
-			output.DecodeSuccess = append(output.DecodeSuccess, decodeSuccess)
-		}
-		for _, encodeFailure := range elem.EncodeFailure {
-			output.EncodeFailure = append(output.EncodeFailure, encodeFailure)
-		}
-		for _, decodeFailure := range elem.DecodeFailure {
-			output.DecodeFailure = append(output.DecodeFailure, decodeFailure)
-		}
-		for _, benchmark := range elem.Benchmark {
-			output.Benchmark = append(output.Benchmark, benchmark)
-		}
+		output.EncodeSuccess = append(output.EncodeSuccess, elem.EncodeSuccess...)
+		output.DecodeSuccess = append(output.DecodeSuccess, elem.DecodeSuccess...)
+		output.EncodeFailure = append(output.EncodeFailure, elem.EncodeFailure...)
+		output.DecodeFailure = append(output.DecodeFailure, elem.DecodeFailure...)
+		output.Benchmark = append(output.Benchmark, elem.Benchmark...)
 	}
 	return output
 }
@@ -96,11 +86,11 @@ func ValidateAllType(input All, generatorType string) {
 }
 
 func TypeFromValue(value Value) string {
-	record, ok := value.(Record)
+	record, ok := value.(RecordLike)
 	if !ok {
-		panic("only can extract type name from struct value")
+		panic(fmt.Sprintf("cannot extract type name from: %T", value))
 	}
-	return record.Name
+	return record.TypeName()
 }
 
 func GetHandlesFromHandleDispositions(handleDispositions []HandleDisposition) []Handle {

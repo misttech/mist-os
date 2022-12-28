@@ -49,7 +49,7 @@ func NewParser(name string, input io.Reader, config Config) *Parser {
 	p.scanner.Position.Filename = name
 	p.scanner.Init(input)
 	p.config = config
-	// This is reset in parseBody. We need to set it here too so that unit tests
+	// This is reset in parseSection. We need to set it here too so that tests
 	// for functions like parseHandleDefs don't panic on nil map assignment.
 	p.handles = make(map[ir.Handle]handleInfo)
 	return &p
@@ -247,7 +247,7 @@ func toIrHandleDispositionEncodings(v []encodingData) []ir.HandleDispositionEnco
 
 type body struct {
 	Type                     string
-	Value                    ir.Record
+	Value                    ir.RecordLike
 	Encodings                []encodingData
 	HandleDefs               []ir.HandleDef
 	Err                      ir.ErrorCode
@@ -292,7 +292,8 @@ func (b *body) addEncoding(e encodingData) error {
 }
 
 type scope struct {
-	allowed allowedFeatures
+	allowed          allowedFeatures
+	inDecodeFunction bool
 }
 
 type allowedFeatures struct {
@@ -302,6 +303,9 @@ type allowedFeatures struct {
 	// Allow using the restrict function in the `value` section, e.g.
 	// `restrict(#0, type: event, rights: basic)` as opposed to `#0`.
 	restrictFunction bool
+	// Allow using the decode function in the `value` section, e.g.
+	// `decode({type = MyStruct, bytes = { v2 = [ ... ] } })`.
+	decodeFunction bool
 }
 
 type sectionMetadata struct {
@@ -347,6 +351,7 @@ var sections = map[string]sectionMetadata{
 		},
 		allowed: allowedFeatures{
 			handleDefRights: true,
+			decodeFunction:  true,
 		},
 		setter: func(name string, body body, all *ir.All) {
 			result := ir.EncodeSuccess{
@@ -389,6 +394,7 @@ var sections = map[string]sectionMetadata{
 		},
 		allowed: allowedFeatures{
 			handleDefRights: true,
+			decodeFunction:  true,
 		},
 		setter: func(name string, body body, all *ir.All) {
 			result := ir.EncodeFailure{
@@ -450,11 +456,33 @@ func (p *Parser) parseSection(all *ir.All) error {
 	if err != nil {
 		return err
 	}
-	scope := scope{allowed: section.allowed}
+	p.handles = make(map[ir.Handle]handleInfo)
+	bodyTok, err := p.peekToken()
+	if err != nil {
+		return err
+	}
+	scope := scope{
+		allowed: section.allowed,
+	}
 	body, err := p.parseBody(section.requiredKinds, section.optionalKinds, scope)
 	if err != nil {
 		return err
 	}
+	for h, info := range p.handles {
+		if !info.defined {
+			return p.newParseError(bodyTok, "missing definition for handle #%d", h)
+		}
+		if info.usesInValue > 1 {
+			return p.newParseError(bodyTok, "handle #%d used more than once in 'value' section", h)
+		}
+		if info.usesInHandles > 1 {
+			return p.newParseError(bodyTok, "handle #%d used more than once in 'handles' section", h)
+		}
+		if info.usesInValue == 0 && info.usesInHandles == 0 {
+			return p.newParseError(bodyTok, "unused handle #%d", h)
+		}
+	}
+	p.handles = nil
 	section.setter(name, body, all)
 	return nil
 }
@@ -498,7 +526,6 @@ func (p *Parser) parseBody(requiredKinds map[bodyElement]struct{}, optionalKinds
 	if err != nil {
 		return result, err
 	}
-	p.handles = make(map[ir.Handle]handleInfo)
 	if err := p.parseCommaSeparated(tLacco, tRacco, func() error {
 		return p.parseSingleBodyElement(&result, parsedKinds, scope)
 	}); err != nil {
@@ -516,21 +543,6 @@ func (p *Parser) parseBody(requiredKinds map[bodyElement]struct{}, optionalKinds
 			return result, p.newParseError(bodyTok, "parameter '%s' does not apply to element", parsedKind)
 		}
 	}
-	for h, info := range p.handles {
-		if !info.defined {
-			return result, p.newParseError(bodyTok, "missing definition for handle #%d", h)
-		}
-		if info.usesInValue > 1 {
-			return result, p.newParseError(bodyTok, "handle #%d used more than once in 'value' section", h)
-		}
-		if info.usesInHandles > 1 {
-			return result, p.newParseError(bodyTok, "handle #%d used more than once in 'handles' section", h)
-		}
-		if info.usesInValue == 0 && info.usesInHandles == 0 {
-			return result, p.newParseError(bodyTok, "unused handle #%d", h)
-		}
-	}
-	p.handles = nil
 	return result, nil
 }
 
@@ -560,8 +572,9 @@ func (p *Parser) parseSingleBodyElement(result *body, all map[bodyElement]struct
 		if err != nil {
 			return err
 		}
-		record, ok := val.(ir.Record)
+		record, ok := val.(ir.RecordLike)
 		if !ok {
+			// TODO(fxbug.dev/118230): Change message when tables and unions are allowed.
 			return p.newParseError(tok, "top-level value must be a struct; got %T", val)
 		}
 		result.Value = record
@@ -578,7 +591,7 @@ func (p *Parser) parseSingleBodyElement(result *body, all map[bodyElement]struct
 		}
 		kind = isBytes
 	case "handles":
-		encodings, err := p.parseHandleSection()
+		encodings, err := p.parseHandleSection(scope)
 		if err != nil {
 			return err
 		}
@@ -762,6 +775,12 @@ func (p *Parser) parseValue(scope scope) (ir.Value, error) {
 			}
 			return p.parseHandleRestrict()
 		}
+		if tok.value == "decode" {
+			if !scope.allowed.decodeFunction {
+				return nil, fmt.Errorf("the 'decode' function is not allowed here")
+			}
+			return p.parseDecode(scope)
+		}
 		return p.parseRecord(tok.value, scope)
 	case tLsquare:
 		return p.parseSlice(scope)
@@ -852,6 +871,18 @@ func (p *Parser) parseRecord(name string, scope scope) (ir.Record, error) {
 		var val ir.Value
 		if key.IsKnown() {
 			val, err = p.parseValue(scope)
+		} else if p.peekTokenKind(tText) {
+			tok, err := p.consumeToken(tText)
+			if err != nil {
+				panic(fmt.Sprintf("consume failed after peek: %s", err))
+			}
+			if tok.value != "null" {
+				return p.newParseError(tok, "expected 'null' or '{', got '%s'", tok.value)
+			}
+			// This syntax, as in `MyUnion { 123: null }` is used to
+			// represent a domain object that only stores the unknown
+			// ordinal, not bytes and handles.
+			val = nil
 		} else {
 			val, err = p.parseUnknownData()
 		}
@@ -875,6 +906,43 @@ func decodeFieldKey(field string) ir.FieldKey {
 	return ir.FieldKey{Name: field}
 }
 
+func (p *Parser) parseDecode(scope scope) (ir.DecodedRecord, error) {
+	parenTok, err := p.consumeToken(tLparen)
+	if err != nil {
+		return ir.DecodedRecord{}, err
+	}
+	required := map[bodyElement]struct{}{
+		isType:  {},
+		isBytes: {},
+	}
+	optional := map[bodyElement]struct{}{
+		isHandles: {},
+	}
+	newscope := scope
+	newscope.inDecodeFunction = true
+	body, err := p.parseBody(required, optional, newscope)
+	if err != nil {
+		return ir.DecodedRecord{}, err
+	}
+	if _, err := p.consumeToken(tRparen); err != nil {
+		return ir.DecodedRecord{}, err
+	}
+	if len(body.Encodings) == 0 {
+		panic("required body elements ensure there is at least one encoding")
+	}
+	if len(body.Encodings) > 1 {
+		return ir.DecodedRecord{}, p.newParseError(parenTok, "the decode function can only use one wire format")
+	}
+	return ir.DecodedRecord{
+		Type: body.Type,
+		Encoding: ir.Encoding{
+			WireFormat: body.Encodings[0].WireFormat,
+			Bytes:      body.Encodings[0].Bytes,
+			Handles:    body.Encodings[0].Handles,
+		},
+	}, nil
+}
+
 // This is not expressed in terms of parseBody because it parses bytes/handles
 // without wire formats (e.g. `bytes = [...]`, not `bytes = { v1 = [...] }`).
 func (p *Parser) parseUnknownData() (ir.UnknownData, error) {
@@ -883,14 +951,6 @@ func (p *Parser) parseUnknownData() (ir.UnknownData, error) {
 	bodyTok, err := p.peekToken()
 	if err != nil {
 		return result, err
-	}
-	// This syntax, as in `MyUnion { 123: null }` is used to represent a domain
-	// object that only stores the unknown ordinal, not bytes and handles.
-	if bodyTok.value == "null" {
-		if _, err := p.consumeToken(tText); err != nil {
-			panic(fmt.Sprintf("consume failed after peek: %s", err))
-		}
-		return ir.UnknownData{}, nil
 	}
 	if err := p.parseCommaSeparated(tLacco, tRacco, func() error {
 		tok, err := p.consumeToken(tText)
@@ -1105,10 +1165,16 @@ func (p *Parser) parseByte() (byte, error) {
 	return byte(b), nil
 }
 
-func (p *Parser) parseHandleSection() ([]encodingData, error) {
+func (p *Parser) parseHandleSection(scope scope) ([]encodingData, error) {
+	info := handleInfo{usesInHandles: 1}
+	if scope.inDecodeFunction {
+		// In `value = decode({type = Foo, handles = {v1 = [#0]}})`, treat
+		// the handle as occurring in 'value' rather than 'handles'.
+		info = handleInfo{usesInValue: 1}
+	}
 	var res []encodingData
 	err := p.parseWireFormatMapping(func(wireFormats []ir.WireFormat) error {
-		h, err := p.parseHandleList(handleInfo{usesInHandles: 1})
+		h, err := p.parseHandleList(info)
 		if err != nil {
 			return err
 		}

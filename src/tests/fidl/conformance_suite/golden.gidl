@@ -404,3 +404,38 @@ decode_failure("GoldenStringStructNullBody") {
     },
     err = NON_EMPTY_STRING_WITH_NULL_BODY,
 }
+
+// Golden test for the decode() function.
+encode_success("GoldenHandleBasicRightsStructReEncode") {
+    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    bindings_allowlist = [rust],
+    handle_defs = {
+        // TODO(fxbug.dev/118275): This has to have basic rights. If we use
+        // event_default, the rights will get reduced in the decode() function,
+        // and the assertion on the handle_dispositions raw handle will fail.
+        #0 = event(rights: basic),
+    },
+    value = decode({
+        type = GoldenHandleBasicRightsStruct,
+        bytes = {
+            v2 = [
+                repeat(0xff):4, padding:4,
+            ],
+        },
+        handles = {
+            v2 = [
+                #0,
+            ],
+        },
+    }),
+    bytes = {
+        v1, v2 = [
+            repeat(0xff):4, padding:4,
+        ],
+    },
+    handle_dispositions = {
+        v1, v2 = [
+            {#0, type: event, rights: basic},
+        ],
+    },
+}

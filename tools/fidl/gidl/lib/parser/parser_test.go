@@ -144,7 +144,7 @@ func TestFailsParseValues(t *testing.T) {
 		{gidl: `"`, expectedErrorSubstr: "improperly escaped string"},
 		{gidl: `"\xwrong"`, expectedErrorSubstr: "improperly escaped string"},
 		{gidl: `#-1`, expectedErrorSubstr: `want "<text>", got "-"`},
-		{gidl: `SomeRecord { 0x01020304: 5, }`, expectedErrorSubstr: "unexpected tokenKind"},
+		{gidl: `SomeRecord { 0x01020304: 5, }`, expectedErrorSubstr: "expected 'null' or '{'"},
 		{gidl: `restrict(#123, type: channel)`, expectedErrorSubstr: "missing restrict argument 'rights'"},
 		{gidl: `restrict(#123, rights: read)`, expectedErrorSubstr: "missing restrict argument 'type'"},
 		{gidl: `restrict(#123, type: channel, rights: read, foo: bar)`, expectedErrorSubstr: "unknown restrict argument: foo"},
@@ -537,7 +537,7 @@ func TestParseHandles(t *testing.T) {
 		p := NewParser("", strings.NewReader(tc.gidl), Config{
 			WireFormats: []ir.WireFormat{"alpha", "beta"},
 		})
-		value, err := p.parseHandleSection()
+		value, err := p.parseHandleSection(scope{})
 		t.Run(tc.gidl, func(t *testing.T) {
 			checkMatch(t, value, tc.expectedValue, err)
 		})
@@ -575,7 +575,7 @@ func TestParseHandlesFailures(t *testing.T) {
 		p := NewParser("", strings.NewReader(tc.gidl), Config{
 			WireFormats: []ir.WireFormat{"alpha", "beta"},
 		})
-		_, err := p.parseHandleSection()
+		_, err := p.parseHandleSection(scope{})
 		t.Run(tc.gidl, func(t *testing.T) {
 			if err == nil {
 				t.Fatalf("error was expected, but no error was returned")

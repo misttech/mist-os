@@ -104,6 +104,32 @@ decode_success("TableFieldInlinedReservedDropped") {
     },
 }
 
+encode_success("TableFieldInlinedReservedDropped") {
+    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    bindings_allowlist = [rust],
+    value = TableFieldInlinedStruct{
+        t: decode({
+            type = TableFieldInlined,
+            bytes = {
+                v2 = [
+                    num(2):8,
+                    repeat(0xff):8,
+
+                    num(0):4, num(0):2, num(0):2,
+                    num(8):4, num(0):2, num(0):2,
+                    num(123):8,
+                ],
+            },
+        }),
+    },
+    bytes = {
+        v2 = [
+            num(0):8, repeat(0xff):8,
+        ],
+    },
+}
+
 // Unlike other inline-able table fields, the value portion of an unset flexible enum field is not
 // necessarily zero on instantiation, as either the compiler or the user (with an `@unknown`
 // override) is responible for picking a value to serve as a stand-in for the "default" case.
@@ -294,6 +320,31 @@ decode_success("TableFieldUnknownInlinedDropped") {
     },
 }
 
+// Tests a table in which a value is inlined into an unknown field.
+encode_success("TableFieldUnknownInlinedDropped") {
+    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    bindings_allowlist = [rust],
+    value = TableFieldUnknownStruct{
+        t: decode({
+            type = TableFieldUnknown,
+            bytes = {
+                v2 = [
+                    num(1):8,
+                    repeat(0xff):8,
+
+                    num(123):4, num(0):2, num(1):2,
+                ],
+            },
+        }),
+    },
+    bytes = {
+        v2 = [
+            num(0):8, repeat(0xff):8,
+        ],
+    },
+}
+
 // Tests a table in which a handle value is inlined into an unknown field.
 success("TableFieldUnknownInlinedHandleStored") {
     // TODO(fxbug.dev/85383): Remove in favor of TableFieldUnknownInlinedHandleDropped.
@@ -342,6 +393,37 @@ decode_success("TableFieldUnknownInlinedHandleDropped") {
     },
     handles = {
         v2 = [#0],
+    },
+}
+
+// Tests a table in which a handle value is inlined into an unknown field.
+encode_success("TableFieldUnknownInlinedHandleDropped") {
+    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    bindings_allowlist = [rust],
+    handle_defs = {
+        #0 = channel(),
+    },
+    value = TableFieldUnknownResourceStruct{
+        t: decode({
+            type = TableFieldUnknownResource,
+            bytes = {
+                v2 = [
+                    num(1):8,
+                    repeat(0xff):8,
+
+                    repeat(0xff):4, num(1):2, num(1):2,
+                ],
+            },
+            handles = {
+                v2 = [#0],
+            },
+        }),
+    },
+    bytes = {
+        v2 = [
+            num(0):8, repeat(0xff):8,
+        ],
     },
 }
 
@@ -401,6 +483,32 @@ decode_success("TableFieldUnknownOutOfLineDropped") {
             num(8):4, num(0):2, num(0):2,
 
             num(123):8,
+        ],
+    },
+}
+
+encode_success("TableFieldUnknownOutOfLineDropped") {
+    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    bindings_allowlist = [rust],
+    value = TableFieldUnknownStruct{
+        t: decode({
+            type = TableFieldUnknown,
+            bytes = {
+                v2 = [
+                    num(1):8,
+                    repeat(0xff):8,
+
+                    num(8):4, num(0):2, num(0):2,
+
+                    num(123):8,
+                ],
+            },
+        }),
+    },
+    bytes = {
+        v1, v2 = [
+            num(0):8, repeat(0xff):8,
         ],
     },
 }
@@ -825,6 +933,44 @@ decode_success("ValueTableUnknownReservedDropped") {
     },
 }
 
+encode_success("ValueTableUnknownReservedDropped") {
+    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    bindings_allowlist = [rust],
+    value = StructOfSimpleTable{
+        table: decode({
+            type = SimpleTable,
+            bytes = {
+                v2 = [
+                    5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
+                    255, 255, 255, 255, 255, 255, 255, 255, // alloc present
+                    8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
+                    0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
+                    8, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
+                    0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
+                    8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
+                    42, 0, 0, 0, 0, 0, 0, 0, // field X
+                    1, 2, 3, 4, 5, 6, 7, 8, // 8 unknown bytes for envelope 3
+                    67, 0, 0, 0, 0, 0, 0, 0, // field Y
+                ],
+            },
+        }),
+    },
+    bytes = {
+        v2 = [
+            5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
+            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
+            8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
+            0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
+            0, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
+            0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
+            8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
+            42, 0, 0, 0, 0, 0, 0, 0, // field X
+            67, 0, 0, 0, 0, 0, 0, 0, // field Y
+        ],
+    },
+}
+
 decode_success("ResourceTableUnknownReservedDropped") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
@@ -864,6 +1010,44 @@ decode_success("ResourceTableUnknownReservedDropped") {
             x: 42,
             y: 67,
         },
+    },
+}
+
+encode_success("ResourceTableUnknownReservedDropped") {
+    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    bindings_allowlist = [rust],
+    value = StructOfSimpleResourceTable{
+        table: decode({
+            type = SimpleResourceTable,
+            bytes = {
+                v2 = [
+                    5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
+                    255, 255, 255, 255, 255, 255, 255, 255, // alloc present
+                    8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
+                    0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
+                    8, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
+                    0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
+                    8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
+                    42, 0, 0, 0, 0, 0, 0, 0, // field X
+                    1, 2, 3, 4, 5, 6, 7, 8, // 8 unknown bytes for envelope 3
+                    67, 0, 0, 0, 0, 0, 0, 0, // field Y
+                ],
+            },
+        }),
+    },
+    bytes = {
+        v2 = [
+            5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
+            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
+            8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
+            0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
+            0, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
+            0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
+            8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
+            42, 0, 0, 0, 0, 0, 0, 0, // field X
+            67, 0, 0, 0, 0, 0, 0, 0, // field Y
+        ],
     },
 }
 
@@ -1002,6 +1186,45 @@ decode_success("ValueTableUnknownTrailingDropped") {
     },
 }
 
+encode_success("ValueTableUnknownTrailingDropped") {
+    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    bindings_allowlist = [rust],
+    value = StructOfSimpleTable{
+        table: decode({
+            type = SimpleTable,
+            bytes = {
+                v2 = [
+                    6, 0, 0, 0, 0, 0, 0, 0, // max ordinal
+                    255, 255, 255, 255, 255, 255, 255, 255, // alloc present
+                    8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
+                    0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
+                    0, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
+                    0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
+                    8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
+                    8, 0, 0, 0, 0, 0, 0, 0, // envelope 6: num bytes / num handles
+                    42, 0, 0, 0, 0, 0, 0, 0, // field X
+                    67, 0, 0, 0, 0, 0, 0, 0, // field Y
+                    1, 2, 3, 4, 5, 6, 7, 8, // 8 unknown bytes for envelope 6
+                ],
+            },
+        }),
+    },
+    bytes = {
+        v2 = [
+            5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
+            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
+            8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
+            0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
+            0, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
+            0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
+            8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
+            42, 0, 0, 0, 0, 0, 0, 0, // field X
+            67, 0, 0, 0, 0, 0, 0, 0, // field Y
+        ],
+    },
+}
+
 decode_success("ResourceTableUnknownTrailingDropped") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
@@ -1044,6 +1267,45 @@ decode_success("ResourceTableUnknownTrailingDropped") {
             x: 42,
             y: 67,
         },
+    },
+}
+
+encode_success("ResourceTableUnknownTrailingDropped") {
+    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    bindings_allowlist = [rust],
+    value = StructOfSimpleResourceTable{
+        table: decode({
+            type = SimpleResourceTable,
+            bytes = {
+                v2 = [
+                    6, 0, 0, 0, 0, 0, 0, 0, // max ordinal
+                    255, 255, 255, 255, 255, 255, 255, 255, // alloc present
+                    8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
+                    0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
+                    0, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
+                    0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
+                    8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
+                    8, 0, 0, 0, 0, 0, 0, 0, // envelope 6: num bytes / num handles
+                    42, 0, 0, 0, 0, 0, 0, 0, // field X
+                    67, 0, 0, 0, 0, 0, 0, 0, // field Y
+                    1, 2, 3, 4, 5, 6, 7, 8, // 8 unknown bytes for envelope 6
+                ],
+            },
+        }),
+    },
+    bytes = {
+        v2 = [
+            5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
+            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
+            8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
+            0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
+            0, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
+            0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
+            8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
+            42, 0, 0, 0, 0, 0, 0, 0, // field X
+            67, 0, 0, 0, 0, 0, 0, 0, // field Y
+        ],
     },
 }
 
@@ -1189,6 +1451,53 @@ decode_success("ValueTableUnknownTrailingHandlesDropped") {
     },
 }
 
+encode_success("ValueTableUnknownTrailingHandlesDropped") {
+    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    bindings_allowlist = [rust],
+    handle_defs = {
+        #0 = event(),
+        #1 = event(),
+        #2 = event(),
+    },
+    value = StructOfSimpleTable{
+        table: decode({
+            type = SimpleTable,
+            bytes = {
+                v2 = [
+                    num(6):8, // max ordinal
+                    repeat(0xff):8, // alloc present
+                    num(0):4, num(0):4, // absent envelope 1
+                    num(0):4, num(0):4, // absent envelope 2
+                    num(0):4, num(0):4, // absent envelope 3
+                    num(0):4, num(0):4, // absent envelope 4
+                    num(8):4, num(0):4, // envelope 5 (field Y)
+                    num(24):4, num(3):4, // envelope 6 (unknown)
+                    num(67):8, // field Y
+                    repeat(0xab):20, padding:4, // unknown bytes
+                ],
+            },
+            handles = {
+                v2 = [
+                    #0, #1, #2,
+                ],
+            },
+        }),
+    },
+    bytes = {
+        v2 = [
+            num(5):8, // max ordinal
+            repeat(0xff):8, // alloc present
+            num(0):4, num(0):4, // absent envelope 1
+            num(0):4, num(0):4, // absent envelope 2
+            num(0):4, num(0):4, // absent envelope 3
+            num(0):4, num(0):4, // absent envelope 4
+            num(8):4, num(0):4, // envelope 5 (field Y)
+            num(67):8, // field Y
+        ],
+    },
+}
+
 decode_success("ResourceTableUnknownTrailingHandlesDropped") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
@@ -1231,6 +1540,53 @@ decode_success("ResourceTableUnknownTrailingHandlesDropped") {
     handles = {
         v1, v2 = [
             #0, #1, #2,
+        ],
+    },
+}
+
+encode_success("ResourceTableUnknownTrailingHandlesDropped") {
+    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    bindings_allowlist = [rust],
+    handle_defs = {
+        #0 = event(),
+        #1 = event(),
+        #2 = event(),
+    },
+    value = StructOfSimpleResourceTable{
+        table: decode({
+            type = SimpleResourceTable,
+            bytes = {
+                v2 = [
+                    num(6):8, // max ordinal
+                    repeat(0xff):8, // alloc present
+                    num(0):4, num(0):4, // absent envelope 1
+                    num(0):4, num(0):4, // absent envelope 2
+                    num(0):4, num(0):4, // absent envelope 3
+                    num(0):4, num(0):4, // absent envelope 4
+                    num(8):4, num(0):4, // envelope 5 (field Y)
+                    num(24):4, num(3):4, // envelope 6 (unknown)
+                    num(67):8, // field Y
+                    repeat(0xab):20, padding:4, // unknown bytes
+                ],
+            },
+            handles = {
+                v2 = [
+                    #0, #1, #2,
+                ],
+            },
+        }),
+    },
+    bytes = {
+        v2 = [
+            num(5):8, // max ordinal
+            repeat(0xff):8, // alloc present
+            num(0):4, num(0):4, // absent envelope 1
+            num(0):4, num(0):4, // absent envelope 2
+            num(0):4, num(0):4, // absent envelope 3
+            num(0):4, num(0):4, // absent envelope 4
+            num(8):4, num(0):4, // envelope 5 (field Y)
+            num(67):8, // field Y
         ],
     },
 }

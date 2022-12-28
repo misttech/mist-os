@@ -5,7 +5,10 @@
 //! This crate contains utility functions used in GIDL tests and benchmarks.
 
 use {
-    fidl::{AsHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, Rights},
+    fidl::{
+        encoding::{Context, Decodable, Decoder},
+        AsHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, Rights,
+    },
     fuchsia_zircon_status::Status,
     fuchsia_zircon_types as zx_types,
 };
@@ -181,4 +184,17 @@ pub fn get_info_handle_valid(handle_info: &zx_types::zx_handle_info_t) -> Result
     } else {
         Ok(())
     }
+}
+
+/// Decodes `T` from the given bytes and handles. Panics on failure.
+pub fn decode_value<T: Decodable>(
+    context: &Context,
+    bytes: &[u8],
+    handles: &mut [HandleInfo],
+) -> T {
+    let mut value = T::new_empty();
+    Decoder::decode_with_context(context, bytes, handles, &mut value).expect(
+        "failed decoding for the GIDL decode() function (not a regular decode test failure!)",
+    );
+    value
 }
