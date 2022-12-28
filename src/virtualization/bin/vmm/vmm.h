@@ -55,6 +55,10 @@ class Vmm : public fuchsia::virtualization::Guest {
   // The guest is being shutdown, so notify all clients by disconnecting with an epitaph.
   virtual void NotifyClientsShutdown(zx_status_t status);
 
+  void AddBinding(fidl::InterfaceRequest<fuchsia::virtualization::Guest> request) {
+    guest_bindings_.AddBinding(this, std::move(request));
+  }
+
   // |fuchsia::virtualization::Guest|
   void GetSerial(GetSerialCallback callback) override;
   void GetConsole(GetConsoleCallback callback) override;

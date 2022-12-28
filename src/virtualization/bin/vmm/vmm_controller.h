@@ -25,6 +25,7 @@ class VmmController : ::fuchsia::virtualization::GuestLifecycle {
   // |fuchsia::virtualization::GuestLifecycle|
   void Create(::fuchsia::virtualization::GuestConfig guest_config,
               CreateCallback callback) override;
+  void Bind(fidl::InterfaceRequest<::fuchsia::virtualization::Guest> guest) override;
   void Run(RunCallback callback) override;
   void Stop(StopCallback callback) override;
 

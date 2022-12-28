@@ -69,6 +69,14 @@ protocol GuestLifecycle {
         guest_config GuestConfig;
     }) -> () error GuestError;
 
+    /// Binds to the Guest protocol for an initialized guest.
+    ///
+    /// This operation must be called between `Create` and `Stop`, otherwise the provided channel
+    /// will be immediately closed.
+    Bind(resource struct {
+        guest server_end:Guest;
+    });
+
     /// Start the primary VCPU and any dispatch loop. This will not return until the VMM stops
     /// running. On a clean shutdown (either guest or client initiated) this will return success.
     ///

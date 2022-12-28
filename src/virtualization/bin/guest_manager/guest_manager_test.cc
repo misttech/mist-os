@@ -43,6 +43,8 @@ class FakeGuestLifecycle : public GuestLifecycle {
     }
   }
   // |fuchsia::virtualization::GuestManager|
+  void Bind(fidl::InterfaceRequest<::fuchsia::virtualization::Guest> guest) override {}
+  // |fuchsia::virtualization::GuestManager|
   void Run(RunCallback callback) override { captured_run_callback_ = std::move(callback); }
   // |fuchsia::virtualization::GuestManager|
   void Stop(StopCallback callback) override {

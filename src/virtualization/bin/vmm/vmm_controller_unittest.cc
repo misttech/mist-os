@@ -73,12 +73,14 @@ TEST_F(VmmControllerTest, RecreatingNonRunningGuestDestroysVmm) {
 
   GuestConfig cfg;  // Invalid config.
   bool create_callback_called = false;
+  fuchsia::virtualization::GuestPtr guest;
   controller_->Create(std::move(cfg),
                       [&create_callback_called](GuestLifecycle_Create_Result result) {
                         ASSERT_TRUE(result.is_err());
                         ASSERT_EQ(result.err(), GuestError::BAD_CONFIG);
                         create_callback_called = true;
                       });
+  controller_->Bind(guest.NewRequest());
 
   ASSERT_TRUE(create_callback_called);
 
@@ -108,12 +110,14 @@ TEST_F(VmmControllerTest, RecreatingRunningGuestRequiresStop) {
 
   GuestConfig cfg;
   bool create_callback_called = false;
+  fuchsia::virtualization::GuestPtr guest;
   controller_->Create(std::move(cfg),
                       [&create_callback_called](GuestLifecycle_Create_Result result) {
                         ASSERT_TRUE(result.is_err());
                         ASSERT_EQ(result.err(), GuestError::ALREADY_RUNNING);
                         create_callback_called = true;
                       });
+  controller_->Bind(guest.NewRequest());
 
   ASSERT_TRUE(create_callback_called);
 

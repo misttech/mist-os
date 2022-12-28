@@ -83,7 +83,6 @@ class GuestManager : public fuchsia::virtualization::GuestManager {
 
  private:
   void HandleCreateResult(::fuchsia::virtualization::GuestLifecycle_Create_Result result,
-                          fidl::InterfaceRequest<fuchsia::virtualization::Guest> controller,
                           bool balloon_enabled, LaunchCallback callback);
   void HandleRunResult(::fuchsia::virtualization::GuestLifecycle_Run_Result result);
   void HandleGuestStopped(fit::result<::fuchsia::virtualization::GuestError> err);

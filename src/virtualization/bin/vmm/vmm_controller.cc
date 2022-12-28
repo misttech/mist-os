@@ -27,7 +27,8 @@ VmmController::VmmController(fit::function<void()> stop_component_callback,
   FX_CHECK(context_->outgoing()->AddPublicService(bindings_.GetHandler(this)) == ZX_OK);
 }
 
-void VmmController::Create(GuestConfig guest_config, CreateCallback callback) {
+void VmmController::Create(::fuchsia::virtualization::GuestConfig guest_config,
+                           CreateCallback callback) {
   if (run_callback_.has_value()) {
     callback(fpromise::error(GuestError::ALREADY_RUNNING));
     return;
@@ -69,6 +70,12 @@ void VmmController::Run(RunCallback callback) {
   }
 
   run_callback_ = std::move(callback);
+}
+
+void VmmController::Bind(fidl::InterfaceRequest<::fuchsia::virtualization::Guest> guest) {
+  if (vmm_) {
+    vmm_->AddBinding(std::move(guest));
+  }
 }
 
 void VmmController::Stop(StopCallback callback) {

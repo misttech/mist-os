@@ -151,18 +151,15 @@ void GuestManager::Launch(GuestConfig user_config,
   last_error_ = std::nullopt;
   SnapshotConfig(merged_cfg);
   bool balloon_enabled = merged_cfg.has_virtio_balloon();
-  lifecycle_->Create(std::move(merged_cfg),
-                     [this, controller = std::move(controller), callback = std::move(callback),
-                      balloon_enabled](GuestLifecycle_Create_Result result) mutable {
-                       this->HandleCreateResult(std::move(result), std::move(controller),
-                                                balloon_enabled, std::move(callback));
-                     });
+  lifecycle_->Create(std::move(merged_cfg), [this, callback = std::move(callback), balloon_enabled](
+                                                GuestLifecycle_Create_Result result) mutable {
+    this->HandleCreateResult(std::move(result), balloon_enabled, std::move(callback));
+  });
+  lifecycle_->Bind(std::move(controller));
 }
 
-void GuestManager::HandleCreateResult(
-    GuestLifecycle_Create_Result result,
-    fidl::InterfaceRequest<fuchsia::virtualization::Guest> controller, bool balloon_enabled,
-    LaunchCallback callback) {
+void GuestManager::HandleCreateResult(GuestLifecycle_Create_Result result, bool balloon_enabled,
+                                      LaunchCallback callback) {
   if (result.is_err()) {
     HandleGuestStopped(fit::error(result.err()));
     callback(fpromise::error(GuestManagerError::START_FAILURE));
@@ -170,7 +167,6 @@ void GuestManager::HandleCreateResult(
     state_ = GuestStatus::RUNNING;
     lifecycle_->Run(
         [this](GuestLifecycle_Run_Result result) { this->HandleRunResult(std::move(result)); });
-    context_->svc()->Connect(std::move(controller));
     if (balloon_enabled) {
       memory_pressure_handler_ = std::make_unique<MemoryPressureHandler>(dispatcher_);
       zx_status_t status = memory_pressure_handler_->Start(context_);
@@ -340,7 +336,7 @@ std::string GuestManager::GuestNetworkStateToStringExplanation(GuestNetworkState
 void GuestManager::Connect(fidl::InterfaceRequest<fuchsia::virtualization::Guest> controller,
                            fuchsia::virtualization::GuestManager::ConnectCallback callback) {
   if (is_guest_started()) {
-    context_->svc()->Connect(std::move(controller));
+    lifecycle_->Bind(std::move(controller));
     callback(fpromise::ok());
   } else {
     FX_LOGS(ERROR) << "Failed to connect to guest. Guest is not running";

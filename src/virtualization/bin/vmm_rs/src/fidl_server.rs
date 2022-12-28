@@ -11,6 +11,7 @@ use {
     },
     fuchsia_zircon_status as zx_status,
     futures::{future::Fuse, select, stream::SelectAll, FutureExt, Stream, StreamExt},
+    tracing,
 };
 
 pub enum OutgoingService {
@@ -111,6 +112,16 @@ impl<Vm: VirtualMachine> FidlServer<Vm> {
                     Ok(virtual_machine) => {
                         self.virtual_machine = Some(virtual_machine);
                         responder.send(&mut Ok(())).unwrap();
+                    }
+                }
+            }
+            GuestLifecycleRequest::Bind { guest, .. } => {
+                if self.virtual_machine.is_some() {
+                    match guest.into_stream() {
+                        Ok(stream) => self.guest_fidl.push(stream),
+                        Err(e) => {
+                            tracing::warn!("Failed to create Guest RequestStream: {}", e);
+                        }
                     }
                 }
             }
