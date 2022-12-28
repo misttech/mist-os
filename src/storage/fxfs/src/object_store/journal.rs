@@ -1010,10 +1010,6 @@ impl Journal {
 
             // If this is the first write after a RESET, we need to output version first.
             if std::mem::take(&mut inner.output_reset_version) {
-                info!(
-                    "Writing reset version at {}",
-                    inner.writer.journal_file_checkpoint().file_offset
-                );
                 LATEST_VERSION.serialize_into(&mut inner.writer)?;
             }
 
