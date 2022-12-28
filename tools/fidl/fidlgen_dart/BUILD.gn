@@ -99,7 +99,7 @@ if (current_toolchain == dart_toolchain) {
 }
 
 group("tests") {
-  # TODO(ianloic): put fidlgen_dart non-host test targets here
+  # TODO(fxbug.dev/118283): put fidlgen_dart non-host test targets here
   testonly = true
   deps = [
     ":fidlgen_dart_golden_tests($host_toolchain)",

@@ -1179,7 +1179,7 @@ func (c *compiler) compileStructMember(val fidlgen.StructMember) StructMember {
 		OffsetV1:          val.FieldShapeV1.Offset,
 		OffsetV2:          val.FieldShapeV2.Offset,
 		HasDefault:        false,
-		DefaultValue:      "", // TODO(cramertj) support defaults
+		DefaultValue:      "", // TODO(fxbug.dev/118283) support defaults
 		HasHandleMetadata: hi.hasHandleMetadata,
 		HandleSubtype:     hi.fullObjectType,
 		HandleRights:      hi.fullRights,

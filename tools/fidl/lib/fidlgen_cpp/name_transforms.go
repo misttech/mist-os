@@ -161,7 +161,7 @@ var (
 	}
 	// Name of a service declaration
 	// https://google.github.io/styleguide/cppguide.html#Type_Names
-	// TODO(yifeit): Protocols and services should not have DeclName.
+	// TODO(fxbug.dev/118283): Protocols and services should not have DeclName.
 	// Not all bindings generate these types.
 	serviceContext = declarationContext{
 		NameContext: fidlgen.NewNameContext(),
@@ -173,7 +173,7 @@ var (
 	}
 	// Name of a protocol declaration
 	// https://google.github.io/styleguide/cppguide.html#Type_Names
-	// TODO(yifeit): Protocols and services should not have DeclName.
+	// TODO(fxbug.dev/118283): Protocols and services should not have DeclName.
 	// Not all bindings generate these types.
 	protocolContext = declarationContext{
 		NameContext: fidlgen.NewNameContext(),
@@ -979,7 +979,7 @@ func init() {
 	}
 
 	// misc other names
-	// TODO(ianloic): confirm which of these can be removed
+	// TODO(fxbug.dev/118283): confirm which of these can be removed
 	miscNames := []string{
 		"assert",
 		"import",

@@ -550,7 +550,7 @@ func docStringLink(nameWithBars string) string {
 
 var reLink = regexp.MustCompile("\\|([^\\|]+)\\|")
 
-// TODO(pascallouis): rethink how we depend on the fidlgen package.
+// TODO(fxbug.dev/118283): rethink how we depend on the fidlgen package.
 type Annotated interface {
 	LookupAttribute(fidlgen.Identifier) (fidlgen.Attribute, bool)
 }

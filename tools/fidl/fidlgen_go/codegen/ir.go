@@ -708,7 +708,7 @@ var internalTypes = map[fidlgen.InternalSubtype]string{
 }
 
 var handleTypes = map[fidlgen.HandleSubtype]string{
-	// TODO(mknyszek): Add support here for process, thread, job, resource,
+	// TODO(fxbug.dev/118283): Add support here for process, thread, job, resource,
 	// interrupt, eventpair, fifo, guest, and time once these are actually
 	// supported in the Go runtime.
 	fidlgen.HandleSubtypeNone:     "_zx.Handle",
@@ -727,7 +727,7 @@ func isReservedWord(str string) bool {
 }
 
 func changeIfReserved(val fidlgen.Identifier, ext string) string {
-	// TODO(mknyszek): Detect name collision within a scope as a result of transforming.
+	// TODO(fxbug.dev/118283): Detect name collision within a scope as a result of transforming.
 	str := string(val) + ext
 	if isReservedWord(str) {
 		return str + "_"
