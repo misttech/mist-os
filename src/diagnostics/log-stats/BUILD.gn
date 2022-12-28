@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
+import("//src/sys/core/build/core_shard.gni")
 
 group("log-stats") {
   testonly = true
@@ -79,4 +80,8 @@ fuchsia_unittest_component("log-stats-unit-tests") {
 
 fuchsia_test_package("log-stats-tests") {
   test_components = [ ":log-stats-unit-tests" ]
+}
+
+core_shard("core_shard") {
+  shard_file = "meta/log-stats.core_shard.cml"
 }

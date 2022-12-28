@@ -91,10 +91,6 @@
             url: "fuchsia-pkg://fuchsia.com/diagnostics-persistence#meta/diagnostics-persistence.cm",
         },
         {
-            name: "log-stats",
-            url: "fuchsia-pkg://fuchsia.com/log-stats#meta/log-stats.cm",
-        },
-        {
             name: "starnix_manager",
             url: "fuchsia-pkg://fuchsia.com/starnix#meta/starnix_manager.cm",
             environment: "#core-env",
@@ -182,10 +178,7 @@
         {
             protocol: [ "fuchsia.ui.activity.Provider" ],
             from: "#activity",
-            to: [
-                "#cobalt_system_metrics",
-                "#log-stats",
-            ],
+            to: [ "#cobalt_system_metrics" ],
         },
         {
             protocol: "fuchsia.pkg.FontResolver",
@@ -316,11 +309,6 @@
             from: "parent",
             to: "#pkg-resolver",
             subdir: "pkg-resolver",
-        },
-        {
-            protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
-            from: "parent",
-            to: [ "#log-stats" ],
         },
         {
             protocol: [ "fuchsia.diagnostics.FeedbackArchiveAccessor" ],
@@ -503,12 +491,6 @@
         {
             directory: "config-data",
             from: "parent",
-            to: "#log-stats",
-            subdir: "log-stats",
-        },
-        {
-            directory: "config-data",
-            from: "parent",
             to: "#system-update-committer",
             subdir: "system-update-committer",
         },
@@ -648,7 +630,6 @@
             from: "#cobalt",
             to: [
                 "#cobalt_system_metrics",
-                "#log-stats",
                 "#pkg-resolver",
                 "#sysmem_connector",
                 "#timekeeper",
@@ -748,11 +729,6 @@
             protocol: [ "fuchsia.component.Binder" ],
             from: "#diagnostics-persistence",
             as: "fuchsia.component.PersistenceBinder",
-        },
-        {
-            protocol: [ "fuchsia.component.Binder" ],
-            from: "#log-stats",
-            as: "fuchsia.component.LogStatsBinder",
         },
         {
             protocol: [
