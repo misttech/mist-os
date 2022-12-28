@@ -176,6 +176,7 @@ fuchsia_sdk_repository(
     name = "fuchsia_sdk",
     local_paths = ["{ninja_output_dir}/sdk/exported/core"],
     local_sdk_version_file = "//:fuchsia_sdk_hash",
+    fuchsia_api_level_override = "HEAD",
 )
 
 fuchsia_sdk_repository(
@@ -184,6 +185,7 @@ fuchsia_sdk_repository(
     local_sdk_version_file = "//:internal_sdk_hash",
     parent_sdk = "@fuchsia_sdk",
     parent_sdk_local_paths = ["{ninja_output_dir}/sdk/exported/core"],
+    fuchsia_api_level_override = "HEAD",
 )
 
 register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
