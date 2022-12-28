@@ -1047,6 +1047,9 @@ config("werror") {
     "-Dinvalid-value",
     "-Dunused-must-use",
   ]
+
+  # TODO(fxbug.dev/118368): Remove blanket allow once lint is actionable.
+  rustflags += [ "-Awhere_clauses_object_safety" ]
   if (deny_warnings) {
     rustflags += [ "-Dwarnings" ]
   }
