@@ -1,0 +1,42 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "syslog/offer.shard.cml" ],
+    children: [
+        {
+            name: "sampler",
+            url: "fuchsia-pkg://fuchsia.com/sampler#meta/sampler.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
+            from: "parent",
+            to: [ "#sampler" ],
+        },
+        {
+            protocol: [ "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister" ],
+            from: "parent",
+            to: "#sampler",
+        },
+        {
+            directory: "config-data",
+            from: "parent",
+            to: "#sampler",
+            subdir: "sampler",
+        },
+        {
+            protocol: "fuchsia.metrics.MetricEventLoggerFactory",
+            from: "#cobalt",
+            to: [ "#sampler" ],
+        },
+    ],
+    expose: [
+        {
+            protocol: [ "fuchsia.component.Binder" ],
+            from: "#sampler",
+            as: "fuchsia.component.SamplerBinder",
+        },
+    ],
+}

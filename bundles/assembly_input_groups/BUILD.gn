@@ -215,7 +215,10 @@ assembly_input_groups("diagnostics") {
     "//src/diagnostics/sampler",
   ]
 
-  core_realm_shards = [ "//src/diagnostics/kcounter:core_shard" ]
+  core_realm_shards = [
+    "//src/diagnostics/kcounter:core_shard",
+    "//src/diagnostics/sampler:core_shard",
+  ]
 }
 
 assembly_input_groups("bootfs-package-support") {

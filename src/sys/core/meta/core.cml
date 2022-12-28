@@ -99,10 +99,6 @@
             url: "fuchsia-pkg://fuchsia.com/log-stats#meta/log-stats.cm",
         },
         {
-            name: "sampler",
-            url: "fuchsia-pkg://fuchsia.com/sampler#meta/sampler.cm",
-        },
-        {
             name: "starnix_manager",
             url: "fuchsia-pkg://fuchsia.com/starnix#meta/starnix_manager.cm",
             environment: "#core-env",
@@ -328,15 +324,7 @@
         {
             protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
             from: "parent",
-            to: [
-                "#log-stats",
-                "#sampler",
-            ],
-        },
-        {
-            protocol: [ "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister" ],
-            from: "parent",
-            to: "#sampler",
+            to: [ "#log-stats" ],
         },
         {
             protocol: [ "fuchsia.diagnostics.FeedbackArchiveAccessor" ],
@@ -438,12 +426,6 @@
             from: "parent",
             to: "#font_provider",
             subdir: "fonts",
-        },
-        {
-            directory: "config-data",
-            from: "parent",
-            to: "#sampler",
-            subdir: "sampler",
         },
         {
             directory: "config-data",
@@ -690,7 +672,6 @@
                 "#cobalt_system_metrics",
                 "#log-stats",
                 "#pkg-resolver",
-                "#sampler",
                 "#sysmem_connector",
                 "#timekeeper",
             ],
@@ -799,11 +780,6 @@
             protocol: [ "fuchsia.component.Binder" ],
             from: "#log-stats",
             as: "fuchsia.component.LogStatsBinder",
-        },
-        {
-            protocol: [ "fuchsia.component.Binder" ],
-            from: "#sampler",
-            as: "fuchsia.component.SamplerBinder",
         },
         {
             protocol: [
