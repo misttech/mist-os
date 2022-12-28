@@ -5,4 +5,8 @@
 declare_args() {
   # If true, uses the new Rust virtio-net device instead of the legacy C++ device.
   rust_virtio_net = true
+
+  # If true, use a wayland server linked into the virtio_wl device instead of using
+  # a wayland_bridge component.
+  virtio_wl_local_wayland_server = false
 }

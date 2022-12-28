@@ -14,7 +14,14 @@
     ],
     use: [
         {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
+            protocol: [
+                "fuchsia.element.GraphicalPresenter",
+                "fuchsia.tracing.provider.Registry",
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.input3.Keyboard",
+                "fuchsia.ui.scenic.Scenic",
+            ],
+            availability: "optional",
         },
     ],
     expose: [

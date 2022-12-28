@@ -18,6 +18,7 @@
 #include <virtio/virtio_ids.h>
 #include <virtio/wl.h>
 
+#include "src/lib/ui/wayland/server/cpp/wayland_server.h"
 #include "src/virtualization/bin/vmm/device/device_base.h"
 #include "src/virtualization/bin/vmm/device/virtio_queue.h"
 
@@ -138,7 +139,6 @@ class VirtioWl : public DeviceBase<VirtioWl, fuchsia::virtualization::hardware::
 
   std::array<VirtioQueue, VIRTWL_QUEUE_COUNT> queues_;
   zx::vmar vmar_;
-  fuchsia::wayland::ServerPtr wayland_server_;
   fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
   fuchsia::ui::composition::AllocatorPtr scenic_allocator_;
   VirtioChain out_chain_;
@@ -174,6 +174,9 @@ class VirtioWl : public DeviceBase<VirtioWl, fuchsia::virtualization::hardware::
   std::deque<PendingVfd> pending_vfds_;
 
   fidl::BindingSet<fuchsia::virtualization::hardware::VirtioWaylandImporter> importer_bindings_;
+
+  fuchsia::wayland::ServerPtr remote_wayland_server_;
+  std::unique_ptr<WaylandServer> local_wayland_server_;
 };
 
 #endif  // SRC_VIRTUALIZATION_BIN_VMM_DEVICE_VIRTIO_WL_H_

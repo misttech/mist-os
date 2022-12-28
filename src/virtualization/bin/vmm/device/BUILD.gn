@@ -96,8 +96,11 @@ executable("virtio_wl_bin") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//src/lib/fsl",
+    "//src/lib/ui/wayland/server/cpp",
     "//zircon/system/ulib/fbl",
   ]
+
+  public_configs = [ "//src/virtualization/bin:args" ]
 }
 
 fuchsia_component("virtio_wl_component") {

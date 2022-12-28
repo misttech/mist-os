@@ -62,7 +62,7 @@ type WaylandDevice = resource struct {
     memory uint64 = 1073741824;
 
     /// The server for new virtio_wl connections.
-    server client_end:fuchsia.wayland.Server;
+    server client_end:<fuchsia.wayland.Server, optional>;
 };
 
 /// Properties describing a virtio_magma device.

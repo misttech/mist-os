@@ -131,9 +131,22 @@
             availability: "optional",
         },
         {
+            protocol: [
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.input3.Keyboard",
+                "fuchsia.ui.scenic.Scenic",
+            ],
+            from: "parent",
+            to: "#virtio_wl_devices",
+            availability: "optional",
+        },
+        {
             protocol: "fuchsia.element.GraphicalPresenter",
             from: "parent",
-            to: "#virtio_gpu_devices",
+            to: [
+                "#virtio_gpu_devices",
+                "#virtio_wl_devices",
+            ],
             dependency: "weak",
             source_availability: "unknown", // may not be available on all products
         },
