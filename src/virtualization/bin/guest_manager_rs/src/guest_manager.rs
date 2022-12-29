@@ -9,13 +9,13 @@ use {
     crate::guest_config,
     anyhow::{anyhow, Error},
     fidl::endpoints::{Proxy, ServerEnd},
-    fidl_fuchsia_net::MacAddress,
+    fidl_fuchsia_hardware_ethernet::MacAddress,
     fidl_fuchsia_net_interfaces as ninterfaces,
     fidl_fuchsia_virtualization::{
         GuestConfig, GuestDescriptor, GuestError, GuestLifecycleMarker, GuestLifecycleProxy,
         GuestManagerConnectResponder, GuestManagerError, GuestManagerForceShutdownResponder,
         GuestManagerGetInfoResponder, GuestManagerLaunchResponder, GuestManagerRequest,
-        GuestManagerRequestStream, GuestMarker, GuestStatus,
+        GuestManagerRequestStream, GuestMarker, GuestStatus, NetSpec,
     },
     fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
@@ -26,7 +26,8 @@ use {
         stream::SelectAll,
         FutureExt, Stream, StreamExt,
     },
-    std::{fmt, rc::Rc},
+    std::collections::HashSet,
+    std::{fmt, fs, rc::Rc},
 };
 
 // This is a locally administered MAC address (first byte 0x02) mixed with the
@@ -184,13 +185,21 @@ impl GuestManager {
 
                     match request {
                         GuestManagerRequest::Launch { guest_config, controller, responder } => {
-                            let config = self.get_merged_config(guest_config, state_tx.clone());
-                            if let Err(err) = config {
-                                // TODO(fxbug.dev/115695): Log and respond via responder.
+                            if self.is_guest_started() {
+                                responder.send(&mut Err(GuestManagerError::AlreadyRunning)).ok();
                                 continue;
                             }
-                            let config = config.unwrap();
 
+                            let config = self.get_merged_config(guest_config);
+                            if let Err(err) = config {
+                                tracing::error!(%err, "Could not create guest config");
+                                responder.send(&mut Err(GuestManagerError::BadConfig)).ok();
+                                continue;
+                            }
+
+                            let config = config.unwrap();
+                            GuestManager::handle_guest_started(
+                                GuestManager::snapshot_config(&config), state_tx.clone()).ok();
                             let create =
                                 GuestManager::send_create_request(lifecycle.clone(), config).await;
                             if let Err(err) = create {
@@ -262,20 +271,51 @@ impl GuestManager {
         unimplemented!();
     }
 
-    fn get_merged_config(
-        &self,
-        user_config: GuestConfig,
+    fn handle_guest_started(
+        snapshot: GuestDescriptor,
         state_tx: UnboundedSender<GuestManagerStateUpdate>,
-    ) -> Result<GuestConfig, Error> {
-        // 1) Get the default guest config, merge it with the user provided config.
-        // 2) Set any additional config defaults (memory, cpus, and default net interface).
-        // 3) Send a state update, including:
-        //      - The start time
-        //      - Setting the status to started
-        //      - The snapshotted config (see the snapshot_config function)
-        //      - A cleared last error
-        // TODO(fxbug.dev/115695): Implement this function and remove this comment.
-        unimplemented!();
+    ) -> Result<(), Error> {
+        state_tx.unbounded_send(GuestManagerStateUpdate::Status(GuestStatus::Starting))?;
+        state_tx.unbounded_send(GuestManagerStateUpdate::Started(fasync::Time::now().into()))?;
+        state_tx.unbounded_send(GuestManagerStateUpdate::GuestDescriptor(snapshot))?;
+        state_tx.unbounded_send(GuestManagerStateUpdate::ClearError)?;
+        Ok(())
+    }
+
+    fn get_merged_config(&self, user_config: GuestConfig) -> Result<GuestConfig, Error> {
+        let mut merged = guest_config::merge_configs(self.get_default_guest_config()?, user_config);
+
+        // Set config defaults for mem, cpus, and net device.
+        merged.guest_memory.get_or_insert(get_default_guest_memory());
+        merged.cpus.get_or_insert(get_default_num_cpus());
+        if merged.default_net.unwrap_or(false) {
+            merged
+                .net_devices
+                .get_or_insert(Vec::new())
+                .push(NetSpec { mac_address: DEFAULT_GUEST_MAC_ADDRESS, enable_bridge: true });
+        }
+
+        // Merge command-line additions into the main command-line field.
+        merged.cmdline =
+            merged.cmdline.into_iter().chain(merged.cmdline_add.into_iter().flatten()).reduce(
+                |mut acc, a| {
+                    acc.push(' ');
+                    acc.push_str(&a);
+                    acc
+                },
+            );
+        merged.cmdline_add = None;
+
+        // Initial vsock listeners must be bound to unique ports.
+        if merged.vsock_listeners.is_some() {
+            let listeners = merged.vsock_listeners.as_ref().unwrap();
+            let ports: HashSet<_> = listeners.iter().map(|l| l.port).collect();
+            if ports.len() != listeners.len() {
+                return Err(anyhow!("Vsock listeners not bound to unique ports"));
+            }
+        }
+
+        Ok(merged)
     }
 
     pub fn connect(controller: ServerEnd<GuestMarker>) -> Result<(), Error> {
@@ -314,24 +354,30 @@ impl GuestManager {
         unimplemented!();
     }
 
-    fn get_default_guest_config(&self) -> Result<GuestConfig, GuestManagerError> {
-        // Read the default guest config from the file `self.config_path`, and parse it into a
-        // GuestConfig. See GuestManager::GetDefaultGuestConfig for an example.
-        unimplemented!();
+    fn get_default_guest_config(&self) -> Result<GuestConfig, Error> {
+        guest_config::parse_config(&fs::read_to_string(&self.config_path)?)
     }
 
     fn snapshot_config(config: &GuestConfig) -> GuestDescriptor {
-        // Store some config fields in a GuestDescriptor struct. See GuestManager::SnapshotConfig
-        // for an example.
-        // TODO(fxbug.dev/115695): Implement this function and remove this comment.
-        unimplemented!();
+        GuestDescriptor {
+            num_cpus: config.cpus,
+            guest_memory: config.guest_memory,
+            wayland: config.wayland_device.as_ref().and(Some(true)),
+            magma: config.magma_device.as_ref().and(Some(true)),
+            balloon: config.virtio_balloon,
+            console: config.virtio_console,
+            gpu: config.virtio_gpu,
+            rng: config.virtio_rng,
+            vsock: config.virtio_vsock,
+            sound: config.virtio_sound,
+            networks: config.net_devices.clone(),
+            mem: config.virtio_mem,
+            ..GuestDescriptor::EMPTY
+        }
     }
 
     fn is_guest_started(&self) -> bool {
-        // Check the guest status and return true if it has started. See
-        // GuestManager::is_guest_started for an example.
-        // TODO(fxbug.dev/115695): Implement this function and remove this comment.
-        unimplemented!();
+        matches!(self.status, GuestStatus::Starting | GuestStatus::Running | GuestStatus::Stopping)
     }
 
     async fn send_create_request(
@@ -361,20 +407,109 @@ impl GuestManager {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, async_utils::PollExt, fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_virtualization::GuestManagerMarker,
+        super::*,
+        async_utils::PollExt,
+        fidl::endpoints::{create_endpoints, create_proxy_and_stream},
+        fidl_fuchsia_virtualization::{
+            GuestManagerMarker, GuestManagerProxy, HostVsockAcceptorMarker, Listener,
+        },
+        fuchsia_async::WaitState,
+        fuchsia_fs::{file, OpenFlags},
+        tempfile::tempdir,
     };
 
-    impl GuestManager {
-        fn new_for_test(config_path: String) -> Self {
-            GuestManager::new(config_path)
-        }
+    #[fuchsia::test]
+    async fn config_applies_defaults() {
+        let tmpdir = tempdir().unwrap();
+        let configpath = tmpdir.path().join("config");
+        let config = r#"{
+        "default-net": true
+        }"#;
+        let userconfig = GuestConfig { ..GuestConfig::EMPTY };
+        file::open_in_namespace(
+            configpath.to_str().unwrap(),
+            OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
+        )
+        .unwrap()
+        .write(config.as_bytes())
+        .await
+        .unwrap()
+        .unwrap();
+
+        let manager = GuestManager::new(configpath.to_str().unwrap().to_string());
+        let merged = manager.get_merged_config(userconfig).unwrap();
+        assert_eq!(merged.cpus, Some(get_default_num_cpus()));
+        assert_eq!(merged.guest_memory, Some(get_default_guest_memory()));
+        assert_eq!(merged.net_devices.as_ref().map(|nd| nd.len()), Some(1));
+        assert_eq!(
+            merged.net_devices.unwrap()[0],
+            NetSpec { mac_address: DEFAULT_GUEST_MAC_ADDRESS, enable_bridge: true }
+        );
+    }
+
+    #[fuchsia::test]
+    async fn config_merges_cmdline() {
+        let tmpdir = tempdir().unwrap();
+        let configpath = tmpdir.path().join("config");
+        let config = r#"{
+        "cmdline": "firstarg"
+        }"#;
+        let userconfig = GuestConfig {
+            cmdline_add: Some(Vec::from(["secondarg", "thirdarg"].map(String::from))),
+            ..GuestConfig::EMPTY
+        };
+        file::open_in_namespace(
+            configpath.to_str().unwrap(),
+            OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
+        )
+        .unwrap()
+        .write(config.as_bytes())
+        .await
+        .unwrap()
+        .unwrap();
+
+        let manager = GuestManager::new(configpath.to_str().unwrap().to_string());
+        let merged = manager.get_merged_config(userconfig).unwrap();
+        assert_eq!(merged.cmdline, Some(String::from("firstarg secondarg thirdarg")));
+    }
+
+    #[fuchsia::test]
+    async fn config_fails_due_to_duplicate_vsock_listeners() {
+        let tmpdir = tempdir().unwrap();
+        let configpath = tmpdir.path().join("config");
+        let config = r#"{
+        "default-net": true,
+        }"#;
+        let (listener_client, listener_server) =
+            create_endpoints::<HostVsockAcceptorMarker>().unwrap();
+        let (listener_client2, listener_server2) =
+            create_endpoints::<HostVsockAcceptorMarker>().unwrap();
+        let userconfig = GuestConfig {
+            vsock_listeners: Some(vec![
+                Listener { port: 2011, acceptor: listener_client },
+                Listener { port: 2011, acceptor: listener_client2 },
+            ]),
+            ..GuestConfig::EMPTY
+        };
+        file::open_in_namespace(
+            configpath.to_str().unwrap(),
+            OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
+        )
+        .unwrap()
+        .write(config.as_bytes())
+        .await
+        .unwrap()
+        .unwrap();
+
+        let manager = GuestManager::new(configpath.to_str().unwrap().to_string());
+        let merged = manager.get_merged_config(userconfig);
+        assert!(merged.is_err());
     }
 
     #[fuchsia::test]
     fn vmm_component_crash() {
         let mut executor = fasync::TestExecutor::new().expect("failed to create test executor");
-        let mut manager = GuestManager::new_for_test("foo".to_string());
+        let mut manager = GuestManager::new("foo".to_string());
         let (stream_tx, state_rx) = mpsc::unbounded::<GuestManagerRequestStream>();
 
         let (proxy, server) = create_proxy_and_stream::<GuestLifecycleMarker>()
@@ -404,15 +539,75 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn launch_fails_due_to_invalid_config_path() {
-        // Pass an invalid config path to GuestManager and ensure launch fails with BAD_CONFIG.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
+    fn launch_fails_due_to_invalid_config_path() {
+        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut manager = GuestManager::new("foo".to_string());
+
+        let (stream_tx, state_rx) = mpsc::unbounded::<GuestManagerRequestStream>();
+        let (proxy, server) = create_proxy_and_stream::<GuestLifecycleMarker>().unwrap();
+
+        let run_fut = manager.run(Rc::new(proxy), state_rx);
+        futures::pin_mut!(run_fut);
+
+        let (manager_proxy, manager_server) =
+            create_proxy_and_stream::<GuestManagerMarker>().unwrap();
+        let (guest_client_end, guest_server_end) =
+            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+
+        stream_tx.unbounded_send(manager_server).unwrap();
+        let launch_fut = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end);
+        futures::pin_mut!(launch_fut);
+
+        assert!(executor.run_until_stalled(&mut launch_fut).is_pending());
+        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
+        assert!(matches!(
+            executor.run_singlethreaded(&mut launch_fut).unwrap(),
+            Err(GuestManagerError::BadConfig)
+        ));
     }
 
     #[fuchsia::test]
-    async fn launch_fails_due_to_bad_config_schema() {
-        // Pass a real config file with an invalid schema and ensure launch fails with BAD_CONFIG.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
+    fn launch_fails_due_to_bad_config_schema() {
+        let mut executor = fasync::TestExecutor::new().unwrap();
+
+        let tmpdir = tempdir().unwrap();
+        let configpath = tmpdir.path().join("config");
+        let config = r#"{
+        "default-net": false,
+        "invalid": "field",
+        "memory": "2G",
+        "cpus": 4}"#;
+        let mut write_fut = file::open_in_namespace(
+            configpath.to_str().unwrap(),
+            OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
+        )
+        .unwrap()
+        .write(config.as_bytes());
+        assert!(executor.run_singlethreaded(&mut write_fut).unwrap().is_ok());
+
+        let mut manager = GuestManager::new(configpath.to_str().unwrap().to_string());
+        let (stream_tx, state_rx) = mpsc::unbounded::<GuestManagerRequestStream>();
+        let (proxy, server) = create_proxy_and_stream::<GuestLifecycleMarker>().unwrap();
+
+        let run_fut = manager.run(Rc::new(proxy), state_rx);
+        futures::pin_mut!(run_fut);
+
+        let (manager_proxy, manager_server) =
+            create_proxy_and_stream::<GuestManagerMarker>().unwrap();
+        let (guest_client_end, guest_server_end) =
+            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+
+        stream_tx.unbounded_send(manager_server).unwrap();
+
+        let launch_fut = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end);
+        futures::pin_mut!(launch_fut);
+
+        assert!(executor.run_until_stalled(&mut launch_fut).is_pending());
+        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
+        assert!(matches!(
+            executor.run_singlethreaded(&mut launch_fut).unwrap(),
+            Err(GuestManagerError::BadConfig)
+        ));
     }
 
     #[fuchsia::test]
@@ -462,12 +657,6 @@ mod tests {
     #[fuchsia::test]
     fn connect_to_vmm() {
         // Call connect, and ensure failure. Call launch, call connect, and check for success.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
-    }
-
-    #[fuchsia::test]
-    fn duplicate_listeners_provided_by_user_guest_config() {
-        // Duplicate listeners, call launch, check for a failure.
         // TODO(fxbug.dev/115695): Write this test and remove this comment.
     }
 
