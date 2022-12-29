@@ -14,6 +14,7 @@
 
 #include <ddktl/metadata/audio.h>
 #include <fbl/algorithm.h>
+#include <soc/as370/as370-audio.h>
 #include <soc/as370/as370-clk.h>
 #include <soc/as370/as370-gpio.h>
 #include <soc/as370/as370-hw.h>
@@ -109,12 +110,32 @@ zx_status_t Pinecrest::AudioInit() {
       }},
   };
 
+  metadata::As370Config controller_metadata = {};
+  snprintf(controller_metadata.manufacturer, sizeof(controller_metadata.manufacturer), "Google");
+  snprintf(controller_metadata.product_name, sizeof(controller_metadata.product_name), "Pinecrest");
+  controller_metadata.is_input = false;
+  controller_metadata.ring_buffer.number_of_channels = 2;
+  // This product uses 2 speakers, one for lower frequencies and one for higher frequencies.
+  controller_metadata.ring_buffer.frequency_ranges[0].min_frequency = 20;
+  controller_metadata.ring_buffer.frequency_ranges[0].max_frequency = 2'000;
+  controller_metadata.ring_buffer.frequency_ranges[1].min_frequency = 2'000;
+  controller_metadata.ring_buffer.frequency_ranges[1].max_frequency = 48'000;
+  std::vector<fpbus::Metadata> controller_metadata2{
+      {{
+          .type = DEVICE_METADATA_PRIVATE,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&controller_metadata),
+              reinterpret_cast<const uint8_t*>(&controller_metadata) + sizeof(controller_metadata)),
+      }},
+  };
+
   fpbus::Node controller_out;
   controller_out.name() = "pinecrest-audio-out";
   controller_out.vid() = PDEV_VID_SYNAPTICS;
   controller_out.pid() = PDEV_PID_SYNAPTICS_AS370;
   controller_out.did() = PDEV_DID_AS370_AUDIO_OUT;
   controller_out.mmio() = mmios_out;
+  controller_out.metadata() = controller_metadata2;
 
   static const std::vector<fpbus::Mmio> mmios_in{
       {{

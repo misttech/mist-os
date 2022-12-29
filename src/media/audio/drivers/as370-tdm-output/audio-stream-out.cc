@@ -25,14 +25,12 @@
 namespace {
 
 constexpr uint32_t kWantedFrameRate = 48'000;
+constexpr size_t kNumberOfChannels = 2;  // Expects L+R.
 
 }  // namespace
 
 namespace audio {
 namespace as370 {
-
-// Expects L+R.
-constexpr size_t kNumberOfChannels = 2;
 
 As370AudioStreamOut::As370AudioStreamOut(zx_device_t* parent)
     : SimpleAudioStream(parent, false), pdev_(parent) {}
@@ -52,6 +50,18 @@ zx_status_t As370AudioStreamOut::InitPdev() {
   clks_[kAvpll0Clk].SetRate(kWantedFrameRate * 64 * 8 * 8);
   clks_[kAvpll0Clk].Enable();
 
+  size_t actual = 0;
+  zx_status_t status =
+      device_get_fragment_metadata(parent(), "pdev", DEVICE_METADATA_PRIVATE, &metadata_,
+                                   sizeof(metadata::As370Config), &actual);
+  if (status != ZX_OK || sizeof(metadata::As370Config) != actual) {
+    zxlogf(ERROR, "device_get_metadata failed %s", zx_status_get_string(status));
+    return status;
+  }
+
+  ZX_DEBUG_ASSERT(!metadata_.is_input);
+  ZX_DEBUG_ASSERT(metadata_.ring_buffer.number_of_channels == kNumberOfChannels);
+
   ddk::SharedDmaProtocolClient dma(parent(), "dma");
   if (!dma.is_valid()) {
     zxlogf(ERROR, "could not get DMA");
@@ -59,7 +69,7 @@ zx_status_t As370AudioStreamOut::InitPdev() {
   }
 
   std::optional<ddk::MmioBuffer> mmio_avio_global, mmio_i2s;
-  zx_status_t status = pdev_.MapMmio(0, &mmio_avio_global);
+  status = pdev_.MapMmio(0, &mmio_avio_global);
   if (status != ZX_OK) {
     return status;
   }
@@ -79,25 +89,27 @@ zx_status_t As370AudioStreamOut::InitPdev() {
       kWantedFrameRate * sizeof(uint16_t) * kNumberOfChannels, zx_system_get_page_size());
   status = InitBuffer(kRingBufferSize);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to Init buffer %d", status);
+    zxlogf(ERROR, "failed to Init buffer %s", zx_status_get_string(status));
     return status;
   }
 
   // TODO(113005): Remove all codec controlling from this driver by converting it into a DAI driver.
   status = codec_.SetProtocol(ddk::CodecProtocolClient(parent(), "codec"));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "could set codec protocol %d", status);
+    zxlogf(ERROR, "could not set codec protocol %s", zx_status_get_string(status));
     return ZX_ERR_NO_RESOURCES;
   }
 
   // Reset and initialize codec after we have configured I2S.
   status = codec_.Reset();
   if (status != ZX_OK) {
+    zxlogf(ERROR, "could not reset codec %s", zx_status_get_string(status));
     return status;
   }
 
   status = codec_.Start();
   if (status != ZX_OK) {
+    zxlogf(ERROR, "could not start codec %s", zx_status_get_string(status));
     return status;
   }
   GainState state = {};
@@ -107,6 +119,7 @@ zx_status_t As370AudioStreamOut::InitPdev() {
 
   status = codec_.SetBridgedMode(false);
   if (status != ZX_OK) {
+    zxlogf(ERROR, "could not set bridged mode for codec %s", zx_status_get_string(status));
     return status;
   }
 
@@ -138,19 +151,19 @@ zx_status_t As370AudioStreamOut::Init() {
   }
 
   // Get our gain capabilities.
-  auto state = codec_.GetGainState();
+  zx::result<GainState> state = codec_.GetGainState();
   if (state.is_error()) {
-    zxlogf(ERROR, "failed to get gain state");
-    return state.error_value();
+    state = zx::ok(GainState{});
+    zxlogf(WARNING, "failed to get gain state");  // Ok to continue if codec does not support gain.
   }
   cur_gain_state_.cur_gain = state->gain;
   cur_gain_state_.cur_mute = state->muted;
   cur_gain_state_.cur_agc = state->agc_enabled;
 
-  auto format = codec_.GetGainFormat();
+  zx::result<GainFormat> format = codec_.GetGainFormat();
   if (format.is_error()) {
-    zxlogf(ERROR, "failed to get gain format");
-    return format.error_value();
+    format = zx::ok(GainFormat{});
+    zxlogf(WARNING, "failed to get gain format");  // Ok to continue if codec does not support gain.
   }
 
   cur_gain_state_.min_gain = format->min_gain;
@@ -160,8 +173,8 @@ zx_status_t As370AudioStreamOut::Init() {
   cur_gain_state_.can_agc = format->can_agc;
 
   snprintf(device_name_, sizeof(device_name_), "as370-audio-out");
-  snprintf(mfr_name_, sizeof(mfr_name_), "unknown");
-  snprintf(prod_name_, sizeof(prod_name_), "as370");
+  strncpy(mfr_name_, metadata_.manufacturer, sizeof(mfr_name_));
+  strncpy(prod_name_, metadata_.product_name, sizeof(prod_name_));
 
   unique_id_ = AUDIO_STREAM_UNIQUE_ID_BUILTIN_SPEAKERS;
 
@@ -259,8 +272,19 @@ zx_status_t As370AudioStreamOut::AddFormats() {
   // Add the range for basic audio support.
   SimpleAudioStream::SupportedFormat format = {};
 
-  format.range.min_channels = kNumberOfChannels;
-  format.range.max_channels = kNumberOfChannels;
+  format.range.min_channels = metadata_.ring_buffer.number_of_channels;
+  format.range.max_channels = metadata_.ring_buffer.number_of_channels;
+
+  for (size_t i = 0; i < metadata_.ring_buffer.number_of_channels; ++i) {
+    if (metadata_.ring_buffer.frequency_ranges[i].min_frequency ||
+        metadata_.ring_buffer.frequency_ranges[i].max_frequency) {
+      SimpleAudioStream::FrequencyRange range = {};
+      range.min_frequency = metadata_.ring_buffer.frequency_ranges[i].min_frequency;
+      range.max_frequency = metadata_.ring_buffer.frequency_ranges[i].max_frequency;
+      format.frequency_ranges.push_back(std::move(range));
+    }
+  }
+
   // TODO(fxbug.dev/117743): Restore AUDIO_SAMPLE_FORMAT_32BIT once the AudioCoreV2 refactor lands.
   format.range.sample_formats = AUDIO_SAMPLE_FORMAT_24BIT_IN32;
   assert(kWantedFrameRate == 48000);

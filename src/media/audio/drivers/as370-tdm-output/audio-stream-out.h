@@ -9,7 +9,6 @@
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/ddk/io-buffer.h>
-#include <lib/device-protocol/i2c-channel.h>
 #include <lib/device-protocol/pdev.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/simple-audio-stream/simple-audio-stream.h>
@@ -24,6 +23,7 @@
 #include <ddktl/device-internal.h>
 #include <ddktl/device.h>
 #include <fbl/mutex.h>
+#include <soc/as370/as370-audio.h>
 #include <soc/as370/syn-audio-out.h>
 
 namespace audio {
@@ -69,6 +69,7 @@ class As370AudioStreamOut : public SimpleAudioStream {
   std::unique_ptr<SynAudioOutDevice> lib_;
   ddk::ClockProtocolClient clks_[kClockCount] TA_GUARDED(domain_token());
   SimpleCodecClient codec_ TA_GUARDED(domain_token());
+  metadata::As370Config metadata_ = {};
 };
 
 }  // namespace as370
