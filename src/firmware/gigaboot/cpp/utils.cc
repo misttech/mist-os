@@ -8,7 +8,7 @@
 #include <lib/zbi/zbi.h>
 #include <stdio.h>
 
-#include <efi/protocol/global-variable.h>
+#include <efi/global-variable.h>
 #include <efi/types.h>
 
 namespace gigaboot {

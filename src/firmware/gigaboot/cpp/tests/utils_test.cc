@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 #include "utils.h"
 
-#include <efi/protocol/global-variable.h>
+#include <efi/global-variable.h>
 #include <efi/types.h>
 #include <gtest/gtest.h>
 

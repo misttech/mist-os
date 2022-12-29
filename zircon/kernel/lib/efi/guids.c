@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <efi/global-variable.h>
 #include <efi/protocol/block-io.h>
 #include <efi/protocol/device-path-to-text.h>
 #include <efi/protocol/device-path.h>
 #include <efi/protocol/disk-io.h>
 #include <efi/protocol/driver-binding.h>
 #include <efi/protocol/file.h>
-#include <efi/protocol/global-variable.h>
 #include <efi/protocol/graphics-output.h>
 #include <efi/protocol/loaded-image.h>
 #include <efi/protocol/managed-network.h>
