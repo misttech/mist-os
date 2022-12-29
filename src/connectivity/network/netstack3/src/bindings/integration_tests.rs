@@ -3,18 +3,17 @@
 // found in the LICENSE file.
 
 use std::collections::{HashMap, HashSet};
-use std::ops::{Deref as _, DerefMut as _};
+use std::ops::DerefMut as _;
 use std::sync::Once;
 
 use anyhow::{format_err, Context as _, Error};
-use assert_matches::assert_matches;
 use fidl_fuchsia_net as fidl_net;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_stack as fidl_net_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_netemul_network as net;
 use fuchsia_async as fasync;
-use futures::FutureExt as _;
+use futures::{FutureExt as _, StreamExt as _};
 use net_types::ip::{Ip, Ipv4, Ipv6, Subnet};
 use net_types::{
     ip::{AddrSubnetEither, Ipv4Addr},
@@ -22,14 +21,11 @@ use net_types::{
 };
 use netstack3_core::{
     add_ip_addr_subnet,
-    device::DeviceId,
     ip::types::{AddableEntry, AddableEntryEither},
-    Ctx, NonSyncContext,
+    Ctx,
 };
-use packet::Buf;
 
 use crate::bindings::{
-    devices::{CommonInfo, DeviceSpecificInfo, EthernetInfo},
     util::{ConversionContext as _, IntoFidl as _, TryFromFidlWithContext as _},
     BindingsNonSyncCtxImpl, RequestStreamExt as _, LOOPBACK_NAME,
 };
@@ -129,11 +125,6 @@ pub(crate) struct TestStack {
         Option<futures::channel::oneshot::Sender<fnet_interfaces_admin::InterfaceRemovedReason>>,
 }
 
-struct InterfaceInfo {
-    admin_enabled: bool,
-    phy_up: bool,
-}
-
 impl TestStack {
     /// Connects to the `fuchsia.net.stack.Stack` service.
     pub(crate) fn connect_stack(&self) -> Result<fidl_fuchsia_net_stack::StackProxy, Error> {
@@ -147,6 +138,22 @@ impl TestStack {
         }))
         .detach();
         Ok(stack)
+    }
+
+    /// Connects to the `fuchsia.net.interfaces.admin.Installer` service.
+    pub(crate) fn connect_interfaces_installer(
+        &self,
+    ) -> fidl_fuchsia_net_interfaces_admin::InstallerProxy {
+        let (installer, rs) = fidl::endpoints::create_proxy_and_stream::<
+            fidl_fuchsia_net_interfaces_admin::InstallerMarker,
+        >()
+        .expect("create endpoints");
+        let task_stream = crate::bindings::interfaces_admin::serve(self.ctx.netstack.clone(), rs);
+        let task_sink = self.ctx.tasks.clone();
+        self.ctx.tasks.push(fasync::Task::spawn(task_stream.for_each(move |r| {
+            futures::future::ready(task_sink.push(r.expect("error serving interfaces installer")))
+        })));
+        installer
     }
 
     /// Creates a new `fuchsia.net.interfaces/Watcher` for this stack.
@@ -176,15 +183,6 @@ impl TestStack {
 
     /// Waits for interface with given `if_id` to come online.
     pub(crate) async fn wait_for_interface_online(&mut self, if_id: u64) {
-        self.wait_for_interface_online_status(if_id, true).await;
-    }
-
-    /// Waits for interface with given `if_id` to go offline.
-    pub(crate) async fn wait_for_interface_offline(&mut self, if_id: u64) {
-        self.wait_for_interface_online_status(if_id, false).await;
-    }
-
-    async fn wait_for_interface_online_status(&mut self, if_id: u64, want_online: bool) {
         let watcher = self.new_interfaces_watcher().await;
         loop {
             let event = watcher.watch().await.expect("failed to watch");
@@ -196,18 +194,14 @@ impl TestStack {
                     continue;
                 }
                 fidl_fuchsia_net_interfaces::Event::Removed(id) => {
-                    assert_ne!(
-                        id, if_id,
-                        "interface {} removed while waiting online = {}",
-                        if_id, want_online
-                    );
+                    assert_ne!(id, if_id, "interface {} removed while waiting online", if_id);
                     continue;
                 }
             };
             if id.expect("missing id") != if_id {
                 continue;
             }
-            if online.map(|online| online == want_online).unwrap_or(false) {
+            if online.unwrap_or(false) {
                 break;
             }
         }
@@ -247,31 +241,6 @@ impl TestStack {
     ) -> impl std::ops::DerefMut<Target = Ctx<BindingsNonSyncCtxImpl>> + '_ {
         self.ctx.netstack.ctx.lock().await
     }
-
-    async fn get_interface_info(&self, id: u64) -> InterfaceInfo {
-        let ctx = self.ctx().await;
-        let Ctx { sync_ctx: _, non_sync_ctx } = ctx.deref();
-        let device = non_sync_ctx.devices.get_device(id).expect("device");
-
-        let (admin_enabled, phy_up) = assert_matches::assert_matches!(
-            device.info(),
-            DeviceSpecificInfo::Ethernet(EthernetInfo {
-                common_info: CommonInfo {
-                    admin_enabled,
-                    mtu: _,
-                    events: _,
-                    name: _,
-                    control_hook: _,
-                    addresses: _,
-                },
-                client: _,
-                mac: _,
-                features: _,
-                phy_up,
-                interface_control: _,
-            }) => (*admin_enabled, *phy_up));
-        InterfaceInfo { admin_enabled, phy_up }
-    }
 }
 
 /// A test setup that than contain multiple stack instances networked together.
@@ -291,19 +260,16 @@ impl TestSetup {
         &mut self.stacks[i]
     }
 
-    /// Acquires a lock on the [`TestContext`] at index `i`.
-    pub(crate) async fn ctx(
-        &mut self,
-        i: usize,
-    ) -> impl std::ops::DerefMut<Target = Ctx<BindingsNonSyncCtxImpl>> + '_ {
-        self.get(i).ctx.netstack.ctx.lock().await
-    }
-
     async fn get_endpoint(
         &mut self,
         ep_name: &str,
-    ) -> Result<fidl::endpoints::ClientEnd<fidl_fuchsia_hardware_ethernet::DeviceMarker>, Error>
-    {
+    ) -> Result<
+        (
+            fidl::endpoints::ClientEnd<fidl_fuchsia_hardware_network::DeviceMarker>,
+            fidl_fuchsia_hardware_network::PortId,
+        ),
+        Error,
+    > {
         let epm = self.sandbox().get_endpoint_manager()?;
         let ep = match epm.get_endpoint(ep_name).await? {
             Some(ep) => ep.into_proxy()?,
@@ -312,27 +278,30 @@ impl TestSetup {
             }
         };
 
-        match ep.get_device().await? {
-            fidl_fuchsia_netemul_network::DeviceConnection::Ethernet(e) => Ok(e),
-            fidl_fuchsia_netemul_network::DeviceConnection::NetworkDevice(n) => {
-                todo!("(48853) Support NetworkDevice for integration tests.  Got unexpected network device {:?}.", n)
+        let device_instance = match ep.get_device().await? {
+            fidl_fuchsia_netemul_network::DeviceConnection::Ethernet(_) => {
+                panic!("unexpected Ethernet endpoint {}", ep_name)
             }
-        }
-    }
+            fidl_fuchsia_netemul_network::DeviceConnection::NetworkDevice(n) => n,
+        };
 
-    /// Changes a named endpoint `ep_name` link status to `up`.
-    pub(crate) async fn set_endpoint_link_up(
-        &mut self,
-        ep_name: &str,
-        up: bool,
-    ) -> Result<(), Error> {
-        let epm = self.sandbox().get_endpoint_manager()?;
-        if let Some(ep) = epm.get_endpoint(ep_name).await? {
-            ep.into_proxy()?.set_link_up(up).await?;
-            Ok(())
-        } else {
-            Err(format_err!("Failed to retrieve endpoint {}", ep_name))
-        }
+        let (device, server_end) = fidl::endpoints::create_proxy().context("create proxy")?;
+        device_instance
+            .into_proxy()
+            .expect("create proxy")
+            .get_device(server_end)
+            .context("get_device")?;
+
+        // Find the port id.
+        let (port_watcher, server_end) = fidl::endpoints::create_proxy().context("create proxy")?;
+        device.get_port_watcher(server_end).context("get port watcher")?;
+        let port_id = match port_watcher.watch().await.context("failed to watch port")? {
+            fidl_fuchsia_hardware_network::DevicePortEvent::Existing(id) => id,
+            e => panic!("unexpected watcher event {:?}", e),
+        };
+        let (client, server_end) = fidl::endpoints::create_endpoints().context("create proxy")?;
+        device.clone(server_end).context("clone device")?;
+        Ok((client, port_id))
     }
 
     /// Creates a new empty `TestSetup`.
@@ -377,7 +346,17 @@ pub(crate) fn test_ep_name(i: usize) -> String {
 }
 
 fn new_endpoint_setup(name: String) -> net::EndpointSetup {
-    net::EndpointSetup { config: None, link_up: true, name }
+    // TODO(https://fxbug.dev/109169): Use defaults once netemul moves to
+    // netdevice only.
+    net::EndpointSetup {
+        config: Some(Box::new(net::EndpointConfig {
+            mtu: 1500,
+            mac: None,
+            backing: net::EndpointBacking::NetworkDevice,
+        })),
+        link_up: true,
+        name,
+    }
 }
 
 /// A builder structure for [`TestSetup`].
@@ -443,14 +422,40 @@ impl TestSetupBuilder {
 
             for (ep_name, addr) in stack_cfg.endpoints.into_iter() {
                 // get the endpoint from the sandbox config:
-                let endpoint = setup.get_endpoint(&ep_name).await?;
-                let cli = stack.connect_stack()?;
-                // add interface:
-                let if_id = cli
-                    .add_ethernet_interface("fake_topo_path", endpoint)
+                let (endpoint, mut port_id) = setup.get_endpoint(&ep_name).await?;
+
+                let installer = stack.connect_interfaces_installer();
+
+                let (device_control, server_end) =
+                    fidl::endpoints::create_proxy().context("create proxy")?;
+                installer.install_device(endpoint, server_end).context("install device")?;
+
+                // Discard strong ownership of device, we're already holding
+                // onto the device's netemul definition we don't need to hold on
+                // to the netstack side of it too.
+                device_control.detach().context("detach")?;
+
+                let (interface_control, server_end) =
+                    fidl::endpoints::create_proxy().context("create proxy")?;
+                device_control
+                    .create_interface(
+                        &mut port_id,
+                        server_end,
+                        fidl_fuchsia_net_interfaces_admin::Options::EMPTY,
+                    )
+                    .context("create interface")?;
+
+                let if_id = interface_control.get_id().await.context("get id")?;
+
+                // Detach interface_control for the same reason as
+                // device_control.
+                interface_control.detach().context("detach")?;
+
+                assert!(interface_control
+                    .enable()
                     .await
-                    .squash_result()
-                    .context("Add ethernet interface")?;
+                    .context("calling enable")?
+                    .map_err(|e| format_err!("enable error {:?}", e))?);
 
                 // We'll ALWAYS await for the newly created interface to come up
                 // online before returning, so users of `TestSetupBuilder` can
@@ -476,7 +481,8 @@ impl TestSetupBuilder {
 
                     let (_, subnet) = addr.addr_subnet();
 
-                    let () = cli
+                    let stack = stack.connect_stack().context("connect stack")?;
+                    stack
                         .add_forwarding_entry(&mut fidl_fuchsia_net_stack::ForwardingEntry {
                             subnet: subnet.into_fidl(),
                             device_id: if_id,
@@ -525,142 +531,6 @@ impl StackSetupBuilder {
         self.endpoints.push((name.into(), address));
         self
     }
-}
-
-#[fasync::run_singlethreaded(test)]
-async fn test_add_remove_interface() {
-    let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await.unwrap();
-    let ep = t.get_endpoint("test-ep1").await.unwrap();
-    let test_stack = t.get(0);
-    let stack = test_stack.connect_stack().unwrap();
-    let if_id = stack
-        .add_ethernet_interface("fake_topo_path", ep)
-        .await
-        .squash_result()
-        .expect("Add interface succeeds");
-
-    // remove the interface:
-    let () = stack.del_ethernet_interface(if_id).await.squash_result().expect("Remove interface");
-    // ensure the interface disappeared from records:
-    assert_matches!(
-        test_stack.ctx.netstack.ctx.lock().await.non_sync_ctx.devices.get_device(if_id),
-        None
-    );
-
-    // if we try to remove it again, NotFound should be returned:
-    let res =
-        stack.del_ethernet_interface(if_id).await.unwrap().expect_err("Failed to remove twice");
-    assert_eq!(res, fidl_net_stack::Error::NotFound);
-}
-
-#[fasync::run_singlethreaded(test)]
-async fn test_ethernet_link_up_down() {
-    let mut t = TestSetupBuilder::new()
-        .add_endpoint()
-        .add_stack(StackSetupBuilder::new().add_endpoint(1, None))
-        .build()
-        .await
-        .unwrap();
-    let ep_name = test_ep_name(1);
-    let test_stack = t.get(0);
-    let if_id = test_stack.get_endpoint_id(1);
-
-    let () = test_stack.wait_for_interface_online(if_id).await;
-
-    // Get the interface info to confirm status indicators are correct.
-    let if_info = test_stack.get_interface_info(if_id).await;
-    assert!(if_info.phy_up);
-    assert!(if_info.admin_enabled);
-
-    // Ensure that the device has been enabled in the core.
-    let core_id = {
-        let mut ctx = test_stack.ctx().await;
-        let core_id = ctx.non_sync_ctx.devices.get_device(if_id).unwrap().core_id().clone();
-        check_ip_enabled(ctx.deref_mut(), &core_id, true);
-        core_id
-    };
-
-    // Setting the link down should disable the interface and disable it from
-    // the core. The AdministrativeStatus should remain unchanged.
-    assert!(t.set_endpoint_link_up(&ep_name, false).await.is_ok());
-    let test_stack = t.get(0);
-    test_stack.wait_for_interface_offline(if_id).await;
-
-    // Get the interface info to confirm that it is disabled.
-    let if_info = test_stack.get_interface_info(if_id).await;
-    assert!(!if_info.phy_up);
-    assert!(if_info.admin_enabled);
-
-    // Ensure that the device has been disabled in the core.
-    check_ip_enabled(test_stack.ctx().await.deref_mut(), &core_id, false);
-
-    // Setting the link down again should cause no effect on the device state,
-    // and should be handled gracefully.
-    assert!(t.set_endpoint_link_up(&ep_name, false).await.is_ok());
-
-    // Get the interface info to confirm that it is disabled.
-    let test_stack = t.get(0);
-    let if_info = test_stack.get_interface_info(if_id).await;
-    assert!(!if_info.phy_up);
-    assert!(if_info.admin_enabled);
-
-    // Ensure that the device has been disabled in the core.
-    check_ip_enabled(test_stack.ctx().await.deref_mut(), &core_id, false);
-
-    // Setting the link up should reenable the interface and enable it in
-    // the core.
-    assert!(t.set_endpoint_link_up(&ep_name, true).await.is_ok());
-    t.get(0).wait_for_interface_online(if_id).await;
-
-    // Get the interface info to confirm that it is reenabled.
-    let test_stack = t.get(0);
-    let if_info = test_stack.get_interface_info(if_id).await;
-    assert!(if_info.phy_up);
-    assert!(if_info.admin_enabled);
-
-    // Ensure that the device has been enabled in the core.
-    check_ip_enabled(test_stack.ctx().await.deref_mut(), &core_id, true);
-
-    // Setting the link up again should cause no effect on the device state,
-    // and should be handled gracefully.
-    assert!(t.set_endpoint_link_up(&ep_name, true).await.is_ok());
-
-    // Get the interface info to confirm that there have been no changes.
-    let test_stack = t.get(0);
-    let if_info = test_stack.get_interface_info(if_id).await;
-    assert!(if_info.phy_up);
-    assert!(if_info.admin_enabled);
-
-    // Ensure that the device has been enabled in the core.
-    let core_id = t
-        .get(0)
-        .with_ctx(|ctx| {
-            let core_id = ctx.non_sync_ctx.devices.get_device(if_id).unwrap().core_id().clone();
-            check_ip_enabled(ctx, &core_id, true);
-            core_id
-        })
-        .await;
-
-    // call directly into core to prove that the device was correctly
-    // initialized (core will panic if we try to use the device and initialize
-    // hasn't been called)
-    let mut ctx = t.ctx(0).await;
-    let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
-    netstack3_core::device::receive_frame(sync_ctx, non_sync_ctx, &core_id, Buf::new(&mut [], ..))
-        .expect("error receiving frame");
-}
-
-fn check_ip_enabled<NonSyncCtx: NonSyncContext>(
-    Ctx { sync_ctx, non_sync_ctx: _ }: &mut Ctx<NonSyncCtx>,
-    core_id: &DeviceId<NonSyncCtx::Instant>,
-    expected: bool,
-) {
-    let ipv4_enabled =
-        netstack3_core::device::get_ipv4_configuration(sync_ctx, core_id).ip_config.ip_enabled;
-    let ipv6_enabled =
-        netstack3_core::device::get_ipv6_configuration(sync_ctx, core_id).ip_config.ip_enabled;
-
-    assert_eq!((ipv4_enabled, ipv6_enabled), (expected, expected));
 }
 
 #[fasync::run_singlethreaded(test)]
