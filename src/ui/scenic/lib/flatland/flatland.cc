@@ -325,6 +325,7 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
        unsquashable = args.unsquashable(), uber_struct = std::move(uber_struct),
        link_operations = std::move(pending_link_operations_),
        release_fences = std::move(*args.mutable_release_fences())]() mutable {
+        TRACE_DURATION("gfx", "Flatland::Present[QueueTask]");
         // Push the UberStruct, then schedule the associated Present that will eventually publish
         // it to the InstanceMap used for rendering.
         uber_struct_queue_->Push(present_id, std::move(uber_struct));
