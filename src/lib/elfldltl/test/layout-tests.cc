@@ -330,14 +330,11 @@ using AllFormatsEhdrTests = std::tuple<AllMachinesEhdrTests<Elf>...>;
 // This instantiates all the types to do their static_assert checks.
 [[maybe_unused]] elfldltl::AllFormats<AllFormatsEhdrTests> kEhdrTests;
 
-constexpr auto DiagnosticsTests = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
-  std::apply([](auto... test) { (decltype(test)::DiagnosticsTests(), ...); },
-             AllMachinesEhdrTests<Elf>::kTests);
-};
+FORMAT_TYPED_TEST_SUITE(ElfldltlLayoutTests);
 
-TEST(ElfldltlLayoutTests, DiagnosticsTests) {
-  ASSERT_NO_FATAL_FAILURE(TestAllFormats(DiagnosticsTests));
+TYPED_TEST(ElfldltlLayoutTests, DiagnosticsTests) {
+  std::apply([](auto... test) { (decltype(test)::DiagnosticsTests(), ...); },
+             AllMachinesEhdrTests<typename TestFixture::Elf>::kTests);
 }
 
 }  // namespace

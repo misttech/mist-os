@@ -32,6 +32,11 @@ struct FormatTypedTest : public testing::Test {
   using Elf = ElfLayout;
 };
 
+#define FORMAT_TYPED_TEST_SUITE(Name) \
+  template <class Elf>                \
+  using Name = FormatTypedTest<Elf>;  \
+  TYPED_TEST_SUITE(Name, AllFormatsTypedTest)
+
 template <class... Elf>
 struct TestAllFormatsHelper {
   template <typename Test>

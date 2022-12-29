@@ -18,10 +18,7 @@ constexpr uint32_t kEmptyGnuHash = 5381;
 constexpr uint32_t kFoobarCompatHash = 0x06d65882;
 constexpr uint32_t kFoobarGnuHash = 0xfde460be;
 
-template <class Elf>
-using ElfldltlSymbolTests = FormatTypedTest<Elf>;
-
-TYPED_TEST_SUITE(ElfldltlSymbolTests, AllFormatsTypedTest);
+FORMAT_TYPED_TEST_SUITE(ElfldltlSymbolTests);
 
 TEST(ElfldltlSymbolTests, CompatHash) {
   EXPECT_EQ(kEmptyCompatHash, elfldltl::SymbolName(kEmpty).compat_hash());
