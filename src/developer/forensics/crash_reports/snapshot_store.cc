@@ -157,6 +157,16 @@ void SnapshotStore::AddSnapshot(const SnapshotUuid& uuid, fuchsia::feedback::Att
   if (!archive.key.empty() && archive.value.vmo.is_valid()) {
     data.archive_size += StorageSize::Bytes(archive.key.size());
     data.archive_size += StorageSize::Bytes(archive.value.size);
+
+    if (data.archive_size > max_archives_size_) {
+      // Attempting to add to the store would needlessly garbage collect all snapshots despite
+      // failing to add.
+      FX_LOGS(WARNING) << "Snapshot for uuid '" << uuid << "' with a size of '"
+                       << data.archive_size.Get() << "' is larger than the store max";
+      data_.erase(uuid);
+      return;
+    }
+
     current_archives_size_ += data.archive_size;
 
     data.archive = MakeShared(ManagedSnapshot::Archive(archive));

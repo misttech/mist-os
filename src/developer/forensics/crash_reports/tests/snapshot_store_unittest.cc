@@ -166,6 +166,24 @@ TEST_F(SnapshotStoreTest, Check_ArchivesMaxSizeIsEnforced) {
                                                }));
 }
 
+TEST_F(SnapshotStoreTest, Check_NoGarbageCollectionIfSnapshotTooBig) {
+  // Initialize the manager to only hold a single default snapshot archive.
+  SetUpSnapshotStore(StorageSize::Bytes(kDefaultArchiveKey.size()));
+
+  AddDefaultSnapshot();
+  ASSERT_EQ(snapshot_store_->SnapshotLocation(kTestUuid), ItemLocation::kMemory);
+
+  fuchsia::feedback::Attachment big_snapshot;
+  big_snapshot.key = kDefaultArchiveKey;
+  FX_CHECK(fsl::VmoFromString("Too big for the store", &big_snapshot.value));
+
+  const SnapshotUuid kTestUuid2 = "test uuid 2";
+  snapshot_store_->AddSnapshot(kTestUuid2, std::move(big_snapshot));
+
+  EXPECT_EQ(snapshot_store_->SnapshotLocation(kTestUuid), ItemLocation::kMemory);
+  EXPECT_FALSE(snapshot_store_->SnapshotExists(kTestUuid2));
+}
+
 TEST_F(SnapshotStoreTest, Check_Delete) {
   AddDefaultSnapshot();
 
