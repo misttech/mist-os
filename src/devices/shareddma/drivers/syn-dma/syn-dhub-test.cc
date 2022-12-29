@@ -26,6 +26,9 @@ class SynDhubWrapper : public SynDhub {
   void SetBuffer(zx_paddr_t buf, size_t len) { SynDhub::SetBuffer(dma_id_, buf, len); }
   void StartDma() { SynDhub::StartDma(dma_id_, true); }
   void Init() { SynDhub::Init(dma_id_); }
+  size_t NumberOfConcurrentDmas() override {
+    return 1;
+  }  // With this class we test non-concurrent DMAs.
 
  private:
   uint32_t dma_id_;
@@ -196,6 +199,10 @@ class FakeMmio {
 
 struct SynDhubLocal : public SynDhub {
   shared_dma_protocol_t GetProto() { return {&this->shared_dma_protocol_ops_, this}; }
+  bool AllowNonContiguousRingBuffer() override { return true; }
+  SynDhubLocal(zx_device_t* device, ddk::MmioBuffer mmio) : SynDhub(device, std::move(mmio)) {}
+  void Shutdown() { SynDhub::Shutdown(); }
+  zx_status_t Bind() { return SynDhub::Bind(); }
 };
 
 class DhubTest : public zxtest::Test {
@@ -211,8 +218,12 @@ class DhubTest : public zxtest::Test {
     pdev_.set_interrupt(0, std::move(irq));
     fake_parent_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx);
 
-    std::unique_ptr<SynDhub> server = SynDhub::Create(fake_parent_.get());
-    server_ = server.release();  // Driver managed by the DF.
+    ddk::PDev pdev = ddk::PDev(fake_parent_.get());
+    std::optional<ddk::MmioBuffer> mmio;
+    ASSERT_OK(pdev.MapMmio(0, &mmio));
+    auto server = std::make_unique<SynDhubLocal>(fake_parent_.get(), *std::move(mmio));
+    server_ = server.release();  // devmgr is now in charge of the memory for the device.
+    ASSERT_OK(server_->Bind());
 
     auto* child_dev = fake_parent_->GetLatestChild();
     ASSERT_NOT_NULL(child_dev);
@@ -227,13 +238,16 @@ class DhubTest : public zxtest::Test {
 
  protected:
   ddk::SharedDmaProtocolClient& proto_client() { return proto_client_; }
+  void TriggerInterrupt() { irq_.trigger(0, zx::clock::get_monotonic()); }
+  void Shutdown() { server_->Shutdown(); }
+  FakeMmio& mmio() { return mmio_; }
 
  private:
   zx::interrupt irq_;
   fake_pdev::FakePDev pdev_;
   FakeMmio mmio_;
   std::shared_ptr<MockDevice> fake_parent_;
-  SynDhub* server_;
+  SynDhubLocal* server_;
   ddk::SharedDmaProtocolClient proto_client_;
 };
 
@@ -250,6 +264,97 @@ TEST_F(DhubTest, TransferSize) {
   ASSERT_EQ(proto_client().GetTransferSize(DmaId::kDmaIdMa0), 128);
   ASSERT_EQ(proto_client().GetTransferSize(DmaId::kDmaIdPdmW0), 128);
   ASSERT_EQ(proto_client().GetTransferSize(DmaId::kDmaIdPdmW1), 128);
+}
+
+TEST_F(DhubTest, OneDmaTwoInterrupts) {
+  zx::vmo vmo;
+  // Big enough for 8K DmaId::kDmaIdMa0 DMAs.
+  constexpr size_t kDmaSize = static_cast<size_t>(32 * 1024);
+  proto_client().InitializeAndGetBuffer(DmaId::kDmaIdMa0, DMA_TYPE_CYCLIC, kDmaSize, &vmo);
+  mmio().reg(0x1'040c).SetReadCallback([]() {
+    return 0x0000'0001;  // interrupt status, always channel 0 triggered.
+  });
+  proto_client().Start(DmaId::kDmaIdMa0);
+  ASSERT_EQ(proto_client().GetBufferPosition(DmaId::kDmaIdMa0), 0);
+
+  TriggerInterrupt();
+  TriggerInterrupt();
+  Shutdown();  // Such that the thread is done processing.
+  // We advanced by 2 DMAs each 8K.
+  ASSERT_EQ(proto_client().GetBufferPosition(DmaId::kDmaIdMa0), 16 * 1024);
+}
+
+TEST_F(DhubTest, ConcurrentDmas) {
+  zx::vmo vmo;
+  // Big enough for 8K DmaId::kDmaIdMa0 DMAs.
+  constexpr size_t kDmaSize = static_cast<size_t>(32 * 1024);
+  proto_client().InitializeAndGetBuffer(DmaId::kDmaIdMa0, DMA_TYPE_CYCLIC, kDmaSize, &vmo);
+  mmio().reg(0x1'040c).SetReadCallback([]() {
+    return 0x0000'0001;  // interrupt status, always channel 0 triggered.
+  });
+
+  std::atomic<int> step = 0;
+  mmio().reg(0x1'0502).SetReadCallback([&]() {
+    return 0x0000;  // ptr = 0 all the time.
+  });
+  uint64_t physical_address = 0;
+  mmio().reg(0).SetWriteCallback([&](uint64_t val) {  // CommandAddress addr field for base 0 ptr 0.
+    if (step == 0) {
+      physical_address = val;  // The first DMA set next the physical address.
+      step++;
+    } else if (step == 1) {
+      // The second DMA (concurrent) adds 8K.
+      constexpr size_t kDmaOffset = static_cast<size_t>(8 * 1024);
+      EXPECT_EQ(val, physical_address + kDmaOffset);
+      step++;
+    } else {
+      EXPECT_TRUE(false, "unexpected write to registor 0");
+    }
+  });
+
+  proto_client().Start(DmaId::kDmaIdMa0);
+  ASSERT_EQ(proto_client().GetBufferPosition(DmaId::kDmaIdMa0), 0);
+}
+
+TEST_F(DhubTest, ConcurrentDmasOneInterrupt) {
+  zx::vmo vmo;
+  // Big enough for 8K DmaId::kDmaIdMa0 DMAs.
+  constexpr size_t kDmaSize = static_cast<size_t>(32 * 1024);
+  proto_client().InitializeAndGetBuffer(DmaId::kDmaIdMa0, DMA_TYPE_CYCLIC, kDmaSize, &vmo);
+  mmio().reg(0x1'040c).SetReadCallback([]() {
+    return 0x0000'0001;  // interrupt status, always channel 0 triggered.
+  });
+
+  std::atomic<int> step = 0;
+  mmio().reg(0x1'0502).SetReadCallback([&]() {
+    return 0x0000;  // ptr = 0 all the time.
+  });
+  uint64_t physical_address = 0;
+  mmio().reg(0).SetWriteCallback([&](uint64_t val) {  // CommandAddress addr field for base 0 ptr 0.
+    if (step == 0) {
+      physical_address = val;  // The first DMA set next the physical address.
+      step++;
+    } else if (step == 1) {
+      // The second DMA (concurrent) adds 8K.
+      constexpr size_t kDmaOffset = static_cast<size_t>(8 * 1024);
+      EXPECT_EQ(val, physical_address + kDmaOffset);
+      step++;
+    } else if (step == 2) {
+      // The third DMA triggered by the interrupt adds another 8K.
+      constexpr size_t kDmaOffset = static_cast<size_t>(2 * 8 * 1024);
+      EXPECT_EQ(val, physical_address + kDmaOffset);
+      step++;
+    } else {
+      EXPECT_TRUE(false, "unexpected write to registor 0");
+    }
+  });
+
+  proto_client().Start(DmaId::kDmaIdMa0);
+  ASSERT_EQ(proto_client().GetBufferPosition(DmaId::kDmaIdMa0), 0);
+  TriggerInterrupt();
+  Shutdown();  // Such that the thread is done processing.
+  // One interrupt, we have advanced the position by 8K.
+  ASSERT_EQ(proto_client().GetBufferPosition(DmaId::kDmaIdMa0), 8 * 1024);
 }
 
 }  // namespace as370

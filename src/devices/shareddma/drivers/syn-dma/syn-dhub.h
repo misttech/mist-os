@@ -32,6 +32,7 @@ class SynDhub : public DeviceType, public ddk::SharedDmaProtocol<SynDhub, ddk::b
   // Move operators are implicitly disabled.
   SynDhub(const SynDhub&) = delete;
   SynDhub& operator=(const SynDhub&) = delete;
+  virtual ~SynDhub() = default;
 
   static std::unique_ptr<SynDhub> Create(zx_device_t* parent);
 
@@ -53,10 +54,21 @@ class SynDhub : public DeviceType, public ddk::SharedDmaProtocol<SynDhub, ddk::b
 
  protected:
   SynDhub(zx_device_t* device, ddk::MmioBuffer mmio) : DeviceType(device), mmio_(std::move(mmio)) {}
+
   void StartDma(uint32_t dma_id, bool trigger_interrupt);       // protected for unit tests.
   void SetBuffer(uint32_t dma_id, zx_paddr_t buf, size_t len);  // protected for unit tests.
   void Init(uint32_t dma_id);                                   // protected for unit tests.
   void Enable(uint32_t channel_id, bool enable);                // protected for unit tests.
+  zx_status_t Bind();                                           // protected for unit tests.
+  void Shutdown();                                              // protected for unit tests.
+
+  // We use 2 concurrent DMAs to have most of the time 2 DMAs in flight.
+  // Without concurrent DMAs a new DMA needs to be re-enabled within the time it takes an MTU to be
+  // drained (usecs), since the interrupt is triggered once the last MTU is transferred.
+  // With concurrent DMAs a new DMA can be safely delayed for up to the time it takes to drain a
+  // complete DMA (msecs), i.e. MTU size x dma_mtus.
+  virtual size_t NumberOfConcurrentDmas() { return 2; }          // protected for unit tests.
+  virtual bool AllowNonContiguousRingBuffer() { return false; }  // for unit tests.
 
  private:
   // The DMA will copy kMtuSize bytes at the time, dma_mtus number of times.
@@ -66,7 +78,6 @@ class SynDhub : public DeviceType, public ddk::SharedDmaProtocol<SynDhub, ddk::b
   };
   static constexpr uint32_t kMtuFactor = 4;
   static constexpr uint32_t kMtuSize = 8 * 2 << (kMtuFactor - 1);
-  static constexpr uint32_t kConcurrentDmas = 1;
   // Maps channel information per channel id.
   // Making TDM half of PDM makes the interrupts occur at the same frequency that allows us to
   // use a unified profile for deadline scheduling the interrupt handlinug.
@@ -76,11 +87,11 @@ class SynDhub : public DeviceType, public ddk::SharedDmaProtocol<SynDhub, ddk::b
       {kDmaIdPdmW1, {14, 128}},
   };
 
-  zx_status_t Bind();
   int Thread();
-  void Shutdown();
   void Ack(uint32_t channel_id);
   void ProcessIrq(uint32_t channel_id);
+  void IncrementCurrent(uint32_t channel_id);
+  void IncrementNext(uint32_t channel_id);
 
   ddk::MmioBuffer mmio_;
   zx::port port_;
@@ -88,6 +99,7 @@ class SynDhub : public DeviceType, public ddk::SharedDmaProtocol<SynDhub, ddk::b
   thrd_t thread_;
   zx::bti bti_;
   fbl::Mutex position_lock_;
+  bool thread_done_ = false;
   // clang-format off
   bool enabled_                    [DmaId::kDmaIdMax] = {};
   dma_notify_callback_t callback_  [DmaId::kDmaIdMax] = {};
@@ -95,7 +107,10 @@ class SynDhub : public DeviceType, public ddk::SharedDmaProtocol<SynDhub, ddk::b
   zx::vmo    dma_buffer_           [DmaId::kDmaIdMax] = {};
   uint32_t   dma_size_             [DmaId::kDmaIdMax] = {};
   zx_paddr_t dma_base_             [DmaId::kDmaIdMax] = {};
+  // Position for DMA already delivered.
   zx_paddr_t dma_current_          [DmaId::kDmaIdMax] TA_GUARDED(position_lock_);
+  // Position for DMA to be started next; ahead of any concurrent DMA already started.
+  zx_paddr_t dma_next_             [DmaId::kDmaIdMax] = {};
   dma_type_t type_                 [DmaId::kDmaIdMax] = {};
   bool       triggers_interrupt_   [DmaId::kDmaIdMax] = {};
   // clang-format on

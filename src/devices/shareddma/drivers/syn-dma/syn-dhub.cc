@@ -23,7 +23,6 @@ constexpr uint64_t kPortShutdown = 0x01;
 }  // namespace
 
 namespace as370 {
-
 std::unique_ptr<SynDhub> SynDhub::Create(zx_device_t* parent) {
   fbl::AllocChecker ac;
 
@@ -79,7 +78,12 @@ zx_status_t SynDhub::Bind() {
     cell_INTR0_mask::Get(true, i).FromValue(0).WriteTo(&mmio_);
   }
 
-  auto cb = [](void* arg) -> int { return reinterpret_cast<SynDhub*>(arg)->Thread(); };
+  auto cb = [](void* arg) -> int {
+    auto thiz = reinterpret_cast<SynDhub*>(arg);
+    int ret = thiz->Thread();
+    thiz->thread_done_ = true;
+    return ret;
+  };
   int rc = thrd_create_with_name(&thread_, cb, this, "synaptics-dhub-thread");
   if (rc != thrd_success) {
     return ZX_ERR_INTERNAL;
@@ -125,11 +129,13 @@ int SynDhub::Thread() {
 }
 
 void SynDhub::Shutdown() {
-  zx_port_packet packet = {kPortShutdown, ZX_PKT_TYPE_USER, ZX_OK, {}};
-  zx_status_t status = port_.queue(&packet);
-  ZX_ASSERT(status == ZX_OK);
-  thrd_join(thread_, NULL);
-  interrupt_.destroy();
+  if (!thread_done_) {
+    zx_port_packet packet = {kPortShutdown, ZX_PKT_TYPE_USER, ZX_OK, {}};
+    zx_status_t status = port_.queue(&packet);
+    ZX_ASSERT(status == ZX_OK);
+    thrd_join(thread_, NULL);
+    interrupt_.destroy();
+  }
 }
 
 zx_status_t SynDhub::SharedDmaSetNotifyCallback(uint32_t channel_id,
@@ -166,8 +172,10 @@ zx_status_t SynDhub::SharedDmaInitializeAndGetBuffer(uint32_t channel_id, dma_ty
     return status;
   }
   if (pinned_dma_buffer_[channel_id].region_count() != 1) {
-    zxlogf(ERROR, "buffer not contiguous");
-    return ZX_ERR_NO_MEMORY;
+    if (!AllowNonContiguousRingBuffer()) {
+      zxlogf(ERROR, "buffer is not contiguous");
+      return ZX_ERR_NO_MEMORY;
+    }
   }
   zx_paddr_t physical_address = pinned_dma_buffer_[channel_id].region(0).phys_addr;
   constexpr uint32_t minimum_alignment = 16;
@@ -281,13 +289,15 @@ void SynDhub::Enable(uint32_t channel_id, bool enable) {
   FiFo_START::Get(fifo_data_id).FromValue(0).set_EN(enable).WriteTo(&mmio_);      // Start FIFO.
 
   if (enable) {
-    for (size_t i = 0; i < kConcurrentDmas; ++i) {
+    // This starts the concurrent DMAs when this channel_id is enabled
+    // incrementing the next pointer for DMAs to be started next (all but the last DMA).
+    // The current pointer is not incremented since the DMAs have not been yet delivered.
+    // Here is where we initially advance next beyond current; after this, they advance in lock
+    // step with each other.
+    for (size_t i = 0; i < NumberOfConcurrentDmas(); ++i) {
       StartDma(channel_id, triggers_interrupt_[channel_id]);
-      if (i != kConcurrentDmas - 1) {
-        fbl::AutoLock lock(&position_lock_);
-        dma_current_[channel_id] += channel_info_[channel_id].dma_mtus * kMtuSize;
-        // We must not wrap around on enable, if we do, something is wrong.
-        ZX_ASSERT(dma_current_[channel_id] < dma_base_[channel_id] + dma_size_[channel_id]);
+      if (i != NumberOfConcurrentDmas() - 1) {
+        IncrementNext(channel_id);
       }
     }
   }
@@ -310,17 +320,13 @@ void SynDhub::StartDma(uint32_t channel_id, bool trigger_interrupt) {
   const uint16_t ptr = mmio_.Read<uint16_t>(0x1'0500 + (fifo_cmd_id << 2) + (producer << 7) + 2);
   const uint32_t base = (channel_info_[channel_id].bank * 2) << 8;
 
-  uint32_t current = 0;
-  {
-    fbl::AutoLock lock(&position_lock_);
-    current = static_cast<uint32_t>(dma_current_[channel_id]);
-  }
+  uint32_t next = static_cast<uint32_t>(dma_next_[channel_id]);
 
-  zxlogf(DEBUG, "start channel id %u from 0x%X  amount 0x%X  ptr %u", channel_id, current,
+  zxlogf(DEBUG, "start channel id %u from 0x%X  amount 0x%X  ptr %u", channel_id, next,
          channel_info_[channel_id].dma_mtus * kMtuSize, ptr);
 
   // Write to SRAM.
-  CommandAddress::Get(base + ptr * 8).FromValue(0).set_addr(current).WriteTo(&mmio_);
+  CommandAddress::Get(base + ptr * 8).FromValue(0).set_addr(next).WriteTo(&mmio_);
   CommandHeader::Get(base + ptr * 8)
       .FromValue(0)
       .set_interrupt(trigger_interrupt)
@@ -344,23 +350,44 @@ void SynDhub::Ack(uint32_t channel_id) {
   full::Get(true).ReadFrom(&mmio_).set_ST(1 << channel_id).WriteTo(&mmio_);
 }
 
+void SynDhub::IncrementCurrent(uint32_t channel_id) {
+  // Locked since it is accessed by other threads in SharedDmaGetBufferPosition.
+  fbl::AutoLock lock(&position_lock_);
+  dma_current_[channel_id] += channel_info_[channel_id].dma_mtus * kMtuSize;
+  if (dma_current_[channel_id] == dma_base_[channel_id] + dma_size_[channel_id]) {
+    zxlogf(DEBUG, "dma channel id %u  wraparound current 0x%lX  limit 0x%lX", channel_id,
+           dma_current_[channel_id], dma_base_[channel_id] + dma_size_[channel_id]);
+    dma_current_[channel_id] = dma_base_[channel_id];
+  } else if (dma_current_[channel_id] > dma_base_[channel_id] + dma_size_[channel_id]) {
+    zxlogf(ERROR, "dma channel id %u  current 0x%lX  exceeded 0x%lX", channel_id,
+           dma_current_[channel_id], dma_base_[channel_id] + dma_size_[channel_id]);
+    dma_current_[channel_id] = dma_base_[channel_id];
+  }
+}
+
+void SynDhub::IncrementNext(uint32_t channel_id) {
+  // Not locked unlike IncrementCurrent since it is only accessed within this driver's thread.
+  dma_next_[channel_id] += channel_info_[channel_id].dma_mtus * kMtuSize;
+  if (dma_next_[channel_id] == dma_base_[channel_id] + dma_size_[channel_id]) {
+    zxlogf(DEBUG, "dma channel id %u  wraparound next 0x%lX  limit 0x%lX", channel_id,
+           dma_next_[channel_id], dma_base_[channel_id] + dma_size_[channel_id]);
+    dma_next_[channel_id] = dma_base_[channel_id];
+  } else if (dma_next_[channel_id] > dma_base_[channel_id] + dma_size_[channel_id]) {
+    zxlogf(ERROR, "dma channel id %u  next 0x%lX  exceeded 0x%lX", channel_id,
+           dma_next_[channel_id], dma_base_[channel_id] + dma_size_[channel_id]);
+    dma_next_[channel_id] = dma_base_[channel_id];
+  }
+}
+
 void SynDhub::ProcessIrq(uint32_t channel_id) {
   if (channel_id >= DmaId::kDmaIdMax) {
     return;
   }
   if (enabled_[channel_id]) {
-    {
-      fbl::AutoLock lock(&position_lock_);
-      dma_current_[channel_id] += channel_info_[channel_id].dma_mtus * kMtuSize;
-      if (dma_current_[channel_id] == dma_base_[channel_id] + dma_size_[channel_id]) {
-        zxlogf(DEBUG, "dma channel id %u  wraparound current 0x%lX  limit 0x%lX", channel_id,
-               dma_current_[channel_id], dma_base_[channel_id] + dma_size_[channel_id]);
-        dma_current_[channel_id] = dma_base_[channel_id];
-      } else if (dma_current_[channel_id] > dma_base_[channel_id] + dma_size_[channel_id]) {
-        zxlogf(ERROR, "dma channel id %u  current 0x%lX  exceeded 0x%lX", channel_id,
-               dma_current_[channel_id], dma_base_[channel_id] + dma_size_[channel_id]);
-      }
-    }
+    // The current pointer is incremented since a DMA has been delivered.
+    // The next pointer is incremented since the next DMA must start ahead of already started DMAs.
+    IncrementCurrent(channel_id);
+    IncrementNext(channel_id);
     if (type_[channel_id] == DMA_TYPE_CYCLIC) {
       StartDma(channel_id, triggers_interrupt_[channel_id]);
     }
@@ -375,7 +402,9 @@ void SynDhub::SetBuffer(uint32_t channel_id, zx_paddr_t buf, size_t len) {
   fbl::AutoLock lock(&position_lock_);
   dma_base_[channel_id] = buf;
   dma_size_[channel_id] = static_cast<uint32_t>(len);
+  // Initial current and next positions.
   dma_current_[channel_id] = dma_base_[channel_id];
+  dma_next_[channel_id] = dma_base_[channel_id];
   zxlogf(DEBUG, "dma set to 0x%lX  size 0x%lX", dma_base_[channel_id], len);
 }
 
