@@ -131,7 +131,7 @@ fuchsia_structured_config_values("persistent-test-config") {
 fuchsia_package("account_handler_persistent_for_test") {
   deps = [
     ":component",
-    ":persistent-config",
+    ":persistent-test-config",
     "//src/storage/bin/minfs",
   ]
 }
@@ -139,7 +139,7 @@ fuchsia_package("account_handler_persistent_for_test") {
 fuchsia_package("account_handler_ephemeral_for_test") {
   deps = [
     ":component",
-    ":ephemeral-config",
+    ":ephemeral-test-config",
     "//src/storage/bin/minfs",
   ]
 }

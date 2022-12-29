@@ -21,6 +21,7 @@ rustc_test("test") {
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_rust",
     "//sdk/fidl/fuchsia.identity.account:fuchsia.identity.account_rust",
+    "//sdk/fidl/fuchsia.identity.authentication:fuchsia.identity.authentication_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
@@ -73,6 +74,7 @@ fuchsia_test_package("account_manager_integration_test") {
     "//src/identity/bin/account_manager:test-config",
     "//src/identity/bin/dev_authenticator:dev_authenticator_always_fail_authentication",
     "//src/identity/bin/dev_authenticator:dev_authenticator_always_succeed",
+    "//src/identity/bin/dev_authenticator:dev_authenticator_component",
     "//src/storage/bin/minfs",
   ]
   test_components = [ ":account_manager_integration_test_component" ]

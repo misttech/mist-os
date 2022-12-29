@@ -37,6 +37,7 @@ rustc_binary("bin") {
 }
 
 fuchsia_component("dev_authenticator_component") {
+  component_name = "dev_authenticator"
   deps = [ ":bin" ]
   manifest = "meta/dev_authenticator.cml"
 }

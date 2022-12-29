@@ -5,25 +5,30 @@
 use {
     anyhow::{anyhow, format_err, Error},
     assert_matches::assert_matches,
-    fidl::endpoints::{create_endpoints, ServerEnd},
+    fidl::endpoints::{create_endpoints, create_proxy, ServerEnd},
     fidl_fuchsia_hardware_block_partition::Guid,
     fidl_fuchsia_identity_account::{
         AccountManagerGetAccountRequest, AccountManagerMarker,
         AccountManagerProvisionNewAccountRequest, AccountManagerProxy, AccountMarker,
         AccountMetadata, AccountProxy, Error as ApiError, Lifetime,
     },
+    fidl_fuchsia_identity_authentication::{
+        Empty, InteractionMarker, InteractionWatchStateResponse, Mechanism, Mode,
+        TestAuthenticatorCondition, TestInteractionWatchStateResponse,
+    },
     fidl_fuchsia_io as fio,
     fidl_fuchsia_logger::LogSinkMarker,
     fidl_fuchsia_sys2 as fsys2,
     fidl_fuchsia_tracing_provider::RegistryMarker,
-    fuchsia_async::{DurationExt, TimeoutExt},
+    fuchsia_async::{DurationExt, Task, TimeoutExt},
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
     fuchsia_zircon as zx,
-    futures::prelude::*,
+    futures::{lock::Mutex, prelude::*},
     ramdevice_client::RamdiskClient,
     ramdisk_common::{format_zxcrypt, setup_ramdisk},
     std::ops::Deref,
+    std::sync::Arc,
 };
 
 /// Type alias for the LocalAccountId FIDL type
@@ -33,6 +38,8 @@ const ALWAYS_SUCCEED_AUTH_MECHANISM_ID: &str = "#meta/dev_authenticator_always_s
 
 const ALWAYS_FAIL_AUTHENTICATION_AUTH_MECHANISM_ID: &str =
     "#meta/dev_authenticator_always_fail_authentication.cm";
+
+const DEV_AUTHENTICATOR_URL: &str = "#meta/dev_authenticator.cm";
 
 const ACCOUNT_MANAGER_URL: &str = "#meta/account_manager.cm";
 
@@ -74,6 +81,61 @@ async fn provision_new_account(
         .map_err(|error| format_err!("ProvisionNewAccount returned error: {:?}", error))
 }
 
+async fn provision_new_account_interaction(
+    account_manager: Arc<Mutex<NestedAccountManagerProxy>>,
+    lifetime: Lifetime,
+    interaction: Option<ServerEnd<InteractionMarker>>,
+    metadata: AccountMetadata,
+) -> Result<LocalAccountId, Error> {
+    account_manager
+        .lock()
+        .await
+        .provision_new_account(AccountManagerProvisionNewAccountRequest {
+            lifetime: Some(lifetime),
+            interaction,
+            metadata: Some(metadata),
+            ..AccountManagerProvisionNewAccountRequest::EMPTY
+        })
+        .await?
+        .map_err(|error| format_err!("ProvisionNewAccount returned error: {:?}", error))
+}
+
+async fn provision_new_account_and_enroll(
+    account_manager: &Arc<Mutex<NestedAccountManagerProxy>>,
+    lifetime: Lifetime,
+) -> Result<LocalAccountId, Error> {
+    let account_manager_clone = Arc::clone(account_manager);
+    let (interaction_proxy_opt, interaction_server_end_opt) = match lifetime {
+        Lifetime::Persistent => {
+            let (interaction_proxy, interaction_server_end) =
+                create_proxy().expect("Failed to create interaction proxy");
+            (Some(interaction_proxy), Some(interaction_server_end))
+        }
+        Lifetime::Ephemeral => (None, None),
+    };
+
+    // Provision a new account.
+    let account_task = Task::local(async move {
+        provision_new_account_interaction(
+            account_manager_clone,
+            lifetime,
+            interaction_server_end_opt,
+            create_account_metadata("test1"),
+        )
+        .await
+    });
+
+    if let Some(interaction_proxy) = interaction_proxy_opt {
+        let state = interaction_proxy.watch_state().await.expect("Failed to get interaction state");
+        assert_eq!(state, InteractionWatchStateResponse::Enrollment(vec![Mechanism::Test]));
+
+        let (_, test_interaction_server_end) = create_proxy().unwrap();
+        interaction_proxy.start_test(test_interaction_server_end, Mode::Enroll).unwrap();
+    }
+
+    account_task.await
+}
+
 /// Convenience function to calls get_account on the supplied account_manager.
 async fn get_account(
     account_manager: &AccountManagerProxy,
@@ -87,6 +149,73 @@ async fn get_account(
             ..AccountManagerGetAccountRequest::EMPTY
         })
         .await
+}
+
+enum InteractionOutcome {
+    Succeed,
+    Fail,
+}
+
+async fn get_account_interaction(
+    account_manager: &Arc<Mutex<NestedAccountManagerProxy>>,
+    account_id: u64,
+    account_server_end: ServerEnd<AccountMarker>,
+    interaction_outcome: InteractionOutcome,
+) -> Result<Result<(), ApiError>, fidl::Error> {
+    let account_manager_clone = Arc::clone(account_manager);
+    let (interaction_proxy, interaction_server_end) =
+        create_proxy().expect("Failed to create interaction proxy");
+    let get_account_task = Task::local(async move {
+        account_manager_clone
+            .lock()
+            .await
+            .get_account(AccountManagerGetAccountRequest {
+                id: Some(account_id),
+                account: Some(account_server_end),
+                interaction: Some(interaction_server_end),
+                ..AccountManagerGetAccountRequest::EMPTY
+            })
+            .await
+    });
+
+    let state = interaction_proxy.watch_state().await;
+    if state.is_ok() {
+        // For GetAccount operation, we expect the AccountManager to require
+        // authentication using the Test Authentication mechanism.
+        assert_eq!(state?, InteractionWatchStateResponse::Authenticate(vec![Mechanism::Test]));
+
+        // Specify that we need to interact with the TestInteraction server to
+        // successfully authenticate.
+        let (test_interaction_proxy, test_interaction_server_end) = create_proxy().unwrap();
+        interaction_proxy
+            .start_test(test_interaction_server_end, Mode::Authenticate)
+            .expect("Failed to complete the StartTest operation");
+
+        let test_state = test_interaction_proxy
+            .watch_state()
+            .await
+            .expect("Failed to get TestInteraction WatchState response");
+        assert_eq!(
+            test_state,
+            TestInteractionWatchStateResponse::Waiting(vec![
+                TestAuthenticatorCondition::SetSuccess(Empty)
+            ])
+        );
+
+        match interaction_outcome {
+            InteractionOutcome::Succeed => {
+                test_interaction_proxy.set_success().expect("Failure during SetSuccess operation")
+            }
+            InteractionOutcome::Fail => {
+                // We don't need a successful Interaction operation so we close
+                // the Interaction channel to indicate an aborted attempt and
+                // prevent the servers waiting indefinitely for a client response.
+                std::mem::drop(interaction_proxy);
+            }
+        }
+    }
+
+    get_account_task.await
 }
 
 /// Utility function to stop a component using LifecycleController.
@@ -173,6 +302,8 @@ async fn create_account_manager() -> Result<NestedAccountManagerProxy, Error> {
             ChildOptions::new(),
         )
         .await?;
+    let dev_authenticator =
+        builder.add_child("dev_authenticator", DEV_AUTHENTICATOR_URL, ChildOptions::new()).await?;
     builder
         .add_route(
             Route::new()
@@ -190,6 +321,16 @@ async fn create_account_manager() -> Result<NestedAccountManagerProxy, Error> {
                     "fuchsia.identity.authentication.AlwaysFailStorageUnlockMechanism",
                 ))
                 .from(&dev_authenticator_always_fail_authentication)
+                .to(&account_manager),
+        )
+        .await?;
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name(
+                    "fuchsia.identity.authentication.TestStorageUnlockMechanism",
+                ))
+                .from(&dev_authenticator)
                 .to(&account_manager),
         )
         .await?;
@@ -283,6 +424,11 @@ async fn create_account_manager() -> Result<NestedAccountManagerProxy, Error> {
     })
 }
 
+async fn create_account_manager_arc_mutex() -> Result<Arc<Mutex<NestedAccountManagerProxy>>, Error>
+{
+    Ok(Arc::new(Mutex::new(create_account_manager().await?)))
+}
+
 /// Locks an account and waits for the channel to close.
 async fn lock_and_check(account: &AccountProxy) -> Result<(), Error> {
     account.lock().await?.map_err(|err| anyhow!("Lock failed: {:?}", err))?;
@@ -300,28 +446,20 @@ async fn lock_and_check(account: &AccountProxy) -> Result<(), Error> {
 // themselves run in a single environment.
 #[fuchsia_async::run_singlethreaded(test)]
 async fn test_provision_one_new_account() -> Result<(), Error> {
-    let account_manager = create_account_manager().await?;
+    let account_manager = create_account_manager_arc_mutex().await?;
 
     // Verify we initially have no accounts.
-    assert_eq!(account_manager.get_account_ids().await?, vec![]);
+    assert_eq!(account_manager.lock().await.get_account_ids().await?, vec![]);
 
-    // Provision a new account.
-    let account_1 = provision_new_account(
-        &account_manager,
-        Lifetime::Persistent,
-        None,
-        create_account_metadata("test1"),
-    )
-    .await?;
-    assert_eq!(account_manager.get_account_ids().await?, vec![account_1]);
+    let account_1 =
+        provision_new_account_and_enroll(&account_manager, Lifetime::Persistent).await?;
 
-    let account_ids = account_manager.get_account_ids().await?;
-    assert_eq!(account_ids.len(), 1);
-    assert!(account_ids.contains(&account_1));
+    assert_eq!(account_manager.lock().await.get_account_ids().await?, vec![account_1]);
 
     Ok(())
 }
 
+// TODO(fxb/104199): Start using Interaction protocol for authentication.
 // Since we only have one zxcrypt-backed partition, provisioning a second
 // account will fail (since the disk is already formatted). When we switch to a
 // fxfs-backed AccountManager, we can reenable this test.
@@ -353,7 +491,7 @@ async fn test_provision_many_new_accounts() -> Result<(), Error> {
     .await?;
     assert_ne!(account_1, account_2);
 
-    // Provision account with an auth mechanism
+    // Provision third account.
     let account_3 = provision_new_account(
         &account_manager,
         Lifetime::Persistent,
@@ -373,18 +511,23 @@ async fn test_provision_many_new_accounts() -> Result<(), Error> {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn test_provision_then_lock_then_unlock_account() -> Result<(), Error> {
-    let account_manager = create_account_manager().await?;
+    let account_manager = create_account_manager_arc_mutex().await?;
 
-    // Provision account with an auth mechanism that passes authentication
-    let account_id = provision_new_account(
-        &account_manager,
-        Lifetime::Persistent,
-        Some(ALWAYS_SUCCEED_AUTH_MECHANISM_ID),
-        create_account_metadata("test"),
-    )
-    .await?;
+    // Provision account
+    let account_id =
+        provision_new_account_and_enroll(&account_manager, Lifetime::Persistent).await?;
+
     let (account_client_end, account_server_end) = create_endpoints()?;
-    assert_eq!(get_account(&account_manager, account_id, account_server_end).await?, Ok(()));
+    assert_eq!(
+        get_account_interaction(
+            &account_manager,
+            account_id,
+            account_server_end,
+            InteractionOutcome::Succeed
+        )
+        .await?,
+        Ok(())
+    );
     let account_proxy = account_client_end.into_proxy()?;
 
     // Lock the account and ensure that it's locked
@@ -392,7 +535,16 @@ async fn test_provision_then_lock_then_unlock_account() -> Result<(), Error> {
 
     // Unlock the account and re-acquire a channel
     let (account_client_end, account_server_end) = create_endpoints()?;
-    assert_eq!(get_account(&account_manager, account_id, account_server_end).await?, Ok(()));
+    assert_eq!(
+        get_account_interaction(
+            &account_manager,
+            account_id,
+            account_server_end,
+            InteractionOutcome::Succeed
+        )
+        .await?,
+        Ok(())
+    );
     let account_proxy = account_client_end.into_proxy()?;
     assert_eq!(account_proxy.get_lifetime().await.unwrap(), Lifetime::Persistent);
     Ok(())
@@ -400,23 +552,27 @@ async fn test_provision_then_lock_then_unlock_account() -> Result<(), Error> {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn test_unlock_account() -> Result<(), Error> {
-    let mut account_manager = create_account_manager().await?;
+    let account_manager = create_account_manager_arc_mutex().await?;
 
-    // Provision account with an auth mechanism that passes authentication
-    let account_id = provision_new_account(
-        &account_manager,
-        Lifetime::Persistent,
-        Some(ALWAYS_SUCCEED_AUTH_MECHANISM_ID),
-        create_account_metadata("test"),
-    )
-    .await?;
+    // Provision account
+    let account_id =
+        provision_new_account_and_enroll(&account_manager, Lifetime::Persistent).await?;
 
-    account_manager.restart().await?;
+    account_manager.lock().await.restart().await?;
 
     // Unlock the account and acquire a channel to it
     let (account_client_end, account_server_end) = create_endpoints()?;
 
-    assert_eq!(get_account(&account_manager, account_id, account_server_end).await?, Ok(()));
+    assert_eq!(
+        get_account_interaction(
+            &account_manager,
+            account_id,
+            account_server_end,
+            InteractionOutcome::Succeed
+        )
+        .await?,
+        Ok(())
+    );
 
     let account_proxy = account_client_end.into_proxy()?;
     assert_eq!(account_proxy.get_lifetime().await.unwrap(), Lifetime::Persistent);
@@ -425,75 +581,101 @@ async fn test_unlock_account() -> Result<(), Error> {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn test_provision_then_lock_then_unlock_fail_authentication() -> Result<(), Error> {
-    let account_manager = create_account_manager().await?;
+    let account_manager = create_account_manager_arc_mutex().await?;
 
-    // Provision account with an auth mechanism that fails authentication
-    let account_id = provision_new_account(
-        &account_manager,
-        Lifetime::Persistent,
-        Some(ALWAYS_FAIL_AUTHENTICATION_AUTH_MECHANISM_ID),
-        create_account_metadata("test"),
-    )
-    .await?;
+    // Provision account
+    let account_id =
+        provision_new_account_and_enroll(&account_manager, Lifetime::Persistent).await?;
     let (account_client_end, account_server_end) = create_endpoints()?;
-    assert_eq!(get_account(&account_manager, account_id, account_server_end).await?, Ok(()));
+    assert_eq!(
+        get_account_interaction(
+            &account_manager,
+            account_id,
+            account_server_end,
+            InteractionOutcome::Fail
+        )
+        .await?,
+        Ok(())
+    );
     let account_proxy = account_client_end.into_proxy()?;
 
     // Lock the account and ensure that it's locked
     lock_and_check(&account_proxy).await?;
 
-    // Attempting to unlock the account fails with an authentication error
+    // Attempting to unlock the account fails with a FailedPrecondition error
+    // since we don't finish interaction procedure while authenticating.
     let (_, account_server_end) = create_endpoints()?;
     assert_eq!(
-        get_account(&account_manager, account_id, account_server_end).await?,
-        Err(ApiError::FailedAuthentication)
+        get_account_interaction(
+            &account_manager,
+            account_id,
+            account_server_end,
+            InteractionOutcome::Fail
+        )
+        .await?,
+        Err(ApiError::FailedPrecondition)
     );
     Ok(())
 }
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn test_unlock_account_fail_authentication() -> Result<(), Error> {
-    let mut account_manager = create_account_manager().await?;
+    let account_manager = create_account_manager_arc_mutex().await?;
 
-    // Provision account with an auth mechanism that fails authentication
-    let account_id = provision_new_account(
-        &account_manager,
-        Lifetime::Persistent,
-        Some(ALWAYS_FAIL_AUTHENTICATION_AUTH_MECHANISM_ID),
-        create_account_metadata("test"),
-    )
-    .await?;
+    // Provision account
+    let account_id =
+        provision_new_account_and_enroll(&account_manager, Lifetime::Persistent).await?;
 
     // Restart the account manager, now the account should be locked
-    account_manager.restart().await?;
+    account_manager.lock().await.restart().await?;
 
-    // Attempting to unlock the account fails with an authentication error
+    // Attempting to unlock the account fails with a FailedPrecondition error
+    // since we don't finish interaction procedure while authenticating.
     let (_, account_server_end) = create_endpoints()?;
     assert_eq!(
-        get_account(&account_manager, account_id, account_server_end).await?,
-        Err(ApiError::FailedAuthentication)
+        get_account_interaction(
+            &account_manager,
+            account_id,
+            account_server_end,
+            InteractionOutcome::Fail
+        )
+        .await?,
+        Err(ApiError::FailedPrecondition)
     );
     Ok(())
 }
 
 // This represents two nearly identical tests, one with ephemeral and one with persistent accounts
 async fn get_account_and_persona_helper(lifetime: Lifetime) -> Result<(), Error> {
-    let account_manager = create_account_manager().await?;
+    let account_manager = create_account_manager_arc_mutex().await?;
 
-    assert_eq!(account_manager.get_account_ids().await?, vec![]);
+    assert_eq!(account_manager.lock().await.get_account_ids().await?, vec![]);
 
-    let account_id =
-        provision_new_account(&account_manager, lifetime, None, create_account_metadata("test"))
-            .await?;
+    // Provision account
+    let account_id = provision_new_account_and_enroll(&account_manager, lifetime).await?;
+
     // Connect a channel to the newly created account and verify it's usable.
     let (account_client_end, account_server_end) = create_endpoints()?;
-    assert_eq!(get_account(&account_manager, account_id, account_server_end).await?, Ok(()));
+    assert_eq!(
+        get_account_interaction(
+            &account_manager,
+            account_id,
+            account_server_end,
+            InteractionOutcome::Succeed
+        )
+        .await?,
+        Ok(())
+    );
     let account_proxy = account_client_end.into_proxy()?;
     let account_auth_state = account_proxy.get_auth_state().await?;
     assert_eq!(account_auth_state, Err(ApiError::UnsupportedOperation));
 
-    // Cannot lock account not protected by an auth mechanism
-    assert_eq!(account_proxy.lock().await?, Err(ApiError::FailedPrecondition));
+    let expected_lock_result = match lifetime {
+        // Cannot lock account not protected by an auth mechanism
+        Lifetime::Ephemeral => Err(ApiError::FailedPrecondition),
+        Lifetime::Persistent => Ok(()),
+    };
+    assert_eq!(account_proxy.lock().await?, expected_lock_result);
     assert_eq!(account_proxy.get_lifetime().await?, lifetime);
 
     // Connect a channel to the account's default persona and verify it's usable.
@@ -517,6 +699,9 @@ async fn test_get_ephemeral_account_and_persona() -> Result<(), Error> {
     get_account_and_persona_helper(Lifetime::Ephemeral).await
 }
 
+// TODO(fxb/104199): Start using Interaction protocol for authentication and
+// enable it by removing the #[ignore] below.
+#[ignore]
 #[fuchsia_async::run_singlethreaded(test)]
 async fn test_one_account_deletion() -> Result<(), Error> {
     let account_manager = create_account_manager().await?;
@@ -548,6 +733,7 @@ async fn test_one_account_deletion() -> Result<(), Error> {
     Ok(())
 }
 
+// TODO(fxb/104199): Start using Interaction protocol for authentication.
 // Since we only have one zxcrypt-backed partition, provisioning a second
 // account will fail (since the disk is already formatted). When we switch to a
 // fxfs-backed AccountManager, we can reenable this test.
@@ -632,6 +818,9 @@ async fn test_one_lifecycle_persistent() -> Result<(), Error> {
     Ok(())
 }
 
+// TODO(fxb/104199): Start using Interaction protocol for authentication and
+// enable it by removing the #[ignore] below.
+#[ignore]
 #[fuchsia_async::run_singlethreaded(test)]
 async fn test_one_lifecycle_ephemeral() -> Result<(), Error> {
     let mut account_manager = create_account_manager().await?;
@@ -665,6 +854,7 @@ async fn test_one_lifecycle_ephemeral() -> Result<(), Error> {
     Ok(())
 }
 
+// TODO(fxb/104199): Start using Interaction protocol for authentication.
 // Since we only have one zxcrypt-backed partition, provisioning a second
 // account will fail (since the disk is already formatted). When we switch to a
 // fxfs-backed AccountManager, we can reenable this test.
@@ -724,6 +914,9 @@ async fn test_many_lifecycles() -> Result<(), Error> {
     Ok(())
 }
 
+// TODO(fxb/104199): Start using Interaction protocol for authentication and
+// enable it by removing the #[ignore] below.
+#[ignore]
 #[fuchsia_async::run_singlethreaded(test)]
 async fn test_account_metadata_persistence() -> Result<(), Error> {
     let mut account_manager = create_account_manager().await?;
@@ -744,6 +937,9 @@ async fn test_account_metadata_persistence() -> Result<(), Error> {
     Ok(())
 }
 
+// TODO(fxb/104199): Start using Interaction protocol for authentication and
+// enable it by removing the #[ignore] below.
+#[ignore]
 #[fuchsia_async::run_singlethreaded(test)]
 async fn test_account_metadata_failures() -> Result<(), Error> {
     let account_manager = create_account_manager().await?;
@@ -779,21 +975,26 @@ async fn test_account_metadata_failures() -> Result<(), Error> {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn test_get_data_directory() -> Result<(), Error> {
-    let account_manager = create_account_manager().await?;
+    let account_manager = create_account_manager_arc_mutex().await?;
 
-    let account_id = provision_new_account(
-        &account_manager,
-        Lifetime::Persistent,
-        Some(ALWAYS_SUCCEED_AUTH_MECHANISM_ID),
-        create_account_metadata("test1"),
-    )
-    .await?;
+    // Provision account
+    let account_id =
+        provision_new_account_and_enroll(&account_manager, Lifetime::Persistent).await?;
 
     let (account_client_end, account_server_end) = create_endpoints()?;
-    assert_eq!(get_account(&account_manager, account_id, account_server_end).await?, Ok(()));
+    assert_eq!(
+        get_account_interaction(
+            &account_manager,
+            account_id,
+            account_server_end,
+            InteractionOutcome::Succeed
+        )
+        .await?,
+        Ok(())
+    );
     let account_proxy = account_client_end.into_proxy()?;
 
-    let (_, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let (_, server) = create_proxy::<fio::DirectoryMarker>().unwrap();
     assert_matches!(account_proxy.get_data_directory(server).await, Ok(Ok(())));
 
     Ok(())
