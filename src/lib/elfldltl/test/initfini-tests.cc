@@ -37,8 +37,10 @@ constexpr cpp20::span<const Dyn> DynSpan(const std::array<Dyn, N>& dyn) {
 
 constexpr elfldltl::DiagnosticsFlags kDiagFlags = {.multiple_errors = true};
 
-constexpr auto EmptyTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+FORMAT_TYPED_TEST_SUITE(ElfldltlInitFiniTests);
+
+TYPED_TEST(ElfldltlInitFiniTests, Empty) {
+  using Elf = typename TestFixture::Elf;
   using Dyn = typename Elf::Dyn;
 
   std::vector<std::string> errors;
@@ -66,12 +68,10 @@ constexpr auto EmptyTest = [](auto&& elf) {
   EXPECT_EQ(0u, info.size());
   info.VisitInit([](auto&&... args) { FAIL() << "should not be called"; }, 0);
   info.VisitFini([](auto&&... args) { FAIL() << "should not be called"; }, 0);
-};
+}
 
-TEST(ElfldltlInitFiniTests, Empty) { TestAllFormats(EmptyTest); }
-
-constexpr auto ArrayOnlyTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlInitFiniTests, ArrayOnly) {
+  using Elf = typename TestFixture::Elf;
   using Dyn = typename Elf::Dyn;
 
   std::vector<std::string> errors;
@@ -99,12 +99,10 @@ constexpr auto ArrayOnlyTest = [](auto&& elf) {
   EXPECT_EQ(0u, errors.size());
 
   EXPECT_EQ(4u, info.size());
-};
+}
 
-TEST(ElfldltlInitFiniTests, ArrayOnly) { TestAllFormats(ArrayOnlyTest); }
-
-constexpr auto LegacyOnlyTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlInitFiniTests, LegacyOnly) {
+  using Elf = typename TestFixture::Elf;
   using Dyn = typename Elf::Dyn;
 
   std::vector<std::string> errors;
@@ -132,12 +130,10 @@ constexpr auto LegacyOnlyTest = [](auto&& elf) {
 
   EXPECT_EQ(1u, info.size());
   EXPECT_EQ(0x5678u, info.legacy());
-};
+}
 
-TEST(ElfldltlInitFiniTests, LegacyOnly) { TestAllFormats(LegacyOnlyTest); }
-
-constexpr auto ArrayWithLegacyTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlInitFiniTests, ArrayWithLegacy) {
+  using Elf = typename TestFixture::Elf;
   using Dyn = typename Elf::Dyn;
 
   std::vector<std::string> errors;
@@ -166,12 +162,10 @@ constexpr auto ArrayWithLegacyTest = [](auto&& elf) {
   EXPECT_EQ(0u, errors.size());
 
   EXPECT_EQ(5u, info.size());
-};
+}
 
-TEST(ElfldltlInitFiniTests, ArrayWithLegacy) { TestAllFormats(ArrayWithLegacyTest); }
-
-constexpr auto MissingArrayTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlInitFiniTests, MissingArray) {
+  using Elf = typename TestFixture::Elf;
   using Dyn = typename Elf::Dyn;
 
   std::vector<std::string> errors;
@@ -199,12 +193,10 @@ constexpr auto MissingArrayTest = [](auto&& elf) {
   EXPECT_EQ(1u, errors.size());
 
   EXPECT_EQ(0u, info.size());
-};
+}
 
-TEST(ElfldltlInitFiniTests, MissingArray) { TestAllFormats(MissingArrayTest); }
-
-constexpr auto MissingSizeTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlInitFiniTests, MissingSize) {
+  using Elf = typename TestFixture::Elf;
   using Dyn = typename Elf::Dyn;
 
   std::vector<std::string> errors;
@@ -232,12 +224,10 @@ constexpr auto MissingSizeTest = [](auto&& elf) {
   EXPECT_EQ(1u, errors.size());
 
   EXPECT_EQ(0u, info.size());
-};
+}
 
-TEST(ElfldltlInitFiniTests, MissingSize) { TestAllFormats(MissingSizeTest); }
-
-constexpr auto VisitInitTests = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlInitFiniTests, VisitInitTests) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
 
   constexpr typename Elf::Addr array[] = {2, 3, 4, 5};
@@ -262,12 +252,10 @@ constexpr auto VisitInitTests = [](auto&& elf) {
         ++i;
       },
       false);
-};
+}
 
-TEST(ElfldltlInitFiniTests, VisitInit) { TestAllFormats(VisitInitTests); }
-
-constexpr auto VisitFiniTests = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlInitFiniTests, VisitFiniTests) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
 
   constexpr typename Elf::Addr array[] = {2, 3, 4, 5};
@@ -292,9 +280,7 @@ constexpr auto VisitFiniTests = [](auto&& elf) {
         --i;
       },
       false);
-};
-
-TEST(ElfldltlInitFiniTests, VisitFini) { TestAllFormats(VisitFiniTests); }
+}
 
 // The tests for CallInit and CallFini must use global state since
 // the callees are simple function pointers taking no arguments.
