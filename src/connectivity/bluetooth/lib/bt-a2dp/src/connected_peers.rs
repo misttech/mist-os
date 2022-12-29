@@ -256,6 +256,8 @@ impl ConnectedPeers {
 
         let strong = peer.upgrade().ok_or(format_err!("Disconnected"))?;
         if strong.streaming_active() {
+            let peer_id = peer.key();
+            info!(%peer_id, "Not starting streaming, it's already started");
             return Ok(());
         }
         strong.stream_start(remote_seid, negotiated).await.map_err(Into::into)

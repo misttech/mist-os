@@ -1066,7 +1066,7 @@ impl PeerInner {
                         waker.wake();
                     }
                 } else {
-                    trace!("response for {:?} we did not send, dropping", header.label());
+                    warn!("response for {:?} we did not send, dropping", header.label());
                 }
                 buf = rest;
                 // Note: we drop any TxLabel response we are not waiting for

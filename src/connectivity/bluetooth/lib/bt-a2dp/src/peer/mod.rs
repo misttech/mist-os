@@ -373,13 +373,13 @@ impl Peer {
     };
 
     /// Open and start a media transport stream, connecting a compatible local stream to the remote
-    /// stream `remote_id`, configuring it with the MediaCodec capability `codec_params`.
+    /// stream `remote_id`, configuring it with the `capabilities` provided.
     /// Returns a future which should be awaited on.
     /// The future returns Ok(()) if successfully started, and an appropriate error otherwise.
     pub fn stream_start(
         &self,
         remote_id: StreamEndpointId,
-        codec_params: ServiceCapability,
+        capabilities: Vec<ServiceCapability>,
     ) -> impl Future<Output = avdtp::Result<()>> {
         let peer = Arc::downgrade(&self.inner);
         let peer_id = self.id.clone();
@@ -387,15 +387,15 @@ impl Peer {
         let profile = self.profile.clone();
 
         async move {
+            let codec_params =
+                capabilities.iter().find(|x| x.is_codec()).ok_or(avdtp::Error::InvalidState)?;
             let local_id = {
                 let strong = PeerInner::upgrade(peer.clone())?;
-                let stream_id = strong.lock().find_compatible_local(&codec_params, &remote_id)?;
+                let stream_id = strong.lock().find_compatible_local(codec_params, &remote_id)?;
                 stream_id
             };
 
-            trace!("Starting stream {} to remote {} with {:?}", local_id, remote_id, codec_params);
-
-            let capabilities = vec![ServiceCapability::MediaTransport, codec_params];
+            trace!("Starting stream {local_id} to remote {remote_id} with {capabilities:?}");
 
             avdtp.set_configuration(&remote_id, &local_id, &capabilities).await?;
             {
@@ -404,7 +404,7 @@ impl Peer {
             }
             avdtp.open(&remote_id).await?;
 
-            trace!("{} Connecting transport channel...", peer_id);
+            info!("{} Connecting transport channel...", peer_id);
             let channel = profile
                 .connect(
                     &mut peer_id.into(),
@@ -956,11 +956,8 @@ impl PeerInner {
             avdtp::Request::DelayReport { responder, delay, stream_id } => {
                 // Delay is in 1/10 ms
                 let delay_ns = delay as i64 * 100000;
+                info!(peer = %self.peer_id, "stream {stream_id} reported delay {}.{} ms", delay / 10, delay % 10);
                 let res = responder.send();
-                info!(
-                    "{}: stream {} delay of {} ns, acknowledging..",
-                    self.peer_id, stream_id, delay_ns
-                );
                 // Record delay to cobalt.
                 if let Some(sender) = &self.metrics {
                     report_integer(
@@ -1613,7 +1610,7 @@ mod tests {
             codec_extra: vec![0x11, 0x45, 51, 51],
         };
 
-        let start_future = peer.stream_start(remote_seid, codec_params);
+        let start_future = peer.stream_start(remote_seid, vec![codec_params]);
         pin_mut!(start_future);
 
         assert!(exec.run_until_stalled(&mut start_future).is_pending());
@@ -1739,7 +1736,7 @@ mod tests {
             codec_type: avdtp::MediaCodecType::AUDIO_SBC,
             codec_extra: vec![0x11, 0x45, 51, 51],
         };
-        let start_future = peer.stream_start(remote_seid, codec_params);
+        let start_future = peer.stream_start(remote_seid, vec![codec_params]);
         pin_mut!(start_future);
 
         assert!(exec.run_until_stalled(&mut start_future).is_pending());
@@ -1827,7 +1824,7 @@ mod tests {
             codec_type: avdtp::MediaCodecType::AUDIO_SBC,
             codec_extra: vec![0x11, 0x45, 51, 51],
         };
-        let start_future = peer.stream_start(remote_seid, codec_params);
+        let start_future = peer.stream_start(remote_seid, vec![codec_params]);
         pin_mut!(start_future);
 
         match exec.run_until_stalled(&mut start_future) {
@@ -1850,7 +1847,7 @@ mod tests {
             codec_extra: vec![0x11, 0x45, 51, 51],
         };
 
-        let start_future = peer.stream_start(remote_seid, codec_params);
+        let start_future = peer.stream_start(remote_seid, vec![codec_params]);
         pin_mut!(start_future);
 
         assert!(exec.run_until_stalled(&mut start_future).is_pending());

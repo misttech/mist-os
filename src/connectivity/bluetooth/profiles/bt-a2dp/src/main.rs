@@ -257,7 +257,7 @@ impl StreamsBuilder {
             SBC_SOURCE_SEID,
             avdtp::MediaType::Audio,
             avdtp::EndpointType::Source,
-            vec![ServiceCapability::MediaTransport, codec_cap],
+            vec![ServiceCapability::MediaTransport, ServiceCapability::DelayReporting, codec_cap],
         )
     }
 
@@ -268,7 +268,7 @@ impl StreamsBuilder {
             AAC_SOURCE_SEID,
             avdtp::MediaType::Audio,
             endpoint_type,
-            vec![ServiceCapability::MediaTransport, codec_cap],
+            vec![ServiceCapability::MediaTransport, ServiceCapability::DelayReporting, codec_cap],
         )
     }
 
