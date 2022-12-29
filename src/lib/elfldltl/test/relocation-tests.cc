@@ -8,14 +8,14 @@
 
 #include <limits>
 
-#include <gtest/gtest.h>
-
 #include "tests.h"
 
 namespace {
 
-constexpr auto VisitRelativeEmpty = [](auto elf) {
-  using RelocInfo = elfldltl::RelocationInfo<decltype(elf)>;
+FORMAT_TYPED_TEST_SUITE(ElfldltlRelocationTests);
+
+TYPED_TEST(ElfldltlRelocationTests, VisitRelativeEmpty) {
+  using RelocInfo = elfldltl::RelocationInfo<typename TestFixture::Elf>;
   RelocInfo info;
   size_t count = 0;
   EXPECT_TRUE(info.VisitRelative([&count](auto&& reloc) -> bool {
@@ -23,9 +23,7 @@ constexpr auto VisitRelativeEmpty = [](auto elf) {
     return false;
   }));
   EXPECT_EQ(0u, count);
-};
-
-TEST(ElfldltlRelocationTests, VisitRelativeEmpty) { TestAllFormats(VisitRelativeEmpty); }
+}
 
 template <class RelocInfo>
 constexpr typename RelocInfo::size_type RelocOffset(const RelocInfo& info,
@@ -67,9 +65,9 @@ constexpr auto kTestMachine = elfldltl::ElfMachine::kNone;
 using TestType = elfldltl::RelocationTraits<kTestMachine>::Type;
 constexpr uint32_t kRelativeType = static_cast<uint32_t>(TestType::kRelative);
 
-template <bool BadCount = false>
-constexpr auto VisitRelativeRel = [](auto elf) {
-  using RelocInfo = elfldltl::RelocationInfo<decltype(elf)>;
+template <class Elf, bool BadCount = false>
+void VisitRelativeRel() {
+  using RelocInfo = elfldltl::RelocationInfo<Elf>;
   using Rel = typename RelocInfo::Rel;
 
   constexpr Rel relocs[] = {
@@ -96,15 +94,19 @@ constexpr auto VisitRelativeRel = [](auto elf) {
     return true;
   }));
   EXPECT_EQ(2u, count);
-};
+}
 
-TEST(ElfldltlRelocationTests, VisitRelativeRel) { TestAllFormats(VisitRelativeRel<>); }
+TYPED_TEST(ElfldltlRelocationTests, VisitRelativeRel) {
+  VisitRelativeRel<typename TestFixture::Elf>();
+}
 
-TEST(ElfldltlRelocationTests, VisitRelativeBadRelCount) { TestAllFormats(VisitRelativeRel<true>); }
+TYPED_TEST(ElfldltlRelocationTests, VisitRelativeBadRelCount) {
+  VisitRelativeRel<typename TestFixture::Elf, true>();
+}
 
-template <bool BadCount = false>
-constexpr auto VisitRelativeRela = [](auto elf) {
-  using RelocInfo = elfldltl::RelocationInfo<decltype(elf)>;
+template <class Elf, bool BadCount = false>
+void VisitRelativeRela() {
+  using RelocInfo = elfldltl::RelocationInfo<Elf>;
   using Rela = typename RelocInfo::Rela;
 
   constexpr Rela relocs[] = {
@@ -134,16 +136,18 @@ constexpr auto VisitRelativeRela = [](auto elf) {
     return true;
   }));
   EXPECT_EQ(2u, count);
-};
-
-TEST(ElfldltlRelocationTests, VisitRelativeRela) { TestAllFormats(VisitRelativeRela<>); }
-
-TEST(ElfldltlRelocationTests, VisitRelativeBadRelaCount) {
-  TestAllFormats(VisitRelativeRela<true>);
 }
 
-constexpr auto VisitRelativeRelrSingle = [](auto elf) {
-  using RelocInfo = elfldltl::RelocationInfo<decltype(elf)>;
+TYPED_TEST(ElfldltlRelocationTests, VisitRelativeRela) {
+  VisitRelativeRela<typename TestFixture::Elf>();
+}
+
+TYPED_TEST(ElfldltlRelocationTests, VisitRelativeBadRelaCount) {
+  VisitRelativeRela<typename TestFixture::Elf, true>();
+}
+
+TYPED_TEST(ElfldltlRelocationTests, VisitRelativeRelrSingle) {
+  using RelocInfo = elfldltl::RelocationInfo<typename TestFixture::Elf>;
   using Addr = typename RelocInfo::Addr;
 
   constexpr Addr relocs[] = {
@@ -166,12 +170,10 @@ constexpr auto VisitRelativeRelrSingle = [](auto elf) {
     return true;
   }));
   EXPECT_EQ(1u, count);
-};
+}
 
-TEST(ElfldltlRelocationTests, VisitRelativeRelrSingle) { TestAllFormats(VisitRelativeRelrSingle); }
-
-constexpr auto VisitRelativeRelrNoBitmaps = [](auto elf) {
-  using RelocInfo = elfldltl::RelocationInfo<decltype(elf)>;
+TYPED_TEST(ElfldltlRelocationTests, VisitRelativeRelrNoBitmaps) {
+  using RelocInfo = elfldltl::RelocationInfo<typename TestFixture::Elf>;
   using Addr = typename RelocInfo::Addr;
 
   constexpr Addr relocs[] = {
@@ -202,14 +204,10 @@ constexpr auto VisitRelativeRelrNoBitmaps = [](auto elf) {
     return true;
   }));
   EXPECT_EQ(3u, count);
-};
-
-TEST(ElfldltlRelocationTests, VisitRelativeRelrNoBitmaps) {
-  TestAllFormats(VisitRelativeRelrNoBitmaps);
 }
 
-constexpr auto VisitRelativeRelrSingleBitmap = [](auto elf) {
-  using RelocInfo = elfldltl::RelocationInfo<decltype(elf)>;
+TYPED_TEST(ElfldltlRelocationTests, VisitRelativeRelrSingleBitmap) {
+  using RelocInfo = elfldltl::RelocationInfo<typename TestFixture::Elf>;
   using Addr = typename RelocInfo::Addr;
 
   constexpr Addr relocs[] = {
@@ -230,14 +228,10 @@ constexpr auto VisitRelativeRelrSingleBitmap = [](auto elf) {
     return true;
   }));
   EXPECT_EQ(3u, count);
-};
-
-TEST(ElfldltlRelocationTests, VisitRelativeRelrSingleBitmap) {
-  TestAllFormats(VisitRelativeRelrSingleBitmap);
 }
 
-constexpr auto VisitRelativeRelrMultipleBitmaps = [](auto elf) {
-  using RelocInfo = elfldltl::RelocationInfo<decltype(elf)>;
+TYPED_TEST(ElfldltlRelocationTests, VisitRelativeRelrMultipleBitmaps) {
+  using RelocInfo = elfldltl::RelocationInfo<typename TestFixture::Elf>;
   using Addr = typename RelocInfo::Addr;
   using size_type = typename RelocInfo::size_type;
 
@@ -268,15 +262,11 @@ constexpr auto VisitRelativeRelrMultipleBitmaps = [](auto elf) {
     return true;
   }));
 
-  EXPECT_EQ(static_cast<size_t>(decltype(elf)::kAddressBits), count);
-};
-
-TEST(ElfldltlRelocationTests, VisitRelativeRelrMultipleBitmaps) {
-  TestAllFormats(VisitRelativeRelrMultipleBitmaps);
+  EXPECT_EQ(static_cast<size_t>(TestFixture::Elf::kAddressBits), count);
 }
 
-constexpr auto VisitSymbolicEmpty = [](auto elf) {
-  using RelocInfo = elfldltl::RelocationInfo<decltype(elf)>;
+TYPED_TEST(ElfldltlRelocationTests, VisitSymbolicEmpty) {
+  using RelocInfo = elfldltl::RelocationInfo<typename TestFixture::Elf>;
   RelocInfo info;
   size_t count = 0;
   EXPECT_TRUE(info.VisitSymbolic([&count](auto&& reloc) -> bool {
@@ -284,9 +274,7 @@ constexpr auto VisitSymbolicEmpty = [](auto elf) {
     return false;
   }));
   EXPECT_EQ(0u, count);
-};
-
-TEST(ElfldltlRelocationTests, VisitSymbolicEmpty) { TestAllFormats(VisitSymbolicEmpty); }
+}
 
 // TODO(fxbug.dev/72221): real VisitSymbolic tests
 
