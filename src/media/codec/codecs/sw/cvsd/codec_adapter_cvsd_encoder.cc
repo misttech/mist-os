@@ -10,100 +10,23 @@
 #include <safemath/safe_math.h>
 
 namespace {
-
-constexpr char kCvsdMimeType[] = "audio/cvsd";
-
-constexpr uint32_t kInputMinBufferCountForCamping = 1;
-constexpr uint32_t kOutputMinBufferCountForCamping = 1;
-
-// Each audio sample is signed 16 bits.
+// Each audio sample is signed 16 bits (2 byte).
 constexpr uint32_t kInputBytesPerSample = 2;
 // Input chunk size matches the number of bytes required to produce 1
 // output byte.
 // 2 byte signed input -> 1 bit output.
 // 2 byte signed * 8 inputs -> 8 bits (1 byte) output.
 constexpr uint32_t kInputChunkSize = kInputBytesPerSample * 8;
-// This is an arbitrary cap for now.
-constexpr uint32_t kInputPerPacketBufferBytesMax = 4 * 1024 * 1024;
-
-// These are default values recommended in Bluetooth Core spec v5.3 section 9.2.
-constexpr uint32_t kK = 4;
-constexpr uint32_t kJ = 4;
-constexpr int16_t kStepDecaySizeMin = 10;    // delta min
-constexpr int16_t kStepDecaySizeMax = 1280;  // delta max
-// Step decay (beta) = 1-1/1024 = 1023/1024.
-constexpr int16_t kStepDecayNumerator = 1023;
-constexpr int16_t kStepDecayDenominator = 1024;
-// Accumulator decay (h) = 1-1/32 = 31/32.
-constexpr int16_t kAccumDecayNumerator = 31;
-constexpr int16_t kAccumDecayDenominator = 32;
-constexpr int16_t kAccumulatorPosSaturation = 32767;  // y_max = 2^15 - 1
-// Table 9.2 allows -2^15 or -2^15+1; we choose -2^15 to match 2's complement,
-// we may as well allow using -32768, and because table 9.2 lists -2^15 first.
-constexpr int16_t kAccumulatorNegSaturation = -32768;  // y_min = -2^15
-
-// The input to the CVSD encode shall be 64000 samples per second linear PCM.
-constexpr size_t kExpectedInputSamplingFreq = 64000;
-
-bool AreJbitsEqual(CodecAdapterCvsdEncoder::CodecParams* params) {
-  uint32_t lastKBits = params->historic_bits;
-  for (uint32_t i = 0; i < params->k - params->j + 1; i++) {
-    auto tmp = lastKBits & params->equal_bit_mask;
-    if (tmp == 0 || tmp == params->equal_bit_mask) {
-      return true;
-    }
-    lastKBits = lastKBits >> 1;
-  }
-  return false;
-}
-
-static_assert(kStepDecaySizeMax <= std::numeric_limits<int16_t>::max());
-static_assert(kStepDecaySizeMin >= std::numeric_limits<int16_t>::min());
-static_assert(kStepDecayNumerator < kStepDecayDenominator);
-
-static_assert(kAccumulatorPosSaturation <= std::numeric_limits<int16_t>::max());
-static_assert(kAccumulatorNegSaturation >= std::numeric_limits<int16_t>::min());
-static_assert(kAccumDecayNumerator < kAccumDecayDenominator);
 
 // The implementations are based off of the CVSD codec algorithm defined in
 // Bluetooth Core Spec v5.3, Vol 2, Part B Sec 9.2.
-uint8_t SingleEncode(CodecAdapterCvsdEncoder::CodecParams* params, const int16_t& input_sample) {
+uint8_t SingleEncode(CodecParams* params, const int16_t& input_sample) {
   const int16_t x = input_sample;
 
   // Determine output value (EQ 15).
   const uint8_t bit = (x >= params->accumulator) ? 0 : 1;
 
-  // Shift last value into historic reference.
-  params->historic_bits = ((params->historic_bits << 1) | bit) & params->historic_bit_mask;
-
-  // Update delta (EQ 16 and EQ 17).
-  // If J bits in the last K output bits are equal, delta is incremented by step size.
-  if (AreJbitsEqual(params)) {
-    params->step_size =
-        std::min(params->step_size + kStepDecaySizeMin, static_cast<double>(kStepDecaySizeMax));
-  } else {
-    params->step_size = static_cast<int16_t>(
-        std::max(params->step_size * kStepDecayNumerator / kStepDecayDenominator,
-                 static_cast<double>(kStepDecaySizeMin)));
-  }
-  ZX_DEBUG_ASSERT(params->step_size <= std::numeric_limits<int16_t>::max());
-  ZX_DEBUG_ASSERT(params->step_size >= std::numeric_limits<int16_t>::min());
-
-  // Update the internal accumulator.
-  // EQ 19. If bit == 0, b(k) = +1 else b(k) = -1.
-  params->accumulator += (bit) ? -params->step_size : params->step_size;
-  // EQ 18. Limit the accumulator.
-  if (params->accumulator >= 0) {
-    params->accumulator =
-        std::min(params->accumulator, static_cast<double>(kAccumulatorPosSaturation));
-  } else {
-    params->accumulator =
-        std::max(params->accumulator, static_cast<double>(kAccumulatorNegSaturation));
-  }
-  // EQ 14. Multiply by the decay factor.
-  params->accumulator = params->accumulator * kAccumDecayNumerator / kAccumDecayDenominator;
-  ZX_DEBUG_ASSERT(params->accumulator <= std::numeric_limits<int16_t>::max());
-  ZX_DEBUG_ASSERT(params->accumulator >= std::numeric_limits<int16_t>::min());
+  UpdateCVSDParams(params, bit);
 
   return bit;
 }
@@ -206,11 +129,6 @@ std::pair<fuchsia::media::FormatDetails, size_t> CodecAdapterCvsdEncoder::Output
   return {std::move(format_details), 1};
 }
 
-void CodecAdapterCvsdEncoder::PostSerial(async_dispatcher_t* dispatcher, fit::closure to_run) {
-  zx_status_t post_result = async::PostTask(dispatcher, std::move(to_run));
-  ZX_ASSERT_MSG(post_result == ZX_OK, "async::PostTask() failed - result: %d", post_result);
-}
-
 void CodecAdapterCvsdEncoder::ProcessInputLoop() {
   std::optional<CodecInputItem> maybe_input_item;
   while ((maybe_input_item = input_queue_.WaitForElement())) {
@@ -222,7 +140,7 @@ void CodecAdapterCvsdEncoder::ProcessInputLoop() {
 
     // Item is format details.
     if (item.is_format_details()) {
-      if (!ProcessFormatDetails(item.format_details())) {
+      if (ProcessFormatDetails(item.format_details()) == kShouldTerminate) {
         // A failure was reported through `events_` or the stream was stopped.
         return;
       }
@@ -234,7 +152,7 @@ void CodecAdapterCvsdEncoder::ProcessInputLoop() {
       events_->onCoreCodecMidStreamOutputConstraintsChange(
           /*output_re_config_required=*/true);
     } else if (item.is_end_of_stream()) {
-      if (!ProcessEndOfStream(&item)) {
+      if (ProcessEndOfStream(&item) == kShouldTerminate) {
         // A failure was reported through `events_` or the stream was stopped.
         return;
       }
@@ -242,9 +160,9 @@ void CodecAdapterCvsdEncoder::ProcessInputLoop() {
     } else {
       // Input is packet.
       ZX_DEBUG_ASSERT(item.is_packet());
-      bool should_continue = ProcessInputPacket(item.packet());
+      auto status = ProcessInputPacket(item.packet());
       events_->onCoreCodecInputPacketDone(item.packet());
-      if (!should_continue) {
+      if (status == kShouldTerminate) {
         // A failure was reported through `events_` or the stream was stopped.
         return;
       }
@@ -252,37 +170,37 @@ void CodecAdapterCvsdEncoder::ProcessInputLoop() {
   }
 }
 
-bool CodecAdapterCvsdEncoder::ProcessFormatDetails(
+InputLoopStatus CodecAdapterCvsdEncoder::ProcessFormatDetails(
     const fuchsia::media::FormatDetails& format_details) {
   if (!format_details.has_domain() || !format_details.domain().is_audio() ||
       !format_details.domain().audio().is_uncompressed() ||
       !format_details.domain().audio().uncompressed().is_pcm()) {
     events_->onCoreCodecFailCodec(
         "CVSD Encoder received input that was not uncompressed pcm audio.");
-    return false;
+    return kShouldTerminate;
   }
   if (!format_details.has_encoder_settings() || !format_details.encoder_settings().is_cvsd()) {
     events_->onCoreCodecFailCodec("CVSD Encoder did not receive encoder settings.");
-    return false;
+    return kShouldTerminate;
   }
   auto& input_format = format_details.domain().audio().uncompressed().pcm();
   if (input_format.pcm_mode != fuchsia::media::AudioPcmMode::LINEAR ||
       input_format.bits_per_sample != 16 || input_format.channel_map.size() != 1) {
     events_->onCoreCodecFailCodec(
         "CVSD Encoder only encodes mono audio with signed 16 bit linear samples.");
-    return false;
+    return kShouldTerminate;
   }
 
-  InitCodecParams();
+  InitCodecParams(codec_params_);
   InitChunkInputStream(format_details);
-  return true;
+  return kOk;
 }
 
 void CodecAdapterCvsdEncoder::InitChunkInputStream(
     const fuchsia::media::FormatDetails& format_details) {
   auto& input_format = format_details.domain().audio().uncompressed().pcm();
-  if (input_format.frames_per_second != kExpectedInputSamplingFreq) {
-    FX_LOGS(WARNING) << "Expected sampling frequency " << kExpectedInputSamplingFreq << " got "
+  if (input_format.frames_per_second != kExpectedSamplingFreq) {
+    FX_LOGS(WARNING) << "Expected sampling frequency " << kExpectedSamplingFreq << " got "
                      << input_format.frames_per_second;
   }
 
@@ -310,7 +228,7 @@ void CodecAdapterCvsdEncoder::InitChunkInputStream(
           auto checked_buffer_length = safemath::MakeCheckedNum(buffer->size()).Cast<uint32_t>();
           ZX_DEBUG_ASSERT(checked_buffer_length.IsValid());
           ZX_DEBUG_ASSERT(checked_buffer_length.ValueOrDie() > 0);
-          SetOutputItem(packet, buffer);
+          SetOutputItem(output_item_, packet, buffer);
         }
 
         ZX_DEBUG_ASSERT(output_item_);
@@ -350,16 +268,16 @@ void CodecAdapterCvsdEncoder::InitChunkInputStream(
       });
 }
 
-bool CodecAdapterCvsdEncoder::ProcessEndOfStream(CodecInputItem* item) {
+InputLoopStatus CodecAdapterCvsdEncoder::ProcessEndOfStream(CodecInputItem* item) {
   ZX_DEBUG_ASSERT(item->is_end_of_stream());
   return ProcessCodecPacket(nullptr);
 }
 
-bool CodecAdapterCvsdEncoder::ProcessInputPacket(CodecPacket* packet) {
+InputLoopStatus CodecAdapterCvsdEncoder::ProcessInputPacket(CodecPacket* packet) {
   return ProcessCodecPacket(packet);
 }
 
-bool CodecAdapterCvsdEncoder::ProcessCodecPacket(CodecPacket* packet) {
+InputLoopStatus CodecAdapterCvsdEncoder::ProcessCodecPacket(CodecPacket* packet) {
   ZX_DEBUG_ASSERT(codec_params_);
   ZX_DEBUG_ASSERT(chunk_input_stream_);
   ChunkInputStream::Status status;
@@ -372,26 +290,12 @@ bool CodecAdapterCvsdEncoder::ProcessCodecPacket(CodecPacket* packet) {
   switch (status) {
     case ChunkInputStream::kExtrapolationFailedWithoutTimebase:
       events_->onCoreCodecFailCodec("Timebase was not set for extrapolation.");
-      return false;
+      return kShouldTerminate;
     case ChunkInputStream::kUserTerminated:
-      return false;
+      return kShouldTerminate;
     default:
-      return true;
+      return kOk;
   };
-}
-
-void CodecAdapterCvsdEncoder::InitCodecParams() {
-  // Number of equal bits (run of 1's or 0's), J, should be less than or equal to
-  // the number of historic output bits we keep track of.
-  codec_params_.emplace(CodecParams{
-      .k = kK,
-      .j = kJ,
-      .equal_bit_mask = static_cast<uint32_t>(pow(2, kJ) - 1),
-      .historic_bit_mask = static_cast<uint32_t>(pow(2, kK) - 1),
-      .historic_bits = 0,
-      .accumulator = 0,
-      .step_size = 0,
-  });
 }
 
 // Encode input buffer of 16 byte size to produce one byte of output data.
@@ -404,15 +308,6 @@ void CodecAdapterCvsdEncoder::Encode(CodecParams* params, const uint8_t* input_d
     output_byte |= SingleEncode(params, *audio_sample);
   }
   *output = output_byte;
-}
-
-void CodecAdapterCvsdEncoder::SetOutputItem(CodecPacket* packet, const CodecBuffer* buffer) {
-  output_item_.emplace(OutputItem{
-      packet,
-      buffer,
-      0,
-      std::nullopt,
-  });
 }
 
 void CodecAdapterCvsdEncoder::SendAndResetOutputPacket() {

@@ -18,6 +18,10 @@ executable("codec_runner_sw_cvsd") {
   ]
 
   sources = [
+    "codec_adapter_cvsd.cc",
+    "codec_adapter_cvsd.h",
+    "codec_adapter_cvsd_decoder.cc",
+    "codec_adapter_cvsd_decoder.h",
     "codec_adapter_cvsd_encoder.cc",
     "codec_adapter_cvsd_encoder.h",
     "main.cc",
