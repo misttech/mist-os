@@ -126,7 +126,8 @@ type generator interface {
 	// DeclOrder gives the declaration order desired by the backend.
 	DeclOrder() zither.DeclOrder
 
-	// Generate generates bindings into the provided output directory.
+	// Generate generates bindings into the provided output directory,
+	// returning the list of outputs emitted.
 	Generate(summaries []zither.FileSummary, outputDir string) ([]string, error)
 }
 

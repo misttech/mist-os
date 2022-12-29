@@ -696,52 +696,11 @@ template("_zither_go_runtime_sources") {
 # `supported_zither_backend_info`:
 #
 # Subtargets:
-#
-#   * C backend: ${target_name}.c
-#     A C library target (e.g., a source set or static library), whose
-#     generated headers are of the form `<${output_subdir}/${filename}>` for
-#     each basename of the associated FIDL source files.
-#
-#   * Go backend: ${target_name}.go
-#     A `go_library()` with a package name of ${output_subdir} (which is
-#     written to pkg_name.txt alongside the bindings).
-#
-#   * Assembly backend: ${target_name}.asm
-#     An assembly library target (e.g., a source set), whose generated headers
-#     are of the form `<${output_subdir}/${filename}>` for each basename of the
-#     associated FIDL source files.
-#
-#   * zircon.ifs backend: ${target_name}.zircon_ifs
-#     A dependency generating a "zircon.ifs" (i.e., a text ABI specification of
-#     libzircon.so). The file is intended to be accessed via
-#     `zither_golden_files()` and checked in as source.
-#
-#   * kernel: ${target_name}.kernel
-#     A C++ library target for the kernel with the following headers:
-#       - <lib/syscalls/category.inc>: a categorization of syscalls with macro
-#         helpers.
-#       - <lib/syscalls/kernel-wrappers.inc>: kernel-side boilerplate for
-#         syscall definitions.
-#       - <lib/syscalls/kernel.inc>: macro-templated enumeration of syscalls
-#         from the kernel's point of view.
-#       - <lib/syscalls/syscalls.inc>: macro-templated enumeration of syscalls
-#         from userspace's point of view.
-#       - <lib/syscalls/zx-syscall-numbers.h>: `#define`s of syscall numbers.
-#
-#   * Legacy syscall C declaration backend: ${target_name}.legacy_syscall_cdecl
-#     A C++ library target for the kernel with the following headers:
-#       - internal/cdecls.inc: macro-templated enumeration of syscalls meant
-#         for the public headers
-#       - internal/testonly-cdecls.inc: similar to cdecls.inc, but consisting
-#         of the test-only syscalls.
-#       - internal/cdecls-next.inc: similar to cdecls.inc, but consisting
-#         of the "next" syscalls.
-#
-#   * Rust syscall backend: ${target_name}.rust_syscall
-#     Generates a crate consisting of thin FFI syscall wrappers.
-#
-#   * Go runtime backend: ${target_name}.go_runtime
-#     Generates go.git sources for Fuchsia support.
+#  * ${target_name}.${backend_name}
+#    Each supported backend, corresponding to a named entry of
+#    `supported_zither_backends`, yields a subtarget for generating the
+#    associated bindings. For more information about a given backend's set of
+#    bindings see //zircon/tools/zither/backends/${backend_name}/README.md.
 #
 # Parameters:
 #
