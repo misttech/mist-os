@@ -556,11 +556,12 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
 
   // Allocator service needs Flatland DisplayCompositor to act as a BufferCollectionImporter.
   {
-    std::vector<std::shared_ptr<allocation::BufferCollectionImporter>> default_importers;
     std::vector<std::shared_ptr<allocation::BufferCollectionImporter>> screen_capture_importers;
-    default_importers.push_back(gfx_buffer_collection_importer);
     screen_capture_importers.push_back(screen_capture_buffer_collection_importer);
 
+    std::vector<std::shared_ptr<allocation::BufferCollectionImporter>> default_importers;
+    if (!config_values_.i_can_haz_flatland)
+      default_importers.push_back(gfx_buffer_collection_importer);
     if (config_values_.enable_allocator_for_flatland && flatland_compositor_)
       default_importers.push_back(flatland_compositor_);
 
