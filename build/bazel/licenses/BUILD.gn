@@ -28,7 +28,6 @@ group("all_bazel_inputs") {
 # Collects the license data for all GN inputs and makes it available for Bazel
 license_data("licenses_data") {
   testonly = true
-  filter = ""
   target = "//build/bazel/licenses:all_bazel_inputs"
   out_dir = "$target_out_dir/licenses_data"
   produce_spdx = true
