@@ -11,16 +11,16 @@
 #include <type_traits>
 #include <vector>
 
-#include <gtest/gtest.h>
-
 #include "symbol-tests.h"
 
 namespace {
 
 constexpr elfldltl::DiagnosticsFlags kDiagFlags = {.multiple_errors = true};
 
-constexpr auto EmptyTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+FORMAT_TYPED_TEST_SUITE(ElfldltlDynamicTests);
+
+TYPED_TEST(ElfldltlDynamicTests, Empty) {
+  using Elf = typename TestFixture::Elf;
 
   std::vector<std::string> errors;
   auto diag = elfldltl::CollectStringsDiagnostics(errors);
@@ -37,12 +37,10 @@ constexpr auto EmptyTest = [](auto&& elf) {
 
   EXPECT_EQ(0u, diag.errors());
   EXPECT_EQ(0u, diag.warnings());
-};
+}
 
-TEST(ElfldltlDynamicTests, Empty) { TestAllFormats(EmptyTest); }
-
-constexpr auto MissingTerminatorTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, MissingTerminator) {
+  using Elf = typename TestFixture::Elf;
 
   std::vector<std::string> errors;
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kDiagFlags);
@@ -58,12 +56,10 @@ constexpr auto MissingTerminatorTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   ASSERT_GE(errors.size(), 1u);
   EXPECT_EQ(errors.front(), "missing DT_NULL terminator in PT_DYNAMIC");
-};
+}
 
-TEST(ElfldltlDynamicTests, MissingTerminator) { TestAllFormats(MissingTerminatorTest); }
-
-constexpr auto RejectTextrelTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, RejectTextrel) {
+  using Elf = typename TestFixture::Elf;
 
   std::vector<std::string> errors;
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kDiagFlags);
@@ -95,9 +91,7 @@ constexpr auto RejectTextrelTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   ASSERT_GE(errors.size(), 1u);
   EXPECT_EQ(errors.front(), elfldltl::DynamicTextrelRejectObserver::Message());
-};
-
-TEST(ElfldltlDynamicTests, RejectTextrel) { TestAllFormats(RejectTextrelTest); }
+}
 
 class TestDiagnostics {
  public:
@@ -123,8 +117,8 @@ class TestDiagnostics {
   DiagType diag_ = elfldltl::CollectStringsDiagnostics(errors_, kDiagFlags);
 };
 
-constexpr auto RelocationInfoObserverEmptyTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverEmpty) {
+  using Elf = typename TestFixture::Elf;
   using Dyn = typename Elf::Dyn;
 
   TestDiagnostics diag;
@@ -150,10 +144,6 @@ constexpr auto RelocationInfoObserverEmptyTest = [](auto&& elf) {
   EXPECT_TRUE(info.rela_symbolic().empty());
   EXPECT_TRUE(info.relr().empty());
   std::visit([](const auto& table) { EXPECT_TRUE(table.empty()); }, info.jmprel());
-};
-
-TEST(ElfldltlDynamicTests, RelocationInfoObserverEmpty) {
-  TestAllFormats(RelocationInfoObserverEmptyTest);
 }
 
 // This synthesizes a memory image of relocation test data with known
@@ -237,8 +227,8 @@ class RelocInfoTestImage {
   cpp20::span<std::byte> image_bytes() { return cpp20::as_writable_bytes(cpp20::span(&image_, 1)); }
 };
 
-constexpr auto RelocationInfoObserverFullValidTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverFullValid) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
@@ -313,17 +303,13 @@ constexpr auto RelocationInfoObserverFullValidTest = [](auto&& elf) {
   EXPECT_EQ(1u, info.rela_symbolic().size());
   EXPECT_EQ(3u, info.relr().size());
   std::visit([](const auto& table) { EXPECT_EQ(3u, table.size()); }, info.jmprel());
-};
-
-TEST(ElfldltlDynamicTests, RelocationInfoObserverFullValid) {
-  TestAllFormats(RelocationInfoObserverFullValidTest);
 }
 
 // We'll reuse that same image for the various error case tests.
 // These cases only differ in their PT_DYNAMIC contents.
 
-constexpr auto RelocationInfoObserverBadRelentTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelent) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
@@ -396,14 +382,10 @@ constexpr auto RelocationInfoObserverBadRelentTest = [](auto&& elf) {
   EXPECT_EQ(1u, info.rela_symbolic().size());
   EXPECT_EQ(3u, info.relr().size());
   std::visit([](const auto& table) { EXPECT_EQ(3u, table.size()); }, info.jmprel());
-};
-
-TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelent) {
-  TestAllFormats(RelocationInfoObserverBadRelentTest);
 }
 
-constexpr auto RelocationInfoObserverBadRelaentTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelaent) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
@@ -477,14 +459,10 @@ constexpr auto RelocationInfoObserverBadRelaentTest = [](auto&& elf) {
   EXPECT_EQ(1u, info.rela_symbolic().size());
   EXPECT_EQ(3u, info.relr().size());
   std::visit([](const auto& table) { EXPECT_EQ(3u, table.size()); }, info.jmprel());
-};
-
-TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelaent) {
-  TestAllFormats(RelocationInfoObserverBadRelaentTest);
 }
 
-constexpr auto RelocationInfoObserverBadRelrentTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelrent) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
@@ -558,14 +536,10 @@ constexpr auto RelocationInfoObserverBadRelrentTest = [](auto&& elf) {
   EXPECT_EQ(1u, info.rela_symbolic().size());
   EXPECT_EQ(3u, info.relr().size());
   std::visit([](const auto& table) { EXPECT_EQ(3u, table.size()); }, info.jmprel());
-};
-
-TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelrent) {
-  TestAllFormats(RelocationInfoObserverBadRelrentTest);
 }
 
-constexpr auto RelocationInfoObserverMissingPltrelTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverMissingPltrel) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
@@ -640,14 +614,10 @@ constexpr auto RelocationInfoObserverMissingPltrelTest = [](auto&& elf) {
   EXPECT_EQ(1u, info.rela_symbolic().size());
   EXPECT_EQ(3u, info.relr().size());
   std::visit([](const auto& table) { EXPECT_EQ(0u, table.size()); }, info.jmprel());
-};
-
-TEST(ElfldltlDynamicTests, RelocationInfoObserverMissingPltrel) {
-  TestAllFormats(RelocationInfoObserverMissingPltrelTest);
 }
 
-constexpr auto RelocationInfoObserverBadPltrelTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadPltrel) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
@@ -718,17 +688,13 @@ constexpr auto RelocationInfoObserverBadPltrelTest = [](auto&& elf) {
   EXPECT_EQ(1u, info.rela_symbolic().size());
   EXPECT_EQ(3u, info.relr().size());
   std::visit([](const auto& table) { EXPECT_EQ(0u, table.size()); }, info.jmprel());
-};
-
-TEST(ElfldltlDynamicTests, RelocationInfoObserverBadPltrel) {
-  TestAllFormats(RelocationInfoObserverBadPltrelTest);
 }
 
 // The bad address, size, and alignment cases are all the same template code
 // paths for each table so we only test DT_REL to stand in for the rest.
 
-constexpr auto RelocationInfoObserverBadRelAddrTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelAddr) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
@@ -804,14 +770,10 @@ constexpr auto RelocationInfoObserverBadRelAddrTest = [](auto&& elf) {
   EXPECT_EQ(1u, info.rela_symbolic().size());
   EXPECT_EQ(3u, info.relr().size());
   std::visit([](const auto& table) { EXPECT_EQ(3u, table.size()); }, info.jmprel());
-};
-
-TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelAddr) {
-  TestAllFormats(RelocationInfoObserverBadRelAddrTest);
 }
 
-constexpr auto RelocationInfoObserverBadRelSzTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelSz) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
@@ -886,14 +848,10 @@ constexpr auto RelocationInfoObserverBadRelSzTest = [](auto&& elf) {
   EXPECT_EQ(1u, info.rela_symbolic().size());
   EXPECT_EQ(3u, info.relr().size());
   std::visit([](const auto& table) { EXPECT_EQ(3u, table.size()); }, info.jmprel());
-};
-
-TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelSz) {
-  TestAllFormats(RelocationInfoObserverBadRelSzTest);
 }
 
-constexpr auto RelocationInfoObserverBadRelSzAlignTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelSzAlign) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
@@ -969,10 +927,6 @@ constexpr auto RelocationInfoObserverBadRelSzAlignTest = [](auto&& elf) {
   EXPECT_EQ(1u, info.rela_symbolic().size());
   EXPECT_EQ(3u, info.relr().size());
   std::visit([](const auto& table) { EXPECT_EQ(3u, table.size()); }, info.jmprel());
-};
-
-TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelSzAlign) {
-  TestAllFormats(RelocationInfoObserverBadRelSzAlignTest);
 }
 
 // This synthesizes a memory image of symbol-related test data with known
@@ -1050,8 +1004,8 @@ class SymbolInfoTestImage {
   size_type gnu_hash_addr_ = 0;
 };
 
-constexpr auto SymbolInfoObserverEmptyTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverEmpty) {
+  using Elf = typename TestFixture::Elf;
   using Dyn = typename Elf::Dyn;
 
   TestDiagnostics diag;
@@ -1076,12 +1030,10 @@ constexpr auto SymbolInfoObserverEmptyTest = [](auto&& elf) {
   EXPECT_TRUE(info.soname().empty());
   EXPECT_FALSE(info.compat_hash());
   EXPECT_FALSE(info.gnu_hash());
-};
+}
 
-TEST(ElfldltlDynamicTests, SymbolInfoObserverEmpty) { TestAllFormats(SymbolInfoObserverEmptyTest); }
-
-constexpr auto SymbolInfoObserverFullValidTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverFullValid) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
@@ -1122,17 +1074,13 @@ constexpr auto SymbolInfoObserverFullValidTest = [](auto&& elf) {
   EXPECT_EQ(info.soname(), "libfoo.so");
   EXPECT_TRUE(info.compat_hash());
   EXPECT_TRUE(info.gnu_hash());
-};
-
-TEST(ElfldltlDynamicTests, SymbolInfoObserverFullValid) {
-  TestAllFormats(SymbolInfoObserverFullValidTest);
 }
 
 // We'll reuse that same image for the various error case tests.
 // These cases only differ in their PT_DYNAMIC contents.
 
-constexpr auto SymbolInfoObserverBadSonameOffsetTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSonameOffset) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
@@ -1166,14 +1114,10 @@ constexpr auto SymbolInfoObserverBadSonameOffsetTest = [](auto&& elf) {
   EXPECT_EQ(1u, diag.diag().errors());
   EXPECT_EQ(0u, diag.diag().warnings());
   EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
-};
-
-TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSonameOffset) {
-  TestAllFormats(SymbolInfoObserverBadSonameOffsetTest);
 }
 
-constexpr auto SymbolInfoObserverBadSymentTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSyment) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
@@ -1205,14 +1149,10 @@ constexpr auto SymbolInfoObserverBadSymentTest = [](auto&& elf) {
   EXPECT_EQ(1u, diag.diag().errors());
   EXPECT_EQ(0u, diag.diag().warnings());
   EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
-};
-
-TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSyment) {
-  TestAllFormats(SymbolInfoObserverBadSymentTest);
 }
 
-constexpr auto SymbolInfoObserverMissingStrszTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverMissingStrsz) {
+  using Elf = typename TestFixture::Elf;
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
 
@@ -1240,14 +1180,10 @@ constexpr auto SymbolInfoObserverMissingStrszTest = [](auto&& elf) {
   EXPECT_EQ(1u, diag.diag().errors());
   EXPECT_EQ(0u, diag.diag().warnings());
   EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
-};
-
-TEST(ElfldltlDynamicTests, SymbolInfoObserverMissingStrsz) {
-  TestAllFormats(SymbolInfoObserverMissingStrszTest);
 }
 
-constexpr auto SymbolInfoObserverMissingStrtabTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverMissingStrtab) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
@@ -1279,14 +1215,10 @@ constexpr auto SymbolInfoObserverMissingStrtabTest = [](auto&& elf) {
   EXPECT_EQ(1u, diag.diag().errors());
   EXPECT_EQ(0u, diag.diag().warnings());
   EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
-};
-
-TEST(ElfldltlDynamicTests, SymbolInfoObserverMissingStrtab) {
-  TestAllFormats(SymbolInfoObserverMissingStrtabTest);
 }
 
-constexpr auto SymbolInfoObserverBadStrtabAddrTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadStrtabAddr) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
@@ -1322,14 +1254,10 @@ constexpr auto SymbolInfoObserverBadStrtabAddrTest = [](auto&& elf) {
   EXPECT_EQ(1u, diag.diag().errors());
   EXPECT_EQ(0u, diag.diag().warnings());
   EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
-};
-
-TEST(ElfldltlDynamicTests, SymbolInfoObserverBadStrtabAddr) {
-  TestAllFormats(SymbolInfoObserverBadStrtabAddrTest);
 }
 
-constexpr auto SymbolInfoObserverBadSymtabAddrTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSymtabAddr) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
@@ -1369,14 +1297,10 @@ constexpr auto SymbolInfoObserverBadSymtabAddrTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.diag().errors());
   EXPECT_EQ(0u, diag.diag().warnings());
   EXPECT_EQ(0u, diag.errors().size()) << diag.ExplainErrors();
-};
-
-TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSymtabAddr) {
-  TestAllFormats(SymbolInfoObserverBadSymtabAddrTest);
 }
 
-constexpr auto SymbolInfoObserverBadSymtabAlignTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSymtabAlign) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
@@ -1415,14 +1339,10 @@ constexpr auto SymbolInfoObserverBadSymtabAlignTest = [](auto&& elf) {
   EXPECT_EQ(1u, diag.diag().errors());
   EXPECT_EQ(0u, diag.diag().warnings());
   EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
-};
-
-TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSymtabAlign) {
-  TestAllFormats(SymbolInfoObserverBadSymtabAlignTest);
 }
 
-constexpr auto SymbolInfoObserverBadHashAddrTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadHashAddr) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
@@ -1462,14 +1382,10 @@ constexpr auto SymbolInfoObserverBadHashAddrTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.diag().errors());
   EXPECT_EQ(0u, diag.diag().warnings());
   EXPECT_EQ(0u, diag.errors().size()) << diag.ExplainErrors();
-};
-
-TEST(ElfldltlDynamicTests, SymbolInfoObserverBadHashAddr) {
-  TestAllFormats(SymbolInfoObserverBadHashAddrTest);
 }
 
-constexpr auto SymbolInfoObserverBadHashAlignTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadHashAlign) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
@@ -1506,14 +1422,10 @@ constexpr auto SymbolInfoObserverBadHashAlignTest = [](auto&& elf) {
   EXPECT_EQ(1u, diag.diag().errors());
   EXPECT_EQ(0u, diag.diag().warnings());
   EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
-};
-
-TEST(ElfldltlDynamicTests, SymbolInfoObserverBadHashAlign) {
-  TestAllFormats(SymbolInfoObserverBadHashAlignTest);
 }
 
-constexpr auto SymbolInfoObserverBadGnuHashAddrTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadGnuHashAddr) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
@@ -1551,14 +1463,10 @@ constexpr auto SymbolInfoObserverBadGnuHashAddrTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.diag().errors());
   EXPECT_EQ(0u, diag.diag().warnings());
   EXPECT_EQ(0u, diag.errors().size()) << diag.ExplainErrors();
-};
-
-TEST(ElfldltlDynamicTests, SymbolInfoObserverBadGnuHashAddr) {
-  TestAllFormats(SymbolInfoObserverBadGnuHashAddrTest);
 }
 
-constexpr auto SymbolInfoObserverBadGnuHashAlignTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadGnuHashAlign) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
@@ -1593,10 +1501,6 @@ constexpr auto SymbolInfoObserverBadGnuHashAlignTest = [](auto&& elf) {
   EXPECT_EQ(1u, diag.diag().errors());
   EXPECT_EQ(0u, diag.diag().warnings());
   EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
-};
-
-TEST(ElfldltlDynamicTests, SymbolInfoObserverBadGnuHashAlign) {
-  TestAllFormats(SymbolInfoObserverBadGnuHashAlignTest);
 }
 
 template <typename Elf>
@@ -1607,8 +1511,8 @@ struct NotCalledSymbolInfo {
   }
 };
 
-constexpr auto ObserveNeededEmptyTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, ObserveNeededEmpty) {
+  using Elf = typename TestFixture::Elf;
 
   auto diag = ExpectOkDiagnostics();
 
@@ -1625,12 +1529,10 @@ constexpr auto ObserveNeededEmptyTest = [](auto&& elf) {
                                         ADD_FAILURE();
                                         return false;
                                       })));
-};
+}
 
-TEST(ElfldltlDynamicTests, ObserveNeededEmpty) { TestAllFormats(ObserveNeededEmptyTest); }
-
-constexpr auto ObserveNeededTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlDynamicTests, ObserveNeeded) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
 
   auto diag = ExpectOkDiagnostics();
@@ -1660,8 +1562,6 @@ constexpr auto ObserveNeededTest = [](auto&& elf) {
 
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, cpp20::span(dyn),
                                       elfldltl::DynamicNeededObserver(si, expect_next)));
-};
-
-TEST(ElfldltlDynamicTests, ObserveNeeded) { TestAllFormats(ObserveNeededTest); }
+}
 
 }  // namespace
