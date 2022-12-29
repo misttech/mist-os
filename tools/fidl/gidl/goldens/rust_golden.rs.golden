@@ -10,7 +10,11 @@ use {
     fidl_test_conformance as test_conformance,
     fuchsia_zircon_status::Status,
     fuchsia_zircon_types as zx_types,
-    gidl_util::{HandleDef, HandleSubtype, copy_handle, create_handles, decode_value, get_handle_koid, get_info_handle_valid, select_handle_infos, to_zx_handle_t, to_zx_handle_disposition_t},
+    gidl_util::{
+        HandleDef, HandleSubtype, copy_handle, create_handles, decode_value,
+        get_handle_koid, get_info_handle_valid, repeat, select_handle_infos,
+        select_raw_handle_infos, to_zx_handle_t, to_zx_handle_disposition_t,
+    },
 };
 
 const _V1_CONTEXT: &Context = &Context { wire_format_version: WireFormatVersion::V1 };
@@ -1487,6 +1491,35 @@ fn test_golden_nullable_handle_struct_null_v2_decode() {
     let value = &mut test_conformance::GoldenNullableHandleStruct::new_empty();
     Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
     assert_eq!(value, &test_conformance::GoldenNullableHandleStruct { v: None });
+}
+
+#[test]
+fn test_golden_table_unknown_dropped_v2_decode() {
+    let bytes = &[
+0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0xff,0xff,0xff,0xff,0x01,0x00,0x01,0x00,
+];
+    let handle_defs = create_handles(&[
+// #0
+HandleDef{
+	subtype: HandleSubtype::Event,
+	rights: Rights::from_bits(2147483648).unwrap(),
+},
+]);
+    let _handle_koids = handle_defs.iter().map(get_handle_koid).collect::<Vec<_>>();
+    let handle_infos = &mut select_handle_infos(&handle_defs, &[
+0,]);
+    let value = &mut test_conformance::GoldenTableStruct::new_empty();
+    Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
+    assert_eq!(value, &test_conformance::GoldenTableStruct { v: test_conformance::GoldenTable { ..test_conformance::GoldenTable::EMPTY } });
+    let unused_handles = select_raw_handle_infos(&handle_defs, &[
+0,]);
+    assert_eq!(
+        unused_handles.iter().map(get_info_handle_valid).collect::<Vec<_>>(),
+        repeat(Err(Status::BAD_HANDLE), unused_handles.len()),
+    );
 }
 
 

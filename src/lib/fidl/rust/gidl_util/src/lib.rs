@@ -40,13 +40,13 @@ pub struct HandleDef {
 /// the handles fails. The caller is responsible for closing the handles.
 pub fn create_handles(defs: &[HandleDef]) -> Vec<zx_types::zx_handle_info_t> {
     let mut factory: HandleFactory = Default::default();
-    let mut handles_infos = Vec::with_capacity(defs.len());
+    let mut handle_infos = Vec::with_capacity(defs.len());
     for def in defs {
         let default_rights_handle = match def.subtype {
             HandleSubtype::Event => factory.create_event().unwrap().into_handle(),
             HandleSubtype::Channel => factory.create_channel().unwrap().into_handle(),
         };
-        handles_infos.push(zx_types::zx_handle_info_t {
+        handle_infos.push(zx_types::zx_handle_info_t {
             handle: match def.rights {
                 Rights::SAME_RIGHTS => default_rights_handle,
                 rights => default_rights_handle.replace(rights).unwrap(),
@@ -57,7 +57,7 @@ pub fn create_handles(defs: &[HandleDef]) -> Vec<zx_types::zx_handle_info_t> {
             unused: 0,
         });
     }
-    handles_infos
+    handle_infos
 }
 
 /// HandleFactory creates handles. For handle subtypes that come in pairs, it
@@ -93,6 +93,14 @@ pub fn copy_handle<T: HandleBased>(handle_info: &zx_types::zx_handle_info_t) -> 
     // handles being double-closed if used incorrectly. GIDL-generated code
     // ensures that handles are only closed once.
     T::from_handle(unsafe { Handle::from_raw(handle_info.handle) })
+}
+
+/// Copies raw handles from the given indices to a new vector.
+pub fn select_raw_handle_infos(
+    handle_defs: &[zx_types::zx_handle_info_t],
+    indices: &[usize],
+) -> Vec<zx_types::zx_handle_info_t> {
+    indices.iter().map(|&i| handle_defs[i]).collect()
 }
 
 /// Copies raw handles from the given indices to a new vector of owned
@@ -184,6 +192,11 @@ pub fn get_info_handle_valid(handle_info: &zx_types::zx_handle_info_t) -> Result
     } else {
         Ok(())
     }
+}
+
+/// Returns a vector of `value` repeated `len` times.
+pub fn repeat<T: Clone>(value: T, len: usize) -> Vec<T> {
+    std::iter::repeat(value).take(len).collect::<Vec<_>>()
 }
 
 /// Decodes `T` from the given bytes and handles. Panics on failure.

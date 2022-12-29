@@ -36,7 +36,7 @@ type encodeSuccessCase struct {
 }
 
 type decodeSuccessCase struct {
-	Name, Context, HandleDefs, ValueType, ValueVar, Bytes, Handles, EqualityCheck string
+	Name, Context, HandleDefs, ValueType, ValueVar, Bytes, Handles, UnusedHandles, EqualityCheck string
 }
 
 type encodeFailureCase struct {
@@ -123,6 +123,10 @@ func decodeSuccessCases(gidlDecodeSuccesses []ir.DecodeSuccess, schema mixer.Sch
 			if !wireFormatSupported(encoding.WireFormat) {
 				continue
 			}
+			unusedHandles := ""
+			if h := ir.GetUnusedHandles(decodeSuccess.Value, encoding.Handles); len(h) != 0 {
+				unusedHandles = buildHandles(h)
+			}
 			decodeSuccessCases = append(decodeSuccessCases, decodeSuccessCase{
 				Name:          testCaseName(decodeSuccess.Name, encoding.WireFormat),
 				Context:       encodingContext(encoding.WireFormat),
@@ -131,6 +135,7 @@ func decodeSuccessCases(gidlDecodeSuccesses []ir.DecodeSuccess, schema mixer.Sch
 				ValueVar:      valueVar,
 				Bytes:         rust.BuildBytes(encoding.Bytes),
 				Handles:       buildHandles(encoding.Handles),
+				UnusedHandles: unusedHandles,
 				EqualityCheck: equalityCheck,
 			})
 		}

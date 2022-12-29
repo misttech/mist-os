@@ -854,6 +854,42 @@ ASSERT_FALSE(f1.v().is_valid());
 }
 #endif  // __Fuchsia__
 
+#ifdef __Fuchsia__
+TEST(Conformance, GoldenTableUnknownDropped_V2_Decode) {
+  const auto handle_defs = std::vector<zx_handle_info_t>{
+
+// #0
+zx_handle_info_t{
+	.handle = conformance_utils::CreateEvent(2147483648),
+	.type = ZX_OBJ_TYPE_EVENT,
+	.rights = 2147483648,
+	.unused = 0u,
+},
+};
+  std::vector<zx_koid_t> handle_koids;
+  for (zx_handle_info_t def : handle_defs) {
+    zx_info_handle_basic_t info;
+    ASSERT_OK(zx_object_get_info(def.handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+    handle_koids.push_back(info.koid);
+  }
+  auto bytes = std::vector<uint8_t>{
+0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0xff,0xff,0xff,0xff,0x01,0x00,0x01,0x00,
+};
+  auto handles = std::vector<zx_handle_info_t>{
+handle_defs[0],};
+  conformance_utils::DecodeSuccess<test_conformance::GoldenTableStruct>(
+    ::fidl::internal::WireFormatVersion::kV2, bytes, handles, [&](test_conformance::GoldenTableStruct& value) {
+    [[maybe_unused]] const auto& f1 = value;
+[[maybe_unused]] const auto& f2 = f1.v();
+ASSERT_FALSE(f2.v().has_value());
+
+  });
+}
+#endif  // __Fuchsia__
+
 
 
 TEST(Conformance, GoldenStringWithMaxSize2_V2_EncodeFailure) {

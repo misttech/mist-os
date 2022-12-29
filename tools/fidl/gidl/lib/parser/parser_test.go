@@ -880,6 +880,7 @@ func TestParseEncodeSuccessCase(t *testing.T) {
 		},
 		value = OneStringOfMaxLengthFive {
 			first: "four",
+			stuff: [#1, #0],
 		},
 		bytes = {
 			v1 = [
@@ -910,6 +911,12 @@ func TestParseEncodeSuccessCase(t *testing.T) {
 							Name: "first",
 						},
 						Value: "four",
+					},
+					{
+						Key: ir.FieldKey{
+							Name: "stuff",
+						},
+						Value: []ir.Value{ir.Handle(1), ir.Handle(0)},
 					},
 				},
 			},
@@ -951,7 +958,7 @@ func TestParseDecodeSuccessCase(t *testing.T) {
 				255, 255, 255, 255, 255, 255, 255, 255, // alloc present
 			],
 		},
-		handles = { v1 = [ #0 ] },
+		handles = { v1 = [ #0, #1 ] },
 		value = OneStringOfMaxLengthFive {
 			first: "four",
 			handle0: #0,
@@ -999,7 +1006,7 @@ func TestParseDecodeSuccessCase(t *testing.T) {
 					0, 0, 0, 0, 0, 0, 0, 0, // length
 					255, 255, 255, 255, 255, 255, 255, 255, // alloc present
 				},
-				Handles: []ir.Handle{0},
+				Handles: []ir.Handle{0, 1},
 			}},
 		}},
 	}

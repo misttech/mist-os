@@ -7,6 +7,7 @@ package parser
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 	"strings"
 	"text/scanner"
@@ -31,16 +32,23 @@ type Config struct {
 }
 
 type handleInfo struct {
-	defined       bool
-	usesInValue   int
+	// True if defined in the 'handle_defs' section.
+	defined bool
+	// Number of uses in the 'value' section.
+	usesInValue int
+	// Number of uses in the 'decode' function in the 'value' section. This
+	// number is included in usesInValue.
+	usesInValueDecodeFunction int
+	// Number of uses in the 'handles' or 'handle_dispositions' section.
 	usesInHandles int
 }
 
 func mergeHandleInfo(a, b handleInfo) handleInfo {
 	return handleInfo{
-		defined:       a.defined || b.defined,
-		usesInValue:   a.usesInValue + b.usesInValue,
-		usesInHandles: a.usesInHandles + b.usesInHandles,
+		defined:                   a.defined || b.defined,
+		usesInValue:               a.usesInValue + b.usesInValue,
+		usesInValueDecodeFunction: a.usesInValueDecodeFunction + b.usesInValueDecodeFunction,
+		usesInHandles:             a.usesInHandles + b.usesInHandles,
 	}
 }
 
@@ -201,18 +209,13 @@ func toIrEncodings(v []encodingData) []ir.Encoding {
 	var out []ir.Encoding
 	for _, e := range v {
 		if e.HandleDispositions != nil {
-			out = append(out, ir.Encoding{
-				WireFormat: e.WireFormat,
-				Bytes:      e.Bytes,
-				Handles:    ir.GetHandlesFromHandleDispositions(e.HandleDispositions),
-			})
-		} else {
-			out = append(out, ir.Encoding{
-				WireFormat: e.WireFormat,
-				Bytes:      e.Bytes,
-				Handles:    e.Handles,
-			})
+			panic("toIrEncodings should not be called when handle_dispositions is allowed")
 		}
+		out = append(out, ir.Encoding{
+			WireFormat: e.WireFormat,
+			Bytes:      e.Bytes,
+			Handles:    e.Handles,
+		})
 	}
 	return out
 }
@@ -312,6 +315,7 @@ type sectionMetadata struct {
 	requiredKinds map[bodyElement]struct{}
 	optionalKinds map[bodyElement]struct{}
 	allowed       allowedFeatures
+	mustUseHandle func(kind bodyElement, info handleInfo) bool
 	setter        func(name string, body body, all *ir.All)
 }
 
@@ -322,6 +326,9 @@ var sections = map[string]sectionMetadata{
 			isHandles: {}, isHandleDefs: {}, isBindingsAllowlist: {}, isBindingsDenylist: {},
 		},
 		allowed: allowedFeatures{},
+		mustUseHandle: func(kind bodyElement, info handleInfo) bool {
+			return kind == isValue || kind == isHandles
+		},
 		setter: func(name string, body body, all *ir.All) {
 			encodeSuccess := ir.EncodeSuccess{
 				Name:              name,
@@ -353,6 +360,18 @@ var sections = map[string]sectionMetadata{
 			handleDefRights: true,
 			decodeFunction:  true,
 		},
+		mustUseHandle: func(kind bodyElement, info handleInfo) bool {
+			switch kind {
+			case isValue:
+				return true
+			case isHandleDispositions:
+				// Generally input handles must appear in the output, but
+				// handles in the 'decode' function might have been discarded.
+				return info.usesInValueDecodeFunction == 0
+			default:
+				return false
+			}
+		},
 		setter: func(name string, body body, all *ir.All) {
 			result := ir.EncodeSuccess{
 				Name:              name,
@@ -375,6 +394,11 @@ var sections = map[string]sectionMetadata{
 			handleDefRights:  true,
 			restrictFunction: true,
 		},
+		mustUseHandle: func(kind bodyElement, info handleInfo) bool {
+			// All handles must appear in 'handles', but not necessarily in
+			// 'value', since they could be unknowns that are discarded.
+			return kind == isHandles
+		},
 		setter: func(name string, body body, all *ir.All) {
 			result := ir.DecodeSuccess{
 				Name:              name,
@@ -396,6 +420,9 @@ var sections = map[string]sectionMetadata{
 			handleDefRights: true,
 			decodeFunction:  true,
 		},
+		mustUseHandle: func(kind bodyElement, info handleInfo) bool {
+			return kind == isValue
+		},
 		setter: func(name string, body body, all *ir.All) {
 			result := ir.EncodeFailure{
 				Name:              name,
@@ -415,6 +442,9 @@ var sections = map[string]sectionMetadata{
 		},
 		allowed: allowedFeatures{
 			handleDefRights: true,
+		},
+		mustUseHandle: func(kind bodyElement, info handleInfo) bool {
+			return kind == isHandles
 		},
 		setter: func(name string, body body, all *ir.All) {
 			result := ir.DecodeFailure{
@@ -436,6 +466,9 @@ var sections = map[string]sectionMetadata{
 			isEnableSendEventBenchmark: {}, isEnableEchoCallBenchmark: {},
 		},
 		allowed: allowedFeatures{},
+		mustUseHandle: func(kind bodyElement, info handleInfo) bool {
+			return kind == isValue
+		},
 		setter: func(name string, body body, all *ir.All) {
 			benchmark := ir.Benchmark{
 				Name:                     name,
@@ -450,6 +483,12 @@ var sections = map[string]sectionMetadata{
 		},
 	},
 }
+
+type handleSlice []ir.Handle
+
+func (h handleSlice) Len() int           { return len(h) }
+func (h handleSlice) Less(i, j int) bool { return h[i] < h[j] }
+func (h handleSlice) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
 
 func (p *Parser) parseSection(all *ir.All) error {
 	section, name, err := p.parsePreamble()
@@ -468,7 +507,14 @@ func (p *Parser) parseSection(all *ir.All) error {
 	if err != nil {
 		return err
 	}
-	for h, info := range p.handles {
+	// Sort handles first so that errors are deterministic.
+	var handles []ir.Handle
+	for h := range p.handles {
+		handles = append(handles, h)
+	}
+	sort.Sort(handleSlice(handles))
+	for _, h := range handles {
+		info := p.handles[h]
 		if !info.defined {
 			return p.newParseError(bodyTok, "missing definition for handle #%d", h)
 		}
@@ -480,6 +526,15 @@ func (p *Parser) parseSection(all *ir.All) error {
 		}
 		if info.usesInValue == 0 && info.usesInHandles == 0 {
 			return p.newParseError(bodyTok, "unused handle #%d", h)
+		}
+		if section.mustUseHandle(isValue, info) && info.usesInValue == 0 {
+			return p.newParseError(bodyTok, "handle #%d does not occur in the 'value' section", h)
+		}
+		if section.mustUseHandle(isHandles, info) && info.usesInHandles == 0 {
+			return p.newParseError(bodyTok, "handle #%d does not occur in the 'handles' section", h)
+		}
+		if section.mustUseHandle(isHandleDispositions, info) && info.usesInHandles == 0 {
+			return p.newParseError(bodyTok, "handle #%d does not occur in the 'handle_dispositions' section", h)
 		}
 	}
 	p.handles = nil
@@ -1168,9 +1223,7 @@ func (p *Parser) parseByte() (byte, error) {
 func (p *Parser) parseHandleSection(scope scope) ([]encodingData, error) {
 	info := handleInfo{usesInHandles: 1}
 	if scope.inDecodeFunction {
-		// In `value = decode({type = Foo, handles = {v1 = [#0]}})`, treat
-		// the handle as occurring in 'value' rather than 'handles'.
-		info = handleInfo{usesInValue: 1}
+		info = handleInfo{usesInValue: 1, usesInValueDecodeFunction: 1}
 	}
 	var res []encodingData
 	err := p.parseWireFormatMapping(func(wireFormats []ir.WireFormat) error {

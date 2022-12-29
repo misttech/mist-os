@@ -937,6 +937,45 @@ TEST(Conformance, GoldenNullableHandleStructNull_V2_Decode) {
 }
 #endif  // __Fuchsia__
 
+#ifdef __Fuchsia__
+
+TEST(Conformance, GoldenTableUnknownDropped_V2_Decode) {
+  const std::vector<zx_handle_info_t> handle_defs = std::vector<zx_handle_info_t>{
+
+// #0
+zx_handle_info_t{
+	.handle = fidl::test::util::CreateEvent(2147483648),
+	.type = ZX_OBJ_TYPE_EVENT,
+	.rights = 2147483648,
+	.unused = 0u,
+},
+};
+  std::vector<zx_koid_t> handle_koids;
+  for (zx_handle_info_t def : handle_defs) {
+    zx_info_handle_basic_t info;
+    ASSERT_EQ(ZX_OK, zx_object_get_info(def.handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+    handle_koids.push_back(info.koid);
+  }
+  [[maybe_unused]] fidl::Arena<ZX_CHANNEL_MAX_MSG_BYTES> allocator;
+  auto bytes = std::vector<uint8_t>{
+0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0xff,0xff,0xff,0xff,0x01,0x00,0x01,0x00,
+};
+  auto handles = std::vector<zx_handle_info_t>{
+handle_defs[0],};
+  auto equality_check = [&](test_conformance::wire::GoldenTableStruct& actual) -> bool {
+    [[maybe_unused]] const auto& f1 = actual;
+[[maybe_unused]] const auto& f2 = f1.v;
+
+    return ((!f2.has_v()));
+  };
+  EXPECT_TRUE(llcpp_conformance_utils::DecodeSuccess<test_conformance::wire::GoldenTableStruct>(
+    ::fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles), std::move(equality_check)));
+}
+#endif  // __Fuchsia__
+
 
 
 TEST(Conformance, GoldenStringWithMaxSize2_V2_Encode_Failure) {

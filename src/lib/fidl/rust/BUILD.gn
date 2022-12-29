@@ -31,6 +31,13 @@ rustc_test("fidl_rust_conformance_tests_bin") {
   ]
   non_rust_deps = [ ":generate_conformance_test" ]
   sources = [ conformance_test_source ]
+  if (is_host) {
+    # We can't run tests in threads because they assert that handles are closed,
+    # which is racy when other threads are creating handles. See the comment on
+    # get_handle_info_valid in ./gidl_util/src/lib.rs for more details. We only
+    # need this on host because the test runner framework uses processes.
+    args = [ "--test-threads=1" ]
+  }
 }
 
 fuchsia_unittest_package("fidl_rust_conformance_tests") {
