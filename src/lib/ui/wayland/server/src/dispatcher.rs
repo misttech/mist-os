@@ -9,8 +9,8 @@ use {
         relative_pointer::*, seat::*, secure_output::*, shm::*, subcompositor::*, viewporter::*,
         xdg_shell::*,
     },
-    anyhow::Error,
-    fuchsia_zircon::{self as zx, HandleBased},
+    anyhow::{Error, Result},
+    fuchsia_zircon as zx,
     parking_lot::Mutex,
     std::io::Read,
     std::sync::Arc,
@@ -26,6 +26,18 @@ use {
     zwp_pointer_constraints_v1_server_protocol::ZwpPointerConstraintsV1,
     zwp_relative_pointer_v1_server_protocol::ZwpRelativePointerManagerV1,
 };
+
+/// Produces a VMO out of the contents of the file with the given filename.
+fn read_file_into_vmo(filename: &str) -> Result<zx::Vmo> {
+    let mut file = std::fs::File::open(filename)?;
+    let keymap_len = file.metadata()?.len();
+
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)?;
+    let vmo = zx::Vmo::create(keymap_len)?;
+    vmo.write(&buffer, 0)?;
+    Ok(vmo)
+}
 
 /// The main FIDL server that listens for incoming client connection
 /// requests.
@@ -65,20 +77,9 @@ impl WaylandDispatcher {
             Ok(Box::new(RequestDispatcher::new(output)))
         });
         {
-            let mut keymap_file = std::fs::File::open("/pkg/data/keymap.xkb")?;
-            let keymap_len = keymap_file.metadata()?.len();
-
-            let mut buffer = Vec::new();
-            keymap_file.read_to_end(&mut buffer)?;
-            let keymap_vmo = zx::Vmo::create(keymap_len)?;
-            keymap_vmo.write(&buffer, 0)?;
-
             registry.add_global(WlSeat, move |id, version, client| {
-                let seat = Seat::new(
-                    version,
-                    keymap_vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-                    keymap_len as u32,
-                );
+                let vmo = read_file_into_vmo("/pkg/data/keymap.xkb")?;
+                let seat = Seat::new(version, vmo);
                 seat.post_seat_info(id, version, client)?;
                 Ok(Box::new(RequestDispatcher::new(seat)))
             });

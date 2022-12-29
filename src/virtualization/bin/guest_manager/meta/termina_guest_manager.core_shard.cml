@@ -92,6 +92,14 @@
             source_availability: "unknown",
         },
         {
+            protocol: [ "fuchsia.input.wayland.Keymap" ],
+            from: "#ui",
+            to: "#termina-guest-manager",
+            dependency: "weak",
+            source_availability: "unknown",
+            availability: "optional",
+        },
+        {
             protocol: [
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",

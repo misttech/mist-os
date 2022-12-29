@@ -8,7 +8,7 @@ use {
     crate::display::Callback,
     crate::object::{NewObjectExt, ObjectRef, RequestReceiver},
     crate::scenic::{Flatland, FlatlandPtr},
-    anyhow::{format_err, Error},
+    anyhow::{format_err, Error, Result},
     async_utils::hanging_get::client::HangingGetStream,
     fidl::endpoints::{create_endpoints, create_proxy, create_request_stream, ServerEnd},
     fidl::prelude::*,
@@ -16,6 +16,7 @@ use {
         Annotation, AnnotationKey, AnnotationValue, ViewControllerMarker, ViewControllerProxy,
         ViewSpec,
     },
+    fidl_fuchsia_input_wayland::{KeymapMarker, KeymapProxy},
     fidl_fuchsia_math::{Rect, Size, SizeF},
     fidl_fuchsia_math::{SizeU, Vec_},
     fidl_fuchsia_ui_app::{ViewProviderControlHandle, ViewProviderMarker, ViewProviderRequest},
@@ -38,6 +39,7 @@ use {
     fuchsia_scenic::ViewRefPair,
     fuchsia_trace as ftrace, fuchsia_wayland_core as wl,
     fuchsia_wayland_core::Enum,
+    fuchsia_zircon::{self as zx, HandleBased},
     futures::prelude::*,
     parking_lot::Mutex,
     std::collections::VecDeque,
@@ -398,6 +400,55 @@ impl XdgSurface {
             }
             _ => {}
         }
+    }
+
+    /// Spawns a task that forwards notifications about keymap changes to all
+    /// attached keyboards.
+    fn spawn_keymap_listener(task_queue: TaskQueue) -> Result<()> {
+        let maybe_keymap_proxy = connect_to_protocol::<KeymapMarker>();
+
+        if let Ok(keymap_proxy) = maybe_keymap_proxy {
+            let mut hanging_get_stream = HangingGetStream::new(keymap_proxy, KeymapProxy::watch);
+
+            fasync::Task::local(async move {
+                loop {
+                    match hanging_get_stream.next().await {
+                        Some(Ok(keymap_vmo)) => {
+                            // Forward keymap information as a Wayland event.
+                            task_queue.post(move |client| {
+                                client.input_dispatcher.send_keymap_event(
+                                    keymap_vmo
+                                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                                        .expect("handle can be duplicated"),
+                                )
+                            });
+                        }
+
+                        Some(Err(e)) => {
+                            // Not fatal, but will cause the Wayland bridge to attempt to read
+                            // keymap updates no longer.
+                            eprintln!(
+                                "could not read keymap information, giving up on keymap: {:?}",
+                                &e
+                            );
+                            break;
+                        }
+
+                        // Should never happen since this stream will yield
+                        // indefinitely.
+                        None => unreachable!(),
+                    }
+                }
+            })
+            .detach();
+        } else {
+            // This is not fatal, but there will be no other keymap supported but the default.
+            eprintln!(
+                "no connection to fuchsia.input.wayland.Keymap, not listening to keymap changes"
+            );
+        }
+
+        Ok(())
     }
 
     fn spawn_keyboard_listener(
@@ -1293,6 +1344,7 @@ impl XdgToplevel {
                                     parent_viewport_watcher_request,
                                 )
                                 .expect("fidl error");
+                            XdgSurface::spawn_keymap_listener(task_queue.clone())?;
                             XdgSurface::spawn_keyboard_listener(
                                 surface_ref,
                                 view_ref,
@@ -1416,6 +1468,7 @@ impl XdgToplevel {
         let surface_ref = toplevel.surface_ref;
         let max_size = toplevel.max_size;
         let task_queue = client.task_queue();
+        XdgSurface::spawn_keymap_listener(task_queue.clone())?;
         XdgSurface::spawn_keyboard_listener(surface_ref, view_ref_dup2, task_queue.clone())?;
         XdgSurface::spawn_view_ref_focused_listener(
             xdg_surface_ref,

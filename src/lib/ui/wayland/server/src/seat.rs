@@ -7,7 +7,7 @@ use {
     crate::compositor::Surface,
     crate::object::{NewObjectExt, ObjectRef, ObjectRefSet, RequestReceiver},
     crate::relative_pointer::RelativePointer,
-    anyhow::Error,
+    anyhow::{Error, Result},
     fidl_fuchsia_ui_input3::{KeyEvent, KeyEventType},
     fidl_fuchsia_ui_pointer::EventPhase,
     fuchsia_trace as ftrace, fuchsia_wayland_core as wl,
@@ -141,13 +141,12 @@ pub fn usb_to_linux_keycode(usb_keycode: u32) -> u16 {
 pub struct Seat {
     client_version: u32,
     keymap: zx::Vmo,
-    keymap_len: u32,
 }
 
 impl Seat {
     /// Creates a new `Seat`.
-    pub fn new(client_version: u32, keymap: zx::Vmo, keymap_len: u32) -> Self {
-        Seat { client_version, keymap, keymap_len }
+    pub fn new(client_version: u32, vmo: zx::Vmo) -> Self {
+        Seat { client_version, keymap: vmo }
     }
 
     pub fn post_seat_info(
@@ -396,6 +395,28 @@ impl InputDispatcher {
             }
         }
         Ok(())
+    }
+
+    /// Dispatches a keymap change event to all attached keyboards.
+    pub fn send_keymap_event(&mut self, keymap_vmo: zx::Vmo) -> Result<()> {
+        ftrace::duration!("wayland", "InputDispatcher::send_keymap_event");
+        let clone_vmo = move || {
+            keymap_vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("handle can be duplicated")
+        };
+        self.keyboards.iter().try_for_each(|k| {
+            let vmo = clone_vmo();
+            let size_bytes = vmo.get_content_size().expect("size can be obtained for a VMO") as u32;
+            // Can this be Keyboard::post_keymap?
+            self.event_queue.post(
+                k.id(),
+                wl_keyboard::Event::Keymap {
+                    // The only format currently supported by Wayland.
+                    format: wl_keyboard::KeymapFormat::XkbV1,
+                    fd: vmo.into(),
+                    size: size_bytes,
+                },
+            )
+        })
     }
 
     fn update_keyboard_focus(
@@ -737,11 +758,13 @@ impl RequestReceiver<WlSeat> for Seat {
             }
             WlSeatRequest::GetKeyboard { id } => {
                 let keyboard = id.implement(client, Keyboard::new(this))?;
-                let (vmo, len) = {
+                let (vmo, len_bytes) = {
                     let this = this.get(client)?;
-                    (this.keymap.duplicate_handle(zx::Rights::SAME_RIGHTS)?, this.keymap_len)
+                    let vmo = this.keymap.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
+                    let len_bytes: u32 = vmo.get_content_size()?.try_into()?;
+                    (vmo, len_bytes)
                 };
-                Keyboard::post_keymap(keyboard, client, vmo.into(), len)?;
+                Keyboard::post_keymap(keyboard, client, vmo.into(), len_bytes)?;
                 client.input_dispatcher.add_keyboard_and_send_focus(keyboard)?;
             }
             WlSeatRequest::GetTouch { id } => {

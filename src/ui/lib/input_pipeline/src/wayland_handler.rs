@@ -7,7 +7,7 @@ use crate::{
     input_handler::UnhandledInputHandler,
     keyboard_binding::KeyboardEvent,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context as _, Result};
 use async_trait::async_trait;
 use async_utils::hanging_get::server::HangingGet;
 use fidl_fuchsia_input::KeymapId;
@@ -18,13 +18,16 @@ use fuchsia_zircon as zx;
 use futures::StreamExt;
 use keymaps;
 use std::cell::RefCell;
+use std::io::Read;
 use std::rc::Rc;
 
-pub type NotifyFn = Box<dyn Fn(&KeymapId, KeymapWatchResponder) -> bool + Send>;
+pub type NotifyFn = Box<dyn Fn(&KeymapId, KeymapWatchResponder) -> bool>;
 pub type KeymapGet = HangingGet<KeymapId, KeymapWatchResponder, NotifyFn>;
 
 /// Serves `fuchsia.input.wayland/Keymap`.
 pub struct WaylandHandler {
+    /// The last known used keymap.
+    keymap_id: RefCell<KeymapId>,
     /// Hanging get handler for propagating client keymap requests.
     hanging_get: RefCell<KeymapGet>,
 }
@@ -53,12 +56,44 @@ impl UnhandledInputHandler for WaylandHandler {
     }
 }
 
-fn keymap_update_fn() -> NotifyFn {
-    Box::new(|state, responder: KeymapWatchResponder| {
+/// A function that maybe produces new VMOs on each call.
+type VmoFactory = Box<dyn Fn(&KeymapId) -> Result<zx::Vmo>>;
+
+/// Produces a function that gets the VMO content from a file.
+fn default_vmo_factory() -> VmoFactory {
+    Box::new(move |keymap_id: &KeymapId| {
+        let filename = match keymap_id {
+            KeymapId::UsQwerty => "/pkg/data/keymap.xkb",
+            // This will be different files once we have multiple keymaps.
+            _ => "/pkg/data/keymap.xkb",
+        };
+        let mut file = std::fs::File::open(filename)
+            .with_context(|| format!("while opening: {:?}", filename))?;
+        let keymap_len = file
+            .metadata()
+            .with_context(|| format!("while getting metadata for: {:?}", filename))?
+            .len();
+
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer).with_context(|| format!("while reading: {:?}", filename))?;
+        let vmo = zx::Vmo::create(keymap_len)
+            .with_context(|| format!("while creating VMO from: {:?}", filename))?;
+        vmo.write(&buffer, 0)?;
+        Ok(vmo)
+    })
+}
+
+fn keymap_update_fn(vmo_factory: VmoFactory) -> NotifyFn {
+    Box::new(move |state: &KeymapId, responder: KeymapWatchResponder| {
         fx_log_debug!("new_state: {:?}", state);
 
-        // TODO(fxbug.dev/116283): Add something meaningful into this VMO.
-        let vmo = zx::Vmo::create(state.into_primitive() as u64).unwrap();
+        let vmo = match vmo_factory(state) {
+            Err(e) => {
+                fx_log_err!("could not load keymap: {:?}", &e);
+                return false;
+            }
+            Ok(vmo) => vmo,
+        };
 
         if let Err(e) = responder.send(vmo) {
             fx_log_err!(
@@ -76,8 +111,16 @@ fn keymap_update_fn() -> NotifyFn {
 impl WaylandHandler {
     /// Creates a new instance of [WaylandHandler].
     pub fn new() -> Rc<Self> {
+        WaylandHandler::new_with_get_vmo_factory(default_vmo_factory())
+    }
+
+    fn new_with_get_vmo_factory(vmo_factory: VmoFactory) -> Rc<Self> {
         Rc::new(Self {
-            hanging_get: RefCell::new(KeymapGet::new(KeymapId::UsQwerty, keymap_update_fn())),
+            keymap_id: RefCell::new(KeymapId::UsQwerty),
+            hanging_get: RefCell::new(KeymapGet::new(
+                KeymapId::UsQwerty,
+                keymap_update_fn(vmo_factory),
+            )),
         })
     }
 
@@ -90,7 +133,9 @@ impl WaylandHandler {
         trace_id: Option<fuchsia_trace::Id>,
     ) -> UnhandledInputEvent {
         let keymap_id = keymaps::into_keymap_id(&event.get_keymap().unwrap_or("".into()));
-        self.update_keymap(keymap_id);
+        if keymap_id != *self.keymap_id.borrow() {
+            self.update_keymap(keymap_id);
+        }
         UnhandledInputEvent {
             device_event: InputDeviceEvent::Keyboard(event),
             device_descriptor,
@@ -101,6 +146,7 @@ impl WaylandHandler {
 
     /// Set the keymap value to `keymap_id`.
     pub(crate) fn update_keymap(self: &Rc<Self>, keymap_id: KeymapId) {
+        *self.keymap_id.borrow_mut() = keymap_id;
         self.hanging_get.borrow().new_publisher().set(keymap_id);
     }
 
@@ -147,10 +193,36 @@ mod tests {
         }
     }
 
+    /// Produces a VMO which is sized according to the passed in state, as a
+    /// fake for tests.
+    fn fake_vmo_factory() -> VmoFactory {
+        Box::new(|state: &KeymapId| {
+            zx::Vmo::create(state.into_primitive() as u64).map_err(|e| e.into())
+        })
+    }
+
+    const KEYMAP_XKB_SIZE_BYTES: u64 = 43264;
+
+    // Tests actual loading of an existing keymap file. Loads it from storage, and
+    // compares VMO size to the file's known good size. This is a bit brittle, but
+    // keymap files seldom change. Assuming that's the case, checking the size is
+    // good enough.
+    #[fasync::run_singlethreaded(test)]
+    async fn get_magic_initial() {
+        let (proxy, stream) = endpoints::create_proxy_and_stream::<KeymapMarker>().unwrap();
+        let handler = WaylandHandler::new();
+        let _task = fasync::Task::local(handler.handle_keymap_watch_stream_fn(stream));
+
+        let keymap_vmo: zx::Vmo = proxy.watch().await.unwrap();
+        assert_eq!(keymap_vmo.get_content_size().unwrap(), KEYMAP_XKB_SIZE_BYTES);
+    }
+
+    // Tests initial hanging get notification by installing a fake update fn that
+    // will produce fake VMOs with sizes that correspond to the KeymapId enum values.
     #[fasync::run_singlethreaded(test)]
     async fn get_initial() {
         let (proxy, stream) = endpoints::create_proxy_and_stream::<KeymapMarker>().unwrap();
-        let handler = WaylandHandler::new();
+        let handler = WaylandHandler::new_with_get_vmo_factory(fake_vmo_factory());
         let _task = fasync::Task::local(handler.handle_keymap_watch_stream_fn(stream));
 
         let keymap_vmo: zx::Vmo = proxy.watch().await.unwrap();
@@ -160,10 +232,12 @@ mod tests {
         );
     }
 
+    // Same as above, except we force an update and test that our listener received the
+    // update.
     #[fasync::run_singlethreaded(test)]
     async fn get_modified() {
         let (proxy, stream) = endpoints::create_proxy_and_stream::<KeymapMarker>().unwrap();
-        let handler = WaylandHandler::new();
+        let handler = WaylandHandler::new_with_get_vmo_factory(fake_vmo_factory());
         let _task = fasync::Task::local(handler.handle_keymap_watch_stream_fn(stream));
 
         let event = get_unhandled_input_event(

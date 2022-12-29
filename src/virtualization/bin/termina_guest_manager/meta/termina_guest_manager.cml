@@ -55,6 +55,7 @@
         {
             protocol: [
                 "fuchsia.element.GraphicalPresenter",
+                "fuchsia.input.wayland.Keymap",
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.input3.Keyboard",

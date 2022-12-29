@@ -10,6 +10,7 @@ rustc_library("input_pipeline") {
   edition = "2021"
 
   deps = [
+    ":assets",
     ":input_pipeline_includes",
     "//sdk/fidl/fuchsia.factory:fuchsia.factory_rust",
     "//sdk/fidl/fuchsia.input:fuchsia.input_rust",
@@ -154,12 +155,20 @@ expect_includes("input_pipeline_includes") {
 }
 
 fuchsia_unittest_package("input_pipeline_lib_tests") {
-  deps = [ ":input_pipeline_test" ]
+  deps = [
+    ":assets",
+    ":input_pipeline_test",
+  ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
     }
   }
+}
+
+group("assets") {
+  # Ends up in /pkg/data/...
+  public_deps = [ "//src/lib/ui/wayland/server:keymap" ]
 }
 
 group("tests") {

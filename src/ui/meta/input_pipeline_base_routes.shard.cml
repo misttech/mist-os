@@ -49,6 +49,7 @@
             protocol: [
                 "fuchsia.input.injection.InputDeviceRegistry", // test-only
                 "fuchsia.input.interaction.Notifier",
+                "fuchsia.input.wayland.Keymap",
                 "fuchsia.recovery.policy.Device",
                 "fuchsia.recovery.ui.FactoryResetCountdown",
                 "fuchsia.ui.policy.DeviceListenerRegistry",

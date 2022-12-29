@@ -21,6 +21,11 @@
             ],
             availability: "optional",
         },
+        {
+            // Experimental updateable keymap support.
+            protocol: [ "fuchsia.input.wayland.Keymap" ],
+            availability: "optional",
+        },
     ],
     expose: [
         {
