@@ -21,7 +21,6 @@ use fidljson::{
 
 mod templates;
 use templates::markdown::MarkdownTemplate;
-use templates::syscall::SyscallTemplate;
 use templates::FidldocTemplate;
 
 static FIDLDOC_CONFIG_PATH: &str = "fidldoc.config.json";
@@ -35,14 +34,12 @@ static HEAD_VERSION_NUMBER: &'static u64 = &(u64::MAX - 1);
 #[derive(Debug)]
 enum TemplateType {
     Markdown,
-    Syscall,
     // Overtime, we'll want to add more rendering options such as HTML.
 }
 
 fn parse_template_type_str(value: &str) -> Result<TemplateType, String> {
     match &value.to_lowercase()[..] {
         "markdown" => Ok(TemplateType::Markdown),
-        "syscall" => Ok(TemplateType::Syscall),
         _ => Err("invalid template type".to_string()),
     }
 }
@@ -248,10 +245,6 @@ fn select_template<'a>(
             let template = MarkdownTemplate::new(&output_path);
             Box::new(template)
         }
-        TemplateType::Syscall => {
-            let template = SyscallTemplate::new(&output_path);
-            Box::new(template)
-        }
     };
     Ok(template)
 }
@@ -427,14 +420,11 @@ mod test {
         let path = PathBuf::new();
         let to_template = |template_type| select_template(&template_type, &path).unwrap();
 
-        let all_template_types = vec![TemplateType::Markdown, TemplateType::Syscall];
+        let all_template_types = vec![TemplateType::Markdown];
         for template_type in all_template_types {
             match template_type {
                 TemplateType::Markdown => {
                     assert_eq!(to_template(template_type).name(), "Markdown".to_string());
-                }
-                TemplateType::Syscall => {
-                    assert_eq!(to_template(template_type).name(), "Syscall".to_string());
                 }
             }
         }
