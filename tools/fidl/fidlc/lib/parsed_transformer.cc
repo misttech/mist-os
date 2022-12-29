@@ -10,6 +10,18 @@
 
 namespace fidl::fix {
 
+bool ParsedTransformer::Prepare() {
+  ZX_ASSERT(step() == Step::kNew);
+  NextStep();
+  BuildTransformStates();
+
+  if (HasErrors()) {
+    return false;
+  }
+  NextStep();
+  return true;
+}
+
 void ParsedTransformer::OnAliasDeclaration(const std::unique_ptr<raw::AliasDeclaration>& el) {
   VISIT_THEN_TRANSFORM_UNIQUE_PTR(AliasDeclaration, AliasDeclaration);
 }

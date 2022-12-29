@@ -23,7 +23,7 @@
 #include "tools/fidl/fidlc/include/fidl/token_list.h"
 #include "tools/fidl/fidlc/include/fidl/tree_visitor.h"
 
-// A macros containing the logic of calling any particular user-supplied |When*| function, which
+// A macro containing the logic of calling any particular user-supplied |When*| function, which
 // should be the same regardless of the particular |NodeKind| being visited.
 //
 // What's happening here:
@@ -508,21 +508,6 @@ class TokenPointerResolver : public raw::DeclarationOrderTreeVisitor {
   TokenSlice* token_slice_;
 };
 
-// Parse a source file. A return value of |nullptr| means that the parse failed, and that all the
-// interesting details will be found in the |reporter|.
-inline std::unique_ptr<raw::File> ParseSource(const SourceFile* source_file,
-                                              const fidl::ExperimentalFlags& experimental_flags,
-                                              Reporter* reporter) {
-  fidl::Lexer lexer(*source_file, reporter);
-  fidl::Parser parser(&lexer, reporter, experimental_flags);
-  std::unique_ptr<raw::File> ast = parser.Parse();
-  if (!parser.Success()) {
-    return nullptr;
-  }
-
-  return ast;
-}
-
 // Tracks the state of the transformation process for a single |SourceFile|.
 class FileTransformState {
  public:
@@ -637,10 +622,10 @@ class Transformer : public raw::DeclarationOrderTreeVisitor {
  public:
   Transformer(const std::vector<const SourceFile*>& source_files,
               const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter)
-      : source_files_(source_files),
+      : reporter_(reporter),
+        source_files_(source_files),
         experimental_flags_(experimental_flags),
-        reporter_was_already_silenced_(reporter->silence_fixables()),
-        reporter_(reporter) {
+        reporter_was_already_silenced_(reporter->silence_fixables()) {
     // No reporting of other fixable errors - we don't want one fixable error to derail to fixing of
     // another one.
     reporter_->set_silence_fixables(true);
@@ -651,57 +636,17 @@ class Transformer : public raw::DeclarationOrderTreeVisitor {
     }
   }
 
-  // This operation readies the passed in source files for transformation. Specifically, it parses
-  // each of them, and returns false if any (non-fixable) errors were reported during that process,
-  // indicating that the files have problems that need to be fixed before they can be run through
-  // a transformer.
-  //
-  // For each entry in the given |source_files| vector, create a corresponding |FileTransformState|
-  // to track transformation progress as we iterate over files. This will require parsing the source
-  // file twice: once to create an immutable raw AST to walk over, and a second time to make a
-  // mutable copy to transform.
-  bool Prepare() {
-    ZX_ASSERT(step_ == Step::kNew);
-    step_ = Step::kPreparing;
-
-    for (const auto* source_file : source_files_) {
-      std::unique_ptr<raw::File> immutable_raw_ast =
-          ParseSource(source_file, experimental_flags_, reporter_);
-      if (immutable_raw_ast == nullptr) {
-        AddError("could not parse input file " + std::string(source_file->filename()));
-        continue;
-      }
-
-      std::unique_ptr<raw::File> mutable_raw_ast =
-          ParseSource(source_file, experimental_flags_, reporter_);
-      ZX_ASSERT_MSG(mutable_raw_ast != nullptr,
-                    "should be impossible for second parse of same source to fail");
-
-      // We have two identical raw ASTs, derived from the same |SourceFile| in memory. We'll now
-      // walk the second one, turning it into a map that we may access from the first as we visit
-      // each of its nodes.
-      std::unique_ptr<MutableElementMap> maybe_mutable_element_map =
-          MutableElementMapGenerator().Produce(mutable_raw_ast);
-      ZX_ASSERT_MSG(maybe_mutable_element_map != nullptr, "could not map input file");
-
-      transform_states_.emplace_back(source_file, std::move(immutable_raw_ast),
-                                     std::move(mutable_raw_ast),
-                                     std::move(maybe_mutable_element_map));
-    }
-
-    if (HasErrors()) {
-      return false;
-    }
-    step_ = Step::kPrepared;
-    return true;
-  }
+  // Handles preparation (input parsing, map building, etc) for the specified transformer
+  // derivation. If any of these steps fail, it means that the inputs were incorrect (missing files,
+  // parse errors, etc).
+  virtual bool Prepare() = 0;
 
   // Performs the actual transformations, modifying the each raw AST + token list pair in sync to
   // properly reflect the new, post-transformation state. Must be followed by a call to |Format| to
   // take the now transformed data and re-print it back into source strings.
   bool Transform() {
     ZX_ASSERT(step_ == Step::kPrepared);
-    step_ = Step::kTransforming;
+    NextStep();
 
     for (auto& transforming : transform_states_) {
       auto ptr_list_location = CurrentlyTransforming().mutable_token_ptr_list->begin();
@@ -722,7 +667,7 @@ class Transformer : public raw::DeclarationOrderTreeVisitor {
     if (HasErrors()) {
       return false;
     }
-    step_ = Step::kTransformed;
+    NextStep();
     return true;
   }
 
@@ -735,7 +680,7 @@ class Transformer : public raw::DeclarationOrderTreeVisitor {
   // supplied to this class.
   std::optional<std::vector<std::string>> Format() {
     ZX_ASSERT(step_ == Step::kTransformed);
-    step_ = Step::kFormatting;
+    NextStep();
 
     std::vector<std::string> out;
     auto formatter = fmt::NewFormatter(100, reporter_);
@@ -776,7 +721,7 @@ class Transformer : public raw::DeclarationOrderTreeVisitor {
     if (HasErrors()) {
       return std::nullopt;
     }
-    step_ = Step::kSuccess;
+    NextStep();
     return out;
   }
 
@@ -802,6 +747,19 @@ class Transformer : public raw::DeclarationOrderTreeVisitor {
   virtual void WhenTypeDeclaration(raw::TypeDeclaration* element, TokenSlice&) {}
   virtual void WhenUsing(raw::Using* element, TokenSlice&) {}
 
+ private:
+  // Mutable internal state tracking the transformation as it progresses, made visible to
+  // intermediate derivations like |ParsedTransformer| and |CompiledTransformer| via "protected"
+  // accessors.
+  Reporter* reporter_;
+  Step step_ = Step::kNew;
+
+  // All of the methods in this "protected" block should be privatized in |ParsedTransformer| and
+  // |CompiledTransformer|, so that derivations of those classes no longer have access to them.
+ protected:
+  Reporter* reporter() { return reporter_; }
+  Step step() { return step_; }
+
   // User-visible function for reporting an error state during transformation. The transformer will
   // proceed as before, though no printing will occur.
   void AddError(const std::string& msg) {
@@ -809,6 +767,49 @@ class Transformer : public raw::DeclarationOrderTreeVisitor {
         .step = step_,
         .msg = msg,
     });
+  }
+
+  // This operation readies the passed in source files for transformation. Specifically, it parses
+  // each of them, and returns false if any (non-fixable) errors were reported during that process,
+  // indicating that the files have problems that need to be fixed before they can be run through
+  // a transformer.
+  //
+  // For each entry in the given |source_files| vector, create a corresponding |FileTransformState|
+  // to track transformation progress as we iterate over files. This will require parsing the source
+  // file twice: once to create an immutable raw AST to walk over, and a second time to make a
+  // mutable copy to transform.
+  bool BuildTransformStates() {
+    ZX_ASSERT(step_ == Step::kPreparing);
+
+    for (const auto* source_file : source_files_) {
+      std::unique_ptr<raw::File> immutable_raw_ast =
+          ParseSource(source_file, experimental_flags_, reporter());
+      if (immutable_raw_ast == nullptr) {
+        AddError("could not parse input file " + std::string(source_file->filename()));
+        continue;
+      }
+
+      std::unique_ptr<raw::File> mutable_raw_ast =
+          ParseSource(source_file, experimental_flags_, reporter());
+      ZX_ASSERT_MSG(mutable_raw_ast != nullptr,
+                    "should be impossible for second parse of same source to fail");
+
+      // We have two identical raw ASTs, derived from the same |SourceFile| in memory. We'll now
+      // walk the second one, turning it into a map that we may access from the first as we visit
+      // each of its nodes.
+      std::unique_ptr<MutableElementMap> maybe_mutable_element_map =
+          MutableElementMapGenerator().Produce(mutable_raw_ast);
+      ZX_ASSERT_MSG(maybe_mutable_element_map != nullptr, "could not map input file");
+
+      transform_states_.emplace_back(source_file, std::move(immutable_raw_ast),
+                                     std::move(mutable_raw_ast),
+                                     std::move(maybe_mutable_element_map));
+    }
+
+    if (HasErrors()) {
+      return false;
+    }
+    return true;
   }
 
   FileTransformState& CurrentlyTransforming() { return transform_states_[index_]; }
@@ -852,6 +853,53 @@ class Transformer : public raw::DeclarationOrderTreeVisitor {
   // are "resolved" properly (see the comment on |TokenPointerResolver| for more information).
   static TokenPointerResolver GetTokenPointerResolver(TokenSlice* token_slice) {
     return TokenPointerResolver(token_slice);
+  }
+
+  void NextStep() {
+    switch (step_) {
+      case Step::kNew: {
+        step_ = Step::kPreparing;
+        return;
+      }
+      case Step::kPreparing: {
+        step_ = Step::kPrepared;
+        return;
+      }
+      case Step::kPrepared: {
+        step_ = Step::kTransforming;
+        return;
+      }
+      case Step::kTransforming: {
+        step_ = Step::kTransformed;
+        return;
+      }
+      case Step::kTransformed: {
+        step_ = Step::kFormatting;
+        return;
+      }
+      case Step::kFormatting: {
+        step_ = Step::kSuccess;
+        return;
+      }
+      case Step::kSuccess:
+      case Step::kFailure:
+        ZX_PANIC("No next step after success/failure!");
+    }
+  }
+
+  // Parse a source file. A return value of |nullptr| means that the parse failed, and that all the
+  // interesting details will be found in the |reporter|.
+  static std::unique_ptr<raw::File> ParseSource(const SourceFile* source_file,
+                                                const fidl::ExperimentalFlags& experimental_flags,
+                                                Reporter* reporter) {
+    fidl::Lexer lexer(*source_file, reporter);
+    Parser parser(&lexer, reporter, experimental_flags);
+    std::unique_ptr<raw::File> ast = parser.Parse();
+    if (!parser.Success()) {
+      return nullptr;
+    }
+
+    return ast;
   }
 
   // Const parameters ingested at construction time.
@@ -927,10 +975,9 @@ class Transformer : public raw::DeclarationOrderTreeVisitor {
     raw::DeclarationOrderTreeVisitor::OnSourceElementStart(el);
   }
 
-  // Mutable internal state tracking the transformation as it progresses.
-  Reporter* reporter_;
+  // Mutable internal state tracking the transformation as it progresses, not visible to
+  // intermediate derivations.
   std::vector<FileTransformState> transform_states_;
-  Step step_ = Step::kNew;
   size_t index_ = 0;
   std::optional<TokenIterator> current_slice_ = std::nullopt;
   std::vector<std::unique_ptr<std::string>> data_stash_;
@@ -951,6 +998,17 @@ class ParsedTransformer : public Transformer {
   ParsedTransformer(const std::vector<const SourceFile*>& source_files,
                     const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter)
       : Transformer(source_files, experimental_flags, reporter) {}
+
+  // This operation readies the passed in source files for transformation. Specifically, it parses
+  // each of them, and returns false if any (non-fixable) errors were reported during that process,
+  // indicating that the files have problems that need to be fixed before they can be run through
+  // a transformer.
+  //
+  // For each entry in the given |source_files| vector, create a corresponding |FileTransformState|
+  // to track transformation progress as we iterate over files. This will require parsing the source
+  // file twice: once to create an immutable raw AST to walk over, and a second time to make a
+  // mutable copy to transform.
+  bool Prepare() final;
 
  protected:
   // Derivations of this class should override at least one of these noop methods to perform the
@@ -1030,13 +1088,15 @@ class ParsedTransformer : public Transformer {
 
   // Privatize some previously "protected" methods from the base class, so that derived classes
   // cannot access them.
-  //
-  // TODO(fxbug.dev/114357): make sure to also do this sort of privatization when creating the
-  // |CompiledTransformer|.
+  using Transformer::BuildTransformStates;
   using Transformer::CurrentlyTransforming;
   using Transformer::GetAsMutable;
   using Transformer::GetTokenPointerResolver;
   using Transformer::GetTokenSlice;
+  using Transformer::NextStep;
+  using Transformer::ParseSource;
+  using Transformer::reporter;
+  using Transformer::step;
 };
 
 }  // namespace fidl::fix

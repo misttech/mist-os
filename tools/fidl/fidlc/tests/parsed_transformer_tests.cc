@@ -28,12 +28,43 @@ void GoodTransform(const std::string& before, const std::string& after) {
   TestLibrary library(before);
   ExperimentalFlags experimental_flags;
   auto transformer = T(library.source_files(), experimental_flags, library.reporter());
-  EXPECT_TRUE(transformer.Prepare());
-  EXPECT_TRUE(transformer.Transform());
+  bool prepared = transformer.Prepare();
+  if (!prepared) {
+    for (const auto& error : transformer.GetErrors()) {
+      ADD_FAILURE("transformer failure: %s\n", error.msg.c_str());
+    }
+    for (const auto& error : library.reporter()->errors()) {
+      ADD_FAILURE("reported error: %s\n",
+                  error->Print(library.reporter()->program_invocation()).c_str());
+    }
+    for (const auto& warning : library.reporter()->errors()) {
+      ADD_FAILURE("reported warning: %s\n",
+                  warning->Print(library.reporter()->program_invocation()).c_str());
+    }
+  }
+  ASSERT_TRUE(prepared);
 
-  auto transformed = transformer.Format().value()[0];
+  bool transformed = transformer.Transform();
+  if (!transformed) {
+    for (const auto& error : transformer.GetErrors()) {
+      ADD_FAILURE("transformer failure: %s\n", error.msg.c_str());
+    }
+    for (const auto& error : library.reporter()->errors()) {
+      ADD_FAILURE("reported error: %s\n",
+                  error->Print(library.reporter()->program_invocation()).c_str());
+    }
+    for (const auto& warning : library.reporter()->errors()) {
+      ADD_FAILURE("reported warning: %s\n",
+                  warning->Print(library.reporter()->program_invocation()).c_str());
+    }
+  }
+  ASSERT_TRUE(transformed);
+
+  auto formatted = transformer.Format().value()[0];
   EXPECT_FALSE(transformer.HasErrors());
-  EXPECT_STREQ(transformed, after);
+  EXPECT_TRUE(library.reporter()->errors().empty());
+  EXPECT_TRUE(library.reporter()->warnings().empty());
+  EXPECT_STREQ(formatted, after);
 }
 
 // A transformer that does nothing.
