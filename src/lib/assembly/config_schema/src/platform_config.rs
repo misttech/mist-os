@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 pub mod development_support_config;
+pub mod diagnostics_config;
 pub mod identity_config;
 pub mod input_config;
 
@@ -51,6 +52,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for enabling developer support.
     #[serde(default)]
     pub development_support: Option<development_support_config::DevelopmentSupportConfig>,
+
+    /// Platform configuration options for the diagnostics area.
+    #[serde(default)]
+    pub diagnostics: Option<diagnostics_config::DiagnosticsConfig>,
 }
 
 /// The platform's base service level.

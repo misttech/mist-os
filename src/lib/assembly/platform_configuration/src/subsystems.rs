@@ -20,6 +20,7 @@ use prelude::*;
 
 mod console;
 mod development;
+mod diagnostics;
 mod example;
 mod identity;
 mod input;
@@ -133,6 +134,13 @@ pub fn define_configuration(
         &mut builder,
     )
     .context("Configuring the 'development' subsystem")?;
+
+    diagnostics::DiagnosticsSubsystem::define_configuration(
+        &context,
+        &config.platform.diagnostics,
+        &mut builder,
+    )
+    .context("Configuring the diagnostics subsystem")?;
 
     Ok(builder.build())
 }

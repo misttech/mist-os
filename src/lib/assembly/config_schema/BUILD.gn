@@ -32,6 +32,7 @@ rustc_library("config_schema") {
     "src/lib.rs",
     "src/platform_config.rs",
     "src/platform_config/development_support_config.rs",
+    "src/platform_config/diagnostics_config.rs",
     "src/platform_config/identity_config.rs",
     "src/platform_config/input_config.rs",
     "src/product_config.rs",

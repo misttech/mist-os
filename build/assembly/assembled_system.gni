@@ -376,6 +376,10 @@ template("assembled_system") {
       "omaha-client",
       "kernel_args_user",
       "kernel_args_userdebug",
+      "archivist-no-detect-service",
+      "archivist-no-service",
+      "archivist-bringup",
+      "archivist-minimal",
     ]
 
     # The names of all of the platform's 'testonly=true' Assembly Input Bundles
