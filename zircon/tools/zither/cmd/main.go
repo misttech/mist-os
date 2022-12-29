@@ -24,6 +24,7 @@ import (
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither/backends/legacy_syscall_cdecl"
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither/backends/rust"
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither/backends/rust_syscall"
+	"go.fuchsia.dev/fuchsia/zircon/tools/zither/backends/syscall_docs"
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither/backends/zircon_ifs"
 )
 
@@ -37,6 +38,7 @@ const (
 	legacySyscallCDeclBackend string = "legacy_syscall_cdecl"
 	rustSyscallBackend        string = "rust_syscall"
 	goRuntimeBackend          string = "go_runtime"
+	syscallDocsBackend        string = "syscall_docs"
 )
 
 var supportedBackends = []string{
@@ -49,6 +51,7 @@ var supportedBackends = []string{
 	legacySyscallCDeclBackend,
 	rustSyscallBackend,
 	goRuntimeBackend,
+	syscallDocsBackend,
 }
 
 // Flag values, grouped into a struct to be kept out of the global namespace.
@@ -104,6 +107,8 @@ func main() {
 		gen = rust_syscall.NewGenerator(f)
 	case goRuntimeBackend:
 		gen = go_runtime.NewGenerator(f)
+	case syscallDocsBackend:
+		gen = syscall_docs.NewGenerator(f)
 	default:
 		logger.Errorf(ctx, "unrecognized `-backend` value: %q", flags.backend)
 		os.Exit(1)

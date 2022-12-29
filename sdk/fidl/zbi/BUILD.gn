@@ -16,5 +16,5 @@ fidl("zbi") {
 zither_golden_files("sysroot_sdk") {
   fidl = ":zbi"
   backend = "c"
-  goldens = [ "//zircon/system/public/zircon/boot/driver-config.h" ]
+  sources = [ "//zircon/system/public/zircon/boot/driver-config.h" ]
 }

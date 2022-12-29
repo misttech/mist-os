@@ -95,9 +95,14 @@ func (d decl) GetName() fidlgen.Name {
 }
 
 func newDecl(d fidlgen.Decl) decl {
+	attrs := d.GetAttributes()
+	var comments []string
+	if !attrs.HasAttribute("no_doc") {
+		comments = attrs.DocComments()
+	}
 	return decl{
 		Name:     fidlgen.MustReadName(string(d.GetName())),
-		Comments: d.GetAttributes().DocComments(),
+		Comments: comments,
 	}
 }
 
@@ -129,9 +134,14 @@ func (m member) GetName() string {
 }
 
 func newMember(m fidlgen.Member) member {
+	attrs := m.GetAttributes()
+	var comments []string
+	if !attrs.HasAttribute("no_doc") {
+		comments = attrs.DocComments()
+	}
 	return member{
 		Name:     string(m.GetName()),
-		Comments: m.GetAttributes().DocComments(),
+		Comments: comments,
 	}
 }
 

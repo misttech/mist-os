@@ -21,6 +21,7 @@ supported_zither_backends = [
   "kernel",  # Internal kernel bindings.
   "rust_syscall",  # Thin Rust FFI syscall wrappers.
   "go_runtime",  # go.git source files for Fuchsia support.
+  "syscall_docs",  # Syscall documentation markdown.
 ]
 
 _clang_format = {
@@ -170,6 +171,12 @@ supported_zither_backend_info = {
     formatter = _gofmt
     _library_template = "_zither_go_runtime_sources"
   }
+
+  syscall_docs = {
+    output_subdir = {
+    }
+    _library_template = "_zither_syscall_docs"
+  }
 }
 
 # Internal Zither invocation helper template used by `zither_library()`.
@@ -235,7 +242,10 @@ template("_zither") {
       tool = "//zircon/tools/zither"
 
       inputs = [ fidl_ir_json ]
-      outputs = generated_files + [ output_manifest ]
+
+      # Ensure that outputs.json is first so that related template internals
+      # may readily access it.
+      outputs = [ output_manifest ] + generated_files
       args = [
         "-ir",
         rebase_path(fidl_ir_json, root_build_dir),
@@ -273,7 +283,7 @@ template("_zither") {
                                "visibility",
                              ])
 
-      script = "//zircon/tools/zither/testing/check-outputs.py"
+      script = "//zircon/tools/zither/scripts/check-outputs.py"
 
       # Stamp file.
       outputs = [ "$target_gen_dir/$output_check_target.stamp" ]
@@ -682,6 +692,45 @@ template("_zither_go_runtime_sources") {
       ":${zither_target}($default_toolchain)",
       ":${zither_target}.check($default_toolchain)",
     ]
+  }
+}
+
+template("_zither_syscall_docs") {
+  assert(invoker.backend == "syscall_docs")
+
+  main_target = target_name
+  zither_target = "$target_name.gen"
+
+  not_needed(invoker, [ "source_names" ])
+
+  _zither(zither_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                             "deps",
+                             "fidl_ir_json",
+                             "fidl_ir_target",
+                             "output_dir",
+                           ])
+    backend = "syscall_docs"
+
+    # The set of generated files is not statically known and is instead
+    # dynamically determined from zither's output manifest, outputs.json.
+    generated_files = []
+  }
+
+  group(main_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+
+    # We purposefully do not depend on
+    # ":${zither_target}.check($default_toolchain)" as we do not statically
+    # know the set of backend outputs in GN.
+    public_deps = [ ":${zither_target}($default_toolchain)" ]
   }
 }
 

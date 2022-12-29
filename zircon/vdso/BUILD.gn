@@ -92,7 +92,7 @@ fidl("zx") {
 zither_golden_files("ifs") {
   fidl = ":zx"
   backend = "zircon_ifs"
-  goldens = [ "//src/zircon/lib/zircon/zircon.ifs" ]
+  sources = [ "//src/zircon/lib/zircon/zircon.ifs" ]
 }
 
 # TODO(fxbug.dev/51002): Consumption of this header in assembly should be
@@ -101,7 +101,7 @@ zither_golden_files("ifs") {
 zither_golden_files("zx.asm.checked-in") {
   fidl = ":zx"
   backend = "asm"
-  goldens = [ "//zircon/system/public/zircon/errors.h" ]
+  sources = [ "//zircon/system/public/zircon/errors.h" ]
 }
 
 # Depended on by //zircon/public/sysroot/sdk:sysroot_sdk.
