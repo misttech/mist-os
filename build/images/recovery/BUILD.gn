@@ -83,6 +83,7 @@ if (is_fuchsia) {
     "//src/connectivity/wlan/wlanstack:wlanstack-core-shard",
     "//src/developer/build_info:build_info_core_shard",
     "//src/developer/forensics:core_shard",
+    "//src/diagnostics/persistence:core_shard",
     "//src/firmware/fastboot-tcp:fastboot-tcp-core-shard",
     "//src/firmware/fastboot-usb:fastboot-usb-core-shard",
     "//src/recovery/factory_reset:factory_reset_core_shard",

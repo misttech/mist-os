@@ -87,10 +87,6 @@
             url: "fuchsia-pkg://fuchsia.com/cobalt#meta/cobalt.cm",
         },
         {
-            name: "diagnostics-persistence",
-            url: "fuchsia-pkg://fuchsia.com/diagnostics-persistence#meta/diagnostics-persistence.cm",
-        },
-        {
             name: "starnix_manager",
             url: "fuchsia-pkg://fuchsia.com/starnix#meta/starnix_manager.cm",
             environment: "#core-env",
@@ -170,6 +166,12 @@
         // unrestricted-storage.core_shard.cml
     ],
     offer: [
+        {
+            protocol: [ "fuchsia.diagnostics.persist.DataPersistence-netstack" ],
+            from: "#diagnostics-persistence",
+            to: "#network",
+            source_availability: "unknown",
+        },
         {
             protocol: [ "fuchsia.kernel.DebugResource" ],
             from: "parent",
@@ -311,16 +313,6 @@
             subdir: "pkg-resolver",
         },
         {
-            protocol: [ "fuchsia.diagnostics.FeedbackArchiveAccessor" ],
-            from: "parent",
-            to: [ "#diagnostics-persistence" ],
-        },
-        {
-            protocol: [ "fuchsia.diagnostics.persist.DataPersistence-netstack" ],
-            from: "#diagnostics-persistence",
-            to: "#network",
-        },
-        {
             protocol: "fuchsia.hardware.pty.Device",
             from: "parent",
             to: "#debug-dash-launcher",
@@ -407,12 +399,6 @@
             from: "parent",
             to: "#font_provider",
             subdir: "fonts",
-        },
-        {
-            directory: "config-data",
-            from: "parent",
-            to: "#diagnostics-persistence",
-            subdir: "diagnostics-persistence",
         },
         {
             protocol: "fuchsia.kernel.Stats",
@@ -539,11 +525,6 @@
             storage: [ "cache" ],
             from: "self",
             to: "#regulatory_region",
-        },
-        {
-            storage: "cache",
-            from: "self",
-            to: "#diagnostics-persistence",
         },
         {
             protocol: [ "fuchsia.vulkan.loader.Loader" ],
@@ -724,11 +705,6 @@
         {
             protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
             from: "#cobalt",
-        },
-        {
-            protocol: [ "fuchsia.component.Binder" ],
-            from: "#diagnostics-persistence",
-            as: "fuchsia.component.PersistenceBinder",
         },
         {
             protocol: [
