@@ -25,6 +25,13 @@ std::filesystem::path GetTestDataPath(std::string_view filename);
 // Get an open fd specifically on a test DSO file.
 fbl::unique_fd GetTestLib(std::string_view libname);
 
+using AllFormatsTypedTest = elfldltl::AllFormats<::testing::Types>;
+
+template <class ElfLayout>
+struct FormatTypedTest : public testing::Test {
+  using Elf = ElfLayout;
+};
+
 template <class... Elf>
 struct TestAllFormatsHelper {
   template <typename Test>

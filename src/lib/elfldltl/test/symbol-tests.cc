@@ -8,8 +8,6 @@
 #include <set>
 #include <vector>
 
-#include <gtest/gtest.h>
-
 namespace {
 
 constexpr std::string_view kEmpty{};
@@ -19,6 +17,11 @@ constexpr uint32_t kEmptyGnuHash = 5381;
 
 constexpr uint32_t kFoobarCompatHash = 0x06d65882;
 constexpr uint32_t kFoobarGnuHash = 0xfde460be;
+
+template <class Elf>
+using ElfldltlSymbolTests = FormatTypedTest<Elf>;
+
+TYPED_TEST_SUITE(ElfldltlSymbolTests, AllFormatsTypedTest);
 
 TEST(ElfldltlSymbolTests, CompatHash) {
   EXPECT_EQ(kEmptyCompatHash, elfldltl::SymbolName(kEmpty).compat_hash());
@@ -36,34 +39,28 @@ TEST(ElfldltlSymbolTests, GnuHash) {
 static_assert(kEmptySymbol.gnu_hash() == kEmptyGnuHash);
 static_assert(kFoobarSymbol.gnu_hash() == kFoobarGnuHash);
 
-constexpr auto CompatHashSize = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlSymbolTests, CompatHashSize) {
+  using Elf = typename TestFixture::Elf;
 
   elfldltl::SymbolInfo<Elf> si;
   kTestSymbols<Elf>.SetInfo(si);
   si.set_compat_hash(kTestCompatHash<typename Elf::Word>);
 
   EXPECT_EQ(si.safe_symtab().size(), kTestSymbolCount);
-};
-
-TEST(ElfldltlSymbolTests, CompatHashSize) {
-  ASSERT_NO_FATAL_FAILURE(TestAllFormats(CompatHashSize));
 }
 
-constexpr auto GnuHashSize = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlSymbolTests, GnuHashSize) {
+  using Elf = typename TestFixture::Elf;
 
   elfldltl::SymbolInfo<Elf> si;
   kTestSymbols<Elf>.SetInfo(si);
   si.set_gnu_hash(kTestGnuHash<typename Elf::Addr>);
 
   EXPECT_EQ(si.safe_symtab().size(), kTestSymbolCount);
-};
+}
 
-TEST(ElfldltlSymbolTests, GnuHashSize) { ASSERT_NO_FATAL_FAILURE(TestAllFormats(GnuHashSize)); }
-
-constexpr auto LookupCompatHash = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlSymbolTests, LookupCompatHash) {
+  using Elf = typename TestFixture::Elf;
 
   elfldltl::SymbolInfo<Elf> si;
   kTestSymbols<Elf>.SetInfo(si);
@@ -84,14 +81,10 @@ constexpr auto LookupCompatHash = [](auto&& elf) {
   const auto* foobar = kFoobarSymbol.Lookup(si);
   ASSERT_NE(foobar, nullptr);
   EXPECT_EQ(foobar->value(), 3u);
-};
-
-TEST(ElfldltlSymbolTests, LookupCompatHash) {
-  ASSERT_NO_FATAL_FAILURE(TestAllFormats(LookupCompatHash));
 }
 
-constexpr auto LookupGnuHash = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlSymbolTests, LookupGnuHash) {
+  using Elf = typename TestFixture::Elf;
 
   elfldltl::SymbolInfo<Elf> si;
   kTestSymbols<Elf>.SetInfo(si);
@@ -112,9 +105,7 @@ constexpr auto LookupGnuHash = [](auto&& elf) {
   const auto* foobar = kFoobarSymbol.Lookup(si);
   ASSERT_NE(foobar, nullptr);
   EXPECT_EQ(foobar->value(), 3u);
-};
-
-TEST(ElfldltlSymbolTests, LookupGnuHash) { ASSERT_NO_FATAL_FAILURE(TestAllFormats(LookupGnuHash)); }
+}
 
 // The enumeration tests use the same symbol table with both flavors of hash
 // table.
@@ -143,9 +134,8 @@ struct GnuHash {
   };
 };
 
-template <template <class Elf> class HashTable>
-constexpr auto EnumerateHashTable = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+template <class Elf, template <class ElfLayout> class HashTable>
+void EnumerateHashTable() {
   using HashBucket =
       typename elfldltl::SymbolInfo<Elf>::template HashBucket<typename HashTable<Elf>::Table>;
 
@@ -171,14 +161,14 @@ constexpr auto EnumerateHashTable = [](auto&& elf) {
   for (size_t i = 0; i < sorted_names.size(); ++i) {
     EXPECT_EQ(sorted_names[i], HashTable<Elf>::kNames[i]);
   }
-};
-
-TEST(ElfldltlSymbolTests, EnumerateCompatHash) {
-  ASSERT_NO_FATAL_FAILURE(TestAllFormats(EnumerateHashTable<CompatHash>));
 }
 
-TEST(ElfldltlSymbolTests, EnumerateGnuHash) {
-  ASSERT_NO_FATAL_FAILURE(TestAllFormats(EnumerateHashTable<GnuHash>));
+TYPED_TEST(ElfldltlSymbolTests, EnumerateCompatHash) {
+  EnumerateHashTable<typename TestFixture::Elf, CompatHash>();
+}
+
+TYPED_TEST(ElfldltlSymbolTests, EnumerateGnuHash) {
+  EnumerateHashTable<typename TestFixture::Elf, GnuHash>();
 }
 
 }  // namespace
